@@ -11,11 +11,12 @@ from .lib.config import Configuration
 from .lib.enums import GraphType, HPRcycle, StreamType, TargetType, ZoneType
 from .lib.schemas.io import (
     StreamSchema,
+    StreamSegmentSchema,
     TargetInput,
     TargetOutput,
+    TemperatureHeatPointSchema,
+    TemperatureHeatProfileSchema,
     UtilitySchema,
-    VisualiseInput,
-    VisualiseOutput,
     ZoneTreeSchema,
 )
 from .lib.schemas.reporting import GraphAvailability, ProblemReport, ReportMetric
@@ -58,15 +59,16 @@ __all__ = [
     "ReportMetric",
     "SampleCaseMetadata",
     "StreamSchema",
+    "StreamSegmentSchema",
     "StreamType",
     "TargetInput",
     "TargetOutput",
     "TargetType",
     "UtilitySchema",
+    "TemperatureHeatPointSchema",
+    "TemperatureHeatProfileSchema",
     "ValidationIssue",
     "ValidationReport",
-    "VisualiseInput",
-    "VisualiseOutput",
     "ZoneTreeSchema",
     "ZoneType",
     "config_options",

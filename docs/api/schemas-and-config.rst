@@ -66,6 +66,18 @@ Input and Output Schemas
    :members:
    :no-index:
 
+.. autoclass:: OpenPinch.lib.schemas.io.StreamSegmentSchema
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.lib.schemas.io.TemperatureHeatPointSchema
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.lib.schemas.io.TemperatureHeatProfileSchema
+   :members:
+   :no-index:
+
 .. autoclass:: OpenPinch.lib.schemas.io.UtilitySchema
    :members:
    :no-index:
@@ -78,7 +90,7 @@ Heat Exchanger Network Design Results
 -------------------------------------
 
 ``TargetOutput.design`` stores a
-:class:`~OpenPinch.lib.schemas.synthesis.HeatExchangerNetworkSynthesisResult`
+:class:`~OpenPinch.lib.schemas.synthesis.result.HeatExchangerNetworkSynthesisResult`
 after ``problem.design.enhanced_synthesis_method(quality_tier=...)``,
 ``problem.design.open_hens_method()``,
 ``problem.design.heat_exchanger_network_synthesis()``, or one of the direct
@@ -104,7 +116,7 @@ default of tier 1 for prepared-problem workflows. User code should prefer
 ``problem.design.enhanced_synthesis_method(quality_tier=...)`` for method-level
 tier selection because it applies a call-local override without mutating the
 loaded problem configuration. Runtime ``options`` passed to design accessors are
-reserved for runtime state and do not accept persistent ``HENS_*`` overrides.
+reserved for runtime context and do not accept persistent ``HENS_*`` overrides.
 
 Method-level inputs and outputs are also Pydantic models. Their shared input
 contract contains run/problem metadata, settings, optional seed network,
@@ -122,25 +134,28 @@ network at ``problem.design.network``:
 ``utility(name)``.
 
 Grid diagrams for the selected network are created with
-``design.network.build_grid_diagram(...)``. The standalone
+``design.network.build_grid_diagram(period_id=...)``. The standalone
 :func:`OpenPinch.services.network_grid_diagram.build_grid_diagram` service still
 accepts one or more
 :class:`~OpenPinch.classes.heat_exchanger_network.HeatExchangerNetwork`
 objects, and
-``design.grid_diagram(solution_rank=...)`` remains available as a convenience
-wrapper that selects a ranked network first. The returned object wraps the
+``design.grid_diagram(solution_rank=..., period_id=...)`` remains available as
+a convenience wrapper that selects a ranked network first. Multiperiod networks
+require an explicit period for duties, temperatures, diagrams, exports, and
+controllability; omission is accepted only for a single-period network. The
+returned object wraps the
 Plotly ``fig``, a lightweight drawing adapter ``ax``, the selected ``network``,
 and the normalized ``grid_model`` used to draw the topology.
 
-.. autoclass:: OpenPinch.lib.schemas.synthesis.HeatExchangerNetworkSynthesisResult
+.. autoclass:: OpenPinch.lib.schemas.synthesis.result.HeatExchangerNetworkSynthesisResult
    :members:
    :no-index:
 
-.. autoclass:: OpenPinch.lib.schemas.synthesis.HeatExchangerNetworkSynthesisMethodInput
+.. autoclass:: OpenPinch.lib.schemas.synthesis.method.HeatExchangerNetworkSynthesisMethodInput
    :members:
    :no-index:
 
-.. autoclass:: OpenPinch.lib.schemas.synthesis.HeatExchangerNetworkSynthesisMethodOutput
+.. autoclass:: OpenPinch.lib.schemas.synthesis.method.HeatExchangerNetworkSynthesisMethodOutput
    :members:
    :no-index:
 

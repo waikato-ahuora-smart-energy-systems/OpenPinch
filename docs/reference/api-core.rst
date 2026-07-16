@@ -87,16 +87,9 @@ modules.
 - :func:`~OpenPinch.main.pinch_analysis_service` validates the incoming input data,
   prepares the zone hierarchy, runs the appropriate direct and indirect
   targeting steps, and returns a structured response.
-- :func:`~OpenPinch.classes._problem.run_targeting_for_zone_and_subzones` accepts an already prepared
-  :class:`~OpenPinch.classes.zone.Zone` tree and dispatches it to the correct
-  zone-level targeting routine.
-- :func:`~OpenPinch.classes._problem.extract_results` converts the solved in-memory zone
-  hierarchy into the dictionary structure consumed by
-  :class:`~OpenPinch.lib.schemas.io.TargetOutput`.
 
-.. autofunction:: OpenPinch.classes._problem.run_targeting_for_zone_and_subzones
-
-.. autofunction:: OpenPinch.classes._problem.extract_results
+Private dispatch and result-extraction helpers support the public problem and
+service entry points but are not documented as stable user interfaces.
 
 .. automodule:: OpenPinch.main
    :no-members:
@@ -150,12 +143,16 @@ Simulated-cycle targets also expose annualized cost fields:
 ``hpr_annualized_capital_cost``, ``hpr_total_annualized_cost``,
 ``hpr_compressor_capital_cost``, and
 ``hpr_heat_exchanger_capital_cost``.
-For stateful input data, the same named entry points also accept
-``state_id=...`` and the refreshed summaries, exports, and graph metadata carry
-that selected state context forward.
+For multiperiod input data, the same named entry points also accept
+``period_id=...`` and the refreshed summaries, exports, and graph metadata carry
+that selected period context forward. Weighted HPR summaries average operating
+fields, retain maximum capital fields, and recompute total annualized cost from
+weighted operating cost plus maximum annualized capital. Per-period summary
+replay uses fresh copies of one baseline zone and restores the original problem
+state on both success and failure.
 
 The ``problem.add_component.*`` accessor is different: it mutates the prepared
 stream model before targeting. The direct process MVR component deactivates
 selected source streams, activates generated compressed-vapour replacement
-streams, stores per-state stage results, and contributes process-component
+streams, stores per-period stage results, and contributes process-component
 work to later target summaries.

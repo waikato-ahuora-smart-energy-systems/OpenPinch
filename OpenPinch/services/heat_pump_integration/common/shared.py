@@ -8,13 +8,16 @@ import numpy as np
 from CoolProp.CoolProp import PropsSI
 
 from ....classes.stream_collection import StreamCollection
+from ....classes.value import Value
 from ....lib.config import tol
 from ....lib.enums import PT
 from ....lib.schemas.hpr import (
     HeatPumpTargetInputs,
     HPRBackendResult,
     HPRParsedState,
+    HPRPeriodCase,
     HPRThermoArtifacts,
+    MultiPeriodHPRTargetInputs,
     SimulatedHPRAnnualizedCostAccounting,
 )
 from ....utils.blackbox_minimisers import multiminima
@@ -41,6 +44,7 @@ from ._shared.streams import (
 __all__ = [
     "PropsSI",
     "solve_hpr_placement",
+    "solve_hpr_multiperiod_placement",
     "compute_entropic_mean_temperature",
     "calc_carnot_heat_pump_cop",
     "calc_carnot_heat_engine_eta",
@@ -130,23 +134,332 @@ def solve_hpr_placement(
     )
 
 
+def solve_hpr_multiperiod_placement(
+    f_obj: Callable,
+    x0_ls: list | float,
+    bnds: list,
+    args: MultiPeriodHPRTargetInputs,
+) -> HPRBackendResult:
+    """Optimise one shared HPR vector against all prepared period cases."""
+    x0_arr = _verify_x0_ls(x0_ls)
+
+    def multiperiod_objective(
+        x: np.ndarray,
+        mp_args: MultiPeriodHPRTargetInputs,
+        *,
+        debug: bool = False,
+    ) -> HPRBackendResult:
+        return _compute_multiperiod_hpr_candidate(f_obj, x, mp_args, debug=debug)
+
+    try:
+        local_minima_x, local_minima_f = multiminima(
+            func=multiperiod_objective,
+            func_kwargs=args,
+            x0_ls=x0_arr,
+            bounds=bnds,
+            optimiser_handle=args.bb_minimiser,
+            opt_kwargs={"n_runs": max(1, int(args.max_multi_start))},
+        )
+    except Exception as exc:
+        if x0_arr is None or x0_arr.size == 0:
+            raise ValueError(
+                "Multi-period heat pump and refrigeration targeting "
+                f"({args.hpr_type}) failed during optimisation and has no "
+                "initial candidate fallback."
+            ) from exc
+        local_minima_x, local_minima_f = np.asarray([]), np.asarray([])
+
+    candidate_x, candidate_f = _merge_candidate_points(
+        local_minima_x=local_minima_x,
+        local_minima_f=local_minima_f,
+        x0_arr=x0_arr,
+        f_obj=multiperiod_objective,
+        args=args,
+    )
+    if candidate_x.size == 0:
+        raise ValueError(
+            "Multi-period heat pump and refrigeration targeting "
+            f"({args.hpr_type}) failed to return any local minima."
+        )
+
+    selected_case = _selected_multiperiod_case(args)
+    for candidate_idx in np.argsort(candidate_f):
+        result = _evaluate_hpr_candidate(
+            multiperiod_objective,
+            candidate_x[candidate_idx],
+            args,
+        )
+        if result.success and np.isfinite(float(result.obj)):
+            return result.with_updates(
+                success=True,
+                amb_streams=get_ambient_air_stream(
+                    result.Q_amb_hot,
+                    result.Q_amb_cold,
+                    selected_case.args,
+                ),
+            )
+
+    raise ValueError(
+        "Multi-period heat pump and refrigeration targeting "
+        f"({args.hpr_type}) failed to return an optimal result."
+    )
+
+
+def _selected_multiperiod_case(
+    args: MultiPeriodHPRTargetInputs,
+) -> HPRPeriodCase:
+    for case in args.period_cases:
+        if str(case.period_id) == str(args.selected_period_id):
+            return case
+    for case in args.period_cases:
+        if int(case.period_idx) == int(args.selected_period_idx):
+            return case
+    raise ValueError(
+        "Selected period is not present in the prepared multi-period HPR cases."
+    )
+
+
+def _compute_multiperiod_hpr_candidate(
+    f_obj: Callable,
+    x: np.ndarray,
+    args: MultiPeriodHPRTargetInputs,
+    *,
+    debug: bool = False,
+) -> HPRBackendResult:
+    if not args.period_cases:
+        return HPRBackendResult.failure(reason="No period cases were prepared.")
+
+    period_outputs: dict[str, HPRBackendResult] = {}
+    for case in args.period_cases:
+        try:
+            result = f_obj(x, case.args, debug=debug)
+        except Exception as exc:
+            return HPRBackendResult.failure(
+                reason=f"HPR period {case.period_id!r} failed: {exc}"
+            )
+        if not isinstance(result, HPRBackendResult):
+            raise TypeError(
+                "Heat pump and refrigeration objective functions must return "
+                "HPRBackendResult."
+            )
+        if not result.success or not np.isfinite(float(result.obj)):
+            reason = result.failure_reason or "candidate failed"
+            return HPRBackendResult.failure(
+                reason=f"HPR period {case.period_id!r} failed: {reason}",
+                Q_amb_hot=result.Q_amb_hot,
+                Q_amb_cold=result.Q_amb_cold,
+            )
+        period_outputs[str(case.period_id)] = result
+
+    weights = np.asarray([case.weight for case in args.period_cases], dtype=float)
+    if not np.isfinite(weights).all() or float(weights.sum()) <= 0.0:
+        return HPRBackendResult.failure(reason="Period weights must be finite.")
+
+    selected = period_outputs[str(_selected_multiperiod_case(args).period_id)]
+    weighted = _weighted_hpr_backend_result(period_outputs, weights)
+    try:
+        shared_objective = _shared_hpr_candidate_objective(
+            list(period_outputs.values()),
+            weights,
+        )
+    except ValueError as exc:
+        return HPRBackendResult.failure(reason=str(exc))
+    weighted = weighted.with_updates(obj=shared_objective)
+    return selected.with_updates(
+        obj=shared_objective,
+        period_outputs=period_outputs,
+        weighted_output=weighted,
+        design_vector=np.asarray(x, dtype=float),
+        period_ids=[str(case.period_id) for case in args.period_cases],
+        period_weights=[float(case.weight) for case in args.period_cases],
+    )
+
+
+def _weighted_hpr_backend_result(
+    period_outputs: dict[str, HPRBackendResult],
+    weights: np.ndarray,
+) -> HPRBackendResult:
+    ordered = list(period_outputs.values())
+    first = ordered[0]
+    updates: dict[str, Any] = {}
+    for field in (
+        "obj",
+        "utility_tot",
+        "w_net",
+        "Q_ext_heat",
+        "Q_ext_cold",
+        "feasibility_penalty",
+        "Q_amb_hot",
+        "Q_amb_cold",
+        "w_hpr",
+        "w_he",
+        "heat_recovery",
+        "cop_h",
+        "eta_he",
+        "Q_cond",
+        "Q_evap",
+        "Q_cond_he",
+        "Q_evap_he",
+        "Q_heat",
+        "Q_cool",
+    ):
+        weighted = _weighted_hpr_metric(ordered, field, weights)
+        if weighted is not None:
+            updates[field] = weighted
+
+    for field in ("hpr_operating_cost",):
+        weighted = _weighted_hpr_metric(ordered, field, weights)
+        if weighted is not None:
+            updates[field] = weighted
+
+    for field in (
+        "hpr_capital_cost",
+        "hpr_annualized_capital_cost",
+        "hpr_compressor_capital_cost",
+        "hpr_heat_exchanger_capital_cost",
+    ):
+        maximum = _max_hpr_metric(ordered, field)
+        if maximum is not None:
+            updates[field] = maximum
+
+    total_cost = _total_hpr_annualized_cost(updates, ordered, weights)
+    if total_cost is not None:
+        updates["hpr_total_annualized_cost"] = total_cost
+
+    return first.with_updates(**updates)
+
+
+def _weighted_hpr_metric(
+    results: list[HPRBackendResult],
+    field: str,
+    weights: np.ndarray,
+) -> Any:
+    values = [getattr(result, field, None) for result in results]
+    if all(value is None for value in values):
+        return None
+    if any(value is None for value in values):
+        return None
+    return _aggregate_hpr_values(values, weights=weights, reducer="weighted")
+
+
+def _max_hpr_metric(results: list[HPRBackendResult], field: str) -> Any:
+    values = [getattr(result, field, None) for result in results]
+    if all(value is None for value in values):
+        return None
+    if any(value is None for value in values):
+        return None
+    return _aggregate_hpr_values(values, weights=None, reducer="max")
+
+
+def _aggregate_hpr_values(
+    values: list[Any],
+    *,
+    weights: np.ndarray | None,
+    reducer: str,
+) -> Any:
+    first = values[0]
+    if isinstance(first, Value):
+        unit = first.unit
+        magnitudes = []
+        for value in values:
+            if not isinstance(value, Value):
+                return None
+            magnitudes.append(float(value.to(unit).value))
+        aggregate = (
+            float(np.average(magnitudes, weights=weights))
+            if reducer == "weighted"
+            else float(np.max(magnitudes))
+        )
+        return Value(aggregate, unit)
+
+    try:
+        arrays = [np.asarray(value, dtype=float) for value in values]
+    except TypeError, ValueError:
+        return None
+    shapes = {array.shape for array in arrays}
+    if len(shapes) != 1:
+        return None
+    stacked = np.stack(arrays, axis=0)
+    if reducer == "weighted":
+        aggregate = np.average(stacked, axis=0, weights=weights)
+    else:
+        aggregate = np.max(stacked, axis=0)
+    if aggregate.ndim == 0:
+        return float(aggregate)
+    return aggregate
+
+
+def _total_hpr_annualized_cost(
+    updates: dict[str, Any],
+    results: list[HPRBackendResult],
+    weights: np.ndarray,
+) -> Any:
+    operating = updates.get("hpr_operating_cost")
+    annualized_capital = updates.get("hpr_annualized_capital_cost")
+    if operating is not None and annualized_capital is not None:
+        try:
+            return operating + annualized_capital
+        except Exception:
+            pass
+    return _weighted_hpr_metric(results, "hpr_total_annualized_cost", weights)
+
+
+def _shared_hpr_candidate_objective(
+    results: list[HPRBackendResult],
+    weights: np.ndarray,
+) -> float:
+    has_cost_breakdown = any(
+        result.hpr_operating_cost is not None
+        or result.hpr_annualized_capital_cost is not None
+        for result in results
+    )
+    if not has_cost_breakdown:
+        fallback = _weighted_hpr_metric(results, "obj", weights)
+        return float(fallback)
+
+    if any(
+        result.hpr_operating_cost is None or result.hpr_annualized_capital_cost is None
+        for result in results
+    ):
+        raise ValueError(
+            "Shared HPR candidates require a complete operating and annualized "
+            "capital cost breakdown for every period."
+        )
+
+    operating = _weighted_hpr_metric(results, "hpr_operating_cost", weights)
+    penalty = _weighted_hpr_metric(results, "feasibility_penalty", weights)
+    annualized_capital = _max_hpr_metric(
+        results,
+        "hpr_annualized_capital_cost",
+    )
+    return (
+        _annual_cost_magnitude(operating)
+        + float(penalty)
+        + _annual_cost_magnitude(annualized_capital)
+    )
+
+
+def _annual_cost_magnitude(value: Any) -> float:
+    if isinstance(value, Value):
+        return float(value.to("$/y").value)
+    return float(value)
+
+
 def _merge_candidate_points(
     local_minima_x: list | np.ndarray,
     local_minima_f: list | np.ndarray,
     x0_arr: np.ndarray | None,
     f_obj: Callable,
-    args: HeatPumpTargetInputs,
+    args: HeatPumpTargetInputs | MultiPeriodHPRTargetInputs,
 ) -> tuple[np.ndarray, np.ndarray]:
     candidate_blocks = []
     objective_blocks = []
-    local_minima_arr = np.asarray(local_minima_x, dtype=float)
-    if local_minima_arr.size:
-        if local_minima_arr.ndim == 1:
-            local_minima_arr = local_minima_arr.reshape(1, -1)
+    local_minima_arr = _normalise_candidate_block(local_minima_x)
+    if local_minima_arr is not None:
         candidate_blocks.append(local_minima_arr)
         objective_blocks.append(np.asarray(local_minima_f, dtype=float))
-    if x0_arr is not None and x0_arr.size:
-        x0_block = x0_arr.reshape(x0_arr.shape[0], -1)
+    x0_block = _normalise_candidate_block(x0_arr)
+    if x0_block is not None:
         candidate_blocks.append(x0_block)
         objective_blocks.append(
             np.asarray(
@@ -156,11 +469,7 @@ def _merge_candidate_points(
         )
     if not candidate_blocks:
         return np.asarray([]), np.asarray([])
-    n_cols = (
-        x0_arr.shape[1]
-        if x0_arr is not None and x0_arr.size
-        else candidate_blocks[0].shape[1]
-    )
+    n_cols = x0_block.shape[1] if x0_block is not None else candidate_blocks[0].shape[1]
     filtered_blocks = []
     filtered_objectives = []
     for block, objectives in zip(candidate_blocks, objective_blocks):
@@ -168,8 +477,6 @@ def _merge_candidate_points(
             continue
         filtered_blocks.append(block)
         filtered_objectives.append(objectives)
-    if not filtered_blocks:
-        return np.asarray([]), np.asarray([])
 
     candidate_x = np.vstack(filtered_blocks)
     candidate_f = np.concatenate(filtered_objectives)
@@ -178,10 +485,24 @@ def _merge_candidate_points(
     return candidate_x[unique_idx], candidate_f[unique_idx]
 
 
+def _normalise_candidate_block(values: list | np.ndarray | None) -> np.ndarray | None:
+    if values is None:
+        return None
+
+    block = np.asarray(values, dtype=float)
+    if block.size == 0:
+        return None
+    if block.ndim == 0:
+        return block.reshape(1, 1)
+    if block.ndim == 1:
+        return block.reshape(1, -1)
+    return block.reshape(block.shape[0], -1)
+
+
 def _score_hpr_candidate_objective(
     f_obj: Callable,
     x: np.ndarray,
-    args: HeatPumpTargetInputs,
+    args: HeatPumpTargetInputs | MultiPeriodHPRTargetInputs,
 ) -> float:
     try:
         result = f_obj(x, args, debug=False)
@@ -194,7 +515,7 @@ def _score_hpr_candidate_objective(
 def _evaluate_hpr_candidate(
     f_obj: Callable,
     x: np.ndarray,
-    args: HeatPumpTargetInputs,
+    args: HeatPumpTargetInputs | MultiPeriodHPRTargetInputs,
 ) -> HPRBackendResult:
     result = f_obj(x, args, debug=args.debug)
     if not isinstance(result, HPRBackendResult):
@@ -307,7 +628,7 @@ def calc_simulated_hpr_annualized_costs(
     hpr_hot_streams = hpr_streams.get_hot_utility_streams()
     hpr_cold_streams = hpr_streams.get_cold_utility_streams()
     hx_duty = sum(
-        max(float(streams.sum_stream_attribute("heat_flow", idx=args.idx)), 0.0)
+        max(float(streams.sum_stream_attribute("heat_flow", idx=args.period_idx)), 0.0)
         for streams in (hpr_hot_streams, hpr_cold_streams)
         if len(streams) > 0
     )
@@ -396,7 +717,7 @@ def evaluate_carnot_hpr_result(
                 f"{(Q_ext_cold / args.Q_hpr_target):.5f} + "
                 f"{(penalty / args.Q_hpr_target):.5f}"
             ),
-            idx=args.idx,
+            period_idx=args.period_idx,
         )
 
     return HPRBackendResult(
@@ -458,7 +779,7 @@ def evaluate_vapour_hpr_result(
             hot_streams=cond_hot_streams,
             cold_streams=cond_cold_streams,
             is_shifted=True,
-            idx=args.idx,
+            period_idx=args.period_idx,
         )
         Q_ext_heat = float(pt_cond[PT.H_NET][0])
         cond_wrong_side = float(pt_cond[PT.H_NET][-1])
@@ -474,7 +795,7 @@ def evaluate_vapour_hpr_result(
             hot_streams=evap_hot_streams,
             cold_streams=evap_cold_streams,
             is_shifted=True,
-            idx=args.idx,
+            period_idx=args.period_idx,
         )
         Q_ext_cold = float(pt_evap[PT.H_NET][-1])
         evap_wrong_side = float(pt_evap[PT.H_NET][0])
@@ -519,7 +840,7 @@ def evaluate_vapour_hpr_result(
                 f"{cost_accounting.hpr_total_annualized_cost.value:.5f} $/y + "
                 f"{penalty:.5f} $/y"
             ),
-            idx=args.idx,
+            period_idx=args.period_idx,
         )
 
     return HPRBackendResult(

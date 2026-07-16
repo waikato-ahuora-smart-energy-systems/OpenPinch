@@ -1,0 +1,69 @@
+{
+  "value_unit_aliases": [
+    {"input": "fraction", "expected_unit": "-"},
+    {"input": "degK", "expected_unit": "K"},
+    {"input": "m2.K/kW", "expected_unit": "m^2/K/kW"},
+    {"input": "kJ/kg.degC", "expected_unit": "kJ/delta_degC/kg"}
+  ],
+  "weighted_period_value": {
+    "values": [10.0, 20.0, 40.0],
+    "weights": [1.0, 2.0, 1.0],
+    "unit": "kW"
+  },
+  "object_value": {
+    "value": null,
+    "values": [1000.0, 2000.0],
+    "weights": [0.25, 0.75],
+    "unit": "W"
+  },
+  "model_dump_value": {
+    "value": 2.5,
+    "unit": "MW"
+  },
+  "stream_cases": {
+    "cold": {
+      "name": "Cold equal state",
+      "t_supply": 40.0,
+      "t_target": 40.0,
+      "heat_flow": 25.0,
+      "dt_cont": 5.0,
+      "htc": 0.0,
+      "price": 12.0,
+      "is_process_stream": true
+    },
+    "hot": {
+      "name": "Hot equal state",
+      "t_supply": 90.0,
+      "t_target": 90.0,
+      "heat_flow": -30.0,
+      "dt_cont": 4.0,
+      "htc": 3.0,
+      "price": 8.0,
+      "is_process_stream": true
+    },
+    "neutral": {
+      "name": "Neutral",
+      "t_supply": 55.0,
+      "t_target": 55.0,
+      "heat_flow": 0.0,
+      "dt_cont": 2.0,
+      "htc": 0.0,
+      "price": 0.0,
+      "is_process_stream": true
+    },
+    "utility": {
+      "name": "Utility",
+      "t_supply": 20.0,
+      "t_target": 70.0,
+      "p_supply": 120.0,
+      "p_target": 100.0,
+      "h_supply": 10.0,
+      "h_target": 20.0,
+      "heat_flow": 50.0,
+      "dt_cont": 3.0,
+      "htc": 2.0,
+      "price": 5.0,
+      "is_process_stream": false
+    }
+  }
+}

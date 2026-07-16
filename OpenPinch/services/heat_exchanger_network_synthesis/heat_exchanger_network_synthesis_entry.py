@@ -9,7 +9,7 @@ from typing import Any
 from ...classes.heat_exchanger_network import HeatExchangerNetwork
 from ...classes.pinch_problem import PinchProblem
 from ...lib.enums import HeatExchangerNetworkDesignMethod, HENDesignMethod
-from ...lib.schemas.synthesis import HeatExchangerNetworkSynthesisResult
+from ...lib.schemas.synthesis.result import HeatExchangerNetworkSynthesisResult
 from .common.execution.executor import SynthesisExecutor
 from .common.results.seeds import resolve_seed_networks
 from .common.service_context import finalise_design_result, prepare_service_context

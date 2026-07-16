@@ -21,6 +21,37 @@ Use the package root when you want the supported front door:
 - report helpers such as ``problem.validation_report()``, ``problem.report()``,
   and ``problem.metrics()``
 
+Root Export Groups
+------------------
+
+The package root exports the stable front-door classes, schemas, enums,
+metadata helpers, and resource helpers most users need:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Group
+     - Exports
+   * - Workflow objects
+     - ``PinchProblem``, ``PinchWorkspace``, ``pinch_analysis_service``
+   * - Input and output schemas
+     - ``TargetInput``, ``TargetOutput``, ``StreamSchema``,
+       ``StreamSegmentSchema``, ``TemperatureHeatPointSchema``,
+       ``TemperatureHeatProfileSchema``, ``UtilitySchema``, ``ZoneTreeSchema``
+   * - Reports and validation
+     - ``ProblemReport``, ``ReportMetric``, ``ValidationIssue``,
+       ``ValidationReport``
+   * - Enums
+     - ``GraphAvailability``, ``GraphType``, ``HPRcycle``, ``StreamType``,
+       ``TargetType``, ``ZoneType``
+   * - Configuration and utilities
+     - ``Configuration``, ``config_options``,
+       ``get_piecewise_linearisation_for_streams``
+   * - Packaged resources
+     - ``NotebookMetadata``, ``SampleCaseMetadata``, ``list_notebooks``,
+       ``notebook_metadata``, ``copy_notebook``, ``list_sample_cases``,
+       ``sample_case_metadata``, ``read_sample_case``, ``copy_sample_case``
+
 Typical Pattern
 ---------------
 

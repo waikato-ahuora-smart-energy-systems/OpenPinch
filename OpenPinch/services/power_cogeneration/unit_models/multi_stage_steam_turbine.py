@@ -310,7 +310,7 @@ def _work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size=1, t_type=1):
 
 
 class MultiStageSteamTurbine:
-    """Stateful multi-stage steam turbine solver for pinch targeting."""
+    """Mutable multi-stage steam turbine solver for pinch targeting."""
 
     def __init__(self):
         self._solved = False

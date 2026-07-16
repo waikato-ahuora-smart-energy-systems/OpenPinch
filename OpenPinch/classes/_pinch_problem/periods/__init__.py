@@ -1,0 +1,1 @@
+"""Private operating-period helpers."""

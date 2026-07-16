@@ -14,10 +14,26 @@ Core Objects
 
 ``Stream``
    Process or utility stream with supply/target states, shifted temperatures,
-   and active/base ``dt_cont`` behavior.
+   and active/base ``dt_cont`` behavior. A variable-heat-capacity parent owns
+   an immutable ordered view of internal segment records while retaining one
+   physical stream identity.
+
+Segment mutations are transactional and revalidate the complete profile.
+``Stream.update_segments(...)`` applies sparse changes to several children in
+one atomic commit; an invalid index, attribute, or resulting profile leaves the
+parent and every child unchanged. Runtime segment record classes are private;
+construct them through ``Stream`` mappings or ``StreamSegmentSchema`` inputs.
+
+For segmented utilities, child prices may differ. The parent ``price`` is the
+duty-weighted effective value for each operating period, so the derived parent
+cost equals the sum of the child costs. Assigning ``parent.price`` is an
+explicit broadcast to every child; updating one child afterwards may make the
+prices differ again.
 
 ``StreamCollection``
    Ordered container with hot/cold filtering and utility inversion helpers.
+   Ordinary iteration and reports remain parent-based; explicit expanded
+   exports include canonical parent keys and ordered segment identities.
 
 ``ProblemTable``
    Numerical temperature-interval table behind composite curves, pinch
@@ -31,8 +47,20 @@ Core Objects
 
 ``HeatExchangerNetwork``
    Selected heat exchanger network design result with ordered exchanger
-   records, total-duty helpers, and
-   ``build_grid_diagram(...)`` for Plotly grid inspection.
+   records, period-aware total-duty helpers, and
+   ``build_grid_diagram(period_id=...)`` for Plotly grid inspection. Period
+   identity may be omitted only when the network has exactly one period.
+
+``HeatExchanger``
+   One physical parent-level match in a synthesized network. For segmented
+   streams, ``segment_area_contributions`` contains ordered diagnostic slices;
+   shared topology, maximum design area, and capital data remain on the
+   exchanger. Operating data is read from ``state(period_id)``.
+
+Operating-period records are owned by each ``HeatExchanger`` and contain duty,
+activity, terminal approaches, branch split fractions, and source/sink inlet
+and outlet temperatures. Their runtime classes are private; multiperiod access
+always names the period through ``exchanger.state(period_id)``.
 
 These are the objects you inspect when you need to understand how a case was
 prepared or why a target changed after mutating the in-memory model.
@@ -57,6 +85,10 @@ Key Classes
    :no-index:
 
 .. autoclass:: OpenPinch.classes.heat_exchanger_network.HeatExchangerNetwork
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.classes.heat_exchanger.HeatExchanger
    :members:
    :no-index:
 

@@ -23,7 +23,7 @@ from OpenPinch.classes.heat_exchanger import HeatExchanger
 from OpenPinch.classes.heat_exchanger_network import HeatExchangerNetwork
 from OpenPinch.lib import HeatExchangerKind
 from OpenPinch.lib.schemas.io import TargetInput
-from OpenPinch.lib.schemas.synthesis import HeatExchangerNetworkSynthesisManifest
+from OpenPinch.lib.schemas.synthesis.common import HeatExchangerNetworkSynthesisManifest
 from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.fake_executor import (
     FakeSynthesisExecutor,
 )
@@ -107,7 +107,7 @@ HEN_SNAPSHOT_NAMES = set().union(*HEN_PUBLIC_NAME_SNAPSHOT.values())
 
 class _IterableDesignOptions:
     def __iter__(self):
-        return iter((("state_id", "0"),))
+        return iter((("period_id", "0"),))
 
 
 def test_hen_public_exports_match_intended_snapshot() -> None:
@@ -207,6 +207,17 @@ def test_public_design_accessor_rejects_separate_options_objects(
 
     with pytest.raises(TypeError, match="runtime options.*dict"):
         problem.design.heat_exchanger_network_synthesis(options=options)  # type: ignore[arg-type]
+
+
+def test_public_design_accessor_runtime_options_include_period_id() -> None:
+    problem = _public_example_problem()
+
+    runtime_options = problem.design._runtime_options(
+        {"existing": True},
+        period_id="peak",
+    )
+
+    assert runtime_options == {"existing": True, "period_id": "peak"}
 
 
 def test_openhens_field_aliases_are_rejected_by_public_schemas() -> None:
@@ -367,8 +378,8 @@ def test_public_design_accessor_returns_ranked_networks(
     assert helper.total_cold_utility == selected_network.total_duty(
         kind=HeatExchangerKind.COLD_UTILITY
     )
-    assert helper.utility(hot_utility.source_stream) == hot_utility.duty
-    assert helper.utility(cold_utility.sink_stream) == cold_utility.duty
+    assert helper.utility(hot_utility.source_stream) == hot_utility.state().duty
+    assert helper.utility(cold_utility.sink_stream) == cold_utility.state().duty
     assert helper.utility(hot_utility.sink_stream) == 0.0
     with pytest.raises(ValueError, match="utility name"):
         helper.utility("")

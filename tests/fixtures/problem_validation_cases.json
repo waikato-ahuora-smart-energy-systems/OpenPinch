@@ -1,0 +1,84 @@
+{
+  "valid_problem": {
+    "options": {
+      "THERMAL_DT_CONT": 10
+    },
+    "streams": [
+      {
+        "zone": "Site",
+        "name": "H1",
+        "t_supply": 150.0,
+        "t_target": 60.0,
+        "heat_flow": 100.0,
+        "dt_cont": 5.0,
+        "htc": 1.0
+      }
+    ],
+    "utilities": [
+      {
+        "name": "Steam",
+        "type": "Hot",
+        "t_supply": 180.0,
+        "dt_cont": 5.0,
+        "price": 20.0
+      }
+    ]
+  },
+  "warning_problem": {
+    "options": {
+      "THERMAL_DT_CONT": 10
+    },
+    "streams": [
+      {
+        "zone": "Site",
+        "name": "H1",
+        "t_supply": {
+          "values": [
+            150.0,
+            155.0
+          ],
+          "unit": "degC"
+        },
+        "t_target": {
+          "values": [
+            60.0,
+            65.0
+          ],
+          "unit": "degC"
+        },
+        "heat_flow": {
+          "values": [
+            100.0,
+            100.0
+          ],
+          "unit": "kW"
+        },
+        "dt_cont": {
+          "values": [
+            -1.0,
+            -1.0
+          ],
+          "unit": "delta_degC"
+        },
+        "htc": 1.0
+      }
+    ],
+    "utilities": []
+  },
+  "empty_stream_problem": {
+    "options": {},
+    "streams": [],
+    "utilities": []
+  },
+  "schema_invalid_problem": {
+    "options": {},
+    "streams": [
+      {
+        "zone": "Site",
+        "name": "H1",
+        "heat_flow": 100.0
+      }
+    ],
+    "utilities": []
+  }
+}

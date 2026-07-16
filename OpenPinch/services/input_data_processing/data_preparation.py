@@ -23,6 +23,7 @@ from ._canonicalization import (
     _validate_input_data,
     _validate_zone_tree_structure,
 )
+from ._stream_segment_preparation import _create_segmented_process_stream
 from ._utility_preparation import (
     _get_hot_and_cold_utilities,
     _set_utilities_for_zone_and_subzones,
@@ -106,10 +107,10 @@ def _build_prepared_stream_collection(
 ) -> tuple[StreamCollection, Dict[str, str]]:
     """Build one canonical collection of prepared process and utility streams."""
     process_streams = StreamCollection()
-    process_streams.set_state_context(
-        state_ids=master_zone.state_ids,
+    process_streams.set_period_context(
+        period_ids=master_zone.period_ids,
         weights=master_zone.weights,
-        num_states=master_zone.num_states,
+        num_periods=master_zone.num_periods,
     )
     process_zone_paths: Dict[str, str] = {}
 
@@ -199,6 +200,8 @@ def _validate_stream_temperatures(stream: StreamSchema):
 
 def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
     """Create a process :class:`Stream` from one validated schema record."""
+    if stream.segments is not None or stream.profile is not None:
+        return _create_segmented_process_stream(stream, zone)
     _validate_stream_temperatures(stream)
     stream_obj = Stream(
         name=stream.name,
@@ -271,13 +274,17 @@ def _find_extreme_process_temperatures(
     cu_t_max: float = None
     stream: Stream
     for stream in hot_streams:
-        stream_min = stream.t_min_star.min
-        if cu_t_max is None or cu_t_max > stream_min:
-            cu_t_max = stream_min
+        thermal_segments = stream.segments or (stream,)
+        for segment in thermal_segments:
+            segment_min = segment.t_min_star.min
+            if cu_t_max is None or cu_t_max > segment_min:
+                cu_t_max = segment_min
     for stream in cold_streams:
-        stream_max = stream.t_max_star.max
-        if hu_t_min is None or hu_t_min < stream_max:
-            hu_t_min = stream_max
+        thermal_segments = stream.segments or (stream,)
+        for segment in thermal_segments:
+            segment_max = segment.t_max_star.max
+            if hu_t_min is None or hu_t_min < segment_max:
+                hu_t_min = segment_max
     if hu_t_min is None:
         hu_t_min = cu_t_max
     if cu_t_max is None:

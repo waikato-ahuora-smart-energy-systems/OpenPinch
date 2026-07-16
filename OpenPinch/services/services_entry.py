@@ -7,8 +7,8 @@ from ..lib.enums import TT
 from ..lib.schemas.io import TargetInput
 from .common.service_orchestration import (
     apply_zone_config_overrides,
-    record_selected_state,
-    target_matches_requested_state,
+    record_selected_period,
+    target_matches_requested_period,
 )
 from .direct_heat_integration.direct_integration_entry import (
     compute_direct_integration_targets,
@@ -68,7 +68,7 @@ def data_preprocessing_service(
 def direct_heat_integration_service(zone: Zone, args: dict | None = None) -> Zone:
     """Run direct heat integration targeting for a prepared zone."""
     apply_zone_config_overrides(zone, args)
-    record_selected_state(zone, args)
+    record_selected_period(zone, args)
     target = compute_direct_integration_targets(zone, args)
     zone.add_target(
         apply_exergy_if_enabled(target, zone, apply_func=apply_exergy_targeting)
@@ -84,7 +84,7 @@ def indirect_heat_integration_service(zone: Zone, args: dict | None = None) -> Z
         is_n_zone_depth=False,
         is_new_stream_collection=True,
     )
-    record_selected_state(zone, args)
+    record_selected_period(zone, args)
     zone.add_target(compute_total_subzone_utility_targets(zone, args))
     target = compute_indirect_integration_targets(zone, args)
     if target is not None:
@@ -97,11 +97,11 @@ def indirect_heat_integration_service(zone: Zone, args: dict | None = None) -> Z
 def direct_heat_pump_service(zone: Zone, args: dict | None = None) -> Zone:
     """Run direct Heat Pump targeting after ensuring a base DI target exists."""
     apply_zone_config_overrides(zone, args)
-    record_selected_state(zone, args)
-    if not target_matches_requested_state(
+    record_selected_period(zone, args)
+    if not target_matches_requested_period(
         zone.targets.get(TT.DI.value),
         args=args,
-        state_ids=zone.state_ids,
+        period_ids=zone.period_ids,
     ):
         direct_heat_integration_service(zone, args)
     target = compute_direct_heat_pump_or_refrigeration_target(
@@ -121,11 +121,11 @@ def direct_heat_pump_service(zone: Zone, args: dict | None = None) -> Zone:
 def indirect_heat_pump_service(zone: Zone, args: dict | None = None) -> Zone:
     """Run indirect Heat Pump targeting after ensuring a base TS target exists."""
     apply_zone_config_overrides(zone, args)
-    record_selected_state(zone, args)
-    if not target_matches_requested_state(
+    record_selected_period(zone, args)
+    if not target_matches_requested_period(
         zone.targets.get(TT.TS.value),
         args=args,
-        state_ids=zone.state_ids,
+        period_ids=zone.period_ids,
     ):
         indirect_heat_integration_service(zone, args)
     target = compute_indirect_heat_pump_or_refrigeration_target(
@@ -145,11 +145,11 @@ def indirect_heat_pump_service(zone: Zone, args: dict | None = None) -> Zone:
 def direct_refrigeration_service(zone: Zone, args: dict | None = None) -> Zone:
     """Run direct refrigeration targeting after ensuring a base DI target exists."""
     apply_zone_config_overrides(zone, args)
-    record_selected_state(zone, args)
-    if not target_matches_requested_state(
+    record_selected_period(zone, args)
+    if not target_matches_requested_period(
         zone.targets.get(TT.DI.value),
         args=args,
-        state_ids=zone.state_ids,
+        period_ids=zone.period_ids,
     ):
         direct_heat_integration_service(zone, args)
     target = compute_direct_heat_pump_or_refrigeration_target(
@@ -167,11 +167,11 @@ def direct_refrigeration_service(zone: Zone, args: dict | None = None) -> Zone:
 def indirect_refrigeration_service(zone: Zone, args: dict | None = None) -> Zone:
     """Run indirect refrigeration targeting after ensuring a base TS target exists."""
     apply_zone_config_overrides(zone, args)
-    record_selected_state(zone, args)
-    if not target_matches_requested_state(
+    record_selected_period(zone, args)
+    if not target_matches_requested_period(
         zone.targets.get(TT.TS.value),
         args=args,
-        state_ids=zone.state_ids,
+        period_ids=zone.period_ids,
     ):
         indirect_heat_integration_service(zone, args)
     target = compute_indirect_heat_pump_or_refrigeration_target(

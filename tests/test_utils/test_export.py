@@ -12,7 +12,7 @@ from openpyxl import Workbook
 import OpenPinch.utils.export as export_mod
 from OpenPinch.classes import ProblemTable, Zone
 from OpenPinch.lib.enums import ProblemTableLabel as PT
-from OpenPinch.lib.schemas.common import StatefulValueWithUnit
+from OpenPinch.lib.schemas.common import PeriodValueWithUnit
 from OpenPinch.lib.schemas.targets import DirectIntegrationTarget
 from OpenPinch.utils.export import (
     _autosize_columns,
@@ -36,8 +36,8 @@ class VU:
 
 def _make_target(
     name="Base",
-    idx=None,
-    state_id=None,
+    period_idx=None,
+    period_id=None,
     pinch_cold=VU(85.0, "degC"),
     pinch_hot=VU(125.0, "degC"),
     Qh=VU(100.0, "kW"),
@@ -67,8 +67,8 @@ def _make_target(
 
     return SimpleNamespace(
         name=name,
-        idx=idx,
-        state_id=state_id,
+        period_idx=period_idx,
+        period_id=period_id,
         pinch_temp=SimpleNamespace(cold_temp=pinch_cold, hot_temp=pinch_hot),
         Qh=Qh,
         Qc=Qc,
@@ -324,21 +324,21 @@ def test_export_writes_problem_tables_for_all_zones(tmp_path: Path):
     assert pytest.approx(sub_df.iloc[0][PT.T.value]) == 40.0
 
 
-def test_build_summary_dataframe_resolves_stateful_values_using_idx():
+def test_build_summary_dataframe_resolves_period_values_using_period_idx():
     target = _make_target(
         name="Peak",
-        idx=1,
-        state_id="peak",
-        pinch_cold=StatefulValueWithUnit(values=[80.0, 95.0], unit="degC"),
-        pinch_hot=StatefulValueWithUnit(values=[120.0, 135.0], unit="degC"),
-        Qh=StatefulValueWithUnit(values=[100.0, 140.0], unit="kW"),
-        Qc=StatefulValueWithUnit(values=[80.0, 60.0], unit="kW"),
-        Qr=StatefulValueWithUnit(values=[20.0, 30.0], unit="kW"),
+        period_idx=1,
+        period_id="peak",
+        pinch_cold=PeriodValueWithUnit(values=[80.0, 95.0], unit="degC"),
+        pinch_hot=PeriodValueWithUnit(values=[120.0, 135.0], unit="degC"),
+        Qh=PeriodValueWithUnit(values=[100.0, 140.0], unit="kW"),
+        Qc=PeriodValueWithUnit(values=[80.0, 60.0], unit="kW"),
+        Qr=PeriodValueWithUnit(values=[20.0, 30.0], unit="kW"),
     )
 
     row = build_summary_dataframe([target]).iloc[0]
 
-    assert row["State ID"] == "peak"
+    assert row["Period ID"] == "peak"
     assert row["Qh (value)"] == pytest.approx(140.0)
     assert row["Qc (value)"] == pytest.approx(60.0)
     assert row["Qr (value)"] == pytest.approx(30.0)
@@ -346,7 +346,7 @@ def test_build_summary_dataframe_resolves_stateful_values_using_idx():
     assert row["Hot Pinch (value)"] == pytest.approx(135.0)
 
 
-def test_target_results_include_idx():
+def test_target_results_include_period_idx():
     target = DirectIntegrationTarget(
         zone_name="Plant",
         type="DI",
@@ -355,14 +355,14 @@ def test_target_results_include_idx():
         hot_utility_target=10.0,
         cold_utility_target=5.0,
         heat_recovery_target=15.0,
-        state_id="peak",
-        state_idx=1,
+        period_id="peak",
+        period_idx=1,
     )
 
     results = target.to_target_results()
 
-    assert results.idx == 1
-    assert results.state_id == "peak"
+    assert results.period_idx == 1
+    assert results.period_id == "peak"
 
 
 # --------------------------------------------------------------------------------------

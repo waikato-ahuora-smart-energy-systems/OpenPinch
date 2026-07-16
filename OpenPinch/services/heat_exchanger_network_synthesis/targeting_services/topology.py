@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 
-from ....lib.schemas.synthesis import HeatExchangerNetworkTopologyRestriction
+from ....lib.schemas.synthesis.topology import HeatExchangerNetworkTopologyRestriction
 
 
 def canonical_topology_restrictions(

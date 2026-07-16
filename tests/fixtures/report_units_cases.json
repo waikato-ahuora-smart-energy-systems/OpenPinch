@@ -1,0 +1,36 @@
+{
+  "array_payload": {
+    "kind": "array",
+    "values": [1.0, 2.5, 4.0],
+    "unit": "kW"
+  },
+  "empty_array_payload": {
+    "kind": "array",
+    "values": [],
+    "unit": "kW"
+  },
+  "scalar_none_payload": {
+    "value": null,
+    "unit": "kW"
+  },
+  "period_single_payload": {
+    "values": [7.0],
+    "unit": "MW"
+  },
+  "period_multi_payload": {
+    "values": [7.0, 9.0],
+    "unit": "MW"
+  },
+  "period_empty_payload": {
+    "values": [],
+    "unit": "MW"
+  },
+  "scalar_object": {
+    "value": 6.5,
+    "unit": "kg/s"
+  },
+  "period_object": {
+    "values": [3.0, 6.0],
+    "unit": "kW"
+  }
+}

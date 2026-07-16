@@ -295,3 +295,78 @@ def test_zone_active_property_and_duplicate_suffix_increment():
     root.add_zone(duplicate, sub=True)
 
     assert "Child_2" in root.subzones
+
+
+def test_zone_property_setters_and_stream_container_type_guard():
+    root = Zone("Root")
+    child = Zone("Child")
+    config = Configuration({"THERMAL_DT_CONT": 8})
+
+    root.type = ZT.S.value
+    root.config = config
+    child.parent_zone = root
+
+    assert root.type == ZT.S.value
+    assert root.config is config
+    assert child.parent_zone is root
+    with pytest.raises(TypeError, match="StreamCollection"):
+        root._attach_stream_collection(object())
+
+
+def test_zone_period_context_none_list_weights_and_target_defaults(dummy_tar):
+    root = Zone("Root")
+    child = Zone("Child", parent_zone=root)
+    root.add_zone(child)
+
+    root.set_period_context(None, None, None)
+    assert root.period_ids is None
+    assert child.period_ids is None
+
+    root.set_period_context(["base", "peak"], [0.25, 0.75], 2)
+    assert root.period_ids == {"base": 0, "peak": 1}
+    assert root.weights.tolist() == [0.25, 0.75]
+    assert child.period_ids == {"base": 0, "peak": 1}
+
+    root.set_period_context(["base", "peak"], (0.4, 0.6), 2)
+    assert root.weights.tolist() == [0.4, 0.6]
+
+    root.add_targets()
+    assert root.targets == {}
+    root.add_targets([dummy_tar])
+    assert dummy_tar.type in root.targets
+
+
+def test_zone_subzone_and_target_zone_resolution_edges():
+    root = Zone("Root")
+    area = Zone("Area", parent_zone=root)
+    unit = Zone("Unit", parent_zone=area)
+    area.add_zone(unit)
+    root.add_zone(area)
+
+    assert root.get_subzone("Root") is root
+    assert root.get_subzone("Root/Area/Unit") is unit
+    with pytest.warns(UserWarning, match="not found"):
+        assert root.get_subzone("Missing") is None
+
+    assert root.get_target_zone(None) is root
+    assert root.get_target_zone("Root") is root
+    assert root.get_target_zone("Root/Area") is area
+
+
+def test_zone_imports_net_streams_and_locks_dt_multiplier():
+    root = Zone("Root")
+    area = Zone("Area", parent_zone=root)
+    area.net_hot_streams.add(
+        Stream(name="NH", t_supply=200.0, t_target=120.0, heat_flow=10.0)
+    )
+    area.net_cold_streams.add(
+        Stream(name="NC", t_supply=50.0, t_target=100.0, heat_flow=8.0)
+    )
+    root.add_zone(area)
+
+    root.import_hot_and_cold_streams_from_sub_zones(get_net_streams=True)
+
+    assert "Area.NH" in root.net_hot_streams
+    assert "Area.NC" in root.net_cold_streams
+    with pytest.warns(UserWarning, match="empty stream collection"):
+        Zone("Empty").lock_dt_cont_multiplier()

@@ -76,15 +76,15 @@ def _row_type(isTotal: bool) -> str:
     return SummaryRowType.FOOTER.value if isTotal else SummaryRowType.CONTENT.value
 
 
-def _serialise_report_payload(value: Any) -> Any:
+def _serialise_report_data(value: Any) -> Any:
     if isinstance(value, Value):
         return value.to_dict()
     if isinstance(value, dict):
-        return {key: _serialise_report_payload(val) for key, val in value.items()}
+        return {key: _serialise_report_data(val) for key, val in value.items()}
     if isinstance(value, list):
-        return [_serialise_report_payload(item) for item in value]
+        return [_serialise_report_data(item) for item in value]
     if hasattr(value, "model_dump"):
-        return _serialise_report_payload(value.model_dump(mode="python"))
+        return _serialise_report_data(value.model_dump(mode="python"))
     return value
 
 
@@ -98,8 +98,8 @@ class BaseTargetModel(BaseModel):
     )
 
     zone_name: Optional[str] = Field(default=None, exclude=True, repr=False)
-    state_id: Optional[str] = None
-    state_idx: Optional[int] = Field(default=None, exclude=True, repr=False)
+    period_id: Optional[str] = None
+    period_idx: Optional[int] = Field(default=None, exclude=True, repr=False)
     name: str
     type: str
     parent_zone: Any = None
@@ -124,18 +124,18 @@ class BaseTargetModel(BaseModel):
 
     def serialize_json(self, isTotal: bool = False) -> dict[str, Any]:
         """Serialise the reporting-schema view of this target to plain Python."""
-        return _serialise_report_payload(
+        return _serialise_report_data(
             self.to_target_results(isTotal=isTotal).model_dump(mode="python")
         )
 
 
 class GraphBackedTarget(BaseTargetModel):
-    """Target with graph payloads attached."""
+    """Target with graph data attached."""
 
     graphs: dict[str, Any] = Field(default_factory=dict)
 
     def add_graph(self, name: str, result: Any) -> None:
-        """Attach one graph payload under ``name`` for later export."""
+        """Attach one graph data under ``name`` for later export."""
         self.graphs[name] = result
 
 
@@ -180,8 +180,8 @@ class UtilitySummaryTarget(BaseTargetModel):
 
         return TargetResults(
             name=self.name,
-            idx=self.state_idx,
-            state_id=self.state_id,
+            period_idx=self.period_idx,
+            period_id=self.period_id,
             degree_of_integration=degree_of_integration,
             Qh=coerce_output_value(
                 self.hot_utility_target,
@@ -247,7 +247,7 @@ class UtilitySummaryTarget(BaseTargetModel):
         )
 
     def to_target_results(self, isTotal: bool = False) -> TargetResults:
-        """Return the common reporting payload for utility-summary targets."""
+        """Return the common reporting data for utility-summary targets."""
         return self._base_target_results(isTotal=isTotal)
 
 
@@ -265,7 +265,7 @@ class DirectIntegrationTarget(GraphBackedTarget, UtilitySummaryTarget):
     turbine_efficiency_target: Optional[float] = None
 
     def to_target_results(self, isTotal: bool = False) -> TargetResults:
-        """Return the reporting payload including DI-only cost and work fields."""
+        """Return the reporting data including DI-only cost and work fields."""
         base = self._base_target_results(isTotal=isTotal)
         return base.model_copy(
             update={
@@ -311,7 +311,7 @@ class TotalSiteTarget(GraphBackedTarget, UtilitySummaryTarget):
     turbine_efficiency_target: Optional[float] = None
 
     def to_target_results(self, isTotal: bool = False) -> TargetResults:
-        """Return the reporting payload including Total Site work fields."""
+        """Return the reporting data including Total Site work fields."""
         base = self._base_target_results(isTotal=isTotal)
         return base.model_copy(
             update={
@@ -375,7 +375,7 @@ class HeatPumpTargetBase(GraphBackedTarget, UtilitySummaryTarget):
     hpr_details: Any
 
     def to_target_results(self, isTotal: bool = False) -> TargetResults:
-        """Return the reporting payload for explicit HPR target results."""
+        """Return the reporting data for explicit HPR target results."""
         base = self._base_target_results(isTotal=isTotal)
         return base.model_copy(
             update={

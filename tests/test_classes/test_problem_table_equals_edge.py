@@ -3,6 +3,19 @@
 import numpy as np
 import pytest
 
+from OpenPinch.classes._problem_table.equality import (
+    arrays_are_empty,
+    numeric_arrays_equal,
+    object_columns_equal,
+    problem_tables_equal,
+    scalar_values_equal,
+    table_arrays_equal,
+    table_data_presence_matches,
+    tables_have_matching_columns,
+    tables_have_matching_shapes,
+    try_cast_object_column_to_float,
+)
+from OpenPinch.classes._problem_table.intervals import TemperatureIntervalEngine
 from OpenPinch.classes.problem_table import ProblemTable
 from OpenPinch.lib.enums import ProblemTableLabel as PT
 
@@ -22,6 +35,72 @@ def test_equals_uses_numeric_allclose_fast_path():
     left = ProblemTable({"a": [1.0, 2.0], "b": [3.0, 4.0]}, add_default_labels=False)
     right = ProblemTable({"a": [1.0, 2.0], "b": [3.0, 4.0]}, add_default_labels=False)
     assert left._equals(right) is True
+
+
+def test_equals_helper_functions_cover_numeric_and_shape_paths():
+    left = ProblemTable({"a": [1.0, np.nan]}, add_default_labels=False)
+    right = ProblemTable({"a": [1.0 + 1e-8, np.nan]}, add_default_labels=False)
+    other_cols = ProblemTable({"b": [1.0]}, add_default_labels=False)
+    other_shape = ProblemTable({"a": [1.0]}, add_default_labels=False)
+
+    assert tables_have_matching_columns(left, right) is True
+    assert tables_have_matching_columns(left, other_cols) is False
+    assert tables_have_matching_shapes(left, right) is True
+    assert tables_have_matching_shapes(left, other_shape) is False
+    assert numeric_arrays_equal(left.data, right.data, atol=1e-6) is True
+    assert table_arrays_equal(left, right, atol=1e-6) is True
+
+
+def test_equals_orchestration_helpers_cover_data_presence_and_type_paths():
+    left = ProblemTable({"a": [0.0]}, add_default_labels=False)
+    right = ProblemTable({"a": [0.0]}, add_default_labels=False)
+    left.data = np.empty((0, 1))
+    right.data = np.empty((0, 1))
+    assert arrays_are_empty(left.data) is True
+    assert problem_tables_equal(
+        left,
+        right,
+        table_type=ProblemTable,
+        default_atol=1e-6,
+    )
+
+    left.data = None
+    right.data = None
+    assert table_data_presence_matches(left, right) is True
+    assert problem_tables_equal(
+        left,
+        right,
+        table_type=ProblemTable,
+        default_atol=1e-6,
+    )
+    assert (
+        problem_tables_equal(
+            left,
+            object(),
+            table_type=ProblemTable,
+            default_atol=1e-6,
+        )
+        is False
+    )
+
+
+def test_equals_helper_functions_cover_object_cast_and_scalar_paths():
+    numeric_like = np.array(["1.0", np.nan], dtype=object)
+    assert np.allclose(
+        try_cast_object_column_to_float(numeric_like),
+        np.array([1.0, np.nan]),
+        equal_nan=True,
+    )
+    assert try_cast_object_column_to_float(np.array(["text"], dtype=object)) is None
+
+    assert object_columns_equal(
+        np.array(["1.0", np.nan], dtype=object),
+        np.array([1.0, np.nan], dtype=object),
+        atol=1e-6,
+    )
+    assert scalar_values_equal(np.nan, np.nan, atol=1e-6) is True
+    assert scalar_values_equal(1.0, 1.0 + 1e-9, atol=1e-6) is True
+    assert scalar_values_equal("left", "right", atol=1e-6) is False
 
 
 def test_equals_columnwise_allclose_branch_with_fake_object_dtype():
@@ -69,6 +148,9 @@ def test_index_views_and_iloc_paths():
     _ = pt.iloc[(0, 0)]
     pt.iloc[(1, 0)] = 150.0
     assert pt.iloc[(1, 0)] == pytest.approx(150.0)
+    assert pt.iloc[(0, PT.T)] == pytest.approx(300.0)
+    pt.iloc[(1, PT.T)] = 125.0
+    assert pt.iloc[(1, PT.T)] == pytest.approx(125.0)
 
 
 def test_uninitialised_column_setters_and_len_zero():
@@ -84,6 +166,10 @@ def test_uninitialised_column_setters_and_len_zero():
 
 def test_cols_view_get_and_set_on_initialised_table():
     pt = _default_table()
+    assert pt.col[PT.T][0] == pytest.approx(200.0)
+    pt.col[PT.T] = [210.0, 110.0]
+    assert pt.col[PT.T].tolist() == [210.0, 110.0]
+
     values = pt.cols[[PT.T, PT.H_NET]]
     assert values.shape == (2, 2)
     mixed_values = pt.cols[[PT.T, PT.H_NET.value]]
@@ -114,6 +200,8 @@ def test_problem_table_getitem_setitem_and_slice_enum_paths():
 
     with pytest.raises(TypeError, match="pt\\.slice"):
         _ = pt[[PT.T, PT.H_NET]]
+    with pytest.raises(TypeError, match="single-column assignment"):
+        pt[[PT.T, PT.H_NET]] = [[1.0, 2.0], [3.0, 4.0]]
 
 
 def test_loc_accepts_enum_column_keys():
@@ -199,12 +287,31 @@ def test_equals_fallback_numeric_pair_continue_path():
 def test_to_list_and_shift_heat_cascade_branches():
     pt = _default_table()
     _ = pt.to_list(col=PT.T)
+    pt.round(0)
+    assert pt[PT.T][0] == pytest.approx(200.0)
     shifted_enum = pt.shift_heat_cascade(5.0, PT.H_NET)
     assert shifted_enum[PT.H_NET][0] == pytest.approx(15.0)
 
     idx = pt.col_index[PT.H_NET.value]
     shifted_idx = pt.shift_heat_cascade(-2.0, idx)
     assert shifted_idx[PT.H_NET][0] == pytest.approx(13.0)
+    assert pt.pinch_idx(idx) == pt.pinch_idx(PT.H_NET)
+
+
+def test_problem_table_column_label_validation_edges():
+    table = ProblemTable(
+        {"empty": np.array([np.nan]), "filled": np.array([1.0])},
+        add_default_labels=False,
+    )
+
+    assert table.columns == ["empty", "filled"]
+    assert np.isnan(table["empty"]).all()
+    with pytest.raises(TypeError, match="Column labels"):
+        ProblemTable._validate_column_name(object())
+    with pytest.raises(TypeError, match="sequences"):
+        ProblemTable._validate_column_names(object())
+    with pytest.raises(ValueError, match="Duplicate column label"):
+        ProblemTable._validate_column_mapping({PT.T: [1.0], PT.T.value: [2.0]})
 
 
 def test_insert_temperature_interval_helper_guard_paths():
@@ -212,25 +319,28 @@ def test_insert_temperature_interval_helper_guard_paths():
     assert pt_none.insert_temperature_interval([120.0]) == 0
 
     pt = _default_table()
-    assert pt._Ts_needing_insertion(np.array([], dtype=float)).size == 0
-    deduped = pt._dedupe_monotonic(np.array([5.0, 5.0, 4.0], dtype=float))
+    engine = TemperatureIntervalEngine(pt)
+    assert engine._Ts_needing_insertion(np.array([], dtype=float)).size == 0
+    deduped = engine._dedupe_monotonic(np.array([5.0, 5.0, 4.0], dtype=float))
     assert deduped.tolist() == [5.0, 4.0]
 
-    same_data, inserted = pt._apply_interval_map({}, np.array([]), np.array([]))
+    same_data, inserted = engine._apply_interval_map({}, np.array([]), np.array([]))
     assert inserted == 0
     assert np.allclose(same_data, pt.data, equal_nan=True)
 
-    rows, top_adj, bot_adj = pt._build_mid_block(pt.data[0], pt.data[1], np.array([]))
+    rows, top_adj, bot_adj = engine._build_mid_block(
+        pt.data[0], pt.data[1], np.array([])
+    )
     assert rows.size == 0
     assert top_adj.shape == pt.data[0].shape
     assert bot_adj.shape == pt.data[1].shape
 
     new_data = np.zeros((2, pt.data.shape[1]))
     row_meta = [{"type": "top"}, {"type": "top"}]
-    pt._rebuild_edge_block(new_data, row_meta, positions=[0], is_top=True)
+    engine._rebuild_edge_block(new_data, row_meta, positions=[0], is_top=True)
 
-    pt._insert_mid_block(new_data, positions=[], upper_pos=0, lower_pos=1)
-    pt._insert_mid_block(new_data, positions=[0], upper_pos=-1, lower_pos=-1)
+    engine._insert_mid_block(new_data, positions=[], upper_pos=0, lower_pos=1)
+    engine._insert_mid_block(new_data, positions=[0], upper_pos=-1, lower_pos=-1)
 
 
 def test_temperature_block_and_interpolation_edge_paths():
@@ -241,7 +351,8 @@ def test_temperature_block_and_interpolation_edge_paths():
         },
         add_default_labels=False,
     )
-    empty_block, _ = mini._build_top_or_bottom_block(
+    mini_engine = TemperatureIntervalEngine(mini)
+    empty_block, _ = mini_engine._build_top_or_bottom_block(
         row_neighbor=np.array([100.0, 0.0], dtype=float),
         T_vals=np.array([]),
         is_top_block=True,
@@ -249,21 +360,22 @@ def test_temperature_block_and_interpolation_edge_paths():
     assert empty_block.shape == (0, 2)
 
     full = _default_table()
+    engine = TemperatureIntervalEngine(full)
     row_neighbor = full.data[0].copy()
-    block, _ = full._build_top_or_bottom_block(
+    block, _ = engine._build_top_or_bottom_block(
         row_neighbor=row_neighbor,
         T_vals=np.array([220.0, 240.0, 260.0], dtype=float),
         is_top_block=True,
     )
     assert block.shape[0] == 3
 
-    rows0, (t_idx, delta_idx) = full._initialise_insert_rows(
+    rows0, (t_idx, delta_idx) = engine._initialise_insert_rows(
         full.data[0], full.data[1], np.array([])
     )
     assert rows0.shape[0] == 0
     assert isinstance(t_idx, int) and isinstance(delta_idx, int)
 
-    full._interpolate_heat_columns(
+    engine._interpolate_heat_columns(
         rows=np.empty((0, full.data.shape[1])),
         row_top=full.data[0],
         row_bot=full.data[1],
@@ -273,7 +385,7 @@ def test_temperature_block_and_interpolation_edge_paths():
     same_top = full.data[0].copy()
     same_bot = full.data[0].copy()
     rows_same = np.array([same_top.copy()])
-    full._interpolate_heat_columns(
+    engine._interpolate_heat_columns(
         rows=rows_same,
         row_top=same_top,
         row_bot=same_bot,
@@ -286,7 +398,7 @@ def test_temperature_block_and_interpolation_edge_paths():
     bot[full.col_index[PT.H_HOT.value]] = 11.0
     rows = np.array([top.copy()])
     rows[0, full.col_index[PT.T.value]] = 150.0
-    full._interpolate_heat_columns(
+    engine._interpolate_heat_columns(
         rows=rows,
         row_top=top,
         row_bot=bot,
@@ -294,7 +406,7 @@ def test_temperature_block_and_interpolation_edge_paths():
     )
     assert rows[0, full.col_index[PT.H_HOT.value]] == pytest.approx(11.0)
 
-    adjusted = full._adjust_bottom_row(
+    adjusted = engine._adjust_bottom_row(
         row_bot=bot,
         rows=np.empty((0, full.data.shape[1])),
         t_idx=full.col_index[PT.T.value],
@@ -338,6 +450,11 @@ def test_update_requires_T_col_for_non_empty_updates():
 
     with pytest.raises(TypeError, match="T_col"):
         pt.update({PT.H_NET: np.array([1.0, 2.0])})
+    with pytest.raises(TypeError, match="updates"):
+        pt.update(
+            ["not", "a", "dict"],
+            T_col=np.array([200.0, 100.0]),
+        )
 
 
 @pytest.mark.parametrize(
@@ -354,6 +471,16 @@ def test_update_rejects_invalid_T_col(T_col, exc_type):
         pt.update(
             {PT.H_NET: np.array([1.0, 2.0])},
             T_col=T_col,
+        )
+
+
+def test_update_rejects_non_numeric_T_col_values():
+    pt = _default_table()
+
+    with pytest.raises(ValueError, match="numeric temperature"):
+        pt.update(
+            {PT.H_NET: np.array([1.0, 2.0])},
+            T_col=np.array(["hot", "cold"], dtype=object),
         )
 
 

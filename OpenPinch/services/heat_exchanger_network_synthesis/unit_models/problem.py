@@ -6,13 +6,13 @@ from dataclasses import dataclass
 from typing import Any, Literal, Mapping, Sequence
 
 from ....classes.heat_exchanger_network import HeatExchangerNetwork
-from ....lib.schemas.synthesis import HeatExchangerNetworkSynthesisResult
+from ....lib.schemas.synthesis.result import HeatExchangerNetworkSynthesisResult
 from ..common.solver.arrays import PreparedSolverArrays
 from ..common.solver.extraction import (
     extract_heat_exchanger_network,
     extract_network_synthesis_result,
 )
-from ..common.solver.pinch_design_snapshot import PinchDecompositionSnapshot
+from ..common.solver.pinch_design_decomposition import PinchDesignDecomposition
 from .stagewise import StageWiseModel
 
 FrameworkName = Literal["PDM", "TDM", "ESM"]
@@ -28,7 +28,7 @@ class InternalHeatExchangerNetworkProblem:
 
     This object is private solver state. HENS-07 constructs moved PDM and
     StageWise models from OpenPinch-prepared solver arrays and emits OpenPinch
-    network/result payloads at the extraction boundary. HENS-08 still owns
+    network/result data at the extraction boundary. HENS-08 still owns
     stage reduction and topology evolution.
     """
 
@@ -48,7 +48,7 @@ class InternalHeatExchangerNetworkProblem:
     stage_selection: str | list[str] = "automated"
     stages: int | None = None
     synthesis_task_id: str | None = None
-    pinch_snapshots: Mapping[str, PinchDecompositionSnapshot] | None = None
+    pinch_decompositions: Mapping[str, PinchDesignDecomposition] | None = None
 
     def load_model(
         self,
@@ -121,7 +121,9 @@ class InternalHeatExchangerNetworkProblem:
             run_id=run_id,
             task_id=self.synthesis_task_id,
             method=self.framework,
-            stage_count=getattr(self.case, "S", self.stages),
+            stage_count=getattr(
+                self.case, "stages", getattr(self.case, "S", self.stages)
+            ),
         )
 
     def extract_result(
@@ -130,9 +132,9 @@ class InternalHeatExchangerNetworkProblem:
         run_id: str,
         problem_id: str | None = None,
         workspace_variant: str | None = None,
-        state_id: str | None = None,
+        period_id: str | None = None,
     ) -> HeatExchangerNetworkSynthesisResult:
-        """Return the serializable result payload for the service boundary."""
+        """Return the serializable result data for the service boundary."""
 
         return extract_network_synthesis_result(
             self.case,
@@ -141,7 +143,7 @@ class InternalHeatExchangerNetworkProblem:
             task_id=self.synthesis_task_id,
             problem_id=problem_id,
             workspace_variant=workspace_variant,
-            state_id=state_id,
+            period_id=period_id,
             solver_name=self.solver,
             method=self.framework,
             stage_count=getattr(self.case, "S", self.stages),
@@ -152,13 +154,13 @@ class InternalHeatExchangerNetworkProblem:
         *,
         model_factories: Mapping[str, Any] | None,
     ) -> None:
-        """Construct source PDM above/below models with private snapshots."""
+        """Construct source PDM above/below models with private decompositions."""
 
-        snapshots = dict(self.pinch_snapshots or {})
-        if "above" not in snapshots or "below" not in snapshots:
+        decompositions = dict(self.pinch_decompositions or {})
+        if "above" not in decompositions or "below" not in decompositions:
             raise ValueError(
                 "PDM construction requires above and below pinch decomposition "
-                "snapshots from the OpenPinch targeting boundary."
+                "records from the OpenPinch targeting boundary."
             )
         factory = self._model_factory(
             model_factories,
@@ -173,7 +175,7 @@ class InternalHeatExchangerNetworkProblem:
                     "name": f"above pinch {self.dTmin}",
                     "pinch_loc": "above",
                     "minimisation_goal": "hot utility",
-                    "pinch_snapshot": snapshots["above"],
+                    "pinch_decomposition": decompositions["above"],
                     "stage_selection": self.stage_selection,
                 }
             )
@@ -185,7 +187,7 @@ class InternalHeatExchangerNetworkProblem:
                     "name": f"below pinch {self.dTmin}",
                     "pinch_loc": "below",
                     "minimisation_goal": "cold utility",
-                    "pinch_snapshot": snapshots["below"],
+                    "pinch_decomposition": decompositions["below"],
                     "stage_selection": self.stage_selection,
                 }
             )
@@ -222,9 +224,9 @@ class InternalHeatExchangerNetworkProblem:
     def _solve_pdm(self, *, print_output: bool = True) -> None:
         """Solve PDM sides and amalgamate them before stage reduction."""
 
-        if self.above.HU_target > 0:
+        if self.above.side_required:
             self.above.optimise(print_output=print_output)
-        if self.below.CU_target > 0:
+        if self.below.side_required:
             self.below.optimise(print_output=print_output)
         self.case = self.above.amalgamate_networks(
             below_case=self.below,

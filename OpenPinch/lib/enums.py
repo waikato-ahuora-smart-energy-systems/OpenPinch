@@ -21,7 +21,7 @@ class CogenerationTarget(Protocol):
     hot_utilities: StreamCollection
     work_target: float | None
     turbine_efficiency_target: float | None
-    state_ids: dict[str, int] | None
+    period_ids: dict[str, int] | None
 
 
 class ZoneType(Enum):
@@ -319,7 +319,7 @@ class LineColour(Enum):
 
 
 class GraphType(Enum):
-    """Graph groups available in the OpenPinch reporting payload."""
+    """Graph groups available in OpenPinch reporting data."""
 
     CC = "Composite Curves"
     SCC = "Shifted Composite Curves"

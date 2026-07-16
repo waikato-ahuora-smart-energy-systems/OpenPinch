@@ -1,112 +1,105 @@
 Capability Matrix
 =================
 
-This page maps the main OpenPinch capabilities to their primary user-facing
-surfaces and outputs.
+This matrix maps the main user capabilities to the preferred public surface,
+typical outputs, dependency notes, and support status.
 
 .. list-table::
    :header-rows: 1
-   :widths: 22 28 28 22
+   :widths: 22 28 28 12 10
 
    * - Capability
-     - Main User Surface
-     - Typical Outputs
+     - Preferred surface
+     - Typical outputs
+     - Dependencies
      - Status
-   * - Direct heat integration targeting
+   * - Direct heat integration
      - ``PinchProblem.target()``, ``problem.target.direct_heat_integration(...)``
      - utility targets, pinch temperatures, recovery metrics, graphs
+     - base
      - Stable
    * - Indirect / Total Site targeting
-     - ``problem.target.indirect_heat_integration(...)``,
-       multiscale service layer
-     - Total Process / Total Site utility targets and graphs
+     - ``problem.target.indirect_heat_integration(...)``
+     - Total Process / Total Site utility targets and graph families
+     - base
      - Stable
-   * - Graph generation
+   * - Graphing and HTML export
      - ``problem.plot.*``, ``problem.plot.export(...)``
-     - composite curves, GCC, site profiles, HTML exports
+     - Plotly figures, graph catalog, HTML graph files
+     - notebook or dashboard
      - Stable
    * - File-backed workflows
-     - JSON, Excel, CSV bundle loading via ``PinchProblem.load(...)``
-     - solved `TargetOutput`, summary frames, Excel export
+     - ``PinchProblem`` and ``PinchWorkspace``
+     - solved results, summary frames, exports, bundle files
+     - base; notebook for Excel
      - Stable
-   * - Schema-driven workflows
-     - :func:`OpenPinch.main.pinch_analysis_service`,
-       :class:`OpenPinch.lib.schemas.io.TargetInput`
-     - typed programmatic solve results
+   * - Schema-driven execution
+     - ``pinch_analysis_service(...)`` with ``TargetInput``
+     - typed ``TargetOutput``
+     - base
      - Stable
-   * - Direct and indirect HPR targeting
-     - ``problem.target.direct_heat_pump(...)``,
-       ``problem.target.indirect_heat_pump(...)``,
-       refrigeration companions
-     - target models with HPR summary fields and graph effects
-     - Advanced
-   * - Heat exchanger network synthesis
-     - ``problem.design.enhanced_synthesis_method(quality_tier=...)``,
-       ``problem.design.open_hens_method(...)``,
-       ``problem.design.heat_exchanger_network_synthesis(method=...)``,
-       direct ``*_method`` accessors
-     - ranked HEN candidates, selected network, task manifest, grid diagrams,
-       optional exports
-     - Advanced
-   * - Direct gas/vapour process MVR
-     - ``problem.add_component.process_mvr(...)`` on a prepared
-       ``PinchProblem`` case
-     - replacement hot streams, MVR stage results, process-component work in
-       target summaries
-     - Advanced
-   * - Cogeneration targeting
-     - ``problem.target.cogeneration(...)``,
-       service-layer cogeneration entrypoint
-     - turbine work and efficiency targets
-     - Advanced
-   * - Exergy targeting post-processing
-     - ``problem.target.exergy(...)``,
-       exergetic plot accessors
-     - exergy metrics plus exergetic GCC and NLP graphs
-     - Advanced
-   * - Area / cost targeting
-     - ``problem.target.area_cost(...)``,
-       common area/cost helpers
-     - refreshed DI targets with area/cost context
+   * - Variable heat-capacity streams
+     - ``StreamSchema`` or ``UtilitySchema`` nested segments/profile
+     - parent-level targets and reports; explicit ordered segment diagnostics
+     - base; synthesis extra for solver-backed HEN design
      - Advanced
    * - Packaged learning assets
-     - ``openpinch notebook``, :mod:`OpenPinch.resources`
-     - runnable sample JSONs and notebooks
+     - ``OpenPinch.resources`` and ``openpinch notebook``
+     - sample JSON cases and clean notebook sources
+     - base; notebook to run notebooks
      - Stable
+   * - Heat Pump and refrigeration
+     - ``problem.target.direct_heat_pump(...)`` and companions
+     - HPR target fields, graph effects, cost fields for simulated cycles
+     - notebook/dashboard for graphs
+     - Advanced
+   * - Direct gas/vapour MVR
+     - ``problem.add_component.process_mvr(...)``
+     - replacement streams, MVR stage results, changed target summaries
+     - notebook/dashboard for graphs
+     - Advanced
+   * - Exergy post-processing
+     - ``problem.target.exergy(...)``
+     - exergy metrics and exergetic graph families
+     - notebook/dashboard for graphs
+     - Advanced
+   * - Cogeneration
+     - ``problem.target.cogeneration(...)``
+     - turbine work, efficiency targets, stage context
+     - base
+     - Advanced
+   * - Heat exchanger network synthesis
+     - ``problem.design.enhanced_synthesis_method(quality_tier=...)``
+     - ranked networks, selected network, manifest, grid diagrams
+     - synthesis extra and solvers
+     - Advanced
    * - Community / region framing
-     - zone-type vocabulary and hierarchy support
-     - extended multiscale labeling and aggregation structures
+     - zone vocabulary and hierarchy support
+     - multiscale labels and aggregation structures
+     - base
      - Experimental / partial
-   * - Energy transfer and lower-level analysis side packages
-     - lower-level service modules
-     - specialist analysis helpers
+   * - Lower-level analysis side packages
+     - service modules below curated wrappers
+     - specialist helper outputs
+     - varies
      - Experimental / partial
 
-How To Read This Matrix
------------------------
+Support Level Meaning
+---------------------
 
 Stable
-   Supported as part of the primary package workflow and documented as a public
-   user-facing surface.
+   Preferred user-facing surfaces documented in guides and curated API pages.
 
 Advanced
-   Supported, but best used after you understand the fundamentals and core
-   workflows. These surfaces are more specialized and often require closer
-   interpretation.
+   Supported, but intended for users who understand the base thermal target and
+   workflow assumptions.
 
 Experimental / partial
-   Exposed in the codebase, but not yet as fully documented or workflow-polished
-   as the core surfaces.
+   Present in the codebase, but not documented or polished as a primary user
+   workflow.
 
-Package Strengths To Keep In Mind
----------------------------------
+Next Steps
+----------
 
-The practical power of OpenPinch comes from the combination of:
-
-- multiple workflow styles over one analysis engine
-- hierarchical zone modeling
-- graph-first interpretation support
-- typed input/result models for integration into other software
-- packaged examples and notebooks that exercise the supported public API
-
-For the workflow-level view, continue to :doc:`workflow-map`.
+- :doc:`workflow-map` to choose an entrypoint.
+- :doc:`support-and-stability` for the detailed support policy.

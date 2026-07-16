@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .....lib.enums import HeatExchangerNetworkDesignMethod, HENDesignMethod
-from .....lib.schemas.synthesis import SynthesisMethod
+from .....lib.schemas.synthesis.common import SynthesisMethod
 from .pathways import tier_evm_branch_breadth, tier_pdm_multipliers
 
 StagePackingScope = str
@@ -44,7 +44,7 @@ class SynthesisWorkflowSettings:
     evm_solver_options: dict[str, Any]
     problem_id: str | None = None
     workspace_variant: str | None = None
-    state_id: str | None = None
+    period_id: str | None = None
     design_method: HeatExchangerNetworkDesignMethod = HENDesignMethod.OpenHENS
 
     def __init__(
@@ -64,28 +64,20 @@ class SynthesisWorkflowSettings:
         tdm_solver: str,
         pdm_solver_options: dict[str, Any],
         tdm_solver_options: dict[str, Any],
+        evm_solver: str,
+        evm_solver_options: dict[str, Any] | None = None,
         synthesis_quality_tier: int = 1,
         pdm_stage_pair_limit: int | None = None,
         tdm_parent_limit: int | None = None,
         stage_packing: StagePackingScope = "auto",
         user_dt_cont_multipliers: bool = False,
-        evm_solver: str | None = None,
-        evm_solver_options: dict[str, Any] | None = None,
-        esm_solver: str | None = None,
-        esm_solver_options: dict[str, Any] | None = None,
         evm_n_ad_branches: int | None = None,
         evm_n_rm_branches: int | None = None,
         problem_id: str | None = None,
         workspace_variant: str | None = None,
-        state_id: str | None = None,
+        period_id: str | None = None,
         design_method: HeatExchangerNetworkDesignMethod = HENDesignMethod.OpenHENS,
     ) -> None:
-        resolved_evm_solver = evm_solver if evm_solver is not None else esm_solver
-        if resolved_evm_solver is None:
-            raise ValueError("evm_solver must be provided.")
-        resolved_evm_solver_options = (
-            evm_solver_options if evm_solver_options is not None else esm_solver_options
-        )
         for name, value in {
             "run_id": run_id,
             "approach_temperatures": approach_temperatures,
@@ -106,13 +98,13 @@ class SynthesisWorkflowSettings:
             "user_dt_cont_multipliers": user_dt_cont_multipliers,
             "pdm_solver": pdm_solver,
             "tdm_solver": tdm_solver,
-            "evm_solver": resolved_evm_solver,
+            "evm_solver": evm_solver,
             "pdm_solver_options": pdm_solver_options,
             "tdm_solver_options": tdm_solver_options,
-            "evm_solver_options": dict(resolved_evm_solver_options or {}),
+            "evm_solver_options": dict(evm_solver_options or {}),
             "problem_id": problem_id,
             "workspace_variant": workspace_variant,
-            "state_id": state_id,
+            "period_id": period_id,
             "design_method": design_method,
         }.items():
             object.__setattr__(self, name, value)
@@ -199,7 +191,7 @@ class SynthesisWorkflowSettings:
 
     @property
     def quality_tdm_parent_limit(self) -> int:
-        """Return explicit parent limit metadata for compatibility."""
+        """Return explicit parent limit metadata for reporting."""
 
         if self.tdm_parent_limit is not None:
             return max(1, int(self.tdm_parent_limit))
@@ -221,21 +213,11 @@ class SynthesisWorkflowSettings:
             return max(1, int(self.evm_n_rm_branches))
         return tier_evm_branch_breadth(self.synthesis_quality_tier)
 
-    @property
-    def esm_solver(self) -> str:
-        """Backward-compatible alias for the network evolution solver."""
-        return self.evm_solver
-
-    @property
-    def esm_solver_options(self) -> dict[str, Any]:
-        """Backward-compatible alias for network evolution solver options."""
-        return dict(self.evm_solver_options)
-
 
 def workflow_settings_from_problem(
     problem,
     *,
-    state_id: str | None = None,
+    period_id: str | None = None,
     workspace_variant: str | None = None,
 ) -> SynthesisWorkflowSettings:
     """Read persistent synthesis controls from a prepared problem configuration."""
@@ -293,7 +275,7 @@ def workflow_settings_from_problem(
         evm_solver_options=dict(hens.solver_options_evm),
         problem_id=problem.project_name,
         workspace_variant=workspace_variant,
-        state_id=state_id,
+        period_id=period_id,
         design_method=HENDesignMethod.OpenHENS,
     )
 

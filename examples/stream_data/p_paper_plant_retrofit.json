@@ -22,9 +22,7 @@
             "htc": {
                 "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "C2[O]",
@@ -48,9 +46,7 @@
             "htc": {
                 "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "C3[O]",
@@ -74,9 +70,7 @@
             "htc": {
                 "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "C4[O]",
@@ -100,9 +94,7 @@
             "htc": {
                 "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "C5[O]",
@@ -126,9 +118,7 @@
             "htc": {
                 "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "E1[O]",
@@ -152,9 +142,7 @@
             "htc": {
                 "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "E1[O]",
@@ -178,9 +166,7 @@
             "htc": {
                 "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "E2[O]",
@@ -204,9 +190,7 @@
             "htc": {
                 "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "E2[O]",
@@ -230,9 +214,7 @@
             "htc": {
                 "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "E3[O]",
@@ -256,9 +238,7 @@
             "htc": {
                 "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "E3[O]",
@@ -282,9 +262,7 @@
             "htc": {
                 "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "E4[O]",
@@ -308,9 +286,7 @@
             "htc": {
                 "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "E4[O]",
@@ -334,9 +310,7 @@
             "htc": {
                 "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "E5[O]",
@@ -360,9 +334,7 @@
             "htc": {
                 "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "E5[O]",
@@ -386,9 +358,7 @@
             "htc": {
                 "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "H1[O]",
@@ -412,9 +382,7 @@
             "htc": {
                 "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "H2[O]",
@@ -438,9 +406,7 @@
             "htc": {
                 "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "H4[O]",
@@ -464,9 +430,7 @@
             "htc": {
                 "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "H5[O]",
@@ -490,9 +454,7 @@
             "htc": {
                 "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         }
     ],
     "utilities": [

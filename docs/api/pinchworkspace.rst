@@ -34,11 +34,19 @@ The typical lifecycle is:
    ``solve_variant(...)``
 5. persist the study with ``save_bundle(...)``
 
+Bundle Contract
+---------------
+
+Workspace bundles use schema version ``2``. Each item in ``variants`` stores
+its canonical problem mapping under ``case_input``. Version ``1``, unknown
+versions, the retired ``payload`` field, and unknown bundle fields are rejected;
+the pre-release API does not provide a compatibility loader.
+
 Core Workflow Members
 ---------------------
 
 The main user-facing workflow members are ``case()``, ``use_case()``,
-``copy_case()``, ``list_cases()``, ``get_case_payload()``,
+``copy_case()``, ``list_cases()``, ``get_case_input()``,
 ``update_options()``, ``set_dt_cont_multiplier()``, ``compare_cases()``,
 ``solve_variant()``, ``compare_variants()``, ``save_bundle()``, and
 ``load_bundle()``.
@@ -54,7 +62,7 @@ Live-case surface
    exergetic plot accessors exactly like any other ``PinchProblem``.
 
 Serializable variant surface
-   ``payload_view()``, ``validate_variant()``, ``solve_variant()``, and
+   ``input_view()``, ``validate_variant()``, ``solve_variant()``, and
    ``compare_variants()`` return schema-backed views that are deterministic and
    easier to pass to another application layer.
 
@@ -117,7 +125,7 @@ Relationship To PinchProblem
 
 ``PinchWorkspace`` is not a second solver. It orchestrates multiple named
 case inputs and live ``PinchProblem`` cases on top of the same validation,
-preparation, targeting, graph, export, and stateful workflow surfaces
+preparation, targeting, graph, export, and period workflow surfaces
 documented for ``PinchProblem``.
 
 Use :doc:`pinchproblem` when you only need one case at a time. Use

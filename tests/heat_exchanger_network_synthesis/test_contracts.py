@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
@@ -12,13 +13,13 @@ import OpenPinch
 import OpenPinch.classes
 import OpenPinch.lib
 import OpenPinch.lib.schemas as schemas
-import OpenPinch.lib.schemas.synthesis as synthesis_schemas
 from OpenPinch.classes import (
     HeatExchanger,
     HeatExchangerKind,
     HeatExchangerNetwork,
     HeatExchangerStreamRole,
 )
+from OpenPinch.classes._heat_exchanger.period_state import HeatExchangerPeriodState
 from OpenPinch.classes.pinch_problem import PinchProblem
 from OpenPinch.lib.config import Configuration
 from OpenPinch.lib.config_metadata import CONFIG_FIELD_SPECS
@@ -27,17 +28,32 @@ from OpenPinch.lib.enums import (
     HeatExchangerNetworkLabel,
 )
 from OpenPinch.lib.schemas.io import TargetInput, TargetOutput
-from OpenPinch.lib.schemas.synthesis import (
+from OpenPinch.lib.schemas.synthesis.common import (
     HeatExchangerNetworkSynthesisExportRecord,
     HeatExchangerNetworkSynthesisManifest,
+)
+from OpenPinch.lib.schemas.synthesis.method import (
     HeatExchangerNetworkSynthesisMethodInput,
     HeatExchangerNetworkSynthesisMethodOutput,
-    HeatExchangerNetworkSynthesisResult,
+)
+from OpenPinch.lib.schemas.synthesis.result import HeatExchangerNetworkSynthesisResult
+from OpenPinch.lib.schemas.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
+from OpenPinch.services.heat_exchanger_network_synthesis.common.errors import (
+    WorkflowContractError,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.common.execution import (
+    task_builders,
+)
 from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.settings import (
+    SynthesisWorkflowSettings,
     workflow_settings_from_problem,
+)
+from OpenPinch.services.heat_exchanger_network_synthesis.common.execution.task_builders import (
+    approach_temperature_from_network,
+    stage_count_from_network,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -54,7 +70,13 @@ def _network() -> HeatExchangerNetwork:
                 source_stream_role=HeatExchangerStreamRole.PROCESS,
                 sink_stream_role=HeatExchangerStreamRole.PROCESS,
                 stage=1,
-                duty=100.0,
+                period_states=(
+                    HeatExchangerPeriodState(
+                        period_id="0",
+                        period_idx=0,
+                        duty=100.0,
+                    ),
+                ),
                 area=20.0,
             ),
         ),
@@ -62,6 +84,28 @@ def _network() -> HeatExchangerNetwork:
         task_id="task-1",
         stage_count=1,
     )
+
+
+def _workflow_settings(**updates) -> SynthesisWorkflowSettings:
+    params = {
+        "run_id": "contract-test",
+        "approach_temperatures": (10.0,),
+        "derivative_thresholds": (0.5,),
+        "stage_selection": (1,),
+        "method_sequence": ("pinch_design_method",),
+        "output_formats": (),
+        "solve_tolerance": 1e-3,
+        "best_solutions_to_save": 2,
+        "max_parallel": 1,
+        "pdm_solver": "couenne",
+        "tdm_solver": "baron",
+        "evm_solver": "ipopt-pyomo",
+        "pdm_solver_options": {"time_limit": 10},
+        "tdm_solver_options": {"time_limit": 20},
+        "evm_solver_options": {"time_limit": 30},
+    }
+    params.update(updates)
+    return SynthesisWorkflowSettings(**params)
 
 
 def test_synthesis_task_generates_deterministic_task_id():
@@ -463,6 +507,139 @@ def test_hen_dt_cont_multipliers_feed_quality_pdm_multiplier_grid():
     assert tier_settings.quality_pdm_approach_temperatures == (10.0, 15.0)
 
 
+def test_workflow_settings_solver_options_and_quality_edges() -> None:
+    standard = _workflow_settings()
+    expanded = _workflow_settings(
+        synthesis_quality_tier=7,
+        tdm_parent_limit=0,
+    )
+
+    assert standard.solver_for("not-a-method") is None
+    assert standard.solver_options_for("thermal_derivative_method") == {
+        "time_limit": 20
+    }
+    assert standard.solver_options_for("network_evolution_method") == {"time_limit": 30}
+    assert standard.solver_options_for("not-a-method") == {}
+    assert standard.quality_fraction == 0.0
+    assert standard.is_standard_quality_tier is True
+    assert standard.quality_pdm_approach_temperatures == ()
+    assert standard.quality_tdm_parent_limit == 2
+    assert expanded.quality_fraction == 1.0
+    assert expanded.quality_tdm_parent_limit == 1
+
+
+def test_workflow_settings_require_loaded_problem() -> None:
+    with pytest.raises(RuntimeError, match="requires a loaded PinchProblem"):
+        workflow_settings_from_problem(SimpleNamespace(master_zone=None))
+
+
+def test_task_builder_helpers_fall_back_to_seed_network_metadata() -> None:
+    staged_network = HeatExchangerNetwork(
+        exchangers=(
+            HeatExchanger(
+                kind=HeatExchangerKind.RECOVERY,
+                source_stream="H1",
+                sink_stream="C1",
+                source_stream_role=HeatExchangerStreamRole.PROCESS,
+                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                stage=3,
+                period_states=(
+                    HeatExchangerPeriodState(
+                        period_id="0",
+                        period_idx=0,
+                        duty=100.0,
+                        approach_temperatures=(12.0,),
+                    ),
+                ),
+            ),
+        ),
+        source_metadata={"solver_dTmin": 9.0},
+    )
+    no_stage_network = HeatExchangerNetwork(
+        exchangers=(
+            HeatExchanger(
+                kind=HeatExchangerKind.HOT_UTILITY,
+                source_stream="Steam",
+                sink_stream="C1",
+                source_stream_role=HeatExchangerStreamRole.UTILITY,
+                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                period_states=(
+                    HeatExchangerPeriodState(
+                        period_id="0",
+                        period_idx=0,
+                        duty=10.0,
+                    ),
+                ),
+            ),
+        )
+    )
+    approach_from_exchanger = HeatExchangerNetwork(
+        exchangers=(
+            HeatExchanger(
+                kind=HeatExchangerKind.RECOVERY,
+                source_stream="H1",
+                sink_stream="C1",
+                source_stream_role=HeatExchangerStreamRole.PROCESS,
+                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                stage=1,
+                period_states=(
+                    HeatExchangerPeriodState(
+                        period_id="0",
+                        period_idx=0,
+                        duty=100.0,
+                        approach_temperatures=(7.0,),
+                    ),
+                ),
+            ),
+        )
+    )
+    approach_from_settings = HeatExchangerNetwork(exchangers=())
+    settings = _workflow_settings(approach_temperatures=(11.0,))
+
+    assert (
+        stage_count_from_network(
+            staged_network,
+            downstream_method="thermal_derivative_method",
+        )
+        == 3
+    )
+    with pytest.raises(WorkflowContractError, match="stage_count"):
+        stage_count_from_network(
+            no_stage_network,
+            downstream_method="thermal_derivative_method",
+        )
+    assert approach_temperature_from_network(staged_network, settings) == pytest.approx(
+        9.0
+    )
+    assert approach_temperature_from_network(
+        approach_from_exchanger,
+        settings,
+    ) == pytest.approx(7.0)
+    assert approach_temperature_from_network(
+        approach_from_settings,
+        settings,
+    ) == pytest.approx(11.0)
+
+
+def test_required_stage_count_reports_missing_stage_metadata() -> None:
+    task = HeatExchangerNetworkSynthesisTask(
+        run_id="run-1",
+        method="pinch_design_method",
+        approach_temperature=10.0,
+        task_id="seed",
+    )
+    outcome = HeatExchangerNetworkSynthesisTaskOutcome(
+        task=task,
+        status="success",
+    )
+
+    with pytest.raises(WorkflowContractError, match="without a stage count"):
+        task_builders._required_stage_count(
+            outcome,
+            downstream_method="thermal_derivative_method",
+        )
+
+
 def test_evm_branch_options_round_trip_to_workflow_settings():
     problem = PinchProblem(
         source=FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json"
@@ -547,6 +724,11 @@ def test_removed_prototype_hen_options_are_not_accepted(removed_key):
 
 
 def test_public_synthesis_exports_are_openpinch_native():
+    synthesis_package = __import__(
+        "OpenPinch.lib.schemas.synthesis",
+        fromlist=["*"],
+    )
+
     expected_class_exports = {
         "HeatExchanger",
         "HeatExchangerKind",
@@ -566,13 +748,21 @@ def test_public_synthesis_exports_are_openpinch_native():
 
     assert expected_class_exports <= set(OpenPinch.classes.__all__)
     assert expected_schema_exports <= set(schemas.__all__)
-    assert expected_schema_exports <= set(synthesis_schemas.__all__)
     assert "HeatExchangerNetworkSynthesisResult" in OpenPinch.lib.__all__
     assert "HeatExchangerKind" in OpenPinch.lib.__all__
     assert "HeatExchangerNetworkLabel" in OpenPinch.lib.__all__
     assert "HeatExchangerStreamRole" in OpenPinch.lib.__all__
     assert OpenPinch.lib.HeatExchangerKind is HeatExchangerKind
     assert OpenPinch.lib.HeatExchangerStreamRole is HeatExchangerStreamRole
+    assert not hasattr(synthesis_package, "__all__")
+    assert expected_schema_exports.isdisjoint(vars(synthesis_package))
+    for compatibility_module in ("methods", "results", "tasks"):
+        assert (
+            importlib.util.find_spec(
+                f"OpenPinch.lib.schemas.synthesis.{compatibility_module}"
+            )
+            is None
+        )
     assert isinstance(
         HeatExchangerNetworkLabel.RECOVERY_DUTY.value,
         str,

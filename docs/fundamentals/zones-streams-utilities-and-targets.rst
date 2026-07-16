@@ -63,7 +63,7 @@ carry:
 - utility targets
 - recovery metrics
 - pinch temperatures
-- graph payloads and related metadata
+- graph data and related metadata
 - optional advanced fields for HPR or cogeneration workflows
 
 For most users, these targets are surfaced through:

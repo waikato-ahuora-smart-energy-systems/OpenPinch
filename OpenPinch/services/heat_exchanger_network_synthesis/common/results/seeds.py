@@ -6,6 +6,7 @@ from collections.abc import Sequence
 
 from .....classes.heat_exchanger_network import HeatExchangerNetwork
 from .....classes.pinch_problem import PinchProblem
+from ..solver.arrays import SEGMENT_PROFILE_VERSION
 
 
 def resolve_seed_networks(
@@ -33,7 +34,21 @@ def resolve_seed_networks(
             f"initial_networks are omitted; cached design method is "
             f"{cached_design.method!r}."
         )
+    if (
+        _problem_has_segments(problem)
+        and cached_design.network.source_metadata.get("segment_profile_version")
+        != SEGMENT_PROFILE_VERSION
+    ):
+        raise ValueError(
+            f"{method_name} cannot reuse a cached network that lacks current "
+            "segment-profile tensors; rerun the upstream HEN method."
+        )
     return (cached_design.network,)
+
+
+def _problem_has_segments(problem: PinchProblem) -> bool:
+    zone = problem.master_zone
+    return zone is not None and any(stream.has_segments for stream in zone.all_streams)
 
 
 def _normalise_seed_networks(

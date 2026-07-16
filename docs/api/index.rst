@@ -1,8 +1,9 @@
 API Reference
 =============
 
-This section starts with curated pages for the user-facing OpenPinch API, then
-links to the exhaustive module-level appendix.
+Start here when you know which workflow you want and need the exact callable
+surface. The curated pages document public contracts first; the generated
+appendix is for module-by-module inspection after that.
 
 .. toctree::
    :maxdepth: 1

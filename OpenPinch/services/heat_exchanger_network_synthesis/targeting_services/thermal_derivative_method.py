@@ -8,7 +8,7 @@ from typing import Sequence
 
 from ....classes.heat_exchanger_network import HeatExchangerNetwork
 from ....lib.enums import HENDesignMethod
-from ....lib.schemas.synthesis import (
+from ....lib.schemas.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
@@ -132,7 +132,7 @@ def build_thermal_derivative_method_tasks(
                     stage_count=stage_count,
                     problem_id=settings.problem_id,
                     workspace_variant=settings.workspace_variant,
-                    state_id=settings.state_id,
+                    period_id=settings.period_id,
                     parent_task_id=outcome.task.task_id,
                     topology_restrictions=restrictions,
                     metadata=metadata,
@@ -173,7 +173,7 @@ def build_seeded_thermal_derivative_method_tasks(
                     stage_count=stage_count,
                     problem_id=settings.problem_id,
                     workspace_variant=settings.workspace_variant,
-                    state_id=settings.state_id,
+                    period_id=settings.period_id,
                     seed_network_index=seed_index,
                     topology_restrictions=restrictions,
                 )
@@ -210,7 +210,7 @@ def _build_seeded_quality_thermal_derivative_method_tasks(
                     stage_count=canonical_stage_count(restrictions),
                     problem_id=settings.problem_id,
                     workspace_variant=settings.workspace_variant,
-                    state_id=settings.state_id,
+                    period_id=settings.period_id,
                     seed_network_index=seed_index,
                     topology_restrictions=restrictions,
                 )

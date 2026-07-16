@@ -4,6 +4,8 @@ import numpy as np
 import pytest
 
 from OpenPinch.services.common.temperature_driving_force import (
+    _discontinuity_values,
+    _normalise_curve,
     get_temperature_driving_forces,
 )
 
@@ -50,6 +52,31 @@ def test_get_temperature_driving_forces_raises_when_unbalanced():
         ValueError, match="requires the inputted composite curves to be balanced"
     ):
         get_temperature_driving_forces(T_hot, H_hot, T_cold, H_cold)
+
+
+def test_get_temperature_driving_forces_rejects_mismatched_and_empty_curves():
+    with pytest.raises(ValueError, match="same length"):
+        get_temperature_driving_forces(
+            np.array([400.0, 300.0]),
+            np.array([0.0]),
+            np.array([300.0, 200.0]),
+            np.array([0.0, 100.0]),
+        )
+
+    with pytest.raises(ValueError, match="cannot be empty"):
+        get_temperature_driving_forces(
+            np.array([]),
+            np.array([]),
+            np.array([300.0, 200.0]),
+            np.array([0.0, 100.0]),
+        )
+
+
+def test_temperature_driving_force_helpers_reject_mismatches_and_short_curves():
+    with pytest.raises(ValueError, match="same length"):
+        _normalise_curve(np.array([0.0]), np.array([100.0, 90.0]))
+
+    assert _discontinuity_values(np.array([0.0])).size == 0
 
 
 def test_get_temperature_driving_forces_shifts_curves_to_common_origin():

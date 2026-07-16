@@ -1,0 +1,900 @@
+{
+  "streams": [
+    {
+      "zone": "Chemical Plant[S]",
+      "name": "A1",
+      "t_supply": {
+        "value": 110,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 80,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 1.333,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 10,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Chemical Plant[S]",
+      "name": "A2",
+      "t_supply": {
+        "value": 150,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 149,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "values": [
+          155,
+          180,
+          115
+        ],
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 10,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Chemical Plant[S]",
+      "name": "A3",
+      "t_supply": {
+        "value": 50,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 135,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 1.228,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 10,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Chemical Plant[S]",
+      "name": "A4",
+      "t_supply": {
+        "value": 85,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 100,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 5.487,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 10,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Chemical Plant[S]",
+      "name": "A5",
+      "t_supply": {
+        "value": 62,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 100,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 3.421,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 10,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Chemical Plant[S]",
+      "name": "A6",
+      "t_supply": {
+        "values": [
+          90,
+          92,
+          86
+        ],
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 55,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "values": [
+          6.8,
+          7.647,
+          5.2
+        ],
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 10,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Food Plant[S]",
+      "name": "B1",
+      "t_supply": {
+        "values": [
+          199,
+          200,
+          196
+        ],
+        "unit": "degC"
+      },
+      "t_target": {
+        "values": [
+          194,
+          195,
+          191
+        ],
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "values": [
+          29,
+          32,
+          23
+        ],
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Food Plant[S]",
+      "name": "B2",
+      "t_supply": {
+        "value": 20,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 54,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 0.294,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Food Plant[S]",
+      "name": "B3",
+      "t_supply": {
+        "value": 50,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 85,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 3.066,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Food Plant[S]",
+      "name": "B4",
+      "t_supply": {
+        "value": 100,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 120,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 6.5,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Food Plant[S]",
+      "name": "B5",
+      "t_supply": {
+        "values": [
+          145,
+          150,
+          140
+        ],
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 40,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "values": [
+          0.62,
+          0.759,
+          0.42
+        ],
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Food Plant[S]",
+      "name": "B6",
+      "t_supply": {
+        "value": 80,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 95,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 3.2,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Food Plant[S]",
+      "name": "B7",
+      "t_supply": {
+        "value": 95,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 25,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 1.143,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Hospital[S]",
+      "name": "Bedpan washers",
+      "t_supply": {
+        "value": 21,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 121,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 0.05,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Hospital[S]",
+      "name": "BFW",
+      "t_supply": {
+        "value": 33,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 60,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 0.446,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Hospital[S]",
+      "name": "Condensate",
+      "t_supply": {
+        "values": [
+          78,
+          80,
+          72
+        ],
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 40,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "values": [
+          2.2,
+          2.41,
+          1.45
+        ],
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Hospital[S]",
+      "name": "Cooking",
+      "t_supply": {
+        "value": 80,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 100,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 1.6,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Hospital[S]",
+      "name": "Heating",
+      "t_supply": {
+        "value": 18,
+        "unit": "degC"
+      },
+      "t_target": {
+        "values": [
+          23,
+          25,
+          29
+        ],
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "values": [
+          2.2,
+          5.871,
+          11.0
+        ],
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Hospital[S]",
+      "name": "Laundry",
+      "t_supply": {
+        "value": 55,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 85,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 0.6,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Hospital[S]",
+      "name": "Sanitary water",
+      "t_supply": {
+        "value": 25,
+        "unit": "degC"
+      },
+      "t_target": {
+        "values": [
+          52,
+          55,
+          59
+        ],
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "values": [
+          0.4,
+          0.576,
+          0.82
+        ],
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Hospital[S]",
+      "name": "Sanitary water",
+      "t_supply": {
+        "value": 25,
+        "unit": "degC"
+      },
+      "t_target": {
+        "values": [
+          57,
+          60,
+          64
+        ],
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "values": [
+          0.28,
+          0.429,
+          0.64
+        ],
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Hospital[S]",
+      "name": "Soapy water",
+      "t_supply": {
+        "value": 85,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 40,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 0.53,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Hospital[S]",
+      "name": "Sterilisation",
+      "t_supply": {
+        "value": 82,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 121,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "value": 0.874,
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Hospital[S]",
+      "name": "Swimming pool water",
+      "t_supply": {
+        "value": 25,
+        "unit": "degC"
+      },
+      "t_target": {
+        "values": [
+          27,
+          28,
+          30
+        ],
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "values": [
+          4.5,
+          7.7,
+          12.0
+        ],
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Residential[S]",
+      "name": "Hot water 2",
+      "t_supply": {
+        "value": 15,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 45,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "values": [
+          0.9,
+          2.167,
+          4.0
+        ],
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 6,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Residential[S]",
+      "name": "Hot water base",
+      "t_supply": {
+        "value": 15,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 45,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "values": [
+          0.4,
+          0.833,
+          1.6
+        ],
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 6,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Residential[S]",
+      "name": "Space heating",
+      "t_supply": {
+        "value": 15,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 25,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "values": [
+          2.5,
+          8.8,
+          16.8
+        ],
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 6,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1.0,
+        "unit": "kW/m^2/degC"
+      }
+    }
+  ],
+  "utilities": [
+    {
+      "name": "VHPS",
+      "type": "Hot",
+      "t_supply": {
+        "value": 280.8588511847681,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 280.7588511847681,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    },
+    {
+      "name": "HPS",
+      "type": "Both",
+      "t_supply": {
+        "value": 233.85844500625205,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 233.75844500625206,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    },
+    {
+      "name": "MPS",
+      "type": "Both",
+      "t_supply": {
+        "value": 179.88563239146663,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 179.78563239146663,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    },
+    {
+      "name": "LPS",
+      "type": "Both",
+      "t_supply": {
+        "value": 138.525357946545,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 138.425357946545,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    },
+    {
+      "name": "HW",
+      "type": "Both",
+      "t_supply": {
+        "value": 90,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 70,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    },
+    {
+      "name": "CW",
+      "type": "Cold",
+      "t_supply": {
+        "value": 20,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 20.1,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 0,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 30,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    }
+  ],
+  "options": {
+    "PROBLEM_PERIOD_IDS": [
+      "summer",
+      "shoulder",
+      "winter"
+    ],
+    "PROBLEM_PERIOD_WEIGHTS": [
+      0.25,
+      0.5,
+      0.25
+    ]
+  }
+}

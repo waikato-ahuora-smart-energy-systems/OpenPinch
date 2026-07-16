@@ -3,10 +3,8 @@
 Interpreting Results
 ====================
 
-This page has moved. For current workflows, interpret base targeting and
-advanced Heat Pump or refrigeration results through ``summary_frame()``,
-``plot.grand_composite_curve()``, utility-target changes, and the direct or
-indirect HPR targets exposed on ``problem.target.*``.
+This legacy page has moved. Result interpretation now lives in the graphing
+guide, graph fundamentals, and decision-workflow examples.
 
 Use these pages instead:
 

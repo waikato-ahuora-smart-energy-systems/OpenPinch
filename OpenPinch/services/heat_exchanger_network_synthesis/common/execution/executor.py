@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import multiprocessing
 from concurrent.futures import ProcessPoolExecutor
 from typing import Any, Callable, Protocol, Sequence
 
-from .....lib.schemas.synthesis import (
+from .....lib.schemas.synthesis.common import SynthesisMethod
+from .....lib.schemas.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
-    SynthesisMethod,
 )
 from ...unit_models.problem import InternalHeatExchangerNetworkProblem
 from ..errors import WorkflowContractError
@@ -18,12 +17,9 @@ from .pathways import pathways_from_metadata, tier_evm_branch_breadth
 
 
 def _process_pool(max_workers: int) -> ProcessPoolExecutor:
-    """Create solver workers with inherited local-package import state."""
+    """Create solver workers with the interpreter's default process context."""
 
-    return ProcessPoolExecutor(
-        max_workers=max_workers,
-        mp_context=multiprocessing.get_context("fork"),
-    )
+    return ProcessPoolExecutor(max_workers=max_workers)
 
 
 class SynthesisExecutor(Protocol):
@@ -128,7 +124,7 @@ class LocalSynthesisExecutor:
         )
         if worker_count == 1:
             solved_results = tuple(
-                _solve_built_task(payload) for payload in solve_inputs
+                _solve_built_task(worker_args) for worker_args in solve_inputs
             )
         else:
             with self.worker_pool_factory(worker_count) as pool:
@@ -188,20 +184,20 @@ class LocalSynthesisExecutor:
         dTmin = _legacy_task_dTmin(task)
         arrays = problem_to_solver_arrays(problem, dTmin)
         stage_selection = _legacy_pdm_stage_selection(problem, task)
-        snapshots = None
+        decompositions = None
         if task.method == "pinch_design_method":
-            from ..solver.pinch_design_snapshot import (
-                build_pinch_design_method_snapshot,
+            from ..solver.pinch_design_decomposition import (
+                build_pinch_design_decomposition,
             )
 
-            snapshots = {
-                "above": build_pinch_design_method_snapshot(
+            decompositions = {
+                "above": build_pinch_design_decomposition(
                     problem,
                     task.approach_temperature,
                     pinch_location="above",
                     stage_selection=stage_selection,
                 ),
-                "below": build_pinch_design_method_snapshot(
+                "below": build_pinch_design_decomposition(
                     problem,
                     task.approach_temperature,
                     pinch_location="below",
@@ -230,7 +226,7 @@ class LocalSynthesisExecutor:
             stage_selection=stage_selection,
             stages=task.stage_count,
             synthesis_task_id=task.task_id,
-            pinch_snapshots=snapshots,
+            pinch_decompositions=decompositions,
         )
 
     def _parent_problem(
@@ -279,14 +275,14 @@ class LocalSynthesisExecutor:
 
 
 def _solve_built_task(
-    payload: tuple[Any, ...],
+    worker_args: tuple[Any, ...],
 ) -> tuple[
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
     InternalHeatExchangerNetworkProblem | None,
 ]:
-    if len(payload) == 4:
-        task, internal_problem, print_output, model_factories = payload
+    if len(worker_args) == 4:
+        task, internal_problem, print_output, model_factories = worker_args
         evolution_options = {
             "n_ad_branches": 1,
             "n_rm_branches": 1,
@@ -295,7 +291,7 @@ def _solve_built_task(
         }
     else:
         task, internal_problem, print_output, model_factories, evolution_options = (
-            payload
+            worker_args
         )
     try:
         solve_kwargs: dict[str, Any] = {
@@ -354,7 +350,7 @@ def _solve_built_task(
 
 
 def _build_and_solve_root_task(
-    payload: tuple[
+    worker_args: tuple[
         HeatExchangerNetworkSynthesisTask,
         Any,
         bool,
@@ -366,7 +362,7 @@ def _build_and_solve_root_task(
     HeatExchangerNetworkSynthesisTaskOutcome,
     InternalHeatExchangerNetworkProblem | None,
 ]:
-    task, problem, print_output, model_factories, evolution_options = payload
+    task, problem, print_output, model_factories, evolution_options = worker_args
     executor = LocalSynthesisExecutor(
         print_output=print_output,
         model_factories=model_factories,
@@ -425,6 +421,8 @@ def _legacy_objective(method: SynthesisMethod) -> str:
 
 
 def _legacy_task_dTmin(task: HeatExchangerNetworkSynthesisTask) -> float:
+    if task.method in {"thermal_derivative_method", "network_evolution_method"}:
+        return 0.1
     return float(task.approach_temperature)
 
 

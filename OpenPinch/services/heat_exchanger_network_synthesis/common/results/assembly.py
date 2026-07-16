@@ -5,16 +5,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Sequence
 
-from .....lib.schemas.synthesis import (
+from .....lib.schemas.synthesis.common import (
     HeatExchangerNetworkSynthesisManifest,
-    HeatExchangerNetworkSynthesisResult,
+    SynthesisMethod,
+)
+from .....lib.schemas.synthesis.result import HeatExchangerNetworkSynthesisResult
+from .....lib.schemas.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
-    SynthesisMethod,
 )
 from ..errors import WorkflowContractError
 from ..execution.pathways import pathways_from_metadata
 from ..execution.settings import SynthesisWorkflowSettings
+from ..reporting.verification import verify_network_feasibility
 
 _METHOD_SEQUENCE: tuple[SynthesisMethod, ...] = (
     "pinch_design_method",
@@ -25,7 +28,7 @@ _METHOD_SEQUENCE: tuple[SynthesisMethod, ...] = (
 
 @dataclass(frozen=True)
 class SynthesisWorkflowResult:
-    """Executed task graph plus accepted design payload."""
+    """Executed task graph plus accepted design data."""
 
     tasks: tuple[HeatExchangerNetworkSynthesisTask, ...]
     outcomes: tuple[HeatExchangerNetworkSynthesisTaskOutcome, ...]
@@ -38,7 +41,8 @@ def build_synthesis_result(
     tasks: Sequence[HeatExchangerNetworkSynthesisTask],
     outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
 ) -> HeatExchangerNetworkSynthesisResult:
-    """Convert accepted task outcomes into the canonical design payload."""
+    """Convert accepted task outcomes into the canonical design data."""
+    _assert_successful_outcomes_feasible(outcomes)
     accepted = _accepted_outcome(outcomes)
     if accepted.network is None:
         raise WorkflowContractError(
@@ -49,7 +53,7 @@ def build_synthesis_result(
         update={
             "run_id": settings.run_id,
             "task_id": accepted.task.task_id,
-            "state_id": settings.state_id,
+            "period_id": settings.period_id,
             "method": accepted.task.method,
             "stage_count": accepted.network.stage_count or accepted.task.stage_count,
         }
@@ -82,7 +86,7 @@ def build_synthesis_result(
         task_ids=tuple(task.task_id for task in tasks if task.task_id is not None),
         problem_id=settings.problem_id,
         workspace_variant=settings.workspace_variant,
-        state_id=settings.state_id,
+        period_id=settings.period_id,
         design_method=settings.design_method,
         selected_pathway_id=selected_pathway.get("pathway_id"),
         selected_pathway_kind=selected_pathway.get("pathway_kind"),
@@ -97,7 +101,7 @@ def build_synthesis_result(
         task_id=accepted.task.task_id,
         problem_id=settings.problem_id,
         workspace_variant=settings.workspace_variant,
-        state_id=settings.state_id,
+        period_id=settings.period_id,
         solver_name=settings.solver_for(accepted.task.method),
         solver_status=accepted.solver_status,
         design_method=settings.design_method,
@@ -153,6 +157,25 @@ def _accepted_outcome(
     raise WorkflowContractError(message)
 
 
+def _assert_successful_outcomes_feasible(
+    outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
+) -> None:
+    infeasible = [
+        (outcome, failures)
+        for outcome in outcomes
+        if outcome.status == "success"
+        and (failures := verify_network_feasibility(outcome.network))
+    ]
+    if not infeasible:
+        return
+
+    raise WorkflowContractError(
+        "solver-success heat exchanger network task failed post-solve "
+        "feasibility checks, which indicates a solver model or extraction "
+        "contract issue. Details: " + _infeasible_outcome_summary(infeasible)
+    )
+
+
 def _failed_outcome_summary(
     outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
 ) -> str:
@@ -172,6 +195,22 @@ def _failed_outcome_summary(
         )
     if len(failed) > len(summaries):
         summaries.append(f"{len(failed) - len(summaries)} more failed task(s)")
+    return "; ".join(summaries)
+
+
+def _infeasible_outcome_summary(
+    outcomes: Sequence[
+        tuple[HeatExchangerNetworkSynthesisTaskOutcome, tuple[str, ...]]
+    ],
+) -> str:
+    if not outcomes:
+        return ""
+    summaries = []
+    for outcome, failures in outcomes[:3]:
+        task_id = outcome.task.task_id or "unknown-task"
+        summaries.append(f"{outcome.task.method}({task_id}) infeasible: {failures[0]}")
+    if len(outcomes) > len(summaries):
+        summaries.append(f"{len(outcomes) - len(summaries)} more infeasible task(s)")
     return "; ".join(summaries)
 
 

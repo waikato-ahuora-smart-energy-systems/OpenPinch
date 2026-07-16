@@ -12,34 +12,19 @@ import logging
 import math
 from collections.abc import Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
 from typing import Any, Literal
 
 import numpy as np
 
+from ..common.indexing import build_index_grid
 from ..common.solver.arrays import PreparedSolverArrays
+from ._stagewise.evolution import (
+    _EvolutionBranchState,
+    _EvolutionCandidateSpec,
+)
 from .base import BaseHeatExchangerNetworkModel
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class _EvolutionCandidateSpec:
-    kind: Literal["minus", "plus"]
-    unit: int
-    branch_index: int
-    rank: int
-    prev_case: Any
-    position: tuple[int, int, int]
-    z_allowed: list
-    signature: tuple[tuple[int, int, int], ...]
-
-
-@dataclass
-class _EvolutionBranchState:
-    model: Any
-    best_tac: float
-    stale_depths: int = 0
 
 
 class StageWiseModel(BaseHeatExchangerNetworkModel):
@@ -98,64 +83,146 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         self.set_obj()
 
     def set_preprocessing(self) -> None:
-        """Pre-process source SynHEAT superstructure parameters unchanged."""
+        """Pre-process SynHEAT superstructure parameters for all states."""
 
         self.S = self.stages
         self.K = self.S + 1
-        self.I = len(self.f_h)
-        self.J = len(self.f_c)
+        self.I = self.f_h_period.shape[1]
+        self.J = self.f_c_period.shape[1]
 
-        self.Qtot_sh = np.array(
-            [(self.T_h_in[i] - self.T_h_out[i]) * self.f_h[i] for i in range(self.I)]
-        )
-        self.Qtot_sc = np.array(
-            [self.f_c[j] * (self.T_c_out[j] - self.T_c_in[j]) for j in range(self.J)]
-        )
-
-        self.U_r = np.array(
-            [
-                [1 / (1 / self.htc_h[i] + 1 / self.htc_c[j]) for j in range(self.J)]
-                for i in range(self.I)
-            ]
-        )
-        self.U_hu = np.array(
-            [1 / (1 / self.htc_hu[0] + 1 / self.htc_c[j]) for j in range(self.J)]
-        )
-        self.U_cu = np.array(
-            [1 / (1 / self.htc_h[i] + 1 / self.htc_cu[0]) for i in range(self.I)]
-        )
-        self.Q_max = np.array(
+        self.Qtot_sh_period = np.array(
             [
                 [
-                    max(
-                        self.T_h_in[i]
-                        - self.T_c_in[j]
-                        - self._recovery_approach_temperature(i, j),
-                        0.0,
+                    self._parent_profile_duty(
+                        "hot",
+                        n,
+                        i,
+                        self.T_h_in_period[n][i],
+                        self.T_h_out_period[n][i],
+                        self.f_h_period[n][i],
                     )
-                    * min(self.f_h[i], self.f_c[j])
+                    for i in range(self.I)
+                ]
+                for n in range(self.N_periods)
+            ],
+            dtype=float,
+        )
+        self.Qtot_sc_period = np.array(
+            [
+                [
+                    self._parent_profile_duty(
+                        "cold",
+                        n,
+                        j,
+                        self.T_c_in_period[n][j],
+                        self.T_c_out_period[n][j],
+                        self.f_c_period[n][j],
+                    )
                     for j in range(self.J)
                 ]
-                for i in range(self.I)
-            ]
+                for n in range(self.N_periods)
+            ],
+            dtype=float,
         )
-        self.M_ij = [
+        self.Qtot_sh = np.max(self.Qtot_sh_period, axis=0)
+        self.Qtot_sc = np.max(self.Qtot_sc_period, axis=0)
+
+        self.U_r_period = np.array(
             [
-                max(
-                    abs(self.T_h_in[i] - self.T_c_in[j]),
-                    abs(self.T_h_in[i] - self.T_c_out[j]),
-                    abs(self.T_h_out[i] - self.T_c_in[j]),
-                    abs(self.T_h_out[i] - self.T_c_out[j]),
-                )
-                + self._recovery_approach_temperature(i, j)
-                for j in range(self.J)
-            ]
-            for i in range(self.I)
-        ]
+                [
+                    [
+                        1 / (1 / self.htc_h_period[n][i] + 1 / self.htc_c_period[n][j])
+                        for j in range(self.J)
+                    ]
+                    for i in range(self.I)
+                ]
+                for n in range(self.N_periods)
+            ],
+            dtype=float,
+        )
+        self.U_hu_period = np.array(
+            [
+                [
+                    1 / (1 / self.htc_hu_period[n][0] + 1 / self.htc_c_period[n][j])
+                    for j in range(self.J)
+                ]
+                for n in range(self.N_periods)
+            ],
+            dtype=float,
+        )
+        self.U_cu_period = np.array(
+            [
+                [
+                    1 / (1 / self.htc_h_period[n][i] + 1 / self.htc_cu_period[n][0])
+                    for i in range(self.I)
+                ]
+                for n in range(self.N_periods)
+            ],
+            dtype=float,
+        )
+        self.U_r = self.U_r_period[0].copy()
+        self.U_hu = self.U_hu_period[0].copy()
+        self.U_cu = self.U_cu_period[0].copy()
+
+        self.Q_max_period = np.array(
+            [
+                [
+                    [
+                        max(
+                            self._recovery_heat_upper_bound(
+                                period_index=n,
+                                hot_index=i,
+                                cold_index=j,
+                                hot_total_duty=self.Qtot_sh_period[n][i],
+                                cold_total_duty=self.Qtot_sc_period[n][j],
+                                hot_cp=self.f_h_period[n][i],
+                                cold_cp=self.f_c_period[n][j],
+                            ),
+                            0.0,
+                        )
+                        for j in range(self.J)
+                    ]
+                    for i in range(self.I)
+                ]
+                for n in range(self.N_periods)
+            ],
+            dtype=float,
+        )
+        self.Q_max = np.max(self.Q_max_period, axis=0)
+        self.M_ij_period = np.array(
+            [
+                [
+                    [
+                        max(
+                            abs(self.T_h_in_period[n][i] - self.T_c_in_period[n][j]),
+                            abs(self.T_h_in_period[n][i] - self.T_c_out_period[n][j]),
+                            abs(self.T_h_out_period[n][i] - self.T_c_in_period[n][j]),
+                            abs(self.T_h_out_period[n][i] - self.T_c_out_period[n][j]),
+                        )
+                        + self._recovery_approach_temperature(i, j, n)
+                        for j in range(self.J)
+                    ]
+                    for i in range(self.I)
+                ]
+                for n in range(self.N_periods)
+            ],
+            dtype=float,
+        )
+        self.M_ij = np.max(self.M_ij_period, axis=0)
 
         self.z_feasible = [
             [
-                [1 if self.Q_max[i][j] > self.tol else 0 for k in range(self.S)]
+                [
+                    (
+                        1
+                        if max(
+                            self.Q_max_period[n][i][j] for n in range(self.N_periods)
+                        )
+                        > self.tol
+                        else 0
+                    )
+                    for k in range(self.S)
+                ]
                 for j in range(self.J)
             ]
             for i in range(self.I)
@@ -164,170 +231,256 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         self.z_cu_feasible = [1 for _i in range(self.I)]
 
     def set_stage_wise_superstructure(self) -> None:
-        """Create the source StageWise variables, constraints, and binaries."""
+        """Create StageWise variables, constraints, and binaries."""
 
-        self.Q_r = [
+        self._set_multiperiod_stage_wise_superstructure()
+
+    def _set_multiperiod_stage_wise_superstructure(self) -> None:
+        """Create shared topology with state-indexed operating variables."""
+
+        self.Q_r_by_period = [
             [
                 [
-                    (
-                        self.m.Var(
-                            value=self.Q_max[i][j] / 3,
-                            ub=self.Q_max[i][j],
-                            lb=0.0,
-                            name=f"Q_H{i}_to_C{j}_at_S{k}",
+                    [
+                        (
+                            self.m.Var(
+                                value=self.Q_max_period[n][i][j] / 3,
+                                ub=self.Q_max_period[n][i][j],
+                                lb=0.0,
+                                name=(f"Q_H{i}_to_C{j}_at_S{k}_period{n}"),
+                            )
+                            if self.z_allowed[i][j][k] > 0
+                            else self.m.Param(
+                                value=0.0,
+                                name=f"Q_H{i}_to_C{j}_at_S{k}_period{n}",
+                            )
                         )
-                        if self.z_allowed[i][j][k] > 0
-                        else self.m.Param(value=0.0, name=f"Q_H{i}_to_C{j}_at_S{k}")
-                    )
-                    for k in range(self.S)
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
                 ]
-                for j in range(self.J)
+                for i in range(self.I)
             ]
-            for i in range(self.I)
+            for n in range(self.N_periods)
         ]
-        self.Q_c = [
-            (
-                self.m.Var(
-                    value=0,
-                    ub=self.Qtot_sh[i],
-                    lb=0.0,
-                    name=f"Q_H{i}_to_CU",
-                )
-                if self.z_cu_allowed[i] > 0
-                else self.m.Param(value=0, name=f"Q_H{i}_to_CU")
-            )
-            for i in range(self.I)
-        ]
-        self.Q_h = [
-            (
-                self.m.Var(
-                    value=0,
-                    ub=self.Qtot_sc[j],
-                    lb=0.0,
-                    name=f"Q_HU_to_C{j}",
-                )
-                if self.z_hu_allowed[j] > 0
-                else self.m.Param(value=0, name=f"Q_HU_to_C{j}")
-            )
-            for j in range(self.J)
-        ]
-        self.T_h = [
+        self.Q_c_by_period = [
             [
                 (
                     self.m.Var(
-                        value=self.T_h_in[i],
-                        ub=self.T_h_in[i],
-                        lb=self.T_h_out[i],
-                        name=f"T_H{i}_at_B{k}",
+                        value=0,
+                        ub=self.Qtot_sh_period[n][i],
+                        lb=0.0,
+                        name=f"Q_H{i}_to_CU_period{n}",
                     )
-                    if k > 0
-                    else self.m.Param(value=self.T_h_in[i], name=f"T_H{i}_at_B{k}")
+                    if self.z_cu_allowed[i] > 0
+                    else self.m.Param(value=0, name=f"Q_H{i}_to_CU_period{n}")
                 )
-                for k in range(self.K)
+                for i in range(self.I)
             ]
-            for i in range(self.I)
+            for n in range(self.N_periods)
         ]
-        self.T_c = [
+        self.Q_h_by_period = [
             [
                 (
                     self.m.Var(
-                        value=self.T_c_in[j],
-                        ub=self.T_c_out[j],
-                        lb=self.T_c_in[j],
-                        name=f"T_C{j}_at_B{k}",
+                        value=0,
+                        ub=self.Qtot_sc_period[n][j],
+                        lb=0.0,
+                        name=f"Q_HU_to_C{j}_period{n}",
                     )
-                    if k < self.S
-                    else self.m.Param(value=self.T_c_in[j], name=f"T_C{j}_at_B{k}")
+                    if self.z_hu_allowed[j] > 0
+                    else self.m.Param(value=0, name=f"Q_HU_to_C{j}_period{n}")
                 )
-                for k in range(self.K)
+                for j in range(self.J)
             ]
-            for j in range(self.J)
+            for n in range(self.N_periods)
         ]
-        self.theta_1 = [
+        self.T_h_by_period = [
             [
                 [
                     (
                         self.m.Var(
-                            value=self._recovery_approach_temperature(i, j),
-                            ub=abs(self.T_h_in[i] - self.T_c_in[j]),
-                            lb=self._recovery_approach_temperature(i, j),
-                            name=f"approach_T1_H{i}_to_C{j}_at_S{k}",
+                            value=self.T_h_in_period[n][i],
+                            ub=self.T_h_in_period[n][i],
+                            lb=self.T_h_out_period[n][i],
+                            name=f"T_H{i}_at_B{k}_period{n}",
                         )
-                        if self.z_allowed[i][j][k] > 0
+                        if k > 0
                         else self.m.Param(
-                            value=self._recovery_approach_temperature(i, j),
-                            name=f"approach_T1_H{i}_to_C{j}_at_S{k}",
+                            value=self.T_h_in_period[n][i],
+                            name=f"T_H{i}_at_B{k}_period{n}",
                         )
                     )
-                    for k in range(self.S)
+                    for k in range(self.K)
                 ]
-                for j in range(self.J)
+                for i in range(self.I)
             ]
-            for i in range(self.I)
+            for n in range(self.N_periods)
         ]
-        self.theta_2 = [
+        self.T_c_by_period = [
             [
                 [
                     (
                         self.m.Var(
-                            value=self._recovery_approach_temperature(i, j),
-                            ub=abs(self.T_h_in[i] - self.T_c_in[j]),
-                            lb=self._recovery_approach_temperature(i, j),
-                            name=f"approach_T2_H{i}_to_C{j}_at_S{k}",
+                            value=self.T_c_in_period[n][j],
+                            ub=self.T_c_out_period[n][j],
+                            lb=self.T_c_in_period[n][j],
+                            name=f"T_C{j}_at_B{k}_period{n}",
                         )
-                        if self.z_allowed[i][j][k] > 0
+                        if k < self.S
                         else self.m.Param(
-                            value=self._recovery_approach_temperature(i, j),
-                            name=f"approach_T2_H{i}_to_C{j}_at_S{k}",
+                            value=self.T_c_in_period[n][j],
+                            name=f"T_C{j}_at_B{k}_period{n}",
                         )
                     )
-                    for k in range(self.S)
+                    for k in range(self.K)
                 ]
                 for j in range(self.J)
             ]
-            for i in range(self.I)
+            for n in range(self.N_periods)
+        ]
+        self.theta_1_by_period = [
+            [
+                [
+                    [
+                        (
+                            self.m.Var(
+                                value=self._recovery_approach_temperature(
+                                    i,
+                                    j,
+                                    n,
+                                ),
+                                ub=abs(
+                                    self.T_h_in_period[n][i] - self.T_c_in_period[n][j]
+                                ),
+                                lb=self._recovery_approach_temperature(
+                                    i,
+                                    j,
+                                    n,
+                                ),
+                                name=(f"approach_T1_H{i}_to_C{j}_at_S{k}_period{n}"),
+                            )
+                            if self.z_allowed[i][j][k] > 0
+                            else self.m.Param(
+                                value=self._recovery_approach_temperature(
+                                    i,
+                                    j,
+                                    n,
+                                ),
+                                name=(f"approach_T1_H{i}_to_C{j}_at_S{k}_period{n}"),
+                            )
+                        )
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
+                ]
+                for i in range(self.I)
+            ]
+            for n in range(self.N_periods)
+        ]
+        self.theta_2_by_period = [
+            [
+                [
+                    [
+                        (
+                            self.m.Var(
+                                value=self._recovery_approach_temperature(
+                                    i,
+                                    j,
+                                    n,
+                                ),
+                                ub=abs(
+                                    self.T_h_in_period[n][i] - self.T_c_in_period[n][j]
+                                ),
+                                lb=self._recovery_approach_temperature(
+                                    i,
+                                    j,
+                                    n,
+                                ),
+                                name=(f"approach_T2_H{i}_to_C{j}_at_S{k}_period{n}"),
+                            )
+                            if self.z_allowed[i][j][k] > 0
+                            else self.m.Param(
+                                value=self._recovery_approach_temperature(
+                                    i,
+                                    j,
+                                    n,
+                                ),
+                                name=(f"approach_T2_H{i}_to_C{j}_at_S{k}_period{n}"),
+                            )
+                        )
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
+                ]
+                for i in range(self.I)
+            ]
+            for n in range(self.N_periods)
         ]
 
-        self.m.Equations(
-            [
-                self.Qtot_sh[i]
-                - self.m.sum(
-                    [self.Q_r[i][j][k] for k in range(self.S) for j in range(self.J)]
-                )
-                - self.Q_c[i]
-                == 0.0
-                for i in range(self.I)
-            ]
-        )
-        self.m.Equations(
-            [
-                self.Qtot_sc[j]
-                - self.m.sum(
-                    [self.Q_r[i][j][k] for k in range(self.S) for i in range(self.I)]
-                )
-                - self.Q_h[j]
-                == 0.0
-                for j in range(self.J)
-            ]
-        )
-        self.m.Equations(
-            [
-                (self.T_h[i][k + 1] - self.T_h[i][k]) * self.f_h[i]
-                + sum(self.Q_r[i][j][k] for j in range(self.J))
-                == 0
-                for k in range(self.S)
-                for i in range(self.I)
-            ]
-        )
-        self.m.Equations(
-            [
-                (self.T_c[j][k + 1] - self.T_c[j][k]) * self.f_c[j]
-                + sum(self.Q_r[i][j][k] for i in range(self.I))
-                == 0
-                for k in range(self.S)
-                for j in range(self.J)
-            ]
-        )
+        self.Q_r = self.Q_r_by_period[0]
+        self.Q_c = self.Q_c_by_period[0]
+        self.Q_h = self.Q_h_by_period[0]
+        self.T_h = self.T_h_by_period[0]
+        self.T_c = self.T_c_by_period[0]
+        self.theta_1 = self.theta_1_by_period[0]
+        self.theta_2 = self.theta_2_by_period[0]
+
+        self._set_piecewise_stage_heat_coordinates()
+
+        for n in range(self.N_periods):
+            self.m.Equations(
+                [
+                    self.Qtot_sh_period[n][i]
+                    - self.m.sum(
+                        [
+                            self.Q_r_by_period[n][i][j][k]
+                            for k in range(self.S)
+                            for j in range(self.J)
+                        ]
+                    )
+                    - self.Q_c_by_period[n][i]
+                    == 0.0
+                    for i in range(self.I)
+                ]
+            )
+            self.m.Equations(
+                [
+                    self.Qtot_sc_period[n][j]
+                    - self.m.sum(
+                        [
+                            self.Q_r_by_period[n][i][j][k]
+                            for k in range(self.S)
+                            for i in range(self.I)
+                        ]
+                    )
+                    - self.Q_h_by_period[n][j]
+                    == 0.0
+                    for j in range(self.J)
+                ]
+            )
+            self.m.Equations(
+                [
+                    (self.T_h_by_period[n][i][k + 1] - self.T_h_by_period[n][i][k])
+                    * self.f_h_period[n][i]
+                    + sum(self.Q_r_by_period[n][i][j][k] for j in range(self.J))
+                    == 0
+                    for k in range(self.S)
+                    for i in range(self.I)
+                    if not self._hot_parent_segmented(i)
+                ]
+            )
+            self.m.Equations(
+                [
+                    (self.T_c_by_period[n][j][k + 1] - self.T_c_by_period[n][j][k])
+                    * self.f_c_period[n][j]
+                    + sum(self.Q_r_by_period[n][i][j][k] for i in range(self.I))
+                    == 0
+                    for k in range(self.S)
+                    for j in range(self.J)
+                    if not self._cold_parent_segmented(j)
+                ]
+            )
 
         if self.integers:
             self.z = [
@@ -378,34 +531,42 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                 )
                 for j in range(self.J)
             ]
-            _ = [
-                (
-                    self.m.Equation(
-                        self.Q_r[i][j][k] <= self.Q_max[i][j] * self.z[i][j][k]
+            for n in range(self.N_periods):
+                _ = [
+                    (
+                        self.m.Equation(
+                            self.Q_r_by_period[n][i][j][k]
+                            <= self.Q_max_period[n][i][j] * self.z[i][j][k]
+                        )
+                        if self.z_allowed[i][j][k] > 0
+                        else None
                     )
-                    if self.z_allowed[i][j][k] > 0
-                    else None
-                )
-                for k in range(self.S)
-                for j in range(self.J)
-                for i in range(self.I)
-            ]
-            _ = [
-                (
-                    self.m.Equation(self.Q_c[i] <= self.Qtot_sh[i] * self.z_cu[i])
-                    if self.z_cu_allowed[i] > 0
-                    else None
-                )
-                for i in range(self.I)
-            ]
-            _ = [
-                (
-                    self.m.Equation(self.Q_h[j] <= self.Qtot_sc[j] * self.z_hu[j])
-                    if self.z_hu_allowed[j] > 0
-                    else None
-                )
-                for j in range(self.J)
-            ]
+                    for k in range(self.S)
+                    for j in range(self.J)
+                    for i in range(self.I)
+                ]
+                _ = [
+                    (
+                        self.m.Equation(
+                            self.Q_c_by_period[n][i]
+                            <= self.Qtot_sh_period[n][i] * self.z_cu[i]
+                        )
+                        if self.z_cu_allowed[i] > 0
+                        else None
+                    )
+                    for i in range(self.I)
+                ]
+                _ = [
+                    (
+                        self.m.Equation(
+                            self.Q_h_by_period[n][j]
+                            <= self.Qtot_sc_period[n][j] * self.z_hu[j]
+                        )
+                        if self.z_hu_allowed[j] > 0
+                        else None
+                    )
+                    for j in range(self.J)
+                ]
         else:
             self.z = [
                 [
@@ -438,8 +599,84 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                 for i in range(self.I)
             ]
 
+        self._set_multiperiod_utility_approach_equations()
+
         if self.non_isothermal_model:
-            self.X = [
+            self._set_multiperiod_non_isothermal_equations()
+        else:
+            self._set_multiperiod_isothermal_approach_equations()
+
+        self.dqda = []
+        self.alpha = []
+
+    def _set_multiperiod_isothermal_approach_equations(self) -> None:
+        for n in range(self.N_periods):
+            _ = [
+                (
+                    self.m.Equation(
+                        self.theta_1_by_period[n][i][j][k]
+                        <= (self.T_h_by_period[n][i][k] - self.T_c_by_period[n][j][k])
+                        + self.M_ij_period[n][i][j] * (1 - self.z[i][j][k])
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
+                )
+                for k in range(self.S)
+                for j in range(self.J)
+                for i in range(self.I)
+            ]
+            _ = [
+                (
+                    self.m.Equation(
+                        self.theta_1_by_period[n][i][j][k]
+                        >= (self.T_h_by_period[n][i][k] - self.T_c_by_period[n][j][k])
+                        - self.M_ij_period[n][i][j] * (1 - self.z[i][j][k])
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
+                )
+                for k in range(self.S)
+                for j in range(self.J)
+                for i in range(self.I)
+            ]
+            _ = [
+                (
+                    self.m.Equation(
+                        self.theta_2_by_period[n][i][j][k]
+                        <= (
+                            self.T_h_by_period[n][i][k + 1]
+                            - self.T_c_by_period[n][j][k + 1]
+                        )
+                        + self.M_ij_period[n][i][j] * (1 - self.z[i][j][k])
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
+                )
+                for k in range(self.S)
+                for j in range(self.J)
+                for i in range(self.I)
+            ]
+            _ = [
+                (
+                    self.m.Equation(
+                        self.theta_2_by_period[n][i][j][k]
+                        >= (
+                            self.T_h_by_period[n][i][k + 1]
+                            - self.T_c_by_period[n][j][k + 1]
+                        )
+                        - self.M_ij_period[n][i][j] * (1 - self.z[i][j][k])
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
+                )
+                for k in range(self.S)
+                for j in range(self.J)
+                for i in range(self.I)
+            ]
+
+    def _set_multiperiod_non_isothermal_equations(self) -> None:
+        self.X_by_period = [
+            [
                 [
                     [
                         (
@@ -447,10 +684,13 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                                 value=0.5,
                                 ub=1.0,
                                 lb=0.0,
-                                name=f"X_H{i}_to_C{j}_at_S{k}",
+                                name=f"X_H{i}_to_C{j}_at_S{k}_period{n}",
                             )
                             if self.z_allowed[i][j][k] > 0
-                            else self.m.Param(value=0.0, name=f"X_H{i}_to_C{j}_at_S{k}")
+                            else self.m.Param(
+                                value=0.0,
+                                name=f"X_H{i}_to_C{j}_at_S{k}_period{n}",
+                            )
                         )
                         for k in range(self.S)
                     ]
@@ -458,7 +698,10 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                 ]
                 for i in range(self.I)
             ]
-            self.Y = [
+            for n in range(self.N_periods)
+        ]
+        self.Y_by_period = [
+            [
                 [
                     [
                         (
@@ -466,10 +709,13 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                                 value=0.5,
                                 ub=1.0,
                                 lb=0.0,
-                                name=f"Y_C{j}_to_H{i}_at_S{k}",
+                                name=f"Y_C{j}_to_H{i}_at_S{k}_period{n}",
                             )
                             if self.z_allowed[i][j][k] > 0
-                            else self.m.Param(value=0.0, name=f"Y_C{j}_to_H{i}_at_S{k}")
+                            else self.m.Param(
+                                value=0.0,
+                                name=f"Y_C{j}_to_H{i}_at_S{k}_period{n}",
+                            )
                         )
                         for k in range(self.S)
                     ]
@@ -477,18 +723,24 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                 ]
                 for j in range(self.J)
             ]
-            self.T_h_out_x = [
+            for n in range(self.N_periods)
+        ]
+        self.T_h_out_x_by_period = [
+            [
                 [
                     [
                         (
                             self.m.Var(
-                                value=self.T_h_in[i],
-                                ub=self.T_h_in[i],
-                                lb=self.T_h_out[i],
-                                name=f"Thout_x_H{i}_to_C{j}_at_S{k}",
+                                value=self.T_h_in_period[n][i],
+                                ub=self.T_h_in_period[n][i],
+                                lb=self.T_h_out_period[n][i],
+                                name=f"Thout_x_H{i}_to_C{j}_at_S{k}_period{n}",
                             )
                             if self.z_allowed[i][j][k] > 0
-                            else self.m.Param(value=0, name=f"Tx_H{i}_to_C{j}_at_S{k}")
+                            else self.m.Param(
+                                value=0,
+                                name=f"Tx_H{i}_to_C{j}_at_S{k}_period{n}",
+                            )
                         )
                         for k in range(self.S)
                     ]
@@ -496,18 +748,24 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                 ]
                 for i in range(self.I)
             ]
-            self.T_c_out_y = [
+            for n in range(self.N_periods)
+        ]
+        self.T_c_out_y_by_period = [
+            [
                 [
                     [
                         (
                             self.m.Var(
-                                value=self.T_c_in[j],
-                                ub=self.T_c_out[j],
-                                lb=self.T_c_in[j],
-                                name=f"Tcout_y_C{j}_to_H{i}_at_S{k}",
+                                value=self.T_c_in_period[n][j],
+                                ub=self.T_c_out_period[n][j],
+                                lb=self.T_c_in_period[n][j],
+                                name=f"Tcout_y_C{j}_to_H{i}_at_S{k}_period{n}",
                             )
                             if self.z_allowed[i][j][k] > 0
-                            else self.m.Param(value=0, name=f"Ty_C{j}_to_H{i}_at_S{k}")
+                            else self.m.Param(
+                                value=0,
+                                name=f"Ty_C{j}_to_H{i}_at_S{k}_period{n}",
+                            )
                         )
                         for k in range(self.S)
                     ]
@@ -515,12 +773,25 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                 ]
                 for j in range(self.J)
             ]
+            for n in range(self.N_periods)
+        ]
+        self.X = self.X_by_period[0]
+        self.Y = self.Y_by_period[0]
+        self.T_h_out_x = self.T_h_out_x_by_period[0]
+        self.T_c_out_y = self.T_c_out_y_by_period[0]
+
+        self._set_piecewise_match_outlet_equations()
+
+        for n in range(self.N_periods):
             _ = [
                 (
                     self.m.Equation(
-                        self.theta_1[i][j][k]
-                        <= (self.T_h[i][k] - self.T_c_out_y[j][i][k])
-                        + self.M_ij[i][j] * (1 - self.z[i][j][k])
+                        self.theta_1_by_period[n][i][j][k]
+                        <= (
+                            self.T_h_by_period[n][i][k]
+                            - self.T_c_out_y_by_period[n][j][i][k]
+                        )
+                        + self.M_ij_period[n][i][j] * (1 - self.z[i][j][k])
                     )
                     if self.z_allowed[i][j][k] > 0
                     else None
@@ -532,9 +803,12 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             _ = [
                 (
                     self.m.Equation(
-                        self.theta_2[i][j][k]
-                        <= (self.T_h_out_x[i][j][k] - self.T_c[j][k + 1])
-                        + self.M_ij[i][j] * (1 - self.z[i][j][k])
+                        self.theta_2_by_period[n][i][j][k]
+                        <= (
+                            self.T_h_out_x_by_period[n][i][j][k]
+                            - self.T_c_by_period[n][j][k + 1]
+                        )
+                        + self.M_ij_period[n][i][j] * (1 - self.z[i][j][k])
                     )
                     if self.z_allowed[i][j][k] > 0
                     else None
@@ -546,13 +820,36 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             _ = [
                 (
                     self.m.Equation(
-                        self.Q_r[i][j][k]
-                        - self.X[i][j][k]
-                        * self.f_h[i]
-                        * (self.T_h[i][k] - self.T_h_out_x[i][j][k])
+                        self.Q_r_by_period[n][i][j][k]
+                        - self.X_by_period[n][i][j][k]
+                        * self.f_h_period[n][i]
+                        * (
+                            self.T_h_by_period[n][i][k]
+                            - self.T_h_out_x_by_period[n][i][j][k]
+                        )
+                        == 0.0
+                    )
+                    if self.z_allowed[i][j][k] > 0 and not self._hot_parent_segmented(i)
+                    else None
+                )
+                for k in range(self.S)
+                for j in range(self.J)
+                for i in range(self.I)
+            ]
+            _ = [
+                (
+                    self.m.Equation(
+                        self.Q_r_by_period[n][i][j][k]
+                        - self.Y_by_period[n][j][i][k]
+                        * self.f_c_period[n][j]
+                        * (
+                            self.T_c_out_y_by_period[n][j][i][k]
+                            - self.T_c_by_period[n][j][k + 1]
+                        )
                         == 0.0
                     )
                     if self.z_allowed[i][j][k] > 0
+                    and not self._cold_parent_segmented(j)
                     else None
                 )
                 for k in range(self.S)
@@ -562,23 +859,10 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             _ = [
                 (
                     self.m.Equation(
-                        self.Q_r[i][j][k]
-                        - self.Y[j][i][k]
-                        * self.f_c[j]
-                        * (self.T_c_out_y[j][i][k] - self.T_c[j][k + 1])
-                        == 0.0
-                    )
-                    if self.z_allowed[i][j][k] > 0
-                    else None
-                )
-                for k in range(self.S)
-                for j in range(self.J)
-                for i in range(self.I)
-            ]
-            _ = [
-                (
-                    self.m.Equation(
-                        self.m.sum([self.X[i][j][k] for j in range(self.J)]) == 1.0
+                        self.m.sum(
+                            [self.X_by_period[n][i][j][k] for j in range(self.J)]
+                        )
+                        == 1.0
                     )
                     if sum(self.z_allowed[i][j][k] for j in range(self.J)) > 0
                     else None
@@ -589,7 +873,10 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             _ = [
                 (
                     self.m.Equation(
-                        self.m.sum([self.Y[j][i][k] for i in range(self.I)]) == 1.0
+                        self.m.sum(
+                            [self.Y_by_period[n][j][i][k] for i in range(self.I)]
+                        )
+                        == 1.0
                     )
                     if sum(self.z_allowed[i][j][k] for i in range(self.I)) > 0
                     else None
@@ -597,90 +884,59 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                 for k in range(self.S)
                 for j in range(self.J)
             ]
-        else:
-            _ = [
-                (
-                    self.m.Equation(
-                        self.theta_1[i][j][k]
-                        <= (self.T_h[i][k] - self.T_c[j][k])
-                        + self.M_ij[i][j] * (1 - self.z[i][j][k])
-                    )
-                    if self.z_allowed[i][j][k] > 0
-                    else None
-                )
-                for k in range(self.S)
-                for j in range(self.J)
-                for i in range(self.I)
-            ]
-            _ = [
-                (
-                    self.m.Equation(
-                        self.theta_1[i][j][k]
-                        >= (self.T_h[i][k] - self.T_c[j][k])
-                        - self.M_ij[i][j] * (1 - self.z[i][j][k])
-                    )
-                    if self.z_allowed[i][j][k] > 0
-                    else None
-                )
-                for k in range(self.S)
-                for j in range(self.J)
-                for i in range(self.I)
-            ]
-            _ = [
-                (
-                    self.m.Equation(
-                        self.theta_2[i][j][k]
-                        <= (self.T_h[i][k + 1] - self.T_c[j][k + 1])
-                        + self.M_ij[i][j] * (1 - self.z[i][j][k])
-                    )
-                    if self.z_allowed[i][j][k] > 0
-                    else None
-                )
-                for k in range(self.S)
-                for j in range(self.J)
-                for i in range(self.I)
-            ]
-            _ = [
-                (
-                    self.m.Equation(
-                        self.theta_2[i][j][k]
-                        >= (self.T_h[i][k + 1] - self.T_c[j][k + 1])
-                        - self.M_ij[i][j] * (1 - self.z[i][j][k])
-                    )
-                    if self.z_allowed[i][j][k] > 0
-                    else None
-                )
-                for k in range(self.S)
-                for j in range(self.J)
-                for i in range(self.I)
-            ]
-
-        self.dqda = []
-        self.alpha = []
 
     def set_dqda_equations(self) -> None:
         """Apply the source TDM minimum dQ/dA restriction."""
 
-        self.min_dqda_int = [
-            [
-                [
-                    (
-                        self.m.Intermediate(
-                            self.min_dqda * (self.T_h[i][k] - self.T_c[j][k + 1])
-                            - self.theta_1[i][j][k]
-                            * self.theta_2[i][j][k]
-                            * self.U_r[i][j],
-                            name=f"dqda_calc_H{i}_to_C{j}_at_S{k}",
+        if getattr(self, "N_periods", 1) > 1:
+            self.min_dqda_int = build_index_grid(
+                lambda n, i, j, k: (
+                    self.m.Intermediate(
+                        self.min_dqda
+                        * (
+                            self.T_h_by_period[n][i][k]
+                            - self.T_c_by_period[n][j][k + 1]
                         )
-                        if self.z_allowed[i][j][k] > 0
-                        else None
+                        - self.theta_1_by_period[n][i][j][k]
+                        * self.theta_2_by_period[n][i][j][k]
+                        * self.U_r_period[n][i][j],
+                        name=f"dqda_calc_H{i}_to_C{j}_at_S{k}_period{n}",
                     )
-                    for k in range(self.S)
-                ]
+                    if self.z_allowed[i][j][k] > 0
+                    else None
+                ),
+                (self.N_periods, self.I, self.J, self.S),
+            )
+            self.min_dQ_dA_eqn = [
+                (
+                    self.m.Equation(
+                        self.min_dqda_int[n][i][j][k]
+                        <= self.min_dqda
+                        * self.M_ij_period[n][i][j]
+                        * (1 - self.z[i][j][k])
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
+                )
+                for n in range(self.N_periods)
+                for k in range(self.S)
                 for j in range(self.J)
+                for i in range(self.I)
             ]
-            for i in range(self.I)
-        ]
+            return
+
+        self.min_dqda_int = build_index_grid(
+            lambda i, j, k: (
+                self.m.Intermediate(
+                    self.min_dqda * (self.T_h[i][k] - self.T_c[j][k + 1])
+                    - self.theta_1[i][j][k] * self.theta_2[i][j][k] * self.U_r[i][j],
+                    name=f"dqda_calc_H{i}_to_C{j}_at_S{k}",
+                )
+                if self.z_allowed[i][j][k] > 0
+                else None
+            ),
+            (self.I, self.J, self.S),
+        )
         self.min_dQ_dA_eqn = [
             (
                 self.m.Equation(
@@ -702,6 +958,10 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         brackets: bool = False,
     ) -> None:
         """Warm-start this model from a solved parent model."""
+
+        if getattr(self, "N_periods", 1) > 1 and hasattr(self, "Q_r_by_period"):
+            self._set_multiperiod_initial_values(init_solution, brackets=brackets)
+            return
 
         for k in range(self.S):
             for j in range(self.J):
@@ -833,67 +1093,31 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                         sum_Q_r_i = sum(
                             init_solution.Q_r[i][j][k].VALUE[0] for j in range(self.J)
                         )
-                        allowed_js = [
-                            j for j in range(self.J) if self.z_allowed[i][j][k] > 0
-                        ]
                         for j in range(self.J):
-                            if self.z_allowed[i][j][k] <= 0:
-                                self._set_value(self.X[i][j][k], 0.0, brackets=brackets)
-                                continue
-                            q_val = init_solution.Q_r[i][j][k].VALUE[0]
-                            if sum_Q_r_i > self.tol:
-                                value = q_val / sum_Q_r_i
-                            else:
-                                value = 1.0 / len(allowed_js) if allowed_js else 0.0
-                            self._set_value(
-                                self.X[i][j][k],
-                                value,
-                                brackets=brackets,
+                            sum_Q_r_j = sum(
+                                init_solution.Q_r[i][j][k].VALUE[0]
+                                for i in range(self.I)
                             )
-                    for j in range(self.J):
-                        sum_Q_r_j = sum(
-                            init_solution.Q_r[i][j][k].VALUE[0] for i in range(self.I)
-                        )
-                        allowed_is = [
-                            i for i in range(self.I) if self.z_allowed[i][j][k] > 0
-                        ]
-                        for i in range(self.I):
-                            if self.z_allowed[i][j][k] <= 0:
-                                self._set_value(self.Y[j][i][k], 0.0, brackets=brackets)
-                                continue
-                            q_val = init_solution.Q_r[i][j][k].VALUE[0]
-                            if sum_Q_r_j > self.tol:
-                                value = q_val / sum_Q_r_j
-                            else:
-                                value = 1.0 / len(allowed_is) if allowed_is else 0.0
-                            self._set_value(
-                                self.Y[j][i][k],
-                                value,
-                                brackets=brackets,
-                            )
-                    for i in range(self.I):
-                        for j in range(self.J):
                             if self.z_allowed[i][j][k] > 0:
                                 q_val = init_solution.Q_r[i][j][k].VALUE[0]
-                                self._set_value(
-                                    self.T_h_out_x[i][j][k],
-                                    (
-                                        init_solution.T_h[i][k + 1].VALUE[0]
-                                        if q_val > self.tol
-                                        else init_solution.T_h[i][k].VALUE[0]
-                                    ),
-                                    brackets=brackets,
-                                )
-                                self._set_value(
-                                    self.T_c_out_y[j][i][k],
-                                    (
-                                        init_solution.T_c[j][k].VALUE[0]
-                                        if q_val > self.tol
-                                        else init_solution.T_c[j][k + 1].VALUE[0]
-                                    ),
-                                    brackets=brackets,
-                                )
-                            else:
+                                if q_val > 0.0:
+                                    self._set_value(
+                                        self.X[i][j][k],
+                                        q_val / sum_Q_r_i if sum_Q_r_i else 0.0,
+                                        brackets=brackets,
+                                    )
+                                    self._set_value(
+                                        self.Y[j][i][k],
+                                        q_val / sum_Q_r_j if sum_Q_r_j else 0.0,
+                                        brackets=brackets,
+                                    )
+                                else:
+                                    self._set_value(
+                                        self.X[i][j][k], 0.0, brackets=brackets
+                                    )
+                                    self._set_value(
+                                        self.Y[j][i][k], 0.0, brackets=brackets
+                                    )
                                 self._set_value(
                                     self.T_h_out_x[i][j][k],
                                     init_solution.T_h[i][k + 1].VALUE[0],
@@ -902,6 +1126,264 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                                 self._set_value(
                                     self.T_c_out_y[j][i][k],
                                     init_solution.T_c[j][k].VALUE[0],
+                                    brackets=brackets,
+                                )
+                            else:
+                                self._set_value(self.X[i][j][k], 0.0, brackets=brackets)
+                                self._set_value(self.Y[j][i][k], 0.0, brackets=brackets)
+                                self._set_value(
+                                    self.T_h_out_x[i][j][k],
+                                    init_solution.T_h[i][k + 1].VALUE[0],
+                                    brackets=brackets,
+                                )
+                                self._set_value(
+                                    self.T_c_out_y[j][i][k],
+                                    init_solution.T_c[j][k].VALUE[0],
+                                    brackets=brackets,
+                                )
+
+    def _set_multiperiod_initial_values(self, init_solution, *, brackets: bool) -> None:
+        source_q_r = getattr(init_solution, "Q_r_by_period", None)
+        source_q_c = getattr(init_solution, "Q_c_by_period", None)
+        source_q_h = getattr(init_solution, "Q_h_by_period", None)
+        source_t_h = getattr(init_solution, "T_h_by_period", None)
+        source_t_c = getattr(init_solution, "T_c_by_period", None)
+        source_theta_1 = getattr(init_solution, "theta_1_by_period", None)
+        source_theta_2 = getattr(init_solution, "theta_2_by_period", None)
+        if source_q_r is None:
+            source_q_r = [init_solution.Q_r for _ in range(self.N_periods)]
+            source_q_c = [init_solution.Q_c for _ in range(self.N_periods)]
+            source_q_h = [init_solution.Q_h for _ in range(self.N_periods)]
+            source_t_h = [init_solution.T_h for _ in range(self.N_periods)]
+            source_t_c = [init_solution.T_c for _ in range(self.N_periods)]
+            source_theta_1 = [init_solution.theta_1 for _ in range(self.N_periods)]
+            source_theta_2 = [init_solution.theta_2 for _ in range(self.N_periods)]
+
+        for n in range(self.N_periods):
+            source_period_idx = min(n, len(source_q_r) - 1)
+            for k in range(self.S):
+                for j in range(self.J):
+                    for i in range(self.I):
+                        if self.z_allowed[i][j][k] > 0:
+                            self._set_value(
+                                self.Q_r_by_period[n][i][j][k],
+                                self._active_binary_value(
+                                    source_q_r[source_period_idx][i][j][k]
+                                ),
+                                brackets=brackets,
+                            )
+                            self._set_value(
+                                self.theta_1_by_period[n][i][j][k],
+                                self._active_binary_value(
+                                    source_theta_1[source_period_idx][i][j][k]
+                                ),
+                                brackets=brackets,
+                            )
+                            self._set_value(
+                                self.theta_2_by_period[n][i][j][k],
+                                self._active_binary_value(
+                                    source_theta_2[source_period_idx][i][j][k]
+                                ),
+                                brackets=brackets,
+                            )
+                        else:
+                            self._set_value(
+                                self.Q_r_by_period[n][i][j][k],
+                                0.0,
+                                brackets=brackets,
+                            )
+                            approach = self._recovery_approach_temperature(
+                                i,
+                                j,
+                                n,
+                            )
+                            self._set_value(
+                                self.theta_1_by_period[n][i][j][k],
+                                approach,
+                                brackets=brackets,
+                            )
+                            self._set_value(
+                                self.theta_2_by_period[n][i][j][k],
+                                approach,
+                                brackets=brackets,
+                            )
+
+            for i in range(self.I):
+                for k in range(self.K):
+                    self._set_value(
+                        self.T_h_by_period[n][i][k],
+                        self._active_binary_value(source_t_h[source_period_idx][i][k]),
+                        brackets=brackets,
+                    )
+            for j in range(self.J):
+                for k in range(self.K):
+                    self._set_value(
+                        self.T_c_by_period[n][j][k],
+                        self._active_binary_value(source_t_c[source_period_idx][j][k]),
+                        brackets=brackets,
+                    )
+            for i in range(self.I):
+                value = (
+                    self._active_binary_value(source_q_c[source_period_idx][i])
+                    if self.z_cu_allowed[i] > 0
+                    else 0.0
+                )
+                self._set_value(
+                    self.Q_c_by_period[n][i],
+                    value,
+                    brackets=brackets,
+                )
+            for j in range(self.J):
+                value = (
+                    self._active_binary_value(source_q_h[source_period_idx][j])
+                    if self.z_hu_allowed[j] > 0
+                    else 0.0
+                )
+                self._set_value(
+                    self.Q_h_by_period[n][j],
+                    value,
+                    brackets=brackets,
+                )
+
+        for k in range(self.S):
+            for j in range(self.J):
+                for i in range(self.I):
+                    self._set_value(
+                        self.z[i][j][k],
+                        self._active_binary_value(init_solution.z[i][j][k]),
+                        brackets=brackets,
+                    )
+        for i in range(self.I):
+            self._set_value(
+                self.z_cu[i],
+                self._active_binary_value(init_solution.z_cu[i]),
+                brackets=brackets,
+            )
+        for j in range(self.J):
+            self._set_value(
+                self.z_hu[j],
+                self._active_binary_value(init_solution.z_hu[j]),
+                brackets=brackets,
+            )
+
+        source_area_r = getattr(init_solution, "area_r_shared", None)
+        source_area_hu = getattr(init_solution, "area_hu_shared", None)
+        source_area_cu = getattr(init_solution, "area_cu_shared", None)
+        if source_area_r is not None and hasattr(self, "area_r_shared"):
+            for k in range(self.S):
+                for j in range(self.J):
+                    for i in range(self.I):
+                        self._set_value(
+                            self.area_r_shared[i][j][k],
+                            self._active_binary_value(source_area_r[i][j][k]),
+                            brackets=brackets,
+                        )
+        if source_area_hu is not None and hasattr(self, "area_hu_shared"):
+            for j in range(self.J):
+                self._set_value(
+                    self.area_hu_shared[j],
+                    self._active_binary_value(source_area_hu[j]),
+                    brackets=brackets,
+                )
+        if source_area_cu is not None and hasattr(self, "area_cu_shared"):
+            for i in range(self.I):
+                self._set_value(
+                    self.area_cu_shared[i],
+                    self._active_binary_value(source_area_cu[i]),
+                    brackets=brackets,
+                )
+
+        if self.non_isothermal_model and hasattr(self, "X_by_period"):
+            source_x = getattr(init_solution, "X_by_period", None)
+            source_y = getattr(init_solution, "Y_by_period", None)
+            source_thx = getattr(init_solution, "T_h_out_x_by_period", None)
+            source_tcy = getattr(init_solution, "T_c_out_y_by_period", None)
+            if source_x is None and getattr(
+                init_solution, "non_isothermal_model", False
+            ):
+                source_x = [init_solution.X for _ in range(self.N_periods)]
+                source_y = [init_solution.Y for _ in range(self.N_periods)]
+                source_thx = [init_solution.T_h_out_x for _ in range(self.N_periods)]
+                source_tcy = [init_solution.T_c_out_y for _ in range(self.N_periods)]
+            if source_x is not None:
+                for n in range(self.N_periods):
+                    source_period_idx = min(n, len(source_x) - 1)
+                    for k in range(self.S):
+                        for j in range(self.J):
+                            for i in range(self.I):
+                                if self.z_allowed[i][j][k] > 0:
+                                    self._set_value(
+                                        self.X_by_period[n][i][j][k],
+                                        self._active_binary_value(
+                                            source_x[source_period_idx][i][j][k]
+                                        ),
+                                        brackets=brackets,
+                                    )
+                                    self._set_value(
+                                        self.Y_by_period[n][j][i][k],
+                                        self._active_binary_value(
+                                            source_y[source_period_idx][j][i][k]
+                                        ),
+                                        brackets=brackets,
+                                    )
+                                    self._set_value(
+                                        self.T_h_out_x_by_period[n][i][j][k],
+                                        self._active_binary_value(
+                                            source_thx[source_period_idx][i][j][k]
+                                        ),
+                                        brackets=brackets,
+                                    )
+                                    self._set_value(
+                                        self.T_c_out_y_by_period[n][j][i][k],
+                                        self._active_binary_value(
+                                            source_tcy[source_period_idx][j][i][k]
+                                        ),
+                                        brackets=brackets,
+                                    )
+            else:
+                for n in range(self.N_periods):
+                    source_period_idx = min(n, len(source_q_r) - 1)
+                    for k in range(self.S):
+                        for i in range(self.I):
+                            hot_total = sum(
+                                self._active_binary_value(
+                                    source_q_r[source_period_idx][i][j][k]
+                                )
+                                for j in range(self.J)
+                            )
+                            for j in range(self.J):
+                                cold_total = sum(
+                                    self._active_binary_value(
+                                        source_q_r[source_period_idx][row][j][k]
+                                    )
+                                    for row in range(self.I)
+                                )
+                                duty = self._active_binary_value(
+                                    source_q_r[source_period_idx][i][j][k]
+                                )
+                                active = self.z_allowed[i][j][k] > 0 and duty > 0.0
+                                self._set_value(
+                                    self.X_by_period[n][i][j][k],
+                                    duty / hot_total if active and hot_total else 0.0,
+                                    brackets=brackets,
+                                )
+                                self._set_value(
+                                    self.Y_by_period[n][j][i][k],
+                                    duty / cold_total if active and cold_total else 0.0,
+                                    brackets=brackets,
+                                )
+                                self._set_value(
+                                    self.T_h_out_x_by_period[n][i][j][k],
+                                    self._active_binary_value(
+                                        source_t_h[source_period_idx][i][k + 1]
+                                    ),
+                                    brackets=brackets,
+                                )
+                                self._set_value(
+                                    self.T_c_out_y_by_period[n][j][i][k],
+                                    self._active_binary_value(
+                                        source_t_c[source_period_idx][j][k]
+                                    ),
                                     brackets=brackets,
                                 )
 
@@ -925,6 +1407,15 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         max_parallel = max(1, int(max_parallel))
         if no_improvement_patience is not None:
             no_improvement_patience = max(1, int(no_improvement_patience))
+        if (
+            n_ad_branches == 1
+            and n_rm_branches == 1
+            and no_improvement_patience is None
+        ):
+            return self._get_source_net_benefit_evolution(
+                print_output=print_output,
+                max_depth=max_depth,
+            )
         frontier = [_EvolutionBranchState(model=self, best_tac=float(self.TAC))]
         best_model = self
 
@@ -955,31 +1446,31 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             for spec, candidate in solved_candidates:
                 if not _is_usable_evolution_candidate(candidate):
                     continue
-                parent_state = frontier[spec.branch_index]
+                parent_period = frontier[spec.branch_index]
                 candidate_tac = float(candidate.TAC)
-                if candidate_tac < parent_state.best_tac:
-                    branch_state = _EvolutionBranchState(
+                if candidate_tac < parent_period.best_tac:
+                    branch_period = _EvolutionBranchState(
                         model=candidate,
                         best_tac=candidate_tac,
                         stale_depths=0,
                     )
                 else:
-                    branch_state = _EvolutionBranchState(
+                    branch_period = _EvolutionBranchState(
                         model=candidate,
-                        best_tac=parent_state.best_tac,
-                        stale_depths=parent_state.stale_depths + 1,
+                        best_tac=parent_period.best_tac,
+                        stale_depths=parent_period.stale_depths + 1,
                     )
                 if (
                     no_improvement_patience is not None
-                    and branch_state.stale_depths >= no_improvement_patience
+                    and branch_period.stale_depths >= no_improvement_patience
                 ):
                     logger.debug(
                         "Pruning EVM branch %s after %s non-improving steps.",
                         spec.branch_index,
-                        branch_state.stale_depths,
+                        branch_period.stale_depths,
                     )
                     continue
-                next_frontier.append(branch_state)
+                next_frontier.append(branch_period)
                 if candidate.TAC < best_model.TAC:
                     best_model = candidate
             frontier = next_frontier
@@ -1001,6 +1492,83 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         self.m.cleanup()
         return self
 
+    def _get_source_net_benefit_evolution(
+        self,
+        *,
+        print_output: bool,
+        max_depth: int,
+    ):
+        """Run the original OpenHENS single-path add/remove evolution search."""
+
+        model = self
+        best_model = self
+        for unit in range(max_depth):
+            logger.debug(
+                "Evolution step %s/%s - Current TAC: %s",
+                unit + 1,
+                max_depth,
+                model.TAC,
+            )
+            model_minus_one = self.get_n_minus_one_evolution(
+                print_output=print_output,
+                unit=unit,
+                prev_case=model,
+            )
+            model_plus_one = self.get_n_plus_one_evolution(
+                print_output=print_output,
+                unit=unit,
+                prev_case=model,
+            )
+            model = self._select_source_best_candidate(
+                model,
+                model_minus_one,
+                model_plus_one,
+            )
+            if model is None:
+                logger.debug("No viable model found; ending evolution.")
+                break
+            if model.TAC < best_model.TAC:
+                best_model = model
+                logger.debug(
+                    "New best model: %s found with TAC: %.6f",
+                    model.name,
+                    best_model.TAC,
+                )
+
+        if best_model.mSuccess and best_model.TAC < self.TAC:
+            self._update_with_best_model(best_model)
+        else:
+            logger.debug("No improvement found over original model.")
+        self.m.cleanup()
+        return self
+
+    def _select_source_best_candidate(
+        self,
+        current_model,
+        model_minus_one,
+        model_plus_one,
+    ):
+        """Select the next OpenHENS tier-1 evolution candidate by success and TAC."""
+
+        del current_model
+        minus_success = bool(getattr(model_minus_one, "mSuccess", 0))
+        plus_success = bool(getattr(model_plus_one, "mSuccess", 0))
+        if not minus_success and not plus_success:
+            return None
+        if minus_success and not plus_success:
+            return model_minus_one
+        if not minus_success and plus_success:
+            return model_plus_one
+        logger.debug(
+            "TAC comparison -1: %.6f, +1: %.6f",
+            model_minus_one.TAC,
+            model_plus_one.TAC,
+        )
+        return min(
+            [model_minus_one, model_plus_one],
+            key=lambda candidate: candidate.TAC,
+        )
+
     def _evolution_candidate_specs(
         self,
         frontier: Sequence[_EvolutionBranchState],
@@ -1011,8 +1579,8 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
     ) -> list[_EvolutionCandidateSpec]:
         specs: list[_EvolutionCandidateSpec] = []
         seen_signatures: set[tuple[tuple[int, int, int], ...]] = set()
-        for branch_index, branch_state in enumerate(frontier):
-            prev_case = branch_state.model
+        for branch_index, branch_period in enumerate(frontier):
+            prev_case = branch_period.model
             for rank, position in enumerate(
                 prev_case.get_lowest_benefit_HX_candidates(n_rm_branches),
                 start=1,
@@ -1192,24 +1760,38 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         """Adopt the selected evolved topology while retaining this model object."""
 
         best_model.verify()
-        self.alpha = [
-            [[best_model.alpha[i][j][k] for k in range(self.S)] for j in range(self.J)]
-            for i in range(self.I)
-        ]
-        self.z_allowed = [
-            [
-                [best_model.z_allowed[i][j][k] for k in range(self.S)]
-                for j in range(self.J)
-            ]
-            for i in range(self.I)
-        ]
+        self.alpha = build_index_grid(
+            lambda i, j, k: best_model.alpha[i][j][k],
+            (self.I, self.J, self.S),
+        )
+        self.z_allowed = build_index_grid(
+            lambda i, j, k: best_model.z_allowed[i][j][k],
+            (self.I, self.J, self.S),
+        )
         self.set_initial_values_for_variables(best_model, brackets=True)
 
         self.hu_cost_total = copy.deepcopy(best_model.hu_cost_total)
         self.cu_cost_total = copy.deepcopy(best_model.cu_cost_total)
-        self.recovery_area_cost_filtered = copy.deepcopy(
-            best_model.recovery_area_cost_filtered
-        )
+        if hasattr(best_model, "recovery_area_cost_filtered"):
+            self.recovery_area_cost_filtered = copy.deepcopy(
+                best_model.recovery_area_cost_filtered
+            )
+        if hasattr(best_model, "recovery_area_cost_total"):
+            self.recovery_area_cost_total = copy.deepcopy(
+                best_model.recovery_area_cost_total
+            )
+        if hasattr(best_model, "capital_cost_total"):
+            self.capital_cost_total = copy.deepcopy(best_model.capital_cost_total)
+        if hasattr(best_model, "weighted_operating_cost"):
+            self.weighted_operating_cost = copy.deepcopy(
+                best_model.weighted_operating_cost
+            )
+        if hasattr(best_model, "area_r_shared"):
+            self.area_r_shared = copy.deepcopy(best_model.area_r_shared)
+        if hasattr(best_model, "area_hu_shared"):
+            self.area_hu_shared = copy.deepcopy(best_model.area_hu_shared)
+        if hasattr(best_model, "area_cu_shared"):
+            self.area_cu_shared = copy.deepcopy(best_model.area_cu_shared)
         self.hu_area_cost_total = copy.deepcopy(best_model.hu_area_cost_total)
         self.cu_area_cost_total = copy.deepcopy(best_model.cu_area_cost_total)
         self.get_post_process()
@@ -1390,16 +1972,98 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         )
 
     def _active_binary_value(self, value) -> float:
-        try:
-            return float(value[0])
-        except TypeError, IndexError:
-            pass
-        if hasattr(value, "VALUE"):
-            return float(value.VALUE[0])
-        return float(value)
+        return _value(value)
 
     def set_obj(self) -> None:
         """Attach source StageWise objective expressions unchanged."""
+
+        if getattr(self, "N_periods", 1) > 1:
+            if self.minimisation_goal == "hot utility":
+                self.m.Minimize(
+                    self._weighted_state_average(
+                        [
+                            self.m.sum(
+                                [self.Q_h_by_period[n][j] for j in range(self.J)]
+                            )
+                            for n in range(self.N_periods)
+                        ]
+                    )
+                )
+            elif self.minimisation_goal == "cold utility":
+                self.m.Minimize(
+                    self._weighted_state_average(
+                        [
+                            self.m.sum(
+                                [self.Q_c_by_period[n][i] for i in range(self.I)]
+                            )
+                            for n in range(self.N_periods)
+                        ]
+                    )
+                )
+            elif self.minimisation_goal == "total utility":
+                self.m.Minimize(
+                    self._weighted_state_average(
+                        [
+                            self.m.sum(
+                                [self.Q_h_by_period[n][j] for j in range(self.J)]
+                            )
+                            + self.m.sum(
+                                [self.Q_c_by_period[n][i] for i in range(self.I)]
+                            )
+                            for n in range(self.N_periods)
+                        ]
+                    )
+                )
+            elif self.minimisation_goal == "utility costs":
+                hot_costs = [
+                    self._utility_cost_expression(
+                        "hot",
+                        n,
+                        self.m.sum([self.Q_h_by_period[n][j] for j in range(self.J)]),
+                        name=f"hot_utility_period_{n}",
+                    )
+                    for n in range(self.N_periods)
+                ]
+                cold_costs = [
+                    self._utility_cost_expression(
+                        "cold",
+                        n,
+                        self.m.sum([self.Q_c_by_period[n][i] for i in range(self.I)]),
+                        name=f"cold_utility_period_{n}",
+                    )
+                    for n in range(self.N_periods)
+                ]
+                self.m.Minimize(
+                    self._weighted_state_average(
+                        [hot_costs[n] + cold_costs[n] for n in range(self.N_periods)]
+                    )
+                )
+            elif self.minimisation_goal == "heat recovery":
+                self.m.Maximize(
+                    self._weighted_state_average(
+                        [
+                            self.m.sum(
+                                [
+                                    self.Q_r_by_period[n][i][j][k]
+                                    for i in range(self.I)
+                                    for j in range(self.J)
+                                    for k in range(self.S)
+                                ]
+                            )
+                            for n in range(self.N_periods)
+                        ]
+                    )
+                )
+            elif self.minimisation_goal == "dQ/dA obj":
+                self.m.Minimize(
+                    self._weighted_state_average(
+                        [sum(self.Q_h_by_period[n]) for n in range(self.N_periods)]
+                    )
+                    - self.HU_target
+                )
+            elif self.minimisation_goal in {"total cost", "variable total cost"}:
+                self._set_total_cost_objective()
+            return
 
         if self.minimisation_goal == "hot utility":
             self.m.Minimize(self.m.sum([self.Q_h[j] for j in range(self.J)]))
@@ -1411,10 +2075,19 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                 + self.m.sum([self.Q_c[i] for i in range(self.I)])
             )
         elif self.minimisation_goal == "utility costs":
-            self.m.Minimize(
-                self.hu_cost[0] * self.m.sum([self.Q_h[j] for j in range(self.J)])
-                + self.cu_cost[0] * self.m.sum([self.Q_c[i] for i in range(self.I)])
+            hot_cost = self._utility_cost_expression(
+                "hot",
+                0,
+                self.m.sum([self.Q_h[j] for j in range(self.J)]),
+                name="hot_utility",
             )
+            cold_cost = self._utility_cost_expression(
+                "cold",
+                0,
+                self.m.sum([self.Q_c[i] for i in range(self.I)]),
+                name="cold_utility",
+            )
+            self.m.Minimize(hot_cost + cold_cost)
         elif self.minimisation_goal == "heat recovery":
             self.m.Maximize(
                 self.m.sum(
@@ -1432,12 +2105,28 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             self._set_total_cost_objective()
 
     def _set_total_cost_objective(self) -> None:
+        if getattr(self, "N_periods", 1) == 1:
+            self._set_source_total_cost_objective()
+            return
+        self._set_multiperiod_total_cost_objective()
+
+    def _set_source_total_cost_objective(self) -> None:
         self.hu_cost_total = self.m.Intermediate(
-            self.hu_cost[0] * self.m.sum([self.Q_h[j] for j in range(self.J)]),
+            self._utility_cost_expression(
+                "hot",
+                0,
+                self.m.sum([self.Q_h[j] for j in range(self.J)]),
+                name="hot_utility_total_cost",
+            ),
             name="Hot utility cost",
         )
         self.cu_cost_total = self.m.Intermediate(
-            self.cu_cost[0] * self.m.sum([self.Q_c[i] for i in range(self.I)]),
+            self._utility_cost_expression(
+                "cold",
+                0,
+                self.m.sum([self.Q_c[i] for i in range(self.I)]),
+                name="cold_utility_total_cost",
+            ),
             name="Cold utility cost",
         )
         self.recovery_area_cost_filtered = [
@@ -1446,30 +2135,32 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         for k in range(self.S):
             for j in range(self.J):
                 allowed_hots = [i for i in range(self.I) if self.z_allowed[i][j][k] > 0]
-                if sum(self.z_allowed[z][j][k] for z in range(self.I)) > 0:
+                if sum(self.z_allowed[i][j][k] for i in range(self.I)) > 0:
                     self.recovery_area_cost_filtered[k][j] = self.m.Intermediate(
                         self.A_coeff[0]
                         * sum(
                             (
-                                self.Q_r[n][j][k]
-                                / (
-                                    self.U_r[n][j]
-                                    * (
-                                        self.theta_1[n][j][k]
-                                        * self.theta_2[n][j][k]
+                                (
+                                    self.Q_r[i][j][k]
+                                    / (
+                                        self.U_r[i][j]
                                         * (
-                                            self.theta_1[n][j][k]
-                                            + self.theta_2[n][j][k]
+                                            self.theta_1[i][j][k]
+                                            * self.theta_2[i][j][k]
+                                            * (
+                                                self.theta_1[i][j][k]
+                                                + self.theta_2[i][j][k]
+                                            )
+                                            / 2
+                                            + 1e-3
                                         )
-                                        / 2
-                                        + 1e-3
+                                        ** (1 / 3)
                                     )
-                                    ** (1 / 3)
                                 )
                                 + 1e-3
                             )
                             ** self.A_exp[0]
-                            for n in allowed_hots
+                            for i in allowed_hots
                         ),
                         name=f"Recovery HX area cost in stage {k} cold {j}",
                     )
@@ -1478,20 +2169,22 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             self.hu_coeff[0]
             * sum(
                 (
-                    self.Q_h[j]
-                    / (
-                        self.U_hu[j]
-                        * (
-                            (self.T_hu_in[0] - self.T_c_out[j])
-                            * (self.T_hu_out[0] - self.T_c[j][0])
+                    (
+                        self.Q_h[j]
+                        / (
+                            self.U_hu[j]
                             * (
                                 (self.T_hu_in[0] - self.T_c_out[j])
-                                + (self.T_hu_out[0] - self.T_c[j][0])
+                                * (self.T_hu_out[0] - self.T_c[j][0])
+                                * (
+                                    (self.T_hu_in[0] - self.T_c_out[j])
+                                    + (self.T_hu_out[0] - self.T_c[j][0])
+                                )
+                                / 2
+                                + 1e-3
                             )
-                            / 2
-                            + 1e-3
+                            ** (1 / 3)
                         )
-                        ** (1 / 3)
                     )
                     + 1e-3
                 )
@@ -1504,20 +2197,22 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             self.cu_coeff[0]
             * sum(
                 (
-                    self.Q_c[i]
-                    / (
-                        self.U_cu[i]
-                        * (
-                            (self.T_h[i][self.S] - self.T_cu_out[0])
-                            * (self.T_h_out[i] - self.T_cu_in[0])
+                    (
+                        self.Q_c[i]
+                        / (
+                            self.U_cu[i]
                             * (
                                 (self.T_h[i][self.S] - self.T_cu_out[0])
-                                + (self.T_h_out[i] - self.T_cu_in[0])
+                                * (self.T_h_out[i] - self.T_cu_in[0])
+                                * (
+                                    (self.T_h[i][self.S] - self.T_cu_out[0])
+                                    + (self.T_h_out[i] - self.T_cu_in[0])
+                                )
+                                / 2
+                                + 1e-3
                             )
-                            / 2
-                            + 1e-3
+                            ** (1 / 3)
                         )
-                        ** (1 / 3)
                     )
                     + 1e-3
                 )
@@ -1572,71 +2267,473 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                 + self.cu_area_cost_total
             )
 
+    def _set_multiperiod_total_cost_objective(self) -> None:
+        self.hu_cost_total_by_period = [
+            self.m.Intermediate(
+                self._utility_cost_expression(
+                    "hot",
+                    n,
+                    self.m.sum([self.Q_h_by_period[n][j] for j in range(self.J)]),
+                    name=f"hot_utility_total_cost_period_{n}",
+                ),
+                name=f"Hot utility cost state {n}",
+            )
+            for n in range(self.N_periods)
+        ]
+        self.cu_cost_total_by_period = [
+            self.m.Intermediate(
+                self._utility_cost_expression(
+                    "cold",
+                    n,
+                    self.m.sum([self.Q_c_by_period[n][i] for i in range(self.I)]),
+                    name=f"cold_utility_total_cost_period_{n}",
+                ),
+                name=f"Cold utility cost state {n}",
+            )
+            for n in range(self.N_periods)
+        ]
+        self.operating_cost_by_state_expr = [
+            self.m.Intermediate(
+                self.hu_cost_total_by_period[n] + self.cu_cost_total_by_period[n],
+                name=f"Operating cost state {n}",
+            )
+            for n in range(self.N_periods)
+        ]
+        self.hu_cost_total = self._weighted_state_average(self.hu_cost_total_by_period)
+        self.cu_cost_total = self._weighted_state_average(self.cu_cost_total_by_period)
+        self.weighted_operating_cost = self._weighted_state_average(
+            self.operating_cost_by_state_expr
+        )
+
+        self.area_r_shared = [
+            [
+                [
+                    (
+                        self.m.Var(
+                            value=0.0,
+                            lb=0.0,
+                            name=f"area_H{i}_to_C{j}_at_S{k}",
+                        )
+                        if self.z_allowed[i][j][k] > 0
+                        else self.m.Param(
+                            value=0.0,
+                            name=f"area_H{i}_to_C{j}_at_S{k}",
+                        )
+                    )
+                    for k in range(self.S)
+                ]
+                for j in range(self.J)
+            ]
+            for i in range(self.I)
+        ]
+        self.area_hu_shared = [
+            (
+                self.m.Var(value=0.0, lb=0.0, name=f"area_HU_to_C{j}")
+                if self.z_hu_allowed[j] > 0
+                else self.m.Param(value=0.0, name=f"area_HU_to_C{j}")
+            )
+            for j in range(self.J)
+        ]
+        self.area_cu_shared = [
+            (
+                self.m.Var(value=0.0, lb=0.0, name=f"area_H{i}_to_CU")
+                if self.z_cu_allowed[i] > 0
+                else self.m.Param(value=0.0, name=f"area_H{i}_to_CU")
+            )
+            for i in range(self.I)
+        ]
+
+        for n in range(self.N_periods):
+            _ = [
+                (
+                    self.m.Equation(
+                        self.area_r_shared[i][j][k]
+                        >= self.Q_r_by_period[n][i][j][k]
+                        / (
+                            self.U_r_period[n][i][j]
+                            * (
+                                self.theta_1_by_period[n][i][j][k]
+                                * self.theta_2_by_period[n][i][j][k]
+                                * (
+                                    self.theta_1_by_period[n][i][j][k]
+                                    + self.theta_2_by_period[n][i][j][k]
+                                )
+                                / 2
+                                + 1e-3
+                            )
+                            ** (1 / 3)
+                        )
+                    )
+                    if self.z_allowed[i][j][k] > 0
+                    else None
+                )
+                for k in range(self.S)
+                for j in range(self.J)
+                for i in range(self.I)
+            ]
+            _ = [
+                (
+                    self.m.Equation(
+                        self.area_hu_shared[j]
+                        >= self.Q_h_by_period[n][j]
+                        / (
+                            self.U_hu_period[n][j]
+                            * (
+                                (self.T_hu_in_period[n][0] - self.T_c_out_period[n][j])
+                                * (
+                                    self._utility_solved_outlet_temperature("hot", n, j)
+                                    - self.T_c_by_period[n][j][0]
+                                )
+                                * (
+                                    (
+                                        self.T_hu_in_period[n][0]
+                                        - self.T_c_out_period[n][j]
+                                    )
+                                    + (
+                                        self._utility_solved_outlet_temperature(
+                                            "hot", n, j
+                                        )
+                                        - self.T_c_by_period[n][j][0]
+                                    )
+                                )
+                                / 2
+                                + 1e-3
+                            )
+                            ** (1 / 3)
+                        )
+                    )
+                    if self.z_hu_allowed[j] > 0
+                    else None
+                )
+                for j in range(self.J)
+            ]
+            _ = [
+                (
+                    self.m.Equation(
+                        self.area_cu_shared[i]
+                        >= self.Q_c_by_period[n][i]
+                        / (
+                            self.U_cu_period[n][i]
+                            * (
+                                (
+                                    self.T_h_by_period[n][i][self.S]
+                                    - self._utility_solved_outlet_temperature(
+                                        "cold", n, i
+                                    )
+                                )
+                                * (
+                                    self.T_h_out_period[n][i]
+                                    - self.T_cu_in_period[n][0]
+                                )
+                                * (
+                                    (
+                                        self.T_h_by_period[n][i][self.S]
+                                        - self._utility_solved_outlet_temperature(
+                                            "cold", n, i
+                                        )
+                                    )
+                                    + (
+                                        self.T_h_out_period[n][i]
+                                        - self.T_cu_in_period[n][0]
+                                    )
+                                )
+                                / 2
+                                + 1e-3
+                            )
+                            ** (1 / 3)
+                        )
+                    )
+                    if self.z_cu_allowed[i] > 0
+                    else None
+                )
+                for i in range(self.I)
+            ]
+
+        self.recovery_area_cost_total = self.m.Intermediate(
+            self.A_coeff[0]
+            * sum(
+                self.area_r_shared[i][j][k] ** self.A_exp[0]
+                for k in range(self.S)
+                for j in range(self.J)
+                for i in range(self.I)
+            ),
+            name="Total recovery HX area cost",
+        )
+        self.hu_area_cost_total = self.m.Intermediate(
+            self.hu_coeff[0]
+            * sum(self.area_hu_shared[j] ** self.hu_exp[0] for j in range(self.J)),
+            name="Total hot utility HX area cost",
+        )
+        self.cu_area_cost_total = self.m.Intermediate(
+            self.cu_coeff[0]
+            * sum(self.area_cu_shared[i] ** self.cu_exp[0] for i in range(self.I)),
+            name="Total cold utility HX area cost",
+        )
+        self.unit_cost_total = self.m.Intermediate(
+            self.unit_cost[0]
+            * sum(
+                self.z[i][j][k]
+                for k in range(self.S)
+                for j in range(self.J)
+                for i in range(self.I)
+            ),
+            name="Total recovery base cost",
+        )
+        self.utility_unit_cost_total = self.m.Intermediate(
+            self.hu_unit_cost[0] * sum(self.z_hu[j] for j in range(self.J))
+            + self.cu_unit_cost[0] * sum(self.z_cu[i] for i in range(self.I)),
+            name="Total utility base cost",
+        )
+        self.capital_cost_total = self.m.Intermediate(
+            self.unit_cost_total
+            + self.utility_unit_cost_total
+            + self.recovery_area_cost_total
+            + self.hu_area_cost_total
+            + self.cu_area_cost_total,
+            name="Total shared capital cost",
+        )
+        self.m.Minimize(self.capital_cost_total + self.weighted_operating_cost)
+
     def get_post_process(self) -> None:
         """Extract source post-process arrays after a successful solve."""
 
         if self.mSuccess != 1:
             return
+        self._get_multiperiod_post_process()
+
+    def _get_multiperiod_post_process(self) -> None:
+        q_r = [
+            [
+                [
+                    [
+                        self._active_binary_value(self.Q_r_by_period[n][i][j][k])
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
+                ]
+                for i in range(self.I)
+            ]
+            for n in range(self.N_periods)
+        ]
+        q_h = [
+            [self._active_binary_value(self.Q_h_by_period[n][j]) for j in range(self.J)]
+            for n in range(self.N_periods)
+        ]
+        q_c = [
+            [self._active_binary_value(self.Q_c_by_period[n][i]) for i in range(self.I)]
+            for n in range(self.N_periods)
+        ]
 
         self.z = [
             [
-                [[1] if self.Q_r[i][j][k][0] > self.tol else [0] for k in range(self.S)]
+                [
+                    [
+                        (
+                            1
+                            if max(q_r[n][i][j][k] for n in range(self.N_periods))
+                            > self.tol
+                            else 0
+                        )
+                    ]
+                    for k in range(self.S)
+                ]
                 for j in range(self.J)
             ]
+            for i in range(self.I)
+        ]
+        self.z_hu = [
+            [1 if max(q_h[n][j] for n in range(self.N_periods)) > self.tol else 0]
+            for j in range(self.J)
+        ]
+        self.z_cu = [
+            [1 if max(q_c[n][i] for n in range(self.N_periods)) > self.tol else 0]
             for i in range(self.I)
         ]
         self.n_recovery_units = sum(
-            self.z[i][j][k][0] if self.Q_r[i][j][k][0] > self.tol else 0
+            self.z[i][j][k][0]
             for k in range(self.S)
             for j in range(self.J)
             for i in range(self.I)
         )
-        self.z_hu = [[1] if self.Q_h[j][0] > self.tol else [0] for j in range(self.J)]
-        self.n_hu_units = sum(
-            self.z_hu[j][0] if self.Q_h[j][0] > self.tol else 0 for j in range(self.J)
-        )
-        self.z_cu = [[1] if self.Q_c[i][0] > self.tol else [0] for i in range(self.I)]
-        self.n_cu_units = sum(
-            self.z_cu[i][0] if self.Q_c[i][0] > self.tol else 0 for i in range(self.I)
-        )
+        self.n_hu_units = sum(self.z_hu[j][0] for j in range(self.J))
+        self.n_cu_units = sum(self.z_cu[i][0] for i in range(self.I))
         self.n_units = self.n_recovery_units + self.n_hu_units + self.n_cu_units
 
-        self.LMTD_r = [
+        self.LMTD_r_by_period = [
             [
                 [
-                    self._post_process_lmtd(
-                        self.theta_1[i][j][k][0],
-                        self.theta_2[i][j][k][0],
-                        self.z[i][j][k][0],
-                        formula_allowed=(
-                            abs(self.theta_1[i][j][k][0] - self.theta_2[i][j][k][0])
-                            > self.tol
-                            and abs(
-                                self.theta_1[i][j][k][0]
-                                - self._recovery_approach_temperature(i, j)
-                            )
-                            >= self.tol
-                            and abs(
-                                self.theta_2[i][j][k][0]
-                                - self._recovery_approach_temperature(i, j)
-                            )
-                            >= self.tol
-                        ),
-                    )
-                    for k in range(self.S)
+                    [
+                        self._post_process_lmtd(
+                            self._active_binary_value(
+                                self.theta_1_by_period[n][i][j][k]
+                            ),
+                            self._active_binary_value(
+                                self.theta_2_by_period[n][i][j][k]
+                            ),
+                            self.z[i][j][k][0],
+                            formula_allowed=(
+                                abs(
+                                    self._active_binary_value(
+                                        self.theta_1_by_period[n][i][j][k]
+                                    )
+                                    - self._active_binary_value(
+                                        self.theta_2_by_period[n][i][j][k]
+                                    )
+                                )
+                                > self.tol
+                                and abs(
+                                    self._active_binary_value(
+                                        self.theta_1_by_period[n][i][j][k]
+                                    )
+                                    - self._recovery_approach_temperature(i, j, n)
+                                )
+                                >= self.tol
+                                and abs(
+                                    self._active_binary_value(
+                                        self.theta_2_by_period[n][i][j][k]
+                                    )
+                                    - self._recovery_approach_temperature(i, j, n)
+                                )
+                                >= self.tol
+                            ),
+                        )
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
                 ]
+                for i in range(self.I)
+            ]
+            for n in range(self.N_periods)
+        ]
+        self.area_r_by_period = [
+            [
+                [
+                    [
+                        (
+                            q_r[n][i][j][k]
+                            / self.U_r_period[n][i][j]
+                            / self.LMTD_r_by_period[n][i][j][k]
+                            if self.LMTD_r_by_period[n][i][j][k] > self.tol
+                            and q_r[n][i][j][k] > self.tol
+                            else 0.0
+                        )
+                        for k in range(self.S)
+                    ]
+                    for j in range(self.J)
+                ]
+                for i in range(self.I)
+            ]
+            for n in range(self.N_periods)
+        ]
+
+        self.LMTD_hu_by_period = [
+            [
+                self._post_process_lmtd(
+                    self.T_hu_in_period[n][0] - self.T_c_out_period[n][j],
+                    self._utility_solved_outlet_temperature("hot", n, j, q_h[n][j])
+                    - self._active_binary_value(self.T_c_by_period[n][j][0]),
+                    self.z_hu[j][0],
+                    formula_allowed=(
+                        abs(
+                            (self.T_hu_in_period[n][0] - self.T_c_out_period[n][j])
+                            - (
+                                self._utility_solved_outlet_temperature(
+                                    "hot", n, j, q_h[n][j]
+                                )
+                                - self._active_binary_value(self.T_c_by_period[n][j][0])
+                            )
+                        )
+                        > self.tol
+                        and self.T_hu_in_period[n][0]
+                        - self.T_c_out_period[n][j]
+                        - self._hot_utility_inlet_approach_temperature(j, n)
+                        >= self.tol
+                        and self._utility_solved_outlet_temperature(
+                            "hot", n, j, q_h[n][j]
+                        )
+                        - self._active_binary_value(self.T_c_by_period[n][j][0])
+                        - self._hot_utility_outlet_approach_temperature(j, n, q_h[n][j])
+                        >= self.tol
+                    ),
+                )
                 for j in range(self.J)
             ]
-            for i in range(self.I)
+            for n in range(self.N_periods)
         ]
+        self.area_hu_by_period = [
+            [
+                (
+                    q_h[n][j] / self.U_hu_period[n][j] / self.LMTD_hu_by_period[n][j]
+                    if self.LMTD_hu_by_period[n][j] > self.tol and q_h[n][j] > self.tol
+                    else 0.0
+                )
+                for j in range(self.J)
+            ]
+            for n in range(self.N_periods)
+        ]
+        self.LMTD_cu_by_period = [
+            [
+                self._post_process_lmtd(
+                    self._active_binary_value(self.T_h_by_period[n][i][self.S])
+                    - self._utility_solved_outlet_temperature("cold", n, i, q_c[n][i]),
+                    self.T_h_out_period[n][i] - self.T_cu_in_period[n][0],
+                    self.z_cu[i][0],
+                    formula_allowed=(
+                        abs(
+                            (
+                                self._active_binary_value(
+                                    self.T_h_by_period[n][i][self.S]
+                                )
+                                - self._utility_solved_outlet_temperature(
+                                    "cold", n, i, q_c[n][i]
+                                )
+                            )
+                            - (self.T_h_out_period[n][i] - self.T_cu_in_period[n][0])
+                        )
+                        > self.tol
+                        and self._active_binary_value(self.T_h_by_period[n][i][self.S])
+                        - self._utility_solved_outlet_temperature(
+                            "cold", n, i, q_c[n][i]
+                        )
+                        - self._cold_utility_outlet_approach_temperature(
+                            i, n, q_c[n][i]
+                        )
+                        >= self.tol
+                        and self.T_h_out_period[n][i]
+                        - self.T_cu_in_period[n][0]
+                        - self._cold_utility_inlet_approach_temperature(i, n)
+                        >= self.tol
+                    ),
+                    fallback_delta=(
+                        self.T_h_out_period[n][i] - self.T_cu_in_period[n][0]
+                    ),
+                )
+                for i in range(self.I)
+            ]
+            for n in range(self.N_periods)
+        ]
+        self.area_cu_by_period = [
+            [
+                (
+                    q_c[n][i] / self.U_cu_period[n][i] / self.LMTD_cu_by_period[n][i]
+                    if self.LMTD_cu_by_period[n][i] > self.tol and q_c[n][i] > self.tol
+                    else 0.0
+                )
+                for i in range(self.I)
+            ]
+            for n in range(self.N_periods)
+        ]
+
+        self._apply_segment_utility_areas(q_h, q_c)
+
+        self.LMTD_r = self.LMTD_r_by_period[0]
+        self.LMTD_hu = self.LMTD_hu_by_period[0]
+        self.LMTD_cu = self.LMTD_cu_by_period[0]
         self.area_r = [
             [
                 [
-                    (
-                        self.Q_r[i][j][k][0] / self.U_r[i][j] / self.LMTD_r[i][j][k]
-                        if self.LMTD_r[i][j][k] > self.tol
-                        and self.Q_r[i][j][k][0] > self.tol
-                        else 0.0
+                    max(
+                        self.area_r_by_period[n][i][j][k] for n in range(self.N_periods)
                     )
                     for k in range(self.S)
                 ]
@@ -1644,90 +2741,117 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             ]
             for i in range(self.I)
         ]
-        self.LMTD_hu = [
-            self._post_process_lmtd(
-                self.T_hu_in[0] - self.T_c_out[j],
-                self.T_hu_out[0] - self.T_c[j][0][0],
-                self.z_hu[j][0],
-                formula_allowed=(
-                    abs(
-                        (self.T_hu_in[0] - self.T_c_out[j])
-                        - (self.T_hu_out[0] - self.T_c[j][0][0])
-                    )
-                    > self.tol
-                    and (
-                        self.T_hu_in[0]
-                        - self.T_c_out[j]
-                        - self._hot_utility_approach_temperature(j)
-                    )
-                    >= self.tol
-                    and (
-                        self.T_hu_out[0]
-                        - self.T_c[j][0][0]
-                        - self._hot_utility_approach_temperature(j)
-                    )
-                    >= self.tol
-                ),
-            )
-            for j in range(self.J)
-        ]
+        self._apply_segment_recovery_areas(q_r)
         self.area_hu = [
-            (
-                self.Q_h[j][0] / self.U_hu[j] / self.LMTD_hu[j]
-                if self.LMTD_hu[j] > self.tol and self.Q_h[j][0] > self.tol
-                else 0.0
-            )
+            max(self.area_hu_by_period[n][j] for n in range(self.N_periods))
             for j in range(self.J)
-        ]
-        self.LMTD_cu = [
-            self._post_process_lmtd(
-                self.T_h[i][self.S][0] - self.T_cu_out[0],
-                self.T_h_out[i] - self.T_cu_in[0],
-                self.z_cu[i][0],
-                formula_allowed=(
-                    abs(
-                        (self.T_h[i][self.S][0] - self.T_cu_out[0])
-                        - (self.T_h_out[i] - self.T_cu_in[0])
-                    )
-                    > self.tol
-                    and (
-                        self.T_h[i][self.S][0]
-                        - self.T_cu_out[0]
-                        - self._cold_utility_approach_temperature(i)
-                    )
-                    >= self.tol
-                    and (
-                        self.T_h_out[i]
-                        - self.T_cu_in[0]
-                        - self._cold_utility_approach_temperature(i)
-                    )
-                    >= self.tol
-                ),
-                fallback_delta=self.T_h_out[i] - self.T_cu_in[0],
-            )
-            for i in range(self.I)
         ]
         self.area_cu = [
-            (
-                self.Q_c[i][0] / self.U_cu[i] / self.LMTD_cu[i]
-                if self.LMTD_cu[i] > self.tol and self.Q_c[i][0] > self.tol
-                else 0.0
-            )
+            max(self.area_cu_by_period[n][i] for n in range(self.N_periods))
             for i in range(self.I)
         ]
-        self.Q_cu_total = sum(self.Q_c[i][0] for i in range(self.I))
-        self.Q_hu_total = sum(self.Q_h[j][0] for j in range(self.J))
-        self.Q_r_total = sum(
-            self.Q_r[i][j][k][0]
+
+        self.Q_hu_total_by_period = [sum(q_h[n]) for n in range(self.N_periods)]
+        self.Q_cu_total_by_period = [sum(q_c[n]) for n in range(self.N_periods)]
+        self.Q_r_total_by_period = [
+            sum(
+                q_r[n][i][j][k]
+                for k in range(self.S)
+                for j in range(self.J)
+                for i in range(self.I)
+            )
+            for n in range(self.N_periods)
+        ]
+        self.Q_hu_total = self._weighted_numeric_average(self.Q_hu_total_by_period)
+        self.Q_cu_total = self._weighted_numeric_average(self.Q_cu_total_by_period)
+        self.Q_r_total = self._weighted_numeric_average(self.Q_r_total_by_period)
+
+        self.operating_cost_by_period = [
+            self._utility_cost_value("hot", n, self.Q_hu_total_by_period[n])
+            + self._utility_cost_value("cold", n, self.Q_cu_total_by_period[n])
+            for n in range(self.N_periods)
+        ]
+        self.weighted_operating_cost_value = self._weighted_numeric_average(
+            self.operating_cost_by_period
+        )
+        self.capital_cost_value = (
+            self.unit_cost[0] * self.n_units
+            + self.A_coeff[0]
+            * sum(
+                self.area_r[i][j][k] ** self.A_exp[0]
+                for k in range(self.S)
+                for j in range(self.J)
+                for i in range(self.I)
+            )
+            + self.hu_coeff[0]
+            * sum(self.area_hu[j] ** self.hu_exp[0] for j in range(self.J))
+            + self.cu_coeff[0]
+            * sum(self.area_cu[i] ** self.cu_exp[0] for i in range(self.I))
+        )
+        self.hu_cost_total = self._weighted_numeric_average(
+            [
+                self._utility_cost_value("hot", n, self.Q_hu_total_by_period[n])
+                for n in range(self.N_periods)
+            ]
+        )
+        self.cu_cost_total = self._weighted_numeric_average(
+            [
+                self._utility_cost_value("cold", n, self.Q_cu_total_by_period[n])
+                for n in range(self.N_periods)
+            ]
+        )
+        self.recovery_area_cost_total = self.A_coeff[0] * sum(
+            self.area_r[i][j][k] ** self.A_exp[0]
             for k in range(self.S)
             for j in range(self.J)
             for i in range(self.I)
         )
-        self.alpha = self.get_alpha_values()
+        self.hu_area_cost_total = self.hu_coeff[0] * sum(
+            self.area_hu[j] ** self.hu_exp[0] for j in range(self.J)
+        )
+        self.cu_area_cost_total = self.cu_coeff[0] * sum(
+            self.area_cu[i] ** self.cu_exp[0] for i in range(self.I)
+        )
+        self.unit_cost_total = self.unit_cost[0] * self.n_recovery_units
+        self.utility_unit_cost_total = self.unit_cost[0] * (
+            self.n_hu_units + self.n_cu_units
+        )
+
         self.dqda = [
             [[None for _k in range(self.S)] for _j in range(self.J)]
             for _i in range(self.I)
         ]
+        for k in range(self.S):
+            for j in range(self.J):
+                for i in range(self.I):
+                    driving_force = self._active_binary_value(
+                        self.T_h[i][k]
+                    ) - self._active_binary_value(self.T_c[j][k + 1])
+                    if q_r[0][i][j][k] > 0.0 and driving_force > 0.0:
+                        self.dqda[i][j][k] = (
+                            self._active_binary_value(self.theta_1[i][j][k])
+                            * self._active_binary_value(self.theta_2[i][j][k])
+                            * self.U_r[i][j]
+                        ) / driving_force
+                    elif driving_force > 0.0:
+                        self.dqda[i][j][k] = self.U_r[i][j] * driving_force
+                    else:
+                        self.dqda[i][j][k] = 0.0
+                    exact_dqda = self._segment_exact_dqda(
+                        period_index=0,
+                        hot_parent_index=i,
+                        cold_parent_index=j,
+                        duty=float(q_r[0][i][j][k]),
+                        hot_inlet_temperature=self._active_binary_value(
+                            self.T_h_by_period[0][i][k]
+                        ),
+                        cold_inlet_temperature=self._active_binary_value(
+                            self.T_c_by_period[0][j][k + 1]
+                        ),
+                    )
+                    if exact_dqda is not None:
+                        self.dqda[i][j][k] = exact_dqda
+        self.alpha = self.get_alpha_values()
         self.dtacda = [
             [[None for _k in range(self.S)] for _j in range(self.J)]
             for _i in range(self.I)
@@ -1735,22 +2859,6 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         for k in range(self.S):
             for j in range(self.J):
                 for i in range(self.I):
-                    if (
-                        self.Q_r[i][j][k][0] > 0
-                        and (self.T_h[i][k][0] - self.T_c[j][k + 1][0]) > 0.0
-                    ):
-                        self.dqda[i][j][k] = (
-                            self.theta_1[i][j][k][0]
-                            * self.theta_2[i][j][k][0]
-                            * self.U_r[i][j]
-                        ) / (self.T_h[i][k][0] - self.T_c[j][k + 1][0])
-                    elif (self.T_h[i][k][0] - self.T_c[j][k + 1][0]) > 0.0:
-                        self.dqda[i][j][k] = self.U_r[i][j] * (
-                            self.T_h[i][k][0] - self.T_c[j][k + 1][0]
-                        )
-                    else:
-                        self.dqda[i][j][k] = 0
-
                     if self.area_r[i][j][k] > 0.0:
                         self.dtacda[i][j][k] = self.dqda[i][j][k] * (
                             self.hu_cost[0] + self.cu_cost[0]
@@ -1772,21 +2880,15 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         ]
 
         self.TAC_model = self.m.options.objfcnval
-        self.TAC = (
-            self.hu_cost[0] * sum(self.Q_h[j][0] for j in range(self.J))
-            + self.cu_cost[0] * sum(self.Q_c[i][0] for i in range(self.I))
-            + self.unit_cost[0] * self.n_units
-            + self.A_coeff[0]
-            * sum(
-                self.area_r[i][j][k] ** self.A_exp[0]
-                for k in range(self.S)
-                for j in range(self.J)
-                for i in range(self.I)
+        self.TAC = self.capital_cost_value + self.weighted_operating_cost_value
+
+    def _weighted_numeric_average(self, values: Sequence[float]) -> float:
+        return float(
+            sum(
+                float(self.period_weights[n]) * float(values[n])
+                for n in range(self.N_periods)
             )
-            + self.hu_coeff[0]
-            * sum(self.area_hu[j] ** self.A_exp[0] for j in range(self.J))
-            + self.cu_coeff[0]
-            * sum(self.area_cu[i] ** self.A_exp[0] for i in range(self.I))
+            / self.period_weight_sum
         )
 
     def get_lowest_benefit_HX(self) -> list[list[int]]:
@@ -1907,6 +3009,14 @@ def _check_temperatures(
     abs_tol: float = 1e-2,
     q_tol: float = 1e-2,
 ) -> bool:
+    if hasattr(case, "Q_r_by_period"):
+        return _check_state_temperatures(
+            case,
+            rel_tol=rel_tol,
+            abs_tol=abs_tol,
+            q_tol=q_tol,
+        )
+
     issues = False
     for i in range(case.I):
         for j in range(case.J):
@@ -1949,14 +3059,102 @@ def _check_temperatures(
     return not issues
 
 
+def _check_state_temperatures(
+    case,
+    *,
+    rel_tol: float,
+    abs_tol: float,
+    q_tol: float,
+) -> bool:
+    issues = False
+    for n in range(case.N_periods):
+        for i in range(case.I):
+            for j in range(case.J):
+                for k in range(case.S):
+                    if _value(case.Q_r_by_period[n][i][j][k]) <= q_tol:
+                        continue
+                    if case.non_isothermal_model:
+                        t_h_in = _value(case.T_h_by_period[n][i][k])
+                        t_c_out_y = _value(case.T_c_out_y_by_period[n][j][i][k])
+                        theta_1 = _value(case.theta_1_by_period[n][i][j][k])
+                        if (
+                            not math.isclose(
+                                t_h_in,
+                                t_c_out_y + theta_1,
+                                rel_tol=rel_tol,
+                                abs_tol=abs_tol,
+                            )
+                            or t_h_in < t_c_out_y
+                        ):
+                            issues = True
+
+                        t_h_out = _value(case.T_h_out_x_by_period[n][i][j][k])
+                        t_c_in = _value(case.T_c_by_period[n][j][k + 1])
+                        theta_2 = _value(case.theta_2_by_period[n][i][j][k])
+                        if (
+                            not math.isclose(
+                                t_h_out,
+                                t_c_in + theta_2,
+                                rel_tol=rel_tol,
+                                abs_tol=abs_tol,
+                            )
+                            or t_h_out < t_c_in
+                        ):
+                            issues = True
+                    else:
+                        if _value(case.T_h_by_period[n][i][k]) < _value(
+                            case.T_c_by_period[n][j][k]
+                        ):
+                            issues = True
+                        if _value(case.T_h_by_period[n][i][k + 1]) < _value(
+                            case.T_c_by_period[n][j][k + 1]
+                        ):
+                            issues = True
+    return not issues
+
+
 def _check_utility_costs(
     case,
     *,
     rel_tol: float = 0.1,
     abs_tol: float = 1.0,
 ) -> bool:
-    post_hot_utility = case.hu_cost[0] * sum(case.Q_h[j][0] for j in range(case.J))
-    post_cold_utility = case.cu_cost[0] * sum(case.Q_c[i][0] for i in range(case.I))
+    def utility_cost(side: str, period_index: int, duty: float) -> float:
+        if hasattr(case, "_utility_cost_value"):
+            return case._utility_cost_value(side, period_index, duty)
+        prices = case.hu_cost_period if side == "hot" else case.cu_cost_period
+        return float(prices[period_index][0]) * duty
+
+    if hasattr(case, "Q_h_by_period"):
+        post_hot_utility = case._weighted_numeric_average(
+            [
+                utility_cost(
+                    "hot",
+                    n,
+                    sum(_value(case.Q_h_by_period[n][j]) for j in range(case.J)),
+                )
+                for n in range(case.N_periods)
+            ]
+        )
+        post_cold_utility = case._weighted_numeric_average(
+            [
+                utility_cost(
+                    "cold",
+                    n,
+                    sum(_value(case.Q_c_by_period[n][i]) for i in range(case.I)),
+                )
+                for n in range(case.N_periods)
+            ]
+        )
+    else:
+        hot_duty = sum(case.Q_h[j][0] for j in range(case.J))
+        cold_duty = sum(case.Q_c[i][0] for i in range(case.I))
+        if hasattr(case, "_utility_cost_value"):
+            post_hot_utility = case._utility_cost_value("hot", 0, hot_duty)
+            post_cold_utility = case._utility_cost_value("cold", 0, cold_duty)
+        else:
+            post_hot_utility = case.hu_cost[0] * hot_duty
+            post_cold_utility = case.cu_cost[0] * cold_duty
     model_hot_utility = _value(case.hu_cost_total)
     model_cold_utility = _value(case.cu_cost_total)
     return math.isclose(
@@ -1979,6 +3177,36 @@ def _check_area_costs(
     abs_tol: float = 1.0,
     q_tol: float = 1e-2,
 ) -> bool:
+    if getattr(case, "segment_area_contributions_by_period", None):
+        recovery_area_cost = case.A_coeff[0] * sum(
+            case.area_r[i][j][k] ** case.A_exp[0]
+            for k in range(case.S)
+            for j in range(case.J)
+            for i in range(case.I)
+        )
+        hu_area_cost = case.hu_coeff[0] * sum(
+            case.area_hu[j] ** case.hu_exp[0] for j in range(case.J)
+        )
+        cu_area_cost = case.cu_coeff[0] * sum(
+            case.area_cu[i] ** case.cu_exp[0] for i in range(case.I)
+        )
+        return all(
+            math.isclose(expected, actual, rel_tol=rel_tol, abs_tol=abs_tol)
+            for expected, actual in (
+                (recovery_area_cost, case.recovery_area_cost_total),
+                (hu_area_cost, case.hu_area_cost_total),
+                (cu_area_cost, case.cu_area_cost_total),
+            )
+        )
+
+    if hasattr(case, "area_r_shared"):
+        return _check_shared_area_costs(
+            case,
+            rel_tol=rel_tol,
+            abs_tol=abs_tol,
+            q_tol=q_tol,
+        )
+
     for k in range(case.S):
         for j in range(case.J):
             allowed_hots = [i for i in range(case.I) if case.z_allowed[i][j][k] > 0]
@@ -1992,16 +3220,16 @@ def _check_area_costs(
             post_area_chen = (
                 sum(
                     (
-                        case.Q_r[n][j][k][0]
+                        case.Q_r[hot_idx][j][k][0]
                         / (
-                            case.U_r[n][j]
+                            case.U_r[hot_idx][j]
                             * (
                                 (
-                                    case.theta_1[n][j][k][0]
-                                    * case.theta_2[n][j][k][0]
+                                    case.theta_1[hot_idx][j][k][0]
+                                    * case.theta_2[hot_idx][j][k][0]
                                     * (
-                                        case.theta_1[n][j][k][0]
-                                        + case.theta_2[n][j][k][0]
+                                        case.theta_1[hot_idx][j][k][0]
+                                        + case.theta_2[hot_idx][j][k][0]
                                     )
                                     / 2
                                     + 1e-3
@@ -2011,7 +3239,7 @@ def _check_area_costs(
                         )
                     )
                     ** case.A_exp[0]
-                    for n in allowed_hots
+                    for hot_idx in allowed_hots
                 )
                 * case.A_coeff[0]
             )
@@ -2026,7 +3254,143 @@ def _check_area_costs(
     return True
 
 
+def _check_shared_area_costs(
+    case,
+    *,
+    rel_tol: float,
+    abs_tol: float,
+    q_tol: float,
+) -> bool:
+    for n in range(case.N_periods):
+        for k in range(case.S):
+            for j in range(case.J):
+                for i in range(case.I):
+                    q = _value(case.Q_r_by_period[n][i][j][k])
+                    if q <= q_tol:
+                        continue
+                    required_area = q / (
+                        case.U_r_period[n][i][j]
+                        * (
+                            _value(case.theta_1_by_period[n][i][j][k])
+                            * _value(case.theta_2_by_period[n][i][j][k])
+                            * (
+                                _value(case.theta_1_by_period[n][i][j][k])
+                                + _value(case.theta_2_by_period[n][i][j][k])
+                            )
+                            / 2
+                            + 1e-3
+                        )
+                        ** (1 / 3)
+                    )
+                    if _value(case.area_r_shared[i][j][k]) + abs_tol < required_area:
+                        return False
+        for j in range(case.J):
+            q = _value(case.Q_h_by_period[n][j])
+            if q > q_tol:
+                required_area = q / (
+                    case.U_hu_period[n][j]
+                    * (
+                        (case.T_hu_in_period[n][0] - case.T_c_out_period[n][j])
+                        * (
+                            case._utility_solved_outlet_temperature("hot", n, j, q)
+                            - _value(case.T_c_by_period[n][j][0])
+                        )
+                        * (
+                            (case.T_hu_in_period[n][0] - case.T_c_out_period[n][j])
+                            + (
+                                case._utility_solved_outlet_temperature("hot", n, j, q)
+                                - _value(case.T_c_by_period[n][j][0])
+                            )
+                        )
+                        / 2
+                        + 1e-3
+                    )
+                    ** (1 / 3)
+                )
+                if _value(case.area_hu_shared[j]) + abs_tol < required_area:
+                    return False
+        for i in range(case.I):
+            q = _value(case.Q_c_by_period[n][i])
+            if q > q_tol:
+                required_area = q / (
+                    case.U_cu_period[n][i]
+                    * (
+                        (
+                            _value(case.T_h_by_period[n][i][case.S])
+                            - case._utility_solved_outlet_temperature("cold", n, i, q)
+                        )
+                        * (case.T_h_out_period[n][i] - case.T_cu_in_period[n][0])
+                        * (
+                            (
+                                _value(case.T_h_by_period[n][i][case.S])
+                                - case._utility_solved_outlet_temperature(
+                                    "cold", n, i, q
+                                )
+                            )
+                            + (case.T_h_out_period[n][i] - case.T_cu_in_period[n][0])
+                        )
+                        / 2
+                        + 1e-3
+                    )
+                    ** (1 / 3)
+                )
+                if _value(case.area_cu_shared[i]) + abs_tol < required_area:
+                    return False
+
+    recovery_area_cost = case.A_coeff[0] * sum(
+        _value(case.area_r_shared[i][j][k]) ** case.A_exp[0]
+        for k in range(case.S)
+        for j in range(case.J)
+        for i in range(case.I)
+    )
+    hu_area_cost = case.hu_coeff[0] * sum(
+        _value(case.area_hu_shared[j]) ** case.hu_exp[0] for j in range(case.J)
+    )
+    cu_area_cost = case.cu_coeff[0] * sum(
+        _value(case.area_cu_shared[i]) ** case.cu_exp[0] for i in range(case.I)
+    )
+    return (
+        math.isclose(
+            recovery_area_cost,
+            _value(case.recovery_area_cost_total),
+            rel_tol=rel_tol,
+            abs_tol=abs_tol,
+        )
+        and math.isclose(
+            hu_area_cost,
+            _value(case.hu_area_cost_total),
+            rel_tol=rel_tol,
+            abs_tol=abs_tol,
+        )
+        and math.isclose(
+            cu_area_cost,
+            _value(case.cu_area_cost_total),
+            rel_tol=rel_tol,
+            abs_tol=abs_tol,
+        )
+    )
+
+
 def _value(value) -> float:
     if isinstance(value, int | float):
         return float(value)
-    return float(value.value[0])
+    try:
+        return float(value[0])
+    except TypeError, IndexError, KeyError:
+        pass
+    for attr in ("VALUE", "value"):
+        if not hasattr(value, attr):
+            continue
+        raw = getattr(value, attr)
+        try:
+            return float(raw[0])
+        except TypeError, IndexError, KeyError:
+            pass
+        raw_value = getattr(raw, "value", raw)
+        if isinstance(raw_value, int | float):
+            return float(raw_value)
+        try:
+            return float(raw_value[0])
+        except TypeError, IndexError, KeyError:
+            return float(raw_value)
+    return float(value)

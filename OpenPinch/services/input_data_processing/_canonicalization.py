@@ -177,7 +177,7 @@ def _apply_zone_dt_cont_multiplier(
     for child_schema in zone_tree.children:
         child_zone = parent_zone.get_subzone(loc=child_schema.name)
         if child_zone is None:
-            child_zone = parent_zone
+            continue
         _apply_zone_dt_cont_multiplier(
             parent_zone=child_zone,
             zone_tree=child_schema,
@@ -327,9 +327,6 @@ def _validate_zone_tree_structure(
         zone_counters[zone_key] += 1
 
         operation_zone_name = f"O{zone_counters[zone_key]}"
-        while operation_zone_name in current["children"]:
-            zone_counters[zone_key] += 1
-            operation_zone_name = f"O{zone_counters[zone_key]}"
 
         current["children"][operation_zone_name] = {
             "name": operation_zone_name,

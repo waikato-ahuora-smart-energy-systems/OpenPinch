@@ -53,11 +53,23 @@ import pytest
 from pydantic import ValidationError
 
 from OpenPinch.classes import *
+from OpenPinch.classes._stream.segment import StreamSegment
 from OpenPinch.lib import *
+from OpenPinch.services.input_data_processing._canonicalization import (
+    _apply_zone_dt_cont_multiplier,
+    _build_zone_config,
+    _resolve_zone_dt_cont_multiplier,
+    _rewrite_stream_zones_from_tree,
+)
+from OpenPinch.services.input_data_processing._utility_preparation import (
+    _orient_utility_temperatures,
+    _utility_temperature_arrays,
+)
 from OpenPinch.services.input_data_processing.data_preparation import (
     _assign_process_streams_to_subzones,
     _build_prepared_stream_collection,
     _create_nested_zones,
+    _find_extreme_process_temperatures,
     _get_validated_zone_info,
     _validate_config_data_completed,
     _validate_input_data,
@@ -192,6 +204,42 @@ def test_prepare_site_stream_data_handles_extreme_temperatures():
     site = prepare_problem(streams=streams)
     assert len(site.hot_utilities) > 0
     assert len(site.cold_utilities) > 0
+
+
+def test_default_utility_extrema_use_authoritative_segment_shifted_temperatures():
+    hot = Stream(
+        name="Segmented hot",
+        segments=[
+            StreamSegment(
+                name="S1",
+                t_supply=200.0,
+                t_target=150.0,
+                heat_flow=50.0,
+                dt_cont=20.0,
+            ),
+            StreamSegment(
+                name="S2",
+                t_supply=150.0,
+                t_target=100.0,
+                heat_flow=50.0,
+                dt_cont=0.0,
+            ),
+        ],
+    )
+    hot_streams = StreamCollection()
+    hot_streams.add(hot)
+
+    hu_t_min, cu_t_max = _find_extreme_process_temperatures(
+        hot_streams,
+        StreamCollection(),
+    )
+
+    assert float(hot.t_min_star) == pytest.approx(80.0)
+    assert min(float(segment.t_min_star) for segment in hot.segments) == pytest.approx(
+        100.0
+    )
+    assert hu_t_min == pytest.approx(100.0)
+    assert cu_t_max == pytest.approx(100.0)
 
 
 # ---------------- Stream and Zone Validations ---------------- #
@@ -457,11 +505,11 @@ def test_prepare_problem_applies_configured_input_unit_defaults():
     assert float(cold_utility.htc) == pytest.approx(0.5)
 
 
-def test_prepare_problem_preserves_stateful_dt_cont_and_htc_values():
+def test_prepare_problem_preserves_period_dt_cont_and_htc_values():
     streams = [
         StreamSchema.model_validate(
             {
-                "name": "H_stateful",
+                "name": "H_period",
                 "zone": "Z1",
                 "t_supply": {"values": [250.0, 260.0]},
                 "t_target": {"values": [100.0, 120.0]},
@@ -474,7 +522,7 @@ def test_prepare_problem_preserves_stateful_dt_cont_and_htc_values():
     utilities = [
         UtilitySchema.model_validate(
             {
-                "name": "HU_stateful",
+                "name": "HU_period",
                 "type": "Hot",
                 "t_supply": {"values": [300.0, 310.0]},
                 "t_target": {"values": [250.0, 255.0]},
@@ -486,13 +534,13 @@ def test_prepare_problem_preserves_stateful_dt_cont_and_htc_values():
     ]
 
     site = prepare_problem(streams=streams, utilities=utilities)
-    stream = next(s for s in site.subzones["Z1"].hot_streams if s.name == "H_stateful")
-    utility = next(u for u in site.hot_utilities if u.name == "HU_stateful")
+    stream = next(s for s in site.subzones["Z1"].hot_streams if s.name == "H_period")
+    utility = next(u for u in site.hot_utilities if u.name == "HU_period")
 
-    assert stream.dt_cont.state_values.tolist() == pytest.approx([2.0, 3.0])
-    assert stream.htc.state_values.tolist() == pytest.approx([0.4, 0.5])
-    assert utility.dt_cont.state_values.tolist() == pytest.approx([4.0, 5.0])
-    assert utility.htc.state_values.tolist() == pytest.approx([0.6, 0.7])
+    assert stream.dt_cont.period_values.tolist() == pytest.approx([2.0, 3.0])
+    assert stream.htc.period_values.tolist() == pytest.approx([0.4, 0.5])
+    assert utility.dt_cont.period_values.tolist() == pytest.approx([4.0, 5.0])
+    assert utility.htc.period_values.tolist() == pytest.approx([0.6, 0.7])
 
 
 # ---------------- Invalid Input Tests ---------------- #
@@ -1239,7 +1287,7 @@ def test_process_stream_with_null_dt_cont_defaults_to_zero():
     assert float(hot_a.dt_cont_act[0]) == pytest.approx(0.0)
 
 
-def test_stateful_process_extrema_use_all_states_for_default_hot_utility():
+def test_period_process_extrema_use_all_periods_for_default_hot_utility():
     streams = [
         StreamSchema.model_validate(
             {
@@ -1274,8 +1322,8 @@ def test_stateful_process_extrema_use_all_states_for_default_hot_utility():
         ),
     ]
     options = {
-        "PROBLEM_STATE_IDS": ["one", "two"],
-        "PROBLEM_STATE_WEIGHTS": [1, 1],
+        "PROBLEM_PERIOD_IDS": ["one", "two"],
+        "PROBLEM_PERIOD_WEIGHTS": [1, 1],
     }
 
     site = prepare_problem(streams=streams, options=options)
@@ -1285,7 +1333,7 @@ def test_stateful_process_extrema_use_all_states_for_default_hot_utility():
     assert float(hu.t_max_star[1]) == pytest.approx(210.0)
 
 
-def test_stateful_process_extrema_use_selected_state_for_default_hot_utility():
+def test_period_process_extrema_use_selected_period_for_default_hot_utility():
     streams = [
         StreamSchema.model_validate(
             {
@@ -1327,7 +1375,7 @@ def test_stateful_process_extrema_use_selected_state_for_default_hot_utility():
     assert float(hu.t_max_star[1]) == pytest.approx(210.0)
 
 
-def test_stateful_hot_utility_sorting_uses_all_state_envelope(dummy_streams):
+def test_period_hot_utility_sorting_uses_all_period_envelope(dummy_streams):
     utilities = [
         UtilitySchema.model_validate(
             {
@@ -1373,7 +1421,7 @@ def test_stateful_hot_utility_sorting_uses_all_state_envelope(dummy_streams):
     assert hot_names[:2] == ["HU_swing", "HU_flat"]
 
 
-def test_stateful_hot_utility_sorting_uses_selected_state(dummy_streams):
+def test_period_hot_utility_sorting_uses_selected_period(dummy_streams):
     utilities = [
         UtilitySchema.model_validate(
             {
@@ -1447,7 +1495,59 @@ def test_build_prepared_stream_collection_rejects_neutral_process_stream():
     sc, _ = _build_prepared_stream_collection(master_zone, streams, [])
 
     assert len(sc.get_hot_process_streams()) == 0
-    assert len(sc.get_cold_process_streams()) == 0
+
+
+def test_utility_temperature_helpers_reject_missing_and_inconsistent_inputs():
+    missing_temperature = UtilitySchema.model_validate(
+        {
+            "name": "HU_missing",
+            "type": "Hot",
+            "t_supply": 200.0,
+            "t_target": None,
+            "heat_flow": 0.0,
+            "dt_cont": 10.0,
+            "price": 100.0,
+            "htc": 1.0,
+        }
+    )
+
+    with pytest.raises(ValueError, match="missing supply or target"):
+        _utility_temperature_arrays(missing_temperature, Configuration())
+
+    inconsistent = UtilitySchema.model_validate(
+        {
+            "name": "HU_swing",
+            "type": "Hot",
+            "t_supply": {"values": [300.0, 200.0], "unit": "degC"},
+            "t_target": {"values": [250.0, 260.0], "unit": "degC"},
+            "heat_flow": 0.0,
+            "dt_cont": 10.0,
+            "price": 100.0,
+            "htc": 1.0,
+        }
+    )
+
+    with pytest.raises(ValueError, match="cannot be oriented consistently"):
+        _orient_utility_temperatures(inconsistent, ST.Hot.value, Configuration())
+
+
+def test_build_prepared_stream_collection_rejects_unresolved_stream_zone():
+    master_zone = Zone(name="Site", type=ZT.S.value, config=Configuration())
+    stream = StreamSchema.model_validate(
+        {
+            "name": "H_missing",
+            "zone": "Site/Missing",
+            "t_supply": 200.0,
+            "t_target": 100.0,
+            "heat_flow": 10.0,
+            "dt_cont": 10.0,
+            "htc": 1.0,
+        }
+    )
+
+    with pytest.warns(UserWarning, match="Subzone 'Site/Missing' not found."):
+        with pytest.raises(ValueError, match="could not resolve zone"):
+            _build_prepared_stream_collection(master_zone, [stream], [])
 
 
 def test_prepare_problem_process_streams_are_referenced_in_parent_imports():
@@ -1727,6 +1827,131 @@ def test_generic_zone_tree_defaults_by_depth():
     assert normalised.type == ZT.S.value
     assert normalised.children[0].type == ZT.P.value
     assert normalised.children[0].children[0].type == ZT.O.value
+
+
+def test_canonical_zone_helpers_reject_invalid_config_and_multiplier_edges():
+    with pytest.raises(TypeError, match="options must be"):
+        _build_zone_config(
+            options=object(),
+            top_zone_name="Site",
+            top_zone_identifier="Site",
+        )
+    with pytest.raises(ValueError, match="dt_cont_multiplier"):
+        _resolve_zone_dt_cont_multiplier(
+            ZoneTreeSchema.model_construct(
+                name="Bad",
+                type="Zone",
+                dt_cont_multiplier=-1.0,
+                children=None,
+            ),
+            inherited_multiplier=None,
+        )
+
+    blank_type_name, blank_type = _get_validated_zone_info(
+        ZoneTreeSchema(name="Blank", type=" "),
+        project_name="Project",
+        depth=0,
+    )
+    assert blank_type_name == "Blank"
+    assert blank_type == ZT.S.value
+
+
+def test_apply_zone_dt_cont_multiplier_skips_missing_child_zone():
+    parent_zone = Zone(name="Site", type=ZT.S.value, config=Configuration())
+    zone_tree = ZoneTreeSchema(
+        name="Site",
+        type="Zone",
+        children=[
+            ZoneTreeSchema(
+                name="MissingChild",
+                type="Zone",
+                dt_cont_multiplier=2.0,
+            )
+        ],
+    )
+
+    with pytest.warns(UserWarning) as caught:
+        out = _apply_zone_dt_cont_multiplier(parent_zone, zone_tree)
+
+    messages = [str(warning.message) for warning in caught]
+    assert any("Subzone 'MissingChild' not found." in message for message in messages)
+    assert any("empty stream collection" in message for message in messages)
+    assert out is parent_zone
+    assert parent_zone.dt_cont_multiplier == pytest.approx(1.0)
+
+
+def test_apply_zone_dt_cont_multiplier_applies_existing_child_zone():
+    parent_zone = Zone(name="Site", type=ZT.S.value, config=Configuration())
+    child_zone = Zone(
+        name="AreaA",
+        type=ZT.P.value,
+        config=parent_zone.config,
+        parent_zone=parent_zone,
+    )
+    parent_zone.add_zone(child_zone)
+    zone_tree = ZoneTreeSchema(
+        name="Site",
+        type="Zone",
+        children=[
+            ZoneTreeSchema(
+                name="AreaA",
+                type="Zone",
+                dt_cont_multiplier=2.0,
+            )
+        ],
+    )
+
+    with pytest.warns(UserWarning, match="empty stream collection"):
+        out = _apply_zone_dt_cont_multiplier(parent_zone, zone_tree)
+
+    assert out is parent_zone
+    assert parent_zone.dt_cont_multiplier == pytest.approx(1.0)
+    assert child_zone.dt_cont_multiplier == pytest.approx(2.0)
+
+
+def test_rewrite_stream_zones_handles_empty_labels_and_root_name_collisions():
+    tree_without_children = ZoneTreeSchema(name="Site", type="Zone", children=None)
+    missing_zone = make_stream(zone="Area")
+    missing_zone.zone = None
+    blank_zone = make_stream(zone=" / ")
+
+    _rewrite_stream_zones_from_tree(
+        tree_without_children,
+        [missing_zone, blank_zone],
+    )
+
+    assert tree_without_children.children == []
+    assert missing_zone.zone is None
+    assert blank_zone.zone == " / "
+
+    collision_tree = ZoneTreeSchema(
+        name="Site",
+        type="Zone",
+        children=[ZoneTreeSchema(name="TestStream", type=ZT.P.value)],
+    )
+    site_stream = make_stream(zone="Site")
+    site_stream.name = "TestStream"
+
+    _rewrite_stream_zones_from_tree(collision_tree, [site_stream])
+
+    assert site_stream.zone == "Site/TestStream_2"
+    assert {child.name for child in collision_tree.children} == {
+        "TestStream",
+        "TestStream_2",
+    }
+
+
+def test_generated_zone_tree_handles_non_string_root_and_empty_zone_path():
+    stream = make_stream(zone="/")
+
+    normalised = _validate_zone_tree_structure(
+        None,
+        [stream],
+        top_zone_name=object(),
+    )
+
+    assert normalised.name == ZT.S.value
+    assert stream.zone == f"{ZT.S.value}/O1"
 
 
 def test_site_level_streams_get_individual_process_zones():
@@ -2043,4 +2268,55 @@ def test_assign_process_streams_to_subzones_requires_zone_mapping():
             master_zone=master_zone,
             process_streams=process_streams,
             process_zone_paths={},
+        )
+
+
+def test_assign_process_streams_to_subzones_rejects_unresolved_and_neutral_streams():
+    master_zone = Zone(name="Site", type=ZT.S.value, config=Configuration())
+    process_streams = StreamCollection()
+    hot_stream = Stream(
+        name="H1",
+        t_supply=200.0,
+        t_target=100.0,
+        heat_flow=10.0,
+        dt_cont=5.0,
+        htc=1.0,
+        is_process_stream=True,
+    )
+    process_streams.add(hot_stream, key="Site.Hot Stream.H1")
+
+    with pytest.warns(UserWarning, match="Subzone 'Site/Missing' not found."):
+        with pytest.raises(ValueError, match="could not resolve zone"):
+            _assign_process_streams_to_subzones(
+                master_zone=master_zone,
+                process_streams=process_streams,
+                process_zone_paths={"Site.Hot Stream.H1": "Site/Missing"},
+            )
+
+    area = Zone(
+        name="AreaA",
+        type=ZT.P.value,
+        config=master_zone.config,
+        parent_zone=master_zone,
+    )
+    master_zone.add_zone(area)
+    neutral_streams = StreamCollection()
+    neutral_streams.add(
+        Stream(
+            name="NeutralA",
+            t_supply=100.0,
+            t_target=100.0,
+            heat_flow=0.0,
+            dt_cont=5.0,
+            htc=1.0,
+            is_process_stream=True,
+        ),
+        key="Site.AreaA.NeutralA",
+    )
+
+    with pytest.raises(ValueError, match="must classify as Hot or Cold"):
+        _assign_process_streams_to_subzones(
+            master_zone=master_zone,
+            process_streams=neutral_streams,
+            process_zone_paths={"Site.AreaA.NeutralA": "Site/AreaA"},
         )

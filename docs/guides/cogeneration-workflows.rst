@@ -1,78 +1,59 @@
 Cogeneration Workflows
 ======================
 
-OpenPinch exposes cogeneration as an advanced post-processing workflow on top
-of solved thermal targets.
+Purpose
+-------
 
-Question This Guide Answers
----------------------------
+Use cogeneration targeting when a solved thermal target should be screened for
+above Pinch or below Pinch turbine work opportunities.
 
-How do I screen turbine cogeneration opportunities from a solved OpenPinch
-case?
+Prerequisites
+-------------
 
-Typical Workflow
-----------------
+Solve the base thermal case first. Cogeneration is an advanced
+post-processing workflow; it should be interpreted after the utility structure
+is understood.
 
-1. solve the base thermal case
-2. inspect the hot utility picture
-3. run the cogeneration workflow on the relevant target
-4. compare work and efficiency targets with the underlying utility structure
+Sample Case
+-----------
 
-Python Surface
---------------
+Use ``pulp_mill.json`` for Total Site and turbine screening examples.
 
-The main user-facing route is:
+Runnable Workflow
+-----------------
 
 .. code-block:: python
 
+   from OpenPinch import PinchProblem
+
    problem = PinchProblem("pulp_mill.json")
-   problem.target()
+   problem.target.indirect_heat_integration()
    cogeneration_target = problem.target.cogeneration()
+   summary = problem.summary_frame()
 
-By default, ``problem.target.cogeneration()`` resolves the first compatible
-target family in this order:
-``Total Site -> Indirect Heat Pump -> Indirect Refrigeration -> Direct Heat Pump -> Direct Refrigeration -> Direct Integration``.
-To pin one exact family and disable fallback, pass
-``options={"base_target_type": "..."}``.
+Expected Output
+---------------
 
-Configuration
--------------
+The cogeneration target adds turbine work and efficiency fields to the solved
+target context. It does not replace the base thermal answer.
 
-The turbine parameters are part of `zone.config`, including:
+Interpretation
+--------------
 
-- `TURB_T_IN`
-- `TURB_P_IN`
-- `MIN_EFF`
-- `LOAD_FRACTION`
-- `ETA_MECH`
-- `TURB_MODEL`
-- `IS_HIGH_P_COND_FLASH`
+Read cogeneration results in this order:
 
-This makes cogeneration studies consistent with the rest of the package model:
-runtime assumptions are attached to the zone hierarchy rather than hidden in a
-side channel.
-
-How To Interpret The Result
----------------------------
-
-Use cogeneration outputs after the thermal answer is already understood.
-
-Read them in this order:
-
-1. utility structure and thermal target context
+1. base thermal target and utility levels
 2. work target
-3. efficiency target
-4. stage detail
+3. turbine efficiency target
+4. stage details
 
-Useful Sample
--------------
-
-The `pulp_mill.json` and `zonal_site.json` assets are good next cases once the
-basic process-level workflow is understood, especially when combined with the
-packaged Total Site notebook.
+Key turbine assumptions live on ``zone.config`` and include ``TURB_T_IN``,
+``TURB_P_IN``, ``MIN_EFF``, ``LOAD_FRACTION``, ``ETA_MECH``,
+``TURB_MODEL``, and ``IS_HIGH_P_COND_FLASH``.
 
 Next Steps
 ----------
 
-- For the method framing, see :doc:`../fundamentals/cogeneration-methods`.
-- For the exact API surfaces, see :doc:`../api/pinchproblem`.
+- :doc:`../fundamentals/cogeneration-methods` for method framing.
+- :doc:`../api/pinchproblem` for the public accessor.
+- :doc:`../api/service-layer` for lower-level orchestration.

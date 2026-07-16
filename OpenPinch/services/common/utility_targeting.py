@@ -68,7 +68,7 @@ def get_utility_targets(
             hot_utilities=hot_utilities,
             cold_utilities=cold_utilities,
             is_shifted=True,
-            idx=idx,
+            period_idx=idx,
         )
     )
     pt.update(
@@ -86,7 +86,7 @@ def get_utility_targets(
                 hot_utilities=hot_utilities,
                 cold_utilities=cold_utilities,
                 is_shifted=False,
-                idx=idx,
+                period_idx=idx,
             )
         )
         pt_real.update(
@@ -247,9 +247,6 @@ def _maximise_utility_duty(
 
     def _candidate_limit(q_pot_values: np.ndarray) -> tuple[float, float, float]:
         q_pot_valid = q_pot_values[valid_mask]
-        if q_pot_valid.size == 0:
-            return 0.0, 0.0, np.inf
-
         q_ts_max = q_pot_valid.max()
         q_tt = np.full_like(q_pot_valid, np.inf, dtype=float)
         slope_mask = (-dt_tar_valid) > tol

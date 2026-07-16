@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from OpenPinch.lib.schemas.synthesis import HeatExchangerNetworkTopologyRestriction
+from OpenPinch.lib.schemas.synthesis.topology import (
+    HeatExchangerNetworkTopologyRestriction,
+)
 from OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.topology import (
     canonical_topology_restrictions,
     topology_restriction_signature,

@@ -1,0 +1,114 @@
+{
+  "valid_option_values": {
+    "INPUT_UNIT_TEMPERATURE": "K",
+    "HENS_DT_CONT_MULTIPLIERS": null,
+    "HENS_APPROACH_TEMPERATURES": [5, 10.5],
+    "HENS_DERIVATIVE_THRESHOLDS": [0.25],
+    "HENS_STAGE_SELECTION": [1, 2, 3],
+    "HENS_METHOD_SEQUENCE": ["pinch_design_method", "network_evolution_method"],
+    "HENS_OUTPUT_FORMATS": ["json", "xlsx"],
+    "HENS_STAGE_PACKING": "all",
+    "HENS_SOLVE_TOLERANCE": 0.001,
+    "HENS_MAX_PARALLEL": 2,
+    "HENS_EVM_N_AD_BRANCHES": null,
+    "HENS_EVM_N_RM_BRANCHES": 3,
+    "HENS_RUN_ID": "Run_01.alpha",
+    "HENS_SOLVER_PDM": "couenne",
+    "HENS_SOLVER_OPTIONS_PDM": {
+      " max_iter ": 100,
+      "tol": 1e-6
+    },
+    "HENS_OUTPUT_FOLDER": "artifacts/hens",
+    "HPR_LOAD_MODE": "duty",
+    "HPR_LOAD_PERIOD_VALUES": {
+      "peak": 10.0
+    },
+    "HENS_PDM_STAGE_PAIR_LIMIT": 3,
+    "HENS_TDM_PARENT_LIMIT": null,
+    "TARGETING_DIRECT_SITE_ENABLED": true,
+    "REPORTING_DECIMAL_PLACES": 3,
+    "THERMAL_DT_CONT": 7.5,
+    "HENS_LOG_LEVEL": "DEBUG",
+    "HENS_SOLVER_OPTIONS_EVM": {
+      "bound_push": 1e-4
+    }
+  },
+  "invalid_values": {
+    "bad_unit": "kW",
+    "empty_solver_name": " ",
+    "bad_output_folder": 42,
+    "duplicate_stage_selection": [1, 1],
+    "bad_method_sequence": ["pinch_design_method", "not-a-method"],
+    "bad_stage_packing": "packed",
+    "bad_positive_float": 0,
+    "bad_positive_int": 0,
+    "bad_float": true,
+    "bad_int": true,
+    "bad_run_id": "-starts-with-hyphen",
+    "bad_solver_options": {
+      " ": 1
+    },
+    "bad_period_value": {
+      "peak": -1
+    },
+    "bad_fraction": 2.0
+  },
+  "hpr_load_errors": [
+    {
+      "options": {
+        "HPR_LOAD_MODE": "fraction",
+        "HPR_LOAD_DUTY": 12.0
+      },
+      "message": "HPR_LOAD_DUTY cannot be supplied"
+    },
+    {
+      "options": {
+        "HPR_LOAD_MODE": "fraction",
+        "HPR_LOAD_PERIOD_VALUES": {
+          "peak": 5.0
+        }
+      },
+      "message": "HPR_LOAD_PERIOD_VALUES cannot be supplied"
+    },
+    {
+      "options": {
+        "HPR_LOAD_MODE": "duty"
+      },
+      "message": "HPR_LOAD_DUTY is required"
+    },
+    {
+      "options": {
+        "HPR_LOAD_MODE": "duty",
+        "HPR_LOAD_DUTY": 12.0,
+        "HPR_LOAD_FRACTION": 0.5
+      },
+      "message": "HPR_LOAD_FRACTION cannot be supplied"
+    },
+    {
+      "options": {
+        "HPR_LOAD_MODE": "period_values"
+      },
+      "message": "HPR_LOAD_PERIOD_VALUES is required"
+    },
+    {
+      "options": {
+        "HPR_LOAD_MODE": "period_values",
+        "HPR_LOAD_PERIOD_VALUES": {
+          "peak": 5.0
+        },
+        "HPR_LOAD_FRACTION": 0.5
+      },
+      "message": "HPR_LOAD_FRACTION cannot be supplied"
+    },
+    {
+      "options": {
+        "HPR_LOAD_MODE": "period_values",
+        "HPR_LOAD_PERIOD_VALUES": {
+          "peak": 5.0
+        },
+        "HPR_LOAD_DUTY": 12.0
+      },
+      "message": "HPR_LOAD_DUTY cannot be supplied"
+    }
+  ]
+}

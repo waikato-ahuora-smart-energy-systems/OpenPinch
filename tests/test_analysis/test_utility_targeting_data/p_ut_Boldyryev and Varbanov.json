@@ -161,9 +161,7 @@
             "htc": {
                 "value": 1.2,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process A - bromine plant",
@@ -187,9 +185,7 @@
             "htc": {
                 "value": 5.3,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process A - bromine plant",
@@ -213,9 +209,7 @@
             "htc": {
                 "value": 6.2,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process A - bromine plant",
@@ -239,9 +233,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process A - bromine plant",
@@ -265,9 +257,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process A - bromine plant",
@@ -291,9 +281,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process A - bromine plant",
@@ -317,9 +305,7 @@
             "htc": {
                 "value": 1.2,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process A - bromine plant",
@@ -343,9 +329,7 @@
             "htc": {
                 "value": 5.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process B - sodium bromide plant",
@@ -369,9 +353,7 @@
             "htc": {
                 "value": 0.8,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process B - sodium bromide plant",
@@ -395,9 +377,7 @@
             "htc": {
                 "value": 0.8,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process B - sodium bromide plant",
@@ -421,9 +401,7 @@
             "htc": {
                 "value": 6,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process B - sodium bromide plant",
@@ -447,9 +425,7 @@
             "htc": {
                 "value": 6,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process B - sodium bromide plant",
@@ -473,9 +449,7 @@
             "htc": {
                 "value": 1.2,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process B - sodium bromide plant",
@@ -499,9 +473,7 @@
             "htc": {
                 "value": 6,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process B - sodium bromide plant",
@@ -525,9 +497,7 @@
             "htc": {
                 "value": 6,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process B - sodium bromide plant",
@@ -551,9 +521,7 @@
             "htc": {
                 "value": 0.8,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process B - sodium bromide plant",
@@ -577,9 +545,7 @@
             "htc": {
                 "value": 0.8,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process B - sodium bromide plant",
@@ -603,9 +569,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process B - sodium bromide plant",
@@ -629,9 +593,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process B - sodium bromide plant",
@@ -655,9 +617,7 @@
             "htc": {
                 "value": 1.3,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process B - sodium bromide plant",
@@ -681,9 +641,7 @@
             "htc": {
                 "value": 1.4,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process C - residential/commercial area",
@@ -707,9 +665,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process C - residential/commercial area",
@@ -733,9 +689,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process C - residential/commercial area",
@@ -759,9 +713,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         }
     ],
     "utilities": [

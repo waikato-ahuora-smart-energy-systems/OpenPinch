@@ -29,6 +29,26 @@ Build the wheel and source distribution from the repository root:
 
    uv run scripts/build_dist.py
 
+CI installs that generated wheel on Ubuntu, Windows, and macOS, then verifies
+the package import, command-line help, and packaged resources without importing
+the source checkout. Ubuntu remains the full-suite platform; Windows and macOS
+provide core-runtime and wheel-install compatibility coverage.
+
+Release Process
+---------------
+
+Production publication is tag-driven:
+
+1. merge only after the required CI jobs pass
+2. verify that ``pyproject.toml`` and ``uv.lock`` carry the intended version
+3. run ``pytest -m solver`` in an environment with the required external solvers
+4. create a signed or annotated ``vX.Y.Z`` tag at the intended commit
+5. push the tag and approve the protected ``pypi`` environment after TestPyPI
+   publication succeeds
+
+The tag must exactly equal ``v{project.version}``. PR automation deliberately
+uses ``--no-tag`` so maintainers retain explicit control of releases.
+
 Alternative Direct Sphinx Build
 -------------------------------
 
@@ -57,12 +77,23 @@ The target state for docs coverage is:
 Current Quality Gates
 ---------------------
 
-- CI now runs a docs HTML build alongside the main test workflow.
+- CI runs Ruff, a warning-free docs build, and the non-solver suite with a 95%
+  line-coverage floor.
+- Every published optional extra, including ``synthesis``, has an isolated
+  installation smoke check.
+- Generated wheels are installed and smoke-tested on Ubuntu, Windows, and macOS.
 - Docs consistency checks run under pytest as part of the normal suite.
 - The docs build helper fails on Sphinx warnings by default.
 
 Recommended Next Gates
 ----------------------
 
-- add link checking
 - keep packaged asset indexes synchronized with the resources module
+- use link checking as an optional local audit, not a required CI or RTD gate,
+  because external links can fail independently of documentation quality
+
+Optional link audit:
+
+.. code-block:: bash
+
+   uv run python -m sphinx -b linkcheck docs docs/_build/linkcheck

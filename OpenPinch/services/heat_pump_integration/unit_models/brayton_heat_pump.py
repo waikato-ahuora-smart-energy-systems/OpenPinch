@@ -22,10 +22,9 @@ except ImportError as exc:  # pragma: no cover - optional dependency guard
 else:
     _TESPY_IMPORT_ERROR = None
 
-# Local stream API used by the simple heat pump
-from ....classes.stream import Stream
 from ....classes.stream_collection import StreamCollection
 from ....utils.optional_dependencies import optional_dependency_error
+from ....utils.stream_linearisation import build_segmented_stream_from_profile
 
 
 def _require_tespy() -> None:
@@ -386,26 +385,19 @@ class SimpleBraytonHeatPumpCycle:
 
         def _build_streams(profile: np.ndarray, is_hot: bool) -> StreamCollection:
             sc = StreamCollection()
-            # calculate m_dot from TESPy if available
             m_dot = self._m_dot if self._m_dot is not None else 1.0
-            for i in range(len(profile) - 1):
-                h1, T1 = profile[i]
-                h2, T2 = profile[i + 1]
-                name = f"Segment_{i + 1}"
-                # simple target logic similar to Rankine implementation
-                if abs(T1 - T2) < 1e-6:
-                    t_target = T2 + (0.001 if not is_hot else -0.001)
-                else:
-                    t_target = T2
-                heat_flow = m_dot * abs(h1 - h2)
-                s = Stream(
-                    name=name,
-                    t_supply=T1,
-                    t_target=t_target,
-                    heat_flow=heat_flow,
+            if m_dot <= 0.0 or np.ptp(np.asarray(profile)[:, 0]) <= 0.0:
+                return sc
+            sc.add(
+                build_segmented_stream_from_profile(
+                    name="Brayton_HTHX" if is_hot else "Brayton_LTHX",
+                    profile=profile,
+                    heat_scale=m_dot,
+                    is_hot_stream=is_hot,
+                    minimum_temperature_span=0.001,
                     is_process_stream=False,
                 )
-                sc.add(s)
+            )
             return sc
 
         hot_sc = _build_streams(hot_profile, True)

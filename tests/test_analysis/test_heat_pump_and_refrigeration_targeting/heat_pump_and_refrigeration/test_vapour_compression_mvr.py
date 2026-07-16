@@ -36,6 +36,50 @@ from ..helpers import (
 )
 
 
+class _ThermoState:
+    def __init__(self, *, h: float, s: float = 1.0, p: float = 1.0, t: float = 300.0):
+        self._h = h
+        self._s = s
+        self._p = p
+        self._t = t
+
+    def hmass(self):
+        return self._h
+
+    def smass(self):
+        return self._s
+
+    def p(self):
+        return self._p
+
+    def T(self):
+        return self._t
+
+
+def _specific_mvr_payload(*, q_shaft: float = 100.0) -> dict[str, object]:
+    return {
+        "state_points": [
+            {"H": 100.0, "S": 1.0, "P": 10.0, "T": 350.0},
+            {"H": 200.0, "S": 1.1, "P": 20.0, "T": 390.0},
+            {"H": 50.0, "S": 0.9, "P": 20.0, "T": 360.0},
+            {"H": 150.0, "S": 1.0, "P": 20.0, "T": 370.0},
+        ],
+        "T_evap_sat_vap": 350.0,
+        "T_cond_sat_liq": 370.0,
+        "dT_subcool": 5.0,
+        "q_source": 80.0,
+        "q_desuperheat": 10.0,
+        "q_liquid_injection": 0.0,
+        "q_latent_condense": 70.0,
+        "q_subcool_process": 20.0,
+        "q_condense": 90.0,
+        "q_cond": 100.0,
+        "q_shaft": q_shaft,
+        "gas_mass_factor": 1.0,
+        "liquid_injection_ratio": 0.0,
+    }
+
+
 def test_mvr_water_default_solves_and_balances_energy():
     pytest.importorskip("CoolProp")
     mvr = MechanicalVapourRecompressionCycle()
@@ -54,7 +98,224 @@ def test_mvr_water_default_solves_and_balances_energy():
     assert mvr.Q_cond > 0.0
     assert mvr.work == pytest.approx(work)
     assert mvr.COP_h == pytest.approx(mvr.Q_cond / mvr.work)
+    assert mvr.COP_r == pytest.approx(mvr.Q_evap / mvr.work)
     assert mvr.cycle_states[0]["T"] == pytest.approx(80.0 + 273.15)
+
+
+def test_mvr_properties_and_cop_guards_on_fake_solved_cycle():
+    mvr = MechanicalVapourRecompressionCycle()
+    mvr._solved = True
+    mvr._cycle_states = [
+        {"H": 1.0, "S": 2.0, "T": 3.0, "P": 4.0},
+        {"H": 5.0, "S": 6.0, "T": 7.0, "P": 8.0},
+        {"H": 9.0, "S": 10.0, "T": 11.0, "P": 12.0},
+        {"H": 13.0, "S": 14.0, "T": 15.0, "P": 16.0},
+    ]
+    mvr._work = 0.0
+    mvr._Q_cond = 100.0
+    mvr._Q_evap = 50.0
+    mvr._m_dot_source = 0.0
+
+    assert mvr.Ss == [2.0, 6.0, 10.0, 14.0]
+    assert mvr.eta_mvr_comp == pytest.approx(0.7)
+    assert mvr.q_condense is None
+    assert mvr.process_heat_components(0.5) == {
+        "desuperheat": 0.0,
+        "latent": 0.0,
+        "subcool": 0.0,
+        "total": 0.0,
+    }
+    with pytest.raises(ZeroDivisionError, match="COP_h"):
+        _ = mvr.COP_h
+    with pytest.raises(ZeroDivisionError, match="COP_process_h"):
+        _ = mvr.COP_process_h
+    with pytest.raises(ZeroDivisionError, match="COP_r"):
+        _ = mvr.COP_r
+
+
+def test_mvr_invalid_inputs_return_finite_penalties(monkeypatch):
+    source = MechanicalVapourRecompressionCycle()
+    assert source.solve_from_source_heat(80.0, 95.0, Q_source=-2.0) == pytest.approx(
+        2000.0
+    )
+
+    source_none = MechanicalVapourRecompressionCycle()
+    monkeypatch.setattr(source_none, "_get_state_points", lambda **_kwargs: None)
+    assert source_none.solve_from_source_heat(80.0, 95.0, Q_source=1.0) == 0.0
+
+    source_zero = MechanicalVapourRecompressionCycle()
+    monkeypatch.setattr(
+        source_zero,
+        "_get_state_points",
+        lambda **_kwargs: {"q_source": 0.0},
+    )
+    assert source_zero.solve_from_source_heat(80.0, 95.0, Q_source=2.0) == 2000.0
+
+    mass = MechanicalVapourRecompressionCycle()
+    assert mass.solve_from_mass_flow(80.0, 95.0, m_dot=-0.5) == pytest.approx(1000.0)
+
+
+def test_mvr_state_point_guards_and_scaling_edges(monkeypatch):
+    mvr = MechanicalVapourRecompressionCycle()
+    assert mvr._get_state_points(80.0, 95.0, dT_superheat=-1.0) is None
+    assert mvr._get_state_points(80.0, 95.0, dT_subcool=-1.0) is None
+    assert mvr._get_state_points(80.0, 95.0, eta_mvr_comp=0.0) is None
+    assert mvr._get_state_points(100.0, 90.0) is None
+
+    pressure_guard = MechanicalVapourRecompressionCycle()
+    pressure_guard._T_evap = 350.0
+    pressure_guard._T_cond = 360.0
+    pressure_guard._dT_superheat = 0.0
+    pressure_guard._dT_subcool = 0.0
+    pressure_guard._eta_mvr_comp = 0.7
+    pressure_guard._max_work = 1.0
+    monkeypatch.setattr(pressure_guard, "_validate_solve_inputs", lambda _fluid: None)
+    monkeypatch.setattr(
+        pressure_guard,
+        "_get_P_sat_from_T",
+        lambda _temperature, Q: 10.0 if Q == 1.0 else 9.0,
+    )
+    assert pressure_guard._compute_open_stage_compression_states("Water") is None
+
+    subcool_guard = MechanicalVapourRecompressionCycle()
+    subcool_guard._T_evap = 350.0
+    subcool_guard._T_cond = 360.0
+    subcool_guard._dT_superheat = 0.0
+    subcool_guard._dT_subcool = 400.0
+    subcool_guard._eta_mvr_comp = 0.7
+    subcool_guard._eta_comp = 0.7
+    subcool_guard._max_work = 1.0
+    monkeypatch.setattr(subcool_guard, "_validate_solve_inputs", lambda _fluid: None)
+    monkeypatch.setattr(
+        subcool_guard,
+        "_get_P_sat_from_T",
+        lambda _temperature, Q: 10.0 if Q == 1.0 else 20.0,
+    )
+    monkeypatch.setattr(
+        subcool_guard,
+        "_compute_state_from_pressure_quality",
+        lambda _pressure, quality: _ThermoState(h=100.0 + quality, t=100.0),
+    )
+    monkeypatch.setattr(
+        subcool_guard,
+        "_compute_state_from_pressure_temperature",
+        lambda **_kwargs: _ThermoState(h=120.0, t=100.0),
+    )
+    monkeypatch.setattr(
+        subcool_guard,
+        "_compute_compressor_outlet_state",
+        lambda **_kwargs: _ThermoState(h=150.0, t=110.0),
+    )
+    assert subcool_guard._compute_open_stage_compression_states("Water") is None
+
+    scale_guard = MechanicalVapourRecompressionCycle()
+    assert (
+        scale_guard._scale_open_stage_solution(
+            _specific_mvr_payload(),
+            m_dot=1.0,
+            process_split=1.5,
+            source_heat_is_external=True,
+        )
+        == 1000.0
+    )
+
+    negative_work = MechanicalVapourRecompressionCycle()
+    assert (
+        negative_work._scale_open_stage_solution(
+            _specific_mvr_payload(q_shaft=-5.0),
+            m_dot=1.0,
+            process_split=1.0,
+            source_heat_is_external=True,
+        )
+        == 5.0
+    )
+    assert negative_work.solved is False
+
+    compression_payload = {
+        "state0": _ThermoState(h=100.0),
+        "state1": _ThermoState(h=150.0),
+        "state2": _ThermoState(h=160.0),
+        "state2_sat": _ThermoState(h=150.0),
+        "state3": _ThermoState(h=150.0),
+        "state_low_liq": _ThermoState(h=120.0),
+        "T_evap_sat_vap": 350.0,
+        "T_cond_sat_liq": 370.0,
+    }
+
+    desuperheat_failure = MechanicalVapourRecompressionCycle()
+    monkeypatch.setattr(
+        desuperheat_failure,
+        "_compute_open_stage_compression_states",
+        lambda _fluid: compression_payload,
+    )
+    monkeypatch.setattr(
+        desuperheat_failure,
+        "_compute_liquid_injection_desuperheating",
+        lambda **_kwargs: None,
+    )
+    assert desuperheat_failure._get_state_points(80.0, 95.0) is None
+
+    non_positive_heat = MechanicalVapourRecompressionCycle()
+    monkeypatch.setattr(
+        non_positive_heat,
+        "_compute_open_stage_compression_states",
+        lambda _fluid: compression_payload,
+    )
+    monkeypatch.setattr(
+        non_positive_heat,
+        "_compute_liquid_injection_desuperheating",
+        lambda **_kwargs: {
+            "gas_mass_factor": 1.0,
+            "q_desuperheat": 0.0,
+            "q_liquid_injection": 0.0,
+            "liquid_injection_ratio": 0.0,
+        },
+    )
+    assert non_positive_heat._get_state_points(80.0, 95.0) is None
+
+
+def test_mvr_liquid_injection_and_process_stream_edge_branches():
+    mvr = MechanicalVapourRecompressionCycle()
+    bad_injection = mvr._compute_liquid_injection_desuperheating(
+        state1=_ThermoState(h=200.0),
+        state3=_ThermoState(h=150.0),
+        state_injection_liq=_ThermoState(h=200.0),
+        liquid_injection=True,
+    )
+    assert bad_injection is None
+
+    dry = MechanicalVapourRecompressionCycle()
+    dry_result = dry._compute_liquid_injection_desuperheating(
+        state1=_ThermoState(h=200.0),
+        state3=_ThermoState(h=150.0),
+        state_injection_liq=_ThermoState(h=100.0),
+        liquid_injection=False,
+    )
+    assert dry_result["q_desuperheat"] == pytest.approx(50.0)
+    assert dry_result["liquid_injection_ratio"] == pytest.approx(0.0)
+
+    streams_cycle = MechanicalVapourRecompressionCycle()
+    streams_cycle._solved = True
+    streams_cycle._cycle_states = [
+        {"H": 0.0, "S": 0.0, "T": 350.0, "P": 1.0},
+        {"H": 0.0, "S": 0.0, "T": 390.0, "P": 1.0},
+        {"H": 0.0, "S": 0.0, "T": 360.0, "P": 1.0},
+        {"H": 0.0, "S": 0.0, "T": 370.0, "P": 1.0},
+    ]
+    streams_cycle._T_cond = 373.15
+    streams_cycle._dT_subcool = 5.0
+    streams_cycle._dtcont = 2.0
+    streams_cycle._process_heat_components = {
+        "desuperheat": 10.0,
+        "latent": 20.0,
+        "subcool": 30.0,
+        "total": 60.0,
+    }
+
+    streams = streams_cycle._build_process_condenser_streams(stage_index=2)
+
+    assert [stream.name for stream in streams] == ["MVR_process_H2"]
+    assert streams[0].segment_count == 3
 
 
 def test_mvr_accepts_generic_coolprop_fluid_and_motor_efficiency_changes_work():
@@ -533,15 +794,11 @@ def test_vc_mvr_cascade_routes_split_and_excludes_internal_streams():
     mvr_process_streams = [
         stream for stream in external_streams if str(stream.name).startswith("MVR_")
     ]
-    assert not any(
-        str(stream.name).startswith("MVR_desuperheat") for stream in mvr_process_streams
+    assert mvr_process_streams
+    assert all(
+        str(stream.name).startswith("MVR_process") for stream in mvr_process_streams
     )
-    assert any(
-        str(stream.name).startswith("MVR_condense") for stream in mvr_process_streams
-    )
-    assert any(
-        str(stream.name).startswith("MVR_subcool") for stream in mvr_process_streams
-    )
+    assert all(stream.has_segments for stream in mvr_process_streams)
     assert sum(stream.heat_flow.value for stream in mvr_process_streams) == (
         pytest.approx(cascade.mvr_stage_heat.sum())
     )
@@ -630,6 +887,364 @@ def test_vc_mvr_cascade_propagates_unsolved_vc_child_cycle(monkeypatch):
     assert cascade.solved is False
     assert work > 0.0
     assert any(penalty > 0.0 for penalty in cascade.penalty)
+
+
+def test_vc_mvr_cascade_properties_and_normalisers_cover_edge_cases():
+    class _Cycle:
+        def __init__(
+            self,
+            *,
+            q_evap: float,
+            work: float,
+            t_evap: float,
+            t_cond: float,
+            penalty=None,
+        ):
+            self.Q_evap = q_evap
+            self.work = work
+            self.T_evap = t_evap
+            self.T_cond = t_cond
+            self.penalty = penalty
+
+    unsolved = VapourCompressionMvrCascade()
+    assert unsolved.work == pytest.approx(0.0)
+    with pytest.raises(RuntimeError, match="Solve the cycle"):
+        _ = unsolved.Q_evap
+
+    cascade = VapourCompressionMvrCascade()
+    cascade._solved = True
+    cascade._source_split = 0.25
+    cascade._vc_cycles = [
+        _Cycle(q_evap=10.0, work=0.0, t_evap=1.0, t_cond=2.0, penalty=None)
+    ]
+    cascade._mvr_cycles = [
+        _Cycle(q_evap=0.0, work=0.0, t_evap=3.0, t_cond=4.0, penalty=[5.0])
+    ]
+    cascade._direct_vc_heat = np.array([20.0])
+    cascade._mvr_stage_heat = np.array([30.0])
+    cascade._T_evap_mvr = np.array([80.0])
+    cascade._T_cond_mvr = np.array([95.0])
+
+    assert cascade.source_split == pytest.approx(0.25)
+    assert cascade.Q_evap == pytest.approx(10.0)
+    np.testing.assert_allclose(cascade.Q_cond_arr, np.array([20.0, 30.0]))
+    assert cascade.Q_cool == pytest.approx(10.0)
+    assert cascade.Q_heat == pytest.approx(50.0)
+    np.testing.assert_allclose(cascade.T_evap, np.array([1.0, 3.0]))
+    np.testing.assert_allclose(cascade.T_cond, np.array([2.0, 4.0]))
+    assert cascade.penalty == [5.0]
+    with pytest.raises(ZeroDivisionError, match="COP_h"):
+        _ = cascade.COP_h
+
+    np.testing.assert_allclose(
+        cascade._normalise_stage_array(2.0, 3),
+        np.array([2.0, 2.0, 2.0]),
+    )
+    with pytest.raises(ValueError, match="Expected 3 stage values"):
+        cascade._normalise_stage_array([1.0, 2.0], 3)
+
+    np.testing.assert_allclose(
+        cascade._normalise_process_split(None, 3),
+        np.array([0.0, 0.0, 1.0]),
+    )
+    np.testing.assert_allclose(
+        cascade._normalise_process_split(0.4, 3),
+        np.array([0.4, 0.4, 1.0]),
+    )
+    np.testing.assert_allclose(
+        cascade._normalise_process_split([0.2, 0.3], 3),
+        np.array([0.2, 0.3, 1.0]),
+    )
+    np.testing.assert_allclose(
+        cascade._normalise_process_split([0.2, 0.3, 0.4], 3),
+        np.array([0.2, 0.3, 1.0]),
+    )
+    with pytest.raises(ValueError, match="Expected 2 MVR process split values"):
+        cascade._normalise_process_split([0.1, 0.2, 0.3, 0.4], 3)
+
+    assert cascade._normalise_fluid_list([], 3) == ["Water", "Water", "Water"]
+    assert cascade._normalise_fluid_list(["R134A", "Water"], 4) == [
+        "R134A",
+        "Water",
+        "Water",
+        "Water",
+    ]
+
+
+def test_vc_mvr_cascade_input_validation_guards():
+    cascade = VapourCompressionMvrCascade()
+
+    with pytest.raises(ValueError, match="Either Q_heat_vc"):
+        cascade.solve(
+            T_evap_vc=np.array([20.0]),
+            T_cond_vc=np.array([80.0]),
+            dT_lift_mvr=np.array([10.0]),
+        )
+
+    with pytest.raises(ValueError, match="at least one VC and MVR"):
+        cascade.solve(
+            T_evap_vc=np.array([]),
+            T_cond_vc=np.array([]),
+            dT_lift_mvr=np.array([10.0]),
+            Q_heat_vc=np.array([]),
+        )
+
+    with pytest.raises(ValueError, match="at least one VC and MVR"):
+        cascade.solve(
+            T_evap_vc=np.array([20.0]),
+            T_cond_vc=np.array([80.0]),
+            dT_lift_mvr=np.array([]),
+            Q_heat_vc=np.array([100.0]),
+        )
+
+    with pytest.raises(ValueError, match="input shapes"):
+        cascade.solve(
+            T_evap_vc=np.array([20.0, 30.0]),
+            T_cond_vc=np.array([80.0]),
+            dT_lift_mvr=np.array([10.0]),
+            Q_heat_vc=np.array([100.0]),
+        )
+
+
+def test_vc_mvr_cascade_propagates_unsolved_mvr_child_cycle(monkeypatch):
+    class _SolvedVcCycle:
+        solved = True
+        work = 10.0
+        penalty = None
+        Ts = [0.0, 0.0, 0.0, 0.0, 353.15]
+
+        def solve(self, **kwargs):
+            return self.work
+
+    class _UnsolvedMvrCycle:
+        solved = False
+        work = -7.0
+        penalty = None
+
+        def solve_from_source_heat(self, **kwargs):
+            return self.work
+
+        def solve_from_mass_flow(self, **kwargs):
+            return self.work
+
+    monkeypatch.setattr(vcmvr_cascade_mod, "VapourCompressionCycle", _SolvedVcCycle)
+    monkeypatch.setattr(
+        vcmvr_cascade_mod,
+        "MechanicalVapourRecompressionCycle",
+        _UnsolvedMvrCycle,
+    )
+
+    cascade = VapourCompressionMvrCascade()
+    work = cascade.solve(
+        T_evap_vc=np.array([20.0]),
+        T_cond_vc=np.array([80.0]),
+        dT_lift_mvr=np.array([10.0]),
+        Q_heat_vc=np.array([100.0]),
+        mvr_source_split=0.25,
+    )
+
+    assert cascade.solved is False
+    assert work == pytest.approx(107.0)
+    assert cascade.penalty[-1] == pytest.approx(7.0)
+
+
+def test_vc_mvr_cascade_negative_total_work_returns_penalty(monkeypatch):
+    class _SolvedVcCycle:
+        solved = True
+        work = -20.0
+        penalty = None
+        Ts = [0.0, 0.0, 0.0, 0.0, 353.15]
+
+        def solve(self, **kwargs):
+            return self.work
+
+    class _SolvedMvrCycle:
+        solved = True
+        work = 5.0
+        source_m_dot = 1.0
+        process_m_dot_out = 0.0
+        penalty = None
+
+        def solve_from_source_heat(self, **kwargs):
+            return self.work
+
+        def solve_from_mass_flow(self, **kwargs):
+            return self.work
+
+        def process_heat_components(self):
+            return {
+                "desuperheat": 1.0,
+                "latent": 2.0,
+                "subcool": 3.0,
+                "total": 6.0,
+            }
+
+    monkeypatch.setattr(vcmvr_cascade_mod, "VapourCompressionCycle", _SolvedVcCycle)
+    monkeypatch.setattr(
+        vcmvr_cascade_mod,
+        "MechanicalVapourRecompressionCycle",
+        _SolvedMvrCycle,
+    )
+
+    cascade = VapourCompressionMvrCascade()
+    work = cascade.solve(
+        T_evap_vc=np.array([20.0]),
+        T_cond_vc=np.array([80.0]),
+        dT_lift_mvr=np.array([10.0]),
+        Q_heat_vc=np.array([100.0]),
+        mvr_source_split=0.25,
+    )
+
+    assert cascade.solved is False
+    assert work == pytest.approx(15.0)
+
+
+def test_vc_mvr_optimise_prepares_seeded_setup(monkeypatch):
+    args = _base_args(
+        n_cond=2,
+        n_evap=1,
+        n_mvr=2,
+        initialise_simulated_cycle=True,
+        refrigerant_ls=["R134A"],
+        mvr_fluid_ls=" Water ",
+    )
+    init_res = SimpleNamespace(
+        T_cond=np.array([120.0]),
+        Q_cond=np.array([100.0]),
+        T_evap=np.array([50.0]),
+        Q_amb_hot=1.0,
+        Q_amb_cold=2.0,
+    )
+    marker = SimpleNamespace(success=True)
+    captured = {}
+
+    monkeypatch.setattr(
+        hp_vc_mvr,
+        "optimise_cascade_carnot_heat_pump_placement",
+        lambda _args: init_res,
+    )
+    monkeypatch.setattr(
+        hp_vc_mvr,
+        "validate_vapour_hp_refrigerant_ls",
+        lambda n_vc, _args: ["R134A"] * n_vc,
+    )
+
+    def _fake_solve_hpr_placement(**kwargs):
+        captured.update(kwargs)
+        return marker
+
+    monkeypatch.setattr(hp_vc_mvr, "solve_hpr_placement", _fake_solve_hpr_placement)
+
+    result = hp_vc_mvr.optimise_vapour_compression_mvr_heat_pump_placement(args)
+
+    assert result is marker
+    assert captured["f_obj"] is hp_vc_mvr._compute_vc_mvr_system_obj
+    assert captured["x0_ls"] is not None
+    assert len(captured["bnds"]) == captured["x0_ls"].shape[0]
+    assert args.refrigerant_ls == ["R134A", "R134A"]
+    assert args.mvr_fluid_ls == ["Water"]
+
+
+def test_vc_mvr_setup_and_small_helpers_cover_edge_cases():
+    args = _base_args(n_cond=2, n_evap=1, n_mvr=2)
+
+    x0, bnds = hp_vc_mvr._get_vc_mvr_opt_setup(init_res=None, args=args)
+
+    assert x0 is None
+    assert len(bnds) == hp_vc_mvr._vc_mvr_layout(args).size
+    np.testing.assert_allclose(hp_vc_mvr._fit_stage_array([], 3), np.zeros(3))
+    np.testing.assert_allclose(
+        hp_vc_mvr._fit_stage_array([2.0], 3),
+        np.array([2.0, 2.0, 2.0]),
+    )
+    assert hp_vc_mvr._normalise_fluid_list(" Water ") == ["Water"]
+    assert hp_vc_mvr._normalise_fluid_list(["", "R134A", "  "]) == ["R134A"]
+    assert hp_vc_mvr._normalise_fluid_list(["", "  "]) == ["Water"]
+
+
+def test_compute_vc_mvr_system_obj_rejects_refrigeration_without_parsing():
+    args = _base_args(is_heat_pumping=False, n_mvr=1)
+
+    out = hp_vc_mvr._compute_vc_mvr_system_obj(np.array([]), args)
+
+    assert out.success is False
+    assert "heat-pump-only" in out.failure_reason
+
+
+def test_compute_vc_mvr_system_obj_validates_dict_state_and_returns_finite_failure(
+    monkeypatch,
+):
+    args = _base_args(
+        n_cond=1,
+        n_evap=1,
+        n_mvr=1,
+        refrigerant_ls=["R134A"],
+        mvr_fluid_ls=["Water"],
+        eta_mvr_comp=0.7,
+        eta_motor=0.95,
+    )
+    x = np.array([0.2] * hp_vc_mvr._vc_mvr_layout(args).size)
+    parsed_state = hp_vc_mvr._parse_vc_mvr_state_variables(x, args)
+
+    class _UnsolvedCascade:
+        solved = False
+        work = 12.0
+        penalty = [3.0]
+
+        def solve(self, **kwargs):
+            return self.work
+
+    monkeypatch.setattr(
+        hp_vc_mvr,
+        "_parse_vc_mvr_state_variables",
+        lambda _x, _args: parsed_state.model_dump(mode="python"),
+    )
+    monkeypatch.setattr(hp_vc_mvr, "VapourCompressionMvrCascade", _UnsolvedCascade)
+
+    out = hp_vc_mvr._compute_vc_mvr_system_obj(x, args)
+
+    assert out.success is False
+    assert out.w_hpr == pytest.approx(12.0)
+    assert out.utility_tot == pytest.approx(15.0)
+    assert "infeasible" in out.failure_reason
+
+
+def test_vc_mvr_solved_state_and_unpack_validation_guards():
+    args = _base_args(n_cond=1, n_evap=1, n_mvr=1)
+    x = np.array([0.2] * hp_vc_mvr._vc_mvr_layout(args).size)
+    state = hp_vc_mvr._parse_vc_mvr_state_variables(x, args)
+
+    hp_bad_stage_counts = SimpleNamespace(
+        mvr_cycles=[],
+        vc_cycles=[SimpleNamespace(dT_subcool=1.0)],
+        T_cond_mvr=np.array([100.0]),
+        T_evap_mvr=np.array([90.0]),
+    )
+    with pytest.raises(ValueError, match="stage counts"):
+        hp_vc_mvr._build_solved_vc_mvr_state(state, hp_bad_stage_counts, args)
+
+    with pytest.raises(ValueError, match="temperature arrays"):
+        hp_vc_mvr._unpack_vc_mvr_state(state.model_copy(update={"T_cond": None}), args)
+    with pytest.raises(ValueError, match="condenser temperatures"):
+        hp_vc_mvr._unpack_vc_mvr_state(
+            state.model_copy(update={"T_cond": np.array([1.0])}),
+            args,
+        )
+    with pytest.raises(ValueError, match="evaporator temperatures"):
+        hp_vc_mvr._unpack_vc_mvr_state(
+            state.model_copy(update={"T_evap": np.array([1.0])}),
+            args,
+        )
+    with pytest.raises(ValueError, match="heat split fractions"):
+        hp_vc_mvr._unpack_vc_mvr_state(
+            state.model_copy(update={"x_heat_split": None}),
+            args,
+        )
+    with pytest.raises(ValueError, match="subcooling"):
+        hp_vc_mvr._unpack_vc_mvr_state(
+            state.model_copy(update={"dT_subcool": np.array([1.0])}),
+            args,
+        )
 
 
 def test_vc_mvr_x0_bounds_parse_round_trip():

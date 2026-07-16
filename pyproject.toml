@@ -27,14 +27,14 @@ packages = ["OpenPinch"]
 [project]
 name = "OpenPinch"
 dependencies=[
-  "numpy",
-  "pint",
-  "pandas",
-  "coolprop",
-  "pydantic",
-  "scipy",
+  "numpy<3",
+  "pint<1",
+  "pandas<3",
+  "coolprop<8",
+  "pydantic<3",
+  "scipy<2",
 ]
-version = "0.4.5"
+version = "0.5.0"
 authors = [
   { name="Tim Walmsley", email="tim.walmsley@waikato.ac.nz" },
 ]
@@ -83,18 +83,24 @@ notebook = [
 ]
 full = [
   "streamlit",
-  "plotly",
-  "openpyxl",
+  "plotly>=6.8.0",
+  "openpyxl>=3.1.5",
   "pyxlsb",
   "tespy",
   "ipykernel>=7.2.0",
   "nbformat>=5.10.4",
+  "pyomo>=6.10.0",
+  "gekko>=1.3.2",
+  "kaleido>=1.3.0",
+  "wakepy>=1.0.0",
+  "idaes-pse>=2.11.0",
 ]
 
 [dependency-groups]
 dev = [
     "build>=1.3.0",
     "hatchling>=1.26",
+    "hypothesis>=6.135.0",
     "ipykernel>=7.2.0",
     "nbformat>=5.10.4",
     "pytest>=9.0.3",
@@ -114,6 +120,7 @@ dev = [
     "pylint>=4.0.5",
     "graphviz>=0.21",
     "idaes-pse>=2.11.0",
+    "coverage>=7.14.3",
 ]
 
 [tool.black]

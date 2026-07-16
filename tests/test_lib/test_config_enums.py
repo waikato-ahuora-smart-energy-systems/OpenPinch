@@ -1,10 +1,19 @@
 """Additional coverage tests for config and enum helpers."""
 
+import json
+from pathlib import Path
+
 import pytest
 
 from OpenPinch.lib.config import Configuration
 from OpenPinch.lib.config_metadata import configuration_option_status
 from OpenPinch.lib.enums import TT, ZT, HPRcycle
+
+FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "config_cases.json"
+
+
+def _config_fixture() -> dict:
+    return json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
 
 
 def test_configuration_parses_refrigerant_list_option():
@@ -43,15 +52,58 @@ def test_configuration_disables_effective_hpr_heat_engine_efficiency_by_default(
 
 
 def test_configuration_accepts_input_and_output_unit_maps():
-    cfg = Configuration(
-        options={
-            "INPUT_UNIT_TEMPERATURE": "K",
-            "OUTPUT_UNIT_HEAT_FLOW": "MW",
-        }
-    )
+    cfg = Configuration(options=_config_fixture()["period_config"])
 
     assert cfg.input_unit_overrides["temperature"] == "K"
     assert cfg.output_unit_overrides["heat_flow"] == "MW"
+
+
+def test_configuration_constructor_helpers_and_catalog_use_static_fixture():
+    fixture = _config_fixture()["period_config"]
+
+    with pytest.raises(TypeError, match="provided as a dict"):
+        Configuration(options=[("THERMAL_DT_CONT", 5.0)])
+
+    cfg = Configuration.from_options(
+        fixture,
+        top_zone_name="Custom Site",
+        top_zone_identifier=ZT.S.value,
+    )
+
+    assert cfg.problem.top_zone_name == "Custom Site"
+    assert cfg.problem.top_zone_identifier == ZT.S.value
+    assert "THERMAL_DT_CONT" in Configuration._known_option_keys()
+    assert any(
+        field.name == "THERMAL_DT_CONT" for field in Configuration.options_catalog()
+    )
+
+
+def test_configuration_for_period_resolves_ids_indexes_and_default_weights():
+    cfg = Configuration(options=_config_fixture()["period_config"])
+
+    default_context = cfg.for_period()
+    peak_context = cfg.for_period(period_id="peak")
+    index_context = cfg.for_period(period_idx=1)
+
+    assert default_context.period_id == "base"
+    assert default_context.period_idx == 0
+    assert default_context.weight == pytest.approx(0.25)
+    assert peak_context.period_id == "peak"
+    assert peak_context.period_idx == 1
+    assert peak_context.weight == pytest.approx(0.75)
+    assert index_context.period_id == "peak"
+    assert index_context.period_idx == 1
+    assert index_context.weight == pytest.approx(0.75)
+
+    missing_weight_cfg = Configuration(
+        options=_config_fixture()["missing_weight_config"]
+    )
+    assert missing_weight_cfg.for_period(period_idx=1).weight == pytest.approx(1.0)
+
+    with pytest.raises(ValueError, match="Unknown period_id"):
+        cfg.for_period(period_id="missing")
+    with pytest.raises(ValueError, match="Unknown period index"):
+        cfg.for_period(period_idx=10)
 
 
 def test_configuration_rejects_unknown_option_keys():

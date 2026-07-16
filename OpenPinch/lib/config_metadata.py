@@ -44,7 +44,7 @@ HENS_METHOD_SEQUENCE_VALUES = frozenset(
 )
 HENS_OUTPUT_FORMAT_VALUES = frozenset({"json", "csv", "xlsx"})
 HENS_STAGE_PACKING_VALUES = frozenset({"auto", "none", "pdm", "tdm", "all"})
-HPR_LOAD_MODE_VALUES = frozenset({"fraction", "duty", "state_values"})
+HPR_LOAD_MODE_VALUES = frozenset({"fraction", "duty", "period_values"})
 _HENS_RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 
 _INPUT_UNIT_TARGETS = {
@@ -99,8 +99,8 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     # Problem shape and state handling.
     "PROBLEM_TOP_ZONE_NAME": _spec(str, "Site", "problem", "top_zone_name"),
     "PROBLEM_TOP_ZONE_IDENTIFIER": _spec(str, ZT.S.value, "problem", "top_zone_identifier", enum_cls=ZT),
-    "PROBLEM_STATE_IDS": _spec(List[str], ["0"], "problem", "state_ids"),
-    "PROBLEM_STATE_WEIGHTS": _spec(List[float], [1.0], "problem", "state_weights", numeric_min=0.0),
+    "PROBLEM_PERIOD_IDS": _spec(List[str], ["0"], "problem", "period_ids"),
+    "PROBLEM_PERIOD_WEIGHTS": _spec(List[float], [1.0], "problem", "period_weights", numeric_min=0.0),
 
     # Explicit input/output units.
     "INPUT_UNIT_TEMPERATURE": _spec(str, "degC", "input_units", "temperature"),
@@ -195,7 +195,8 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HPR_LOAD_MODE": _spec(str, "fraction", "hpr", "load_mode"),
     "HPR_LOAD_FRACTION": _spec(float, 1.0, "hpr", "load_fraction", numeric_min=0.0),
     "HPR_LOAD_DUTY": _spec(float | None, None, "hpr", "load_duty", numeric_min=0.0),
-    "HPR_LOAD_STATE_VALUES": _spec(dict[str, float], {}, "hpr", "load_state_values"),
+    "HPR_LOAD_PERIOD_VALUES": _spec(dict[str, float], {}, "hpr", "load_period_values"),
+    "HPR_MULTIPERIOD_OPTIMIZATION_ENABLED": _spec(bool, False, "hpr", "multiperiod_optimization_enabled"),
     "HPR_REFRIGERANTS": _spec(List[str], ["water", "ammonia"], "hpr", "refrigerants"),
     "HPR_REFRIGERANT_SORT_ENABLED": _spec(bool, True, "hpr", "refrigerant_sort_enabled"),
     "HPR_MVR_FLUIDS": _spec(List[str], ["Water"], "hpr", "mvr_fluids"),
@@ -369,7 +370,7 @@ def validate_configuration_option_value(name: str, value: Any) -> Any:
         return value
     if name == "HPR_LOAD_MODE":
         return _string_choice(name, value, HPR_LOAD_MODE_VALUES)
-    if name == "HPR_LOAD_STATE_VALUES":
+    if name == "HPR_LOAD_PERIOD_VALUES":
         return _float_mapping(name, value, numeric_min=0.0)
 
     if spec.enum_cls is not None:
@@ -513,9 +514,9 @@ def _validate_hpr_load_options(
         raise ValueError(
             "HPR_LOAD_DUTY cannot be supplied when HPR_LOAD_MODE is 'fraction'."
         )
-    if mode == "fraction" and "HPR_LOAD_STATE_VALUES" in provided_keys:
+    if mode == "fraction" and "HPR_LOAD_PERIOD_VALUES" in provided_keys:
         raise ValueError(
-            "HPR_LOAD_STATE_VALUES cannot be supplied when HPR_LOAD_MODE is 'fraction'."
+            "HPR_LOAD_PERIOD_VALUES cannot be supplied when HPR_LOAD_MODE is 'fraction'."
         )
     if mode == "duty" and options.get("HPR_LOAD_DUTY") is None:
         raise ValueError("HPR_LOAD_DUTY is required when HPR_LOAD_MODE is 'duty'.")
@@ -523,17 +524,17 @@ def _validate_hpr_load_options(
         raise ValueError(
             "HPR_LOAD_FRACTION cannot be supplied when HPR_LOAD_MODE is 'duty'."
         )
-    if mode == "state_values" and not options.get("HPR_LOAD_STATE_VALUES"):
+    if mode == "period_values" and not options.get("HPR_LOAD_PERIOD_VALUES"):
         raise ValueError(
-            "HPR_LOAD_STATE_VALUES is required when HPR_LOAD_MODE is 'state_values'."
+            "HPR_LOAD_PERIOD_VALUES is required when HPR_LOAD_MODE is 'period_values'."
         )
-    if mode == "state_values" and "HPR_LOAD_FRACTION" in provided_keys:
+    if mode == "period_values" and "HPR_LOAD_FRACTION" in provided_keys:
         raise ValueError(
-            "HPR_LOAD_FRACTION cannot be supplied when HPR_LOAD_MODE is 'state_values'."
+            "HPR_LOAD_FRACTION cannot be supplied when HPR_LOAD_MODE is 'period_values'."
         )
-    if mode == "state_values" and "HPR_LOAD_DUTY" in provided_keys:
+    if mode == "period_values" and "HPR_LOAD_DUTY" in provided_keys:
         raise ValueError(
-            "HPR_LOAD_DUTY cannot be supplied when HPR_LOAD_MODE is 'state_values'."
+            "HPR_LOAD_DUTY cannot be supplied when HPR_LOAD_MODE is 'period_values'."
         )
 
 
@@ -580,7 +581,7 @@ def _float_mapping(
                 float,
                 None,
                 "hpr",
-                ("hpr", "load_state_values"),
+                ("hpr", "load_period_values"),
                 numeric_min=numeric_min,
             ),
         )

@@ -3,6 +3,7 @@
 import json
 import os
 
+import numpy as np
 import pytest
 
 from OpenPinch.classes import *
@@ -12,12 +13,63 @@ from OpenPinch.services.common.gcc_manipulation import (
 )
 from OpenPinch.services.common.miscellaneous import *
 from OpenPinch.services.common.utility_targeting import (
+    _assign_utility,
+    _maximise_utility_duty,
     target_utilities_for_load_profiles,
 )
 from OpenPinch.services.input_data_processing.data_preparation import prepare_problem
 from OpenPinch.utils import get_scalar_value
 
 """Tests for target_utilities_for_load_profiles."""
+
+
+def test_target_utilities_for_load_profiles_rejects_missing_required_utilities():
+    with pytest.raises(ValueError, match="No hot utilities provided"):
+        target_utilities_for_load_profiles(
+            hot_utilities=StreamCollection(),
+            cold_utilities=StreamCollection(),
+            T_vals=np.array([200.0, 100.0]),
+            H_net_cold=np.array([10.0, 0.0]),
+            H_net_hot=np.array([0.0, 0.0]),
+            pinch_idx=(0, 1),
+        )
+
+    with pytest.raises(ValueError, match="No cold utilities provided"):
+        target_utilities_for_load_profiles(
+            hot_utilities=StreamCollection(),
+            cold_utilities=StreamCollection(),
+            T_vals=np.array([200.0, 100.0]),
+            H_net_cold=np.array([0.0, 0.0]),
+            H_net_hot=np.array([0.0, 10.0]),
+            pinch_idx=(0, 1),
+        )
+
+
+def test_assign_utility_rejects_non_vector_heat_segment():
+    with pytest.raises(ValueError, match="Error in utility targeting"):
+        _assign_utility(
+            T_vals=np.array([200.0, 100.0]),
+            H_vals=np.array([[0.0, 10.0], [20.0, 30.0]]),
+            u_ls=StreamCollection(),
+            pinch_row=1,
+            is_hot_ut=True,
+            is_real_temperatures=False,
+            idx=None,
+        )
+
+
+def test_maximise_utility_duty_returns_zero_for_single_point_segment():
+    assert (
+        _maximise_utility_duty(
+            T_segment=np.array([200.0]),
+            H_segment=np.array([0.0]),
+            Ts=210.0,
+            Tt=190.0,
+            is_hot_ut=True,
+            Q_assigned=0.0,
+        )
+        == 0.0
+    )
 
 
 def get_test_filenames():
@@ -38,7 +90,8 @@ def test_target_utility(filename):
     r_file_path = filepath + "/r" + filename[1:]
     with open(p_file_path) as json_data:
         input_data = json.load(json_data)
-    data = GetInputOutputData.model_validate(input_data)
+    data = TargetInput.model_validate(input_data)
+    plant_profiles = input_data["plant_profile_data"]
 
     with open(r_file_path) as json_data:
         wkb_res = json.load(json_data)
@@ -48,10 +101,12 @@ def test_target_utility(filename):
         streams=data.streams, utilities=data.utilities, options=data.options
     )
 
-    for plant in data.plant_profile_data:
-        z = site.get_subzone(plant.name)
-        pt = ProblemTable({PT.T: plant.data.T})
-        pt[PT.H_NET] = plant.data.H_net
+    for plant in plant_profiles:
+        plant_name = plant["name"]
+        plant_data = plant["data"]
+        z = site.get_subzone(plant_name)
+        pt = ProblemTable({PT.T: plant_data["T"]})
+        pt[PT.H_NET] = plant_data["H_net"]
         pt.update(
             **get_seperated_gcc_heat_load_profiles(
                 T_col=pt[PT.T],
@@ -71,7 +126,7 @@ def test_target_utility(filename):
         t = None
         i = 0
         for t in wkb_res.targets:
-            if plant.name == t.name.replace("/" + TT.DI.value, ""):
+            if plant_name == t.name.replace("/" + TT.DI.value, ""):
                 break
             i += 1
         assert i < len(wkb_res.targets)

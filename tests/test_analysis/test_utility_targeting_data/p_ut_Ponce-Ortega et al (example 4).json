@@ -87,9 +87,7 @@
             "htc": {
                 "value": 0.53,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Medium",
@@ -113,9 +111,7 @@
             "htc": {
                 "value": 1.8,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Medium",
@@ -139,9 +135,7 @@
             "htc": {
                 "value": 0.52,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Medium",
@@ -165,9 +159,7 @@
             "htc": {
                 "value": 2.1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Medium",
@@ -191,9 +183,7 @@
             "htc": {
                 "value": 0.71,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Medium",
@@ -217,9 +207,7 @@
             "htc": {
                 "value": 0.54,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Medium",
@@ -243,9 +231,7 @@
             "htc": {
                 "value": 2.3,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Medium",
@@ -269,9 +255,7 @@
             "htc": {
                 "value": 0.8,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Medium",
@@ -295,9 +279,7 @@
             "htc": {
                 "value": 1.9,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Medium",
@@ -321,9 +303,7 @@
             "htc": {
                 "value": 0.62,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         }
     ],
     "utilities": [

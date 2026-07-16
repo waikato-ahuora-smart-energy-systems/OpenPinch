@@ -5,12 +5,38 @@ import json
 # import types
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
+import pandas as pd
 import pytest
 
-from OpenPinch.classes._problem._plot_accessor import _PlotAccessor
+from OpenPinch.classes._pinch_problem.accessors.plot import (
+    _gallery_index_html,
+    _graph_set_matches_zone_selector,
+    _PlotAccessor,
+    _slugify,
+)
+from OpenPinch.classes._pinch_problem.accessors.target import _TargetAccessor
+from OpenPinch.classes._pinch_problem.input.loading import (
+    _load_json_inputs,
+    _packaged_sample_case_name,
+    _ProblemSourceAdapters,
+    find_zone_tree_node,
+    load_problem_source,
+)
+from OpenPinch.classes._pinch_problem.output.reporting import (
+    _target_attr,
+    build_graph_availability,
+    build_graph_data,
+    build_problem_report,
+    build_problem_summary_frame,
+    format_res,
+    locate_summary_row,
+)
 from OpenPinch.classes.pinch_problem import PinchProblem
 from OpenPinch.classes.zone import Zone
+from OpenPinch.lib.schemas.io import TargetInput
+from OpenPinch.lib.schemas.workspace import ValidationReport
 from OpenPinch.resources import copy_sample_case
 
 
@@ -26,7 +52,7 @@ def sample_problem():
                 "t_supply": 150,
                 "t_target": 60,
                 "heat_flow": 2.0,
-                "dtcont": 1,
+                "dt_cont": 1,
             }
         ],
         "utilities": [{"name": "LP Steam", "t_supply": 150, "type": "Hot", "cost": 20}],
@@ -323,7 +349,7 @@ def test_root_stream_views_are_exposed_on_problem():
                 "t_supply": 180.0,
                 "t_target": 90.0,
                 "heat_flow": 100.0,
-                "dtcont": 5.0,
+                "dt_cont": 5.0,
             },
             {
                 "zone": "Area1",
@@ -331,7 +357,7 @@ def test_root_stream_views_are_exposed_on_problem():
                 "t_supply": 40.0,
                 "t_target": 120.0,
                 "heat_flow": 80.0,
-                "dtcont": 5.0,
+                "dt_cont": 5.0,
             },
         ],
         "utilities": [
@@ -365,7 +391,7 @@ def test_problem_hot_stream_temperature_mutation_updates_root_zone_stream():
                 "t_supply": 180.0,
                 "t_target": 90.0,
                 "heat_flow": 100.0,
-                "dtcont": 5.0,
+                "dt_cont": 5.0,
             }
         ],
         "utilities": [],
@@ -383,7 +409,7 @@ def test_problem_hot_stream_temperature_mutation_updates_root_zone_stream():
     assert float(hot_stream.t_max) == pytest.approx(195.0)
 
 
-def test_show_dashboard_builds_graph_payload(monkeypatch):
+def test_show_dashboard_builds_graph_data(monkeypatch):
     mod = sys.modules[PinchProblem.__module__]
     captured = {}
 
@@ -394,9 +420,9 @@ def test_show_dashboard_builds_graph_payload(monkeypatch):
     class ResultContainer:
         graphs = {"g1": GraphWithDump(), "g2": {"y": 2}}
 
-    def fake_render(zone, graph_payload, page_title, value_rounding):
+    def fake_render(zone, graph_data, page_title, value_rounding):
         captured["zone"] = zone
-        captured["payload"] = graph_payload
+        captured["graph_data"] = graph_data
         captured["title"] = page_title
         captured["rounding"] = value_rounding
 
@@ -408,8 +434,8 @@ def test_show_dashboard_builds_graph_payload(monkeypatch):
     obj.show_dashboard(page_title="Dash", value_rounding=3)
 
     assert captured["zone"] == {"name": "root"}
-    assert captured["payload"]["g1"] == {"x": 1}
-    assert captured["payload"]["g2"] == {"y": 2}
+    assert captured["graph_data"]["g1"] == {"x": 1}
+    assert captured["graph_data"]["g2"] == {"y": 2}
     assert captured["title"] == "Dash"
     assert captured["rounding"] == 3
 
@@ -479,7 +505,7 @@ def test_target_accessor_supports_named_workflow(monkeypatch):
     assert called["include_subzones"] is False
 
 
-def test_target_accessor_supports_named_workflow_with_state_id(monkeypatch):
+def test_target_accessor_supports_named_workflow_with_period_id(monkeypatch):
     called = {}
 
     def fake_execute_targeting(
@@ -508,13 +534,13 @@ def test_target_accessor_supports_named_workflow_with_state_id(monkeypatch):
     out = obj.target.direct_heat_integration(
         zone_name="Plant/DI",
         options={"dt_min": 15},
-        state_id="peak",
+        period_id="peak",
     )
 
     assert out == {"target": "di"}
     assert called["target_id"] == "Direct Integration"
     assert called["application_zone"] == "Plant/DI"
-    assert called["options"] == {"dt_min": 15, "state_id": "peak"}
+    assert called["options"] == {"dt_min": 15, "period_id": "peak"}
 
 
 def test_target_accessor_cogeneration_uses_dedicated_execution_path(monkeypatch):
@@ -545,14 +571,14 @@ def test_target_accessor_cogeneration_uses_dedicated_execution_path(monkeypatch)
     out = obj.target.cogeneration(
         zone_name="Plant/TS",
         options={"base_target_type": "Total Site Target"},
-        state_id="peak",
+        period_id="peak",
     )
 
     assert out == {"target": "ts"}
     assert called["application_zone"] == "Plant/TS"
     assert called["options"] == {
         "base_target_type": "Total Site Target",
-        "state_id": "peak",
+        "period_id": "peak",
     }
     assert called["include_subzones"] is False
     assert called["service_func"] is not None
@@ -586,14 +612,14 @@ def test_target_accessor_exergy_uses_dedicated_execution_path(monkeypatch):
     out = obj.target.exergy(
         zone_name="Plant",
         options={"base_target_type": "Direct Integration"},
-        state_id="peak",
+        period_id="peak",
     )
 
     assert out == {"target": "x"}
     assert called["application_zone"] == "Plant"
     assert called["options"] == {
         "base_target_type": "Direct Integration",
-        "state_id": "peak",
+        "period_id": "peak",
     }
     assert called["include_subzones"] is False
     assert called["service_func"] is not None
@@ -794,7 +820,7 @@ def test_run_exergy_targeting_for_zone_and_subzones_is_post_order():
     problem._run_exergy_targeting_for_zone_and_subzones(
         zone=root,
         service_func=lambda zone, args=None: order.append(zone.name),
-        options={"state_id": "peak"},
+        options={"period_id": "peak"},
     )
 
     assert order == ["Child", "Root"]
@@ -812,13 +838,13 @@ def test_run_exergy_targeting_for_zone_and_subzones_drops_base_target_type_for_c
         service_func=lambda zone, args=None: calls.append(
             (zone.name, dict(args or {}))
         ),
-        options={"base_target_type": "Total Site Target", "state_id": "peak"},
+        options={"base_target_type": "Total Site Target", "period_id": "peak"},
     )
 
-    assert calls[0] == ("Child", {"state_id": "peak"})
+    assert calls[0] == ("Child", {"period_id": "peak"})
     assert calls[1] == (
         "Root",
-        {"base_target_type": "Total Site Target", "state_id": "peak"},
+        {"base_target_type": "Total Site Target", "period_id": "peak"},
     )
 
 
@@ -861,7 +887,7 @@ def test_validate_uses_schema_and_prepare_problem(monkeypatch, sample_problem):
     assert payload.streams == ["s"]
 
 
-def test_validate_rejects_stateful_streams_with_mixed_hot_cold_classification():
+def test_validate_rejects_period_streams_with_mixed_hot_cold_classification():
     payload = {
         "streams": [
             {
@@ -923,7 +949,7 @@ def test_summary_frame_compact_and_detailed(monkeypatch):
 
     assert list(compact.columns[:7]) == [
         "Target",
-        "State ID",
+        "Period ID",
         "Hot Utility Target",
         "Cold Utility Target",
         "Heat Recovery",
@@ -1008,7 +1034,7 @@ def test_summary_frame_preserves_equal_hot_and_cold_pinch_values():
     assert summary.iloc[0]["Cold Pinch"] == "120.00 degC"
 
 
-def test_summary_frame_uses_selected_state_for_stateful_results():
+def test_summary_frame_uses_selected_period_for_period_results():
     class _Utility:
         def __init__(self, name, heat_flow):
             self.name = name
@@ -1019,23 +1045,23 @@ def test_summary_frame_uses_selected_state_for_stateful_results():
         (),
         {
             "name": "Plant/DI",
-            "idx": 1,
-            "state_id": "peak",
-            "Qh": {"values": [10.0, 25.0], "state_ids": ["0", "peak"], "unit": "kW"},
-            "Qc": {"values": [20.0, 15.0], "state_ids": ["0", "peak"], "unit": "kW"},
-            "Qr": {"values": [30.0, 35.0], "state_ids": ["0", "peak"], "unit": "kW"},
+            "period_idx": 1,
+            "period_id": "peak",
+            "Qh": {"values": [10.0, 25.0], "period_ids": ["0", "peak"], "unit": "kW"},
+            "Qc": {"values": [20.0, 15.0], "period_ids": ["0", "peak"], "unit": "kW"},
+            "Qr": {"values": [30.0, 35.0], "period_ids": ["0", "peak"], "unit": "kW"},
             "pinch_temp": type(
                 "PinchTemp",
                 (),
                 {
                     "hot_temp": {
                         "values": [120.0, 140.0],
-                        "state_ids": ["0", "peak"],
+                        "period_ids": ["0", "peak"],
                         "unit": "degC",
                     },
                     "cold_temp": {
                         "values": [100.0, 115.0],
-                        "state_ids": ["0", "peak"],
+                        "period_ids": ["0", "peak"],
                         "unit": "degC",
                     },
                 },
@@ -1045,7 +1071,7 @@ def test_summary_frame_uses_selected_state_for_stateful_results():
                     "Steam",
                     {
                         "values": [10.0, 25.0],
-                        "state_ids": ["0", "peak"],
+                        "period_ids": ["0", "peak"],
                         "unit": "kW",
                     },
                 )
@@ -1058,7 +1084,7 @@ def test_summary_frame_uses_selected_state_for_stateful_results():
 
     summary = obj.summary_frame()
 
-    assert summary.iloc[0]["State ID"] == "peak"
+    assert summary.iloc[0]["Period ID"] == "peak"
     assert summary.iloc[0]["Hot Utility Target"] == "25.00 kW"
     assert summary.iloc[0]["Hot Pinch"] == "140.00 degC"
     assert summary.iloc[0]["Hot Utilities"] == "Steam: 25.00 kW"
@@ -1299,6 +1325,92 @@ def test_plot_helper_can_build_energy_transfer_diagram(monkeypatch):
         "name": "ETD",
         "segments": [],
     }
+
+
+def test_plot_accessor_shortcuts_select_all_named_graph_types():
+    payload = {
+        "Plant/All": {
+            "name": "Plant/All Graphs",
+            "zone_name": "Plant",
+            "zone_address": "Site/Plant",
+            "graphs": [
+                {"type": "Shifted Composite Curves", "name": "SCC"},
+                {"type": "Balanced Composite Curves", "name": "BCC"},
+                {"type": "Grand Composite Curve (Real)", "name": "GCC_R"},
+                {"type": "Grand Composite Curve with Heat Pump", "name": "GCC_HP"},
+                {"type": "Net Load Profiles", "name": "NLP"},
+                {"type": "Total Site Profiles", "name": "TSP"},
+                {"type": "Site Utility Grand Composite Curve", "name": "SUGCC"},
+            ],
+        }
+    }
+    problem = SimpleNamespace(_results=SimpleNamespace(graphs=payload))
+    accessor = _PlotAccessor(problem)
+
+    assert accessor.shifted_composite_curve(return_graph_data=True)["name"] == "SCC"
+    assert accessor.balanced_composite_curve(return_graph_data=True)["name"] == "BCC"
+    assert accessor.real_grand_composite_curve(return_graph_data=True)["name"] == (
+        "GCC_R"
+    )
+    assert (
+        accessor.grand_composite_curve_with_heat_pump(return_graph_data=True)["name"]
+        == "GCC_HP"
+    )
+    assert accessor.net_load_profiles(return_graph_data=True)["name"] == "NLP"
+    assert accessor.total_site_profiles(return_graph_data=True)["name"] == "TSP"
+    assert (
+        accessor.site_utility_grand_composite_curve(return_graph_data=True)["name"]
+        == "SUGCC"
+    )
+
+
+def test_plot_accessor_reports_selection_errors_without_building_figures():
+    payload = {
+        "Plant/DI": {
+            "name": "Plant/Direct Integration",
+            "zone_name": "Plant",
+            "zone_address": "Site/Plant",
+            "graphs": [{"type": "Grand Composite Curve", "name": "GCC"}],
+        }
+    }
+    accessor = _PlotAccessor(SimpleNamespace(_results=SimpleNamespace(graphs=payload)))
+
+    with pytest.raises(ValueError, match="No graphs matched"):
+        accessor.composite_curve(return_graph_data=True)
+    with pytest.raises(IndexError, match="out of range"):
+        accessor.grand_composite_curve(index=4, return_graph_data=True)
+    with pytest.raises(KeyError, match="Unknown zone"):
+        accessor.grand_composite_curve(zone_name="Unknown", return_graph_data=True)
+
+
+def test_plot_accessor_utility_helpers_handle_edge_cases():
+    descriptor = PinchProblem.plot
+    graph_set = {
+        "name": "Site/Area/Direct Integration",
+        "zone_name": None,
+        "zone_address": "Site/Area",
+        "target_type": "Direct Integration",
+    }
+
+    assert descriptor is PinchProblem.plot
+    assert _graph_set_matches_zone_selector(
+        selector="Area/Direct Integration",
+        graph_key="Site/Area/Direct Integration",
+        graph_set=graph_set,
+    )
+    assert _graph_set_matches_zone_selector(
+        selector="Area/Direct Integration",
+        graph_key="graph-key",
+        graph_set={**graph_set, "name": "Site/Direct Integration"},
+    )
+    assert not _graph_set_matches_zone_selector(
+        selector="Other",
+        graph_key="Site/Area/Direct Integration",
+        graph_set=graph_set,
+    )
+    assert _slugify("  Heat++Pump / GCC  ") == "heat_pump_gcc"
+    assert _slugify("!!!") == "graph"
+    assert "No graphs matched" in _gallery_index_html([])
 
 
 def test_plot_helper_rejects_show_when_returning_graph_data(monkeypatch):
@@ -1650,7 +1762,7 @@ def test_load_allows_missing_optional_utility_and_stream_fields():
     assert validated.utilities[0].t_target is None
 
 
-def test_load_preserves_stateful_stream_values_on_runtime_streams():
+def test_load_preserves_period_stream_values_on_runtime_streams():
     payload = {
         "streams": [
             {
@@ -1686,7 +1798,7 @@ def test_load_preserves_stateful_stream_values_on_runtime_streams():
     assert stream.supply_temperature[1].unit == "degC"
 
 
-def test_validate_rejects_stateful_equal_temperatures_with_state_id(tmp_path: Path):
+def test_validate_rejects_period_equal_temperatures_with_period_id(tmp_path: Path):
     payload = {
         "streams": [
             {
@@ -1710,17 +1822,17 @@ def test_validate_rejects_stateful_equal_temperatures_with_state_id(tmp_path: Pa
         ],
         "utilities": [],
         "options": {
-            "PROBLEM_STATE_IDS": ["0", "peak"],
+            "PROBLEM_PERIOD_IDS": ["0", "peak"],
         },
     }
-    path = tmp_path / "stateful_equal_t.json"
+    path = tmp_path / "period_equal_t.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
 
     with pytest.raises(ValueError) as exc_info:
         PinchProblem().load(source=path)
 
     message = str(exc_info.value)
-    assert "Supply and target temperatures must differ for state_id '1'" in message
+    assert "Supply and target temperatures must differ for period_id '1'" in message
     assert "Stream 1 'H1'" in message
 
 
@@ -1909,7 +2021,7 @@ def test_set_dt_cont_multiplier_below_one_rebuilds_default_utilities_and_net_str
     )
 
 
-def test_direct_heat_integration_accepts_state_id_and_returns_state_specific_results():
+def test_direct_heat_integration_accepts_period_id_and_returns_period_specific_results():
     payload = {
         "streams": [
             {
@@ -1955,25 +2067,25 @@ def test_direct_heat_integration_accepts_state_id_and_returns_state_specific_res
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
         "options": {
-            "PROBLEM_STATE_IDS": ["0", "peak"],
+            "PROBLEM_PERIOD_IDS": ["0", "peak"],
         },
     }
 
     problem = PinchProblem(source=payload, project_name="Site")
 
-    offpeak = problem.target.direct_heat_integration(state_id="0")
-    peak = problem.target.direct_heat_integration(state_id="peak")
+    offpeak = problem.target.direct_heat_integration(period_id="0")
+    peak = problem.target.direct_heat_integration(period_id="peak")
 
-    assert offpeak.state_id == "0"
-    assert peak.state_id == "peak"
+    assert offpeak.period_id == "0"
+    assert peak.period_id == "peak"
     assert peak.cold_utility_target != offpeak.cold_utility_target
     assert peak.heat_recovery_target != offpeak.heat_recovery_target
 
     summary = problem.summary_frame()
-    assert summary.iloc[0]["State ID"] == "peak"
+    assert summary.iloc[0]["Period ID"] == "peak"
 
 
-def test_direct_heat_pump_accepts_state_id_and_returns_state_specific_results(
+def test_direct_heat_pump_accepts_period_id_and_returns_period_specific_results(
     monkeypatch,
 ):
     from OpenPinch.classes.problem_table import ProblemTable
@@ -2008,16 +2120,16 @@ def test_direct_heat_pump_accepts_state_id_and_returns_state_specific_results(
             "type": "Site",
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
-        "options": {"PROBLEM_STATE_IDS": ["0", "peak"]},
+        "options": {"PROBLEM_PERIOD_IDS": ["0", "peak"]},
     }
 
     def fake_direct_hpr(target_zone, is_heat_pumping, args=None):
-        idx = args["idx"]
-        sid = args.get("state_id")
+        idx = args["period_idx"]
+        sid = args.get("period_id")
         return DirectHeatPumpTarget(
             zone_name=target_zone.name,
-            state_id=sid,
-            state_idx=idx,
+            period_id=sid,
+            period_idx=idx,
             type=TT.DHP.value,
             parent_zone=target_zone.parent_zone,
             config=target_zone.config,
@@ -2033,7 +2145,7 @@ def test_direct_heat_pump_accepts_state_id_and_returns_state_specific_results(
             hpr_success=True,
             hpr_hot_streams=StreamCollection(),
             hpr_cold_streams=StreamCollection(),
-            hpr_details={"idx": idx},
+            hpr_details={"period_idx": idx},
         )
 
     monkeypatch.setattr(
@@ -2044,16 +2156,16 @@ def test_direct_heat_pump_accepts_state_id_and_returns_state_specific_results(
 
     problem = PinchProblem(source=payload, project_name="Site")
 
-    offpeak = problem.target.direct_heat_pump(state_id="0")
-    peak = problem.target.direct_heat_pump(state_id="peak")
+    offpeak = problem.target.direct_heat_pump(period_id="0")
+    peak = problem.target.direct_heat_pump(period_id="peak")
 
-    assert offpeak.state_id == "0"
-    assert peak.state_id == "peak"
+    assert offpeak.period_id == "0"
+    assert peak.period_id == "peak"
     assert peak.hpr_utility_total != offpeak.hpr_utility_total
-    assert problem.master_zone.targets[TT.DI.value].state_idx == 1
+    assert problem.master_zone.targets[TT.DI.value].period_idx == 1
 
 
-def test_indirect_heat_pump_accepts_state_id_and_returns_state_specific_results(
+def test_indirect_heat_pump_accepts_period_id_and_returns_period_specific_results(
     monkeypatch,
 ):
     from OpenPinch.classes.problem_table import ProblemTable
@@ -2088,16 +2200,16 @@ def test_indirect_heat_pump_accepts_state_id_and_returns_state_specific_results(
             "type": "Site",
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
-        "options": {"PROBLEM_STATE_IDS": ["0", "peak"]},
+        "options": {"PROBLEM_PERIOD_IDS": ["0", "peak"]},
     }
 
     def fake_indirect_hpr(target_zone, is_heat_pumping, args=None):
-        idx = args["idx"]
-        sid = args.get("state_id")
+        idx = args["period_idx"]
+        sid = args.get("period_id")
         return IndirectHeatPumpTarget(
             zone_name=target_zone.name,
-            state_id=sid,
-            state_idx=idx,
+            period_id=sid,
+            period_idx=idx,
             type=TT.IHP.value,
             parent_zone=target_zone.parent_zone,
             config=target_zone.config,
@@ -2113,7 +2225,7 @@ def test_indirect_heat_pump_accepts_state_id_and_returns_state_specific_results(
             hpr_success=True,
             hpr_hot_streams=StreamCollection(),
             hpr_cold_streams=StreamCollection(),
-            hpr_details={"idx": idx},
+            hpr_details={"period_idx": idx},
         )
 
     monkeypatch.setattr(
@@ -2128,17 +2240,17 @@ def test_indirect_heat_pump_accepts_state_id_and_returns_state_specific_results(
             target_zone.add_target(
                 TotalSiteTarget(
                     zone_name=target_zone.name,
-                    state_id=args.get("state_id"),
-                    state_idx=args["idx"],
+                    period_id=args.get("period_id"),
+                    period_idx=args["period_idx"],
                     type=TT.TS.value,
                     parent_zone=target_zone.parent_zone,
                     config=target_zone.config,
                     pt=ProblemTable({PT.T: [120.0, 60.0]}),
                     hot_utilities=StreamCollection(),
                     cold_utilities=StreamCollection(),
-                    hot_utility_target=10.0 + args["idx"],
-                    cold_utility_target=5.0 + args["idx"],
-                    heat_recovery_target=15.0 + args["idx"],
+                    hot_utility_target=10.0 + args["period_idx"],
+                    cold_utility_target=5.0 + args["period_idx"],
+                    heat_recovery_target=15.0 + args["period_idx"],
                 )
             )
             or target_zone
@@ -2147,16 +2259,16 @@ def test_indirect_heat_pump_accepts_state_id_and_returns_state_specific_results(
 
     problem = PinchProblem(source=payload, project_name="Site")
 
-    offpeak = problem.target.indirect_heat_pump(state_id="0")
-    peak = problem.target.indirect_heat_pump(state_id="peak")
+    offpeak = problem.target.indirect_heat_pump(period_id="0")
+    peak = problem.target.indirect_heat_pump(period_id="peak")
 
-    assert offpeak.state_id == "0"
-    assert peak.state_id == "peak"
+    assert offpeak.period_id == "0"
+    assert peak.period_id == "peak"
     assert peak.hpr_utility_total != offpeak.hpr_utility_total
-    assert problem.master_zone.targets[TT.TS.value].state_idx == 1
+    assert problem.master_zone.targets[TT.TS.value].period_idx == 1
 
 
-def test_direct_heat_integration_rejects_unknown_state_id():
+def test_direct_heat_integration_rejects_unknown_period_id():
     payload = {
         "streams": [
             {
@@ -2184,7 +2296,7 @@ def test_direct_heat_integration_rejects_unknown_state_id():
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
         "options": {
-            "PROBLEM_STATE_IDS": ["0", "peak"],
+            "PROBLEM_PERIOD_IDS": ["0", "peak"],
         },
     }
 
@@ -2192,12 +2304,12 @@ def test_direct_heat_integration_rejects_unknown_state_id():
 
     with pytest.raises(
         ValueError,
-        match="state_id 'summer' was not found on this collection",
+        match="period_id 'summer' was not found on this collection",
     ):
-        problem.target.direct_heat_integration(state_id="summer")
+        problem.target.direct_heat_integration(period_id="summer")
 
 
-def test_problem_exposes_canonical_state_ids():
+def test_problem_exposes_canonical_period_ids():
     payload = {
         "streams": [
             {
@@ -2225,15 +2337,15 @@ def test_problem_exposes_canonical_state_ids():
             "type": "Site",
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
-        "options": {"PROBLEM_STATE_IDS": ["0", "peak"]},
+        "options": {"PROBLEM_PERIOD_IDS": ["0", "peak"]},
     }
 
     problem = PinchProblem(source=payload, project_name="Site")
 
-    assert list(problem.state_ids.keys()) == ["0", "peak"]
+    assert list(problem.period_ids.keys()) == ["0", "peak"]
 
 
-def test_target_all_states_runs_each_state_and_preserves_call_order():
+def test_target_all_periods_runs_each_period_and_preserves_call_order():
     payload = {
         "streams": [
             {
@@ -2280,21 +2392,21 @@ def test_target_all_states_runs_each_state_and_preserves_call_order():
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
         "options": {
-            "PROBLEM_STATE_IDS": ["0", "peak"],
+            "PROBLEM_PERIOD_IDS": ["0", "peak"],
         },
     }
 
     problem = PinchProblem(source=payload, project_name="Site")
 
-    results = problem.target_all_states()
+    results = problem.target_all_periods()
 
     assert list(results) == ["0", "peak"]
-    assert results["0"].targets[0].state_id == "0"
-    assert results["peak"].targets[0].state_id == "peak"
+    assert results["0"].targets[0].period_id == "0"
+    assert results["peak"].targets[0].period_id == "peak"
     assert results["0"].targets[0].Qc != results["peak"].targets[0].Qc
 
 
-def test_target_all_states_uses_validated_output_state_id_for_serial_keys(
+def test_target_all_periods_uses_validated_output_period_id_for_serial_keys(
     monkeypatch,
 ):
     from OpenPinch.lib.schemas.io import TargetOutput
@@ -2317,26 +2429,26 @@ def test_target_all_states_uses_validated_output_state_id_for_serial_keys(
             "type": "Site",
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
-        "options": {"PROBLEM_STATE_IDS": ["0", "peak"]},
+        "options": {"PROBLEM_PERIOD_IDS": ["0", "peak"]},
     }
 
     monkeypatch.setattr(
         PinchProblem,
-        "_solve_target_for_state",
-        lambda self, state_id: TargetOutput(
+        "_solve_target_for_period",
+        lambda self, period_id: TargetOutput(
             name="Site",
-            state_id=f"{state_id}-resolved",
+            period_id=f"{period_id}-resolved",
             targets=[],
         ),
     )
 
     problem = PinchProblem(source=payload, project_name="Site")
-    results = problem.target_all_states()
+    results = problem.target_all_periods()
 
     assert list(results) == ["0-resolved", "peak-resolved"]
 
 
-def test_target_all_states_supports_thread_parallel_execution():
+def test_target_all_periods_supports_thread_parallel_execution():
     payload = {
         "streams": [
             {
@@ -2383,22 +2495,22 @@ def test_target_all_states_supports_thread_parallel_execution():
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
         "options": {
-            "PROBLEM_STATE_IDS": ["0", "peak"],
+            "PROBLEM_PERIOD_IDS": ["0", "peak"],
         },
     }
 
     problem = PinchProblem(source=payload, project_name="Site")
 
-    results = problem.target_all_states(parallel="thread", max_workers=2)
+    results = problem.target_all_periods(parallel="thread", max_workers=2)
 
     assert list(results) == ["0", "peak"]
-    assert {result.targets[0].state_id for result in results.values()} == {"0", "peak"}
+    assert {result.targets[0].period_id for result in results.values()} == {"0", "peak"}
 
 
-def test_target_all_states_uses_validated_output_state_id_for_parallel_keys(
+def test_target_all_periods_uses_validated_output_period_id_for_parallel_keys(
     monkeypatch,
 ):
-    mod = sys.modules[PinchProblem.__module__]
+    from OpenPinch.classes._pinch_problem.periods import execution
 
     payload = {
         "streams": [
@@ -2418,26 +2530,645 @@ def test_target_all_states_uses_validated_output_state_id_for_parallel_keys(
             "type": "Site",
             "children": [{"name": "AreaA", "type": "Process Zone"}],
         },
-        "options": {"PROBLEM_STATE_IDS": ["0", "peak"]},
+        "options": {"PROBLEM_PERIOD_IDS": ["0", "peak"]},
     }
 
     monkeypatch.setattr(
-        mod,
-        "_solve_default_target_for_state",
-        lambda problem_inputs, project_name, state_id: {
+        execution,
+        "solve_default_target_for_period",
+        lambda problem_inputs, project_name, period_id: {
             "name": project_name,
-            "state_id": f"{state_id}-resolved",
+            "period_id": f"{period_id}-resolved",
             "targets": [],
         },
     )
 
     problem = PinchProblem(source=payload, project_name="Site")
-    results = problem.target_all_states(parallel="thread", max_workers=2)
+    results = problem.target_all_periods(parallel="thread", max_workers=2)
 
     assert list(results) == ["0-resolved", "peak-resolved"]
 
 
-def test_target_all_states_rejects_scalar_only_problems(sample_problem):
+def test_target_all_periods_rejects_scalar_only_problems(sample_problem):
     problem = PinchProblem(source=sample_problem, project_name="Site")
-    results = problem.target_all_states()
+    results = problem.target_all_periods()
     assert list(results) == ["0"]
+
+
+def test_load_without_source_and_without_filepath_returns_none():
+    assert PinchProblem().load() is None
+
+
+def test_run_targeting_for_zone_and_subzones_uses_prepared_zone(monkeypatch):
+    mod = sys.modules[PinchProblem.__module__]
+    problem = PinchProblem()
+    root = Zone("Site")
+    problem._master_zone = root
+    called = {}
+
+    monkeypatch.setattr(
+        mod,
+        "run_targeting_for_zone_and_subzones",
+        lambda **kwargs: called.update(kwargs),
+    )
+    monkeypatch.setattr(
+        mod,
+        "extract_results",
+        lambda zone, period_id=None: {"zone": zone.name, "period": period_id},
+    )
+    monkeypatch.setattr(
+        mod.TargetOutput,
+        "model_validate",
+        classmethod(lambda cls, data: data),
+    )
+
+    out = problem._run_targeting_for_zone_and_subzones(
+        zone=None,
+        options={"period_id": "0"},
+    )
+
+    assert called["zone"] is root
+    assert out == {"zone": "Site", "period": "0"}
+
+
+def test_execute_targeting_include_subzones_and_missing_target_paths(monkeypatch):
+    mod = sys.modules[PinchProblem.__module__]
+    problem = PinchProblem()
+    zone = Zone("Site")
+    zone.targets["Direct Integration"] = "target"
+    problem._master_zone = zone
+    called = {}
+
+    monkeypatch.setattr(
+        problem,
+        "_run_targeting_for_zone_and_subzones",
+        lambda **kwargs: called.update(kwargs),
+    )
+
+    out = problem._execute_targeting(
+        target_id="Direct Integration",
+        application_zone=None,
+        options={},
+        include_subzones=True,
+    )
+
+    assert out == "target"
+    assert called["zone"] is zone
+
+    monkeypatch.setattr(mod, "extract_results", lambda zone, period_id=None: {})
+    monkeypatch.setattr(
+        mod.TargetOutput,
+        "model_validate",
+        classmethod(lambda cls, data: data),
+    )
+    zone.targets.clear()
+
+    with pytest.raises(RuntimeError, match="did not produce target"):
+        problem._execute_targeting(
+            target_id="Direct Integration",
+            application_zone=None,
+            options={},
+            include_subzones=False,
+        )
+
+
+def test_cogeneration_and_exergy_selection_error_paths(monkeypatch):
+    mod = sys.modules[PinchProblem.__module__]
+    problem = PinchProblem()
+    zone = Zone("Site")
+    problem._master_zone = zone
+
+    monkeypatch.setattr(mod, "extract_results", lambda zone, period_id=None: {})
+    monkeypatch.setattr(
+        mod.TargetOutput,
+        "model_validate",
+        classmethod(lambda cls, data: data),
+    )
+
+    with pytest.raises(RuntimeError, match="Cogeneration did not select"):
+        problem._execute_cogeneration_targeting(
+            application_zone=None,
+            options={},
+            include_subzones=False,
+        )
+
+    zone._selected_cogeneration_target_type = "Total Site Target"
+    with pytest.raises(RuntimeError, match="target was not available"):
+        problem._execute_cogeneration_targeting(
+            application_zone=None,
+            options={},
+            include_subzones=False,
+        )
+
+    del zone._selected_cogeneration_target_type
+    with pytest.raises(RuntimeError, match="Exergy targeting did not select"):
+        problem._execute_exergy_targeting(
+            application_zone=None,
+            options={},
+            include_subzones=False,
+        )
+
+    zone._selected_exergy_target_type = "Exergy Target"
+    with pytest.raises(RuntimeError, match="target was not available"):
+        problem._execute_exergy_targeting(
+            application_zone=None,
+            options={},
+            include_subzones=False,
+        )
+
+
+def test_subzone_targeting_execution_paths(monkeypatch):
+    problem = PinchProblem()
+    root = Zone("Site")
+    child = Zone("Area", parent_zone=root)
+    root.subzones["Area"] = child
+    problem._master_zone = root
+    visited = []
+
+    def service(zone, options):
+        visited.append((zone.name, options.get("base_target_type")))
+
+    problem._run_exergy_targeting_for_zone_and_subzones(
+        zone=root,
+        service_func=service,
+        options={"base_target_type": "Direct Integration", "period_id": "0"},
+    )
+
+    assert visited == [("Area", None), ("Site", "Direct Integration")]
+
+
+def test_resolve_and_lazy_build_guard_paths(monkeypatch, sample_problem):
+    problem = PinchProblem()
+    with pytest.raises(RuntimeError, match="Load problem source data"):
+        problem._resolve_target_zone()
+
+    explicit_zone = Zone("Explicit")
+    assert problem._resolve_target_zone(explicit_zone, master_zone=Zone("Root")) is (
+        explicit_zone
+    )
+
+    problem._problem_data = sample_problem
+    loaded_zone = Zone("Loaded")
+
+    def fake_load(source):
+        assert source == sample_problem
+        problem._master_zone = loaded_zone
+        return loaded_zone
+
+    monkeypatch.setattr(problem, "load", fake_load)
+    assert problem._build_execution_master_zone() is loaded_zone
+    problem._master_zone = None
+    monkeypatch.setattr(problem, "_rebuild_problem_state", lambda: loaded_zone)
+    assert problem._require_prepared_root_zone() is loaded_zone
+
+
+def test_process_component_work_and_target_attachment_paths():
+    problem = PinchProblem()
+    zone = Zone("Site")
+    child = Zone("Area", parent_zone=zone)
+    zone.subzones["Area"] = child
+    target = SimpleNamespace(process_component_work_target=None, work_target=None)
+    child.targets["Direct Integration"] = target
+    component = SimpleNamespace(
+        work_for_zone=lambda zone, period_id, period_idx: (
+            5.0 if zone.name == "Area" else 0.0
+        )
+    )
+    problem._process_components = {
+        "ignored": SimpleNamespace(),
+        "compressor": component,
+    }
+
+    problem._attach_process_component_work_targets(
+        zone,
+        {"period_id": "0", "period_idx": 0},
+    )
+
+    assert target.process_component_work_target == pytest.approx(5.0)
+    assert target.work_target == pytest.approx(5.0)
+
+
+def test_validation_summary_metrics_and_update_guards(sample_problem):
+    problem = PinchProblem()
+    with pytest.raises(RuntimeError, match="No input loaded"):
+        problem.validate()
+    with pytest.raises(RuntimeError, match="No input loaded"):
+        problem.validation_report()
+    with pytest.raises(ValueError, match="no canonical period_ids"):
+        empty_period_problem = PinchProblem(source=sample_problem)
+        empty_period_problem.master_zone._period_ids = {}
+        empty_period_problem.target_all_periods()
+
+    problem._results = SimpleNamespace(targets=[])
+    with pytest.raises(ValueError, match="Use either detailed=True"):
+        problem.summary_frame(detailed=True, format="compact")
+    assert PinchProblem().metrics(solve=False) == []
+    with pytest.raises(ValueError, match="No validated data"):
+        PinchProblem()._data_preprocessing()
+    with pytest.raises(TypeError, match="options must"):
+        PinchProblem(source=sample_problem).update_options(["not", "a", "dict"])
+
+
+def test_set_dt_cont_multiplier_warns_and_refresh_results_paths(
+    monkeypatch,
+    sample_problem,
+):
+    mod = sys.modules[PinchProblem.__module__]
+    problem = PinchProblem(source=sample_problem)
+
+    with pytest.warns(UserWarning, match="finite non-negative"):
+        problem.set_dt_cont_multiplier(float("nan"))
+
+    assert problem.master_zone.dt_cont_multiplier == pytest.approx(1.0)
+
+    empty = PinchProblem()
+    with pytest.raises(RuntimeError, match="No analysed zone"):
+        empty._refresh_results_from_master_zone()
+
+    monkeypatch.setattr(mod, "extract_results", lambda zone: {"ok": zone.name})
+    monkeypatch.setattr(
+        mod.TargetOutput,
+        "model_validate",
+        classmethod(lambda cls, data: data),
+    )
+
+    assert problem._refresh_results_from_master_zone() == {"ok": "Site"}
+
+
+def test_load_reuses_saved_filepath_when_source_omitted(tmp_path: Path, sample_problem):
+    problem_path = tmp_path / "problem.json"
+    problem_path.write_text(json.dumps(sample_problem), encoding="utf-8")
+
+    problem = PinchProblem()
+    problem._problem_filepath = problem_path
+
+    assert isinstance(problem.load(), Zone)
+    assert problem.problem_filepath == problem_path
+
+
+def test_cogeneration_and_exergy_include_subzones_execution_paths(monkeypatch):
+    mod = sys.modules[PinchProblem.__module__]
+    problem = PinchProblem()
+    zone = Zone("Site")
+    zone.targets["Total Site Target"] = "cogen"
+    zone.targets["Exergy Target"] = "exergy"
+    zone._selected_cogeneration_target_type = "Total Site Target"
+    zone._selected_exergy_target_type = "Exergy Target"
+    problem._master_zone = zone
+    called = {}
+
+    monkeypatch.setattr(
+        problem,
+        "_run_targeting_for_zone_and_subzones",
+        lambda **kwargs: called.setdefault("cogen", kwargs),
+    )
+    assert (
+        problem._execute_cogeneration_targeting(
+            application_zone=None,
+            options={},
+            include_subzones=True,
+        )
+        == "cogen"
+    )
+    assert called["cogen"]["zone"] is zone
+
+    monkeypatch.setattr(
+        problem,
+        "_run_exergy_targeting_for_zone_and_subzones",
+        lambda **kwargs: called.setdefault("exergy", kwargs),
+    )
+    monkeypatch.setattr(mod, "extract_results", lambda zone, period_id=None: {})
+    monkeypatch.setattr(
+        mod.TargetOutput,
+        "model_validate",
+        classmethod(lambda cls, data: data),
+    )
+    assert (
+        problem._execute_exergy_targeting(
+            application_zone=None,
+            options={},
+            include_subzones=True,
+        )
+        == "exergy"
+    )
+    assert called["exergy"]["zone"] is zone
+
+
+def test_resolve_subzone_and_project_name_property_paths():
+    problem = PinchProblem()
+    root = Zone("Site")
+    child = Zone("Area", parent_zone=root)
+    root.subzones["Area"] = child
+
+    assert PinchProblem.add_component is PinchProblem.__dict__["add_component"]
+    assert PinchProblem.design is PinchProblem.__dict__["design"]
+    assert problem._resolve_target_zone("Area", master_zone=root) is child
+    assert problem.process_components == {}
+
+    problem._master_zone = root
+    problem.project_name = "Renamed"
+
+    assert problem.project_name == "Renamed"
+    assert root.name == "Renamed"
+
+
+def test_metrics_solves_when_requested_and_compare_handles_non_numeric_units(
+    monkeypatch,
+):
+    problem = PinchProblem()
+    solved_results = SimpleNamespace(targets=[])
+    monkeypatch.setattr(problem, "target", lambda: solved_results)
+    monkeypatch.setattr(
+        sys.modules[PinchProblem.__module__],
+        "build_report_metrics",
+        lambda results: ["metric", results],
+    )
+
+    assert problem.metrics() == ["metric", solved_results]
+
+    base = PinchProblem()
+    other = PinchProblem()
+    frame = pd.DataFrame(
+        [
+            {
+                "Target": "Site/Direct Integration",
+                "Hot Utility Target": "not numeric",
+                "Hot Utility Target (unit)": "kW",
+                "Cold Utility Target": 1.0,
+                "Cold Utility Target (unit)": "kW",
+                "Heat Recovery": 2.0,
+                "Heat Recovery (unit)": "kW",
+                "Hot Pinch": 3.0,
+                "Hot Pinch (unit)": "degC",
+                "Cold Pinch": 4.0,
+                "Cold Pinch (unit)": "degC",
+            }
+        ]
+    )
+    monkeypatch.setattr(base, "summary_frame", lambda format=None: frame)
+    monkeypatch.setattr(other, "summary_frame", lambda format=None: frame)
+
+    comparison = base.compare_to(other)
+
+    assert comparison.loc["Change", "Hot Utility Target"] is None
+    assert comparison.loc["Change", "Hot Utility Target (unit)"] is None
+
+
+def test_update_options_replaces_inputs_and_preserves_filepath(
+    monkeypatch,
+    tmp_path: Path,
+    sample_problem,
+):
+    problem = PinchProblem(source=sample_problem)
+    original_path = tmp_path / "original.json"
+    problem._problem_filepath = original_path
+    rebuilt = Zone("Rebuilt")
+
+    def fake_rebuild():
+        problem._master_zone = rebuilt
+        return rebuilt
+
+    monkeypatch.setattr(problem, "_rebuild_problem_state", fake_rebuild)
+
+    out = problem.update_options({"THERMAL_DT_CONT": 25}, replace=True)
+
+    assert out is rebuilt
+    assert problem.problem_filepath == original_path
+    assert problem.problem_data["options"] == {"THERMAL_DT_CONT": 25}
+
+
+def test_target_accessor_delegates_named_workflows_with_period_options():
+    class RecordingProblem:
+        def __init__(self):
+            self.calls = []
+
+        def _execute_targeting(self, **kwargs):
+            self.calls.append(("targeting", kwargs))
+            return kwargs["target_id"]
+
+        def _execute_cogeneration_targeting(self, **kwargs):
+            self.calls.append(("cogeneration", kwargs))
+            return "cogeneration"
+
+        def _execute_exergy_targeting(self, **kwargs):
+            self.calls.append(("exergy", kwargs))
+            return "exergy"
+
+    problem = RecordingProblem()
+    accessor = _TargetAccessor(problem)
+
+    assert (
+        accessor.indirect_heat_integration(
+            zone_name="Site",
+            options={"existing": True},
+            include_subzones=True,
+            period_id="peak",
+        )
+        == "Total Site Target"
+    )
+    assert accessor.direct_heat_pump(period_id="peak") == "Direct Heat Pump"
+    assert accessor.indirect_heat_pump(period_id="peak") == "Indirect Heat Pump"
+    assert accessor.direct_refrigeration(period_id="peak") == "Direct Refrigeration"
+    assert accessor.indirect_refrigeration(period_id="peak") == (
+        "Indirect Refrigeration"
+    )
+    assert accessor.area_cost(period_id="peak") == "Direct Integration"
+    assert accessor.energy_transfer(period_id="peak") == "Energy Transfer Analysis"
+    assert accessor.cogeneration(period_id="peak") == "cogeneration"
+    assert accessor.exergy(period_id="peak") == "exergy"
+
+    assert problem.calls[0][1]["application_zone"] == "Site"
+    assert problem.calls[0][1]["include_subzones"] is True
+    assert problem.calls[0][1]["options"] == {"existing": True, "period_id": "peak"}
+    assert all(call[1]["options"]["period_id"] == "peak" for call in problem.calls)
+
+
+def test_loading_zone_tree_and_packaged_sample_edges(tmp_path: Path):
+    zone_tree = {
+        "name": "Site",
+        "children": [
+            {
+                "name": "Plant",
+                "children": [{"name": "Train"}],
+            }
+        ],
+    }
+
+    assert find_zone_tree_node(zone_tree, "Site") is zone_tree
+    assert find_zone_tree_node(zone_tree, "Plant/Train") == {"name": "Train"}
+    with pytest.raises(ValueError, match="must identify"):
+        find_zone_tree_node(zone_tree, " / ")
+    with pytest.raises(ValueError, match="was not found"):
+        find_zone_tree_node(zone_tree, "Plant/Missing")
+
+    assert (
+        _packaged_sample_case_name(
+            "case.json",
+            Path("case.json"),
+            sample_case_names=["case.json"],
+        )
+        == "case.json"
+    )
+    assert (
+        _packaged_sample_case_name(
+            "other.json",
+            Path("case.json"),
+            sample_case_names=["case.json"],
+        )
+        is None
+    )
+    assert (
+        _packaged_sample_case_name(
+            "case.csv",
+            Path("case.csv"),
+            sample_case_names=["case.csv"],
+        )
+        is None
+    )
+    assert (
+        _packaged_sample_case_name(
+            "case.json",
+            Path("case.json"),
+            sample_case_names=["other.json"],
+        )
+        is None
+    )
+
+    adapters = _ProblemSourceAdapters(
+        get_problem_from_excel=lambda *_args, **_kwargs: {},
+        get_problem_from_csv=lambda *_args, **_kwargs: {
+            "streams": [],
+            "utilities": [],
+        },
+        list_sample_cases=lambda: ["packaged.json"],
+        read_sample_case=lambda _name: json.dumps(
+            {"streams": [], "utilities": [], "zone_tree": {"name": "Site"}}
+        ),
+    )
+    target_input = TargetInput.model_validate(
+        {
+            "streams": [
+                {
+                    "zone": "Site",
+                    "name": "H1",
+                    "t_supply": 150.0,
+                    "t_target": 60.0,
+                    "heat_flow": 100.0,
+                }
+            ],
+            "utilities": [],
+        }
+    )
+    loaded_target_input = load_problem_source(
+        target_input,
+        current_project_name="Demo",
+        adapters=adapters,
+    )
+    loaded_csv_tuple = load_problem_source(
+        (tmp_path / "streams.csv", tmp_path / "utilities.csv"),
+        current_project_name="Demo",
+        adapters=adapters,
+    )
+
+    assert loaded_target_input.input_data is target_input
+    assert loaded_target_input.source_kind == "target_input"
+    assert loaded_csv_tuple.source_kind == "csv"
+
+    packaged = _load_json_inputs(
+        Path("packaged.json"), source="packaged.json", adapters=adapters
+    )
+    assert packaged["zone_tree"]["name"] == "Site"
+
+    list_json = tmp_path / "list.json"
+    list_json.write_text("[1, 2, 3]", encoding="utf-8")
+    with pytest.raises(ValueError, match="must be an object"):
+        _load_json_inputs(list_json, source=list_json, adapters=adapters)
+
+
+def test_output_helpers_cover_report_summary_and_formatting_edges():
+    target = SimpleNamespace(
+        name="Plant/Direct Integration",
+        period_id="peak",
+        period_idx=0,
+        Qh={"values": [100.0], "unit": "kW"},
+        Qc={"values": [50.0], "unit": "kW"},
+        Qr={"values": [75.0], "unit": "kW"},
+        pinch_temp=SimpleNamespace(
+            hot_temp={"values": [120.0], "unit": "degC"},
+            cold_temp={"values": [110.0], "unit": "degC"},
+        ),
+        hot_utilities=[SimpleNamespace(name="Steam", heat_flow=None)],
+        cold_utilities=[
+            SimpleNamespace(
+                name="Cooling Water",
+                heat_flow={"values": [50.0], "unit": "kW"},
+            )
+        ],
+    )
+    results = SimpleNamespace(
+        targets=[target],
+        graphs={
+            "set": SimpleNamespace(model_dump=lambda: {"graphs": []}),
+            "mapping": {"graphs": []},
+        },
+    )
+
+    assert build_problem_summary_frame(SimpleNamespace(targets=[]), detailed=True).empty
+    with pytest.raises(ValueError, match="summary format"):
+        build_problem_summary_frame(results, format="wide")
+
+    plain = build_problem_summary_frame(results, format="plain")
+    assert plain.loc[0, "Hot Utility Target"] == pytest.approx(100.0)
+    assert plain.loc[0, "Hot Utilities"] == "Steam: n/a"
+    assert plain.loc[0, "Cold Utilities"] == "Cooling Water: 50.00 kW"
+
+    frame = pd.DataFrame(
+        [
+            {"Target": "Other Target", "Value": 1},
+            {"Target": "Plant/Direct Integration", "Value": 2},
+        ]
+    )
+    assert locate_summary_row(frame)["Value"] == 2
+    assert locate_summary_row(frame, target_name="Direct Integration")["Value"] == 2
+    assert (
+        locate_summary_row(pd.DataFrame([{"Target": "Other", "Value": 3}]))["Value"]
+        == 3
+    )
+    with pytest.raises(ValueError, match="Summary frame"):
+        locate_summary_row(pd.DataFrame())
+    with pytest.raises(KeyError, match="not found"):
+        locate_summary_row(frame, target_name="Missing")
+    assert _target_attr(SimpleNamespace(), "pinch_temp.hot_temp") is None
+
+    graph_catalog = build_graph_availability(
+        {
+            "direct": {
+                "name": "Direct",
+                "zone_name": "Plant",
+                "graphs": [{"type": None}],
+            }
+        }
+    )
+    assert graph_catalog[0].graph_id == "direct::graph::0"
+    assert graph_catalog[0].graph_name == "Graph 1"
+    assert build_graph_data(SimpleNamespace(graphs=None)) is None
+    assert build_graph_data(results) == {
+        "set": {"graphs": []},
+        "mapping": {"graphs": []},
+    }
+
+    report = build_problem_report(
+        project_name="Demo",
+        validation=ValidationReport(valid=True),
+        results=None,
+        graph_data=None,
+        warnings=["note"],
+    )
+    assert report.solved is False
+    assert report.metrics == []
+    assert report.warnings == ["note"]
+
+    assert format_res(value=None) == "n/a"
+    assert format_res(name="Utility", value=None) == "Utility: n/a"
+    assert format_res(value=12.0) == "12.00"
+    assert format_res(name="Utility", value=12.0) == "Utility: 12.00"

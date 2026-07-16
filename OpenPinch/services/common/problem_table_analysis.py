@@ -46,7 +46,7 @@ def get_process_heat_cascade(
     known_heat_recovery: float = None,
     extra_T_intervals: list = None,
     is_full_analysis: bool = False,
-    idx: int | None = None,
+    period_idx: int | None = None,
 ) -> ProblemTable:
     """Prepare, calculate, and analyse the problem table for given streams."""
     if hot_streams is None:
@@ -64,15 +64,18 @@ def get_process_heat_cascade(
         streams=all_streams,
         is_shifted=is_shifted,
         extra_T_intervals=extra_T_intervals,
-        idx=idx,
+        period_idx=period_idx,
     )
+    if len(pt) == 0:
+        return pt
+
     # Perform the heat cascade of the problem table
     problem_table_algorithm(
         pt=pt,
         hot_streams=hot_streams,
         cold_streams=cold_streams,
         is_shifted=is_shifted,
-        idx=idx,
+        idx=period_idx,
     )
 
     if isinstance(known_heat_recovery, float):
@@ -99,7 +102,7 @@ def get_utility_heat_cascade(
     hot_utilities: StreamCollection = None,
     cold_utilities: StreamCollection = None,
     is_shifted: bool = True,
-    idx: int | None = None,
+    period_idx: int | None = None,
 ) -> ProblemTableUpdateKwargs:
     """Prepare and calculate the utility heat cascade for a utility set."""
     pt_ut = ProblemTable({PT.T: T_int_vals})
@@ -108,7 +111,7 @@ def get_utility_heat_cascade(
         hot_utilities,
         cold_utilities,
         is_shifted,
-        idx=idx,
+        idx=period_idx,
     )
 
     h_net_values = pt_ut[PT.H_NET]
@@ -134,14 +137,14 @@ def create_problem_table_with_t_int(
     streams: StreamCollection = None,
     is_shifted: bool = True,
     extra_T_intervals: list | float | np.ndarray = None,
-    idx: int | None = None,
+    period_idx: int | None = None,
 ) -> ProblemTable:
     """Return a problem table populated with ordered unique temperature intervals."""
     if streams is None:
         streams = StreamCollection()
 
     if isinstance(streams, StreamCollection):
-        numeric = streams.numeric_view(idx)
+        numeric = streams.segment_numeric_view(period_idx)
         if is_shifted:
             T_vals = np.concatenate((numeric.t_min_star, numeric.t_max_star))
         else:
@@ -151,10 +154,14 @@ def create_problem_table_with_t_int(
             T_vals = [
                 float(t)
                 for s in streams
-                for t in (s.t_min_star[idx], s.t_max_star[idx])
+                for t in (s.t_min_star[period_idx], s.t_max_star[period_idx])
             ]
         else:
-            T_vals = [float(t) for s in streams for t in (s.t_min[idx], s.t_max[idx])]
+            T_vals = [
+                float(t)
+                for s in streams
+                for t in (s.t_min[period_idx], s.t_max[period_idx])
+            ]
         T_vals = np.asarray(T_vals, dtype=float)
 
     if extra_T_intervals is not None:
@@ -291,7 +298,7 @@ def _sum_mcp_between_temperature_boundaries(
     if return_lists:
         streams = StreamCollection(list(streams))
 
-    numeric = streams.numeric_view(idx)
+    numeric = streams.segment_numeric_view(idx)
     t_min = numeric.t_min_star if is_shifted else numeric.t_min
     t_max = numeric.t_max_star if is_shifted else numeric.t_max
     active_streams = numeric.active & np.isfinite(t_min) & np.isfinite(t_max)

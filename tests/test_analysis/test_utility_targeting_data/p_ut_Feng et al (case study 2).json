@@ -309,9 +309,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Aromatic hydrocarbon extraction unit",
@@ -335,9 +333,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Aromatic hydrocarbon extraction unit",
@@ -361,9 +357,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Aromatic hydrocarbon extraction unit",
@@ -387,9 +381,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Aromatic hydrocarbon extraction unit",
@@ -413,9 +405,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Aromatic hydrocarbon extraction unit",
@@ -439,9 +429,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Aromatic hydrocarbon extraction unit",
@@ -465,9 +453,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Aromatic hydrocarbon extraction unit",
@@ -491,9 +477,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Aromatic hydrocarbon extraction unit",
@@ -517,9 +501,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Aromatic hydrocarbon extraction unit",
@@ -543,9 +525,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Aromatic hydrocarbon extraction unit",
@@ -569,9 +549,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Aromatic hydrocarbon extraction unit",
@@ -595,9 +573,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Aromatic hydrocarbon extraction unit",
@@ -621,9 +597,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Aromatic hydrocarbon extraction unit",
@@ -647,9 +621,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Aromatic hydrocarbon extraction unit",
@@ -673,9 +645,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Aromatic hydrocarbon extraction unit",
@@ -699,9 +669,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Aromatic hydrocarbon extraction unit",
@@ -725,9 +693,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -751,9 +717,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -777,9 +741,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -803,9 +765,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -829,9 +789,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -855,9 +813,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -881,9 +837,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -907,9 +861,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -933,9 +885,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -959,9 +909,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -985,9 +933,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1011,9 +957,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1037,9 +981,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1063,9 +1005,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1089,9 +1029,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1115,9 +1053,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1141,9 +1077,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1167,9 +1101,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1193,9 +1125,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1219,9 +1149,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1245,9 +1173,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1271,9 +1197,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1297,9 +1221,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1323,9 +1245,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1349,9 +1269,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1375,9 +1293,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1401,9 +1317,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1427,9 +1341,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1453,9 +1365,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1479,9 +1389,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1505,9 +1413,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1531,9 +1437,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1557,9 +1461,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1583,9 +1485,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1609,9 +1509,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1635,9 +1533,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1661,9 +1557,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1687,9 +1581,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1713,9 +1605,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1739,9 +1629,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1765,9 +1653,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1791,9 +1677,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hydrocracking unit",
@@ -1817,9 +1701,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Isomerization unit",
@@ -1843,9 +1725,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Isomerization unit",
@@ -1869,9 +1749,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Isomerization unit",
@@ -1895,9 +1773,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Isomerization unit",
@@ -1921,9 +1797,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Isomerization unit",
@@ -1947,9 +1821,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Isomerization unit",
@@ -1973,9 +1845,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Isomerization unit",
@@ -1999,9 +1869,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Isomerization unit",
@@ -2025,9 +1893,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Isomerization unit",
@@ -2051,9 +1917,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Isomerization unit",
@@ -2077,9 +1941,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Isomerization unit",
@@ -2103,9 +1965,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Isomerization unit",
@@ -2129,9 +1989,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Isomerization unit",
@@ -2155,9 +2013,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Isomerization unit",
@@ -2181,9 +2037,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Isomerization unit",
@@ -2207,9 +2061,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Isomerization unit",
@@ -2233,9 +2085,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Isomerization unit",
@@ -2259,9 +2109,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Isomerization unit",
@@ -2285,9 +2133,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         }
     ],
     "utilities": [

@@ -122,7 +122,7 @@ def test_validate_utilities_data_dataframe_filters_missing_names():
 """Additional edge-branch tests for input validation helpers."""
 
 
-def test_validate_stream_data_stateful_isna_hits_normalize_label_nan_path(monkeypatch):
+def test_validate_stream_data_period_isna_hits_normalize_label_nan_path(monkeypatch):
 
     real_isna = pd.isna
     calls = {"sentinel": 0}

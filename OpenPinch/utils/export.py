@@ -83,9 +83,9 @@ def _value_unit_columns(
     label: str,
     value: Any,
     *,
-    idx: int | None = None,
+    period_idx: int | None = None,
 ) -> dict[str, Any]:
-    resolved_value, resolved_unit = split_report_value(value, idx=idx)
+    resolved_value, resolved_unit = split_report_value(value, period_idx=period_idx)
     return {
         f"{label} (value)": resolved_value,
         f"{label} (unit)": resolved_unit,
@@ -115,113 +115,125 @@ def _safe_name(name: str) -> str:
 
 
 def _make_summary_row(t) -> dict:
-    state_id = getattr(t, "state_id", None)
-    idx = getattr(t, "idx", None)
+    period_id = getattr(t, "period_id", None)
+    period_idx = getattr(t, "period_idx", None)
     base_columns = {
         "Target": t.name,
-        "State ID": state_id,
+        "Period ID": period_id,
         **_value_unit_columns(
             "Cold Pinch",
             getattr(t.pinch_temp, "cold_temp", None),
-            idx=idx,
+            period_idx=period_idx,
         ),
         **_value_unit_columns(
             "Hot Pinch",
             getattr(t.pinch_temp, "hot_temp", None),
-            idx=idx,
+            period_idx=period_idx,
         ),
-        **_value_unit_columns("Qh", t.Qh, idx=idx),
-        **_value_unit_columns("Qc", t.Qc, idx=idx),
-        **_value_unit_columns("Qr", t.Qr, idx=idx),
+        **_value_unit_columns("Qh", t.Qh, period_idx=period_idx),
+        **_value_unit_columns("Qc", t.Qc, period_idx=period_idx),
+        **_value_unit_columns("Qr", t.Qr, period_idx=period_idx),
         **_value_unit_columns(
             "Degree of Integration",
             t.degree_of_integration,
-            idx=idx,
+            period_idx=period_idx,
         ),
     }
 
     utility_columns = _utility_columns(
         t.hot_utilities,
         t.cold_utilities,
-        idx=idx,
+        period_idx=period_idx,
     )
 
     tail_columns = {
-        **_value_unit_columns("Utility Cost", t.utility_cost, idx=idx),
-        **_value_unit_columns("Area", t.area, idx=idx),
+        **_value_unit_columns("Utility Cost", t.utility_cost, period_idx=period_idx),
+        **_value_unit_columns("Area", t.area, period_idx=period_idx),
         "Num Units": t.num_units,
-        **_value_unit_columns("Capital Cost", t.capital_cost, idx=idx),
-        **_value_unit_columns("Total Cost", t.total_cost, idx=idx),
-        **_value_unit_columns("Work Target", t.work_target, idx=idx),
+        **_value_unit_columns("Capital Cost", t.capital_cost, period_idx=period_idx),
+        **_value_unit_columns("Total Cost", t.total_cost, period_idx=period_idx),
+        **_value_unit_columns("Work Target", t.work_target, period_idx=period_idx),
         **_value_unit_columns(
             "Process Component Work",
             getattr(t, "process_component_work_target", None),
-            idx=idx,
+            period_idx=period_idx,
         ),
         **_value_unit_columns(
             "Turbine Eff Target",
             t.turbine_efficiency_target,
-            idx=idx,
+            period_idx=period_idx,
         ),
-        **_value_unit_columns("ETE", t.ETE, idx=idx),
-        **_value_unit_columns("Exergy Sources", t.exergy_sources, idx=idx),
-        **_value_unit_columns("Exergy Sinks", t.exergy_sinks, idx=idx),
-        **_value_unit_columns("Exergy Req Min", t.exergy_req_min, idx=idx),
-        **_value_unit_columns("Exergy Des Min", t.exergy_des_min, idx=idx),
+        **_value_unit_columns("ETE", t.ETE, period_idx=period_idx),
+        **_value_unit_columns(
+            "Exergy Sources", t.exergy_sources, period_idx=period_idx
+        ),
+        **_value_unit_columns("Exergy Sinks", t.exergy_sinks, period_idx=period_idx),
+        **_value_unit_columns(
+            "Exergy Req Min", t.exergy_req_min, period_idx=period_idx
+        ),
+        **_value_unit_columns(
+            "Exergy Des Min", t.exergy_des_min, period_idx=period_idx
+        ),
         "HPR Cycle": getattr(t, "hpr_cycle", None),
         "HPR Success": getattr(t, "hpr_success", None),
         **_value_unit_columns(
             "HPR Utility Total",
             getattr(t, "hpr_utility_total", None),
-            idx=idx,
+            period_idx=period_idx,
         ),
-        **_value_unit_columns("HPR Work", getattr(t, "hpr_work", None), idx=idx),
+        **_value_unit_columns(
+            "HPR Work", getattr(t, "hpr_work", None), period_idx=period_idx
+        ),
         **_value_unit_columns(
             "HPR External Utility",
             getattr(t, "hpr_external_utility", None),
-            idx=idx,
+            period_idx=period_idx,
         ),
         **_value_unit_columns(
             "HPR Ambient Hot",
             getattr(t, "hpr_ambient_hot", None),
-            idx=idx,
+            period_idx=period_idx,
         ),
         **_value_unit_columns(
             "HPR Ambient Cold",
             getattr(t, "hpr_ambient_cold", None),
-            idx=idx,
+            period_idx=period_idx,
         ),
-        **_value_unit_columns("HPR COP", getattr(t, "hpr_cop", None), idx=idx),
-        **_value_unit_columns("HPR Eta HE", getattr(t, "hpr_eta_he", None), idx=idx),
+        **_value_unit_columns(
+            "HPR COP", getattr(t, "hpr_cop", None), period_idx=period_idx
+        ),
+        **_value_unit_columns(
+            "HPR Eta HE", getattr(t, "hpr_eta_he", None), period_idx=period_idx
+        ),
         **_value_unit_columns(
             "HPR Operating Cost",
             getattr(t, "hpr_operating_cost", None),
-            idx=idx,
+            period_idx=period_idx,
         ),
         **_value_unit_columns(
             "HPR Capital Cost",
             getattr(t, "hpr_capital_cost", None),
-            idx=idx,
+            period_idx=period_idx,
         ),
         **_value_unit_columns(
             "HPR Annualized Capital Cost",
             getattr(t, "hpr_annualized_capital_cost", None),
-            idx=idx,
+            period_idx=period_idx,
         ),
         **_value_unit_columns(
             "HPR Total Annualized Cost",
             getattr(t, "hpr_total_annualized_cost", None),
-            idx=idx,
+            period_idx=period_idx,
         ),
         **_value_unit_columns(
             "HPR Compressor Capital Cost",
             getattr(t, "hpr_compressor_capital_cost", None),
-            idx=idx,
+            period_idx=period_idx,
         ),
         **_value_unit_columns(
             "HPR Heat Exchanger Capital Cost",
             getattr(t, "hpr_heat_exchanger_capital_cost", None),
-            idx=idx,
+            period_idx=period_idx,
         ),
     }
 
@@ -232,14 +244,14 @@ def _utility_columns(
     hot_utils: Optional[Iterable],
     cold_utils: Optional[Iterable],
     *,
-    idx: int | None = None,
+    period_idx: int | None = None,
 ) -> dict:
     """Return flattened value/unit columns for the provided utilities."""
     columns: dict[str, Any] = {}
 
     def emit(utils):
         for u in utils or []:
-            hf_val, hf_unit = split_report_value(u.heat_flow, idx=idx)
+            hf_val, hf_unit = split_report_value(u.heat_flow, period_idx=period_idx)
             columns[f"{u.name} (value)"] = hf_val
             columns[f"{u.name} (unit)"] = hf_unit
 
@@ -314,8 +326,8 @@ def _unique_sheet_name(base: str, used: set[str]) -> str:
         used.add(candidate)
         return candidate
 
-    for idx in range(2, 1000):
-        suffix = f" ({idx})"
+    for period_idx in range(2, 1000):
+        suffix = f" ({period_idx})"
         trimmed = (
             candidate[: 31 - len(suffix)]
             if len(candidate) + len(suffix) > 31

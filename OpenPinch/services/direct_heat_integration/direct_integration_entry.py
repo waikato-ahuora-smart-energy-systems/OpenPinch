@@ -20,7 +20,7 @@ from ..common.capital_cost_and_area_targeting import (
     get_min_number_hx,
 )
 from ..common.gcc_manipulation import get_additional_GCCs
-from ..common.miscellaneous import delta_vals, get_state_index
+from ..common.miscellaneous import delta_vals, get_period_index
 from ..common.problem_table_analysis import (
     get_heat_recovery_target_from_pt,
     get_process_heat_cascade,
@@ -45,14 +45,14 @@ def compute_direct_integration_targets(
     pinch temperature detection, and graph preparation.  Results are cached on
     the provided ``zone`` and used later by site and regional aggregation routines.
     """
-    idx, sid = get_state_index(state_ids=zone.state_ids, args=args)
+    idx, sid = get_period_index(period_ids=zone.period_ids, args=args)
     all_streams = zone.all_streams
     pt = get_process_heat_cascade(
         hot_streams=zone.hot_streams,
         cold_streams=zone.cold_streams,
         all_streams=all_streams,
         is_shifted=True,
-        idx=idx,
+        period_idx=idx,
     )
     pt_real = get_process_heat_cascade(
         hot_streams=zone.hot_streams,
@@ -60,7 +60,7 @@ def compute_direct_integration_targets(
         all_streams=all_streams,
         is_shifted=False,
         known_heat_recovery=get_heat_recovery_target_from_pt(pt),
-        idx=idx,
+        period_idx=idx,
     )
     hot_pinch, cold_pinch = pt.pinch_temperatures()
     direct = zone.config.direct
@@ -89,7 +89,7 @@ def compute_direct_integration_targets(
             idx=idx,
         )
     )
-    if direct.balanced_cc_enabled or targeting.area_cost_enabled:
+    if should_update_balanced_composite_curves(direct, targeting):
         pt.update(
             **get_balanced_CC(
                 T_col=pt[PT.T],
@@ -113,42 +113,11 @@ def compute_direct_integration_targets(
                 RCP_cold_ut=pt_real[PT.RCP_COLD_UT],
             )
         )
-        # Target capital cost, area, and exchanger count from the balanced CC.
-        if targeting.area_cost_enabled:
-            num_units = get_min_number_hx(
-                T_vals=pt[PT.T],
-                H_hot_bal=pt[PT.H_HOT_BAL],
-                H_cold_bal=pt[PT.H_COLD_BAL],
-                hot_streams=zone.hot_streams,
-                cold_streams=zone.cold_streams,
-                hot_utilities=zone.hot_utilities,
-                cold_utilities=zone.cold_utilities,
-                idx=idx,
-            )
-            area = get_area_targets(
-                T_vals=pt_real[PT.T],
-                H_hot_bal=pt_real[PT.H_HOT_BAL],
-                H_cold_bal=pt_real[PT.H_COLD_BAL],
-                R_hot_bal=pt_real[PT.R_HOT_BAL],
-                R_cold_bal=pt_real[PT.R_COLD_BAL],
-            )
-            capital_cost, annual_capital_cost = get_capital_cost_targets(
-                area=area,
-                num_units=num_units,
-                config=zone.config,
-            )
-            area_payload = {
-                "area": area,
-                "num_units": num_units,
-                "capital_cost": capital_cost,
-                "total_cost": annual_capital_cost,
-            }
-        else:
-            area_payload = {}
+        area_data = build_area_cost_target_data(pt, pt_real, zone, idx)
     else:
-        area_payload = {}
+        area_data = {}
 
-    payload = (
+    target_data = (
         set_zonal_targets(
             pt=pt,
             pt_real=pt_real,
@@ -165,17 +134,62 @@ def compute_direct_integration_targets(
             "cold_utilities": zone.cold_utilities,
             "hot_pinch": hot_pinch,
             "cold_pinch": cold_pinch,
-            "state_id": sid,
-            "state_idx": idx,
+            "period_id": sid,
+            "period_idx": idx,
         }
-        | area_payload
+        | area_data
     )
-    return DirectIntegrationTarget.model_validate(payload)
+    return DirectIntegrationTarget.model_validate(target_data)
 
 
 ################################################################################
 # Helper functions
 ################################################################################
+
+
+def should_update_balanced_composite_curves(direct_config, targeting_config) -> bool:
+    """Return True when balanced composite curves are needed downstream."""
+    return bool(direct_config.balanced_cc_enabled or targeting_config.area_cost_enabled)
+
+
+def build_area_cost_target_data(
+    pt: ProblemTable,
+    pt_real: ProblemTable,
+    zone: Zone,
+    idx: int | None,
+) -> dict:
+    """Calculate direct-integration area and capital-cost target fields."""
+    if not zone.config.targeting.area_cost_enabled:
+        return {}
+
+    num_units = get_min_number_hx(
+        T_vals=pt[PT.T],
+        H_hot_bal=pt[PT.H_HOT_BAL],
+        H_cold_bal=pt[PT.H_COLD_BAL],
+        hot_streams=zone.hot_streams,
+        cold_streams=zone.cold_streams,
+        hot_utilities=zone.hot_utilities,
+        cold_utilities=zone.cold_utilities,
+        idx=idx,
+    )
+    area = get_area_targets(
+        T_vals=pt_real[PT.T],
+        H_hot_bal=pt_real[PT.H_HOT_BAL],
+        H_cold_bal=pt_real[PT.H_COLD_BAL],
+        R_hot_bal=pt_real[PT.R_HOT_BAL],
+        R_cold_bal=pt_real[PT.R_COLD_BAL],
+    )
+    capital_cost, annual_capital_cost = get_capital_cost_targets(
+        area=area,
+        num_units=num_units,
+        config=zone.config,
+    )
+    return {
+        "area": area,
+        "num_units": num_units,
+        "capital_cost": capital_cost,
+        "total_cost": annual_capital_cost,
+    }
 
 
 def _create_net_hot_and_cold_stream_collections_for_site_analysis(
@@ -216,7 +230,7 @@ def _create_net_hot_and_cold_stream_collections_for_site_analysis(
     k = 1
     for i, dh in enumerate(dh_vals):
         if dh > tol and hu_idx >= 0:
-            hu_idx, k = _add_net_segment_stateful(
+            hu_idx, k = _add_net_segment_period(
                 T_ub=T_vals[i],
                 T_lb=T_vals[i + 1],
                 curr_idx=hu_idx,
@@ -228,7 +242,7 @@ def _create_net_hot_and_cold_stream_collections_for_site_analysis(
                 idx=idx,
             )
         elif -dh > tol and cu_idx >= 0:
-            cu_idx, k = _add_net_segment_stateful(
+            cu_idx, k = _add_net_segment_period(
                 T_ub=T_vals[i],
                 T_lb=T_vals[i + 1],
                 curr_idx=cu_idx,
@@ -243,7 +257,7 @@ def _create_net_hot_and_cold_stream_collections_for_site_analysis(
     return net_hot_streams, net_cold_streams
 
 
-def _add_net_segment_stateful(
+def _add_net_segment_period(
     T_ub: float,
     T_lb: float,
     curr_idx: int,

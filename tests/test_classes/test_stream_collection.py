@@ -1,6 +1,7 @@
 """Regression tests for the stream collection classes."""
 
 import csv
+from types import SimpleNamespace
 from uuid import uuid4
 
 import numpy as np
@@ -8,6 +9,7 @@ import pandas as pd
 import pytest
 
 from OpenPinch.classes import *
+from OpenPinch.classes._stream_collection.numeric_view import value_at_idx
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.lib import *
@@ -201,6 +203,22 @@ def test_numeric_view_updates_after_collection_mutation(sample_streams):
     sc.add(s2)
 
     assert sc.numeric_view().cp.shape == (2,)
+
+
+def test_numeric_view_none_values_and_legacy_pickle_state_rebuild_cache():
+    assert np.isnan(value_at_idx(None))
+
+    stream = Stream(name="H1", t_supply=200, t_target=120, heat_flow=80.0)
+    sc = StreamCollection([stream])
+    state = sc.__getstate__()
+    state.pop("_numeric_cache", None)
+
+    restored = StreamCollection()
+    del restored.__dict__["_numeric_cache"]
+    restored.__setstate__(state)
+
+    assert restored._numeric_cache == {}
+    assert restored[0].name == "H1"
 
 
 def test_get_hot_streams_filters_and_preserves_sort_settings():
@@ -540,7 +558,7 @@ def test_to_dict_exports_streams_in_standard_reporting_order():
     assert frame.loc[0, "t_target"] == pytest.approx(90.0)
 
 
-def test_to_dict_uses_requested_state_index_for_stateful_stream_values():
+def test_to_dict_uses_requested_period_index_for_period_stream_values():
     sc = StreamCollection()
     sc.add(
         Stream(
@@ -559,12 +577,12 @@ def test_to_dict_uses_requested_state_index_for_stateful_stream_values():
     assert frame.loc[0, "heat_flow"] == pytest.approx(80.0)
 
 
-def test_validate_state_alignment_uses_first_stateful_stream_as_canonical():
+def test_validate_period_alignment_uses_first_period_stream_as_canonical():
     sc = StreamCollection()
-    sc.set_state_context(
-        state_ids={"0": 0, "1": 1},
+    sc.set_period_context(
+        period_ids={"0": 0, "1": 1},
         weights=[0.25, 0.75],
-        num_states=2,
+        num_periods=2,
     )
     sc.add(
         Stream(
@@ -577,7 +595,7 @@ def test_validate_state_alignment_uses_first_stateful_stream_as_canonical():
                 "values": [120.0, 100.0],
                 "unit": "degC",
             },
-            heat_flow={"values": [100.0, 80.0], "state_ids": ["0", "1"], "unit": "kW"},
+            heat_flow={"values": [100.0, 80.0], "period_ids": ["0", "1"], "unit": "kW"},
             htc=1.0,
         ),
         key="AreaA.H1",
@@ -592,18 +610,18 @@ def test_validate_state_alignment_uses_first_stateful_stream_as_canonical():
         )
     )
 
-    assert list(sc[0].state_ids.keys()) == ["0", "1"]
+    assert list(sc[0].period_ids.keys()) == ["0", "1"]
     np.testing.assert_allclose(sc[0].weights, np.array([0.25, 0.75]))
-    assert sc.state_ids == {"0": 0, "1": 1}
+    assert sc.period_ids == {"0": 0, "1": 1}
     np.testing.assert_allclose(sc.weights, np.array([0.25, 0.75]))
 
 
 def test_state_context_is_preserved_on_copy_and_subset():
     sc = StreamCollection()
-    sc.set_state_context(
-        state_ids={"0": 0, "1": 1},
+    sc.set_period_context(
+        period_ids={"0": 0, "1": 1},
         weights=[0.25, 0.75],
-        num_states=2,
+        num_periods=2,
     )
     sc.add(
         Stream(
@@ -636,9 +654,9 @@ def test_state_context_is_preserved_on_copy_and_subset():
     copied = sc.copy()
     hot_streams = sc.get_hot_streams()
 
-    assert copied.state_ids == {"0": 0, "1": 1}
+    assert copied.period_ids == {"0": 0, "1": 1}
     np.testing.assert_allclose(copied.weights, np.array([0.25, 0.75]))
-    assert hot_streams.state_ids == {"0": 0, "1": 1}
+    assert hot_streams.period_ids == {"0": 0, "1": 1}
     np.testing.assert_allclose(hot_streams.weights, np.array([0.25, 0.75]))
 
 
@@ -684,3 +702,109 @@ def test_stream_collection_get_index_and_getitem_by_name():
     idx = collection.get_index(s1)
     assert idx in (0, 1)
     assert collection["S2"] is s2
+
+
+def test_stream_collection_warning_paths_and_name_helpers():
+    empty = StreamCollection()
+
+    assert empty.num_periods == 1
+    with pytest.warns(UserWarning, match="empty stream collection"):
+        assert empty.sum_stream_attribute("heat_flow") == pytest.approx(0.0)
+    with pytest.warns(UserWarning, match="empty stream collection"):
+        assert empty.set_common_stream_attribute("heat_flow", 0.0) == pytest.approx(0.0)
+
+    collection = StreamCollection()
+    collection.add(Stream(name="Steam", t_supply=200, t_target=150, heat_flow=10.0))
+
+    assert collection.get_stream_by_name("tea", approximate=True).name == "Steam"
+    assert collection.get_stream_names() == ["Steam"]
+    with pytest.warns(UserWarning, match="not found"):
+        assert collection.get_stream_by_name("missing") is None
+    with pytest.warns(UserWarning, match="does not have attribute"):
+        assert collection.sum_stream_attribute("missing") == pytest.approx(0.0)
+    with pytest.warns(UserWarning, match="does not have attribute"):
+        collection.set_common_stream_attribute("missing", 1.0)
+    with pytest.warns(UserWarning, match="not found"):
+        collection.remove("missing")
+
+
+def test_stream_collection_period_context_validation_and_adoption_edges():
+    collection = StreamCollection()
+    collection.set_period_context({"0": 0, "1": 1}, [0.5, 0.5], 2)
+    three_period_stream = Stream(
+        name="H3",
+        t_supply={"values": [200.0, 190.0, 180.0], "unit": "degC"},
+        t_target={"values": [120.0, 110.0, 100.0], "unit": "degC"},
+        heat_flow={"values": [1.0, 1.0, 1.0], "unit": "kW"},
+    )
+
+    with pytest.raises(ValueError, match="must align"):
+        collection.add(three_period_stream)
+
+    left = StreamCollection()
+    left.set_period_context(None, None, None)
+    right = StreamCollection()
+    right.set_period_context({"0": 0, "1": 1}, [0.25, 0.75], 2)
+    combined = left + right
+
+    assert combined.period_ids == {"0": 0, "1": 1}
+
+    different = StreamCollection()
+    different.set_period_context({"base": 0, "peak": 1}, [0.5, 0.5], 2)
+    with pytest.raises(ValueError, match="different period_ids"):
+        right + different
+
+
+def test_stream_collection_pickle_state_and_sort_edge_helpers():
+    collection = StreamCollection()
+    collection.add(Stream(name="H1", t_supply=200, t_target=120, heat_flow=1.0))
+    collection.set_sort_key(lambda stream: stream.name)
+
+    state = collection.__getstate__()
+    assert state["_sort_spec"] == ("attr", "t_supply")
+    state.pop("_numeric_cache")
+
+    restored = StreamCollection()
+    restored.__setstate__(state)
+
+    assert restored.numeric_view().cp.tolist() == [pytest.approx(0.0125)]
+    assert StreamCollection._descending_sort_value(float("nan")) == float("inf")
+    assert (
+        StreamCollection._dict_category(
+            SimpleNamespace(is_process_stream=False, type="Other")
+        )
+        == "other"
+    )
+
+
+def test_stream_collection_subset_sort_and_inverted_utility_edges():
+    collection = StreamCollection()
+    collection.add(
+        Stream(
+            name="HU",
+            t_supply=220,
+            t_target=180,
+            heat_flow=1.0,
+            is_process_stream=False,
+        )
+    )
+    collection.add(
+        Stream(
+            name="CU",
+            t_supply=40,
+            t_target=80,
+            heat_flow=1.0,
+            is_process_stream=False,
+        )
+    )
+    collection.add(Stream(name="H1", t_supply=200, t_target=100, heat_flow=1.0))
+
+    hot_subset = collection.get_hot_streams(sort_attr="name")
+    inverted_hot_utilities = collection.get_inverted_hot_utility_streams()
+    inverted_cold_utilities = collection.get_inverted_cold_utility_streams()
+
+    assert [stream.name for stream in hot_subset] == ["HU", "H1"]
+    assert set(inverted_hot_utilities._streams) == {"CU"}
+    assert inverted_hot_utilities["CU"].type == ST.Hot.value
+    assert set(inverted_cold_utilities._streams) == {"HU"}
+    assert inverted_cold_utilities["HU"].type == ST.Cold.value

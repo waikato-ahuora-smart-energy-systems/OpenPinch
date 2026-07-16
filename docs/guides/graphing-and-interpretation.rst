@@ -1,26 +1,58 @@
 Graphing and Interpretation
 ===========================
 
-This guide focuses on the practical use of OpenPinch graph outputs after a
-case has been solved.
+Purpose
+-------
 
-Question This Guide Answers
----------------------------
+Use this guide after a case has been solved and you need to connect graph
+shape to utility targets, target scope, and workflow decisions.
 
-Which graph should I inspect first, and how do I connect graph changes back to
-the summary metrics?
+Prerequisites
+-------------
 
-Fastest Graph Workflow
-----------------------
+Install ``openpinch[notebook]`` for Plotly figures or
+``openpinch[dashboard]`` for the Streamlit review surface.
 
-Python:
+Sample Case
+-----------
+
+Use ``basic_pinch.json`` for process-level graphs and ``pulp_mill.json`` or
+``zonal_site.json`` for Total Site profiles and SUGCC views.
+
+Runnable Workflow
+-----------------
 
 .. code-block:: python
 
+   from OpenPinch import PinchProblem
+
+   problem = PinchProblem("basic_pinch.json")
+   problem.target()
+
+   summary = problem.summary_frame()
    gcc = problem.plot.grand_composite_curve()
    cc = problem.plot.composite_curve()
+   catalog = problem.plot.catalog()
 
-After exergy post-processing:
+Expected Output
+---------------
+
+``summary_frame()`` gives the numerical context. ``problem.plot.*`` returns
+Plotly figures or graph data for the solved target family. ``catalog()`` helps
+confirm which graph families are available before exporting or displaying.
+
+Interpretation
+--------------
+
+Use this order:
+
+1. read the summary row and target scope
+2. inspect the Grand Composite Curve for utility placement
+3. inspect Composite Curves or shifted curves for overlap and pinch behavior
+4. inspect Total Site profiles only after confirming the workflow is multizone
+5. inspect exergetic graphs only after running exergy post-processing
+
+After exergy enrichment:
 
 .. code-block:: python
 
@@ -28,48 +60,19 @@ After exergy post-processing:
    gcc_x = problem.plot.exergetic_grand_composite_curve()
    nlp_x = problem.plot.exergetic_net_load_profiles()
 
-Best Default Graph
-------------------
+For portable review artifacts:
 
-If you only inspect one graph after the summary, inspect the grand composite
-curve.
+.. code-block:: python
 
-It is usually the best graph for:
+   paths = problem.plot.export("graphs", graph_type="gcc")
 
-- utility placement questions
-- residual thermal pocket interpretation
-- Heat Pump opportunity screening
-
-Recommended Interpretation Order
---------------------------------
-
-1. read the summary table first
-2. identify the target row and scope
-3. inspect the GCC
-4. move to composite or shifted composite curves if you need overlap detail
-5. move to site-level graph families only when the workflow is multiscale
-6. move to exergetic graphs only after the thermal target context is clear
-
-Exporting Graphs
-----------------
-
-Use Python when you want direct `plotly` figures. Install
-``openpinch[notebook]`` or ``openpinch[dashboard]`` first.
-
-Use `problem.plot.export(...)` when you want portable HTML output for sharing
-or review outside Python.
-
-Common Mistakes
----------------
-
-- reading a graph without checking the target scope first
-- treating a graph improvement as enough without checking the utility numbers
-- comparing process-level and site-level views as though they were the same
-  question
+Common mistakes are comparing a process-level row to a site-level graph,
+reading graph shape before checking utility targets, or treating a graph
+change as sufficient without confirming the metrics.
 
 Next Steps
 ----------
 
-- For graph meaning, see :doc:`../fundamentals/graphs-and-interpretation`.
-- For multiscale workflows, see :doc:`zonal-and-total-site-workflows`.
-- For exergy post-processing, see :doc:`exergy-workflows`.
+- :doc:`../fundamentals/graphs-and-interpretation` for graph meaning.
+- :doc:`exporting-results` for Excel, HTML, and dashboard outputs.
+- :doc:`heat-pump-workflows` for HPR graph families.

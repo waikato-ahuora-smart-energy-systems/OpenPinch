@@ -1,82 +1,64 @@
 Exporting Results
 =================
 
-OpenPinch supports several output surfaces depending on whether you want a
-quick check, a report artifact, or an interactive review.
+Purpose
+-------
 
-Question This Guide Answers
----------------------------
+Use this guide when you need to move solved OpenPinch results into tables,
+workbooks, HTML graphs, or an interactive dashboard.
 
-How do I get OpenPinch results out of the runtime object and into a form I can
-review or share?
+Prerequisites
+-------------
 
-Main Output Surfaces
---------------------
+Run a solve first. Install ``openpinch[notebook]`` for Excel and graph exports
+or ``openpinch[dashboard]`` for the Streamlit dashboard.
 
-Terminal summary
-   Best for quick comparison and regression-style checking.
+Sample Case
+-----------
 
-`summary_frame()`
-   Best for Python-side inspection and downstream data manipulation.
+Use ``basic_pinch.json`` for first exports. Use ``pulp_mill.json`` when you
+want Total Site and cogeneration outputs in the same workbook.
 
-Excel export
-   Best for detailed review and handoff.
-
-Graph HTML export
-   Best for visual sharing outside Python.
-
-Dashboard
-   Best for interactive inspection once a case is already solved.
-
-Python Examples
----------------
+Runnable Workflow
+-----------------
 
 .. code-block:: python
 
+   from OpenPinch import PinchProblem
+
+   problem = PinchProblem("basic_pinch.json")
+   problem.target()
+
    summary = problem.summary_frame()
    detailed = problem.summary_frame(detailed=True)
-   workbook = problem.export_excel("results")
-   graphs = problem.plot.export("graphs", graph_type="gcc")
+   workbook_path = problem.export_excel("results")
+   graph_paths = problem.plot.export("graphs", graph_type="gcc")
 
-CLI Examples
-------------
+Expected Output
+---------------
 
-OpenPinch no longer exposes dedicated export commands through the CLI. Use the
-Python methods above when you need result workbooks, graph HTML files, or other
-post-solve artifacts.
+- ``summary_frame()`` returns a pandas table for scriptable inspection.
+- ``export_excel(...)`` writes workbook artifacts for review or handoff.
+- ``problem.plot.export(...)`` writes portable HTML graph files.
+- ``show_dashboard()`` opens the Streamlit review surface when dashboard
+  dependencies are installed.
 
-Choosing the Right Output
--------------------------
+Interpretation
+--------------
 
-Use `summary_frame()` when:
+Choose the output by audience:
 
-- you want a scriptable table
-- you are comparing scenarios in code
+- Use summary frames for Python analysis and regression checks.
+- Use Excel when the review audience expects spreadsheet artifacts.
+- Use HTML graphs when visual interpretation needs to be shared outside
+  Python.
+- Use the dashboard when a solved case needs interactive inspection.
 
-Use Excel when:
-
-- you want a reviewable report artifact
-- the audience prefers spreadsheet consumption
-
-These workbook-oriented outputs require the ``openpinch[notebook]`` or
-``openpinch[dashboard]`` extra.
-
-Use HTML graphs when:
-
-- you want portable visual output
-- you do not need the live Python object
-
-These rendered graph exports require the ``openpinch[notebook]`` or
-``openpinch[dashboard]`` extra.
-
-Use the dashboard when:
-
-- you want an interactive review after solving
-
-This surface requires ``openpinch[dashboard]``.
+The CLI does not provide export commands. Use Python for solved outputs.
 
 Next Steps
 ----------
 
-- For graph usage, see :doc:`graphing-and-interpretation`.
-- For the exact wrapper methods, see :doc:`../api/pinchproblem`.
+- :doc:`graphing-and-interpretation` for graph reading order.
+- :doc:`../api/pinchproblem` for the exact export methods.
+- :doc:`../api/cli-and-resources` for the boundary between Python and CLI.

@@ -8,6 +8,7 @@ import pytest
 
 from OpenPinch.classes import *
 from OpenPinch.lib import *
+from OpenPinch.services.common import gcc_manipulation as gcc
 from OpenPinch.services.common.gcc_manipulation import *
 from OpenPinch.services.common.miscellaneous import *
 
@@ -151,6 +152,58 @@ def test_get_additional_gccs_uses_assisted_profile_as_actual_when_enabled():
     )
 
 
+def test_get_additional_gccs_uses_vertical_profile_as_actual_when_enabled():
+    pt = ProblemTable(
+        {
+            PT.T: [400, 300, 200, 100],
+            PT.H_COLD: [500, 300, 100, 50],
+            PT.H_HOT: [250, 150, 100, 0],
+            PT.H_NET: [250, 150, 0, 50],
+        }
+    )
+
+    result = get_additional_GCCs(pt, do_vert_cc_calc=True)
+
+    assert PT.H_NET_V.value in result.columns
+    np.testing.assert_allclose(result[PT.H_NET_A], result[PT.H_NET_V])
+
+
+def test_get_gcc_with_partial_pockets_handles_empty_boundary_and_short_runs():
+    no_pockets = get_GCC_with_partial_pockets(
+        T_col=np.array([100.0, 50.0]),
+        h_net=np.array([0.0, 0.0]),
+        h_net_np=np.array([0.0, 0.0]),
+    )
+    np.testing.assert_allclose(no_pockets["updates"][PT.H_NET_PK], [0.0, 0.0])
+
+    boundary_run = get_GCC_with_partial_pockets(
+        T_col=np.array([100.0, 50.0, 0.0]),
+        h_net=np.array([10.0, 10.0, 0.0]),
+        h_net_np=np.array([0.0, 0.0, 0.0]),
+    )
+    np.testing.assert_allclose(boundary_run["updates"][PT.H_NET_AI], [0.0, 0.0, 0.0])
+
+    short_run = get_GCC_with_partial_pockets(
+        T_col=np.array([100.0, 95.0, 90.0]),
+        h_net=np.array([0.0, 10.0, 0.0]),
+        h_net_np=np.array([0.0, 0.0, 0.0]),
+        dt_cut=20.0,
+    )
+    np.testing.assert_allclose(short_run["updates"][PT.H_NET_PK], [0.0, 10.0, 0.0])
+
+
+def test_get_gcc_with_partial_pockets_keeps_pocket_when_cut_height_is_zero():
+    result = get_GCC_with_partial_pockets(
+        T_col=np.array([100.0, 80.0, 60.0]),
+        h_net=np.array([0.0, 10.0, 0.0]),
+        h_net_np=np.array([0.0, 0.0, 0.0]),
+        dt_cut=40.0,
+    )
+
+    np.testing.assert_allclose(result["updates"][PT.H_NET_PK], [0.0, 10.0, 0.0])
+    np.testing.assert_allclose(result["updates"][PT.H_NET_AI], [0.0, 0.0, 0.0])
+
+
 def test_get_GCC_needing_utility_combines_columns():
     pt = ProblemTable({PT.H_NET_NP: [100, 200, 300]})
 
@@ -230,3 +283,109 @@ def test_get_separated_heat_profiles_categorises_correctly():
     assert PT.H_NET_COLD in result_cols["updates"]
     assert result_cols["updates"][PT.H_NET_HOT][-1] == -100
     assert result_cols["updates"][PT.H_NET_COLD][0] == 300
+
+
+def test_get_separated_heat_profiles_handles_utility_profiles_with_rcp():
+    result = get_seperated_gcc_heat_load_profiles(
+        T_col=np.array([400.0, 300.0, 200.0]),
+        H_net=np.array([0.0, -40.0, 20.0]),
+        rcp_net=np.array([1.0, 2.0, 3.0]),
+        is_process_stream=False,
+    )
+
+    assert PT.H_HOT_UT in result["updates"]
+    assert PT.H_COLD_UT in result["updates"]
+    assert PT.RCP_HOT_UT in result["updates"]
+    assert PT.RCP_COLD_UT in result["updates"]
+    np.testing.assert_allclose(result["updates"][PT.RCP_HOT_UT], [0.0, 2.0, 0.0])
+    np.testing.assert_allclose(result["updates"][PT.RCP_COLD_UT], [1.0, 0.0, 3.0])
+
+
+def test_gcc_private_pocket_helpers_cover_run_and_cut_edges():
+    assert gcc._pocket_exit_index(np.array([5.0, 6.0, 7.0]), 0, 2, 1) == 2
+    assert gcc._pocket_exit_index(np.array([7.0, 6.0, 5.0]), 2, 0, -1) == 0
+    assert gcc._next_positive_run(np.array([0.0, 0.0])) is None
+    assert gcc._next_positive_run(np.array([0.0, 2.0, 3.0]), start_idx=1) == (1, 3)
+
+    assert gcc._shrink_pocket_to_dt_cut_zone(
+        t_vals=np.array([100.0, 80.0, 60.0, 40.0, 20.0]),
+        h_pockets=np.array([0.0, 10.0, 5.0, 2.0, 0.0]),
+        i_upper=0,
+        i_lower=4,
+        dt_cut=10.0,
+    ) == (0, 2)
+
+    assert (
+        gcc._solve_assisted_pocket_cut_height(
+            t_vals=np.array([100.0, 80.0, 60.0]),
+            h_pockets=np.array([5.0, 5.0, 0.0]),
+            i_upper=0,
+            i_lower=2,
+            dt_cut=20.0,
+        )
+        is None
+    )
+    assert (
+        gcc._solve_assisted_pocket_cut_height(
+            t_vals=np.array([100.0, 80.0, 60.0]),
+            h_pockets=np.array([0.0, 10.0, 20.0]),
+            i_upper=0,
+            i_lower=2,
+            dt_cut=20.0,
+        )
+        is None
+    )
+    assert (
+        gcc._solve_assisted_pocket_cut_height(
+            t_vals=np.array([100.0, 80.0, 60.0]),
+            h_pockets=np.array([0.0, 10.0, 0.0]),
+            i_upper=0,
+            i_lower=2,
+            dt_cut=100.0,
+        )
+        is None
+    )
+    with np.errstate(invalid="ignore"):
+        assert (
+            gcc._solve_assisted_pocket_cut_height(
+                t_vals=np.array([np.inf, 80.0, 60.0]),
+                h_pockets=np.array([0.0, 10.0, 0.0]),
+                i_upper=0,
+                i_lower=2,
+                dt_cut=20.0,
+            )
+            is None
+        )
+
+    assert (
+        gcc._cut_temperatures_needing_insertion(
+            t_vals=np.array([100.0, 80.0]),
+            h_pockets=np.array([0.0, 10.0]),
+            i_upper=0,
+            i_lower=1,
+            h_cut=5.0,
+            dt_cut=10.0,
+        ).size
+        == 0
+    )
+    assert (
+        gcc._cut_temperatures_needing_insertion(
+            t_vals=np.array([100.0, 70.0, 30.0, 0.0]),
+            h_pockets=np.array([0.0, 10.0, 10.0, 0.0]),
+            i_upper=0,
+            i_lower=3,
+            h_cut=10.0,
+            dt_cut=50.0,
+        ).size
+        == 0
+    )
+    assert (
+        gcc._segment_cut_temperature(
+            t_vals=np.array([100.0, 80.0]),
+            h_pockets=np.array([0.0, 10.0]),
+            left_idx=0,
+            right_idx=1,
+            h_cut=10.0,
+        )
+        is None
+    )

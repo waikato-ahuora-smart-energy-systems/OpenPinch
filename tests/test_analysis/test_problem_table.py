@@ -10,6 +10,7 @@ import pytest
 from OpenPinch.classes import *
 from OpenPinch.lib import *
 from OpenPinch.services.common.problem_table_analysis import (
+    _get_T_start_on_opposite_cc,
     _insert_temperature_interval_into_pt_at_constant_h,
     _shift_pt_to_set_heat_recovery,
     _sum_mcp_between_temperature_boundaries,
@@ -136,6 +137,36 @@ def test_empty_stream_lists_returns_zero():
     assert CP_cold == [0, 0, 0]
 
 
+def test_problem_table_generation_handles_empty_defaults_and_extra_intervals():
+    empty = get_process_heat_cascade()
+    assert empty[PT.T].size == 0
+
+    with_extra = create_problem_table_with_t_int(
+        StreamCollection(),
+        extra_T_intervals=[150.0],
+    )
+
+    assert with_extra[PT.T].tolist() == [150.0]
+
+
+def test_sum_mcp_handles_empty_temperature_and_inactive_streams():
+    assert _sum_mcp_between_temperature_boundaries([], [], is_shifted=False) == (
+        [],
+        [],
+    )
+
+    stream = make_stream("inactive", 300, 200, 0, cp=1.0)
+    stream.active = False
+    zeros, rcp_zeros = _sum_mcp_between_temperature_boundaries(
+        [300.0, 200.0],
+        StreamCollection([stream]),
+        is_shifted=False,
+    )
+
+    np.testing.assert_allclose(zeros, [0.0, 0.0])
+    np.testing.assert_allclose(rcp_zeros, [0.0, 0.0])
+
+
 """Tests for problem_table_algorithm function."""
 
 
@@ -241,6 +272,14 @@ def test_insert_temperature_interval_basic():
                 assert result_val == pytest.approx(expected_val, abs=1e-6)
             else:
                 assert result_val == expected_val
+
+
+def test_get_T_start_on_opposite_cc_returns_none_without_usable_crossing():
+    single_row = ProblemTable({PT.T: [200.0], PT.H_COLD: [10.0]})
+    assert _get_T_start_on_opposite_cc(single_row, 5.0, PT.H_COLD) is None
+
+    no_transition = ProblemTable({PT.T: [300.0, 200.0, 100.0], PT.H_COLD: [30, 20, 10]})
+    assert _get_T_start_on_opposite_cc(no_transition, 0.0, PT.H_COLD) is None
 
 
 def test_insert_temperature_interval_gcc_basic():

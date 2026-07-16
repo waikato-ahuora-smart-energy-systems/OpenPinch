@@ -52,6 +52,81 @@ def _solve_cascade_carnot_cycle(
     return cycle
 
 
+def test_cascade_carnot_unsolved_properties_and_empty_stream_collection():
+    cycle = CascadeCarnotCycle()
+
+    assert cycle.solved is False
+    assert cycle.T_cond.size == 0
+    assert cycle.T_evap.size == 0
+    assert cycle.Q_heat.size == 0
+    assert cycle.Q_cool.size == 0
+    assert cycle.Q_cond.size == 0
+    assert cycle.Q_evap.size == 0
+    assert cycle.Q_cond_he.size == 0
+    assert cycle.Q_evap_he.size == 0
+    assert cycle.w_hpr == 0.0
+    assert cycle.w_he == 0.0
+    assert cycle.heat_recovery.size == 0
+    assert cycle.work == 0.0
+    assert cycle.work_arr.tolist() == [0.0]
+    assert cycle.penalty.size == 0
+    assert cycle.COP_h == 1.0
+    assert len(cycle.build_stream_collection()) == 0
+
+
+def test_cascade_carnot_solved_properties_expose_arrays_and_work_balance():
+    T_cond = np.array([80.0])
+    Q_cond = np.array([200.0])
+    T_evap = np.array([20.0])
+    Q_evap = np.array([90.0])
+    args, _, _ = _build_cascade_carnot_profiles(
+        T_cond,
+        Q_cond,
+        T_evap,
+        Q_evap,
+        eta_hp=0.5,
+        eta_he=0.0,
+    )
+
+    cycle = _solve_cascade_carnot_cycle(T_cond, Q_cond, T_evap, Q_evap, args)
+
+    assert cycle.solved is True
+    np.testing.assert_allclose(cycle.T_cond, T_cond)
+    np.testing.assert_allclose(cycle.T_evap, T_evap)
+    np.testing.assert_allclose(cycle.Q_heat, cycle.Q_cond)
+    np.testing.assert_allclose(cycle.Q_cool, cycle.Q_evap)
+    assert cycle.Q_cond_he.shape == cycle.Q_cond.shape
+    assert cycle.Q_evap_he.shape == cycle.Q_evap.shape
+    assert cycle.work_arr.tolist() == [pytest.approx(cycle.work)]
+    assert cycle.penalty.shape == cycle.Q_cond.shape
+    assert len(cycle.build_stream_collection()) > 0
+
+
+def test_cascade_carnot_rejects_inconsistent_pool_sizes():
+    args, _, _ = _build_cascade_carnot_profiles(
+        T_cond=np.array([80.0]),
+        Q_cond=np.array([100.0]),
+        T_evap=np.array([20.0]),
+        Q_evap=np.array([90.0, 80.0]),
+        eta_hp=0.5,
+        eta_he=0.0,
+    )
+    cycle = CascadeCarnotCycle()
+
+    with pytest.raises(ValueError, match="pool sizes"):
+        cycle.solve(
+            T_cond=np.array([80.0]),
+            T_evap=np.array([20.0]),
+            Q_heat_base=100.0,
+            x_heat_split=np.array([1.0]),
+            Q_heat_available=np.array([100.0]),
+            Q_cool_available=np.array([90.0, 80.0]),
+            eta_ii_hpr_carnot=args.eta_ii_hpr_carnot,
+            eta_ii_he_carnot=args.eta_ii_he_carnot,
+            args=args,
+        )
+
+
 def test_cascade_carnot_cycle_returns_entropic_mean_cop():
     T_cond = np.array([150.0, 120.0])
     Q_cond = np.array([60.0, 40.0])
@@ -345,7 +420,7 @@ def test_cascade_carnot_optimiser_success_and_failure(monkeypatch):
 
 
 def test_cascade_carnot_objective_debug_branch(monkeypatch):
-    args = _base_args(n_cond=1, n_evap=1, idx=0)
+    args = _base_args(n_cond=1, n_evap=1, period_idx=0)
     called = {"plot": 0}
     monkeypatch.setattr(
         hp_shared,

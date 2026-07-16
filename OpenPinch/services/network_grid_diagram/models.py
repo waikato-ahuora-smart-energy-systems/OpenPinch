@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ...classes._heat_exchanger.period_state import HeatExchangerPeriodState
 from ...classes.heat_exchanger import HeatExchanger
 from ...classes.heat_exchanger_network import HeatExchangerNetwork
 
@@ -15,6 +16,7 @@ class GridDiagramMatch:
     """One active exchanger match placed in the process-stream grid."""
 
     exchanger: HeatExchanger
+    state: HeatExchangerPeriodState
     source_stream: str
     sink_stream: str
     stage: int | None
@@ -26,6 +28,7 @@ class HeatExchangerNetworkGridModel:
     """Normalized topology for a heat exchanger network grid diagram."""
 
     network: HeatExchangerNetwork
+    period_id: str
     hot_streams: tuple[str, ...]
     cold_streams: tuple[str, ...]
     stages: tuple[int, ...]

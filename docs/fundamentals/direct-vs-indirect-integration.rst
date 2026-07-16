@@ -67,15 +67,14 @@ When comparing direct and indirect answers:
 - do not assume an indirect answer is always better; it is only better if the
   larger system boundary creates additional feasible recovery
 
-OpenPinch Surfaces
-------------------
+Where The Methods Appear
+------------------------
 
-Common user-facing routes are:
-
-- `problem.target()` for the default high-level workflow
-- `problem.target.direct_heat_integration(...)`
-- `problem.target.indirect_heat_integration(...)`
-- the CLI `run` and `graph` workflows
+In user workflows, direct and indirect integration are usually reached through
+``problem.target()`` for the default solve or through the explicit
+``problem.target.direct_heat_integration(...)`` and
+``problem.target.indirect_heat_integration(...)`` accessors. The command-line
+surface does not run or graph these methods.
 
 Recommended Follow-On Pages
 ---------------------------

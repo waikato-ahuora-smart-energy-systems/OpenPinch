@@ -1,15 +1,115 @@
 """Regression tests for the simple heat pump cycle classes."""
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
+from hypothesis import given
 
 import OpenPinch.services.heat_pump_integration.unit_models.vapour_compression_cycle as shp_mod
 from OpenPinch.lib.enums import *
 from OpenPinch.services.heat_pump_integration.unit_models.vapour_compression_cycle import (
     VapourCompressionCycle,
 )
+from tests.strategies.heat_pump_cycles import zero_duty_stream_side_cases
 
 pytest.importorskip("CoolProp")
+
+
+class _FakeFluid:
+    def keyed_output(self, _key):
+        return 500.0
+
+
+class _FakeState:
+    def __init__(self, *, h=0.0, s=1.0, p=1.0, T=300.0):
+        self._h = h
+        self._s = s
+        self._p = p
+        self._T = T
+
+    def hmass(self):
+        return self._h
+
+    def smass(self):
+        return self._s
+
+    def p(self):
+        return self._p
+
+    def T(self):
+        return self._T
+
+
+@pytest.mark.parametrize(
+    "is_condenser",
+    [True, False],
+    ids=["condenser", "evaporator"],
+)
+def test_zero_process_duty_skips_roundoff_profile(is_condenser):
+    """A one-ULP property residue must not create a zero-duty process stream."""
+    cycle = VapourCompressionCycle()
+    cycle._solved = True
+    cycle._m_dot = 0.005
+    cycle._Q_heat = 0.0
+    cycle._Q_cool = 0.0
+    enthalpy = 230_289.987
+    temperature = 22.0
+    target_temperature = temperature - 0.01 if is_condenser else temperature + 0.01
+    profile = np.array(
+        [
+            [enthalpy, temperature],
+            [np.nextafter(enthalpy, np.inf), target_temperature],
+        ]
+    )
+    profile_calls = 0
+
+    def _profile_with_roundoff():
+        nonlocal profile_calls
+        profile_calls += 1
+        return profile
+
+    if is_condenser:
+        cycle._build_condenser_profile = _profile_with_roundoff
+    else:
+        cycle._build_evaporator_profile = _profile_with_roundoff
+
+    streams = cycle.build_stream_collection(
+        include_cond=is_condenser,
+        include_evap=not is_condenser,
+    )
+
+    assert len(streams) == 0
+    assert profile_calls == 0
+
+
+@given(zero_duty_stream_side_cases())
+def test_zero_process_duty_omission_invariant(case):
+    """Every process duty within project tolerance omits its derived stream."""
+    cycle = VapourCompressionCycle()
+    cycle._solved = True
+    cycle._m_dot = case.mass_flow
+    cycle._Q_heat = case.duty if case.is_condenser else None
+    cycle._Q_cool = None if case.is_condenser else case.duty
+    profile_calls = 0
+
+    def _generated_profile():
+        nonlocal profile_calls
+        profile_calls += 1
+        return np.asarray(case.profile)
+
+    if case.is_condenser:
+        cycle._build_condenser_profile = _generated_profile
+    else:
+        cycle._build_evaporator_profile = _generated_profile
+
+    streams = cycle.build_stream_collection(
+        include_cond=case.is_condenser,
+        include_evap=not case.is_condenser,
+    )
+
+    assert len(streams) == 0
+    assert profile_calls == 0
 
 
 def _validate_results(
@@ -29,18 +129,34 @@ def _validate_results(
     assert np.isclose(cycle.q_cond - cycle.q_evap - cycle.w_net, 0)
     assert np.isclose(cycle.Q_cond - cycle.Q_evap - cycle.work, 0)
     assert np.isclose(cycle.Q_cond - cycle.Q_heat - cycle.Q_cas_heat, 0)
+    assert len(cond_streams) <= 1
+    assert len(evap_streams) <= 1
+    assert all(stream.has_segments for stream in [*cond_streams, *evap_streams])
     assert np.isclose(sum([s.heat_flow for s in cond_streams]) - cycle.Q_heat, 0)
-    assert np.isclose(
-        min([s.t_target for s in cond_streams]) - (T_cond - dT_subcool), 0, atol=0.02
-    )
-    assert np.isclose(evap_streams[-1].t_target - (T_evap + dT_superheat), 0, atol=0.02)
+    if cond_streams:
+        assert np.isclose(
+            min(
+                segment.t_target
+                for stream in cond_streams
+                for segment in stream.segments
+            )
+            - (T_cond - dT_subcool),
+            0,
+            atol=0.02,
+        )
+    if evap_streams:
+        assert np.isclose(
+            evap_streams[-1].t_target - (T_evap + dT_superheat), 0, atol=0.02
+        )
 
-    if evap_streams[0].type == ST.Cold.value:
+    if evap_streams and evap_streams[0].type == ST.Cold.value:
         assert np.isclose(sum([s.heat_flow for s in evap_streams]) - cycle.Q_cool, 0)
-    else:
+    elif evap_streams:
         assert np.isclose(
             sum([s.heat_flow for s in evap_streams]) - cycle.Q_cool * -1, 0
         )
+    else:
+        assert np.isclose(cycle.Q_cool, 0)
 
     assert cycle.COP_h >= 1 if cycle.q_evap >= 0 else cycle.COP_h < 1
     assert cycle.COP_r >= 0 if cycle.q_evap >= 0 else cycle.COP_r < 0
@@ -74,6 +190,95 @@ def test_heat_pump_cycle_requires_dtcont():
 
     with pytest.raises(TypeError, match="dtcont"):
         cycle.solve(T_evap=-15.0, T_cond=35.0, refrigerant="R134a")
+
+
+def test_heat_pump_cycle_exposes_kelvin_saturation_temperature_properties():
+    cycle = VapourCompressionCycle()
+    cycle.temperature_unit = "K"
+    cycle._T_evap_sat_vap = 280.0
+    cycle._T_cond_sat_liq = 330.0
+
+    assert cycle.T_evap_sat_vap == pytest.approx(280.0)
+    assert cycle.T_cond_sat_liq == pytest.approx(330.0)
+
+
+def test_heat_pump_cycle_rejects_evaporator_pressure_above_condenser(monkeypatch):
+    monkeypatch.setattr(
+        VapourCompressionCycle,
+        "_get_fluid_state",
+        staticmethod(lambda _value: _FakeFluid()),
+    )
+    cycle = VapourCompressionCycle()
+    pressures = iter([2.0, 1.0])
+    monkeypatch.setattr(
+        cycle, "_get_P_sat_from_T", lambda *_args, **_kwargs: next(pressures)
+    )
+
+    with pytest.raises(ValueError, match="Evaporator pressure"):
+        cycle.solve(
+            T_evap=20.0,
+            T_cond=60.0,
+            dtcont=0.0,
+            refrigerant="R134a",
+        )
+
+
+def test_heat_pump_cycle_penalties_precede_condenser_enthalpy_guard(monkeypatch):
+    monkeypatch.setattr(
+        VapourCompressionCycle,
+        "_get_fluid_state",
+        staticmethod(lambda _value: _FakeFluid()),
+    )
+    cycle = VapourCompressionCycle()
+    monkeypatch.setattr(cycle, "_get_P_sat_from_T", lambda *_args, **_kwargs: 1.0)
+
+    quality_states = iter(
+        [
+            _FakeState(T=280.0),
+            _FakeState(h=110.0),
+            _FakeState(T=330.0),
+        ]
+    )
+    temperature_states = iter(
+        [
+            _FakeState(h=100.0, T=285.0),
+            _FakeState(h=150.0, T=380.0),
+            _FakeState(h=120.0, T=340.0),
+            _FakeState(h=90.0, T=320.0),
+        ]
+    )
+
+    monkeypatch.setattr(
+        cycle,
+        "_compute_state_from_pressure_quality",
+        lambda *_args, **_kwargs: next(quality_states),
+    )
+    monkeypatch.setattr(
+        cycle,
+        "_compute_state_from_pressure_temperature",
+        lambda *_args, **_kwargs: next(temperature_states),
+    )
+    monkeypatch.setattr(
+        cycle,
+        "_compute_compressor_outlet_state",
+        lambda **_kwargs: _FakeState(h=100.0, T=360.0),
+    )
+    monkeypatch.setattr(
+        cycle,
+        "_compute_state_from_pressure_enthalpy",
+        lambda **kwargs: _FakeState(h=kwargs["h"], T=310.0),
+    )
+
+    with pytest.raises(ValueError, match="Condenser cannot"):
+        cycle.solve(
+            T_evap=20.0,
+            T_cond=80.0,
+            dtcont=0.0,
+            refrigerant="R134a",
+            dT_ihx_gas_side=100.0,
+        )
+
+    assert len(cycle._penalty) == 2
 
 
 def test_heat_pump_cycle_case_2():
@@ -352,12 +557,14 @@ def test_heat_pump_cycle_with_zeotropic_mixture_generates_gliding_profiles():
     assert np.isclose(sum(s.heat_flow for s in evap_streams), cycle.Q_cool, 0.0)
 
     # Zeotropic blends should preserve glide across the phase-change profiles.
-    assert min(s.t_target for s in cond_streams) < T_cond
-    assert max(s.t_target for s in cond_streams) > T_cond
-    assert min(s.t_supply for s in evap_streams) < T_evap
-    assert max(s.t_target for s in evap_streams) > T_evap
-    assert all(abs(s.t_supply - s.t_target) > 0.05 for s in cond_streams)
-    assert all(abs(s.t_supply - s.t_target) > 0.05 for s in evap_streams)
+    cond_segments = [segment for stream in cond_streams for segment in stream.segments]
+    evap_segments = [segment for stream in evap_streams for segment in stream.segments]
+    assert min(s.t_target for s in cond_segments) < T_cond
+    assert max(s.t_target for s in cond_segments) > T_cond
+    assert min(s.t_supply for s in evap_segments) < T_evap
+    assert max(s.t_target for s in evap_segments) > T_evap
+    assert all(abs(s.t_supply - s.t_target) > 0.05 for s in cond_segments)
+    assert all(abs(s.t_supply - s.t_target) > 0.05 for s in evap_segments)
 
 
 def test_heat_pump_cycle_accepts_binary_mole_fraction_refrigerant_string():
@@ -613,3 +820,96 @@ def test_simple_heat_pump_cop_zero_division_and_misc_helpers(monkeypatch):
     hp._save_cycle_state(state, 0)
 
     assert hp._cycle_states[0]["H"] == pytest.approx(112653.67968857559)
+
+
+def test_simple_heat_pump_celsius_temperature_properties_handle_values_and_none():
+    hp = VapourCompressionCycle()
+    hp.temperature_unit = "C"
+    hp._T_evap = None
+    hp._T_evap_sat_vap = None
+    hp._T_cond = 363.15
+    hp._T_cond_sat_liq = None
+
+    assert hp.T_evap is None
+    assert hp.T_evap_sat_vap is None
+    assert hp.T_cond == pytest.approx(90.0)
+    assert hp.T_cond_sat_liq is None
+
+    hp._T_evap = 283.15
+    hp._T_evap_sat_vap = 282.15
+    hp._T_cond_sat_liq = 360.15
+
+    assert hp.T_evap == pytest.approx(10.0)
+    assert hp.T_evap_sat_vap == pytest.approx(9.0)
+    assert hp.T_cond_sat_liq == pytest.approx(87.0)
+
+
+def test_simple_heat_pump_single_phase_solver_brackets_and_reports_failure():
+    low_hit = _LinearSinglePhaseCycle()._solve_single_phase_state_from_pressure_target(
+        P=1.0,
+        target=10.0,
+        property_name="hmass",
+        T_low=10.0,
+        T_high=20.0,
+    )
+    high_hit = _LinearSinglePhaseCycle()._solve_single_phase_state_from_pressure_target(
+        P=1.0,
+        target=20.0,
+        property_name="hmass",
+        T_low=10.0,
+        T_high=20.0,
+    )
+    expanded_low = (
+        _LinearSinglePhaseCycle()._solve_single_phase_state_from_pressure_target(
+            P=1.0,
+            target=5.0,
+            property_name="hmass",
+            T_low=20.0,
+            T_high=30.0,
+            expand="low",
+        )
+    )
+
+    assert low_hit.T() == pytest.approx(10.0)
+    assert high_hit.T() == pytest.approx(20.0)
+    assert expanded_low.T() == pytest.approx(5.0)
+
+    with pytest.raises(ValueError, match="Could not bracket"):
+        _LinearSinglePhaseCycle(
+            constant_property=1.0
+        )._solve_single_phase_state_from_pressure_target(
+            P=1.0,
+            target=0.0,
+            property_name="hmass",
+            T_low=10.0,
+            T_high=20.0,
+        )
+
+
+class _LinearSinglePhaseState:
+    def __init__(self, constant_property: float | None = None) -> None:
+        self._temperature = 0.0
+        self._constant_property = constant_property
+
+    def update(self, _input_pair, _pressure, temperature):
+        self._temperature = float(temperature)
+
+    def hmass(self):
+        if self._constant_property is not None:
+            return self._constant_property
+        return self._temperature
+
+
+class _LinearSinglePhaseCycle(VapourCompressionCycle):
+    def __init__(self, constant_property: float | None = None) -> None:
+        super().__init__()
+        self._refrigerant = "linear"
+        self._constant_property = constant_property
+
+    def _get_fluid_state(self, value):
+        del value
+        return _LinearSinglePhaseState(self._constant_property)
+
+    def _compute_state_from_pressure_temperature(self, P, T, *, phase=1.0):
+        del P, phase
+        return SimpleNamespace(T=lambda: float(T))

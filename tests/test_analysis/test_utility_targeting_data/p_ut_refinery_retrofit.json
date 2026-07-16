@@ -2828,9 +2828,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-101A-B[O]",
@@ -2854,9 +2852,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-102[O]",
@@ -2880,9 +2876,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-102[O]",
@@ -2906,9 +2900,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-103[O]",
@@ -2932,9 +2924,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-103[O]",
@@ -2958,9 +2948,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-104[O]",
@@ -2984,9 +2972,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-104[O]",
@@ -3010,9 +2996,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-105A-B[O]",
@@ -3036,9 +3020,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-105A-B[O]",
@@ -3062,9 +3044,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-106A-C[O]",
@@ -3088,9 +3068,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-106A-C[O]",
@@ -3114,9 +3092,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-107A-B[O]",
@@ -3140,9 +3116,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-107A-B[O]",
@@ -3166,9 +3140,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-108A-H[O]",
@@ -3192,9 +3164,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-109[O]",
@@ -3218,9 +3188,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-110[O]",
@@ -3244,9 +3212,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-112[O]",
@@ -3270,9 +3236,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-113[O]",
@@ -3296,9 +3260,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-114A-B[O]",
@@ -3322,9 +3284,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-115[O]",
@@ -3348,9 +3308,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-116[O]",
@@ -3374,9 +3332,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-116[O]",
@@ -3400,9 +3356,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-117[O]",
@@ -3426,9 +3380,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-117[O]",
@@ -3452,9 +3404,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-118A-B[O]",
@@ -3478,9 +3428,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-119A-B[O]",
@@ -3504,9 +3452,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-119A-B[O]",
@@ -3530,9 +3476,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-120[O]",
@@ -3556,9 +3500,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-120[O]",
@@ -3582,9 +3524,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-131 (N)[O]",
@@ -3608,9 +3548,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-132A-B[O]",
@@ -3634,9 +3572,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-132A-B[O]",
@@ -3660,9 +3596,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-133(N)[O]",
@@ -3686,9 +3620,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-151A-D[O]",
@@ -3712,9 +3644,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-152A-B[O]",
@@ -3738,9 +3668,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-153[O]",
@@ -3764,9 +3692,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-156A-B[O]",
@@ -3790,9 +3716,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-160[O]",
@@ -3816,9 +3740,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-160[O]",
@@ -3842,9 +3764,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-161[O]",
@@ -3868,9 +3788,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-162A-B[O]",
@@ -3894,9 +3812,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-162A-B[O]",
@@ -3920,9 +3836,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-163[O]",
@@ -3946,9 +3860,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-163[O]",
@@ -3972,9 +3884,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-164A-D[O]",
@@ -3998,9 +3908,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-164A-D[O]",
@@ -4024,9 +3932,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-170 (N)[O]",
@@ -4050,9 +3956,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-171A-B[O]",
@@ -4076,9 +3980,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-172 (N)[O]",
@@ -4102,9 +4004,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-181 [O]",
@@ -4128,9 +4028,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-181 [O]",
@@ -4154,9 +4052,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-1829\\C\\D[O]",
@@ -4180,9 +4076,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-182A[O]",
@@ -4206,9 +4100,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-183[O]",
@@ -4232,9 +4124,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-184[O]",
@@ -4258,9 +4148,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-184[O]",
@@ -4284,9 +4172,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-185[O]",
@@ -4310,9 +4196,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-186[O]",
@@ -4336,9 +4220,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TE-187(N)[O]",
@@ -4362,9 +4244,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TH-101[O]",
@@ -4388,9 +4268,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TH-102 (N)[O]",
@@ -4414,9 +4292,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TH-151[O]",
@@ -4440,9 +4316,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Refinery[Z]/TH-152 (N)[O]",
@@ -4466,9 +4340,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         }
     ],
     "utilities": [

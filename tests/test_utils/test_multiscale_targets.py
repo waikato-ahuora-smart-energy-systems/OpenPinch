@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 
 from OpenPinch import *
-from OpenPinch.classes._problem import _result_extraction as re
-from OpenPinch.classes._problem import _target_dispatch as td
+from OpenPinch.classes._pinch_problem.output import result_extraction as re
+from OpenPinch.classes._pinch_problem.targeting import dispatch as td
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.classes.zone import Zone

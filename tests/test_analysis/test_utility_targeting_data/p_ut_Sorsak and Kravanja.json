@@ -123,9 +123,7 @@
             "htc": {
                 "value": 0.06,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Plant",
@@ -149,9 +147,7 @@
             "htc": {
                 "value": 0.06,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Plant",
@@ -175,9 +171,7 @@
             "htc": {
                 "value": 0.06,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Plant",
@@ -201,9 +195,7 @@
             "htc": {
                 "value": 0.06,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Plant",
@@ -227,9 +219,7 @@
             "htc": {
                 "value": 0.06,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Plant",
@@ -253,9 +243,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Plant",
@@ -279,9 +267,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Plant",
@@ -305,9 +291,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Plant",
@@ -331,9 +315,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Plant",
@@ -357,9 +339,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Plant",
@@ -383,9 +363,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Plant",
@@ -409,9 +387,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Plant",
@@ -435,9 +411,7 @@
             "htc": {
                 "value": 0.06,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Plant",
@@ -461,9 +435,7 @@
             "htc": {
                 "value": 0.06,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Plant",
@@ -487,9 +459,7 @@
             "htc": {
                 "value": 1.2,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Plant",
@@ -513,9 +483,7 @@
             "htc": {
                 "value": 2,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Plant",
@@ -539,9 +507,7 @@
             "htc": {
                 "value": 1.2,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Plant",
@@ -565,9 +531,7 @@
             "htc": {
                 "value": 1.2,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Plant",
@@ -591,9 +555,7 @@
             "htc": {
                 "value": 2,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Plant",
@@ -617,9 +579,7 @@
             "htc": {
                 "value": 0.06,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         }
     ],
     "utilities": [

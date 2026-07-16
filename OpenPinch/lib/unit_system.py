@@ -205,37 +205,39 @@ def _has_explicit_unit(value: Any) -> bool:
     return unit is not None and unit not in _DIMENSIONLESS_UNIT_TOKENS
 
 
-def _value_like_payload(value: Any) -> Any:
+def _value_like_data(value: Any) -> Any:
     if hasattr(value, "model_dump") and not isinstance(value, Mapping):
         return value.model_dump(mode="python")
     return value
 
 
 def _value_magnitudes(value: Any) -> Any:
-    payload = _value_like_payload(value)
-    if isinstance(payload, Value):
-        return payload.state_values if payload.num_states > 1 else payload.value
-    if isinstance(payload, Mapping):
-        if "values" in payload:
-            return payload.get("values")
-        if "value" in payload:
-            return payload.get("value")
-    if hasattr(payload, "values"):
-        return getattr(payload, "values")
-    if hasattr(payload, "value"):
-        return getattr(payload, "value")
-    return payload
+    value_data = _value_like_data(value)
+    if isinstance(value_data, Value):
+        return (
+            value_data.period_values if value_data.num_periods > 1 else value_data.value
+        )
+    if isinstance(value_data, Mapping):
+        if "values" in value_data:
+            return value_data.get("values")
+        if "value" in value_data:
+            return value_data.get("value")
+    if hasattr(value_data, "values"):
+        return getattr(value_data, "values")
+    if hasattr(value_data, "value"):
+        return getattr(value_data, "value")
+    return value_data
 
 
 def _ensure_value(value: Any, *, user_unit: str | None) -> Value:
-    payload = _value_like_payload(value)
-    if isinstance(payload, Value):
-        if _has_explicit_unit(payload):
-            return Value(payload)
-        return Value(payload.to_dict(), unit=user_unit)
-    if _has_explicit_unit(payload):
-        return Value(payload)
-    return Value(payload, unit=user_unit)
+    value_data = _value_like_data(value)
+    if isinstance(value_data, Value):
+        if _has_explicit_unit(value_data):
+            return Value(value_data)
+        return Value(_value_magnitudes(value_data), unit=user_unit)
+    if _has_explicit_unit(value_data):
+        return Value(value_data)
+    return Value(value_data, unit=user_unit)
 
 
 def standardise_input_value(

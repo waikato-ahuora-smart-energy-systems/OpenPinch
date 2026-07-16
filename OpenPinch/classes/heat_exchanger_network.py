@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import math
-from typing import Any
+from typing import Any, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ..lib.enums import HeatExchangerNetworkLabel
 from .heat_exchanger import HeatExchanger, HeatExchangerKind
@@ -31,7 +31,7 @@ class HeatExchangerNetwork(BaseModel):
     exchangers: tuple[HeatExchanger, ...] = Field(default_factory=tuple)
     run_id: str | None = None
     task_id: str | None = None
-    state_id: str | None = None
+    period_id: str | None = None
     method: str | None = None
     stage_count: int | None = None
     objective_value: float | None = None
@@ -52,7 +52,7 @@ class HeatExchangerNetwork(BaseModel):
         repr=False,
     )
 
-    @field_validator("run_id", "task_id", "state_id", "method")
+    @field_validator("run_id", "task_id", "period_id", "method")
     @classmethod
     def _validate_optional_identity(cls, value: str | None) -> str | None:
         if value is None:
@@ -98,9 +98,21 @@ class HeatExchangerNetwork(BaseModel):
                 raise ValueError("summary metric values must be finite")
         return value
 
+    @model_validator(mode="after")
+    def _validate_period_state_alignment(self) -> Self:
+        if not self.exchangers:
+            return self
+        ordered = self.exchangers[0].period_ids
+        if any(exchanger.period_ids != ordered for exchanger in self.exchangers[1:]):
+            raise ValueError(
+                "all exchangers in a network must use the same ordered period_ids"
+            )
+        return self
+
     def build_grid_diagram(
         self,
         *,
+        period_id: str | None = None,
         stream_line_width: float = 5.0,
         temperature_scaled: bool = False,
     ) -> Any:
@@ -109,30 +121,66 @@ class HeatExchangerNetwork(BaseModel):
 
         return build_grid_diagram(
             self,
+            period_id=self.resolve_period_id(period_id),
             stream_line_width=stream_line_width,
             temperature_scaled=temperature_scaled,
         )
 
-    def quantify_controllability(self, **kwargs: Any) -> Any:
+    def quantify_controllability(
+        self,
+        *,
+        period_id: str | None = None,
+        **kwargs: Any,
+    ) -> Any:
         """Return steady-state controllability metrics for this network."""
         from ..services.heat_exchanger_network_controllability import (
             quantify_heat_exchanger_network_controllability,
         )
 
-        return quantify_heat_exchanger_network_controllability(self, **kwargs)
+        return quantify_heat_exchanger_network_controllability(
+            self,
+            period_id=self.resolve_period_id(period_id),
+            **kwargs,
+        )
+
+    @property
+    def period_ids(self) -> tuple[str, ...]:
+        """Return ordered period identities represented by exchanger states."""
+
+        if not self.exchangers:
+            return (self.period_id,) if self.period_id is not None else ()
+        return self.exchangers[0].period_ids
+
+    def resolve_period_id(self, period_id: str | None = None) -> str | None:
+        """Resolve an optional period identity without ambiguous multiperiod access."""
+
+        period_ids = self.period_ids
+        if period_id is not None:
+            if period_ids and period_id not in period_ids:
+                raise ValueError(
+                    f"unknown period_id {period_id!r}; expected one of {period_ids!r}"
+                )
+            return period_id
+        if len(period_ids) > 1:
+            raise ValueError(
+                "period_id is required when a network has multiple period states"
+            )
+        return period_ids[0] if period_ids else None
 
     def exchangers_involving_stream(
         self,
         stream_id: str,
         *,
         active_only: bool = False,
+        period_id: str | None = None,
     ) -> tuple[HeatExchanger, ...]:
         """Return all exchangers that use ``stream_id`` as source or sink."""
+        resolved_period_id = self.resolve_period_id(period_id) if active_only else None
         return tuple(
             exchanger
             for exchanger in self.exchangers
             if exchanger.involves_stream(stream_id)
-            and (exchanger.active or not active_only)
+            and (exchanger.state(resolved_period_id).active if active_only else True)
         )
 
     def exchanger_between(
@@ -168,6 +216,7 @@ class HeatExchangerNetwork(BaseModel):
         stream: str | None = None,
         stage: int | None = None,
         active_only: bool = True,
+        period_id: str | None = None,
     ) -> float:
         """Return duty total filtered by kind, stream identity, and stage."""
         return self._sum_numeric(
@@ -176,6 +225,7 @@ class HeatExchangerNetwork(BaseModel):
             stream=stream,
             stage=stage,
             active_only=active_only,
+            period_id=period_id,
         )
 
     def total_area(
@@ -185,6 +235,7 @@ class HeatExchangerNetwork(BaseModel):
         stream: str | None = None,
         stage: int | None = None,
         active_only: bool = True,
+        period_id: str | None = None,
     ) -> float:
         """Return area total filtered by kind, stream identity, and stage."""
         return self._sum_numeric(
@@ -193,6 +244,7 @@ class HeatExchangerNetwork(BaseModel):
             stream=stream,
             stage=stage,
             active_only=active_only,
+            period_id=period_id,
         )
 
     def total(
@@ -203,6 +255,7 @@ class HeatExchangerNetwork(BaseModel):
         stream: str | None = None,
         stage: int | None = None,
         active_only: bool = True,
+        period_id: str | None = None,
     ) -> float:
         """Return a numeric total for a supported heat exchanger network label."""
         normalised_label = HeatExchangerNetworkLabel(label)
@@ -213,6 +266,7 @@ class HeatExchangerNetwork(BaseModel):
                 stream=stream,
                 stage=stage,
                 active_only=active_only,
+                period_id=period_id,
             )
         if normalised_label in _AREA_LABEL_KINDS:
             label_kind = _AREA_LABEL_KINDS[normalised_label]
@@ -221,6 +275,7 @@ class HeatExchangerNetwork(BaseModel):
                 stream=stream,
                 stage=stage,
                 active_only=active_only,
+                period_id=period_id,
             )
         raise ValueError(f"{normalised_label.value!r} is not a numeric total label")
 
@@ -232,6 +287,7 @@ class HeatExchangerNetwork(BaseModel):
         sink_stream: str,
         stage: int | None = None,
         kind: HeatExchangerKind | str | None = None,
+        period_id: str | None = None,
     ) -> float | bool | None:
         """Return a labelled value from one source/sink/stage exchanger link."""
         normalised_label = HeatExchangerNetworkLabel(label)
@@ -258,7 +314,7 @@ class HeatExchangerNetwork(BaseModel):
             return None
 
         if normalised_label in _DUTY_LABEL_KINDS:
-            return exchanger.duty
+            return exchanger.state(self.resolve_period_id(period_id)).duty
         if normalised_label in _AREA_LABEL_KINDS:
             return exchanger.area
         if (
@@ -266,18 +322,24 @@ class HeatExchangerNetwork(BaseModel):
             is HeatExchangerNetworkLabel.HOT_RECOVERY_OUTLET_TEMPERATURE
         ):
             _require_recovery_label(exchanger, normalised_label)
-            return exchanger.source_outlet_temperature
+            return exchanger.state(
+                self.resolve_period_id(period_id)
+            ).source_outlet_temperature
         if (
             normalised_label
             is HeatExchangerNetworkLabel.COLD_RECOVERY_OUTLET_TEMPERATURE
         ):
             _require_recovery_label(exchanger, normalised_label)
-            return exchanger.sink_outlet_temperature
+            return exchanger.state(
+                self.resolve_period_id(period_id)
+            ).sink_outlet_temperature
         if normalised_label is HeatExchangerNetworkLabel.MATCH_ACTIVE:
-            return exchanger.active
+            return exchanger.state(self.resolve_period_id(period_id)).active
         if normalised_label is HeatExchangerNetworkLabel.MATCH_ALLOWED:
             return exchanger.match_allowed
-        raise ValueError(f"unsupported heat exchanger network label: {label!r}")
+        raise ValueError(  # pragma: no cover - all current enum labels are handled.
+            f"unsupported heat exchanger network label: {label!r}"
+        )
 
     def _sum_numeric(
         self,
@@ -287,11 +349,14 @@ class HeatExchangerNetwork(BaseModel):
         stream: str | None,
         stage: int | None,
         active_only: bool,
+        period_id: str | None,
     ) -> float:
         expected_kind = _coerce_kind(kind)
+        resolved_period_id = self.resolve_period_id(period_id)
         total = 0.0
         for exchanger in self.exchangers:
-            if active_only and not exchanger.active:
+            state = exchanger.state(resolved_period_id)
+            if active_only and not state.active:
                 continue
             if expected_kind is not None and exchanger.kind is not expected_kind:
                 continue
@@ -299,7 +364,7 @@ class HeatExchangerNetwork(BaseModel):
                 continue
             if stage is not None and exchanger.stage != stage:
                 continue
-            value = getattr(exchanger, attribute)
+            value = state.duty if attribute == "duty" else getattr(exchanger, attribute)
             if value is not None:
                 total += float(value)
         return total

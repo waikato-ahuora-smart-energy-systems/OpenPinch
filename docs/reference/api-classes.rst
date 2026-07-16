@@ -19,7 +19,7 @@ How These Objects Fit Together
   temperature-interval cascade that drives pinch and utility calculations.
 - :class:`~OpenPinch.lib.schemas.targets.BaseTargetModel` stores one solved set
   of metrics for a zone and is later serialised into the public output schema.
-- :class:`~OpenPinch.classes.value.Value` wraps scalar and discrete-state
+- :class:`~OpenPinch.classes.value.Value` wraps scalar and discrete-period
   quantities with units for report-friendly serialisation.
 
 .. automodule:: OpenPinch.classes
@@ -97,9 +97,9 @@ Units and Scalar Helpers
 ------------------------
 
 :class:`~OpenPinch.classes.value.Value` supports both ordinary scalar
-quantities and discrete-state values with ``state_ids`` and normalised
+quantities and discrete-period values with ``period_ids`` and normalised
 ``weights``. This makes it suitable for both deterministic reports and
-state-weighted scenario data.
+period-weighted scenario data.
 
 .. automodule:: OpenPinch.classes.value
    :members:
@@ -109,7 +109,7 @@ Process Component Models
 
 Process components are live model mutations attached after preparation and
 before rerunning targets. The direct process MVR component owns the original
-stream records, replacement streams, per-state stage results, and
+stream records, replacement streams, per-period stage results, and
 activation/deactivation state used by workspace comparison studies.
 
 .. automodule:: OpenPinch.services.components.process_components

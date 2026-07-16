@@ -3,7 +3,7 @@ PinchProblem
 
 :class:`OpenPinch.classes.pinch_problem.PinchProblem` is the primary
 single-case interface in the package. It owns the source inputs, validated
-problem data, prepared zone tree, solved targets, graph exports, stateful
+problem data, prepared zone tree, solved targets, graph exports, multiperiod
 reruns, and several advanced post-processing helpers.
 
 When To Use It
@@ -15,11 +15,11 @@ Use ``PinchProblem`` when you want:
   inputs
 - one object that keeps both the original case and the solved result state
 - compact and detailed summary tables
-- graph building and graph export without manually wiring result payloads
+- graph building and graph export without manually wiring result data
 - notebook-friendly advanced workflows such as HPR screening or
   ``dt_cont`` sensitivity studies
-- selected-state reruns through ``state_id`` and batch reruns through
-  ``target_all_states()``
+- selected-period reruns through ``period_id`` and batch reruns through
+  ``target_all_periods()``
 
 Use :doc:`pinchworkspace` instead when the study itself needs to keep multiple
 named cases and compare them over time.
@@ -46,7 +46,7 @@ The typical lifecycle is:
 2. call :meth:`load` or pass the source at construction time
 3. call :meth:`validate` if you want a preflight check
 4. call :meth:`target`
-5. inspect summaries, graphs, exports, state-specific reruns, or the prepared
+5. inspect summaries, graphs, exports, period-specific reruns, or the prepared
    ``master_zone``
 
 When the source is a bare ``*.json`` filename and no local file exists,
@@ -58,21 +58,21 @@ Core Workflow Members
 
 The main user-facing workflow members are ``load()``, ``validate()``,
 ``target()``, ``summary_frame()``, ``export_excel()``, ``compare_to()``,
-``set_dt_cont_multiplier()``, ``update_options()``, ``target_all_states()``,
+``set_dt_cont_multiplier()``, ``update_options()``, ``target_all_periods()``,
 and ``show_dashboard()``.
 
-Stateful Workflows
+Period Workflows
 ------------------
 
-When the prepared data contains multiple states, the main stateful surfaces are:
+When the prepared data contains multiple periods, the main period surfaces are:
 
-- ``state_ids`` for the canonical ``state_id -> idx`` mapping
-- named ``problem.target.*(..., state_id="peak")`` reruns
-- ``target_all_states(parallel=False | True | "thread" | "process")`` for
-  batch solves across every canonical state
+- ``period_ids`` for the canonical ``period_id -> idx`` mapping
+- named ``problem.target.*(..., period_id="peak")`` reruns
+- ``target_all_periods(parallel=False | True | "thread" | "process")`` for
+  batch solves across every canonical period
 
-State selection happens at targeting time, not at load time. The cached result,
-summary frame, export surface, and graph payload then reflect the selected
+Period selection happens at targeting time, not at load time. The cached result,
+summary frame, export surface, and graph data then reflect the selected
 state.
 
 Advanced Entry Points
@@ -89,8 +89,8 @@ Two descriptor families make ``PinchProblem`` broader than a simple wrapper:
    Re-runs targeted advanced routines such as direct and indirect heat pump,
    refrigeration, exergy enrichment, cogeneration, or area/cost targeting
    against the prepared zone hierarchy. Named target workflows also accept
-   ``state_id=...`` when input data carries stateful values, and the
-   refreshed summary/export surfaces then expose that selected state on the
+   ``period_id=...`` when input data carries multiperiod values, and the
+   refreshed summary/export surfaces then expose that selected period on the
    result rows.
 
 Named target methods also accept ``zone_name=...`` and
@@ -118,7 +118,7 @@ After solving, the main read and export surfaces are:
 
 - ``summary_frame()`` for compact or detailed pandas views
 - ``problem.plot.catalog()`` for the available graph inventory
-- ``problem.plot.*`` for Plotly figures and raw graph payloads
+- ``problem.plot.*`` for Plotly figures and raw graph data
 - ``problem.plot.export(...)`` for standalone HTML graph files
 - ``export_excel(...)`` for workbook output
 - ``show_dashboard()`` for the Streamlit-based review surface

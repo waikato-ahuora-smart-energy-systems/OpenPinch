@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 import warnings
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
@@ -19,7 +18,7 @@ from ..lib.schemas.targets import BaseTargetModel
 from ..lib.schemas.workspace import ValidationReport
 from ..resources import list_sample_cases, read_sample_case
 from ..services import data_preprocessing_service
-from ..services.common.miscellaneous import get_state_index
+from ..services.common.miscellaneous import get_period_index
 from ..services.input_data_processing._canonicalization import canonical_problem_inputs
 from ..streamlit_webviewer.web_graphing import (
     render_streamlit_dashboard as _render_streamlit_dashboard,
@@ -30,32 +29,46 @@ from ..utils.export import (
     export_target_summary_to_excel_with_units,
 )
 from ..utils.wkbook_to_json import get_problem_from_excel
-from ._problem import (
+from ._pinch_problem.accessors.component import _ComponentAccessorDescriptor
+from ._pinch_problem.accessors.design import _DesignAccessorDescriptor
+from ._pinch_problem.accessors.plot import _PlotAccessorDescriptor
+from ._pinch_problem.accessors.target import _TargetAccessorDescriptor
+from ._pinch_problem.input.loading import (
     JsonDict,
     PathLike,
-    _ComponentAccessorDescriptor,
-    _DesignAccessorDescriptor,
     _LoadedProblemSource,
-    _PlotAccessorDescriptor,
     _ProblemSourceAdapters,
-    _TargetAccessorDescriptor,
-    _validate_problem_semantics,
-    build_graph_payload,
+    load_problem_source,
+    prepare_in_memory_problem_source,
+)
+from ._pinch_problem.input.validation import (
+    build_validation_report,
+)
+from ._pinch_problem.input.validation import (
+    format_schema_validation_error as _format_schema_validation_error,
+)
+from ._pinch_problem.input.validation import (
+    validate_problem_semantics as _validate_problem_semantics,
+)
+from ._pinch_problem.output.reporting import (
+    build_graph_data,
     build_problem_report,
     build_problem_summary_frame,
     build_report_metrics,
-    build_validation_report,
-    extract_results,
-    load_problem_source,
-    prepare_in_memory_problem_source,
-    run_targeting_for_zone_and_subzones,
 )
-from ._problem import (
-    format_schema_validation_error as _format_schema_validation_error,
-)
-from ._problem import (
+from ._pinch_problem.output.reporting import (
     locate_summary_row as _locate_summary_row,
 )
+from ._pinch_problem.output.result_extraction import extract_results
+from ._pinch_problem.periods.aggregation import (
+    SUMMARY_PERIOD_MODES,
+    output_for_period_mode,
+)
+from ._pinch_problem.periods.execution import solve_periods_parallel
+from ._pinch_problem.targeting import execution as _target_execution
+from ._pinch_problem.targeting.dispatch import run_targeting_for_zone_and_subzones
+from ._pinch_problem.targeting.execution import _TargetRunSpec
+from ._stream.value_state import resolve_period_weights
 from .stream_collection import StreamCollection
 from .value import Value
 from .zone import Zone
@@ -76,6 +89,8 @@ class PinchProblem:
     _process_components: dict[str, Any]
     _input_source_kind: str
     _validation_context: Optional[dict[str, list[dict[str, Any]]]]
+    _last_target_run_spec: Optional[_TargetRunSpec]
+    _suspend_target_run_recording: bool
     add_component = _ComponentAccessorDescriptor()
     design = _DesignAccessorDescriptor()
     plot = _PlotAccessorDescriptor()
@@ -98,6 +113,8 @@ class PinchProblem:
         self._validated_data = None
         self._master_zone = None
         self._process_components = {}
+        self._last_target_run_spec = None
+        self._suspend_target_run_recording = False
         self.results_dir = None
 
         if source is not None:
@@ -131,22 +148,16 @@ class PinchProblem:
         options: Optional[dict[str, Any]] = None,
         sid: str = None,
     ) -> TargetOutput:
-        """Run the targeting analysis against the loaded input and cache the result."""
-        if not isinstance(zone, Zone):
-            zone = self._build_execution_master_zone()
-        runtime_options, sid = self._resolve_runtime_state_options(
-            options,
-            zone=zone,
-        )
-        run_targeting_for_zone_and_subzones(
+        return _target_execution.run_problem_targeting(
+            self,
             zone=zone,
             direct_service_func=direct_service_func,
             indirect_service_func=indirect_service_func,
-            args=runtime_options,
+            options=options,
+            sid=sid,
+            dispatch_func=run_targeting_for_zone_and_subzones,
+            extract_func=extract_results,
         )
-        self._attach_process_component_work_targets(zone, runtime_options)
-        self._results = TargetOutput.model_validate(extract_results(zone, state_id=sid))
-        return self._results
 
     def _execute_targeting(
         self,
@@ -159,42 +170,17 @@ class PinchProblem:
         indirect_service_func: Optional[ZoneService] = None,
         sid: str = None,
     ) -> BaseTargetModel:
-        execution_master_zone = self._build_execution_master_zone()
-        runtime_options, sid = self._resolve_runtime_state_options(
-            options,
-            zone=execution_master_zone,
+        return _target_execution.execute_targeting(
+            self,
+            target_id=target_id,
+            application_zone=application_zone,
+            options=options,
+            include_subzones=include_subzones,
+            direct_service_func=direct_service_func,
+            indirect_service_func=indirect_service_func,
+            sid=sid,
+            extract_func=extract_results,
         )
-        zone = self._resolve_target_zone(
-            application_zone, master_zone=execution_master_zone
-        )
-        if include_subzones:
-            self._run_targeting_for_zone_and_subzones(
-                zone=zone,
-                direct_service_func=direct_service_func,
-                indirect_service_func=indirect_service_func,
-                options=runtime_options,
-                sid=sid,
-            )
-        else:
-            if direct_service_func is not None:
-                direct_service_func(zone, runtime_options)
-            if indirect_service_func is not None:
-                indirect_service_func(zone, runtime_options)
-            self._attach_process_component_work_targets(
-                execution_master_zone,
-                runtime_options,
-            )
-            self._results = TargetOutput.model_validate(
-                extract_results(execution_master_zone, state_id=sid)
-            )
-
-        try:
-            return zone.targets[target_id]
-        except KeyError as exc:
-            raise RuntimeError(
-                f"Targeting did not produce target {target_id!r} "
-                f"for zone {zone.name!r}."
-            ) from exc
 
     def _execute_cogeneration_targeting(
         self,
@@ -205,47 +191,15 @@ class PinchProblem:
         service_func: Optional[ZoneService] = None,
         sid: str = None,
     ) -> BaseTargetModel:
-        """Run cogeneration targeting and return the family selected at runtime."""
-        execution_master_zone = self._build_execution_master_zone()
-        runtime_options, sid = self._resolve_runtime_state_options(
-            options,
-            zone=execution_master_zone,
+        return _target_execution.execute_cogeneration_targeting(
+            self,
+            application_zone=application_zone,
+            options=options,
+            include_subzones=include_subzones,
+            service_func=service_func,
+            sid=sid,
+            extract_func=extract_results,
         )
-        zone = self._resolve_target_zone(
-            application_zone, master_zone=execution_master_zone
-        )
-        if include_subzones:
-            self._run_targeting_for_zone_and_subzones(
-                zone=zone,
-                direct_service_func=service_func,
-                options=runtime_options,
-                sid=sid,
-            )
-        else:
-            if service_func is not None:
-                service_func(zone, runtime_options)
-            self._attach_process_component_work_targets(
-                execution_master_zone,
-                runtime_options,
-            )
-            self._results = TargetOutput.model_validate(
-                extract_results(execution_master_zone, state_id=sid)
-            )
-
-        selected_target_type = getattr(zone, "_selected_cogeneration_target_type", None)
-        if not isinstance(selected_target_type, str):
-            raise RuntimeError(
-                "Cogeneration did not select a compatible target "
-                f"for zone {zone.name!r}."
-            )
-        try:
-            return zone.targets[selected_target_type]
-        except KeyError as exc:
-            raise RuntimeError(
-                "Cogeneration selected target "
-                f"{selected_target_type!r} for zone {zone.name!r}, "
-                "but that target was not available on the zone."
-            ) from exc
 
     def _run_exergy_targeting_for_zone_and_subzones(
         self,
@@ -254,17 +208,11 @@ class PinchProblem:
         service_func: Optional[ZoneService],
         options: Optional[dict[str, Any]],
     ) -> None:
-        """Run exergy targeting in post-order so site targets see solved children."""
-        child_options = dict(options or {})
-        child_options.pop("base_target_type", None)
-        for subzone in zone.subzones.values():
-            self._run_exergy_targeting_for_zone_and_subzones(
-                zone=subzone,
-                service_func=service_func,
-                options=child_options,
-            )
-        if service_func is not None:
-            service_func(zone, options)
+        _target_execution.run_exergy_targeting_for_zone_and_subzones(
+            zone=zone,
+            service_func=service_func,
+            options=options,
+        )
 
     def _execute_exergy_targeting(
         self,
@@ -275,48 +223,15 @@ class PinchProblem:
         service_func: Optional[ZoneService] = None,
         sid: str = None,
     ) -> BaseTargetModel:
-        """Apply exergy targeting and return the compatible target family selected."""
-        execution_master_zone = self._build_execution_master_zone()
-        runtime_options, sid = self._resolve_runtime_state_options(
-            options,
-            zone=execution_master_zone,
+        return _target_execution.execute_exergy_targeting(
+            self,
+            application_zone=application_zone,
+            options=options,
+            include_subzones=include_subzones,
+            service_func=service_func,
+            sid=sid,
+            extract_func=extract_results,
         )
-        zone = self._resolve_target_zone(
-            application_zone, master_zone=execution_master_zone
-        )
-
-        if include_subzones:
-            self._run_exergy_targeting_for_zone_and_subzones(
-                zone=zone,
-                service_func=service_func,
-                options=runtime_options,
-            )
-        elif service_func is not None:
-            service_func(zone, runtime_options)
-
-        self._attach_process_component_work_targets(
-            execution_master_zone,
-            runtime_options,
-        )
-        self._results = TargetOutput.model_validate(
-            extract_results(execution_master_zone, state_id=sid)
-        )
-
-        selected_target_type = getattr(zone, "_selected_exergy_target_type", None)
-        if not isinstance(selected_target_type, str):
-            raise RuntimeError(
-                "Exergy targeting did not select a compatible target "
-                f"for zone {zone.name!r}."
-            )
-
-        try:
-            return zone.targets[selected_target_type]
-        except KeyError as exc:
-            raise RuntimeError(
-                "Exergy targeting selected target "
-                f"{selected_target_type!r} for zone {zone.name!r}, "
-                "but that target was not available on the zone."
-            ) from exc
 
     def _resolve_target_zone(
         self,
@@ -340,13 +255,13 @@ class PinchProblem:
     ) -> None:
         if not self._process_components:
             return
-        state_id = (runtime_options or {}).get("state_id")
-        state_idx = (runtime_options or {}).get("idx")
+        period_id = (runtime_options or {}).get("period_id")
+        period_idx = (runtime_options or {}).get("period_idx")
         for current_zone in self._walk_zone_tree(zone):
             component_work = self._process_component_work_for_zone(
                 current_zone,
-                state_id=state_id,
-                state_idx=state_idx,
+                period_id=period_id,
+                period_idx=period_idx,
             )
             for target in current_zone.targets.values():
                 if hasattr(target, "process_component_work_target"):
@@ -362,15 +277,17 @@ class PinchProblem:
         self,
         zone: "Zone",
         *,
-        state_id: str | None,
-        state_idx: int | None,
+        period_id: str | None,
+        period_idx: int | None,
     ) -> float:
         total = 0.0
         for component in self._process_components.values():
             work_for_zone = getattr(component, "work_for_zone", None)
             if work_for_zone is None:
                 continue
-            total += float(work_for_zone(zone, state_id=state_id, state_idx=state_idx))
+            total += float(
+                work_for_zone(zone, period_id=period_id, period_idx=period_idx)
+            )
         return total
 
     def _walk_zone_tree(self, zone: "Zone"):
@@ -386,19 +303,19 @@ class PinchProblem:
         return self._master_zone
 
     @property
-    def state_ids(self) -> dict[str, int]:
-        """Return the canonical ``state_id -> idx`` lookup for the loaded problem."""
+    def period_ids(self) -> dict[str, int]:
+        """Return the canonical ``period_id -> idx`` lookup for the loaded problem."""
         master_zone = self._require_prepared_root_zone()
-        return master_zone.state_ids
+        return master_zone.period_ids
 
-    def target_all_states(
+    def target_all_periods(
         self,
         *,
         parallel: bool | str = False,
         max_workers: int | None = None,
         preserve_cached_results: bool = True,
     ) -> dict[str, TargetOutput]:
-        """Run default targeting once per canonical state id.
+        """Run default targeting once per canonical period id.
 
         Parameters
         ----------
@@ -411,104 +328,215 @@ class PinchProblem:
         preserve_cached_results:
             Restore the original ``results`` cache after the batch run when ``True``.
         """
-        state_ids = list(self.state_ids.keys())
-        if not state_ids:
-            raise ValueError("This problem has no canonical state_ids to target.")
+        period_ids = list(self.period_ids.keys())
+        if not period_ids:
+            raise ValueError("This problem has no canonical period_ids to target.")
 
         previous_results = self._results
+        previous_recording_state = self._suspend_target_run_recording
         try:
+            self._suspend_target_run_recording = True
             if parallel in (False, None):
-                results_by_requested_state = {
-                    state_id: self._solve_target_for_state(state_id)
-                    for state_id in state_ids
+                results_by_requested_period = {
+                    period_id: self._solve_target_for_period(period_id)
+                    for period_id in period_ids
                 }
-                return self._order_state_results(
-                    state_ids=state_ids,
-                    results_by_requested_state=results_by_requested_state,
+                return self._order_period_results(
+                    period_ids=period_ids,
+                    results_by_requested_period=results_by_requested_period,
                 )
-            return self._target_all_states_parallel(
-                state_ids=state_ids,
+            return self._target_all_periods_parallel(
+                period_ids=period_ids,
                 backend="thread" if parallel == "thread" else "process",
                 max_workers=max_workers,
             )
         finally:
+            self._suspend_target_run_recording = previous_recording_state
             if preserve_cached_results:
                 self._results = previous_results
 
-    def _solve_target_for_state(self, state_id: str) -> TargetOutput:
-        result = self.target(state_id=state_id)
+    def _solve_target_for_period(self, period_id: str) -> TargetOutput:
+        result = self.target(period_id=period_id)
         return TargetOutput.model_validate(result.model_dump(mode="python"))
 
-    def _resolve_runtime_state_options(
+    def _record_target_run(
+        self,
+        surface: str,
+        *,
+        options: Optional[dict[str, Any]] = None,
+        zone_name: Optional[str] = None,
+        include_subzones: bool = False,
+    ) -> None:
+        """Remember the public target accessor that produced the current result."""
+        if self._suspend_target_run_recording:
+            return
+        self._last_target_run_spec = _TargetRunSpec(
+            surface=surface,
+            options=deepcopy(dict(options or {})),
+            zone_name=zone_name,
+            include_subzones=bool(include_subzones),
+        )
+
+    def _target_run_spec_for_summary(self) -> _TargetRunSpec:
+        return self._last_target_run_spec or _TargetRunSpec(
+            surface="default",
+            options={},
+        )
+
+    def _period_options_for_replay(
+        self,
+        spec: _TargetRunSpec,
+        *,
+        period_id: str,
+    ) -> dict[str, Any]:
+        runtime_options = deepcopy(dict(spec.options or {}))
+        runtime_options.pop("period_id", None)
+        runtime_options.pop("period_idx", None)
+        runtime_options["period_id"] = period_id
+        return runtime_options
+
+    def _target_outputs_for_recorded_periods(self) -> list[TargetOutput]:
+        period_ids = list(self.period_ids.keys())
+        if not period_ids:
+            raise ValueError("This problem has no canonical period_ids to target.")
+
+        spec = self._target_run_spec_for_summary()
+        original_master_zone = self._require_prepared_root_zone()
+        previous_results = self._results
+        previous_recording_state = self._suspend_target_run_recording
+        previous_spec = self._last_target_run_spec
+        outputs: list[TargetOutput] = []
+        try:
+            self._suspend_target_run_recording = True
+            baseline_zone = deepcopy(original_master_zone)
+            for period_id in period_ids:
+                self._master_zone = deepcopy(baseline_zone)
+                outputs.append(self._target_output_for_recorded_period(spec, period_id))
+        finally:
+            self._master_zone = original_master_zone
+            self._suspend_target_run_recording = previous_recording_state
+            self._last_target_run_spec = previous_spec
+            self._results = previous_results
+        return outputs
+
+    def _target_output_for_recorded_period(
+        self,
+        spec: _TargetRunSpec,
+        period_id: str,
+    ) -> TargetOutput:
+        runtime_options = self._period_options_for_replay(spec, period_id=period_id)
+        if spec.surface == "default":
+            result = self.target(options=runtime_options)
+            return TargetOutput.model_validate(result.model_dump(mode="python"))
+
+        target_accessor = self.target
+        target_method = getattr(target_accessor, spec.surface)
+        target_method(
+            zone_name=spec.zone_name,
+            options=runtime_options,
+            include_subzones=spec.include_subzones,
+        )
+        if self._results is None:
+            raise RuntimeError(
+                f"Target accessor {spec.surface!r} did not produce report results."
+            )
+        return TargetOutput.model_validate(self._results.model_dump(mode="python"))
+
+    def _period_weights_for_summary(self) -> list[float]:
+        master_zone = self._require_prepared_root_zone()
+        period_ids = list(master_zone.period_ids.keys())
+        resolved = resolve_period_weights(
+            master_zone.period_ids,
+            getattr(master_zone, "weights", None),
+        )
+        return [
+            float(resolved[master_zone.period_ids[period_id]])
+            for period_id in period_ids
+        ]
+
+    def _summary_results(
+        self,
+        *,
+        periods: str,
+        solve: bool = True,
+    ) -> TargetOutput | None:
+        if periods not in SUMMARY_PERIOD_MODES:
+            raise ValueError(
+                "periods must be one of: "
+                + ", ".join(sorted(SUMMARY_PERIOD_MODES))
+                + "."
+            )
+        if periods == "selected":
+            results = self._results
+            if results is None and solve:
+                results = self.target()
+            return results
+        if not solve:
+            return None
+
+        outputs = self._target_outputs_for_recorded_periods()
+        weights = self._period_weights_for_summary()
+        return output_for_period_mode(outputs, weights, periods=periods)
+
+    def _resolve_runtime_period_options(
         self,
         options: Optional[dict[str, Any]],
         *,
         zone: "Zone",
     ) -> tuple[dict[str, Any], str | None]:
         runtime_options = dict(options or {})
-        idx, sid = get_state_index(state_ids=zone.state_ids, args=runtime_options)
-        runtime_options["idx"] = idx
+        idx, sid = get_period_index(period_ids=zone.period_ids, args=runtime_options)
+        runtime_options["period_idx"] = idx
         if sid is not None:
-            runtime_options["state_id"] = sid
+            runtime_options["period_id"] = sid
         return runtime_options, sid
 
-    def _state_result_key(
+    def _period_result_key(
         self,
         result: TargetOutput,
         *,
-        requested_state_id: str,
+        requested_period_id: str,
     ) -> str:
         return (
-            str(result.state_id) if result.state_id is not None else requested_state_id
+            str(result.period_id)
+            if result.period_id is not None
+            else requested_period_id
         )
 
-    def _order_state_results(
+    def _order_period_results(
         self,
         *,
-        state_ids: list[str],
-        results_by_requested_state: dict[str, TargetOutput],
+        period_ids: list[str],
+        results_by_requested_period: dict[str, TargetOutput],
     ) -> dict[str, TargetOutput]:
         ordered_results: dict[str, TargetOutput] = {}
-        for requested_state_id in state_ids:
-            result = results_by_requested_state[requested_state_id]
+        for requested_period_id in period_ids:
+            result = results_by_requested_period[requested_period_id]
             ordered_results[
-                self._state_result_key(
+                self._period_result_key(
                     result,
-                    requested_state_id=requested_state_id,
+                    requested_period_id=requested_period_id,
                 )
             ] = result
         return ordered_results
 
-    def _target_all_states_parallel(
+    def _target_all_periods_parallel(
         self,
         *,
-        state_ids: list[str],
+        period_ids: list[str],
         backend: str,
         max_workers: int | None,
     ) -> dict[str, TargetOutput]:
-        problem_inputs = self.canonical_problem_json()
-        executor_cls = (
-            ThreadPoolExecutor if backend == "thread" else ProcessPoolExecutor
+        results_by_requested_period = solve_periods_parallel(
+            problem_inputs=self.canonical_problem_json(),
+            project_name=self.project_name,
+            period_ids=period_ids,
+            backend=backend,
+            max_workers=max_workers,
         )
-        results_by_requested_state: dict[str, TargetOutput] = {}
-        with executor_cls(max_workers=max_workers) as executor:
-            futures = {
-                executor.submit(
-                    _solve_default_target_for_state,
-                    problem_inputs,
-                    self.project_name,
-                    state_id,
-                ): state_id
-                for state_id in state_ids
-            }
-            for future in as_completed(futures):
-                state_id = futures[future]
-                results_by_requested_state[state_id] = TargetOutput.model_validate(
-                    future.result()
-                )
-        return self._order_state_results(
-            state_ids=state_ids,
-            results_by_requested_state=results_by_requested_state,
+        return self._order_period_results(
+            period_ids=period_ids,
+            results_by_requested_period=results_by_requested_period,
         )
 
     def validate(self) -> TargetInput:
@@ -547,9 +575,10 @@ class PinchProblem:
         *,
         detailed: bool = False,
         format: str | None = None,
+        periods: str = "selected",
     ) -> pd.DataFrame:
         """Return the solved target summary as a pandas DataFrame."""
-        results = self._results if self._results is not None else self.target()
+        results = self._summary_results(periods=periods)
         if format is None:
             format = "detailed" if detailed else "compact"
         elif detailed and format != "detailed":
@@ -558,39 +587,49 @@ class PinchProblem:
             return build_summary_dataframe(results.targets)
         return build_problem_summary_frame(results, format=format)
 
-    def metrics(self, *, solve: bool = True) -> list[ReportMetric]:
+    def metrics(
+        self,
+        *,
+        solve: bool = True,
+        periods: str = "selected",
+    ) -> list[ReportMetric]:
         """Return typed summary metrics for the current solved result."""
-        results = self._results
-        if results is None and solve:
-            results = self.target()
+        results = self._summary_results(periods=periods, solve=solve)
         if results is None:
             return []
         return build_report_metrics(results)
 
-    def report(self, *, solve: bool = True) -> ProblemReport:
+    def report(
+        self,
+        *,
+        solve: bool = True,
+        periods: str = "selected",
+    ) -> ProblemReport:
         """Return a typed report without writing any files."""
-        results = self._results
-        if results is None and solve:
-            results = self.target()
-        graph_payload = build_graph_payload(results) if results is not None else None
+        results = self._summary_results(periods=periods, solve=solve)
+        graph_data = build_graph_data(results) if results is not None else None
         return build_problem_report(
             project_name=self.project_name,
             validation=self.validation_report(),
             results=results,
-            graph_payload=graph_payload,
+            graph_data=graph_data,
         )
 
-    def export_excel(self, results_dir: Optional[PathLike] = None) -> Path:
+    def export_excel(
+        self,
+        results_dir: Optional[PathLike] = None,
+        *,
+        periods: str = "selected",
+    ) -> Path:
         """Export the solved target summary and problem tables to an Excel file."""
         if results_dir is not None:
             self.results_dir = Path(results_dir)
         if self.results_dir is None:
             raise ValueError("No results_dir set. Provide a path to export results.")
-        if self._results is None:
-            self.target()
+        results = self._summary_results(periods=periods)
 
         output_path = export_target_summary_to_excel_with_units(
-            target_response=self._results,
+            target_response=results,
             master_zone=self._master_zone,
             out_dir=self.results_dir,
         )
@@ -624,11 +663,11 @@ class PinchProblem:
         unit_columns = {col: f"{col} (unit)" for col in columns}
 
         row_columns = [*columns, *unit_columns.values()]
-        base_payload = {
+        base_row_data = {
             "Target": str(base_row["Target"]),
             **{col: base_row.get(col) for col in row_columns},
         }
-        other_payload = {
+        other_row_data = {
             "Target": str(other_row["Target"]),
             **{col: other_row.get(col) for col in row_columns},
         }
@@ -651,8 +690,8 @@ class PinchProblem:
 
         return pd.DataFrame.from_dict(
             {
-                base_label: base_payload,
-                other_label: other_payload,
+                base_label: base_row_data,
+                other_label: other_row_data,
                 "Change": change_row,
             },
             orient="index",
@@ -766,6 +805,7 @@ class PinchProblem:
             resolved_value = 1.0
         self._master_zone.get_subzone(zone_name).dt_cont_multiplier = resolved_value
         self._results = None  # Clear cached results since multipliers have changed
+        self._last_target_run_spec = None
         return self._master_zone
 
     def update_options(
@@ -808,7 +848,7 @@ class PinchProblem:
         self,
         *,
         zone: Optional["Zone"] = None,
-        graph_payload: Optional[Dict[str, Any]] = None,
+        graph_data: Optional[Dict[str, Any]] = None,
         page_title: Optional[str] = "OpenPinch Dashboard",
         value_rounding: int = 2,
     ) -> None:
@@ -819,13 +859,13 @@ class PinchProblem:
                 "No analysed zone is available. Run target() before rendering."
             )
 
-        payload = graph_payload
-        if payload is None and self._results is not None:
-            payload = build_graph_payload(self._results)
+        dashboard_graph_data = graph_data
+        if dashboard_graph_data is None and self._results is not None:
+            dashboard_graph_data = build_graph_data(self._results)
 
         _render_streamlit_dashboard(
             active_zone,
-            graph_payload=payload,
+            graph_data=dashboard_graph_data,
             page_title=page_title,
             value_rounding=value_rounding,
         )
@@ -868,6 +908,7 @@ class PinchProblem:
         self._master_zone = self._data_preprocessing()
         self._process_components = {}
         self._results = None
+        self._last_target_run_spec = None
         return self._master_zone
 
     def _replace_problem_inputs(self, problem_inputs: JsonDict) -> Zone:
@@ -880,13 +921,3 @@ class PinchProblem:
         self._apply_loaded_source(loaded_source)
         self._problem_filepath = current_filepath
         return self._rebuild_problem_state()
-
-
-def _solve_default_target_for_state(
-    problem_inputs: JsonDict,
-    project_name: str,
-    state_id: str,
-) -> dict[str, Any]:
-    problem = PinchProblem(source=problem_inputs, project_name=project_name)
-    result = problem.target(state_id=state_id)
-    return result.model_dump(mode="python")

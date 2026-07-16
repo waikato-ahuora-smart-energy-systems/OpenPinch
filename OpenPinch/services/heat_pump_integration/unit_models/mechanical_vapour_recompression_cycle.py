@@ -6,9 +6,11 @@ from typing import Optional, Sequence
 
 import numpy as np
 
-from ....classes.stream import Stream
 from ....classes.stream_collection import StreamCollection
-from ....utils.stream_linearisation import get_piecewise_data_points
+from ....utils.stream_linearisation import (
+    build_segmented_stream_from_profile,
+    get_piecewise_data_points,
+)
 from .vapour_compression_cycle import VapourCompressionCycle
 
 __all__ = ["MechanicalVapourRecompressionCycle"]
@@ -641,20 +643,20 @@ class MechanicalVapourRecompressionCycle(VapourCompressionCycle):
         mass_flow: float,
     ) -> StreamCollection:
         sc = StreamCollection()
-        for i in range(len(profile) - 1):
-            h1, T1 = profile[i]
-            h2, T2 = profile[i + 1]
-            if abs(T1 - T2) < 0.01:
-                T2 = T1 - 0.01 if is_condenser else T1 + 0.01
-            sc.add(
-                Stream(
-                    name=f"MVR_H{i + 1}" if is_condenser else f"MVR_C{i + 1}",
-                    t_supply=T1,
-                    t_target=T2,
-                    heat_flow=mass_flow * abs(h1 - h2),
-                    dt_cont=self._dtcont,
-                )
+        if mass_flow <= 0.0 or np.ptp(np.asarray(profile)[:, 0]) <= 0.0:
+            return sc
+        is_hot_profile = bool(profile[0, 1] > profile[-1, 1])
+        if np.isclose(profile[0, 1], profile[-1, 1]):
+            is_hot_profile = is_condenser
+        sc.add(
+            build_segmented_stream_from_profile(
+                name="MVR_H" if is_condenser else "MVR_C",
+                profile=profile,
+                heat_scale=mass_flow,
+                is_hot_stream=is_hot_profile,
+                dt_cont=self._dtcont,
             )
+        )
         return sc
 
     def _build_process_condenser_streams(
@@ -665,38 +667,29 @@ class MechanicalVapourRecompressionCycle(VapourCompressionCycle):
     ) -> StreamCollection:
         """Build process-heating streams for this MVR stage."""
         self._require_solution()
-        streams = StreamCollection()
         components = self.process_heat_components()
         dt_cont = self._dtcont if dtcont is None else float(dtcont)
         t_discharge = self.Ts[1] - 273.15
         t_sat = self.T_cond
+        heat = 0.0
+        temperature = t_discharge if components["desuperheat"] > 0.0 else t_sat
+        profile = [[heat, temperature]]
         if components["desuperheat"] > 0.0:
-            streams.add(
-                Stream(
-                    name=f"MVR_desuperheat_H{stage_index}",
-                    t_supply=t_discharge,
-                    t_target=t_sat,
-                    heat_flow=components["desuperheat"],
-                    dt_cont=dt_cont,
-                )
-            )
+            heat += components["desuperheat"]
+            profile.append([heat, t_sat])
         if components["latent"] > 0.0:
-            streams.add(
-                Stream(
-                    name=f"MVR_condense_H{stage_index}",
-                    t_supply=t_sat,
-                    t_target=t_sat - 0.01,
-                    heat_flow=components["latent"],
-                    dt_cont=dt_cont,
-                )
-            )
+            heat += components["latent"]
+            profile.append([heat, t_sat - 0.01])
         if components["subcool"] > 0.0:
+            heat += components["subcool"]
+            profile.append([heat, t_sat - self.dT_subcool])
+        streams = StreamCollection()
+        if len(profile) > 1:
             streams.add(
-                Stream(
-                    name=f"MVR_subcool_H{stage_index}",
-                    t_supply=t_sat,
-                    t_target=t_sat - self.dT_subcool,
-                    heat_flow=components["subcool"],
+                build_segmented_stream_from_profile(
+                    name=f"MVR_process_H{stage_index}",
+                    profile=profile,
+                    is_hot_stream=True,
                     dt_cont=dt_cont,
                 )
             )

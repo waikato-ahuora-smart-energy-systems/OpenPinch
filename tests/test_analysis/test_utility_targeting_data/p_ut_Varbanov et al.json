@@ -286,9 +286,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process A - chemical plant",
@@ -312,9 +310,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process A - chemical plant",
@@ -338,9 +334,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process A - chemical plant",
@@ -364,9 +358,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process A - chemical plant",
@@ -390,9 +382,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process A - chemical plant",
@@ -416,9 +406,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process B - food plant",
@@ -442,9 +430,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process B - food plant",
@@ -468,9 +454,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process B - food plant",
@@ -494,9 +478,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process B - food plant",
@@ -520,9 +502,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process B - food plant",
@@ -546,9 +526,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process B - food plant",
@@ -572,9 +550,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process B - food plant",
@@ -598,9 +574,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process C - hospital",
@@ -624,9 +598,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process C - hospital",
@@ -650,9 +622,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process C - hospital",
@@ -676,9 +646,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process C - hospital",
@@ -702,9 +670,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process C - hospital",
@@ -728,9 +694,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process C - hospital",
@@ -754,9 +718,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process C - hospital",
@@ -780,9 +742,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process C - hospital",
@@ -806,9 +766,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process C - hospital",
@@ -832,9 +790,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process C - hospital",
@@ -858,9 +814,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process C - hospital",
@@ -884,9 +838,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process D - residential area",
@@ -910,9 +862,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process D - residential area",
@@ -936,9 +886,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process D - residential area",
@@ -962,9 +910,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         }
     ],
     "utilities": [

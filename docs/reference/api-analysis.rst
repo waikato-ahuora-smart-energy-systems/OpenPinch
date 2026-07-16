@@ -28,7 +28,7 @@ The analysis stack typically runs in this order:
    aggregates solved subzones into site-style indirect integration targets when
    the hierarchy requires it.
 6. :mod:`OpenPinch.services.common.graph_data` converts solved tables and
-   targets into serialisable graph payloads for reporting and Streamlit
+   targets into serialisable graph data for reporting and Streamlit
    visualisation.
 
 Service Package Map

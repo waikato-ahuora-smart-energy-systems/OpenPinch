@@ -3,58 +3,109 @@
 from __future__ import annotations
 
 import math
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Self
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 from ..config_metadata import validate_configuration_options
 from ..enums import ST, FluidPhase
 from .common import ScalarOrVU
 from .graphs import GraphSet
 from .reporting import TargetResults
-from .synthesis import HeatExchangerNetworkSynthesisResult
+from .synthesis.result import HeatExchangerNetworkSynthesisResult
+
+
+class StreamSegmentSchema(BaseModel):
+    """One ordered linear interval in a variable-CP stream profile."""
+
+    name: Optional[str] = None
+    t_supply: ScalarOrVU
+    t_target: ScalarOrVU
+    heat_flow: ScalarOrVU
+    p_supply: Optional[ScalarOrVU] = None
+    p_target: Optional[ScalarOrVU] = None
+    h_supply: Optional[ScalarOrVU] = None
+    h_target: Optional[ScalarOrVU] = None
+    dt_cont: Optional[ScalarOrVU] = None
+    htc: Optional[ScalarOrVU] = None
+    price: Optional[ScalarOrVU] = None
+
+    model_config = ConfigDict(
+        use_enum_values=True,
+        populate_by_name=True,
+        extra="forbid",
+    )
+
+
+class TemperatureHeatPointSchema(BaseModel):
+    """One temperature and cumulative-heat coordinate in an ordered profile."""
+
+    cumulative_heat: ScalarOrVU
+    temperature: ScalarOrVU
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+
+class TemperatureHeatProfileSchema(BaseModel):
+    """Ordered temperature-cumulative-heat data for one physical stream."""
+
+    points: List[TemperatureHeatPointSchema]
+    linearisation_tolerance: float = 0.1
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("points")
+    @classmethod
+    def _require_two_points(
+        cls,
+        value: List[TemperatureHeatPointSchema],
+    ) -> List[TemperatureHeatPointSchema]:
+        if len(value) < 2:
+            raise ValueError("A temperature-heat profile requires at least two points.")
+        return value
+
+    @field_validator("linearisation_tolerance")
+    @classmethod
+    def _positive_tolerance(cls, value: float) -> float:
+        if not math.isfinite(value) or value <= 0.0:
+            raise ValueError("linearisation_tolerance must be finite and positive.")
+        return float(value)
 
 
 class StreamSchema(BaseModel):
     """Process stream definition supplied to the targeting service."""
 
     zone: str
-    name: str = Field(
-        validation_alias=AliasChoices("name", "stream_name"),
-        serialization_alias="name",
-    )
-    t_supply: ScalarOrVU
-    t_target: ScalarOrVU
+    name: str
+    segments: Optional[List[StreamSegmentSchema]] = None
+    profile: Optional[TemperatureHeatProfileSchema] = None
+    t_supply: Optional[ScalarOrVU] = None
+    t_target: Optional[ScalarOrVU] = None
     p_supply: Optional[ScalarOrVU] = None
     p_target: Optional[ScalarOrVU] = None
     h_supply: Optional[ScalarOrVU] = None
     h_target: Optional[ScalarOrVU] = None
-    heat_flow: ScalarOrVU
-    heat_capacity_flowrate: Optional[ScalarOrVU] = Field(
-        default=None,
-        validation_alias=AliasChoices(
-            "heat_capacity_flowrate",
-            "heat_capacity_flow_rate",
-            "flow_heat_capacity",
-        ),
-        serialization_alias="heat_capacity_flowrate",
-    )
+    heat_flow: Optional[ScalarOrVU] = None
+    heat_capacity_flowrate: Optional[ScalarOrVU] = None
     dt_cont: Optional[ScalarOrVU] = 0.0
     htc: Optional[ScalarOrVU] = 1.0
     fluid_name: Optional[str] = None
     fluid_phase: Optional[FluidPhase] = None
     active: bool = True
 
-    model_config = ConfigDict(use_enum_values=True, populate_by_name=True)
-
-    @property
-    def stream_name(self) -> str:
-        """Alias for the canonical stream identifier."""
-        return self.name
-
-    @stream_name.setter
-    def stream_name(self, value: str) -> None:
-        self.name = value
+    model_config = ConfigDict(
+        use_enum_values=True,
+        populate_by_name=True,
+        validate_default=True,
+        extra="forbid",
+    )
 
     @field_validator("fluid_name")
     @classmethod
@@ -72,13 +123,43 @@ class StreamSchema(BaseModel):
         text = str(value).strip()
         return FluidPhase.from_code_or_description(value) if text else None
 
+    @field_validator("t_supply", "t_target", "heat_flow")
+    @classmethod
+    def _require_ordinary_thermal_fields(
+        cls,
+        value: Optional[ScalarOrVU],
+        info: ValidationInfo,
+    ) -> Optional[ScalarOrVU]:
+        has_nested = (
+            info.data.get("segments") is not None
+            or info.data.get("profile") is not None
+        )
+        if value is None and not has_nested:
+            raise ValueError(f"Ordinary streams require {info.field_name}.")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_thermal_definition(self) -> Self:
+        if self.segments is not None and self.profile is not None:
+            raise ValueError("Provide either segments or profile, not both.")
+        has_nested = self.segments is not None or self.profile is not None
+        if self.segments is not None and len(self.segments) == 0:
+            raise ValueError("segments must contain at least one segment.")
+        if has_nested and self.heat_capacity_flowrate is not None:
+            raise ValueError(
+                "heat_capacity_flowrate cannot be supplied with segments or profile."
+            )
+        return self
+
 
 class UtilitySchema(BaseModel):
     """Utility definition including thermal and optional economic attributes."""
 
     name: str
     type: ST
-    t_supply: ScalarOrVU
+    segments: Optional[List[StreamSegmentSchema]] = None
+    profile: Optional[TemperatureHeatProfileSchema] = None
+    t_supply: Optional[ScalarOrVU] = None
     t_target: Optional[ScalarOrVU] = None
     p_supply: Optional[ScalarOrVU] = None
     p_target: Optional[ScalarOrVU] = None
@@ -92,7 +173,34 @@ class UtilitySchema(BaseModel):
     fluid_phase: Optional[FluidPhase] = None
     active: bool = True
 
-    model_config = ConfigDict(use_enum_values=True)
+    model_config = ConfigDict(
+        use_enum_values=True,
+        populate_by_name=True,
+        validate_default=True,
+    )
+
+    @field_validator("t_supply")
+    @classmethod
+    def _require_ordinary_supply_temperature(
+        cls,
+        value: Optional[ScalarOrVU],
+        info: ValidationInfo,
+    ) -> Optional[ScalarOrVU]:
+        has_nested = (
+            info.data.get("segments") is not None
+            or info.data.get("profile") is not None
+        )
+        if value is None and not has_nested:
+            raise ValueError("Ordinary utilities require t_supply.")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_thermal_definition(self) -> Self:
+        if self.segments is not None and self.profile is not None:
+            raise ValueError("Provide either segments or profile, not both.")
+        if self.segments is not None and len(self.segments) == 0:
+            raise ValueError("segments must contain at least one segment.")
+        return self
 
     @field_validator("fluid_name")
     @classmethod
@@ -151,37 +259,10 @@ class TargetOutput(BaseModel):
     """Top-level response data returned by :func:`OpenPinch.pinch_analysis_service`."""
 
     name: str = "Site"
-    state_id: Optional[str] = None
+    period_id: Optional[str] = None
     targets: List[TargetResults]
     graphs: Optional[Dict[str, GraphSet]] = None
     design: Optional[HeatExchangerNetworkSynthesisResult] = None
-
-
-class THSchema(BaseModel):
-    """Temperature-enthalpy series data used for Problem Table exchange."""
-
-    T: List[float]
-    H_hot: Optional[List[float]] = None
-    H_cold: Optional[List[float]] = None
-    H_net: Optional[List[float]] = None
-    H_hot_net: Optional[List[float]] = None
-    H_cold_net: Optional[List[float]] = None
-
-
-class ProblemTableDataSchema(BaseModel):
-    """Named container for a single temperature-enthalpy profile."""
-
-    name: str
-    data: THSchema
-
-
-class GetInputOutputData(BaseModel):
-    """Aggregate structure used by legacy I/O helpers and tests."""
-
-    plant_profile_data: List[ProblemTableDataSchema]
-    streams: List[StreamSchema]
-    utilities: List[UtilitySchema] = Field(default_factory=list)
-    options: Optional[dict] = Field(default_factory=dict)
 
 
 class NonLinearStream(BaseModel):
@@ -196,48 +277,15 @@ class NonLinearStream(BaseModel):
     composition: list[tuple[str, float]]
 
 
-class LineariseInput(BaseModel):
-    """Input bundle for stream linearisation workflows."""
-
-    t_h_data: List
-    num_intervals: Optional[int] = 100
-    t_min: Optional[float] = 1
-    streams: List[NonLinearStream]
-    ppKey: str = ""
-    mole_flow: float = 1.0
-
-
-class LineariseOutput(BaseModel):
-    """Output data containing generated linearised stream segments."""
-
-    streams: List[Optional[list]]
-
-
-class VisualiseInput(BaseModel):
-    """Input data for graph visualisation conversion routines."""
-
-    zones: list
-
-
-class VisualiseOutput(BaseModel):
-    """Graph payload returned by visualisation conversion routines."""
-
-    graphs: List[GraphSet]
-
-
 __all__ = [
-    "GetInputOutputData",
-    "LineariseInput",
-    "LineariseOutput",
     "NonLinearStream",
-    "ProblemTableDataSchema",
     "StreamSchema",
-    "THSchema",
+    "StreamSegmentSchema",
     "TargetInput",
     "TargetOutput",
+    "TemperatureHeatPointSchema",
+    "TemperatureHeatProfileSchema",
     "UtilitySchema",
-    "VisualiseInput",
-    "VisualiseOutput",
     "ZoneTreeSchema",
 ]
 
@@ -245,8 +293,3 @@ __all__ = [
 ZoneTreeSchema.model_rebuild()
 TargetInput.model_rebuild()
 TargetOutput.model_rebuild()
-GetInputOutputData.model_rebuild()
-LineariseInput.model_rebuild()
-LineariseOutput.model_rebuild()
-VisualiseInput.model_rebuild()
-VisualiseOutput.model_rebuild()

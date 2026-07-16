@@ -1,136 +1,129 @@
 Heat Pump Workflows
 ===================
 
-OpenPinch exposes two related but distinct Heat Pump workflow families.
-It also includes a direct process MVR component path for cases where a hot
-gas/vapour stream is recompressed before the normal direct or Total Site
-targeting workflow.
+Purpose
+-------
 
-Question This Guide Answers
----------------------------
+Use this guide when you need to screen Heat Pump, refrigeration, or direct
+gas/vapour MVR opportunities in the context of an OpenPinch thermal target.
 
-How do I use OpenPinch to evaluate Heat Pump or refrigeration opportunities in
-the context of process integration?
+Prerequisites
+-------------
 
-Direct and Indirect HPR Targeting
----------------------------------
+Run and interpret a base direct or indirect integration target first. Install
+``openpinch[notebook]`` when you want graph rendering or the packaged
+notebooks.
 
-Use this when you want the package to compute or screen HPR-oriented targets
-more directly.
+Sample Case
+-----------
 
-Typical surfaces:
+Use ``chocolate_factory.json`` for direct-versus-indirect HPR comparison and
+``heat_pump_targeting.json`` for a compact direct screening input. Use
+``crude_preheat_train_multiperiod.json`` when one HPR design must serve
+several weighted operating periods. Use notebook 05 when the question is
+direct process gas/vapour recompression.
 
-- `problem.target.direct_heat_pump(...)`
-- `problem.target.indirect_heat_pump(...)`
-- `problem.target.direct_refrigeration(...)`
-- `problem.target.indirect_refrigeration(...)`
+Runnable Workflow
+-----------------
 
-Use this workflow when your main question is:
+Direct or indirect HPR targeting:
 
-- how do direct and indirect HPR routes compare over a study range?
+.. code-block:: python
 
-Recommended Learning Asset
---------------------------
+   from OpenPinch import PinchProblem
+   from OpenPinch.lib.enums import HPRcycle
 
-The packaged notebook:
+   problem = PinchProblem("chocolate_factory.json")
+   problem.update_options({"HPR_TYPE": HPRcycle.CascadeCarnot.value})
+   base = problem.target.direct_heat_integration()
+   hpr = problem.target.direct_heat_pump()
+   site_hpr = problem.target.indirect_heat_pump()
+   summary = problem.summary_frame()
 
-.. code-block:: bash
+Opt in to one shared HPR design across named operating periods:
 
-   openpinch notebook --name 03_carnot_hpr_comparison.ipynb -o notebooks
+.. code-block:: python
 
-This is the best single packaged learning asset for the broader direct-versus-
-indirect HPR comparison workflow. It keeps the study orchestration on
-``PinchWorkspace`` and inspects the resulting HPR target through the standard
-plot accessor surfaces, especially
-``problem.plot.net_load_profiles(zone_name="Direct Heat Pump")`` and
-``problem.plot.grand_composite_curve_with_heat_pump(...)``.
+   multiperiod = PinchProblem("crude_preheat_train_multiperiod.json")
+   multiperiod.update_options(
+       {
+           "HPR_TYPE": HPRcycle.CascadeCarnot.value,
+           "HPR_MULTIPERIOD_OPTIMIZATION_ENABLED": True,
+       }
+   )
+   shared_hpr = multiperiod.target.direct_heat_pump(period_id="base")
+   weighted_summary = multiperiod.summary_frame(periods="weighted_average")
 
-Direct Gas/Vapour MVR Components
---------------------------------
+Refrigeration uses the companion accessors:
 
-Use this when the process stream itself is the MVR source. Unlike the HPR
-targeting routines above, direct process MVR mutates a prepared
-``PinchProblem`` by deactivating selected original hot streams and activating
-replacement hot streams generated from the compressed vapour cooling profile.
-The subsequent direct or Total Site target then includes the component work in
-the solved summary.
+.. code-block:: python
 
-Typical surface:
+   direct_refrigeration = problem.target.direct_refrigeration()
+   indirect_refrigeration = problem.target.indirect_refrigeration()
 
-- ``problem.add_component.process_mvr(...)``
+Direct process MVR mutates a prepared problem through a process component:
 
-The packaged notebook:
+.. code-block:: python
 
-.. code-block:: bash
+   component = problem.add_component.process_mvr(...)
+   rerun_target = problem.target.direct_heat_integration()
 
-   openpinch notebook --name 08_direct_gas_stream_mvr.ipynb -o notebooks
-
-This notebook compares baseline, dry MVR, and liquid-injection MVR cases in a
-``PinchWorkspace``. It also shows ``stage_results_by_state``, replacement
-stream inspection, and component ``activate()`` / ``deactivate()`` behavior.
-
-Current Recommendation
-----------------------
-
-For supported advanced Heat Pump and refrigeration work today, prefer the
-``problem.target.direct_heat_pump(...)``,
-``problem.target.indirect_heat_pump(...)``, and refrigeration companion
-methods. Use ``chocolate_factory.json`` plus notebook 03 when the question is
-direct-versus-indirect comparison over a study range, and use
-``heat_pump_targeting.json`` when you want a smaller direct HPR screening
-input data. Use notebook 08 when the question is direct recompression of an
-existing process gas/vapour stream before re-solving the base integration
-targets.
-
-Start simulated-cycle studies from a Carnot solve where possible. Use
-``HPR_TYPE = "Cascade Carnot cycles"`` for broad screening,
-``HPR_TYPE = "Parallel Carnot cycles"`` when you want one explicit Carnot
-stage per temperature pair, and then move to
-``"Parallel vapour compression cycles"``,
-``"Cascade vapour compression cycles"``, or
-``"Vapour compression with MVR cascade"`` when refrigerant-specific behaviour
-matters.
-
-What To Compare
+Expected Output
 ---------------
 
-Start with:
+HPR and refrigeration targeting add target rows with HPR cost, duty, COP, and
+graph effects. Direct gas/vapour MVR adds replacement hot streams and includes
+component work in later target summaries. Multiperiod HPR shared-design mode
+keeps the requested period target row and stores all-period evaluations on
+``hpr_details`` for weighted summary reporting. Candidate designs are ranked by
+weighted operating cost and feasibility penalty plus the largest period's
+annualized capital cost, so equipment is sized for the peak-capital period even
+when another period dominates operating cost.
 
-- total annualized HPR cost for simulated-cycle backends
-- hot utility target change
-- cold utility target change
-- heat recovery change
-- graph change, especially in the GCC
+Weighted HPR summary rows average operating quantities and operating cost, use
+the maximum total, annualized, compressor, and heat-exchanger capital fields,
+and recompute total annualized cost as weighted operating cost plus maximum
+annualized capital. Other target fields retain the normal weighted-average
+policy. Summary replay uses isolated copies and leaves the selected problem zone
+and cached result unchanged, including when a replayed period fails.
 
-Treat cycle-level quantities as supporting context after the integration-level
-answer looks promising.
+Interpretation
+--------------
 
-For ``"Parallel vapour compression cycles"``,
-``"Cascade vapour compression cycles"``, and
-``"Vapour compression with MVR cascade"``, OpenPinch reports unit-aware HPR
-cost fields:
+Compare HPR results in this order:
 
-- ``hpr_operating_cost`` in ``$/y``
-- ``hpr_capital_cost`` in ``$``
-- ``hpr_annualized_capital_cost`` in ``$/y``
-- ``hpr_total_annualized_cost`` in ``$/y``
-- ``hpr_compressor_capital_cost`` in ``$``
-- ``hpr_heat_exchanger_capital_cost`` in ``$``
+1. hot utility target change
+2. cold utility target change
+3. heat recovery change
+4. total annualized HPR cost for simulated-cycle backends
+5. GCC or net-load profile changes
 
-The simulated-cycle objective minimises ``hpr_total_annualized_cost`` plus
-feasibility penalties. Remaining external utility at the ends of the combined
-residual GCC is costed as operating cost. Residual GCC pockets, opposite
-utility regression, and cycle allocation penalties are the feasibility terms.
+Start broad screening with ``HPR_TYPE = "Cascade Carnot cycles"`` or
+``"Parallel Carnot cycles"``. Move to ``"Parallel vapour compression cycles"``,
+``"Cascade vapour compression cycles"``, or
+``"Vapour compression with MVR cascade"`` only when refrigerant-specific
+behavior matters.
 
-For the simulated aggregate backends, optimiser variables named
-``x_heat_base``/``x_cool_base`` set the total cycle scale and
-``x_heat_split``/``x_cool_split`` distribute that scale between stages. The
-backend classes clip requested stage duties to the process availability before
-solving refrigerant or Carnot physics.
+Recommended Learning Assets
+---------------------------
+
+- ``04_carnot_heat_pump_screening.ipynb`` for direct/indirect HPR comparison.
+- ``05_direct_gas_stream_mvr_scenarios.ipynb`` for process-component MVR scenarios.
+- ``06_vapour_compression_mvr_cascade_hpr.ipynb`` for the VC+MVR cascade
+  backend.
+- ``10_multiperiod_hpr_shared_design.ipynb`` for shared HPR design across
+  weighted operating periods.
+
+Copy them with:
+
+.. code-block:: bash
+
+   openpinch notebook --name 04_carnot_heat_pump_screening.ipynb -o notebooks
 
 Next Steps
 ----------
 
-- For the technical framing, see
-  :doc:`../fundamentals/heat-pump-and-refrigeration-methods`.
-- For the deeper implementation stack, see :doc:`../api/generated-index`.
+- :doc:`../fundamentals/heat-pump-and-refrigeration-methods` for cycle
+  conventions and backend details.
+- :doc:`graphing-and-interpretation` for reading HPR graph effects.
+- :doc:`../api/pinchproblem` for the public accessors.

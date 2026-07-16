@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from OpenPinch.services.heat_pump_integration.common.layout import HPRoptVectorLayout
 
@@ -92,3 +93,41 @@ def test_non_brayton_backends_share_canonical_opt_vector_prefix():
     assert layouts[3].heat_split_slice == slice(9, 11)
     assert layouts[3].cool_split_slice == slice(11, 12)
     assert layouts[3].ihx_slice == slice(12, 15)
+
+
+def test_hpr_opt_vector_layout_validates_counts_and_empty_layout():
+    with pytest.raises(ValueError, match="n_cond"):
+        HPRoptVectorLayout(n_cond=-1)
+
+    empty = HPRoptVectorLayout(
+        n_amb=0,
+        n_cond=0,
+        n_evap=0,
+        n_subcool=0,
+        n_heat_base=0,
+        n_cool_base=0,
+        n_heat_split=0,
+        n_cool_split=0,
+        n_ihx=0,
+        n_misc=0,
+    )
+
+    assert empty.size == 0
+    assert empty.pack().size == 0
+    assert empty.unpack(np.array([]))["x_amb"] == 0.0
+    assert empty.build_bounds() == []
+
+
+def test_hpr_opt_vector_layout_rejects_bad_vector_block_and_bounds_sizes():
+    layout = HPRoptVectorLayout(n_cond=2, n_evap=1)
+
+    with pytest.raises(ValueError, match="Expected optimisation vector"):
+        layout.unpack(np.array([0.0, 0.0]))
+    with pytest.raises(ValueError, match="x_cond"):
+        layout.pack(x_cond=[0.1])
+    with pytest.raises(ValueError, match="x_cond bounds"):
+        layout.build_bounds(x_cond=[(0.0, 1.0)])
+    assert layout.build_bounds(x_cond=[(0.0, 0.5), (0.5, 1.0)])[1:3] == [
+        (0.0, 0.5),
+        (0.5, 1.0),
+    ]

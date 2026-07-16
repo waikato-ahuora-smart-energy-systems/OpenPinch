@@ -57,6 +57,34 @@ def test_get_reduced_bckgrd_cascade_till_Q_target_handles_zero_target_without_in
         )
 
 
+def test_get_reduced_bckgrd_cascade_till_Q_target_refrigeration_interpolates():
+    T_hot = np.array([120.0, 90.0, 60.0, 30.0])
+    H_hot = np.array([0.0, -80.0, -160.0, -240.0])
+
+    T_out, H_out = hp_pre._get_reduced_bckgrd_cascade_till_Q_target(
+        120.0, T_hot.copy(), H_hot.copy(), is_cold=False
+    )
+
+    np.testing.assert_allclose(T_out, np.array([120.0, 90.0, 75.0]))
+    np.testing.assert_allclose(H_out, np.array([0.0, -80.0, -120.0]))
+
+
+def test_get_reduced_bckgrd_cascade_till_Q_target_refrigeration_edges():
+    T_hot = np.array([120.0, 90.0, 60.0])
+    H_hot = np.array([0.0, -80.0, -160.0])
+
+    T_full, H_full = hp_pre._get_reduced_bckgrd_cascade_till_Q_target(
+        250.0, T_hot.copy(), H_hot.copy(), is_cold=False
+    )
+    np.testing.assert_allclose(T_full, T_hot)
+    np.testing.assert_allclose(H_full, H_hot)
+
+    with pytest.raises(ValueError, match="Target for refrigeration cannot be zero."):
+        hp_pre._get_reduced_bckgrd_cascade_till_Q_target(
+            0.0, T_hot.copy(), H_hot.copy(), is_cold=False
+        )
+
+
 def test_temperature_shift_and_h_column_edge_branches():
     T_hot, T_cold = hp_pre._apply_temperature_shift_for_hpr_stream_dtmin_cont(
         np.array([100.0, 80.0]), 10.0
@@ -142,3 +170,13 @@ def test_add_t_amb_interval_aligns_profile_to_ambient_breakpoints():
 
     np.testing.assert_allclose(T_out, np.array([120.0, 105.0, 100.0, 80.0]))
     np.testing.assert_allclose(H_out, np.array([10.0, 6.25, 5.0, 0.0]))
+
+
+def test_extend_profile_with_temperature_margin_keeps_empty_profiles_empty():
+    T_out, H_out, z_out = hp_pre._extend_profile_with_temperature_margin(
+        np.array([]), np.array([]), np.array([])
+    )
+
+    assert T_out.size == 0
+    assert H_out.size == 0
+    assert z_out.size == 0

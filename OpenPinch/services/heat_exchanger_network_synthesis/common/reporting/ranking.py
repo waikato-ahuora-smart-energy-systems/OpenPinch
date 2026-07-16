@@ -5,18 +5,16 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from .....classes.heat_exchanger_network import HeatExchangerNetwork
-from .....lib.schemas.synthesis import HeatExchangerNetworkTopologyRestriction
-from ....network_grid_diagram.builder import build_grid_model
+from .....lib.schemas.synthesis.topology import HeatExchangerNetworkTopologyRestriction
 from ...targeting_services.topology import (
     canonical_topology_restrictions,
     topology_restriction_signature,
 )
+from .verification import is_network_feasible
 
 if TYPE_CHECKING:
-    from .....lib.schemas.synthesis import (
-        HeatExchangerNetworkSynthesisResult,
-        HeatExchangerNetworkSynthesisTaskOutcome,
-    )
+    from .....lib.schemas.synthesis.result import HeatExchangerNetworkSynthesisResult
+from .....lib.schemas.synthesis.task import HeatExchangerNetworkSynthesisTaskOutcome
 
 
 def rank_unique_network_outcomes(
@@ -46,20 +44,34 @@ def network_structure_signature(
     network: HeatExchangerNetwork,
 ) -> tuple[tuple[Any, ...], ...]:
     """Return the stable topology signature used by grid-diagram plotting."""
-    grid_model = build_grid_model(network)
     recovery_restrictions = canonical_topology_restrictions(
         (
             HeatExchangerNetworkTopologyRestriction(
-                source_stream=match.source_stream,
-                sink_stream=match.sink_stream,
-                stage=int(match.stage),
-                duty=float(match.duty),
+                source_stream=exchanger.source_stream,
+                sink_stream=exchanger.sink_stream,
+                stage=int(exchanger.stage),
+                duty=max(state.duty for state in exchanger.period_states),
             )
-            for match in grid_model.recovery_matches
-            if match.stage is not None
+            for exchanger in network.exchangers
+            if exchanger.kind.value == "recovery"
+            and exchanger.stage is not None
+            and exchanger.match_allowed
+            and any(state.active for state in exchanger.period_states)
         ),
-        hot_stream_order=grid_model.hot_streams,
-        cold_stream_order=grid_model.cold_streams,
+        hot_stream_order=tuple(
+            dict.fromkeys(
+                exchanger.source_stream
+                for exchanger in network.exchangers
+                if exchanger.kind.value == "recovery"
+            )
+        ),
+        cold_stream_order=tuple(
+            dict.fromkeys(
+                exchanger.sink_stream
+                for exchanger in network.exchangers
+                if exchanger.kind.value == "recovery"
+            )
+        ),
     )
     links = [
         (
@@ -73,12 +85,16 @@ def network_structure_signature(
         )
     ]
     links.extend(
-        ("hot_utility", match.source_stream, match.sink_stream, None)
-        for match in grid_model.hot_utility_matches
+        ("hot_utility", exchanger.source_stream, exchanger.sink_stream, None)
+        for exchanger in network.exchangers
+        if exchanger.kind.value == "hot_utility"
+        and any(state.active for state in exchanger.period_states)
     )
     links.extend(
-        ("cold_utility", match.source_stream, match.sink_stream, None)
-        for match in grid_model.cold_utility_matches
+        ("cold_utility", exchanger.source_stream, exchanger.sink_stream, None)
+        for exchanger in network.exchangers
+        if exchanger.kind.value == "cold_utility"
+        and any(state.active for state in exchanger.period_states)
     )
     return tuple(sorted(links))
 
@@ -92,6 +108,7 @@ def _ranked_candidate_outcomes(
         if outcome.status == "success"
         and outcome.network is not None
         and outcome.objective_value is not None
+        and is_network_feasible(outcome.network)
     ]
     accepted_method = [
         outcome for outcome in candidates if outcome.task.method == result.method

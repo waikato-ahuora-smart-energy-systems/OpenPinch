@@ -8,8 +8,6 @@ import tarfile
 from pathlib import Path
 from zipfile import ZipFile
 
-import pytest
-
 
 def _build_artifacts(tmp_path: Path) -> tuple[Path, list[str], list[str]]:
     repo_root = Path(__file__).resolve().parents[1]
@@ -26,8 +24,6 @@ def _build_artifacts(tmp_path: Path) -> tuple[Path, list[str], list[str]]:
         capture_output=True,
         text=True,
     )
-    if proc.returncode != 0 and "Unable to build distributions" in proc.stderr:
-        pytest.skip("release artifact build requires the 'build' module or uv")
     assert proc.returncode == 0, proc.stderr
 
     wheel_paths = sorted(out_dir.glob("*.whl"))
@@ -85,9 +81,7 @@ def _assert_common_release_boundary(names: list[str], *, root_prefix: str = "") 
         for name in names
     )
     assert any(
-        name.endswith(
-            "OpenPinch/data/notebooks/01_basic_pinch_and_dtcont_sensitivity.ipynb"
-        )
+        name.endswith("OpenPinch/data/notebooks/01_first_solve_summary_graphs.ipynb")
         for name in names
     )
 

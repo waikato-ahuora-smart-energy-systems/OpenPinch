@@ -6,7 +6,7 @@ from dataclasses import replace
 from time import perf_counter
 
 from ....lib.enums import HENDesignMethod
-from ....lib.schemas.synthesis import HeatExchangerNetworkSynthesisTask
+from ....lib.schemas.synthesis.task import HeatExchangerNetworkSynthesisTask
 from ..common.execution.executor import LocalSynthesisExecutor, SynthesisExecutor
 from ..common.execution.pathways import (
     TierPathway,
@@ -15,12 +15,12 @@ from ..common.execution.pathways import (
 )
 from ..common.execution.settings import SynthesisWorkflowSettings
 from ..common.results.assembly import SynthesisWorkflowResult, build_synthesis_result
-from ..common.solver.pinch_design_snapshot import (
-    PinchDecompositionSnapshot,
+from ..common.solver.pinch_design_decomposition import (
+    PinchDesignDecomposition,
+    PinchDesignTarget,
     PinchLocation,
-    PinchTargetSnapshot,
     StageSelection,
-    build_pinch_design_method_snapshot,
+    build_pinch_design_decomposition,
 )
 
 _PDM_STAGE_PAIR_SWEEP = (
@@ -112,7 +112,7 @@ def _build_pathway_pinch_design_method_tasks(
                         approach_temperature=approach_temperature,
                         problem_id=settings.problem_id,
                         workspace_variant=settings.workspace_variant,
-                        state_id=settings.state_id,
+                        period_id=settings.period_id,
                         metadata=pathway_metadata((pathway,)),
                     )
                 )
@@ -124,7 +124,7 @@ def _build_pathway_pinch_design_method_tasks(
         grouped.setdefault(key, []).append(pathway)
 
     for (pdm_mode, approach_temperature), grouped_pathways in grouped.items():
-        settings_payload = {"pdm_mode": pdm_mode}
+        settings_data = {"pdm_mode": pdm_mode}
         tasks.append(
             HeatExchangerNetworkSynthesisTask(
                 run_id=settings.run_id,
@@ -132,8 +132,8 @@ def _build_pathway_pinch_design_method_tasks(
                 approach_temperature=approach_temperature,
                 problem_id=settings.problem_id,
                 workspace_variant=settings.workspace_variant,
-                state_id=settings.state_id,
-                settings=settings_payload,
+                period_id=settings.period_id,
+                settings=settings_data,
                 metadata=pathway_metadata(grouped_pathways),
             )
         )
@@ -168,7 +168,7 @@ def _with_quality_pdm_tasks(
                 approach_temperature=approach_temperature,
                 problem_id=settings.problem_id,
                 workspace_variant=settings.workspace_variant,
-                state_id=settings.state_id,
+                period_id=settings.period_id,
                 metadata={"quality_candidate": "dt_cont_multiplier"},
             )
         )
@@ -194,7 +194,7 @@ def _with_quality_pdm_tasks(
                 approach_temperature=stage_pair_temperature,
                 problem_id=settings.problem_id,
                 workspace_variant=settings.workspace_variant,
-                state_id=settings.state_id,
+                period_id=settings.period_id,
                 settings={"stage_selection": [above_stages, below_stages]},
                 metadata={"quality_candidate": "stage_pair"},
             )
@@ -214,12 +214,12 @@ def _pathway_approach_temperature(
 
 
 __all__ = [
-    "PinchDecompositionSnapshot",
+    "PinchDesignDecomposition",
+    "PinchDesignTarget",
     "PinchLocation",
-    "PinchTargetSnapshot",
     "StageSelection",
     "_execute_pinch_design_method_workflow",
-    "build_pinch_design_method_snapshot",
+    "build_pinch_design_decomposition",
     "build_pinch_design_method_tasks",
     "execute_pinch_design_method_stage",
 ]

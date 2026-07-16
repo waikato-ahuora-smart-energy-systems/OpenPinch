@@ -31,7 +31,7 @@ def plot_multi_hp_profiles_from_results(
     H_cold: np.ndarray = None,
     hpr_hot_streams: StreamCollection = None,
     hpr_cold_streams: StreamCollection = None,
-    idx: int = 0,
+    period_idx: int = 0,
     title: str = None,
 ) -> "go.Figure":  # type: ignore
     """Plot background source/sink profiles alongside solved HPR cycle streams."""
@@ -66,7 +66,7 @@ def plot_multi_hp_profiles_from_results(
         T_hpr_arr, H_hpr_hot, H_hpr_cold = _get_hpr_cascade(
             hpr_hot_streams,
             hpr_cold_streams,
-            idx=idx,
+            period_idx=period_idx,
         )
         T_hpr_hot, H_hpr_hot = clean_composite_curve_ends(T_hpr_arr, H_hpr_hot)
         T_hpr_cold, H_hpr_cold = clean_composite_curve_ends(T_hpr_arr, H_hpr_cold)
@@ -118,13 +118,13 @@ def _get_hpr_cascade(
     hot_streams: StreamCollection,
     cold_streams: StreamCollection,
     *,
-    idx: int = None,
+    period_idx: int = None,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    idx = idx or 0
+    period_idx = period_idx or 0
     pt = create_problem_table_with_t_int(
         streams=hot_streams + cold_streams,
         is_shifted=False,
-        idx=idx,
+        period_idx=period_idx,
     )
     pt.update(
         **get_utility_heat_cascade(
@@ -132,7 +132,7 @@ def _get_hpr_cascade(
             hot_streams,
             cold_streams,
             is_shifted=False,
-            idx=idx,
+            period_idx=period_idx,
         )
     )
     return pt[PT.T], pt[PT.H_HOT_UT], pt[PT.H_COLD_UT]

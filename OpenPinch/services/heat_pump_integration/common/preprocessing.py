@@ -29,7 +29,7 @@ def construct_HPRTargetInputs(
     *,
     is_heat_pumping: bool = True,
     config: Configuration,
-    idx: int = 0,
+    period_idx: int = 0,
     debug: bool = False,
 ) -> HeatPumpTargetInputs:
     """Prepare normalised background cascades and solver arguments for HPR targeting."""
@@ -75,7 +75,7 @@ def construct_HPRTargetInputs(
         bckgrd_cold_streams=s_cold,
         is_heat_pumping=bool(is_heat_pumping),
         debug=debug,
-        idx=idx,
+        period_idx=period_idx,
         # Direct config pass-through.
         hpr_type=hpr.type,
         hpr_comp_fixed_cost=costing.hpr_comp_fixed_cost,
@@ -130,7 +130,7 @@ def _prepare_hpr_background_profile(
     config: Configuration,
     is_heat_pumping: bool,
     is_cold: bool,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, object]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, StreamCollection]:
     should_trim_to_target = ((is_cold) and (is_heat_pumping)) or (
         (not is_cold) and (not is_heat_pumping)
     )
@@ -244,7 +244,7 @@ def _get_simplified_bckgrd_cascade_and_z_amb(
     config: Configuration,
     *,
     is_cold: bool,
-) -> Tuple[np.ndarray, float]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     sign = 1 if is_cold else -1
     T_amb_star = (
         config.environment.temperature
@@ -296,9 +296,9 @@ def _extend_profile_with_temperature_margin(
     z_amb: np.ndarray,
     *,
     dt_margin: float = 10.0,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     if T_vals.size == 0:
-        return T_vals, H_vals
+        return T_vals, H_vals, z_amb
 
     T_ext = np.empty(T_vals.size + 2, dtype=T_vals.dtype)
     H_ext = np.empty(H_vals.size + 2, dtype=H_vals.dtype)

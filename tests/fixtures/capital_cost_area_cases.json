@@ -1,0 +1,33 @@
+{
+  "balanced_composite": {
+    "T_col": [400.0, 350.0, 300.0],
+    "H_hot": [100.0, 60.0, 0.0],
+    "H_cold": [100.0, 50.0, 0.0],
+    "H_hot_ut": [0.0, 20.0, 0.0],
+    "H_cold_ut": [0.0, 10.0, 0.0],
+    "dT_vals": [10.0, 20.0, 30.0],
+    "RCP_hot": [1.0, 2.0, 4.0],
+    "RCP_cold": [2.0, 3.0, 4.0],
+    "RCP_hot_ut": [0.5, 0.5, 0.5],
+    "RCP_cold_ut": [1.0, 1.0, 1.0],
+    "expected_R_hot_bal": [0.0, 2.5, 1.6875],
+    "expected_R_cold_bal": [0.0, 2.0, 2.5]
+  },
+  "area_target": {
+    "T_vals": [400.0, 350.0, 300.0, 250.0],
+    "H_hot_bal": [300.0, 0.0, 0.0, 0.0],
+    "H_cold_bal": [300.0, 300.0, 0.0, 0.0],
+    "R_hot_bal": [0.0, 0.2, 0.2, 0.2],
+    "R_cold_bal": [0.0, 0.2, 0.2, 0.2],
+    "expected_area": 2.4
+  },
+  "costing": {
+    "area": 100.0,
+    "num_units": 4,
+    "hx_unit_cost": 1000.0,
+    "hx_area_coeff": 250.0,
+    "hx_area_exp": 0.5,
+    "discount_rate": 0.1,
+    "service_life": 5.0
+  }
+}

@@ -9,9 +9,34 @@ from OpenPinch.services.heat_pump_integration.common.shared import (
 )
 from OpenPinch.services.heat_pump_integration.targeting_services.parallel_carnot import (
     _compute_parallel_carnot_hp_opt_obj,
+    _get_parallel_carnot_hp_opt_setup,
     _parse_parallel_carnot_hp_state_variables,
+    optimise_parallel_carnot_heat_pump_placement,
 )
 from OpenPinch.services.heat_pump_integration.unit_models import ParallelCarnotCycles
+
+
+def test_parallel_carnot_unsolved_properties_and_empty_stream_collection():
+    cycle = ParallelCarnotCycles()
+
+    assert cycle.solved is False
+    assert cycle.T_cond.size == 0
+    assert cycle.T_evap.size == 0
+    assert cycle.Q_heat.size == 0
+    assert cycle.Q_cool.size == 0
+    assert cycle.Q_cond.size == 0
+    assert cycle.Q_evap.size == 0
+    assert cycle.Q_cond_he.size == 0
+    assert cycle.Q_evap_he.size == 0
+    assert cycle.w_hpr.size == 0
+    assert cycle.w_he.size == 0
+    assert cycle.heat_recovery == 0.0
+    assert cycle.work == 0.0
+    assert cycle.work_arr.size == 0
+    assert cycle.penalty.size == 0
+    assert cycle.COP_h == 0.0
+    assert cycle.eta_he == 0.0
+    assert len(cycle.build_stream_collection()) == 0
 
 
 def test_parallel_carnot_cycle_positive_lift_uses_absolute_temperatures():
@@ -45,6 +70,42 @@ def test_parallel_carnot_cycle_positive_lift_uses_absolute_temperatures():
     np.testing.assert_allclose(cycle.w_hpr, np.array([expected_work]))
     np.testing.assert_allclose(cycle.w_he, np.array([0.0]))
     assert cycle.heat_recovery == 0.0
+    assert len(cycle.build_stream_collection()) > 0
+
+
+def test_parallel_carnot_rejects_mismatched_stage_arrays():
+    args = SimpleNamespace(
+        T_hot=np.array([120.0, 20.0]),
+        T_cold=np.array([80.0, 40.0]),
+        eta_ii_hpr_carnot=0.5,
+        eta_ii_he_carnot=0.0,
+    )
+    cycle = ParallelCarnotCycles()
+
+    with pytest.raises(ValueError, match="matching sizes"):
+        cycle.solve(
+            T_cond=np.array([80.0]),
+            T_evap=np.array([20.0, 10.0]),
+            Q_heat_base=100.0,
+            x_heat_split=np.array([1.0]),
+            Q_heat_available=np.array([100.0]),
+            Q_cool_available=np.array([100.0, 50.0]),
+            eta_ii_hpr_carnot=args.eta_ii_hpr_carnot,
+            eta_ii_he_carnot=args.eta_ii_he_carnot,
+            args=args,
+        )
+    with pytest.raises(ValueError, match="Q_cool_available"):
+        cycle.solve(
+            T_cond=np.array([80.0]),
+            T_evap=np.array([20.0]),
+            Q_heat_base=100.0,
+            x_heat_split=np.array([1.0]),
+            Q_heat_available=np.array([100.0]),
+            Q_cool_available=np.array([100.0, 50.0]),
+            eta_ii_hpr_carnot=args.eta_ii_hpr_carnot,
+            eta_ii_he_carnot=args.eta_ii_he_carnot,
+            args=args,
+        )
 
 
 def test_parallel_carnot_cycle_uses_per_stage_pools():
@@ -174,3 +235,31 @@ def test_parse_parallel_carnot_state_variables_uses_bounded_ambient_mapping():
     assert np.isclose(vars["Q_amb_cold"], 200.0 * np.arctanh(0.5))
     assert vars["Q_heat_base"] == pytest.approx(200.0 + 200.0 * np.arctanh(0.5))
     np.testing.assert_allclose(vars["x_heat_split"], np.array([1.0]))
+
+
+def test_parallel_carnot_optimise_normalises_stage_count_and_delegates(monkeypatch):
+    args = SimpleNamespace(
+        n_cond=1,
+        n_evap=3,
+        T_cold=np.array([100.0, 75.0, 50.0]),
+        T_hot=np.array([90.0, 65.0, 40.0]),
+    )
+    captured = {}
+
+    def fake_solve_hpr_placement(**kwargs):
+        captured.update(kwargs)
+        return "backend-result"
+
+    monkeypatch.setattr(
+        "OpenPinch.services.heat_pump_integration.targeting_services.parallel_carnot.solve_hpr_placement",
+        fake_solve_hpr_placement,
+    )
+
+    assert optimise_parallel_carnot_heat_pump_placement(args) == "backend-result"
+
+    expected_x0, expected_bounds = _get_parallel_carnot_hp_opt_setup(args)
+    assert args.n_cond == args.n_evap == 3
+    assert captured["f_obj"] is _compute_parallel_carnot_hp_opt_obj
+    np.testing.assert_allclose(captured["x0_ls"], expected_x0)
+    assert captured["bnds"] == expected_bounds
+    assert captured["args"] is args

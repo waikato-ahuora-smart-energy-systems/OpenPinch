@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -117,3 +118,29 @@ def test_notebook_command_debug_raises_original_exception(monkeypatch, tmp_path:
                 str(tmp_path),
             ]
         )
+
+
+def test_main_returns_success_for_parser_command_without_handler(monkeypatch):
+    parser = SimpleNamespace(
+        parse_args=lambda _argv: SimpleNamespace(command="unknown", debug=False)
+    )
+
+    monkeypatch.setattr(cli, "build_parser", lambda: parser)
+
+    assert cli.main(["unknown"]) == 0
+
+
+def test_module_execution_exits_with_main_status(monkeypatch, tmp_path: Path):
+    monkeypatch.setattr(
+        "sys.argv",
+        ["openpinch", "notebook", "-o", str(tmp_path / "notebooks")],
+    )
+
+    source = Path(cli.__file__).read_text(encoding="utf-8")
+    namespace = {
+        "__file__": cli.__file__,
+        "__name__": "__main__",
+        "__package__": "OpenPinch",
+    }
+    with pytest.raises(SystemExit, match="0"):
+        exec(compile(source, cli.__file__, "exec"), namespace)

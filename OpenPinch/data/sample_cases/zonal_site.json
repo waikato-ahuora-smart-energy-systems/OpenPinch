@@ -20,11 +20,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Chemical Plant[S]",
@@ -46,11 +44,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Chemical Plant[S]",
@@ -72,11 +68,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Chemical Plant[S]",
@@ -98,11 +92,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Chemical Plant[S]",
@@ -124,11 +116,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Chemical Plant[S]",
@@ -150,11 +140,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Food Plant[S]",
@@ -176,11 +164,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Food Plant[S]",
@@ -202,11 +188,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Food Plant[S]",
@@ -228,11 +212,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Food Plant[S]",
@@ -254,11 +236,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Food Plant[S]",
@@ -280,11 +260,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Food Plant[S]",
@@ -306,11 +284,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Food Plant[S]",
@@ -332,11 +308,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hospital[S]",
@@ -358,11 +332,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hospital[S]",
@@ -384,11 +356,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hospital[S]",
@@ -410,11 +380,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hospital[S]",
@@ -436,11 +404,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hospital[S]",
@@ -462,11 +428,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hospital[S]",
@@ -488,11 +452,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hospital[S]",
@@ -514,11 +476,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hospital[S]",
@@ -540,11 +500,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hospital[S]",
@@ -566,11 +524,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hospital[S]",
@@ -592,11 +548,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Hospital[S]",
@@ -618,11 +572,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Residential[S]",
@@ -644,11 +596,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Residential[S]",
@@ -670,11 +620,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Residential[S]",
@@ -696,11 +644,9 @@
                 "unit": "degC"
             },
             "htc": {
-                "value": NaN,
+                "value": 1.0,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         }
     ],
     "utilities": [

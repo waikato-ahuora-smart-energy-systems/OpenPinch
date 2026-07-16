@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from OpenPinch.utils import csv_to_json
+from OpenPinch.utils import _tabular_input, csv_to_json
 from OpenPinch.utils.csv_to_json import get_problem_from_csv
 
 
@@ -140,6 +140,17 @@ def test_get_results_from_csv_writes_json(tmp_path: Path, capsys):
     assert capsys.readouterr().out == ""
 
 
+def test_get_results_from_csv_wraps_missing_and_invalid_summary_inputs(tmp_path: Path):
+    with pytest.raises(FileNotFoundError, match="CSV summary file not found"):
+        csv_to_json.get_results_from_csv(tmp_path / "missing.csv", None, "Site")
+
+    invalid = tmp_path / "invalid_summary.csv"
+    invalid.write_text("", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Failed to read CSV summary input"):
+        csv_to_json.get_results_from_csv(invalid, None, "Site")
+
+
 def test_parse_csv_with_units_drops_extra_columns(monkeypatch):
     rows = [
         ["ignored"] * 11,
@@ -164,6 +175,26 @@ def test_parse_csv_with_units_drops_extra_columns(monkeypatch):
 
     assert len(captured["df"].columns) == 9
     assert "index" in captured["df"].columns
+
+
+def test_parse_csv_with_units_rejects_empty_dataframe(monkeypatch):
+    monkeypatch.setattr(
+        csv_to_json.pd, "read_csv", lambda *args, **kwargs: pd.DataFrame()
+    )
+
+    with pytest.raises(ValueError, match="CSV is empty"):
+        csv_to_json._parse_csv_with_units(io.StringIO(""), kind="Stream Data")
+
+
+def test_tabular_helpers_reject_unknown_sheet_and_invalid_pinch_temperature():
+    with pytest.raises(ValueError, match="Unsupported tabular sheet kind"):
+        _tabular_input.get_column_names_and_units(pd.DataFrame(), "Not A Sheet")
+
+    assert _tabular_input._parse_temp_pinch("") == (None, None)
+    assert _tabular_input._parse_temp_pinch("80") == (80.0, 80.0)
+
+    with pytest.raises(ValueError, match="Invalid pinch_temp"):
+        _tabular_input._parse_temp_pinch("1;2;3")
 
 
 def test_parse_csv_with_units_pads_missing_columns_and_converts_blanks(monkeypatch):

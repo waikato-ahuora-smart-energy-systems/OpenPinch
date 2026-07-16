@@ -15,15 +15,16 @@ from OpenPinch.resources import (
 )
 
 EXPECTED_NOTEBOOKS = [
-    "01_basic_pinch_and_dtcont_sensitivity.ipynb",
-    "02_total_site_targets_and_sugcc.ipynb",
-    "03_carnot_hpr_comparison.ipynb",
-    "04_multistate_targeting_and_state_comparison.ipynb",
-    "05_schema_service_and_output_workflows.ipynb",
-    "06_energy_transfer_analysis.ipynb",
-    "07_vapour_compression_mvr_cascade_hpr.ipynb",
-    "08_direct_gas_stream_mvr.ipynb",
-    "09_hen_design_service_four_stream.ipynb",
+    "01_first_solve_summary_graphs.ipynb",
+    "02_total_site_sugcc_interpretation.ipynb",
+    "03_multiperiod_workspace_scenarios.ipynb",
+    "04_carnot_heat_pump_screening.ipynb",
+    "05_direct_gas_stream_mvr_scenarios.ipynb",
+    "06_vapour_compression_mvr_cascade_hpr.ipynb",
+    "07_heat_exchanger_network_synthesis.ipynb",
+    "08_energy_transfer_analysis.ipynb",
+    "09_schema_service_exports_and_bundles.ipynb",
+    "10_multiperiod_hpr_shared_design.ipynb",
 ]
 
 
@@ -48,11 +49,11 @@ def test_packaged_notebook_series_is_present():
 
 def test_packaged_resource_metadata_and_friendly_errors():
     sample_meta = sample_case_metadata("basic_pinch.json")
-    notebook_meta = notebook_metadata("01_basic_pinch_and_dtcont_sensitivity.ipynb")
+    notebook_meta = notebook_metadata("01_first_solve_summary_graphs.ipynb")
 
     assert sample_meta.title == "Basic Pinch"
     assert "quickstart" in sample_meta.topics
-    assert notebook_meta.title == "Basic Pinch and DT Cont Sensitivity"
+    assert notebook_meta.title == "First Solve, Summary, and Graphs"
     assert len(sample_case_metadata()) == len(list_sample_cases())
     assert len(notebook_metadata()) == len(list_notebooks())
 
@@ -65,6 +66,34 @@ def test_packaged_resource_metadata_and_friendly_errors():
 
     assert "Unknown OpenPinch sample case" in message
     assert "basic_pinch.json" in message
+
+
+def test_packaged_notebook_metadata_covers_user_paths():
+    metadata = notebook_metadata()
+
+    assert [item.name for item in metadata] == EXPECTED_NOTEBOOKS
+    assert {
+        "solve",
+        "method",
+        "integrator",
+    }.issubset({topic for item in metadata for topic in item.topics})
+    assert [
+        item.name
+        for item in metadata
+        if "solve" in item.topics and "advanced" in item.topics
+    ] == [
+        "04_carnot_heat_pump_screening.ipynb",
+        "05_direct_gas_stream_mvr_scenarios.ipynb",
+        "07_heat_exchanger_network_synthesis.ipynb",
+    ]
+    assert [item.name for item in metadata if "method" in item.topics] == [
+        "02_total_site_sugcc_interpretation.ipynb",
+        "06_vapour_compression_mvr_cascade_hpr.ipynb",
+        "08_energy_transfer_analysis.ipynb",
+    ]
+    assert [item.name for item in metadata if "integrator" in item.topics] == [
+        "09_schema_service_exports_and_bundles.ipynb"
+    ]
 
 
 def test_packaged_notebooks_are_output_free_and_use_library_surfaces(tmp_path: Path):
@@ -87,7 +116,7 @@ def test_packaged_notebooks_are_output_free_and_use_library_surfaces(tmp_path: P
 def test_notebook_1_covers_single_case_and_workspace_sensitivity(tmp_path: Path):
     notebook = _copied_notebook(
         tmp_path,
-        "01_basic_pinch_and_dtcont_sensitivity.ipynb",
+        "01_first_solve_summary_graphs.ipynb",
     )
     combined_source = _combined_source(notebook)
 
@@ -103,7 +132,7 @@ def test_notebook_1_covers_single_case_and_workspace_sensitivity(tmp_path: Path)
     assert "copy_case(" in combined_source
     assert "set_dt_cont_multiplier(" in combined_source
     assert "compare_cases(" in combined_source
-    assert 'state_id="0"' not in combined_source
+    assert 'period_id="0"' not in combined_source
 
 
 def test_notebook_2_uses_only_packaged_pulp_mill_assets_and_real_zones(
@@ -111,7 +140,7 @@ def test_notebook_2_uses_only_packaged_pulp_mill_assets_and_real_zones(
 ):
     notebook = _copied_notebook(
         tmp_path,
-        "02_total_site_targets_and_sugcc.ipynb",
+        "02_total_site_sugcc_interpretation.ipynb",
     )
     combined_source = _combined_source(notebook)
 
@@ -125,15 +154,32 @@ def test_notebook_2_uses_only_packaged_pulp_mill_assets_and_real_zones(
     assert '"base_target_type": "Total Site Target"' in combined_source
     assert '"base_target_type": "Direct Integration"' in combined_source
     assert "Power Cogeneration Target" in combined_source
-    assert 'state_id="0"' not in combined_source
+    assert 'period_id="0"' not in combined_source
 
 
-def test_notebook_3_compares_direct_indirect_and_carnot_backends(
+def test_notebook_3_covers_real_multiperiod_targeting(tmp_path: Path):
+    notebook = _copied_notebook(
+        tmp_path,
+        "03_multiperiod_workspace_scenarios.ipynb",
+    )
+    combined_source = _combined_source(notebook)
+
+    assert "crude_preheat_train_multiperiod.json" in combined_source
+    assert "zonal_site_multiperiod.json" in combined_source
+    assert "period_ids" in combined_source
+    assert "target_all_periods(" in combined_source
+    assert "direct_heat_integration(period_id=" in combined_source
+    assert "indirect_heat_integration(period_id=" in combined_source
+    assert "turndown" in combined_source
+    assert "summer" in combined_source
+
+
+def test_notebook_4_compares_direct_indirect_and_carnot_backends(
     tmp_path: Path,
 ):
     notebook = _copied_notebook(
         tmp_path,
-        "03_carnot_hpr_comparison.ipynb",
+        "04_carnot_heat_pump_screening.ipynb",
     )
     combined_source = _combined_source(notebook)
 
@@ -153,79 +199,10 @@ def test_notebook_3_compares_direct_indirect_and_carnot_backends(
     assert "compare_cases(" in combined_source
 
 
-def test_notebook_4_covers_real_multistate_targeting(tmp_path: Path):
+def test_notebook_5_covers_direct_gas_stream_mvr(tmp_path: Path):
     notebook = _copied_notebook(
         tmp_path,
-        "04_multistate_targeting_and_state_comparison.ipynb",
-    )
-    combined_source = _combined_source(notebook)
-
-    assert "crude_preheat_train_multistate.json" in combined_source
-    assert "zonal_site_multistate.json" in combined_source
-    assert "state_ids" in combined_source
-    assert "target_all_states(" in combined_source
-    assert "direct_heat_integration(state_id=" in combined_source
-    assert "indirect_heat_integration(state_id=" in combined_source
-    assert "turndown" in combined_source
-    assert "summer" in combined_source
-
-
-def test_notebook_5_covers_service_boundary_and_output_workflows(tmp_path: Path):
-    notebook = _copied_notebook(
-        tmp_path,
-        "05_schema_service_and_output_workflows.ipynb",
-    )
-    combined_source = _combined_source(notebook)
-
-    assert "copy_sample_case" in combined_source
-    assert "TargetInput" in combined_source
-    assert "pinch_analysis_service" in combined_source
-    assert "export_excel" in combined_source
-    assert "plot.export" in combined_source
-    assert "payload_view(" in combined_source
-    assert "validate_variant(" in combined_source
-    assert "solve_variant(" in combined_source
-    assert "compare_variants(" in combined_source
-    assert "save_bundle(" in combined_source
-    assert "load_bundle(" in combined_source
-
-
-def test_notebook_6_covers_energy_transfer_analysis(tmp_path: Path):
-    notebook = _copied_notebook(
-        tmp_path,
-        "06_energy_transfer_analysis.ipynb",
-    )
-    combined_source = _combined_source(notebook)
-
-    assert "pulp_mill.json" in combined_source
-    assert "target.energy_transfer(" in combined_source
-    assert "heat_surplus_deficit_table" in combined_source
-    assert "energy_transfer_diagram" in combined_source
-    assert "plot.energy_transfer_diagram" in combined_source
-    assert '"base_target_type": "Total Site Target"' in combined_source
-    assert '"base_target_type": "Direct Integration"' in combined_source
-    assert 'zone_name="Bleaching"' in combined_source
-
-
-def test_notebook_7_covers_vapour_compression_mvr_cascade_hpr(tmp_path: Path):
-    notebook = _copied_notebook(
-        tmp_path,
-        "07_vapour_compression_mvr_cascade_hpr.ipynb",
-    )
-    combined_source = _combined_source(notebook)
-
-    assert "HPRcycle.VapourCompMVR" in combined_source
-    assert "VapourCompressionMvrCascade" in combined_source
-    assert "MechanicalVapourRecompressionCycle" in combined_source
-    assert "target.direct_heat_pump()" in combined_source
-    assert "plot.net_load_profiles_with_heat_pump(" in combined_source
-    assert "plot.grand_composite_curve_with_heat_pump(" in combined_source
-
-
-def test_notebook_8_covers_direct_gas_stream_mvr(tmp_path: Path):
-    notebook = _copied_notebook(
-        tmp_path,
-        "08_direct_gas_stream_mvr.ipynb",
+        "05_direct_gas_stream_mvr_scenarios.ipynb",
     )
     combined_source = _combined_source(notebook)
 
@@ -242,7 +219,7 @@ def test_notebook_8_covers_direct_gas_stream_mvr(tmp_path: Path):
     assert "mvr.activate()" in combined_source
     assert "Evaporator vapour" in combined_source
     assert "mvr.replacement_streams" in combined_source
-    assert "stage_results_by_state" in combined_source
+    assert "stage_results_by_period" in combined_source
     assert "target.direct_heat_integration(" in combined_source
     assert "target.indirect_heat_integration(" in combined_source
     assert "summary_frame(case_name=" in combined_source
@@ -250,10 +227,25 @@ def test_notebook_8_covers_direct_gas_stream_mvr(tmp_path: Path):
     assert "return_graph_data=True" in combined_source
 
 
-def test_notebook_9_covers_hen_design_service_four_stream_problem(tmp_path: Path):
+def test_notebook_6_covers_vapour_compression_mvr_cascade_hpr(tmp_path: Path):
     notebook = _copied_notebook(
         tmp_path,
-        "09_hen_design_service_four_stream.ipynb",
+        "06_vapour_compression_mvr_cascade_hpr.ipynb",
+    )
+    combined_source = _combined_source(notebook)
+
+    assert "HPRcycle.VapourCompMVR" in combined_source
+    assert "VapourCompressionMvrCascade" in combined_source
+    assert "MechanicalVapourRecompressionCycle" in combined_source
+    assert "target.direct_heat_pump()" in combined_source
+    assert "plot.net_load_profiles_with_heat_pump(" in combined_source
+    assert "plot.grand_composite_curve_with_heat_pump(" in combined_source
+
+
+def test_notebook_7_covers_hen_design_service_four_stream_problem(tmp_path: Path):
+    notebook = _copied_notebook(
+        tmp_path,
+        "07_heat_exchanger_network_synthesis.ipynb",
     )
     combined_source = _combined_source(notebook)
 
@@ -271,10 +263,16 @@ def test_notebook_9_covers_hen_design_service_four_stream_problem(tmp_path: Path
     assert "top_ranked_networks" in combined_source
     assert "get_n_best_networks(3)" in combined_source
     assert "select_network(solution_rank=2)" in combined_source
-    assert "problem.design.network.total_heat_recovery" in combined_source
-    assert "problem.design.network.total_hot_utility" in combined_source
-    assert "problem.design.network.total_cold_utility" in combined_source
+    assert 'network.total_duty(kind="recovery", period_id=period_id)' in combined_source
+    assert (
+        'network.total_duty(kind="hot_utility", period_id=period_id)' in combined_source
+    )
+    assert (
+        'network.total_duty(kind="cold_utility", period_id=period_id)'
+        in combined_source
+    )
     assert "problem.design.network.utility(" in combined_source
+    assert "exchanger.state(period_id)" in combined_source
     assert "from OpenPinch.lib import" not in combined_source
     assert "HeatExchangerKind" not in combined_source
     assert "HeatExchangerNetworkLabel" not in combined_source
@@ -283,3 +281,59 @@ def test_notebook_9_covers_hen_design_service_four_stream_problem(tmp_path: Path
     assert "from OpenPinch.services.network_grid_diagram" not in combined_source
     assert "design.network.build_grid_diagram(" in combined_source
     assert "go.Figure()" not in combined_source
+
+
+def test_notebook_8_covers_energy_transfer_analysis(tmp_path: Path):
+    notebook = _copied_notebook(
+        tmp_path,
+        "08_energy_transfer_analysis.ipynb",
+    )
+    combined_source = _combined_source(notebook)
+
+    assert "pulp_mill.json" in combined_source
+    assert "target.energy_transfer(" in combined_source
+    assert "heat_surplus_deficit_table" in combined_source
+    assert "energy_transfer_diagram" in combined_source
+    assert "plot.energy_transfer_diagram" in combined_source
+    assert '"base_target_type": "Total Site Target"' in combined_source
+    assert '"base_target_type": "Direct Integration"' in combined_source
+    assert 'zone_name="Bleaching"' in combined_source
+
+
+def test_notebook_9_covers_service_boundary_and_output_workflows(tmp_path: Path):
+    notebook = _copied_notebook(
+        tmp_path,
+        "09_schema_service_exports_and_bundles.ipynb",
+    )
+    combined_source = _combined_source(notebook)
+
+    assert "copy_sample_case" in combined_source
+    assert "TargetInput" in combined_source
+    assert "pinch_analysis_service" in combined_source
+    assert "export_excel" in combined_source
+    assert "plot.export" in combined_source
+    assert "input_view(" in combined_source
+    assert "validate_variant(" in combined_source
+    assert "solve_variant(" in combined_source
+    assert "compare_variants(" in combined_source
+    assert "save_bundle(" in combined_source
+    assert "load_bundle(" in combined_source
+
+
+def test_notebook_10_covers_multiperiod_hpr_shared_design(tmp_path: Path):
+    notebook = _copied_notebook(
+        tmp_path,
+        "10_multiperiod_hpr_shared_design.ipynb",
+    )
+    combined_source = _combined_source(notebook)
+
+    assert "crude_preheat_train_multiperiod.json" in combined_source
+    assert "HPR_MULTIPERIOD_OPTIMIZATION_ENABLED" in combined_source
+    assert "HPR_BB_MINIMISER" in combined_source
+    assert "HPRcycle.CascadeCarnot" in combined_source
+    assert "target.direct_heat_pump(period_id=" in combined_source
+    assert 'summary_frame(periods="weighted_average"' in combined_source
+    assert 'summary_frame(periods="all_with_weighted_average"' in combined_source
+    assert "hpr_details" in combined_source
+    assert "period_outputs" in combined_source
+    assert "weighted_output" in combined_source
