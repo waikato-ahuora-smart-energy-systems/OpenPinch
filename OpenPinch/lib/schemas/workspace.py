@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ValidationIssue(BaseModel):
@@ -203,14 +203,30 @@ class ScenarioVariantBundleEntry(BaseModel):
     workflow: ScenarioWorkflowConfig = Field(default_factory=ScenarioWorkflowConfig)
     cached_view: Optional[ScenarioVariantView] = None
 
+    model_config = ConfigDict(extra="forbid")
+
 
 class PinchWorkspaceBundle(BaseModel):
     """Portable persisted multi-case study bundle."""
 
-    schema_version: str = "1"
+    schema_version: Literal["2"] = "2"
     project_name: Optional[str] = None
     baseline_name: str = "baseline"
     variants: Dict[str, ScenarioVariantBundleEntry]
+
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_unsupported_schema(cls, value):
+        if isinstance(value, dict):
+            schema_version = value.get("schema_version", "2")
+            if schema_version != "2":
+                raise ValueError(
+                    "Unsupported workspace schema_version "
+                    f"{schema_version!r}; expected '2'."
+                )
+        return value
 
 
 __all__ = [

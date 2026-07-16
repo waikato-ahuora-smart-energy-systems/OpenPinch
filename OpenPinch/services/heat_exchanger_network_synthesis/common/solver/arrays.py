@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 
+from .....classes._stream_value_state import resolve_period_weights
 from .....classes.pinch_problem import PinchProblem
 from .....classes.stream import Stream
 from .....classes.value import Value
@@ -416,19 +417,13 @@ def _segment_identity(parent_key: str, segment_index: int) -> str:
 def _period_ids_and_weights(zone: Zone) -> tuple[tuple[str, ...], tuple[float, ...]]:
     period_lookup = zone.period_ids or {"0": 0}
     ordered_period_ids = ordered_mapping_keys(period_lookup)
-    weights = getattr(zone, "weights", None)
-    if weights is None:
-        period_weights = tuple(1.0 for _ in ordered_period_ids)
-    else:
-        period_weights = tuple(
-            float(weight) for weight in np.asarray(weights, dtype=float)
+    period_weights = tuple(
+        float(weight)
+        for weight in resolve_period_weights(
+            ordered_period_ids,
+            getattr(zone, "weights", None),
         )
-    if len(period_weights) != len(ordered_period_ids):
-        raise ValueError("HEN period weight count must match period_id count.")
-    if not ordered_period_ids:
-        raise ValueError("HEN synthesis requires at least one operating period.")
-    if not np.isfinite(period_weights).all() or sum(period_weights) <= 0.0:
-        raise ValueError("HEN synthesis requires a positive finite period-weight sum.")
+    )
     return ordered_period_ids, period_weights
 
 

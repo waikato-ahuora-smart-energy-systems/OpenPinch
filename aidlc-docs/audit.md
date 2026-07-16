@@ -959,3 +959,148 @@ Github CI tests fail with the attached error message."
 - build-and-test/build-and-test-summary.md
 
 ---
+
+## Pending-Commit Pull Request Review Update Request
+**Timestamp**: 2026-07-16T03:13:12Z
+**User Input**: "Update the review to account for the pending commits."
+**AI Response**: "Started a read-only refresh of the PR review against local HEAD 756c1128a12ec16f5bcb4b9a366352ea402d7d42, including all four commits pending above origin/develop c0182ca6fa61173f87588f9a660947be33426d94. The refresh will revalidate every prior finding against the combined pending range and inspect the new changes for regressions."
+**Context**: Post-implementation PR quality review refresh. No application-code or external pull-request changes authorized.
+
+---
+
+## Pending-Commit Pull Request Review Update Completion
+**Timestamp**: 2026-07-16T03:28:59Z
+**User Input**: "Update the review to account for the pending commits."
+**AI Response**: "Completed the read-only review refresh for base 90ae88ff8d627279b6479fafd0d97ffe722cdbd9 through local HEAD 756c1128a12ec16f5bcb4b9a366352ea402d7d42. Verdict remains Request changes. The pending commits resolve the prior PDM child-segment dt_cont normalization finding; fourteen prior findings remain reproducible; and one new P1 finding was identified because segmented-utility child dt_cont values are preserved by input preparation but omitted from solver segment arrays and minimum-approach constraints. Net reportable findings: fifteen (nine P1, six P2)."
+**Context**: Post-implementation pull-request review refresh covering the four commits pending above origin/develop. No application code or external pull-request state was changed.
+**Validation**:
+- Targeted segment/schema/HEN tests: 76 passed
+- Full suite in sandbox: 1978 passed, 1 skipped; three capability-dependent tests failed because Chrome, network access, or process semaphores were blocked
+- Capability-dependent rerun outside the sandbox: 3 passed
+- Solver-marked suite outside the sandbox: 3 passed, 1 skipped
+- Ruff: passed
+- Git diff whitespace check: passed
+
+---
+
+## Pre-Release Corrective Code Generation Approval
+**Timestamp**: 2026-07-16T03:49:15Z
+**User Input**:
+```text
+PLEASE IMPLEMENT THIS PLAN:
+# Pre-Release Corrective Plan
+
+## Summary
+
+Resolve all 15 findings in four dependency-ordered PRs based on local `756c1128`. Because the project is pre-release, use clean contract changes: no legacy aliases, migration shims, deprecation paths, or ambiguous first-period compatibility fields.
+
+## Implementation Changes
+
+### PR 1 — Domain and input correctness
+
+- Make every `Value` stored by a `Stream` or `StreamSegment` read-only. Mutations through `.value`, `.unit`, or period indexing raise a clear `TypeError`; callers must assign the stream property, call `set_value_attr_at_idx`, or use `update_segment(s)`. Internal mutation paths work on mutable copies and commit transactionally.
+- Calculate default utility temperatures from every process segment’s shifted extrema across all periods.
+- Introduce one period-weight resolver used by zones, utilities, HEN arrays, and summaries: pad missing trailing weights with `1.0`, reject excess/non-finite/negative weights, and require a positive total.
+- Make stream inputs canonical-only (`name`, `heat_capacity_flowrate`) with `extra="forbid"`. Remove documentation and tests claiming support for retired aliases.
+- Change workspace bundles to strict schema version `2` using `case_input`. Version `1`, `payload`, and unknown versions fail with an explicit unsupported-schema error; regenerate repository fixtures as v2.
+- Share segmented semantic validation between validation reports and preparation. Validate streams and utilities for continuity, direction, period alignment, finite positive duty/HTC, non-negative `dt_cont`, profile validity, and supplied-parent aggregate consistency.
+
+### PR 2 — Period-native PDM and utility constraints
+
+- Replace the singular decomposition target with ordered `period_targets`, each carrying `period_id` and `period_idx`. Replace scalar clipped-temperature fields with period-indexed fields.
+- Feed period-indexed utility targets and pinch temperatures directly into PDM preprocessing and constraints. Build shared topology from the union of period-active streams and enable an above/below side when any period requires it.
+- Amalgamate every period’s recovery duties, boundary temperatures, utility duties, approach variables, split fractions, and non-isothermal outlet temperatures. Derive shared binary topology from any-period activity.
+- Correct warm-start normalization: `X[i,j,k]` divides by the fixed-hot-stream sum across `j`; `Y[j,i,k]` divides by the fixed-cold-stream sum across `i`, for every stage and period.
+- Add utility-segment `dt_cont` tensors and integrate them into the existing piecewise utility mapping. Use the first segment contribution at the inlet and the traversed segment contribution at the solved outlet duty; enforce the larger adjacent value at an exact segment boundary. Flat utilities continue through the scalar calculation.
+
+### PR 3 — Period-native HEN results
+
+- Introduce `HeatExchangerPeriodState` containing period identity, duty, activity, approach temperatures, and source/sink inlet and outlet temperatures.
+- Replace operational scalar fields on `HeatExchanger` with non-empty ordered `period_states`. Keep design-level topology, design area, and capital fields on the exchanger.
+- Require `period_id` for multiperiod duty, temperature, diagram, export, and controllability queries; allow omission only when exactly one period state exists.
+- Extract recovery and utility matches from all period arrays, retaining matches active only in later periods.
+- Prefer explicit non-isothermal branch outlet temperatures; use constant-CP arithmetic only when explicit values are unavailable.
+- Migrate all internal consumers, exports, diagrams, schemas, notebooks, and tests to the period-native result contract.
+
+### PR 4 — Isolated summaries and HPR economics
+
+- Run each summary period against a fresh deep copy of one baseline zone. Restore the original zone object, results cache, and target-run specification in `finally`, including exception paths.
+- Score shared simulated-HPR candidates as weighted operating cost plus weighted feasibility penalty plus maximum annualized capital cost. Fall back to weighted backend `obj` only when no cost breakdown exists.
+- Aggregate public HPR results using weighted operating fields, maximum capital/component-capital fields, and total annualized cost recomputed as weighted operating cost plus maximum annualized capital.
+- Keep non-HPR summary fields on their existing weighted-average policy.
+
+## Interface and Schema Changes
+
+- Workspace bundle schema becomes strictly version `2`; no v1 loader or field migration is provided.
+- Retired flat-input aliases are removed rather than restored.
+- Stream-owned `Value` instances become immutable views; all state changes use explicit stream mutation APIs.
+- PDM decomposition becomes period-native with no singular-target or period-zero aliases.
+- HEN exchanger operating data moves to `HeatExchangerPeriodState`; ambiguous multiperiod scalar access is removed.
+- Record all breaking contracts in release notes and regenerate examples and packaged fixtures.
+
+## Test and Acceptance Plan
+
+- Convert every review reproducer into a regression test and require all 15 to pass.
+- Add property-based tests for transaction rollback, revision/cache invalidation, immutable stream-owned values, serialization, and period-weight expansion.
+- Add validation-report/load parity tests for segmented process streams and utilities.
+- Add strict rejection tests for schema v1, `payload`, retired aliases, extra fields, and ambiguous period access.
+- Add two-period PDM fixtures with distinct targets, pinches, active streams, utility duties, and non-isothermal states.
+- Test utility `dt_cont` within segments, at boundaries, and across boundaries for hot/cold and scalar/multiperiod cases.
+- Test later-period-only exchangers, period-state serialization, explicit branch temperatures, and period-aware totals/exports.
+- Test summary object identity and state equality after successful and failed replay.
+- Hand-calculate shared-HPR cases where peak capital and operating-cost periods differ.
+- Run focused tests per PR, the full suite, solver-marked tests, Ruff, documentation, packaging, patch hygiene, and canonical HEN tier 0/1 regressions after solver/result changes.
+- Update AI-DLC checklists, state, audit, and build/test evidence in the same interaction as each completed implementation step.
+
+## Locked Decisions
+
+- Breaking pre-release changes are acceptable; no compatibility shims or deprecation windows.
+- Delivery remains four staged PRs.
+- Typed period states are authoritative for multiperiod HEN results.
+- The four pending commits remain the baseline, including the corrected PDM child `dt_cont` transaction.
+- Security and resiliency extensions remain disabled; partial property-based-testing rules apply.
+```
+**AI Response**: "Accepted the supplied plan as explicit Code Generation approval, persisted its four dependency-ordered implementation units, and started PR 1 regression-first construction from local baseline 756c1128."
+**Context**: CONSTRUCTION - Code Generation Part 1 complete; Part 2 begins with PR 1 Domain and Input Correctness. No compatibility shims will be introduced.
+
+---
+
+## Code Generation - PR 1 Domain Contracts
+**Timestamp**: 2026-07-16T03:59:27Z
+**User Input**: "No new user input."
+**AI Response**: "Completed and verified immutable Stream/StreamSegment-owned Value contracts and canonical period-weight resolution across zones, utility preparation, HEN solver arrays, and summaries. Focused regression and summary tests passed (9 passed); Ruff passed for the touched implementation and tests."
+**Context**: CONSTRUCTION - Code Generation Part 2, PR 1. Updated both completed plan checkboxes and the stage-level progress record in the same interaction.
+
+---
+
+## Code Generation - PR 1 Segmented Utility Extrema
+**Timestamp**: 2026-07-16T04:01:46Z
+**User Input**: "No new user input."
+**AI Response**: "Changed default utility temperature derivation to inspect every authoritative process-stream segment and every period before selecting shifted extrema. The focused regression passed and Ruff reported no issues."
+**Context**: CONSTRUCTION - Code Generation Part 2, PR 1. Marked the segmented default-utility-extrema plan step complete in the same interaction.
+
+---
+
+## Code Generation - PR 1 Strict Input and Bundle Schemas
+**Timestamp**: 2026-07-16T04:04:40Z
+**User Input**: "No new user input."
+**AI Response**: "Enforced forbidden extras for canonical process-stream, segment, and temperature-profile inputs; removed the retired alias-specific validator; made workspace bundles strict schema version 2 with case_input and explicit unsupported-version errors; and removed obsolete loc/index bookkeeping fields from packaged sample inputs. Focused schema, bundle round-trip, workspace, resource, and Ruff checks passed."
+**Context**: CONSTRUCTION - Code Generation Part 2, PR 1. No compatibility loader, alias, payload migration, or deprecation shim was introduced. Marked the strict-schema plan step complete in the same interaction.
+
+---
+
+## Code Generation - PR 1 Shared Segmented Semantics
+**Timestamp**: 2026-07-16T04:12:02Z
+**User Input**: "No new user input."
+**AI Response**: "Unified nested process-stream and utility semantic validation for validation reports and preparation. The shared checks now cover ordered continuity, thermal direction, period alignment, finite positive segment duty and HTC, finite non-negative segment dt_cont, profile validity, and supplied-parent aggregate consistency. Added report/load parity assertions and property-based immutability, rollback, revision/cache invalidation, serialization, and period-weight expansion coverage. Focused tests passed (14 passed) and Ruff passed."
+**Context**: CONSTRUCTION - Code Generation Part 2, PR 1. Marked the shared-semantic-validation plan step complete in the same interaction.
+
+---
+
+## Code Generation - PR 1 Completion
+**Timestamp**: 2026-07-16T04:58:53Z
+**User Input**: "No new user input."
+**AI Response**: "Completed PR 1 Domain and Input Correctness. The sandbox-safe non-solver matrix passed 1,985 tests with six deselections; the documentation and Kaleido image gates passed separately with their required external resources; post-matrix period-context regressions passed; repository Ruff, JSON parsing, warning-free Sphinx, isolated wheel/sdist packaging, and git diff hygiene all passed. Updated release notes, implementation summary, Build and Test evidence, the detailed plan checkboxes, and stage state."
+**Context**: CONSTRUCTION - Code Generation Part 2, PR 1 complete. Extension compliance: Security disabled (N/A), Resiliency disabled (N/A), Property-Based Testing Partial compliant. PR 2 is the next dependency-ordered unit.
+
+---

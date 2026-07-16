@@ -153,3 +153,34 @@ the deferred refinement is not part of the immediate next steps.
 - Tests: pass.
 - Coverage gate: pass.
 - Ready for Operations placeholder: yes; no deployment work was requested.
+
+## Pre-Release Corrective PR 1 Evidence
+
+### Results
+
+- Sandbox-safe non-solver matrix: 1,985 passed and 6 deselected in 137.19
+  seconds. The deselections were four solver-marked cases plus the two
+  environment-dependent documentation/image gates.
+- Environment-dependent gates: warning-free Sphinx build passed with official
+  intersphinx inventories; Kaleido grid-image export passed with headless Chrome.
+- Post-matrix period-context regressions: 2 passed.
+- Ruff: repository-wide `OpenPinch` and `tests` lint passed.
+- Structured JSON: every packaged sample, example input, and mirrored utility
+  targeting fixture parsed with `jq` after canonical-field regeneration.
+- Packaging: OpenPinch 0.4.6 wheel and source distribution built successfully in
+  an isolated temporary directory.
+- Patch hygiene: `git diff --check` passed; generated documentation and
+  distribution outputs remained outside the worktree.
+
+### Extension Compliance
+
+- Security Baseline: disabled; N/A for this stage.
+- Resiliency Baseline: disabled; N/A for this stage.
+- Property-Based Testing (Partial): compliant; generated invariants cover
+  immutable owned values, transaction rollback, revisions/cache invalidation,
+  serialization, and canonical period-weight expansion.
+
+### Status
+
+PR 1 Domain and Input Correctness is independently green and ready to be
+committed as the first stacked pre-release change.

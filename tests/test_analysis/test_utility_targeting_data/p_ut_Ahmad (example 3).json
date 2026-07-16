@@ -85,9 +85,7 @@
             "htc": {
                 "value": 0.05,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Ahmad",
@@ -111,9 +109,7 @@
             "htc": {
                 "value": 0.05,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Ahmad",
@@ -137,9 +133,7 @@
             "htc": {
                 "value": 0.05,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Ahmad",
@@ -163,9 +157,7 @@
             "htc": {
                 "value": 0.05,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Ahmad",
@@ -189,9 +181,7 @@
             "htc": {
                 "value": 0.05,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Ahmad",
@@ -215,9 +205,7 @@
             "htc": {
                 "value": 0.05,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Ahmad",
@@ -241,9 +229,7 @@
             "htc": {
                 "value": 0.05,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Ahmad",
@@ -267,9 +253,7 @@
             "htc": {
                 "value": 0.05,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Ahmad",
@@ -293,9 +277,7 @@
             "htc": {
                 "value": 0.05,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Ahmad",
@@ -319,9 +301,7 @@
             "htc": {
                 "value": 0.05,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         }
     ],
     "utilities": [

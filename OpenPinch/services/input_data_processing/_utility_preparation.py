@@ -7,6 +7,7 @@ from typing import List, Tuple
 
 import numpy as np
 
+from ...classes._stream_value_state import resolve_period_weights
 from ...classes.stream import Stream
 from ...classes.stream_collection import StreamCollection
 from ...classes.value import Value
@@ -66,12 +67,7 @@ def _get_hot_and_cold_utilities(
         str(period_id): index
         for index, period_id in enumerate(config.problem.period_ids)
     }
-    configured_weights = list(config.problem.period_weights)
-    weights = (
-        configured_weights
-        if len(configured_weights) == len(period_ids)
-        else [1.0] * len(period_ids)
-    )
+    weights = resolve_period_weights(period_ids, config.problem.period_weights)
     prepared.set_period_context(
         period_ids=period_ids,
         weights=weights,

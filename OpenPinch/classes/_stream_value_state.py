@@ -24,7 +24,7 @@ def coerce_to_value(value, *, target_unit: str) -> Value | None:
             "unit": raw_value.get("unit"),
         }
 
-    parsed = raw_value if isinstance(raw_value, Value) else Value(raw_value)
+    parsed = Value(raw_value)
     if parsed.unit == target_unit:
         return parsed
     if parsed.unit in {"", "-"}:
@@ -69,7 +69,62 @@ def copy_value(value: Value | None) -> Value | None:
     """Return a defensive value copy while preserving ``None``."""
     if value is None:
         return None
-    return Value(value)
+    copied = Value(value)
+    reason = getattr(value, "_read_only_reason", None)
+    return copied._make_read_only(reason) if reason is not None else copied
+
+
+def resolve_period_weights(
+    period_ids: Mapping[str, int] | Iterable[str],
+    weights,
+) -> np.ndarray:
+    """Return the canonical non-negative weight vector for ``period_ids``.
+
+    Missing trailing values default to one. Excess, non-finite, negative, and
+    all-zero vectors are rejected so every consumer sees the same period model.
+    """
+    expected_len = (
+        len(period_ids)
+        if hasattr(period_ids, "__len__")
+        else len(list(period_ids))
+    )
+    if expected_len <= 0:
+        raise ValueError("At least one operating period is required.")
+    if weights is None:
+        resolved = np.ones(expected_len, dtype=float)
+    else:
+        if isinstance(weights, Mapping):
+            ordered_period_ids = list(period_ids)
+            unknown_ids = set(weights) - set(ordered_period_ids)
+            if unknown_ids:
+                unknown = ", ".join(sorted(str(item) for item in unknown_ids))
+                raise ValueError(f"Unknown period weight id(s): {unknown}.")
+            supplied_values = []
+            missing_seen = False
+            for period_id in ordered_period_ids:
+                if period_id not in weights:
+                    missing_seen = True
+                    continue
+                if missing_seen:
+                    raise ValueError("Missing period weights must be trailing.")
+                supplied_values.append(weights[period_id])
+            supplied = np.asarray(supplied_values, dtype=float).reshape(-1)
+        else:
+            supplied = np.asarray(weights, dtype=float).reshape(-1)
+        if supplied.size > expected_len:
+            raise ValueError(
+                f"Expected at most {expected_len} period weight(s), "
+                f"got {supplied.size}."
+            )
+        resolved = np.ones(expected_len, dtype=float)
+        resolved[: supplied.size] = supplied
+    if not np.isfinite(resolved).all():
+        raise ValueError("Period weights must be finite.")
+    if np.any(resolved < 0.0):
+        raise ValueError("Period weights must be non-negative.")
+    if float(resolved.sum()) <= 0.0:
+        raise ValueError("At least one period weight must be positive.")
+    return resolved
 
 
 def is_period_value_data(value: Mapping) -> bool:

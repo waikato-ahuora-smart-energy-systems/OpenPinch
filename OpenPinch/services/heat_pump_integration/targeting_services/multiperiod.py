@@ -8,6 +8,7 @@ from typing import Any, Callable
 
 import numpy as np
 
+from ....classes._stream_value_state import resolve_period_weights
 from ....classes.problem_table import ProblemTable
 from ....classes.zone import Zone
 from ....lib.config import tol
@@ -357,10 +358,10 @@ def _canonical_period_items(zone: Zone) -> list[tuple[str, int]]:
 
 def _canonical_period_weights(zone: Zone) -> dict[str, float]:
     items = _canonical_period_items(zone)
-    weights = getattr(zone, "weights", None)
-    if weights is None or len(weights) != len(items):
-        return {period_id: 1.0 for period_id, _idx in items}
-    flat_weights = np.asarray(weights, dtype=float).reshape(-1)
+    flat_weights = resolve_period_weights(
+        [period_id for period_id, _idx in items],
+        getattr(zone, "weights", None),
+    )
     return {
         period_id: float(flat_weights[period_idx]) for period_id, period_idx in items
     }

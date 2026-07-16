@@ -133,9 +133,7 @@
             "htc": {
                 "value": 2,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process",
@@ -159,9 +157,7 @@
             "htc": {
                 "value": 0.6,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process",
@@ -185,9 +181,7 @@
             "htc": {
                 "value": 0.3,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process",
@@ -211,9 +205,7 @@
             "htc": {
                 "value": 2,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process",
@@ -237,9 +229,7 @@
             "htc": {
                 "value": 0.08,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process",
@@ -263,9 +253,7 @@
             "htc": {
                 "value": 0.02,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process",
@@ -289,9 +277,7 @@
             "htc": {
                 "value": 2,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process",
@@ -315,9 +301,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process",
@@ -341,9 +325,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process",
@@ -367,9 +349,7 @@
             "htc": {
                 "value": 2,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process",
@@ -393,9 +373,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process",
@@ -419,9 +397,7 @@
             "htc": {
                 "value": 2,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process",
@@ -445,9 +421,7 @@
             "htc": {
                 "value": 1.6,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process",
@@ -471,9 +445,7 @@
             "htc": {
                 "value": 2,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process",
@@ -497,9 +469,7 @@
             "htc": {
                 "value": 2,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process",
@@ -523,9 +493,7 @@
             "htc": {
                 "value": 0.06,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process",
@@ -549,9 +517,7 @@
             "htc": {
                 "value": 0.4,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process",
@@ -575,9 +541,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process",
@@ -601,9 +565,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Process",
@@ -627,9 +589,7 @@
             "htc": {
                 "value": 0.7,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         }
     ],
     "utilities": [

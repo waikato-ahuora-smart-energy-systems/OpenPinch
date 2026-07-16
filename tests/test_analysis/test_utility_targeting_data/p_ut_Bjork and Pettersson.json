@@ -101,9 +101,7 @@
             "htc": {
                 "value": 2,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Bjork and Pettersson",
@@ -127,9 +125,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Bjork and Pettersson",
@@ -153,9 +149,7 @@
             "htc": {
                 "value": 2,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Bjork and Pettersson",
@@ -179,9 +173,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Bjork and Pettersson",
@@ -205,9 +197,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Bjork and Pettersson",
@@ -231,9 +221,7 @@
             "htc": {
                 "value": 2,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Bjork and Pettersson",
@@ -257,9 +245,7 @@
             "htc": {
                 "value": 0.4,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Bjork and Pettersson",
@@ -283,9 +269,7 @@
             "htc": {
                 "value": 0.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Bjork and Pettersson",
@@ -309,9 +293,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Bjork and Pettersson",
@@ -335,9 +317,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Bjork and Pettersson",
@@ -361,9 +341,7 @@
             "htc": {
                 "value": 2,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Bjork and Pettersson",
@@ -387,9 +365,7 @@
             "htc": {
                 "value": 2,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Bjork and Pettersson",
@@ -413,9 +389,7 @@
             "htc": {
                 "value": 2,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Bjork and Pettersson",
@@ -439,9 +413,7 @@
             "htc": {
                 "value": 1,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Bjork and Pettersson",
@@ -465,9 +437,7 @@
             "htc": {
                 "value": 3,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         }
     ],
     "utilities": [

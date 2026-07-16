@@ -59,6 +59,7 @@ from ._problem import (
 from ._problem import (
     locate_summary_row as _locate_summary_row,
 )
+from ._stream_value_state import resolve_period_weights
 from .stream_collection import StreamCollection
 from .value import Value
 from .zone import Zone
@@ -545,11 +546,12 @@ class PinchProblem:
     def _period_weights_for_summary(self) -> list[float]:
         master_zone = self._require_prepared_root_zone()
         period_ids = list(master_zone.period_ids.keys())
-        weights = getattr(master_zone, "weights", None)
-        if weights is None or len(weights) != len(period_ids):
-            return [1.0 for _ in period_ids]
+        resolved = resolve_period_weights(
+            master_zone.period_ids,
+            getattr(master_zone, "weights", None),
+        )
         return [
-            float(weights[int(master_zone.period_ids[period_id])])
+            float(resolved[master_zone.period_ids[period_id]])
             for period_id in period_ids
         ]
 

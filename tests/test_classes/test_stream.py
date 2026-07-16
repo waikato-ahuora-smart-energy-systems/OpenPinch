@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from OpenPinch.classes._stream_value_state import resolve_period_weights
 from OpenPinch.classes.stream import Stream
 from OpenPinch.classes.value import Value
 from OpenPinch.lib.enums import ST, FluidPhase
@@ -104,12 +105,28 @@ def test_derived_stream_fields_are_read_only():
     with pytest.raises(AttributeError):
         stream.t_min = 150.0
 
-    # Derived-value accessors return defensive copies, so mutating them does not
-    # write back onto the stream.
-    stream.t_min["0"] = 150.0
-    stream.CP["0"] = 10.0
+    with pytest.raises(TypeError, match="Stream-owned Value is read-only"):
+        stream.t_min["0"] = 150.0
+    with pytest.raises(TypeError, match="Stream-owned Value is read-only"):
+        stream.CP["0"] = 10.0
     assert float(stream.t_min) == pytest.approx(200.0)
     assert float(stream.CP) == pytest.approx(50.0)
+
+
+def test_period_weight_resolution_pads_missing_values_and_rejects_invalid_shapes():
+    np.testing.assert_allclose(
+        resolve_period_weights(["base", "peak", "idle"], [0.25]),
+        [0.25, 1.0, 1.0],
+    )
+
+    with pytest.raises(ValueError, match="at most 2"):
+        resolve_period_weights(["base", "peak"], [1.0, 2.0, 3.0])
+    with pytest.raises(ValueError, match="non-negative"):
+        resolve_period_weights(["base", "peak"], [1.0, -1.0])
+    with pytest.raises(ValueError, match="finite"):
+        resolve_period_weights(["base", "peak"], [1.0, np.nan])
+    with pytest.raises(ValueError, match="positive"):
+        resolve_period_weights(["base", "peak"], [0.0, 0.0])
 
 
 def test_period_stream_resolves_named_periods_from_context():
@@ -195,7 +212,9 @@ def test_stream_accessor_assignment_updates_selected_position():
         htc=2.0,
     )
 
-    stream.heat_flow["1"] = 3500.0
+    with pytest.raises(TypeError, match="Stream-owned Value is read-only"):
+        stream.heat_flow["1"] = 3500.0
+    stream.set_value_attr_at_idx("heat_flow", 3500.0, idx="1")
 
     np.testing.assert_allclose(
         stream.heat_flow.period_values, np.array([5000.0, 3500.0])
@@ -212,7 +231,9 @@ def test_stream_accessor_assignment_with_none_updates_default_period():
         htc=2.0,
     )
 
-    stream.heat_flow[None] = 3500.0
+    with pytest.raises(TypeError, match="Stream-owned Value is read-only"):
+        stream.heat_flow[None] = 3500.0
+    stream.set_value_attr_at_idx("heat_flow", 3500.0, idx=None)
 
     np.testing.assert_allclose(
         stream.heat_flow.period_values, np.array([3500.0, 4000.0])
@@ -229,7 +250,9 @@ def test_scalar_stream_accessor_assignment_with_none_updates_value():
         htc=2.0,
     )
 
-    stream.heat_flow[None] = 3500.0
+    with pytest.raises(TypeError, match="Stream-owned Value is read-only"):
+        stream.heat_flow[None] = 3500.0
+    stream.set_value_attr_at_idx("heat_flow", 3500.0, idx=None)
 
     assert stream.heat_flow.value == pytest.approx(3500.0)
 
@@ -433,7 +456,7 @@ def test_stream_period_context_helpers_validate_ids_and_lengths():
     assert stream.resolve_attr("name") == "Period-valued"
     with pytest.raises(ValueError, match="Unknown period_id"):
         stream.get_period_index("missing")
-    with pytest.raises(ValueError, match="period_ids and weights"):
+    with pytest.raises(ValueError, match="Expected at most 1 period weight"):
         stream.set_period_context(["base"], [0.5, 0.5], num_periods=2)
 
 

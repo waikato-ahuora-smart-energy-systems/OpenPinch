@@ -63,6 +63,15 @@ Supported Source Shapes
 - ``TargetInput`` instances
 - plain mappings that already match the case-input structure
 
+Canonical Input Fields
+----------------------
+
+Structured process-stream, segment, and temperature-profile mappings reject
+unknown fields. Process streams use ``name`` and
+``heat_capacity_flowrate`` as their canonical field names. Retired spellings
+such as ``stream_name``, ``heat_capacity_flow_rate``, and
+``flow_heat_capacity`` are invalid inputs and are not migrated.
+
 Variable Heat-Capacity Streams
 ------------------------------
 
@@ -70,6 +79,12 @@ Structured Python and JSON inputs can describe one physical stream with an
 ordered piecewise thermal profile. The prepared problem retains one parent
 ``Stream``; its children are ``StreamSegment`` objects used for interval,
 area, and network calculations.
+
+Every ``Value`` exposed by a prepared ``Stream`` or ``StreamSegment`` is a
+read-only view. Change domain state by assigning the stream property, calling
+``set_value_attr_at_idx(...)``, or using ``update_segment(...)`` and
+``update_segments(...)``. These APIs validate a mutable candidate and commit
+the complete change transactionally.
 
 Explicit segment input supplies each piece in physical traversal order. Every
 segment target temperature must equal the next segment supply temperature.

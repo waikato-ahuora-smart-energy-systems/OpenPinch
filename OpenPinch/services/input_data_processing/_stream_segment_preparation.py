@@ -17,6 +17,7 @@ from ...lib.unit_system import standardise_input_value
 
 def _create_segmented_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
     """Create one physical parent stream from ordered nested thermal data."""
+    _validate_nested_record_semantics(stream, config=zone.config, section="streams")
     common = {
         "dt_cont": standardise_input_value(
             stream.dt_cont,
@@ -242,6 +243,7 @@ def _create_segmented_utility_stream(
     dt_cont_multiplier: float,
 ) -> Stream:
     """Create one ordered segmented utility, preserving local segment prices."""
+    _validate_nested_record_semantics(utility, config=config, section="utilities")
     common = {
         "dt_cont": standardise_input_value(
             utility.dt_cont,
@@ -395,6 +397,28 @@ def _validate_supplied_parent_aggregates(
                 f"Segmented stream {schema.name!r} supplied {field_name} does not "
                 "match the authoritative profile."
             )
+
+
+def _validate_nested_record_semantics(
+    schema: StreamSchema | UtilitySchema,
+    *,
+    config,
+    section: str,
+) -> None:
+    """Apply the same nested semantic checks used by validation reports."""
+    from ...classes._problem._validation import segmented_record_issues
+
+    issues = segmented_record_issues(
+        schema,
+        section=section,
+        record_index=0,
+        record_label=schema.name,
+        config=config,
+    )
+    errors = [issue for issue in issues if issue.severity == "error"]
+    if errors:
+        details = "; ".join(f"{issue.path}: {issue.message}" for issue in errors)
+        raise ValueError(details)
 
 
 __all__: list[str] = []

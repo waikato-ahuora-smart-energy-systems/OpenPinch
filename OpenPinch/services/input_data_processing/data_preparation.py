@@ -274,13 +274,17 @@ def _find_extreme_process_temperatures(
     cu_t_max: float = None
     stream: Stream
     for stream in hot_streams:
-        stream_min = stream.t_min_star.min
-        if cu_t_max is None or cu_t_max > stream_min:
-            cu_t_max = stream_min
+        thermal_segments = stream.segments or (stream,)
+        for segment in thermal_segments:
+            segment_min = segment.t_min_star.min
+            if cu_t_max is None or cu_t_max > segment_min:
+                cu_t_max = segment_min
     for stream in cold_streams:
-        stream_max = stream.t_max_star.max
-        if hu_t_min is None or hu_t_min < stream_max:
-            hu_t_min = stream_max
+        thermal_segments = stream.segments or (stream,)
+        for segment in thermal_segments:
+            segment_max = segment.t_max_star.max
+            if hu_t_min is None or hu_t_min < segment_max:
+                hu_t_min = segment_max
     if hu_t_min is None:
         hu_t_min = cu_t_max
     if cu_t_max is None:

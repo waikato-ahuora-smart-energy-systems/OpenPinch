@@ -89,9 +89,7 @@
             "htc": {
                 "value": 0.8,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Dairy",
@@ -115,9 +113,7 @@
             "htc": {
                 "value": 0.8,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Dairy",
@@ -141,9 +137,7 @@
             "htc": {
                 "value": 0.8,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Dairy",
@@ -167,9 +161,7 @@
             "htc": {
                 "value": 0.8,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Dairy",
@@ -193,9 +185,7 @@
             "htc": {
                 "value": 0.8,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Dairy",
@@ -219,9 +209,7 @@
             "htc": {
                 "value": 0.8,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Dairy",
@@ -245,9 +233,7 @@
             "htc": {
                 "value": 0.8,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Dairy",
@@ -271,9 +257,7 @@
             "htc": {
                 "value": 0.8,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Dairy",
@@ -297,9 +281,7 @@
             "htc": {
                 "value": 0.8,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Dairy",
@@ -323,9 +305,7 @@
             "htc": {
                 "value": 0.8,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Dairy",
@@ -349,9 +329,7 @@
             "htc": {
                 "value": 0.8,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Dairy",
@@ -375,9 +353,7 @@
             "htc": {
                 "value": 0.8,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Dairy",
@@ -401,9 +377,7 @@
             "htc": {
                 "value": 0.8,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         }
     ],
     "utilities": [

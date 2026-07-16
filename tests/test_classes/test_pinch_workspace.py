@@ -10,6 +10,7 @@ from types import SimpleNamespace
 from typing import List
 
 import pytest
+from pydantic import ValidationError
 
 from OpenPinch import PinchProblem, PinchWorkspace, config_options
 from OpenPinch.classes._workspace import case_inputs
@@ -30,6 +31,7 @@ from OpenPinch.classes._workspace.views import summary_metric_deltas
 from OpenPinch.lib.enums import HPRcycle
 from OpenPinch.lib.schemas.io import TargetInput
 from OpenPinch.lib.schemas.workspace import (
+    PinchWorkspaceBundle,
     ProblemTableView,
     ScenarioVariantView,
     TableView,
@@ -82,12 +84,39 @@ def test_pinch_workspace_updates_case_options_and_roundtrips_bundles(tmp_path: P
     workspace.update_options({"THERMAL_DT_CONT": 15}, case_name="wide_dt")
 
     bundle_path = workspace.save_bundle(tmp_path / "pinch_workspace_bundle.json")
+    saved_bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
     reloaded = PinchWorkspace.load_bundle(bundle_path)
 
     assert workspace.get_case_input("wide_dt")["options"]["THERMAL_DT_CONT"] == 15
     assert bundle_path.exists()
+    assert saved_bundle["schema_version"] == "2"
+    assert "case_input" in saved_bundle["variants"]["baseline"]
     assert reloaded.list_cases() == ["baseline", "wide_dt"]
     assert reloaded.get_case_input("wide_dt")["options"]["THERMAL_DT_CONT"] == 15
+
+
+def test_workspace_bundle_rejects_v1_payload_and_unknown_versions():
+    base = {
+        "project_name": "Demo",
+        "baseline_name": "baseline",
+        "variants": {"baseline": {"case_input": _basic_payload()}},
+    }
+
+    valid = PinchWorkspaceBundle.model_validate({"schema_version": "2", **base})
+    assert valid.schema_version == "2"
+
+    with pytest.raises(ValidationError, match="Unsupported workspace schema_version"):
+        PinchWorkspaceBundle.model_validate({"schema_version": "1", **base})
+    with pytest.raises(ValidationError, match="Unsupported workspace schema_version"):
+        PinchWorkspaceBundle.model_validate({"schema_version": "future", **base})
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        PinchWorkspaceBundle.model_validate(
+            {
+                "schema_version": "2",
+                **base,
+                "variants": {"baseline": {"payload": _basic_payload()}},
+            }
+        )
 
 
 def test_pinch_workspace_scenario_helper_and_report_delegates():

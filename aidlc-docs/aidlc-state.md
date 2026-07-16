@@ -107,6 +107,11 @@
   contract; focused multiperiod and segmented-stream tests also pass.
 
 ## Follow-up Plans
+- **Pre-release corrective review findings**: The user approved a four-PR
+  breaking-change implementation plan closing fifteen validated review findings.
+  Code Generation Part 1 is complete; PR 1 Domain and Input Correctness is the
+  active unit. The execution checklist is
+  `aidlc-docs/construction/plans/pre-release-corrective-code-generation-plan.md`.
 - **Segment batch update and pricing**: Approved Code Generation plan created at
   `aidlc-docs/construction/plans/segment-batch-update-and-pricing-code-generation-plan.md`.
   Implementation and Build and Test are complete. Segment prices remain
@@ -141,6 +146,21 @@
   completed, including documentation updates. The completed code-generation
   checklist is at
   `aidlc-docs/construction/plans/hen-area-slice-code-generation-plan.md`.
+
+## Pre-Release Corrective Review Progress
+
+- [x] CONSTRUCTION - Code Generation Part 1 plan approved by the user's explicit
+  implementation request.
+- [x] CONSTRUCTION - PR 1 Domain and Input Correctness.
+- [ ] CONSTRUCTION - PR 2 Period-Native PDM and Utility Constraints.
+- [ ] CONSTRUCTION - PR 3 Period-Native HEN Results.
+- [ ] CONSTRUCTION - PR 4 Summary Isolation and HPR Economics.
+- [ ] CONSTRUCTION - Final Build and Test.
+- **Current stage**: Code Generation Part 2 - PR 2 period-native PDM and utility
+  constraints. PR 1 is independently green with implementation, documentation,
+  packaging, and Build and Test evidence complete.
+- **Compatibility policy**: Pre-release clean breaks; no compatibility shims.
+- **Plan**: `aidlc-docs/construction/plans/pre-release-corrective-code-generation-plan.md`.
 
 ## Read the Docs Configuration Follow-up Progress
 - [x] INCEPTION - Workspace Detection

@@ -52,7 +52,7 @@ def sample_problem():
                 "t_supply": 150,
                 "t_target": 60,
                 "heat_flow": 2.0,
-                "dtcont": 1,
+                "dt_cont": 1,
             }
         ],
         "utilities": [{"name": "LP Steam", "t_supply": 150, "type": "Hot", "cost": 20}],
@@ -349,7 +349,7 @@ def test_root_stream_views_are_exposed_on_problem():
                 "t_supply": 180.0,
                 "t_target": 90.0,
                 "heat_flow": 100.0,
-                "dtcont": 5.0,
+                "dt_cont": 5.0,
             },
             {
                 "zone": "Area1",
@@ -357,7 +357,7 @@ def test_root_stream_views_are_exposed_on_problem():
                 "t_supply": 40.0,
                 "t_target": 120.0,
                 "heat_flow": 80.0,
-                "dtcont": 5.0,
+                "dt_cont": 5.0,
             },
         ],
         "utilities": [
@@ -391,7 +391,7 @@ def test_problem_hot_stream_temperature_mutation_updates_root_zone_stream():
                 "t_supply": 180.0,
                 "t_target": 90.0,
                 "heat_flow": 100.0,
-                "dtcont": 5.0,
+                "dt_cont": 5.0,
             }
         ],
         "utilities": [],

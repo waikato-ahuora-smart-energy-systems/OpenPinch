@@ -324,7 +324,7 @@ def test_zone_period_context_none_list_weights_and_target_defaults(dummy_tar):
 
     root.set_period_context(["base", "peak"], [0.25, 0.75], 2)
     assert root.period_ids == {"base": 0, "peak": 1}
-    assert root.weights == [0.25, 0.75]
+    assert root.weights.tolist() == [0.25, 0.75]
     assert child.period_ids == {"base": 0, "peak": 1}
 
     root.set_period_context(["base", "peak"], (0.4, 0.6), 2)

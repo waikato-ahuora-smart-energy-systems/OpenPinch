@@ -153,7 +153,7 @@ def test_target_input_accepts_stream_fluid_pressure_and_enthalpy_fields():
 
 @pytest.mark.parametrize(
     "alias_name",
-    ["stream_name", "heat_capacity_flow_rate", "flow_heat_capacity"],
+    ["stream_name", "heat_capacity_flow_rate", "flow_heat_capacity", "dtcont"],
 )
 def test_stream_schema_rejects_retired_aliases(alias_name):
     payload = {
@@ -173,21 +173,19 @@ def test_stream_schema_rejects_retired_aliases(alias_name):
         StreamSchema.model_validate(payload)
 
 
-def test_stream_schema_ignores_fixture_bookkeeping_fields():
-    stream = StreamSchema.model_validate(
-        {
-            "zone": "Zone A",
-            "name": "H1",
-            "t_supply": 150.0,
-            "t_target": 60.0,
-            "heat_flow": 100.0,
-            "loc": 0,
-            "index": 0,
-        }
-    )
-
-    assert stream.name == "H1"
-    assert stream.model_dump(mode="python")["name"] == "H1"
+def test_stream_schema_rejects_fixture_bookkeeping_fields():
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        StreamSchema.model_validate(
+            {
+                "zone": "Zone A",
+                "name": "H1",
+                "t_supply": 150.0,
+                "t_target": 60.0,
+                "heat_flow": 100.0,
+                "loc": 0,
+                "index": 0,
+            }
+        )
 
 
 def test_target_input_accepts_fluid_phase_enum_instances():

@@ -42,11 +42,95 @@ def test_validation_report_and_warning_semantics(validation_cases):
 
     report = validation.build_validation_report(validation_cases["warning_problem"])
     assert report.valid is True
-    assert [issue.severity for issue in report.issues] == ["warning"]
+    assert [issue.severity for issue in report.issues] == ["warning", "warning"]
 
     validated = TargetInput.model_validate(validation_cases["warning_problem"])
     with pytest.warns(UserWarning, match="warning"):
         validation._validate_problem_semantics(validated, context={})
+
+
+def test_validation_report_rejects_discontinuous_segmented_utility_before_loading():
+    payload = {
+        "streams": [
+            {
+                "zone": "Site",
+                "name": "C1",
+                "t_supply": 20.0,
+                "t_target": 80.0,
+                "heat_flow": 60.0,
+            }
+        ],
+        "utilities": [
+            {
+                "name": "Steam",
+                "type": "Hot",
+                "segments": [
+                    {
+                        "t_supply": 300.0,
+                        "t_target": 250.0,
+                        "heat_flow": 50.0,
+                    },
+                    {
+                        "t_supply": 240.0,
+                        "t_target": 200.0,
+                        "heat_flow": 40.0,
+                    },
+                ],
+            }
+        ],
+    }
+
+    report = validation.build_validation_report(payload)
+
+    assert report.valid is False
+    assert any(
+        issue.path == "utilities[0].segments[1].t_supply"
+        and "previous segment" in issue.message
+        for issue in report.issues
+    )
+    with pytest.raises(
+        ValueError,
+        match=r"utilities\[0\]\.segments\[1\]\.t_supply",
+    ):
+        validation.validate_problem_inputs(payload)
+
+
+def test_validation_report_rejects_segmented_parent_aggregate_mismatch():
+    payload = {
+        "streams": [
+            {
+                "zone": "Site",
+                "name": "H1",
+                "t_supply": 200.0,
+                "t_target": 100.0,
+                "heat_flow": 999.0,
+                "segments": [
+                    {
+                        "t_supply": 200.0,
+                        "t_target": 150.0,
+                        "heat_flow": 50.0,
+                    },
+                    {
+                        "t_supply": 150.0,
+                        "t_target": 100.0,
+                        "heat_flow": 100.0,
+                    },
+                ],
+            }
+        ],
+        "utilities": [],
+    }
+
+    report = validation.build_validation_report(payload)
+
+    assert report.valid is False
+    assert any(
+        issue.path == "streams[0].heat_flow"
+        and "authoritative profile" in issue.message
+        for issue in report.issues
+    )
+    with pytest.raises(ValueError, match=r"streams\[0\]\.heat_flow"):
+        validation.validate_problem_inputs(payload)
 
 
 def test_schema_error_formatting_and_record_context_helpers():

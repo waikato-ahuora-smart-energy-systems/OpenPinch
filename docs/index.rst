@@ -67,4 +67,5 @@ API pages document the exact public contracts.
    guides/index
    api/index
    examples/index
+   release-notes
    developer/index

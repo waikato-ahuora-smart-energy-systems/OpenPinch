@@ -61,9 +61,7 @@
             "htc": {
                 "value": 1.88,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Ziyatdinov et al",
@@ -87,9 +85,7 @@
             "htc": {
                 "value": 1.9,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Ziyatdinov et al",
@@ -113,9 +109,7 @@
             "htc": {
                 "value": 1.7,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "Ziyatdinov et al",
@@ -139,9 +133,7 @@
             "htc": {
                 "value": 1.85,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         }
     ],
     "utilities": [

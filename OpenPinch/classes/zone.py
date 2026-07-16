@@ -5,11 +5,10 @@ from __future__ import annotations
 import warnings
 from typing import TYPE_CHECKING, Optional
 
-import numpy as np
-
 from ..lib.config import Configuration
 from ..lib.enums import ZT
 from ..lib.schemas.targets import BaseTargetModel
+from ._stream_value_state import resolve_period_weights
 from .stream_collection import StreamCollection
 
 if TYPE_CHECKING:
@@ -64,11 +63,10 @@ class Zone:
                 else {"0": 0}
             )
             self._num_periods = len(self._period_ids)
-            if isinstance(self._config.problem.period_weights, np.ndarray | list):
-                if len(self._config.problem.period_weights) == self._num_periods:
-                    self._weights = self._config.problem.period_weights
-                else:
-                    self._weights = np.ones(len(self._period_ids), dtype=float)
+            self._weights = resolve_period_weights(
+                self._period_ids,
+                self._config.problem.period_weights,
+            )
 
         self._subzones = {}
         self._targets = {}
@@ -326,13 +324,8 @@ class Zone:
                 if isinstance(period_ids, dict)
                 else {str(period_id): idx for idx, period_id in enumerate(period_ids)}
             )
-            if weights is None:
-                self._weights = None
-            elif hasattr(weights, "copy"):
-                self._weights = weights
-            else:
-                self._weights = np.asarray(weights, dtype=float).reshape(-1)
-            self._num_periods = num_periods
+            self._weights = resolve_period_weights(self._period_ids, weights)
+            self._num_periods = len(self._period_ids)
         self._propagate_period_context()
 
     # === Methods ===

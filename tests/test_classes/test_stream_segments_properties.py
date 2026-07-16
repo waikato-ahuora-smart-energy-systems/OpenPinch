@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from OpenPinch.classes import Stream
+from OpenPinch.classes._stream_value_state import resolve_period_weights
 from OpenPinch.classes.stream_collection import StreamCollection
 from OpenPinch.lib.config import tol
 from OpenPinch.lib.schemas.io import TargetInput
@@ -12,6 +15,56 @@ from OpenPinch.services.common.problem_table_analysis import (
     problem_table_algorithm,
 )
 from tests.strategies.stream_segments import segmented_streams
+
+
+@given(segmented_streams())
+@settings(max_examples=30)
+def test_owned_value_immutability_and_transaction_invariants(stream):
+    collection = StreamCollection([stream])
+    original_view = collection.segment_numeric_view()
+    original_revision = stream._numeric_revision
+    original_duties = [float(segment.heat_flow) for segment in stream.segments]
+
+    with pytest.raises(TypeError, match="Stream-owned Value is read-only"):
+        stream.heat_flow.value = float(stream.heat_flow) + 1.0
+    with pytest.raises(TypeError, match="Stream-owned Value is read-only"):
+        stream.segments[0].heat_flow[0] = original_duties[0] + 1.0
+    with pytest.raises(ValueError):
+        stream.update_segment(0, heat_flow=0.0)
+
+    assert stream._numeric_revision == original_revision
+    assert [float(segment.heat_flow) for segment in stream.segments] == original_duties
+    assert collection.segment_numeric_view() is original_view
+
+    stream.update_segment(0, heat_flow=original_duties[0] + 1.0)
+    assert stream._numeric_revision > original_revision
+    assert collection.segment_numeric_view() is not original_view
+
+
+@given(period_count=st.integers(min_value=1, max_value=8), data=st.data())
+@settings(max_examples=40)
+def test_period_weight_expansion_invariant(period_count, data):
+    supplied_count = data.draw(st.integers(min_value=0, max_value=period_count))
+    supplied = data.draw(
+        st.lists(
+            st.floats(
+                min_value=0.01,
+                max_value=100.0,
+                allow_nan=False,
+                allow_infinity=False,
+            ),
+            min_size=supplied_count,
+            max_size=supplied_count,
+        )
+    )
+    resolved = resolve_period_weights(
+        [f"period-{index}" for index in range(period_count)],
+        supplied,
+    )
+
+    np.testing.assert_allclose(resolved[:supplied_count], supplied)
+    np.testing.assert_allclose(resolved[supplied_count:], 1.0)
+    assert float(resolved.sum()) > 0.0
 
 
 @given(segmented_streams())

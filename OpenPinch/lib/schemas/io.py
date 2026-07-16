@@ -37,7 +37,11 @@ class StreamSegmentSchema(BaseModel):
     htc: Optional[ScalarOrVU] = None
     price: Optional[ScalarOrVU] = None
 
-    model_config = ConfigDict(use_enum_values=True, populate_by_name=True)
+    model_config = ConfigDict(
+        use_enum_values=True,
+        populate_by_name=True,
+        extra="forbid",
+    )
 
 
 class TemperatureHeatPointSchema(BaseModel):
@@ -46,7 +50,7 @@ class TemperatureHeatPointSchema(BaseModel):
     cumulative_heat: ScalarOrVU
     temperature: ScalarOrVU
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
 
 class TemperatureHeatProfileSchema(BaseModel):
@@ -54,6 +58,8 @@ class TemperatureHeatProfileSchema(BaseModel):
 
     points: List[TemperatureHeatPointSchema]
     linearisation_tolerance: float = 0.1
+
+    model_config = ConfigDict(extra="forbid")
 
     @field_validator("points")
     @classmethod
@@ -98,22 +104,8 @@ class StreamSchema(BaseModel):
         use_enum_values=True,
         populate_by_name=True,
         validate_default=True,
+        extra="forbid",
     )
-
-    @model_validator(mode="before")
-    @classmethod
-    def _reject_retired_field_aliases(cls, value):
-        if isinstance(value, dict):
-            retired_aliases = {
-                "stream_name",
-                "heat_capacity_flow_rate",
-                "flow_heat_capacity",
-            }
-            present = retired_aliases & set(value)
-            if present:
-                aliases = ", ".join(sorted(present))
-                raise ValueError(f"Retired stream field alias(es): {aliases}.")
-        return value
 
     @field_validator("fluid_name")
     @classmethod

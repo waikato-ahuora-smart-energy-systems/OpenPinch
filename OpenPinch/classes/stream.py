@@ -71,6 +71,7 @@ class Stream:
         "_htr",
         "_cost",
         "_rcp_prod",
+        "_t_entr_mean",
     )
     _MUTABLE_VALUE_ATTRS = frozenset(
         attr.lstrip("_") for attr in _CORE_VALUE_ATTRS
@@ -573,7 +574,8 @@ class Stream:
         if len(self._weights) > 1 and len(self._weights) != parsed.num_periods:
             raise ValueError("Weights length must match the number of periods.")
 
-        setattr(self, internal_name, parsed.to(self._VALUE_UNITS[internal_name]))
+        owned_value = parsed.to(self._VALUE_UNITS[internal_name])
+        setattr(self, internal_name, self._read_only_value(owned_value))
         self._bump_numeric_revision()
         self._validate_num_periods()
         if update_derived:
@@ -634,7 +636,8 @@ class Stream:
         current = getattr(self, internal_name)
         if current is None:
             current = Value(0.0, unit=self._VALUE_UNITS[internal_name])
-            setattr(self, internal_name, current)
+        else:
+            current = current.mutable_copy()
 
         target_size = self._period_vector_size()
         if current.num_periods == 1 and target_size > 1:
@@ -642,13 +645,13 @@ class Stream:
                 np.full(target_size, float(current.value), dtype=float),
                 unit=current.unit,
             )
-            setattr(self, internal_name, current)
 
         current[idx if current.num_periods > 1 else 0] = value
-        self._bump_numeric_revision()
-        self._validate_num_periods()
-        if update_derived:
-            self.update_derived_properties()
+        self.set_value_attr(
+            internal_name,
+            current,
+            update_derived=update_derived,
+        )
 
     def _coerce_to_value(self, value, attr_name: str) -> Value | None:
         return _stream_value_state.coerce_to_value(
@@ -676,6 +679,7 @@ class Stream:
         self._heat_flow = completed.heat_flow
         self._htc = completed.htc
         self._price = completed.price
+        self._freeze_owned_values()
 
     def update_derived_properties(self) -> None:
         derived = _stream_thermodynamics.derive_stream_state(
@@ -702,6 +706,7 @@ class Stream:
         self._htr = derived.htr
         self._rcp_prod = derived.rcp_prod
         self._cost = derived.cost
+        self._freeze_owned_values()
         self._bump_numeric_revision()
 
     def _validate_num_periods(self):
@@ -785,13 +790,19 @@ class Stream:
         weights: np.ndarray | list[float] | tuple[float, ...] | None,
         num_periods: int | None,
     ) -> None:
-        self._period_ids = period_ids
-        self._weights = weights
-        self._num_periods = num_periods
-        if len(self._period_ids) != len(self._weights):
-            raise ValueError(
-                "Length of period_ids and weights must match eachother in length."
-            )
+        self._period_ids = self._normalise_period_ids(period_ids)
+        if self._period_ids is None:
+            self._weights = None
+            self._num_periods = None
+            self._bump_numeric_revision()
+            for segment in self._segments:
+                segment.set_period_context(None, None, None)
+            return
+        self._weights = _stream_value_state.resolve_period_weights(
+            self._period_ids,
+            weights,
+        )
+        self._num_periods = len(self._period_ids)
         self._bump_numeric_revision()
         for segment in self._segments:
             segment.set_period_context(
@@ -1039,6 +1050,21 @@ class Stream:
     def _copy_value(self, value: Value | None) -> Value | None:
         return _stream_value_state.copy_value(value)
 
+    @staticmethod
+    def _read_only_value(value: Value | None) -> Value | None:
+        if value is None:
+            return None
+        return value._make_read_only(
+            "Stream-owned Value is read-only; assign the stream property, call "
+            "set_value_attr_at_idx, or use update_segment(s)."
+        )
+
+    def _freeze_owned_values(self) -> None:
+        for attr_name in (*self._CORE_VALUE_ATTRS, *self._DERIVED_VALUE_ATTRS):
+            value = getattr(self, attr_name, None)
+            if isinstance(value, Value):
+                self._read_only_value(value)
+
     def _resolve_attr_name(self, attr_name: str) -> str:
         if attr_name in self._MUTABLE_VALUE_ATTRS:
             return attr_name if attr_name.startswith("_") else f"_{attr_name}"
@@ -1196,9 +1222,12 @@ class StreamSegment(Stream):
             expected_weights = self._owner.weights
             same_ids = period_ids == expected_ids
             same_weights = (
-                weights is not None
-                and expected_weights is not None
-                and np.array_equal(np.asarray(weights), expected_weights)
+                (weights is None and expected_weights is None)
+                or (
+                    weights is not None
+                    and expected_weights is not None
+                    and np.array_equal(np.asarray(weights), expected_weights)
+                )
             )
             if (
                 not same_ids

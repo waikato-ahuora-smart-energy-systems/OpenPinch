@@ -761,11 +761,10 @@ def test_solver_array_private_helpers_cover_period_and_value_edges() -> None:
     assert arrays_module._period_ids_and_weights(
         SimpleNamespace(period_ids={"base": 0}, weights=None)
     ) == (("base",), (1.0,))
-    with pytest.raises(ValueError, match="weight count"):
-        arrays_module._period_ids_and_weights(
-            SimpleNamespace(period_ids={"base": 0, "peak": 1}, weights=[1.0])
-        )
-    with pytest.raises(ValueError, match="at least one operating period"):
+    assert arrays_module._period_ids_and_weights(
+        SimpleNamespace(period_ids={"base": 0, "peak": 1}, weights=[1.0])
+    ) == (("base", "peak"), (1.0, 1.0))
+    with pytest.raises(ValueError, match="operating period"):
         arrays_module._period_ids_and_weights(
             SimpleNamespace(period_ids=_TruthyEmptyMapping(), weights=[])
         )
@@ -866,7 +865,7 @@ def test_stagewise_model_rejects_solver_arrays_without_state_metadata() -> None:
 
 
 def test_solver_arrays_reject_zero_total_period_weight() -> None:
-    with pytest.raises(ValueError, match="positive finite period-weight sum"):
+    with pytest.raises(ValueError, match="period weight must be positive"):
         problem_to_solver_arrays(
             _two_state_problem(
                 options={"PROBLEM_PERIOD_WEIGHTS": [0.0, 0.0]},

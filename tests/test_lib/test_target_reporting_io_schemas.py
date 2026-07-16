@@ -94,7 +94,7 @@ def test_io_schemas_normalise_fluid_fields_and_reject_edges():
     assert default_utility.fluid_name is None
     assert default_utility.fluid_phase is None
 
-    with pytest.raises(ValidationError, match="Retired stream field alias"):
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         io.StreamSchema(
             zone="Zone",
             name="S1",

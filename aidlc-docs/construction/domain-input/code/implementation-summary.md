@@ -35,3 +35,35 @@ The `Stream` model now delegates three stateless calculation boundaries:
 - Security Baseline: disabled; not enforced.
 - Resiliency Baseline: disabled; not enforced.
 - Property-Based Testing (Partial): compliant for the domain unit through shared generators, bounded examples, serializable schemas, invariant properties, shrinking, and a reproducible CI seed.
+
+## Pre-Release Corrective PR 1
+
+### Outcome
+
+The domain and input review findings are closed with clean pre-release contract
+changes. No aliases, workspace migrations, or mutation compatibility shims were
+added.
+
+### Delivered
+
+- Stream- and segment-owned values are immutable views; explicit domain APIs
+  perform transactional mutation and revision/cache invalidation.
+- One period-weight resolver pads trailing values and rejects excess,
+  non-finite, negative, and all-zero vectors across zones, utilities, HEN
+  arrays, and summaries.
+- Default utility temperatures use all authoritative child-segment shifted
+  extrema in all periods.
+- Process-stream inputs reject extras and retired field spellings; all packaged
+  and regression example inputs use canonical fields.
+- Workspace bundles are strict schema version 2 and store variant data under
+  `case_input` only.
+- Segmented process streams and utilities use one semantic validation path in
+  reporting and preparation, including parent aggregate checks.
+
+### Extension Compliance
+
+- Security Baseline: disabled; N/A.
+- Resiliency Baseline: disabled; N/A.
+- Property-Based Testing (Partial): compliant for immutable ownership,
+  transactional rollback, revision/cache invalidation, schema serialization,
+  and period-weight expansion.

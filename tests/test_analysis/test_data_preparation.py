@@ -68,6 +68,7 @@ from OpenPinch.services.input_data_processing.data_preparation import (
     _assign_process_streams_to_subzones,
     _build_prepared_stream_collection,
     _create_nested_zones,
+    _find_extreme_process_temperatures,
     _get_validated_zone_info,
     _validate_config_data_completed,
     _validate_input_data,
@@ -202,6 +203,42 @@ def test_prepare_site_stream_data_handles_extreme_temperatures():
     site = prepare_problem(streams=streams)
     assert len(site.hot_utilities) > 0
     assert len(site.cold_utilities) > 0
+
+
+def test_default_utility_extrema_use_authoritative_segment_shifted_temperatures():
+    hot = Stream(
+        name="Segmented hot",
+        segments=[
+            StreamSegment(
+                name="S1",
+                t_supply=200.0,
+                t_target=150.0,
+                heat_flow=50.0,
+                dt_cont=20.0,
+            ),
+            StreamSegment(
+                name="S2",
+                t_supply=150.0,
+                t_target=100.0,
+                heat_flow=50.0,
+                dt_cont=0.0,
+            ),
+        ],
+    )
+    hot_streams = StreamCollection()
+    hot_streams.add(hot)
+
+    hu_t_min, cu_t_max = _find_extreme_process_temperatures(
+        hot_streams,
+        StreamCollection(),
+    )
+
+    assert float(hot.t_min_star) == pytest.approx(80.0)
+    assert min(float(segment.t_min_star) for segment in hot.segments) == pytest.approx(
+        100.0
+    )
+    assert hu_t_min == pytest.approx(100.0)
+    assert cu_t_max == pytest.approx(100.0)
 
 
 # ---------------- Stream and Zone Validations ---------------- #

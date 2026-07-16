@@ -10,6 +10,7 @@ import numpy as np
 from ...lib.schemas.io import TargetOutput
 from ...lib.schemas.report_units import split_report_value
 from ...lib.schemas.reporting import HeatUtility, PinchTemp, TargetResults
+from .._stream_value_state import resolve_period_weights
 from ..value import Value
 
 WEIGHTED_AVERAGE_PERIOD_ID = "weighted_average"
@@ -114,18 +115,10 @@ def output_for_period_mode(
 
 
 def _normalise_weights(weights: Sequence[float], *, expected_len: int) -> np.ndarray:
-    if expected_len <= 0:
-        raise ValueError("At least one period output is required.")
-    resolved = np.asarray(list(weights), dtype=float).reshape(-1)
-    if resolved.size != expected_len:
-        raise ValueError(
-            f"Expected {expected_len} period weight(s), got {resolved.size}."
-        )
-    if not np.isfinite(resolved).all():
-        raise ValueError("Period weights must be finite.")
-    if float(np.sum(resolved)) <= 0.0:
-        raise ValueError("At least one period weight must be positive.")
-    return resolved
+    return resolve_period_weights(
+        [str(period_idx) for period_idx in range(expected_len)],
+        weights,
+    )
 
 
 def _aligned_target_groups(

@@ -74,6 +74,28 @@ def test_segment_mutation_is_transactional_and_updates_parent_revision():
     assert stream._numeric_revision > original_revision
 
 
+def test_stream_owned_values_reject_in_place_mutation_and_explicit_update_commits():
+    stream = Stream(name="Variable CP", segments=_hot_segments())
+    original_revision = stream._numeric_revision
+
+    with pytest.raises(TypeError, match="Stream-owned Value is read-only"):
+        stream.segments[0].t_target.value = 140.0
+    with pytest.raises(TypeError, match="Stream-owned Value is read-only"):
+        stream.segments[0].heat_flow[0] = 60.0
+    with pytest.raises(TypeError, match="Stream-owned Value is read-only"):
+        stream.heat_flow.unit = "MW"
+
+    assert float(stream.segments[0].t_target) == pytest.approx(150.0)
+    assert float(stream.heat_flow) == pytest.approx(150.0)
+    assert stream._numeric_revision == original_revision
+
+    stream.update_segment(0, heat_flow=60.0)
+
+    assert float(stream.segments[0].heat_flow) == pytest.approx(60.0)
+    assert float(stream.heat_flow) == pytest.approx(160.0)
+    assert stream._numeric_revision > original_revision
+
+
 def test_sparse_batch_segment_mutation_commits_once_and_preserves_order(monkeypatch):
     stream = Stream(name="Variable CP", segments=_hot_segments())
     original_names = [segment.name for segment in stream.segments]
@@ -464,6 +486,23 @@ def test_replacement_segments_inherit_existing_period_context():
     assert stream.num_periods == 2
     assert stream.heat_flow.num_periods == 2
     assert all(segment.num_periods == 2 for segment in stream.segments)
+
+
+def test_segmented_period_context_can_be_cleared_consistently():
+    stream = Stream(name="Variable CP", segments=_hot_segments())
+    stream.set_period_context(
+        period_ids={"winter": 0, "summer": 1},
+        weights=[0.4, 0.6],
+        num_periods=2,
+    )
+
+    stream.set_period_context(None, None, None)
+
+    assert stream.period_ids is None
+    assert stream.weights is None
+    assert stream.num_periods is None
+    assert all(segment.period_ids is None for segment in stream.segments)
+    assert all(segment.weights is None for segment in stream.segments)
 
 
 def test_segmented_parent_rejects_nonpositive_segment_htc():

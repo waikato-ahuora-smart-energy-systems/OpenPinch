@@ -198,26 +198,15 @@ def semantic_issues(
                 record_label=label,
             )
         )
-        if stream.segments is not None:
-            issues.extend(
-                _validate_segmented_stream_states(
-                    stream,
-                    section="streams",
-                    record_index=index,
-                    record_label=label,
-                    config=input_unit_config,
-                )
+        issues.extend(
+            segmented_record_issues(
+                stream,
+                section="streams",
+                record_index=index,
+                record_label=label,
+                config=input_unit_config,
             )
-        elif stream.profile is not None:
-            issues.extend(
-                _validate_temperature_heat_profile_states(
-                    stream,
-                    section="streams",
-                    record_index=index,
-                    record_label=label,
-                    config=input_unit_config,
-                )
-            )
+        )
 
     for index, utility in enumerate(problem_inputs.utilities):
         label = validation_record_label("utilities", index, context)
@@ -239,7 +228,56 @@ def semantic_issues(
                 record_label=label,
             )
         )
+        issues.extend(
+            segmented_record_issues(
+                utility,
+                section="utilities",
+                record_index=index,
+                record_label=label,
+                config=input_unit_config,
+            )
+        )
 
+    return issues
+
+
+def segmented_record_issues(
+    record,
+    *,
+    section: str,
+    record_index: int,
+    record_label: Optional[str],
+    config,
+) -> list[ValidationIssue]:
+    """Return the shared semantic findings for one nested thermal record."""
+    if record.segments is not None:
+        issues = _validate_segmented_stream_states(
+            record,
+            section=section,
+            record_index=record_index,
+            record_label=record_label,
+            config=config,
+        )
+    elif record.profile is not None:
+        issues = _validate_temperature_heat_profile_states(
+            record,
+            section=section,
+            record_index=record_index,
+            record_label=record_label,
+            config=config,
+        )
+    else:
+        return []
+    if not any(issue.severity == "error" for issue in issues):
+        issues.extend(
+            _validate_supplied_parent_aggregate_states(
+                record,
+                section=section,
+                record_index=record_index,
+                record_label=record_label,
+                config=config,
+            )
+        )
     return issues
 
 
@@ -525,7 +563,7 @@ def _validate_stream_record_states(
         )
     )
     issues.extend(
-        _validate_non_negative_states(
+        _validate_positive_states(
             values.get("htc"),
             section=section,
             record_index=record_index,
@@ -621,14 +659,22 @@ def _validate_segmented_stream_states(
 ) -> list[ValidationIssue]:
     """Validate ordered child states with precise nested input paths."""
     issues: list[ValidationIssue] = []
-    parsed: list[tuple[Value, Value, Value, Value]] = []
+    parsed: list[tuple[Value, Value, Value, Value, Value]] = []
     for index, segment in enumerate(stream.segments):
         values = []
-        for field_name in ("t_supply", "t_target", "heat_flow", "htc"):
+        for field_name in (
+            "t_supply",
+            "t_target",
+            "heat_flow",
+            "htc",
+            "dt_cont",
+        ):
             try:
                 raw_value = getattr(segment, field_name)
                 if field_name == "htc" and raw_value is None:
                     raw_value = stream.htc
+                if field_name == "dt_cont" and raw_value is None:
+                    raw_value = stream.dt_cont
                 values.append(
                     standardise_input_value(
                         raw_value,
@@ -664,12 +710,14 @@ def _validate_segmented_stream_states(
         return value.period_values
 
     direction = None
-    for index, (supply_value, target_value, duty_value, htc_value) in enumerate(parsed):
+    for index, values in enumerate(parsed):
+        supply_value, target_value, duty_value, htc_value, dt_cont_value = values
         try:
             supply = states(supply_value)
             target = states(target_value)
             duty = states(duty_value)
             htc = states(htc_value)
+            dt_cont = states(dt_cont_value)
         except ValueError as exc:
             issues.append(
                 _build_issue(
@@ -718,6 +766,18 @@ def _validate_segmented_stream_states(
                     path_field=f"segments[{index}].htc",
                     field=f"segments[{index}].htc",
                     message="Segment HTC must be finite and positive.",
+                )
+            )
+        if not np.isfinite(dt_cont).all() or np.any(dt_cont < 0.0):
+            issues.append(
+                _build_issue(
+                    severity="error",
+                    section=section,
+                    record_index=record_index,
+                    record_label=record_label,
+                    path_field=f"segments[{index}].dt_cont",
+                    field=f"segments[{index}].dt_cont",
+                    message="Segment dt_cont must be finite and non-negative.",
                 )
             )
         signs = np.sign(delta)
@@ -771,6 +831,97 @@ def _validate_segmented_stream_states(
                         ),
                     )
                 )
+    return issues
+
+
+def _validate_supplied_parent_aggregate_states(
+    record,
+    *,
+    section: str,
+    record_index: int,
+    record_label: Optional[str],
+    config,
+) -> list[ValidationIssue]:
+    """Compare supplied parent fields with the authoritative nested profile."""
+    if record.segments is not None:
+        raw_expected = {
+            "t_supply": record.segments[0].t_supply,
+            "t_target": record.segments[-1].t_target,
+        }
+        heat_values = [
+            standardise_input_value(
+                segment.heat_flow,
+                field_name="heat_flow",
+                config=config,
+            )
+            for segment in record.segments
+        ]
+        expected_heat = heat_values[0]
+        for heat_value in heat_values[1:]:
+            expected_heat = expected_heat + heat_value
+    else:
+        raw_expected = {
+            "t_supply": record.profile.points[0].temperature,
+            "t_target": record.profile.points[-1].temperature,
+        }
+        first_heat = standardise_input_value(
+            record.profile.points[0].cumulative_heat,
+            field_name="heat_flow",
+            config=config,
+        )
+        last_heat = standardise_input_value(
+            record.profile.points[-1].cumulative_heat,
+            field_name="heat_flow",
+            config=config,
+        )
+        expected_heat = last_heat - first_heat
+
+    expected = {
+        field_name: standardise_input_value(
+            raw_value,
+            field_name=field_name,
+            config=config,
+        )
+        for field_name, raw_value in raw_expected.items()
+    }
+    expected["heat_flow"] = expected_heat
+
+    issues: list[ValidationIssue] = []
+    for field_name, expected_value in expected.items():
+        supplied = getattr(record, field_name)
+        if supplied is None:
+            continue
+        supplied_value = standardise_input_value(
+            supplied,
+            field_name=field_name,
+            config=config,
+        ).to(expected_value.unit)
+        supplied_states = supplied_value.period_values
+        expected_states = expected_value.period_values
+        if supplied_states.size == 1 and expected_states.size > 1:
+            supplied_states = np.full(expected_states.size, supplied_states[0])
+        if expected_states.size == 1 and supplied_states.size > 1:
+            expected_states = np.full(supplied_states.size, expected_states[0])
+        if supplied_states.size != expected_states.size or not np.allclose(
+            supplied_states,
+            expected_states,
+            atol=tol,
+            rtol=0.0,
+        ):
+            issues.append(
+                _build_issue(
+                    severity="error",
+                    section=section,
+                    record_index=record_index,
+                    record_label=record_label,
+                    path_field=field_name,
+                    field=field_name,
+                    message=(
+                        f"Segmented stream {record.name!r} supplied {field_name} "
+                        "does not match the authoritative profile."
+                    ),
+                )
+            )
     return issues
 
 
@@ -871,7 +1022,8 @@ def _validate_temperature_heat_profile_states(
                         path_field=f"profile.points[{index}].cumulative_heat",
                         field=f"profile.points[{index}].cumulative_heat",
                         message=(
-                            "Cumulative heat must increase strictly in every period."
+                            "Profile cumulative heat must increase strictly in "
+                            "every period."
                         ),
                     )
                 )
@@ -888,7 +1040,7 @@ def _validate_temperature_heat_profile_states(
                         path_field=f"profile.points[{index}].temperature",
                         field=f"profile.points[{index}].temperature",
                         message=(
-                            "Profile temperatures must preserve one thermal direction."
+                            "Profile temperatures must preserve one direction."
                         ),
                     )
                 )
@@ -959,7 +1111,7 @@ def _validate_utility_record_states(
         )
 
     issues.extend(
-        _validate_non_negative_states(
+        _validate_positive_states(
             values.get("htc"),
             section=section,
             record_index=record_index,
@@ -990,7 +1142,7 @@ def _validate_value_finiteness(
     if value is None:
         return issues
 
-    for idx in range(len(value.period_values) - 1):
+    for idx in range(len(value.period_values)):
         magnitude = value[idx]
         if magnitude is None:
             continue
@@ -1024,9 +1176,42 @@ def _validate_non_negative_states(
     if value is None:
         return issues
 
-    for idx in range(len(value.period_values) - 1):
+    for idx in range(len(value.period_values)):
         magnitude = value[idx]
         if magnitude is None or not math.isfinite(magnitude) or magnitude >= 0.0:
+            continue
+        issues.append(
+            _build_issue(
+                severity=severity,
+                section=section,
+                record_index=record_index,
+                record_label=record_label,
+                path_field=field_name,
+                field=field_name,
+                message=_with_period_suffix(message, idx),
+            )
+        )
+
+    return issues
+
+
+def _validate_positive_states(
+    value: Value | None,
+    *,
+    section: str,
+    record_index: int,
+    record_label: Optional[str],
+    field_name: str,
+    severity: str,
+    message: str,
+) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    if value is None:
+        return issues
+
+    for idx in range(len(value.period_values)):
+        magnitude = value[idx]
+        if magnitude is None or not math.isfinite(magnitude) or magnitude > 0.0:
             continue
         issues.append(
             _build_issue(

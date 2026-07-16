@@ -199,8 +199,16 @@ def _match_utility_gen_and_use_at_same_level(
                 and abs((u_h.t_target[period_idx] - u_c.t_supply[period_idx])) < 1
             ):
                 Q = min(u_h.heat_flow[period_idx], u_c.heat_flow[period_idx])
-                u_h.heat_flow[period_idx] -= Q
-                u_c.heat_flow[period_idx] -= Q
+                u_h.set_value_attr_at_idx(
+                    "heat_flow",
+                    u_h.heat_flow[period_idx] - Q,
+                    idx=period_idx,
+                )
+                u_c.set_value_attr_at_idx(
+                    "heat_flow",
+                    u_c.heat_flow[period_idx] - Q,
+                    idx=period_idx,
+                )
     return hot_utilities, cold_utilities
 
 

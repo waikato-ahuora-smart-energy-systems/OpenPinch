@@ -266,9 +266,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "A",
@@ -292,9 +290,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "A",
@@ -318,9 +314,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "A",
@@ -344,9 +338,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "A",
@@ -370,9 +362,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "B",
@@ -396,9 +386,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "B",
@@ -422,9 +410,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "B",
@@ -448,9 +434,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "B",
@@ -474,9 +458,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "B",
@@ -500,9 +482,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "B",
@@ -526,9 +506,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "C",
@@ -552,9 +530,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "C",
@@ -578,9 +554,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "C",
@@ -604,9 +578,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "C",
@@ -630,9 +602,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "C",
@@ -656,9 +626,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "C",
@@ -682,9 +650,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "C",
@@ -708,9 +674,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "C",
@@ -734,9 +698,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "C",
@@ -760,9 +722,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "C",
@@ -786,9 +746,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "C",
@@ -812,9 +770,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "D",
@@ -838,9 +794,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         },
         {
             "zone": "D",
@@ -864,9 +818,7 @@
             "htc": {
                 "value": 1.5,
                 "unit": "kW/m^2/degC"
-            },
-            "loc": 0,
-            "index": 0
+            }
         }
     ],
     "utilities": [

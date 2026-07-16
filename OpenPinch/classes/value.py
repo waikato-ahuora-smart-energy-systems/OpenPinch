@@ -71,6 +71,7 @@ class Value:
         quantity, weights = self._coerce_input(data, unit)
         self._set_storage(quantity)
         self._weights = weights
+        self._read_only_reason: str | None = None
 
     @property
     def value(self):
@@ -82,6 +83,7 @@ class Value:
     @value.setter
     def value(self, data):
         """Set the scalar magnitude or per-period magnitudes in-place."""
+        self._assert_writable()
         if self._is_period_valued():
             magnitudes = self._coerce_magnitude_array(
                 data,
@@ -150,6 +152,7 @@ class Value:
     @unit.setter
     def unit(self, unit_str):
         """Convert the stored quantity to ``unit_str`` in-place."""
+        self._assert_writable()
         self._set_storage(self._quantity.to(self._normalise_unit_input(unit_str)))
 
     def to(self, new_unit: str) -> "Value":
@@ -188,6 +191,7 @@ class Value:
         return iter(self._quantity.magnitude)
 
     def __setitem__(self, idx, value):
+        self._assert_writable()
         resolved_idx = self._resolve_period_index(idx)
         values = self._quantity.magnitude.copy()
         values[resolved_idx] = self._coerce_scalar_magnitude(value)
@@ -343,7 +347,22 @@ class Value:
         instance = type(self).__new__(type(self))
         instance._set_storage(qty)
         instance._weights = self.weights
+        instance._read_only_reason = None
         return instance
+
+    def _make_read_only(self, reason: str) -> "Value":
+        """Mark this value as an immutable domain-owned view."""
+        self._read_only_reason = str(reason)
+        return self
+
+    def mutable_copy(self) -> "Value":
+        """Return an independent writable copy of this value."""
+        return Value(self)
+
+    def _assert_writable(self) -> None:
+        reason = getattr(self, "_read_only_reason", None)
+        if reason is not None:
+            raise TypeError(reason)
 
     def _binary_operation(self, other, operator, reverse: bool = False):
         left, right = (other, self) if reverse else (self, other)

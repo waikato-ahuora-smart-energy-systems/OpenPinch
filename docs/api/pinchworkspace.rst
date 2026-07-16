@@ -34,6 +34,14 @@ The typical lifecycle is:
    ``solve_variant(...)``
 5. persist the study with ``save_bundle(...)``
 
+Bundle Contract
+---------------
+
+Workspace bundles use schema version ``2``. Each item in ``variants`` stores
+its canonical problem mapping under ``case_input``. Version ``1``, unknown
+versions, the retired ``payload`` field, and unknown bundle fields are rejected;
+the pre-release API does not provide a compatibility loader.
+
 Core Workflow Members
 ---------------------
 
