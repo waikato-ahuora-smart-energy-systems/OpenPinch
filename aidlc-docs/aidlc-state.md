@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: CONSTRUCTION - Segmented Stream dt_cont Transaction Generation
+- **Current Stage**: CONSTRUCTION - Segmented Stream dt_cont Transaction Code Generation Complete
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -110,8 +110,9 @@
 - **Segmented parent dt_cont transaction**: Focused Code Generation plan created
   at `aidlc-docs/construction/plans/segmented-stream-dt-cont-transaction-code-generation-plan.md`.
   The plan propagates full and indexed parent assignments through detached child
-  candidates with atomic replacement. The user approved the plan on
-  2026-07-16; Code Generation Part 2 is in progress.
+  candidates with atomic replacement. Code Generation is complete and awaiting
+  user review. All 1,960 CI-selected non-solver tests pass, four solver tests are
+  deselected, total coverage is 99%, and focused Ruff/patch checks pass.
 - **Read the Docs configuration verification**: Workspace detection is complete.
   The tracked root `.readthedocs.yaml` matches the current repository and the
   official Read the Docs v2 schema. Hosted-build troubleshooting was selected;

@@ -535,6 +535,13 @@ class Stream:
         if (
             self.has_segments
             and not self._syncing_segments
+            and internal_name == "_dt_cont"
+        ):
+            self._update_all_segments_value_attr(internal_name, value)
+            return
+        if (
+            self.has_segments
+            and not self._syncing_segments
             and internal_name in {"_t_supply", "_t_target", "_heat_flow", "_htc"}
         ):
             raise ValueError(
@@ -601,6 +608,13 @@ class Stream:
         update_derived: bool = True,
     ):
         internal_name = self._resolve_attr_name(attr_name)
+        if (
+            self.has_segments
+            and not self._syncing_segments
+            and internal_name == "_dt_cont"
+        ):
+            self._update_all_segments_value_attr(internal_name, value, idx=idx)
+            return
         if (
             self.has_segments
             and not self._syncing_segments
@@ -783,6 +797,22 @@ class Stream:
                 weights=weights,
                 num_periods=num_periods,
             )
+
+    def _update_all_segments_value_attr(
+        self,
+        attr_name: str,
+        value: float | Value | np.ndarray | Mapping | None,
+        *,
+        idx: int | None = None,
+    ) -> None:
+        """Apply one value mutation to every segment and commit atomically."""
+        candidates = [self._detached_segment(segment) for segment in self._segments]
+        for candidate in candidates:
+            if idx is None:
+                candidate.set_value_attr(attr_name, value)
+            else:
+                candidate.set_value_attr_at_idx(attr_name, value, idx=idx)
+        self.replace_segments(candidates)
 
     def replace_segments(
         self,

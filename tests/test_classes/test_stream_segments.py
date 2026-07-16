@@ -5,6 +5,8 @@ from copy import deepcopy
 
 import numpy as np
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 import OpenPinch
 from OpenPinch import PinchWorkspace, StreamSegment
@@ -19,6 +21,7 @@ from OpenPinch.services.common.problem_table_analysis import (
 )
 from OpenPinch.services.input_data_processing.data_preparation import prepare_problem
 from OpenPinch.utils.stream_linearisation import align_temperature_heat_profiles
+from tests.strategies.stream_segments import segmented_streams
 
 
 def _hot_segments() -> list[StreamSegment]:
@@ -127,6 +130,141 @@ def test_expanded_numeric_view_replaces_stale_cache_signatures():
     assert second is not first
     assert second.heat_flow.tolist() == pytest.approx([60.0, 100.0])
     assert len(collection._numeric_cache) == 1
+
+
+def test_segmented_parent_dt_cont_assignment_propagates_and_invalidates_view():
+    stream = Stream(name="Variable CP", segments=_hot_segments())
+    stream.dt_cont_multiplier = 2.0
+    collection = StreamCollection([stream])
+    before = collection.segment_numeric_view()
+
+    stream.dt_cont = 7.5
+
+    after = collection.segment_numeric_view()
+    assert after is not before
+    assert float(stream.dt_cont) == pytest.approx(7.5)
+    assert float(stream.dt_cont_act) == pytest.approx(15.0)
+    assert [float(segment.dt_cont) for segment in stream.segments] == pytest.approx(
+        [7.5, 7.5]
+    )
+    assert [float(segment.dt_cont_act) for segment in stream.segments] == pytest.approx(
+        [15.0, 15.0]
+    )
+    np.testing.assert_allclose(after.dt_cont, [7.5, 7.5])
+    np.testing.assert_allclose(
+        after.t_min_star,
+        [float(segment.t_min_star) for segment in stream.segments],
+    )
+
+
+def test_segmented_parent_indexed_dt_cont_assignment_propagates_one_period():
+    stream = Stream(
+        name="Multiperiod variable CP",
+        segments=[
+            StreamSegment(
+                t_supply=[200.0, 210.0],
+                t_target=[150.0, 160.0],
+                heat_flow=[50.0, 60.0],
+                dt_cont=[1.0, 2.0],
+            ),
+            StreamSegment(
+                t_supply=[150.0, 160.0],
+                t_target=[100.0, 110.0],
+                heat_flow=[100.0, 120.0],
+                dt_cont=[3.0, 4.0],
+            ),
+        ],
+    )
+
+    stream.set_value_attr_at_idx("dt_cont", 9.0, idx=1)
+
+    np.testing.assert_allclose(stream.dt_cont.period_values, [1.0, 9.0])
+    np.testing.assert_allclose(stream.segments[0].dt_cont.period_values, [1.0, 9.0])
+    np.testing.assert_allclose(stream.segments[1].dt_cont.period_values, [3.0, 9.0])
+    np.testing.assert_allclose(
+        StreamCollection([stream]).segment_numeric_view().dt_cont,
+        [1.0, 3.0],
+    )
+    np.testing.assert_allclose(
+        StreamCollection([stream]).segment_numeric_view(1).dt_cont,
+        [9.0, 9.0],
+    )
+
+
+def test_segmented_parent_dt_cont_assignment_rolls_back_before_commit(monkeypatch):
+    stream = Stream(name="Variable CP", segments=_hot_segments())
+    collection = StreamCollection([stream])
+    before_view = collection.segment_numeric_view()
+    before_segments = stream.segments
+    before_parent_revision = stream._numeric_revision
+    before_segment_revisions = [
+        segment._numeric_revision for segment in stream.segments
+    ]
+
+    def reject_candidates(_segments):
+        raise ValueError("candidate validation failed")
+
+    monkeypatch.setattr(stream, "_validate_segments", reject_candidates)
+
+    with pytest.raises(ValueError, match="candidate validation failed"):
+        stream.dt_cont = 8.0
+
+    assert stream.segments == before_segments
+    assert all(
+        actual is expected
+        for actual, expected in zip(stream.segments, before_segments, strict=True)
+    )
+    assert float(stream.dt_cont) == pytest.approx(0.0)
+    assert [float(segment.dt_cont) for segment in stream.segments] == pytest.approx(
+        [0.0, 0.0]
+    )
+    assert stream._numeric_revision == before_parent_revision
+    assert [segment._numeric_revision for segment in stream.segments] == (
+        before_segment_revisions
+    )
+    assert collection.segment_numeric_view() is before_view
+
+
+def test_flat_stream_dt_cont_mutation_contract_is_unchanged():
+    stream = Stream(
+        name="Flat",
+        t_supply=[200.0, 210.0],
+        t_target=[100.0, 110.0],
+        heat_flow=[100.0, 120.0],
+        dt_cont=[1.0, 2.0],
+    )
+
+    stream.set_value_attr_at_idx("dt_cont", 4.0, idx=1)
+    np.testing.assert_allclose(stream.dt_cont.period_values, [1.0, 4.0])
+
+    stream.dt_cont = 6.0
+    np.testing.assert_allclose(stream.dt_cont.period_values, [6.0, 6.0])
+
+
+@given(
+    segmented_streams(),
+    st.floats(
+        min_value=0.0,
+        max_value=100.0,
+        allow_nan=False,
+        allow_infinity=False,
+    ),
+)
+@settings(max_examples=30)
+def test_segmented_parent_dt_cont_assignment_invariant(stream, contribution):
+    collection = StreamCollection([stream])
+
+    stream.dt_cont = contribution
+
+    assert float(stream.dt_cont) == pytest.approx(contribution)
+    assert all(
+        float(segment.dt_cont) == pytest.approx(contribution)
+        for segment in stream.segments
+    )
+    np.testing.assert_allclose(
+        collection.segment_numeric_view().dt_cont,
+        np.full(stream.segment_count, contribution),
+    )
 
 
 def test_attached_segment_rejects_parent_controlled_metadata_changes():

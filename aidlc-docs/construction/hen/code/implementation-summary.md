@@ -55,6 +55,34 @@ Verification for this correction:
   decomposition module reached 100%.
 - Ruff formatting, Ruff lint, and `git diff --check` passed.
 
+## Segmented Parent dt_cont Transaction
+
+Assigning `dt_cont` to a segmented parent now applies the full value to every
+ordered child through detached candidates and commits the profile only after all
+candidate mutations and complete-profile validation succeed. Indexed
+multiperiod updates use the same transaction and apply the selected-period value
+to every child while preserving values in other periods. Parent aggregate and
+derived state are then rebuilt through the established `replace_segments` path,
+which also updates ownership, revisions, and segment-aware cache signatures.
+
+Flat streams retain their previous scalar and indexed mutation behavior, and
+explicit segment-level overrides continue to use the existing single-segment
+transaction.
+
+Verification for this correction:
+
+- Five focused scalar, multiperiod, rollback, flat-stream, and Hypothesis
+  contract tests passed with seed `20260715`.
+- 84 stream, segmented-stream, and collection tests passed.
+- 156 direct integration, indirect integration, problem-table, HPR, and
+  segmented-PDM regression tests passed.
+- The complete CI-selected non-solver suite passed effectively: 1,958 tests
+  passed in the restricted run and the two environment-dependent Chrome/Sphinx
+  checks passed when rerun with their required permissions, for all 1,960
+  selected tests passing and four solver tests deselected.
+- Total line coverage is 99%, above the 95% repository gate.
+- Ruff formatting, Ruff lint, and `git diff --check` passed.
+
 ## Extension Compliance
 
 - Security Baseline: disabled; not enforced.
