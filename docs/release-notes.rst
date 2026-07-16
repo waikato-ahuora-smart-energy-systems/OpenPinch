@@ -55,3 +55,17 @@ Period-native HEN results
 - Extraction walks every period array, retains matches active only outside the
   first period, and prefers explicit non-isothermal branch outlet temperatures.
   Solved branch split fractions keep downstream duty checks physically valid.
+
+Isolated summaries and HPR economics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Multiperiod summary replay captures one baseline zone and solves every period
+  against a fresh deep copy. The original zone object, cached results, and
+  recorded targeting specification are restored after success or failure.
+- Shared simulated-HPR candidates are ranked by weighted operating cost plus
+  weighted feasibility penalty plus maximum annualized capital cost. Weighted
+  backend ``obj`` is used only for backends that provide no cost breakdown.
+- Weighted public HPR summaries average operating fields, use the maximum
+  capital, annualized-capital, compressor-capital, and heat-exchanger-capital
+  fields, and recompute total annualized cost as weighted operating cost plus
+  maximum annualized capital. Non-HPR fields retain weighted averaging.

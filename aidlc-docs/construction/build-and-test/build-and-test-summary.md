@@ -259,3 +259,76 @@ ready to be committed as the second stacked pre-release change.
 PR 3 Period-Native HEN Results is independently green and ready to be committed
 as the third stacked pre-release change. The two bounded tier-1 solve timeouts
 are recorded as performance observations, not correctness passes.
+
+## Pre-Release Corrective PR 4 Evidence
+
+### Results
+
+- Regression-first baseline: five expected failures and seventeen passes;
+  post-implementation focused result: 22 passed.
+- Expanded HPR, reporting, target schema, and unit-aware result coverage: 228
+  passed.
+- PinchProblem, workspace, export, report-unit, and packaged notebook coverage:
+  156 passed.
+- Complete seeded non-solver repository matrix: 2,004 passed and four
+  solver-marked cases deselected in 125.52 seconds.
+- Solver-marked matrix: three passed and one intentionally skipped in 83.99
+  seconds.
+- Coverage: 98% across 23,201 statements, above the required 95% floor.
+- Ruff: repository-wide lint passed; all five changed Python files passed format
+  checks.
+- Documentation and artifacts: the changed notebook parsed as JSON, all 59
+  Sphinx sources built with warnings as errors, and OpenPinch 0.4.6 wheel/source
+  distributions built in isolated temporary directories.
+- Patch hygiene: `git diff --check` passed and generated artifacts remained
+  outside the worktree.
+
+### Extension Compliance
+
+- Security Baseline: disabled; N/A for this stage.
+- Resiliency Baseline: disabled; N/A for this stage.
+- Property-Based Testing (Partial): compliant. Existing generated transaction,
+  serialization, period-weight, and multiperiod invariants passed in the full
+  suite; deterministic regressions cover replay restoration and HPR economics.
+
+### Status
+
+PR 4 Summary Isolation and HPR Economics is independently green and ready to be
+committed as the fourth stacked pre-release change.
+
+## Pre-Release Corrective Final Build and Test
+
+### Closure
+
+- All fifteen review findings are represented by regression coverage and passed
+  in the final complete matrix.
+- The four dependency-ordered commits are isolated on
+  `codex/pr1-domain-input-correctness`, `codex/pr2-period-native-pdm`,
+  `codex/pr3-period-native-hen-results`, and
+  `codex/pr4-summary-hpr-economics`.
+- The final worktree audit found no untracked files, duplicate application
+  copies, unintended generated artifacts, or patch-integrity errors.
+- No compatibility aliases, migration loaders, period-zero shims, or deprecated
+  scalar HEN operating fields were added.
+
+### Final Matrix
+
+- Seeded non-solver suite: 2,004 passed and four solver cases deselected.
+- Solver suite: three passed and one intentional environment-dependent skip.
+- Coverage: 98%, above the required 95% floor.
+- Ruff lint and changed-file formatting: pass.
+- Packaged notebook JSON and notebook smoke tests: pass.
+- Sphinx with warnings as errors: 59 sources passed.
+- Wheel and source distribution: pass.
+- Canonical HEN solver/result evidence remains the PR 3 matrix: twelve accepted
+  tier 0/1 networks, plus bounded pre-extraction timeouts for Nine-stream tier 1
+  and Six-stream Yee tier 1; the Four-stream live baseline passed.
+
+### Publication Status
+
+Publication is the sole remaining plan item. The GitHub publishing workflow
+requires `gh`, which is not installed. The restricted environment also cannot
+resolve GitHub, and local `develop` is four approved baseline commits ahead of
+`origin/develop`. No remote branch was pushed and no pull request was opened
+because doing so without identifying the intended baseline would produce an
+incorrect stack or mutate `develop` without authorization.

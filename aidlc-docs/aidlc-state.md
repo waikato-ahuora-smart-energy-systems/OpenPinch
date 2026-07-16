@@ -154,13 +154,16 @@
 - [x] CONSTRUCTION - PR 1 Domain and Input Correctness.
 - [x] CONSTRUCTION - PR 2 Period-Native PDM and Utility Constraints.
 - [x] CONSTRUCTION - PR 3 Period-Native HEN Results.
-- [ ] CONSTRUCTION - PR 4 Summary Isolation and HPR Economics.
-- [ ] CONSTRUCTION - Final Build and Test.
-- **Current stage**: Code Generation Part 2 - PR 4 summary isolation and HPR
-  economics. PR 1, PR 2, and PR 3 are independently green with implementation,
-  documentation, packaging, solver, canonical benchmark, and Build and Test
-  evidence complete. PR 3 records bounded tier-1 solver timeouts separately
-  from its green correctness matrix.
+- [x] CONSTRUCTION - PR 4 Summary Isolation and HPR Economics.
+- [x] CONSTRUCTION - Final Build and Test.
+- **Current stage**: GitHub publication handoff. All four dependency-ordered PR units
+  are independently green with implementation, documentation, packaging,
+  solver, coverage, and Build and Test evidence complete. PR 3 records bounded
+  tier-1 solver timeouts separately from its green correctness matrix.
+- **Publication blocker**: The required `gh` CLI is not installed and GitHub DNS
+  is unavailable in the restricted environment. Local `develop` is four commits
+  ahead of `origin/develop`, so the correct remote base cannot be inferred safely
+  and no branch or PR has been published.
 - **Compatibility policy**: Pre-release clean breaks; no compatibility shims.
 - **Plan**: `aidlc-docs/construction/plans/pre-release-corrective-code-generation-plan.md`.
 

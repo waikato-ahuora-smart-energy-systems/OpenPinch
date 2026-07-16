@@ -257,8 +257,16 @@ def _compute_multiperiod_hpr_candidate(
 
     selected = period_outputs[str(_selected_multiperiod_case(args).period_id)]
     weighted = _weighted_hpr_backend_result(period_outputs, weights)
+    try:
+        shared_objective = _shared_hpr_candidate_objective(
+            list(period_outputs.values()),
+            weights,
+        )
+    except ValueError as exc:
+        return HPRBackendResult.failure(reason=str(exc))
+    weighted = weighted.with_updates(obj=shared_objective)
     return selected.with_updates(
-        obj=weighted.obj,
+        obj=shared_objective,
         period_outputs=period_outputs,
         weighted_output=weighted,
         design_vector=np.asarray(x, dtype=float),
@@ -366,7 +374,7 @@ def _aggregate_hpr_values(
 
     try:
         arrays = [np.asarray(value, dtype=float) for value in values]
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     shapes = {array.shape for array in arrays}
     if len(shapes) != 1:
@@ -394,6 +402,47 @@ def _total_hpr_annualized_cost(
         except Exception:
             pass
     return _weighted_hpr_metric(results, "hpr_total_annualized_cost", weights)
+
+
+def _shared_hpr_candidate_objective(
+    results: list[HPRBackendResult],
+    weights: np.ndarray,
+) -> float:
+    has_cost_breakdown = any(
+        result.hpr_operating_cost is not None
+        or result.hpr_annualized_capital_cost is not None
+        for result in results
+    )
+    if not has_cost_breakdown:
+        fallback = _weighted_hpr_metric(results, "obj", weights)
+        return float(fallback)
+
+    if any(
+        result.hpr_operating_cost is None or result.hpr_annualized_capital_cost is None
+        for result in results
+    ):
+        raise ValueError(
+            "Shared HPR candidates require a complete operating and annualized "
+            "capital cost breakdown for every period."
+        )
+
+    operating = _weighted_hpr_metric(results, "hpr_operating_cost", weights)
+    penalty = _weighted_hpr_metric(results, "feasibility_penalty", weights)
+    annualized_capital = _max_hpr_metric(
+        results,
+        "hpr_annualized_capital_cost",
+    )
+    return (
+        _annual_cost_magnitude(operating)
+        + float(penalty)
+        + _annual_cost_magnitude(annualized_capital)
+    )
+
+
+def _annual_cost_magnitude(value: Any) -> float:
+    if isinstance(value, Value):
+        return float(value.to("$/y").value)
+    return float(value)
 
 
 def _merge_candidate_points(

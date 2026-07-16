@@ -43,9 +43,10 @@ _VALUE_FIELDS = (
     "hpr_cop",
     "hpr_eta_he",
     "hpr_operating_cost",
+)
+_HPR_MAX_VALUE_FIELDS = (
     "hpr_capital_cost",
     "hpr_annualized_capital_cost",
-    "hpr_total_annualized_cost",
     "hpr_compressor_capital_cost",
     "hpr_heat_exchanger_capital_cost",
 )
@@ -169,6 +170,9 @@ def _weighted_average_target(
     data["period_idx"] = None
     for field in _VALUE_FIELDS:
         data[field] = _weighted_report_value(targets, field, weights)
+    for field in _HPR_MAX_VALUE_FIELDS:
+        data[field] = _max_report_value(targets, field)
+    data["hpr_total_annualized_cost"] = _total_hpr_annualized_cost(data)
     for field in _NUMERIC_FIELDS:
         data[field] = _weighted_numeric_attr(targets, field, weights)
     for field in _CONSENSUS_FIELDS:
@@ -217,6 +221,55 @@ def _weighted_report_value(
         raise ValueError(f"Cannot aggregate partially missing field {attr_path!r}.")
     weighted = _weighted_average(values, weights)
     return Value(weighted, unit) if unit is not None else weighted
+
+
+def _max_report_value(
+    targets: Sequence[TargetResults],
+    attr_path: str,
+) -> Value | float | None:
+    values = []
+    unit = None
+    missing = 0
+    for target in targets:
+        raw_value = _target_attr(target, attr_path)
+        value, value_unit = split_report_value(
+            raw_value,
+            period_idx=getattr(target, "period_idx", None),
+        )
+        if value is None:
+            missing += 1
+            continue
+        if isinstance(value, list):
+            raise ValueError(f"Cannot aggregate array-valued field {attr_path!r}.")
+        if value_unit is not None:
+            if unit is None:
+                unit = value_unit
+            elif value_unit != unit:
+                value = Value(value, value_unit).to(unit).value
+        values.append(float(value))
+
+    if missing == len(targets):
+        return None
+    if missing:
+        raise ValueError(f"Cannot aggregate partially missing field {attr_path!r}.")
+    maximum = max(values)
+    return Value(maximum, unit) if unit is not None else maximum
+
+
+def _total_hpr_annualized_cost(data: Mapping[str, Any]) -> Value | float | None:
+    operating = data.get("hpr_operating_cost")
+    annualized_capital = data.get("hpr_annualized_capital_cost")
+    if operating is None and annualized_capital is None:
+        return None
+    if operating is None or annualized_capital is None:
+        raise ValueError(
+            "Cannot recompute HPR total annualized cost from a partial cost breakdown."
+        )
+    if isinstance(operating, Value) and isinstance(annualized_capital, Value):
+        return operating + annualized_capital
+    if isinstance(operating, Value) or isinstance(annualized_capital, Value):
+        raise ValueError("HPR annualized cost fields must use compatible units.")
+    return float(operating) + float(annualized_capital)
 
 
 def _weighted_numeric_attr(

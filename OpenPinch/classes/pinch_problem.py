@@ -506,15 +506,19 @@ class PinchProblem:
             raise ValueError("This problem has no canonical period_ids to target.")
 
         spec = self._target_run_spec_for_summary()
+        original_master_zone = self._require_prepared_root_zone()
         previous_results = self._results
         previous_recording_state = self._suspend_target_run_recording
         previous_spec = self._last_target_run_spec
         outputs: list[TargetOutput] = []
         try:
             self._suspend_target_run_recording = True
+            baseline_zone = deepcopy(original_master_zone)
             for period_id in period_ids:
+                self._master_zone = deepcopy(baseline_zone)
                 outputs.append(self._target_output_for_recorded_period(spec, period_id))
         finally:
+            self._master_zone = original_master_zone
             self._suspend_target_run_recording = previous_recording_state
             self._last_target_run_spec = previous_spec
             self._results = previous_results

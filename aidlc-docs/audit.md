@@ -1120,3 +1120,35 @@ Resolve all 15 findings in four dependency-ordered PRs based on local `756c1128`
 **Context**: CONSTRUCTION - Code Generation Part 2, PR 3 complete. No scalar compatibility aliases or period-zero shims were added. Security and Resiliency extensions are disabled; Property-Based Testing Partial is compliant. PR 4 is the next dependency-ordered unit.
 
 ---
+
+## Code Generation - PR 4 Regression Baseline
+**Timestamp**: 2026-07-16T07:51:06Z
+**User Input**: "No new user input."
+**AI Response**: "Added and executed regression tests for fresh-zone summary replay on success and failure, restoration of zone identity/results/target specification, peak-capital public HPR aggregation, shared simulated-HPR candidate scoring, and raw-objective fallback when no cost breakdown exists. The focused baseline produced five expected failures and seventeen passes, localizing the remaining defects to summary replay isolation, public HPR capital aggregation, and shared candidate scoring."
+**Context**: CONSTRUCTION - Code Generation Part 2, PR 4 regression-first baseline. Marked the failing-regression plan step complete in the same interaction.
+
+---
+
+## Code Generation - PR 4 Summary and HPR Corrections
+**Timestamp**: 2026-07-16T07:53:22Z
+**User Input**: "No new user input."
+**AI Response**: "Implemented fresh baseline-zone copies for each summary replay period with unconditional restoration of the original zone object, results cache, recording state, and target-run specification. Shared simulated-HPR candidates now score weighted operating cost plus weighted feasibility penalty plus maximum annualized capital, falling back to weighted backend obj only when every period lacks a cost breakdown. Public HPR summaries weight operating fields, maximize capital fields, and recompute total annualized cost. All twenty-two focused summary and multiperiod HPR tests passed; focused Ruff lint passed."
+**Context**: CONSTRUCTION - Code Generation Part 2, PR 4 implementation. Marked the three completed implementation checkboxes in the same interaction. Non-HPR summary aggregation remains unchanged and no compatibility shim was added.
+
+---
+
+## Code Generation - PR 4 Completion
+**Timestamp**: 2026-07-16T08:03:21Z
+**User Input**: "No new user input."
+**AI Response**: "Completed PR 4 Summary Isolation and HPR Economics. Summary replay is transactionally isolated across periods and exception paths; shared simulated-HPR ranking combines weighted operating cost and feasibility penalty with maximum annualized capital; public HPR summaries weight operations, maximize capital fields, and recompute annualized totals. The complete seeded non-solver suite passed 2,004 tests, the solver suite passed three with one intentional skip, and total coverage was 98%. Ruff, notebook parsing, warning-free Sphinx, wheel/sdist packaging, and patch hygiene passed."
+**Context**: CONSTRUCTION - Code Generation Part 2, PR 4 complete. All PR 4 plan checkboxes and stage-level state were updated in the same interaction. Security and Resiliency extensions are disabled; Property-Based Testing Partial is compliant. Final Build and Test is next.
+
+---
+
+## Final Build and Test - Publication Handoff
+**Timestamp**: 2026-07-16T08:05:37Z
+**User Input**: "No new user input."
+**AI Response**: "Completed the final local review and Build and Test matrix. All fifteen review findings are closed by passing regressions; the four stacked commits are clean and independently evidenced; 2,004 non-solver tests, three runnable solver tests, 98% coverage, Ruff, notebook parsing, warning-free Sphinx, packaging, and patch integrity passed. GitHub publication could not proceed because the required gh CLI is absent, GitHub DNS is unavailable, and local develop contains four approved baseline commits not present on origin/develop. No remote state was changed."
+**Context**: CONSTRUCTION - Final Build and Test complete. GitHub publication remains the only unchecked plan item. The GitHub publish workflow was paused at its mandatory prerequisite rather than assuming a remote base or pushing local develop.
+
+---

@@ -152,7 +152,11 @@ Simulated-cycle targets also expose annualized cost fields:
 ``hpr_heat_exchanger_capital_cost``.
 For multiperiod input data, the same named entry points also accept
 ``period_id=...`` and the refreshed summaries, exports, and graph metadata carry
-that selected period context forward.
+that selected period context forward. Weighted HPR summaries average operating
+fields, retain maximum capital fields, and recompute total annualized cost from
+weighted operating cost plus maximum annualized capital. Per-period summary
+replay uses fresh copies of one baseline zone and restores the original problem
+state on both success and failure.
 
 The ``problem.add_component.*`` accessor is different: it mutates the prepared
 stream model before targeting. The direct process MVR component deactivates

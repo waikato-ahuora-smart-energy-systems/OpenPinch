@@ -158,10 +158,16 @@ def test_solve_hpr_multiperiod_placement_scores_weighted_shared_vector(
     def objective(x, args, debug=False):
         target = 1.0 if args.period_idx == 0 else 3.0
         obj = float((x[0] - target) ** 2)
-        return _backend_result(
+        result = _backend_result(
             obj=obj,
             utility_tot=float(x[0] + 10.0 * args.period_idx),
             period_idx=args.period_idx,
+        )
+        return result.with_updates(
+            hpr_operating_cost=Value(
+                float(result.hpr_operating_cost.value) + 100.0 * obj,
+                "$/y",
+            )
         )
 
     result = hp_shared.solve_hpr_multiperiod_placement(
@@ -171,18 +177,144 @@ def test_solve_hpr_multiperiod_placement_scores_weighted_shared_vector(
         args=mp_args,
     )
 
-    assert result.obj == pytest.approx(1.0)
+    assert result.obj == pytest.approx(427.5)
     assert result.utility_tot == pytest.approx(3.0)
     np.testing.assert_allclose(result.design_vector, np.array([3.0]))
     assert result.period_ids == ["p0", "p1"]
     assert result.period_weights == [1.0, 3.0]
     assert set(result.period_outputs) == {"p0", "p1"}
     assert result.weighted_output.utility_tot == pytest.approx(10.5)
-    assert result.weighted_output.hpr_operating_cost.value == pytest.approx(107.5)
+    assert result.weighted_output.hpr_operating_cost.value == pytest.approx(207.5)
     assert result.weighted_output.hpr_capital_cost.value == pytest.approx(1100.0)
     assert result.weighted_output.hpr_total_annualized_cost.value == pytest.approx(
-        327.5
+        427.5
     )
+
+
+def test_shared_hpr_candidate_score_uses_weighted_operation_and_peak_capital(
+    monkeypatch,
+):
+    def fake_multiminima(**kwargs):
+        candidates = np.array([[1.0], [2.0]])
+        scores = np.array(
+            [
+                kwargs["func"](x, kwargs["func_kwargs"], debug=False).obj
+                for x in candidates
+            ]
+        )
+        return candidates, scores
+
+    monkeypatch.setattr(hp_shared, "multiminima", fake_multiminima)
+    cases = [
+        HPRPeriodCase(
+            period_id="p0",
+            period_idx=0,
+            weight=1.0,
+            args=_input_args(period_idx=0),
+        ),
+        HPRPeriodCase(
+            period_id="p1",
+            period_idx=1,
+            weight=3.0,
+            args=_input_args(period_idx=1),
+        ),
+    ]
+    mp_args = MultiPeriodHPRTargetInputs(
+        period_cases=cases,
+        selected_period_id="p0",
+        selected_period_idx=0,
+        hpr_type=HPRcycle.CascadeCarnot.value,
+        max_multi_start=2,
+        bb_minimiser="rbf",
+    )
+
+    def objective(x, args, debug=False):
+        candidate = int(x[0])
+        period_idx = int(args.period_idx)
+        operating = {
+            (1, 0): 100.0,
+            (1, 1): 300.0,
+            (2, 0): 400.0,
+            (2, 1): 100.0,
+        }[candidate, period_idx]
+        annualized_capital = {
+            (1, 0): 500.0,
+            (1, 1): 50.0,
+            (2, 0): 100.0,
+            (2, 1): 200.0,
+        }[candidate, period_idx]
+        penalty = 40.0 if candidate == 2 and period_idx == 0 else 0.0
+        return _backend_result(
+            obj=1.0 if candidate == 1 else 100.0,
+            utility_tot=float(candidate),
+            period_idx=period_idx,
+        ).with_updates(
+            hpr_operating_cost=Value(operating, "$/y"),
+            hpr_annualized_capital_cost=Value(annualized_capital, "$/y"),
+            feasibility_penalty=penalty,
+        )
+
+    result = hp_shared.solve_hpr_multiperiod_placement(
+        f_obj=objective,
+        x0_ls=None,
+        bnds=[(0.0, 3.0)],
+        args=mp_args,
+    )
+
+    np.testing.assert_allclose(result.design_vector, np.array([2.0]))
+    assert result.obj == pytest.approx(385.0)
+    assert result.weighted_output.hpr_operating_cost.value == pytest.approx(175.0)
+    assert result.weighted_output.feasibility_penalty == pytest.approx(10.0)
+    assert result.weighted_output.hpr_annualized_capital_cost.value == pytest.approx(
+        200.0
+    )
+    assert result.weighted_output.hpr_total_annualized_cost.value == pytest.approx(
+        375.0
+    )
+
+
+def test_shared_hpr_candidate_score_falls_back_when_cost_breakdown_absent():
+    cases = [
+        HPRPeriodCase(
+            period_id="p0",
+            period_idx=0,
+            weight=1.0,
+            args=_input_args(period_idx=0),
+        ),
+        HPRPeriodCase(
+            period_id="p1",
+            period_idx=1,
+            weight=3.0,
+            args=_input_args(period_idx=1),
+        ),
+    ]
+    mp_args = MultiPeriodHPRTargetInputs(
+        period_cases=cases,
+        selected_period_id="p0",
+        selected_period_idx=0,
+        hpr_type=HPRcycle.CascadeCarnot.value,
+        max_multi_start=1,
+        bb_minimiser="rbf",
+    )
+
+    def objective(x, args, debug=False):
+        return HPRBackendResult(
+            obj=10.0 + 10.0 * args.period_idx,
+            utility_tot=1.0,
+            w_net=1.0,
+            Q_ext_heat=0.0,
+            Q_ext_cold=0.0,
+            Q_amb_hot=0.0,
+            Q_amb_cold=0.0,
+        )
+
+    result = hp_shared._compute_multiperiod_hpr_candidate(
+        objective,
+        np.array([1.0]),
+        mp_args,
+    )
+
+    assert result.obj == pytest.approx(17.5)
 
 
 def test_solve_hpr_multiperiod_placement_fails_when_any_period_fails(monkeypatch):

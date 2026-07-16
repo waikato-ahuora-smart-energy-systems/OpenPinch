@@ -75,7 +75,17 @@ HPR and refrigeration targeting add target rows with HPR cost, duty, COP, and
 graph effects. Direct gas/vapour MVR adds replacement hot streams and includes
 component work in later target summaries. Multiperiod HPR shared-design mode
 keeps the requested period target row and stores all-period evaluations on
-``hpr_details`` for weighted summary reporting.
+``hpr_details`` for weighted summary reporting. Candidate designs are ranked by
+weighted operating cost and feasibility penalty plus the largest period's
+annualized capital cost, so equipment is sized for the peak-capital period even
+when another period dominates operating cost.
+
+Weighted HPR summary rows average operating quantities and operating cost, use
+the maximum total, annualized, compressor, and heat-exchanger capital fields,
+and recompute total annualized cost as weighted operating cost plus maximum
+annualized capital. Other target fields retain the normal weighted-average
+policy. Summary replay uses isolated copies and leaves the selected problem zone
+and cached result unchanged, including when a replayed period fails.
 
 Interpretation
 --------------

@@ -72,27 +72,33 @@ its work completes.
 
 ## Step 4 - PR 4: Summary Isolation and HPR Economics
 
-- [ ] Add failing success/error state-isolation and shared-HPR aggregation tests.
-- [ ] Replay each summary period against a fresh baseline-zone copy and restore
+- [x] Add failing success/error state-isolation and shared-HPR aggregation tests.
+- [x] Replay each summary period against a fresh baseline-zone copy and restore
   the original zone identity, result cache, and recorded target specification.
-- [ ] Score shared simulated-HPR candidates with weighted operating cost and
+- [x] Score shared simulated-HPR candidates with weighted operating cost and
   penalty plus maximum annualized capital cost.
-- [ ] Aggregate public HPR outputs using weighted operating fields, maximum
+- [x] Aggregate public HPR outputs using weighted operating fields, maximum
   capital fields, and recomputed total annualized cost; retain existing policy
   for non-HPR fields.
-- [ ] Update targeting/HPR documentation and run focused, full, Ruff,
+- [x] Update targeting/HPR documentation and run focused, full, Ruff,
   documentation, packaging, solver, and patch-hygiene checks.
-- [ ] Record PR 4 implementation summary and Build and Test evidence.
+- [x] Record PR 4 implementation summary and Build and Test evidence.
 
 ## Step 5 - Final Review and Handoff
 
-- [ ] Re-run all fifteen review reproducers and confirm every finding is closed.
-- [ ] Run the complete supported test, coverage, solver, documentation, notebook,
+- [x] Re-run all fifteen review reproducers and confirm every finding is closed.
+- [x] Run the complete supported test, coverage, solver, documentation, notebook,
   packaging, Ruff, and patch-integrity matrix.
-- [ ] Confirm no duplicate application files or unintended worktree changes.
-- [ ] Update AI-DLC state, audit, release notes, and final Build and Test summary.
+- [x] Confirm no duplicate application files or unintended worktree changes.
+- [x] Update AI-DLC state, audit, release notes, and final Build and Test summary.
 - [ ] Publish the four stacked branches and create their pull requests only after
   each branch is independently green.
+
+Publication is pending because the required GitHub CLI is not installed and the
+restricted environment cannot resolve GitHub to identify the remote branch that
+contains the four approved baseline commits. Local `develop` is four commits
+ahead of `origin/develop`; it must not be pushed or used as an implicit PR base
+without confirming the intended remote baseline.
 
 ## Approved Decisions
 

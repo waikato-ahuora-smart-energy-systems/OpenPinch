@@ -112,7 +112,12 @@ def test_weighted_average_output_aggregates_values_utilities_and_metadata():
     assert target.capital_cost.value == pytest.approx(2500.0)
     assert target.exergy_sources.value == pytest.approx(20.0)
     assert target.hpr_work.value == pytest.approx(2.5)
-    assert target.hpr_total_annualized_cost.value == pytest.approx(600.0)
+    assert target.hpr_operating_cost.value == pytest.approx(500.0)
+    assert target.hpr_capital_cost.value == pytest.approx(900.0)
+    assert target.hpr_annualized_capital_cost.value == pytest.approx(120.0)
+    assert target.hpr_total_annualized_cost.value == pytest.approx(620.0)
+    assert target.hpr_compressor_capital_cost.value == pytest.approx(360.0)
+    assert target.hpr_heat_exchanger_capital_cost.value == pytest.approx(540.0)
     assert target.hpr_cycle == "Carnot"
     assert target.hpr_success is None
     assert {
@@ -121,6 +126,46 @@ def test_weighted_average_output_aggregates_values_utilities_and_metadata():
         "Steam": pytest.approx(25.0),
         "Fuel": pytest.approx(6.0),
     }
+
+
+def test_weighted_average_output_uses_peak_hpr_capital_and_weighted_operation():
+    base_target = _target(period_id="base", qh=10.0).model_copy(
+        update={
+            "hpr_operating_cost": Value(800.0, "$/y"),
+            "hpr_capital_cost": Value(1000.0, "$"),
+            "hpr_annualized_capital_cost": Value(100.0, "$/y"),
+            "hpr_total_annualized_cost": Value(900.0, "$/y"),
+            "hpr_compressor_capital_cost": Value(600.0, "$"),
+            "hpr_heat_exchanger_capital_cost": Value(400.0, "$"),
+        }
+    )
+    peak_target = _target(period_id="peak", qh=30.0).model_copy(
+        update={
+            "hpr_operating_cost": Value(200.0, "$/y"),
+            "hpr_capital_cost": Value(3000.0, "$"),
+            "hpr_annualized_capital_cost": Value(300.0, "$/y"),
+            "hpr_total_annualized_cost": Value(500.0, "$/y"),
+            "hpr_compressor_capital_cost": Value(1800.0, "$"),
+            "hpr_heat_exchanger_capital_cost": Value(1200.0, "$"),
+        }
+    )
+
+    output = weighted_average_output(
+        [
+            TargetOutput(name="Site", period_id="base", targets=[base_target]),
+            TargetOutput(name="Site", period_id="peak", targets=[peak_target]),
+        ],
+        [3.0, 1.0],
+    )
+    target = output.targets[0]
+
+    assert target.hpr_operating_cost.value == pytest.approx(650.0)
+    assert target.hpr_capital_cost.value == pytest.approx(3000.0)
+    assert target.hpr_annualized_capital_cost.value == pytest.approx(300.0)
+    assert target.hpr_compressor_capital_cost.value == pytest.approx(1800.0)
+    assert target.hpr_heat_exchanger_capital_cost.value == pytest.approx(1200.0)
+    assert target.hpr_total_annualized_cost.value == pytest.approx(950.0)
+    assert target.Qh.value == pytest.approx(15.0)
 
 
 def test_weighted_average_output_rejects_partially_missing_numeric_fields():
@@ -190,6 +235,113 @@ def test_weighted_summary_replays_last_named_target_accessor(monkeypatch):
     assert frame.iloc[0]["Period ID"] == WEIGHTED_AVERAGE_PERIOD_ID
     assert frame.iloc[0]["Hot Utility Target"] == pytest.approx(25.0)
     assert problem.results.period_id == "peak"
+
+
+def test_weighted_summary_replay_uses_fresh_zone_copies_and_restores_state(
+    monkeypatch,
+):
+    root = Zone("Site")
+    root.set_period_context({"base": 0, "peak": 1}, [1.0, 3.0], 2)
+    root.targets["sentinel"] = object()
+    problem = PinchProblem()
+    problem._master_zone = root
+    cached_results = TargetOutput(
+        name="Site",
+        period_id="peak",
+        targets=[_target(period_id="peak", qh=30.0)],
+    )
+    recorded_spec = SimpleNamespace(surface="sentinel", options={})
+    problem._results = cached_results
+    problem._last_target_run_spec = recorded_spec
+    seen = []
+
+    def fake_period_output(self, spec, period_id):
+        seen.append(
+            (
+                self._master_zone,
+                self._master_zone.name,
+                tuple(self._master_zone.targets),
+            )
+        )
+        self._master_zone.name = f"mutated-{period_id}"
+        self._master_zone.targets[period_id] = object()
+        self._results = TargetOutput(
+            name="Site",
+            period_id=period_id,
+            targets=[_target(period_id=period_id)],
+        )
+        self._last_target_run_spec = SimpleNamespace(surface=period_id, options={})
+        return self._results
+
+    monkeypatch.setattr(
+        PinchProblem,
+        "_target_output_for_recorded_period",
+        fake_period_output,
+    )
+
+    outputs = problem._target_outputs_for_recorded_periods()
+
+    assert [output.period_id for output in outputs] == ["base", "peak"]
+    assert seen[0][0] is not seen[1][0]
+    assert all(zone is not root for zone, _name, _targets in seen)
+    assert [name for _zone, name, _targets in seen] == ["Site", "Site"]
+    assert [targets for _zone, _name, targets in seen] == [
+        ("sentinel",),
+        ("sentinel",),
+    ]
+    assert problem.master_zone is root
+    assert problem.master_zone.name == "Site"
+    assert tuple(problem.master_zone.targets) == ("sentinel",)
+    assert problem.results is cached_results
+    assert problem._last_target_run_spec is recorded_spec
+
+
+def test_weighted_summary_replay_restores_state_when_a_period_fails(monkeypatch):
+    root = Zone("Site")
+    root.set_period_context({"base": 0, "peak": 1}, [1.0, 3.0], 2)
+    root.targets["sentinel"] = object()
+    problem = PinchProblem()
+    problem._master_zone = root
+    cached_results = TargetOutput(
+        name="Site",
+        period_id="peak",
+        targets=[_target(period_id="peak", qh=30.0)],
+    )
+    recorded_spec = SimpleNamespace(surface="sentinel", options={})
+    problem._results = cached_results
+    problem._last_target_run_spec = recorded_spec
+    seen = []
+
+    def fake_period_output(self, spec, period_id):
+        seen.append((self._master_zone, self._master_zone.name))
+        self._master_zone.name = f"mutated-{period_id}"
+        self._master_zone.targets[period_id] = object()
+        self._results = None
+        self._last_target_run_spec = None
+        if period_id == "peak":
+            raise RuntimeError("period replay failed")
+        return TargetOutput(
+            name="Site",
+            period_id=period_id,
+            targets=[_target(period_id=period_id)],
+        )
+
+    monkeypatch.setattr(
+        PinchProblem,
+        "_target_output_for_recorded_period",
+        fake_period_output,
+    )
+
+    with pytest.raises(RuntimeError, match="period replay failed"):
+        problem._target_outputs_for_recorded_periods()
+
+    assert seen[0][0] is not seen[1][0]
+    assert [name for _zone, name in seen] == ["Site", "Site"]
+    assert problem.master_zone is root
+    assert problem.master_zone.name == "Site"
+    assert tuple(problem.master_zone.targets) == ("sentinel",)
+    assert problem.results is cached_results
+    assert problem._last_target_run_spec is recorded_spec
 
 
 @pytest.mark.parametrize(
