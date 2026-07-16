@@ -64,6 +64,8 @@ def _segmented_problem(
     cold_second_duty: float = 100.0,
     segmented_utility: bool = False,
     segmented_cold_utility: bool = False,
+    hot_utility_dt_cont: tuple[float, float] = (0.0, 0.0),
+    cold_utility_dt_cont: tuple[float, float] = (0.0, 0.0),
 ) -> PinchProblem:
     hot_utility = (
         {
@@ -77,6 +79,7 @@ def _segmented_problem(
                     "heat_flow": 50.0,
                     "htc": 2.0,
                     "price": 20.0,
+                    "dt_cont": hot_utility_dt_cont[0],
                 },
                 {
                     "t_supply": 225.0,
@@ -84,6 +87,7 @@ def _segmented_problem(
                     "heat_flow": 100.0,
                     "htc": 1.0,
                     "price": 80.0,
+                    "dt_cont": hot_utility_dt_cont[1],
                 },
             ],
         }
@@ -109,6 +113,7 @@ def _segmented_problem(
                     "heat_flow": 50.0,
                     "htc": 2.0,
                     "price": 30.0,
+                    "dt_cont": cold_utility_dt_cont[0],
                 },
                 {
                     "t_supply": 45.0,
@@ -116,6 +121,7 @@ def _segmented_problem(
                     "heat_flow": 100.0,
                     "htc": 1.0,
                     "price": 90.0,
+                    "dt_cont": cold_utility_dt_cont[1],
                 },
             ],
         }
@@ -218,6 +224,97 @@ def test_segmented_utility_arrays_and_cost_profile_use_local_prices_exactly():
     assert profile.cost_at_heat(150.0) == pytest.approx(9000.0)
 
 
+def test_segmented_utility_dt_cont_tensors_and_boundary_mapping_are_local():
+    problem = _segmented_problem(
+        segmented_utility=True,
+        segmented_cold_utility=True,
+        hot_utility_dt_cont=(0.2, 0.8),
+        cold_utility_dt_cont=(0.7, 0.3),
+    )
+    arrays = problem_to_solver_arrays(problem, 10.0)
+    hot_profile = profile_from_solver_arrays(
+        arrays,
+        side="hot_utility",
+        parent_index=0,
+        period_index=0,
+    )
+    cold_profile = profile_from_solver_arrays(
+        arrays,
+        side="cold_utility",
+        parent_index=0,
+        period_index=0,
+    )
+
+    np.testing.assert_allclose(
+        arrays.arrays["hot_utility_segment_dt_cont_period"][0, 0],
+        [2.0, 8.0],
+    )
+    np.testing.assert_allclose(
+        arrays.arrays["cold_utility_segment_dt_cont_period"][0, 0],
+        [7.0, 3.0],
+    )
+    assert hot_profile.temperature_contribution_at_heat(0.0) == pytest.approx(2.0)
+    assert hot_profile.temperature_contribution_at_heat(25.0) == pytest.approx(2.0)
+    assert hot_profile.temperature_contribution_at_heat(50.0) == pytest.approx(8.0)
+    assert hot_profile.temperature_contribution_at_heat(75.0) == pytest.approx(8.0)
+    assert cold_profile.temperature_contribution_at_heat(0.0) == pytest.approx(7.0)
+    assert cold_profile.temperature_contribution_at_heat(50.0) == pytest.approx(7.0)
+    assert cold_profile.temperature_contribution_at_heat(75.0) == pytest.approx(3.0)
+
+
+def test_flat_utility_dt_cont_keeps_scalar_contribution():
+    arrays = problem_to_solver_arrays(_segmented_problem(), 10.0)
+    model = StageWiseModel.__new__(StageWiseModel)
+    model.solver_arrays = arrays
+    model.T_hu_cont_period = arrays.arrays["T_hu_cont_period"]
+    model.T_cu_cont_period = arrays.arrays["T_cu_cont_period"]
+
+    assert model._utility_outlet_temperature_contribution("hot", 0, 0, 25.0) == 5.0
+    assert model._utility_outlet_temperature_contribution("cold", 0, 0, 25.0) == 5.0
+
+
+def test_segmented_utility_dt_cont_mapping_is_built_into_stagewise_constraints():
+    arrays = problem_to_solver_arrays(
+        _segmented_problem(
+            segmented_utility=True,
+            segmented_cold_utility=True,
+            hot_utility_dt_cont=(0.2, 0.8),
+            cold_utility_dt_cont=(0.7, 0.3),
+        ),
+        10.0,
+    )
+
+    model = StageWiseModel(
+        name="utility-dt-cont",
+        framework="TDM",
+        solver="apopt",
+        solver_arrays=arrays,
+        stages=1,
+        dTmin=10.0,
+        z_restriction=None,
+        min_dqda=0.0,
+        minimisation_goal="total utility",
+        non_isothermal_model=False,
+        integers=False,
+        tol=1e-3,
+    )
+
+    assert model.T_hu_in_cont_by_period == [2.0]
+    assert model.T_cu_in_cont_by_period == [7.0]
+    assert len(model.T_hu_out_cont_by_period) == 1
+    assert len(model.T_cu_out_cont_by_period) == 1
+    assert len(model.T_hu_solved_out_by_period) == 1
+    assert len(model.T_cu_solved_out_by_period) == 1
+    contribution_mappings = [
+        mapping
+        for mapping in model._piecewise_active_mappings
+        if "segment_index_at_heat" in mapping
+    ]
+    assert len(contribution_mappings) == 2
+    assert contribution_mappings[0]["segment_index_at_heat"](50.0) == 1
+    assert contribution_mappings[1]["segment_index_at_heat"](50.0) == 0
+
+
 @given(
     st.floats(min_value=1.0, max_value=100.0, allow_nan=False),
     st.floats(min_value=1.0, max_value=100.0, allow_nan=False),
@@ -277,12 +374,14 @@ def test_multiperiod_segmented_utility_cost_profiles_keep_stable_identities():
                             "t_target": period_value([225.0, 235.0], "degC"),
                             "heat_flow": period_value([50.0, 100.0], "kW"),
                             "price": period_value([20.0, 40.0], "$/MWh"),
+                            "dt_cont": period_value([0.2, 0.6], "delta_degC"),
                         },
                         {
                             "t_supply": period_value([225.0, 235.0], "degC"),
                             "t_target": period_value([200.0, 210.0], "degC"),
                             "heat_flow": period_value([100.0, 100.0], "kW"),
                             "price": period_value([80.0, 20.0], "$/MWh"),
+                            "dt_cont": period_value([0.8, 0.3], "delta_degC"),
                         },
                     ],
                 },
@@ -316,13 +415,18 @@ def test_multiperiod_segmented_utility_cost_profiles_keep_stable_identities():
     np.testing.assert_allclose(profiles[1].cumulative_duties, [0.0, 100.0, 200.0])
     assert profiles[0].cost_at_heat(75.0) == pytest.approx(3000.0)
     assert profiles[1].cost_at_heat(150.0) == pytest.approx(5000.0)
+    np.testing.assert_allclose(profiles[0].temperature_contributions, [2.0, 8.0])
+    np.testing.assert_allclose(profiles[1].temperature_contributions, [6.0, 3.0])
+    assert profiles[0].temperature_contribution_at_heat(50.0) == pytest.approx(8.0)
+    assert profiles[1].temperature_contribution_at_heat(100.0) == pytest.approx(6.0)
 
 
 def test_pdm_targeting_applies_hen_dtmin_to_every_expanded_segment(monkeypatch):
     problem = _segmented_problem()
     observed = {}
 
-    def capture_targeting_zone(zone):
+    def capture_targeting_zone(zone, args=None):
+        assert args == {"period_id": "0"}
         numeric = zone.process_streams.segment_numeric_view()
         observed["dt_cont"] = numeric.dt_cont.copy()
         observed["t_min_star"] = numeric.t_min_star.copy()

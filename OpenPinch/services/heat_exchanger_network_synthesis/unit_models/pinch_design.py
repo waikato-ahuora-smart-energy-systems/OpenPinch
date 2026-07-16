@@ -28,11 +28,17 @@ def _lmtd_formula_allowed(
     delta_2: float,
     approach_temperature: float,
     tolerance: float,
+    second_approach_temperature: float | None = None,
 ) -> bool:
+    second_approach = (
+        approach_temperature
+        if second_approach_temperature is None
+        else second_approach_temperature
+    )
     return (
         abs(delta_1 - delta_2) > tolerance
         and delta_1 - approach_temperature >= tolerance
-        and delta_2 - approach_temperature >= tolerance
+        and delta_2 - second_approach >= tolerance
     )
 
 
@@ -117,12 +123,28 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
 
         if self.pinch_decomposition.pinch_location != self.pinch_loc:
             raise ValueError("pinch decomposition location does not match PDM side.")
-        target = self.pinch_decomposition.target
-        self.HU_target = target.hot_utility_target
-        self.CU_target = target.cold_utility_target
-        self.T_pinch = target.shifted_pinch_temperature
-        if self.T_pinch is None:
-            raise ValueError("PDM construction requires a shifted pinch temperature.")
+        targets = self.pinch_decomposition.period_targets
+        if len(targets) != self.N_periods:
+            raise ValueError("PDM period targets must match the model period count.")
+        if tuple(target.period_id for target in targets) != tuple(self.period_ids):
+            raise ValueError("PDM period target identities must match solver arrays.")
+        self.HU_target_by_period = [target.hot_utility_target for target in targets]
+        self.CU_target_by_period = [target.cold_utility_target for target in targets]
+        self.T_pinch_by_period = [
+            target.shifted_pinch_temperature for target in targets
+        ]
+        if any(value is None for value in self.T_pinch_by_period):
+            raise ValueError(
+                "PDM construction requires a shifted pinch temperature in every period."
+            )
+        self.side_required = any(
+            target > self.tol
+            for target in (
+                self.HU_target_by_period
+                if self.pinch_loc == "above"
+                else self.CU_target_by_period
+            )
+        )
 
     def set_preprocessing(self) -> None:
         """Pre-process PDM superstructure parameters."""
@@ -134,89 +156,30 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         self.J = self.f_c_period.shape[1]
 
         decomposition = self.pinch_decomposition
-        shifted_pinch = float(self.T_pinch)
-        hot_threshold = shifted_pinch + self.dTmin / 2.0
-        cold_threshold = shifted_pinch - self.dTmin / 2.0
-
-        self.T_h_in_period = self.T_h_in_period.copy()
-        self.T_h_out_period = self.T_h_out_period.copy()
-        self.T_c_in_period = self.T_c_in_period.copy()
-        self.T_c_out_period = self.T_c_out_period.copy()
-        self.z_i_active_period = []
-        self.z_j_active_period = []
-        for n in range(self.N_periods):
-            if self.pinch_loc == "above":
-                z_i_active = [
-                    1 if value > hot_threshold else 0 for value in self.T_h_in_period[n]
-                ]
-                z_j_active = [
-                    1 if value > cold_threshold else 0
-                    for value in self.T_c_out_period[n]
-                ]
-                for i, is_active in enumerate(z_i_active):
-                    if is_active:
-                        self.T_h_out_period[n][i] = max(
-                            self.T_h_out_period[n][i],
-                            hot_threshold,
-                        )
-                    else:
-                        self.T_h_in_period[n][i] = 0.0
-                        self.T_h_out_period[n][i] = 0.0
-                for j, is_active in enumerate(z_j_active):
-                    if is_active:
-                        self.T_c_in_period[n][j] = max(
-                            self.T_c_in_period[n][j],
-                            cold_threshold,
-                        )
-                    else:
-                        self.T_c_in_period[n][j] = 0.0
-                        self.T_c_out_period[n][j] = 0.0
-            else:
-                z_i_active = [
-                    1 if value < hot_threshold else 0
-                    for value in self.T_h_out_period[n]
-                ]
-                z_j_active = [
-                    1 if value < cold_threshold else 0
-                    for value in self.T_c_in_period[n]
-                ]
-                for i, is_active in enumerate(z_i_active):
-                    if is_active:
-                        self.T_h_in_period[n][i] = min(
-                            self.T_h_in_period[n][i],
-                            hot_threshold,
-                        )
-                    else:
-                        self.T_h_in_period[n][i] = 0.0
-                        self.T_h_out_period[n][i] = 0.0
-                for j, is_active in enumerate(z_j_active):
-                    if is_active:
-                        self.T_c_out_period[n][j] = min(
-                            self.T_c_out_period[n][j],
-                            cold_threshold,
-                        )
-                    else:
-                        self.T_c_in_period[n][j] = 0.0
-                        self.T_c_out_period[n][j] = 0.0
-            self.z_i_active_period.append(z_i_active)
-            self.z_j_active_period.append(z_j_active)
-
-        self.z_i_active = [
-            (
-                1
-                if any(self.z_i_active_period[n][i] for n in range(self.N_periods))
-                else 0
-            )
-            for i in range(self.I)
+        self.T_h_in_period = np.asarray(
+            decomposition.clipped_hot_supply_temperatures_by_period,
+            dtype=float,
+        )
+        self.T_h_out_period = np.asarray(
+            decomposition.clipped_hot_target_temperatures_by_period,
+            dtype=float,
+        )
+        self.T_c_in_period = np.asarray(
+            decomposition.clipped_cold_supply_temperatures_by_period,
+            dtype=float,
+        )
+        self.T_c_out_period = np.asarray(
+            decomposition.clipped_cold_target_temperatures_by_period,
+            dtype=float,
+        )
+        self.z_i_active_period = [
+            list(row) for row in decomposition.z_i_active_by_period
         ]
-        self.z_j_active = [
-            (
-                1
-                if any(self.z_j_active_period[n][j] for n in range(self.N_periods))
-                else 0
-            )
-            for j in range(self.J)
+        self.z_j_active_period = [
+            list(row) for row in decomposition.z_j_active_by_period
         ]
+        self.z_i_active = list(decomposition.z_i_active)
+        self.z_j_active = list(decomposition.z_j_active)
         if decomposition.manual_stage_selection is None:
             self.S = max(sum(self.z_i_active), sum(self.z_j_active))
         else:
@@ -601,6 +564,8 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                 for i in range(self.I)
             ]
 
+        self._set_multiperiod_utility_approach_equations()
+
         M_ij_period = [
             [
                 [
@@ -658,7 +623,9 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
 
         if self.minimisation_goal == "hot utility":
             for n in range(self.N_periods):
-                self.m.Equation(sum(self.Q_h_by_period[n]) - self.HU_target >= 0.0)
+                self.m.Equation(
+                    sum(self.Q_h_by_period[n]) - self.HU_target_by_period[n] >= 0.0
+                )
             self.m.Minimize(
                 self._weighted_state_average(
                     [sum(self.Q_h_by_period[n]) for n in range(self.N_periods)]
@@ -666,7 +633,9 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
             )
         elif self.minimisation_goal == "cold utility":
             for n in range(self.N_periods):
-                self.m.Equation(sum(self.Q_c_by_period[n]) - self.CU_target >= 0.0)
+                self.m.Equation(
+                    sum(self.Q_c_by_period[n]) - self.CU_target_by_period[n] >= 0.0
+                )
             self.m.Minimize(
                 self._weighted_state_average(
                     [sum(self.Q_c_by_period[n]) for n in range(self.N_periods)]
@@ -819,15 +788,16 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         self.LMTD_hu_by_period = build_index_grid(
             lambda n, j: self._post_process_lmtd(
                 self.T_hu_in_period[n][0] - self.T_c_out_period[n][j],
-                self.T_hu_out_period[n][0]
+                self._utility_solved_outlet_temperature("hot", n, j, q_h[n][j])
                 - self._active_binary_value(self.T_c_by_period[n][j][0]),
                 self.z_hu[j][0],
                 formula_allowed=_lmtd_formula_allowed(
                     self.T_hu_in_period[n][0] - self.T_c_out_period[n][j],
-                    self.T_hu_out_period[n][0]
+                    self._utility_solved_outlet_temperature("hot", n, j, q_h[n][j])
                     - self._active_binary_value(self.T_c_by_period[n][j][0]),
-                    self._hot_utility_approach_temperature(j, n),
+                    self._hot_utility_inlet_approach_temperature(j, n),
                     self.tol,
+                    self._hot_utility_outlet_approach_temperature(j, n, q_h[n][j]),
                 ),
             ),
             (self.N_periods, self.J),
@@ -845,15 +815,16 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         self.LMTD_cu_by_period = build_index_grid(
             lambda n, i: self._post_process_lmtd(
                 self._active_binary_value(self.T_h_by_period[n][i][self.S])
-                - self.T_cu_out_period[n][0],
+                - self._utility_solved_outlet_temperature("cold", n, i, q_c[n][i]),
                 self.T_h_out_period[n][i] - self.T_cu_in_period[n][0],
                 self.z_cu[i][0],
                 formula_allowed=_lmtd_formula_allowed(
                     self._active_binary_value(self.T_h_by_period[n][i][self.S])
-                    - self.T_cu_out_period[n][0],
+                    - self._utility_solved_outlet_temperature("cold", n, i, q_c[n][i]),
                     self.T_h_out_period[n][i] - self.T_cu_in_period[n][0],
-                    self._cold_utility_approach_temperature(i, n),
+                    self._cold_utility_outlet_approach_temperature(i, n, q_c[n][i]),
                     self.tol,
+                    self._cold_utility_inlet_approach_temperature(i, n),
                 ),
                 fallback_delta=(self.T_h_out_period[n][i] - self.T_cu_in_period[n][0]),
             ),
@@ -969,13 +940,16 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
     ) -> StageWiseModel:
         """Amalgamate solved above/below-pinch side models into one network."""
 
+        above_required = bool(above_case.side_required)
+        below_required = bool(below_case.side_required)
+
         amalgamated = StageWiseModel(
             name="amalgamated",
             framework=self.framework,
             solver=self.solver,
             solver_arrays=self.solver_arrays,
-            stages=(above_case.S if above_case.HU_target > 0 else 0)
-            + (below_case.S if below_case.CU_target > 0 else 0),
+            stages=(above_case.S if above_required else 0)
+            + (below_case.S if below_required else 0),
             dTmin=self.dTmin,
             z_restriction=self.z_restriction,
             min_dqda=self.min_dqda,
@@ -985,8 +959,8 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
             tol=1e-3,
             solver_options=self.solver_options,
         )
-        if (above_case.HU_target > 0 and above_case.mSuccess == 0) or (
-            below_case.CU_target > 0 and below_case.mSuccess == 0
+        if (above_required and above_case.mSuccess == 0) or (
+            below_required and below_case.mSuccess == 0
         ):
             raise ValueError(
                 "Pinch Decomposition failed: "
@@ -994,7 +968,7 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                 f"dTmin {self.dTmin}"
             )
 
-        if above_case.HU_target > 0 and above_case.mSuccess == 1:
+        if above_required and above_case.mSuccess == 1:
             amalgamated.mSuccess = above_case.mSuccess
             amalgamated.TAC = above_case.TAC
             amalgamated.solve_time = above_case.solve_time
@@ -1004,34 +978,40 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                         self._copy_recovery_match(amalgamated, above_case, i, j, k, k)
             for i in range(self.I):
                 for k in range(above_case.K):
-                    value = (
-                        above_case.T_h[i][k][0]
-                        if above_case.z_i_active[i] > 0
-                        else amalgamated.T_h_in[i]
-                    )
-                    amalgamated.T_h[i][k].VALUE.value = [value]
+                    for n in range(amalgamated.N_periods):
+                        value = (
+                            above_case.T_h_by_period[n][i][k][0]
+                            if above_case.z_i_active_period[n][i] > 0
+                            else amalgamated.T_h_in_period[n][i]
+                        )
+                        amalgamated.T_h_by_period[n][i][k].VALUE.value = [value]
             for j in range(self.J):
                 for k in range(above_case.K):
-                    value = (
-                        above_case.T_c[j][k][0]
-                        if above_case.z_j_active[j] > 0
-                        else amalgamated.T_c_out[j]
-                    )
-                    amalgamated.T_c[j][k].VALUE.value = [value]
+                    for n in range(amalgamated.N_periods):
+                        value = (
+                            above_case.T_c_by_period[n][j][k][0]
+                            if above_case.z_j_active_period[n][j] > 0
+                            else amalgamated.T_c_out_period[n][j]
+                        )
+                        amalgamated.T_c_by_period[n][j][k].VALUE.value = [value]
             for j in range(self.J):
-                amalgamated.Q_h[j].VALUE.value = [above_case.Q_h[j][0]]
+                for n in range(amalgamated.N_periods):
+                    amalgamated.Q_h_by_period[n][j].VALUE.value = [
+                        above_case.Q_h_by_period[n][j][0]
+                    ]
                 amalgamated.z_hu[j].VALUE.value = [above_case.z_hu[j][0]]
-            if below_case.CU_target == 0:
+            if not below_required:
                 for i in range(self.I):
-                    amalgamated.Q_c[i].VALUE.value = [0]
+                    for n in range(amalgamated.N_periods):
+                        amalgamated.Q_c_by_period[n][i].VALUE.value = [0]
                     amalgamated.z_cu[i].VALUE.value = [0]
                     amalgamated.minimisation_goal = "hot utility"
 
-        if below_case.CU_target > 0 and below_case.mSuccess == 1:
+        if below_required and below_case.mSuccess == 1:
             amalgamated.mSuccess = below_case.mSuccess
             amalgamated.TAC = below_case.TAC
             amalgamated.solve_time = below_case.solve_time
-            if above_case.HU_target == 0:
+            if not above_required:
                 above_case.S = 0
                 above_case.K = 0
             for i in range(self.I):
@@ -1047,38 +1027,44 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
                         )
             for i in range(self.I):
                 for k in range(above_case.K, amalgamated.K):
-                    if below_case.z_i_active[i] > 0:
-                        value = (
-                            below_case.T_h[i][k - above_case.K + 1][0]
-                            if above_case.HU_target > 0
-                            else round(below_case.T_h[i][k][0], 5)
-                        )
-                    else:
-                        value = amalgamated.T_h_out[i]
-                    amalgamated.T_h[i][k].VALUE.value = [value]
+                    for n in range(amalgamated.N_periods):
+                        if below_case.z_i_active_period[n][i] > 0:
+                            value = (
+                                below_case.T_h_by_period[n][i][k - above_case.K + 1][0]
+                                if above_required
+                                else round(below_case.T_h_by_period[n][i][k][0], 5)
+                            )
+                        else:
+                            value = amalgamated.T_h_out_period[n][i]
+                        amalgamated.T_h_by_period[n][i][k].VALUE.value = [value]
             for j in range(self.J):
                 for k in range(above_case.K, amalgamated.K):
-                    if below_case.z_j_active[j] > 0:
-                        value = (
-                            below_case.T_c[j][k - above_case.K + 1][0]
-                            if above_case.HU_target > 0
-                            else round(below_case.T_c[j][k][0], 5)
-                        )
-                    else:
-                        value = amalgamated.T_c_in[j]
-                    amalgamated.T_c[j][k].VALUE.value = [value]
+                    for n in range(amalgamated.N_periods):
+                        if below_case.z_j_active_period[n][j] > 0:
+                            value = (
+                                below_case.T_c_by_period[n][j][k - above_case.K + 1][0]
+                                if above_required
+                                else round(below_case.T_c_by_period[n][j][k][0], 5)
+                            )
+                        else:
+                            value = amalgamated.T_c_in_period[n][j]
+                        amalgamated.T_c_by_period[n][j][k].VALUE.value = [value]
             for i in range(self.I):
-                amalgamated.Q_c[i].VALUE.value = [round(below_case.Q_c[i][0], 5)]
+                for n in range(amalgamated.N_periods):
+                    amalgamated.Q_c_by_period[n][i].VALUE.value = [
+                        round(below_case.Q_c_by_period[n][i][0], 5)
+                    ]
                 amalgamated.z_cu[i].VALUE.value = [below_case.z_cu[i][0]]
-            if above_case.HU_target == 0:
+            if not above_required:
                 for j in range(self.J):
-                    amalgamated.Q_h[j].VALUE.value = [0]
+                    for n in range(amalgamated.N_periods):
+                        amalgamated.Q_h_by_period[n][j].VALUE.value = [0]
                     amalgamated.z_hu[j].VALUE.value = [0]
                     amalgamated.minimisation_goal = "cold utility"
 
         if (
-            above_case.HU_target > 0
-            and below_case.CU_target > 0
+            above_required
+            and below_required
             and above_case.mSuccess == 1
             and below_case.mSuccess == 1
         ):
@@ -1122,35 +1108,32 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
         target_stage: int,
     ) -> None:
         target.z[i][j][target_stage].VALUE.value = [source.z[i][j][source_stage][0]]
-        if hasattr(target, "Q_r_by_period") and hasattr(source, "Q_r_by_period"):
-            for n in range(target.N_periods):
-                source_period_idx = min(n, source.N_periods - 1)
-                target.Q_r_by_period[n][i][j][target_stage].VALUE.value = [
-                    source.Q_r_by_period[source_period_idx][i][j][source_stage][0]
-                ]
-                target.theta_1_by_period[n][i][j][target_stage].VALUE.value = [
-                    source.theta_1_by_period[source_period_idx][i][j][source_stage][0]
-                ]
-                target.theta_2_by_period[n][i][j][target_stage].VALUE.value = [
-                    source.theta_2_by_period[source_period_idx][i][j][source_stage][0]
-                ]
-            return
-        target.Q_r[i][j][target_stage].VALUE.value = [source.Q_r[i][j][source_stage][0]]
-        target.theta_1[i][j][target_stage].VALUE.value = [
-            source.theta_1[i][j][source_stage][0]
-        ]
-        target.theta_2[i][j][target_stage].VALUE.value = [
-            source.theta_2[i][j][source_stage][0]
-        ]
+        if target.N_periods != source.N_periods:
+            raise ValueError("PDM side period counts must match during amalgamation.")
+        for n in range(target.N_periods):
+            target.Q_r_by_period[n][i][j][target_stage].VALUE.value = [
+                source.Q_r_by_period[n][i][j][source_stage][0]
+            ]
+            target.theta_1_by_period[n][i][j][target_stage].VALUE.value = [
+                source.theta_1_by_period[n][i][j][source_stage][0]
+            ]
+            target.theta_2_by_period[n][i][j][target_stage].VALUE.value = [
+                source.theta_2_by_period[n][i][j][source_stage][0]
+            ]
         if source.non_isothermal_model:
-            target.X[i][j][target_stage].VALUE.value = [source.X[i][j][source_stage][0]]
-            target.Y[j][i][target_stage].VALUE.value = [source.Y[j][i][source_stage][0]]
-            target.T_h_out_x[i][j][target_stage].VALUE.value = [
-                source.T_h_out_x[i][j][source_stage][0]
-            ]
-            target.T_c_out_y[j][i][target_stage].VALUE.value = [
-                source.T_c_out_y[j][i][source_stage][0]
-            ]
+            for n in range(target.N_periods):
+                target.X_by_period[n][i][j][target_stage].VALUE.value = [
+                    source.X_by_period[n][i][j][source_stage][0]
+                ]
+                target.Y_by_period[n][j][i][target_stage].VALUE.value = [
+                    source.Y_by_period[n][j][i][source_stage][0]
+                ]
+                target.T_h_out_x_by_period[n][i][j][target_stage].VALUE.value = [
+                    source.T_h_out_x_by_period[n][i][j][source_stage][0]
+                ]
+                target.T_c_out_y_by_period[n][j][i][target_stage].VALUE.value = [
+                    source.T_c_out_y_by_period[n][j][i][source_stage][0]
+                ]
 
 
 __all__ = ["PinchDecompModel"]

@@ -224,9 +224,9 @@ class InternalHeatExchangerNetworkProblem:
     def _solve_pdm(self, *, print_output: bool = True) -> None:
         """Solve PDM sides and amalgamate them before stage reduction."""
 
-        if self.above.HU_target > 0:
+        if self.above.side_required:
             self.above.optimise(print_output=print_output)
-        if self.below.CU_target > 0:
+        if self.below.side_required:
             self.below.optimise(print_output=print_output)
         self.case = self.above.amalgamate_networks(
             below_case=self.below,

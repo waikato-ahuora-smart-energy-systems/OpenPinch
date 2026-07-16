@@ -40,19 +40,19 @@ its work completes.
 
 ## Step 2 - PR 2: Period-Native PDM and Utility Constraints
 
-- [ ] Add failing two-period PDM, amalgamation, warm-start, and segmented-utility
+- [x] Add failing two-period PDM, amalgamation, warm-start, and segmented-utility
   `dt_cont` regression tests.
-- [ ] Replace singular PDM target and clipped-temperature fields with ordered
+- [x] Replace singular PDM target and clipped-temperature fields with ordered
   period-native contracts carrying period identities.
-- [ ] Feed period targets and pinches into PDM preprocessing, side activation,
+- [x] Feed period targets and pinches into PDM preprocessing, side activation,
   stage topology, and utility constraints.
-- [ ] Amalgamate all recovery, utility, temperature, split, and non-isothermal
+- [x] Amalgamate all recovery, utility, temperature, split, and non-isothermal
   variables for every period and derive shared topology from any-period activity.
-- [ ] Correct single- and multiperiod warm-start loop nesting and X/Y duty-share
+- [x] Correct single- and multiperiod warm-start loop nesting and X/Y duty-share
   denominators.
-- [ ] Add utility-segment `dt_cont` tensors and exact active-segment approach
+- [x] Add utility-segment `dt_cont` tensors and exact active-segment approach
   mappings, using the larger contribution at an exact segment boundary.
-- [ ] Run focused, solver-marked, canonical HEN tier 0/1, Ruff, documentation,
+- [x] Run focused, solver-marked, canonical HEN tier 0/1, Ruff, documentation,
   packaging, and patch-hygiene checks; record PR 2 evidence.
 
 ## Step 3 - PR 3: Period-Native HEN Results

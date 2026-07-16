@@ -56,9 +56,10 @@ def test_required_case_matrix_has_no_hu_or_cu_threshold_rows_to_cover() -> None:
                 pinch_location="above",
                 stage_selection=AUTO_STAGE_SELECTION,
             )
-            if abs(decomposition.target.hot_utility_target) <= ABS_TOL:
+            target = decomposition.period_targets[0]
+            if abs(target.hot_utility_target) <= ABS_TOL:
                 hu_thresholds.append((case_id, dTmin))
-            if abs(decomposition.target.cold_utility_target) <= ABS_TOL:
+            if abs(target.cold_utility_target) <= ABS_TOL:
                 cu_thresholds.append((case_id, dTmin))
 
     assert hu_thresholds == []
@@ -68,7 +69,7 @@ def test_required_case_matrix_has_no_hu_or_cu_threshold_rows_to_cover() -> None:
 def test_decomposition_targets_are_finite_for_required_fixture() -> None:
     problem = _load_problem(CASE_IDS[0])
 
-    target = decomposition_module._calculate_openpinch_targets(problem, dTmin=10.0)
+    (target,) = decomposition_module._calculate_openpinch_targets(problem, dTmin=10.0)
 
     assert target.hot_utility_target > 0.0
     assert target.cold_utility_target > 0.0
@@ -82,7 +83,8 @@ def test_decomposition_targets_use_copied_zone_with_minimum_dt_cont(
     problem = _load_problem(CASE_IDS[0])
     captured: dict[str, float | bool | list[float]] = {}
 
-    def fake_compute_direct_integration_targets(zone):
+    def fake_compute_direct_integration_targets(zone, args=None):
+        assert args == {"period_id": "0"}
         captured["same_zone"] = zone is problem.master_zone
         captured["dt_cont_multiplier"] = zone.dt_cont_multiplier
         captured["process_dt_cont"] = [
@@ -107,7 +109,7 @@ def test_decomposition_targets_use_copied_zone_with_minimum_dt_cont(
         fake_compute_direct_integration_targets,
     )
 
-    target = decomposition_module._calculate_openpinch_targets(problem, dTmin=12.0)
+    (target,) = decomposition_module._calculate_openpinch_targets(problem, dTmin=12.0)
 
     assert captured["same_zone"] is False
     assert captured["dt_cont_multiplier"] == pytest.approx(1.0)

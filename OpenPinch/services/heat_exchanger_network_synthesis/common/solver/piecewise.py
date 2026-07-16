@@ -23,11 +23,18 @@ class PiecewiseThermalProfile:
     heat_capacity_flowrates: np.ndarray
     heat_transfer_coefficients: np.ndarray
     prices: np.ndarray | None = None
+    temperature_contributions: np.ndarray | None = None
 
     def __post_init__(self) -> None:
         if self.prices is None:
             object.__setattr__(
                 self, "prices", np.zeros(len(self.identities), dtype=float)
+            )
+        if self.temperature_contributions is None:
+            object.__setattr__(
+                self,
+                "temperature_contributions",
+                np.zeros(len(self.identities), dtype=float),
             )
         arrays = (
             self.temperatures_in,
@@ -36,6 +43,7 @@ class PiecewiseThermalProfile:
             self.heat_capacity_flowrates,
             self.heat_transfer_coefficients,
             self.prices,
+            self.temperature_contributions,
         )
         lengths = {len(values) for values in arrays}
         if not self.identities or lengths != {len(self.identities)}:
@@ -52,6 +60,10 @@ class PiecewiseThermalProfile:
             raise ValueError("Piecewise profile HTCs must be positive.")
         if np.any(self.prices < 0.0):
             raise ValueError("Piecewise profile prices must be non-negative.")
+        if np.any(self.temperature_contributions < 0.0):
+            raise ValueError(
+                "Piecewise profile temperature contributions must be non-negative."
+            )
         temperature_steps = self.temperatures_out - self.temperatures_in
         if len(self.identities) > 1 and (
             np.any(np.abs(temperature_steps) <= tol)
@@ -92,6 +104,26 @@ class PiecewiseThermalProfile:
         q = min(max(float(heat_coordinate), 0.0), self.total_duty)
         index = int(np.searchsorted(self.cumulative_duties, q, side="right") - 1)
         return min(max(index, 0), len(self.duties) - 1)
+
+    def contribution_index_at_heat(self, heat_coordinate: float) -> int:
+        """Return the traversed segment, preferring the stricter boundary value."""
+        q = min(max(float(heat_coordinate), 0.0), self.total_duty)
+        for boundary_index, boundary in enumerate(self.cumulative_duties[1:-1], 1):
+            if abs(q - float(boundary)) <= tol:
+                adjacent = (boundary_index - 1, boundary_index)
+                return max(
+                    adjacent,
+                    key=lambda index: float(self.temperature_contributions[index]),
+                )
+        return self.segment_index_at_heat(q)
+
+    def temperature_contribution_at_heat(self, heat_coordinate: float) -> float:
+        """Return the local contribution at duty, including boundary conservatism."""
+        return float(
+            self.temperature_contributions[
+                self.contribution_index_at_heat(heat_coordinate)
+            ]
+        )
 
     def temperature_at_heat(self, heat_coordinate: float) -> float:
         q = min(max(float(heat_coordinate), 0.0), self.total_duty)
@@ -145,6 +177,7 @@ class PiecewiseThermalProfile:
         cps = []
         htcs = []
         prices = []
+        temperature_contributions = []
         for index in range(len(self.duties)):
             local_start = max(q_start, self.cumulative_duties[index])
             local_end = min(q_end, self.cumulative_duties[index + 1])
@@ -157,6 +190,7 @@ class PiecewiseThermalProfile:
             cps.append(self.heat_capacity_flowrates[index])
             htcs.append(self.heat_transfer_coefficients[index])
             prices.append(self.prices[index])
+            temperature_contributions.append(self.temperature_contributions[index])
         return PiecewiseThermalProfile(
             identities=tuple(identities),
             temperatures_in=np.asarray(temperatures_in, dtype=float),
@@ -165,6 +199,10 @@ class PiecewiseThermalProfile:
             heat_capacity_flowrates=np.asarray(cps, dtype=float),
             heat_transfer_coefficients=np.asarray(htcs, dtype=float),
             prices=np.asarray(prices, dtype=float),
+            temperature_contributions=np.asarray(
+                temperature_contributions,
+                dtype=float,
+            ),
         )
 
 
@@ -200,6 +238,10 @@ def profile_from_solver_arrays(
             f"{prefix}_price_period",
             np.zeros((period_index + 1, parent_index + 1, count), dtype=float),
         )[period_index, parent_index, :count].astype(float),
+        temperature_contributions=arrays.arrays.get(
+            f"{prefix}_dt_cont_period",
+            np.zeros((period_index + 1, parent_index + 1, count), dtype=float),
+        )[period_index, parent_index, :count].astype(float),
     )
 
 
@@ -223,6 +265,7 @@ def utility_thermal_profile(
         heat_capacity_flowrates=np.array([cp], dtype=float),
         heat_transfer_coefficients=np.array([heat_transfer_coefficient], dtype=float),
         prices=np.array([price], dtype=float),
+        temperature_contributions=np.array([0.0], dtype=float),
     )
 
 
@@ -477,9 +520,50 @@ def add_piecewise_cost_mapping(
     }
 
 
+def add_piecewise_temperature_contribution_mapping(
+    model,
+    heat_coordinate,
+    contribution,
+    profile: PiecewiseThermalProfile,
+    *,
+    name: str,
+    initial_segment: int = 0,
+):
+    """Map duty to the traversed segment's approach contribution.
+
+    The mapping follows the same active-set iteration as continuous piecewise
+    temperature and cost mappings. At an exact internal boundary the segment
+    carrying the larger adjacent contribution is selected.
+    """
+    if len(profile.duties) == 1:
+        model.Equation(contribution == profile.temperature_contributions[0])
+        return None
+
+    active_segment = min(max(initial_segment, 0), len(profile.duties) - 1)
+    selectors = [
+        model.Param(
+            value=1.0 if index == active_segment else 0.0,
+            name=f"{name}_active_{index}",
+        )
+        for index in range(len(profile.duties))
+    ]
+    for index, selector in enumerate(selectors):
+        model.Equation(
+            selector * (contribution - profile.temperature_contributions[index]) == 0.0
+        )
+    return {
+        "heat_coordinate": heat_coordinate,
+        "profile": profile,
+        "selectors": selectors,
+        "active_segment": active_segment,
+        "segment_index_at_heat": profile.contribution_index_at_heat,
+    }
+
+
 __all__ = [
     "PiecewiseThermalProfile",
     "add_piecewise_cost_mapping",
+    "add_piecewise_temperature_contribution_mapping",
     "add_piecewise_temperature_mapping",
     "duty_aligned_area_contributions",
     "profile_from_solver_arrays",

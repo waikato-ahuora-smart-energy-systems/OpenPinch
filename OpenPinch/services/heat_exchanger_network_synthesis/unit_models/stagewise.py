@@ -615,6 +615,8 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                 for i in range(self.I)
             ]
 
+        self._set_multiperiod_utility_approach_equations()
+
         if self.non_isothermal_model:
             self._set_multiperiod_non_isothermal_equations()
         else:
@@ -1103,54 +1105,58 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                                 )
             else:
                 for k in range(self.S):
-                    for j in range(self.J):
-                        sum_Q_r_j = sum(
-                            init_solution.Q_r[i][j][k].VALUE[0] for i in range(self.I)
-                        )
                     for i in range(self.I):
                         sum_Q_r_i = sum(
                             init_solution.Q_r[i][j][k].VALUE[0] for j in range(self.J)
                         )
-
-                        if self.z_allowed[i][j][k] > 0:
-                            q_val = init_solution.Q_r[i][j][k].VALUE[0]
-                            if q_val > 0.0:
+                        for j in range(self.J):
+                            sum_Q_r_j = sum(
+                                init_solution.Q_r[i][j][k].VALUE[0]
+                                for i in range(self.I)
+                            )
+                            if self.z_allowed[i][j][k] > 0:
+                                q_val = init_solution.Q_r[i][j][k].VALUE[0]
+                                if q_val > 0.0:
+                                    self._set_value(
+                                        self.X[i][j][k],
+                                        q_val / sum_Q_r_i if sum_Q_r_i else 0.0,
+                                        brackets=brackets,
+                                    )
+                                    self._set_value(
+                                        self.Y[j][i][k],
+                                        q_val / sum_Q_r_j if sum_Q_r_j else 0.0,
+                                        brackets=brackets,
+                                    )
+                                else:
+                                    self._set_value(
+                                        self.X[i][j][k], 0.0, brackets=brackets
+                                    )
+                                    self._set_value(
+                                        self.Y[j][i][k], 0.0, brackets=brackets
+                                    )
                                 self._set_value(
-                                    self.X[i][j][k],
-                                    q_val / sum_Q_r_j if sum_Q_r_j else 0.0,
+                                    self.T_h_out_x[i][j][k],
+                                    init_solution.T_h[i][k + 1].VALUE[0],
                                     brackets=brackets,
                                 )
                                 self._set_value(
-                                    self.Y[j][i][k],
-                                    q_val / sum_Q_r_i if sum_Q_r_i else 0.0,
+                                    self.T_c_out_y[j][i][k],
+                                    init_solution.T_c[j][k].VALUE[0],
                                     brackets=brackets,
                                 )
                             else:
                                 self._set_value(self.X[i][j][k], 0.0, brackets=brackets)
                                 self._set_value(self.Y[j][i][k], 0.0, brackets=brackets)
-                            self._set_value(
-                                self.T_h_out_x[i][j][k],
-                                init_solution.T_h[i][k + 1].VALUE[0],
-                                brackets=brackets,
-                            )
-                            self._set_value(
-                                self.T_c_out_y[j][i][k],
-                                init_solution.T_c[j][k].VALUE[0],
-                                brackets=brackets,
-                            )
-                        else:
-                            self._set_value(self.X[i][j][k], 0.0, brackets=brackets)
-                            self._set_value(self.Y[j][i][k], 0.0, brackets=brackets)
-                            self._set_value(
-                                self.T_h_out_x[i][j][k],
-                                init_solution.T_h[i][k + 1].VALUE[0],
-                                brackets=brackets,
-                            )
-                            self._set_value(
-                                self.T_c_out_y[j][i][k],
-                                init_solution.T_c[j][k].VALUE[0],
-                                brackets=brackets,
-                            )
+                                self._set_value(
+                                    self.T_h_out_x[i][j][k],
+                                    init_solution.T_h[i][k + 1].VALUE[0],
+                                    brackets=brackets,
+                                )
+                                self._set_value(
+                                    self.T_c_out_y[j][i][k],
+                                    init_solution.T_c[j][k].VALUE[0],
+                                    brackets=brackets,
+                                )
 
     def _set_multiperiod_initial_values(self, init_solution, *, brackets: bool) -> None:
         source_q_r = getattr(init_solution, "Q_r_by_period", None)
@@ -1350,6 +1356,52 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                                         ),
                                         brackets=brackets,
                                     )
+            else:
+                for n in range(self.N_periods):
+                    source_period_idx = min(n, len(source_q_r) - 1)
+                    for k in range(self.S):
+                        for i in range(self.I):
+                            hot_total = sum(
+                                self._active_binary_value(
+                                    source_q_r[source_period_idx][i][j][k]
+                                )
+                                for j in range(self.J)
+                            )
+                            for j in range(self.J):
+                                cold_total = sum(
+                                    self._active_binary_value(
+                                        source_q_r[source_period_idx][row][j][k]
+                                    )
+                                    for row in range(self.I)
+                                )
+                                duty = self._active_binary_value(
+                                    source_q_r[source_period_idx][i][j][k]
+                                )
+                                active = self.z_allowed[i][j][k] > 0 and duty > 0.0
+                                self._set_value(
+                                    self.X_by_period[n][i][j][k],
+                                    duty / hot_total if active and hot_total else 0.0,
+                                    brackets=brackets,
+                                )
+                                self._set_value(
+                                    self.Y_by_period[n][j][i][k],
+                                    duty / cold_total if active and cold_total else 0.0,
+                                    brackets=brackets,
+                                )
+                                self._set_value(
+                                    self.T_h_out_x_by_period[n][i][j][k],
+                                    self._active_binary_value(
+                                        source_t_h[source_period_idx][i][k + 1]
+                                    ),
+                                    brackets=brackets,
+                                )
+                                self._set_value(
+                                    self.T_c_out_y_by_period[n][j][i][k],
+                                    self._active_binary_value(
+                                        source_t_c[source_period_idx][j][k]
+                                    ),
+                                    brackets=brackets,
+                                )
 
     def get_net_benefit_evolution(
         self,
@@ -2345,7 +2397,7 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                             * (
                                 (self.T_hu_in_period[n][0] - self.T_c_out_period[n][j])
                                 * (
-                                    self.T_hu_out_period[n][0]
+                                    self._utility_solved_outlet_temperature("hot", n, j)
                                     - self.T_c_by_period[n][j][0]
                                 )
                                 * (
@@ -2354,7 +2406,9 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                                         - self.T_c_out_period[n][j]
                                     )
                                     + (
-                                        self.T_hu_out_period[n][0]
+                                        self._utility_solved_outlet_temperature(
+                                            "hot", n, j
+                                        )
                                         - self.T_c_by_period[n][j][0]
                                     )
                                 )
@@ -2379,7 +2433,9 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                             * (
                                 (
                                     self.T_h_by_period[n][i][self.S]
-                                    - self.T_cu_out_period[n][0]
+                                    - self._utility_solved_outlet_temperature(
+                                        "cold", n, i
+                                    )
                                 )
                                 * (
                                     self.T_h_out_period[n][i]
@@ -2388,7 +2444,9 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                                 * (
                                     (
                                         self.T_h_by_period[n][i][self.S]
-                                        - self.T_cu_out_period[n][0]
+                                        - self._utility_solved_outlet_temperature(
+                                            "cold", n, i
+                                        )
                                     )
                                     + (
                                         self.T_h_out_period[n][i]
@@ -2588,25 +2646,29 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             [
                 self._post_process_lmtd(
                     self.T_hu_in_period[n][0] - self.T_c_out_period[n][j],
-                    self.T_hu_out_period[n][0]
+                    self._utility_solved_outlet_temperature("hot", n, j, q_h[n][j])
                     - self._active_binary_value(self.T_c_by_period[n][j][0]),
                     self.z_hu[j][0],
                     formula_allowed=(
                         abs(
                             (self.T_hu_in_period[n][0] - self.T_c_out_period[n][j])
                             - (
-                                self.T_hu_out_period[n][0]
+                                self._utility_solved_outlet_temperature(
+                                    "hot", n, j, q_h[n][j]
+                                )
                                 - self._active_binary_value(self.T_c_by_period[n][j][0])
                             )
                         )
                         > self.tol
                         and self.T_hu_in_period[n][0]
                         - self.T_c_out_period[n][j]
-                        - self._hot_utility_approach_temperature(j, n)
+                        - self._hot_utility_inlet_approach_temperature(j, n)
                         >= self.tol
-                        and self.T_hu_out_period[n][0]
+                        and self._utility_solved_outlet_temperature(
+                            "hot", n, j, q_h[n][j]
+                        )
                         - self._active_binary_value(self.T_c_by_period[n][j][0])
-                        - self._hot_utility_approach_temperature(j, n)
+                        - self._hot_utility_outlet_approach_temperature(j, n, q_h[n][j])
                         >= self.tol
                     ),
                 )
@@ -2629,7 +2691,7 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             [
                 self._post_process_lmtd(
                     self._active_binary_value(self.T_h_by_period[n][i][self.S])
-                    - self.T_cu_out_period[n][0],
+                    - self._utility_solved_outlet_temperature("cold", n, i, q_c[n][i]),
                     self.T_h_out_period[n][i] - self.T_cu_in_period[n][0],
                     self.z_cu[i][0],
                     formula_allowed=(
@@ -2638,18 +2700,24 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
                                 self._active_binary_value(
                                     self.T_h_by_period[n][i][self.S]
                                 )
-                                - self.T_cu_out_period[n][0]
+                                - self._utility_solved_outlet_temperature(
+                                    "cold", n, i, q_c[n][i]
+                                )
                             )
                             - (self.T_h_out_period[n][i] - self.T_cu_in_period[n][0])
                         )
                         > self.tol
                         and self._active_binary_value(self.T_h_by_period[n][i][self.S])
-                        - self.T_cu_out_period[n][0]
-                        - self._cold_utility_approach_temperature(i, n)
+                        - self._utility_solved_outlet_temperature(
+                            "cold", n, i, q_c[n][i]
+                        )
+                        - self._cold_utility_outlet_approach_temperature(
+                            i, n, q_c[n][i]
+                        )
                         >= self.tol
                         and self.T_h_out_period[n][i]
                         - self.T_cu_in_period[n][0]
-                        - self._cold_utility_approach_temperature(i, n)
+                        - self._cold_utility_inlet_approach_temperature(i, n)
                         >= self.tol
                     ),
                     fallback_delta=(
@@ -3240,13 +3308,13 @@ def _check_shared_area_costs(
                     * (
                         (case.T_hu_in_period[n][0] - case.T_c_out_period[n][j])
                         * (
-                            case.T_hu_out_period[n][0]
+                            case._utility_solved_outlet_temperature("hot", n, j, q)
                             - _value(case.T_c_by_period[n][j][0])
                         )
                         * (
                             (case.T_hu_in_period[n][0] - case.T_c_out_period[n][j])
                             + (
-                                case.T_hu_out_period[n][0]
+                                case._utility_solved_outlet_temperature("hot", n, j, q)
                                 - _value(case.T_c_by_period[n][j][0])
                             )
                         )
@@ -3265,13 +3333,15 @@ def _check_shared_area_costs(
                     * (
                         (
                             _value(case.T_h_by_period[n][i][case.S])
-                            - case.T_cu_out_period[n][0]
+                            - case._utility_solved_outlet_temperature("cold", n, i, q)
                         )
                         * (case.T_h_out_period[n][i] - case.T_cu_in_period[n][0])
                         * (
                             (
                                 _value(case.T_h_by_period[n][i][case.S])
-                                - case.T_cu_out_period[n][0]
+                                - case._utility_solved_outlet_temperature(
+                                    "cold", n, i, q
+                                )
                             )
                             + (case.T_h_out_period[n][i] - case.T_cu_in_period[n][0])
                         )

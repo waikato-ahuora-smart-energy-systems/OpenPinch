@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: CONSTRUCTION - Segment Batch Update and Pricing Code Generation
+- **Current Stage**: CONSTRUCTION - Pre-Release Corrective PR 3 Code Generation
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -152,13 +152,13 @@
 - [x] CONSTRUCTION - Code Generation Part 1 plan approved by the user's explicit
   implementation request.
 - [x] CONSTRUCTION - PR 1 Domain and Input Correctness.
-- [ ] CONSTRUCTION - PR 2 Period-Native PDM and Utility Constraints.
+- [x] CONSTRUCTION - PR 2 Period-Native PDM and Utility Constraints.
 - [ ] CONSTRUCTION - PR 3 Period-Native HEN Results.
 - [ ] CONSTRUCTION - PR 4 Summary Isolation and HPR Economics.
 - [ ] CONSTRUCTION - Final Build and Test.
-- **Current stage**: Code Generation Part 2 - PR 2 period-native PDM and utility
-  constraints. PR 1 is independently green with implementation, documentation,
-  packaging, and Build and Test evidence complete.
+- **Current stage**: Code Generation Part 2 - PR 3 period-native HEN results.
+  PR 1 and PR 2 are independently green with implementation, documentation,
+  packaging, solver, canonical benchmark, and Build and Test evidence complete.
 - **Compatibility policy**: Pre-release clean breaks; no compatibility shims.
 - **Plan**: `aidlc-docs/construction/plans/pre-release-corrective-code-generation-plan.md`.
 

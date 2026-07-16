@@ -1765,6 +1765,10 @@ def _source_shaped_lmtd_post_process_model(model_cls):
     model.T_hu_out_period = [model.T_hu_out]
     model.T_cu_in_period = [model.T_cu_in]
     model.T_cu_out_period = [model.T_cu_out]
+    model.T_h_cont_period = [[10.0]]
+    model.T_c_cont_period = [[10.0]]
+    model.T_hu_cont_period = [[10.0]]
+    model.T_cu_cont_period = [[10.0]]
     model.hu_cost = [2.0]
     model.cu_cost = [3.0]
     model.hu_cost_period = [model.hu_cost]
@@ -1821,6 +1825,8 @@ def _solver_arrays() -> PreparedSolverArrays:
 
 def _pdm_target(**updates):
     values = {
+        "period_id": "0",
+        "period_idx": 0,
         "hot_utility_target": 1.0,
         "cold_utility_target": 0.0,
         "heat_recovery_target": 10.0,
@@ -1835,13 +1841,15 @@ def _pdm_target(**updates):
 def _pdm_decomposition_kwargs(updates: dict | None = None) -> dict:
     values = {
         "pinch_location": "above",
-        "target": _pdm_target(),
+        "period_targets": (_pdm_target(),),
         "z_i_active": (1,),
         "z_j_active": (1,),
-        "clipped_hot_supply_temperatures": (420.0,),
-        "clipped_hot_target_temperatures": (380.0,),
-        "clipped_cold_supply_temperatures": (300.0,),
-        "clipped_cold_target_temperatures": (360.0,),
+        "z_i_active_by_period": ((1,),),
+        "z_j_active_by_period": ((1,),),
+        "clipped_hot_supply_temperatures_by_period": ((420.0,),),
+        "clipped_hot_target_temperatures_by_period": ((380.0,),),
+        "clipped_cold_supply_temperatures_by_period": ((300.0,),),
+        "clipped_cold_target_temperatures_by_period": ((360.0,),),
         "S": 1,
         "K": 2,
         "manual_stage_selection": None,
@@ -1917,20 +1925,96 @@ class _ValueCell:
         return self.VALUE.value[index]
 
 
-def _pdm_amalgamation_driver() -> PinchDecompModel:
+def _pdm_amalgamation_driver(
+    *,
+    multiperiod: bool = False,
+    non_isothermal: bool = False,
+) -> PinchDecompModel:
     driver = PinchDecompModel.__new__(PinchDecompModel)
     driver.framework = "PDM"
     driver.solver = "apopt"
-    driver.solver_arrays = problem_to_solver_arrays(_four_stream_problem(), 14.0)
+    driver.solver_arrays = problem_to_solver_arrays(
+        _two_state_problem() if multiperiod else _four_stream_problem(),
+        14.0,
+    )
     driver.dTmin = 14.0
     driver.z_restriction = None
     driver.min_dqda = 0.0
-    driver.non_isothermal_model = False
+    driver.non_isothermal_model = non_isothermal
     driver.solver_options = []
     driver.I = 2
     driver.J = 2
     driver.tol = 1e-3
     return driver
+
+
+def _pdm_multiperiod_side_result(*, required: bool) -> SimpleNamespace:
+    side = _pdm_side_result(hot_utility_target=1.0 if required else 0.0)
+    stream_count = 2
+    stages = side.S
+    boundary_count = side.K
+    side.N_periods = 2
+    side.HU_target_by_period = [0.0, 1.0] if required else [0.0, 0.0]
+    side.CU_target_by_period = [0.0, 0.0]
+    side.side_required = required
+    side.z_i_active_period = [[0, 0], [1, 1]]
+    side.z_j_active_period = [[0, 0], [1, 1]]
+    side.Q_r_by_period = [
+        _value_cell_grid(value, stream_count, stream_count, stages)
+        for value in (0.0, 12.0)
+    ]
+    side.theta_1_by_period = [
+        _value_cell_grid(value, stream_count, stream_count, stages)
+        for value in (14.0, 30.0)
+    ]
+    side.theta_2_by_period = [
+        _value_cell_grid(value, stream_count, stream_count, stages)
+        for value in (14.0, 20.0)
+    ]
+    side.T_h_by_period = [
+        [
+            [
+                _ValueCell(500.0 + 20.0 * n - 10.0 * i - 20.0 * k)
+                for k in range(boundary_count)
+            ]
+            for i in range(stream_count)
+        ]
+        for n in range(2)
+    ]
+    side.T_c_by_period = [
+        [
+            [
+                _ValueCell(300.0 + 20.0 * n + 10.0 * j + 20.0 * k)
+                for k in range(boundary_count)
+            ]
+            for j in range(stream_count)
+        ]
+        for n in range(2)
+    ]
+    side.Q_h_by_period = [
+        [_ValueCell(value) for _ in range(stream_count)] for value in (0.0, 6.0)
+    ]
+    side.Q_c_by_period = [
+        [_ValueCell(0.0) for _ in range(stream_count)] for _ in range(2)
+    ]
+    side.non_isothermal_model = True
+    side.X_by_period = [
+        _value_cell_grid(value, stream_count, stream_count, stages)
+        for value in (0.0, 0.25)
+    ]
+    side.Y_by_period = [
+        _value_cell_grid(value, stream_count, stream_count, stages)
+        for value in (0.0, 0.5)
+    ]
+    side.T_h_out_x_by_period = [
+        _value_cell_grid(value, stream_count, stream_count, stages)
+        for value in (0.0, 470.0)
+    ]
+    side.T_c_out_y_by_period = [
+        _value_cell_grid(value, stream_count, stream_count, stages)
+        for value in (0.0, 330.0)
+    ]
+    return side
 
 
 def _pdm_side_result(
@@ -1946,10 +2030,19 @@ def _pdm_side_result(
     stream_count = 2
     boundary_count = stages + 1
     active_flags = [1 if active else 0] * stream_count
+    t_h = [
+        [_ValueCell(500.0 - 10.0 * i - 20.0 * k) for k in range(boundary_count)]
+        for i in range(stream_count)
+    ]
+    t_c = [
+        [_ValueCell(300.0 + 10.0 * j + 20.0 * k) for k in range(boundary_count)]
+        for j in range(stream_count)
+    ]
 
     return SimpleNamespace(
-        HU_target=hot_utility_target,
-        CU_target=cold_utility_target,
+        side_required=bool(hot_utility_target or cold_utility_target),
+        HU_target_by_period=[hot_utility_target],
+        CU_target_by_period=[cold_utility_target],
         mSuccess=m_success,
         S=stages,
         K=boundary_count,
@@ -1957,22 +2050,19 @@ def _pdm_side_result(
         solve_time=solve_time,
         z_i_active=active_flags,
         z_j_active=active_flags,
+        z_i_active_period=[active_flags],
+        z_j_active_period=[active_flags],
         N_periods=1,
+        non_isothermal_model=False,
         z=_value_cell_grid(1.0, stream_count, stream_count, stages),
         Q_r_by_period=[_value_cell_grid(12.0, stream_count, stream_count, stages)],
         theta_1_by_period=[_value_cell_grid(30.0, stream_count, stream_count, stages)],
         theta_2_by_period=[_value_cell_grid(20.0, stream_count, stream_count, stages)],
-        T_h=[
-            [_ValueCell(500.0 - 10.0 * i - 20.0 * k) for k in range(boundary_count)]
-            for i in range(stream_count)
-        ],
-        T_c=[
-            [_ValueCell(300.0 + 10.0 * j + 20.0 * k) for k in range(boundary_count)]
-            for j in range(stream_count)
-        ],
-        Q_h=[_ValueCell(5.0 + j) for j in range(stream_count)],
+        T_h_by_period=[t_h],
+        T_c_by_period=[t_c],
+        Q_h_by_period=[[_ValueCell(5.0 + j) for j in range(stream_count)]],
         z_hu=[_ValueCell(1.0) for _ in range(stream_count)],
-        Q_c=[_ValueCell(7.0 + i) for i in range(stream_count)],
+        Q_c_by_period=[[_ValueCell(7.0 + i) for i in range(stream_count)]],
         z_cu=[_ValueCell(1.0) for _ in range(stream_count)],
     )
 
@@ -2379,6 +2469,8 @@ def test_extraction_operating_state_metadata_and_optional_float_edges() -> None:
 def test_pdm_target_and_decomposition_validators_reject_bad_inputs() -> None:
     with pytest.raises(ValidationError, match="pinch target values must be finite"):
         pdm_decomposition.PinchDesignTarget(
+            period_id="0",
+            period_idx=0,
             hot_utility_target=np.inf,
             cold_utility_target=0.0,
             heat_recovery_target=10.0,
@@ -2388,6 +2480,8 @@ def test_pdm_target_and_decomposition_validators_reject_bad_inputs() -> None:
         )
     with pytest.raises(ValidationError, match="pinch temperatures must be finite"):
         pdm_decomposition.PinchDesignTarget(
+            period_id="0",
+            period_idx=0,
             hot_utility_target=1.0,
             cold_utility_target=0.0,
             heat_recovery_target=10.0,
@@ -2401,8 +2495,11 @@ def test_pdm_target_and_decomposition_validators_reject_bad_inputs() -> None:
 
     invalid_cases = [
         ({"z_i_active": (2,)}, "active-stream flags"),
-        ({"clipped_hot_supply_temperatures": (np.nan,)}, "clipped stream temperatures"),
-        ({"S": 0}, "stage count S"),
+        (
+            {"clipped_hot_supply_temperatures_by_period": ((np.nan,),)},
+            "clipped stream temperatures",
+        ),
+        ({"S": -1, "K": 0}, "stage count S"),
         ({"K": 4}, "boundary count K"),
         ({"z_i_active": (1, 1)}, "hot active flags"),
         ({"z_j_active": (1, 1)}, "cold active flags"),
@@ -2412,6 +2509,69 @@ def test_pdm_target_and_decomposition_validators_reject_bad_inputs() -> None:
             pdm_decomposition.PinchDesignDecomposition(
                 **_pdm_decomposition_kwargs(update)
             )
+
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        pdm_decomposition.PinchDesignDecomposition(
+            **_pdm_decomposition_kwargs(),
+            target=_pdm_target(),
+        )
+
+    utility_only = pdm_decomposition.PinchDesignDecomposition(
+        **_pdm_decomposition_kwargs(
+            {
+                "z_i_active": (0,),
+                "z_j_active": (0,),
+                "z_i_active_by_period": ((0,),),
+                "z_j_active_by_period": ((0,),),
+                "S": 0,
+                "K": 1,
+            }
+        )
+    )
+    assert utility_only.S == 0
+    assert utility_only.K == 1
+
+
+def test_pdm_decomposition_keeps_distinct_period_targets_and_union_topology() -> None:
+    arrays = problem_to_solver_arrays(_two_state_problem(), 10.0)
+    arrays.arrays["T_h_in_period"][:, 0] = [500.0, 600.0]
+    arrays.arrays["T_h_out_period"][:, 0] = [450.0, 550.0]
+    targets = (
+        _pdm_target(
+            period_id="base",
+            period_idx=0,
+            hot_utility_target=10.0,
+            shifted_pinch_temperature=500.0,
+        ),
+        _pdm_target(
+            period_id="peak",
+            period_idx=1,
+            hot_utility_target=20.0,
+            shifted_pinch_temperature=520.0,
+        ),
+    )
+
+    decomposition = pdm_decomposition._build_decomposition(
+        arrays=arrays,
+        period_targets=targets,
+        dTmin=10.0,
+        pinch_location="above",
+        stage_selection="automated",
+    )
+
+    assert [target.period_id for target in decomposition.period_targets] == [
+        "base",
+        "peak",
+    ]
+    assert [target.hot_utility_target for target in decomposition.period_targets] == [
+        10.0,
+        20.0,
+    ]
+    assert decomposition.z_i_active_by_period[0][0] == 0
+    assert decomposition.z_i_active_by_period[1][0] == 1
+    assert decomposition.z_i_active[0] == 1
+    assert decomposition.clipped_hot_supply_temperatures_by_period[0][0] == 0.0
+    assert decomposition.clipped_hot_supply_temperatures_by_period[1][0] == 600.0
 
 
 def test_pdm_decomposition_private_helpers_cover_guard_and_stage_edges() -> None:
@@ -2466,8 +2626,8 @@ def test_pdm_decomposition_private_helpers_cover_guard_and_stage_edges() -> None
 
     with pytest.raises(ValueError, match="shifted pinch"):
         pdm_decomposition._build_decomposition(
-            arrays=_solver_arrays(),
-            target=_pdm_target(shifted_pinch_temperature=None),
+            arrays=problem_to_solver_arrays(_four_stream_problem(), 10.0),
+            period_targets=(_pdm_target(shifted_pinch_temperature=None),),
             dTmin=10.0,
             pinch_location="above",
             stage_selection="automated",
@@ -2514,19 +2674,56 @@ def test_pinch_decomp_model_calculate_pinch_rejects_mismatched_or_missing_pinch(
 ):
     model = PinchDecompModel.__new__(PinchDecompModel)
     model.pinch_loc = "above"
+    model.N_periods = 1
+    model.period_ids = np.array(["0"])
+    model.tol = 1e-3
     model.pinch_decomposition = SimpleNamespace(
         pinch_location="below",
-        target=_pdm_target(),
+        period_targets=(_pdm_target(),),
     )
     with pytest.raises(ValueError, match="location"):
         model.calculate_pinch()
 
     model.pinch_decomposition = SimpleNamespace(
         pinch_location="above",
-        target=_pdm_target(shifted_pinch_temperature=None),
+        period_targets=(_pdm_target(shifted_pinch_temperature=None),),
     )
     with pytest.raises(ValueError, match="shifted pinch"):
         model.calculate_pinch()
+
+
+def test_pinch_decomp_calculate_pinch_keeps_period_targets_and_later_side_need():
+    model = PinchDecompModel.__new__(PinchDecompModel)
+    model.pinch_loc = "above"
+    model.N_periods = 2
+    model.period_ids = np.array(["base", "peak"])
+    model.tol = 1e-3
+    model.pinch_decomposition = SimpleNamespace(
+        pinch_location="above",
+        period_targets=(
+            _pdm_target(
+                period_id="base",
+                period_idx=0,
+                hot_utility_target=0.0,
+                cold_utility_target=10.0,
+                shifted_pinch_temperature=400.0,
+            ),
+            _pdm_target(
+                period_id="peak",
+                period_idx=1,
+                hot_utility_target=25.0,
+                cold_utility_target=0.0,
+                shifted_pinch_temperature=450.0,
+            ),
+        ),
+    )
+
+    model.calculate_pinch()
+
+    assert model.HU_target_by_period == [0.0, 25.0]
+    assert model.CU_target_by_period == [10.0, 0.0]
+    assert model.T_pinch_by_period == [400.0, 450.0]
+    assert model.side_required is True
 
 
 def test_pinch_decomp_below_preprocessing_handles_inactive_streams_and_manual_stages() -> (
@@ -2534,8 +2731,18 @@ def test_pinch_decomp_below_preprocessing_handles_inactive_streams_and_manual_st
 ):
     model = PinchDecompModel.__new__(PinchDecompModel)
     model.pinch_loc = "below"
-    model.pinch_decomposition = SimpleNamespace(manual_stage_selection=(2, 3), S=3)
-    model.T_pinch = 400.0
+    model.pinch_decomposition = SimpleNamespace(
+        manual_stage_selection=(2, 3),
+        S=3,
+        clipped_hot_supply_temperatures_by_period=((405.0, 0.0),),
+        clipped_hot_target_temperatures_by_period=((390.0, 0.0),),
+        clipped_cold_supply_temperatures_by_period=((390.0, 0.0),),
+        clipped_cold_target_temperatures_by_period=((395.0, 0.0),),
+        z_i_active_by_period=((1, 0),),
+        z_j_active_by_period=((1, 0),),
+        z_i_active=(1, 0),
+        z_j_active=(1, 0),
+    )
     model.dTmin = 10.0
     model.N_periods = 1
     model.f_h_period = np.array([[2.0, 3.0]])
@@ -2590,6 +2797,15 @@ def test_pinch_decomp_non_integer_superstructure_builds_param_binaries() -> None
     model.T_c_out_period = np.array([[350.0]])
     model.f_h_period = np.array([[2.0]])
     model.f_c_period = np.array([[3.0]])
+    model.T_h_cont_period = np.array([[5.0]])
+    model.T_c_cont_period = np.array([[5.0]])
+    model.T_hu_cont_period = np.array([[5.0]])
+    model.T_cu_cont_period = np.array([[5.0]])
+    model.T_hu_in_period = np.array([[600.0]])
+    model.T_hu_out_period = np.array([[580.0]])
+    model.T_cu_in_period = np.array([[280.0]])
+    model.T_cu_out_period = np.array([[300.0]])
+    model.dTmin = 10.0
     model._recovery_approach_temperature = lambda i, j, n: 10.0
 
     model._set_multiperiod_stage_wise_superstructure()
@@ -2646,6 +2862,7 @@ def test_pinch_decomp_post_process_skips_failed_model_and_copy_helpers_cover_sha
         Q_r_by_period=[[[[_ValueCell(12.0)]]]],
         theta_1_by_period=[[[[_ValueCell(30.0)]]]],
         theta_2_by_period=[[[[_ValueCell(20.0)]]]],
+        non_isothermal_model=False,
     )
     target = SimpleNamespace(
         N_periods=1,
@@ -2664,34 +2881,36 @@ def test_pinch_decomp_post_process_skips_failed_model_and_copy_helpers_cover_sha
     assert target.theta_2_by_period[0][0][0][0][0] == 20.0
 
     non_iso_source = SimpleNamespace(
+        N_periods=1,
         non_isothermal_model=True,
         z=[[[_ValueCell(1.0)]]],
-        Q_r=[[[_ValueCell(10.0)]]],
-        theta_1=[[[_ValueCell(9.0)]]],
-        theta_2=[[[_ValueCell(8.0)]]],
-        X=[[[_ValueCell(1.0)]]],
-        Y=[[[_ValueCell(0.0)]]],
-        T_h_out_x=[[[_ValueCell(470.0)]]],
-        T_c_out_y=[[[_ValueCell(330.0)]]],
+        Q_r_by_period=[[[[_ValueCell(10.0)]]]],
+        theta_1_by_period=[[[[_ValueCell(9.0)]]]],
+        theta_2_by_period=[[[[_ValueCell(8.0)]]]],
+        X_by_period=[[[[_ValueCell(1.0)]]]],
+        Y_by_period=[[[[_ValueCell(0.0)]]]],
+        T_h_out_x_by_period=[[[[_ValueCell(470.0)]]]],
+        T_c_out_y_by_period=[[[[_ValueCell(330.0)]]]],
     )
     non_iso_target = SimpleNamespace(
+        N_periods=1,
         z=[[[_ValueCell(0.0)]]],
-        Q_r=[[[_ValueCell(0.0)]]],
-        theta_1=[[[_ValueCell(0.0)]]],
-        theta_2=[[[_ValueCell(0.0)]]],
-        X=[[[_ValueCell(0.0)]]],
-        Y=[[[_ValueCell(0.0)]]],
-        T_h_out_x=[[[_ValueCell(0.0)]]],
-        T_c_out_y=[[[_ValueCell(0.0)]]],
+        Q_r_by_period=[[[[_ValueCell(0.0)]]]],
+        theta_1_by_period=[[[[_ValueCell(0.0)]]]],
+        theta_2_by_period=[[[[_ValueCell(0.0)]]]],
+        X_by_period=[[[[_ValueCell(0.0)]]]],
+        Y_by_period=[[[[_ValueCell(0.0)]]]],
+        T_h_out_x_by_period=[[[[_ValueCell(0.0)]]]],
+        T_c_out_y_by_period=[[[[_ValueCell(0.0)]]]],
     )
 
     copier._copy_recovery_match(non_iso_target, non_iso_source, 0, 0, 0, 0)
 
-    assert non_iso_target.Q_r[0][0][0][0] == 10.0
-    assert non_iso_target.X[0][0][0][0] == 1.0
-    assert non_iso_target.Y[0][0][0][0] == 0.0
-    assert non_iso_target.T_h_out_x[0][0][0][0] == 470.0
-    assert non_iso_target.T_c_out_y[0][0][0][0] == 330.0
+    assert non_iso_target.Q_r_by_period[0][0][0][0][0] == 10.0
+    assert non_iso_target.X_by_period[0][0][0][0][0] == 1.0
+    assert non_iso_target.Y_by_period[0][0][0][0][0] == 0.0
+    assert non_iso_target.T_h_out_x_by_period[0][0][0][0][0] == 470.0
+    assert non_iso_target.T_c_out_y_by_period[0][0][0][0][0] == 330.0
 
 
 def test_pinch_decomp_amalgamate_handles_failure_and_single_sided_networks() -> None:
@@ -2722,6 +2941,26 @@ def test_pinch_decomp_amalgamate_handles_failure_and_single_sided_networks() -> 
     assert below_only.mSuccess == 1
     assert below_only.minimisation_goal == "cold utility"
     assert below_only.z_allowed[0][0] == [1]
+
+
+def test_pdm_amalgamation_retains_later_period_only_nonisothermal_matches() -> None:
+    driver = _pdm_amalgamation_driver(multiperiod=True, non_isothermal=True)
+
+    network = driver.amalgamate_networks(
+        above_case=_pdm_multiperiod_side_result(required=True),
+        below_case=_pdm_multiperiod_side_result(required=False),
+    )
+
+    assert network.N_periods == 2
+    assert network.Q_r_by_period[0][0][0][0][0] == pytest.approx(0.0)
+    assert network.Q_r_by_period[1][0][0][0][0] == pytest.approx(12.0)
+    assert network.Q_h_by_period[0][0][0] == pytest.approx(0.0)
+    assert network.Q_h_by_period[1][0][0] == pytest.approx(6.0)
+    assert network.z_allowed[0][0][0] == 1
+    assert network.X_by_period[1][0][0][0][0] == pytest.approx(0.25)
+    assert network.Y_by_period[1][0][0][0][0] == pytest.approx(0.5)
+    assert network.T_h_out_x_by_period[1][0][0][0][0] == pytest.approx(470.0)
+    assert network.T_c_out_y_by_period[1][0][0][0][0] == pytest.approx(330.0)
 
 
 def test_pinch_decomp_amalgamate_combines_successful_above_and_below_networks() -> None:

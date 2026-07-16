@@ -22,6 +22,7 @@ from .....lib.config import tol
 from .....services.direct_heat_integration.direct_integration_entry import (
     compute_direct_integration_targets,
 )
+from ..indexing import ordered_mapping_keys
 from .arrays import PreparedSolverArrays, problem_to_solver_arrays
 
 PinchLocation = Literal["above", "below"]
@@ -35,6 +36,8 @@ class PinchDesignTarget(BaseModel):
 
     model_config = _MODEL_CONFIG
 
+    period_id: str
+    period_idx: int
     hot_utility_target: float
     cold_utility_target: float
     heat_recovery_target: float
@@ -61,6 +64,22 @@ class PinchDesignTarget(BaseModel):
             raise ValueError("pinch target values must be finite")
         return value
 
+    @field_validator("period_idx")
+    @classmethod
+    def _non_negative_period_idx(cls, value: int) -> int:
+        value = int(value)
+        if value < 0:
+            raise ValueError("period_idx must be non-negative")
+        return value
+
+    @field_validator("period_id")
+    @classmethod
+    def _non_empty_period_id(cls, value: str) -> str:
+        value = str(value).strip()
+        if not value:
+            raise ValueError("period_id must be non-empty")
+        return value
+
     @field_validator("hot_pinch", "cold_pinch", "shifted_pinch_temperature")
     @classmethod
     def _optional_finite_target(cls, value: float | None) -> float | None:
@@ -78,13 +97,15 @@ class PinchDesignDecomposition(BaseModel):
     model_config = _MODEL_CONFIG
 
     pinch_location: PinchLocation
-    target: PinchDesignTarget
+    period_targets: tuple[PinchDesignTarget, ...]
     z_i_active: tuple[int, ...]
     z_j_active: tuple[int, ...]
-    clipped_hot_supply_temperatures: tuple[float, ...]
-    clipped_hot_target_temperatures: tuple[float, ...]
-    clipped_cold_supply_temperatures: tuple[float, ...]
-    clipped_cold_target_temperatures: tuple[float, ...]
+    z_i_active_by_period: tuple[tuple[int, ...], ...]
+    z_j_active_by_period: tuple[tuple[int, ...], ...]
+    clipped_hot_supply_temperatures_by_period: tuple[tuple[float, ...], ...]
+    clipped_hot_target_temperatures_by_period: tuple[tuple[float, ...], ...]
+    clipped_cold_supply_temperatures_by_period: tuple[tuple[float, ...], ...]
+    clipped_cold_target_temperatures_by_period: tuple[tuple[float, ...], ...]
     S: int
     K: int
     manual_stage_selection: tuple[int, int] | None
@@ -93,40 +114,84 @@ class PinchDesignDecomposition(BaseModel):
     unit_conventions: dict[str, str]
     dt_cont_convention: str
 
-    @field_validator("z_i_active", "z_j_active")
+    @field_validator(
+        "z_i_active",
+        "z_j_active",
+        "z_i_active_by_period",
+        "z_j_active_by_period",
+    )
     @classmethod
     def _binary_flags(cls, value: tuple[int, ...]) -> tuple[int, ...]:
-        flags = tuple(int(item) for item in value)
-        if any(item not in {0, 1} for item in flags):
+        nested = bool(value and isinstance(value[0], tuple))
+        rows = value if nested else (value,)
+        flags = tuple(tuple(int(item) for item in row) for row in rows)
+        if any(item not in {0, 1} for row in flags for item in row):
             raise ValueError("PDM active-stream flags must be binary")
-        return flags
+        return flags if nested else flags[0]
 
     @field_validator(
-        "clipped_hot_supply_temperatures",
-        "clipped_hot_target_temperatures",
-        "clipped_cold_supply_temperatures",
-        "clipped_cold_target_temperatures",
+        "clipped_hot_supply_temperatures_by_period",
+        "clipped_hot_target_temperatures_by_period",
+        "clipped_cold_supply_temperatures_by_period",
+        "clipped_cold_target_temperatures_by_period",
     )
     @classmethod
     def _finite_temperature_tuple(
         cls,
-        value: tuple[float, ...],
-    ) -> tuple[float, ...]:
-        temperatures = tuple(float(item) for item in value)
-        if any(not np.isfinite(item) for item in temperatures):
+        value: tuple[tuple[float, ...], ...],
+    ) -> tuple[tuple[float, ...], ...]:
+        temperatures = tuple(tuple(float(item) for item in row) for row in value)
+        if any(not np.isfinite(item) for row in temperatures for item in row):
             raise ValueError("PDM clipped stream temperatures must be finite")
         return temperatures
 
     @model_validator(mode="after")
     def _consistent_stage_count(self) -> "PinchDesignDecomposition":
-        if self.S <= 0:
-            raise ValueError("PDM stage count S must be positive")
+        if self.S < 0:
+            raise ValueError("PDM stage count S must be non-negative")
         if self.K != self.S + 1:
             raise ValueError("PDM boundary count K must equal S + 1")
         if len(self.z_i_active) != len(self.hot_stream_identities):
             raise ValueError("hot active flags must match hot stream identities")
         if len(self.z_j_active) != len(self.cold_stream_identities):
             raise ValueError("cold active flags must match cold stream identities")
+        period_count = len(self.period_targets)
+        if period_count == 0:
+            raise ValueError("PDM period_targets must be non-empty")
+        period_fields = (
+            self.z_i_active_by_period,
+            self.z_j_active_by_period,
+            self.clipped_hot_supply_temperatures_by_period,
+            self.clipped_hot_target_temperatures_by_period,
+            self.clipped_cold_supply_temperatures_by_period,
+            self.clipped_cold_target_temperatures_by_period,
+        )
+        if any(len(field) != period_count for field in period_fields):
+            raise ValueError("PDM period-indexed fields must match period_targets")
+        if tuple(target.period_idx for target in self.period_targets) != tuple(
+            range(period_count)
+        ):
+            raise ValueError("PDM period targets must be ordered by period_idx")
+        if len({target.period_id for target in self.period_targets}) != period_count:
+            raise ValueError("PDM period target identities must be unique")
+        if any(
+            len(row) != len(self.hot_stream_identities)
+            for row in (
+                *self.z_i_active_by_period,
+                *self.clipped_hot_supply_temperatures_by_period,
+                *self.clipped_hot_target_temperatures_by_period,
+            )
+        ):
+            raise ValueError("hot period fields must match hot stream identities")
+        if any(
+            len(row) != len(self.cold_stream_identities)
+            for row in (
+                *self.z_j_active_by_period,
+                *self.clipped_cold_supply_temperatures_by_period,
+                *self.clipped_cold_target_temperatures_by_period,
+            )
+        ):
+            raise ValueError("cold period fields must match cold stream identities")
         return self
 
 
@@ -149,10 +214,10 @@ def build_pinch_design_decomposition(
         raise ValueError("pinch_location must be 'above' or 'below'.")
 
     arrays = problem_to_solver_arrays(problem, dTmin)
-    target = _calculate_openpinch_targets(problem, dTmin=float(dTmin))
+    period_targets = _calculate_openpinch_targets(problem, dTmin=float(dTmin))
     return _build_decomposition(
         arrays=arrays,
-        target=target,
+        period_targets=period_targets,
         dTmin=float(dTmin),
         pinch_location=pinch_location,
         stage_selection=stage_selection,
@@ -163,23 +228,34 @@ def _calculate_openpinch_targets(
     problem: PinchProblem,
     *,
     dTmin: float,
-) -> PinchDesignTarget:
+) -> tuple[PinchDesignTarget, ...]:
     zone = _zone_with_hen_dt_contribution(problem, dTmin=dTmin)
-    target = compute_direct_integration_targets(zone)
-    shifted_pinch_temperature = _shifted_pinch_temperature(
-        hot_utility_target=target.hot_utility_target,
-        cold_utility_target=target.cold_utility_target,
-        hot_pinch=target.hot_pinch,
-        cold_pinch=target.cold_pinch,
-    )
-    return PinchDesignTarget(
-        hot_utility_target=target.hot_utility_target,
-        cold_utility_target=target.cold_utility_target,
-        heat_recovery_target=target.heat_recovery_target,
-        hot_pinch=target.hot_pinch,
-        cold_pinch=target.cold_pinch,
-        shifted_pinch_temperature=shifted_pinch_temperature,
-    )
+    period_ids = ordered_mapping_keys(zone.period_ids or {"0": 0})
+    targets = []
+    for period_idx, period_id in enumerate(period_ids):
+        target = compute_direct_integration_targets(
+            zone,
+            args={"period_id": period_id},
+        )
+        shifted_pinch_temperature = _shifted_pinch_temperature(
+            hot_utility_target=target.hot_utility_target,
+            cold_utility_target=target.cold_utility_target,
+            hot_pinch=target.hot_pinch,
+            cold_pinch=target.cold_pinch,
+        )
+        targets.append(
+            PinchDesignTarget(
+                period_id=str(period_id),
+                period_idx=period_idx,
+                hot_utility_target=target.hot_utility_target,
+                cold_utility_target=target.cold_utility_target,
+                heat_recovery_target=target.heat_recovery_target,
+                hot_pinch=target.hot_pinch,
+                cold_pinch=target.cold_pinch,
+                shifted_pinch_temperature=shifted_pinch_temperature,
+            )
+        )
+    return tuple(targets)
 
 
 def _zone_with_hen_dt_contribution(problem: PinchProblem, *, dTmin: float) -> Zone:
@@ -271,27 +347,56 @@ def _shifted_pinch_temperature(
 def _build_decomposition(
     *,
     arrays: PreparedSolverArrays,
-    target: PinchDesignTarget,
+    period_targets: tuple[PinchDesignTarget, ...],
     dTmin: float,
     pinch_location: PinchLocation,
     stage_selection: StageSelection,
 ) -> PinchDesignDecomposition:
-    if target.shifted_pinch_temperature is None:
-        raise ValueError("Cannot build PDM fields without a shifted pinch temperature.")
-
     values = arrays.arrays
-    T_h_in = _copy_state_row(values, "T_h_in_period")
-    T_h_out = _copy_state_row(values, "T_h_out_period")
-    T_c_in = _copy_state_row(values, "T_c_in_period")
-    T_c_out = _copy_state_row(values, "T_c_out_period")
-    z_i_active, z_j_active = _clip_stream_temperatures(
-        T_h_in=T_h_in,
-        T_h_out=T_h_out,
-        T_c_in=T_c_in,
-        T_c_out=T_c_out,
-        shifted_pinch_temperature=target.shifted_pinch_temperature,
-        dTmin=dTmin,
-        pinch_location=pinch_location,
+    period_count = len(period_targets)
+    if period_count == 0:
+        raise ValueError("PDM period_targets must be non-empty.")
+    array_period_ids = tuple(str(value) for value in values["period_ids"])
+    target_period_ids = tuple(target.period_id for target in period_targets)
+    if target_period_ids != array_period_ids:
+        raise ValueError("PDM period target identities must match solver arrays.")
+    state_names = (
+        "T_h_in_period",
+        "T_h_out_period",
+        "T_c_in_period",
+        "T_c_out_period",
+    )
+    state_rows = {
+        name: np.asarray(values[name], dtype=float).copy() for name in state_names
+    }
+    if any(rows.shape[0] != period_count for rows in state_rows.values()):
+        raise ValueError("PDM period targets must match solver-array periods.")
+    z_i_active_period = []
+    z_j_active_period = []
+    for period_idx, target in enumerate(period_targets):
+        if target.shifted_pinch_temperature is None:
+            raise ValueError(
+                f"Cannot build PDM fields without a shifted pinch temperature for "
+                f"period_id {target.period_id!r}."
+            )
+        z_i_active, z_j_active = _clip_stream_temperatures(
+            T_h_in=state_rows["T_h_in_period"][period_idx],
+            T_h_out=state_rows["T_h_out_period"][period_idx],
+            T_c_in=state_rows["T_c_in_period"][period_idx],
+            T_c_out=state_rows["T_c_out_period"][period_idx],
+            shifted_pinch_temperature=target.shifted_pinch_temperature,
+            dTmin=dTmin,
+            pinch_location=pinch_location,
+        )
+        z_i_active_period.append(z_i_active)
+        z_j_active_period.append(z_j_active)
+    z_i_active = tuple(
+        int(any(row[index] for row in z_i_active_period))
+        for index in range(len(z_i_active_period[0]))
+    )
+    z_j_active = tuple(
+        int(any(row[index] for row in z_j_active_period))
+        for index in range(len(z_j_active_period[0]))
     )
     manual_stage_selection = _manual_stage_selection(stage_selection)
     S = _stage_count(
@@ -303,13 +408,23 @@ def _build_decomposition(
 
     return PinchDesignDecomposition(
         pinch_location=pinch_location,
-        target=target,
+        period_targets=period_targets,
         z_i_active=z_i_active,
         z_j_active=z_j_active,
-        clipped_hot_supply_temperatures=tuple(T_h_in.tolist()),
-        clipped_hot_target_temperatures=tuple(T_h_out.tolist()),
-        clipped_cold_supply_temperatures=tuple(T_c_in.tolist()),
-        clipped_cold_target_temperatures=tuple(T_c_out.tolist()),
+        z_i_active_by_period=tuple(z_i_active_period),
+        z_j_active_by_period=tuple(z_j_active_period),
+        clipped_hot_supply_temperatures_by_period=tuple(
+            tuple(row) for row in state_rows["T_h_in_period"]
+        ),
+        clipped_hot_target_temperatures_by_period=tuple(
+            tuple(row) for row in state_rows["T_h_out_period"]
+        ),
+        clipped_cold_supply_temperatures_by_period=tuple(
+            tuple(row) for row in state_rows["T_c_in_period"]
+        ),
+        clipped_cold_target_temperatures_by_period=tuple(
+            tuple(row) for row in state_rows["T_c_out_period"]
+        ),
         S=S,
         K=S + 1,
         manual_stage_selection=manual_stage_selection,

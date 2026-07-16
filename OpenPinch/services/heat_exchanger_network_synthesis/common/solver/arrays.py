@@ -107,13 +107,13 @@ def problem_to_solver_arrays(
         period_weights=period_weights,
         zone=zone,
     )
-    arrays.update(_segment_profile_arrays("hot", hot_items, num_periods))
-    arrays.update(_segment_profile_arrays("cold", cold_items, num_periods))
+    arrays.update(_segment_profile_arrays("hot", hot_items, num_periods, dTmin))
+    arrays.update(_segment_profile_arrays("cold", cold_items, num_periods, dTmin))
     arrays.update(
-        _segment_profile_arrays("hot_utility", hot_utility_items, num_periods)
+        _segment_profile_arrays("hot_utility", hot_utility_items, num_periods, dTmin)
     )
     arrays.update(
-        _segment_profile_arrays("cold_utility", cold_utility_items, num_periods)
+        _segment_profile_arrays("cold_utility", cold_utility_items, num_periods, dTmin)
     )
 
     axis_maps = {
@@ -313,6 +313,7 @@ def _segment_profile_arrays(
     prefix: str,
     items: list[_PreparedItem],
     num_periods: int,
+    dTmin: float,
 ) -> dict[str, np.ndarray]:
     """Build padded segment tensors while keeping the solver parent axes intact."""
     segment_rows = [_segments_for_solver(stream) for _, stream, _ in items]
@@ -324,6 +325,7 @@ def _segment_profile_arrays(
     heat_capacity_flowrates = np.zeros(shape, dtype=float)
     heat_transfer_coefficients = np.zeros(shape, dtype=float)
     prices = np.zeros(shape, dtype=float)
+    temperature_contributions = np.zeros(shape, dtype=float)
     mask = np.zeros(shape, dtype=bool)
     cumulative_duties = np.zeros(
         (num_periods, len(items), max_segments + 1), dtype=float
@@ -364,6 +366,13 @@ def _segment_profile_arrays(
                     "$/MW/h",
                     period_idx=period_index,
                 )
+                temperature_contributions[period_index, parent_index, segment_index] = (
+                    _temperature_contribution(
+                        segment,
+                        dTmin,
+                        period_idx=period_index,
+                    )
+                )
         cumulative_duties[:, parent_index, 1:] = np.cumsum(
             duties[:, parent_index, :], axis=1
         )
@@ -379,6 +388,7 @@ def _segment_profile_arrays(
         f"{prefix}_segment_cp_period": heat_capacity_flowrates,
         f"{prefix}_segment_htc_period": heat_transfer_coefficients,
         f"{prefix}_segment_price_period": prices,
+        f"{prefix}_segment_dt_cont_period": temperature_contributions,
         f"{prefix}_segment_cumulative_duty_period": cumulative_duties,
         f"{prefix}_segment_identities": identities,
         f"{prefix}_parent_segmented": np.asarray(

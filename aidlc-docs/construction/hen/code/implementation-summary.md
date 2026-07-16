@@ -83,6 +83,36 @@ Verification for this correction:
 - Total line coverage is 99%, above the 95% repository gate.
 - Ruff formatting, Ruff lint, and `git diff --check` passed.
 
+## Pre-Release Period-Native PDM and Utility Constraints
+
+PDM decomposition now carries an ordered target and clipped stream state for
+every operating period. Each period uses its own pinch and utility targets,
+while process topology is shared from the union of period-active streams.
+Above- and below-pinch solutions preserve every period's duties, boundary
+temperatures, approach variables, split fractions, and explicit
+non-isothermal branch outlet temperatures during amalgamation.
+
+Non-isothermal warm starts now normalize hot fractions over cold matches and
+cold fractions over hot matches. GEKKO warm-start assignment also correctly
+handles variables with only one finite bound. Segmented utilities expose
+period-indexed `dt_cont` tensors and use the first segment contribution at the
+inlet and the traversed contribution at the solved match outlet, selecting the
+larger adjacent value at an exact segment boundary. Flat utilities retain the
+scalar constraint path.
+
+Verification for this unit:
+
+- 443 broad non-solver HEN tests passed with four solver cases deselected.
+- The complete non-solver repository suite passed: 1,996 tests with four
+  solver-marked cases deselected.
+- The solver-marked suite passed three tests with one intentional skip.
+- The seven-fixture tier 0/1 canonical matrix produced thirteen accepted
+  networks and the established nine-stream tier 1 bounded timeout. A discovered
+  zero-stage utility-only decomposition regression was corrected and both Spray
+  Dryer tiers then passed.
+- Repository Ruff lint, changed-file formatting, warning-free Sphinx,
+  wheel/sdist packaging, and `git diff --check` passed.
+
 ## Extension Compliance
 
 - Security Baseline: disabled; not enforced.

@@ -560,8 +560,7 @@ def test_internal_problem_error_and_pdm_print_paths():
     assert failing_problem.solution_failure_reason == "bad model"
 
     class FakeSide:
-        HU_target = 1.0
-        CU_target = 1.0
+        side_required = True
 
         def __init__(self):
             self.optimised = False
@@ -809,6 +808,11 @@ def test_stagewise_shared_area_cost_checks_each_failure_path():
         recovery_area_cost_total=0.0,
         hu_area_cost_total=0.0,
         cu_area_cost_total=0.0,
+        _utility_solved_outlet_temperature=(
+            lambda side, period_idx, match_index, heat_duty: (
+                180.0 if side == "hot" else 40.0
+            )
+        ),
     )
 
     no_recovery = SimpleNamespace(

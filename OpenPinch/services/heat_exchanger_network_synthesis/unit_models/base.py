@@ -117,7 +117,10 @@ class BaseHeatExchangerNetworkModel(ABC):
         """Assign GEKKO values while preserving source bound-clamping behavior."""
 
         if type(variable).__name__ == "GKVariable":
-            value = max(variable.lower, min(variable.upper, value))
+            if variable.lower is not None:
+                value = max(variable.lower, value)
+            if variable.upper is not None:
+                value = min(variable.upper, value)
             variable.VALUE.value = [value] if brackets else value
             return
         if type(variable).__name__ == "GKParameter":
@@ -509,7 +512,11 @@ class BaseHeatExchangerNetworkModel(ABC):
         changed = False
         for mapping in self._piecewise_active_mappings:
             coordinate = self._solver_value(mapping["heat_coordinate"])
-            next_segment = mapping["profile"].segment_index_at_heat(coordinate)
+            segment_index_at_heat = mapping.get(
+                "segment_index_at_heat",
+                mapping["profile"].segment_index_at_heat,
+            )
+            next_segment = segment_index_at_heat(coordinate)
             if next_segment == mapping["active_segment"]:
                 continue
             for index, selector in enumerate(mapping["selectors"]):
@@ -526,6 +533,7 @@ class BaseHeatExchangerNetworkModel(ABC):
             return
         arrays = self.solver_arrays.arrays
         self._set_segmented_utility_capacity_constraints()
+        self._set_piecewise_utility_outlet_states()
         self._segmented_hot_parents = (
             np.asarray(arrays.get("hot_segment_count", np.ones(self.I)), dtype=int) > 1
         )
@@ -669,6 +677,123 @@ class BaseHeatExchangerNetworkModel(ABC):
                     period_index=n,
                 )
                 self.m.Equation(sum(self.Q_c_by_period[n]) <= cold_profile.total_duty)
+
+    def _set_piecewise_utility_outlet_states(self) -> None:
+        """Map aggregate utility duty to outlet temperature and local ``dt_cont``."""
+        from ..common.solver.piecewise import (
+            add_piecewise_temperature_contribution_mapping,
+            add_piecewise_temperature_mapping,
+            profile_from_solver_arrays,
+        )
+
+        self.T_hu_solved_out_by_period = [[] for _n in range(self.N_periods)]
+        self.T_cu_solved_out_by_period = [[] for _n in range(self.N_periods)]
+        self.T_hu_out_cont_by_period = [[] for _n in range(self.N_periods)]
+        self.T_cu_out_cont_by_period = [[] for _n in range(self.N_periods)]
+        self.T_hu_in_cont_by_period = []
+        self.T_cu_in_cont_by_period = []
+        for n in range(self.N_periods):
+            for side, loads in (
+                ("hot", self.Q_h_by_period[n]),
+                ("cold", self.Q_c_by_period[n]),
+            ):
+                scalar_contribution = float(
+                    (
+                        self.T_hu_cont_period[n][0]
+                        if side == "hot"
+                        else self.T_cu_cont_period[n][0]
+                    )
+                )
+                inlet_contribution = scalar_contribution
+                if self._utility_is_segmented(side):
+                    profile = profile_from_solver_arrays(
+                        self.solver_arrays,
+                        side=f"{side}_utility",
+                        parent_index=0,
+                        period_index=n,
+                    )
+                    inlet_contribution = float(profile.temperature_contributions[0])
+                getattr(self, f"T_{side[0]}u_in_cont_by_period").append(
+                    inlet_contribution
+                )
+
+                solved_outlets = getattr(self, f"T_{side[0]}u_solved_out_by_period")[n]
+                outlet_contributions = getattr(
+                    self, f"T_{side[0]}u_out_cont_by_period"
+                )[n]
+                for match_index, load in enumerate(loads):
+                    if not self._utility_is_segmented(side):
+                        solved_outlets.append(
+                            self.T_hu_out_period[n][0]
+                            if side == "hot"
+                            else self.T_cu_out_period[n][0]
+                        )
+                        outlet_contributions.append(scalar_contribution)
+                        continue
+
+                    matched_duty = (
+                        self.Qtot_sc_period[n][match_index]
+                        if side == "hot"
+                        else self.Qtot_sh_period[n][match_index]
+                    )
+                    initial_duty = min(matched_duty / 2.0, profile.total_duty)
+                    coordinate = self.m.Var(
+                        value=initial_duty,
+                        lb=0.0,
+                        ub=profile.total_duty,
+                        name=(f"Qcoord_{side}_utility_M{match_index}_period{n}"),
+                    )
+                    self.m.Equation(coordinate == load)
+                    solved_outlet = self.m.Var(
+                        value=profile.temperature_at_heat(initial_duty),
+                        lb=float(
+                            min(
+                                profile.temperatures_in.min(),
+                                profile.temperatures_out.min(),
+                            )
+                        ),
+                        ub=float(
+                            max(
+                                profile.temperatures_in.max(),
+                                profile.temperatures_out.max(),
+                            )
+                        ),
+                        name=(f"T_{side}_utility_out_M{match_index}_period{n}"),
+                    )
+                    contribution_values = profile.temperature_contributions
+                    outlet_contribution = self.m.Var(
+                        value=profile.temperature_contribution_at_heat(initial_duty),
+                        lb=float(contribution_values.min()),
+                        ub=float(contribution_values.max()),
+                        name=(f"dTcont_{side}_utility_out_M{match_index}_period{n}"),
+                    )
+                    temperature_segment = profile.segment_index_at_heat(initial_duty)
+                    contribution_segment = profile.contribution_index_at_heat(
+                        initial_duty
+                    )
+                    self._register_piecewise_mapping(
+                        add_piecewise_temperature_mapping(
+                            self.m,
+                            coordinate,
+                            solved_outlet,
+                            profile,
+                            name=(f"TQ_{side}_utility_M{match_index}_period{n}"),
+                            integer_capable=self.solver in {"apopt", "couenne"},
+                            initial_segment=temperature_segment,
+                        )
+                    )
+                    self._register_piecewise_mapping(
+                        add_piecewise_temperature_contribution_mapping(
+                            self.m,
+                            coordinate,
+                            outlet_contribution,
+                            profile,
+                            name=(f"dTQ_{side}_utility_M{match_index}_period{n}"),
+                            initial_segment=contribution_segment,
+                        )
+                    )
+                    solved_outlets.append(solved_outlet)
+                    outlet_contributions.append(outlet_contribution)
 
     def _hot_parent_segmented(self, index: int) -> bool:
         return bool(getattr(self, "_segmented_hot_parents", [False] * self.I)[index])
@@ -1344,27 +1469,209 @@ class BaseHeatExchangerNetworkModel(ABC):
             return float(self.dT_r_period[period_idx][i][j])
         return float(self.dT_r[i][j])
 
-    def _hot_utility_approach_temperature(
+    def _hot_utility_inlet_approach_temperature(
         self,
         j: int,
         period_idx: int = 0,
     ) -> float:
-        if not hasattr(self, "dT_hu"):
-            return float(self.dTmin)
-        if hasattr(self, "dT_hu_period"):
-            return float(self.dT_hu_period[period_idx][j])
-        return float(self.dT_hu[j])
+        contribution = (
+            self.T_hu_in_cont_by_period[period_idx]
+            if hasattr(self, "T_hu_in_cont_by_period")
+            else self.T_hu_cont_period[period_idx][0]
+        )
+        return float(contribution + self.T_c_cont_period[period_idx][j])
 
-    def _cold_utility_approach_temperature(
+    def _hot_utility_outlet_approach_temperature(
+        self,
+        j: int,
+        period_idx: int = 0,
+        heat_duty: float | None = None,
+    ):
+        contribution = self._utility_outlet_temperature_contribution(
+            "hot",
+            period_idx,
+            match_index=j,
+            heat_duty=heat_duty,
+        )
+        return contribution + self.T_c_cont_period[period_idx][j]
+
+    def _cold_utility_inlet_approach_temperature(
         self,
         i: int,
         period_idx: int = 0,
     ) -> float:
-        if not hasattr(self, "dT_cu"):
-            return float(self.dTmin)
-        if hasattr(self, "dT_cu_period"):
-            return float(self.dT_cu_period[period_idx][i])
-        return float(self.dT_cu[i])
+        contribution = (
+            self.T_cu_in_cont_by_period[period_idx]
+            if hasattr(self, "T_cu_in_cont_by_period")
+            else self.T_cu_cont_period[period_idx][0]
+        )
+        return float(self.T_h_cont_period[period_idx][i] + contribution)
+
+    def _cold_utility_outlet_approach_temperature(
+        self,
+        i: int,
+        period_idx: int = 0,
+        heat_duty: float | None = None,
+    ):
+        contribution = self._utility_outlet_temperature_contribution(
+            "cold",
+            period_idx,
+            match_index=i,
+            heat_duty=heat_duty,
+        )
+        return self.T_h_cont_period[period_idx][i] + contribution
+
+    def _utility_outlet_temperature_contribution(
+        self,
+        side: str,
+        period_idx: int,
+        match_index: int,
+        heat_duty: float | None = None,
+    ):
+        if heat_duty is None and hasattr(
+            self,
+            f"T_{side[0]}u_out_cont_by_period",
+        ):
+            return getattr(self, f"T_{side[0]}u_out_cont_by_period")[period_idx][
+                match_index
+            ]
+        scalar = (
+            self.T_hu_cont_period[period_idx][0]
+            if side == "hot"
+            else self.T_cu_cont_period[period_idx][0]
+        )
+        if heat_duty is None or not self._utility_is_segmented(side):
+            return float(scalar)
+
+        from ..common.solver.piecewise import profile_from_solver_arrays
+
+        profile = profile_from_solver_arrays(
+            self.solver_arrays,
+            side=f"{side}_utility",
+            parent_index=0,
+            period_index=period_idx,
+        )
+        return profile.temperature_contribution_at_heat(heat_duty)
+
+    def _utility_solved_outlet_temperature(
+        self,
+        side: str,
+        period_idx: int,
+        match_index: int,
+        heat_duty: float | None = None,
+    ):
+        if heat_duty is None and hasattr(
+            self,
+            f"T_{side[0]}u_solved_out_by_period",
+        ):
+            return getattr(self, f"T_{side[0]}u_solved_out_by_period")[period_idx][
+                match_index
+            ]
+        if heat_duty is None or not self._utility_is_segmented(side):
+            return (
+                self.T_hu_out_period[period_idx][0]
+                if side == "hot"
+                else self.T_cu_out_period[period_idx][0]
+            )
+
+        from ..common.solver.piecewise import profile_from_solver_arrays
+
+        return profile_from_solver_arrays(
+            self.solver_arrays,
+            side=f"{side}_utility",
+            parent_index=0,
+            period_index=period_idx,
+        ).temperature_at_heat(heat_duty)
+
+    def _utility_max_temperature_contribution(
+        self,
+        side: str,
+        period_idx: int,
+    ) -> float:
+        scalar = (
+            self.T_hu_cont_period[period_idx][0]
+            if side == "hot"
+            else self.T_cu_cont_period[period_idx][0]
+        )
+        if not self._utility_is_segmented(side):
+            return float(scalar)
+        values = self.solver_arrays.arrays[f"{side}_utility_segment_dt_cont_period"][
+            period_idx, 0
+        ]
+        count = int(self.solver_arrays.arrays[f"{side}_utility_segment_count"][0])
+        return float(np.max(values[:count]))
+
+    def _set_multiperiod_utility_approach_equations(self) -> None:
+        """Constrain both utility terminals with local segment contributions."""
+        for n in range(self.N_periods):
+            for j in range(self.J):
+                if self.z_hu_allowed[j] <= 0 or not self._utility_is_segmented("hot"):
+                    continue
+                inlet_approach = self._hot_utility_inlet_approach_temperature(j, n)
+                outlet_approach = self._hot_utility_outlet_approach_temperature(j, n)
+                maximum_approach = (
+                    self._utility_max_temperature_contribution("hot", n)
+                    + self.T_c_cont_period[n][j]
+                )
+                big_m = max(
+                    abs(self.T_hu_in_period[n][0] - self.T_c_out_period[n][j]),
+                    abs(self.T_hu_in_period[n][0] - self.T_c_in_period[n][j]),
+                    abs(self.T_hu_out_period[n][0] - self.T_c_out_period[n][j]),
+                    abs(self.T_hu_out_period[n][0] - self.T_c_in_period[n][j]),
+                ) + max(maximum_approach, float(self.dTmin))
+                inlet_delta = self.T_hu_in_period[n][0] - self.T_c_out_period[n][j]
+                if type(self.z_hu[j]).__name__ == "GKParameter":
+                    if (
+                        self._solver_value(self.z_hu[j].VALUE.value) > self.tol
+                        and inlet_delta + self.tol < inlet_approach
+                    ):
+                        raise ValueError(
+                            f"Hot utility match {j} violates its inlet approach "
+                            f"temperature in period {self.period_ids[n]!r}."
+                        )
+                else:
+                    self.m.Equation(
+                        inlet_delta >= inlet_approach - big_m * (1 - self.z_hu[j])
+                    )
+                self.m.Equation(
+                    self._utility_solved_outlet_temperature("hot", n, j)
+                    - self.T_c_by_period[n][j][0]
+                    >= outlet_approach - big_m * (1 - self.z_hu[j])
+                )
+
+            for i in range(self.I):
+                if self.z_cu_allowed[i] <= 0 or not self._utility_is_segmented("cold"):
+                    continue
+                inlet_approach = self._cold_utility_inlet_approach_temperature(i, n)
+                outlet_approach = self._cold_utility_outlet_approach_temperature(i, n)
+                maximum_approach = self.T_h_cont_period[n][
+                    i
+                ] + self._utility_max_temperature_contribution("cold", n)
+                big_m = max(
+                    abs(self.T_h_in_period[n][i] - self.T_cu_out_period[n][0]),
+                    abs(self.T_h_in_period[n][i] - self.T_cu_in_period[n][0]),
+                    abs(self.T_h_out_period[n][i] - self.T_cu_out_period[n][0]),
+                    abs(self.T_h_out_period[n][i] - self.T_cu_in_period[n][0]),
+                ) + max(maximum_approach, float(self.dTmin))
+                self.m.Equation(
+                    self.T_h_by_period[n][i][self.S]
+                    - self._utility_solved_outlet_temperature("cold", n, i)
+                    >= outlet_approach - big_m * (1 - self.z_cu[i])
+                )
+                inlet_delta = self.T_h_out_period[n][i] - self.T_cu_in_period[n][0]
+                if type(self.z_cu[i]).__name__ == "GKParameter":
+                    if (
+                        self._solver_value(self.z_cu[i].VALUE.value) > self.tol
+                        and inlet_delta + self.tol < inlet_approach
+                    ):
+                        raise ValueError(
+                            f"Cold utility match {i} violates its inlet approach "
+                            f"temperature in period {self.period_ids[n]!r}."
+                        )
+                else:
+                    self.m.Equation(
+                        inlet_delta >= inlet_approach - big_m * (1 - self.z_cu[i])
+                    )
 
     def _weighted_state_average(self, values: Sequence[Any]) -> Any:
         """Return ``sum_s(w_s * value_s) / sum_s(w_s)`` for GEKKO expressions."""

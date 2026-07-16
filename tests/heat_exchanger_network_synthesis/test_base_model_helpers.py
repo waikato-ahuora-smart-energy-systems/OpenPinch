@@ -359,24 +359,24 @@ def test_blank_and_solver_array_state_helpers_validate_static_arrays():
     assert model._recovery_approach_temperature(0, 0, period_idx=1) == pytest.approx(
         12.0
     )
-    assert model._hot_utility_approach_temperature(0, period_idx=1) == pytest.approx(
-        10.0
-    )
-    assert model._cold_utility_approach_temperature(0, period_idx=1) == pytest.approx(
-        9.0
-    )
+    assert model._hot_utility_inlet_approach_temperature(
+        0, period_idx=1
+    ) == pytest.approx(10.0)
+    assert model._hot_utility_outlet_approach_temperature(
+        0, period_idx=1, heat_duty=1.0
+    ) == pytest.approx(10.0)
+    assert model._cold_utility_inlet_approach_temperature(
+        0, period_idx=1
+    ) == pytest.approx(9.0)
+    assert model._cold_utility_outlet_approach_temperature(
+        0, period_idx=1, heat_duty=1.0
+    ) == pytest.approx(9.0)
     assert model._weighted_state_average([10.0, 30.0]) == pytest.approx(25.0)
 
     fallback = _model()
     assert fallback._recovery_approach_temperature(0, 0) == pytest.approx(10.0)
-    assert fallback._hot_utility_approach_temperature(0) == pytest.approx(10.0)
-    assert fallback._cold_utility_approach_temperature(0) == pytest.approx(10.0)
     fallback.dT_r = np.array([[11.0]])
-    fallback.dT_hu = np.array([12.0])
-    fallback.dT_cu = np.array([13.0])
     assert fallback._recovery_approach_temperature(0, 0) == pytest.approx(11.0)
-    assert fallback._hot_utility_approach_temperature(0) == pytest.approx(12.0)
-    assert fallback._cold_utility_approach_temperature(0) == pytest.approx(13.0)
 
 
 @pytest.mark.parametrize(

@@ -254,6 +254,66 @@ def _multi_period_warm_start_model() -> StageWiseModel:
     return model
 
 
+def _asymmetric_warm_start_model(*, multiperiod: bool) -> StageWiseModel:
+    model = StageWiseModel.__new__(StageWiseModel)
+    model.I = 2
+    model.J = 2
+    model.S = 1
+    model.K = 2
+    model.dTmin = 7.0
+    model.non_isothermal_model = True
+    model.z_allowed = [[[1], [1]], [[1], [1]]]
+    model.z_cu_allowed = [0, 0]
+    model.z_hu_allowed = [0, 0]
+    model.z = _variables((2, 2, 1))
+    model.z_cu = _variables((2,))
+    model.z_hu = _variables((2,))
+    if not multiperiod:
+        model.Q_r = _variables((2, 2, 1))
+        model.theta_1 = _variables((2, 2, 1))
+        model.theta_2 = _variables((2, 2, 1))
+        model.T_h = _variables((2, 2))
+        model.T_c = _variables((2, 2))
+        model.Q_c = _variables((2,))
+        model.Q_h = _variables((2,))
+        model.X = _variables((2, 2, 1))
+        model.Y = _variables((2, 2, 1))
+        model.T_h_out_x = _variables((2, 2, 1))
+        model.T_c_out_y = _variables((2, 2, 1))
+        return model
+
+    model.N_periods = 2
+    model.Q_r_by_period = _variables((2, 2, 2, 1))
+    model.theta_1_by_period = _variables((2, 2, 2, 1))
+    model.theta_2_by_period = _variables((2, 2, 2, 1))
+    model.T_h_by_period = _variables((2, 2, 2))
+    model.T_c_by_period = _variables((2, 2, 2))
+    model.Q_c_by_period = _variables((2, 2))
+    model.Q_h_by_period = _variables((2, 2))
+    model.X_by_period = _variables((2, 2, 2, 1))
+    model.Y_by_period = _variables((2, 2, 2, 1))
+    model.T_h_out_x_by_period = _variables((2, 2, 2, 1))
+    model.T_c_out_y_by_period = _variables((2, 2, 2, 1))
+    return model
+
+
+def _asymmetric_isothermal_source() -> SimpleNamespace:
+    duties = [[[10.0], [30.0]], [[20.0], [40.0]]]
+    return SimpleNamespace(
+        non_isothermal_model=False,
+        Q_r=_source_variables(duties),
+        z=[[[[1]], [[1]]], [[[1]], [[1]]]],
+        theta_1=_source_variables([[[20.0], [20.0]], [[20.0], [20.0]]]),
+        theta_2=_source_variables([[[15.0], [15.0]], [[15.0], [15.0]]]),
+        T_h=_source_variables([[200.0, 150.0], [190.0, 140.0]]),
+        T_c=_source_variables([[50.0, 100.0], [60.0, 110.0]]),
+        Q_c=_source_variables([0.0, 0.0]),
+        z_cu=[[0], [0]],
+        Q_h=_source_variables([0.0, 0.0]),
+        z_hu=[[0], [0]],
+    )
+
+
 def _source_area_case(*, model_area: float | None = None) -> SimpleNamespace:
     expected = 2.0 * (10.0 / ((10.0 * 20.0 * (10.0 + 20.0) / 2.0 + 1e-3) ** (1 / 3)))
     return SimpleNamespace(
@@ -305,6 +365,13 @@ def _shared_area_case() -> SimpleNamespace:
         recovery_area_cost_total=200.0,
         hu_area_cost_total=300.0,
         cu_area_cost_total=400.0,
+    )
+    case._utility_solved_outlet_temperature = (
+        lambda side, period_idx, match_index, heat_duty: (
+            case.T_hu_out_period[period_idx][0]
+            if side == "hot"
+            else case.T_cu_out_period[period_idx][0]
+        )
     )
     return case
 
@@ -525,6 +592,23 @@ def test_stagewise_multiperiod_initial_values_use_source_fallback_and_shared_are
     assert model.Y_by_period[1][0][0][0].VALUE.value == pytest.approx(0.35)
     assert model.T_h_out_x_by_period[1][0][0][0].VALUE.value == pytest.approx(80.0)
     assert model.T_c_out_y_by_period[1][0][0][0].VALUE.value == pytest.approx(60.0)
+
+
+@pytest.mark.parametrize("multiperiod", [False, True])
+def test_warm_start_split_normalization_uses_fixed_stream_totals(multiperiod: bool):
+    model = _asymmetric_warm_start_model(multiperiod=multiperiod)
+    model.set_initial_values_for_variables(_asymmetric_isothermal_source())
+
+    x = model.X_by_period[1] if multiperiod else model.X
+    y = model.Y_by_period[1] if multiperiod else model.Y
+    assert x[0][0][0].VALUE.value == pytest.approx(10.0 / 40.0)
+    assert x[0][1][0].VALUE.value == pytest.approx(30.0 / 40.0)
+    assert x[1][0][0].VALUE.value == pytest.approx(20.0 / 60.0)
+    assert x[1][1][0].VALUE.value == pytest.approx(40.0 / 60.0)
+    assert y[0][0][0].VALUE.value == pytest.approx(10.0 / 30.0)
+    assert y[0][1][0].VALUE.value == pytest.approx(20.0 / 30.0)
+    assert y[1][0][0].VALUE.value == pytest.approx(30.0 / 70.0)
+    assert y[1][1][0].VALUE.value == pytest.approx(40.0 / 70.0)
 
 
 def test_stagewise_candidate_helpers_cover_invalid_and_verified_paths():

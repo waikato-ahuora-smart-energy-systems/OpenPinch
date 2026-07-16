@@ -20,3 +20,22 @@ This pre-release changes the following contracts without compatibility shims:
   unknown versions, and the retired ``payload`` field are rejected.
 - Segmented process streams and utilities share the same semantic validation in
   reports and preparation, including parent aggregate consistency.
+
+Period-native PDM and utility constraints
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- PDM decompositions expose ordered ``period_targets`` with explicit period
+  identities and indices. Clipped temperatures and active-stream flags are
+  period-indexed; the retired singular target and clipped-temperature fields do
+  not exist.
+- Each operating period uses its own utility targets and pinch temperature.
+  Shared topology is the union of streams and matches active in any period, and
+  a pinch side is solved when any period requires it.
+- Above- and below-pinch amalgamation retains every period's duties,
+  temperatures, approach variables, split fractions, and explicit
+  non-isothermal branch outlet temperatures.
+- Non-isothermal warm starts normalize hot split fractions across cold matches
+  and cold split fractions across hot matches independently in every period.
+- Segmented utilities use local per-segment ``dt_cont`` values. The inlet uses
+  the first segment contribution, the solved match outlet uses the traversed
+  segment contribution, and an exact boundary uses the larger adjacent value.

@@ -184,3 +184,38 @@ the deferred refinement is not part of the immediate next steps.
 
 PR 1 Domain and Input Correctness is independently green and ready to be
 committed as the first stacked pre-release change.
+
+## Pre-Release Corrective PR 2 Evidence
+
+### Results
+
+- Focused and broad HEN regressions: 443 passed with four solver cases
+  deselected.
+- Complete non-solver repository matrix: 1,996 passed and four solver-marked
+  cases deselected in 140.69 seconds.
+- Solver-marked matrix: three passed and one intentionally skipped in 80.33
+  seconds.
+- Canonical HEN tier 0/1 matrix: thirteen successful case/tier results and the
+  established bounded timeout for Nine-stream Linnhoff/Ahmad tier 1. Both
+  Spray Dryer tiers passed after correcting acceptance of a legitimate
+  utility-only zero-stage PDM side.
+- Ruff: repository-wide lint passed; every PR 2 Python file passed formatting.
+- Documentation: the 59-source Sphinx HTML build completed with warnings as
+  errors and official intersphinx inventories.
+- Packaging: OpenPinch 0.4.6 wheel and source distribution built successfully
+  in an isolated temporary directory.
+- Patch hygiene: `git diff --check` passed and temporary benchmark, Sphinx, and
+  distribution outputs remained outside the worktree.
+
+### Extension Compliance
+
+- Security Baseline: disabled; N/A for this stage.
+- Resiliency Baseline: disabled; N/A for this stage.
+- Property-Based Testing (Partial): compliant through the period-native,
+  exact-boundary, asymmetric warm-start, and multiperiod regression matrix;
+  no new generated-domain requirement was introduced in this unit.
+
+### Status
+
+PR 2 Period-Native PDM and Utility Constraints is independently green and
+ready to be committed as the second stacked pre-release change.
