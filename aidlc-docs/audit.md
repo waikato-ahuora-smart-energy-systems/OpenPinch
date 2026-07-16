@@ -831,3 +831,11 @@ Github CI tests fail with the attached error message."
 **Context**: CONSTRUCTION - Additional Build and Test regression requested by the user. Plan created at aidlc-docs/construction/discopt-removal/build-and-test/hens-tier-0-1-regression-plan.md. Extension compliance: Security and Resiliency disabled; Property-Based Testing Partial and supplemented by deterministic real-solver evidence.
 
 ---
+
+## HEN Tier 0 and Tier 1 Exact Regression Completion
+**Timestamp**: 2026-07-15T22:54:03Z
+**User Input**: "No new user input; completed the requested Tier 0 and Tier 1 exact regression."
+**AI Response**: "Executed 28 controlled HEN attempts across pre-segment revision 973d2322 and the current workspace. All 14 case/tier pairs matched exactly across the deterministic comparison contract: 11 successful networks with zero numeric deltas, one matching 600-second timeout, and two matching validation failures. Ran the focused live multiperiod equivalence test and complete segmented-stream HEN module, with 13 tests passing in 18.84 seconds. Saved raw JSON evidence and a detailed scope-aware comparison report under results/."
+**Context**: CONSTRUCTION - Extended Build and Test complete. The exact legacy regression passes. The seven benchmark fixtures are single-period constant-CP cases; direct multiperiod and segmented behavior is covered by focused current-code tests rather than an object-for-object pre-segment baseline. Extension compliance: Security and Resiliency disabled; Property-Based Testing Partial and compliant.
+
+---

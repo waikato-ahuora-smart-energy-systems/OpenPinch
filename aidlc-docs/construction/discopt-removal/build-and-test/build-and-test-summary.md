@@ -33,6 +33,25 @@
 - One solver-marked case was intentionally skipped.
 - Couenne and IPOPT/APOPT support remained functional.
 
+### Tier 0 and Tier 1 Exact Regression
+
+- Compared the current workspace with pre-segment revision `973d2322` using
+  seven legacy OpenHENS fixtures at both Tier 0 and Tier 1.
+- Executed 28 controlled baseline/current attempts with identical fixtures,
+  harness, Python environment, solver binaries, fixed settings, serial worker,
+  and 600-second case limit.
+- All 14 case/tier pairs matched exactly across status, error classification,
+  selected method, stages, task and candidate counts, full-precision costs,
+  exchanger count, recovery and utility duties, settings, fallback flags, and
+  verification metadata.
+- Eleven successful-network pairs had zero numeric deltas. The remaining pairs
+  reproduced one timeout and two validation failures exactly.
+- A focused live multiperiod equivalence test plus the complete segmented-stream
+  HEN module passed: 13 tests in 18.84 seconds.
+- Raw results and the comparison report are in `results/`; the report records
+  the important scope distinction that the seven exact-comparison fixtures are
+  legacy single-period, constant-CP inputs.
+
 ## Build Results
 
 - Sphinx 9.1.0 built all 58 sources with warnings treated as errors.

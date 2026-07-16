@@ -47,15 +47,15 @@ differences. A tolerance match must not be described as exact equality.
 - [x] Export baseline revision `973d2322` to a unique temporary directory.
 - [x] Prove baseline and current runs import their intended OpenPinch source trees.
 - [x] Run a paired Tier 0/1 smoke case and confirm the comparison contract works.
-- [ ] Run all seven cases at Tier 0 against the baseline revision.
-- [ ] Run all seven cases at Tier 1 against the baseline revision.
-- [ ] Run all seven cases at Tier 0 against the current workspace.
-- [ ] Run all seven cases at Tier 1 against the current workspace.
-- [ ] Validate 28 unique version/case/tier attempts with no missing records.
-- [ ] Produce an exact field-by-field comparison and classify every difference.
-- [ ] Relate the result to multiperiod and segmented-stream coverage limits.
-- [ ] Save the raw baseline/current JSON and comparison report under `results/`.
-- [ ] Update the Build and Test summary, state, audit, and this checklist.
+- [x] Run all seven cases at Tier 0 against the baseline revision.
+- [x] Run all seven cases at Tier 1 against the baseline revision.
+- [x] Run all seven cases at Tier 0 against the current workspace.
+- [x] Run all seven cases at Tier 1 against the current workspace.
+- [x] Validate 28 unique version/case/tier attempts with no missing records.
+- [x] Produce an exact field-by-field comparison and classify every difference.
+- [x] Relate the result to multiperiod and segmented-stream coverage limits.
+- [x] Save the raw baseline/current JSON and comparison report under `results/`.
+- [x] Update the Build and Test summary, state, audit, and this checklist.
 
 ## Extension Compliance
 

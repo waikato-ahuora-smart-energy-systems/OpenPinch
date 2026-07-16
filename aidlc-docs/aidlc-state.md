@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: CONSTRUCTION - HEN Tier 0 and Tier 1 Exact Regression
+- **Current Stage**: CONSTRUCTION - HEN Tier 0 and Tier 1 Exact Regression Complete
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -91,10 +91,10 @@
 - [x] CONSTRUCTION - Code Generation Part 2 implementation completed.
 - [x] CONSTRUCTION - Generated code approved by the user.
 - [x] CONSTRUCTION - Build and Test completed.
-- [ ] CONSTRUCTION - Build and Test approval superseded by requested Tier 0/1
+- [x] CONSTRUCTION - Build and Test approval superseded by requested Tier 0/1
   regression extension.
-- [ ] CONSTRUCTION - HEN Tier 0/1 exact regression in progress.
-- [ ] CONSTRUCTION - Build and Test.
+- [x] CONSTRUCTION - HEN Tier 0/1 exact regression complete.
+- [x] CONSTRUCTION - Build and Test.
 - [ ] OPERATIONS - Placeholder; no deployment work requested.
 - **Requirements artifact**: `aidlc-docs/inception/requirements/discopt-removal-requirements.md`.
 - **Workflow artifact**: `aidlc-docs/inception/plans/discopt-removal-execution-plan.md`.
@@ -102,8 +102,9 @@
 - **Code Generation summary**: `aidlc-docs/construction/discopt-removal/code/code-generation-summary.md`.
 - **Build and Test summary**: `aidlc-docs/construction/discopt-removal/build-and-test/build-and-test-summary.md`.
 - **Regression plan**: `aidlc-docs/construction/discopt-removal/build-and-test/hens-tier-0-1-regression-plan.md`.
-- **Current work**: Comparing the current workspace against pre-segmentation
-  revision `973d2322` on the controlled seven-case Tier 0/1 matrix.
+- **Current work**: Tier 0/1 regression complete. All 14 case/tier pairs match
+  pre-segmentation revision `973d2322` exactly under the deterministic result
+  contract; focused multiperiod and segmented-stream tests also pass.
 
 ## Follow-up Plans
 - **Read the Docs configuration verification**: Workspace detection is complete.
