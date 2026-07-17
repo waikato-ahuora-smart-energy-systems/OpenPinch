@@ -51,6 +51,19 @@ passes 2,091 tests with four solver-marked tests deselected.
 The generated network property uses fixed seed `20260717`, 30 bounded examples,
 normal Hypothesis shrinking, and exact mapping and ordering invariants.
 
+## Serialized HEN JSON-Safety Regression
+
+```bash
+uv run pytest -q \
+  tests/domain/test_heat_exchanger_network.py::test_heat_exchanger_python_dump_is_json_safe \
+  tests/contracts/test_heat_exchanger_network_input.py::test_canonical_problem_inputs_retain_the_transport_network_without_consuming_it \
+  tests/application/test_pinch_workspace.py::test_workspace_roundtrips_a_serialized_heat_exchanger_network
+```
+
+The three tests failed with `TypeError` before `StreamID` became string-backed
+and pass afterward. The expanded affected gate passes 574 tests with four
+solver-marked cases deselected.
+
 ## Segment Batch Update and Pricing Acceptance
 
 ```bash

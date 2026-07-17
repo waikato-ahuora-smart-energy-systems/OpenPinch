@@ -69,6 +69,8 @@ This pre-release changes the following contracts without compatibility shims:
 - HEN endpoint classifications now use ``StreamID`` values ``Process`` and
   ``Utility``. The retired lowercase endpoint-role enum and ``Unassigned``
   endpoint values are not accepted.
+- ``StreamID`` is string-backed, keeping Python-mode HEN and canonical input
+  mappings safe for direct JSON and workspace-bundle persistence.
 
 Private helper ownership
 ~~~~~~~~~~~~~~~~~~~~~~~~

@@ -41,7 +41,10 @@ from OpenPinch.contracts.workspace import (
     TableView,
     ValidationReport,
 )
-from OpenPinch.domain.enums import HPRcycle
+from OpenPinch.domain._heat_exchanger.period_state import HeatExchangerPeriodState
+from OpenPinch.domain.enums import HeatExchangerKind, HPRcycle, StreamID
+from OpenPinch.domain.heat_exchanger import HeatExchanger
+from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
 from OpenPinch.presentation.configuration import annotation_metadata
 from OpenPinch.presentation.configuration import configuration_options as config_options
 from OpenPinch.resources import read_sample_case
@@ -53,6 +56,29 @@ def _basic_payload() -> dict:
 
 def _chocolate_payload() -> dict:
     return json.loads(read_sample_case("chocolate_factory.json"))
+
+
+def _network_payload() -> dict:
+    network = HeatExchangerNetwork(
+        exchangers=(
+            HeatExchanger(
+                kind=HeatExchangerKind.RECOVERY,
+                source_stream="H1",
+                sink_stream="C1",
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Process,
+                stage=1,
+                period_states=(
+                    HeatExchangerPeriodState(
+                        period_id="base",
+                        period_idx=0,
+                        duty=10.0,
+                    ),
+                ),
+            ),
+        )
+    )
+    return network.model_dump(mode="json")
 
 
 def test_workspace_returns_real_cases_and_delegates_to_pinchproblem():
@@ -100,6 +126,24 @@ def test_workspace_updates_case_options_and_roundtrips_bundles(tmp_path: Path):
     assert "case_input" in saved_bundle["variants"]["baseline"]
     assert reloaded.list_cases() == ["baseline", "wide_dt"]
     assert reloaded.get_case_input("wide_dt")["options"]["THERMAL_DT_CONT"] == 15
+
+
+def test_workspace_roundtrips_a_serialized_heat_exchanger_network(
+    tmp_path: Path,
+) -> None:
+    payload = _basic_payload()
+    network_payload = _network_payload()
+    payload["network"] = network_payload
+    workspace = PinchWorkspace(payload, project_name="Demo")
+
+    bundle_path = workspace.save_bundle(tmp_path / "hen_workspace_bundle.json")
+    saved_bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+    reloaded = PinchWorkspace.load_bundle(bundle_path)
+
+    assert saved_bundle["variants"]["baseline"]["case_input"]["network"] == (
+        network_payload
+    )
+    assert reloaded.get_case_input("baseline")["network"] == network_payload
 
 
 def test_workspace_bundle_rejects_v1_payload_and_unknown_versions():

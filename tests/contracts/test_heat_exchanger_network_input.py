@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 
 import pytest
@@ -200,6 +201,10 @@ def test_canonical_problem_inputs_retain_the_transport_network_without_consuming
     canonical = canonical_problem_inputs(input_data, project_name="Site")
 
     assert canonical["network"] == input_data.model_dump(mode="python")["network"]
+    assert (
+        json.loads(json.dumps(canonical))["network"]
+        == input_data.model_dump(mode="json")["network"]
+    )
 
 
 def test_network_input_rejects_an_encoded_json_string() -> None:

@@ -34,6 +34,8 @@ round trip.
 - `network` may be absent, `null`, or an empty network.
 - `StreamID.Unassigned`, lowercase legacy endpoint values, and kind/role
   mismatches are rejected.
+- `StreamID` is string-backed, so default Python-mode runtime and transport
+  dumps remain directly JSON-serializable while retaining enum typing.
 
 ## Extension Compliance
 

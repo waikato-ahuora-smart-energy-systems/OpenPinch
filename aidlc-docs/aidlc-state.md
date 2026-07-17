@@ -472,3 +472,21 @@
 - **Verification**: 2,091 non-solver tests passed with four solver-marked tests
   deselected; Ruff lint/format, warning-as-error Sphinx, architecture,
   stale-symbol, and patch-hygiene gates passed.
+
+## Serialized HEN JSON-Safety Fix Progress
+
+- [x] Review finding reproduced in runtime, canonical-input, and workspace paths.
+- [x] Regression tests added and confirmed failing before the fix.
+- [x] `StreamID` made string-backed without compatibility behavior.
+- [x] Runtime, canonical-input, and workspace regressions pass after the fix.
+- [x] Focused and complete quality gates.
+- [x] Build and Test evidence and review handoff.
+- **Plan**:
+  `aidlc-docs/construction/plans/serialized-hen-json-safety-fix-plan.md`.
+- **Extensions**: Security and Resiliency disabled (N/A); partial PBT remains
+  enabled for the serialized-network round-trip properties.
+- **Verification**: 574 focused tests and 2,093 complete non-solver tests pass;
+  four solver-marked tests are deselected. Ruff, Sphinx, stale-symbol, and
+  patch-hygiene gates pass.
+- **Current stage**: Code Generation and Build and Test complete; generated-code
+  review requested. Operations is N/A.

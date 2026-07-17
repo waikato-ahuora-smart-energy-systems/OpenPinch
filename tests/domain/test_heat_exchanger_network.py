@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from pydantic import ValidationError
 
@@ -92,6 +94,13 @@ def test_heat_exchanger_serialization_round_trip_excludes_solver_metadata():
     )
     assert "solver_metadata" not in exchanger.model_dump()
     assert "source_metadata" not in exchanger.model_dump()
+
+
+def test_heat_exchanger_python_dump_is_json_safe() -> None:
+    payload = json.loads(json.dumps(_recovery_exchanger().model_dump()))
+
+    assert payload["source_stream_role"] == "Process"
+    assert payload["sink_stream_role"] == "Process"
 
 
 def test_heat_exchanger_rejects_retired_scalar_operating_fields():

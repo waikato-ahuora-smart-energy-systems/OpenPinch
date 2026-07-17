@@ -409,3 +409,20 @@ infrastructure work was requested.
 
 The serialized HEN contract is ready for generated-code review. Operations is
 N/A because no deployment or infrastructure work was requested.
+
+## Serialized HEN JSON-Safety Fix Evidence
+
+- Regression-first result: three expected `StreamID` JSON serialization
+  failures across runtime, canonical-input, and public workspace paths.
+- Post-fix targeted result: three passed.
+- Expanded HEN, contract, workspace, property, and architecture gate: 574
+  passed; four solver-marked cases deselected.
+- Complete non-solver suite: 2,093 passed; four solver-marked cases deselected.
+- Ruff lint and formatting: passed across all 460 Python files.
+- Documentation: warning-as-error Sphinx HTML build passed.
+- Stale-symbol and patch-hygiene checks: passed.
+- Compatibility: no alias, lowercase legacy value, migration layer, or field
+  serializer was added; `StreamID` is directly string-backed.
+- Security and Resiliency: N/A, disabled.
+- Partial PBT: compliant; the existing seeded serialized-network property ran
+  in both the focused and complete suites.

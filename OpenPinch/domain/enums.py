@@ -170,7 +170,7 @@ class FluidPhase(str, Enum):
         raise ValueError(f"Unknown fluid phase: {value!r}.")
 
 
-class StreamID(Enum):
+class StreamID(str, Enum):
     """Stream identity"""
 
     Process = "Process"

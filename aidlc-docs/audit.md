@@ -2147,3 +2147,75 @@ This is an intentional clean break for unsupported internal APIs. No deprecation
 **Context**: Generated code is ready for review. Operations remains N/A. Security and Resiliency disabled (N/A); partial PBT compliant.
 
 ---
+
+## Recent Major Changes Review Request
+**Timestamp**: 2026-07-17T04:38:41Z
+**User Input**: "Thoroughly review all the recent major changes for possible issues."
+**AI Response**: "Started a read-only code review of the complete recent change set, covering runtime migration, transport contracts, validation and serialization edge cases, test quality, documentation accuracy, and AI-DLC evidence. No implementation changes are authorized by this review request."
+**Context**: Generated-code review. Security and Resiliency remain disabled (N/A); enabled partial PBT controls will be audited against the implemented tests.
+
+---
+
+## Recent Major Changes Review Findings
+**Timestamp**: 2026-07-17T04:44:10Z
+**User Input**: "No new user input."
+**AI Response**: "Completed the read-only review of commit d29bbee4. Confirmed one high-priority runtime integration defect: StreamID members remain in TargetInput Python-mode dumps, causing canonical workspace bundle JSON persistence to raise TypeError. Confirmed one process artifact defect: the implementation-approval audit block was inserted near the beginning of the pre-existing audit instead of appended chronologically. Runtime direction mappings, transport validators, dump-key drift guards, metadata rejection, no-seed behavior, documentation, and focused/full test evidence were otherwise consistent."
+**Context**: Generated-code review complete with two actionable findings. No implementation code was changed. Security and Resiliency remain disabled (N/A); partial PBT implementation is compliant but does not cover workspace persistence.
+
+---
+
+## Recent Major Changes Fix Recommendations
+**Timestamp**: 2026-07-17T05:47:33Z
+**User Input**: "Suggest fixes"
+**AI Response**: "Recommended a targeted field serializer for the two transport StreamID fields so Python-mode canonical dumps remain JSON-safe without changing in-memory enum typing, plus canonical JSON-safety and workspace save/reload regressions. Recommended preserving audit immutability by appending a correction entry rather than moving or deleting the misplaced historical block. No implementation code was changed."
+**Context**: Generated-code review follow-up. Recommendations only; explicit fix approval is still required before code generation. Security and Resiliency disabled (N/A); partial PBT remains applicable to the serialization regression suite.
+
+---
+
+## Recent Major Changes Compatibility Clarification
+**Timestamp**: 2026-07-17T05:49:39Z
+**User Input**: "No compatilbility needed."
+**AI Response**: "Revised the recommended JSON-safety fix to make StreamID inherit from str and Enum directly. This clean break fixes Python-mode runtime and transport dumps globally without a field serializer, alias, migration layer, or legacy-value support. No implementation code was changed."
+**Context**: Generated-code review follow-up. Recommendation revised; explicit implementation approval is still required. Security and Resiliency disabled (N/A); partial PBT remains applicable to serialization and persistence regressions.
+
+---
+
+## Serialized HEN JSON-Safety Fix Approval
+**Timestamp**: 2026-07-17T05:50:42Z
+**User Input**: "go"
+**AI Response**: "Accepted explicit approval to implement the clean-break StreamID JSON-safety fix, add runtime/canonical/workspace persistence regressions, append an audit-order correction, and run focused and complete verification gates. Created a six-step checkbox plan; Step 1 is complete and Step 2 is active."
+**Context**: CONSTRUCTION - Code Generation Parts 1 and 2. No compatibility aliases, legacy lowercase values, or migration layer will be added. Security and Resiliency disabled (N/A); partial PBT applies to serialization regressions.
+
+---
+
+## Serialized HEN JSON-Safety Regressions
+**Timestamp**: 2026-07-17T05:53:21Z
+**User Input**: "No new user input."
+**AI Response**: "Added three regression tests covering default runtime HEN dump JSON safety, canonical TargetInput JSON safety, and public workspace bundle save/load with a serialized network. All three fail before the fix with the confirmed StreamID TypeError."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 2 complete; Step 3 active. Regression-first evidence confirms the reviewed defect. Security and Resiliency disabled (N/A); partial PBT remains compliant.
+
+---
+
+## Serialized HEN String-Backed StreamID Fix
+**Timestamp**: 2026-07-17T05:54:06Z
+**User Input**: "No new user input."
+**AI Response**: "Changed StreamID to inherit from str and Enum. The three previously failing runtime, canonical-input, and workspace persistence regressions now pass. No serializer, compatibility alias, lowercase legacy value, or migration layer was added."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 3 complete; Step 4 active. Security and Resiliency disabled (N/A); partial PBT remains compliant.
+
+---
+
+## Audit Ordering Correction
+**Timestamp**: 2026-07-17T05:55:17Z
+**User Input**: "No new user input."
+**AI Response**: "Recorded that the Serialized HEN TargetInput Implementation Approval entry timestamped 2026-07-17T04:19:28Z was mistakenly inserted near the beginning of audit.md. Its correct chronological position is after the Post-Implementation Import and Type Fix Completion entry timestamped 2026-07-17T03:20:27Z and before the Serialized HEN Runtime Identity Migration entry. The original record remains untouched to preserve append-only audit integrity. Updated state, release notes, and implementation evidence for the string-backed StreamID fix."
+**Context**: Audit correction appended; no historical audit content was moved, deleted, or rewritten. CONSTRUCTION - Code Generation Part 2, Step 4 complete; Step 5 active. Security and Resiliency disabled (N/A); partial PBT remains compliant.
+
+---
+
+## Serialized HEN JSON-Safety Fix Completion
+**Timestamp**: 2026-07-17T06:00:12Z
+**User Input**: "No new user input."
+**AI Response**: "Completed all six fix-plan steps. The three regression-first failures now pass; the expanded affected gate passes 574 tests with four solver cases deselected; the complete non-solver suite passes 2,093 tests with four solver cases deselected; Ruff lint/format, warning-as-error Sphinx, stale-symbol, and patch-hygiene gates pass. Updated state and Build and Test evidence."
+**Context**: CONSTRUCTION - Code Generation and Build and Test complete; generated code ready for review. Operations N/A. Security and Resiliency disabled (N/A); partial PBT compliant. No compatibility behavior was added.
+
+---
