@@ -2264,3 +2264,267 @@ from OpenPinch import PinchProblem, PinchWorkspace"
 **Context**: CONSTRUCTION - Code Generation and Build and Test complete; generated code ready for review. Operations N/A. Security and Resiliency disabled (N/A); partial PBT N/A. No compatibility layer was added.
 
 ---
+
+## Tutorial Notebook Review Request
+**Timestamp**: 2026-07-17T06:32:45Z
+**User Input**: "Examine the 10 tutorial notebooks are up-to-date, avoid unnecessary imports, and identify syntax that would be verbose or unintuitive to a new user."
+**AI Response**: "Started a read-only review of all ten packaged tutorial notebooks covering current API usage, import necessity, syntax validity, repeated boilerplate, and beginner-facing clarity. Existing notebook outputs will be preserved and findings will be reported before any tutorial edits."
+**Context**: Generated-code review; no implementation authorized. Security and Resiliency disabled (N/A); partial PBT N/A for documentation review.
+
+---
+
+## Tutorial Notebook Review Completion
+**Timestamp**: 2026-07-17T06:46:52Z
+**User Input**: "No new user input."
+**AI Response**: "Reviewed all ten packaged tutorial notebooks. All code cells compile and all imported names are referenced, but only notebooks 03, 08, and 09 execute unchanged against the current package. Identified keyword-only copy_case breakage in notebooks 01, 02, 05, and 06; missing explicit indirect targeting and stale cross-references in notebook 02; unsafe base-target/error handling in notebook 04; removed HEN result-selection methods in notebook 07; and a real weighted-summary failure in notebook 10. Also identified private/deep imports, redundant sample-copy and scalar-resolution boilerplate, repeated target lookups, broad getattr/exception patterns, 38 overlong lines, seven unsorted import blocks, one trailing-whitespace issue, and a pandas FutureWarning. No notebook or application code was changed."
+**Context**: Generated-code review complete; findings prepared for user decision. Security and Resiliency disabled (N/A); partial PBT N/A. Execution used in-memory review-only rewrites to confirm proposed current-API corrections without modifying notebooks.
+
+---
+
+## Package Usability Refactor Planning Request
+**Timestamp**: 2026-07-17T06:57:12Z
+**User Input**: "Develop a plan to refactor the notebooks and codebase to make the application of OpenPinch as a package simple and intuitive."
+**AI Response**: "Started an inception-only planning workflow using the completed ten-notebook execution review and a refreshed scan of the current root facade, target/design accessors, workspace scenario APIs, documentation contract, and notebook tests. No application or notebook implementation will occur before plan approval."
+**Context**: INCEPTION - Workspace Detection and Requirements Analysis. Brownfield Python package; existing reverse-engineering artifacts are structurally stale after the owner-oriented refactor, so current affected surfaces are being resolved from the live package and recent review. Existing extension configuration retained: Security disabled, Resiliency disabled, partial PBT enabled but N/A for planning artifacts.
+
+---
+
+## Package Usability Refactor Requirements and Workflow Planning
+**Timestamp**: 2026-07-17T07:01:34Z
+**User Input**: "No new user input."
+**AI Response**: "Completed comprehensive requirements, user-story assessment, four personas, seven acceptance stories, and a validated five-unit execution plan. The plan keeps the root at exactly PinchProblem and PinchWorkspace, preserves the strict main service, removes ambiguous target/copy/configuration syntax without compatibility aliases, adds application-owned HEN result behavior, rewrites all ten tutorials after supporting APIs are green, and replaces stale substring tests with executable notebook contracts. Please review aidlc-docs/inception/plans/package-usability-refactor-execution-plan.md. You may request changes or explicitly approve it to proceed to Application Design; no implementation has started."
+**Context**: INCEPTION - Requirements Analysis, User Stories, and Workflow Planning complete; explicit approval required. Content validation passed for five Markdown artifacts and six Mermaid edges. Security and Resiliency disabled; partial PBT conditionally applicable during construction.
+
+---
+
+## Package Usability Refactor Plan Amendment
+**Timestamp**: 2026-07-17T07:16:17Z
+**User Input**: "The ambiguous callable `problem.target()` is important because it efficiently cycles through each zone performing pinch analysis and total site. So, it needs to retain something along these lines like:
+`problem.target.all()`"
+**AI Response**: "Accepted the correction that bulk targeting orchestration is an essential public workflow. Began amending the requirements, user stories, and execution plan so the existing efficient zone-tree traversal is retained under the explicit `problem.target.all()` name, while focused targeting methods remain available and the unnamed callable is removed without a compatibility alias."
+**Context**: INCEPTION - Workflow Planning amendment. No implementation authorized. Security and Resiliency disabled; partial PBT conditionally applicable during construction.
+
+---
+
+## Package Usability Refactor Plan Amendment Completion
+**Timestamp**: 2026-07-17T07:18:39Z
+**User Input**: "No new user input."
+**AI Response**: "Amended the requirements, first-solve and Total Site user stories, target user experience, architectural decisions, Unit 1 contracts, Unit 2 implementation work, workspace vocabulary, notebooks 01 and 02, contract tests, and success criteria. The plan now preserves the current one-plan, one-zone-tree configured orchestration as problem.target.all(), retains focused direct() and total_site() workflows, and removes only the unnamed problem.target() callable with no compatibility alias. Content validation and patch hygiene passed. Requested explicit approval or further changes before Application Design."
+**Context**: INCEPTION - Workflow Planning amendment complete; explicit approval required. No implementation has started. Security and Resiliency disabled; partial PBT conditionally applicable during construction.
+
+---
+
+## Package Usability Refactor Indirect Target Amendment
+**Timestamp**: 2026-07-17T07:19:19Z
+**User Input**: "Allow indirect() too"
+**AI Response**: "Accepted problem.target.indirect() as a first-class focused public operation alongside problem.target.total_site(). Began amending the requirements, stories, examples, implementation unit, notebook guidance, and contract tests so both names share one indirect/Total Site implementation and result contract rather than forming a legacy compatibility layer."
+**Context**: INCEPTION - Workflow Planning amendment. No implementation authorized. Security and Resiliency disabled; partial PBT conditionally applicable during construction.
+
+---
+
+## Package Usability Refactor Indirect Target Amendment Completion
+**Timestamp**: 2026-07-17T07:20:10Z
+**User Input**: "No new user input."
+**AI Response**: "Completed the plan amendment for problem.target.indirect(). The requirements now define indirect() and total_site() as deliberate first-class focused names with identical keyword-only signatures, validation, shared dispatch, result recording, return types, and numerical output. Workspace vocabulary, notebook 02 guidance, and contract tests cover both names while prohibiting duplicate execution. The old indirect_heat_integration() name and unnamed problem.target() callable remain removed without compatibility shims. Content validation and patch hygiene passed. Requested explicit approval or further changes before Application Design."
+**Context**: INCEPTION - Workflow Planning amendment complete; explicit approval required. No implementation has started. Security and Resiliency disabled; partial PBT conditionally applicable during construction.
+
+---
+
+## Package Usability Refactor Target Surface Review
+**Timestamp**: 2026-07-17T07:20:38Z
+**User Input**: "Give the list of callables from `problem.target.*`"
+**AI Response**: "Inspected the live target accessor and prepared a comparison between the current callable surface and the proposed clean-break public surface, including the shared indirect()/total_site() contract. No plan or implementation files were changed."
+**Context**: INCEPTION - Workflow Planning review; explicit approval remains pending. Security and Resiliency disabled; partial PBT N/A for this read-only API inventory.
+
+---
+
+## Package Usability Refactor Descriptive Target Naming
+**Timestamp**: 2026-07-17T07:24:50Z
+**User Input**: "direct, indirect, all, area_cost are not specific enough for a new user"
+**AI Response**: "Accepted the naming constraint and began revising the planned beginner-facing surface to use engineering outcomes: pinch_analysis(), total_site(), configured_analyses(), and heat_exchanger_area_cost(). This latest feedback supersedes the proposed direct(), indirect(), all(), and area_cost() shorthands."
+**Context**: INCEPTION - Workflow Planning amendment. No implementation authorized. Security and Resiliency disabled; partial PBT conditionally applicable during construction.
+
+---
+
+## Package Usability Refactor Descriptive Target Naming Completion
+**Timestamp**: 2026-07-17T07:26:38Z
+**User Input**: "No new user input."
+**AI Response**: "Completed the descriptive target naming amendment. The planned public methods are configured_analyses(), pinch_analysis(), total_site(), and heat_exchanger_area_cost(); direct(), indirect(), all(), and area_cost() are explicitly absent. Updated requirements, first-solve and Total Site stories, examples, workspace dispatch vocabulary, Units 1 and 2, notebooks 01 through 03, contract tests, numerical gates, success criteria, and workflow state. Content validation and patch hygiene passed. Requested explicit approval or further naming changes before Application Design."
+**Context**: INCEPTION - Workflow Planning amendment complete; explicit approval required. No implementation has started. Security and Resiliency disabled; partial PBT conditionally applicable during construction.
+
+---
+
+## Package Usability Refactor Target Naming Exploration
+**Timestamp**: 2026-07-17T07:29:55Z
+**User Input**: "The functional use to services by direct(), indirect(), all(), and area_cost() are needed. The names just need improvement. direct_heat_recovery() or direct_heat_integration() are examples. Develop a number of ideas.  "
+**AI Response**: "Confirmed that all four service capabilities remain required and started a terminology-backed naming exploration. Inspected the live accessor, targeting services, target enum labels, Total Site analysis owner, area/cost calculations, configuration selectors, tests, and tutorial language. No API plan or implementation was changed pending selection of a naming family."
+**Context**: INCEPTION - Workflow Planning naming exploration. Security and Resiliency disabled; partial PBT N/A for this read-only naming analysis.
+
+---
+
+## Package Usability Refactor Target Naming Exploration Completion
+**Timestamp**: 2026-07-17T07:31:01Z
+**User Input**: "No new user input."
+**AI Response**: "Developed five coherent naming families for the four retained target services: domain terminology, beginner outcomes, explicit verbs, target outputs, and a recommended hybrid. Recommended direct_heat_integration(), total_site_heat_integration(), configured_analyses(), and heat_exchanger_area_and_cost(). Flagged direct_heat_recovery() as too narrow because the service also produces utility, pinch-temperature, and curve results, and flagged all/full heat integration names as inaccurate because the configured plan can include heat pumps, refrigeration, cogeneration, exergy, and area/cost services. Requested selection before amending the approved-plan candidate."
+**Context**: INCEPTION - Workflow Planning naming exploration complete; plan amendment awaits user selection. Security and Resiliency disabled; partial PBT N/A.
+
+---
+
+## PinchProblem-Owned Targeting Workflow Direction
+**Timestamp**: 2026-07-17T07:40:18Z
+**User Input**: "problem.target.direct_heat_integration()
+problem.target.indirect_heat_integration()
+problem.target.total_site_heat_integration()
+problem.target.configured_analyses()
+problem.target.heat_exchanger_area_and_cost()
+
+problem.target.all_heat_integration() is fine too. I want to start removing the config options related to targeting and have the new workflow revolve completely around PinchProblem. "
+**AI Response**: "Accepted the PinchProblem-owned targeting direction and began an impact analysis before amending the plan. Inspected all ten TARGETING_* selectors, the configured targeting-plan registry, zone dispatch gates, explicit target services, exergy and area/cost feature gates, workspace workflow replay, sample inputs, documentation, and affected tests."
+**Context**: INCEPTION - Requirements and Workflow Planning amendment. No implementation authorized. Security and Resiliency disabled; partial PBT conditionally applicable to explicit traversal and dispatch policies during construction.
+
+---
+
+## PinchProblem-Owned Targeting Workflow Plan Amendment Completion
+**Timestamp**: 2026-07-17T07:44:24Z
+**User Input**: "No new user input."
+**AI Response**: "Amended the requirements, user stories, execution plan, tutorials, workspace design, test strategy, acceptance criteria, and workflow state around PinchProblem-owned targeting. Selected all_heat_integration() instead of configured_analyses() because configuration will no longer select analyses. Retained direct_heat_integration(), indirect_heat_integration(), total_site_heat_integration(), and heat_exchanger_area_and_cost(). Defined all_heat_integration() as direct-plus-indirect heat integration only, using one dependency-aware zone traversal. Planned atomic removal of all ten TARGETING_*_ENABLED fields, config.targeting, configured-plan selection, selector-gated dispatch, hidden exergy and area/cost gates, sample keys, and workspace's hidden problem.target() pre-run. Numerical configuration remains. Content validation and patch hygiene passed; explicit plan approval is still required before Application Design."
+**Context**: INCEPTION - Requirements and Workflow Planning amendment complete. No implementation has started. Security and Resiliency disabled; partial PBT applies during construction to pure traversal and dispatch policies.
+
+---
+
+## Complete PinchProblem Interaction Plan Expansion
+**Timestamp**: 2026-07-17T07:45:14Z
+**User Input**: "Expand the plan to consider all problem.* and how the user should interact.
+
+Config will still be used when explicit args to problem.*.*(kwargs) are not given by the user. However, config will no longer store which core methods to run."
+**AI Response**: "Accepted the complete PinchProblem interaction scope and the precedence rule that explicit method kwargs override stored configuration while omitted kwargs fall back to configuration. Began inventorying the live PinchProblem constructor, loading and validation methods, target/design/plot/component accessors, period execution, results/reporting/export methods, configuration mutation, serialization, dashboard, and workspace interactions."
+**Context**: INCEPTION - Requirements and Workflow Planning expansion. No implementation authorized. Security and Resiliency disabled; partial PBT conditionally applicable to option precedence, traversal, and replay policies during construction.
+
+---
+
+## Complete PinchProblem Interaction Plan Expansion Completion
+**Timestamp**: 2026-07-17T07:54:58Z
+**User Input**: "No new user input."
+**AI Response**: "Expanded requirements, user stories, the execution plan, tests, acceptance criteria, and workflow state to cover the complete PinchProblem interaction model. Inventoried lifecycle/input, config, targeting, periods, components, design, results, reports, plots, exports, dashboard, serialization, comparison, and advanced inspection. Defined named kwargs > advanced options > stored config > library defaults precedence with an omitted-value sentinel, ephemeral overrides, and resolved provenance. Core workflow selectors remain explicit and are never config fallback fields; HENS_METHOD_SEQUENCE joins TARGETING_* selectors for removal. Added explicit state transitions, cache invalidation, no-hidden-execution rules, a complete planned public surface inventory, a validated user-journey Mermaid diagram and text alternative, notebook changes, drift guards, and property/contract tests. Content validation and patch hygiene passed. Requested explicit approval before Application Design."
+**Context**: INCEPTION - Comprehensive Requirements and Workflow Planning expansion complete; explicit approval required. No implementation has started. Security and Resiliency disabled; partial PBT applies during construction to precedence, traversal, state invalidation, and replay policies.
+
+---
+
+## Process-Engineer Persona and Tutorial Coverage Revision
+**Timestamp**: 2026-07-17T08:11:02Z
+**User Input**: "US-6 and 7 are not needed. `pinch_analysis_service` will soon be retired. Only process engineers are the persona.
+
+Ideally, the tutorials cover all core and advanced methods under target, design, plot, etc. "
+**AI Response**: "Accepted the single process-engineer persona, removal of integration and maintainer user stories, and retirement direction for pinch_analysis_service. Began revising persona, requirements, stories, workflow, notebook 09, documentation, tests, and acceptance criteria, and mapping every core and advanced PinchProblem method to at least one tutorial."
+**Context**: INCEPTION - Requirements, User Stories, and Workflow Planning revision. No implementation authorized. Security and Resiliency disabled; partial PBT conditionally applicable during construction.
+
+---
+## Tutorial Scope and Advanced Analysis Revision
+**Timestamp**: 2026-07-17T08:13:00Z
+**User Input**: "Expand the number of tutorials as needed. In addition, multi period analysis for heat integration, heat pumps, cogeneration, and synthesis should be demonstrated. Multi-segmented streams should also come into the tutorials."
+**AI Response**: "Accepted an expandable tutorial suite and began revising requirements, stories, and workflow planning to provide executable coverage of multiperiod heat integration, heat pumps, cogeneration, HEN synthesis, and multi-segment stream modelling."
+**Context**: INCEPTION - Requirements, User Stories, and Workflow Planning revision. No implementation authorized. Security and Resiliency disabled; partial PBT conditionally applicable during construction.
+
+---
+
+## Workflow Planning Revision - Approval Prompt
+**Timestamp**: 2026-07-17T08:20:58Z
+**AI Prompt**: "The revised requirements, stories, and workflow plan are complete. Please review package-usability-refactor-workflow-approval-questions.md and enter A, B, or X after the [Answer]: tag, then tell me when it is complete."
+**Status**: Awaiting explicit approval
+**Context**: INCEPTION - Workflow Planning. The plan uses one process-engineer persona, removes US-6 and US-7, retires pinch_analysis_service from the supported experience, and expands to sixteen capability-mapped tutorials including multiperiod heat integration, heat pumps, cogeneration, and HEN synthesis plus multi-segment streams. Application Design remains blocked pending approval.
+
+---
+
+## Live Feature-to-Tutorial Coverage Map Revision
+**Timestamp**: 2026-07-17T08:21:58Z
+**User Input**: "Create a map of features/functionality in PinchProblem and PinchWorkspace compared to the tutorial coverage. Add to the exisiting tutorials or expand to new tutorials as required to reach 100% coverage."
+**AI Response**: "Accepted the requested workflow-plan revision. Began inventorying the live PinchProblem and PinchWorkspace surfaces and executable notebook usage to create a feature-to-tutorial manifest, classify supported versus retiring/internal functionality, and assign every supported coverage gap to an existing or new tutorial."
+**Context**: INCEPTION - Workflow Planning change request. Explicit approval is deferred until the revised coverage map and tutorial allocation are complete; no application or notebook implementation has started.
+
+---
+
+## Live Feature-to-Tutorial Coverage Map - Completion and Approval Prompt
+**Timestamp**: 2026-07-17T08:34:38Z
+**AI Prompt**: "The live feature-to-tutorial map and revised workflow plan are complete. Please review pinchproblem-workspace-tutorial-coverage-map.md and package-usability-refactor-execution-plan.md, enter A, B, or X after the [Answer]: tag in package-usability-refactor-workflow-approval-questions.md, then tell me when it is complete."
+**AI Response**: "Mapped 66 live PinchProblem-accessible callable/property members, 37 PinchWorkspace members, and seven supported process-MVR return-object interactions; compared them with all ten existing notebooks; classified covered, partial, missing, replace, and retire dispositions; expanded the target suite to seventeen tutorials; and added exact canonical operation and semantic-mode coverage gates requiring 100 percent executable coverage. Updated requirements, stories, workflow state, and approval materials. No implementation was performed."
+**Status**: Awaiting explicit approval
+**Context**: INCEPTION - Workflow Planning revision complete. Security and Resiliency remain disabled; Partial PBT applies during construction to public-inventory drift, period replay, multi-segment invariants, and deterministic tutorial-manifest resolution. Application Design remains blocked pending approval.
+
+---
+
+## Read the Docs Coverage Map Revision
+**Timestamp**: 2026-07-17T08:35:22Z
+**User Input**: "Include the coverage map in RTDs"
+**AI Response**: "Accepted the documentation requirement and began revising the workflow so the public Read the Docs site publishes the canonical feature-to-tutorial coverage map from the same manifest enforced by CI, with navigation from the tutorial index and PinchProblem/PinchWorkspace API pages."
+**Context**: INCEPTION - Workflow Planning change request. No Sphinx source or application implementation has started; explicit plan approval remains required.
+
+---
+
+## Read the Docs Coverage Map Revision - Completion and Approval Prompt
+**Timestamp**: 2026-07-17T08:37:18Z
+**AI Prompt**: "The RTD publication requirement is incorporated. Please review the updated coverage map and execution plan, enter A, B, or X after the [Answer]: tag in package-usability-refactor-workflow-approval-questions.md, then tell me when it is complete."
+**AI Response**: "Defined docs/examples/tutorial-coverage-map.rst as the public coverage page and docs/_data/tutorial-coverage.csv as the single canonical table source shared by Sphinx and CI. Added navigation from the Examples index, notebook series, PinchProblem API, PinchWorkspace API, and capability matrix; required tutorial/API cross-links, denominator and execution-profile explanations, and warning-as-error failures for stale operations, missing tutorial owners, unsupported claims, and broken links. Updated requirements, user-story acceptance, execution plan, state, and approval summary. No implementation was performed."
+**Status**: Awaiting explicit approval
+**Context**: INCEPTION - Workflow Planning revision complete. Security and Resiliency remain disabled; Partial PBT remains applicable during construction. Application Design remains blocked pending approval.
+
+---
+
+## Workflow Argument Simplification Revision
+**Timestamp**: 2026-07-17T09:02:00Z
+**User Input**: "Avoid the need for the user to know str answer.
+
+Example:
+
+heat_pump = problem.target.heat_pump(
+    placement=\"direct\",
+    cycle=\"cascade_carnot\",
+    load_fraction=0.25,
+    condensers=1,
+    evaporators=1,
+)
+
+could be:
+
+problem.target.heat_pump(
+    is_utility_heat_pump: bool, # True = indirect heat pump
+    is_simulated_cycle: bool, # Coolprop simulated if true, otherwise carnot
+    is_cascade_cycle: bool, # Cascade simulation with/without MVR if true, otherwise parallel heat pump
+    has_mvr: bool, # only applicable if is_simulated_cycle and is_cascade_cycle
+    load_fraction=0.25,
+    condensers=1,
+    evaporators=1,
+)
+
+Alternately, splitting off brayton_heat_pump and mvr_heat_pump as specialised callables might be better.
+
+Examine the args for all the core and advanced workflows to simplify the user experience."
+**AI Response**: "Accepted a complete workflow-signature review. Began mapping every current target, design, component, workspace, plot, result, and output argument to its engineering meaning, with a preference for dedicated callables and true binary flags over undocumented string selectors or invalid boolean combinations."
+**Context**: INCEPTION - Requirements and Workflow Planning change request. No API implementation has started; explicit approval is deferred until the argument-simplification map is complete.
+
+---
+
+## Workflow Argument Simplification Revision - Completion and Approval Prompt
+**Timestamp**: 2026-07-17T09:14:26Z
+**AI Prompt**: "The complete argument review is incorporated. Please review the workflow argument map and revised execution plan, enter A, B, or X after the [Answer]: tag in package-usability-refactor-workflow-approval-questions.md, then tell me when it is complete."
+**AI Response**: "Reviewed every core and advanced PinchProblem and PinchWorkspace workflow argument. Chose specialized Carnot, vapour-compression, Brayton, MVR, cogeneration, HEN, and mirrored all-period callables instead of OpenPinch-owned string selectors or dependent boolean matrices. Retained booleans only for independent utility-placement, topology, aggregation, and presentation decisions; replaced load-mode strings with mutually exclusive named values; replaced workspace workflow dispatch with a batch accessor; and replaced plot-type export strings with plot method references. Expanded the tutorial plan to eighteen notebooks and updated requirements, user stories, feature coverage, RTD coverage obligations, execution plan, state, and approval summary. Validated Markdown fences, tables, tabs, and patch hygiene. No implementation was performed."
+**Status**: Awaiting explicit approval
+**Context**: INCEPTION - Workflow Planning revision complete. Security and Resiliency remain disabled; Partial PBT remains applicable during construction. Application Design remains blocked pending approval.
+
+---
+
+## Carnot HPR Naming Revision
+**Timestamp**: 2026-07-17T09:16:13Z
+**User Input**: "Change problem.target.heat_pump to problem.target.carnot_heat_pump"
+**AI Response**: "Accepted the explicit Carnot method name and began applying the same model-explicit naming to the symmetric refrigeration method, all-period mirrors, tutorials, requirements, coverage, execution plan, state, and approval materials. No application implementation has started."
+**Context**: INCEPTION - Requirements and Workflow Planning change request. Explicit approval remains deferred until the naming revision is complete.
+
+---
+
+## Carnot HPR Naming Revision - Completion and Approval Prompt
+**Timestamp**: 2026-07-17T09:17:48Z
+**AI Prompt**: "The Carnot naming revision is incorporated. Please review the workflow argument map and revised execution plan, enter A, B, or X after the [Answer]: tag in package-usability-refactor-workflow-approval-questions.md, then tell me when it is complete."
+**AI Response**: "Changed the planned generic heat-pump spelling to `problem.target.carnot_heat_pump()` and applied the symmetric `problem.target.carnot_refrigeration()` name. Updated focused and all-period examples, requirements, user-story acceptance, tutorial coverage, execution checklists, workflow state, and approval summary. Verified the new names across planning artifacts, validated Markdown fences and tabs, and passed patch-hygiene checks. No implementation was performed."
+**Status**: Awaiting explicit approval
+**Context**: INCEPTION - Workflow Planning revision complete. Security and Resiliency remain disabled; Partial PBT remains applicable during construction. Application Design remains blocked pending approval.
+
+---

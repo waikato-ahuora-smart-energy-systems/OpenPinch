@@ -506,6 +506,63 @@
 - [x] OPERATIONS - N/A; no deployment work requested.
 - **Current stage**: Code Generation and Build and Test complete; generated code
   ready for review.
+
+## Package Usability Refactor Planning Progress
+
+- [x] INCEPTION - Workspace Detection resumed from the current brownfield
+  package and ten-notebook execution review.
+- [x] INCEPTION - Comprehensive Requirements Analysis.
+- [x] INCEPTION - User Stories assessment, personas, and acceptance stories.
+- [x] INCEPTION - Workflow Planning and five-unit decomposition.
+- [ ] INCEPTION - Plan approval.
+- [ ] INCEPTION - Application Design for canonical target, workspace, and HEN
+  application-view contracts.
+- [ ] INCEPTION - Units Generation approval.
+- [ ] CONSTRUCTION - Functional Design and Code Generation per approved unit.
+- [ ] CONSTRUCTION - Build and Test.
+- [ ] OPERATIONS - N/A; no deployment work requested.
+- **Current stage**: INCEPTION - Workflow Planning complete; awaiting explicit
+  plan approval. Targeting selection now belongs to explicit
+  `PinchProblem.target.*` methods. The plan uses `all_heat_integration()` for
+  bulk direct-plus-Total-Site traversal, retains focused direct and indirect
+  heat-integration methods, and removes all `TARGETING_*_ENABLED` selectors.
+  The interaction contract now covers every public `problem.*` surface with
+  `named kwargs > options > stored config > defaults` precedence, explicit state
+  invalidation, and no hidden execution from read/report/plot/export methods.
+  Core workflow selectors remain explicit and `HENS_METHOD_SEQUENCE` is removed
+  rather than used as configuration fallback. A complete argument review now
+  removes OpenPinch-owned closed string answers from normal workflows:
+  specialized callables select `carnot_heat_pump()`,
+  `carnot_refrigeration()`, vapour-compression, Brayton, MVR,
+  cogeneration, HEN, and multiperiod algorithms; booleans express only genuine
+  placement/topology decisions; and named load values replace load-mode
+  strings. Workspace case batches and plot exports likewise use mirrored
+  accessors or method references instead of workflow or graph-type strings.
+  The tutorial plan now expands to eighteen focused notebooks for one
+  process-engineer persona, with explicit
+  multiperiod heat-integration, heat-pump, cogeneration, and HEN-synthesis
+  paths, plus multi-segment stream modelling and complete public-method
+  coverage. A live-to-canonical map now accounts for every `PinchProblem`,
+  `PinchWorkspace`, target, component, design, selected-network, and plot
+  operation; retiring symbols remain tracked until removal tests pass. The same
+  canonical CSV manifest will render a Read the Docs coverage page linked from
+  the tutorial index, notebook series, both workflow API pages, and capability
+  matrix.
+- **Requirements**:
+  `aidlc-docs/inception/requirements/package-usability-refactor-requirements.md`.
+- **User stories**:
+  `aidlc-docs/inception/user-stories/package-usability-refactor-stories.md`.
+- **Execution plan**:
+  `aidlc-docs/inception/plans/package-usability-refactor-execution-plan.md`.
+- **Feature-to-tutorial map**:
+  `aidlc-docs/inception/requirements/pinchproblem-workspace-tutorial-coverage-map.md`.
+- **Workflow argument map**:
+  `aidlc-docs/inception/requirements/workflow-argument-simplification-map.md`.
+- **Compatibility policy**: Clean break for stateful workflow methods; retire
+  `pinch_analysis_service` from the supported package experience and preserve
+  the exact two-class root surface.
+- **Extensions**: Security and Resiliency disabled. Partial PBT applies during
+  construction to pure aggregation and normalization policies.
 - **Plan**:
   `aidlc-docs/construction/plans/root-workflow-exports-code-generation-plan.md`.
 - **Compatibility policy**: No legacy alias or compatibility layer was added;
