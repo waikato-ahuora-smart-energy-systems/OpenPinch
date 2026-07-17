@@ -1,18 +1,18 @@
-Main Contract and Application Internals
+Main Contract and Application Workflows
 =======================================
 
-Only :func:`OpenPinch.main.pinch_analysis_service` is a protected external
-Python contract. The convenience coordinators and lower-level orchestration
-helpers below are unsupported contributor references.
+The public workflow coordinators are imported from :mod:`OpenPinch`. The
+mapping-in/result-out service remains the strict protected integration
+contract. Lower-level orchestration helpers below are contributor references.
 
 Recommended Usage
 -----------------
 
-For external code, pass a request mapping to
+For stateful workflow code, import ``PinchProblem`` or ``PinchWorkspace`` from
+``OpenPinch``. For service-style code, pass a request mapping to
 :func:`~OpenPinch.main.pinch_analysis_service`.
 
-For repository development where internal churn is acceptable, load a problem
-file into :class:`~OpenPinch.application.problem.PinchProblem`, call
+Load a problem file into :class:`~OpenPinch.application.problem.PinchProblem`, call
 :meth:`~OpenPinch.application.problem.PinchProblem.target`, and inspect or
 export the cached results. Use
 :class:`~OpenPinch.application.workspace.PinchWorkspace` when the study needs
@@ -46,14 +46,18 @@ Service-Layer Example
 
    result = pinch_analysis_service(input_data, project_name="Example")
 
-Concrete Owner Imports
-----------------------
+Public and Concrete Owner Imports
+---------------------------------
 
-The :mod:`OpenPinch` package is an import-free marker. Import the protected
-service from :mod:`OpenPinch.main` and advanced objects from their concrete
-application, contract, domain, analysis, adapter, or presentation owners.
+Import the two public workflow coordinators from :mod:`OpenPinch`, the
+protected service from :mod:`OpenPinch.main`, and advanced objects from their
+concrete contract, domain, analysis, adapter, or presentation owners.
 
-Common advanced imports include:
+.. code-block:: python
+
+   from OpenPinch import PinchProblem, PinchWorkspace
+
+Common entry points and advanced imports include:
 
 - :class:`~OpenPinch.application.problem.PinchProblem`
 - :class:`~OpenPinch.application.workspace.PinchWorkspace`

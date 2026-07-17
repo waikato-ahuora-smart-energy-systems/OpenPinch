@@ -7,11 +7,11 @@ post-processing, cogeneration targeting, and heat exchanger network synthesis.
 It is built for engineers and researchers who need reproducible thermal
 targeting workflows in scripts, notebooks, and applications.
 
-OpenPinch currently exposes one compatibility-protected Python contract:
-:func:`OpenPinch.main.pinch_analysis_service`. The package root is an
-import-free marker. Concrete owner modules remain available for repository
-development and advanced experiments, but their imports may change before a
-future contract expansion is explicitly selected.
+OpenPinch exposes ``PinchProblem`` and ``PinchWorkspace`` as high-level package
+root workflows. The strict mapping-in/result-out contract remains
+:func:`OpenPinch.main.pinch_analysis_service`. Concrete owner modules remain
+available for repository development and advanced experiments, but other deep
+imports may change before a future contract expansion is explicitly selected.
 
 The published CLI is intentionally narrow: ``openpinch notebook`` copies the
 packaged notebook series, while solving, validation, graph export, Excel
@@ -53,7 +53,8 @@ What OpenPinch Covers
 The documentation is organized as a manual first and an internal reference second:
 overview pages help you choose a workflow, fundamentals explain the method,
 guides provide runnable tasks, examples map packaged assets to decisions, and
-API pages distinguish the one external contract from unsupported internals.
+API pages distinguish the selected public workflows and service contract from
+unsupported internals.
 
 .. toctree::
    :maxdepth: 2

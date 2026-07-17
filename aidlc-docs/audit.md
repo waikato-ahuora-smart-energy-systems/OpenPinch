@@ -2219,3 +2219,48 @@ This is an intentional clean break for unsupported internal APIs. No deprecation
 **Context**: CONSTRUCTION - Code Generation and Build and Test complete; generated code ready for review. Operations N/A. Security and Resiliency disabled (N/A); partial PBT compliant. No compatibility behavior was added.
 
 ---
+
+## Root Workflow Exports Approval
+**Timestamp**: 2026-07-17T06:01:24Z
+**User Input**: "from OpenPinch.application.problem import PinchProblem
+from OpenPinch.application.workspace import PinchWorkspace
+
+These should be
+
+from OpenPinch import PinchProblem, PinchWorkspace"
+**AI Response**: "Accepted the explicit public import-contract change. Recorded minimal requirements and a user story, inspected the marker-root, optional-import, notebook, test, and documentation impact, and created a six-step code-generation checklist. Step 1 is complete and Step 2 is active."
+**Context**: INCEPTION approved by explicit request; CONSTRUCTION - Code Generation active. The package root will export exactly PinchProblem and PinchWorkspace while concrete modules remain implementation owners. Security and Resiliency disabled (N/A); partial PBT N/A because this is an import-surface change.
+
+---
+
+## Root Workflow Export Regressions
+**Timestamp**: 2026-07-17T06:04:06Z
+**User Input**: "No new user input."
+**AI Response**: "Added regression coverage for the exact root export list and owner identity, fresh-process imports with optional dependencies blocked, and packaged notebook import conventions. The three focused tests fail before implementation because the root has no exports and the notebooks still use concrete application-module imports."
+**Context**: Root workflow exports code generation; plan Step 2 completed and Step 3 started.
+
+---
+
+## Root Workflow Exports Implementation
+**Timestamp**: 2026-07-17T06:05:12Z
+**User Input**: "No new user input."
+**AI Response**: "Exported PinchProblem and PinchWorkspace from the package root with an exact two-name __all__. Owner identity and all fresh-process cold-import cases pass, including the root import with optional solver, plotting, dashboard, spreadsheet, and heat-pump packages blocked."
+**Context**: Root workflow exports code generation; plan Step 3 completed and Step 4 started.
+
+---
+
+## Root Workflow Import Migration
+**Timestamp**: 2026-07-17T06:10:13Z
+**User Input**: "No new user input."
+**AI Response**: "Migrated all curated user-facing documentation and all ten packaged notebook source cells to import PinchProblem and PinchWorkspace from OpenPinch. Updated support language to distinguish the public package-root workflows from unsupported concrete internals, preserved the existing executed outputs in notebook 01, and passed the focused documentation and notebook contract checks."
+**Context**: Root workflow exports code generation; plan Step 4 completed and Step 5 started.
+
+---
+
+## Root Workflow Exports Completion
+**Timestamp**: 2026-07-17T06:19:41Z
+**User Input**: "No new user input."
+**AI Response**: "Completed the six-step root workflow export plan. The package exports exactly PinchProblem and PinchWorkspace with concrete owner identity; user documentation and all packaged notebook source imports use the root surface. The affected complete gate passes 2,092 non-solver tests with four solver cases and the pre-existing notebook-output cleanliness assertion deselected. Ruff, warning-as-error Sphinx, notebook JSON parsing, stale-contract search, cold imports, and patch hygiene pass. The isolated cleanliness assertion still reports execution counts and outputs already present in notebook 01; those local results were preserved."
+**Context**: CONSTRUCTION - Code Generation and Build and Test complete; generated code ready for review. Operations N/A. Security and Resiliency disabled (N/A); partial PBT N/A. No compatibility layer was added.
+
+---

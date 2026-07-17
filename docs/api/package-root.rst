@@ -1,15 +1,30 @@
 External Python Contract
 ========================
 
-OpenPinch currently compatibility-protects exactly one Python import:
+OpenPinch exposes the two high-level workflow coordinators from the package
+root:
+
+.. code-block:: python
+
+   from OpenPinch import PinchProblem, PinchWorkspace
+
+The strict mapping-in/result-out service remains available separately:
 
 .. code-block:: python
 
    from OpenPinch.main import pinch_analysis_service
 
-The package root is an import-free marker. It has no ``__all__`` declaration
-and does not re-export workflow classes, schemas, enums, resources, or the main
-service.
+The package root ``__all__`` contains exactly ``PinchProblem`` and
+``PinchWorkspace``. Schemas, enums, resources, lower-level services, and
+``pinch_analysis_service`` stay with their concrete owners.
+
+Workflow Classes
+----------------
+
+Use ``PinchProblem`` for a single live study and ``PinchWorkspace`` for named
+baseline and variant cases. Their implementation owners remain
+``OpenPinch.application.problem`` and ``OpenPinch.application.workspace``;
+application code should use the shorter root imports shown above.
 
 Service Function
 ----------------
@@ -62,14 +77,15 @@ Example
 
    print(result.model_dump(mode="json"))
 
-Unsupported Internal Owners
----------------------------
+Internal Owners
+---------------
 
 Concrete modules under ``application``, ``analysis``, ``domain``,
 ``contracts``, ``adapters``, ``optimisation``, and ``presentation`` are
-documented for contributors and advanced experiments. They are not external
-compatibility contracts. No deep import, root alias, package barrel, or Python
-pickle path is preserved across releases.
+documented for contributors and advanced experiments. Apart from the two
+selected root workflow exports, they are not external compatibility contracts.
+No other deep import, package barrel, or Python pickle path is preserved across
+releases.
 
 See :doc:`../developer/architecture` for the internal dependency map and
 :doc:`../overview/support-and-stability` for the support policy.

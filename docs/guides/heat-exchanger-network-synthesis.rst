@@ -37,7 +37,7 @@ Runnable Workflow
 
 .. code-block:: python
 
-   from OpenPinch.application.problem import PinchProblem
+   from OpenPinch import PinchProblem
    from OpenPinch.domain.enums import HENDesignMethod
    from OpenPinch.presentation.network_grid.service import build_grid_diagram
 

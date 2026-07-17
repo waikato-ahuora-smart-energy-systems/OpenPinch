@@ -1,12 +1,12 @@
-PinchProblem Internal API
-=========================
+PinchProblem API
+================
 
-:class:`OpenPinch.application.problem.PinchProblem` is an unsupported internal
-single-case convenience object. Its import and methods may change without a
-compatibility facade. Use :func:`OpenPinch.main.pinch_analysis_service` for
-external integrations. Internally, it owns the source inputs, validated
+``PinchProblem`` is the high-level single-case workflow object. Import it with
+``from OpenPinch import PinchProblem``. It owns the source inputs, validated
 problem data, prepared zone tree, solved targets, graph exports, multiperiod
-reruns, and several advanced post-processing helpers.
+reruns, and several advanced post-processing helpers. Use
+:func:`OpenPinch.main.pinch_analysis_service` when an integration needs a
+strict mapping-in/result-out boundary instead of a stateful workflow.
 
 When To Use It
 --------------

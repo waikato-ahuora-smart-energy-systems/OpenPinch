@@ -4,8 +4,8 @@ First Solve with Python
 Purpose
 -------
 
-Call :func:`OpenPinch.main.pinch_analysis_service`, the sole current external
-Python contract, and inspect its structured result.
+Call the strict :func:`OpenPinch.main.pinch_analysis_service` integration
+contract and inspect its structured result.
 
 Prerequisites
 -------------

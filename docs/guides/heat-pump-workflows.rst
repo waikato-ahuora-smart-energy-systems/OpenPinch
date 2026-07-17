@@ -35,7 +35,7 @@ Direct or indirect HPR targeting:
 
 .. code-block:: python
 
-   from OpenPinch.application.problem import PinchProblem
+   from OpenPinch import PinchProblem
    from OpenPinch.domain.enums import HPRcycle
 
    problem = PinchProblem("chocolate_factory.json")

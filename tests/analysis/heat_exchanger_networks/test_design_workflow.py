@@ -60,7 +60,7 @@ class _IterableDesignOptions:
 
 
 def test_hen_public_exports_match_intended_snapshot() -> None:
-    assert not hasattr(OpenPinch, "__all__")
+    assert OpenPinch.__all__ == ["PinchProblem", "PinchWorkspace"]
     assert not hasattr(synthesis_package, "__all__")
     assert HeatExchanger.__module__ == "OpenPinch.domain.heat_exchanger"
     assert HeatExchangerNetwork.__module__ == "OpenPinch.domain.heat_exchanger_network"

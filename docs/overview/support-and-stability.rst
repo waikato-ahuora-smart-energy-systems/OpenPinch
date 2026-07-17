@@ -1,24 +1,30 @@
 Support and Stability
 =====================
 
-OpenPinch 0.5.0 intentionally has one compatibility-protected Python contract.
-This narrow promise lets the internal package architecture improve without
-maintaining forwarding modules or import aliases.
+OpenPinch intentionally keeps a narrow public Python surface so that the
+internal package architecture can improve without broad forwarding modules or
+import aliases.
 
 Stable
 ------
 
-The supported Python call is:
+The supported high-level workflow imports are:
+
+.. code-block:: python
+
+   from OpenPinch import PinchProblem, PinchWorkspace
+
+For strict mapping-in/result-out integrations, use:
 
 .. code-block:: python
 
    from OpenPinch.main import pinch_analysis_service
 
-Its signature, validation order, exceptions, return shape, serialization,
-ordering, and numerical behaviour are protected by the end-to-end contract
-suite. The request and response wire structures used by this function are also
-protected. The root ``OpenPinch`` package is an import-free marker and exports
-no user objects.
+The service signature, validation order, exceptions, return shape,
+serialization, ordering, and numerical behaviour are protected by the
+end-to-end contract suite. The request and response wire structures used by
+this function are also protected. The package root exports exactly the two
+workflow classes; other objects remain with concrete owner modules.
 
 Advanced
 --------

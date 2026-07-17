@@ -490,3 +490,31 @@
   patch-hygiene gates pass.
 - **Current stage**: Code Generation and Build and Test complete; generated-code
   review requested. Operations is N/A.
+
+## Root Workflow Exports Progress
+
+- [x] INCEPTION - Minimal requirements and user story recorded from the explicit
+  import-contract request.
+- [x] CONSTRUCTION - Exact root export and cold-import regressions added.
+- [x] CONSTRUCTION - `PinchProblem` and `PinchWorkspace` exported from
+  `OpenPinch` with concrete owner identity preserved.
+- [x] CONSTRUCTION - Curated documentation and all packaged notebooks migrated
+  to package-root workflow imports.
+- [x] CONSTRUCTION - Complete affected Build and Test gates and evidence; the
+  pre-existing executed-output state of notebook 01 remains explicitly
+  isolated from the source import change.
+- [x] OPERATIONS - N/A; no deployment work requested.
+- **Current stage**: Code Generation and Build and Test complete; generated code
+  ready for review.
+- **Plan**:
+  `aidlc-docs/construction/plans/root-workflow-exports-code-generation-plan.md`.
+- **Compatibility policy**: No legacy alias or compatibility layer was added;
+  the requested package-root imports are the canonical workflow surface.
+- **Extensions**: Security and Resiliency disabled (N/A); partial PBT N/A
+  because this change affects import ownership rather than numerical logic.
+- **Verification**: 2,092 non-solver tests passed with four solver tests and the
+  pre-existing notebook-output cleanliness assertion deselected. The isolated
+  cleanliness assertion still fails because notebook 01 already contains
+  execution counts and outputs; those local results were preserved. Root
+  identity/cold imports, curated docs/notebooks, Ruff, warning-as-error Sphinx,
+  notebook JSON parsing, stale-contract search, and patch hygiene pass.

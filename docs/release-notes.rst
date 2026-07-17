@@ -7,12 +7,13 @@ Unreleased
 0.5.0 architecture clean break
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- ``OpenPinch.main.pinch_analysis_service`` is the sole current
-  compatibility-protected Python contract. Its signature, validation order,
-  return structure, serialization, ordering, exceptions, and numerical
-  behaviour are unchanged.
-- The package root is now an import-free marker. It no longer exports workflow
-  classes, schemas, enums, resource helpers, or the main service.
+- ``OpenPinch.main.pinch_analysis_service`` remains the strict
+  mapping-in/result-out contract. Its signature, validation order, return
+  structure, serialization, ordering, exceptions, and numerical behaviour are
+  unchanged.
+- The package root exports exactly ``PinchProblem`` and ``PinchWorkspace`` as
+  the high-level workflow entry points. Schemas, enums, resource helpers, and
+  the main service remain with their concrete owners.
 - Business state, wire contracts, reusable optimisation, orchestration,
   engineering analysis, infrastructure adapters, and presentation now have
   explicit ``domain``, ``contracts``, ``optimisation``, ``application``,
@@ -89,8 +90,9 @@ Private helper ownership
   owners. The compatibility-only ``methods``, ``tasks``, and ``results`` modules
   and the synthesis package re-export barrel are removed. Import concrete owner
   modules instead; old barrel-qualified pickle paths are unsupported.
-- The package root and owner package ``__init__`` files are import-free markers.
-  The retired ``classes``, ``lib``, ``services``, ``utils``, and
+- Owner package ``__init__`` files remain import-free markers. The package root
+  is the deliberate two-class workflow surface. The retired ``classes``,
+  ``lib``, ``services``, ``utils``, and
   ``streamlit_webviewer`` package paths have no compatibility facades; advanced
   callers import concrete owner modules.
 - Process-MVR records, multiperiod HPR period cases, dashboard graph state,

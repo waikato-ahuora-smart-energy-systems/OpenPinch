@@ -426,3 +426,25 @@ N/A because no deployment or infrastructure work was requested.
 - Security and Resiliency: N/A, disabled.
 - Partial PBT: compliant; the existing seeded serialized-network property ran
   in both the focused and complete suites.
+
+## Root Workflow Exports Evidence
+
+- Exact package-root contract: `OpenPinch.__all__` is
+  `["PinchProblem", "PinchWorkspace"]`, and both names are identical to their
+  concrete application-owner classes.
+- Cold imports: all 10 fresh-process layer cases pass with optional solver,
+  plotting, dashboard, spreadsheet, and heat-pump packages blocked.
+- Curated docs and packaged notebook import/support contracts: passed.
+- Complete affected non-solver suite: 2,092 passed; four solver-marked tests and
+  the pre-existing notebook-output cleanliness assertion deselected.
+- Isolated local-state check: the notebook-output cleanliness assertion fails
+  because notebook 01 already contains execution counts and outputs. Those
+  unrelated results were preserved; all notebook JSON files parse successfully.
+- Ruff lint: passed.
+- Ruff format: all 460 Python files formatted.
+- Documentation: warning-as-error Sphinx HTML build passed for 60 sources.
+- Stale-contract search: no curated documentation or packaged notebook uses the
+  concrete application import or describes the root as import-free.
+- Patch hygiene: passed.
+- Security and Resiliency: N/A, disabled.
+- Partial PBT: N/A; no numerical algorithm or generated invariant changed.

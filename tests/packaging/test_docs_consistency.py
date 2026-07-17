@@ -175,24 +175,22 @@ def test_notebook_docs_keep_user_paths_and_numbered_order():
             last_position = position
 
 
-def test_main_contract_is_covered_by_curated_api_docs():
+def test_public_python_surface_is_covered_by_curated_api_docs():
     combined_api = _docs_text(sorted(API_ROOT.glob("*.rst")))
     contract_page = _read(API_ROOT / "package-root.rst")
 
-    assert not hasattr(OpenPinch, "__all__")
+    assert OpenPinch.__all__ == ["PinchProblem", "PinchWorkspace"]
     assert "OpenPinch.main.pinch_analysis_service" in combined_api
-    assert "exactly one Python import" in contract_page
-    assert "package root is an import-free marker" in contract_page
-    assert "No deep import, root alias, package barrel" in contract_page
+    assert "from OpenPinch import PinchProblem, PinchWorkspace" in contract_page
+    assert "contains exactly ``PinchProblem`` and" in contract_page
+    assert "No other deep import, package barrel" in contract_page
 
 
-def test_advanced_owner_guides_are_explicitly_unsupported():
-    for path in sorted(GUIDES_ROOT.glob("*.rst")):
-        text = _read(path)
-        if "from OpenPinch.application" not in text:
-            continue
-        assert "unsupported" in text.lower(), path
-        assert "OpenPinch.main.pinch_analysis_service" in text, path
+def test_workflow_guides_do_not_recommend_concrete_application_imports():
+    combined_guides = _docs_text(sorted(GUIDES_ROOT.glob("*.rst")))
+
+    assert "from OpenPinch.application.problem import" not in combined_guides
+    assert "from OpenPinch.application.workspace import" not in combined_guides
 
 
 def test_architecture_docs_define_owner_directions_and_shared_optimisation():

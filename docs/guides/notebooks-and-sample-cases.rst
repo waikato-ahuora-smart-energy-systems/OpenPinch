@@ -56,8 +56,7 @@ Load a packaged sample case directly when no local file with that name exists:
 
 .. code-block:: python
 
-   from OpenPinch.application.problem import PinchProblem
-   from OpenPinch.application.workspace import PinchWorkspace
+   from OpenPinch import PinchProblem, PinchWorkspace
 
    problem = PinchProblem("basic_pinch.json")
    workspace = PinchWorkspace(source="crude_preheat_train.json")

@@ -30,7 +30,7 @@ Runnable Workflow
 
 .. code-block:: python
 
-   from OpenPinch.application.problem import PinchProblem
+   from OpenPinch import PinchProblem
 
    problem = PinchProblem("pulp_mill.json")
    problem.target.indirect_heat_integration()

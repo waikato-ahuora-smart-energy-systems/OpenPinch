@@ -29,7 +29,7 @@ Runnable Workflow
 
 .. code-block:: python
 
-   from OpenPinch.application.problem import PinchProblem
+   from OpenPinch import PinchProblem
 
    problem = PinchProblem("basic_pinch.json")
    problem.target()

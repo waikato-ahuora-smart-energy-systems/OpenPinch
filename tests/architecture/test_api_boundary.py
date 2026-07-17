@@ -1,8 +1,7 @@
-"""API-surface tests for the marker root and concrete owner modules."""
+"""API-surface tests for root workflow exports and concrete owner modules."""
 
 from __future__ import annotations
 
-import ast
 import importlib.util
 import subprocess
 import sys
@@ -33,13 +32,13 @@ RETIRED_PACKAGES = (
 )
 
 
-def test_root_package_is_an_import_free_marker() -> None:
-    tree = ast.parse(Path(OpenPinch.__file__).read_text(encoding="utf-8"))
+def test_root_package_exports_only_the_workflow_entrypoints() -> None:
+    from OpenPinch.application.problem import PinchProblem
+    from OpenPinch.application.workspace import PinchWorkspace
 
-    assert not hasattr(OpenPinch, "__all__")
-    assert not any(isinstance(node, ast.Import | ast.ImportFrom) for node in tree.body)
-    assert not hasattr(OpenPinch, "PinchProblem")
-    assert not hasattr(OpenPinch, "PinchWorkspace")
+    assert OpenPinch.__all__ == ["PinchProblem", "PinchWorkspace"]
+    assert OpenPinch.PinchProblem is PinchProblem
+    assert OpenPinch.PinchWorkspace is PinchWorkspace
     assert not hasattr(OpenPinch, "TargetInput")
     assert not hasattr(OpenPinch, "pinch_analysis_service")
 

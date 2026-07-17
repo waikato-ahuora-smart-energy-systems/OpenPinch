@@ -1023,7 +1023,7 @@ def test_hen_synthesis_has_no_public_target_or_root_service_bypass() -> None:
 
     assert not hasattr(problem.target, "heat_exchanger_network_synthesis")
     assert not hasattr(OpenPinch, "heat_exchanger_network_synthesis_service")
-    assert not hasattr(OpenPinch, "__all__")
+    assert OpenPinch.__all__ == ["PinchProblem", "PinchWorkspace"]
     assert not hasattr(hens_package, "heat_exchanger_network_synthesis_service")
     assert not hasattr(hens_package, "run_synthesis_workflow")
     assert not hasattr(workflow_module, "run_synthesis_workflow")

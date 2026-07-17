@@ -47,9 +47,10 @@ def test_packaged_notebook_series_is_present():
     assert list_notebooks() == EXPECTED_NOTEBOOKS
 
 
-def test_packaged_notebooks_use_concrete_owner_imports(tmp_path: Path) -> None:
+def test_packaged_notebooks_use_root_workflow_imports(tmp_path: Path) -> None:
     forbidden_imports = (
-        "from OpenPinch import",
+        "from OpenPinch.application.problem import PinchProblem",
+        "from OpenPinch.application.workspace import PinchWorkspace",
         "OpenPinch.classes",
         "OpenPinch.lib",
         "OpenPinch.services",
@@ -59,15 +60,17 @@ def test_packaged_notebooks_use_concrete_owner_imports(tmp_path: Path) -> None:
     for notebook_name in EXPECTED_NOTEBOOKS:
         source = _combined_source(_copied_notebook(tmp_path, notebook_name))
         assert all(value not in source for value in forbidden_imports), notebook_name
+        assert "from OpenPinch import " in source, notebook_name
 
 
-def test_packaged_notebooks_label_internal_owners_and_main_contract(
+def test_packaged_notebooks_label_public_workflows_and_internal_owners(
     tmp_path: Path,
 ) -> None:
     for notebook_name in EXPECTED_NOTEBOOKS:
         source = _combined_source(_copied_notebook(tmp_path, notebook_name))
         assert "**Support notice:**" in source, notebook_name
-        assert "unsupported internal" in source, notebook_name
+        assert "public package-root workflows" in source, notebook_name
+        assert "Concrete owner modules" in source, notebook_name
         assert "from OpenPinch.main import pinch_analysis_service" in source
 
     integrator_source = _combined_source(

@@ -34,7 +34,7 @@ Wrapper-based validation:
 
 .. code-block:: python
 
-   from OpenPinch.application.problem import PinchProblem
+   from OpenPinch import PinchProblem
 
    problem = PinchProblem("basic_pinch.json")
    validation = problem.validation_report()
@@ -99,7 +99,7 @@ non-positive segment duties or heat-transfer coefficients.
 
 .. code-block:: python
 
-   from OpenPinch.application.problem import PinchProblem
+   from OpenPinch import PinchProblem
 
    problem = PinchProblem(
        {

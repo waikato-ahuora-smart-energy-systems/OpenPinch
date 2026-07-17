@@ -32,7 +32,7 @@ Runnable Workflow
 
 .. code-block:: python
 
-   from OpenPinch.application.workspace import PinchWorkspace
+   from OpenPinch import PinchWorkspace
 
    workspace = PinchWorkspace(source="pulp_mill.json", project_name="Site")
    case = workspace.case("baseline")

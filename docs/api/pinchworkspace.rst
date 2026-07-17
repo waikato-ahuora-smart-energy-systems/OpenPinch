@@ -1,9 +1,8 @@
-PinchWorkspace Internal API
-===========================
+PinchWorkspace API
+==================
 
-:class:`OpenPinch.application.workspace.PinchWorkspace` is an unsupported
-internal multi-case coordinator. Its import and bundle helpers are not
-compatibility-protected. It keeps named study cases, but each case
+``PinchWorkspace`` is the high-level multi-case coordinator. Import it with
+``from OpenPinch import PinchWorkspace``. It keeps named study cases, but each case
 still resolves to a real :class:`~OpenPinch.application.problem.PinchProblem`
 instance for targeting, plotting, summaries, export, and advanced workflows.
 It also exposes a second surface for serializable variant views that are useful
@@ -93,7 +92,7 @@ Typical Pattern
 
 .. code-block:: python
 
-   from OpenPinch.application.workspace import PinchWorkspace
+   from OpenPinch import PinchWorkspace
 
    workspace = PinchWorkspace(
        source="crude_preheat_train.json",
