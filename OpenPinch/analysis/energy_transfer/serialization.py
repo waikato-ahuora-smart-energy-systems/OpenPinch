@@ -7,11 +7,11 @@ from typing import Any
 import numpy as np
 
 from ...domain.configuration import tol
-from ...domain.enums import GT
+from ...domain.enums import GraphType
 
 
 def _save_graph_data(diagram: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    return {GT.ETD.value: diagram}
+    return {GraphType.ETD.value: diagram}
 
 
 def _as_float_array(values) -> np.ndarray:

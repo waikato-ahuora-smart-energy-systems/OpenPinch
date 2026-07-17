@@ -160,13 +160,13 @@ NOTEBOOKS = {
                 "hot_utilities = list(problem.hot_utilities)\n"
                 "cold_utilities = list(problem.cold_utilities)\n"
                 "segment_table = [\n"
-                '    {"name": segment.name, "supply": float(segment.t_supply), '
-                '"target": float(segment.t_target), '
+                '    {"name": segment.name, "supply": float(segment.supply_temperature), '
+                '"target": float(segment.target_temperature), '
                 '"duty": float(segment.heat_flow)}\n'
                 "    for segment in prepared_hot.segments\n"
                 "]\n"
                 "assert all(\n"
-                "    first.t_target == second.t_supply\n"
+                "    first.target_temperature == second.supply_temperature\n"
                 "    for first, second in zip(\n"
                 "        prepared_hot.segments, prepared_hot.segments[1:]\n"
                 "    )\n"
@@ -593,7 +593,7 @@ NOTEBOOKS = {
                 '    "hot utility": design.total_hot_utility,\n'
                 '    "cold utility": design.total_cold_utility,\n'
                 "}\n"
-                'serialized = design.model_dump(mode="json")\n'
+                'serialized = design.result.model_dump(mode="json")\n'
                 "metrics"
             ),
         ],

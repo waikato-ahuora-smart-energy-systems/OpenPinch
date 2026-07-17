@@ -13,7 +13,7 @@ import OpenPinch.presentation.dashboard.dependencies as dashboard_dependencies
 import OpenPinch.presentation.dashboard.exports as dashboard_exports
 import OpenPinch.presentation.dashboard.rendering as dashboard
 import OpenPinch.presentation.graphs.plotly as plotly_graphs
-from OpenPinch.domain.enums import ProblemTableLabel as PT
+from OpenPinch.domain.enums import ProblemTableLabel as ProblemTableLabel
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream import Stream
 from OpenPinch.domain.stream_collection import StreamCollection
@@ -109,8 +109,8 @@ def _make_target(name: str) -> DirectIntegrationTarget:
     hu.add(
         Stream(
             name="HP Steam",
-            t_supply=180.0,
-            t_target=170.0,
+            supply_temperature=180.0,
+            target_temperature=170.0,
             heat_flow=75.0,
             is_process_stream=False,
         )
@@ -119,8 +119,8 @@ def _make_target(name: str) -> DirectIntegrationTarget:
     cu.add(
         Stream(
             name="Cooling Water",
-            t_supply=30.0,
-            t_target=40.0,
+            supply_temperature=30.0,
+            target_temperature=40.0,
             heat_flow=40.0,
             is_process_stream=False,
         )
@@ -128,9 +128,9 @@ def _make_target(name: str) -> DirectIntegrationTarget:
 
     pt = ProblemTable(
         {
-            PT.T: [150.0, 100.0, 60.0],
-            PT.H_HOT: [30.0, 15.0, 0.0],
-            PT.H_COLD: [0.0, 10.0, 20.0],
+            ProblemTableLabel.T: [150.0, 100.0, 60.0],
+            ProblemTableLabel.H_HOT: [30.0, 15.0, 0.0],
+            ProblemTableLabel.H_COLD: [0.0, 10.0, 20.0],
         }
     )
     return DirectIntegrationTarget(
@@ -403,8 +403,8 @@ def test_render_streamlit_dashboard_empty_graph_and_problem_tables(monkeypatch):
     target = DirectIntegrationTarget(
         zone_name="Plant",
         type="DI",
-        pt=ProblemTable({PT.T: []}),
-        pt_real=ProblemTable({PT.T: []}),
+        pt=ProblemTable({ProblemTableLabel.T: []}),
+        pt_real=ProblemTable({ProblemTableLabel.T: []}),
         cold_pinch=80.0,
         hot_pinch=120.0,
         hot_utility_target=100.0,
@@ -444,7 +444,9 @@ def test_render_streamlit_dashboard_handles_energy_transfer_target(monkeypatch):
     target = EnergyTransferTarget(
         zone_name="Plant",
         type="Energy Transfer Analysis",
-        pt=ProblemTable({PT.T: [150.0, 100.0], PT.H_NET: [20.0, 0.0]}),
+        pt=ProblemTable(
+            {ProblemTableLabel.T: [150.0, 100.0], ProblemTableLabel.H_NET: [20.0, 0.0]}
+        ),
         cold_pinch=80.0,
         hot_pinch=120.0,
         hot_utility_target=20.0,

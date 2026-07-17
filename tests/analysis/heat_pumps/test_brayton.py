@@ -97,10 +97,10 @@ def test_brayton_objective_builds_streams_and_scores_cascades(monkeypatch):
         def build_stream_collection(self, **kwargs):
             stream = Stream(
                 name=f"HP {'cond' if kwargs['include_cond'] else 'evap'}",
-                t_supply=120.0,
-                t_target=80.0,
+                supply_temperature=120.0,
+                target_temperature=80.0,
                 heat_flow=25.0,
-                dt_cont=kwargs["dtcont"],
+                delta_t_contribution=kwargs["dtcont"],
                 is_process_stream=kwargs["is_process_stream"],
             )
             return [stream]
@@ -109,7 +109,7 @@ def test_brayton_objective_builds_streams_and_scores_cascades(monkeypatch):
 
     def fake_process_heat_cascade(**kwargs):
         cascade_calls.append(kwargs)
-        return {hp_brayton.PT.H_NET: np.array([10.0, 2.0])}
+        return {hp_brayton.ProblemTableLabel.H_NET: np.array([10.0, 2.0])}
 
     def fake_objective(**kwargs):
         return kwargs["work"] + kwargs["Q_ext_heat"] + kwargs["penalty"]

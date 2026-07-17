@@ -10,7 +10,7 @@ import pytest
 
 import OpenPinch.domain.configuration_fields as meta
 from OpenPinch.domain.configuration_fields import ConfigurationFieldSpec
-from OpenPinch.domain.enums import HPRcycle
+from OpenPinch.domain.enums import HeatPumpAndRefrigerationCycle
 from tests.support.paths import FIXTURES_ROOT
 
 FIXTURE_PATH = FIXTURES_ROOT / "config_metadata_cases.json"
@@ -174,7 +174,9 @@ def test_validate_configuration_option_value_accepts_static_valid_cases():
 
 def test_public_configuration_rejects_internal_method_selectors():
     with pytest.raises(ValueError, match="Unknown configuration option"):
-        meta.validate_configuration_option_value("HPR_TYPE", HPRcycle.CascadeCarnot)
+        meta.validate_configuration_option_value(
+            "HPR_TYPE", HeatPumpAndRefrigerationCycle.CascadeCarnot
+        )
     with pytest.raises(ValueError, match="Unknown configuration option"):
         meta.validate_configuration_options({"POWER_TURB_MODEL": "Medina-Flores"})
 

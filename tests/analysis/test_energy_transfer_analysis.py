@@ -51,16 +51,16 @@ from OpenPinch.analysis.energy_transfer.selection import (
 from OpenPinch.analysis.energy_transfer.service import (
     run_energy_transfer_analysis_service,
 )
-from OpenPinch.domain.enums import GT, PT, TT
+from OpenPinch.domain.enums import GraphType, ProblemTableLabel, TargetType
 from OpenPinch.domain.problem_table import ProblemTable
 
 
 def _sample_problem_table() -> ProblemTable:
     return ProblemTable(
         {
-            PT.T: [200.0, 150.0, 100.0],
-            PT.CP_NET: [0.0, 1.0, -1.2],
-            PT.H_NET: [15.0, 65.0, 5.0],
+            ProblemTableLabel.T: [200.0, 150.0, 100.0],
+            ProblemTableLabel.CP_NET: [0.0, 1.0, -1.2],
+            ProblemTableLabel.H_NET: [15.0, 65.0, 5.0],
         }
     )
 
@@ -111,22 +111,22 @@ def test_create_energy_transfer_diagram_builds_stacked_operation_profile():
 def test_create_energy_transfer_diagram_prefers_saved_gcc_payload():
     fallback_pt = ProblemTable(
         {
-            PT.T: [200.0, 100.0],
-            PT.CP_NET: [0.0, 0.0],
-            PT.H_NET: [999.0, 999.0],
+            ProblemTableLabel.T: [200.0, 100.0],
+            ProblemTableLabel.CP_NET: [0.0, 0.0],
+            ProblemTableLabel.H_NET: [999.0, 999.0],
         }
     )
     gcc = ProblemTable(
         {
-            PT.T: [200.0, 150.0, 100.0],
-            PT.H_NET: [0.0, 25.0, -10.0],
+            ProblemTableLabel.T: [200.0, 150.0, 100.0],
+            ProblemTableLabel.H_NET: [0.0, 25.0, -10.0],
         }
     )
     target = SimpleNamespace(
         zone_name="NestedUnit",
-        type=TT.DI.value,
+        type=TargetType.DI.value,
         pt=fallback_pt,
-        graphs={GT.GCC.value: gcc},
+        graphs={GraphType.GCC.value: gcc},
         hot_utility_target=0.0,
         cold_utility_target=0.0,
     )
@@ -142,7 +142,7 @@ def test_create_energy_transfer_diagram_prefers_saved_gcc_payload():
 def test_empty_energy_transfer_inputs_return_empty_diagram_and_table():
     base_target = SimpleNamespace(
         name="Base",
-        type=TT.DI.value,
+        type=TargetType.DI.value,
         hot_pinch=120.0,
         cold_pinch=90.0,
     )
@@ -168,13 +168,13 @@ def test_energy_transfer_service_handles_period_context_and_error_paths():
 
     zone = FakeZone()
     target = SimpleNamespace(
-        type=TT.DI.value,
+        type=TargetType.DI.value,
         period_id="peak",
         period_idx=1,
     )
-    zone.targets[TT.DI.value] = target
+    zone.targets[TargetType.DI.value] = target
 
-    result_target = SimpleNamespace(type=TT.ET.value)
+    result_target = SimpleNamespace(type=TargetType.ET.value)
     out = run_energy_transfer_analysis_service(
         zone,
         {"period_id": "peak"},
@@ -184,7 +184,7 @@ def test_energy_transfer_service_handles_period_context_and_error_paths():
 
     assert out is zone
     assert zone._selected_period_id == "peak"
-    assert zone.targets[TT.ET.value] is result_target
+    assert zone.targets[TargetType.ET.value] is result_target
 
     with pytest.raises(ValueError, match="Unsupported energy-transfer"):
         _normalize_energy_transfer_base_target_type("unsupported")
@@ -192,8 +192,10 @@ def test_energy_transfer_service_handles_period_context_and_error_paths():
     with pytest.raises(RuntimeError, match="could not produce base target"):
         run_energy_transfer_analysis_service(
             FakeZone(),
-            {"base_target_type": TT.TS.value},
-            refresh_services={TT.TS.value: lambda target_zone, args=None: target_zone},
+            {"base_target_type": TargetType.TS.value},
+            refresh_services={
+                TargetType.TS.value: lambda target_zone, args=None: target_zone
+            },
             compute_func=lambda base_target, source_targets=None: result_target,
         )
 
@@ -217,7 +219,7 @@ def test_ensure_energy_transfer_base_target_reports_missing_and_stale_refreshes(
     assert (
         _ensure_energy_transfer_base_target(
             zone,
-            target_type=TT.DI.value,
+            target_type=TargetType.DI.value,
             refresh_args={},
             compare_args={},
             refresh_services={},
@@ -227,41 +229,43 @@ def test_ensure_energy_transfer_base_target_reports_missing_and_stale_refreshes(
     assert (
         _ensure_energy_transfer_base_target(
             zone,
-            target_type=TT.TS.value,
+            target_type=TargetType.TS.value,
             refresh_args={},
             compare_args={},
-            refresh_services={TT.TS.value: lambda target_zone, args=None: None},
+            refresh_services={TargetType.TS.value: lambda target_zone, args=None: None},
         )
         is None
     )
 
     def stale_refresh(target_zone, args=None):
-        target_zone.targets[TT.DI.value] = SimpleNamespace(
-            type=TT.DI.value,
+        target_zone.targets[TargetType.DI.value] = SimpleNamespace(
+            type=TargetType.DI.value,
             period_id="off-peak",
         )
 
     assert (
         _ensure_energy_transfer_base_target(
             zone,
-            target_type=TT.DI.value,
+            target_type=TargetType.DI.value,
             refresh_args={"period_id": "peak"},
             compare_args={"period_id": "peak"},
-            refresh_services={TT.DI.value: stale_refresh},
+            refresh_services={TargetType.DI.value: stale_refresh},
         )
         is None
     )
 
 
 def test_energy_transfer_interval_helpers_handle_degenerate_and_one_point_tables():
-    empty_pt = ProblemTable({PT.T: [], PT.H_NET: []})
+    empty_pt = ProblemTable({ProblemTableLabel.T: [], ProblemTableLabel.H_NET: []})
     temperatures = _compile_temperature_intervals(
         [{"name": "Empty", "mode": "R", "pt": empty_pt}],
         base_table=None,
     )
     assert temperatures.size == 0
 
-    one_point = ProblemTable({PT.T: [200.0], PT.H_NET: [25.0]})
+    one_point = ProblemTable(
+        {ProblemTableLabel.T: [200.0], ProblemTableLabel.H_NET: [25.0]}
+    )
     names, modes, interval_heat, cascades = _transpose_operation_cascades(
         [{"name": "One", "mode": "R", "pt": one_point}],
         np.array([200.0, 150.0]),
@@ -299,11 +303,13 @@ def test_energy_transfer_target_naming_modes_and_problem_table_guards():
         base_table=None,
     ) == (140.0, None)
     assert _operation_name(
-        SimpleNamespace(zone_name=None, name=None, type=TT.DI.value), 2
+        SimpleNamespace(zone_name=None, name=None, type=TargetType.DI.value), 2
     ) == ("Operation 3")
     assert (
         _operation_name(
-            SimpleNamespace(zone_name="Plant/Direct Integration", type=TT.DI.value),
+            SimpleNamespace(
+                zone_name="Plant/Direct Integration", type=TargetType.DI.value
+            ),
             0,
         )
         == "Plant"
@@ -323,8 +329,11 @@ def test_energy_transfer_target_naming_modes_and_problem_table_guards():
         def __getitem__(self, column):
             raise KeyError(column)
 
-    assert _has_problem_table_values(MissingColumnTable(), PT.H_NET) is False
-    invalid_pt = ProblemTable({PT.T: [100.0, 80.0]})
-    assert _has_problem_table_values(invalid_pt, PT.H_NET) is False
-    nan_pt = ProblemTable({PT.H_NET: [np.nan, np.nan]})
-    assert _has_problem_table_values(nan_pt, PT.H_NET) is False
+    assert (
+        _has_problem_table_values(MissingColumnTable(), ProblemTableLabel.H_NET)
+        is False
+    )
+    invalid_pt = ProblemTable({ProblemTableLabel.T: [100.0, 80.0]})
+    assert _has_problem_table_values(invalid_pt, ProblemTableLabel.H_NET) is False
+    nan_pt = ProblemTable({ProblemTableLabel.H_NET: [np.nan, np.nan]})
+    assert _has_problem_table_values(nan_pt, ProblemTableLabel.H_NET) is False

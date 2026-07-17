@@ -7,7 +7,7 @@ from copy import deepcopy
 from typing import TYPE_CHECKING, Any, Mapping
 
 from ....contracts.output import TargetOutput
-from ....domain.enums import TT, HPRcycle, TurbineModel
+from ....domain.enums import HeatPumpAndRefrigerationCycle, TargetType, TurbineModel
 from ....domain.targets import BaseTargetModel
 from ...targeting import (
     area_cost_targeting_service,
@@ -232,7 +232,7 @@ class _TargetAccessor:
     ) -> BaseTargetModel:
         return self._execute(
             surface="direct_heat_integration",
-            target_id=TT.DI.value,
+            target_id=TargetType.DI.value,
             zone=zone,
             options=options,
             configuration=None,
@@ -260,7 +260,7 @@ class _TargetAccessor:
     ) -> BaseTargetModel:
         return self._execute(
             surface=surface,
-            target_id=TT.TS.value,
+            target_id=TargetType.TS.value,
             zone=zone,
             options=options,
             configuration=None,
@@ -302,7 +302,7 @@ class _TargetAccessor:
         self,
         *,
         surface: str,
-        cycle: HPRcycle,
+        cycle: HeatPumpAndRefrigerationCycle,
         is_heat_pump: bool,
         is_utility: bool,
         is_cascade_cycle: bool | None = None,
@@ -322,17 +322,17 @@ class _TargetAccessor:
         extra_configuration: Mapping[str, Any] | None = None,
     ) -> BaseTargetModel:
         if is_cascade_cycle is not None:
-            if cycle is HPRcycle.CascadeCarnot:
+            if cycle is HeatPumpAndRefrigerationCycle.CascadeCarnot:
                 cycle = (
-                    HPRcycle.CascadeCarnot
+                    HeatPumpAndRefrigerationCycle.CascadeCarnot
                     if is_cascade_cycle
-                    else HPRcycle.ParallelCarnot
+                    else HeatPumpAndRefrigerationCycle.ParallelCarnot
                 )
-            elif cycle is HPRcycle.CascadeVapourComp:
+            elif cycle is HeatPumpAndRefrigerationCycle.CascadeVapourComp:
                 cycle = (
-                    HPRcycle.CascadeVapourComp
+                    HeatPumpAndRefrigerationCycle.CascadeVapourComp
                     if is_cascade_cycle
-                    else HPRcycle.ParallelVapourComp
+                    else HeatPumpAndRefrigerationCycle.ParallelVapourComp
                 )
         configuration = {"HPR_TYPE": cycle.value}
         configuration.update(
@@ -361,13 +361,13 @@ class _TargetAccessor:
             else indirect_refrigeration_service
         )
         target_id = (
-            TT.IHP.value
+            TargetType.IHP.value
             if is_heat_pump and is_utility
-            else TT.IR.value
+            else TargetType.IR.value
             if not is_heat_pump and is_utility
-            else TT.DHP.value
+            else TargetType.DHP.value
             if is_heat_pump
-            else TT.DR.value
+            else TargetType.DR.value
         )
         return self._execute(
             surface=surface,
@@ -402,7 +402,7 @@ class _TargetAccessor:
     ):
         return self._hpr(
             surface="carnot_heat_pump",
-            cycle=HPRcycle.CascadeCarnot,
+            cycle=HeatPumpAndRefrigerationCycle.CascadeCarnot,
             is_heat_pump=True,
             is_utility=is_utility_heat_pump,
             is_cascade_cycle=is_cascade_cycle,
@@ -442,7 +442,7 @@ class _TargetAccessor:
     ):
         return self._hpr(
             surface="carnot_refrigeration",
-            cycle=HPRcycle.CascadeCarnot,
+            cycle=HeatPumpAndRefrigerationCycle.CascadeCarnot,
             is_heat_pump=False,
             is_utility=is_utility_refrigeration,
             is_cascade_cycle=is_cascade_cycle,
@@ -494,7 +494,7 @@ class _TargetAccessor:
             _set_if_not_none(extra, key, value)
         return self._hpr(
             surface="vapour_compression_heat_pump",
-            cycle=HPRcycle.CascadeVapourComp,
+            cycle=HeatPumpAndRefrigerationCycle.CascadeVapourComp,
             is_heat_pump=True,
             is_utility=is_utility_heat_pump,
             is_cascade_cycle=is_cascade_cycle,
@@ -547,7 +547,7 @@ class _TargetAccessor:
             _set_if_not_none(extra, key, value)
         return self._hpr(
             surface="vapour_compression_refrigeration",
-            cycle=HPRcycle.CascadeVapourComp,
+            cycle=HeatPumpAndRefrigerationCycle.CascadeVapourComp,
             is_heat_pump=False,
             is_utility=is_utility_refrigeration,
             is_cascade_cycle=is_cascade_cycle,
@@ -584,7 +584,7 @@ class _TargetAccessor:
     ):
         return self._hpr(
             surface="brayton_heat_pump",
-            cycle=HPRcycle.Brayton,
+            cycle=HeatPumpAndRefrigerationCycle.Brayton,
             is_heat_pump=True,
             is_utility=is_utility_heat_pump,
             is_cascade_cycle=None,
@@ -617,7 +617,7 @@ class _TargetAccessor:
     ):
         return self._hpr(
             surface="brayton_refrigeration",
-            cycle=HPRcycle.Brayton,
+            cycle=HeatPumpAndRefrigerationCycle.Brayton,
             is_heat_pump=False,
             is_utility=is_utility_refrigeration,
             is_cascade_cycle=None,
@@ -663,7 +663,7 @@ class _TargetAccessor:
             _set_if_not_none(extra, key, value)
         return self._hpr(
             surface="mvr_heat_pump",
-            cycle=HPRcycle.VapourCompMVR,
+            cycle=HeatPumpAndRefrigerationCycle.VapourCompMVR,
             is_heat_pump=True,
             is_utility=is_utility_heat_pump,
             is_cascade_cycle=None,
@@ -711,7 +711,7 @@ class _TargetAccessor:
         runtime["_calculate_area_cost"] = True
         return self._execute(
             surface="heat_exchanger_area_and_cost",
-            target_id=TT.DI.value,
+            target_id=TargetType.DI.value,
             zone=zone,
             options=runtime,
             configuration=configuration,
@@ -822,7 +822,7 @@ class _TargetAccessor:
             runtime["base_target_type"] = getattr(base_target, "type", None)
         return self._execute(
             surface="energy_transfer",
-            target_id=TT.ET.value,
+            target_id=TargetType.ET.value,
             zone=zone,
             options=runtime,
             configuration=None,

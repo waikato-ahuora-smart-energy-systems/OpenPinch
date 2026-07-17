@@ -53,7 +53,7 @@ class WorkspaceCaseBundleEntry(BaseModel):
 class PinchWorkspaceBundle(BaseModel):
     """Portable persisted multi-case study bundle."""
 
-    schema_version: Literal["3"] = "3"
+    schema_version: Literal["3"]
     project_name: Optional[str] = None
     baseline_name: str = "baseline"
     cases: Dict[str, WorkspaceCaseBundleEntry]
@@ -64,7 +64,7 @@ class PinchWorkspaceBundle(BaseModel):
     @classmethod
     def _reject_unsupported_schema(cls, value):
         if isinstance(value, dict):
-            schema_version = value.get("schema_version", "3")
+            schema_version = value.get("schema_version")
             if schema_version != "3":
                 raise ValueError(
                     "Unsupported workspace schema_version "

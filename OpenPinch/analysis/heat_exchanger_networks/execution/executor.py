@@ -5,11 +5,11 @@ from __future__ import annotations
 from concurrent.futures import ProcessPoolExecutor
 from typing import Any, Callable, Protocol, Sequence
 
-from ....contracts.synthesis.common import SynthesisMethod
 from ....contracts.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
+from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ..errors import WorkflowContractError
 from ..models.problem import InternalHeatExchangerNetworkProblem
 from ..solver.arrays import PreparedSolverArrays, problem_to_solver_arrays
@@ -52,7 +52,7 @@ class LocalSynthesisExecutor:
         self.model_factories = model_factories
         self.worker_pool_factory = worker_pool_factory or _process_pool
         self.executed_tasks: list[HeatExchangerNetworkSynthesisTask] = []
-        self.stage_order: list[SynthesisMethod] = []
+        self.stage_order: list[HeatExchangerNetworkDesignMethod] = []
         self.problems_by_task_id: dict[str, InternalHeatExchangerNetworkProblem] = {}
 
     def execute(
@@ -406,7 +406,7 @@ def _failed_task_outcome(
     )
 
 
-def _model_framework(method: SynthesisMethod) -> str:
+def _model_framework(method: HeatExchangerNetworkDesignMethod) -> str:
     return {
         "pinch_design_method": "PDM",
         "thermal_derivative_method": "TDM",
@@ -414,7 +414,7 @@ def _model_framework(method: SynthesisMethod) -> str:
     }[method]
 
 
-def _model_objective(method: SynthesisMethod) -> str:
+def _model_objective(method: HeatExchangerNetworkDesignMethod) -> str:
     if method == "network_evolution_method":
         return "variable total cost"
     return "hot utility"
@@ -438,7 +438,7 @@ def _task_model_name(task: HeatExchangerNetworkSynthesisTask) -> str:
     return f"P-S{stages}-Synheat-Iso-NLP"
 
 
-def _solver_for_task(problem, method: SynthesisMethod) -> str:
+def _solver_for_task(problem, method: HeatExchangerNetworkDesignMethod) -> str:
     hens = problem.master_zone.config.hens
     if method == "pinch_design_method":
         return str(hens.solver_pdm)

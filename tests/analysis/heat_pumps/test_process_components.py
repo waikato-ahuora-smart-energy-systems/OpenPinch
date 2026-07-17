@@ -136,16 +136,16 @@ def test_add_process_mvr_applies_replacements_and_registers_component():
     assert isinstance(component, ProcessMVRComponent)
     assert component.id == "mvr_1"
     assert problem.process_components["mvr_1"] is component
-    assert source.active is False
+    assert source.is_active is False
     assert len(component.replacement_streams) >= 2
-    assert all(stream.active for stream in component.replacement_streams)
+    assert all(stream.is_active for stream in component.replacement_streams)
     assert all(
-        float(stream.p_supply) > float(source.p_supply)
+        float(stream.supply_pressure) > float(source.supply_pressure)
         for stream in component.replacement_streams
     )
-    assert min(float(stream.t_target) for stream in component.replacement_streams) == (
-        pytest.approx(float(source.t_target), abs=0.05)
-    )
+    assert min(
+        float(stream.target_temperature) for stream in component.replacement_streams
+    ) == (pytest.approx(float(source.target_temperature), abs=0.05))
     assert "Site/Evaporation Train" in component.affected_zone_paths
     assert any(stream is source for _key, stream in zone.hot_streams.items())
     assert any(
@@ -243,7 +243,7 @@ def test_duplicate_display_names_apply_to_all_matching_hot_gas_streams():
     )
 
     assert len(component.original_streams) == 2
-    assert all(not stream.active for stream in component.original_streams)
+    assert all(not stream.is_active for stream in component.original_streams)
     assert len(component.replacement_streams) >= 2
 
 
@@ -268,8 +268,8 @@ def test_process_mvr_activate_deactivate_toggles_recorded_streams_and_invalidate
     component.deactivate()
 
     assert component.active is False
-    assert all(stream.active for stream in component.original_streams)
-    assert all(not stream.active for stream in component.replacement_streams)
+    assert all(stream.is_active for stream in component.original_streams)
+    assert all(not stream.is_active for stream in component.replacement_streams)
     assert problem.results is None
     second_target = problem.target.direct_heat_integration(zone="Evaporation Train")
     assert second_target.heat_recovery_target == pytest.approx(100.0)
@@ -294,8 +294,8 @@ def test_add_process_mvr_accepts_engineering_efficiency_names():
 
     assert component.settings.eta_mvr_comp == pytest.approx(0.73)
     assert component.settings.eta_motor == pytest.approx(0.96)
-    assert all(not stream.active for stream in component.original_streams)
-    assert all(stream.active for stream in component.replacement_streams)
+    assert all(not stream.is_active for stream in component.original_streams)
+    assert all(stream.is_active for stream in component.replacement_streams)
 
 
 def test_process_mvr_is_not_a_targeting_method():
@@ -347,8 +347,8 @@ def test_process_mvr_accepts_vapour_stream_and_derives_saturation_pressure():
     )
 
     source = component.original_streams[0]
-    assert float(source.p_supply) == pytest.approx(101.4, rel=0.02)
-    assert float(source.p_target) == pytest.approx(float(source.p_supply))
+    assert float(source.supply_pressure) == pytest.approx(101.4, rel=0.02)
+    assert float(source.target_pressure) == pytest.approx(float(source.supply_pressure))
     assert component.stage_results_by_period["0"][0].work > 0.0
 
 
@@ -381,8 +381,8 @@ def test_process_mvr_defaults_missing_gas_target_pressure():
         liquid_injection=False,
     )
 
-    assert float(component.original_streams[0].p_target) == pytest.approx(
-        float(component.original_streams[0].p_supply)
+    assert float(component.original_streams[0].target_pressure) == pytest.approx(
+        float(component.original_streams[0].supply_pressure)
     )
 
 
@@ -426,17 +426,19 @@ def test_process_mvr_solves_all_periods_for_multiperiod_streams():
     replacement = component.replacement_streams[0]
     assert len(component.replacement_streams) == 1
     assert replacement.has_segments
-    assert all(segment.t_supply.num_periods == 2 for segment in replacement.segments)
+    assert all(
+        segment.supply_temperature.num_periods == 2 for segment in replacement.segments
+    )
     assert [segment.segment_index for segment in replacement.segments] == list(
         range(replacement.segment_count)
     )
     assert float(replacement.heat_flow[0]) > 0.0
     assert float(replacement.heat_flow[1]) > 0.0
     assert min(
-        float(stream.t_target[0]) for stream in component.replacement_streams
+        float(stream.target_temperature[0]) for stream in component.replacement_streams
     ) == (pytest.approx(80.0, abs=0.05))
     assert min(
-        float(stream.t_target[1]) for stream in component.replacement_streams
+        float(stream.target_temperature[1]) for stream in component.replacement_streams
     ) == (pytest.approx(82.0, abs=0.05))
 
     normal_target = problem.target.direct_heat_integration(
@@ -486,9 +488,9 @@ def test_process_mvr_work_for_zone_uses_active_state_membership_and_period_conte
     root.add_zone(other)
     source = Stream(
         name="HotGas",
-        t_supply=120.0,
-        t_target=80.0,
-        p_supply=101.325,
+        supply_temperature=120.0,
+        target_temperature=80.0,
+        supply_pressure=101.325,
         heat_flow=100.0,
         fluid_name="Air",
         fluid_phase="gas",
@@ -524,9 +526,9 @@ def test_process_mvr_work_for_zone_uses_active_state_membership_and_period_conte
 def test_process_mvr_helper_guards_and_period_value_edges():
     source = Stream(
         name="HotGas",
-        t_supply=120.0,
-        t_target=80.0,
-        p_supply=101.325,
+        supply_temperature=120.0,
+        target_temperature=80.0,
+        supply_pressure=101.325,
         heat_flow=100.0,
         fluid_name="Air",
         fluid_phase="gas",
@@ -567,17 +569,17 @@ def test_process_mvr_stream_matching_and_source_validation_errors():
     root = Zone("Site")
     hot = Stream(
         name="HotGas",
-        t_supply=120.0,
-        t_target=80.0,
-        p_supply=101.325,
+        supply_temperature=120.0,
+        target_temperature=80.0,
+        supply_pressure=101.325,
         heat_flow=100.0,
         fluid_name="Air",
         fluid_phase="gas",
     )
     cold = Stream(
         name="ColdLoad",
-        t_supply=20.0,
-        t_target=80.0,
+        supply_temperature=20.0,
+        target_temperature=80.0,
         heat_flow=100.0,
     )
     root.hot_streams.add(hot, key="H1")
@@ -592,19 +594,19 @@ def test_process_mvr_stream_matching_and_source_validation_errors():
 
     inactive = Stream(
         name="InactiveGas",
-        t_supply=120.0,
-        t_target=80.0,
-        p_supply=101.325,
+        supply_temperature=120.0,
+        target_temperature=80.0,
+        supply_pressure=101.325,
         heat_flow=100.0,
         fluid_name="Air",
         fluid_phase="gas",
     )
-    inactive.active = False
+    inactive.is_active = False
     utility = Stream(
         name="UtilityGas",
-        t_supply=120.0,
-        t_target=80.0,
-        p_supply=101.325,
+        supply_temperature=120.0,
+        target_temperature=80.0,
+        supply_pressure=101.325,
         heat_flow=100.0,
         is_process_stream=False,
         fluid_name="Air",
@@ -612,9 +614,9 @@ def test_process_mvr_stream_matching_and_source_validation_errors():
     )
     no_fluid = Stream(
         name="NoFluid",
-        t_supply=120.0,
-        t_target=80.0,
-        p_supply=101.325,
+        supply_temperature=120.0,
+        target_temperature=80.0,
+        supply_pressure=101.325,
         heat_flow=100.0,
         fluid_phase="gas",
     )
@@ -652,28 +654,28 @@ def test_process_mvr_phase_validation_edges_use_real_fluid_data():
     pytest.importorskip("CoolProp")
     heating_stream = Stream(
         name="HeatingGas",
-        t_supply=80.0,
-        t_target=120.0,
-        p_supply=101.325,
+        supply_temperature=80.0,
+        target_temperature=120.0,
+        supply_pressure=101.325,
         heat_flow=100.0,
         fluid_name="Air",
         fluid_phase="gas",
     )
     gas_without_pressure = Stream(
         name="NoPressureGas",
-        t_supply=120.0,
-        t_target=80.0,
-        p_supply=None,
+        supply_temperature=120.0,
+        target_temperature=80.0,
+        supply_pressure=None,
         heat_flow=100.0,
         fluid_name="Air",
         fluid_phase="gas",
     )
     vapour_without_pressure = Stream(
         name="WaterVapour",
-        t_supply=[100.0, 99.0],
-        t_target=[99.5, 98.5],
-        p_supply=None,
-        p_target=None,
+        supply_temperature=[100.0, 99.0],
+        target_temperature=[99.5, 98.5],
+        supply_pressure=None,
+        target_pressure=None,
         heat_flow=[100.0, 90.0],
         fluid_name="Water",
         fluid_phase="vapour",
@@ -695,10 +697,10 @@ def test_process_mvr_phase_validation_edges_use_real_fluid_data():
         "WaterVapour",
     )
 
-    assert list(vapour_without_pressure.p_supply.value) == pytest.approx(
-        list(vapour_without_pressure.p_target.value)
+    assert list(vapour_without_pressure.supply_pressure.value) == pytest.approx(
+        list(vapour_without_pressure.target_pressure.value)
     )
-    assert len(vapour_without_pressure.p_supply.value) == 2
+    assert len(vapour_without_pressure.supply_pressure.value) == 2
 
     with pytest.raises(ValueError, match="critical temperature"):
         selection.validate_vapour_state(

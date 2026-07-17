@@ -45,13 +45,12 @@ from OpenPinch.analysis.graphs.specifications import (
     _GraphBuildSpec,
 )
 from OpenPinch.domain.enums import (
-    GT,
-    PT,
-    ST,
-    TT,
     ArrowHead,
+    GraphType,
     LineColour,
+    ProblemTableLabel,
     StreamLoc,
+    TargetType,
 )
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.zone import Zone
@@ -82,20 +81,20 @@ def test_create_curve_formats_data_correctly():
 def test_graph_cc_hot_curve():
     x_vals = [0, 10]
     y_vals = [100, 200]
-    result = _graph_cc("Hot CC", ST.Hot.value, y_vals, x_vals)
+    result = _graph_cc("Hot CC", StreamLoc.HotS, y_vals, x_vals)
     assert result[0]["title"] == "Hot CC"
     assert result[0]["arrow"] == ArrowHead.END.value
 
 
 def test_graph_cc_invalid_type():
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError, match="StreamLoc"):
         _graph_cc("CC", "Invalid", [1, 2], [3, 4])
 
 
-def test_graph_cc_uses_total_site_arrow_direction_and_aliases():
+def test_graph_cc_uses_total_site_arrow_direction():
     [segment] = _graph_cc(
-        GT.TSP.value,
-        "Hot",
+        GraphType.TSP.value,
+        StreamLoc.HotS,
         [220.0, 180.0, 140.0],
         [0.0, -30.0, -60.0],
         include_arrows=True,
@@ -177,8 +176,10 @@ def test_graph_helper_normalisation_and_series_meta_edges():
 
 
 def test_graph_column_extraction_supports_table_column_and_index_protocols():
-    table = ProblemTable({PT.T: [100.0, 80.0], PT.H_NET: [0.0, 20.0]})
-    assert _column_to_list(table, PT.H_NET) == [0.0, 20.0]
+    table = ProblemTable(
+        {ProblemTableLabel.T: [100.0, 80.0], ProblemTableLabel.H_NET: [0.0, 20.0]}
+    )
+    assert _column_to_list(table, ProblemTableLabel.H_NET) == [0.0, 20.0]
 
     class ColumnBacked:
         columns = ["heat"]
@@ -211,11 +212,15 @@ def test_graph_series_and_segment_low_level_edges():
 
     assert _classify_segment(np.nan, is_utility_profile=False) == StreamLoc.Unassigned
     assert _segment_streamloc(StreamLoc.HotU) == StreamLoc.HotU
-    assert _segment_streamloc(StreamLoc.ColdS.value) == StreamLoc.ColdS
-    assert _segment_streamloc(StreamLoc.HotS.value) == StreamLoc.HotS
-    assert _segment_streamloc(StreamLoc.HotU.value) == StreamLoc.HotU
-    assert _segment_streamloc(StreamLoc.ColdU.value) == StreamLoc.ColdU
-    assert _segment_streamloc("unknown") == StreamLoc.Unassigned
+    for value in (
+        StreamLoc.ColdS.value,
+        StreamLoc.HotS.value,
+        StreamLoc.HotU.value,
+        StreamLoc.ColdU.value,
+        "unknown",
+    ):
+        with pytest.raises(TypeError, match="StreamLoc"):
+            _segment_streamloc(value)
     assert _streamloc_colour(StreamLoc.Unassigned) == LineColour.Black.value
     assert _streamloc_colour("custom") == LineColour.Other.value
 
@@ -226,8 +231,12 @@ def test_graph_series_and_segment_low_level_edges():
 
 
 def test_graph_build_specs_reference_valid_labels_and_metadata_lengths():
-    assert all(isinstance(spec.graph_type, GT) for spec in GRAPH_BUILD_SPECS)
-    assert all(field in PT for spec in GRAPH_BUILD_SPECS for field in spec.value_fields)
+    assert all(isinstance(spec.graph_type, GraphType) for spec in GRAPH_BUILD_SPECS)
+    assert all(
+        field in ProblemTableLabel
+        for spec in GRAPH_BUILD_SPECS
+        for field in spec.value_fields
+    )
 
     for spec in COMPOSITE_GRAPH_SPECS:
         assert spec.builder == "composite"
@@ -242,41 +251,41 @@ def test_graph_build_specs_reference_valid_labels_and_metadata_lengths():
 
 def test_iter_available_graph_specs_uses_canonical_order():
     target_graphs = {
-        GT.ETD.value: {},
-        GT.GCC.value: {},
-        GT.CC.value: {},
-        GT.NLP.value: {},
+        GraphType.ETD.value: {},
+        GraphType.GCC.value: {},
+        GraphType.CC.value: {},
+        GraphType.NLP.value: {},
     }
 
     assert [spec.graph_type for spec in iter_available_graph_specs(target_graphs)] == [
-        GT.CC,
-        GT.GCC,
-        GT.NLP,
-        GT.ETD,
+        GraphType.CC,
+        GraphType.GCC,
+        GraphType.NLP,
+        GraphType.ETD,
     ]
 
 
 def test_build_graph_from_spec_rejects_unknown_builder():
     spec = _GraphBuildSpec(
-        graph_type=GT.CC,
+        graph_type=GraphType.CC,
         label="Bad",
         builder="unknown",
     )
 
     with pytest.raises(ValueError, match="Unsupported graph builder"):
-        build_graph_from_spec("Target", {GT.CC.value: {}}, spec)
+        build_graph_from_spec("Target", {GraphType.CC.value: {}}, spec)
 
 
 def test_create_graph_set_with_mock_zone():
     mock_target = MagicMock()
     mock_target.name = "ZoneA/Direct Integration"
-    mock_target.type = TT.DI.value
+    mock_target.type = TargetType.DI.value
     mock_target.zone_name = "ZoneA"
     mock_target.graphs = {
-        GT.CC.value: {
-            PT.T.value: MagicMock(to_list=lambda: [100, 200]),
-            PT.H_HOT.value: MagicMock(to_list=lambda: [100, 150]),
-            PT.H_COLD.value: MagicMock(to_list=lambda: [80, 130]),
+        GraphType.CC.value: {
+            ProblemTableLabel.T.value: MagicMock(to_list=lambda: [100, 200]),
+            ProblemTableLabel.H_HOT.value: MagicMock(to_list=lambda: [100, 150]),
+            ProblemTableLabel.H_COLD.value: MagicMock(to_list=lambda: [80, 130]),
         }
     }
     mock_zone = MagicMock(spec=Zone)
@@ -285,27 +294,27 @@ def test_create_graph_set_with_mock_zone():
 
     graph_set = _create_graph_set(mock_target, zone=mock_zone)
     assert graph_set["name"] == "ZoneA/Direct Integration"
-    assert graph_set["target_type"] == TT.DI.value
+    assert graph_set["target_type"] == TargetType.DI.value
     assert graph_set["zone_name"] == "ZoneA"
     assert graph_set["zone_address"] == "Site/ZoneA"
     assert len(graph_set["graphs"]) == 1
-    assert graph_set["graphs"][0]["type"] == GT.CC.value
+    assert graph_set["graphs"][0]["type"] == GraphType.CC.value
 
 
 def test_create_graph_set_includes_net_load_curves():
     mock_target = MagicMock()
     mock_target.name = "ZoneA/Direct Integration"
-    mock_target.type = TT.DI.value
+    mock_target.type = TargetType.DI.value
     mock_target.zone_name = "ZoneA"
     mock_target.graphs = {
-        GT.NLP.value: {
-            PT.T.value: MagicMock(to_list=lambda: [200, 150, 100]),
-            PT.H_NET_HOT.value: MagicMock(to_list=lambda: [0, -20, -40]),
-            PT.H_NET_COLD.value: MagicMock(to_list=lambda: [30, 10, 0]),
-            PT.H_HOT_UT.value: MagicMock(to_list=lambda: [5, 5, 5]),
-            PT.H_COLD_UT.value: MagicMock(to_list=lambda: [25, 15, 5]),
-            PT.H_HOT_HP.value: MagicMock(to_list=lambda: [0, 0, 0]),
-            PT.H_COLD_HP.value: MagicMock(to_list=lambda: [0, 0, 0]),
+        GraphType.NLP.value: {
+            ProblemTableLabel.T.value: MagicMock(to_list=lambda: [200, 150, 100]),
+            ProblemTableLabel.H_NET_HOT.value: MagicMock(to_list=lambda: [0, -20, -40]),
+            ProblemTableLabel.H_NET_COLD.value: MagicMock(to_list=lambda: [30, 10, 0]),
+            ProblemTableLabel.H_HOT_UT.value: MagicMock(to_list=lambda: [5, 5, 5]),
+            ProblemTableLabel.H_COLD_UT.value: MagicMock(to_list=lambda: [25, 15, 5]),
+            ProblemTableLabel.H_HOT_HP.value: MagicMock(to_list=lambda: [0, 0, 0]),
+            ProblemTableLabel.H_COLD_HP.value: MagicMock(to_list=lambda: [0, 0, 0]),
         }
     }
     mock_zone = MagicMock(spec=Zone)
@@ -315,7 +324,7 @@ def test_create_graph_set_includes_net_load_curves():
     graph_set = _create_graph_set(mock_target, zone=mock_zone)
 
     assert len(graph_set["graphs"]) == 1
-    assert graph_set["graphs"][0]["type"] == GT.NLP.value
+    assert graph_set["graphs"][0]["type"] == GraphType.NLP.value
     assert graph_set["graphs"][0]["name"] == "Net Load Curves: ZoneA/Direct Integration"
     assert len(graph_set["graphs"][0]["segments"]) == 4
 
@@ -323,13 +332,13 @@ def test_create_graph_set_includes_net_load_curves():
 def test_create_graph_set_includes_real_grand_composite_curve():
     mock_target = MagicMock()
     mock_target.name = "ZoneA/Direct Integration"
-    mock_target.type = TT.DI.value
+    mock_target.type = TargetType.DI.value
     mock_target.zone_name = "ZoneA"
     mock_target.graphs = {
-        GT.GCC_R.value: {
-            PT.T.value: MagicMock(to_list=lambda: [200, 150, 100]),
-            PT.H_NET.value: MagicMock(to_list=lambda: [0, 20, 40]),
-            PT.H_NET_UT.value: MagicMock(to_list=lambda: [0, 5, 10]),
+        GraphType.GCC_R.value: {
+            ProblemTableLabel.T.value: MagicMock(to_list=lambda: [200, 150, 100]),
+            ProblemTableLabel.H_NET.value: MagicMock(to_list=lambda: [0, 20, 40]),
+            ProblemTableLabel.H_NET_UT.value: MagicMock(to_list=lambda: [0, 5, 10]),
         }
     }
     mock_zone = MagicMock(spec=Zone)
@@ -339,7 +348,7 @@ def test_create_graph_set_includes_real_grand_composite_curve():
     graph_set = _create_graph_set(mock_target, zone=mock_zone)
 
     assert len(graph_set["graphs"]) == 1
-    assert graph_set["graphs"][0]["type"] == GT.GCC_R.value
+    assert graph_set["graphs"][0]["type"] == GraphType.GCC_R.value
     assert (
         graph_set["graphs"][0]["name"]
         == "Grand Composite Curve (Real): ZoneA/Direct Integration"
@@ -349,12 +358,12 @@ def test_create_graph_set_includes_real_grand_composite_curve():
 def test_create_graph_set_includes_energy_transfer_diagram():
     mock_target = MagicMock()
     mock_target.name = "ZoneA/Energy Transfer Analysis"
-    mock_target.type = TT.ET.value
+    mock_target.type = TargetType.ET.value
     mock_target.zone_name = "ZoneA"
     mock_target.graphs = {
-        GT.ETD.value: {
-            PT.T.value: MagicMock(to_list=lambda: [200, 150, 100]),
-            PT.H_NET.value: MagicMock(to_list=lambda: [10, 40, 5]),
+        GraphType.ETD.value: {
+            ProblemTableLabel.T.value: MagicMock(to_list=lambda: [200, 150, 100]),
+            ProblemTableLabel.H_NET.value: MagicMock(to_list=lambda: [10, 40, 5]),
         }
     }
     mock_zone = MagicMock(spec=Zone)
@@ -364,7 +373,7 @@ def test_create_graph_set_includes_energy_transfer_diagram():
     graph_set = _create_graph_set(mock_target, zone=mock_zone)
 
     assert len(graph_set["graphs"]) == 1
-    assert graph_set["graphs"][0]["type"] == GT.ETD.value
+    assert graph_set["graphs"][0]["type"] == GraphType.ETD.value
     assert (
         graph_set["graphs"][0]["name"]
         == "Energy Transfer Diagram: ZoneA/Energy Transfer Analysis"
@@ -374,15 +383,15 @@ def test_create_graph_set_includes_energy_transfer_diagram():
 def test_create_graph_set_includes_exergy_graphs():
     mock_target = MagicMock()
     mock_target.name = "ZoneA/Direct Integration"
-    mock_target.type = TT.DI.value
+    mock_target.type = TargetType.DI.value
     mock_target.zone_name = "ZoneA"
     mock_target.graphs = {
-        GT.GCC_X.value: {
-            PT.T.value: MagicMock(to_list=lambda: [10, 5, 0]),
+        GraphType.GCC_X.value: {
+            ProblemTableLabel.T.value: MagicMock(to_list=lambda: [10, 5, 0]),
             "X(net)": MagicMock(to_list=lambda: [0, 4, 8]),
         },
-        GT.NLP_X.value: {
-            PT.T.value: MagicMock(to_list=lambda: [10, 5, 0]),
+        GraphType.NLP_X.value: {
+            ProblemTableLabel.T.value: MagicMock(to_list=lambda: [10, 5, 0]),
             "X(surplus)": MagicMock(to_list=lambda: [8, 4, 0]),
             "X(deficit)": MagicMock(to_list=lambda: [0, 2, 4]),
         },
@@ -394,8 +403,8 @@ def test_create_graph_set_includes_exergy_graphs():
     graph_set = _create_graph_set(mock_target, zone=mock_zone)
 
     assert {graph["type"] for graph in graph_set["graphs"]} == {
-        GT.GCC_X.value,
-        GT.NLP_X.value,
+        GraphType.GCC_X.value,
+        GraphType.NLP_X.value,
     }
 
 
@@ -403,17 +412,17 @@ def test_create_graph_set_includes_remaining_graph_families_from_static_fixture(
     table = _graph_fixture("base_table")
     target = SimpleNamespace(
         name="Site/Total Site",
-        type=TT.TS.value,
+        type=TargetType.TS.value,
         period_id="annual",
         zone_name="TargetZone",
         graphs={
-            GT.SCC.value: table,
-            GT.BCC.value: table,
-            GT.GCC.value: table,
-            GT.NLP_HP.value: table,
-            GT.TSP.value: table,
-            GT.SUGCC.value: table,
-            GT.GCC_HP.value: table,
+            GraphType.SCC.value: table,
+            GraphType.BCC.value: table,
+            GraphType.GCC.value: table,
+            GraphType.NLP_HP.value: table,
+            GraphType.TSP.value: table,
+            GraphType.SUGCC.value: table,
+            GraphType.GCC_HP.value: table,
         },
     )
     zone = SimpleNamespace(name="ZoneFromContext", address="Site/ZoneFromContext")
@@ -424,13 +433,13 @@ def test_create_graph_set_includes_remaining_graph_families_from_static_fixture(
     assert graph_set["zone_name"] == "ZoneFromContext"
     assert graph_set["zone_address"] == "Site/ZoneFromContext"
     assert {graph["type"] for graph in graph_set["graphs"]} == {
-        GT.SCC.value,
-        GT.BCC.value,
-        GT.GCC.value,
-        GT.NLP_HP.value,
-        GT.TSP.value,
-        GT.SUGCC.value,
-        GT.GCC_HP.value,
+        GraphType.SCC.value,
+        GraphType.BCC.value,
+        GraphType.GCC.value,
+        GraphType.NLP_HP.value,
+        GraphType.TSP.value,
+        GraphType.SUGCC.value,
+        GraphType.GCC_HP.value,
     }
     assert all(graph["segments"] for graph in graph_set["graphs"])
 
@@ -438,12 +447,12 @@ def test_create_graph_set_includes_remaining_graph_families_from_static_fixture(
 def test_make_energy_transfer_diagram_uses_operation_fixture():
     graph = _make_energy_transfer_diagram_graph(
         "Site/Energy Transfer",
-        {GT.ETD.value: _graph_fixture("energy_transfer_diagram")},
+        {GraphType.ETD.value: _graph_fixture("energy_transfer_diagram")},
     )
 
-    assert graph["type"] == GT.ETD.value
+    assert graph["type"] == GraphType.ETD.value
     assert len(graph["segments"]) == 2
-    assert graph["segments"][0]["series_id"] == f"{GT.ETD.value}:Reactor"
+    assert graph["segments"][0]["series_id"] == f"{GraphType.ETD.value}:Reactor"
     assert graph["segments"][1]["series_description"] == "C cascade"
 
 
@@ -453,20 +462,20 @@ def test_make_graph_helpers_validate_mismatched_metadata_lengths():
     with pytest.raises(ValueError, match="stream_type"):
         _make_composite_graph(
             "Bad",
-            GT.CC.value,
+            GraphType.CC.value,
             table,
             "Composite",
-            value_field=[PT.H_HOT, PT.H_COLD],
+            value_field=[ProblemTableLabel.H_HOT, ProblemTableLabel.H_COLD],
             stream_type=[StreamLoc.HotS],
         )
 
     with pytest.raises(ValueError, match="is_utility_profile"):
         _make_gcc_graph(
             "Bad",
-            GT.GCC.value,
+            GraphType.GCC.value,
             table,
             "Grand",
-            value_field=[PT.H_NET, PT.H_NET_UT],
+            value_field=[ProblemTableLabel.H_NET, ProblemTableLabel.H_NET_UT],
             is_utility_profile=[False],
         )
 
@@ -483,9 +492,9 @@ def test_get_output_graph_data_single_zone(monkeypatch):
     zone.subzones = {}
     target = MagicMock()
     target.name = "Site/Direct Integration"
-    target.type = TT.DI.value
+    target.type = TargetType.DI.value
     target.graphs = {}
-    zone.targets = {TT.DI.value: target}
+    zone.targets = {TargetType.DI.value: target}
 
     monkeypatch.setattr(
         sys.modules[_create_graph_set.__module__],
@@ -508,16 +517,16 @@ def test_get_output_graph_data_keeps_same_target_type_for_multiple_subzones(
     area_b = Zone(name="AreaB", parent_zone=site)
     site._subzones = {"AreaA": area_a, "AreaB": area_b}
 
-    area_a._targets = {TT.DI.value: MagicMock()}
-    area_a._targets[TT.DI.value].name = "Site/AreaA/Direct Integration"
-    area_a._targets[TT.DI.value].type = TT.DI.value
-    area_a._targets[TT.DI.value].graphs = {}
-    area_a._targets[TT.DI.value].zone_name = "AreaA"
-    area_b._targets = {TT.DI.value: MagicMock()}
-    area_b._targets[TT.DI.value].name = "Site/AreaB/Direct Integration"
-    area_b._targets[TT.DI.value].type = TT.DI.value
-    area_b._targets[TT.DI.value].graphs = {}
-    area_b._targets[TT.DI.value].zone_name = "AreaB"
+    area_a._targets = {TargetType.DI.value: MagicMock()}
+    area_a._targets[TargetType.DI.value].name = "Site/AreaA/Direct Integration"
+    area_a._targets[TargetType.DI.value].type = TargetType.DI.value
+    area_a._targets[TargetType.DI.value].graphs = {}
+    area_a._targets[TargetType.DI.value].zone_name = "AreaA"
+    area_b._targets = {TargetType.DI.value: MagicMock()}
+    area_b._targets[TargetType.DI.value].name = "Site/AreaB/Direct Integration"
+    area_b._targets[TargetType.DI.value].type = TargetType.DI.value
+    area_b._targets[TargetType.DI.value].graphs = {}
+    area_b._targets[TargetType.DI.value].zone_name = "AreaB"
 
     monkeypatch.setattr(
         sys.modules[_create_graph_set.__module__],

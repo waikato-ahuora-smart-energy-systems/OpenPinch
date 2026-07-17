@@ -4,14 +4,16 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from ....domain.enums import ZT
+from ....domain.enums import ZoneType
 from ....domain.zone import Zone
 
 __all__ = ["run_targeting_for_zone_and_subzones"]
 
-_DIRECT_ZONE_TYPES = frozenset({ZT.S.value, ZT.P.value, ZT.O.value})
-_INDIRECT_ZONE_TYPES = frozenset({ZT.R.value, ZT.C.value, ZT.S.value, ZT.P.value})
-_KNOWN_ZONE_TYPES = _DIRECT_ZONE_TYPES | _INDIRECT_ZONE_TYPES | {ZT.U.value}
+_DIRECT_ZONE_TYPES = frozenset({ZoneType.S.value, ZoneType.P.value, ZoneType.O.value})
+_INDIRECT_ZONE_TYPES = frozenset(
+    {ZoneType.R.value, ZoneType.C.value, ZoneType.S.value, ZoneType.P.value}
+)
+_KNOWN_ZONE_TYPES = _DIRECT_ZONE_TYPES | _INDIRECT_ZONE_TYPES | {ZoneType.U.value}
 
 
 def run_targeting_for_zone_and_subzones(

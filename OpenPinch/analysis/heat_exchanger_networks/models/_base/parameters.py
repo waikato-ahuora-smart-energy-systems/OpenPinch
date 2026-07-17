@@ -74,12 +74,16 @@ def _normalise_state_arrays(model) -> None:
     if model.N_periods <= 0:
         raise ValueError("HEN model construction requires at least one state.")
     if len(model.period_weights) != model.N_periods:
-        raise ValueError("HEN period weight count must match period_id count.")
+        raise ValueError(
+            "HeatExchangerNetworkLabel period weight count must match period_id count."
+        )
     if not np.isfinite(model.period_weights).all():
-        raise ValueError("HEN period weights must be finite.")
+        raise ValueError("HeatExchangerNetworkLabel period weights must be finite.")
     model.period_weight_sum = float(np.sum(model.period_weights))
     if model.period_weight_sum <= 0.0:
-        raise ValueError("HEN period weights must have a positive sum.")
+        raise ValueError(
+            "HeatExchangerNetworkLabel period weights must have a positive sum."
+        )
 
     for base_name in (
         "T_h_in",

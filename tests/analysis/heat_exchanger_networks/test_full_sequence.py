@@ -67,7 +67,7 @@ from OpenPinch.contracts.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
-from OpenPinch.domain.enums import HeatExchangerKind, HENDesignMethod
+from OpenPinch.domain.enums import HeatExchangerKind, HeatExchangerNetworkDesignMethod
 from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
 from tests.support.paths import REPOSITORY_ROOT
 
@@ -658,11 +658,14 @@ def test_direct_design_run_populates_results_cache_and_preserves_targets(
     assert problem.results.design == design.result
     assert problem.results.targets == target_output.targets
     assert design.selected_network.exchangers
-    assert design.objective_values["total_annual_cost"] > 0
-    assert design.design_method == HENDesignMethod.OpenHENS
-    assert design.manifest is not None
-    assert design.manifest.design_method == HENDesignMethod.OpenHENS
-    assert design.manifest.synthesis_quality_tier == 0
+    assert design.result.objective_values["total_annual_cost"] > 0
+    assert design.result.design_method == HeatExchangerNetworkDesignMethod.OpenHENS
+    assert design.result.manifest is not None
+    assert (
+        design.result.manifest.design_method
+        == HeatExchangerNetworkDesignMethod.OpenHENS
+    )
+    assert design.result.manifest.synthesis_quality_tier == 0
 
 
 def test_open_hens_method_accessor_runs_original_tier_one(monkeypatch) -> None:
@@ -674,9 +677,9 @@ def test_open_hens_method_accessor_runs_original_tier_one(monkeypatch) -> None:
 
     design = configured_problem.design.open_hens()
 
-    assert design.design_method == HENDesignMethod.OpenHENS
-    assert design.manifest is not None
-    assert design.manifest.synthesis_quality_tier == 1
+    assert design.result.design_method == HeatExchangerNetworkDesignMethod.OpenHENS
+    assert design.result.manifest is not None
+    assert design.result.manifest.synthesis_quality_tier == 1
     assert configured_problem.master_zone.config.hens.synthesis_quality_tier == (
         original_config_tier
     )
@@ -692,12 +695,17 @@ def test_default_dispatch_is_fast_tier_zero_and_explicit_openhens_is_tier_one(
     default_design = default_problem.design.heat_exchanger_network()
     explicit_design = explicit_problem.design.open_hens()
 
-    assert default_design.design_method == HENDesignMethod.OpenHENS
-    assert explicit_design.design_method == HENDesignMethod.OpenHENS
-    assert default_design.manifest is not None
-    assert explicit_design.manifest is not None
-    assert default_design.manifest.synthesis_quality_tier == 0
-    assert explicit_design.manifest.synthesis_quality_tier == 1
+    assert (
+        default_design.result.design_method == HeatExchangerNetworkDesignMethod.OpenHENS
+    )
+    assert (
+        explicit_design.result.design_method
+        == HeatExchangerNetworkDesignMethod.OpenHENS
+    )
+    assert default_design.result.manifest is not None
+    assert explicit_design.result.manifest is not None
+    assert default_design.result.manifest.synthesis_quality_tier == 0
+    assert explicit_design.result.manifest.synthesis_quality_tier == 1
     assert default_problem.master_zone.config.hens.synthesis_quality_tier == 4
 
 
@@ -714,12 +722,17 @@ def test_enhanced_synthesis_method_runs_requested_quality_tier(monkeypatch) -> N
         quality_tier=3,
     )
 
-    assert default_design.design_method == HENDesignMethod.OpenHENS
-    assert explicit_design.design_method == HENDesignMethod.OpenHENS
-    assert default_design.manifest is not None
-    assert explicit_design.manifest is not None
-    assert default_design.manifest.synthesis_quality_tier == 2
-    assert explicit_design.manifest.synthesis_quality_tier == 3
+    assert (
+        default_design.result.design_method == HeatExchangerNetworkDesignMethod.OpenHENS
+    )
+    assert (
+        explicit_design.result.design_method
+        == HeatExchangerNetworkDesignMethod.OpenHENS
+    )
+    assert default_design.result.manifest is not None
+    assert explicit_design.result.manifest is not None
+    assert default_design.result.manifest.synthesis_quality_tier == 2
+    assert explicit_design.result.manifest.synthesis_quality_tier == 3
     assert explicit_problem.master_zone.config.hens.synthesis_quality_tier == (
         original_config_tier
     )
@@ -852,18 +865,20 @@ def test_explicit_pdm_tdm_and_evolution_design_methods_share_result_shape(
     tdm = problem.design.thermal_derivative()
     evolution = problem.design.network_evolution((tdm.selected_network,))
 
-    assert pdm.method == "pinch_design_method"
-    assert tdm.method == "thermal_derivative_method"
-    assert evolution.method == "network_evolution_method"
+    assert pdm.result.method == "pinch_design_method"
+    assert tdm.result.method == "thermal_derivative_method"
+    assert evolution.result.method == "network_evolution_method"
     assert problem.results is not None
     assert problem.results.design == evolution.result
-    assert all(outcome.network is not None for outcome in pdm.ranked_networks)
-    assert all(outcome.network is not None for outcome in tdm.ranked_networks)
-    assert all(outcome.network is not None for outcome in evolution.ranked_networks)
-    assert {outcome.task.method for outcome in tdm.ranked_networks} == {
+    assert all(outcome.network is not None for outcome in pdm.result.ranked_networks)
+    assert all(outcome.network is not None for outcome in tdm.result.ranked_networks)
+    assert all(
+        outcome.network is not None for outcome in evolution.result.ranked_networks
+    )
+    assert {outcome.task.method for outcome in tdm.result.ranked_networks} == {
         "thermal_derivative_method",
     }
-    assert {outcome.task.method for outcome in evolution.ranked_networks} == {
+    assert {outcome.task.method for outcome in evolution.result.ranked_networks} == {
         "network_evolution_method",
     }
 
@@ -878,12 +893,17 @@ def test_named_design_accessor_dispatches_each_hen_design_method(
     tdm = problem.design.thermal_derivative()
     evolution = problem.design.network_evolution((tdm.selected_network,))
 
-    assert pdm.design_method == HENDesignMethod.PinchDesign
-    assert pdm.method == "pinch_design_method"
-    assert tdm.design_method == HENDesignMethod.ThermalDerivative
-    assert tdm.method == "thermal_derivative_method"
-    assert evolution.design_method == HENDesignMethod.NetworkEvolution
-    assert evolution.method == "network_evolution_method"
+    assert pdm.result.design_method == HeatExchangerNetworkDesignMethod.PinchDesign
+    assert pdm.result.method == "pinch_design_method"
+    assert (
+        tdm.result.design_method == HeatExchangerNetworkDesignMethod.ThermalDerivative
+    )
+    assert tdm.result.method == "thermal_derivative_method"
+    assert (
+        evolution.result.design_method
+        == HeatExchangerNetworkDesignMethod.NetworkEvolution
+    )
+    assert evolution.result.method == "network_evolution_method"
 
 
 def test_design_accessor_rejects_retired_selector_and_invalid_seed_shapes(
@@ -1200,20 +1220,20 @@ def _skip_if_live_solver_environment_missing() -> None:
     try:
         require_solver_binary(
             "couenne",
-            purpose="single-period/multiperiod HEN equivalence test",
+            purpose="single-period/multiperiod HeatExchangerNetworkLabel equivalence test",
         )
         require_solver_binary(
             "ipopt",
-            purpose="single-period/multiperiod HEN equivalence test",
+            purpose="single-period/multiperiod HeatExchangerNetworkLabel equivalence test",
         )
         require_synthesis_dependency(
             "gekko",
-            purpose="single-period/multiperiod HEN equivalence test",
+            purpose="single-period/multiperiod HeatExchangerNetworkLabel equivalence test",
         )
         require_synthesis_dependency(
             "pyomo.environ",
             package="pyomo",
-            purpose="single-period/multiperiod HEN equivalence test",
+            purpose="single-period/multiperiod HeatExchangerNetworkLabel equivalence test",
         )
     except (MissingSynthesisDependencyError, MissingSynthesisSolverError) as exc:
         pytest.skip(str(exc))

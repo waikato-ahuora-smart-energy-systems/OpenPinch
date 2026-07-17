@@ -8,10 +8,10 @@ from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from ...domain.enums import HeatExchangerNetworkDesignMethod
 from ...domain.heat_exchanger_network import HeatExchangerNetwork
 from .common import (
     HeatExchangerNetworkSynthesisManifest,
-    SynthesisMethod,
     SynthesisTaskStatus,
     _validate_non_negative_finite,
     _validate_optional_identity,
@@ -28,7 +28,7 @@ class HeatExchangerNetworkSynthesisMethodInput(BaseModel):
 
     task_id: str | None = None
     run_id: str
-    method: SynthesisMethod
+    method: HeatExchangerNetworkDesignMethod
     approach_temperature: float
     derivative_threshold: float | None = None
     stage_count: int | None = None
@@ -121,7 +121,7 @@ class HeatExchangerNetworkSynthesisMethodOutput(BaseModel):
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
-    method: SynthesisMethod | None = None
+    method: HeatExchangerNetworkDesignMethod | None = None
     task: HeatExchangerNetworkSynthesisMethodInput | None = None
     status: SynthesisTaskStatus
     network: HeatExchangerNetwork | None = None

@@ -19,7 +19,7 @@ from OpenPinch.analysis.targeting.area_cost import (
 )
 from OpenPinch.domain._stream.segment import StreamSegment
 from OpenPinch.domain.configuration import Configuration
-from OpenPinch.domain.enums import PT
+from OpenPinch.domain.enums import ProblemTableLabel
 from OpenPinch.domain.stream import Stream
 from OpenPinch.domain.stream_collection import StreamCollection
 from tests.support.paths import FIXTURES_ROOT
@@ -44,11 +44,11 @@ def _make_stream(
     """Helper to create a configured stream for the unit tests."""
     return Stream(
         name=name,
-        t_supply=t_supply,
-        t_target=t_target,
+        supply_temperature=t_supply,
+        target_temperature=t_target,
         heat_flow=heat_flow,
-        dt_cont=dt_cont,
-        htc=htc,
+        delta_t_contribution=dt_cont,
+        heat_transfer_coefficient=htc,
         is_process_stream=is_process_stream,
     )
 
@@ -108,16 +108,24 @@ def test_get_balanced_composite_curve_uses_static_resistance_fixture():
 
     updates = result["updates"]
     np.testing.assert_allclose(result["T_col"], np.array(fixture["T_col"]))
-    np.testing.assert_allclose(updates[PT.H_HOT_BAL], np.array([100.0, 80.0, 0.0]))
-    np.testing.assert_allclose(updates[PT.H_COLD_BAL], np.array([100.0, 60.0, 0.0]))
-    np.testing.assert_allclose(updates[PT.RCP_HOT_BAL], np.array([1.5, 2.5, 4.5]))
-    np.testing.assert_allclose(updates[PT.RCP_COLD_BAL], np.array([3.0, 4.0, 5.0]))
     np.testing.assert_allclose(
-        updates[PT.R_HOT_BAL],
+        updates[ProblemTableLabel.H_HOT_BAL], np.array([100.0, 80.0, 0.0])
+    )
+    np.testing.assert_allclose(
+        updates[ProblemTableLabel.H_COLD_BAL], np.array([100.0, 60.0, 0.0])
+    )
+    np.testing.assert_allclose(
+        updates[ProblemTableLabel.RCP_HOT_BAL], np.array([1.5, 2.5, 4.5])
+    )
+    np.testing.assert_allclose(
+        updates[ProblemTableLabel.RCP_COLD_BAL], np.array([3.0, 4.0, 5.0])
+    )
+    np.testing.assert_allclose(
+        updates[ProblemTableLabel.R_HOT_BAL],
         np.array(fixture["expected_R_hot_bal"]),
     )
     np.testing.assert_allclose(
-        updates[PT.R_COLD_BAL],
+        updates[ProblemTableLabel.R_COLD_BAL],
         np.array(fixture["expected_R_cold_bal"]),
     )
 
@@ -133,9 +141,16 @@ def test_get_balanced_composite_curve_without_resistance_data_returns_heat_updat
         np.array(fixture["H_cold_ut"]),
     )
 
-    assert set(result["updates"]) == {PT.H_HOT_BAL, PT.H_COLD_BAL}
-    np.testing.assert_allclose(result["updates"][PT.H_HOT_BAL], [100.0, 80.0, 0.0])
-    np.testing.assert_allclose(result["updates"][PT.H_COLD_BAL], [100.0, 60.0, 0.0])
+    assert set(result["updates"]) == {
+        ProblemTableLabel.H_HOT_BAL,
+        ProblemTableLabel.H_COLD_BAL,
+    }
+    np.testing.assert_allclose(
+        result["updates"][ProblemTableLabel.H_HOT_BAL], [100.0, 80.0, 0.0]
+    )
+    np.testing.assert_allclose(
+        result["updates"][ProblemTableLabel.H_COLD_BAL], [100.0, 60.0, 0.0]
+    )
 
 
 def test_get_area_targets_returns_expected_total_area_from_static_fixture():
@@ -326,13 +341,13 @@ def test_crossing_ranges_deduplicates_segments_within_each_range_only():
                 name="Parent",
                 segments=[
                     StreamSegment(
-                        t_supply=400.0,
-                        t_target=300.0,
+                        supply_temperature=400.0,
+                        target_temperature=300.0,
                         heat_flow=100.0,
                     ),
                     StreamSegment(
-                        t_supply=300.0,
-                        t_target=200.0,
+                        supply_temperature=300.0,
+                        target_temperature=200.0,
                         heat_flow=100.0,
                     ),
                 ],

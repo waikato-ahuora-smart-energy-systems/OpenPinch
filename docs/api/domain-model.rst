@@ -16,8 +16,9 @@ Core Objects
    graphs.
 
 ``Stream``
-   Process or utility stream with supply/target states, shifted temperatures,
-   and active/base ``dt_cont`` behavior. A variable-heat-capacity parent owns
+   Process or utility stream with ``supply_temperature``,
+   ``target_temperature``, shifted temperatures, and base/effective
+   ``delta_t_contribution`` behavior. A variable-heat-capacity parent owns
    an immutable ordered view of internal segment records while retaining one
    physical stream identity.
 

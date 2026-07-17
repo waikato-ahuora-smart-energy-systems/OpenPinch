@@ -9,7 +9,7 @@ import pytest
 import OpenPinch.analysis.targeting.grand_composite as gcc
 from OpenPinch.analysis.numerics import *
 from OpenPinch.analysis.targeting.grand_composite import *
-from OpenPinch.domain.enums import PT
+from OpenPinch.domain.enums import ProblemTableLabel
 from OpenPinch.domain.problem_table import ProblemTable
 from tests.support.paths import FIXTURES_ROOT
 
@@ -33,8 +33,8 @@ def make_df(t_vals, h_net_vals) -> ProblemTable:
     """Build df data used by this test module."""
     return ProblemTable(
         {
-            PT.T: pd.Series(t_vals, dtype="float64"),
-            PT.H_NET: pd.Series(h_net_vals, dtype="float64"),
+            ProblemTableLabel.T: pd.Series(t_vals, dtype="float64"),
+            ProblemTableLabel.H_NET: pd.Series(h_net_vals, dtype="float64"),
         }
     )
 
@@ -62,8 +62,8 @@ def test_get_gcc_without_pockets(
 
     # Structure
     assert isinstance(result, ProblemTable)
-    assert PT.H_NET_NP.value in result.columns
-    assert PT.T.value in result.columns
+    assert ProblemTableLabel.H_NET_NP.value in result.columns
+    assert ProblemTableLabel.T.value in result.columns
     assert len(pt) >= len(t_vals)
 
     # Pocket flattening check
@@ -72,7 +72,7 @@ def test_get_gcc_without_pockets(
         h_idx, c_idx, valid = pt.pinch_idx()
 
         if valid and h_idx + 1 < c_idx:
-            values = pt.loc[h_idx + 1 : c_idx - 1, PT.H_NET_NP]
+            values = pt.loc[h_idx + 1 : c_idx - 1, ProblemTableLabel.H_NET_NP]
             first_val = values.iloc[0]
             assert all(abs(val - first_val) < 1e-6 for val in values), (
                 f"Pocket not flattened: found values {list(values)} between pinches."
@@ -82,50 +82,52 @@ def test_get_gcc_without_pockets(
 def test_get_gcc_with_vertical_heat_transfer_clears_top_and_bottom():
     pt = ProblemTable(
         {
-            PT.T: [400, 300, 200, 100],
-            PT.H_COLD: [500, 300, 100, 50],
-            PT.H_HOT: [250, 150, 100, 0],
-            PT.H_NET: [250, 150, 0, 50],
+            ProblemTableLabel.T: [400, 300, 200, 100],
+            ProblemTableLabel.H_COLD: [500, 300, 100, 50],
+            ProblemTableLabel.H_HOT: [250, 150, 100, 0],
+            ProblemTableLabel.H_NET: [250, 150, 0, 50],
         }
     )
 
     pt_copy = pt.copy
     result = get_GCC_with_vertical_heat_transfer(
-        T_col=pt_copy[PT.T],
-        h_cold=pt_copy[PT.H_COLD],
-        h_hot=pt_copy[PT.H_HOT],
-        h_net=pt_copy[PT.H_NET],
+        T_col=pt_copy[ProblemTableLabel.T],
+        h_cold=pt_copy[ProblemTableLabel.H_COLD],
+        h_hot=pt_copy[ProblemTableLabel.H_HOT],
+        h_net=pt_copy[ProblemTableLabel.H_NET],
     )
 
-    assert np.allclose(result["T_col"], pt_copy[PT.T])
-    assert PT.H_NET_V in result["updates"]
-    assert result["updates"][PT.H_NET_V][0] == 250  # Top value nonzero
-    assert result["updates"][PT.H_NET_V][-1] == 50  # Bottom-out should zero
+    assert np.allclose(result["T_col"], pt_copy[ProblemTableLabel.T])
+    assert ProblemTableLabel.H_NET_V in result["updates"]
+    assert result["updates"][ProblemTableLabel.H_NET_V][0] == 250  # Top value nonzero
+    assert (
+        result["updates"][ProblemTableLabel.H_NET_V][-1] == 50
+    )  # Bottom-out should zero
 
 
 def test_get_gcc_with_partial_pockets_cuts_pocket_and_inserts_breakpoints():
     pt = ProblemTable(
         {
-            PT.T: [200.0, 150.0, 100.0, 50.0, 0.0],
-            PT.H_NET: [0.0, 50.0, 100.0, 50.0, 0.0],
-            PT.H_NET_NP: [0.0, 0.0, 0.0, 0.0, 0.0],
+            ProblemTableLabel.T: [200.0, 150.0, 100.0, 50.0, 0.0],
+            ProblemTableLabel.H_NET: [0.0, 50.0, 100.0, 50.0, 0.0],
+            ProblemTableLabel.H_NET_NP: [0.0, 0.0, 0.0, 0.0, 0.0],
         }
     )
 
     result = get_GCC_with_partial_pockets(
-        T_col=pt[PT.T],
-        h_net=pt[PT.H_NET],
-        h_net_np=pt[PT.H_NET_NP],
+        T_col=pt[ProblemTableLabel.T],
+        h_net=pt[ProblemTableLabel.H_NET],
+        h_net_np=pt[ProblemTableLabel.H_NET_NP],
         dt_cut=60.0,
     )
 
     assert np.allclose(result["T_col"], [200.0, 150.0, 130.0, 100.0, 70.0, 50.0, 0.0])
     assert np.allclose(
-        result["updates"][PT.H_NET_PK],
+        result["updates"][ProblemTableLabel.H_NET_PK],
         [0.0, 0.0, 0.0, 30.0, 0.0, 0.0, 0.0],
     )
     assert np.allclose(
-        result["updates"][PT.H_NET_AI],
+        result["updates"][ProblemTableLabel.H_NET_AI],
         [0.0, 50.0, 70.0, 70.0, 70.0, 50.0, 0.0],
     )
 
@@ -133,8 +135,8 @@ def test_get_gcc_with_partial_pockets_cuts_pocket_and_inserts_breakpoints():
 def test_get_additional_gccs_uses_assisted_profile_as_actual_when_enabled():
     pt = ProblemTable(
         {
-            PT.T: [200.0, 150.0, 100.0, 50.0, 0.0],
-            PT.H_NET: [0.0, 50.0, 100.0, 50.0, 0.0],
+            ProblemTableLabel.T: [200.0, 150.0, 100.0, 50.0, 0.0],
+            ProblemTableLabel.H_NET: [0.0, 50.0, 100.0, 50.0, 0.0],
         }
     )
 
@@ -144,11 +146,15 @@ def test_get_additional_gccs_uses_assisted_profile_as_actual_when_enabled():
         assisted_ht_dt_cut=60.0,
     )
 
-    assert np.allclose(result[PT.T], [200.0, 150.0, 130.0, 100.0, 70.0, 50.0, 0.0])
-    assert np.allclose(result[PT.H_NET_NP], np.zeros(7))
-    assert np.allclose(result[PT.H_NET_A], result[PT.H_NET_AI])
     assert np.allclose(
-        result[PT.H_NET_A],
+        result[ProblemTableLabel.T], [200.0, 150.0, 130.0, 100.0, 70.0, 50.0, 0.0]
+    )
+    assert np.allclose(result[ProblemTableLabel.H_NET_NP], np.zeros(7))
+    assert np.allclose(
+        result[ProblemTableLabel.H_NET_A], result[ProblemTableLabel.H_NET_AI]
+    )
+    assert np.allclose(
+        result[ProblemTableLabel.H_NET_A],
         [0.0, 50.0, 70.0, 70.0, 70.0, 50.0, 0.0],
     )
 
@@ -156,17 +162,19 @@ def test_get_additional_gccs_uses_assisted_profile_as_actual_when_enabled():
 def test_get_additional_gccs_uses_vertical_profile_as_actual_when_enabled():
     pt = ProblemTable(
         {
-            PT.T: [400, 300, 200, 100],
-            PT.H_COLD: [500, 300, 100, 50],
-            PT.H_HOT: [250, 150, 100, 0],
-            PT.H_NET: [250, 150, 0, 50],
+            ProblemTableLabel.T: [400, 300, 200, 100],
+            ProblemTableLabel.H_COLD: [500, 300, 100, 50],
+            ProblemTableLabel.H_HOT: [250, 150, 100, 0],
+            ProblemTableLabel.H_NET: [250, 150, 0, 50],
         }
     )
 
     result = get_additional_GCCs(pt, do_vert_cc_calc=True)
 
-    assert PT.H_NET_V.value in result.columns
-    np.testing.assert_allclose(result[PT.H_NET_A], result[PT.H_NET_V])
+    assert ProblemTableLabel.H_NET_V.value in result.columns
+    np.testing.assert_allclose(
+        result[ProblemTableLabel.H_NET_A], result[ProblemTableLabel.H_NET_V]
+    )
 
 
 def test_get_gcc_with_partial_pockets_handles_empty_boundary_and_short_runs():
@@ -175,14 +183,18 @@ def test_get_gcc_with_partial_pockets_handles_empty_boundary_and_short_runs():
         h_net=np.array([0.0, 0.0]),
         h_net_np=np.array([0.0, 0.0]),
     )
-    np.testing.assert_allclose(no_pockets["updates"][PT.H_NET_PK], [0.0, 0.0])
+    np.testing.assert_allclose(
+        no_pockets["updates"][ProblemTableLabel.H_NET_PK], [0.0, 0.0]
+    )
 
     boundary_run = get_GCC_with_partial_pockets(
         T_col=np.array([100.0, 50.0, 0.0]),
         h_net=np.array([10.0, 10.0, 0.0]),
         h_net_np=np.array([0.0, 0.0, 0.0]),
     )
-    np.testing.assert_allclose(boundary_run["updates"][PT.H_NET_AI], [0.0, 0.0, 0.0])
+    np.testing.assert_allclose(
+        boundary_run["updates"][ProblemTableLabel.H_NET_AI], [0.0, 0.0, 0.0]
+    )
 
     short_run = get_GCC_with_partial_pockets(
         T_col=np.array([100.0, 95.0, 90.0]),
@@ -190,7 +202,9 @@ def test_get_gcc_with_partial_pockets_handles_empty_boundary_and_short_runs():
         h_net_np=np.array([0.0, 0.0, 0.0]),
         dt_cut=20.0,
     )
-    np.testing.assert_allclose(short_run["updates"][PT.H_NET_PK], [0.0, 10.0, 0.0])
+    np.testing.assert_allclose(
+        short_run["updates"][ProblemTableLabel.H_NET_PK], [0.0, 10.0, 0.0]
+    )
 
 
 def test_get_gcc_with_partial_pockets_keeps_pocket_when_cut_height_is_zero():
@@ -201,26 +215,30 @@ def test_get_gcc_with_partial_pockets_keeps_pocket_when_cut_height_is_zero():
         dt_cut=40.0,
     )
 
-    np.testing.assert_allclose(result["updates"][PT.H_NET_PK], [0.0, 10.0, 0.0])
-    np.testing.assert_allclose(result["updates"][PT.H_NET_AI], [0.0, 0.0, 0.0])
+    np.testing.assert_allclose(
+        result["updates"][ProblemTableLabel.H_NET_PK], [0.0, 10.0, 0.0]
+    )
+    np.testing.assert_allclose(
+        result["updates"][ProblemTableLabel.H_NET_AI], [0.0, 0.0, 0.0]
+    )
 
 
 def test_get_GCC_needing_utility_combines_columns():
-    pt = ProblemTable({PT.H_NET_NP: [100, 200, 300]})
+    pt = ProblemTable({ProblemTableLabel.H_NET_NP: [100, 200, 300]})
 
     result = get_GCC_needing_utility(
         T_col=np.array([300.0, 200.0, 100.0]),
-        h_net=pt[PT.H_NET_NP],
+        h_net=pt[ProblemTableLabel.H_NET_NP],
     )
 
     expected = [100, 200, 300]
-    assert (result["updates"][PT.H_NET_A] == expected).all()
+    assert (result["updates"][ProblemTableLabel.H_NET_A] == expected).all()
 
 
 def test_get_gcc_without_pockets_updates_pinch_after_insertions():
     pt = ProblemTable(
         {
-            PT.T: [
+            ProblemTableLabel.T: [
                 259.0,
                 258.9,
                 245.0,
@@ -238,7 +256,7 @@ def test_get_gcc_without_pockets_updates_pinch_after_insertions():
                 11.1,
                 11.0,
             ],
-            PT.H_NET: [
+            ProblemTableLabel.H_NET: [
                 750.0,
                 750.0,
                 750.0,
@@ -261,29 +279,29 @@ def test_get_gcc_without_pockets_updates_pinch_after_insertions():
 
     result = get_GCC_without_pockets(pt)
 
-    assert any(abs(t - 225.0) < 1e-6 for t in result[PT.T])
-    assert any(abs(t - 175.0) < 1e-6 for t in result[PT.T])
+    assert any(abs(t - 225.0) < 1e-6 for t in result[ProblemTableLabel.T])
+    assert any(abs(t - 175.0) < 1e-6 for t in result[ProblemTableLabel.T])
 
 
 def test_get_separated_heat_profiles_categorises_correctly():
     pt = ProblemTable(
         {
-            PT.T: [400, 300, 200],
-            PT.H_NET_A: [300, 0, 100],
-            PT.RCP_UT_NET: [5, 10, 15],
+            ProblemTableLabel.T: [400, 300, 200],
+            ProblemTableLabel.H_NET_A: [300, 0, 100],
+            ProblemTableLabel.RCP_UT_NET: [5, 10, 15],
         }
     )
 
     result_cols = get_seperated_gcc_heat_load_profiles(
-        T_col=pt[PT.T],
-        H_net=pt[PT.H_NET_A],
+        T_col=pt[ProblemTableLabel.T],
+        H_net=pt[ProblemTableLabel.H_NET_A],
     )
 
-    assert np.allclose(result_cols["T_col"], pt[PT.T])
-    assert PT.H_NET_HOT in result_cols["updates"]
-    assert PT.H_NET_COLD in result_cols["updates"]
-    assert result_cols["updates"][PT.H_NET_HOT][-1] == -100
-    assert result_cols["updates"][PT.H_NET_COLD][0] == 300
+    assert np.allclose(result_cols["T_col"], pt[ProblemTableLabel.T])
+    assert ProblemTableLabel.H_NET_HOT in result_cols["updates"]
+    assert ProblemTableLabel.H_NET_COLD in result_cols["updates"]
+    assert result_cols["updates"][ProblemTableLabel.H_NET_HOT][-1] == -100
+    assert result_cols["updates"][ProblemTableLabel.H_NET_COLD][0] == 300
 
 
 def test_get_separated_heat_profiles_handles_utility_profiles_with_rcp():
@@ -294,12 +312,16 @@ def test_get_separated_heat_profiles_handles_utility_profiles_with_rcp():
         is_process_stream=False,
     )
 
-    assert PT.H_HOT_UT in result["updates"]
-    assert PT.H_COLD_UT in result["updates"]
-    assert PT.RCP_HOT_UT in result["updates"]
-    assert PT.RCP_COLD_UT in result["updates"]
-    np.testing.assert_allclose(result["updates"][PT.RCP_HOT_UT], [0.0, 2.0, 0.0])
-    np.testing.assert_allclose(result["updates"][PT.RCP_COLD_UT], [1.0, 0.0, 3.0])
+    assert ProblemTableLabel.H_HOT_UT in result["updates"]
+    assert ProblemTableLabel.H_COLD_UT in result["updates"]
+    assert ProblemTableLabel.RCP_HOT_UT in result["updates"]
+    assert ProblemTableLabel.RCP_COLD_UT in result["updates"]
+    np.testing.assert_allclose(
+        result["updates"][ProblemTableLabel.RCP_HOT_UT], [0.0, 2.0, 0.0]
+    )
+    np.testing.assert_allclose(
+        result["updates"][ProblemTableLabel.RCP_COLD_UT], [1.0, 0.0, 3.0]
+    )
 
 
 def test_gcc_private_pocket_helpers_cover_run_and_cut_edges():

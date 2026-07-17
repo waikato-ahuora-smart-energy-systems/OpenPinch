@@ -1,4 +1,4 @@
-"""Benchmark diagnostics tests for HEN quality-tier evaluation."""
+"""Benchmark diagnostics tests for HeatExchangerNetworkLabel quality-tier evaluation."""
 
 from __future__ import annotations
 

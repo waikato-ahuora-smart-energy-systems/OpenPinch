@@ -31,7 +31,8 @@ Ranked Synthesis
    grid = design.grid(rank=1)
 
 The design view also exposes ``selected_network``, total recovery, hot and cold
-utility duty, ``utility(name)``, and ``model_dump(...)``.
+utility duty, and ``utility(name)``. Serialize the complete result with
+``design.result.model_dump(mode="json")``.
 
 Named Advanced Methods
 ----------------------
@@ -122,12 +123,6 @@ verification, ranking, and derivative calculations. A future exact
 logarithmic-LMTD formulation would be limited to the continuous NLP path and is
 not the current contract.
 
-Migration and Verification
---------------------------
-
-Old import paths and OpenHENS field aliases are not compatibility surfaces.
-Convert source data to native JSON or ``TargetInput`` contracts and use the
-package-root workflow.
 
 Contributor verification separates ordinary, synthesis, and external-solver
 profiles:

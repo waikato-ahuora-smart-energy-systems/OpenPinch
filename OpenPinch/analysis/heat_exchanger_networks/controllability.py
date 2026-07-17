@@ -44,7 +44,7 @@ def quantify_heat_exchanger_network_controllability(
     rank_tolerance: float | None = None,
     condition_warning_threshold: float = 25.0,
 ) -> HeatExchangerNetworkControllabilityResult:
-    """Return a 0-1 controllability assessment for a solved HEN.
+    """Return a 0-1 controllability assessment for a solved HeatExchangerNetworkLabel.
 
     The service builds a steady-state interaction matrix from available network
     data. Rows are process-stream outlet temperatures, columns are practical

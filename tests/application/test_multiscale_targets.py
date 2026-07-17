@@ -7,14 +7,14 @@ import pytest
 from OpenPinch.application._problem.targeting.dispatch import (
     run_targeting_for_zone_and_subzones,
 )
-from OpenPinch.domain.enums import ZT
+from OpenPinch.domain.enums import ZoneType
 from OpenPinch.domain.zone import Zone
 
 
 def _zone_tree() -> Zone:
-    site = Zone(name="Site", type=ZT.S.value)
-    process = Zone(name="Process", type=ZT.P.value)
-    operation = Zone(name="Operation", type=ZT.O.value)
+    site = Zone(name="Site", type=ZoneType.S.value)
+    process = Zone(name="Process", type=ZoneType.P.value)
+    operation = Zone(name="Operation", type=ZoneType.O.value)
     process.add_zone(operation)
     site.add_zone(process)
     return site
@@ -59,7 +59,7 @@ def test_targeting_traversal_passes_the_same_arguments_to_each_service():
 
 
 def test_targeting_traversal_skips_utility_zones():
-    utility = Zone(name="Utilities", type=ZT.U.value)
+    utility = Zone(name="Utilities", type=ZoneType.U.value)
     calls: list[str] = []
 
     result = run_targeting_for_zone_and_subzones(

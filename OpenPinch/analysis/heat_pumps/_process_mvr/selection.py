@@ -6,7 +6,7 @@ import numpy as np
 from CoolProp.CoolProp import PropsSI
 
 from ....domain.configuration import tol
-from ....domain.enums import ST
+from ....domain.enums import StreamType
 from ....domain.stream import Stream
 from ....domain.zone import Zone
 from .membership import walk_zones
@@ -80,11 +80,11 @@ def selector_matches(selector, key: str, stream: Stream) -> bool:
 
 def validate_process_mvr_source(stream: Stream, selector) -> None:
     """Validate source role, phase, fluid, and period thermodynamic states."""
-    if not stream.active:
+    if not stream.is_active:
         raise ValueError(f"MVR source stream {selector!r} is not active.")
     if not stream.is_process_stream:
         raise ValueError(f"MVR source stream {selector!r} must be a process stream.")
-    if stream.type != ST.Hot.value:
+    if stream.stream_type != StreamType.Hot.value:
         raise ValueError(f"MVR source stream {selector!r} must be a hot stream.")
     phase = str(stream.fluid_phase or "").strip().lower()
     if phase not in {"gas", "vapour", "vapor"}:
@@ -104,19 +104,19 @@ def validate_process_mvr_source_phase(stream: Stream, selector) -> None:
     target_pressures: list[float] = []
     for index in range(period_count):
         supply_temperature = required_period_value(
-            stream.t_supply,
+            stream.supply_temperature,
             index,
             "t_supply",
             selector,
         )
         target_temperature = required_period_value(
-            stream.t_target,
+            stream.target_temperature,
             index,
             "t_target",
             selector,
         )
-        supply_pressure = value_at_index(stream.p_supply, index, unit="kPa")
-        target_pressure = value_at_index(stream.p_target, index, unit="kPa")
+        supply_pressure = value_at_index(stream.supply_pressure, index, unit="kPa")
+        target_pressure = value_at_index(stream.target_pressure, index, unit="kPa")
         critical_temperature = to_degrees_celsius(
             coolprop_value("TCRIT", str(stream.fluid_name))
         )
@@ -169,10 +169,10 @@ def validate_process_mvr_source_phase(stream: Stream, selector) -> None:
         supply_pressures.append(float(supply_pressure))
         target_pressures.append(float(target_pressure))
 
-    if stream.p_supply is None:
-        stream.p_supply = period_values_or_scalar(supply_pressures)
-    if stream.p_target is None:
-        stream.p_target = period_values_or_scalar(target_pressures)
+    if stream.supply_pressure is None:
+        stream.supply_pressure = period_values_or_scalar(supply_pressures)
+    if stream.target_pressure is None:
+        stream.target_pressure = period_values_or_scalar(target_pressures)
 
 
 def validate_vapour_state(

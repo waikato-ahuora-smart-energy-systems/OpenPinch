@@ -24,8 +24,8 @@ def source_enthalpies(
     period_index: int,
 ) -> tuple[float, float]:
     """Resolve source enthalpies from input data or CoolProp states."""
-    supply_enthalpy = value_at_index(stream.h_supply, period_index, unit="kJ/kg")
-    target_enthalpy = value_at_index(stream.h_target, period_index, unit="kJ/kg")
+    supply_enthalpy = value_at_index(stream.supply_enthalpy, period_index, unit="kJ/kg")
+    target_enthalpy = value_at_index(stream.target_enthalpy, period_index, unit="kJ/kg")
     if supply_enthalpy is not None and target_enthalpy is not None:
         return to_j_per_kg(supply_enthalpy), to_j_per_kg(target_enthalpy)
     return (

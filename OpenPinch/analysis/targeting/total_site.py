@@ -13,7 +13,7 @@ from typing import Tuple
 import numpy as np
 
 from ...domain._problem_table.types import ProblemTableUpdateKwargs
-from ...domain.enums import GT, PT, TT
+from ...domain.enums import GraphType, ProblemTableLabel, TargetType
 from ...domain.problem_table import ProblemTable
 from ...domain.stream_collection import StreamCollection
 from ...domain.targets import TotalProcessTarget, TotalSiteTarget
@@ -49,7 +49,7 @@ def compute_total_subzone_utility_targets(
         attr_name="heat_flow", value=0.0, idx=idx
     )
     for subzone in zone.subzones.values():
-        t = subzone.targets[TT.DI.value]
+        t = subzone.targets[TargetType.DI.value]
         hot_utility_target += t.hot_utility_target
         cold_utility_target += t.cold_utility_target
         heat_recovery_target += t.heat_recovery_target
@@ -71,10 +71,10 @@ def compute_total_subzone_utility_targets(
                 idx=idx,
             )
 
-    heat_recovery_limit = zone.targets[TT.DI.value].heat_recovery_limit
+    heat_recovery_limit = zone.targets[TargetType.DI.value].heat_recovery_limit
     output = {
         "zone_name": zone.name,
-        "type": TT.TZ.value,
+        "type": TargetType.TZ.value,
         "parent_zone": zone.parent_zone,
         "config": zone.config,
         "hot_utilities": hot_utilities,
@@ -107,7 +107,7 @@ def compute_indirect_integration_targets(
     resulting Total Site target on ``zone`` before returning it.
     """
     idx, sid = get_period_index(period_ids=zone.period_ids, args=args)
-    s_tzt = zone.targets[TT.TZ.value]
+    s_tzt = zone.targets[TargetType.TZ.value]
     if len(zone.net_hot_streams) == 0 and len(zone.net_cold_streams) == 0:
         return None
 
@@ -120,9 +120,9 @@ def compute_indirect_integration_targets(
     )
     pt.update(
         **_shift_site_process_profiles(
-            T_col=pt[PT.T],
-            H_hot=pt[PT.H_HOT],
-            H_cold=pt[PT.H_COLD],
+            T_col=pt[ProblemTableLabel.T],
+            H_hot=pt[ProblemTableLabel.H_HOT],
+            H_cold=pt[ProblemTableLabel.H_COLD],
         )
     )
     # Apply the problem table algorithm to subzone utility use
@@ -136,12 +136,12 @@ def compute_indirect_integration_targets(
     )
 
     # Extract overall heat integration targets
-    hot_utility_target = pt.loc[0, PT.H_NET_UT]
-    cold_utility_target = pt.loc[-1, PT.H_NET_UT]
+    hot_utility_target = pt.loc[0, ProblemTableLabel.H_NET_UT]
+    cold_utility_target = pt.loc[-1, ProblemTableLabel.H_NET_UT]
     heat_recovery_target = s_tzt.heat_recovery_target + (
         s_tzt.hot_utility_target - hot_utility_target
     )
-    hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=PT.H_NET_UT)
+    hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=ProblemTableLabel.H_NET_UT)
 
     # Apply the utility targeting method to determine the net utility use and generation
     hot_utilities, cold_utilities = _match_utility_gen_and_use_at_same_level(
@@ -152,7 +152,7 @@ def compute_indirect_integration_targets(
 
     output = {
         "zone_name": zone.name,
-        "type": TT.TS.value,
+        "type": TargetType.TS.value,
         "parent_zone": zone.parent_zone,
         "config": zone.config,
         "pt": pt,
@@ -193,8 +193,20 @@ def _match_utility_gen_and_use_at_same_level(
     for u_h in hot_utilities:
         for u_c in cold_utilities:
             if (
-                abs((u_h.t_supply[period_idx] - u_c.t_target[period_idx])) < 1
-                and abs((u_h.t_target[period_idx] - u_c.t_supply[period_idx])) < 1
+                abs(
+                    (
+                        u_h.supply_temperature[period_idx]
+                        - u_c.target_temperature[period_idx]
+                    )
+                )
+                < 1
+                and abs(
+                    (
+                        u_h.target_temperature[period_idx]
+                        - u_c.supply_temperature[period_idx]
+                    )
+                )
+                < 1
             ):
                 Q = min(u_h.heat_flow[period_idx], u_c.heat_flow[period_idx])
                 u_h.set_value_attr_at_idx(
@@ -225,8 +237,8 @@ def _shift_site_process_profiles(
     return {
         "T_col": T_col,
         "updates": {
-            PT.H_HOT: H_hot - H_hot[0],
-            PT.H_COLD: H_cold - H_cold[-1],
+            ProblemTableLabel.H_HOT: H_hot - H_hot[0],
+            ProblemTableLabel.H_COLD: H_cold - H_cold[-1],
         },
     }
 
@@ -243,13 +255,14 @@ def _build_site_utility_profile(
         is_shifted=is_shifted,
         period_idx=idx,
     )
-    h_net_ut = pt_ut[PT.H_HOT] - pt_ut[PT.H_COLD]
+    h_net_ut = pt_ut[ProblemTableLabel.H_HOT] - pt_ut[ProblemTableLabel.H_COLD]
     return {
-        "T_col": pt_ut[PT.T],
+        "T_col": pt_ut[ProblemTableLabel.T],
         "updates": {
-            PT.H_NET_UT: h_net_ut - h_net_ut.min(),
-            PT.H_HOT_UT: pt_ut[PT.H_HOT],
-            PT.H_COLD_UT: pt_ut[PT.H_COLD] - pt_ut[PT.H_COLD].max(),
+            ProblemTableLabel.H_NET_UT: h_net_ut - h_net_ut.min(),
+            ProblemTableLabel.H_HOT_UT: pt_ut[ProblemTableLabel.H_HOT],
+            ProblemTableLabel.H_COLD_UT: pt_ut[ProblemTableLabel.H_COLD]
+            - pt_ut[ProblemTableLabel.H_COLD].max(),
         },
     }
 
@@ -260,6 +273,20 @@ def _save_graph_data(
     """Prepare graph-ready tables capturing site-level utility composite curves."""
     pt.round(decimals=4)
     return {
-        GT.TSP.value: pt.slice([PT.T, PT.H_HOT, PT.H_COLD, PT.H_HOT_UT, PT.H_COLD_UT]),
-        GT.SUGCC.value: pt.slice([PT.T, PT.H_NET_UT, PT.H_NET_HP]),
+        GraphType.TSP.value: pt.slice(
+            [
+                ProblemTableLabel.T,
+                ProblemTableLabel.H_HOT,
+                ProblemTableLabel.H_COLD,
+                ProblemTableLabel.H_HOT_UT,
+                ProblemTableLabel.H_COLD_UT,
+            ]
+        ),
+        GraphType.SUGCC.value: pt.slice(
+            [
+                ProblemTableLabel.T,
+                ProblemTableLabel.H_NET_UT,
+                ProblemTableLabel.H_NET_HP,
+            ]
+        ),
     }

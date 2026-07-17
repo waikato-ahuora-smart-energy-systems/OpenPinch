@@ -30,7 +30,7 @@ def test_build_curve_pure():
 
 
 def test_get_piecewise_linearisation_for_streams_mismatched_lengths():
-    streams = [SimpleNamespace(t_supply=150.0, t_target=80.0)]
+    streams = [SimpleNamespace(supply_temperature=150.0, target_temperature=80.0)]
     with pytest.raises(ValueError, match="different number of streams"):
         sl.get_piecewise_linearisation_for_streams(
             streams, t_h_data=[], dt_diff_max=0.2
@@ -39,8 +39,8 @@ def test_get_piecewise_linearisation_for_streams_mismatched_lengths():
 
 def test_get_piecewise_linearisation_for_streams_returns_every_profile():
     streams = [
-        SimpleNamespace(t_supply=150.0, t_target=80.0),
-        SimpleNamespace(t_supply=60.0, t_target=120.0),
+        SimpleNamespace(supply_temperature=150.0, target_temperature=80.0),
+        SimpleNamespace(supply_temperature=60.0, target_temperature=120.0),
     ]
     t_h_data = [
         [[0.0, 150.0], [1.0, 110.0], [2.0, 80.0]],

@@ -820,16 +820,13 @@ def test_solver_array_private_helpers_cover_period_and_value_edges() -> None:
             SimpleNamespace(period_ids=_TruthyEmptyMapping(), weights=[])
         )
 
-    assert (
-        arrays_module._temperature_contribution(
-            SimpleNamespace(dt_cont=_SinglePeriodValue(0.25)),
-            20.0,
-        )
-        == 5.0
-    )
+    assert arrays_module._temperature_contribution(
+        SimpleNamespace(delta_t_contribution=_SinglePeriodValue(0.25)),
+        20.0,
+    ) == pytest.approx(5.0)
     assert (
         arrays_module._stream_heat_capacity_flowrate(
-            SimpleNamespace(CP=_SinglePeriodValue(8.0)),
+            SimpleNamespace(heat_capacity_flowrate=_SinglePeriodValue(8.0)),
             SimpleNamespace(),
         )
         == 8.0

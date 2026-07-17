@@ -20,7 +20,8 @@ Lifecycle
    network selection and grid rendering.
 
 ``invalidated``
-   Loading new input, changing stored options, changing ``dt_cont``, or mutating
+   Loading new input, changing stored options, changing the temperature-approach
+   contribution, or mutating
    a process component clears results that no longer describe the prepared
    problem.
 

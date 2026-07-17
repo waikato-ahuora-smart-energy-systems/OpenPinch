@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: CONSTRUCTION - Package Usability Refactor complete; Operations N/A
+- **Current Stage**: CONSTRUCTION - Compatibility Shim Canonicalization complete; Operations N/A
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -165,6 +165,49 @@
   profiles pass. The complete non-solver suite passes 2,084 tests with 3
   opt-in-profile skips and 4 external-solver deselections; Ruff, architecture,
   offline warning-as-error Sphinx, and stale-symbol checks pass.
+
+## Compatibility Shim Canonicalization Progress
+
+- [x] INCEPTION - Workspace Detection and continuity
+- [x] INCEPTION - Reverse Engineering reused with focused live audit
+- [x] INCEPTION - Requirements Analysis approved by implementation request
+- [x] INCEPTION - User Stories reused from package usability refactor
+- [x] INCEPTION - Workflow Planning
+- [x] INCEPTION - Application Design reused
+- [x] INCEPTION - Units Generation skipped; one coupled clean-break unit
+- [x] CONSTRUCTION - Functional Design
+- [x] CONSTRUCTION - NFR Requirements and Design reused
+- [x] CONSTRUCTION - Infrastructure Design skipped
+- [x] CONSTRUCTION - Code Generation
+- [x] CONSTRUCTION - Build and Test
+- [x] OPERATIONS - N/A; no deployment work requested
+- **Approval mode**: The user's explicit implementation request approves the
+  decision-complete plan, and the earlier blanket approval remains active through
+  completion.
+- **Compatibility policy**: Immediate clean break with compact wire keys retained but
+  no runtime aliases, forwarding facades, transition pages, or migration behavior.
+- **Extension configuration**: Security disabled; Resiliency disabled; partial
+  Property-Based Testing enabled for round trips, mutation invariants, generators,
+  shrinking, and fixed-seed pytest integration.
+- **Current stage**: Complete. All ten code-generation steps and every build,
+  test, documentation, tutorial, distribution, and isolated-install gate pass.
+- **Verification evidence**: 2,089 complete-suite tests passed; the fixed-seed
+  non-solver gate passed 2,086 tests with 3 optional skips and 4 solver
+  deselections; slow-HPR and HEN solver tutorial profiles passed; Ruff,
+  warning-free Sphinx, source/wheel build, isolated wheel smoke, stale-symbol
+  checks, and patch hygiene passed.
+- **Requirements**:
+  `aidlc-docs/inception/requirements/compatibility-shim-canonicalization-requirements.md`.
+- **Workflow plan**:
+  `aidlc-docs/inception/plans/compatibility-shim-canonicalization-execution-plan.md`.
+- **Functional design**:
+  `aidlc-docs/construction/compatibility-shim-canonicalization/functional-design/`.
+- **Code Generation plan**:
+  `aidlc-docs/construction/plans/compatibility-shim-canonicalization-code-generation-plan.md`.
+- **Code Generation summary**:
+  `aidlc-docs/construction/compatibility-shim-canonicalization/code/code-generation-summary.md`.
+- **Build and Test summary**:
+  `aidlc-docs/construction/compatibility-shim-canonicalization/build-and-test/build-and-test-summary.md`.
 
 ## Private Helper Reorganization Progress
 

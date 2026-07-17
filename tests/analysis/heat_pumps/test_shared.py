@@ -17,7 +17,7 @@ from OpenPinch.contracts.hpr import (
     HPRThermoArtifacts,
     SimulatedHPRAnnualizedCostAccounting,
 )
-from OpenPinch.domain.enums import PT
+from OpenPinch.domain.enums import ProblemTableLabel
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream_collection import StreamCollection
 from OpenPinch.domain.value import Value
@@ -239,7 +239,7 @@ def test_ambient_preallocation_helpers_cover_zero_and_out_of_range_edges():
 def test_compute_utility_cost_skips_utilities_without_cost_data():
     no_cost = _stream("free", 120.0, 80.0, 10.0, is_process_stream=False)
     priced = _stream("priced", 120.0, 80.0, 10.0, is_process_stream=False)
-    priced.set_value_attr("_cost", [3.5], update_derived=False)
+    priced.set_value_attr("utility_cost", [3.5], update_derived=False)
 
     assert _compute_utility_cost(
         _sc(no_cost), _sc(priced), period_idx=0
@@ -599,9 +599,9 @@ def test_get_heat_pump_cascade_helper(monkeypatch):
         "create_problem_table_with_t_int",
         lambda streams, is_shifted, period_idx: ProblemTable(
             {
-                PT.T: [120.0, 80.0],
-                PT.H_HOT_UT: [0.0, 0.0],
-                PT.H_COLD_UT: [0.0, 0.0],
+                ProblemTableLabel.T: [120.0, 80.0],
+                ProblemTableLabel.H_HOT_UT: [0.0, 0.0],
+                ProblemTableLabel.H_COLD_UT: [0.0, 0.0],
             }
         ),
     )
@@ -611,8 +611,8 @@ def test_get_heat_pump_cascade_helper(monkeypatch):
         lambda *args, **kwargs: {
             "T_col": np.array([120.0, 80.0]),
             "updates": {
-                PT.H_HOT_UT: np.array([5.0, 0.0]),
-                PT.H_COLD_UT: np.array([3.0, 0.0]),
+                ProblemTableLabel.H_HOT_UT: np.array([5.0, 0.0]),
+                ProblemTableLabel.H_COLD_UT: np.array([3.0, 0.0]),
             },
         },
     )

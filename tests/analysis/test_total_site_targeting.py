@@ -10,8 +10,8 @@ import pytest
 
 import OpenPinch.analysis.targeting.total_site as indirect
 from OpenPinch.domain.configuration import Configuration
-from OpenPinch.domain.enums import GT, TT, ZT
-from OpenPinch.domain.enums import ProblemTableLabel as PT
+from OpenPinch.domain.enums import GraphType, TargetType, ZoneType
+from OpenPinch.domain.enums import ProblemTableLabel as ProblemTableLabel
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream import Stream
 from OpenPinch.domain.stream_collection import StreamCollection
@@ -28,8 +28,8 @@ def _fixture() -> dict:
 def _utility_stream(spec: dict) -> Stream:
     return Stream(
         name=spec["name"],
-        t_supply=spec["t_supply"],
-        t_target=spec["t_target"],
+        supply_temperature=spec["t_supply"],
+        target_temperature=spec["t_target"],
         heat_flow=spec["heat_flow"],
         price=spec["price"],
         is_process_stream=False,
@@ -58,8 +58,8 @@ def _target_utilities(fixture: dict, target_spec: dict) -> tuple[StreamCollectio
 def test_compute_indirect_integration_targets_auto_aligns_utility_profile_grids(
     monkeypatch,
 ):
-    zone = Zone(name="Plant", type=ZT.S.value, config=Configuration())
-    zone.targets[TT.TZ.value] = SimpleNamespace(
+    zone = Zone(name="Plant", type=ZoneType.S.value, config=Configuration())
+    zone.targets[TargetType.TZ.value] = SimpleNamespace(
         hot_utilities=StreamCollection(),
         cold_utilities=StreamCollection(),
         heat_recovery_target=25.0,
@@ -67,26 +67,36 @@ def test_compute_indirect_integration_targets_auto_aligns_utility_profile_grids(
         heat_recovery_limit=50.0,
     )
     zone.net_hot_streams.add(
-        Stream(name="NetHot", t_supply=300.0, t_target=100.0, heat_flow=20.0)
+        Stream(
+            name="NetHot",
+            supply_temperature=300.0,
+            target_temperature=100.0,
+            heat_flow=20.0,
+        )
     )
 
     site_pt = ProblemTable(
         {
-            PT.T: [300.0, 100.0],
-            PT.H_HOT: [30.0, 10.0],
-            PT.H_COLD: [5.0, 0.0],
+            ProblemTableLabel.T: [300.0, 100.0],
+            ProblemTableLabel.H_HOT: [30.0, 10.0],
+            ProblemTableLabel.H_COLD: [5.0, 0.0],
         }
     )
     utility_pt = ProblemTable(
         {
-            PT.T: [300.0, 200.0, 100.0],
-            PT.H_HOT: [40.0, 25.0, 10.0],
-            PT.H_COLD: [8.0, 4.0, 1.0],
+            ProblemTableLabel.T: [300.0, 200.0, 100.0],
+            ProblemTableLabel.H_HOT: [40.0, 25.0, 10.0],
+            ProblemTableLabel.H_COLD: [8.0, 4.0, 1.0],
         }
     )
-    expected_h_net_ut = utility_pt[PT.H_HOT] - utility_pt[PT.H_COLD]
+    expected_h_net_ut = (
+        utility_pt[ProblemTableLabel.H_HOT] - utility_pt[ProblemTableLabel.H_COLD]
+    )
     expected_h_net_ut = expected_h_net_ut - expected_h_net_ut.min()
-    expected_h_cold_ut = utility_pt[PT.H_COLD] - utility_pt[PT.H_COLD].max()
+    expected_h_cold_ut = (
+        utility_pt[ProblemTableLabel.H_COLD]
+        - utility_pt[ProblemTableLabel.H_COLD].max()
+    )
 
     calls = {"count": 0, "period_indices": []}
 
@@ -119,23 +129,25 @@ def test_compute_indirect_integration_targets_auto_aligns_utility_profile_grids(
 
     assert calls["count"] == 2
     assert calls["period_indices"] == [0, 0]
-    assert target.pt[PT.T].tolist() == [300.0, 200.0, 100.0]
-    assert np.allclose(target.pt[PT.H_NET_UT], expected_h_net_ut)
-    assert np.allclose(target.pt[PT.H_HOT_UT], utility_pt[PT.H_HOT])
-    assert np.allclose(target.pt[PT.H_COLD_UT], expected_h_cold_ut)
+    assert target.pt[ProblemTableLabel.T].tolist() == [300.0, 200.0, 100.0]
+    assert np.allclose(target.pt[ProblemTableLabel.H_NET_UT], expected_h_net_ut)
+    assert np.allclose(
+        target.pt[ProblemTableLabel.H_HOT_UT], utility_pt[ProblemTableLabel.H_HOT]
+    )
+    assert np.allclose(target.pt[ProblemTableLabel.H_COLD_UT], expected_h_cold_ut)
 
 
 def test_compute_total_subzone_utility_targets_sums_static_fixture_targets():
     fixture = _fixture()
-    zone = Zone(name="Site", type=ZT.S.value, config=Configuration())
+    zone = Zone(name="Site", type=ZoneType.S.value, config=Configuration())
     zone.hot_utilities = _utility_collection(fixture["base_utilities"]["hot"])
     zone.cold_utilities = _utility_collection(fixture["base_utilities"]["cold"])
-    zone.targets[TT.DI.value] = SimpleNamespace(heat_recovery_limit=100.0)
+    zone.targets[TargetType.DI.value] = SimpleNamespace(heat_recovery_limit=100.0)
 
     for target_spec in fixture["subzone_targets"]:
         subzone = Zone(name=target_spec["name"], parent_zone=zone)
         hot_utilities, cold_utilities = _target_utilities(fixture, target_spec)
-        subzone.targets[TT.DI.value] = SimpleNamespace(
+        subzone.targets[TargetType.DI.value] = SimpleNamespace(
             hot_utility_target=target_spec["hot_utility_target"],
             cold_utility_target=target_spec["cold_utility_target"],
             heat_recovery_target=target_spec["heat_recovery_target"],
@@ -158,10 +170,10 @@ def test_compute_total_subzone_utility_targets_sums_static_fixture_targets():
 
 def test_compute_total_subzone_utility_targets_handles_zero_recovery_limit():
     fixture = _fixture()
-    zone = Zone(name="Site", type=ZT.S.value, config=Configuration())
+    zone = Zone(name="Site", type=ZoneType.S.value, config=Configuration())
     zone.hot_utilities = _utility_collection(fixture["base_utilities"]["hot"])
     zone.cold_utilities = _utility_collection(fixture["base_utilities"]["cold"])
-    zone.targets[TT.DI.value] = SimpleNamespace(heat_recovery_limit=0.0)
+    zone.targets[TargetType.DI.value] = SimpleNamespace(heat_recovery_limit=0.0)
 
     target = indirect.compute_total_subzone_utility_targets(zone)
 
@@ -172,8 +184,8 @@ def test_compute_total_subzone_utility_targets_handles_zero_recovery_limit():
 
 def test_compute_indirect_integration_targets_returns_none_without_net_streams():
     fixture = _fixture()
-    zone = Zone(name="Site", type=ZT.S.value, config=Configuration())
-    zone.targets[TT.TZ.value] = SimpleNamespace(
+    zone = Zone(name="Site", type=ZoneType.S.value, config=Configuration())
+    zone.targets[TargetType.TZ.value] = SimpleNamespace(
         hot_utilities=_utility_collection(fixture["base_utilities"]["hot"]),
         cold_utilities=_utility_collection(fixture["base_utilities"]["cold"]),
         heat_recovery_target=0.0,
@@ -214,27 +226,30 @@ def test_indirect_helpers_compute_cost_shift_profiles_and_graph_slices():
         H_hot=np.array([40.0, 10.0]),
         H_cold=np.array([12.0, 2.0]),
     )
-    assert shifted["updates"][PT.H_HOT].tolist() == [0.0, -30.0]
-    assert shifted["updates"][PT.H_COLD].tolist() == [10.0, 0.0]
+    assert shifted["updates"][ProblemTableLabel.H_HOT].tolist() == [0.0, -30.0]
+    assert shifted["updates"][ProblemTableLabel.H_COLD].tolist() == [10.0, 0.0]
 
     pt = ProblemTable(
         {
-            PT.T: [100.12345, 80.98765],
-            PT.H_HOT: [10.0, 2.0],
-            PT.H_COLD: [6.0, 1.0],
-            PT.H_HOT_UT: [3.0, 0.0],
-            PT.H_COLD_UT: [0.0, -1.0],
-            PT.H_NET_UT: [0.0, 2.0],
-            PT.H_NET_HP: [1.0, 4.0],
+            ProblemTableLabel.T: [100.12345, 80.98765],
+            ProblemTableLabel.H_HOT: [10.0, 2.0],
+            ProblemTableLabel.H_COLD: [6.0, 1.0],
+            ProblemTableLabel.H_HOT_UT: [3.0, 0.0],
+            ProblemTableLabel.H_COLD_UT: [0.0, -1.0],
+            ProblemTableLabel.H_NET_UT: [0.0, 2.0],
+            ProblemTableLabel.H_NET_HP: [1.0, 4.0],
         }
     )
 
     graphs = indirect._save_graph_data(pt)
 
-    assert sorted(graphs) == sorted([GT.SUGCC.value, GT.TSP.value])
-    assert graphs[GT.TSP.value][PT.T].tolist() == [100.1234, 80.9876]
-    assert list(graphs[GT.SUGCC.value].columns) == [
-        PT.T.value,
-        PT.H_NET_UT.value,
-        PT.H_NET_HP.value,
+    assert sorted(graphs) == sorted([GraphType.SUGCC.value, GraphType.TSP.value])
+    assert graphs[GraphType.TSP.value][ProblemTableLabel.T].tolist() == [
+        100.1234,
+        80.9876,
+    ]
+    assert list(graphs[GraphType.SUGCC.value].columns) == [
+        ProblemTableLabel.T.value,
+        ProblemTableLabel.H_NET_UT.value,
+        ProblemTableLabel.H_NET_HP.value,
     ]

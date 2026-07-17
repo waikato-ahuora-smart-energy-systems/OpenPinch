@@ -15,7 +15,7 @@ from pydantic import (
 )
 
 from ..domain.configuration_fields import validate_configuration_options
-from ..domain.enums import ST, FluidPhase, HeatExchangerKind, StreamID
+from ..domain.enums import FluidPhase, HeatExchangerKind, StreamID, StreamType
 from .common import ScalarOrVU
 
 
@@ -36,7 +36,6 @@ class StreamSegmentSchema(BaseModel):
 
     model_config = ConfigDict(
         use_enum_values=True,
-        populate_by_name=True,
         extra="forbid",
     )
 
@@ -47,7 +46,7 @@ class TemperatureHeatPointSchema(BaseModel):
     cumulative_heat: ScalarOrVU
     temperature: ScalarOrVU
 
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+    model_config = ConfigDict(extra="forbid")
 
 
 class TemperatureHeatProfileSchema(BaseModel):
@@ -99,7 +98,6 @@ class StreamSchema(BaseModel):
 
     model_config = ConfigDict(
         use_enum_values=True,
-        populate_by_name=True,
         validate_default=True,
         extra="forbid",
     )
@@ -153,7 +151,7 @@ class UtilitySchema(BaseModel):
     """Utility definition including thermal and optional economic attributes."""
 
     name: str
-    type: ST
+    type: StreamType
     segments: Optional[List[StreamSegmentSchema]] = None
     profile: Optional[TemperatureHeatProfileSchema] = None
     t_supply: Optional[ScalarOrVU] = None
@@ -172,8 +170,8 @@ class UtilitySchema(BaseModel):
 
     model_config = ConfigDict(
         use_enum_values=True,
-        populate_by_name=True,
         validate_default=True,
+        extra="forbid",
     )
 
     @field_validator("t_supply")
@@ -223,6 +221,8 @@ class ZoneTreeSchema(BaseModel):
     type: str
     dt_cont_multiplier: Optional[float] = None
     children: Optional[List["ZoneTreeSchema"]] = None
+
+    model_config = ConfigDict(extra="forbid")
 
     @field_validator("dt_cont_multiplier")
     @classmethod
@@ -537,6 +537,47 @@ class HeatExchangerNetworkSchema(BaseModel):
         return self
 
 
+class PlantProfileDataSchema(BaseModel):
+    """One precomputed plant heat-load profile used by site utility workflows."""
+
+    T: List[float]
+    H_net: Optional[List[float]] = None
+    H_hot_net: Optional[List[float]] = None
+    H_cold_net: Optional[List[float]] = None
+
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def _validate_heat_load_profiles(self) -> Self:
+        if self.H_net is None and (self.H_hot_net is None or self.H_cold_net is None):
+            raise ValueError(
+                "plant profile data requires H_net or both H_hot_net and H_cold_net"
+            )
+        expected = len(self.T)
+        for name in ("H_net", "H_hot_net", "H_cold_net"):
+            values = getattr(self, name)
+            if values is not None and len(values) != expected:
+                raise ValueError(f"{name} must have the same length as T")
+        return self
+
+
+class PlantProfileSchema(BaseModel):
+    """Named plant heat-load profile retained with canonical problem input."""
+
+    name: str
+    data: PlantProfileDataSchema
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("name")
+    @classmethod
+    def _validate_name(cls, value: str) -> str:
+        name = value.strip()
+        if not name:
+            raise ValueError("plant profile name must be non-empty")
+        return name
+
+
 class TargetInput(BaseModel):
     """Validated top-level input data for :class:`PinchProblem`."""
 
@@ -545,6 +586,9 @@ class TargetInput(BaseModel):
     options: Optional[dict] = None
     zone_tree: Optional[ZoneTreeSchema] = None
     network: HeatExchangerNetworkSchema | None = None
+    plant_profile_data: List[PlantProfileSchema] = Field(default_factory=list)
+
+    model_config = ConfigDict(extra="forbid")
 
     @field_validator("options")
     @classmethod
@@ -567,6 +611,8 @@ class NonLinearStream(BaseModel):
     h_target: float
     composition: list[tuple[str, float]]
 
+    model_config = ConfigDict(extra="forbid")
+
 
 __all__ = [
     "HeatExchangerAreaSliceSchema",
@@ -574,6 +620,8 @@ __all__ = [
     "HeatExchangerPeriodStateSchema",
     "HeatExchangerSchema",
     "NonLinearStream",
+    "PlantProfileDataSchema",
+    "PlantProfileSchema",
     "StreamSchema",
     "StreamSegmentSchema",
     "TargetInput",

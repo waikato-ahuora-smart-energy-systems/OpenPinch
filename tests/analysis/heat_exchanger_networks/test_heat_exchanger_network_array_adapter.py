@@ -295,8 +295,8 @@ def test_adapter_prefers_input_heat_capacity_flowrate_when_supplied() -> None:
 
     payload = problem_to_solver_arrays(problem, 10.0)
 
-    assert float(problem.hot_streams[0].CP) != pytest.approx(14.8)
-    assert float(problem.cold_streams[0].CP) != pytest.approx(6.1)
+    assert float(problem.hot_streams[0].heat_capacity_flowrate) != pytest.approx(14.8)
+    assert float(problem.cold_streams[0].heat_capacity_flowrate) != pytest.approx(6.1)
     assert _single_state_array(payload, "f_h").tolist() == [14.8]
     assert _single_state_array(payload, "f_c").tolist() == [6.1]
 

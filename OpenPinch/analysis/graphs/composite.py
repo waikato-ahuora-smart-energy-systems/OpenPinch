@@ -7,7 +7,13 @@ from typing import Any
 import numpy as np
 
 from ...domain.configuration import tol
-from ...domain.enums import GT, PT, ArrowHead, LineColour, StreamLoc
+from ...domain.enums import (
+    ArrowHead,
+    GraphType,
+    LineColour,
+    ProblemTableLabel,
+    StreamLoc,
+)
 from .metadata import _GraphSeriesMeta
 from .primitives import (
     _column_key,
@@ -83,7 +89,7 @@ def _make_composite_graph(
     include_arrows: bool = True,
     decolour: bool = False,
 ) -> dict[str, Any]:
-    temperatures = _column_to_list(data, PT.T)
+    temperatures = _column_to_list(data, ProblemTableLabel.T)
     fields = _normalise_graph_fields(value_field)
     stream_types = _normalise_graph_values(
         stream_type,
@@ -115,7 +121,7 @@ def _make_composite_graph(
 
 def _graph_cc(
     key: str,
-    stream_loc,
+    stream_loc: StreamLoc,
     y_vals: list[float],
     x_vals: list[float],
     *,
@@ -126,16 +132,7 @@ def _graph_cc(
     """Build one shifted or unshifted composite-curve segment."""
     y_vals, x_vals = clean_composite_curve(y_vals, x_vals)
     if not isinstance(stream_loc, StreamLoc):
-        candidate = getattr(stream_loc, "value", stream_loc)
-        try:
-            stream_loc = StreamLoc(candidate)
-        except ValueError:
-            aliases = {"Hot": StreamLoc.HotS, "Cold": StreamLoc.ColdS}
-            if candidate not in aliases:
-                raise ValueError(
-                    "Unrecognised composite curve stream location."
-                ) from None
-            stream_loc = aliases[candidate]
+        raise TypeError("stream_loc must be a StreamLoc member.")
 
     title_map = {
         StreamLoc.HotS: "Hot CC",
@@ -143,6 +140,8 @@ def _graph_cc(
         StreamLoc.HotU: "Hot Utility",
         StreamLoc.ColdU: "Cold Utility",
     }
+    if stream_loc not in title_map:
+        raise ValueError("Unrecognised composite curve stream location.")
     arrow_map = (
         {
             StreamLoc.HotS: ArrowHead.START.value,
@@ -150,7 +149,7 @@ def _graph_cc(
             StreamLoc.ColdS: ArrowHead.END.value,
             StreamLoc.ColdU: ArrowHead.END.value,
         }
-        if key == GT.TSP.value
+        if key == GraphType.TSP.value
         else {
             StreamLoc.HotS: ArrowHead.END.value,
             StreamLoc.HotU: ArrowHead.END.value,

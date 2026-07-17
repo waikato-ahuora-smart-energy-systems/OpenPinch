@@ -10,7 +10,12 @@ from ...analysis.numerics import get_period_index
 from ...analysis.targeting.cascade import create_problem_table_with_t_int
 from ...contracts.hpr import HeatPumpTargetOutputs
 from ...domain.configuration import Configuration, tol
-from ...domain.enums import GT, PT, TT, HPRcycle
+from ...domain.enums import (
+    GraphType,
+    HeatPumpAndRefrigerationCycle,
+    ProblemTableLabel,
+    TargetType,
+)
 from ...domain.problem_table import ProblemTable
 from ...domain.targets import (
     DirectHeatPumpTarget,
@@ -80,11 +85,11 @@ def compute_direct_heat_pump_or_refrigeration_target(
 
     idx, period_id = get_period_index(period_ids=zone.period_ids, args=args)
     is_refrigeration = not (is_heat_pumping)
-    base_target = zone.targets[TT.DI.value]
+    base_target = zone.targets[TargetType.DI.value]
     pt = deepcopy(base_target.pt)
     target_load = resolve_hpr_target_load(
-        H_net_cold=pt[PT.H_NET_COLD],
-        H_net_hot=pt[PT.H_NET_HOT],
+        H_net_cold=pt[ProblemTableLabel.H_NET_COLD],
+        H_net_hot=pt[ProblemTableLabel.H_NET_HOT],
         is_heat_pumping=is_heat_pumping,
         is_refrigeration=is_refrigeration,
         config=zone.config,
@@ -96,9 +101,9 @@ def compute_direct_heat_pump_or_refrigeration_target(
 
     res = _get_hpr_targets(
         Q_hpr_target=target_load,
-        T_vals=pt[PT.T],
-        H_hot=pt[PT.H_NET_HOT],
-        H_cold=pt[PT.H_NET_COLD],
+        T_vals=pt[ProblemTableLabel.T],
+        H_hot=pt[ProblemTableLabel.H_NET_HOT],
+        H_cold=pt[ProblemTableLabel.H_NET_COLD],
         config=zone.config,
         is_heat_pumping=is_heat_pumping,
         period_idx=idx,
@@ -112,7 +117,7 @@ def compute_direct_heat_pump_or_refrigeration_target(
     )
     general_results = {
         "zone_name": zone.name,
-        "type": TT.DHP.value if is_heat_pumping else TT.DR.value,
+        "type": TargetType.DHP.value if is_heat_pumping else TargetType.DR.value,
         "parent_zone": zone.parent_zone,
         "config": zone.config,
         "pt": pt,
@@ -152,7 +157,7 @@ def compute_indirect_heat_pump_or_refrigeration_target(
 
     idx, period_id = get_period_index(period_ids=zone.period_ids, args=args)
     is_refrigeration = not (is_heat_pumping)
-    base_target = zone.targets[TT.TS.value]
+    base_target = zone.targets[TargetType.TS.value]
     pt = deepcopy(base_target.pt)
     # Create problem table based on inverted utility streams
     pt_ut_gen = get_process_heat_cascade(
@@ -164,8 +169,8 @@ def compute_indirect_heat_pump_or_refrigeration_target(
     )
     # Perform heat pump and/or refrigeration targeting on the correct cascades
     target_load = resolve_hpr_target_load(
-        H_net_cold=pt_ut_gen[PT.H_NET_COLD],
-        H_net_hot=pt_ut_gen[PT.H_NET_HOT],
+        H_net_cold=pt_ut_gen[ProblemTableLabel.H_NET_COLD],
+        H_net_hot=pt_ut_gen[ProblemTableLabel.H_NET_HOT],
         is_heat_pumping=is_heat_pumping,
         is_refrigeration=is_refrigeration,
         config=zone.config,
@@ -177,9 +182,9 @@ def compute_indirect_heat_pump_or_refrigeration_target(
 
     res = _get_hpr_targets(
         Q_hpr_target=target_load,
-        T_vals=pt_ut_gen[PT.T],
-        H_hot=pt_ut_gen[PT.H_NET_HOT],
-        H_cold=pt_ut_gen[PT.H_NET_COLD],
+        T_vals=pt_ut_gen[ProblemTableLabel.T],
+        H_hot=pt_ut_gen[ProblemTableLabel.H_NET_HOT],
+        H_cold=pt_ut_gen[ProblemTableLabel.H_NET_COLD],
         config=zone.config,
         is_heat_pumping=is_heat_pumping,
         period_idx=idx,
@@ -193,7 +198,7 @@ def compute_indirect_heat_pump_or_refrigeration_target(
     )
     general_results = {
         "zone_name": zone.name,
-        "type": TT.IHP.value if is_heat_pumping else TT.IR.value,
+        "type": TargetType.IHP.value if is_heat_pumping else TargetType.IR.value,
         "parent_zone": zone.parent_zone,
         "config": zone.config,
         "pt": pt,
@@ -291,8 +296,8 @@ def _compute_multiperiod_heat_pump_or_refrigeration_target(
 
 def _hpr_target_type(*, is_direct: bool, is_heat_pumping: bool) -> str:
     if is_direct:
-        return TT.DHP.value if is_heat_pumping else TT.DR.value
-    return TT.IHP.value if is_heat_pumping else TT.IR.value
+        return TargetType.DHP.value if is_heat_pumping else TargetType.DR.value
+    return TargetType.IHP.value if is_heat_pumping else TargetType.IR.value
 
 
 def _hpr_target_model_cls(*, is_direct: bool, is_heat_pumping: bool):
@@ -364,30 +369,30 @@ def _get_hpr_graphs(
 
     if is_direct:
         return {
-            GT.NLP_HP.value: pt.slice(
+            GraphType.NLP_HP.value: pt.slice(
                 [
-                    PT.T,
-                    PT.H_NET_HOT,
-                    PT.H_NET_COLD,
-                    PT.H_HOT_HP,
-                    PT.H_COLD_HP,
+                    ProblemTableLabel.T,
+                    ProblemTableLabel.H_NET_HOT,
+                    ProblemTableLabel.H_NET_COLD,
+                    ProblemTableLabel.H_HOT_HP,
+                    ProblemTableLabel.H_COLD_HP,
                 ]
             ),
-            GT.GCC_HP.value: pt.slice(
+            GraphType.GCC_HP.value: pt.slice(
                 [
-                    PT.T,
-                    PT.H_NET_W_AIR,
-                    PT.H_NET_HP,
+                    ProblemTableLabel.T,
+                    ProblemTableLabel.H_NET_W_AIR,
+                    ProblemTableLabel.H_NET_HP,
                 ]
             ),
         }
 
     return {
-        GT.SUGCC.value: pt.slice(
+        GraphType.SUGCC.value: pt.slice(
             [
-                PT.T,
-                PT.H_NET_UT,
-                PT.H_NET_HP,
+                ProblemTableLabel.T,
+                ProblemTableLabel.H_NET_UT,
+                ProblemTableLabel.H_NET_HP,
             ]
         )
     }
@@ -414,7 +419,7 @@ def _calc_hpr_cascade(
     pt.share_temperature_intervals(pt_hpr_grid)
 
     # Ambient air addition to the process stream set
-    pt[PT.H_NET_W_AIR] = pt[PT.H_NET_A]
+    pt[ProblemTableLabel.H_NET_W_AIR] = pt[ProblemTableLabel.H_NET_A]
     if len(res.amb_streams) > 0:
         pt_air = get_process_heat_cascade(
             hot_streams=res.amb_streams.get_hot_streams(),
@@ -424,13 +429,13 @@ def _calc_hpr_cascade(
             period_idx=period_idx,
         )
         pt.share_temperature_intervals(pt_air)
-        pt[PT.H_NET_W_AIR] += pt_air[PT.H_NET]
-        pt[PT.H_NET_HOT] += pt_air[PT.H_NET_HOT]
-        pt[PT.H_NET_COLD] += pt_air[PT.H_NET_COLD]
+        pt[ProblemTableLabel.H_NET_W_AIR] += pt_air[ProblemTableLabel.H_NET]
+        pt[ProblemTableLabel.H_NET_HOT] += pt_air[ProblemTableLabel.H_NET_HOT]
+        pt[ProblemTableLabel.H_NET_COLD] += pt_air[ProblemTableLabel.H_NET_COLD]
 
     # Heat pump or refrigeration cascade
     hpr_profile = get_utility_heat_cascade(
-        T_int_vals=pt[PT.T],
+        T_int_vals=pt[ProblemTableLabel.T],
         hot_utilities=res.hpr_hot_streams,
         cold_utilities=res.hpr_cold_streams,
         is_shifted=is_T_vals_shifted,
@@ -441,18 +446,18 @@ def _calc_hpr_cascade(
         pt.update(
             T_col=hpr_profile["T_col"],
             updates={
-                PT.H_NET_HP: hpr_updates[PT.H_NET_UT],
-                PT.H_HOT_HP: hpr_updates[PT.H_HOT_UT],
-                PT.H_COLD_HP: hpr_updates[PT.H_COLD_UT],
+                ProblemTableLabel.H_NET_HP: hpr_updates[ProblemTableLabel.H_NET_UT],
+                ProblemTableLabel.H_HOT_HP: hpr_updates[ProblemTableLabel.H_HOT_UT],
+                ProblemTableLabel.H_COLD_HP: hpr_updates[ProblemTableLabel.H_COLD_UT],
             },
         )
     else:
         pt.update(
             T_col=hpr_profile["T_col"],
             updates={
-                PT.H_NET_RFRG: hpr_updates[PT.H_NET_UT],
-                PT.H_HOT_RFRG: hpr_updates[PT.H_HOT_UT],
-                PT.H_COLD_RFRG: hpr_updates[PT.H_COLD_UT],
+                ProblemTableLabel.H_NET_RFRG: hpr_updates[ProblemTableLabel.H_NET_UT],
+                ProblemTableLabel.H_HOT_RFRG: hpr_updates[ProblemTableLabel.H_HOT_UT],
+                ProblemTableLabel.H_COLD_RFRG: hpr_updates[ProblemTableLabel.H_COLD_UT],
             },
         )
 
@@ -460,10 +465,20 @@ def _calc_hpr_cascade(
 
 
 _HP_PLACEMENT_HANDLERS = {
-    HPRcycle.Brayton.value: optimise_brayton_heat_pump_placement,
-    HPRcycle.CascadeCarnot.value: (optimise_cascade_carnot_heat_pump_placement),
-    HPRcycle.ParallelVapourComp.value: optimise_parallel_heat_pump_placement,
-    HPRcycle.CascadeVapourComp.value: optimise_cascade_heat_pump_placement,
-    HPRcycle.VapourCompMVR.value: (optimise_vapour_compression_mvr_heat_pump_placement),
-    HPRcycle.ParallelCarnot.value: optimise_parallel_carnot_heat_pump_placement,
+    HeatPumpAndRefrigerationCycle.Brayton.value: optimise_brayton_heat_pump_placement,
+    HeatPumpAndRefrigerationCycle.CascadeCarnot.value: (
+        optimise_cascade_carnot_heat_pump_placement
+    ),
+    HeatPumpAndRefrigerationCycle.ParallelVapourComp.value: (
+        optimise_parallel_heat_pump_placement
+    ),
+    HeatPumpAndRefrigerationCycle.CascadeVapourComp.value: (
+        optimise_cascade_heat_pump_placement
+    ),
+    HeatPumpAndRefrigerationCycle.VapourCompMVR.value: (
+        optimise_vapour_compression_mvr_heat_pump_placement
+    ),
+    HeatPumpAndRefrigerationCycle.ParallelCarnot.value: (
+        optimise_parallel_carnot_heat_pump_placement
+    ),
 }

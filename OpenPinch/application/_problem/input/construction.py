@@ -10,7 +10,7 @@ from ....contracts.input import StreamSchema, UtilitySchema, ZoneTreeSchema
 from ....contracts.units import standardise_input_value
 from ....domain._value.resolution import resolve_value_array
 from ....domain.configuration import tol
-from ....domain.enums import ST
+from ....domain.enums import StreamType
 from ....domain.stream import Stream
 from ....domain.stream_collection import StreamCollection
 from ....domain.zone import Zone
@@ -154,9 +154,9 @@ def _assign_process_streams_to_subzones(
                 f"'{zone_path}'."
             )
 
-        if stream_obj.type == ST.Hot.value:
+        if stream_obj.stream_type == StreamType.Hot.value:
             zone.hot_streams.add(stream_obj, key=stream_key, prevent_overwrite=False)
-        elif stream_obj.type == ST.Cold.value:
+        elif stream_obj.stream_type == StreamType.Cold.value:
             zone.cold_streams.add(
                 stream_obj,
                 key=stream_key,
@@ -165,7 +165,7 @@ def _assign_process_streams_to_subzones(
         else:
             raise ValueError(
                 f"Process stream '{stream_obj.name}' must classify as Hot or Cold, "
-                f"got '{stream_obj.type}'."
+                f"got '{stream_obj.stream_type}'."
             )
     return master_zone
 
@@ -188,32 +188,32 @@ def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
     _validate_stream_temperatures(stream)
     stream_obj = Stream(
         name=stream.name,
-        t_supply=standardise_input_value(
+        supply_temperature=standardise_input_value(
             stream.t_supply,
             field_name="t_supply",
             config=zone.config,
         ),
-        t_target=standardise_input_value(
+        target_temperature=standardise_input_value(
             stream.t_target,
             field_name="t_target",
             config=zone.config,
         ),
-        p_supply=standardise_input_value(
+        supply_pressure=standardise_input_value(
             stream.p_supply,
             field_name="p_supply",
             config=zone.config,
         ),
-        p_target=standardise_input_value(
+        target_pressure=standardise_input_value(
             stream.p_target,
             field_name="p_target",
             config=zone.config,
         ),
-        h_supply=standardise_input_value(
+        supply_enthalpy=standardise_input_value(
             stream.h_supply,
             field_name="h_supply",
             config=zone.config,
         ),
-        h_target=standardise_input_value(
+        target_enthalpy=standardise_input_value(
             stream.h_target,
             field_name="h_target",
             config=zone.config,
@@ -223,13 +223,13 @@ def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
             field_name="heat_flow",
             config=zone.config,
         ),
-        dt_cont=standardise_input_value(
+        delta_t_contribution=standardise_input_value(
             stream.dt_cont,
             field_name="dt_cont",
             config=zone.config,
         ),
-        dt_cont_multiplier=zone.dt_cont_multiplier,
-        htc=standardise_input_value(
+        delta_t_contribution_multiplier=zone.dt_cont_multiplier,
+        heat_transfer_coefficient=standardise_input_value(
             stream.htc,
             field_name="htc",
             config=zone.config,
@@ -250,7 +250,7 @@ def _find_extreme_process_temperatures(
     hot_streams: StreamCollection,
     cold_streams: StreamCollection,
 ) -> Tuple[float, float]:
-    """Find highest TT of a cold stream and lowest TT of a hot stream."""
+    """Find cold-stream high and hot-stream low target temperatures."""
     if len(hot_streams) == 0 and len(cold_streams) == 0:
         return 20, 20
     hu_t_min: float = None
@@ -259,13 +259,13 @@ def _find_extreme_process_temperatures(
     for stream in hot_streams:
         thermal_segments = stream.segments or (stream,)
         for segment in thermal_segments:
-            segment_min = segment.t_min_star.min
+            segment_min = segment.shifted_minimum_temperature.min
             if cu_t_max is None or cu_t_max > segment_min:
                 cu_t_max = segment_min
     for stream in cold_streams:
         thermal_segments = stream.segments or (stream,)
         for segment in thermal_segments:
-            segment_max = segment.t_max_star.max
+            segment_max = segment.shifted_maximum_temperature.max
             if hu_t_min is None or hu_t_min < segment_max:
                 hu_t_min = segment_max
     if hu_t_min is None:

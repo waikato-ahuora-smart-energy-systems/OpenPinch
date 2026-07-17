@@ -2754,3 +2754,67 @@ Examine the args for all the core and advanced workflows to simplify the user ex
 **Context**: Generated-code review. Security and Resiliency extensions are disabled and N/A. Partial Property-Based Testing is N/A because the audit made no runtime changes.
 
 ---
+
+## Compatibility Shim Canonicalization - Implementation Request
+**Timestamp**: 2026-07-17T21:54:41Z
+**User Input**: "PLEASE IMPLEMENT THIS PLAN:
+# Remove Residual Compatibility Shims
+
+## Summary
+
+Perform one clean-break canonicalization with no aliases, deprecation warnings, migration paths, or transition pages. Preserve intentional input normalization and solver structures required by current algorithms.
+
+## Public Contract Changes
+
+- Remove `format` from `PinchProblem.summary_frame()` and `PinchWorkspace.summary_frame()`. Retain only `detailed`, `include_periods`, and `include_weighted_average`; use a private numeric frame for `compare_to()`.
+- Make descriptive `Stream` names canonical across constructors, properties, setters, and string-based attribute helpers:
+  - Temperature, pressure, and enthalpy fields use `supply_*`, `target_*`, `minimum_*`, `maximum_*`, and `shifted_*`.
+  - Use `stream_type`, `is_active`, `delta_t_contribution`, `effective_delta_t_contribution`, `heat_transfer_coefficient`, `heat_transfer_resistance`, `heat_capacity_flowrate`, `utility_cost`, and `resistance_capacity_product`.
+  - Remove all compact public counterparts. Keep compact private storage and JSON fields such as `t_supply`.
+  - Keep `problem.set_dt_cont_multiplier()` and its workspace equivalent as the deliberate engineering shorthand.
+- Remove `Value.values`; retain `period_values`. Serialized mappings continue using the `\"values\"` wire key.
+- Remove all enum/type identity aliases, including `ZT`, `TT`, `ST`, `SID`, `PT`, `GT`, `ResultsType`, `HPRcycle`, `HENDesignMethod`, `SynthesisMethod`, and `SynthesisDesignMethod`. Use the full canonical class names everywhere.
+- Keep `HeatExchangerNetworkDesignView` as a closed explicit API with `result`, `selected_network`, `top()`, `network()`, `grid()`, totals, and `utility()`. Remove `__getattr__` and `model_dump`; serialization becomes `design.result.model_dump(...)`.
+- Keep the root exports exactly `PinchProblem` and `PinchWorkspace`.
+
+## Implementation Changes
+
+- Add explicit wire-to-runtime translation when schemas construct streams; do not rename established JSON fields or configuration keys.
+- Reject unknown fields throughout `TargetInput`, utilities, zone trees, nonlinear-stream inputs, and nested transport contracts. Remove redundant `populate_by_name` settings where no aliases exist.
+- Require an explicit `\"schema_version\": \"3\"` when loading workspace bundles; missing, old, and unknown versions fail without migration.
+- Remove graph-string alias normalization and require internal `GraphType` values selected by named plot methods. Composite graph builders accept `StreamLoc` only.
+- Retain documented unit-group overrides, case-insensitive fluid phases, `vapor`/`vapour`, Pint/value-like coercion, optional-dependency guards, and solver fallbacks as intentional normalization.
+- Retain the segmented-stream solver parent-axis placeholder because current equations require its shape; revise its “legacy compatibility” wording to describe the current invariant.
+- Delete all seven orphan legacy documentation pages and their transition-page tests. Update API docs, tutorials, generators, coverage maps, release notes, and conventions to contain only canonical names.
+- Update AI-DLC requirements, functional design, code-generation plan, build/test artifacts, state, and audit records; checkbox each implementation step as it completes.
+
+## Test Plan
+
+- Add closed-contract tests proving removed names, parameters, graph aliases, forwarding, missing bundle versions, unknown fields, and legacy documentation pages are absent or rejected.
+- Test every descriptive `Stream` constructor argument, getter, setter, indexed mutation, segmented-stream restriction, multiperiod value, and derived property.
+- Verify compact JSON input still constructs descriptive runtime streams and round-trips unchanged, including serialized HEN payloads.
+- Verify `Value.period_values`, dictionary serialization, reporting, and foreign value-like coercion without `Value.values`.
+- Test compact and detailed summaries plus numeric `compare_to()` without any format string.
+- Test the explicit HEN view and `design.result.model_dump(mode=\"json\")`.
+- Update fixed-seed property tests and stale-symbol/AST checks to prevent aliases or forwarding façades from returning.
+- Run focused Stream, Value, input, workspace, graph, reporting, HPR, HEN, notebook, and documentation suites; then the complete non-solver suite, relevant opt-in HPR/HEN profiles, Ruff, warning-free Sphinx, package build, and isolated wheel smoke.
+
+## Assumptions
+
+- This is an immediate pre-1.0 clean break with no compatibility period.
+- Compact serialized field names and configuration keys remain stable by explicit decision; only runtime `Stream` vocabulary changes.
+- `selected_network` and `network(rank=...)` remain intentional distinct conveniences.
+- Existing unrelated working-tree changes must be preserved."
+**AI Response**: "Resumed the completed package-usability AI-DLC workflow, reused the approved process-engineer stories and architecture, and created the focused requirements, workflow, functional-design, and code-generation artifacts. The decision-complete implementation request and prior blanket approval authorize the single coupled clean-break unit through completion."
+**Status**: Code Generation approved and started
+**Context**: Brownfield compatibility canonicalization. Security and Resiliency are disabled and N/A. Partial Property-Based Testing is enabled for PBT-02, PBT-03, PBT-07, PBT-08, and PBT-09.
+
+---
+
+## Compatibility Shim Canonicalization - Completion
+**Timestamp**: 2026-07-17T22:54:01Z
+**User Input**: "No new user input; continued under the approved implementation request and blanket approval through task completion."
+**AI Response**: "Completed the immediate clean-break canonicalization. Removed runtime Stream compact names, enum identity aliases, Value.values, summary format dispatch, graph aliases, dynamic HEN view forwarding and serialization, optional workspace schema versions, permissive unknown-field handling, and seven transition pages. Preserved compact wire keys and intentional normalization. Regenerated 18 notebooks and the RTD coverage manifest. The complete suite passed 2,089 tests; the fixed-seed non-solver suite passed 2,086 with 3 skips and 4 solver deselections; slow-HPR and HEN solver profiles passed; Ruff, warning-free Sphinx, distributions, isolated wheel smoke, stale-symbol checks, and patch hygiene passed."
+**Context**: CONSTRUCTION - Code Generation and Build and Test complete. Security and Resiliency disabled and N/A. Partial Property-Based Testing compliant with seed 20260715. Operations N/A.
+
+---

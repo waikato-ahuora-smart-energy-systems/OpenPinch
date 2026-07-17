@@ -97,10 +97,10 @@ def _build_latent_streams(
         sc.add(
             Stream(
                 name=f"{prefix}_H{i + 1}" if is_hot else f"{prefix}_C{i + 1}",
-                t_supply=T_ls[i] if is_hot else T_ls[i] - dT_phase_change,
-                t_target=T_ls[i] - dT_phase_change if is_hot else T_ls[i],
+                supply_temperature=T_ls[i] if is_hot else T_ls[i] - dT_phase_change,
+                target_temperature=T_ls[i] - dT_phase_change if is_hot else T_ls[i],
                 heat_flow=Q_ls[i],
-                dt_cont=dt_cont,
+                delta_t_contribution=dt_cont,
                 is_process_stream=is_process_stream,
             )
         )

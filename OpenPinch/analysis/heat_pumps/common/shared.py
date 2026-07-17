@@ -23,7 +23,7 @@ from ....contracts.hpr import (
     SimulatedHPRAnnualizedCostAccounting,
 )
 from ....domain.configuration import tol as _tol
-from ....domain.enums import PT
+from ....domain.enums import ProblemTableLabel
 from ....domain.stream_collection import StreamCollection
 from ..optimisation_adapter import build_hpr_accounting as _build_hpr_accounting
 from ._shared import plotting as _plotting
@@ -256,8 +256,8 @@ def evaluate_vapour_hpr_result(
             is_shifted=True,
             period_idx=args.period_idx,
         )
-        Q_ext_heat = float(pt_cond[PT.H_NET][0])
-        cond_wrong_side = float(pt_cond[PT.H_NET][-1])
+        Q_ext_heat = float(pt_cond[ProblemTableLabel.H_NET][0])
+        cond_wrong_side = float(pt_cond[ProblemTableLabel.H_NET][-1])
     else:
         Q_ext_heat = 0.0
         cond_wrong_side = 0.0
@@ -276,8 +276,8 @@ def evaluate_vapour_hpr_result(
             is_shifted=True,
             period_idx=args.period_idx,
         )
-        Q_ext_cold = float(pt_evap[PT.H_NET][-1])
-        evap_wrong_side = float(pt_evap[PT.H_NET][0])
+        Q_ext_cold = float(pt_evap[ProblemTableLabel.H_NET][-1])
+        evap_wrong_side = float(pt_evap[ProblemTableLabel.H_NET][0])
     else:
         Q_ext_cold = 0.0
         evap_wrong_side = 0.0

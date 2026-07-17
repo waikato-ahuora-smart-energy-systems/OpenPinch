@@ -88,11 +88,11 @@ def test_decomposition_targets_use_copied_zone_with_minimum_dt_cont(
         captured["same_zone"] = zone is problem.master_zone
         captured["dt_cont_multiplier"] = zone.dt_cont_multiplier
         captured["process_dt_cont"] = [
-            float(stream.dt_cont.to("delta_degC").value)
+            float(stream.delta_t_contribution.to("delta_degC").value)
             for stream in zone.process_streams
         ]
         captured["process_dt_cont_act"] = [
-            float(stream.dt_cont_act.to("delta_degC").value)
+            float(stream.effective_delta_t_contribution.to("delta_degC").value)
             for stream in zone.process_streams
         ]
         return SimpleNamespace(

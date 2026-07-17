@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from ..enums import ST
+from ..enums import StreamType
 from ..value import Value
 
 
@@ -63,9 +63,9 @@ def build_numeric_view(
         rcp[stream_idx] = value_at_idx(stream._rcp_prod, idx)
         heat_flow[stream_idx] = value_at_idx(stream._heat_flow, idx)
         dt_cont[stream_idx] = value_at_idx(stream._dt_cont, idx)
-        is_hot[stream_idx] = stream.type == ST.Hot.value
-        is_cold[stream_idx] = stream.type == ST.Cold.value
-        active[stream_idx] = bool(stream.active)
+        is_hot[stream_idx] = stream.stream_type == StreamType.Hot.value
+        is_cold[stream_idx] = stream.stream_type == StreamType.Cold.value
+        active[stream_idx] = bool(stream.is_active)
 
     return StreamCollectionNumericView(
         t_min=t_min,

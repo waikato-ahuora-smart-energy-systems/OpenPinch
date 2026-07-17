@@ -72,9 +72,9 @@ def solve_direct_gas_mvr_stream(
 ) -> _DirectGasMVRStreamSolveResult:
     """Solve direct gas MVR replacement streams for one source stream and period."""
     fluid = str(stream.fluid_name)
-    t_supply = _value(stream.t_supply, idx, unit="degC")
-    t_target = _value(stream.t_target, idx, unit="degC")
-    p_supply = _value(stream.p_supply, idx, unit="kPa")
+    t_supply = _value(stream.supply_temperature, idx, unit="degC")
+    t_target = _value(stream.target_temperature, idx, unit="degC")
+    p_supply = _value(stream.supply_pressure, idx, unit="kPa")
     heat_flow = _value(stream.heat_flow, idx, unit="kW")
     if heat_flow is None or heat_flow <= tol:
         raise ValueError(f"MVR source stream {stream.name!r} requires positive duty.")
@@ -348,10 +348,12 @@ def _stage_to_stream(
         heat_scale=_stage_mass_flow(stage),
         heat_unit=stage.heat_flow_unit,
         is_hot_stream=True,
-        p_supply=Value(stage.p_out, stage.pressure_unit),
-        p_target=Value(stage.p_out, stage.pressure_unit),
-        dt_cont=_value(source.dt_cont, idx) or 0.0,
-        htc=_value(source.htc, idx) or 1.0,
+        supply_pressure=Value(stage.p_out, stage.pressure_unit),
+        target_pressure=Value(stage.p_out, stage.pressure_unit),
+        delta_t_contribution=_value(source.delta_t_contribution, idx) or 0.0,
+        heat_transfer_coefficient=(
+            _value(source.heat_transfer_coefficient, idx) or 1.0
+        ),
         is_process_stream=True,
         fluid_name=source.fluid_name,
         fluid_phase=source.fluid_phase,

@@ -39,11 +39,11 @@ from OpenPinch.analysis.heat_exchanger_networks.solver import (
 from OpenPinch.analysis.heat_exchanger_networks.targeting import (
     open_hens_method,
 )
-from OpenPinch.contracts.synthesis.common import SynthesisMethod
 from OpenPinch.contracts.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
+from OpenPinch.domain.enums import HeatExchangerNetworkDesignMethod
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _HENS_FIXTURE_ROOT = _REPO_ROOT / "tests" / "fixtures" / "openhens"
@@ -268,7 +268,7 @@ class BenchmarkTraceExecutor:
         self.solver_tracer = solver_tracer
         self.task_records: list[dict[str, Any]] = []
         self.stage_records: list[dict[str, Any]] = []
-        self.stage_order: list[SynthesisMethod] = []
+        self.stage_order: list[HeatExchangerNetworkDesignMethod] = []
         self.executed_tasks: list[HeatExchangerNetworkSynthesisTask] = []
 
     def execute(

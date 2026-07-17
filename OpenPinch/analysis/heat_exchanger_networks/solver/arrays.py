@@ -205,8 +205,8 @@ def problem_to_solver_arrays(
             "heat_transfer_coefficient": "kW/m^2/K",
             "temperature": "K",
             "temperature_contribution": (
-                "K, using prepared stream dt_cont multiplied by the active HEN "
-                "sweep value and falling back to dTmin / 2 when prepared "
+                "K, using the stream contribution multiplied by the active HEN sweep "
+                "value and falling back to dTmin / 2 when the prepared "
                 "contribution is absent"
             ),
             "utility_price": (
@@ -270,15 +270,27 @@ def _solver_array_mapping(
         "period_ids": _str_array(period_ids),
         "period_weights": _float_array(period_weights),
         "T_c_cont_period": period_values(cold_items, temperature_contribution),
-        "T_c_in_period": period_values(cold_items, stream_attr("t_supply", temp_unit)),
-        "T_c_out_period": period_values(cold_items, stream_attr("t_target", temp_unit)),
-        "T_cu_in_period": period_values(cu, stream_attr("t_supply", temp_unit)),
+        "T_c_in_period": period_values(
+            cold_items, stream_attr("supply_temperature", temp_unit)
+        ),
+        "T_c_out_period": period_values(
+            cold_items, stream_attr("target_temperature", temp_unit)
+        ),
+        "T_cu_in_period": period_values(
+            cu, stream_attr("supply_temperature", temp_unit)
+        ),
         "T_cu_out_period": period_values(cold_utility_items, utility_solver_target),
         "T_cu_cont_period": period_values(cold_utility_items, temperature_contribution),
         "T_h_cont_period": period_values(hot_items, temperature_contribution),
-        "T_h_in_period": period_values(hot_items, stream_attr("t_supply", temp_unit)),
-        "T_h_out_period": period_values(hot_items, stream_attr("t_target", temp_unit)),
-        "T_hu_in_period": period_values(hu, stream_attr("t_supply", temp_unit)),
+        "T_h_in_period": period_values(
+            hot_items, stream_attr("supply_temperature", temp_unit)
+        ),
+        "T_h_out_period": period_values(
+            hot_items, stream_attr("target_temperature", temp_unit)
+        ),
+        "T_hu_in_period": period_values(
+            hu, stream_attr("supply_temperature", temp_unit)
+        ),
         "T_hu_out_period": period_values(hot_utility_items, utility_solver_target),
         "T_hu_cont_period": period_values(hot_utility_items, temperature_contribution),
         "c_cost_period": period_values(cold_items, stream_attr("price", price_unit)),
@@ -291,13 +303,17 @@ def _solver_array_mapping(
         "f_h_period": period_values(hot_items, heat_capacity_flowrate),
         "h_cost_period": period_values(hot_items, stream_attr("price", price_unit)),
         "hot_names": _str_array(stream.name for _, stream, _ in hot_items),
-        "htc_c_period": period_values(cold_items, stream_attr("htc", htc_unit)),
-        "htc_cu_period": period_values(
-            cold_utility_items, stream_attr("htc", htc_unit)
+        "htc_c_period": period_values(
+            cold_items, stream_attr("heat_transfer_coefficient", htc_unit)
         ),
-        "htc_h_period": period_values(hot_items, stream_attr("htc", htc_unit)),
+        "htc_cu_period": period_values(
+            cold_utility_items, stream_attr("heat_transfer_coefficient", htc_unit)
+        ),
+        "htc_h_period": period_values(
+            hot_items, stream_attr("heat_transfer_coefficient", htc_unit)
+        ),
         "htc_hu_period": period_values(
-            hot_utility_items, stream_attr("htc", htc_unit)
+            hot_utility_items, stream_attr("heat_transfer_coefficient", htc_unit)
         ),
         "hu_coeff": _float_array([costing.hx_area_coeff]),
         "hu_cost_period": period_values(hu, stream_attr("price", price_unit)),
@@ -342,21 +358,25 @@ def _segment_profile_arrays(
             for period_index in range(num_periods):
                 mask[period_index, parent_index, segment_index] = True
                 temperatures_in[period_index, parent_index, segment_index] = _value(
-                    segment.t_supply, "K", period_idx=period_index
+                    segment.supply_temperature, "K", period_idx=period_index
                 )
                 temperatures_out[period_index, parent_index, segment_index] = _value(
-                    segment.t_target, "K", period_idx=period_index
+                    segment.target_temperature, "K", period_idx=period_index
                 )
                 duties[period_index, parent_index, segment_index] = _value(
                     segment.heat_flow, "kW", period_idx=period_index
                 )
                 heat_capacity_flowrates[period_index, parent_index, segment_index] = (
-                    _value(segment.CP, "kW/delta_degC", period_idx=period_index)
+                    _value(
+                        segment.heat_capacity_flowrate,
+                        "kW/delta_degC",
+                        period_idx=period_index,
+                    )
                 )
                 heat_transfer_coefficients[
                     period_index, parent_index, segment_index
                 ] = _value(
-                    segment.htc,
+                    segment.heat_transfer_coefficient,
                     "kW/m^2/delta_degC",
                     period_idx=period_index,
                 )
@@ -442,7 +462,9 @@ def _temperature_contribution(
     *,
     period_idx: int = 0,
 ) -> float:
-    contribution = _value(stream.dt_cont, "delta_degC", period_idx=period_idx)
+    contribution = _value(
+        stream.delta_t_contribution, "delta_degC", period_idx=period_idx
+    )
     if contribution > tol:
         return contribution * float(dTmin)
     return float(dTmin) / 2.0
@@ -454,8 +476,8 @@ def _utility_solver_target(
     *,
     period_idx: int = 0,
 ) -> float:
-    supply = _value(stream.t_supply, "K", period_idx=period_idx)
-    target = _value(stream.t_target, "K", period_idx=period_idx)
+    supply = _value(stream.supply_temperature, "K", period_idx=period_idx)
+    target = _value(stream.target_temperature, "K", period_idx=period_idx)
     if abs(supply - target) <= zone.config.thermal.dt_phase_change + tol:
         return supply
     return target
@@ -468,9 +490,9 @@ def _stream_heat_capacity_flowrate(
     period_idx: int = 0,
 ) -> float:
     if getattr(stream, "has_segments", False):
-        # Parent axes retain this legacy array only for shape compatibility.
-        # A zero sentinel prevents segmented equations from accidentally using
-        # the parent's effective CP instead of the segment-profile tensors.
+        # Parent axes require this placeholder to preserve the current equation
+        # shape. A zero sentinel directs segmented equations to the authoritative
+        # segment-profile tensors instead of the parent's effective flowrate.
         return 0.0
     raw_flowrate = getattr(record, "heat_capacity_flowrate", None)
     if raw_flowrate is not None:
@@ -481,7 +503,7 @@ def _stream_heat_capacity_flowrate(
         )
         if parsed is not None:
             return parsed
-    return _value(stream.CP, "kW/delta_degC", period_idx=period_idx)
+    return _value(stream.heat_capacity_flowrate, "kW/delta_degC", period_idx=period_idx)
 
 
 def _ordered_stream_items(problem: PinchProblem, items) -> list[_PreparedItem]:

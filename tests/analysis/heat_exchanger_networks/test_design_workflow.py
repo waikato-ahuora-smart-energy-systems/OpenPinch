@@ -1,4 +1,4 @@
-"""HENS-09 public service, compatibility, and documentation examples."""
+"""HENS-09 public service, closed-contract, and documentation examples."""
 
 from __future__ import annotations
 
@@ -126,7 +126,7 @@ def test_design_options_are_validated_at_their_owner_boundary() -> None:
     view = problem.design.heat_exchanger_network(
         options={"HENS_DERIVATIVE_THRESHOLDS": [9.9]},
     )
-    assert view.manifest is not None
+    assert view.result.manifest is not None
     assert problem.master_zone.config.hens.derivative_thresholds == configured
 
 
@@ -183,8 +183,8 @@ def test_problem_design_workflow_example_from_converted_openhens_fixture(
     design = problem.design.heat_exchanger_network()
     assert problem.results is not None
     assert problem.results.design == design.result
-    assert design.manifest is not None
-    assert design.manifest.run_id == "Four-stream-Yee-and-Grossmann-1990-1"
+    assert design.result.manifest is not None
+    assert design.result.manifest.run_id == "Four-stream-Yee-and-Grossmann-1990-1"
     assert isinstance(design.selected_network, HeatExchangerNetwork)
     assert design.selected_network.exchangers
     first_link = design.selected_network.exchangers[0]
@@ -205,8 +205,8 @@ def test_enhanced_synthesis_method_is_public_quality_tier_entrypoint(
 
     assert problem.results is not None
     assert problem.results.design == design.result
-    assert design.manifest is not None
-    assert design.manifest.synthesis_quality_tier == 3
+    assert design.result.manifest is not None
+    assert design.result.manifest.synthesis_quality_tier == 3
     assert problem.master_zone.config.hens.synthesis_quality_tier == configured_tier
 
 
@@ -275,33 +275,38 @@ def test_public_design_accessor_returns_ranked_networks(
     )
 
     design = problem.design.heat_exchanger_network()
-    serialized_before = design.model_dump(mode="json")
+    serialized_before = design.result.model_dump(mode="json")
+
+    assert not hasattr(design, "model_dump")
+    assert not hasattr(design, "ranked_networks")
+    assert not hasattr(design, "manifest")
 
     assert problem.results is not None
     assert problem.results.design == design.result
-    assert len(design.ranked_networks) == 1
-    assert design.top(1) == design.ranked_networks[:1]
+    assert len(design.result.ranked_networks) == 1
+    assert design.top(1) == design.result.ranked_networks[:1]
     assert design.network(rank=1) == design.selected_network
     with pytest.raises(ValueError, match="one-based"):
         design.network(rank=0)
     with pytest.raises(IndexError):
         design.network(rank=2)
-    assert design.ranked_networks[0].network == design.selected_network
-    assert design.task_id == design.ranked_networks[0].task.task_id
-    assert [outcome.objective_value for outcome in design.ranked_networks] == sorted(
-        outcome.objective_value for outcome in design.ranked_networks
-    )
-    assert all(outcome.status == "success" for outcome in design.ranked_networks)
+    assert design.result.ranked_networks[0].network == design.selected_network
+    assert design.result.task_id == design.result.ranked_networks[0].task.task_id
+    assert [
+        outcome.objective_value for outcome in design.result.ranked_networks
+    ] == sorted(outcome.objective_value for outcome in design.result.ranked_networks)
+    assert all(outcome.status == "success" for outcome in design.result.ranked_networks)
     assert all(
-        outcome.task.method == design.method for outcome in design.ranked_networks
+        outcome.task.method == design.result.method
+        for outcome in design.result.ranked_networks
     )
     assert len(
         {
             network_structure_signature(outcome.network)
-            for outcome in design.ranked_networks
+            for outcome in design.result.ranked_networks
             if outcome.network is not None
         }
-    ) == len(design.ranked_networks)
+    ) == len(design.result.ranked_networks)
 
     selected_network = design.selected_network
     helper = design
@@ -329,7 +334,7 @@ def test_public_design_accessor_returns_ranked_networks(
     assert helper.utility(hot_utility.sink_stream) == 0.0
     with pytest.raises(ValueError, match="utility name"):
         helper.utility("")
-    assert design.model_dump(mode="json") == serialized_before
+    assert design.result.model_dump(mode="json") == serialized_before
 
 
 def test_native_targetinput_design_workflow_example_from_converted_fixture(

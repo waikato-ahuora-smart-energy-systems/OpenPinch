@@ -23,7 +23,11 @@ from OpenPinch.contracts.hpr import (
     MultiPeriodHPRTargetInputs,
 )
 from OpenPinch.domain.configuration import Configuration
-from OpenPinch.domain.enums import PT, TT, HPRcycle
+from OpenPinch.domain.enums import (
+    HeatPumpAndRefrigerationCycle,
+    ProblemTableLabel,
+    TargetType,
+)
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream_collection import StreamCollection
 from OpenPinch.domain.targets import DirectHeatPumpTarget
@@ -83,11 +87,11 @@ def _hpr_output(**updates) -> HeatPumpTargetOutputs:
 def _pt(T, H_cold, H_hot):
     return ProblemTable(
         {
-            PT.T: T,
-            PT.H_NET: np.asarray(H_cold) + np.asarray(H_hot),
-            PT.H_NET_COLD: H_cold,
-            PT.H_NET_HOT: H_hot,
-            PT.H_NET_A: np.asarray(H_cold) + np.asarray(H_hot),
+            ProblemTableLabel.T: T,
+            ProblemTableLabel.H_NET: np.asarray(H_cold) + np.asarray(H_hot),
+            ProblemTableLabel.H_NET_COLD: H_cold,
+            ProblemTableLabel.H_NET_HOT: H_hot,
+            ProblemTableLabel.H_NET_A: np.asarray(H_cold) + np.asarray(H_hot),
         }
     )
 
@@ -148,7 +152,7 @@ def test_solve_hpr_multiperiod_placement_scores_weighted_shared_vector(
         period_cases=cases,
         selected_period_id="p0",
         selected_period_idx=0,
-        hpr_type=HPRcycle.CascadeCarnot.value,
+        hpr_type=HeatPumpAndRefrigerationCycle.CascadeCarnot.value,
         max_multi_start=2,
         bb_minimiser="rbf_surrogate",
     )
@@ -218,7 +222,7 @@ def test_shared_hpr_candidate_score_uses_weighted_operation_and_peak_capital(
         period_cases=cases,
         selected_period_id="p0",
         selected_period_idx=0,
-        hpr_type=HPRcycle.CascadeCarnot.value,
+        hpr_type=HeatPumpAndRefrigerationCycle.CascadeCarnot.value,
         max_multi_start=2,
         bb_minimiser="rbf_surrogate",
     )
@@ -287,7 +291,7 @@ def test_shared_hpr_candidate_score_falls_back_when_cost_breakdown_absent():
         period_cases=cases,
         selected_period_id="p0",
         selected_period_idx=0,
-        hpr_type=HPRcycle.CascadeCarnot.value,
+        hpr_type=HeatPumpAndRefrigerationCycle.CascadeCarnot.value,
         max_multi_start=1,
         bb_minimiser="rbf_surrogate",
     )
@@ -336,7 +340,7 @@ def test_solve_hpr_multiperiod_placement_fails_when_any_period_fails(monkeypatch
         period_cases=cases,
         selected_period_id="p0",
         selected_period_idx=0,
-        hpr_type=HPRcycle.CascadeCarnot.value,
+        hpr_type=HeatPumpAndRefrigerationCycle.CascadeCarnot.value,
         max_multi_start=1,
         bb_minimiser="rbf_surrogate",
     )
@@ -386,9 +390,12 @@ def test_build_multiperiod_cases_aligns_period_temperature_grids(monkeypatch):
 
     assert [case.period_id for case in cases] == ["p0", "p1"]
     assert [case.weight for case in cases] == [1.0, 3.0]
-    np.testing.assert_allclose(cases[0].optimizer_pt[PT.T], cases[1].optimizer_pt[PT.T])
     np.testing.assert_allclose(
-        cases[0].optimizer_pt[PT.T],
+        cases[0].optimizer_pt[ProblemTableLabel.T],
+        cases[1].optimizer_pt[ProblemTableLabel.T],
+    )
+    np.testing.assert_allclose(
+        cases[0].optimizer_pt[ProblemTableLabel.T],
         np.array([140.0, 120.0, 90.0, 60.0]),
     )
 
@@ -396,11 +403,11 @@ def test_build_multiperiod_cases_aligns_period_temperature_grids(monkeypatch):
 @pytest.mark.parametrize(
     "cycle",
     [
-        HPRcycle.CascadeCarnot.value,
-        HPRcycle.ParallelCarnot.value,
-        HPRcycle.CascadeVapourComp.value,
-        HPRcycle.ParallelVapourComp.value,
-        HPRcycle.VapourCompMVR.value,
+        HeatPumpAndRefrigerationCycle.CascadeCarnot.value,
+        HeatPumpAndRefrigerationCycle.ParallelCarnot.value,
+        HeatPumpAndRefrigerationCycle.CascadeVapourComp.value,
+        HeatPumpAndRefrigerationCycle.ParallelVapourComp.value,
+        HeatPumpAndRefrigerationCycle.VapourCompMVR.value,
     ],
 )
 def test_supported_hpr_cycles_prepare_shared_target_inputs(
@@ -472,7 +479,10 @@ def test_supported_hpr_cycles_prepare_shared_target_inputs(
     assert captured["period_ids"] == ["p0", "p1"]
     assert captured["hpr_type"] == cycle
     assert captured["has_bounds"] is True
-    if cycle in {HPRcycle.CascadeCarnot.value, HPRcycle.ParallelCarnot.value}:
+    if cycle in {
+        HeatPumpAndRefrigerationCycle.CascadeCarnot.value,
+        HeatPumpAndRefrigerationCycle.ParallelCarnot.value,
+    }:
         assert captured["has_initial_candidate"] is True
 
 
@@ -485,7 +495,7 @@ def test_hpr_multiperiod_flag_false_uses_selected_period_path(monkeypatch):
             }
         )
     )
-    zone.targets[TT.DI.value] = _base_target(
+    zone.targets[TargetType.DI.value] = _base_target(
         _pt([120.0, 60.0], [100.0, 0.0], [0.0, -50.0])
     )
     calls = {"selected": 0}
@@ -552,7 +562,9 @@ def test_hpr_multiperiod_flag_true_returns_selected_period_from_shared_design(
         cases = kwargs["period_cases"]
         captured["period_ids"] = [case.period_id for case in cases]
         captured["weights"] = [case.weight for case in cases]
-        captured["row_counts"] = [len(case.optimizer_pt[PT.T]) for case in cases]
+        captured["row_counts"] = [
+            len(case.optimizer_pt[ProblemTableLabel.T]) for case in cases
+        ]
         return _hpr_output(
             utility_tot=42.0,
             w_net=4.2,
@@ -625,10 +637,10 @@ def test_weighted_hpr_summary_uses_shared_design_period_evaluations(monkeypatch)
             zone_name=target_zone.name,
             period_id=args.get("period_id"),
             period_idx=idx,
-            type=TT.DHP.value,
+            type=TargetType.DHP.value,
             parent_zone=target_zone.parent_zone,
             config=target_zone.config,
-            pt=ProblemTable({PT.T: [120.0, 60.0]}),
+            pt=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]}),
             hpr_cycle="shared",
             hpr_utility_total=hpr_utility_total,
             hpr_work=1.0 + idx,

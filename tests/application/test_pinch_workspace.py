@@ -142,6 +142,8 @@ def test_workspace_bundle_rejects_old_payloads_and_unknown_versions():
     assert valid.schema_version == "3"
 
     with pytest.raises(ValidationError, match="Unsupported workspace schema_version"):
+        PinchWorkspaceBundle.model_validate(base)
+    with pytest.raises(ValidationError, match="Unsupported workspace schema_version"):
         PinchWorkspaceBundle.model_validate({"schema_version": "1", **base})
     with pytest.raises(ValidationError, match="Unsupported workspace schema_version"):
         PinchWorkspaceBundle.model_validate({"schema_version": "future", **base})

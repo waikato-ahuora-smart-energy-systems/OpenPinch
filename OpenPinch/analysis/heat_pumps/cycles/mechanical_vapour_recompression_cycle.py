@@ -654,7 +654,7 @@ class MechanicalVapourRecompressionCycle(VapourCompressionCycle):
                 profile=profile,
                 heat_scale=mass_flow,
                 is_hot_stream=is_hot_profile,
-                dt_cont=self._dtcont,
+                delta_t_contribution=self._dtcont,
             )
         )
         return sc
@@ -690,7 +690,7 @@ class MechanicalVapourRecompressionCycle(VapourCompressionCycle):
                     name=f"MVR_process_H{stage_index}",
                     profile=profile,
                     is_hot_stream=True,
-                    dt_cont=dt_cont,
+                    delta_t_contribution=dt_cont,
                 )
             )
         return streams

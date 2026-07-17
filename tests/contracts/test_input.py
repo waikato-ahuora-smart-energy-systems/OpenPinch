@@ -7,7 +7,13 @@ from OpenPinch.contracts.common import (
     PeriodValueWithUnit,
     ValueWithUnit,
 )
-from OpenPinch.contracts.input import StreamSchema, TargetInput, UtilitySchema
+from OpenPinch.contracts.input import (
+    NonLinearStream,
+    StreamSchema,
+    TargetInput,
+    UtilitySchema,
+    ZoneTreeSchema,
+)
 from OpenPinch.contracts.reporting import PinchTemp, TargetResults
 from OpenPinch.domain.enums import FluidPhase
 from OpenPinch.domain.stream_collection import StreamCollection
@@ -30,6 +36,42 @@ def test_target_input_utilities_default_is_not_shared():
 
     assert len(first.utilities) == 1
     assert second.utilities == []
+
+
+def test_nested_input_contracts_reject_unknown_fields():
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        TargetInput.model_validate({"streams": [], "unknown": True})
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        UtilitySchema.model_validate(
+            {
+                "name": "Steam",
+                "type": "Hot",
+                "t_supply": 200.0,
+                "t_target": 180.0,
+                "unknown": True,
+            }
+        )
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        ZoneTreeSchema.model_validate(
+            {
+                "name": "Site",
+                "type": "Site",
+                "children": [{"name": "Area", "type": "Process Zone", "unknown": True}],
+            }
+        )
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        NonLinearStream.model_validate(
+            {
+                "t_supply": 150.0,
+                "t_target": 80.0,
+                "p_supply": 200.0,
+                "p_target": 150.0,
+                "h_supply": 2_500.0,
+                "h_target": 2_000.0,
+                "composition": [("Water", 1.0)],
+                "unknown": True,
+            }
+        )
 
 
 def test_utility_schema_accepts_one_nested_thermal_definition():
@@ -316,7 +358,7 @@ def test_target_results_accept_unit_aware_hpr_scalar_and_array_metrics():
     assert results.Qh.value == pytest.approx(100.0)
     assert results.Qh.unit == "kW"
     assert isinstance(results.hpr_utility_total, Value)
-    assert results.hpr_utility_total.values == [10.0, 12.0]
+    assert results.hpr_utility_total.period_values.tolist() == [10.0, 12.0]
     assert results.hpr_utility_total.unit == "kW"
     assert isinstance(results.hpr_cop, Value)
     assert results.hpr_cop.value == pytest.approx(3.5)

@@ -101,11 +101,6 @@ class Value:
         return self._quantity.magnitude.copy()
 
     @property
-    def values(self) -> list[float]:
-        """Return magnitudes as a JSON-friendly list for period-value compatibility."""
-        return [float(item) for item in self.period_values.tolist()]
-
-    @property
     def weights(self) -> np.ndarray:
         """Return optional passive period weights carried with this value."""
         return self._weights

@@ -132,27 +132,31 @@ the exact :class:`~OpenPinch.domain.enums.StreamID` values ``Process`` and
 Heat Exchanger Network Design Results
 -------------------------------------
 
-``TargetOutput.design`` stores a
-:class:`~OpenPinch.contracts.synthesis.result.HeatExchangerNetworkSynthesisResult`
-after ``problem.design.enhanced_heat_exchanger_network(quality_tier=...)``,
-``problem.design.open_hens()``,
-``problem.design.multiperiod_heat_exchanger_network()``, or one of the direct
-method accessors runs. The selected network is available as ``design.network``
-and the ranked unique network candidates are available as
-``design.ranked_networks``.
+Every ``problem.design.*`` call returns an explicit design view. Inspect its
+selected network with ``design.selected_network``, choose a ranked candidate
+with ``design.network(rank=...)``, list candidates with ``design.top(n)``, or
+render one with ``design.grid(rank=...)``. Convenience totals and
+``design.utility(name)`` always refer to ``selected_network``.
 
-The same
-:class:`~OpenPinch.domain.enums.HeatExchangerNetworkDesignMethod` enum is used for
-internal dispatch and task/result method metadata. ``HENDesignMethod`` is the
-short internal alias. ``design.design_method`` records the requested design
-service that was requested, such as ``HENDesignMethod.OpenHENS``. ``design.method``
-records the task method that produced the selected network, such as
-``HENDesignMethod.NetworkEvolution`` for a normal OpenHENS sequence result.
-``design.manifest.method_sequence`` records the executed task-level method
-sequence. For OpenHENS tiered runs, ``design.manifest.synthesis_quality_tier``
-records the call-local or configured tier, ``selected_pathway_id`` records the
-winning pathway, and ``selected_protected_pathway`` indicates whether the
-selected network came from a protected fallback route.
+The complete serializable synthesis result is ``design.result`` and is also
+stored at ``problem.results.design``. Serialize it explicitly:
+
+.. code-block:: python
+
+   design = problem.design.heat_exchanger_network()
+   payload = design.result.model_dump(mode="json")
+
+The result's ``ranked_networks``, ``manifest``, diagnostics, task metadata,
+``design_method``, and task ``method`` remain available through
+``design.result``. The design view does not forward unknown attributes and is
+not itself a Pydantic model.
+
+The
+:class:`~OpenPinch.domain.enums.HeatExchangerNetworkDesignMethod` enum is the
+single method identity used for dispatch and result metadata.
+``design.result.manifest.method_sequence`` records the executed task sequence.
+For tiered OpenHENS runs, the manifest also records the synthesis quality tier,
+selected pathway, and protected-fallback status.
 
 ``HENS_SYNTHESIS_QUALITY_TIER`` remains a persistent configuration field with a
 default of tier 1 for prepared-problem workflows. User code should prefer
@@ -161,20 +165,13 @@ tier selection because it applies a call-local override without mutating the
 loaded problem configuration. Runtime ``options`` passed to design accessors are
 reserved for runtime context and do not accept persistent ``HENS_*`` overrides.
 
-Method-level inputs and outputs are also Pydantic models. Their shared input
+Method-level inputs and outputs are Pydantic models. Their shared input
 contract contains run/problem metadata, settings, optional seed network,
 optional seed-network index, and trace metadata. Their shared output contract
 contains status, accepted networks, ranked networks, diagnostics, trace
 metadata, and an optional manifest.
 
-Use ``design.get_n_best_networks(n)`` to read the first ``n`` ranked
-candidates. Use ``design.select_network(solution_rank=...)`` to make another
-ranked candidate the selected ``design.network``. ``solution_rank`` is 1-based.
-
-The problem-level design accessor exposes convenience totals for the selected
-network at ``problem.design.network``:
-``total_heat_recovery``, ``total_hot_utility``, ``total_cold_utility``, and
-``utility(name)``.
+Ranks passed to ``design.network(...)`` and ``design.grid(...)`` are one-based.
 
 Grid diagrams for the selected network are created with
 :func:`OpenPinch.presentation.network_grid.service.build_grid_diagram`. The

@@ -6,7 +6,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 
 from ...domain.configuration import tol
-from ...domain.enums import PT, ArrowHead, LineColour, StreamLoc
+from ...domain.enums import ArrowHead, LineColour, ProblemTableLabel, StreamLoc
 from .composite import clean_composite_curve
 from .metadata import _GraphSeriesMeta
 from .primitives import (
@@ -152,7 +152,7 @@ def _make_gcc_graph(
     is_utility_profile: bool = False,
     decolour: bool = False,
 ) -> dict:
-    temperatures = _column_to_list(data, PT.T)
+    temperatures = _column_to_list(data, ProblemTableLabel.T)
     fields = _normalise_graph_fields(value_field)
     flags = _normalise_gcc_flags(is_utility_profile, len(fields))
     segments: list[dict] = []
@@ -177,7 +177,7 @@ def _make_gcc_graph(
     }
 
 
-def _classify_segment(enthalpy_diff: float, is_utility_profile: bool) -> str:
+def _classify_segment(enthalpy_diff: float, is_utility_profile: bool) -> StreamLoc:
     if abs(enthalpy_diff) <= GCC_VERTICAL_TOL:
         return StreamLoc.Unassigned
     if enthalpy_diff > 0:
@@ -187,14 +187,8 @@ def _classify_segment(enthalpy_diff: float, is_utility_profile: bool) -> str:
     return StreamLoc.Unassigned
 
 
-def _segment_streamloc(segment_type: str) -> StreamLoc:
-    """Map one segment classification to a stream location."""
-    if isinstance(segment_type, StreamLoc):
-        return segment_type
-    locations = {
-        StreamLoc.ColdS.value: StreamLoc.ColdS,
-        StreamLoc.HotS.value: StreamLoc.HotS,
-        StreamLoc.HotU.value: StreamLoc.HotU,
-        StreamLoc.ColdU.value: StreamLoc.ColdU,
-    }
-    return locations.get(segment_type, StreamLoc.Unassigned)
+def _segment_streamloc(segment_type: StreamLoc) -> StreamLoc:
+    """Return one canonical segment stream location."""
+    if not isinstance(segment_type, StreamLoc):
+        raise TypeError("segment_type must be a StreamLoc value")
+    return segment_type

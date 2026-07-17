@@ -91,16 +91,20 @@ def build_multiperiod_stage_streams(
                         f"{source_stream.name}_direct_MVR_H{stage_index}_S"
                         f"{segment_index}"
                     ),
-                    t_supply=Value(
+                    supply_temperature=Value(
                         [float(start[1]) for start, _end in segment_points],
                         temperature_unit,
                     ),
-                    t_target=Value(
+                    target_temperature=Value(
                         [float(end[1]) for _start, end in segment_points],
                         temperature_unit,
                     ),
-                    p_supply=Value([stage.p_out for stage in stages], pressure_unit),
-                    p_target=Value([stage.p_out for stage in stages], pressure_unit),
+                    supply_pressure=Value(
+                        [stage.p_out for stage in stages], pressure_unit
+                    ),
+                    target_pressure=Value(
+                        [stage.p_out for stage in stages], pressure_unit
+                    ),
                     heat_flow=Value(
                         [
                             stage_segment_heat_flow(stage, start[0], end[0]).value
@@ -108,12 +112,13 @@ def build_multiperiod_stage_streams(
                         ],
                         heat_flow_unit,
                     ),
-                    dt_cont=[
-                        value_at_index(source_stream.dt_cont, index) or 0.0
+                    delta_t_contribution=[
+                        value_at_index(source_stream.delta_t_contribution, index) or 0.0
                         for index in range(period_count)
                     ],
-                    htc=[
-                        value_at_index(source_stream.htc, index) or 1.0
+                    heat_transfer_coefficient=[
+                        value_at_index(source_stream.heat_transfer_coefficient, index)
+                        or 1.0
                         for index in range(period_count)
                     ],
                     is_process_stream=True,
@@ -128,7 +133,7 @@ def build_multiperiod_stage_streams(
             fluid_name=source_stream.fluid_name,
             fluid_phase=source_stream.fluid_phase,
         )
-        stream.active = True
+        stream.is_active = True
         streams.append(stream)
     return streams
 

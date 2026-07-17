@@ -11,7 +11,7 @@ from ....contracts.synthesis.task import (
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
 from ....contracts.synthesis.topology import HeatExchangerNetworkTopologyRestriction
-from ....domain.enums import HENDesignMethod
+from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..execution.executor import LocalSynthesisExecutor, SynthesisExecutor
 from ..execution.pathways import (
@@ -47,8 +47,8 @@ def _execute_network_evolution_method_workflow(
     """Execute only the seeded evolution method and collect validated outputs."""
     method_settings = replace(
         settings,
-        method_sequence=("network_evolution_method",),
-        design_method=HENDesignMethod.NetworkEvolution,
+        method_sequence=(HeatExchangerNetworkDesignMethod.NetworkEvolution,),
+        design_method=HeatExchangerNetworkDesignMethod.NetworkEvolution,
     )
     start = perf_counter()
 

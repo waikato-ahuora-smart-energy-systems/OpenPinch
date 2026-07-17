@@ -17,37 +17,6 @@ GUIDES_ROOT = DOCS_ROOT / "guides"
 API_ROOT = DOCS_ROOT / "api"
 EXAMPLES_ROOT = DOCS_ROOT / "examples"
 
-LEGACY_PAGE_TARGETS = {
-    DOCS_ROOT / "user-guide" / "quickstart.rst": (
-        "../guides/first-solve-python",
-        "../guides/notebooks-and-sample-cases",
-    ),
-    DOCS_ROOT / "user-guide" / "notebooks.rst": (
-        "../guides/notebooks-and-sample-cases",
-        "../examples/notebook-series",
-    ),
-    DOCS_ROOT / "user-guide" / "heat-pump-targeting.rst": (
-        "../guides/heat-pump-workflows",
-        "../fundamentals/heat-pump-and-refrigeration-methods",
-    ),
-    DOCS_ROOT / "user-guide" / "interpreting-results.rst": (
-        "../guides/graphing-and-interpretation",
-        "../fundamentals/graphs-and-interpretation",
-    ),
-    DOCS_ROOT / "reference" / "api.rst": (
-        "../api/package-root",
-        "../api/generated-index",
-    ),
-    DOCS_ROOT / "reference" / "architecture.rst": (
-        "../overview/workflow-map",
-        "../fundamentals/pinch-analysis",
-    ),
-    DOCS_ROOT / "reference" / "index.rst": (
-        "../api/index",
-        "../developer/index",
-    ),
-}
-
 STALE_DOC_STRINGS = (
     "openpinch run",
     "openpinch graph",
@@ -221,15 +190,6 @@ def test_docs_define_stability_and_optional_dependency_boundaries():
         assert phrase in combined
 
 
-def test_old_url_pages_remain_orphan_transition_stubs():
-    for path, targets in LEGACY_PAGE_TARGETS.items():
-        text = _read(path)
-        assert ":orphan:" in text
-        assert "Use these pages instead" in text or "Use these sections instead" in text
-        for target in targets:
-            assert target in text, f"{path} missing transition target {target}"
-
-
 def test_docs_do_not_present_removed_cli_surfaces():
     combined = _docs_text()
 
@@ -251,8 +211,8 @@ def test_hen_synthesis_docs_keep_internal_cutover_and_dependency_notes():
         "problem.design.open_hens()",
         "problem.design.network_evolution(",
         "TargetOutput.design",
-        "Old import paths",
-        "OpenHENS field aliases",
+        'design.result.model_dump(mode="json")',
+        "design.selected_network",
         "pytest -m synthesis",
         "pytest -m solver",
     ):

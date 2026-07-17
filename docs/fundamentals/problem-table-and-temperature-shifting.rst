@@ -29,8 +29,8 @@ OpenPinch Runtime Representation
 
 At the class level, the stream model stores:
 
-- the original/base `dt_cont`
-- the active/effective `dt_cont`
+- the base ``delta_t_contribution``
+- the ``effective_delta_t_contribution``
 - shifted temperatures such as `t_min_star` and `t_max_star`
 
 That allows workflows such as sensitivity studies or zone-level multiplier

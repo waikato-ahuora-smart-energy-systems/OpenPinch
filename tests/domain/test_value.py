@@ -150,7 +150,7 @@ def test_period_value_assignment_accepts_scalar_broadcast_and_validates_lengths(
 
     value.value = 3.0
     np.testing.assert_allclose(value.period_values, np.array([3.0, 3.0]))
-    assert value.values == [3.0, 3.0]
+    assert not hasattr(value, "values")
     assert repr(value) == "Value(values=[3.0, 3.0], unit='kW')"
     assert value.to_dict() == {"values": [3.0, 3.0], "unit": "kW"}
 

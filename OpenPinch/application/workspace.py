@@ -485,14 +485,12 @@ class PinchWorkspace:
         *,
         case_name: Optional[str] = None,
         detailed: bool = False,
-        format: str | None = None,
         include_periods: bool = False,
         include_weighted_average: bool = False,
     ) -> pd.DataFrame:
         """Return the solved summary for one case."""
         return self.case(case_name).summary_frame(
             detailed=detailed,
-            format=format,
             include_periods=include_periods,
             include_weighted_average=include_weighted_average,
         )
@@ -629,6 +627,7 @@ class PinchWorkspace:
         """Persist the current workspace, syncing any live case edits first."""
         self._sync_all_cases()
         bundle = PinchWorkspaceBundle(
+            schema_version="3",
             project_name=self.project_name,
             baseline_name=self.baseline_name,
             cases={

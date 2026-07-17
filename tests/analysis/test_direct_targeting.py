@@ -15,7 +15,7 @@ from OpenPinch.analysis.targeting.direct import (
     should_update_balanced_composite_curves,
 )
 from OpenPinch.domain.configuration import tol
-from OpenPinch.domain.enums import PT
+from OpenPinch.domain.enums import ProblemTableLabel
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream import Stream
 from OpenPinch.domain.stream_collection import StreamCollection
@@ -24,11 +24,11 @@ from OpenPinch.domain.stream_collection import StreamCollection
 def _balanced_problem_table():
     return ProblemTable(
         {
-            PT.T: [300.0, 200.0],
-            PT.H_HOT_BAL: [100.0, 0.0],
-            PT.H_COLD_BAL: [100.0, 0.0],
-            PT.R_HOT_BAL: [0.1, 0.1],
-            PT.R_COLD_BAL: [0.2, 0.2],
+            ProblemTableLabel.T: [300.0, 200.0],
+            ProblemTableLabel.H_HOT_BAL: [100.0, 0.0],
+            ProblemTableLabel.H_COLD_BAL: [100.0, 0.0],
+            ProblemTableLabel.R_HOT_BAL: [0.1, 0.1],
+            ProblemTableLabel.R_COLD_BAL: [0.2, 0.2],
         }
     )
 
@@ -85,13 +85,13 @@ def test_compute_direct_integration_targets_uses_empty_area_payload_when_disable
 ):
     table = ProblemTable(
         {
-            PT.T: [300.0, 200.0],
-            PT.H_NET: [100.0, 0.0],
-            PT.H_NET_A: [100.0, 0.0],
-            PT.H_HOT: [100.0, 0.0],
-            PT.H_COLD: [0.0, 100.0],
-            PT.H_HOT_UT: [0.0, 0.0],
-            PT.H_COLD_UT: [0.0, 0.0],
+            ProblemTableLabel.T: [300.0, 200.0],
+            ProblemTableLabel.H_NET: [100.0, 0.0],
+            ProblemTableLabel.H_NET_A: [100.0, 0.0],
+            ProblemTableLabel.H_HOT: [100.0, 0.0],
+            ProblemTableLabel.H_COLD: [0.0, 100.0],
+            ProblemTableLabel.H_HOT_UT: [0.0, 0.0],
+            ProblemTableLabel.H_COLD_UT: [0.0, 0.0],
         }
     )
     zone = SimpleNamespace(

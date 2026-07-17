@@ -40,6 +40,7 @@ from ._problem.input.validation import (
     validate_problem_semantics as _validate_problem_semantics,
 )
 from ._problem.output.reporting import (
+    _build_numeric_summary_frame,
     build_graph_data,
     build_problem_report,
     build_problem_summary_frame,
@@ -396,7 +397,6 @@ class PinchProblem:
         self,
         *,
         detailed: bool = False,
-        format: str | None = None,
         include_periods: bool = False,
         include_weighted_average: bool = False,
     ) -> pd.DataFrame:
@@ -407,15 +407,7 @@ class PinchProblem:
                 include_weighted_average=include_weighted_average,
             )
         )
-        if format is None:
-            format = "detailed" if detailed else "compact"
-        elif detailed and format != "detailed":
-            raise ValueError("Use either detailed=True or format=..., not both.")
-        if detailed:
-            from ..presentation.reporting.workbook import build_summary_dataframe
-
-            return build_summary_dataframe(results.targets)
-        return build_problem_summary_frame(results, format=format)
+        return build_problem_summary_frame(results, detailed=detailed)
 
     def metrics(
         self,
@@ -490,8 +482,10 @@ class PinchProblem:
     ) -> pd.DataFrame:
         """Compare numeric summary metrics of two solved problems."""
         return compare_problem_summaries(
-            self.summary_frame(format="plain"),
-            other_problem.summary_frame(format="plain"),
+            _build_numeric_summary_frame(self._summary_results(periods="selected")),
+            _build_numeric_summary_frame(
+                other_problem._summary_results(periods="selected")
+            ),
             target_name=target_name,
             base_label=base_label,
             other_label=other_label,

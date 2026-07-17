@@ -300,7 +300,9 @@ def get_problem_from_excel(excel_file, output_json):
       }
     """
 
-    plant_profile_data = parse_sheet_for_gcc_with_units(excel_file, sheet_name="PT")
+    plant_profile_data = parse_sheet_for_gcc_with_units(
+        excel_file, sheet_name="ProblemTableLabel"
+    )
     streams_data = parse_sheet_with_units(excel_file, sheet_name="Stream Data")
     utilities_data = parse_sheet_with_units(excel_file, sheet_name="Utility Data")
     options_data = set_options()

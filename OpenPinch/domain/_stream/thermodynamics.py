@@ -7,7 +7,7 @@ from typing import Mapping
 
 import numpy as np
 
-from ..enums import ST
+from ..enums import StreamType
 from ..value import Value
 from . import value_state
 
@@ -165,19 +165,19 @@ def derive_stream_state(
     cold_states = t_supply_arr < t_target_arr - temperature_equal_tol
 
     if np.any(hot_states):
-        stream_type = ST.Hot.value
+        stream_type = StreamType.Hot.value
         t_min = t_target_arr
         t_max = t_supply_arr
         t_min_star = t_min - dt_cont_act
         t_max_star = t_max - dt_cont_act
     elif np.any(cold_states):
-        stream_type = ST.Cold.value
+        stream_type = StreamType.Cold.value
         t_min = t_supply_arr
         t_max = t_target_arr
         t_min_star = t_min + dt_cont_act
         t_max_star = t_max + dt_cont_act
     else:
-        stream_type = ST.Neutral.value
+        stream_type = StreamType.Neutral.value
         t_min = t_supply_arr
         t_max = t_target_arr
         t_min_star = t_min.copy()

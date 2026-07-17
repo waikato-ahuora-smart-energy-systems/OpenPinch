@@ -29,8 +29,8 @@ def _stream_collection() -> StreamCollection:
         collection.add(
             Stream(
                 name=spec["name"],
-                t_supply=spec["t_supply"],
-                t_target=spec["t_target"],
+                supply_temperature=spec["t_supply"],
+                target_temperature=spec["t_target"],
                 heat_flow=spec["heat_flow"],
                 is_process_stream=False,
             )

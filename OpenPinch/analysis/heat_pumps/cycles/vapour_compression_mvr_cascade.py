@@ -437,10 +437,10 @@ class VapourCompressionMvrCascade:
                 streams.add(
                     Stream(
                         name="VC_to_MVR_source",
-                        t_supply=self._T_evap_mvr[0],
-                        t_target=self._T_evap_mvr[0] + 0.01,
+                        supply_temperature=self._T_evap_mvr[0],
+                        target_temperature=self._T_evap_mvr[0] + 0.01,
                         heat_flow=heat_flow,
-                        dt_cont=dtcont,
+                        delta_t_contribution=dtcont,
                     )
                 )
         for stream in streams:

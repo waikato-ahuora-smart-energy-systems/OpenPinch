@@ -8,7 +8,7 @@ from typing import Any
 
 from ...application.problem import PinchProblem
 from ...contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
-from ...domain.enums import HeatExchangerNetworkDesignMethod, HENDesignMethod
+from ...domain.enums import HeatExchangerNetworkDesignMethod
 from ...domain.heat_exchanger_network import HeatExchangerNetwork
 from .context import finalise_design_result, prepare_service_context
 from .execution.executor import SynthesisExecutor
@@ -50,7 +50,7 @@ def heat_exchanger_network_synthesis_service(
         )
 
     design_method = _coerce_design_method(method)
-    if design_method is HENDesignMethod.OpenHENS:
+    if design_method is HeatExchangerNetworkDesignMethod.OpenHENS:
         if initial_networks is not None:
             raise ValueError("open_hens_method does not accept initial_networks.")
         return heat_exchanger_network_open_hens_method_service(
@@ -59,7 +59,7 @@ def heat_exchanger_network_synthesis_service(
             workspace_variant=workspace_variant,
             executor=executor,
         )
-    if design_method is HENDesignMethod.PinchDesign:
+    if design_method is HeatExchangerNetworkDesignMethod.PinchDesign:
         if initial_networks is not None:
             raise ValueError("pinch_design_method does not accept initial_networks.")
         return heat_exchanger_network_pinch_design_method_service(
@@ -68,7 +68,7 @@ def heat_exchanger_network_synthesis_service(
             workspace_variant=workspace_variant,
             executor=executor,
         )
-    if design_method is HENDesignMethod.ThermalDerivative:
+    if design_method is HeatExchangerNetworkDesignMethod.ThermalDerivative:
         return heat_exchanger_network_thermal_derivative_method_service(
             problem,
             initial_networks=initial_networks,
@@ -76,7 +76,7 @@ def heat_exchanger_network_synthesis_service(
             workspace_variant=workspace_variant,
             executor=executor,
         )
-    if design_method is HENDesignMethod.NetworkEvolution:
+    if design_method is HeatExchangerNetworkDesignMethod.NetworkEvolution:
         return heat_exchanger_network_evolution_method_service(
             problem,
             initial_networks=initial_networks,

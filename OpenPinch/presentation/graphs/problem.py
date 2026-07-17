@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 import pandas as pd
 
 from ...analysis.graphs.service import get_output_graph_data
-from ...domain.enums import GT
+from ...domain.enums import GraphType
 from .plotly import build_plotly_figure
 
 if TYPE_CHECKING:
@@ -17,58 +17,6 @@ if TYPE_CHECKING:
 PathLike = Union[str, Path]
 GraphRecord = Dict[str, Any]
 GraphData = Dict[str, GraphRecord]
-
-_GRAPH_TYPE_ALIASES = {
-    "etd": GT.ETD.value,
-    "energy transfer": GT.ETD.value,
-    "energy transfer diagram": GT.ETD.value,
-    "cc": GT.CC.value,
-    "composite": GT.CC.value,
-    "composite curve": GT.CC.value,
-    "composite curves": GT.CC.value,
-    "scc": GT.SCC.value,
-    "shifted": GT.SCC.value,
-    "shifted composite": GT.SCC.value,
-    "shifted composite curve": GT.SCC.value,
-    "shifted composite curves": GT.SCC.value,
-    "bcc": GT.BCC.value,
-    "balanced": GT.BCC.value,
-    "balanced composite": GT.BCC.value,
-    "balanced composite curve": GT.BCC.value,
-    "balanced composite curves": GT.BCC.value,
-    "gcc": GT.GCC.value,
-    "grand composite": GT.GCC.value,
-    "grand composite curve": GT.GCC.value,
-    "gcc_x": GT.GCC_X.value,
-    "exergy gcc": GT.GCC_X.value,
-    "exergetic grand composite curve": GT.GCC_X.value,
-    "nlc": GT.NLP.value,
-    "net load": GT.NLP.value,
-    "net load curve": GT.NLP.value,
-    "net load curves": GT.NLP.value,
-    "net load profile": GT.NLP.value,
-    "net load profiles": GT.NLP.value,
-    "net_load": GT.NLP.value,
-    "net_load curve": GT.NLP.value,
-    "net_load curves": GT.NLP.value,
-    "net_load profile": GT.NLP.value,
-    "net_load profiles": GT.NLP.value,
-    "nlp_hp": GT.NLP_HP.value,
-    "net load with heat pump": GT.NLP_HP.value,
-    "net load curve with heat pump": GT.NLP_HP.value,
-    "net load curves with heat pump": GT.NLP_HP.value,
-    "net load profile with heat pump": GT.NLP_HP.value,
-    "net load profiles with heat pump": GT.NLP_HP.value,
-    "net_load_with_heat_pump": GT.NLP_HP.value,
-    "nlp_x": GT.NLP_X.value,
-    "exergy nlp": GT.NLP_X.value,
-    "exergetic net load profiles": GT.NLP_X.value,
-    "tsp": GT.TSP.value,
-    "total site": GT.TSP.value,
-    "total site profiles": GT.TSP.value,
-    "sugcc": GT.SUGCC.value,
-    "site utility grand composite curve": GT.SUGCC.value,
-}
 
 
 class _PlotAccessor:
@@ -104,7 +52,7 @@ class _PlotAccessor:
         self,
         *,
         zone_name: Optional[str] = None,
-        graph_type: Optional[str] = None,
+        graph_type: GraphType | None = None,
         index: int = 0,
         show: bool = False,
         return_graph_data: bool = False,
@@ -139,7 +87,7 @@ class _PlotAccessor:
         self,
         *,
         zone_name: Optional[str] = None,
-        graph_type: Optional[str] = None,
+        graph_type: GraphType | None = None,
         index: int = 0,
     ) -> GraphRecord:
         """Return one graph from the filtered graph selection."""
@@ -157,11 +105,13 @@ class _PlotAccessor:
         self,
         *,
         zone_name: Optional[str] = None,
-        graph_type: Optional[str] = None,
+        graph_type: GraphType | None = None,
     ) -> list[tuple[str, GraphRecord]]:
         """Return all graphs matching the optional zone and type filters."""
         graph_data = self.data()
-        selected_graph_type = _normalise_graph_type_selector(graph_type)
+        if graph_type is not None and not isinstance(graph_type, GraphType):
+            raise TypeError("graph_type must be a GraphType selected by a plot method.")
+        selected_graph_type = graph_type.value if graph_type is not None else None
 
         zone_items = graph_data.items()
         if zone_name is not None:
@@ -265,7 +215,7 @@ class _PlotAccessor:
         index_path.write_text(_gallery_index_html(links), encoding="utf-8")
         return index_path
 
-    def _graph_type_for_method(self, plot: Callable | None) -> str | None:
+    def _graph_type_for_method(self, plot: Callable | None) -> GraphType | None:
         if plot is None:
             return None
         if not callable(plot):
@@ -277,19 +227,19 @@ class _PlotAccessor:
                 "plot must be a method bound to this problem.plot accessor."
             )
         method_types = {
-            "composite_curve": GT.CC.value,
-            "shifted_composite_curve": GT.SCC.value,
-            "balanced_composite_curve": GT.BCC.value,
-            "grand_composite_curve": GT.GCC.value,
-            "real_grand_composite_curve": GT.GCC_R.value,
-            "exergetic_grand_composite_curve": GT.GCC_X.value,
-            "grand_composite_curve_with_heat_pump": GT.GCC_HP.value,
-            "net_load_profiles": GT.NLP.value,
-            "net_load_profiles_with_heat_pump": GT.NLP_HP.value,
-            "exergetic_net_load_profiles": GT.NLP_X.value,
-            "total_site_profiles": GT.TSP.value,
-            "site_utility_grand_composite_curve": GT.SUGCC.value,
-            "energy_transfer_diagram": GT.ETD.value,
+            "composite_curve": GraphType.CC,
+            "shifted_composite_curve": GraphType.SCC,
+            "balanced_composite_curve": GraphType.BCC,
+            "grand_composite_curve": GraphType.GCC,
+            "real_grand_composite_curve": GraphType.GCC_R,
+            "exergetic_grand_composite_curve": GraphType.GCC_X,
+            "grand_composite_curve_with_heat_pump": GraphType.GCC_HP,
+            "net_load_profiles": GraphType.NLP,
+            "net_load_profiles_with_heat_pump": GraphType.NLP_HP,
+            "exergetic_net_load_profiles": GraphType.NLP_X,
+            "total_site_profiles": GraphType.TSP,
+            "site_utility_grand_composite_curve": GraphType.SUGCC,
+            "energy_transfer_diagram": GraphType.ETD,
         }
         try:
             return method_types[name]
@@ -307,7 +257,7 @@ class _PlotAccessor:
         """Return the first matching Composite Curve figure or raw data."""
         return self._plot_graph(
             zone_name=zone_name,
-            graph_type=GT.CC.value,
+            graph_type=GraphType.CC,
             index=index,
             show=show,
             return_graph_data=return_graph_data,
@@ -324,7 +274,7 @@ class _PlotAccessor:
         """Return the first matching Shifted Composite Curve figure or raw data."""
         return self._plot_graph(
             zone_name=zone_name,
-            graph_type=GT.SCC.value,
+            graph_type=GraphType.SCC,
             index=index,
             show=show,
             return_graph_data=return_graph_data,
@@ -341,7 +291,7 @@ class _PlotAccessor:
         """Return the first matching Balanced Composite Curve figure or raw data."""
         return self._plot_graph(
             zone_name=zone_name,
-            graph_type=GT.BCC.value,
+            graph_type=GraphType.BCC,
             index=index,
             show=show,
             return_graph_data=return_graph_data,
@@ -358,7 +308,7 @@ class _PlotAccessor:
         """Return the first matching Grand Composite Curve figure or raw data."""
         return self._plot_graph(
             zone_name=zone_name,
-            graph_type=GT.GCC.value,
+            graph_type=GraphType.GCC,
             index=index,
             show=show,
             return_graph_data=return_graph_data,
@@ -375,7 +325,7 @@ class _PlotAccessor:
         """Return the first matching real temperature GCC data or figure."""
         return self._plot_graph(
             zone_name=zone_name,
-            graph_type=GT.GCC_R.value,
+            graph_type=GraphType.GCC_R,
             index=index,
             show=show,
             return_graph_data=return_graph_data,
@@ -392,7 +342,7 @@ class _PlotAccessor:
         """Return the first matching exergetic GCC output or figure."""
         return self._plot_graph(
             zone_name=zone_name,
-            graph_type=GT.GCC_X.value,
+            graph_type=GraphType.GCC_X,
             index=index,
             show=show,
             return_graph_data=return_graph_data,
@@ -409,7 +359,7 @@ class _PlotAccessor:
         """Return the first matching GCC with Heat Pump data or figure."""
         return self._plot_graph(
             zone_name=zone_name,
-            graph_type=GT.GCC_HP.value,
+            graph_type=GraphType.GCC_HP,
             index=index,
             show=show,
             return_graph_data=return_graph_data,
@@ -426,7 +376,7 @@ class _PlotAccessor:
         """Return the first matching net load profile data or figure."""
         return self._plot_graph(
             zone_name=zone_name,
-            graph_type=GT.NLP.value,
+            graph_type=GraphType.NLP,
             index=index,
             show=show,
             return_graph_data=return_graph_data,
@@ -443,7 +393,7 @@ class _PlotAccessor:
         """Return the first matching net load profile (with Heat Pump) or figure."""
         return self._plot_graph(
             zone_name=zone_name,
-            graph_type=GT.NLP_HP.value,
+            graph_type=GraphType.NLP_HP,
             index=index,
             show=show,
             return_graph_data=return_graph_data,
@@ -460,7 +410,7 @@ class _PlotAccessor:
         """Return the first matching exergetic NLP data or figure."""
         return self._plot_graph(
             zone_name=zone_name,
-            graph_type=GT.NLP_X.value,
+            graph_type=GraphType.NLP_X,
             index=index,
             show=show,
             return_graph_data=return_graph_data,
@@ -477,7 +427,7 @@ class _PlotAccessor:
         """Return the first matching Total Site profiles data or figure."""
         return self._plot_graph(
             zone_name=zone_name,
-            graph_type=GT.TSP.value,
+            graph_type=GraphType.TSP,
             index=index,
             show=show,
             return_graph_data=return_graph_data,
@@ -494,7 +444,7 @@ class _PlotAccessor:
         """Return the first matching site-utility GCC data or figure."""
         return self._plot_graph(
             zone_name=zone_name,
-            graph_type=GT.SUGCC.value,
+            graph_type=GraphType.SUGCC,
             index=index,
             show=show,
             return_graph_data=return_graph_data,
@@ -511,19 +461,11 @@ class _PlotAccessor:
         """Return the first matching energy-transfer diagram data or figure."""
         return self._plot_graph(
             zone_name=zone_name,
-            graph_type=GT.ETD.value,
+            graph_type=GraphType.ETD,
             index=index,
             show=show,
             return_graph_data=return_graph_data,
         )
-
-
-def _normalise_graph_type_selector(graph_type: Optional[str]) -> Optional[str]:
-    """Normalize short graph-type aliases to their canonical enum label."""
-    if graph_type is None:
-        return None
-    text = str(graph_type).strip()
-    return _GRAPH_TYPE_ALIASES.get(text.lower(), text)
 
 
 def _graph_set_matches_zone_selector(

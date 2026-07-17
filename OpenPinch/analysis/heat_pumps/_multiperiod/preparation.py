@@ -14,7 +14,7 @@ from ....analysis.targeting.total_site import (
 from ....contracts.hpr import HPRPeriodCase
 from ....domain._stream.value_state import resolve_period_weights
 from ....domain.configuration import tol
-from ....domain.enums import PT
+from ....domain.enums import ProblemTableLabel
 from ....domain.problem_table import ProblemTable
 from ....domain.zone import Zone
 from ...targeting.cascade import get_process_heat_cascade
@@ -69,8 +69,8 @@ def build_multiperiod_hpr_cases(
         period_id = case["period_id"]
         period_idx = case["period_idx"]
         target_load = resolve_hpr_target_load(
-            H_net_cold=pt[PT.H_NET_COLD],
-            H_net_hot=pt[PT.H_NET_HOT],
+            H_net_cold=pt[ProblemTableLabel.H_NET_COLD],
+            H_net_hot=pt[ProblemTableLabel.H_NET_HOT],
             is_heat_pumping=is_heat_pumping,
             is_refrigeration=not is_heat_pumping,
             config=zone.config,
@@ -88,9 +88,9 @@ def build_multiperiod_hpr_cases(
             weight=case["weight"],
             args=construct_HPRTargetInputs(
                 Q_hpr_target=target_load,
-                T_vals=pt[PT.T],
-                H_hot=np.abs(pt[PT.H_NET_HOT]) * -1,
-                H_cold=np.abs(pt[PT.H_NET_COLD]),
+                T_vals=pt[ProblemTableLabel.T],
+                H_hot=np.abs(pt[ProblemTableLabel.H_NET_HOT]) * -1,
+                H_cold=np.abs(pt[ProblemTableLabel.H_NET_COLD]),
                 is_heat_pumping=is_heat_pumping,
                 config=zone.config,
                 period_idx=period_idx,
@@ -176,16 +176,17 @@ def _align_hpr_problem_tables(tables: list[ProblemTable]) -> None:
         for other in tables[i + 1 :]:
             table.share_temperature_intervals(other)
 
-    reference = tables[0][PT.T]
+    reference = tables[0][ProblemTableLabel.T]
     for table in tables[1:]:
-        if len(table[PT.T]) != len(reference) or not np.allclose(
-            table[PT.T],
+        if len(table[ProblemTableLabel.T]) != len(reference) or not np.allclose(
+            table[ProblemTableLabel.T],
             reference,
             rtol=0.0,
             atol=tol,
         ):
             raise ValueError(
-                "Multi-period HPR optimisation requires aligned PT temperature grids."
+                "Multi-period HPR optimisation requires aligned problem-table "
+                "temperature grids."
             )
 
 

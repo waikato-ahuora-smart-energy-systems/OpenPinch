@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from time import perf_counter
 
-from ....domain.enums import HENDesignMethod
+from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ..execution.executor import LocalSynthesisExecutor, SynthesisExecutor
 from ..execution.fallbacks import (
     _can_skip_derivative_stage_for_missing_couenne,
@@ -31,7 +31,9 @@ def execute_open_hens_method(
     executor: SynthesisExecutor | None = None,
 ) -> SynthesisWorkflowResult:
     """Generate, execute, and collect the PDM -> TDM -> EVM task graph."""
-    settings = replace(settings, design_method=HENDesignMethod.OpenHENS)
+    settings = replace(
+        settings, design_method=HeatExchangerNetworkDesignMethod.OpenHENS
+    )
     if executor is None:
         executor = LocalSynthesisExecutor()
     start = perf_counter()

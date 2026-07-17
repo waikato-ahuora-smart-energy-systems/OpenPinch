@@ -14,7 +14,7 @@ import numpy as np
 
 from ...domain._problem_table.types import ProblemTableUpdateKwargs
 from ...domain.configuration import tol
-from ...domain.enums import PT
+from ...domain.enums import ProblemTableLabel
 from ...domain.problem_table import ProblemTable
 from ...domain.stream_collection import StreamCollection
 from ..numerics import (
@@ -105,7 +105,7 @@ def get_utility_heat_cascade(
     period_idx: int | None = None,
 ) -> ProblemTableUpdateKwargs:
     """Prepare and calculate the utility heat cascade for a utility set."""
-    pt_ut = ProblemTable({PT.T: T_int_vals})
+    pt_ut = ProblemTable({ProblemTableLabel.T: T_int_vals})
     problem_table_algorithm(
         pt_ut,
         hot_utilities,
@@ -114,21 +114,22 @@ def get_utility_heat_cascade(
         idx=period_idx,
     )
 
-    h_net_values = pt_ut[PT.H_NET]
+    h_net_values = pt_ut[ProblemTableLabel.H_NET]
     H_NET_UT = h_net_values.max() - h_net_values
 
-    h_ut_cc = pt_ut[PT.H_HOT]
-    c_ut_cc = pt_ut[PT.H_COLD] - pt_ut[PT.H_COLD].max()
+    h_ut_cc = pt_ut[ProblemTableLabel.H_HOT]
+    c_ut_cc = pt_ut[ProblemTableLabel.H_COLD] - pt_ut[ProblemTableLabel.H_COLD].max()
 
     return {
         "T_col": T_int_vals,
         "updates": {
-            PT.H_NET_UT: H_NET_UT,
-            PT.H_HOT_UT: h_ut_cc,
-            PT.H_COLD_UT: c_ut_cc,
-            PT.RCP_HOT_UT: pt_ut[PT.RCP_HOT],
-            PT.RCP_COLD_UT: pt_ut[PT.RCP_COLD],
-            PT.RCP_UT_NET: pt_ut[PT.RCP_HOT] + pt_ut[PT.RCP_COLD],
+            ProblemTableLabel.H_NET_UT: H_NET_UT,
+            ProblemTableLabel.H_HOT_UT: h_ut_cc,
+            ProblemTableLabel.H_COLD_UT: c_ut_cc,
+            ProblemTableLabel.RCP_HOT_UT: pt_ut[ProblemTableLabel.RCP_HOT],
+            ProblemTableLabel.RCP_COLD_UT: pt_ut[ProblemTableLabel.RCP_COLD],
+            ProblemTableLabel.RCP_UT_NET: pt_ut[ProblemTableLabel.RCP_HOT]
+            + pt_ut[ProblemTableLabel.RCP_COLD],
         },
     }
 
@@ -154,13 +155,19 @@ def create_problem_table_with_t_int(
             T_vals = [
                 float(t)
                 for s in streams
-                for t in (s.t_min_star[period_idx], s.t_max_star[period_idx])
+                for t in (
+                    s.shifted_minimum_temperature[period_idx],
+                    s.shifted_maximum_temperature[period_idx],
+                )
             ]
         else:
             T_vals = [
                 float(t)
                 for s in streams
-                for t in (s.t_min[period_idx], s.t_max[period_idx])
+                for t in (
+                    s.minimum_temperature[period_idx],
+                    s.maximum_temperature[period_idx],
+                )
             ]
         T_vals = np.asarray(T_vals, dtype=float)
 
@@ -170,11 +177,11 @@ def create_problem_table_with_t_int(
             T_vals = np.concatenate((T_vals, extra_vals))
 
     if T_vals.size == 0:
-        return ProblemTable({PT.T: []})
+        return ProblemTable({ProblemTableLabel.T: []})
 
     dp = int(-math.log10(tol))
     T_vals = np.round(T_vals[np.isfinite(T_vals)], dp)
-    return ProblemTable({PT.T: np.unique(T_vals)[::-1]})
+    return ProblemTable({ProblemTableLabel.T: np.unique(T_vals)[::-1]})
 
 
 def problem_table_algorithm(
@@ -188,52 +195,68 @@ def problem_table_algorithm(
 
     # Sum m_dot*Cp contributions from hot streams per interval (sets CP_HOT and rCP_HOT)
     if hot_streams is not None:
-        pt[PT.CP_HOT], pt[PT.RCP_HOT] = _sum_mcp_between_temperature_boundaries(
-            pt[PT.T], hot_streams, is_shifted, idx=idx
+        pt[ProblemTableLabel.CP_HOT], pt[ProblemTableLabel.RCP_HOT] = (
+            _sum_mcp_between_temperature_boundaries(
+                pt[ProblemTableLabel.T], hot_streams, is_shifted, idx=idx
+            )
         )
     else:
-        pt[PT.CP_HOT].fill(0.0)
-        pt[PT.RCP_HOT].fill(0.0)
+        pt[ProblemTableLabel.CP_HOT].fill(0.0)
+        pt[ProblemTableLabel.RCP_HOT].fill(0.0)
 
     # Sum m_dot*Cp contributions from cold streams per interval.
     if cold_streams is not None:
-        pt[PT.CP_COLD], pt[PT.RCP_COLD] = _sum_mcp_between_temperature_boundaries(
-            pt[PT.T], cold_streams, is_shifted, idx=idx
+        pt[ProblemTableLabel.CP_COLD], pt[ProblemTableLabel.RCP_COLD] = (
+            _sum_mcp_between_temperature_boundaries(
+                pt[ProblemTableLabel.T], cold_streams, is_shifted, idx=idx
+            )
         )
     else:
-        pt[PT.CP_COLD].fill(0.0)
-        pt[PT.RCP_COLD].fill(0.0)
+        pt[ProblemTableLabel.CP_COLD].fill(0.0)
+        pt[ProblemTableLabel.RCP_COLD].fill(0.0)
 
     # ΔT_i = T_{i-1} - T_i
-    pt[PT.DELTA_T] = delta_with_zero_at_start(pt[PT.T])
+    pt[ProblemTableLabel.DELTA_T] = delta_with_zero_at_start(pt[ProblemTableLabel.T])
 
     # ΔH_hot = ΔT * CP_hot
-    pt[PT.DELTA_H_HOT] = pt[PT.DELTA_T] * pt[PT.CP_HOT]
+    pt[ProblemTableLabel.DELTA_H_HOT] = (
+        pt[ProblemTableLabel.DELTA_T] * pt[ProblemTableLabel.CP_HOT]
+    )
 
     # H_hot = Σ ΔH_hot
-    pt[PT.H_HOT] = np.cumsum(pt[PT.DELTA_H_HOT])
+    pt[ProblemTableLabel.H_HOT] = np.cumsum(pt[ProblemTableLabel.DELTA_H_HOT])
 
     # ΔH_cold = ΔT * CP_cold
-    pt[PT.DELTA_H_COLD] = pt[PT.DELTA_T] * pt[PT.CP_COLD]
+    pt[ProblemTableLabel.DELTA_H_COLD] = (
+        pt[ProblemTableLabel.DELTA_T] * pt[ProblemTableLabel.CP_COLD]
+    )
 
     # H_cold = Σ ΔH_cold
-    pt[PT.H_COLD] = np.cumsum(pt[PT.DELTA_H_COLD])
+    pt[ProblemTableLabel.H_COLD] = np.cumsum(pt[ProblemTableLabel.DELTA_H_COLD])
 
     # CP_NET = CP_cold - CP_hot
-    pt[PT.CP_NET] = pt[PT.CP_COLD] - pt[PT.CP_HOT]
+    pt[ProblemTableLabel.CP_NET] = (
+        pt[ProblemTableLabel.CP_COLD] - pt[ProblemTableLabel.CP_HOT]
+    )
 
     # ΔH_net = ΔT * CP_NET
-    pt[PT.DELTA_H_NET] = pt[PT.DELTA_T] * pt[PT.CP_NET]
+    pt[ProblemTableLabel.DELTA_H_NET] = (
+        pt[ProblemTableLabel.DELTA_T] * pt[ProblemTableLabel.CP_NET]
+    )
 
     # H_net = -Σ ΔH_net
-    pt[PT.H_NET] = -np.cumsum(pt[PT.DELTA_H_NET])
+    pt[ProblemTableLabel.H_NET] = -np.cumsum(pt[ProblemTableLabel.DELTA_H_NET])
 
     # Shift cascades so minimum H_net is zero and the curves align at the pinch.
-    pt[PT.H_HOT] = pt[PT.H_HOT][-1] - pt[PT.H_HOT]
-    pt[PT.H_COLD] = (pt[PT.H_COLD][-1] + pt[PT.H_NET][-1] - pt[PT.H_NET].min()) - pt[
-        PT.H_COLD
-    ]
-    pt[PT.H_NET] -= pt[PT.H_NET].min()
+    pt[ProblemTableLabel.H_HOT] = (
+        pt[ProblemTableLabel.H_HOT][-1] - pt[ProblemTableLabel.H_HOT]
+    )
+    pt[ProblemTableLabel.H_COLD] = (
+        pt[ProblemTableLabel.H_COLD][-1]
+        + pt[ProblemTableLabel.H_NET][-1]
+        - pt[ProblemTableLabel.H_NET].min()
+    ) - pt[ProblemTableLabel.H_COLD]
+    pt[ProblemTableLabel.H_NET] -= pt[ProblemTableLabel.H_NET].min()
 
     return pt
 
@@ -253,7 +276,7 @@ def get_heat_recovery_target_from_pt(
     float
         Maximum direct heat recovery for the analysed zone.
     """
-    return pt.loc[0, PT.H_HOT] - pt.loc[-1, PT.H_NET]
+    return pt.loc[0, ProblemTableLabel.H_HOT] - pt.loc[-1, ProblemTableLabel.H_NET]
 
 
 def set_zonal_targets(
@@ -262,14 +285,23 @@ def set_zonal_targets(
 ) -> dict:
     """Assign thermal targets and integration degree from process-table data."""
     return {
-        "hot_utility_target": pt.loc[0, PT.H_NET],
-        "cold_utility_target": pt.loc[-1, PT.H_NET],
-        "heat_recovery_target": pt.loc[0, PT.H_HOT] - pt.loc[-1, PT.H_NET],
-        "heat_recovery_limit": pt_real.loc[0, PT.H_HOT] - pt_real.loc[-1, PT.H_NET],
+        "hot_utility_target": pt.loc[0, ProblemTableLabel.H_NET],
+        "cold_utility_target": pt.loc[-1, ProblemTableLabel.H_NET],
+        "heat_recovery_target": pt.loc[0, ProblemTableLabel.H_HOT]
+        - pt.loc[-1, ProblemTableLabel.H_NET],
+        "heat_recovery_limit": pt_real.loc[0, ProblemTableLabel.H_HOT]
+        - pt_real.loc[-1, ProblemTableLabel.H_NET],
         "degree_of_int": (
-            (pt.loc[0, PT.H_HOT] - pt.loc[-1, PT.H_NET])
-            / (pt_real.loc[0, PT.H_HOT] - pt_real.loc[-1, PT.H_NET])
-            if (pt_real.loc[0, PT.H_HOT] - pt_real.loc[-1, PT.H_NET]) > 0
+            (pt.loc[0, ProblemTableLabel.H_HOT] - pt.loc[-1, ProblemTableLabel.H_NET])
+            / (
+                pt_real.loc[0, ProblemTableLabel.H_HOT]
+                - pt_real.loc[-1, ProblemTableLabel.H_NET]
+            )
+            if (
+                pt_real.loc[0, ProblemTableLabel.H_HOT]
+                - pt_real.loc[-1, ProblemTableLabel.H_NET]
+            )
+            > 0
             else 1.0
         ),
     }
@@ -333,8 +365,8 @@ def _shift_pt_to_set_heat_recovery(
 ) -> ProblemTable:
     """Shift H_COLD and H_NET columns to match targeted heat recovery levels."""
     delta_shift = current_heat_recovery - heat_recovery_target
-    pt[PT.H_COLD] += delta_shift
-    pt[PT.H_NET] += delta_shift
+    pt[ProblemTableLabel.H_COLD] += delta_shift
+    pt[ProblemTableLabel.H_NET] += delta_shift
     return pt
 
 
@@ -344,11 +376,19 @@ def _insert_temperature_interval_into_pt_at_constant_h(
     """Insert temperature intervals where HCC and CCC intersect at constant enthalpy."""
     T_new = []
     # --- HCC to CCC projection ---
-    if pt[PT.H_HOT][0] > 0.0:
-        T_new.append(_get_T_start_on_opposite_cc(pt, pt[PT.H_HOT][0], PT.H_COLD))
+    if pt[ProblemTableLabel.H_HOT][0] > 0.0:
+        T_new.append(
+            _get_T_start_on_opposite_cc(
+                pt, pt[ProblemTableLabel.H_HOT][0], ProblemTableLabel.H_COLD
+            )
+        )
     # --- CCC to HCC projection ---
-    if pt[PT.H_COLD][-1] > 0.0:
-        T_new.append(_get_T_start_on_opposite_cc(pt, pt[PT.H_COLD][-1], PT.H_HOT))
+    if pt[ProblemTableLabel.H_COLD][-1] > 0.0:
+        T_new.append(
+            _get_T_start_on_opposite_cc(
+                pt, pt[ProblemTableLabel.H_COLD][-1], ProblemTableLabel.H_HOT
+            )
+        )
     T_new = [t for t in T_new if t is not None]
     if len(T_new) > 0:
         pt.insert_temperature_interval(T_new)
@@ -358,8 +398,8 @@ def _insert_temperature_interval_into_pt_at_constant_h(
 def _get_T_start_on_opposite_cc(
     pt: ProblemTable,
     h0: float,
-    col_CC: str | PT,
-    col_T: str | PT = PT.T,
+    col_CC: str | ProblemTableLabel,
+    col_T: str | ProblemTableLabel = ProblemTableLabel.T,
 ) -> float:
     """Find the temperature where composite curves intersect at constant enthalpy."""
 

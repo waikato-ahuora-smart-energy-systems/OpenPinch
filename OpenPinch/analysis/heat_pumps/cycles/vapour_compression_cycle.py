@@ -784,7 +784,7 @@ class VapourCompressionCycle:
                     heat_scale=self._m_dot,
                     is_hot_stream=is_hot_profile,
                     is_process_stream=is_process_stream,
-                    dt_cont=self._dtcont,
+                    delta_t_contribution=self._dtcont,
                 )
             )
             return sc

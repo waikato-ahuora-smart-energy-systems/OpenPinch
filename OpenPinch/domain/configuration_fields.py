@@ -10,7 +10,7 @@ from enum import Enum
 from types import UnionType
 from typing import Any, List, get_args, get_origin
 
-from .enums import ZT, BB_Minimiser, HPRcycle, TurbineModel
+from .enums import BB_Minimiser, HeatPumpAndRefrigerationCycle, TurbineModel, ZoneType
 
 
 @dataclass(frozen=True)
@@ -91,7 +91,7 @@ def _spec(
 CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     # Problem shape and state handling.
     "PROBLEM_TOP_ZONE_NAME": _spec(str, "Site", "problem", "top_zone_name"),
-    "PROBLEM_TOP_ZONE_IDENTIFIER": _spec(str, ZT.S.value, "problem", "top_zone_identifier", enum_cls=ZT),
+    "PROBLEM_TOP_ZONE_IDENTIFIER": _spec(str, ZoneType.S.value, "problem", "top_zone_identifier", enum_cls=ZoneType),
     "PROBLEM_PERIOD_IDS": _spec(List[str], ["0"], "problem", "period_ids"),
     "PROBLEM_PERIOD_WEIGHTS": _spec(List[float], [1.0], "problem", "period_weights", numeric_min=0.0),
 
@@ -171,7 +171,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HENS_RUN_ID": _spec(str, "default", "hens", "run_id"),
     "HENS_BEST_SOLUTIONS_TO_SAVE": _spec(int, 1, "hens", "best_solutions_to_save", numeric_min=1.0),
     # Heat pump and refrigeration.
-    "HPR_TYPE": _spec(str, HPRcycle.CascadeCarnot.value, "hpr", "type", enum_cls=HPRcycle),
+    "HPR_TYPE": _spec(str, HeatPumpAndRefrigerationCycle.CascadeCarnot.value, "hpr", "type", enum_cls=HeatPumpAndRefrigerationCycle),
     "HPR_LOAD_MODE": _spec(str, "fraction", "hpr", "load_mode"),
     "HPR_LOAD_FRACTION": _spec(float, 1.0, "hpr", "load_fraction", numeric_min=0.0),
     "HPR_LOAD_DUTY": _spec(float | None, None, "hpr", "load_duty", numeric_min=0.0),

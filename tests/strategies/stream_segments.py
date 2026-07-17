@@ -50,8 +50,8 @@ def segmented_streams(draw) -> Stream:
         segments.append(
             StreamSegment(
                 name=f"S{index + 1}",
-                t_supply=current,
-                t_target=target,
+                supply_temperature=current,
+                target_temperature=target,
                 heat_flow=duty,
             )
         )

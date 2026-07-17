@@ -23,7 +23,7 @@ from OpenPinch.analysis.exergy.service import (
     compute_exergetic_temperature,
 )
 from OpenPinch.domain.configuration import Configuration
-from OpenPinch.domain.enums import GT, PT, TT
+from OpenPinch.domain.enums import GraphType, ProblemTableLabel, TargetType
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream_collection import StreamCollection
 from OpenPinch.domain.targets import (
@@ -49,10 +49,10 @@ def _base_config() -> Configuration:
 def _di_problem_table() -> ProblemTable:
     return _make_problem_table(
         {
-            PT.T: [80.0, 40.0, 10.0, -20.0],
-            PT.H_NET_A: [0.0, 20.0, 35.0, 55.0],
-            PT.H_NET_HOT: [30.0, 20.0, 8.0, 0.0],
-            PT.H_NET_COLD: [0.0, 8.0, 18.0, 26.0],
+            ProblemTableLabel.T: [80.0, 40.0, 10.0, -20.0],
+            ProblemTableLabel.H_NET_A: [0.0, 20.0, 35.0, 55.0],
+            ProblemTableLabel.H_NET_HOT: [30.0, 20.0, 8.0, 0.0],
+            ProblemTableLabel.H_NET_COLD: [0.0, 8.0, 18.0, 26.0],
         }
     )
 
@@ -60,10 +60,10 @@ def _di_problem_table() -> ProblemTable:
 def _ts_problem_table() -> ProblemTable:
     return _make_problem_table(
         {
-            PT.T: [120.0, 60.0, 20.0, -10.0],
-            PT.H_NET_UT: [0.0, 15.0, 28.0, 40.0],
-            PT.H_HOT_UT: [22.0, 16.0, 5.0, 0.0],
-            PT.H_COLD_UT: [0.0, 6.0, 15.0, 24.0],
+            ProblemTableLabel.T: [120.0, 60.0, 20.0, -10.0],
+            ProblemTableLabel.H_NET_UT: [0.0, 15.0, 28.0, 40.0],
+            ProblemTableLabel.H_HOT_UT: [22.0, 16.0, 5.0, 0.0],
+            ProblemTableLabel.H_COLD_UT: [0.0, 6.0, 15.0, 24.0],
         }
     )
 
@@ -71,14 +71,14 @@ def _ts_problem_table() -> ProblemTable:
 def _dhp_problem_table() -> ProblemTable:
     return _make_problem_table(
         {
-            PT.T: [90.0, 45.0, 20.0, -15.0],
-            PT.H_NET_W_AIR: [0.0, 18.0, 30.0, 42.0],
-            PT.H_NET_HOT: [28.0, 18.0, 6.0, 0.0],
-            PT.H_NET_COLD: [0.0, 7.0, 16.0, 24.0],
-            PT.H_HOT_UT: [12.0, 9.0, 2.0, 0.0],
-            PT.H_COLD_UT: [0.0, 2.0, 5.0, 9.0],
-            PT.H_HOT_HP: [8.0, 6.0, 2.0, 0.0],
-            PT.H_COLD_HP: [0.0, 1.0, 4.0, 8.0],
+            ProblemTableLabel.T: [90.0, 45.0, 20.0, -15.0],
+            ProblemTableLabel.H_NET_W_AIR: [0.0, 18.0, 30.0, 42.0],
+            ProblemTableLabel.H_NET_HOT: [28.0, 18.0, 6.0, 0.0],
+            ProblemTableLabel.H_NET_COLD: [0.0, 7.0, 16.0, 24.0],
+            ProblemTableLabel.H_HOT_UT: [12.0, 9.0, 2.0, 0.0],
+            ProblemTableLabel.H_COLD_UT: [0.0, 2.0, 5.0, 9.0],
+            ProblemTableLabel.H_HOT_HP: [8.0, 6.0, 2.0, 0.0],
+            ProblemTableLabel.H_COLD_HP: [0.0, 1.0, 4.0, 8.0],
         }
     )
 
@@ -86,13 +86,13 @@ def _dhp_problem_table() -> ProblemTable:
 def _ihp_problem_table() -> ProblemTable:
     return _make_problem_table(
         {
-            PT.T: [110.0, 55.0, 15.0, -25.0],
-            PT.H_NET_UT: [0.0, 14.0, 26.0, 38.0],
-            PT.H_NET_HP: [0.0, 6.0, 12.0, 18.0],
-            PT.H_HOT_UT: [18.0, 12.0, 4.0, 0.0],
-            PT.H_COLD_UT: [0.0, 5.0, 11.0, 18.0],
-            PT.H_HOT_HP: [10.0, 7.0, 3.0, 0.0],
-            PT.H_COLD_HP: [0.0, 2.0, 6.0, 10.0],
+            ProblemTableLabel.T: [110.0, 55.0, 15.0, -25.0],
+            ProblemTableLabel.H_NET_UT: [0.0, 14.0, 26.0, 38.0],
+            ProblemTableLabel.H_NET_HP: [0.0, 6.0, 12.0, 18.0],
+            ProblemTableLabel.H_HOT_UT: [18.0, 12.0, 4.0, 0.0],
+            ProblemTableLabel.H_COLD_UT: [0.0, 5.0, 11.0, 18.0],
+            ProblemTableLabel.H_HOT_HP: [10.0, 7.0, 3.0, 0.0],
+            ProblemTableLabel.H_COLD_HP: [0.0, 2.0, 6.0, 10.0],
         }
     )
 
@@ -101,7 +101,7 @@ def _make_direct_integration_target() -> DirectIntegrationTarget:
     config = _base_config()
     return DirectIntegrationTarget(
         zone_name="Plant",
-        type=TT.DI.value,
+        type=TargetType.DI.value,
         config=config,
         pt=_di_problem_table(),
         pt_real=_di_problem_table(),
@@ -115,7 +115,7 @@ def _make_total_site_target() -> TotalSiteTarget:
     config = _base_config()
     return TotalSiteTarget(
         zone_name="Plant",
-        type=TT.TS.value,
+        type=TargetType.TS.value,
         config=config,
         pt=_ts_problem_table(),
         hot_utility_target=0.0,
@@ -128,7 +128,7 @@ def _make_direct_heat_pump_target() -> DirectHeatPumpTarget:
     config = _base_config()
     return DirectHeatPumpTarget(
         zone_name="Plant",
-        type=TT.DHP.value,
+        type=TargetType.DHP.value,
         config=config,
         pt=_dhp_problem_table(),
         hot_utilities=StreamCollection(),
@@ -155,7 +155,7 @@ def _make_indirect_heat_pump_target() -> IndirectHeatPumpTarget:
     config = _base_config()
     return IndirectHeatPumpTarget(
         zone_name="Plant",
-        type=TT.IHP.value,
+        type=TargetType.IHP.value,
         config=config,
         pt=_ihp_problem_table(),
         hot_utilities=StreamCollection(),
@@ -192,9 +192,9 @@ def test_build_exergy_gcc_curve_splits_segments_that_cross_ambient():
         dt_cont_half=0.0,
     )
 
-    assert 0.0 in payload[PT.T.value]
-    assert len(payload[PT.T.value]) > 3
-    assert min(payload[PT.X_GCC.value]) >= 0.0
+    assert 0.0 in payload[ProblemTableLabel.T.value]
+    assert len(payload[ProblemTableLabel.T.value]) > 3
+    assert min(payload[ProblemTableLabel.X_GCC.value]) >= 0.0
 
 
 def test_build_exergy_gcc_curve_handles_zero_negative_and_single_point_segments():
@@ -203,7 +203,7 @@ def test_build_exergy_gcc_curve_handles_zero_negative_and_single_point_segments(
         heat_loads=[0.0, 0.0, 10.0],
         t_env=15.0,
     )
-    assert len(duplicate_temperature[PT.T.value]) == 2
+    assert len(duplicate_temperature[ProblemTableLabel.T.value]) == 2
 
     sign_change = build_exergy_gcc_curve(
         temperatures=[100.0, 60.0, 20.0, -20.0],
@@ -211,15 +211,18 @@ def test_build_exergy_gcc_curve_handles_zero_negative_and_single_point_segments(
         t_env=15.0,
         dt_cont_half=5.0,
     )
-    assert len(sign_change[PT.T.value]) > 4
-    assert min(sign_change[PT.X_GCC.value]) == pytest.approx(0.0)
+    assert len(sign_change[ProblemTableLabel.T.value]) > 4
+    assert min(sign_change[ProblemTableLabel.X_GCC.value]) == pytest.approx(0.0)
 
     one_point = build_exergy_gcc_curve(
         temperatures=[15.0],
         heat_loads=[0.0],
         t_env=15.0,
     )
-    assert one_point == {PT.T.value: [0.0], PT.X_GCC.value: [0.0]}
+    assert one_point == {
+        ProblemTableLabel.T.value: [0.0],
+        ProblemTableLabel.X_GCC.value: [0.0],
+    }
 
 
 def test_build_exergy_nlp_curves_handles_empty_constant_and_cross_ambient_branches():
@@ -258,11 +261,11 @@ def test_apply_exergy_targeting_populates_graphs_and_scalar_targets(factory):
 
     apply_exergy_targeting(target)
 
-    assert GT.GCC_X.value in target.graphs
-    assert GT.NLP_X.value in target.graphs
-    assert PT.X_GCC.value in target.graphs[GT.GCC_X.value]
-    assert PT.X_SUR.value in target.graphs[GT.NLP_X.value]
-    assert PT.X_DEF.value in target.graphs[GT.NLP_X.value]
+    assert GraphType.GCC_X.value in target.graphs
+    assert GraphType.NLP_X.value in target.graphs
+    assert ProblemTableLabel.X_GCC.value in target.graphs[GraphType.GCC_X.value]
+    assert ProblemTableLabel.X_SUR.value in target.graphs[GraphType.NLP_X.value]
+    assert ProblemTableLabel.X_DEF.value in target.graphs[GraphType.NLP_X.value]
     assert target.exergy_sources is not None
     assert target.exergy_sinks is not None
     assert target.ETE is not None
@@ -293,7 +296,12 @@ def test_exergy_target_selection_and_column_helpers_cover_edge_cases():
     with pytest.raises(ValueError, match="Unsupported exergy base_target_type"):
         _normalize_exergy_base_target_type("unsupported")
 
-    for target_type in (TT.DI.value, TT.TS.value, TT.DHP.value, TT.IHP.value):
+    for target_type in (
+        TargetType.DI.value,
+        TargetType.TS.value,
+        TargetType.DHP.value,
+        TargetType.IHP.value,
+    ):
         assert (
             _resolve_target_exergy_spec(SimpleNamespace(type=target_type, pt=None))
             is None
@@ -315,9 +323,19 @@ def test_exergy_target_selection_and_column_helpers_cover_edge_cases():
         def __getitem__(self, column):
             raise KeyError(column)
 
-    assert _optional_column(MissingColumnTable(), PT.H_NET) is None
-    assert _optional_column({PT.H_NET: [np.nan, np.nan]}, PT.H_NET) is None
-    assert _first_available_column(MissingColumnTable(), [PT.H_NET, PT.H_NET_A]) is None
+    assert _optional_column(MissingColumnTable(), ProblemTableLabel.H_NET) is None
+    assert (
+        _optional_column(
+            {ProblemTableLabel.H_NET: [np.nan, np.nan]}, ProblemTableLabel.H_NET
+        )
+        is None
+    )
+    assert (
+        _first_available_column(
+            MissingColumnTable(), [ProblemTableLabel.H_NET, ProblemTableLabel.H_NET_A]
+        )
+        is None
+    )
     assert _should_use_series([np.nan, np.inf]) is False
 
     with pytest.raises(ValueError, match="matching lengths"):

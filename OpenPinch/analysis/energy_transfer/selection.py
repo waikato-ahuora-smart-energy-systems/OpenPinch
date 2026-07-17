@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from ...domain.enums import TT
+from ...domain.enums import TargetType
 from ..targeting.context import target_matches_requested_period
 
-ENERGY_TRANSFER_TARGET_ORDER = (TT.TS.value, TT.DI.value)
+ENERGY_TRANSFER_TARGET_ORDER = (TargetType.TS.value, TargetType.DI.value)
 
 
 def normalize_base_target_type(base_target_type: object | None) -> str | None:
@@ -28,9 +28,9 @@ def candidate_order(zone, base_target_type: str | None) -> tuple[str, ...]:
     """Return the base-target search order for one zone."""
     if base_target_type is not None:
         return (base_target_type,)
-    if TT.TS.value in zone.targets or zone.subzones:
+    if TargetType.TS.value in zone.targets or zone.subzones:
         return ENERGY_TRANSFER_TARGET_ORDER
-    return (TT.DI.value,)
+    return (TargetType.DI.value,)
 
 
 def ensure_base_target(
@@ -52,24 +52,24 @@ def ensure_base_target(
     refresh_service = refresh_services.get(target_type)
     if refresh_service is None:
         return None
-    if target_type == TT.TS.value:
+    if target_type == TargetType.TS.value:
         if not zone.subzones:
             return None
-        direct_target = zone.targets.get(TT.DI.value)
+        direct_target = zone.targets.get(TargetType.DI.value)
         if not target_matches_requested_period(
             direct_target,
             args=compare_args,
             period_ids=getattr(zone, "period_ids", None),
         ):
-            refresh_services[TT.DI.value](zone, refresh_args)
+            refresh_services[TargetType.DI.value](zone, refresh_args)
         for subzone in zone.subzones.values():
-            subtarget = subzone.targets.get(TT.DI.value)
+            subtarget = subzone.targets.get(TargetType.DI.value)
             if not target_matches_requested_period(
                 subtarget,
                 args=compare_args,
                 period_ids=getattr(subzone, "period_ids", None),
             ):
-                refresh_services[TT.DI.value](subzone, refresh_args)
+                refresh_services[TargetType.DI.value](subzone, refresh_args)
     refresh_service(zone, refresh_args)
     refreshed_target = zone.targets.get(target_type)
     if target_matches_requested_period(
@@ -83,11 +83,11 @@ def ensure_base_target(
 
 def source_targets(zone, base_target_type: str) -> list:
     """Return operation-level targets contributing to one diagram."""
-    if base_target_type == TT.TS.value and zone.subzones:
+    if base_target_type == TargetType.TS.value and zone.subzones:
         return [
-            {"name": source_name, "target": source_zone.targets[TT.DI.value]}
+            {"name": source_name, "target": source_zone.targets[TargetType.DI.value]}
             for source_name, source_zone in iter_source_zones(zone)
-            if TT.DI.value in source_zone.targets
+            if TargetType.DI.value in source_zone.targets
         ]
     target = zone.targets.get(base_target_type)
     return [target] if target is not None else []

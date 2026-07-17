@@ -20,9 +20,9 @@ from OpenPinch.contracts.input import TargetInput
 from OpenPinch.contracts.output import TargetOutput
 from OpenPinch.domain._value.resolution import get_scalar_value
 from OpenPinch.domain.enums import (
-    PT,
-    TT,
+    ProblemTableLabel,
     StreamLoc,
+    TargetType,
 )
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream_collection import StreamCollection
@@ -114,28 +114,28 @@ def test_target_utility(filename):
         plant_name = plant["name"]
         plant_data = plant["data"]
         z = site.get_subzone(plant_name)
-        pt = ProblemTable({PT.T: plant_data["T"]})
-        pt[PT.H_NET] = plant_data["H_net"]
+        pt = ProblemTable({ProblemTableLabel.T: plant_data["T"]})
+        pt[ProblemTableLabel.H_NET] = plant_data["H_net"]
         pt.update(
             **get_seperated_gcc_heat_load_profiles(
-                T_col=pt[PT.T],
-                H_net=pt[PT.H_NET],
+                T_col=pt[ProblemTableLabel.T],
+                H_net=pt[ProblemTableLabel.H_NET],
             )
         )
         z.hot_utilities, z.cold_utilities = target_utilities_for_load_profiles(
             hot_utilities=z.hot_utilities,
             cold_utilities=z.cold_utilities,
-            T_vals=pt[PT.T],
-            H_net_cold=pt[PT.H_NET_COLD],
-            H_net_hot=pt[PT.H_NET_HOT],
-            pinch_idx=pt.pinch_idx(PT.H_NET),
+            T_vals=pt[ProblemTableLabel.T],
+            H_net_cold=pt[ProblemTableLabel.H_NET_COLD],
+            H_net_hot=pt[ProblemTableLabel.H_NET_HOT],
+            pinch_idx=pt.pinch_idx(ProblemTableLabel.H_NET),
             is_real_temperatures=False,
         )
 
         t = None
         i = 0
         for t in wkb_res.targets:
-            if plant_name == t.name.replace("/" + TT.DI.value, ""):
+            if plant_name == t.name.replace("/" + TargetType.DI.value, ""):
                 break
             i += 1
         assert i < len(wkb_res.targets)

@@ -21,17 +21,15 @@ def _set_if_supplied(values: dict[str, Any], key: str, value: Any) -> None:
 
 
 class HeatExchangerNetworkDesignView:
-    """Application behavior around one serializable HEN synthesis result."""
+    """Explicit application behavior around one serializable HEN result."""
 
     def __init__(self, result: "HeatExchangerNetworkSynthesisResult") -> None:
-        self.result = result
+        self._result = result
 
-    def __getattr__(self, name: str):
-        return getattr(self.result, name)
-
-    def model_dump(self, *args, **kwargs):
-        """Serialize the underlying synthesis result without view state."""
-        return self.result.model_dump(*args, **kwargs)
+    @property
+    def result(self) -> "HeatExchangerNetworkSynthesisResult":
+        """Return the complete serializable synthesis result."""
+        return self._result
 
     @property
     def selected_network(self) -> "HeatExchangerNetwork":

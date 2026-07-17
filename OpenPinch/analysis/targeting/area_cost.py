@@ -6,7 +6,7 @@ import numpy as np
 
 from ...domain._problem_table.types import ProblemTableUpdateKwargs
 from ...domain.configuration import Configuration, tol
-from ...domain.enums import PT
+from ...domain.enums import ProblemTableLabel
 from ...domain.stream_collection import StreamCollection
 from ..economics import compute_annual_capital_cost, compute_capital_cost
 from ..graphs.composite import clean_composite_curve_ends
@@ -80,8 +80,8 @@ def get_balanced_CC(
     H_hot_bal = H_hot + H_hot_ut
     H_cold_bal = H_cold + H_cold_ut
     res = {
-        PT.H_HOT_BAL: H_hot_bal,
-        PT.H_COLD_BAL: H_cold_bal,
+        ProblemTableLabel.H_HOT_BAL: H_hot_bal,
+        ProblemTableLabel.H_COLD_BAL: H_cold_bal,
     }
 
     if (
@@ -118,12 +118,12 @@ def get_balanced_CC(
         )
         res.update(
             {
-                PT.H_HOT_BAL: H_hot + H_hot_ut,
-                PT.H_COLD_BAL: H_cold + H_cold_ut,
-                PT.RCP_HOT_BAL: RCP_hot + RCP_hot_ut,
-                PT.RCP_COLD_BAL: RCP_cold + RCP_cold_ut,
-                PT.R_HOT_BAL: R_hot_bal,
-                PT.R_COLD_BAL: R_cold_bal,
+                ProblemTableLabel.H_HOT_BAL: H_hot + H_hot_ut,
+                ProblemTableLabel.H_COLD_BAL: H_cold + H_cold_ut,
+                ProblemTableLabel.RCP_HOT_BAL: RCP_hot + RCP_hot_ut,
+                ProblemTableLabel.RCP_COLD_BAL: RCP_cold + RCP_cold_ut,
+                ProblemTableLabel.R_HOT_BAL: R_hot_bal,
+                ProblemTableLabel.R_COLD_BAL: R_cold_bal,
             }
         )
     return {"T_col": T_col, "updates": res}

@@ -6,7 +6,7 @@ import numpy as np
 
 from ...domain._problem_table.types import ProblemTableUpdateKwargs
 from ...domain.configuration import tol
-from ...domain.enums import PT
+from ...domain.enums import ProblemTableLabel
 from ...domain.problem_table import ProblemTable
 from ..numerics import delta_with_zero_at_start, linear_interpolation
 
@@ -53,53 +53,57 @@ def get_additional_GCCs(
     # Calculate various GCC profiles
     get_GCC_without_pockets(pt)
 
-    actual_h_net = pt[PT.H_NET_NP]
+    actual_h_net = pt[ProblemTableLabel.H_NET_NP]
 
     if do_vert_cc_calc:
         pt.update(
             **get_GCC_with_vertical_heat_transfer(
-                T_col=pt[PT.T],
-                h_cold=pt[PT.H_COLD],
-                h_hot=pt[PT.H_HOT],
-                h_net=pt[PT.H_NET],
+                T_col=pt[ProblemTableLabel.T],
+                h_cold=pt[ProblemTableLabel.H_COLD],
+                h_hot=pt[ProblemTableLabel.H_HOT],
+                h_net=pt[ProblemTableLabel.H_NET],
             )
         )
-        actual_h_net = pt[PT.H_NET_V]
+        actual_h_net = pt[ProblemTableLabel.H_NET_V]
 
     if do_assisted_ht_calc:
         pt.update(
             **get_GCC_with_partial_pockets(
-                T_col=pt[PT.T],
-                h_net=pt[PT.H_NET],
-                h_net_np=pt[PT.H_NET_NP],
+                T_col=pt[ProblemTableLabel.T],
+                h_net=pt[ProblemTableLabel.H_NET],
+                h_net_np=pt[ProblemTableLabel.H_NET_NP],
                 dt_cut=assisted_ht_dt_cut,
                 dt_cut_min=assisted_ht_dt_cut_min,
             )
         )
-        actual_h_net = pt[PT.H_NET_AI]
+        actual_h_net = pt[ProblemTableLabel.H_NET_AI]
     else:
         pt.update(
             **get_GGC_pockets(
-                T_col=pt[PT.T],
-                h_net=pt[PT.H_NET],
-                h_net_np=pt[PT.H_NET_NP],
+                T_col=pt[ProblemTableLabel.T],
+                h_net=pt[ProblemTableLabel.H_NET],
+                h_net_np=pt[ProblemTableLabel.H_NET_NP],
             )
         )
         pt.update(
-            T_col=pt[PT.T],
-            updates={PT.H_NET_AI: np.asarray(pt[PT.H_NET_NP], dtype=float)},
+            T_col=pt[ProblemTableLabel.T],
+            updates={
+                ProblemTableLabel.H_NET_AI: np.asarray(
+                    pt[ProblemTableLabel.H_NET_NP], dtype=float
+                )
+            },
         )
 
     pt.update(
         **get_GCC_needing_utility(
-            T_col=pt[PT.T],
+            T_col=pt[ProblemTableLabel.T],
             h_net=actual_h_net,
         )
     )
     pt.update(
         **get_seperated_gcc_heat_load_profiles(
-            T_col=pt[PT.T],
-            H_net=pt[PT.H_NET_A],
+            T_col=pt[ProblemTableLabel.T],
+            H_net=pt[ProblemTableLabel.H_NET_A],
             is_process_stream=is_process_stream,
         )
     )
@@ -108,8 +112,8 @@ def get_additional_GCCs(
 
 def get_GCC_without_pockets(
     pt: ProblemTable,
-    col_H_NP: str | PT = PT.H_NET_NP,
-    col_H: str | PT = PT.H_NET,
+    col_H_NP: str | ProblemTableLabel = ProblemTableLabel.H_NET_NP,
+    col_H: str | ProblemTableLabel = ProblemTableLabel.H_NET,
 ) -> ProblemTable:
     """Flatten GCC pockets by inserting breakpoints so the profile becomes monotonic."""
     pt[col_H_NP] = pt[col_H]
@@ -151,19 +155,19 @@ def get_GCC_with_partial_pockets(
     h_net_pk = _normalise_pocket_profile(np.subtract(h_net, h_net_np))
     pocket_pt = ProblemTable(
         {
-            PT.T: T_col,
-            PT.H_NET: h_net,
-            PT.H_NET_NP: h_net_np,
-            PT.H_NET_PK: h_net_pk,
-            PT.H_NET_AI: h_net - h_net_pk,
+            ProblemTableLabel.T: T_col,
+            ProblemTableLabel.H_NET: h_net,
+            ProblemTableLabel.H_NET_NP: h_net_np,
+            ProblemTableLabel.H_NET_PK: h_net_pk,
+            ProblemTableLabel.H_NET_AI: h_net - h_net_pk,
         }
     )
-    if np.nansum(pocket_pt[PT.H_NET_PK]) <= tol * len(pocket_pt):
+    if np.nansum(pocket_pt[ProblemTableLabel.H_NET_PK]) <= tol * len(pocket_pt):
         return _assisted_gcc_updates(pocket_pt)
 
     scan_idx = 0
     while True:
-        h_pockets = pocket_pt[PT.H_NET_PK]
+        h_pockets = pocket_pt[ProblemTableLabel.H_NET_PK]
         run_bounds = _next_positive_run(h_pockets, start_idx=scan_idx)
         if run_bounds is None:
             break
@@ -173,7 +177,7 @@ def get_GCC_with_partial_pockets(
             scan_idx = run_stop
             continue
 
-        t_vals = pocket_pt[PT.T]
+        t_vals = pocket_pt[ProblemTableLabel.T]
         i_upper = run_start - 1
         i_lower = run_stop
         if t_vals[i_upper] - t_vals[i_lower] < dt_cut - tol:
@@ -210,20 +214,24 @@ def get_GCC_with_partial_pockets(
         )
         if cut_temps.size > 0:
             pocket_pt.insert_temperature_interval(cut_temps)
-            h_pockets = pocket_pt[PT.H_NET_PK]
+            h_pockets = pocket_pt[ProblemTableLabel.H_NET_PK]
             run_bounds = _next_positive_run(h_pockets, start_idx=max(i_upper, 0))
             run_start, run_stop = run_bounds
 
         _apply_h_cut_to_positive_run(
-            h_pockets=pocket_pt[PT.H_NET_PK],
+            h_pockets=pocket_pt[ProblemTableLabel.H_NET_PK],
             run_start=run_start,
             run_stop=run_stop,
             h_cut=h_cut,
         )
         scan_idx = run_stop
 
-    pocket_pt[PT.H_NET_PK] = _normalise_pocket_profile(pocket_pt[PT.H_NET_PK])
-    pocket_pt[PT.H_NET_AI] = pocket_pt[PT.H_NET] - pocket_pt[PT.H_NET_PK]
+    pocket_pt[ProblemTableLabel.H_NET_PK] = _normalise_pocket_profile(
+        pocket_pt[ProblemTableLabel.H_NET_PK]
+    )
+    pocket_pt[ProblemTableLabel.H_NET_AI] = (
+        pocket_pt[ProblemTableLabel.H_NET] - pocket_pt[ProblemTableLabel.H_NET_PK]
+    )
     return _assisted_gcc_updates(pocket_pt)
 
 
@@ -247,7 +255,7 @@ def get_GCC_with_vertical_heat_transfer(
         cu_tar - h_hot,
         base,
     )
-    return {"T_col": T_col, "updates": {PT.H_NET_V: h_net_v}}
+    return {"T_col": T_col, "updates": {ProblemTableLabel.H_NET_V: h_net_v}}
 
 
 def get_GCC_needing_utility(
@@ -255,7 +263,7 @@ def get_GCC_needing_utility(
     h_net: np.ndarray,
 ) -> ProblemTableUpdateKwargs:
     """Return the actual GCC."""
-    return {"T_col": T_col, "updates": {PT.H_NET_A: h_net}}
+    return {"T_col": T_col, "updates": {ProblemTableLabel.H_NET_A: h_net}}
 
 
 def get_GGC_pockets(
@@ -270,7 +278,7 @@ def get_GGC_pockets(
     h_net_pk = _normalise_pocket_profile(np.subtract(h_net, h_net_np))
     return {
         "T_col": np.asarray(T_col, dtype=float),
-        "updates": {PT.H_NET_PK: h_net_pk},
+        "updates": {ProblemTableLabel.H_NET_PK: h_net_pk},
     }
 
 
@@ -313,15 +321,15 @@ def get_seperated_gcc_heat_load_profiles(
 
     updates = (
         {
-            PT.H_NET_HOT: hot_profile,
-            PT.H_NET_COLD: cold_profile,
+            ProblemTableLabel.H_NET_HOT: hot_profile,
+            ProblemTableLabel.H_NET_COLD: cold_profile,
         }
         if is_process_stream
         else {
-            PT.H_HOT_UT: hot_profile,
-            PT.H_COLD_UT: cold_profile,
-            PT.RCP_HOT_UT: rcp_hot,
-            PT.RCP_COLD_UT: rcp_cold,
+            ProblemTableLabel.H_HOT_UT: hot_profile,
+            ProblemTableLabel.H_COLD_UT: cold_profile,
+            ProblemTableLabel.RCP_HOT_UT: rcp_hot,
+            ProblemTableLabel.RCP_COLD_UT: rcp_cold,
         }
     )
     return {"T_col": T_col, "updates": updates}
@@ -334,8 +342,8 @@ def get_seperated_gcc_heat_load_profiles(
 
 def _remove_pockets_on_one_side_of_the_pinch(
     pt: ProblemTable,
-    col_H_NP: str | PT = PT.H_NET_NP,
-    col_H: str | PT = PT.H_NET,
+    col_H_NP: str | ProblemTableLabel = ProblemTableLabel.H_NET_NP,
+    col_H: str | ProblemTableLabel = ProblemTableLabel.H_NET,
     hot_pinch_loc: int = None,
     cold_pinch_loc: int = None,
     is_above_pinch: bool = True,
@@ -352,7 +360,7 @@ def _remove_pockets_on_one_side_of_the_pinch(
         pinch_loc = cold_pinch_loc
         sgn = -1
 
-    T_vals, H_vals, H_NP_vals = pt[PT.T], pt[col_H], pt[col_H_NP]
+    T_vals, H_vals, H_NP_vals = pt[ProblemTableLabel.T], pt[col_H], pt[col_H_NP]
 
     if H_vals[i] < tol:
         # No heating or cooling required
@@ -373,7 +381,7 @@ def _remove_pockets_on_one_side_of_the_pinch(
 
             if n_int_added > 0:
                 T_vals, H_vals, H_NP_vals = (
-                    pt[PT.T],
+                    pt[ProblemTableLabel.T],
                     pt[col_H],
                     pt[col_H_NP],
                 )
@@ -414,10 +422,10 @@ def _pocket_exit_index(H_vals: np.ndarray, i_0: int, pinch_loc: int, sgn: int) -
 def _assisted_gcc_updates(pocket_pt: ProblemTable) -> ProblemTableUpdateKwargs:
     """Return aligned assisted GCC updates from a local pocket ProblemTable."""
     return {
-        "T_col": pocket_pt[PT.T],
+        "T_col": pocket_pt[ProblemTableLabel.T],
         "updates": {
-            PT.H_NET_PK: pocket_pt[PT.H_NET_PK],
-            PT.H_NET_AI: pocket_pt[PT.H_NET_AI],
+            ProblemTableLabel.H_NET_PK: pocket_pt[ProblemTableLabel.H_NET_PK],
+            ProblemTableLabel.H_NET_AI: pocket_pt[ProblemTableLabel.H_NET_AI],
         },
     }
 

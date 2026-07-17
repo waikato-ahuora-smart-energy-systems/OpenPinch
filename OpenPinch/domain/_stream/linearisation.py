@@ -35,7 +35,7 @@ def get_piecewise_linearisation_for_streams(
 
     # Create and Linearize stream
     for index, s in enumerate(streams):
-        is_hot_stream = s.t_supply > s.t_target
+        is_hot_stream = s.supply_temperature > s.target_temperature
         curve_points = t_h_data[index]
         mask_points = get_piecewise_data_points(
             curve=curve_points, dt_diff_max=dt_diff_max, is_hot_stream=is_hot_stream

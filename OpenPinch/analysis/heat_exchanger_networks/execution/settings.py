@@ -5,8 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ....contracts.synthesis.common import SynthesisMethod
-from ....domain.enums import HeatExchangerNetworkDesignMethod, HENDesignMethod
+from ....domain.enums import HeatExchangerNetworkDesignMethod
 from .pathways import tier_evm_branch_breadth, tier_pdm_multipliers
 
 StagePackingScope = str
@@ -14,9 +13,9 @@ StagePackingScope = str
 _MAX_PDM_STAGE_PAIR_COUNT = 12
 _MAX_TDM_PARENT_LIMIT = 10
 _OPEN_HENS_METHOD_SEQUENCE = (
-    HENDesignMethod.PinchDesign,
-    HENDesignMethod.ThermalDerivative,
-    HENDesignMethod.NetworkEvolution,
+    HeatExchangerNetworkDesignMethod.PinchDesign,
+    HeatExchangerNetworkDesignMethod.ThermalDerivative,
+    HeatExchangerNetworkDesignMethod.NetworkEvolution,
 )
 
 
@@ -29,7 +28,7 @@ class SynthesisWorkflowSettings:
     dt_cont_multipliers: tuple[float, ...] | None
     derivative_thresholds: tuple[float, ...]
     stage_selection: tuple[int, ...]
-    method_sequence: tuple[SynthesisMethod, ...]
+    method_sequence: tuple[HeatExchangerNetworkDesignMethod, ...]
     output_formats: tuple[str, ...]
     solve_tolerance: float
     best_solutions_to_save: int
@@ -50,7 +49,9 @@ class SynthesisWorkflowSettings:
     problem_id: str | None = None
     workspace_variant: str | None = None
     period_id: str | None = None
-    design_method: HeatExchangerNetworkDesignMethod = HENDesignMethod.OpenHENS
+    design_method: HeatExchangerNetworkDesignMethod = (
+        HeatExchangerNetworkDesignMethod.OpenHENS
+    )
 
     def __init__(
         self,
@@ -60,7 +61,7 @@ class SynthesisWorkflowSettings:
         dt_cont_multipliers: tuple[float, ...] | None = None,
         derivative_thresholds: tuple[float, ...],
         stage_selection: tuple[int, ...],
-        method_sequence: tuple[SynthesisMethod, ...],
+        method_sequence: tuple[HeatExchangerNetworkDesignMethod, ...],
         output_formats: tuple[str, ...],
         solve_tolerance: float,
         best_solutions_to_save: int,
@@ -81,7 +82,9 @@ class SynthesisWorkflowSettings:
         problem_id: str | None = None,
         workspace_variant: str | None = None,
         period_id: str | None = None,
-        design_method: HeatExchangerNetworkDesignMethod = HENDesignMethod.OpenHENS,
+        design_method: HeatExchangerNetworkDesignMethod = (
+            HeatExchangerNetworkDesignMethod.OpenHENS
+        ),
     ) -> None:
         for name, value in {
             "run_id": run_id,
@@ -114,7 +117,7 @@ class SynthesisWorkflowSettings:
         }.items():
             object.__setattr__(self, name, value)
 
-    def solver_for(self, method: SynthesisMethod | None) -> str | None:
+    def solver_for(self, method: HeatExchangerNetworkDesignMethod | None) -> str | None:
         """Return the configured solver name for one workflow method."""
         if method == "pinch_design_method":
             return self.pdm_solver
@@ -124,7 +127,9 @@ class SynthesisWorkflowSettings:
             return self.evm_solver
         return None
 
-    def solver_options_for(self, method: SynthesisMethod | None) -> dict[str, Any]:
+    def solver_options_for(
+        self, method: HeatExchangerNetworkDesignMethod | None
+    ) -> dict[str, Any]:
         """Return user-provided solver options for one workflow method."""
         if method == "pinch_design_method":
             return dict(self.pdm_solver_options)
@@ -279,7 +284,7 @@ def workflow_settings_from_problem(
         problem_id=problem.project_name,
         workspace_variant=workspace_variant,
         period_id=period_id,
-        design_method=HENDesignMethod.OpenHENS,
+        design_method=HeatExchangerNetworkDesignMethod.OpenHENS,
     )
 
 

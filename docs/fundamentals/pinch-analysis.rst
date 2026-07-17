@@ -51,16 +51,17 @@ notebook sources; it does not run this solve path.
 Minimum Approach Temperature
 ----------------------------
 
-OpenPinch uses `dt_cont` as the main continuous temperature-approach
+OpenPinch uses ``delta_t_contribution`` as the runtime stream temperature-approach
 assumption for streams and many utility calculations.
 
 Conceptually:
 
-- a larger `dt_cont` makes heat recovery more conservative
-- a smaller `dt_cont` increases the apparent recovery potential
+- a larger ``delta_t_contribution`` makes heat recovery more conservative
+- a smaller ``delta_t_contribution`` increases the apparent recovery potential
 - the pinch location and utility targets depend on this assumption
 
-The package supports both base and active `dt_cont` values on runtime streams,
+The package exposes base ``delta_t_contribution`` and
+``effective_delta_t_contribution`` values on runtime streams,
 so zone-level multiplier studies can alter the effective shift while preserving
 the original input.
 

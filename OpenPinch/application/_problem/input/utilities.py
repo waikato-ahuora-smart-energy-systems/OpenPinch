@@ -11,7 +11,7 @@ from ....contracts.input import UtilitySchema
 from ....contracts.units import standardise_input_value
 from ....domain._stream.value_state import resolve_period_weights
 from ....domain.configuration import Configuration
-from ....domain.enums import ST, StreamLoc
+from ....domain.enums import StreamLoc, StreamType
 from ....domain.stream import Stream
 from ....domain.stream_collection import StreamCollection
 from ....domain.value import Value
@@ -52,13 +52,13 @@ def _get_hot_and_cold_utilities(
     )
     hot_utilities, utilities_left = _create_utilities_list(
         utilities=utilities_with_defaults,
-        utility_type=ST.Hot.value,
+        utility_type=StreamType.Hot.value,
         dt_cont_multiplier=dt_cont_multiplier,
         config=config,
     )
     cold_utilities, _ = _create_utilities_list(
         utilities=utilities_left,
-        utility_type=ST.Cold.value,
+        utility_type=StreamType.Cold.value,
         dt_cont_multiplier=dt_cont_multiplier,
         config=config,
     )
@@ -181,12 +181,12 @@ def _orient_utility_temperatures(
     t_supply_arr = t_supply.period_values
     t_target_arr = t_target.period_values
 
-    if utility_type == ST.Hot.value:
+    if utility_type == StreamType.Hot.value:
         if np.all(t_supply_arr >= t_target_arr - _TEMPERATURE_EQUAL_TOL):
             return t_supply, t_target, False
         if np.all(t_supply_arr <= t_target_arr + _TEMPERATURE_EQUAL_TOL):
             return t_target, t_supply, True
-    elif utility_type == ST.Cold.value:
+    elif utility_type == StreamType.Cold.value:
         if np.all(t_supply_arr <= t_target_arr + _TEMPERATURE_EQUAL_TOL):
             return t_supply, t_target, False
         if np.all(t_supply_arr >= t_target_arr - _TEMPERATURE_EQUAL_TOL):
@@ -219,7 +219,7 @@ def _complete_utility_data(
         if _value_is_missing(t_target):
             delta = (
                 -thermal.dt_phase_change
-                if utility.type in [ST.Hot.value, ST.Both.value]
+                if utility.type in [StreamType.Hot.value, StreamType.Both.value]
                 else thermal.dt_phase_change
             )
             utility.t_target = _shift_temperature_value(t_supply, delta).to_dict()
@@ -237,7 +237,7 @@ def _complete_utility_data(
             ):
                 delta = (
                     -thermal.dt_phase_change
-                    if utility.type in [ST.Hot.value, ST.Both.value]
+                    if utility.type in [StreamType.Hot.value, StreamType.Both.value]
                     else thermal.dt_phase_change
                 )
                 utility.t_target = _shift_temperature_value(
@@ -286,7 +286,7 @@ def _complete_utility_data(
         effective_dt_cont_arr = dt_cont_arr * float(dt_cont_multiplier)
 
         if (
-            utility.type in [ST.Hot.value, ST.Both.value]
+            utility.type in [StreamType.Hot.value, StreamType.Both.value]
             and utility.active
             and (
                 np.min(np.minimum(t_supply_arr, t_target_arr) - effective_dt_cont_arr)
@@ -295,7 +295,7 @@ def _complete_utility_data(
         ):
             add_default_hu = False
         if (
-            utility.type in [ST.Cold.value, ST.Both.value]
+            utility.type in [StreamType.Cold.value, StreamType.Both.value]
             and utility.active
             and (
                 np.max(np.maximum(t_supply_arr, t_target_arr) + effective_dt_cont_arr)
@@ -320,7 +320,7 @@ def _add_default_utilities(
         utilities.append(
             _create_default_utility(
                 "HU",
-                ST.Hot.value,
+                StreamType.Hot.value,
                 hu_t_min,
                 config,
                 dt_cont_multiplier=dt_cont_multiplier,
@@ -330,7 +330,7 @@ def _add_default_utilities(
         utilities.append(
             _create_default_utility(
                 "CU",
-                ST.Cold.value,
+                StreamType.Cold.value,
                 cu_t_max,
                 config,
                 dt_cont_multiplier=dt_cont_multiplier,
@@ -347,7 +347,7 @@ def _create_default_utility(
     dt_cont_multiplier: float = 1.0,
 ) -> UtilitySchema:
     """Construct a default utility entry anchored to the process temperature."""
-    direction = 1 if utility_type == ST.Hot.value else -1
+    direction = 1 if utility_type == StreamType.Hot.value else -1
     dt_cont = config.thermal.dt_cont
     dt_cont_act = dt_cont * dt_cont_multiplier
     return UtilitySchema.model_validate(
@@ -393,7 +393,7 @@ def _create_utilities_list(
 
         key = (
             ".".join([StreamLoc.HotU.value, selected.name])
-            if utility_type == ST.Hot.value
+            if utility_type == StreamType.Hot.value
             else ".".join([StreamLoc.ColdU.value, selected.name])
         )
 
@@ -411,34 +411,34 @@ def _create_utilities_list(
         else:
             created = Stream(
                 name=selected.name,
-                t_supply=supply_value,
-                t_target=target_value,
-                p_supply=standardise_input_value(
+                supply_temperature=supply_value,
+                target_temperature=target_value,
+                supply_pressure=standardise_input_value(
                     p_supply,
                     field_name="p_supply",
                     config=config,
                 ),
-                p_target=standardise_input_value(
+                target_pressure=standardise_input_value(
                     p_target,
                     field_name="p_target",
                     config=config,
                 ),
-                h_supply=standardise_input_value(
+                supply_enthalpy=standardise_input_value(
                     h_supply,
                     field_name="h_supply",
                     config=config,
                 ),
-                h_target=standardise_input_value(
+                target_enthalpy=standardise_input_value(
                     h_target,
                     field_name="h_target",
                     config=config,
                 ),
-                dt_cont=standardise_input_value(
+                delta_t_contribution=standardise_input_value(
                     selected.dt_cont,
                     field_name="dt_cont",
                     config=config,
                 ),
-                htc=standardise_input_value(
+                heat_transfer_coefficient=standardise_input_value(
                     selected.htc,
                     field_name="htc",
                     config=config,
@@ -453,6 +453,6 @@ def _create_utilities_list(
                 fluid_phase=selected.fluid_phase,
             )
         created_utilities.add(created, key)
-        created_utilities[key].dt_cont_multiplier = dt_cont_multiplier
+        created_utilities[key].delta_t_contribution_multiplier = dt_cont_multiplier
 
     return created_utilities, unassigned_utilities

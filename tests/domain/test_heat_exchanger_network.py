@@ -14,7 +14,9 @@ from OpenPinch.domain.enums import (
     HeatExchangerKind,
     StreamID,
 )
-from OpenPinch.domain.enums import HeatExchangerNetworkLabel as HEN
+from OpenPinch.domain.enums import (
+    HeatExchangerNetworkLabel as HeatExchangerNetworkLabel,
+)
 from OpenPinch.domain.heat_exchanger import HeatExchanger
 from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
 
@@ -335,49 +337,51 @@ def test_heat_exchanger_network_labelled_access_and_totals():
         == network.exchangers[0]
     )
     assert network.labelled_value(
-        HEN.RECOVERY_DUTY,
+        HeatExchangerNetworkLabel.RECOVERY_DUTY,
         source_stream="H1",
         sink_stream="C1",
         stage=1,
     ) == pytest.approx(100.0)
     assert network.labelled_value(
-        HEN.HOT_RECOVERY_OUTLET_TEMPERATURE,
+        HeatExchangerNetworkLabel.HOT_RECOVERY_OUTLET_TEMPERATURE,
         source_stream="H1",
         sink_stream="C1",
         stage=1,
     ) == pytest.approx(120.0)
     assert network.labelled_value(
-        HEN.MATCH_ACTIVE,
+        HeatExchangerNetworkLabel.MATCH_ACTIVE,
         source_stream="H1",
         sink_stream="C1",
         stage=1,
     )
     assert network.total_duty(kind=HeatExchangerKind.RECOVERY) == pytest.approx(100.0)
     assert network.total_duty(stream="H1") == pytest.approx(120.0)
-    assert network.total(HEN.HOT_UTILITY_DUTY, stream="C1") == pytest.approx(30.0)
-    assert network.total(HEN.RECOVERY_AREA) == pytest.approx(25.0)
+    assert network.total(
+        HeatExchangerNetworkLabel.HOT_UTILITY_DUTY, stream="C1"
+    ) == pytest.approx(30.0)
+    assert network.total(HeatExchangerNetworkLabel.RECOVERY_AREA) == pytest.approx(25.0)
     assert network.total_area(kind="cold_utility") == pytest.approx(5.0)
     assert network.labelled_value(
-        HEN.RECOVERY_AREA,
+        HeatExchangerNetworkLabel.RECOVERY_AREA,
         source_stream="H1",
         sink_stream="C1",
         stage=1,
     ) == pytest.approx(25.0)
     assert network.labelled_value(
-        HEN.COLD_RECOVERY_OUTLET_TEMPERATURE,
+        HeatExchangerNetworkLabel.COLD_RECOVERY_OUTLET_TEMPERATURE,
         source_stream="H1",
         sink_stream="C1",
         stage=1,
     ) == pytest.approx(110.0)
     assert network.labelled_value(
-        HEN.MATCH_ALLOWED,
+        HeatExchangerNetworkLabel.MATCH_ALLOWED,
         source_stream="H1",
         sink_stream="C1",
         stage=1,
     )
     assert (
         network.labelled_value(
-            HEN.RECOVERY_DUTY,
+            HeatExchangerNetworkLabel.RECOVERY_DUTY,
             source_stream="missing",
             sink_stream="C1",
         )
@@ -429,7 +433,7 @@ def test_multiperiod_queries_require_explicit_period_identity():
     assert network.total_duty(period_id="base") == pytest.approx(0.0)
     assert network.total_duty(period_id="peak") == pytest.approx(125.0)
     assert network.labelled_value(
-        HEN.MATCH_ACTIVE,
+        HeatExchangerNetworkLabel.MATCH_ACTIVE,
         source_stream="H1",
         sink_stream="C1",
         stage=1,
@@ -489,16 +493,18 @@ def test_heat_exchanger_network_rejects_ambiguous_or_incompatible_labels():
 
     network = HeatExchangerNetwork(exchangers=(_hot_utility_exchanger(),))
     with pytest.raises(ValueError, match="label cannot be used"):
-        network.total(HEN.RECOVERY_DUTY, kind=HeatExchangerKind.HOT_UTILITY)
+        network.total(
+            HeatExchangerNetworkLabel.RECOVERY_DUTY, kind=HeatExchangerKind.HOT_UTILITY
+        )
     with pytest.raises(ValueError, match="only valid for recovery"):
         network.labelled_value(
-            HEN.HOT_RECOVERY_OUTLET_TEMPERATURE,
+            HeatExchangerNetworkLabel.HOT_RECOVERY_OUTLET_TEMPERATURE,
             source_stream="Steam",
             sink_stream="C1",
             kind=HeatExchangerKind.HOT_UTILITY,
         )
     with pytest.raises(ValueError, match="not a numeric total label"):
-        network.total(HEN.MATCH_ACTIVE)
+        network.total(HeatExchangerNetworkLabel.MATCH_ACTIVE)
 
 
 def test_heat_exchanger_network_totals_honour_active_stream_stage_and_none_values():
@@ -558,7 +564,7 @@ def test_labelled_access_is_stable_when_solver_axes_and_rows_reorder():
 
     for network in (first, reordered):
         assert network.labelled_value(
-            HEN.RECOVERY_DUTY,
+            HeatExchangerNetworkLabel.RECOVERY_DUTY,
             source_stream="H1",
             sink_stream="C1",
             stage=1,

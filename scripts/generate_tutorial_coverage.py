@@ -424,7 +424,11 @@ def main() -> None:
     rows = _rows()
     DESTINATION.parent.mkdir(parents=True, exist_ok=True)
     with DESTINATION.open("w", newline="", encoding="utf-8") as stream:
-        writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(
+            stream,
+            fieldnames=list(rows[0]),
+            lineterminator="\n",
+        )
         writer.writeheader()
         writer.writerows(rows)
 

@@ -7,6 +7,9 @@ from types import SimpleNamespace
 import openpyxl
 import pytest
 
+from OpenPinch.application._problem.output.reporting import (
+    _build_numeric_summary_frame,
+)
 from OpenPinch.application._problem.periods.aggregation import (
     WEIGHTED_AVERAGE_PERIOD_ID,
     weighted_average_output,
@@ -14,7 +17,7 @@ from OpenPinch.application._problem.periods.aggregation import (
 from OpenPinch.application.problem import PinchProblem
 from OpenPinch.contracts.output import TargetOutput
 from OpenPinch.contracts.reporting import HeatUtility, PinchTemp, TargetResults
-from OpenPinch.domain.enums import TT
+from OpenPinch.domain.enums import TargetType
 from OpenPinch.domain.value import Value
 from OpenPinch.domain.zone import Zone
 
@@ -262,10 +265,12 @@ def test_weighted_summary_uses_explicit_cached_all_period_results(monkeypatch):
             targets=[_target(period_id="peak", qh=30.0)],
         ),
     }
-    frame = problem.summary_frame(include_weighted_average=True, format="plain")
+    frame = _build_numeric_summary_frame(
+        problem._summary_results(periods="weighted_average")
+    )
 
     assert calls == [
-        (TT.DI.value, "AreaA", True, "peak"),
+        (TargetType.DI.value, "AreaA", True, "peak"),
     ]
     assert frame.iloc[0]["Period ID"] == WEIGHTED_AVERAGE_PERIOD_ID
     assert frame.iloc[0]["Hot Utility Target"] == pytest.approx(25.0)
@@ -390,7 +395,9 @@ def test_weighted_summary_matches_sample_period_weights(source):
     problem = PinchProblem(source=source, project_name=source)
 
     period_results = problem.target.all_periods.direct_heat_integration()
-    frame = problem.summary_frame(include_weighted_average=True, format="plain")
+    frame = _build_numeric_summary_frame(
+        problem._summary_results(periods="weighted_average")
+    )
     period_outputs = list(period_results.values())
     weights = list(problem.master_zone.weights)
     target_name = period_outputs[0].targets[0].name

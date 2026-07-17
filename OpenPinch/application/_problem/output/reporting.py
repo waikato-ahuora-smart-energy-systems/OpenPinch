@@ -26,15 +26,10 @@ def build_problem_summary_frame(
     results: Any,
     *,
     detailed: bool = False,
-    format: str = "compact",
 ) -> pd.DataFrame:
-    """Build either the compact or detailed problem summary table."""
-    if detailed or format == "detailed":
+    """Build either the compact or detailed public problem summary table."""
+    if detailed:
         return build_summary_dataframe(results.targets)
-    if format == "plain":
-        return build_plain_summary_frame(results)
-    if format != "compact":
-        raise ValueError("summary format must be 'compact', 'plain', or 'detailed'.")
 
     rows = []
     for target in results.targets:
@@ -95,8 +90,8 @@ def build_problem_summary_frame(
     return pd.DataFrame(rows)
 
 
-def build_plain_summary_frame(results: Any) -> pd.DataFrame:
-    """Build a user-readable summary with numeric value and unit columns."""
+def _build_numeric_summary_frame(results: Any) -> pd.DataFrame:
+    """Build the private numeric summary used for problem comparisons."""
     rows = []
     for target in results.targets:
         row = {

@@ -38,9 +38,6 @@ class ZoneType(Enum):
         return self.value
 
 
-ZT = ZoneType
-
-
 class TargetType(Enum):
     """Different target calculation categories."""
 
@@ -57,9 +54,6 @@ class TargetType(Enum):
 
     def __str__(self):
         return self.value
-
-
-TT = TargetType
 
 
 class HeatExchangerTypes(Enum):
@@ -95,9 +89,6 @@ class HeatExchangerNetworkDesignMethod(str, Enum):
         return self.value
 
 
-HENDesignMethod = HeatExchangerNetworkDesignMethod
-
-
 class HeatPump(Enum):
     """Heat pump components"""
 
@@ -119,9 +110,6 @@ class HeatPumpAndRefrigerationCycle(str, Enum):
     VapourCompMVR = "Vapour compression with MVR cascade"
 
 
-HPRcycle = HeatPumpAndRefrigerationCycle
-
-
 class HeatFlowUnits(Enum):
     """Heat flow units"""
 
@@ -139,9 +127,6 @@ class StreamType(Enum):
     Both = "Both"
     Neutral = "Neutral"
     Unassigned = ""
-
-
-ST = StreamType
 
 
 class FluidPhase(str, Enum):
@@ -176,9 +161,6 @@ class StreamID(str, Enum):
     Process = "Process"
     Utility = "Utility"
     Unassigned = "Unassigned"
-
-
-SID = StreamID
 
 
 class StreamLoc(Enum):
@@ -256,9 +238,6 @@ class ProblemTableLabel(Enum):
     X_DEF = "X(deficit)"
 
 
-PT = ProblemTableLabel
-
-
 class HeatExchangerNetworkLabel(Enum):
     """Heat exchanger network metric labels for labelled accessors."""
 
@@ -274,9 +253,6 @@ class HeatExchangerNetworkLabel(Enum):
     MATCH_ALLOWED = "match_allowed"
 
 
-HEN = HeatExchangerNetworkLabel
-
-
 class StreamDataLabel(Enum):
     """Stream data column header labels"""
 
@@ -287,9 +263,6 @@ class StreamDataLabel(Enum):
     H = "heat_flow"
     DT_CONT = "\N{GREEK CAPITAL LETTER DELTA}T_cont"
     HTC = "heat_transfer_coefficient"
-
-
-SD = StreamDataLabel
 
 
 class ArrowHead(Enum):
@@ -327,9 +300,6 @@ class GraphType(Enum):
     ETD = "Energy Transfer Diagram"
     TSP = "Total Site Profiles"
     SUGCC = "Site Utility Grand Composite Curve"
-
-
-ResultsType = GT = GraphType
 
 
 class LegendSeries(Enum):
@@ -373,31 +343,22 @@ __all__ = [
     "CogenerationTarget",
     "FluidPhase",
     "GraphType",
-    "GT",
     "HeatExchangerKind",
-    "HEN",
     "HeatExchangerNetworkLabel",
+    "HeatExchangerNetworkDesignMethod",
     "HeatExchangerTypes",
     "HeatFlowUnits",
     "HeatPump",
     "HeatPumpAndRefrigerationCycle",
-    "HPRcycle",
     "LegendSeries",
     "LineColour",
     "ProblemTableLabel",
-    "PT",
-    "ResultsType",
-    "SID",
-    "SD",
-    "ST",
-    "StreamDataLabel",
     "StreamID",
-    "StreamLoc",
+    "StreamDataLabel",
     "StreamType",
+    "StreamLoc",
     "SummaryRowType",
     "TargetType",
-    "TT",
     "TurbineModel",
     "ZoneType",
-    "ZT",
 ]
