@@ -17,7 +17,6 @@ from OpenPinch.analysis.exergy.service import (
     _should_use_series,
     _strictly_between,
     _validate_curve_lengths,
-    apply_exergy_if_enabled,
     apply_exergy_targeting,
     build_exergy_gcc_curve,
     build_exergy_nlp_curves,
@@ -275,26 +274,6 @@ def test_apply_exergy_targeting_returns_unsupported_targets_unchanged():
     target = SimpleNamespace(type="unsupported", graphs={})
 
     assert apply_exergy_targeting(target) is target
-
-
-def test_apply_exergy_if_enabled_uses_grouped_targeting_config_only():
-    config = Configuration()
-    zone = SimpleNamespace(config=config)
-    target = object()
-    calls = []
-
-    def apply_func(value):
-        calls.append(value)
-        return "applied"
-
-    assert apply_exergy_if_enabled(target, zone, apply_func=apply_func) is target
-    assert calls == []
-
-    config.targeting.exergy_enabled = True
-
-    assert apply_exergy_if_enabled(target, zone, apply_func=apply_func) == "applied"
-    assert calls == [target]
-    assert not hasattr(config, "TARGETING_EXERGY_ENABLED")
 
 
 def test_total_site_serialization_includes_exergy_fields_after_enrichment():

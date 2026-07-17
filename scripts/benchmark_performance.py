@@ -22,6 +22,7 @@ from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from typing import Any
 
+from OpenPinch import PinchProblem
 from OpenPinch.analysis.heat_exchanger_networks.context import (
     ensure_target_results,
     finalise_design_result,
@@ -38,7 +39,6 @@ from OpenPinch.analysis.heat_exchanger_networks.solver import (
 from OpenPinch.analysis.heat_exchanger_networks.targeting import (
     open_hens_method,
 )
-from OpenPinch.application.problem import PinchProblem
 from OpenPinch.contracts.synthesis.common import SynthesisMethod
 from OpenPinch.contracts.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,

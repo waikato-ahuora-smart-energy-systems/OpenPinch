@@ -18,8 +18,8 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any
 
+from OpenPinch import PinchProblem
 from OpenPinch.analysis.heat_exchanger_networks.results.selection import ranked_networks
-from OpenPinch.application.problem import PinchProblem
 
 _HENS_PACKAGE = "OpenPinch.analysis.heat_exchanger_networks"
 _executor_module = import_module(f"{_HENS_PACKAGE}.common.execution.executor")
@@ -852,7 +852,7 @@ def _run_openpinch_grid(
 ) -> list[RankedNetwork]:
     fixture_path = repo_root / "tests" / "fixtures" / "openhens" / f"{case_id}.json"
     problem = PinchProblem(source=fixture_path)
-    problem.target()
+    problem.target.all_heat_integration()
     settings = replace(
         workflow_settings_from_problem(problem),
         approach_temperatures=d_tmin_grid,

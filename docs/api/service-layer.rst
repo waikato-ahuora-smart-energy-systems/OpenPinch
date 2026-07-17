@@ -1,8 +1,8 @@
 Internal Service Layer
 ======================
 
-These modules are unsupported internals documented for contributors. The sole
-external Python contract is :func:`OpenPinch.main.pinch_analysis_service`.
+These modules are contributor implementation owners. Process-engineer code
+uses :class:`OpenPinch.PinchProblem` or :class:`OpenPinch.PinchWorkspace`.
 The service layer is the boundary between validated input data and the
 prepared/solved in-memory model. It is the right integration surface when you
 want more control than :class:`~OpenPinch.application.problem.PinchProblem`
@@ -61,22 +61,15 @@ enter through ``PinchProblem.design``:
 
 .. code-block:: python
 
-   from OpenPinch.domain.enums import HENDesignMethod
-
-   problem.design.enhanced_synthesis_method(quality_tier=2)
-   problem.design.open_hens_method()
-   problem.design.heat_exchanger_network_synthesis()
-   problem.design.heat_exchanger_network_synthesis(
-       method=HENDesignMethod.NetworkEvolution,
-       initial_networks=(existing_network,),
-   )
+   problem.design.enhanced_heat_exchanger_network(quality_tier=2)
+   problem.design.open_hens()
+   problem.design.heat_exchanger_network()
+   problem.design.multiperiod_heat_exchanger_network()
+   problem.design.network_evolution((existing_network,))
 
 The internal service entry point owns method dispatch and final result caching.
 It dispatches to the same direct services exposed by the design accessor.
-Use ``enhanced_synthesis_method(quality_tier=...)`` as the internal quality-tier
-selector, ``open_hens_method()`` for original tier 1 OpenHENS, and
-``heat_exchanger_network_synthesis()`` for the generic fast tier 0 default or
-explicit enum dispatch.
+Each named method selects one workflow without a method-name string.
 
 .. automodule:: OpenPinch.analysis.heat_exchanger_networks.service
    :members:
@@ -172,24 +165,20 @@ The exergy service follows a slightly different contract from the base thermal
 targeting services: it enriches an already existing compatible target for the
 requested period instead of re-solving direct or indirect targeting internally.
 
-Direct High-Level Orchestration
--------------------------------
+Application Facade
+------------------
 
-External callers use the one supported orchestration function:
-
-.. automodule:: OpenPinch.main
-   :members:
-   :no-index:
+The supported orchestration facade is documented in :doc:`pinchproblem` and
+:doc:`pinchworkspace`.
 
 Choosing Between Interfaces
 ---------------------------
 
-- Use :func:`OpenPinch.main.pinch_analysis_service` for supported application
+- Use :class:`OpenPinch.PinchProblem` for supported application
   integration.
-- Use ``problem.add_component.process_mvr(...)`` when the study needs direct
+- Use ``problem.components.add_process_mvr(...)`` when the study needs direct
   gas/vapour MVR stream replacement before ordinary target reruns.
-- Use concrete analysis or application owners only when accepting unsupported
-  internal API churn for repository development or advanced research.
+- Use concrete analysis owners for repository development or advanced research.
 
 The service layer is also the best place to look when you are trying to
 understand how the narrative workflow maps onto the actual analysis pipeline.

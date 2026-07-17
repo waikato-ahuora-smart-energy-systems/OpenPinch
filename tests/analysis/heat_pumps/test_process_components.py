@@ -126,7 +126,7 @@ def test_add_process_mvr_applies_replacements_and_registers_component():
         stream for stream in zone.hot_streams if stream.name == "Evaporator vapour"
     )
 
-    component = problem.add_component.process_mvr(
+    component = problem.components.add_process_mvr(
         source,
         n_stages=2,
         liquid_injection=False,
@@ -157,7 +157,7 @@ def test_add_process_mvr_applies_replacements_and_registers_component():
 def test_process_mvr_can_select_by_display_name_and_qualified_key():
     pytest.importorskip("CoolProp")
     by_name = _problem()
-    component = by_name.add_component.process_mvr(
+    component = by_name.components.add_process_mvr(
         "Evaporator vapour",
         liquid_injection=False,
     )
@@ -168,7 +168,7 @@ def test_process_mvr_can_use_pressure_ratio_target():
     pytest.importorskip("CoolProp")
     problem = _problem()
 
-    component = problem.add_component.process_mvr(
+    component = problem.components.add_process_mvr(
         "Evaporator vapour",
         liquid_injection=False,
         mvr_stage_pressure_ratio=1.2,
@@ -185,7 +185,7 @@ def test_process_mvr_rejects_conflicting_compression_targets():
         ValueError,
         match="either mvr_stage_t_lift or mvr_stage_pressure_ratio",
     ):
-        problem.add_component.process_mvr(
+        problem.components.add_process_mvr(
             "Evaporator vapour",
             mvr_stage_t_lift=10.0,
             mvr_stage_pressure_ratio=1.2,
@@ -198,7 +198,7 @@ def test_process_mvr_rejects_conflicting_compression_targets():
         for key, stream in zone.hot_streams.items()
         if stream.name == "Evaporator vapour"
     )
-    component = by_key.add_component.process_mvr(key, liquid_injection=False)
+    component = by_key.components.add_process_mvr(key, liquid_injection=False)
     assert len(component.original_streams) == 1
 
 
@@ -207,7 +207,7 @@ def test_process_mvr_rejects_invalid_stage_count(n_stages):
     problem = _problem()
 
     with pytest.raises(ValueError, match="positive integer"):
-        problem.add_component.process_mvr(
+        problem.components.add_process_mvr(
             "Evaporator vapour",
             n_stages=n_stages,
             liquid_injection=False,
@@ -218,14 +218,14 @@ def test_process_mvr_rejects_empty_source_selector_list():
     problem = _problem()
 
     with pytest.raises(ValueError, match="at least one stream selector"):
-        problem.add_component.process_mvr([], liquid_injection=False)
+        problem.components.add_process_mvr([], liquid_injection=False)
 
 
 def test_process_mvr_rejects_conflicting_state_contexts():
     problem = _problem(multiperiod=True)
 
     with pytest.raises(ValueError, match="period_id and options\\['period_id'\\]"):
-        problem.add_component.process_mvr(
+        problem.components.add_process_mvr(
             "Evaporator vapour",
             period_id="peak",
             options={"period_id": "0"},
@@ -237,7 +237,7 @@ def test_duplicate_display_names_apply_to_all_matching_hot_gas_streams():
     pytest.importorskip("CoolProp")
     problem = _problem(duplicate_display_names=True)
 
-    component = problem.add_component.process_mvr(
+    component = problem.components.add_process_mvr(
         "Evaporator vapour",
         liquid_injection=False,
     )
@@ -251,11 +251,11 @@ def test_process_mvr_activate_deactivate_toggles_recorded_streams_and_invalidate
     pytest.importorskip("CoolProp")
     problem = _problem()
     zone = problem.master_zone.get_subzone("Evaporation Train")
-    component = problem.add_component.process_mvr(
+    component = problem.components.add_process_mvr(
         "Evaporator vapour",
         liquid_injection=False,
     )
-    first_target = problem.target.direct_heat_integration(zone_name="Evaporation Train")
+    first_target = problem.target.direct_heat_integration(zone="Evaporation Train")
     assert first_target.heat_recovery_target == pytest.approx(120.0)
     assert first_target.process_component_work_target == pytest.approx(
         component.work_for_zone(zone, period_id="0", period_idx=0)
@@ -271,9 +271,7 @@ def test_process_mvr_activate_deactivate_toggles_recorded_streams_and_invalidate
     assert all(stream.active for stream in component.original_streams)
     assert all(not stream.active for stream in component.replacement_streams)
     assert problem.results is None
-    second_target = problem.target.direct_heat_integration(
-        zone_name="Evaporation Train"
-    )
+    second_target = problem.target.direct_heat_integration(zone="Evaporation Train")
     assert second_target.heat_recovery_target == pytest.approx(100.0)
     assert second_target.process_component_work_target == pytest.approx(0.0)
     assert second_target.work_target is None
@@ -281,6 +279,21 @@ def test_process_mvr_activate_deactivate_toggles_recorded_streams_and_invalidate
     component.activate()
 
     assert component.active is True
+
+
+def test_add_process_mvr_accepts_engineering_efficiency_names():
+    pytest.importorskip("CoolProp")
+    problem = _problem()
+
+    component = problem.components.add_process_mvr(
+        "Evaporator vapour",
+        liquid_injection=False,
+        compressor_efficiency=0.73,
+        motor_efficiency=0.96,
+    )
+
+    assert component.settings.eta_mvr_comp == pytest.approx(0.73)
+    assert component.settings.eta_motor == pytest.approx(0.96)
     assert all(not stream.active for stream in component.original_streams)
     assert all(stream.active for stream in component.replacement_streams)
 
@@ -295,12 +308,12 @@ def test_process_mvr_is_not_a_targeting_method():
 def test_process_mvr_rejects_duplicate_component_id():
     pytest.importorskip("CoolProp")
     problem = _problem()
-    problem.add_component.process_mvr(
+    problem.components.add_process_mvr(
         "Evaporator vapour", mvr_id="vapour_mvr", liquid_injection=False
     )
 
     with pytest.raises(ValueError, match="already exists"):
-        problem.add_component.process_mvr("Evaporator vapour", mvr_id="vapour_mvr")
+        problem.components.add_process_mvr("Evaporator vapour", mvr_id="vapour_mvr")
 
 
 def test_process_mvr_rejects_non_gas_stream():
@@ -309,7 +322,7 @@ def test_process_mvr_rejects_non_gas_stream():
     problem = PinchProblem(payload, project_name="Site")
 
     with pytest.raises(ValueError, match="fluid_phase='gas' or fluid_phase='vapour'"):
-        problem.add_component.process_mvr("Evaporator vapour")
+        problem.components.add_process_mvr("Evaporator vapour")
 
 
 def test_process_mvr_accepts_vapour_stream_and_derives_saturation_pressure():
@@ -327,7 +340,7 @@ def test_process_mvr_accepts_vapour_stream_and_derives_saturation_pressure():
     )
     problem = PinchProblem(payload, project_name="Site")
 
-    component = problem.add_component.process_mvr(
+    component = problem.components.add_process_mvr(
         "Evaporator vapour",
         mvr_stage_pressure_ratio=1.2,
         liquid_injection=False,
@@ -354,7 +367,7 @@ def test_process_mvr_rejects_vapour_stream_away_from_saturation_pressure():
     problem = PinchProblem(payload, project_name="Site")
 
     with pytest.raises(ValueError, match="saturation pressure"):
-        problem.add_component.process_mvr("Evaporator vapour")
+        problem.components.add_process_mvr("Evaporator vapour")
 
 
 def test_process_mvr_defaults_missing_gas_target_pressure():
@@ -363,7 +376,7 @@ def test_process_mvr_defaults_missing_gas_target_pressure():
     payload["streams"][0]["p_target"] = None
     problem = PinchProblem(payload, project_name="Site")
 
-    component = problem.add_component.process_mvr(
+    component = problem.components.add_process_mvr(
         "Evaporator vapour",
         liquid_injection=False,
     )
@@ -389,21 +402,21 @@ def test_process_mvr_rejects_subcritical_liquid_like_gas_state():
     problem = PinchProblem(payload, project_name="Site")
 
     with pytest.raises(ValueError, match="above saturation pressure"):
-        problem.add_component.process_mvr("Evaporator vapour")
+        problem.components.add_process_mvr("Evaporator vapour")
 
 
 def test_process_mvr_rejects_cold_stream_selection():
     problem = _problem()
 
     with pytest.raises(ValueError, match="must be a hot stream"):
-        problem.add_component.process_mvr("Product heating")
+        problem.components.add_process_mvr("Product heating")
 
 
 def test_process_mvr_solves_all_periods_for_multiperiod_streams():
     pytest.importorskip("CoolProp")
     problem = _problem(multiperiod=True)
 
-    component = problem.add_component.process_mvr(
+    component = problem.components.add_process_mvr(
         "Evaporator vapour",
         liquid_injection=False,
         period_id="peak",
@@ -427,15 +440,15 @@ def test_process_mvr_solves_all_periods_for_multiperiod_streams():
     ) == (pytest.approx(82.0, abs=0.05))
 
     normal_target = problem.target.direct_heat_integration(
-        zone_name="Evaporation Train",
+        zone="Evaporation Train",
         period_id="0",
     )
     peak_target = problem.target.direct_heat_integration(
-        zone_name="Evaporation Train",
+        zone="Evaporation Train",
         period_id="peak",
     )
     peak_target_by_idx = problem.target.direct_heat_integration(
-        zone_name="Evaporation Train",
+        zone="Evaporation Train",
         options={"period_idx": 1},
     )
 

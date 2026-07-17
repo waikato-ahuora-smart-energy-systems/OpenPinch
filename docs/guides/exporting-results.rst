@@ -1,11 +1,6 @@
 Exporting Results
 =================
 
-.. warning::
-
-   The export and dashboard examples use unsupported internal owners. Only
-   :func:`OpenPinch.main.pinch_analysis_service` is compatibility protected.
-
 Purpose
 -------
 
@@ -32,12 +27,15 @@ Runnable Workflow
    from OpenPinch import PinchProblem
 
    problem = PinchProblem("basic_pinch.json")
-   problem.target()
+   problem.target.all_heat_integration()
 
    summary = problem.summary_frame()
    detailed = problem.summary_frame(detailed=True)
    workbook_path = problem.export_excel("results")
-   graph_paths = problem.plot.export("graphs", graph_type="gcc")
+   graph_paths = problem.plot.export(
+       "graphs",
+       plot=problem.plot.grand_composite_curve,
+   )
 
 Expected Output
 ---------------

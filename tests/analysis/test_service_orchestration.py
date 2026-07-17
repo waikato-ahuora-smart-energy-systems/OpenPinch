@@ -164,6 +164,7 @@ def test_indirect_heat_integration_service_records_total_process_and_site_target
     monkeypatch,
 ):
     zone = _make_zone()
+    zone.add_target(_make_target(zone, TT.DI.value, period_idx=0))
     calls = []
 
     def fake_compute_total(target_zone: Zone, args: dict | None = None):
@@ -180,12 +181,6 @@ def test_indirect_heat_integration_service_records_total_process_and_site_target
     monkeypatch.setattr(
         svc, "compute_indirect_integration_targets", fake_compute_indirect
     )
-    monkeypatch.setattr(
-        svc,
-        "apply_exergy_if_enabled",
-        lambda target, target_zone, apply_func: target,
-    )
-
     out = svc.indirect_heat_integration_service(zone, args={"period_idx": 0})
 
     assert out is zone

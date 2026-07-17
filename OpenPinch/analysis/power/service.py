@@ -45,9 +45,13 @@ def get_power_cogeneration_above_pinch(
 ) -> CogenerationTarget:
     """Calculate above-Pinch cogeneration for a compatible thermal target object."""
     turbine_params = _prepare_turbine_parameters(target.config)
+    period_ids = getattr(target, "period_ids", None)
+    period_args = dict(args or {})
+    if not period_ids and "period_idx" in period_args:
+        period_args.pop("period_id", None)
     idx, sid = get_period_index(
-        period_ids=getattr(target, "period_ids", None),
-        args=args,
+        period_ids=period_ids,
+        args=period_args,
     )
     utility_data = _preprocess_utilities(target, turbine_params, idx=idx)
     if utility_data is None:

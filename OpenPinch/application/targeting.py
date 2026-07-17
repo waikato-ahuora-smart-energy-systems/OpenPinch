@@ -5,7 +5,6 @@ from __future__ import annotations
 from ..analysis.energy_transfer.diagram import compute_energy_transfer_target
 from ..analysis.energy_transfer.service import run_energy_transfer_analysis_service
 from ..analysis.exergy.service import (
-    apply_exergy_if_enabled,
     apply_exergy_targeting,
     run_exergy_targeting_service,
 )
@@ -66,15 +65,26 @@ def direct_heat_integration_service(zone: Zone, args: dict | None = None) -> Zon
     apply_zone_config_overrides(zone, args)
     record_selected_period(zone, args)
     target = compute_direct_integration_targets(zone, args)
-    zone.add_target(
-        apply_exergy_if_enabled(target, zone, apply_func=apply_exergy_targeting)
-    )
+    zone.add_target(target)
     return zone
 
 
 def indirect_heat_integration_service(zone: Zone, args: dict | None = None) -> Zone:
     """Run indirect heat integration targeting for a prepared zone."""
     apply_zone_config_overrides(zone, args)
+    if not target_matches_requested_period(
+        zone.targets.get(TT.DI.value),
+        args=args,
+        period_ids=zone.period_ids,
+    ):
+        direct_heat_integration_service(zone, args)
+    for subzone in zone.subzones.values():
+        if not target_matches_requested_period(
+            subzone.targets.get(TT.DI.value),
+            args=args,
+            period_ids=subzone.period_ids,
+        ):
+            direct_heat_integration_service(subzone, args)
     zone.import_hot_and_cold_streams_from_sub_zones(
         get_net_streams=True,
         is_n_zone_depth=False,
@@ -84,9 +94,7 @@ def indirect_heat_integration_service(zone: Zone, args: dict | None = None) -> Z
     zone.add_target(compute_total_subzone_utility_targets(zone, args))
     target = compute_indirect_integration_targets(zone, args)
     if target is not None:
-        zone.add_target(
-            apply_exergy_if_enabled(target, zone, apply_func=apply_exergy_targeting)
-        )
+        zone.add_target(target)
     return zone
 
 
@@ -108,9 +116,7 @@ def direct_heat_pump_service(zone: Zone, args: dict | None = None) -> Zone:
     if target is None:
         zone.targets.pop(TT.DHP.value, None)
     else:
-        zone.add_target(
-            apply_exergy_if_enabled(target, zone, apply_func=apply_exergy_targeting)
-        )
+        zone.add_target(target)
     return zone
 
 
@@ -132,9 +138,7 @@ def indirect_heat_pump_service(zone: Zone, args: dict | None = None) -> Zone:
     if target is None:
         zone.targets.pop(TT.IHP.value, None)
     else:
-        zone.add_target(
-            apply_exergy_if_enabled(target, zone, apply_func=apply_exergy_targeting)
-        )
+        zone.add_target(target)
     return zone
 
 

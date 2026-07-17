@@ -159,7 +159,6 @@ def problem_to_solver_arrays(
             "HENS_MAX_PARALLEL": hens.max_parallel,
             "HENS_EVM_N_AD_BRANCHES": hens.evm_n_ad_branches,
             "HENS_EVM_N_RM_BRANCHES": hens.evm_n_rm_branches,
-            "HENS_METHOD_SEQUENCE": list(hens.method_sequence),
             "HENS_OUTPUT_FOLDER": hens.output_folder,
             "HENS_OUTPUT_FORMATS": list(hens.output_formats),
             "HENS_RUN_ID": hens.run_id,

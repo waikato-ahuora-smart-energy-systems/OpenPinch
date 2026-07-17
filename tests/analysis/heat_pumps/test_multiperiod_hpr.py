@@ -653,9 +653,9 @@ def test_weighted_hpr_summary_uses_shared_design_period_evaluations(monkeypatch)
     )
 
     problem = PinchProblem(source=payload, project_name="Site")
-    problem.target.direct_heat_pump(zone_name="AreaA", period_id="p0")
+    problem.target.all_periods.carnot_heat_pump(zone="AreaA")
 
-    frame = problem.summary_frame(detailed=True, periods="weighted_average")
+    frame = problem.summary_frame(detailed=True, include_weighted_average=True)
     hpr_rows = frame[frame["HPR Utility Total (value)"].notna()]
 
     assert len(hpr_rows) == 1

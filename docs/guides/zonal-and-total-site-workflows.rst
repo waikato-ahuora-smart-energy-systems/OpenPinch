@@ -1,12 +1,6 @@
 Zonal and Total Site Workflows
 ==============================
 
-.. warning::
-
-   This advanced guide uses unsupported internal application and analysis
-   owners. Only :func:`OpenPinch.main.pinch_analysis_service` is compatibility
-   protected.
-
 Purpose
 -------
 
@@ -38,7 +32,7 @@ Runnable Workflow
    case = workspace.case("baseline")
 
    direct = case.target.direct_heat_integration()
-   total_site = case.target.indirect_heat_integration()
+   total_site = case.target.total_site_heat_integration()
    summary = case.summary_frame()
 
    print(summary[["Target", "Zone", "Hot Utility Target", "Cold Utility Target"]])

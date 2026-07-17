@@ -1,33 +1,11 @@
 First Solve with Python
 =======================
 
-Purpose
--------
-
-Call the strict :func:`OpenPinch.main.pinch_analysis_service` integration
-contract and inspect its structured result.
-
-Prerequisites
--------------
-
-Install the base package:
-
-.. code-block:: bash
-
-   python -m pip install openpinch
-
-Sample Case
------------
-
-The example uses two inline process streams so it is independent of repository
-paths and resource-helper imports.
-
-Runnable Workflow
------------------
+This is the primary OpenPinch workflow for a process engineer.
 
 .. code-block:: python
 
-   from OpenPinch.main import pinch_analysis_service
+   from OpenPinch import PinchProblem
 
    request = {
        "streams": [
@@ -49,37 +27,35 @@ Runnable Workflow
        "utilities": [],
    }
 
-   result = pinch_analysis_service(request, project_name="first-solve")
-   output = result.model_dump(mode="json")
-   print(output["name"])
-   print(output["targets"])
+   problem = PinchProblem(request, project_name="First solve")
+   problem.validate()
+   problem.target.all_heat_integration()
 
-Expected Output
----------------
+   summary = problem.summary_frame()
+   metrics = problem.metrics()
+   report = problem.report()
+   gcc = problem.plot.grand_composite_curve()
 
-``output`` has the stable top-level field order ``name``, ``period_id``,
-``targets``, ``graphs``, and ``design``. Invalid input raises Pydantic's
-validation error before targeting begins.
+The lifecycle is explicit. Construction prepares the case,
+``all_heat_integration()`` performs dependency-aware analysis, and subsequent
+operations observe the cached result. Invalid input raises a Pydantic
+validation error before analysis begins.
 
-Interpretation
---------------
+Use a focused method when appropriate:
 
-Read each target's ``Qh``, ``Qc``, and ``Qr`` fields as the hot-utility,
-cold-utility, and heat-recovery targets. Values retain their units in the
-serialized structure.
+.. code-block:: python
 
-Advanced Internal Workflows
----------------------------
+   direct = problem.target.direct_heat_integration()
+   area_cost = problem.target.heat_exchanger_area_and_cost()
 
-Packaged notebooks also exercise ``PinchProblem``, ``PinchWorkspace``, HPR,
-HEN, plotting, and export modules. Those concrete-owner imports are useful for
-development and research, but are deliberately unsupported as external
-contracts in version 0.5.0.
+Method arguments are ephemeral. Persistent engineering fallbacks belong in
+``problem.update_options(...)``; configuration does not decide which method
+runs.
 
 Next Steps
 ----------
 
-- :doc:`../api/package-root` for the support boundary.
-- :doc:`input-formats-and-validation` for request-field details.
-- :doc:`../developer/architecture` for internal owner responsibilities.
-- :doc:`notebooks-and-sample-cases` for advanced unsupported examples.
+- :doc:`zonal-and-total-site-workflows`
+- :doc:`heat-pump-workflows`
+- :doc:`../examples/notebook-series`
+- :doc:`../api/pinchproblem`

@@ -7,11 +7,9 @@ post-processing, cogeneration targeting, and heat exchanger network synthesis.
 It is built for engineers and researchers who need reproducible thermal
 targeting workflows in scripts, notebooks, and applications.
 
-OpenPinch exposes ``PinchProblem`` and ``PinchWorkspace`` as high-level package
-root workflows. The strict mapping-in/result-out contract remains
-:func:`OpenPinch.main.pinch_analysis_service`. Concrete owner modules remain
-available for repository development and advanced experiments, but other deep
-imports may change before a future contract expansion is explicitly selected.
+OpenPinch exposes ``PinchProblem`` and ``PinchWorkspace`` as its package-root
+process-engineer workflows. Named target and design methods execute analyses;
+read, report, plot, and export methods consume prepared or cached state.
 
 The published CLI is intentionally narrow: ``openpinch notebook`` copies the
 packaged notebook series, while solving, validation, graph export, Excel
@@ -31,9 +29,9 @@ I need to understand the method
    :doc:`fundamentals/direct-vs-indirect-integration`, and
    :doc:`fundamentals/graphs-and-interpretation`.
 
-I am integrating or extending OpenPinch
+I am building a reusable study
    Start with :doc:`api/package-root` and :doc:`developer/architecture`.
-   The generated module appendix documents unsupported internals for
+   The generated module appendix documents implementation owners for
    contributors.
 
 What OpenPinch Covers
@@ -53,8 +51,8 @@ What OpenPinch Covers
 The documentation is organized as a manual first and an internal reference second:
 overview pages help you choose a workflow, fundamentals explain the method,
 guides provide runnable tasks, examples map packaged assets to decisions, and
-API pages distinguish the selected public workflows and service contract from
-unsupported internals.
+API pages distinguish the supported workflow facade from contributor-owned
+implementation modules.
 
 .. toctree::
    :maxdepth: 2

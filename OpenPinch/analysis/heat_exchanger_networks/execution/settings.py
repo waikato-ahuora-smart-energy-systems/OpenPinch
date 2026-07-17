@@ -13,6 +13,11 @@ StagePackingScope = str
 
 _MAX_PDM_STAGE_PAIR_COUNT = 12
 _MAX_TDM_PARENT_LIMIT = 10
+_OPEN_HENS_METHOD_SEQUENCE = (
+    HENDesignMethod.PinchDesign,
+    HENDesignMethod.ThermalDerivative,
+    HENDesignMethod.NetworkEvolution,
+)
 
 
 @dataclass(frozen=True, init=False)
@@ -243,9 +248,7 @@ def workflow_settings_from_problem(
             float(value) for value in hens.derivative_thresholds
         ),
         stage_selection=tuple(int(value) for value in hens.stage_selection),
-        method_sequence=tuple(
-            HeatExchangerNetworkDesignMethod(value) for value in hens.method_sequence
-        ),
+        method_sequence=_OPEN_HENS_METHOD_SEQUENCE,
         output_formats=tuple(hens.output_formats),
         solve_tolerance=float(hens.solve_tolerance),
         best_solutions_to_save=int(hens.best_solutions_to_save),

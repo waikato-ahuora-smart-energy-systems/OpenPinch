@@ -1,9 +1,14 @@
-"""Content checks for the packaged OpenPinch notebook series."""
+"""Executable contract checks for the packaged process-engineer tutorials."""
 
 from __future__ import annotations
 
+import ast
+import csv
 import json
+import os
 from pathlib import Path
+
+import pytest
 
 from OpenPinch.resources import (
     copy_notebook,
@@ -14,361 +19,211 @@ from OpenPinch.resources import (
     sample_case_metadata,
 )
 
-EXPECTED_NOTEBOOKS = [
-    "01_first_solve_summary_graphs.ipynb",
-    "02_total_site_sugcc_interpretation.ipynb",
-    "03_multiperiod_workspace_scenarios.ipynb",
-    "04_carnot_heat_pump_screening.ipynb",
-    "05_direct_gas_stream_mvr_scenarios.ipynb",
-    "06_vapour_compression_mvr_cascade_hpr.ipynb",
-    "07_heat_exchanger_network_synthesis.ipynb",
-    "08_energy_transfer_analysis.ipynb",
-    "09_schema_service_exports_and_bundles.ipynb",
-    "10_multiperiod_hpr_shared_design.ipynb",
-]
+ROOT = Path(__file__).resolve().parents[2]
+MANIFEST = ROOT / "docs" / "_data" / "tutorial-coverage.csv"
+FORBIDDEN_IMPORT_PREFIXES = (
+    "OpenPinch.analysis",
+    "OpenPinch.application",
+    "OpenPinch.contracts",
+    "OpenPinch.domain",
+    "OpenPinch.presentation",
+)
+
+
+def _manifest_rows() -> list[dict[str, str]]:
+    with MANIFEST.open(newline="", encoding="utf-8") as stream:
+        return list(csv.DictReader(stream))
+
+
+EXPECTED_NOTEBOOKS = sorted({row["primary_tutorial"] for row in _manifest_rows()})
 
 
 def _load_notebook(path: Path) -> dict:
-    """Return the notebook JSON document from ``path``."""
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _copied_notebook(tmp_path: Path, name: str) -> dict:
+    return _load_notebook(copy_notebook(name, tmp_path / name))
+
+
+def _code_sources(notebook: dict) -> list[str]:
+    return [
+        "".join(cell.get("source", []))
+        for cell in notebook["cells"]
+        if cell["cell_type"] == "code"
+    ]
+
+
 def _combined_source(notebook: dict) -> str:
-    """Return all notebook cell sources concatenated into one string."""
-    return "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
+    return "\n".join(_code_sources(notebook))
 
 
-def _copied_notebook(tmp_path: Path, notebook_name: str) -> dict:
-    return _load_notebook(copy_notebook(notebook_name, tmp_path / notebook_name))
+def test_manifest_and_packaged_inventory_are_identical() -> None:
+    rows = _manifest_rows()
 
-
-def test_packaged_notebook_series_is_present():
-    """Keep the packaged notebook inventory synchronized with the docs."""
+    assert len(rows) >= 100
     assert list_notebooks() == EXPECTED_NOTEBOOKS
+    assert len({row["operation"] for row in rows}) == len(rows)
+    assert {row["execution_profile"] for row in rows} == {
+        "base",
+        "interactive",
+        "slow-hpr",
+        "solver",
+    }
+    assert all(row["operation"] for row in rows)
 
 
-def test_packaged_notebooks_use_root_workflow_imports(tmp_path: Path) -> None:
-    forbidden_imports = (
-        "from OpenPinch.application.problem import PinchProblem",
-        "from OpenPinch.application.workspace import PinchWorkspace",
-        "OpenPinch.classes",
-        "OpenPinch.lib",
-        "OpenPinch.services",
-        "OpenPinch.utils",
-        "OpenPinch.streamlit_webviewer",
-    )
-    for notebook_name in EXPECTED_NOTEBOOKS:
-        source = _combined_source(_copied_notebook(tmp_path, notebook_name))
-        assert all(value not in source for value in forbidden_imports), notebook_name
-        assert "from OpenPinch import " in source, notebook_name
+def test_notebooks_are_valid_source_only_nbformat_documents(tmp_path: Path) -> None:
+    for name in EXPECTED_NOTEBOOKS:
+        notebook = _copied_notebook(tmp_path, name)
+
+        assert notebook["nbformat"] == 4, name
+        assert notebook["nbformat_minor"] >= 5, name
+        assert notebook["cells"], name
+        assert notebook["cells"][0]["cell_type"] == "markdown", name
+        introduction = "".join(notebook["cells"][0]["source"])
+        for label in (
+            "Learning outcome",
+            "Level",
+            "Execution profile",
+            "Expected runtime",
+            "Optional extras",
+        ):
+            assert label in introduction, (name, label)
+        markdown_text = "\n".join(
+            "".join(cell.get("source", []))
+            for cell in notebook["cells"]
+            if cell["cell_type"] == "markdown"
+        )
+        assert (
+            sum(cell["cell_type"] == "markdown" for cell in notebook["cells"]) >= 5
+        ), name
+        for heading in (
+            "Study question and data",
+            "Interpret the result",
+            "Adapt this template",
+        ):
+            assert heading in markdown_text, (name, heading)
+        for cell in notebook["cells"]:
+            if cell["cell_type"] == "code":
+                assert cell["execution_count"] is None, name
+                assert cell["outputs"] == [], name
 
 
-def test_packaged_notebooks_label_public_workflows_and_internal_owners(
+def test_every_code_cell_compiles_and_uses_only_public_package_imports(
     tmp_path: Path,
 ) -> None:
-    for notebook_name in EXPECTED_NOTEBOOKS:
+    for name in EXPECTED_NOTEBOOKS:
+        notebook = _copied_notebook(tmp_path, name)
+        source = _combined_source(notebook)
+        assert "from OpenPinch import " in source, name
+        assert "pinch_analysis_service" not in source, name
+
+        for index, code_source in enumerate(_code_sources(notebook), start=1):
+            tree = ast.parse(code_source, filename=f"{name}:cell-{index}")
+            compile(tree, f"{name}:cell-{index}", "exec")
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.module:
+                    assert not node.module.startswith(FORBIDDEN_IMPORT_PREFIXES), (
+                        name,
+                        node.module,
+                    )
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        assert not alias.name.startswith(FORBIDDEN_IMPORT_PREFIXES), (
+                            name,
+                            alias.name,
+                        )
+
+
+def test_manifest_operations_are_demonstrated_in_notebook_source(
+    tmp_path: Path,
+) -> None:
+    aliases = {
+        "summary_frame.include_periods": "include_periods",
+        "summary_frame.include_weighted_average": "include_weighted_average",
+        "design.utility": "total_hot_utility",
+        "design.selected_network": "network(rank=1)",
+        "load": 'PinchProblem("basic_pinch.json"',
+        "PinchProblem.__init__": "PinchProblem(",
+        "PinchWorkspace.__init__": "PinchWorkspace(",
+        "source": "basic_pinch.json",
+        "show_dashboard": "show_dashboard",
+    }
+    for row in _manifest_rows():
+        operation = row["operation"]
+        notebook_name = row["primary_tutorial"]
         source = _combined_source(_copied_notebook(tmp_path, notebook_name))
-        assert "**Support notice:**" in source, notebook_name
-        assert "public package-root workflows" in source, notebook_name
-        assert "Concrete owner modules" in source, notebook_name
-        assert "from OpenPinch.main import pinch_analysis_service" in source
+        token = aliases.get(operation, operation.rsplit(".", maxsplit=1)[-1])
+        assert token in source, (notebook_name, operation)
+        if row["owner"].startswith("Batch"):
+            secondary = row["secondary_tutorials"]
+            assert secondary == "04_workspace_cases_and_scenarios.ipynb"
+            secondary_source = _combined_source(_copied_notebook(tmp_path, secondary))
+            assert "workspace.cases(" in secondary_source
 
-    integrator_source = _combined_source(
-        _copied_notebook(
-            tmp_path,
-            "09_schema_service_exports_and_bundles.ipynb",
+
+@pytest.mark.parametrize(
+    "name",
+    sorted(
+        {
+            row["primary_tutorial"]
+            for row in _manifest_rows()
+            if row["execution_profile"] == "base"
+        }
+    ),
+)
+def test_base_profile_notebook_executes(name: str, tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    namespace = {"__name__": "__main__"}
+    notebook = _copied_notebook(tmp_path, name)
+
+    for index, source in enumerate(_code_sources(notebook), start=1):
+        exec(compile(source, f"{name}:cell-{index}", "exec"), namespace)
+
+
+@pytest.mark.parametrize("profile", ["slow-hpr", "solver", "interactive"])
+def test_optional_profile_notebooks_execute(
+    profile: str, tmp_path: Path, monkeypatch
+) -> None:
+    enabled = set(filter(None, os.getenv("OPENPINCH_TUTORIAL_PROFILES", "").split(",")))
+    if profile not in enabled and "all" not in enabled:
+        pytest.skip(
+            f"Set OPENPINCH_TUTORIAL_PROFILES={profile} with its declared extras."
         )
+
+    if profile == "interactive":
+        from OpenPinch import PinchProblem, PinchWorkspace
+
+        monkeypatch.setattr(PinchProblem, "show_dashboard", lambda *_a, **_k: None)
+        monkeypatch.setattr(PinchWorkspace, "show_dashboard", lambda *_a, **_k: None)
+
+    monkeypatch.chdir(tmp_path)
+    names = sorted(
+        {
+            row["primary_tutorial"]
+            for row in _manifest_rows()
+            if row["execution_profile"] == profile
+        }
     )
-    assert "service_result = pinch_analysis_service(" in integrator_source
+    for name in names:
+        namespace = {"__name__": "__main__"}
+        notebook = _copied_notebook(tmp_path, name)
+        for index, source in enumerate(_code_sources(notebook), start=1):
+            exec(compile(source, f"{name}:cell-{index}", "exec"), namespace)
 
 
-def test_packaged_resource_metadata_and_friendly_errors():
+def test_packaged_resource_metadata_and_friendly_errors() -> None:
     sample_meta = sample_case_metadata("basic_pinch.json")
-    notebook_meta = notebook_metadata("01_first_solve_summary_graphs.ipynb")
+    notebook_meta = notebook_metadata(EXPECTED_NOTEBOOKS[0])
 
     assert sample_meta.title == "Basic Pinch"
+    assert sample_case_metadata("process_mvr.json").title == "Process MVR"
     assert "quickstart" in sample_meta.topics
-    assert notebook_meta.title == "First Solve, Summary, and Graphs"
+    assert notebook_meta.title == "First Solve and Core Curves"
     assert len(sample_case_metadata()) == len(list_sample_cases())
-    assert len(notebook_metadata()) == len(list_notebooks())
+    assert [item.name for item in notebook_metadata()] == EXPECTED_NOTEBOOKS
 
-    try:
+    with pytest.raises(FileNotFoundError, match="Unknown OpenPinch sample case") as exc:
         read_sample_case("not-a-case.json")
-    except FileNotFoundError as exc:
-        message = str(exc)
-    else:  # pragma: no cover - defensive assertion
-        raise AssertionError("invalid sample case unexpectedly succeeded")
-
-    assert "Unknown OpenPinch sample case" in message
-    assert "basic_pinch.json" in message
-
-
-def test_packaged_notebook_metadata_covers_user_paths():
-    metadata = notebook_metadata()
-
-    assert [item.name for item in metadata] == EXPECTED_NOTEBOOKS
-    assert {
-        "solve",
-        "method",
-        "integrator",
-    }.issubset({topic for item in metadata for topic in item.topics})
-    assert [
-        item.name
-        for item in metadata
-        if "solve" in item.topics and "advanced" in item.topics
-    ] == [
-        "04_carnot_heat_pump_screening.ipynb",
-        "05_direct_gas_stream_mvr_scenarios.ipynb",
-        "07_heat_exchanger_network_synthesis.ipynb",
-    ]
-    assert [item.name for item in metadata if "method" in item.topics] == [
-        "02_total_site_sugcc_interpretation.ipynb",
-        "06_vapour_compression_mvr_cascade_hpr.ipynb",
-        "08_energy_transfer_analysis.ipynb",
-    ]
-    assert [item.name for item in metadata if "integrator" in item.topics] == [
-        "09_schema_service_exports_and_bundles.ipynb"
-    ]
-
-
-def test_packaged_notebooks_are_output_free_and_use_library_surfaces(tmp_path: Path):
-    """The packaged notebooks should stay source-only and owner-explicit."""
-    for notebook_name in EXPECTED_NOTEBOOKS:
-        notebook = _copied_notebook(tmp_path, notebook_name)
-        combined_source = _combined_source(notebook)
-
-        assert "read_sample_case" not in combined_source
-        assert "json.loads(" not in combined_source
-        assert "def " not in combined_source
-        assert all(cell.get("execution_count") is None for cell in notebook["cells"])
-        assert all(
-            not cell.get("outputs")
-            for cell in notebook["cells"]
-            if cell["cell_type"] == "code"
-        )
-
-
-def test_notebook_1_covers_single_case_and_workspace_sensitivity(tmp_path: Path):
-    notebook = _copied_notebook(
-        tmp_path,
-        "01_first_solve_summary_graphs.ipynb",
-    )
-    combined_source = _combined_source(notebook)
-
-    assert "PinchProblem" in combined_source
-    assert "PinchWorkspace" in combined_source
-    assert ".validate()" in combined_source
-    assert "summary_frame()" in combined_source
-    assert "plot.catalog()" in combined_source
-    assert "plot.composite_curve" in combined_source
-    assert "plot.shifted_composite_curve" in combined_source
-    assert "plot.grand_composite_curve" in combined_source
-    assert "target.area_cost()" in combined_source
-    assert "copy_case(" in combined_source
-    assert "set_dt_cont_multiplier(" in combined_source
-    assert "compare_cases(" in combined_source
-    assert 'period_id="0"' not in combined_source
-
-
-def test_notebook_2_uses_only_packaged_pulp_mill_assets_and_real_zones(
-    tmp_path: Path,
-):
-    notebook = _copied_notebook(
-        tmp_path,
-        "02_total_site_sugcc_interpretation.ipynb",
-    )
-    combined_source = _combined_source(notebook)
-
-    assert "pulp_mill.json" in combined_source
-    assert "p_Varbanov et al.json" not in combined_source
-    assert 'source="pulp_mill.json"' in combined_source
-    assert 'zone_name="Bleaching"' in combined_source
-    assert "plot.get_graph_data()" in combined_source
-    assert "plot.total_site_profiles" in combined_source
-    assert "plot.site_utility_grand_composite_curve" in combined_source
-    assert '"base_target_type": "Total Site Target"' in combined_source
-    assert '"base_target_type": "Direct Integration"' in combined_source
-    assert "Power Cogeneration Target" in combined_source
-    assert 'period_id="0"' not in combined_source
-
-
-def test_notebook_3_covers_real_multiperiod_targeting(tmp_path: Path):
-    notebook = _copied_notebook(
-        tmp_path,
-        "03_multiperiod_workspace_scenarios.ipynb",
-    )
-    combined_source = _combined_source(notebook)
-
-    assert "crude_preheat_train_multiperiod.json" in combined_source
-    assert "zonal_site_multiperiod.json" in combined_source
-    assert "period_ids" in combined_source
-    assert "target_all_periods(" in combined_source
-    assert "direct_heat_integration(period_id=" in combined_source
-    assert "indirect_heat_integration(period_id=" in combined_source
-    assert "turndown" in combined_source
-    assert "summer" in combined_source
-
-
-def test_notebook_4_compares_direct_indirect_and_carnot_backends(
-    tmp_path: Path,
-):
-    notebook = _copied_notebook(
-        tmp_path,
-        "04_carnot_heat_pump_screening.ipynb",
-    )
-    combined_source = _combined_source(notebook)
-
-    assert "plot_multi_hp_profiles_from_results" not in combined_source
-    assert "direct_heat_pump" in combined_source
-    assert "indirect_heat_pump" in combined_source
-    assert "direct_refrigeration" not in combined_source
-    assert "indirect_refrigeration" not in combined_source
-    assert "HPRcycle.CascadeCarnot" in combined_source
-    assert "HPRcycle.ParallelCarnot" in combined_source
-    assert "SOLVED_TARGETS" in combined_source
-    assert "plot.catalog()" in combined_source
-    assert "selected_problem.plot.net_load_profiles_with_heat_pump(" in combined_source
-    assert (
-        "selected_problem.plot.grand_composite_curve_with_heat_pump(" in combined_source
-    )
-    assert "compare_cases(" in combined_source
-
-
-def test_notebook_5_covers_direct_gas_stream_mvr(tmp_path: Path):
-    notebook = _copied_notebook(
-        tmp_path,
-        "05_direct_gas_stream_mvr_scenarios.ipynb",
-    )
-    combined_source = _combined_source(notebook)
-
-    assert "PinchWorkspace" in combined_source
-    assert "copy_case(" in combined_source
-    assert "workspace.case(" in combined_source
-    assert "workspace.compare_cases(" in combined_source
-    assert "add_component.process_mvr(" in combined_source
-    assert "after_mvr_liquid_injection" in combined_source
-    assert "mvr_liquid_injection" in combined_source
-    assert "liquid_injection=True" in combined_source
-    assert "problem.process_components" in combined_source
-    assert "mvr.deactivate()" in combined_source
-    assert "mvr.activate()" in combined_source
-    assert "Evaporator vapour" in combined_source
-    assert "mvr.replacement_streams" in combined_source
-    assert "stage_results_by_period" in combined_source
-    assert "target.direct_heat_integration(" in combined_source
-    assert "target.indirect_heat_integration(" in combined_source
-    assert "summary_frame(case_name=" in combined_source
-    assert "plot.grand_composite_curve(" in combined_source
-    assert "return_graph_data=True" in combined_source
-
-
-def test_notebook_6_covers_vapour_compression_mvr_cascade_hpr(tmp_path: Path):
-    notebook = _copied_notebook(
-        tmp_path,
-        "06_vapour_compression_mvr_cascade_hpr.ipynb",
-    )
-    combined_source = _combined_source(notebook)
-
-    assert "HPRcycle.VapourCompMVR" in combined_source
-    assert "VapourCompressionMvrCascade" in combined_source
-    assert "MechanicalVapourRecompressionCycle" in combined_source
-    assert "target.direct_heat_pump()" in combined_source
-    assert "plot.net_load_profiles_with_heat_pump(" in combined_source
-    assert "plot.grand_composite_curve_with_heat_pump(" in combined_source
-
-
-def test_notebook_7_covers_hen_design_service_four_stream_problem(tmp_path: Path):
-    notebook = _copied_notebook(
-        tmp_path,
-        "07_heat_exchanger_network_synthesis.ipynb",
-    )
-    combined_source = _combined_source(notebook)
-
-    assert "PinchProblem" in combined_source
-    assert "Four-stream-Yee-and-Grossmann-1990-1.json" in list_sample_cases()
-    assert '"Four-stream-Yee-and-Grossmann-1990-1.json"' in combined_source
-    assert "four_stream_case = {" not in combined_source
-    assert "source=case_name" in combined_source
-    assert "problem.update_options(teaching_grid)" in combined_source
-    assert "design.heat_exchanger_network_synthesis()" in combined_source
-    assert '"HENS_APPROACH_TEMPERATURES": [10.0, 14.0, 18.0]' in combined_source
-    assert '"HENS_DERIVATIVE_THRESHOLDS": [0.5]' in combined_source
-    assert '"HENS_STAGE_SELECTION": [3]' in combined_source
-    assert '"HENS_MAX_PARALLEL": 1' in combined_source
-    assert "top_ranked_networks" in combined_source
-    assert "get_n_best_networks(3)" in combined_source
-    assert "select_network(solution_rank=2)" in combined_source
-    assert 'network.total_duty(kind="recovery", period_id=period_id)' in combined_source
-    assert (
-        'network.total_duty(kind="hot_utility", period_id=period_id)' in combined_source
-    )
-    assert (
-        'network.total_duty(kind="cold_utility", period_id=period_id)'
-        in combined_source
-    )
-    assert "problem.design.network.utility(" in combined_source
-    assert "exchanger.state(period_id)" in combined_source
-    assert "from OpenPinch.lib import" not in combined_source
-    assert "HeatExchangerKind" not in combined_source
-    assert "HeatExchangerNetworkLabel" not in combined_source
-    assert "filterwarnings" not in combined_source
-    assert "import warnings" not in combined_source
-    assert "from OpenPinch.services.network_grid_diagram" not in combined_source
-    assert "build_grid_diagram(design.network," in combined_source
-    assert "go.Figure()" not in combined_source
-
-
-def test_notebook_8_covers_energy_transfer_analysis(tmp_path: Path):
-    notebook = _copied_notebook(
-        tmp_path,
-        "08_energy_transfer_analysis.ipynb",
-    )
-    combined_source = _combined_source(notebook)
-
-    assert "pulp_mill.json" in combined_source
-    assert "target.energy_transfer(" in combined_source
-    assert "heat_surplus_deficit_table" in combined_source
-    assert "energy_transfer_diagram" in combined_source
-    assert "plot.energy_transfer_diagram" in combined_source
-    assert '"base_target_type": "Total Site Target"' in combined_source
-    assert '"base_target_type": "Direct Integration"' in combined_source
-    assert 'zone_name="Bleaching"' in combined_source
-
-
-def test_notebook_9_covers_service_boundary_and_output_workflows(tmp_path: Path):
-    notebook = _copied_notebook(
-        tmp_path,
-        "09_schema_service_exports_and_bundles.ipynb",
-    )
-    combined_source = _combined_source(notebook)
-
-    assert "copy_sample_case" in combined_source
-    assert "TargetInput" in combined_source
-    assert "pinch_analysis_service" in combined_source
-    assert "export_excel" in combined_source
-    assert "plot.export" in combined_source
-    assert "input_view(" in combined_source
-    assert "validate_variant(" in combined_source
-    assert "solve_variant(" in combined_source
-    assert "compare_variants(" in combined_source
-    assert "save_bundle(" in combined_source
-    assert "load_bundle(" in combined_source
-
-
-def test_notebook_10_covers_multiperiod_hpr_shared_design(tmp_path: Path):
-    notebook = _copied_notebook(
-        tmp_path,
-        "10_multiperiod_hpr_shared_design.ipynb",
-    )
-    combined_source = _combined_source(notebook)
-
-    assert "crude_preheat_train_multiperiod.json" in combined_source
-    assert "HPR_MULTIPERIOD_OPTIMIZATION_ENABLED" in combined_source
-    assert "HPR_BB_MINIMISER" in combined_source
-    assert "HPRcycle.CascadeCarnot" in combined_source
-    assert "target.direct_heat_pump(period_id=" in combined_source
-    assert 'summary_frame(periods="weighted_average"' in combined_source
-    assert 'summary_frame(periods="all_with_weighted_average"' in combined_source
-    assert "hpr_details" in combined_source
-    assert "period_outputs" in combined_source
-    assert "weighted_output" in combined_source
+    assert "basic_pinch.json" in str(exc.value)

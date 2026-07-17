@@ -7,9 +7,8 @@ OpenPinch has two distinct but closely related internal typed surfaces:
 - a runtime :class:`~OpenPinch.domain.configuration.Configuration` object attached to
   each prepared zone
 
-Together they implement the wire format protected through
-:func:`OpenPinch.main.pinch_analysis_service` and the per-zone analysis
-behaviour. Their direct import paths are not compatibility contracts.
+Together they implement the transport format used by
+:class:`OpenPinch.PinchProblem` and the per-zone analysis behaviour.
 
 What Each Layer Does
 --------------------
@@ -22,8 +21,8 @@ What Each Layer Does
    Define the structured response returned by the top-level service boundary.
 
 ``Configuration``
-   Stores runtime knobs for targeting flags, heat pump parameters, utility
-   assumptions, costing inputs, and turbine settings. Each prepared
+   Stores numerical and engineering defaults for heat pumps, utilities,
+   costing, turbines, and solvers. It does not select core methods. Each prepared
    :class:`~OpenPinch.domain.zone.Zone` owns one config object.
 
 Discovering Options
@@ -41,9 +40,10 @@ enum choices, numeric bounds, and config paths:
    hpr_options = [field for field in options if field.group == "hpr"]
 
 Common options include ``THERMAL_DT_CONT`` for minimum contribution
-temperature, ``TARGETING_*`` flags for default target selection,
-``OUTPUT_UNIT_*`` fields for report units, and ``HPR_*`` fields for heat-pump
-and refrigeration workflows.
+temperature, ``OUTPUT_UNIT_*`` fields for report units, and numerical
+``HPR_*`` fields for heat-pump and refrigeration workflows. Configuration does
+not contain target-method selectors; the descriptive ``problem.target.*`` or
+``problem.design.*`` callable selects the analysis.
 
 Configuration
 -------------
@@ -134,9 +134,9 @@ Heat Exchanger Network Design Results
 
 ``TargetOutput.design`` stores a
 :class:`~OpenPinch.contracts.synthesis.result.HeatExchangerNetworkSynthesisResult`
-after ``problem.design.enhanced_synthesis_method(quality_tier=...)``,
-``problem.design.open_hens_method()``,
-``problem.design.heat_exchanger_network_synthesis()``, or one of the direct
+after ``problem.design.enhanced_heat_exchanger_network(quality_tier=...)``,
+``problem.design.open_hens()``,
+``problem.design.multiperiod_heat_exchanger_network()``, or one of the direct
 method accessors runs. The selected network is available as ``design.network``
 and the ranked unique network candidates are available as
 ``design.ranked_networks``.
@@ -156,7 +156,7 @@ selected network came from a protected fallback route.
 
 ``HENS_SYNTHESIS_QUALITY_TIER`` remains a persistent configuration field with a
 default of tier 1 for prepared-problem workflows. User code should prefer
-``problem.design.enhanced_synthesis_method(quality_tier=...)`` for method-level
+``problem.design.enhanced_heat_exchanger_network(quality_tier=...)`` for method-level
 tier selection because it applies a call-local override without mutating the
 loaded problem configuration. Runtime ``options`` passed to design accessors are
 reserved for runtime context and do not accept persistent ``HENS_*`` overrides.

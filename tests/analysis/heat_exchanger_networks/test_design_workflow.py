@@ -107,7 +107,7 @@ def test_internal_service_requires_live_problem(raw_input: object) -> None:
         heat_exchanger_network_synthesis_service(raw_input)  # type: ignore[arg-type]
 
 
-def test_internal_service_rejects_separate_design_options() -> None:
+def test_design_options_are_validated_at_their_owner_boundary() -> None:
     problem = _public_example_problem()
 
     with pytest.raises(TypeError, match="runtime options.*dict"):
@@ -122,10 +122,12 @@ def test_internal_service_rejects_separate_design_options() -> None:
             options={"HENS_APPROACH_TEMPERATURES": [99.0]},
         )
 
-    with pytest.raises(ValueError, match="TargetInput.options"):
-        problem.design.heat_exchanger_network_synthesis(
-            options={"HENS_DERIVATIVE_THRESHOLDS": [9.9]},
-        )
+    configured = problem.master_zone.config.hens.derivative_thresholds
+    view = problem.design.heat_exchanger_network(
+        options={"HENS_DERIVATIVE_THRESHOLDS": [9.9]},
+    )
+    assert view.manifest is not None
+    assert problem.master_zone.config.hens.derivative_thresholds == configured
 
 
 @pytest.mark.parametrize(
@@ -142,19 +144,20 @@ def test_public_design_accessor_rejects_separate_options_objects(
 ) -> None:
     problem = _public_example_problem()
 
-    with pytest.raises(TypeError, match="runtime options.*dict"):
-        problem.design.heat_exchanger_network_synthesis(options=options)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="design options.*mapping"):
+        problem.design.heat_exchanger_network(options=options)  # type: ignore[arg-type]
 
 
-def test_public_design_accessor_runtime_options_include_period_id() -> None:
+def test_public_design_accessor_separates_runtime_and_configuration() -> None:
     problem = _public_example_problem()
 
-    runtime_options = problem.design._runtime_options(
-        {"existing": True},
+    runtime_options, configuration = problem.design._arguments(
+        options={"existing": True, "HENS_STAGE_SELECTION": [2]},
         period_id="peak",
     )
 
     assert runtime_options == {"existing": True, "period_id": "peak"}
+    assert configuration == {"HENS_STAGE_SELECTION": [2]}
 
 
 def test_openhens_field_aliases_are_rejected_by_public_schemas() -> None:
@@ -177,15 +180,14 @@ def test_problem_design_workflow_example_from_converted_openhens_fixture(
     _use_fake_default_executor(monkeypatch)
     problem = _public_example_problem()
 
-    design = problem.design.heat_exchanger_network_synthesis()
-
+    design = problem.design.heat_exchanger_network()
     assert problem.results is not None
-    assert problem.results.design == design
+    assert problem.results.design == design.result
     assert design.manifest is not None
     assert design.manifest.run_id == "Four-stream-Yee-and-Grossmann-1990-1"
-    assert isinstance(design.network, HeatExchangerNetwork)
-    assert design.network.exchangers
-    first_link = design.network.exchangers[0]
+    assert isinstance(design.selected_network, HeatExchangerNetwork)
+    assert design.selected_network.exchangers
+    first_link = design.selected_network.exchangers[0]
     assert isinstance(first_link, HeatExchanger)
     assert first_link.source_stream
     assert first_link.sink_stream
@@ -199,20 +201,20 @@ def test_enhanced_synthesis_method_is_public_quality_tier_entrypoint(
     problem.update_options({"HENS_SYNTHESIS_QUALITY_TIER": 5})
     configured_tier = problem.master_zone.config.hens.synthesis_quality_tier
 
-    design = problem.design.enhanced_synthesis_method(quality_tier=3)
+    design = problem.design.enhanced_heat_exchanger_network(quality_tier=3)
 
     assert problem.results is not None
-    assert problem.results.design == design
+    assert problem.results.design == design.result
     assert design.manifest is not None
     assert design.manifest.synthesis_quality_tier == 3
     assert problem.master_zone.config.hens.synthesis_quality_tier == configured_tier
 
 
-def test_problem_design_network_helpers_require_cached_design() -> None:
+def test_problem_design_view_is_created_only_by_explicit_design() -> None:
     problem = _public_example_problem()
 
-    with pytest.raises(RuntimeError, match="heat exchanger network design method"):
-        _ = problem.design.network.total_heat_recovery
+    assert problem.results is None
+    assert not hasattr(problem.design, "network")
 
 
 def test_public_design_accessor_returns_ranked_networks(
@@ -272,12 +274,19 @@ def test_public_design_accessor_returns_ranked_networks(
         project_name="Ranked unique heat exchanger network outcomes",
     )
 
-    design = problem.design.heat_exchanger_network_synthesis()
+    design = problem.design.heat_exchanger_network()
+    serialized_before = design.model_dump(mode="json")
 
     assert problem.results is not None
-    assert problem.results.design == design
+    assert problem.results.design == design.result
     assert len(design.ranked_networks) == 1
-    assert design.ranked_networks[0].network == design.network
+    assert design.top(1) == design.ranked_networks[:1]
+    assert design.network(rank=1) == design.selected_network
+    with pytest.raises(ValueError, match="one-based"):
+        design.network(rank=0)
+    with pytest.raises(IndexError):
+        design.network(rank=2)
+    assert design.ranked_networks[0].network == design.selected_network
     assert design.task_id == design.ranked_networks[0].task.task_id
     assert [outcome.objective_value for outcome in design.ranked_networks] == sorted(
         outcome.objective_value for outcome in design.ranked_networks
@@ -294,8 +303,8 @@ def test_public_design_accessor_returns_ranked_networks(
         }
     ) == len(design.ranked_networks)
 
-    selected_network = design.network
-    helper = problem.design.network
+    selected_network = design.selected_network
+    helper = design
     hot_utility = next(
         exchanger
         for exchanger in selected_network.exchangers
@@ -320,6 +329,7 @@ def test_public_design_accessor_returns_ranked_networks(
     assert helper.utility(hot_utility.sink_stream) == 0.0
     with pytest.raises(ValueError, match="utility name"):
         helper.utility("")
+    assert design.model_dump(mode="json") == serialized_before
 
 
 def test_native_targetinput_design_workflow_example_from_converted_fixture(
@@ -332,11 +342,11 @@ def test_native_targetinput_design_workflow_example_from_converted_fixture(
         project_name="Four-stream converted OpenHENS native example",
     )
 
-    design = problem.design.heat_exchanger_network_synthesis()
+    design = problem.design.heat_exchanger_network()
 
     assert problem.results is not None
-    assert problem.results.design == design
-    assert design.network.exchangers
+    assert problem.results.design == design.result
+    assert design.selected_network.exchangers
 
 
 def test_workspace_design_workflow_example_from_converted_openhens_fixture(
@@ -348,17 +358,12 @@ def test_workspace_design_workflow_example_from_converted_openhens_fixture(
         project_name="Four-stream converted OpenHENS example",
     )
 
-    view = workspace.solve_variant(
-        "baseline",
-        workflow="heat_exchanger_network_synthesis",
-    )
+    design = workspace.design.heat_exchanger_network()
     problem = workspace.case("baseline")
 
-    assert view.status == "solved"
-    assert view.support_level == "advanced"
+    assert design.selected_network.exchangers
     assert problem.results is not None
     assert problem.results.design is not None
-    assert problem.results.design.workspace_variant == "baseline"
     assert problem.results.design.network.exchangers
 
 

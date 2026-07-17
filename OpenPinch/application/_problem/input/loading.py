@@ -58,6 +58,7 @@ def rebuild_problem_state(
     problem._process_components = {}
     problem._results = None
     problem._last_target_run_spec = None
+    problem._period_results = {}
     return problem._master_zone
 
 

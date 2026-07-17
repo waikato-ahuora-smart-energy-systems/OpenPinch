@@ -1,105 +1,72 @@
 Getting Started
 ===============
 
-This is the shortest supported path from a clean environment to a solved
-OpenPinch case. The only currently compatibility-protected Python entry point
-is :func:`OpenPinch.main.pinch_analysis_service`.
+OpenPinch has two package-root workflow classes. Use :class:`PinchProblem
+<OpenPinch.PinchProblem>` for one engineering case and :class:`PinchWorkspace
+<OpenPinch.PinchWorkspace>` for named cases and scenarios.
 
-Install
--------
-
-Install the base package for validation and targeting:
-
-.. code-block:: bash
-
-   python -m pip install openpinch
-
-Optional extras provide notebook, dashboard, Brayton-cycle, and HEN-synthesis
-dependencies. They do not expand the compatibility-protected Python API.
-
-.. list-table::
-   :header-rows: 1
-
-   * - Extra
-     - Use when you need
-     - Command
-   * - notebook
-     - Jupyter, Plotly, or Excel tooling
-     - ``python -m pip install "openpinch[notebook]"``
-   * - dashboard
-     - Streamlit dashboard review
-     - ``python -m pip install "openpinch[dashboard]"``
-   * - synthesis
-     - solver-backed HEN development
-     - ``python -m pip install "openpinch[synthesis]"`` then ``idaes get-extensions``
-   * - brayton_cycle
-     - TESPy-backed Brayton-cycle development
-     - ``python -m pip install "openpinch[brayton_cycle]"``
-
-OpenPinch currently targets Python 3.14.
-
-Run the First Solve
--------------------
+Install the package, then run a complete heat-integration study:
 
 .. code-block:: python
 
-   from OpenPinch.main import pinch_analysis_service
+   from OpenPinch import PinchProblem
 
-   result = pinch_analysis_service(
-       {
-           "streams": [
-               {
-                   "name": "Hot feed",
-                   "zone": "Process",
-                   "t_supply": 180.0,
-                   "t_target": 80.0,
-                   "heat_flow": 1000.0,
-               },
-               {
-                   "name": "Cold feed",
-                   "zone": "Process",
-                   "t_supply": 20.0,
-                   "t_target": 120.0,
-                   "heat_flow": 800.0,
-               },
-           ],
-           "utilities": [],
-       },
-       project_name="first-solve",
-   )
+   problem = PinchProblem("basic_pinch.json", project_name="Site")
+   problem.validate()
+   problem.target.all_heat_integration()
 
-   print(result.model_dump(mode="json"))
+   summary = problem.summary_frame()
+   metrics = problem.metrics()
+   report = problem.report()
+   figure = problem.plot.grand_composite_curve()
 
-Read the Result
+The named target call is the only analysis step in this example. Validation,
+summary, metrics, report, and plot operations inspect prepared or cached state;
+they never decide which analysis to run.
+
+Observation operations such as ``summary_frame()``, ``metrics()``, ``report()``,
+and ``problem.plot.*`` are deliberately separate from execution. If the input,
+configuration, or component inventory changes, run the desired target or design
+method again before observing the refreshed result.
+
+Focused Analysis
+----------------
+
+Use descriptive methods when only one analysis is required:
+
+.. code-block:: python
+
+   direct = problem.target.direct_heat_integration()
+   total_site = problem.target.total_site_heat_integration()
+   area_cost = problem.target.heat_exchanger_area_and_cost()
+
+``all_heat_integration()`` is the dependency-aware convenience method. It
+cycles through the zone hierarchy, computes direct targets where needed, and
+then completes Total Process and Total Site targeting.
+
+Named Scenarios
 ---------------
 
-The returned model contains ``name``, ``period_id``, ``targets``, ``graphs``,
-and ``design``. Inspect each target's hot-utility, cold-utility, and recovered-
-heat values through its serialized fields.
+.. code-block:: python
 
-Unsupported Advanced Modules
-----------------------------
+   from OpenPinch import PinchWorkspace
 
-The repository contains concrete owner modules for application workflows,
-domain objects, engineering analyses, adapters, optimisation, and
-presentation. They support OpenPinch development and the packaged advanced
-notebooks, but they are not current external contracts. Deep imports may move
-without a compatibility layer.
+   workspace = PinchWorkspace("crude_preheat_train.json", project_name="Site")
+   workspace.case("baseline").target.direct_heat_integration()
 
-Use the CLI Only for Notebook Assets
-------------------------------------
+   tight = workspace.scenario("tight", dt_cont_multiplier=0.75)
+   tight.target.direct_heat_integration()
 
-The CLI copies packaged notebooks; it does not solve cases:
+   comparison = workspace.compare_cases("baseline", "tight")
 
-.. code-block:: bash
-
-   openpinch notebook -o notebooks
+Method arguments are one-call overrides. ``update_options(...)`` changes the
+stored fallback for later calls. Configuration supplies engineering values; it
+does not select which core method runs.
 
 Next Steps
 ----------
 
-- :doc:`guides/first-solve-python` for the supported service call.
-- :doc:`api/package-root` for the exact compatibility boundary.
-- :doc:`developer/architecture` for contributor-facing package ownership.
-- :doc:`guides/notebooks-and-sample-cases` for explicitly unsupported advanced
-  examples.
+- :doc:`guides/first-solve-python` for the full lifecycle.
+- :doc:`api/pinchproblem` and :doc:`api/pinchworkspace` for interaction maps.
+- :doc:`examples/notebook-series` for the eighteen maintained tutorials.
+- :doc:`examples/tutorial-coverage-map` for the complete operation coverage.

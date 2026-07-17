@@ -12,7 +12,7 @@ from .synthesis.result import HeatExchangerNetworkSynthesisResult
 
 
 class TargetOutput(BaseModel):
-    """Top-level response data returned by ``pinch_analysis_service``."""
+    """Top-level cached targeting output for :class:`PinchProblem`."""
 
     name: str = "Site"
     period_id: Optional[str] = None

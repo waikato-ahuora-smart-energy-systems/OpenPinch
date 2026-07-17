@@ -1,94 +1,44 @@
 # Build Instructions
 
-## Environment
+## Prerequisites
 
-Use Python 3.14.2 or newer and the locked development environment from the repository root.
+- Python 3.11 or newer.
+- `uv` with the repository lock file available.
+- Network access only when locked dependencies are not already installed.
+- Chrome or Chromium plus Kaleido for static Plotly image tests.
+- External HEN solvers only when running the separately marked solver profile.
 
-```bash
-uv sync --group dev
-```
+No application environment variables or external services are required for the
+base package build.
 
-## Distribution Build
+## Build Steps
 
-```bash
-uv run python scripts/build_dist.py
-```
-
-The verified acceptance build produced both the OpenPinch 0.4.5 wheel and source distribution. A temporary output directory may be selected with `--output-dir` to avoid replacing local release artifacts.
-
-## Documentation Build
+Install the locked development environment:
 
 ```bash
-uv run sphinx-build -W -b html docs docs/_build/html
+uv sync --all-extras --dev
 ```
 
-The segmented-stream API and input guide build warning-free.
-
-## Serialized HEN Target Input Build
-
-No generated source or binary build step is required for the schema change.
-Validate the importable package and documentation from the repository root:
+Build the wheel and source distribution:
 
 ```bash
-uv run python -m sphinx -b html --fail-on-warning --keep-going \
-  docs docs/_build/html
+uv run python scripts/build_dist.py --output-dir dist
 ```
 
-The acceptance build passed against all 60 documentation sources.
-
-## Segment Batch Update and Pricing Acceptance Build
+Build warning-free HTML documentation:
 
 ```bash
-uv run python scripts/build_dist.py \
-  --output-dir /private/tmp/openpinch-segment-pricing-20260716
+uv run sphinx-build -W --keep-going -b html docs docs/_build/html
 ```
 
-Verified result: OpenPinch 0.4.6 wheel and source distribution built
-successfully without modifying tracked release artifacts.
+Successful distribution output contains one `openpinch-*.whl` and one
+`openpinch-*.tar.gz`. Successful documentation output is under
+`docs/_build/html` with zero warnings.
 
-## GitHub CI Heat-Pump Zero-Duty Follow-Up
+## Troubleshooting
 
-### Verified Environment
-
-- Python 3.14.2
-- NumPy 2.4.6
-- CoolProp 7.2.0
-- pytest 9.1.1
-- Hypothesis 6.156.6
-
-### Isolated Distribution Build
-
-```bash
-uv run python scripts/build_dist.py \
-  --output-dir /private/tmp/openpinch-ci-build-20260715T2024
-```
-
-Verified result: OpenPinch 0.4.5 wheel and source distribution built
-successfully without replacing workspace release artifacts.
-
-## Residual Compatibility Shim Removal
-
-### Prerequisites
-
-- Python 3.14.2 or newer.
-- The locked development environment installed with `uv sync --group dev`.
-- No environment variable, service, database, or external solver is required.
-
-### Static and Documentation Build
-
-```bash
-uv run ruff check .
-uv run ruff format --check .
-uv run python -m sphinx -E -W --keep-going -b html docs /tmp/openpinch-docs
-```
-
-### Isolated Distribution Build
-
-```bash
-uv run python scripts/build_dist.py \
-  --output-dir /tmp/openpinch-residual-shims-dist
-```
-
-The verified build produced OpenPinch 0.5.0 wheel and source distributions.
-The expected artifacts are `openpinch-0.5.0-py3-none-any.whl` and
-`openpinch-0.5.0.tar.gz`. Warnings are not accepted by the documentation gate.
+- The Sphinx tree is self-contained and must build without network access.
+- Kaleido browser failures indicate that Chrome cannot start in the current
+  sandbox; verify image export in an environment allowed to launch it.
+- HEN solver failures belong to the explicit `solver` test profile and require
+  the corresponding solver installation.

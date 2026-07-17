@@ -32,7 +32,7 @@ def project_name_from_case_input(case_input: JsonDict) -> Optional[str]:
 
 
 def merge_case_inputs(base: JsonDict, overlay: JsonDict) -> JsonDict:
-    """Deep-merge two case input fragments for variant editing workflows."""
+    """Deep-merge two case input fragments for case scenario workflows."""
     merged = deepcopy(base)
     for key, value in overlay.items():
         if isinstance(value, dict) and isinstance(merged.get(key), dict):
@@ -52,7 +52,7 @@ def canonical_case_input_from_source(
 ) -> tuple[JsonDict, str]:
     """Normalize one workspace source into a canonical stored case input."""
     if isinstance(source, PinchProblem):
-        case_input = source.canonical_problem_json()
+        case_input = source.to_problem_json()
         resolved_project_name = (
             project_name
             or source.project_name
@@ -93,7 +93,7 @@ def canonical_case_input_from_source(
             return normalized, seed_project_name
         raise
 
-    case_input = problem.canonical_problem_json()
+    case_input = problem.to_problem_json()
     resolved_project_name = (
         project_name
         or project_name_from_case_input(case_input)

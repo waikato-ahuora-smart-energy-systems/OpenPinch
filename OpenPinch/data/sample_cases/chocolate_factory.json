@@ -1674,9 +1674,6 @@
         }
     ],
     "options": {
-        "TARGETING_PROCESS_HP_ENABLED": true,
-        "TARGETING_UTILITY_HP_ENABLED": true,
-        "HPR_TYPE": "Parallel vapour compression cycles",
         "HPR_LOAD_MODE": "fraction",
         "HPR_LOAD_FRACTION": 1.0,
         "HPR_REFRIGERANTS": [

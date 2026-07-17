@@ -1,14 +1,14 @@
 Examples
 ========
 
-OpenPinch ships maintained sample cases and notebooks as repository learning
-assets. Most notebooks deliberately exercise unsupported internal owners; only
-calls through ``OpenPinch.main.pinch_analysis_service`` are compatibility
-protected.
+OpenPinch ships eighteen output-free process-engineer tutorials and maintained
+sample cases. Every supported public operation has an executable tutorial owner
+in the canonical coverage manifest.
 
 .. toctree::
    :maxdepth: 1
 
    notebook-series
+   tutorial-coverage-map
    sample-cases
    decision-workflows

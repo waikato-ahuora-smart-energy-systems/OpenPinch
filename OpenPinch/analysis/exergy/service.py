@@ -17,7 +17,6 @@ from ..targeting.context import (
 )
 
 __all__ = [
-    "apply_exergy_if_enabled",
     "apply_exergy_targeting",
     "build_exergy_gcc_curve",
     "build_exergy_nlp_curves",
@@ -263,18 +262,6 @@ def apply_exergy_targeting(target: Any) -> Any:
     return target
 
 
-def apply_exergy_if_enabled(
-    target: Any,
-    zone,
-    *,
-    apply_func=apply_exergy_targeting,
-) -> Any:
-    """Attach exergy outputs to one target when the feature is enabled."""
-    if target is None or not bool(zone.config.targeting.exergy_enabled):
-        return target
-    return apply_func(target)
-
-
 def run_exergy_targeting_service(
     zone,
     args: dict | None = None,
@@ -283,7 +270,6 @@ def run_exergy_targeting_service(
 ):
     """Enrich the first compatible existing target family with exergy outputs."""
     apply_zone_config_overrides(zone, args)
-    zone.config.targeting.exergy_enabled = True
     runtime_args = dict(args or {})
     explicit_target_type = _normalize_exergy_base_target_type(
         runtime_args.get("base_target_type")
@@ -311,7 +297,7 @@ def run_exergy_targeting_service(
                 )
             continue
 
-        zone.add_target(apply_exergy_if_enabled(target, zone, apply_func=apply_func))
+        zone.add_target(apply_func(target))
         zone._selected_exergy_target_type = target_type
         return zone
 

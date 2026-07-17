@@ -1,9 +1,8 @@
 Sample Cases
 ============
 
-The packaged sample cases are not filler assets. They provide reproducible
-inputs for the protected main contract and for explicitly unsupported advanced
-repository workflows.
+The packaged sample cases provide reproducible inputs for public
+``PinchProblem`` and ``PinchWorkspace`` workflows.
 
 Included Cases
 --------------
@@ -40,15 +39,19 @@ Included Cases
    Advanced direct-versus-indirect Carnot HPR and refrigeration example used in
    the packaged notebook workflow.
 
+``process_mvr.json``
+   Small pressure-defined gas-stream case for direct process MVR component
+   creation, lifecycle inspection, and retargeting in notebook 11.
+
 ``Four-stream-Yee-and-Grossmann-1990-1.json``
-   Converted OpenHENS Ye and Grossman four-stream heat exchanger network
-   synthesis example used by notebook 09.
+   Converted OpenHENS Yee and Grossmann four-stream heat exchanger network
+   synthesis example used by notebooks 15 through 17.
 
 How To Copy Them
 ----------------
 
-Contributors can browse or copy the packaged cases through the unsupported
-:mod:`OpenPinch.resources` helper when they want a local editable copy:
+Browse or copy packaged cases through :mod:`OpenPinch.resources` when an
+editable local copy is useful:
 
 .. code-block:: python
 
@@ -57,7 +60,7 @@ Contributors can browse or copy the packaged cases through the unsupported
    print(list_sample_cases())
    copy_sample_case("basic_pinch.json", "basic_pinch.json")
 
-Unsupported internal coordinators can also load a packaged case by name when
+The public problem and workspace constructors load a packaged case by name when
 no local file with that name exists:
 
 .. code-block:: python
@@ -84,6 +87,9 @@ Choosing The Right Case
 - Use ``heat_pump_targeting.json`` when you want a smaller direct HPR
   screening input data set.
 - Use ``chocolate_factory.json`` when you want to study the advanced
-  direct-versus-indirect HPR and refrigeration surface used by notebook 03.
+  direct-versus-indirect HPR and refrigeration surface used by notebooks 08
+  through 10.
+- Use ``process_mvr.json`` for the pressure-defined process MVR component
+  workflow in notebook 11.
 - Use ``Four-stream-Yee-and-Grossmann-1990-1.json`` when you want the converted
-  OpenHENS four-stream synthesis case used by notebook 09.
+  OpenHENS four-stream synthesis studies in notebooks 15 through 17.

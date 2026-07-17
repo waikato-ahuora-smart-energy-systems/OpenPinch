@@ -64,7 +64,7 @@ def compute_direct_integration_targets(
     )
     hot_pinch, cold_pinch = pt.pinch_temperatures()
     direct = zone.config.direct
-    targeting = zone.config.targeting
+    calculate_area_cost = bool((args or {}).get("_calculate_area_cost", False))
     pt = get_additional_GCCs(
         pt,
         do_vert_cc_calc=direct.vertical_gcc_enabled,
@@ -89,7 +89,7 @@ def compute_direct_integration_targets(
             idx=idx,
         )
     )
-    if should_update_balanced_composite_curves(direct, targeting):
+    if should_update_balanced_composite_curves(direct, calculate_area_cost):
         pt.update(
             **get_balanced_CC(
                 T_col=pt[PT.T],
@@ -113,7 +113,13 @@ def compute_direct_integration_targets(
                 RCP_cold_ut=pt_real[PT.RCP_COLD_UT],
             )
         )
-        area_data = build_area_cost_target_data(pt, pt_real, zone, idx)
+        area_data = build_area_cost_target_data(
+            pt,
+            pt_real,
+            zone,
+            idx,
+            enabled=calculate_area_cost,
+        )
     else:
         area_data = {}
 
@@ -147,9 +153,12 @@ def compute_direct_integration_targets(
 ################################################################################
 
 
-def should_update_balanced_composite_curves(direct_config, targeting_config) -> bool:
+def should_update_balanced_composite_curves(
+    direct_config,
+    calculate_area_cost: bool = False,
+) -> bool:
     """Return True when balanced composite curves are needed downstream."""
-    return bool(direct_config.balanced_cc_enabled or targeting_config.area_cost_enabled)
+    return bool(direct_config.balanced_cc_enabled or calculate_area_cost)
 
 
 def build_area_cost_target_data(
@@ -157,9 +166,11 @@ def build_area_cost_target_data(
     pt_real: ProblemTable,
     zone: Zone,
     idx: int | None,
+    *,
+    enabled: bool,
 ) -> dict:
     """Calculate direct-integration area and capital-cost target fields."""
-    if not zone.config.targeting.area_cost_enabled:
+    if not enabled:
         return {}
 
     num_units = get_min_number_hx(

@@ -2528,3 +2528,229 @@ Examine the args for all the core and advanced workflows to simplify the user ex
 **Context**: INCEPTION - Workflow Planning revision complete. Security and Resiliency remain disabled; Partial PBT remains applicable during construction. Application Design remains blocked pending approval.
 
 ---
+
+## Package Usability Refactor - Plan Approval and Implementation Start
+**Timestamp**: 2026-07-17T09:52:56Z
+**User Input**: "Implement the plan with a focus on usability and tutorials for new users that also serve as templates for various types of studies."
+**AI Response**: "Recorded explicit approval of the package-usability requirements, user stories, tutorial coverage map, and workflow plan. Resumed the governed brownfield workflow at Application Design, preserving completed design records from earlier initiatives and preparing a namespaced usability design for the two-class public facade, accessors, workspace batches, tutorial templates, RTD coverage, and verification."
+**Context**: INCEPTION - Workflow Planning approved; Application Design started. No application code was changed in this interaction entry.
+
+---
+
+## Package Usability Refactor - Application Design Completion Prompt
+**Timestamp**: 2026-07-17T09:55:50Z
+**AI Prompt**: "The package-usability application design is complete. Please review aidlc-docs/inception/application-design/package-usability-refactor-design.md and the component artifacts, enter A, B, or X after the [Answer]: tag in package-usability-refactor-application-design-approval-questions.md, then tell me when it is complete."
+**AI Response**: "Preserved earlier segmented-stream design records and added a namespaced package-usability application design. Defined the two-class facade, target/all-period/component/design/observation/workspace-batch components, effective-argument precedence, public method families, service orchestration, state transitions, dependency direction, and eighteen-template tutorial/RTD contract. Updated the mandatory component, method, service, dependency, consolidated-design, plan, and state artifacts. Validated Markdown structure, trailing whitespace, Mermaid edge syntax, text alternatives, and patch hygiene."
+**Status**: Awaiting explicit application-design approval
+**Context**: INCEPTION - Application Design artifact generation complete. Security and Resiliency are disabled; Partial PBT applies later to argument normalization, period ordering, aggregation, and manifest resolution. Units Generation and application code changes have not started.
+
+---
+
+## Package Usability Refactor - Application Design Continuity Check
+**Timestamp**: 2026-07-17T09:57:47Z
+**AI Response**: "Checked the application-design approval artifact and confirmed that its `[Answer]:` tag remains empty. Per the mandatory stage gate, Units Generation and source-code changes cannot start. Used the waiting turn to strengthen the design with an authoritative live-to-target module migration matrix covering target, period, component, design, plot, workspace, contracts, samples, tutorials, docs, and tests. Patch hygiene and the approval-file format remain valid."
+**Status**: Awaiting explicit application-design approval
+**Context**: INCEPTION - Application Design. This is the first continuation check after the completion prompt; the active implementation goal remains open.
+
+---
+
+## Package Usability Refactor - Application Design Blocked Audit
+**Timestamp**: 2026-07-17T09:58:13Z
+**AI Response**: "Performed the third consecutive application-design approval check and confirmed that the `[Answer]:` tag remains empty. The same mandatory approval condition has now blocked the original implementation turn and two automatic continuation turns. Marked the active implementation goal blocked as required; Units Generation and source changes remain unauthorized until the user records A, B, or X in the approval artifact."
+**Status**: Blocked pending explicit application-design approval
+**Context**: INCEPTION - Application Design. The design artifacts are complete and validated. The blocking condition is the mandatory unanswered approval file, not implementation difficulty or uncertainty.
+
+---
+
+## Package Usability Refactor - Application Design Approval
+**Timestamp**: 2026-07-17T10:23:46Z
+**User Input**: "A"
+**AI Response**: "Validated the answer recorded in package-usability-refactor-application-design-approval-questions.md as approval to continue. Marked Application Design complete and started Units Generation planning using the five dependency-ordered units already approved in the package-usability execution plan."
+**Status**: Application Design approved; Units Generation planning started
+**Context**: INCEPTION - Transition from Application Design to Units Generation. This resumes the previously blocked goal with an explicit external-state change.
+
+---
+
+## Package Usability Refactor - Unit Plan Approval Prompt
+**Timestamp**: 2026-07-17T10:23:46Z
+**AI Prompt**: "Unit of work plan complete. Review the Package Usability Refactor Unit Plan section in aidlc-docs/inception/plans/unit-of-work-plan.md, enter A, B, or X after its [Answer]: tag, then tell me when it is complete."
+**AI Response**: "Formalized the approved five-unit decomposition assessment across story grouping, dependency order, team alignment, technical deployment, business-domain boundaries, and brownfield code organization. Added the mandatory artifact-generation and validation checkboxes without generating unit artifacts before approval."
+**Status**: Awaiting explicit unit-plan approval
+**Context**: INCEPTION - Units Generation Part 1. Application Design is complete. Unit artifact generation and construction remain gated.
+
+---
+
+## Package Usability Refactor - Unit Plan Continuity Check
+**Timestamp**: 2026-07-17T10:25:08Z
+**AI Response**: "Checked the Package Usability Refactor Unit Plan and confirmed that its `[Answer]:` tag remains empty. Per the mandatory Units Generation Part 1 gate, the five unit artifacts and construction work cannot be generated yet."
+**Status**: Awaiting explicit unit-plan approval
+**Context**: INCEPTION - Units Generation Part 1. This is the first continuation check for the unit-plan approval condition after the previously blocked goal resumed through Application Design approval.
+
+---
+
+## Package Usability Refactor - Unit Plan Continuity Check 2
+**Timestamp**: 2026-07-17T10:25:28Z
+**AI Response**: "Performed the second consecutive Unit Plan approval check and confirmed that its `[Answer]:` tag remains empty. Unit artifact generation and construction remain unauthorized under the mandatory AI-DLC stage gate."
+**Status**: Awaiting explicit unit-plan approval
+**Context**: INCEPTION - Units Generation Part 1. This is the second consecutive check of the same unit-plan approval condition in the resumed goal audit.
+
+---
+
+## Package Usability Refactor - Unit Plan Blocked Audit
+**Timestamp**: 2026-07-17T10:25:46Z
+**AI Response**: "Performed the third consecutive Unit Plan approval check and confirmed that its `[Answer]:` tag remains empty. The same mandatory gate has repeated across three resumed-goal turns, so the implementation goal is formally blocked again. No unit artifacts or construction changes were generated without authorization."
+**Status**: Blocked pending explicit unit-plan approval
+**Context**: INCEPTION - Units Generation Part 1. Application Design is approved; only the required Unit Plan answer prevents the dependency-ordered unit artifacts and construction from proceeding.
+
+---
+
+## Package Usability Refactor - Unit Plan Approval
+**Timestamp**: 2026-07-17T10:47:55Z
+**User Input**: "Approved."
+**AI Response**: "Interpreted the unambiguous approval as option A, recorded `[Answer]: A` in the Unit Plan, and started generation of the five dependency-ordered unit artifacts."
+**Status**: Unit Plan approved; artifact generation started
+**Context**: INCEPTION - Units Generation Part 2. This resumes the previously blocked goal through explicit user approval.
+
+---
+
+## Package Usability Refactor - Units Generation Completion Prompt
+**Timestamp**: 2026-07-17T10:49:42Z
+**AI Prompt**: "The five package-usability units are generated. Please review the Package Usability Refactor sections in unit-of-work.md, unit-of-work-dependency.md, and unit-of-work-story-map.md; enter A, B, or X after the [Answer]: tag in package-usability-refactor-units-approval-questions.md; then tell me when it is complete."
+**AI Response**: "Generated all five unit definitions, the acyclic 1-to-5 dependency matrix, and an explicit mapping for US-1 through US-5, US-8, FR-1 through FR-9, and every numbered acceptance criterion. Expanded initially grouped acceptance criteria 1-3 after the traceability validator identified indirect coverage. Marked every Unit Plan generation checkbox complete and passed Markdown, checkbox, exact traceability, and patch-hygiene validation."
+**Status**: Awaiting explicit generated-units approval
+**Context**: INCEPTION - Units Generation Part 2 complete. Security and Resiliency are disabled (N/A); Partial PBT remains applicable during Construction. No source-code construction has started.
+
+---
+
+## Package Usability Refactor - Generated Units Continuity Check
+**Timestamp**: 2026-07-17T10:50:04Z
+**AI Response**: "Checked the generated-units approval artifact and confirmed that its `[Answer]:` tag remains empty. Construction Unit 1 cannot start before explicit approval of the generated unit boundaries and traceability."
+**Status**: Awaiting explicit generated-units approval
+**Context**: INCEPTION - Units Generation Part 2. This is the first continuation check for this new approval condition.
+
+---
+
+## Package Usability Refactor - Generated Units Continuity Check 2
+**Timestamp**: 2026-07-17T10:50:22Z
+**AI Response**: "Performed the second consecutive generated-units approval check and confirmed that its `[Answer]:` tag remains empty. Construction remains unauthorized under the mandatory stage gate."
+**Status**: Awaiting explicit generated-units approval
+**Context**: INCEPTION - Units Generation Part 2. This is the second consecutive check of the same approval condition.
+
+---
+
+## Package Usability Refactor - Generated Units Blocked Audit
+**Timestamp**: 2026-07-17T10:50:39Z
+**AI Response**: "Performed the third consecutive generated-units approval check and confirmed that its `[Answer]:` tag remains empty. The repeated mandatory gate now meets the blocked threshold, so the implementation goal is formally blocked before Construction."
+**Status**: Blocked pending explicit generated-units approval
+**Context**: INCEPTION - Units Generation Part 2. Unit artifacts and traceability are complete; only their required approval prevents Construction Unit 1 from starting.
+
+---
+
+## Package Usability Refactor - Blanket Construction Approval
+**Timestamp**: 2026-07-17T11:50:05Z
+**User Input**: "Approve through to task completion"
+**AI Response**: "Recorded generated-units approval as option A and accepted explicit authorization for all remaining standardized AI-DLC completion gates through task completion. Advanced to Construction Unit 1. The workflow will continue to create, validate, checkbox, and audit every mandatory artifact and completion decision without pausing between stages."
+**Status**: Units Generation approved; Construction authorized through completion
+**Context**: Transition from INCEPTION to CONSTRUCTION. Security and Resiliency remain disabled. Partial PBT rules PBT-02, PBT-03, PBT-07, PBT-08, and PBT-09 are enforced.
+
+---
+
+## Package Usability Refactor - Unit 1 Construction Complete
+**Timestamp**: 2026-07-17T11:56:12Z
+**AI Response**: "Completed and blanket-approved Unit 1 Functional Design, minimal NFR Requirements, minimal NFR Design, and Code Generation. Implemented an explicit partial-missing policy for optional pinch diagnostics while preserving strict required-metric aggregation. Added centralized generated period-output strategies, seeded property coverage, example regressions, and closed package vocabulary manifests. Marked every Unit 1 plan checkbox complete. Focused pytest passed 16 tests; Ruff lint, Ruff format, and patch hygiene passed."
+**Status**: Unit 1 complete; Unit 2 started
+**Context**: CONSTRUCTION - Contract and Correctness Foundation. PBT-02, PBT-03, PBT-07, PBT-08, and PBT-09 are compliant. Security and Resiliency are disabled and N/A.
+
+---
+
+## Package Usability Refactor - Unit 2 Design and Generation Plan
+**Timestamp**: 2026-07-17T11:56:12Z
+**AI Response**: "Completed and blanket-approved Unit 2 Functional Design, minimal NFR Requirements, minimal NFR Design, and Code Generation Part 1. Defined the explicit target execution model, shared argument precedence, state transitions, HPR call families, all-period mirroring, applicable NFRs, logical components, and a ten-step implementation checklist. Marked every completed design-plan checkbox immediately."
+**Status**: Unit 2 Code Generation Part 2 started
+**Context**: CONSTRUCTION - PinchProblem Interaction, Targeting, and Configuration. Infrastructure Design is skipped because no infrastructure or deployment resources change.
+
+---
+
+## Package Usability Refactor - Units 2 and 3 Construction Complete
+**Timestamp**: 2026-07-17T12:40:25Z
+**AI Response**: "Completed the blanket-approved Unit 2 targeting workflow and Unit 3 component, HEN design, workspace, observation, and presentation refactors. Removed callable and selector-driven APIs without compatibility aliases; added descriptive target/design/component methods, ordered case batches, design result views, boolean period aggregation, and generated order/non-mutation properties. Marked every Unit 2 and Unit 3 code-generation checkbox complete. The expanded focused checkpoint passed 232 tests; focused Ruff lint and format checks passed."
+**Status**: Units 2 and 3 complete; Unit 4 tutorial generation started
+**Context**: CONSTRUCTION - Package Usability Refactor. PBT-02, PBT-03, PBT-07, PBT-08, and PBT-09 are compliant. Security and Resiliency are disabled and N/A. Infrastructure Design was skipped because no infrastructure changed.
+
+---
+
+## Package Usability Refactor - Unit 4 Construction Complete
+**Timestamp**: 2026-07-17T12:56:29Z
+**AI Response**: "Completed the blanket-approved Unit 4 tutorial refactor. Generated the canonical eighteen-notebook series and manifest, aligned packaged metadata, replaced retired-API substring tests with executable structural contracts, and fixed the total-site and multiperiod-cogeneration defects exposed by clean notebook execution. Marked all Unit 4 plan checkboxes complete. All eighteen notebooks pass warning-as-error nbformat validation and extracted Ruff checks; the ten base-profile notebooks execute cleanly; 51 tutorial and service tests pass."
+**Status**: Unit 4 complete; Unit 5 documentation and full quality gates started
+**Context**: CONSTRUCTION - Tutorial Suite. Security and Resiliency are disabled and N/A. Partial PBT is N/A for generated notebook documents; deterministic manifest and executable drift contracts apply.
+
+---
+
+## Package Usability Refactor - Unit 5 Construction Complete
+**Timestamp**: 2026-07-17T13:47:16Z
+**AI Response**: "Completed the blanket-approved Unit 5 documentation and executable quality gates. Published an exact 129-operation tutorial coverage manifest in RTD, rewrote the package-root interaction guides, restored detailed HPR and HEN engineering guidance, removed the retired service/workflow-string/variant-view layers without aliases, and made Heat Pump and turbine model selection private call-local state rather than stored user configuration. Marked every Unit 5 code-generation checkbox complete."
+**Status**: Unit 5 complete; Build and Test complete
+**Context**: CONSTRUCTION - Documentation and Executable Quality Gates. Security and Resiliency are disabled and N/A. Partial PBT is compliant for effective arguments, ordered case batches, and multiperiod aggregation.
+
+---
+
+## Build and Test Stage
+**Timestamp**: 2026-07-17T13:47:16Z
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Built the 0.5.2 wheel and source distribution, passed an isolated installed-wheel smoke outside the checkout, completed a warning-as-error Sphinx build, passed repository-wide Ruff lint and format checks, and passed the complete non-solver suite with 2,079 tests and four external-solver tests deselected. Generated and checkboxed all mandatory Build and Test instruction and summary artifacts. Operations is N/A because no deployment work was requested."
+**Files Generated**:
+- build-and-test-plan.md
+- build-instructions.md
+- unit-test-instructions.md
+- integration-test-instructions.md
+- performance-test-instructions.md
+- build-and-test-summary.md
+**Context**: CONSTRUCTION - Build and Test complete under the user's blanket approval through task completion.
+
+---
+
+## Package Usability Refactor - Post-Completion Evidence Audit
+**Timestamp**: 2026-07-17T20:22:29Z
+**AI Response**: "Reopened the earlier completion claim and checked the approved requirements against live public classes, all eighteen notebook sources, the RTD map, execution-profile gates, and runtime behavior. Corrected the ordered case batch so target and design namespaces no longer advertise each other's methods; added batch metrics, reports, exports, all-period targeting, error isolation, and drift tests. Added engineering-named Process MVR efficiencies and documented/tested the returned component lifecycle. Expanded every notebook into a process-engineer study template with a study question, explicit steps, interpretation, and adaptation guidance. Expanded the exact live denominator from 129 to 186 operations, added semantic dimensions and profile evidence, and explicitly marked the two Brayton methods plus their batch mirrors as mapped but runtime unsupported. Fixed defects found by actual execution: plot invalidation after configuration mutation, an invalid Process MVR sample, an unsuitable multiperiod HEN sample, unreliable infeasibility handling, workspace filesystem coupling, and network-dependent Sphinx inventories."
+**Status**: Completion audit corrections implemented
+**Context**: CONSTRUCTION - Package Usability Refactor revalidation under the user's blanket approval through task completion. Security and Resiliency are disabled and N/A. Partial PBT remains compliant through ordered-batch, effective-argument, and multiperiod properties.
+
+---
+
+## Package Usability Refactor - Final Revalidation
+**Timestamp**: 2026-07-17T20:22:29Z
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Verified 186/186 live operations mapped to tutorial code and all 18 packaged notebooks with at least six Markdown guidance cells. Executed all profile gates: 10 base notebooks in the routine suite, 4 slow-HPR notebooks in 204.74 seconds, 3 real HEN solver notebooks in 160.68 seconds, and 1 guarded-interactive notebook in 7.78 seconds. The final focused usability, notebook, documentation, architecture, workspace, and component suite passed 108 tests with three inactive profile selectors skipped. The complete non-solver suite passed 2,084 tests with three opt-in profile selectors skipped and four external-solver tests deselected. Repository-wide Ruff lint and format, dependency architecture, root-import/stale-symbol contracts, and offline warning-as-error Sphinx passed."
+**Status**: Package Usability Refactor complete and revalidated
+**Context**: CONSTRUCTION - Build and Test completion evidence. Operations remains N/A because no deployment work was requested.
+
+---
+
+## Package Usability Refactor - Installed Artifact and Documentation Closure
+**Timestamp**: 2026-07-17T20:30:42Z
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Repeated the isolated offline wheel smoke and confirmed that OpenPinch loaded from the installed site-packages path rather than the checkout. The installed artifact exposes the public package entry points and contains all eighteen notebooks plus the Process MVR study input. Clarified the heat-pump workflow guide so the public Brayton vocabulary cannot be mistaken for a currently operational solver path, and rebuilt all RTD pages with warnings treated as errors. Patch whitespace validation remained clean."
+**Status**: Package Usability Refactor verification closed
+**Context**: CONSTRUCTION - Final Build and Test evidence under the user's blanket approval. Security and Resiliency are disabled and N/A; Operations is N/A.
+
+---
+
+## Compatibility Shim Repository Audit - User Request
+**Timestamp**: 2026-07-17T21:28:24Z
+**User Input**: "Scan the repo for any compatibility shims."
+**AI Response**: "Started a read-only, repository-wide compatibility audit. The scan will distinguish public aliases and deprecated entry points from behavioural retries, accepted legacy values, serialized-state migration, test-only compatibility assertions, and ordinary feature fallbacks. No application code will be changed."
+**Context**: Existing brownfield AI-DLC project; resuming the open generated-code review finding recorded in aidlc-state.md. Security and Resiliency extensions remain disabled; partial Property-Based Testing is N/A for a read-only source audit.
+
+---
+
+## Compatibility Shim Repository Audit - Completion
+**Timestamp**: 2026-07-17T21:39:38Z
+**AI Response**: "Completed the read-only repository-wide scan. Confirmed residual compatibility surfaces in the public summary format selector, duplicate enum/schema type identities, Stream and Value alias properties, graph selector and stream-location aliases, dynamic HEN result forwarding, seven legacy documentation transition pages, optional workspace schema-version defaulting, and permissive input schemas that silently discard unknown keys. Distinguished these from intentional unit-group overrides, fluid spelling normalization, solver/backend fallbacks, private composition helpers, and current-version pickle support. Focused regression evidence passed 19 tests. No application code was changed."
+**Status**: Read-only compatibility audit complete
+**Context**: Generated-code review. Security and Resiliency extensions are disabled and N/A. Partial Property-Based Testing is N/A because the audit made no runtime changes.
+
+---

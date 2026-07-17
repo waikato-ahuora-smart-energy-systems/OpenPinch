@@ -24,7 +24,7 @@ Python.
 Packaged Resources
 ------------------
 
-The unsupported internal resources module exposes the packaged sample cases
+The resources module exposes the packaged sample cases
 and notebooks used throughout the guides and examples.
 
 The main helpers are:
@@ -83,10 +83,9 @@ interactive exploration after solving a problem. Install
 ``openpinch[dashboard]`` before using this surface.
 
 The repository-level ``streamlit_app.py`` module is documented here as a local
-demo entrypoint for contributors. It is not part of the published wheel. The
-dashboard modules are unsupported internals. External Python integrations
-should use :func:`OpenPinch.main.pinch_analysis_service` and render the returned
-data in their own supported application boundary.
+demo entrypoint for contributors. It is not part of the published wheel.
+Application code can call ``problem.show_dashboard()`` explicitly after
+targeting.
 
 .. automodule:: streamlit_app
    :members:
@@ -96,6 +95,6 @@ Where This Fits
 ---------------
 
 Use packaged resources when you want reproducible examples, shareable learning
-assets, or a fast onboarding path. Use :doc:`package-root` for the protected
-integration contract; use the other API pages only when internal churn is
+assets, or a fast onboarding path. Use :doc:`package-root` for the application
+contract; use the other API pages only when contributor-level detail is
 acceptable.

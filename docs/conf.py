@@ -41,7 +41,6 @@ version = release
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
-    "sphinx.ext.intersphinx",
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
 ]
@@ -76,12 +75,6 @@ autodoc_mock_imports = [
     "streamlit",
     "tespy",
 ]
-
-intersphinx_mapping = {
-    "python": ("https://docs.python.org/3", None),
-    "pandas": ("https://pandas.pydata.org/docs/", None),
-    "numpy": ("https://numpy.org/doc/stable/", None),
-}
 
 # -- Options for HTML output -------------------------------------------------
 try:  # Prefer the Read the Docs theme when available

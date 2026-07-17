@@ -279,7 +279,7 @@ def test_four_stream_live_solver_corrected_warm_start_branch_is_feasible() -> No
 
     expected = BASELINE_EXPECTATIONS[FOUR_STREAM]
     problem = PinchProblem(source=FIXTURE_ROOT / f"{FOUR_STREAM}.json")
-    problem.target()
+    problem.target.all_heat_integration()
     settings = replace(
         workflow_settings_from_problem(problem),
         approach_temperatures=(expected["best_dTmin"],),
@@ -345,7 +345,7 @@ def test_nine_stream_live_solver_with_eight_workers_matches_current_openhens() -
 
     expected = CURRENT_OPENHENS_LIVE_EXPECTATIONS[NINE_STREAM]
     problem = PinchProblem(source=FIXTURE_ROOT / f"{NINE_STREAM}.json")
-    problem.target()
+    problem.target.all_heat_integration()
     settings = replace(
         workflow_settings_from_problem(problem),
         max_parallel=8,
@@ -409,7 +409,7 @@ def _assert_live_solver_case_matches_checked_in_summary(
     expected = BASELINE_EXPECTATIONS[case_id]
     problem = PinchProblem(source=FIXTURE_ROOT / f"{case_id}.json")
 
-    problem.target()
+    problem.target.all_heat_integration()
     if max_parallel is None:
         settings = workflow_settings_from_problem(problem)
     else:

@@ -1,5 +1,6 @@
 """Graph-accessor helpers for selecting, rendering, and exporting solved plots."""
 
+from collections.abc import Callable
 from html import escape
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
@@ -71,20 +72,16 @@ _GRAPH_TYPE_ALIASES = {
 
 
 class _PlotAccessor:
-    """Callable graph helper that also exposes common named plot shortcuts."""
+    """Read-only graph inventory, selection, rendering, and export helpers."""
 
     def __init__(self, problem: "PinchProblem") -> None:
         """Bind the accessor to one solved or solveable :class:`PinchProblem`."""
         self._problem = problem
 
-    def __call__(self):
-        """Return the same graph inventory table as :meth:`catalog`."""
-        return self.catalog()
-
     def catalog(self) -> pd.DataFrame:
         """Return a table describing the available graph outputs."""
         rows = []
-        for graph_key, graph_set in self.get_graph_data().items():
+        for graph_key, graph_set in self.data().items():
             graph_zone_name = graph_set.get("zone_name", graph_key)
             graph_zone_address = graph_set.get("zone_address", graph_zone_name)
             target_name = graph_set.get("name", graph_key)
@@ -163,7 +160,7 @@ class _PlotAccessor:
         graph_type: Optional[str] = None,
     ) -> list[tuple[str, GraphRecord]]:
         """Return all graphs matching the optional zone and type filters."""
-        graph_data = self.get_graph_data()
+        graph_data = self.data()
         selected_graph_type = _normalise_graph_type_selector(graph_type)
 
         zone_items = graph_data.items()
@@ -198,10 +195,13 @@ class _PlotAccessor:
                 selected.append((zone_identifier, graph))
         return selected
 
-    def get_graph_data(self) -> GraphData:
+    def data(self) -> GraphData:
         """Return the serialized graph data for the solved problem."""
         if getattr(self._problem._results, "graphs", None) is None:
-            self._problem.target()
+            raise RuntimeError(
+                "No graph data is available. Run a problem.target.<method>() "
+                "workflow before requesting plots."
+            )
 
         graphs = getattr(self._problem._results, "graphs", None)
 
@@ -217,13 +217,16 @@ class _PlotAccessor:
         output_dir: PathLike,
         *,
         zone_name: Optional[str] = None,
-        graph_type: Optional[str] = None,
+        plot: Callable | None = None,
     ) -> list[Path]:
         """Write selected graph outputs as standalone HTML files."""
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
 
-        selected = self._select_graphs(zone_name=zone_name, graph_type=graph_type)
+        selected = self._select_graphs(
+            zone_name=zone_name,
+            graph_type=self._graph_type_for_method(plot),
+        )
         written_paths = []
         for idx, (graph_zone_name, graph) in enumerate(selected, start=1):
             figure = self._build_graph_figure(graph)
@@ -238,14 +241,17 @@ class _PlotAccessor:
         output_dir: PathLike,
         *,
         zone_name: Optional[str] = None,
-        graph_type: Optional[str] = None,
+        plot: Callable | None = None,
         index_name: str = "index.html",
     ) -> Path:
         """Write selected graphs and a browsable HTML index to ``output_dir``."""
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
 
-        selected = self._select_graphs(zone_name=zone_name, graph_type=graph_type)
+        selected = self._select_graphs(
+            zone_name=zone_name,
+            graph_type=self._graph_type_for_method(plot),
+        )
         links = []
         for idx, (graph_zone_name, graph) in enumerate(selected, start=1):
             figure = self._build_graph_figure(graph)
@@ -259,11 +265,42 @@ class _PlotAccessor:
         index_path.write_text(_gallery_index_html(links), encoding="utf-8")
         return index_path
 
+    def _graph_type_for_method(self, plot: Callable | None) -> str | None:
+        if plot is None:
+            return None
+        if not callable(plot):
+            raise TypeError("plot must be one of the bound problem.plot methods.")
+        owner = getattr(plot, "__self__", None)
+        name = getattr(plot, "__name__", "")
+        if not isinstance(owner, _PlotAccessor) or owner._problem is not self._problem:
+            raise ValueError(
+                "plot must be a method bound to this problem.plot accessor."
+            )
+        method_types = {
+            "composite_curve": GT.CC.value,
+            "shifted_composite_curve": GT.SCC.value,
+            "balanced_composite_curve": GT.BCC.value,
+            "grand_composite_curve": GT.GCC.value,
+            "real_grand_composite_curve": GT.GCC_R.value,
+            "exergetic_grand_composite_curve": GT.GCC_X.value,
+            "grand_composite_curve_with_heat_pump": GT.GCC_HP.value,
+            "net_load_profiles": GT.NLP.value,
+            "net_load_profiles_with_heat_pump": GT.NLP_HP.value,
+            "exergetic_net_load_profiles": GT.NLP_X.value,
+            "total_site_profiles": GT.TSP.value,
+            "site_utility_grand_composite_curve": GT.SUGCC.value,
+            "energy_transfer_diagram": GT.ETD.value,
+        }
+        try:
+            return method_types[name]
+        except KeyError as exc:
+            raise ValueError(f"Unsupported plot method {name!r}.") from exc
+
     def composite_curve(
         self,
         *,
         zone_name: Optional[str] = None,
-        index: float = 0,
+        index: int = 0,
         show: bool = False,
         return_graph_data: bool = False,
     ):
@@ -280,7 +317,7 @@ class _PlotAccessor:
         self,
         *,
         zone_name: Optional[str] = None,
-        index: float = 0,
+        index: int = 0,
         show: bool = False,
         return_graph_data: bool = False,
     ):
@@ -297,7 +334,7 @@ class _PlotAccessor:
         self,
         *,
         zone_name: Optional[str] = None,
-        index: float = 0,
+        index: int = 0,
         show: bool = False,
         return_graph_data: bool = False,
     ):
@@ -314,7 +351,7 @@ class _PlotAccessor:
         self,
         *,
         zone_name: Optional[str] = None,
-        index: float = 0,
+        index: int = 0,
         show: bool = False,
         return_graph_data: bool = False,
     ):
@@ -331,7 +368,7 @@ class _PlotAccessor:
         self,
         *,
         zone_name: Optional[str] = None,
-        index: float = 0,
+        index: int = 0,
         show: bool = False,
         return_graph_data: bool = False,
     ):
@@ -348,7 +385,7 @@ class _PlotAccessor:
         self,
         *,
         zone_name: Optional[str] = None,
-        index: float = 0,
+        index: int = 0,
         show: bool = False,
         return_graph_data: bool = False,
     ):
@@ -365,7 +402,7 @@ class _PlotAccessor:
         self,
         *,
         zone_name: Optional[str] = None,
-        index: float = 0,
+        index: int = 0,
         show: bool = False,
         return_graph_data: bool = False,
     ):
@@ -382,7 +419,7 @@ class _PlotAccessor:
         self,
         *,
         zone_name: Optional[str] = None,
-        index: float = 0,
+        index: int = 0,
         show: bool = False,
         return_graph_data: bool = False,
     ):
@@ -399,7 +436,7 @@ class _PlotAccessor:
         self,
         *,
         zone_name: Optional[str] = None,
-        index: float = 0,
+        index: int = 0,
         show: bool = False,
         return_graph_data: bool = False,
     ):
@@ -416,7 +453,7 @@ class _PlotAccessor:
         self,
         *,
         zone_name: Optional[str] = None,
-        index: float = 0,
+        index: int = 0,
         show: bool = False,
         return_graph_data: bool = False,
     ):
@@ -433,7 +470,7 @@ class _PlotAccessor:
         self,
         *,
         zone_name: Optional[str] = None,
-        index: float = 0,
+        index: int = 0,
         show: bool = False,
         return_graph_data: bool = False,
     ):
@@ -450,7 +487,7 @@ class _PlotAccessor:
         self,
         *,
         zone_name: Optional[str] = None,
-        index: float = 0,
+        index: int = 0,
         show: bool = False,
         return_graph_data: bool = False,
     ):
@@ -467,7 +504,7 @@ class _PlotAccessor:
         self,
         *,
         zone_name: Optional[str] = None,
-        index: float = 0,
+        index: int = 0,
         show: bool = False,
         return_graph_data: bool = False,
     ):

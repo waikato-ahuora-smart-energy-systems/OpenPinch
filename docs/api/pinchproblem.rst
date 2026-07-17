@@ -1,152 +1,128 @@
-PinchProblem API
-================
+PinchProblem
+============
 
-``PinchProblem`` is the high-level single-case workflow object. Import it with
-``from OpenPinch import PinchProblem``. It owns the source inputs, validated
-problem data, prepared zone tree, solved targets, graph exports, multiperiod
-reruns, and several advanced post-processing helpers. Use
-:func:`OpenPinch.main.pinch_analysis_service` when an integration needs a
-strict mapping-in/result-out boundary instead of a stateful workflow.
-
-When To Use It
---------------
-
-Use ``PinchProblem`` when you want:
-
-- support for JSON, workbook, CSV-bundle, packaged sample-case, or in-memory
-  inputs
-- one object that keeps both the original case and the solved result state
-- compact and detailed summary tables
-- graph building and graph export without manually wiring result data
-- notebook-friendly advanced workflows such as HPR screening or
-  ``dt_cont`` sensitivity studies
-- selected-period reruns through ``period_id`` and batch reruns through
-  ``target_all_periods()``
-
-Use :doc:`pinchworkspace` instead when the study itself needs to keep multiple
-named cases and compare them over time.
-
-Supported Sources
------------------
-
-``PinchProblem`` accepts these load shapes:
-
-- ``TargetInput`` or plain mappings
-- JSON files
-- Excel files such as ``.xlsx`` and ``.xlsb``
-- a directory with ``streams.csv`` and ``utilities.csv``
-- a ``(streams_csv, utilities_csv)`` tuple
-- a packaged sample-case name such as ``basic_pinch.json`` when no local file
-  with that name exists
+:class:`OpenPinch.PinchProblem` is the canonical stateful workflow for one
+process-engineering case.
 
 Lifecycle
 ---------
 
-The typical lifecycle is:
+``prepared``
+   Construction or ``load(...)`` validates and prepares streams, utilities,
+   zones, periods, and configuration.
 
-1. construct the wrapper with a project name or input source
-2. call :meth:`load` or pass the source at construction time
-3. call :meth:`validate` if you want a preflight check
-4. call :meth:`target`
-5. inspect summaries, graphs, exports, period-specific reruns, or the prepared
-   ``master_zone``
+``targeted``
+   A descriptive ``target`` method stores the latest result. All-period methods
+   additionally populate the ordered ``period_results`` cache.
 
-When the source is a bare ``*.json`` filename and no local file exists,
-``PinchProblem`` also resolves packaged sample cases such as
-``basic_pinch.json`` or ``crude_preheat_train.json`` directly.
+``designed``
+   A descriptive ``design`` method returns a HEN design view with ranked
+   network selection and grid rendering.
 
-Core Workflow Members
----------------------
+``invalidated``
+   Loading new input, changing stored options, changing ``dt_cont``, or mutating
+   a process component clears results that no longer describe the prepared
+   problem.
 
-The main user-facing workflow members are ``load()``, ``validate()``,
-``target()``, ``summary_frame()``, ``export_excel()``, ``compare_to()``,
-``set_dt_cont_multiplier()``, ``update_options()``, ``target_all_periods()``,
-and ``show_dashboard()``.
-
-Period Workflows
+Interaction Matrix
 ------------------
 
-When the prepared data contains multiple periods, the main period surfaces are:
+.. list-table::
+   :header-rows: 1
+   :widths: 24 27 18 18 13
 
-- ``period_ids`` for the canonical ``period_id -> idx`` mapping
-- named ``problem.target.*(..., period_id="peak")`` reruns
-- ``target_all_periods(parallel=False | True | "thread" | "process")`` for
-  batch solves across every canonical period
+   * - Surface
+     - Purpose
+     - Return
+     - State effect
+     - Dependency
+   * - ``load``, ``validate``, ``validation_report``, ``to_problem_json``
+     - Prepare, check, and serialize input
+     - zone, report, or mapping
+     - prepare or observe
+     - base
+   * - ``target.direct_heat_integration``, ``indirect_heat_integration``,
+       ``total_site_heat_integration``, ``all_heat_integration``
+     - Core Pinch and Total Site analysis
+     - target output
+     - targeted
+     - base
+   * - ``target.heat_exchanger_area_and_cost``, ``exergy``,
+       ``energy_transfer``
+     - Enrich a thermal target
+     - target output
+     - targeted
+     - base
+   * - ``target.carnot_*``, ``vapour_compression_*``, ``brayton_*``,
+       ``mvr_heat_pump``
+     - Model-specific HPR studies
+     - target output
+     - targeted
+     - HPR extras by model
+   * - ``target.cogeneration`` and named turbine-model methods
+     - Cogeneration screening
+     - target output
+     - targeted
+     - base
+   * - ``target.all_periods.*``
+     - Mirror supported targeting over ordered periods
+     - period-to-output mapping
+     - period cache
+     - method-specific
+   * - ``components.add_process_mvr``, ``components.inventory``
+     - Add or inspect process MVR mutations
+     - component or mapping
+     - invalidates on mutation
+     - HPR extras
+   * - ``design.*heat_exchanger_network``, ``open_hens``, ``pinch_design``,
+       ``thermal_derivative``, ``network_evolution``
+     - HEN synthesis and improvement
+     - design view
+     - designed
+     - HEN solver
+   * - ``summary_frame``, ``metrics``, ``report`` and state properties
+     - Inspect prepared or cached state
+     - dataframe, mapping, report, or record
+     - none
+     - base
+   * - ``plot.catalog``, ``plot.data``, and named plot methods
+     - Inspect cached graph data or build a figure
+     - catalog, mapping, or figure
+     - none
+     - plotting
+   * - ``plot.export``, ``plot.export_gallery``, ``export_excel``,
+       ``show_dashboard``
+     - Explicit publication side effects
+     - paths or dashboard handle
+     - none
+     - output-specific
 
-Period selection happens at targeting time, not at load time. The cached result,
-summary frame, export surface, and graph data then reflect the selected
-state.
+Argument Precedence
+-------------------
 
-Advanced Entry Points
----------------------
+Effective arguments resolve as ``named keyword > options > stored config >
+default``. Named keywords and ``options`` apply only to that call. Use
+``update_options(...)`` when a later call should inherit a persistent
+engineering value. Configuration never stores which target or design method to
+run.
 
-Two descriptor families make ``PinchProblem`` broader than a simple wrapper:
+Process MVR Component Results
+-----------------------------
 
-``problem.plot``
-   Builds Plotly figures for composite curves, grand composite curves, net-load
-   profiles, exergetic post-processing graphs, and related graph families from
-   the cached solved state.
+``components.add_process_mvr(...)`` returns the component it created. Use
+engineering argument names such as ``compressor_efficiency`` and
+``motor_efficiency``. The returned object exposes ``active``, ``activate()``,
+``deactivate()``, ``original_streams``, ``replacement_streams``,
+``stage_results_by_period``, ``affected_zone_paths``, and ``work_for_zone()``.
+Changing component activity invalidates cached targets, so rerun the chosen
+target method afterward.
 
-``problem.target``
-   Re-runs targeted advanced routines such as direct and indirect heat pump,
-   refrigeration, exergy enrichment, cogeneration, or area/cost targeting
-   against the prepared zone hierarchy. Named target workflows also accept
-   ``period_id=...`` when input data carries multiperiod values, and the
-   refreshed summary/export surfaces then expose that selected period on the
-   result rows.
+Complete API
+------------
 
-Named target methods also accept ``zone_name=...`` and
-``include_subzones=True`` when you want one zone-level or subtree-level rerun
-instead of the default root-case solve.
-
-``problem.target.exergy(...)`` is intentionally a post-processing accessor: it
-enriches one existing compatible target family instead of solving a new target
-family of its own.
-
-``problem.add_component``
-   Mutates the prepared process model with memory-only process components
-   before rerunning targets. The current internal component surface is
-   ``problem.add_component.process_mvr(...)`` for direct gas/vapour MVR. It
-   deactivates selected original hot streams, activates generated replacement
-   streams, and carries the process-component work into later summaries.
-
-Those accessors are the high-level path into the package's deeper analytical
-power without dropping all the way to the raw service modules.
-
-Output and Inspection Surfaces
-------------------------------
-
-After solving, the main read and export surfaces are:
-
-- ``summary_frame()`` for compact or detailed pandas views
-- ``problem.plot.catalog()`` for the available graph inventory
-- ``problem.plot.*`` for Plotly figures and raw graph data
-- ``problem.plot.export(...)`` for standalone HTML graph files
-- ``export_excel(...)`` for workbook output
-- ``show_dashboard()`` for the Streamlit-based review surface
-
-PinchProblem API
-----------------
-
-.. autoclass:: OpenPinch.application.problem.PinchProblem
+.. autoclass:: OpenPinch.PinchProblem
    :members:
-   :no-index:
+   :undoc-members:
 
-Heat Pump Integration Comparison
---------------------------------
-
-Older examples sometimes refer to broader helper-backed HPR comparison flows.
-The current object surface instead exposes the explicit advanced HPR routines
-on ``problem.target.*``, described above and in :doc:`service-layer`.
-
-Relationship To Lower Layers
-----------------------------
-
-``PinchProblem`` is a wrapper, not a separate solver. Under the hood it still
-validates the input data, prepares a :class:`~OpenPinch.domain.zone.Zone` tree,
-runs the same targeting services documented in :doc:`service-layer`, and then
-packages the outputs for summaries, graphs, and export.
-
-If you need to mutate the prepared zone tree directly, inspect stream objects,
-or run only one analysis stage, move down to :doc:`service-layer` and
-:doc:`domain-model`.
+The operation-level inventory and tutorial owner for every member is published
+in :doc:`../examples/tutorial-coverage-map`.

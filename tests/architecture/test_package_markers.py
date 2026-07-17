@@ -112,7 +112,6 @@ def guarded_import(name, *args, **kwargs):
     return real_import(name, *args, **kwargs)
 builtins.__import__ = guarded_import
 import OpenPinch
-import OpenPinch.main
 import OpenPinch.contracts.input
 import OpenPinch.contracts.synthesis.common
 import OpenPinch.contracts.synthesis.topology

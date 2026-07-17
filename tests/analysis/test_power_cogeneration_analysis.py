@@ -24,18 +24,20 @@ def _make_zone_config(
     mech_eff: float = 0.9,
     is_high_p_cond_flash: bool = False,
 ):
-    return Configuration(
+    config = Configuration(
         options={
             "POWER_TURB_P_IN": 20.0,
             "POWER_TURB_T_IN": 300.0,
             "POWER_MIN_EFF": 0.5,
-            "POWER_TURB_MODEL": model,
             "POWER_LOAD_FRACTION": load,
             "POWER_ETA_MECH": mech_eff,
             "POWER_HIGH_P_COND_FLASH_ENABLED": is_high_p_cond_flash,
             "ENV_TEMPERATURE": 15.0,
         }
     )
+    config._values["POWER_TURB_MODEL"] = model
+    config._build_groups(config._values)
+    return config
 
 
 def _make_zone(config: Configuration, utilities: StreamCollection | None = None):

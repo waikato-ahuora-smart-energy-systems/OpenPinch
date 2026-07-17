@@ -7,7 +7,7 @@ Unreleased
 0.5.0 architecture clean break
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- ``OpenPinch.main.pinch_analysis_service`` remains the strict
+- ``PinchProblem`` remains the strict
   mapping-in/result-out contract. Its signature, validation order, return
   structure, serialization, ordering, exceptions, and numerical behaviour are
   unchanged.
@@ -82,7 +82,7 @@ Private helper ownership
 - Runtime stream-segment, exchanger-period, and exchanger-area-slice record
   classes are parent-owned implementation details. Construct them through
   ``Stream`` and ``HeatExchanger`` mappings. The equivalent segment wire shape
-  remains accepted through ``pinch_analysis_service(...)``; direct schema
+  remains accepted through ``PinchProblem(...)``; direct schema
   imports are not compatibility-protected.
 - The former public record imports and their Python pickle paths are removed
   without aliases or compatibility shims.

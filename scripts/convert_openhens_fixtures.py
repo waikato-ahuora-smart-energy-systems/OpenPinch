@@ -16,10 +16,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from OpenPinch import PinchProblem
 from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
     problem_to_solver_arrays,
 )
-from OpenPinch.application.problem import PinchProblem
 
 CASE_IDS = (
     "Four-stream-Escobar-and-Trierweiler-2013-1",
@@ -254,11 +254,6 @@ def convert_case_to_target_input(
             "HENS_SOLVER_OPTIONS_EVM": {},
             "HENS_LOG_LEVEL": "WARNING",
             "HENS_MAX_PARALLEL": 10,
-            "HENS_METHOD_SEQUENCE": [
-                "pinch_design_method",
-                "thermal_derivative_method",
-                "network_evolution_method",
-            ],
             "HENS_OUTPUT_FOLDER": (
                 output_folder
                 if output_folder is not None

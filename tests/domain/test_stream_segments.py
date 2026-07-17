@@ -636,7 +636,7 @@ def test_workspace_bundle_and_case_copy_preserve_nested_segment_order(tmp_path):
         "utilities": [],
     }
     workspace = PinchWorkspace(payload, project_name="Site")
-    workspace.copy_case(source_name="baseline", new_name="copied", activate=False)
+    workspace.scenario("copied", base="baseline", activate=False)
 
     restored = PinchWorkspace.load_bundle(
         workspace.save_bundle(tmp_path / "segmented-workspace.json")

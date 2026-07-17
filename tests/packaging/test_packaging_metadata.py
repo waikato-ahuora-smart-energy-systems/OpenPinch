@@ -296,14 +296,14 @@ def test_pr_version_bump_waits_for_validation():
     assert "surface: [core, dashboard, notebook, brayton_cycle, synthesis]" in workflow
 
 
-def test_installed_wheel_smoke_protects_only_the_main_python_contract():
+def test_installed_wheel_smoke_uses_only_the_root_workflow_contract():
     smoke = (REPO_ROOT / "scripts" / "artifact_install_smoke.py").read_text(
         encoding="utf-8"
     )
 
-    assert "from OpenPinch.main import pinch_analysis_service" in smoke
-    assert "Installed wheel failed the protected main contract" in smoke
-    assert "Root package exposes unsupported aliases" in smoke
+    assert "from OpenPinch import PinchProblem, PinchWorkspace" in smoke
+    assert "Installed wheel failed the PinchProblem workflow" in smoke
+    assert "Unexpected root exports" in smoke
     assert "Installed wheel contains retired packages" in smoke
 
 

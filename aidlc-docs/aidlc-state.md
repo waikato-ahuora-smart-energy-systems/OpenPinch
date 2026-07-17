@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: CONSTRUCTION - Package Architecture Modernization Generated Code Review
+- **Current Stage**: CONSTRUCTION - Package Usability Refactor complete; Operations N/A
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -133,6 +133,38 @@
   Code Generation Part 1 is complete; PR 1 Domain and Input Correctness is the
   active unit. The execution checklist is
   `aidlc-docs/construction/plans/pre-release-corrective-code-generation-plan.md`.
+
+## Package Usability Refactor Progress
+
+- [x] INCEPTION - Workspace Detection and continuity
+- [x] INCEPTION - Requirements Analysis
+- [x] INCEPTION - User Stories
+- [x] INCEPTION - Workflow Planning
+- [x] INCEPTION - Application Design
+- [x] INCEPTION - Units Generation
+- [x] CONSTRUCTION - Unit 1 Contract and Correctness Foundation
+- [x] CONSTRUCTION - Unit 2 PinchProblem Targeting Workflow
+- [x] CONSTRUCTION - Unit 3 Component, Design, Plot, and Workspace Workflows
+- [x] CONSTRUCTION - Unit 4 Tutorial Templates
+- [x] CONSTRUCTION - Unit 5 RTD Coverage and Documentation
+- [x] CONSTRUCTION - Build and Test
+- [x] OPERATIONS - N/A; no deployment work requested
+- **Approval mode**: The user explicitly approved every remaining standardized
+  workflow gate through task completion.
+- **Compatibility policy**: Clean break; no aliases for retired public workflow
+  names or string selectors.
+- **Extension configuration**: Security disabled; Resiliency disabled; partial
+  Property-Based Testing enabled and blocking where applicable.
+- **Unit 1 evidence**: 16 focused tests passed with seed `20260715`; Ruff lint,
+  Ruff format, and patch-hygiene checks passed.
+- **Completion revalidation**: The post-completion audit expanded the exact
+  tutorial denominator from 129 to 186 live operations, including constructors,
+  returned Process MVR behavior, and ordered batch target/design/report/export
+  surfaces. All 18 notebooks now have process-engineer study questions,
+  interpretation, and adaptation guidance. All four notebook execution
+  profiles pass. The complete non-solver suite passes 2,084 tests with 3
+  opt-in-profile skips and 4 external-solver deselections; Ruff, architecture,
+  offline warning-as-error Sphinx, and stale-symbol checks pass.
 
 ## Private Helper Reorganization Progress
 
@@ -514,15 +546,26 @@
 - [x] INCEPTION - Comprehensive Requirements Analysis.
 - [x] INCEPTION - User Stories assessment, personas, and acceptance stories.
 - [x] INCEPTION - Workflow Planning and five-unit decomposition.
-- [ ] INCEPTION - Plan approval.
-- [ ] INCEPTION - Application Design for canonical target, workspace, and HEN
+- [x] INCEPTION - Plan approval.
+- [x] INCEPTION - Application Design for canonical target, workspace, and HEN
   application-view contracts.
-- [ ] INCEPTION - Units Generation approval.
-- [ ] CONSTRUCTION - Functional Design and Code Generation per approved unit.
-- [ ] CONSTRUCTION - Build and Test.
-- [ ] OPERATIONS - N/A; no deployment work requested.
-- **Current stage**: INCEPTION - Workflow Planning complete; awaiting explicit
-  plan approval. Targeting selection now belongs to explicit
+- [x] INCEPTION - Units Generation approval.
+- [x] CONSTRUCTION - Units 1-4 Functional Design and Code Generation.
+- [x] CONSTRUCTION - Unit 5 RTD coverage and executable quality gates.
+- [x] CONSTRUCTION - Build and Test.
+- [x] OPERATIONS - N/A; no deployment work requested.
+- **Current stage**: Package Usability Refactor complete; generated code,
+  tutorials, RTD coverage, and build-and-test evidence are ready for review.
+  The user explicitly approved every remaining AI-DLC gate through task
+  completion. Completion prompts and approval decisions will still be logged,
+  but they no longer pause execution. The five units are
+  dependency ordered as contract/correctness, problem targeting/configuration,
+  components/design/workspace/presentation, tutorials, and documentation/
+  executable quality gates. The package-usability plan is
+  represented by a two-class facade, application-owned workflow accessors,
+  mirrored workspace batch operations, an effective-argument resolver, strict
+  execution-versus-observation state rules, and a tutorial/RTD manifest
+  boundary. Targeting selection belongs to explicit
   `PinchProblem.target.*` methods. The plan uses `all_heat_integration()` for
   bulk direct-plus-Total-Site traversal, retains focused direct and indirect
   heat-integration methods, and removes all `TARGETING_*_ENABLED` selectors.

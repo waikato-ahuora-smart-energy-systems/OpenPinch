@@ -538,7 +538,7 @@ class HeatExchangerNetworkSchema(BaseModel):
 
 
 class TargetInput(BaseModel):
-    """Validated top-level input data for ``pinch_analysis_service``."""
+    """Validated top-level input data for :class:`PinchProblem`."""
 
     streams: List[StreamSchema]
     utilities: List[UtilitySchema] = Field(default_factory=list)

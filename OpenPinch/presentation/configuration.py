@@ -7,7 +7,7 @@ from typing import Any
 
 from ..contracts.workspace import ConfigurationFieldMetadata
 from ..domain.configuration_fields import (
-    CONFIG_FIELD_SPECS,
+    USER_CONFIG_FIELD_SPECS,
     configuration_field_support_level,
 )
 
@@ -20,7 +20,7 @@ def configuration_options() -> list[ConfigurationFieldMetadata]:
 def configuration_field_metadata() -> list[ConfigurationFieldMetadata]:
     """Return declarative metadata for editable configuration fields."""
     fields = []
-    for name, spec in CONFIG_FIELD_SPECS.items():
+    for name, spec in USER_CONFIG_FIELD_SPECS.items():
         enum_cls = spec.enum_cls
         field_type, multiple = annotation_metadata(spec.annotation, enum_cls=enum_cls)
         fields.append(

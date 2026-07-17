@@ -15,10 +15,10 @@ Where To Start
 Repository developers can begin with the parent-owned internal surfaces
 documented in :doc:`api-core`:
 
-- ``problem.target.direct_heat_pump(...)``
-- ``problem.target.indirect_heat_pump(...)``
-- ``problem.target.direct_refrigeration(...)``
-- ``problem.target.indirect_refrigeration(...)``
+- ``problem.target.carnot_heat_pump(...)``
+- ``problem.target.carnot_heat_pump(...)``
+- ``problem.target.carnot_refrigeration(...)``
+- ``problem.target.carnot_refrigeration(...)``
 
 The modules on this page are the lower-level implementation layers behind
 those helpers.

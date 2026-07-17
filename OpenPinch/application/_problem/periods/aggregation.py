@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -13,7 +14,6 @@ from ....contracts.report_units import split_report_value
 from ....contracts.reporting import HeatUtility, PinchTemp, TargetResults
 from ....domain._stream.value_state import resolve_period_weights
 from ....domain.value import Value
-from ..targeting.plan import _TargetRunSpec
 
 if TYPE_CHECKING:
     from ...problem import PinchProblem
@@ -22,6 +22,16 @@ WEIGHTED_AVERAGE_PERIOD_ID = "weighted_average"
 SUMMARY_PERIOD_MODES = frozenset(
     {"selected", "all", "weighted_average", "all_with_weighted_average"}
 )
+
+
+@dataclass(frozen=True)
+class _TargetRunSpec:
+    """Immutable targeting intent used for explicit period replay."""
+
+    surface: str
+    options: dict[str, object]
+    zone_name: str | None = None
+    include_subzones: bool = False
 
 
 def record_target_run(
@@ -44,11 +54,13 @@ def record_target_run(
 
 
 def target_run_spec_for_summary(problem: "PinchProblem") -> _TargetRunSpec:
-    """Return recorded targeting intent or the default target surface."""
-    return problem._last_target_run_spec or _TargetRunSpec(
-        surface="default",
-        options={},
-    )
+    """Return recorded explicit targeting intent for report replay."""
+    if problem._last_target_run_spec is None:
+        raise RuntimeError(
+            "No target analysis is available. Run a problem.target.<method>() "
+            "workflow before requesting multi-period summaries."
+        )
+    return problem._last_target_run_spec
 
 
 def period_options_for_replay(
@@ -99,10 +111,6 @@ def target_output_for_recorded_period(
 ) -> TargetOutput:
     """Replay one recorded targeting surface for a selected period."""
     runtime_options = period_options_for_replay(spec, period_id=period_id)
-    if spec.surface == "default":
-        result = problem.target(options=runtime_options)
-        return TargetOutput.model_validate(result.model_dump(mode="python"))
-
     target_method = getattr(problem.target, spec.surface)
     target_method(
         zone_name=spec.zone_name,
@@ -133,22 +141,26 @@ def summary_results(
     problem: "PinchProblem",
     *,
     periods: str,
-    solve: bool = True,
-) -> TargetOutput | None:
-    """Resolve selected, all-period, or weighted report results."""
+) -> TargetOutput:
+    """Resolve existing selected or explicitly generated all-period results."""
     if periods not in SUMMARY_PERIOD_MODES:
         raise ValueError(
             "periods must be one of: " + ", ".join(sorted(SUMMARY_PERIOD_MODES)) + "."
         )
     if periods == "selected":
-        results = problem._results
-        if results is None and solve:
-            results = problem.target()
-        return results
-    if not solve:
-        return None
+        if problem._results is None:
+            raise RuntimeError(
+                "No target analysis is available. Run a problem.target.<method>() "
+                "workflow before requesting results."
+            )
+        return problem._results
 
-    outputs = target_outputs_for_recorded_periods(problem)
+    outputs = list(problem._period_results.values())
+    if not outputs:
+        raise RuntimeError(
+            "No all-period analysis is available. Run the matching "
+            "problem.target.all_periods.<method>() workflow first."
+        )
     weights = period_weights_for_summary(problem)
     return output_for_period_mode(outputs, weights, periods=periods)
 
@@ -315,8 +327,18 @@ def _weighted_average_target(
             getattr(target, field, None) for target in targets
         )
     data["pinch_temp"] = PinchTemp(
-        cold_temp=_weighted_report_value(targets, "pinch_temp.cold_temp", weights),
-        hot_temp=_weighted_report_value(targets, "pinch_temp.hot_temp", weights),
+        cold_temp=_weighted_report_value(
+            targets,
+            "pinch_temp.cold_temp",
+            weights,
+            allow_partial_missing=True,
+        ),
+        hot_temp=_weighted_report_value(
+            targets,
+            "pinch_temp.hot_temp",
+            weights,
+            allow_partial_missing=True,
+        ),
     )
     data["hot_utilities"] = _weighted_utilities(targets, "hot_utilities", weights)
     data["cold_utilities"] = _weighted_utilities(targets, "cold_utilities", weights)
@@ -327,6 +349,8 @@ def _weighted_report_value(
     targets: Sequence[TargetResults],
     attr_path: str,
     weights: np.ndarray,
+    *,
+    allow_partial_missing: bool = False,
 ) -> Value | float | None:
     values = []
     unit = None
@@ -353,6 +377,8 @@ def _weighted_report_value(
     if missing == len(targets):
         return None
     if missing:
+        if allow_partial_missing:
+            return None
         raise ValueError(f"Cannot aggregate partially missing field {attr_path!r}.")
     weighted = _weighted_average(values, weights)
     return Value(weighted, unit) if unit is not None else weighted

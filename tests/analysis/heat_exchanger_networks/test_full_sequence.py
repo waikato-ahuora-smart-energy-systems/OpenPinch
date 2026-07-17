@@ -649,15 +649,15 @@ def test_direct_design_run_populates_results_cache_and_preserves_targets(
 ) -> None:
     _use_fake_default_executor(monkeypatch)
     problem = _small_problem()
-    target_output = problem.target()
+    target_output = problem.target.all_heat_integration()
 
-    design = problem.design.heat_exchanger_network_synthesis()
+    design = problem.design.heat_exchanger_network()
 
     assert problem.results is not None
     assert problem._results is problem.results
-    assert problem.results.design == design
+    assert problem.results.design == design.result
     assert problem.results.targets == target_output.targets
-    assert design.network.exchangers
+    assert design.selected_network.exchangers
     assert design.objective_values["total_annual_cost"] > 0
     assert design.design_method == HENDesignMethod.OpenHENS
     assert design.manifest is not None
@@ -672,7 +672,7 @@ def test_open_hens_method_accessor_runs_original_tier_one(monkeypatch) -> None:
         configured_problem.master_zone.config.hens.synthesis_quality_tier
     )
 
-    design = configured_problem.design.open_hens_method()
+    design = configured_problem.design.open_hens()
 
     assert design.design_method == HENDesignMethod.OpenHENS
     assert design.manifest is not None
@@ -689,10 +689,8 @@ def test_default_dispatch_is_fast_tier_zero_and_explicit_openhens_is_tier_one(
     default_problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 4})
     explicit_problem = _small_problem()
 
-    default_design = default_problem.design.heat_exchanger_network_synthesis()
-    explicit_design = explicit_problem.design.heat_exchanger_network_synthesis(
-        method=HENDesignMethod.OpenHENS,
-    )
+    default_design = default_problem.design.heat_exchanger_network()
+    explicit_design = explicit_problem.design.open_hens()
 
     assert default_design.design_method == HENDesignMethod.OpenHENS
     assert explicit_design.design_method == HENDesignMethod.OpenHENS
@@ -711,8 +709,8 @@ def test_enhanced_synthesis_method_runs_requested_quality_tier(monkeypatch) -> N
         explicit_problem.master_zone.config.hens.synthesis_quality_tier
     )
 
-    default_design = default_problem.design.enhanced_synthesis_method()
-    explicit_design = explicit_problem.design.enhanced_synthesis_method(
+    default_design = default_problem.design.enhanced_heat_exchanger_network()
+    explicit_design = explicit_problem.design.enhanced_heat_exchanger_network(
         quality_tier=3,
     )
 
@@ -736,7 +734,7 @@ def test_enhanced_synthesis_method_rejects_out_of_range_quality_tier(
     problem = _small_problem()
 
     with pytest.raises(ValueError, match="quality_tier"):
-        problem.design.enhanced_synthesis_method(quality_tier=quality_tier)
+        problem.design.enhanced_heat_exchanger_network(quality_tier=quality_tier)
 
 
 @pytest.mark.parametrize("quality_tier", [1.5, "2", True])
@@ -748,7 +746,7 @@ def test_enhanced_synthesis_method_rejects_non_integer_quality_tier(
     problem = _small_problem()
 
     with pytest.raises(TypeError, match="quality_tier"):
-        problem.design.enhanced_synthesis_method(quality_tier=quality_tier)  # type: ignore[arg-type]
+        problem.design.enhanced_heat_exchanger_network(quality_tier=quality_tier)  # type: ignore[arg-type]
 
 
 @pytest.mark.synthesis
@@ -837,11 +835,11 @@ def test_direct_design_run_computes_targets_when_cache_is_empty(monkeypatch) -> 
     _use_fake_default_executor(monkeypatch)
     problem = _small_problem()
 
-    design = problem.design.heat_exchanger_network_synthesis()
+    design = problem.design.heat_exchanger_network()
 
     assert problem.results is not None
     assert problem.results.targets
-    assert problem.results.design == design
+    assert problem.results.design == design.result
 
 
 def test_explicit_pdm_tdm_and_evolution_design_methods_share_result_shape(
@@ -850,15 +848,15 @@ def test_explicit_pdm_tdm_and_evolution_design_methods_share_result_shape(
     _use_fake_default_executor(monkeypatch)
     problem = _small_problem()
 
-    pdm = problem.design.pinch_design_method()
-    tdm = problem.design.thermal_derivative_method()
-    evolution = problem.design.network_evolution_method((tdm.network,))
+    pdm = problem.design.pinch_design()
+    tdm = problem.design.thermal_derivative()
+    evolution = problem.design.network_evolution((tdm.selected_network,))
 
     assert pdm.method == "pinch_design_method"
     assert tdm.method == "thermal_derivative_method"
     assert evolution.method == "network_evolution_method"
     assert problem.results is not None
-    assert problem.results.design == evolution
+    assert problem.results.design == evolution.result
     assert all(outcome.network is not None for outcome in pdm.ranked_networks)
     assert all(outcome.network is not None for outcome in tdm.ranked_networks)
     assert all(outcome.network is not None for outcome in evolution.ranked_networks)
@@ -870,22 +868,15 @@ def test_explicit_pdm_tdm_and_evolution_design_methods_share_result_shape(
     }
 
 
-def test_umbrella_design_accessor_dispatches_each_hen_design_method(
+def test_named_design_accessor_dispatches_each_hen_design_method(
     monkeypatch,
 ) -> None:
     _use_fake_default_executor(monkeypatch)
     problem = _small_problem()
 
-    pdm = problem.design.heat_exchanger_network_synthesis(
-        method=HENDesignMethod.PinchDesign,
-    )
-    tdm = problem.design.heat_exchanger_network_synthesis(
-        method=HENDesignMethod.ThermalDerivative,
-    )
-    evolution = problem.design.heat_exchanger_network_synthesis(
-        method=HENDesignMethod.NetworkEvolution,
-        initial_networks=(tdm.network,),
-    )
+    pdm = problem.design.pinch_design()
+    tdm = problem.design.thermal_derivative()
+    evolution = problem.design.network_evolution((tdm.selected_network,))
 
     assert pdm.design_method == HENDesignMethod.PinchDesign
     assert pdm.method == "pinch_design_method"
@@ -895,29 +886,21 @@ def test_umbrella_design_accessor_dispatches_each_hen_design_method(
     assert evolution.method == "network_evolution_method"
 
 
-def test_umbrella_design_accessor_rejects_invalid_method_and_invalid_seed(
+def test_design_accessor_rejects_retired_selector_and_invalid_seed_shapes(
     monkeypatch,
 ) -> None:
     _use_fake_default_executor(monkeypatch)
     problem = _small_problem()
-    seed = problem.design.pinch_design_method().network
+    seed = problem.design.pinch_design().selected_network
 
-    with pytest.raises(
-        ValueError, match="Unknown heat exchanger network design method"
-    ):
-        problem.design.heat_exchanger_network_synthesis(method="not_a_method")
+    with pytest.raises(TypeError, match="unexpected keyword argument 'method'"):
+        problem.design.heat_exchanger_network(method="not_a_method")
 
-    with pytest.raises(ValueError, match="open_hens_method does not accept"):
-        problem.design.heat_exchanger_network_synthesis(
-            method=HENDesignMethod.OpenHENS,
-            initial_networks=(seed,),
-        )
+    with pytest.raises(TypeError, match="unexpected keyword argument"):
+        problem.design.open_hens(initial_networks=(seed,))
 
-    with pytest.raises(ValueError, match="pinch_design_method does not accept"):
-        problem.design.heat_exchanger_network_synthesis(
-            method=HENDesignMethod.PinchDesign,
-            initial_networks=(seed,),
-        )
+    with pytest.raises(TypeError, match="unexpected keyword argument"):
+        problem.design.pinch_design(initial_networks=(seed,))
 
 
 def test_seeded_design_methods_require_seed_or_cached_design(monkeypatch) -> None:
@@ -925,10 +908,10 @@ def test_seeded_design_methods_require_seed_or_cached_design(monkeypatch) -> Non
     problem = _small_problem()
 
     with pytest.raises(ValueError, match="initial_networks"):
-        problem.design.thermal_derivative_method()
+        problem.design.thermal_derivative()
 
     with pytest.raises(ValueError, match="initial_networks"):
-        problem.design.network_evolution_method()
+        problem.design.network_evolution()
 
 
 def test_direct_design_run_reports_absolute_temperatures_in_kelvin(
@@ -942,10 +925,10 @@ def test_direct_design_run_reports_absolute_temperatures_in_kelvin(
             record[field]["unit"] = "degC"
     problem = PinchProblem(source=payload, project_name="HENS Celsius Demo")
 
-    design = problem.design.heat_exchanger_network_synthesis()
+    design = problem.design.heat_exchanger_network()
     recovery = next(
         exchanger
-        for exchanger in design.network.exchangers
+        for exchanger in design.selected_network.exchangers
         if exchanger.kind is HeatExchangerKind.RECOVERY
     )
 
@@ -953,7 +936,9 @@ def test_direct_design_run_reports_absolute_temperatures_in_kelvin(
     assert recovery.state().source_outlet_temperature > 273.15
     assert recovery.state().sink_inlet_temperature == pytest.approx(410.0)
     assert recovery.state().sink_outlet_temperature > 273.15
-    assert design.network.summary_metrics["approach_temperature"] == pytest.approx(2.0)
+    assert design.selected_network.summary_metrics[
+        "approach_temperature"
+    ] == pytest.approx(2.0)
 
 
 def test_workspace_design_workflow_dispatches_to_live_problem_design_path(
@@ -962,17 +947,12 @@ def test_workspace_design_workflow_dispatches_to_live_problem_design_path(
     _use_fake_default_executor(monkeypatch)
     workspace = PinchWorkspace(_small_payload(), project_name="HENS Demo")
 
-    view = workspace.solve_variant(
-        "baseline",
-        workflow="heat_exchanger_network_synthesis",
-    )
+    design = workspace.design.heat_exchanger_network()
     problem = workspace.case("baseline")
 
-    assert view.status == "solved"
-    assert view.support_level == "advanced"
+    assert design.selected_network.exchangers
     assert problem.results is not None
     assert problem.results.design is not None
-    assert problem.results.design.workspace_variant == "baseline"
     assert problem.results.design.problem_id == problem.project_name
     assert not hasattr(problem.target, "heat_exchanger_network_synthesis")
 
@@ -983,7 +963,7 @@ def test_optional_exports_round_trip_from_problem_results(
 ) -> None:
     _use_fake_default_executor(monkeypatch)
     problem = _small_problem(project_name="Export Demo")
-    problem.design.heat_exchanger_network_synthesis(workspace_variant="variant-a")
+    problem.design.heat_exchanger_network()
 
     manifest = export_heat_exchanger_network_synthesis_results(
         problem,
@@ -1161,11 +1141,6 @@ def _single_state_no_sweep_payload() -> dict:
             "HENS_DERIVATIVE_THRESHOLDS": [0.5],
             "HENS_LOG_LEVEL": "WARNING",
             "HENS_MAX_PARALLEL": 1,
-            "HENS_METHOD_SEQUENCE": [
-                "pinch_design_method",
-                "thermal_derivative_method",
-                "network_evolution_method",
-            ],
             "HENS_OUTPUT_FORMATS": [],
             "HENS_RUN_ID": "single-state-no-sweep",
             "HENS_SOLVER_EVM": "ipopt-pyomo",
@@ -1194,7 +1169,7 @@ def _run_single_candidate_open_hens(
     *,
     approach_temperature: float = 14.0,
 ):
-    problem.target()
+    problem.target.direct_heat_integration()
     settings = workflow_settings_from_problem(problem)
     assert settings.approach_temperatures == (approach_temperature,)
     assert settings.derivative_thresholds == (0.5,)

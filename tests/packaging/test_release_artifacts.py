@@ -53,7 +53,7 @@ def _assert_common_release_boundary(names: list[str], *, root_prefix: str = "") 
     prefix = f"{root_prefix}/" if root_prefix else ""
 
     assert f"{prefix}OpenPinch/__init__.py" in names
-    assert f"{prefix}OpenPinch/main.py" in names
+    assert f"{prefix}OpenPinch/main.py" not in names
     assert f"{prefix}__init__.py" not in names
 
     required_owner_files = [
@@ -105,7 +105,14 @@ def _assert_common_release_boundary(names: list[str], *, root_prefix: str = "") 
         for name in names
     )
     assert any(
-        name.endswith("OpenPinch/data/notebooks/01_first_solve_summary_graphs.ipynb")
+        name.endswith("OpenPinch/data/notebooks/01_first_solve_and_core_curves.ipynb")
+        for name in names
+    )
+    assert any(
+        name.endswith("OpenPinch/data/sample_cases/process_mvr.json") for name in names
+    )
+    assert any(
+        name.endswith("OpenPinch/data/notebooks/11_process_mvr_and_cascade.ipynb")
         for name in names
     )
 

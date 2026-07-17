@@ -22,7 +22,6 @@ BLOCKED_OPTIONAL_PACKAGES = {
 }
 IMPORT_CASES = {
     "root-workflows": ("OpenPinch",),
-    "main-contract": ("OpenPinch.main",),
     "contracts": (
         "OpenPinch.contracts.input",
         "OpenPinch.contracts.output",

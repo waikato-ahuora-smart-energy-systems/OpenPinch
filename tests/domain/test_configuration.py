@@ -123,8 +123,7 @@ def test_configuration_rejects_removed_condensate_alias():
 def test_configuration_option_status_classifies_runtime_roles():
     assert configuration_option_status("THERMAL_DT_CONT").runtime_status == "supported"
     assert (
-        configuration_option_status("TARGETING_EXERGY_ENABLED").runtime_status
-        == "experimental"
+        configuration_option_status("TARGETING_EXERGY_ENABLED").runtime_status == "dead"
     )
     assert configuration_option_status("HP_CONDESATE").runtime_status == "dead"
     assert configuration_option_status("PROP_TOP_0").runtime_status == "dead"
@@ -136,7 +135,7 @@ def test_zone_and_target_enum_str_methods():
     assert str(TT.DI) == TT.DI.value
 
 
-def test_configuration_accepts_current_hpr_names_and_rejects_invalid_names():
+def test_hpr_cycle_enum_remains_internal_and_configuration_rejects_selectors():
     assert [cycle.name for cycle in HPRcycle] == [
         "CascadeCarnot",
         "ParallelCarnot",
@@ -153,21 +152,11 @@ def test_configuration_accepts_current_hpr_names_and_rejects_invalid_names():
         "Parallel vapour compression cycles",
         "Vapour compression with MVR cascade",
     ]
-    assert (
-        Configuration(options={"HPR_TYPE": HPRcycle.CascadeCarnot.value}).hpr.type
-        == HPRcycle.CascadeCarnot.value
-    )
-    assert (
-        Configuration(options={"HPR_TYPE": HPRcycle.ParallelCarnot.value}).hpr.type
-        == HPRcycle.ParallelCarnot.value
-    )
-    assert (
-        Configuration(options={"HPR_TYPE": HPRcycle.ParallelVapourComp.value}).hpr.type
-        == HPRcycle.ParallelVapourComp.value
-    )
-
-    with pytest.raises(ValueError, match="Invalid value"):
-        Configuration(options={"HPR_TYPE": "Not a real HPR cycle"})
+    assert Configuration().hpr.type == HPRcycle.CascadeCarnot.value
+    with pytest.raises(ValueError, match="Unknown configuration option"):
+        Configuration(options={"HPR_TYPE": HPRcycle.ParallelCarnot.value})
+    with pytest.raises(ValueError, match="Unknown configuration option"):
+        Configuration(options={"POWER_TURB_MODEL": "Sun-Smith"})
 
 
 @pytest.mark.parametrize(
@@ -198,7 +187,6 @@ def test_configuration_builds_two_layer_runtime_config_from_flat_options():
             "POWER_TURB_P_IN": 110.0,
             "COSTING_HX_UNIT_COST": 5000.0,
             "HENS_SOLVER_EVM": "ipopt-pyomo",
-            "TARGETING_AREA_COST_ENABLED": True,
             "THERMAL_DT_CONT": 8.0,
             "THERMAL_DT_PHASE_CHANGE": 0.02,
         }
@@ -211,7 +199,7 @@ def test_configuration_builds_two_layer_runtime_config_from_flat_options():
     assert cfg.power.turb_p_in == pytest.approx(110.0)
     assert cfg.costing.hx_unit_cost == pytest.approx(5000.0)
     assert cfg.hens.solver_evm == "ipopt-pyomo"
-    assert cfg.targeting.area_cost_enabled is True
+    assert not hasattr(cfg, "targeting")
     assert cfg.thermal.dt_cont == pytest.approx(8.0)
     assert cfg.thermal.dt_phase_change == pytest.approx(0.02)
     assert not hasattr(cfg, "COSTING_ANNUAL_OP_TIME")

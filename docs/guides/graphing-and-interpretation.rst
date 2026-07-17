@@ -1,11 +1,6 @@
 Graphing and Interpretation
 ===========================
 
-.. warning::
-
-   Graph owners are currently unsupported internal APIs. Only
-   :func:`OpenPinch.main.pinch_analysis_service` is compatibility protected.
-
 Purpose
 -------
 
@@ -32,7 +27,7 @@ Runnable Workflow
    from OpenPinch import PinchProblem
 
    problem = PinchProblem("basic_pinch.json")
-   problem.target()
+   problem.target.all_heat_integration()
 
    summary = problem.summary_frame()
    gcc = problem.plot.grand_composite_curve()
@@ -69,7 +64,10 @@ For portable review artifacts:
 
 .. code-block:: python
 
-   paths = problem.plot.export("graphs", graph_type="gcc")
+   paths = problem.plot.export(
+       "graphs",
+       plot=problem.plot.grand_composite_curve,
+   )
 
 Common mistakes are comparing a process-level row to a site-level graph,
 reading graph shape before checking utility targets, or treating a graph

@@ -67,6 +67,12 @@ _SAMPLE_CASE_METADATA: dict[str, SampleCaseMetadata] = {
         description="Zonal total-site problem with cogeneration and SUGCC examples.",
         topics=("total site", "cogeneration", "zonal"),
     ),
+    "process_mvr.json": SampleCaseMetadata(
+        name="process_mvr.json",
+        title="Process MVR",
+        description="Pressure-defined gas stream for direct process MVR studies.",
+        topics=("MVR", "components", "heat pump"),
+    ),
     "zonal_site.json": SampleCaseMetadata(
         name="zonal_site.json",
         title="Zonal Site",
@@ -88,97 +94,95 @@ _SAMPLE_CASE_METADATA: dict[str, SampleCaseMetadata] = {
 }
 
 
+_NOTEBOOK_CATALOG = (
+    (
+        "01_first_solve_and_core_curves.ipynb",
+        "First Solve and Core Curves",
+        ("quickstart", "plots"),
+    ),
+    (
+        "02_focused_direct_and_total_site.ipynb",
+        "Focused Direct and Total Site",
+        ("direct", "total site"),
+    ),
+    ("03_multisegment_streams.ipynb", "Multi-Segment Streams", ("streams", "segments")),
+    (
+        "04_workspace_cases_and_scenarios.ipynb",
+        "Workspace Cases and Scenarios",
+        ("workspace", "cases"),
+    ),
+    (
+        "05_workspace_persistence.ipynb",
+        "Workspace Data and Persistence",
+        ("workspace", "persistence"),
+    ),
+    (
+        "06_multiperiod_heat_integration.ipynb",
+        "Multiperiod Heat Integration",
+        ("multiperiod", "targets"),
+    ),
+    (
+        "07_area_cost_and_exergy.ipynb",
+        "Area Cost and Exergy",
+        ("area", "cost", "exergy"),
+    ),
+    (
+        "08_carnot_heat_pump_and_refrigeration.ipynb",
+        "Carnot Heat Pump and Refrigeration",
+        ("heat pump", "refrigeration"),
+    ),
+    (
+        "09_vapour_compression_and_brayton.ipynb",
+        "Vapour Compression and Brayton HPR",
+        ("heat pump", "Brayton"),
+    ),
+    (
+        "10_multiperiod_heat_pumps.ipynb",
+        "Multiperiod Heat Pumps",
+        ("multiperiod", "heat pump"),
+    ),
+    (
+        "11_process_mvr_and_cascade.ipynb",
+        "Process MVR and VC Cascade",
+        ("MVR", "components"),
+    ),
+    ("12_cogeneration.ipynb", "Cogeneration", ("cogeneration",)),
+    (
+        "13_multiperiod_cogeneration.ipynb",
+        "Multiperiod Cogeneration",
+        ("multiperiod", "cogeneration"),
+    ),
+    ("14_energy_transfer.ipynb", "Energy Transfer", ("energy transfer", "plots")),
+    (
+        "15_hen_synthesis_and_selection.ipynb",
+        "HEN Synthesis and Selection",
+        ("HEN", "synthesis"),
+    ),
+    (
+        "16_advanced_hen_methods.ipynb",
+        "Advanced HEN Methods",
+        ("HEN", "advanced design"),
+    ),
+    (
+        "17_multiperiod_hen_synthesis.ipynb",
+        "Multiperiod HEN Synthesis",
+        ("multiperiod", "HEN"),
+    ),
+    (
+        "18_results_plots_reports_exports.ipynb",
+        "Results, Plots, Reports, and Exports",
+        ("results", "exports"),
+    ),
+)
+
 _NOTEBOOK_METADATA: dict[str, NotebookMetadata] = {
-    "01_first_solve_summary_graphs.ipynb": NotebookMetadata(
-        name="01_first_solve_summary_graphs.ipynb",
-        title="First Solve, Summary, and Graphs",
-        description=(
-            "Foundation notebook for solving one case, reading summary metrics, "
-            "graphing, area/cost, and dt_cont workspace sensitivity."
-        ),
-        topics=("solve", "quickstart", "graphs", "workspace"),
-    ),
-    "02_total_site_sugcc_interpretation.ipynb": NotebookMetadata(
-        name="02_total_site_sugcc_interpretation.ipynb",
-        title="Total Site and SUGCC Interpretation",
-        description=(
-            "Method notebook for local-vs-site targeting, Total Site profiles, "
-            "SUGCC, and cogeneration context."
-        ),
-        topics=("method", "total site", "sugcc", "cogeneration"),
-    ),
-    "03_multiperiod_workspace_scenarios.ipynb": NotebookMetadata(
-        name="03_multiperiod_workspace_scenarios.ipynb",
-        title="Multiperiod Workspace Scenarios",
-        description=(
-            "Scenario notebook for named periods, period-specific targeting, "
-            "target_all_periods, and workspace comparison."
-        ),
-        topics=("solve", "multiperiod", "workspace"),
-    ),
-    "04_carnot_heat_pump_screening.ipynb": NotebookMetadata(
-        name="04_carnot_heat_pump_screening.ipynb",
-        title="Carnot Heat Pump Screening",
-        description=(
-            "Advanced-method notebook for direct/indirect Carnot Heat Pump "
-            "screening and HPR graph interpretation."
-        ),
-        topics=("solve", "advanced", "heat pump", "comparison"),
-    ),
-    "05_direct_gas_stream_mvr_scenarios.ipynb": NotebookMetadata(
-        name="05_direct_gas_stream_mvr_scenarios.ipynb",
-        title="Direct Gas Stream MVR Scenarios",
-        description=(
-            "Advanced-method notebook for process-component MVR, replacement "
-            "streams, and baseline-vs-MVR case comparison."
-        ),
-        topics=("solve", "advanced", "mvr", "workspace"),
-    ),
-    "06_vapour_compression_mvr_cascade_hpr.ipynb": NotebookMetadata(
-        name="06_vapour_compression_mvr_cascade_hpr.ipynb",
-        title="Vapour Compression MVR Cascade HPR",
-        description=(
-            "Method notebook for VC+MVR cascade mechanics, standalone MVR "
-            "thermodynamics, stream profiles, and HPR targeting."
-        ),
-        topics=("method", "heat pump", "mvr", "vapour compression"),
-    ),
-    "07_heat_exchanger_network_synthesis.ipynb": NotebookMetadata(
-        name="07_heat_exchanger_network_synthesis.ipynb",
-        title="Heat Exchanger Network Synthesis",
-        description=(
-            "Advanced-method notebook for public HEN design accessors, ranked "
-            "networks, manifests, and grid diagrams."
-        ),
-        topics=("solve", "advanced", "synthesis", "design"),
-    ),
-    "08_energy_transfer_analysis.ipynb": NotebookMetadata(
-        name="08_energy_transfer_analysis.ipynb",
-        title="Energy Transfer Analysis",
-        description=(
-            "Method notebook for heat-surplus/deficit tables, energy-transfer "
-            "diagrams, and target-family selection."
-        ),
-        topics=("method", "energy transfer", "graphs"),
-    ),
-    "09_schema_service_exports_and_bundles.ipynb": NotebookMetadata(
-        name="09_schema_service_exports_and_bundles.ipynb",
-        title="Schema Service Exports and Bundles",
-        description=(
-            "Integrator notebook for TargetInput, pinch_analysis_service, "
-            "exports, workspace variant views, and bundles."
-        ),
-        topics=("integrator", "schemas", "exports", "workspace"),
-    ),
-    "10_multiperiod_hpr_shared_design.ipynb": NotebookMetadata(
-        name="10_multiperiod_hpr_shared_design.ipynb",
-        title="Multiperiod HPR Shared Design",
-        description=(
-            "Focused notebook for opt-in weighted multi-period HPR design, "
-            "HPR detail inspection, and weighted summary modes."
-        ),
-        topics=("multiperiod", "heat pump", "hpr", "weighted summary"),
-    ),
+    name: NotebookMetadata(
+        name=name,
+        title=title,
+        description=f"Process-engineer tutorial for {title.lower()}.",
+        topics=topics,
+    )
+    for name, title, topics in _NOTEBOOK_CATALOG
 }
 
 
