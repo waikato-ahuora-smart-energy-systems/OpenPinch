@@ -1,6 +1,11 @@
 Heat Pump Workflows
 ===================
 
+.. warning::
+
+   Heat-pump owner modules and parent accessors are unsupported internals. Only
+   :func:`OpenPinch.main.pinch_analysis_service` is compatibility protected.
+
 Purpose
 -------
 
@@ -30,8 +35,8 @@ Direct or indirect HPR targeting:
 
 .. code-block:: python
 
-   from OpenPinch import PinchProblem
-   from OpenPinch.lib.enums import HPRcycle
+   from OpenPinch.application.problem import PinchProblem
+   from OpenPinch.domain.enums import HPRcycle
 
    problem = PinchProblem("chocolate_factory.json")
    problem.update_options({"HPR_TYPE": HPRcycle.CascadeCarnot.value})
@@ -126,4 +131,4 @@ Next Steps
 - :doc:`../fundamentals/heat-pump-and-refrigeration-methods` for cycle
   conventions and backend details.
 - :doc:`graphing-and-interpretation` for reading HPR graph effects.
-- :doc:`../api/pinchproblem` for the public accessors.
+- :doc:`../api/pinchproblem` for the internal parent accessors.

@@ -38,12 +38,12 @@ def _exercise_cli_help() -> None:
 
 def _check_core_surface() -> None:
     import OpenPinch
-    from OpenPinch import PinchProblem
-    from OpenPinch.services.heat_pump_integration.unit_models.brayton_heat_pump import (
+    from OpenPinch.analysis.heat_pumps.cycles.brayton_heat_pump import (
         SimpleBraytonHeatPumpCycle,
     )
-    from OpenPinch.streamlit_webviewer import web_graphing as wg
-    from OpenPinch.utils.plots import graph_simple_cc_plot
+    from OpenPinch.application.problem import PinchProblem
+    from OpenPinch.presentation.dashboard import dependencies as dashboard_dependencies
+    from OpenPinch.presentation.graphs.simple import graph_simple_cc_plot
 
     assert OpenPinch.__version__ if hasattr(OpenPinch, "__version__") else True
     assert PinchProblem is not None
@@ -66,7 +66,7 @@ def _check_core_surface() -> None:
         _assert_module_absent(module_name)
 
     try:
-        wg._require_streamlit()
+        dashboard_dependencies._require_streamlit()
     except ImportError:
         pass
     else:
@@ -88,22 +88,23 @@ def _check_core_surface() -> None:
 
 
 def _check_dashboard_surface() -> None:
-    from OpenPinch.streamlit_webviewer import web_graphing as wg
+    from OpenPinch.presentation.dashboard import dependencies as dashboard_dependencies
+    from OpenPinch.presentation.graphs import plotly as plotly_graphs
 
     _exercise_cli_help()
     for module_name in ["streamlit", "plotly", "openpyxl", "pyxlsb"]:
         _assert_module_present(module_name)
 
-    assert wg._require_plotly() is not None
-    assert wg._require_streamlit() is not None
-    assert wg._require_openpyxl() is not None
+    assert plotly_graphs._require_plotly() is not None
+    assert dashboard_dependencies._require_streamlit() is not None
+    assert dashboard_dependencies._require_openpyxl() is not None
 
 
 def _check_notebook_surface() -> None:
     import nbformat
 
+    from OpenPinch.presentation.graphs.simple import _require_plotly
     from OpenPinch.resources import copy_notebook, list_notebooks
-    from OpenPinch.utils.plots import _require_plotly
 
     _exercise_cli_help()
     for module_name in ["plotly", "openpyxl", "pyxlsb", "ipykernel", "nbformat"]:
@@ -120,7 +121,7 @@ def _check_notebook_surface() -> None:
 
 
 def _check_brayton_cycle_surface() -> None:
-    from OpenPinch.services.heat_pump_integration.unit_models.brayton_heat_pump import (
+    from OpenPinch.analysis.heat_pumps.cycles.brayton_heat_pump import (
         SimpleBraytonHeatPumpCycle,
     )
 
@@ -130,7 +131,7 @@ def _check_brayton_cycle_surface() -> None:
 
 
 def _check_synthesis_surface() -> None:
-    from OpenPinch.services.heat_exchanger_network_synthesis.common.solver import (
+    from OpenPinch.analysis.heat_exchanger_networks.solver import (
         dependencies,
     )
 

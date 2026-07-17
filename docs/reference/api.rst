@@ -3,8 +3,8 @@
 API Reference
 =============
 
-The API reference has moved into a curated workflow-first section plus an
-exhaustive appendix.
+The API reference has moved to a protected-main-contract page plus an
+unsupported contributor appendix.
 
 Use these pages instead:
 

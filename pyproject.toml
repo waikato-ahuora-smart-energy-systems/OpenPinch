@@ -34,7 +34,7 @@ dependencies=[
   "pydantic<3",
   "scipy<2",
 ]
-version = "0.5.0"
+version = "0.5.1"
 authors = [
   { name="Tim Walmsley", email="tim.walmsley@waikato.ac.nz" },
 ]
@@ -138,9 +138,7 @@ ignore = ["E203"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["F403", "F405", "E501"]
-"OpenPinch/lib/config_metadata.py" = ["E501"]
-"OpenPinch/services/energy_transfer_analysis/energy_transfer_analysis.py" = ["E501"]
-"OpenPinch/services/exergy_analysis/exergy_targeting_entry.py" = ["E501"]
+"OpenPinch/domain/configuration_fields.py" = ["E501"]
 
 [tool.ruff.format]
 quote-style = "double"

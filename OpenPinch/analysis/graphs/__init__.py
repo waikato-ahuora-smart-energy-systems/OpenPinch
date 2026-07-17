@@ -1,0 +1,1 @@
+"""Deterministic graph-data construction."""

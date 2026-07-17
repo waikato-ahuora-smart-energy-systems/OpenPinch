@@ -1,0 +1,1 @@
+"""Reusable scalar numerical optimisation."""

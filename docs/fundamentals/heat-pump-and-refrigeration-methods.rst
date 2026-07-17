@@ -6,7 +6,7 @@ first and a cycle problem second. A candidate cycle is valuable only if its
 hot and cold utility streams improve the process heat cascade after the
 minimum-approach shifts have been applied.
 
-The public workflows are:
+The internal parent-owned workflows are:
 
 - ``problem.target.direct_heat_pump(...)``
 - ``problem.target.indirect_heat_pump(...)``
@@ -129,7 +129,7 @@ cycle calculations. This is important for robustness: a trial optimiser point
 may request more heat or cooling than one stage can exchange, but the backend
 still solves a physically bounded cycle and reports the over-allocation.
 
-Use the public cycle names exactly as listed in this page.
+Use the current internal cycle names exactly as listed in this page.
 
 Cascade Carnot Cycles
 ---------------------

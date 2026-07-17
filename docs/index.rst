@@ -7,13 +7,11 @@ post-processing, cogeneration targeting, and heat exchanger network synthesis.
 It is built for engineers and researchers who need reproducible thermal
 targeting workflows in scripts, notebooks, and applications.
 
-OpenPinch exposes one analysis engine through three public front doors:
-
-- :class:`OpenPinch.PinchProblem` for one case at a time
-- :class:`OpenPinch.PinchWorkspace` for named multi-case studies and bundle
-  persistence
-- :func:`OpenPinch.main.pinch_analysis_service` for typed request/response
-  integration
+OpenPinch currently exposes one compatibility-protected Python contract:
+:func:`OpenPinch.main.pinch_analysis_service`. The package root is an
+import-free marker. Concrete owner modules remain available for repository
+development and advanced experiments, but their imports may change before a
+future contract expansion is explicitly selected.
 
 The published CLI is intentionally narrow: ``openpinch notebook`` copies the
 packaged notebook series, while solving, validation, graph export, Excel
@@ -34,9 +32,9 @@ I need to understand the method
    :doc:`fundamentals/graphs-and-interpretation`.
 
 I am integrating or extending OpenPinch
-   Start with :doc:`api/pinchproblem`, :doc:`api/schemas-and-config`, and
-   :doc:`api/service-layer`; use :doc:`api/generated-index` only after you know
-   which layer you need.
+   Start with :doc:`api/package-root` and :doc:`developer/architecture`.
+   The generated module appendix documents unsupported internals for
+   contributors.
 
 What OpenPinch Covers
 ---------------------
@@ -52,10 +50,10 @@ What OpenPinch Covers
 - exergy and cogeneration post-processing on solved thermal targets
 - heat exchanger network synthesis through the ``problem.design`` accessor
 
-The documentation is organized as a manual first and an API reference second:
+The documentation is organized as a manual first and an internal reference second:
 overview pages help you choose a workflow, fundamentals explain the method,
 guides provide runnable tasks, examples map packaged assets to decisions, and
-API pages document the exact public contracts.
+API pages distinguish the one external contract from unsupported internals.
 
 .. toctree::
    :maxdepth: 2

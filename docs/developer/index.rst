@@ -8,5 +8,6 @@ surface around the core analysis code.
    :maxdepth: 1
 
    docs-conventions
+   architecture
    build-and-coverage
    synthesis-dependency-policy

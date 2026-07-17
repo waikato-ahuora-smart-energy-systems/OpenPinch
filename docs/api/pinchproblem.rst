@@ -1,8 +1,10 @@
-PinchProblem
-============
+PinchProblem Internal API
+=========================
 
-:class:`OpenPinch.classes.pinch_problem.PinchProblem` is the primary
-single-case interface in the package. It owns the source inputs, validated
+:class:`OpenPinch.application.problem.PinchProblem` is an unsupported internal
+single-case convenience object. Its import and methods may change without a
+compatibility facade. Use :func:`OpenPinch.main.pinch_analysis_service` for
+external integrations. Internally, it owns the source inputs, validated
 problem data, prepared zone tree, solved targets, graph exports, multiperiod
 reruns, and several advanced post-processing helpers.
 
@@ -103,7 +105,7 @@ family of its own.
 
 ``problem.add_component``
    Mutates the prepared process model with memory-only process components
-   before rerunning targets. The current public component surface is
+   before rerunning targets. The current internal component surface is
    ``problem.add_component.process_mvr(...)`` for direct gas/vapour MVR. It
    deactivates selected original hot streams, activates generated replacement
    streams, and carries the process-component work into later summaries.
@@ -126,7 +128,7 @@ After solving, the main read and export surfaces are:
 PinchProblem API
 ----------------
 
-.. autoclass:: OpenPinch.classes.pinch_problem.PinchProblem
+.. autoclass:: OpenPinch.application.problem.PinchProblem
    :members:
    :no-index:
 
@@ -141,7 +143,7 @@ Relationship To Lower Layers
 ----------------------------
 
 ``PinchProblem`` is a wrapper, not a separate solver. Under the hood it still
-validates the input data, prepares a :class:`~OpenPinch.classes.zone.Zone` tree,
+validates the input data, prepares a :class:`~OpenPinch.domain.zone.Zone` tree,
 runs the same targeting services documented in :doc:`service-layer`, and then
 packages the outputs for summaries, graphs, and export.
 

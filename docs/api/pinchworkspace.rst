@@ -1,9 +1,10 @@
-PinchWorkspace
-==============
+PinchWorkspace Internal API
+===========================
 
-:class:`OpenPinch.classes.pinch_workspace.PinchWorkspace` is the public
-multi-case interface in OpenPinch. It keeps named study cases, but each case
-still resolves to a real :class:`~OpenPinch.classes.pinch_problem.PinchProblem`
+:class:`OpenPinch.application.workspace.PinchWorkspace` is an unsupported
+internal multi-case coordinator. Its import and bundle helpers are not
+compatibility-protected. It keeps named study cases, but each case
+still resolves to a real :class:`~OpenPinch.application.problem.PinchProblem`
 instance for targeting, plotting, summaries, export, and advanced workflows.
 It also exposes a second surface for serializable variant views that are useful
 for applications or frontend-oriented comparisons.
@@ -57,7 +58,7 @@ Two Related Surfaces
 Live-case surface
    ``case()``, ``use_case()``, ``target``, ``plot``, ``summary_frame()``,
    ``export_excel()``, and ``show_dashboard()`` all delegate to a real active
-   :class:`~OpenPinch.classes.pinch_problem.PinchProblem`.
+   :class:`~OpenPinch.application.problem.PinchProblem`.
    That live case can use ``problem.target.exergy(...)`` and the matching
    exergetic plot accessors exactly like any other ``PinchProblem``.
 
@@ -66,22 +67,22 @@ Serializable variant surface
    ``compare_variants()`` return schema-backed views that are deterministic and
    easier to pass to another application layer.
 
-Workflow Names and Support Levels
----------------------------------
+Internal Workflow Categories
+----------------------------
 
 ``solve_variant()`` accepts the same high-level workflow names exposed on
 ``problem.target.*`` after normalizing case, hyphens, and spaces.
 
-Stable workflows
+Core internal workflows
    ``target``, ``direct_heat_integration``, ``indirect_heat_integration``
 
-Advanced workflows
+Advanced internal workflows
    ``direct_heat_pump``, ``indirect_heat_pump``,
    ``direct_refrigeration``, ``indirect_refrigeration``, ``cogeneration``,
    ``area_cost``
 
-The advanced workflows are supported, but the workspace marks them as advanced
-explicitly so consuming applications can surface that distinction.
+The workspace labels the second group as advanced so repository applications
+can surface that distinction. Neither group is compatibility-protected.
 
 ``solve_variant()`` does not currently normalize a dedicated ``exergy``
 workflow name. Use the live-case ``PinchProblem`` surface when you need the
@@ -92,7 +93,7 @@ Typical Pattern
 
 .. code-block:: python
 
-   from OpenPinch import PinchWorkspace
+   from OpenPinch.application.workspace import PinchWorkspace
 
    workspace = PinchWorkspace(
        source="crude_preheat_train.json",
@@ -116,7 +117,7 @@ For application-style usage:
 PinchWorkspace API
 ------------------
 
-.. autoclass:: OpenPinch.classes.pinch_workspace.PinchWorkspace
+.. autoclass:: OpenPinch.application.workspace.PinchWorkspace
    :members:
    :no-index:
 

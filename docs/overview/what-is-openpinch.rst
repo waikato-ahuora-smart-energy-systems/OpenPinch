@@ -14,24 +14,21 @@ Use OpenPinch when you need to answer questions such as:
 - Does a Heat Pump, refrigeration, MVR, exergy, cogeneration, or HEN synthesis
   workflow improve the study decision?
 
-Primary User Surfaces
----------------------
+External Contract and Internal Tools
+------------------------------------
 
-``PinchProblem``
-   One live case with loading, validation, targeting, summaries, graphs,
-   exports, period selection, process-component mutation, and design accessors.
+``OpenPinch.main.pinch_analysis_service``
+   The sole compatibility-protected Python contract. It accepts the supported
+   request mapping and returns the structured targeting result.
 
-``PinchWorkspace``
-   Named baseline-versus-variant studies, bundle persistence, serializable
-   variant views, and comparisons over real ``PinchProblem`` cases.
-
-``pinch_analysis_service``
-   Typed ``TargetInput`` to ``TargetOutput`` execution for applications that
-   do not need a live wrapper object.
+``PinchProblem`` and ``PinchWorkspace``
+   Unsupported internal application coordinators used by advanced notebooks,
+   repository applications, and contributor workflows. Their paths and
+   methods may change without a compatibility layer.
 
 ``OpenPinch.resources`` and ``openpinch notebook``
-   Packaged sample cases and notebooks for learning, regression examples, and
-   reproducible demonstrations.
+   Repository learning and asset-copy tooling. These are maintained, but are
+   separate from the protected Python contract.
 
 Product Shape
 -------------
@@ -55,19 +52,17 @@ Product Shape
                v
       TargetOutput + summaries + graph data + exports
 
-What Is Stable First
---------------------
+What Is Stable
+--------------
 
-The most supported user path is:
+For application integration, import
+:func:`OpenPinch.main.pinch_analysis_service`, pass a request mapping, and
+consume its structured return value. That is the only Python path covered by
+the current compatibility policy.
 
-1. load a case with ``PinchProblem`` or ``PinchWorkspace``
-2. validate and target it
-3. read ``summary_frame()``
-4. inspect graph families through ``problem.plot``
-5. export Excel or HTML graph artifacts if needed
-
-Advanced workflows are documented, but they assume the base thermal picture is
-already understood.
+Advanced workflows remain documented for development and research. They use
+concrete owner modules deliberately and should be adopted only when internal
+API churn is acceptable.
 
 What OpenPinch Is Not
 ---------------------
@@ -82,6 +77,6 @@ case input and configuration.
 Next Steps
 ----------
 
-- :doc:`workflow-map` to choose the right public entrypoint.
+- :doc:`workflow-map` to distinguish the supported contract from internal owners.
 - :doc:`capability-matrix` to see feature status.
 - :doc:`../getting-started` for the shortest supported solve.

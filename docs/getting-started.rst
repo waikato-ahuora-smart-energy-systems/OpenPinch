@@ -1,20 +1,21 @@
 Getting Started
 ===============
 
-This is the fastest supported path from a clean environment to a solved
-OpenPinch case. It uses the packaged ``basic_pinch.json`` sample case so you
-can verify the installation before preparing your own data.
+This is the shortest supported path from a clean environment to a solved
+OpenPinch case. The only currently compatibility-protected Python entry point
+is :func:`OpenPinch.main.pinch_analysis_service`.
 
 Install
 -------
 
-Install the base package for core Python workflows:
+Install the base package for validation and targeting:
 
 .. code-block:: bash
 
    python -m pip install openpinch
 
-Install optional extras only when the workflow needs them:
+Optional extras provide notebook, dashboard, Brayton-cycle, and HEN-synthesis
+dependencies. They do not expand the compatibility-protected Python API.
 
 .. list-table::
    :header-rows: 1
@@ -22,20 +23,17 @@ Install optional extras only when the workflow needs them:
    * - Extra
      - Use when you need
      - Command
-   * - base
-     - validation, targeting, summaries, schema-driven runs
-     - ``python -m pip install openpinch``
    * - notebook
-     - Jupyter notebooks, Plotly graph rendering, Excel import/export
+     - Jupyter, Plotly, or Excel tooling
      - ``python -m pip install "openpinch[notebook]"``
    * - dashboard
-     - Streamlit dashboard review plus graph/export dependencies
+     - Streamlit dashboard review
      - ``python -m pip install "openpinch[dashboard]"``
    * - synthesis
-     - solver-backed heat exchanger network synthesis
+     - solver-backed HEN development
      - ``python -m pip install "openpinch[synthesis]"`` then ``idaes get-extensions``
    * - brayton_cycle
-     - TESPy-backed Brayton-cycle tooling
+     - TESPy-backed Brayton-cycle development
      - ``python -m pip install "openpinch[brayton_cycle]"``
 
 OpenPinch currently targets Python 3.14.
@@ -45,73 +43,63 @@ Run the First Solve
 
 .. code-block:: python
 
-   from OpenPinch import PinchProblem
+   from OpenPinch.main import pinch_analysis_service
 
-   problem = PinchProblem("basic_pinch.json", project_name="basic_pinch")
-   validation = problem.validation_report()
-   result = problem.target()
-   summary = problem.summary_frame()
+   result = pinch_analysis_service(
+       {
+           "streams": [
+               {
+                   "name": "Hot feed",
+                   "zone": "Process",
+                   "t_supply": 180.0,
+                   "t_target": 80.0,
+                   "heat_flow": 1000.0,
+               },
+               {
+                   "name": "Cold feed",
+                   "zone": "Process",
+                   "t_supply": 20.0,
+                   "t_target": 120.0,
+                   "heat_flow": 800.0,
+               },
+           ],
+           "utilities": [],
+       },
+       project_name="first-solve",
+   )
 
-   print(validation.valid)
-   print(summary[["Target", "Hot Utility Target", "Cold Utility Target"]])
-
-When no local file named ``basic_pinch.json`` exists, ``PinchProblem`` resolves
-the packaged sample case that ships with OpenPinch. The same wrapper also
-loads JSON files, Excel workbooks, CSV bundles, ``TargetInput`` models, and
-plain mappings.
+   print(result.model_dump(mode="json"))
 
 Read the Result
 ---------------
 
-For a first pass, read the summary table in this order:
+The returned model contains ``name``, ``period_id``, ``targets``, ``graphs``,
+and ``design``. Inspect each target's hot-utility, cold-utility, and recovered-
+heat values through its serialized fields.
 
-1. ``Hot Utility Target``
-2. ``Cold Utility Target``
-3. ``Heat Recovery``
-4. ``Hot Pinch`` and ``Cold Pinch``
+Unsupported Advanced Modules
+----------------------------
 
-Then inspect graphs if you installed the notebook or dashboard extra:
-
-.. code-block:: python
-
-   gcc = problem.plot.grand_composite_curve()
-   catalog = problem.plot.catalog()
-
-The Grand Composite Curve is usually the best first graph for utility
-placement and Heat Pump screening questions.
-
-Use Named Studies When You Compare Cases
-----------------------------------------
-
-Use ``PinchWorkspace`` when the study has a baseline and variants:
-
-.. code-block:: python
-
-   from OpenPinch import PinchWorkspace
-
-   workspace = PinchWorkspace(
-       source="crude_preheat_train.json",
-       project_name="crude_preheat_train",
-   )
-   workspace.scenario("wide_dt", dt_cont_multiplier=0.5)
-   comparison = workspace.compare_cases("baseline", "wide_dt")
+The repository contains concrete owner modules for application workflows,
+domain objects, engineering analyses, adapters, optimisation, and
+presentation. They support OpenPinch development and the packaged advanced
+notebooks, but they are not current external contracts. Deep imports may move
+without a compatibility layer.
 
 Use the CLI Only for Notebook Assets
 ------------------------------------
 
-The supported CLI copies packaged notebooks. It does not solve cases:
+The CLI copies packaged notebooks; it does not solve cases:
 
 .. code-block:: bash
 
    openpinch notebook -o notebooks
 
-Use Python for validation, solves, graph export, Excel export, dashboards, and
-advanced targeting.
+Next Steps
+----------
 
-Use these pages instead:
-
-- :doc:`guides/first-solve-python`
-- :doc:`guides/first-solve-cli`
-- :doc:`guides/notebooks-and-sample-cases`
-- :doc:`api/cli-and-resources`
-- :doc:`overview/workflow-map`
+- :doc:`guides/first-solve-python` for the supported service call.
+- :doc:`api/package-root` for the exact compatibility boundary.
+- :doc:`developer/architecture` for contributor-facing package ownership.
+- :doc:`guides/notebooks-and-sample-cases` for explicitly unsupported advanced
+  examples.

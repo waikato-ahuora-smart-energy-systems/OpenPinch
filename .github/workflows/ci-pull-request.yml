@@ -34,7 +34,7 @@ jobs:
       - name: Run Ruff
         run: ruff check .
       - name: Run tests
-        run: coverage run --source=OpenPinch -m pytest --hypothesis-seed=20260715 -m "not solver"
+        run: coverage run --branch --source=OpenPinch -m pytest --hypothesis-seed=20260715 -m "not solver"
       - name: Enforce coverage
         run: coverage report --fail-under=95
 

@@ -1,8 +1,8 @@
 Entrypoints and Assets
 ======================
 
-This page documents the repository-level entrypoints and packaged assets that
-support the main OpenPinch workflows outside the core analysis modules.
+This page documents repository tooling and packaged assets. The sole protected
+Python contract is :func:`OpenPinch.main.pinch_analysis_service`.
 
 CLI and Packaged Resources
 --------------------------
@@ -28,29 +28,29 @@ Packaged Data Assets
 Heat Exchanger Network Synthesis
 --------------------------------
 
-These modules back the public ``problem.design`` HEN synthesis accessors. The
+These modules back the internal ``problem.design`` HEN synthesis accessors. The
 entry module owns dispatch and problem result caching; targeting service modules
 own method-specific orchestration.
 
-.. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.heat_exchanger_network_synthesis_entry
+.. automodule:: OpenPinch.analysis.heat_exchanger_networks.service
    :members:
 
-.. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.open_hens_method
+.. automodule:: OpenPinch.analysis.heat_exchanger_networks.targeting.open_hens_method
    :members:
 
-.. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.pinch_design_method
+.. automodule:: OpenPinch.analysis.heat_exchanger_networks.targeting.pinch_design_method
    :members:
 
-.. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.thermal_derivative_method
+.. automodule:: OpenPinch.analysis.heat_exchanger_networks.targeting.thermal_derivative_method
    :members:
 
-.. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.network_evolution_method
+.. automodule:: OpenPinch.analysis.heat_exchanger_networks.targeting.network_evolution_method
    :members:
 
-.. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.targeting_services.topology
+.. automodule:: OpenPinch.analysis.heat_exchanger_networks.targeting.topology
    :members:
 
-.. automodule:: OpenPinch.services.heat_exchanger_network_synthesis.common.execution.pathways
+.. automodule:: OpenPinch.analysis.heat_exchanger_networks.execution.pathways
    :members:
 
 Streamlit App

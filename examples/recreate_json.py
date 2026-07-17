@@ -2,7 +2,10 @@
 
 import os
 
-from OpenPinch.utils import get_problem_from_excel, get_results_from_excel
+from OpenPinch.adapters.io.workbook import (
+    get_problem_from_excel,
+    get_results_from_excel,
+)
 
 
 def create_problem_and_results_json():

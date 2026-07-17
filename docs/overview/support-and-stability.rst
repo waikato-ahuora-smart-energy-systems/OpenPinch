@@ -1,77 +1,67 @@
 Support and Stability
 =====================
 
-OpenPinch documents different surfaces with different promises. Use this page
-when deciding whether a callable is a stable user interface, an advanced
-workflow, or an implementation detail.
+OpenPinch 0.5.0 intentionally has one compatibility-protected Python contract.
+This narrow promise lets the internal package architecture improve without
+maintaining forwarding modules or import aliases.
 
-Stable Public Surfaces
+Stable
+------
+
+The supported Python call is:
+
+.. code-block:: python
+
+   from OpenPinch.main import pinch_analysis_service
+
+Its signature, validation order, exceptions, return shape, serialization,
+ordering, and numerical behaviour are protected by the end-to-end contract
+suite. The request and response wire structures used by this function are also
+protected. The root ``OpenPinch`` package is an import-free marker and exports
+no user objects.
+
+Advanced
+--------
+
+Concrete modules beneath ``OpenPinch.application``, ``OpenPinch.analysis``,
+``OpenPinch.domain``, ``OpenPinch.contracts``, ``OpenPinch.adapters``,
+``OpenPinch.optimisation``, and ``OpenPinch.presentation`` are maintained as a
+coherent internal architecture. They are inspectable and tested, but their
+Python import paths and signatures are not compatibility promises.
+
+Experimental / partial
 ----------------------
 
-Stable surfaces are the preferred way to build user workflows:
-
-- ``PinchProblem``
-- ``PinchWorkspace``
-- ``pinch_analysis_service``
-- root package imports listed in :mod:`OpenPinch`
-- ``TargetInput``, ``TargetOutput``, and the main I/O schema models
-- nested segment/profile input schemas, including ``StreamSegmentSchema``
-- packaged resource helpers such as ``list_sample_cases()`` and
-  ``copy_notebook()``
-- ``openpinch notebook`` for copying notebooks only
-- ``validation_report()``, ``summary_frame()``, ``report()``, ``metrics()``,
-  and ``config_options()``
-
-Advanced Public Surfaces
-------------------------
-
-Advanced surfaces are supported, but they require more interpretation:
-
-- ``problem.target.*`` specialized targeting accessors
-- ``problem.plot.*`` graph accessors
-- ``problem.add_component.process_mvr(...)``
-- ``problem.design.*`` heat exchanger network synthesis accessors
-- exergy and cogeneration post-processing
-- service-layer helpers under :mod:`OpenPinch.services`
-- domain classes such as ``Zone``, ``Stream``, ``StreamCollection``, and
-  ``ProblemTable``
-
-Experimental or Partial Surfaces
---------------------------------
-
-These surfaces may be useful, but they are not presented as primary user
-workflows:
-
-- community and region framing
-- lower-level energy-transfer and exergy helper modules
-- optimizer backend internals
-- implementation modules below the curated service/API pages
+Solver-backed HEN work, simulated heat-pump cycles, dashboards, repository
+resource helpers, and packaged advanced notebooks may depend on optional
+software or internal owner modules. Their numerical fixtures are regression
+tested where dependencies are available, but callers should expect structural
+changes before a future contract expansion is explicitly selected.
 
 Dependency Boundaries
 ---------------------
 
-Optional dependencies are intentionally workflow-specific:
+Optional dependencies are workflow-specific:
 
-- ``openpinch[notebook]`` for Jupyter, Plotly graph rendering, and Excel I/O
-- ``openpinch[dashboard]`` for Streamlit dashboard review
-- ``openpinch[synthesis]`` plus solver extensions for solver-backed HEN synthesis
-- ``openpinch[brayton_cycle]`` for TESPy-backed Brayton-cycle tooling
+- ``openpinch[notebook]`` for Jupyter, Plotly, and Excel tooling
+- ``openpinch[dashboard]`` for Streamlit review
+- ``openpinch[synthesis]`` plus solver extensions for HEN synthesis
+- ``openpinch[brayton_cycle]`` for TESPy-backed cycles
 
-Documentation Rule
-------------------
+Optional packages load only in their owner leaves and report an actionable
+installation extra when absent.
 
-When a stable public surface changes, update:
+No Migration Facades
+--------------------
 
-1. the task guide that teaches the workflow
-2. the curated API page that documents the contract
-3. examples or packaged asset docs when the change affects learning workflows
-4. docs consistency tests
-
-When an advanced or experimental surface changes, document it in proportion to
-its intended user visibility and mark the support level clearly.
+Version 0.5.0 provides no aliases, forwarding modules, dynamic export barrels,
+or pickle-path shims for removed imports. In particular, the retired
+``OpenPinch.classes``, ``OpenPinch.lib``, ``OpenPinch.services``,
+``OpenPinch.utils``, and ``OpenPinch.streamlit_webviewer`` paths do not resolve.
 
 Next Steps
 ----------
 
-- :doc:`capability-matrix` for feature status by workflow.
-- :doc:`../developer/docs-conventions` for contributor standards.
+- :doc:`../api/package-root` for the exact external call.
+- :doc:`../developer/architecture` for internal ownership and dependency rules.
+- :doc:`capability-matrix` for workflow maturity and optional dependencies.

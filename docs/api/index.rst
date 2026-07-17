@@ -1,9 +1,9 @@
 API Reference
 =============
 
-Start here when you know which workflow you want and need the exact callable
-surface. The curated pages document public contracts first; the generated
-appendix is for module-by-module inspection after that.
+Start with the external contract page. The remaining pages document
+unsupported internal owners for contributors and advanced experiments; they
+are not compatibility promises.
 
 .. toctree::
    :maxdepth: 1

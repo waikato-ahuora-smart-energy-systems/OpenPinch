@@ -1,225 +1,161 @@
-"""End-to-end tests for main."""
+"""External contract tests for :mod:`OpenPinch.main`."""
 
 from __future__ import annotations
 
+import inspect
 import json
+import math
+import subprocess
+import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
-from OpenPinch.lib import TargetOutput
 from OpenPinch.main import pinch_analysis_service
-from OpenPinch.utils import get_scalar_value
+from tests.support.paths import REPOSITORY_ROOT
 
-EXPECTED_VALIDATION_WARNINGS = {
-    "p_Sorsak and Kravanja.json": "Input validation reported 8 warning(s):",
-    "p_Bjork and Pettersson.json": "Input validation reported 1 warning(s):",
-    "p_Ziyatdinov et al (example 1).json": "Input validation reported 1 warning(s):",
-    "p_Gundersen et al.json": "Input validation reported 1 warning(s):",
-}
+EXAMPLE_INPUTS = REPOSITORY_ROOT / "examples" / "stream_data"
 
 
-def get_example_problem_filepaths():
-    """Return example problem filepaths used by this test module."""
-    test_data_dir = Path(__file__).resolve().parents[2] / "examples" / "stream_data"
-    return sorted(
-        [
-            filepath
-            for filepath in test_data_dir.iterdir()
-            if filepath.name.startswith("p_") and filepath.name.endswith(".json")
-        ],
-        key=lambda filepath: filepath.name,
-    )
+def _example_problem_filepaths() -> list[Path]:
+    """Return all supported example inputs in deterministic name order."""
+    return sorted(EXAMPLE_INPUTS.glob("p_*.json"), key=lambda path: path.name)
 
 
-def get_results_filepath(problem_filepath: Path) -> Path:
-    """
-    Given a problem file path (e.g. .../examples/stream_data/p_case.json),
-    return the corresponding results file path (.../examples/results/r_case.json).
-    Raise FileNotFoundError if the results file does not exist.
-    """
-    # Go up from stream_data → examples
-    examples_dir = problem_filepath.parent.parent
-    results_dir = examples_dir / "results"
+def _scalar_value(value: dict[str, object]) -> float:
+    """Read the numeric value from the external value-with-unit structure."""
+    return float(value["value"])
 
-    # Swap prefix p_ → r_
-    result_name = problem_filepath.name.replace("p_", "r_", 1)
-    result_path = results_dir / result_name
 
-    # Validate existence
-    if not result_path.exists():
-        print(
-            f"Expected results file not found: {result_path} "
-            f"(problem file was {problem_filepath})"
-        )
-        return None
+def test_pinch_analysis_service_signature_is_stable() -> None:
+    """Protect the only supported external Python call contract."""
+    signature = inspect.signature(pinch_analysis_service)
+    parameters = list(signature.parameters.values())
 
-    return result_path
+    assert [(parameter.name, parameter.kind) for parameter in parameters] == [
+        ("data", inspect.Parameter.POSITIONAL_OR_KEYWORD),
+        ("project_name", inspect.Parameter.POSITIONAL_OR_KEYWORD),
+    ]
+    assert parameters[0].annotation is Any
+    assert parameters[1].annotation is str
+    assert parameters[1].default == "Project"
+    assert signature.return_annotation.__name__ == "TargetOutput"
+
+
+def test_pinch_analysis_service_preserves_validation_failure_shape() -> None:
+    """Invalid caller data fails before any targeting work begins."""
+    with pytest.raises(ValidationError) as caught:
+        pinch_analysis_service({})
+
+    errors = caught.value.errors(include_url=False)
+    assert [(error["type"], error["loc"]) for error in errors] == [
+        ("missing", ("streams",)),
+    ]
+
+
+def test_pinch_analysis_service_returns_stable_output_structure() -> None:
+    """Pin representative values and serialized field ordering at the boundary."""
+    data = json.loads((EXAMPLE_INPUTS / "p_illustrative.json").read_text())
+
+    result = pinch_analysis_service(data, project_name="Contract")
+    dumped = result.model_dump(mode="json")
+
+    assert type(result).__name__ == "TargetOutput"
+    assert list(dumped) == ["name", "period_id", "targets", "graphs", "design"]
+    assert dumped["name"] == "Contract"
+    assert dumped["period_id"] is None
+    assert dumped["design"] is None
+    assert len(dumped["targets"]) == 2
+    assert list(dumped["targets"][0])[:6] == [
+        "name",
+        "period_idx",
+        "period_id",
+        "degree_of_integration",
+        "Qh",
+        "Qc",
+    ]
+    assert dumped["targets"][0]["name"] == "Contract/Direct Integration"
+    assert _scalar_value(dumped["targets"][0]["Qh"]) == pytest.approx(749.9999950000001)
+    assert _scalar_value(dumped["targets"][0]["Qc"]) == pytest.approx(1000.0)
+    assert _scalar_value(dumped["targets"][0]["Qr"]) == pytest.approx(5150.000005)
+    assert list(dumped["graphs"]) == [
+        "Contract/Direct Integration",
+        "Plant/Direct Integration",
+    ]
+
+
+def test_pinch_analysis_service_accepts_mapping_and_default_project() -> None:
+    """A caller mapping and the default project label remain supported."""
+    data = json.loads((EXAMPLE_INPUTS / "p_illustrative.json").read_text())
+
+    result = pinch_analysis_service(data)
+
+    assert result.name == "Project"
+    assert result.targets[0].name == "Project/Direct Integration"
 
 
 @pytest.mark.parametrize(
-    "p_filepath",
-    get_example_problem_filepaths(),
-    ids=lambda filepath: filepath.name,
+    "problem_path",
+    _example_problem_filepaths(),
+    ids=lambda path: path.name,
 )
-def test_pinch_analysis_pipeline(p_filepath: Path):
-    """Validate each example problem produces target outputs matching reference results."""
-    # if p_filepath.name != "p_Ahmad (example 1).json":
-    #     return True
+def test_pinch_analysis_pipeline_solves_every_shipped_example(
+    problem_path: Path,
+) -> None:
+    """Every shipped example returns complete, finite caller-visible targets."""
+    project_name = problem_path.stem.removeprefix("p_")
+    data = json.loads(problem_path.read_text())
+    actual = pinch_analysis_service(data=data, project_name=project_name).model_dump(
+        mode="json"
+    )
 
-    # Set the file path to the directory of this script
-    with open(p_filepath) as json_data:
-        data = json.load(json_data)
+    assert actual["name"] == project_name
+    assert actual["targets"]
+    assert isinstance(actual["graphs"], dict)
+    for actual_target in actual["targets"]:
+        assert actual_target["name"].endswith("/Direct Integration")
+        for field in ("Qh", "Qc", "Qr"):
+            value = _scalar_value(actual_target[field])
+            assert math.isfinite(value)
+            assert value >= 0.0
 
-    r_filepath = get_results_filepath(p_filepath)
-    project_name = p_filepath.stem[2:]
-    res = pinch_analysis_service(data=data, project_name=project_name)
 
-    # Get and validate the format of the "correct" targets from the Open Pinch workbook
-    if r_filepath is not None:
-        with open(r_filepath) as json_data:
-            wkb_res = json.load(json_data)
-        wkb_res = TargetOutput.model_validate(wkb_res)
+def test_main_import_does_not_require_optional_feature_packages() -> None:
+    """The external entry point remains importable in a core-only install."""
+    blocked = {
+        "gekko",
+        "idaes",
+        "kaleido",
+        "openpyxl",
+        "plotly",
+        "pyomo",
+        "streamlit",
+        "tespy",
+        "wakepy",
+    }
+    script = f"""
+import builtins
 
-    # Compare targets from Python and Excel implementations of Open Pinch
-    if 0 and r_filepath is not None:
-        print(f"Name: {res.name}")
-        for z in res.targets:
-            for z0 in wkb_res.targets:
-                if z.name in z0.name:
-                    print("")
-                    print("Name:", z.name, z0.name)
-                    print(
-                        "Qh:",
-                        round(get_scalar_value(z.Qh), 2),
-                        "Qh:",
-                        round(get_scalar_value(z0.Qh), 2),
-                        round(get_scalar_value(z.Qh), 2)
-                        == round(get_scalar_value(z0.Qh), 2),
-                        sep="\t",
-                    )
-                    print(
-                        "Qc:",
-                        round(get_scalar_value(z.Qc), 2),
-                        "Qc:",
-                        round(get_scalar_value(z0.Qc), 2),
-                        round(get_scalar_value(z.Qc), 2)
-                        == round(get_scalar_value(z0.Qc), 2),
-                        sep="\t",
-                    )
-                    print(
-                        "Qr:",
-                        round(get_scalar_value(z.Qr), 2),
-                        "Qr:",
-                        round(get_scalar_value(z0.Qr), 2),
-                        round(get_scalar_value(z.Qr), 2)
-                        == round(get_scalar_value(z0.Qr), 2),
-                        sep="\t",
-                    )
-                    [
-                        print(
-                            z.hot_utilities[i].name + ":",
-                            round(get_scalar_value(z.hot_utilities[i].heat_flow), 2),
-                            z0.hot_utilities[i].name + ":",
-                            round(get_scalar_value(z0.hot_utilities[i].heat_flow), 2),
-                            round(get_scalar_value(z.hot_utilities[i].heat_flow), 2)
-                            == round(
-                                get_scalar_value(z0.hot_utilities[i].heat_flow), 2
-                            ),
-                            sep="\t",
-                        )
-                        for i in range(len(z.hot_utilities))
-                    ]
-                    [
-                        print(
-                            z.cold_utilities[i].name + ":",
-                            round(get_scalar_value(z.cold_utilities[i].heat_flow), 2),
-                            z0.cold_utilities[i].name + ":",
-                            round(get_scalar_value(z0.cold_utilities[i].heat_flow), 2),
-                            round(get_scalar_value(z.cold_utilities[i].heat_flow), 2)
-                            == round(
-                                get_scalar_value(z0.cold_utilities[i].heat_flow), 2
-                            ),
-                            sep="\t",
-                        )
-                        for i in range(len(z.cold_utilities))
-                    ]
-                    print("")
-    elif 0:
-        print(f"Name: {res.name}")
-        for z in res.targets:
-            print("")
-            print("Name:", z.name, z0.name)
-            print(
-                "Qh:",
-                round(get_scalar_value(z.Qh), 2),
-                sep="\t",
-            )
-            print(
-                "Qc:",
-                round(get_scalar_value(z.Qc), 2),
-                sep="\t",
-            )
-            print(
-                "Qr:",
-                round(get_scalar_value(z.Qr), 2),
-                sep="\t",
-            )
-            [
-                print(
-                    z.hot_utilities[i].name + ":",
-                    round(get_scalar_value(z.hot_utilities[i].heat_flow), 2),
-                    sep="\t",
-                )
-                for i in range(len(z.hot_utilities))
-            ]
-            [
-                print(
-                    z.cold_utilities[i].name + ":",
-                    round(get_scalar_value(z.cold_utilities[i].heat_flow), 2),
-                    sep="\t",
-                )
-                for i in range(len(z.cold_utilities))
-            ]
-            print("")
+blocked = {blocked!r}
+real_import = builtins.__import__
 
-        for z in res.targets:
-            for z0 in wkb_res.targets:
-                if z.name in z0.name:
-                    assert abs(get_scalar_value(z.Qh) - get_scalar_value(z0.Qh)) < 1e-3
-                    assert abs(get_scalar_value(z.Qc) - get_scalar_value(z0.Qc)) < 1e-3
-                    assert abs(get_scalar_value(z.Qr) - get_scalar_value(z0.Qr)) < 1e-3
-                    # Utilities that can act on both hot and cold sides can shift
-                    # slightly between equivalent steam levels while leaving total
-                    # Qh/Qc unchanged, so compare only single-role utility duties.
-                    dual_role_names = {utility.name for utility in z.hot_utilities} & {
-                        utility.name for utility in z.cold_utilities
-                    }
+def guarded_import(name, *args, **kwargs):
+    if name.split('.', 1)[0] in blocked:
+        raise ModuleNotFoundError(name)
+    return real_import(name, *args, **kwargs)
 
-                    for i in range(len(z.hot_utilities)):
-                        if z.hot_utilities[i].name in dual_role_names:
-                            continue
-                        if get_scalar_value(
-                            z.hot_utilities[i].heat_flow
-                        ) > 0 and i < len(z0.hot_utilities):
-                            assert (
-                                abs(
-                                    get_scalar_value(z.hot_utilities[i].heat_flow)
-                                    - get_scalar_value(z0.hot_utilities[i].heat_flow)
-                                )
-                                < 1e-3
-                            )
+builtins.__import__ = guarded_import
+from OpenPinch.main import pinch_analysis_service
+assert callable(pinch_analysis_service)
+"""
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=REPOSITORY_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
 
-                    for i in range(len(z.cold_utilities)):
-                        if z.cold_utilities[i].name in dual_role_names:
-                            continue
-                        if get_scalar_value(
-                            z.cold_utilities[i].heat_flow
-                        ) > 0 and i < len(z0.cold_utilities):
-                            assert (
-                                abs(
-                                    get_scalar_value(z.cold_utilities[i].heat_flow)
-                                    - get_scalar_value(z0.cold_utilities[i].heat_flow)
-                                )
-                                < 1e-3
-                            )
+    assert completed.returncode == 0, completed.stderr

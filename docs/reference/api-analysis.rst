@@ -1,6 +1,10 @@
 Analysis Package
 ================
 
+This is an unsupported contributor reference. Analysis modules may move or
+change without a compatibility facade; external callers should use
+:func:`OpenPinch.main.pinch_analysis_service`.
+
 The analysis package contains the numerical workflow that turns validated
 inputs into pinch targets, utility allocations, and graph-ready composite
 curve data. The modules are designed so that the high-level service layer can
@@ -12,32 +16,32 @@ Pipeline Overview
 
 The analysis stack typically runs in this order:
 
-1. :mod:`OpenPinch.services.input_data_processing.data_preparation` validates
+1. :mod:`OpenPinch.application._problem.input.construction` validates
    options, normalises the zone hierarchy, and constructs
-   :class:`~OpenPinch.classes.zone.Zone`,
-   :class:`~OpenPinch.classes.stream.Stream`, and
-   :class:`~OpenPinch.classes.stream_collection.StreamCollection` objects.
-2. :mod:`OpenPinch.services.services_entry` selects the orchestration path used
+   :class:`~OpenPinch.domain.zone.Zone`,
+   :class:`~OpenPinch.domain.stream.Stream`, and
+   :class:`~OpenPinch.domain.stream_collection.StreamCollection` objects.
+2. :mod:`OpenPinch.application.targeting` selects the orchestration path used
    by the high-level service layer and ``PinchProblem.target.*`` helpers.
-3. :mod:`OpenPinch.services.common.problem_table_analysis` builds the shifted
+3. :mod:`OpenPinch.analysis.targeting.cascade` builds the shifted
    and real temperature problem tables used throughout the rest of the
    workflow.
-4. :mod:`OpenPinch.services.direct_heat_integration.direct_integration_entry`
+4. :mod:`OpenPinch.analysis.targeting.direct`
    computes direct integration targets for unit-operation and process zones.
-5. :mod:`OpenPinch.services.indirect_heat_integration.indirect_integration_entry`
+5. :mod:`OpenPinch.analysis.targeting.total_site`
    aggregates solved subzones into site-style indirect integration targets when
    the hierarchy requires it.
-6. :mod:`OpenPinch.services.common.graph_data` converts solved tables and
+6. :mod:`OpenPinch.analysis.graphs.service` converts solved tables and
    targets into serialisable graph data for reporting and Streamlit
    visualisation.
 
 Service Package Map
 -------------------
 
-.. automodule:: OpenPinch.services
+.. automodule:: OpenPinch.analysis
    :no-members:
 
-.. automodule:: OpenPinch.services.services_entry
+.. automodule:: OpenPinch.application.targeting
    :members:
 
 Preparation and Zone Construction
@@ -46,10 +50,7 @@ Preparation and Zone Construction
 These functions are the bridge between external schema inputs and the
 internal object model.
 
-.. automodule:: OpenPinch.services.input_data_processing
-   :no-members:
-
-.. automodule:: OpenPinch.services.input_data_processing.data_preparation
+.. automodule:: OpenPinch.application._problem.input.construction
    :members:
 
 Direct and Indirect Targeting Entrypoints
@@ -65,12 +66,12 @@ constructed.
   and applies utility-to-utility balancing for Total Site studies.
 - Lower-level Heat Pump and refrigeration screening for both routes is
   centralised in
-  :mod:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry`.
+  :mod:`OpenPinch.analysis.heat_pumps.service`.
 
-.. automodule:: OpenPinch.services.direct_heat_integration.direct_integration_entry
+.. automodule:: OpenPinch.analysis.targeting.direct
    :members:
 
-.. automodule:: OpenPinch.services.indirect_heat_integration.indirect_integration_entry
+.. automodule:: OpenPinch.analysis.targeting.total_site
    :members:
 
 Problem Tables, Utility Allocation, and Graph Data
@@ -79,26 +80,26 @@ Problem Tables, Utility Allocation, and Graph Data
 These modules implement the numerical building blocks that the entry-point
 workflows depend on.
 
-- :mod:`OpenPinch.services.common.problem_table_analysis` generates the cascade tables
+- :mod:`OpenPinch.analysis.targeting.cascade` generates the cascade tables
   and extracts pinch, utility, and heat-recovery targets from them.
-- :mod:`OpenPinch.services.common.utility_targeting` assigns multiple utilities across
+- :mod:`OpenPinch.analysis.targeting.utilities` assigns multiple utilities across
   heating and cooling deficits while respecting temperature feasibility.
-- :mod:`OpenPinch.services.common.gcc_manipulation` derives pocket-free, assisted, and
+- :mod:`OpenPinch.analysis.targeting.grand_composite` derives pocket-free, assisted, and
   other Grand Composite Curve variants used for interpretation and advanced
   targeting.
-- :mod:`OpenPinch.services.common.graph_data` translates tables and targets into the
-  graph structures emitted in :class:`~OpenPinch.lib.schemas.io.TargetOutput`.
+- :mod:`OpenPinch.analysis.graphs.service` translates tables and targets into the
+  graph structures emitted in :class:`~OpenPinch.contracts.output.TargetOutput`.
 
-.. automodule:: OpenPinch.services.common.problem_table_analysis
+.. automodule:: OpenPinch.analysis.targeting.cascade
    :members:
 
-.. automodule:: OpenPinch.services.common.utility_targeting
+.. automodule:: OpenPinch.analysis.targeting.utilities
    :members:
 
-.. automodule:: OpenPinch.services.common.gcc_manipulation
+.. automodule:: OpenPinch.analysis.targeting.grand_composite
    :members:
 
-.. automodule:: OpenPinch.services.common.graph_data
+.. automodule:: OpenPinch.analysis.graphs.service
    :members:
 
 Process Component Services
@@ -109,22 +110,23 @@ rerun. They sit below ``PinchProblem.add_component`` and are most useful for
 workspace before/after studies where the active stream set changes between
 cases.
 
-.. automodule:: OpenPinch.services.components
+.. automodule:: OpenPinch.analysis.heat_pumps
    :no-members:
+   :no-index:
 
-.. automodule:: OpenPinch.services.components.process_components
+.. automodule:: OpenPinch.analysis.heat_pumps.components
    :members:
    :no-index:
 
-.. automodule:: OpenPinch.services.components.process_mvr
+.. automodule:: OpenPinch.analysis.heat_pumps.process_mvr
    :members:
    :no-index:
 
-.. automodule:: OpenPinch.services.components.direct_mvr
+.. automodule:: OpenPinch.analysis.heat_pumps.direct_mvr
    :no-members:
 
-.. automodule:: OpenPinch.services.components.direct_mvr.direct_gas_mvr
-   :members:
+.. automodule:: OpenPinch.analysis.heat_pumps.direct_mvr.execution
+   :members: solve_direct_gas_mvr_stream, coerce_positive_mvr_stage_count
    :no-index:
 
 Advanced Add-On Analyses
@@ -139,15 +141,15 @@ The Heat Pump and refrigeration stack is documented separately in
 optimisers and helper modules. The main low-level entrypoints remain
 ``compute_direct_heat_pump_or_refrigeration_target(...)`` and
 ``compute_indirect_heat_pump_or_refrigeration_target(...)`` in
-:mod:`OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry`.
+:mod:`OpenPinch.analysis.heat_pumps.service`.
 
-.. automodule:: OpenPinch.services.common.capital_cost_and_area_targeting
+.. automodule:: OpenPinch.analysis.targeting.area_cost
    :members:
 
-.. automodule:: OpenPinch.services.common.temperature_driving_force
+.. automodule:: OpenPinch.analysis.targeting.temperature_driving_force
    :members:
 
-.. automodule:: OpenPinch.services.power_cogeneration.power_cogeneration_entry
+.. automodule:: OpenPinch.analysis.power.service
    :members:
 
 Experimental or Partial Analysis Modules
@@ -158,8 +160,5 @@ but they should not be read as stable production workflows. They are present in
 the repository with partial implementations, commented stubs, or incomplete
 workflow documentation.
 
-.. automodule:: OpenPinch.services.exergy_analysis
-   :no-members:
-
-.. automodule:: OpenPinch.services.exergy_analysis.exergy_targeting_entry
+.. automodule:: OpenPinch.analysis.exergy.service
    :no-members:

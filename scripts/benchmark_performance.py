@@ -22,27 +22,27 @@ from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from typing import Any
 
-from OpenPinch.classes.pinch_problem import PinchProblem
-from OpenPinch.lib.schemas.synthesis.common import SynthesisMethod
-from OpenPinch.lib.schemas.synthesis.task import (
-    HeatExchangerNetworkSynthesisTask,
-    HeatExchangerNetworkSynthesisTaskOutcome,
-)
-from OpenPinch.services.heat_exchanger_network_synthesis.common.execution import (
-    executor as executor_module,
-)
-from OpenPinch.services.heat_exchanger_network_synthesis.common.execution import (
-    settings as settings_module,
-)
-from OpenPinch.services.heat_exchanger_network_synthesis.common.service_context import (
+from OpenPinch.analysis.heat_exchanger_networks.context import (
     ensure_target_results,
     finalise_design_result,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.common.solver import (
+from OpenPinch.analysis.heat_exchanger_networks.execution import (
+    executor as executor_module,
+)
+from OpenPinch.analysis.heat_exchanger_networks.execution import (
+    settings as settings_module,
+)
+from OpenPinch.analysis.heat_exchanger_networks.solver import (
     backend as solver_backend,
 )
-from OpenPinch.services.heat_exchanger_network_synthesis.targeting_services import (
+from OpenPinch.analysis.heat_exchanger_networks.targeting import (
     open_hens_method,
+)
+from OpenPinch.application.problem import PinchProblem
+from OpenPinch.contracts.synthesis.common import SynthesisMethod
+from OpenPinch.contracts.synthesis.task import (
+    HeatExchangerNetworkSynthesisTask,
+    HeatExchangerNetworkSynthesisTaskOutcome,
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]

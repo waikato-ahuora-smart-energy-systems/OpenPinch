@@ -2,7 +2,7 @@
 
 Run with ``streamlit run streamlit_app.py`` to load the bundled demonstration
 case and launch the interactive dashboard defined in
-``OpenPinch.streamlit_webviewer.web_graphing``.
+``OpenPinch.presentation.dashboard``.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from OpenPinch import PinchProblem
+from OpenPinch.application.problem import PinchProblem
 
 # Current case. Update this path if you want to switch datasets.
 PROBLEM_FILE = Path("examples/OpenPinchWkbs/Ziyatdinov et al (example 2).xlsb")
