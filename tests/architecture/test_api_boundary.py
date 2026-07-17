@@ -13,6 +13,7 @@ import pytest
 import OpenPinch
 import OpenPinch.domain.heat_exchanger as heat_exchanger
 import OpenPinch.domain.stream as stream
+from OpenPinch.contracts.hpr import HPRBackendResult, HPRParsedState
 from OpenPinch.contracts.input import StreamSegmentSchema, TargetInput
 
 PACKAGE_DIR = Path(OpenPinch.__file__).parent
@@ -78,6 +79,11 @@ def test_service_runtime_records_and_graph_specs_are_private() -> None:
     assert not hasattr(metadata, "GraphSeriesMeta")
     assert not hasattr(multiperiod_state, "PreparedHPRPeriodCase")
     assert not hasattr(rendering, "StreamlitGraphSet")
+
+
+def test_typed_hpr_records_do_not_emulate_dictionaries() -> None:
+    assert {"__getitem__", "get"}.isdisjoint(HPRParsedState.__dict__)
+    assert {"__getitem__", "get", "__contains__"}.isdisjoint(HPRBackendResult.__dict__)
 
 
 def test_hen_model_package_is_a_marker_without_runtime_exports() -> None:

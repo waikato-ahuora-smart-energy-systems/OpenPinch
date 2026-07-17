@@ -50,6 +50,9 @@ points provide residual external utilities for operating-cost accounting;
 cycle penalties remain separate feasibility terms. HPR objective and failure
 semantics are translated to the reusable optimiser only by
 ``optimisation_adapter``; the generic optimiser has no heat-pump dependency.
+Optimiser identifiers are exact: ``dual_annealing``, ``cmaes``, ``bo``, and
+``rbf_surrogate``. Case changes, surrounding whitespace, and abbreviated or
+historical spellings are rejected.
 
 .. automodule:: OpenPinch.analysis.heat_pumps.common
    :no-members:
@@ -68,6 +71,14 @@ semantics are translated to the reusable optimiser only by
 
 HPR Schemas
 -----------
+
+``HPRParsedState`` and ``HPRBackendResult`` are internal typed records with
+attribute-only access. Use their named attributes while processing results and
+``model_dump()`` when a mapping is required; they do not emulate dictionaries.
+
+.. autoclass:: OpenPinch.contracts.hpr.HPRParsedState
+   :members:
+   :no-index:
 
 .. autoclass:: OpenPinch.contracts.hpr.HeatPumpTargetInputs
    :members:

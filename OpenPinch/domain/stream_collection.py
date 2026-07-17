@@ -420,16 +420,16 @@ class StreamCollection:
 
     def __getstate__(self):
         state = self.__dict__.copy()
-        mode, sort_detail = state.get("_sort_spec", ("attr", "t_supply"))
+        mode, sort_detail = state["_sort_spec"]
         if mode == "callable" and not _is_picklable(sort_detail):
             state["_sort_spec"] = ("attr", "t_supply")
+            state["_sorted_cache"] = []
+            state["_needs_sort"] = True
         state["_sort_key"] = None
         return state
 
     def __setstate__(self, state):
         self.__dict__.update(state)
-        if "_numeric_cache" not in self.__dict__:
-            self._numeric_cache = {}
         self._rebuild_sort_key()
 
     def to_dict(

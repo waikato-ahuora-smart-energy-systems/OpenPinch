@@ -88,10 +88,13 @@ def test_compute_indirect_integration_targets_auto_aligns_utility_profile_grids(
     expected_h_net_ut = expected_h_net_ut - expected_h_net_ut.min()
     expected_h_cold_ut = utility_pt[PT.H_COLD] - utility_pt[PT.H_COLD].max()
 
-    calls = {"count": 0}
+    calls = {"count": 0, "period_indices": []}
 
-    def fake_get_process_heat_cascade(*args, **kwargs):
+    def fake_get_process_heat_cascade(
+        *, hot_streams, cold_streams, is_shifted, period_idx
+    ):
         calls["count"] += 1
+        calls["period_indices"].append(period_idx)
         return site_pt.copy if calls["count"] == 1 else utility_pt.copy
 
     monkeypatch.setattr(
@@ -115,6 +118,7 @@ def test_compute_indirect_integration_targets_auto_aligns_utility_profile_grids(
     target = indirect.compute_indirect_integration_targets(zone)
 
     assert calls["count"] == 2
+    assert calls["period_indices"] == [0, 0]
     assert target.pt[PT.T].tolist() == [300.0, 200.0, 100.0]
     assert np.allclose(target.pt[PT.H_NET_UT], expected_h_net_ut)
     assert np.allclose(target.pt[PT.H_HOT_UT], utility_pt[PT.H_HOT])

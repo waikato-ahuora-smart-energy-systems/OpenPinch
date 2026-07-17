@@ -29,6 +29,16 @@ Unreleased
 - Optimisation is a reusable package-level capability. Heat-pump targeting
   crosses one explicit adapter; new services can reuse optimisation without
   importing heat-pump code.
+- HPR internal records are attribute-only, and HPR optimiser identifiers must
+  exactly match ``dual_annealing``, ``cmaes``, ``bo``, or ``rbf_surrogate``.
+  Obsolete helper-signature retries and historical optimiser spellings are not
+  accepted.
+- ``StreamCollection`` supports current-version pickle round trips, including
+  deterministic fallback for an unpicklable callable sort key. It does not
+  repair state dictionaries produced by older package versions.
+- Internal type-only imports now resolve to the concrete configuration owner,
+  total-site utility profiles forward the canonical period keyword, and invalid
+  crossflow row counts raise an explicit validation error.
 - Tests now mirror observable owner layers. The external main contract is
   authoritative, architecture directions are AST-enforced, and CI measures
   seeded statement and branch coverage with Hypothesis seed ``20260715``.

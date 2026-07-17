@@ -68,7 +68,7 @@ def test_stream_property_roundtrip_and_mutation_paths():
     assert float(s.t_max_star) == pytest.approx(154.0)
 
 
-def test_stream_collection_edge_paths_and_pickle_state(tmp_path):
+def test_stream_collection_edge_paths():
     st1 = Stream(name="A", t_supply=120.0, t_target=80.0, heat_flow=20.0)
     st2 = Stream(name="B", t_supply=110.0, t_target=70.0, heat_flow=10.0)
     st3 = Stream(name="C", t_supply=60.0, t_target=90.0, heat_flow=5.0)
@@ -97,11 +97,6 @@ def test_stream_collection_edge_paths_and_pickle_state(tmp_path):
         _ = sc[1.2]
     with pytest.warns(Warning):
         sc.remove("unknown")
-
-    state = sc.__getstate__()
-    assert state["_sort_spec"] == ("attr", "t_supply")
-    sc2 = StreamCollection()
-    sc2.__setstate__(state)
 
     sc3 = StreamCollection()
     sc3.add_many([st1, st2], keys=["A", "B"])

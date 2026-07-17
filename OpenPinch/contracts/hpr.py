@@ -186,15 +186,6 @@ class HPRParsedState(BaseModel):
     x_mvr_source_split: float | None = None
     x_mvr_process_split: np.ndarray | None = None
 
-    def __getitem__(self, key: str) -> Any:
-        return getattr(self, key)
-
-    def get(self, key: str, default: Any = None) -> Any:
-        try:
-            return self[key]
-        except AttributeError:
-            return default
-
 
 class HPRThermoArtifacts(BaseModel):
     """Optional solved thermodynamic artefacts attached to a backend result."""
@@ -281,38 +272,6 @@ class HPRBackendResult(BaseModel):
 
     def with_updates(self, **kwargs) -> "HPRBackendResult":
         return self.model_copy(update=kwargs)
-
-    def __getitem__(self, key: str) -> Any:
-        if key == "Q_ext":
-            return self.Q_ext
-        if key == "hpr_streams":
-            return self.hpr_streams
-        if key == "hpr_hot_streams":
-            return self.hpr_hot_streams
-        if key == "hpr_cold_streams":
-            return self.hpr_cold_streams
-        if key == "model":
-            return self.model
-        return getattr(self, key)
-
-    def get(self, key: str, default: Any = None) -> Any:
-        try:
-            return self[key]
-        except AttributeError:
-            return default
-
-    def __contains__(self, key: str) -> bool:
-        if not isinstance(key, str):
-            return False
-        if key in {
-            "Q_ext",
-            "hpr_streams",
-            "hpr_hot_streams",
-            "hpr_cold_streams",
-            "model",
-        }:
-            return True
-        return hasattr(self, key)
 
     def to_output_fields(self) -> dict[str, Any]:
         output_values = {

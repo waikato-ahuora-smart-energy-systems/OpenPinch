@@ -30,3 +30,12 @@ No new release-blocking performance threshold is required. Exact utility cost is
 piecewise linear in the already-prepared segment count and preserves parent HEN
 axes. The complete non-solver suite finished in 120.22 seconds, and the four-case
 solver-marked run finished in 85.49 seconds in the acceptance environment.
+
+## Residual Compatibility Shim Removal
+
+Dedicated performance testing is N/A. The change removes retry, mapping, alias,
+and state-repair branches and does not alter a numerical kernel, loop bound,
+solver axis, tolerance, or data-size relationship. The complete 2,063-test
+non-solver suite finished in 104.45 seconds in the verification environment.
+Future performance regressions remain covered by the package-level performance
+matrix above.

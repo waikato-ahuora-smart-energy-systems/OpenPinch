@@ -105,7 +105,7 @@ def _base_args(**overrides):
         "bckgrd_cold_streams": _sc(
             Stream(name="C", t_supply=30.0, t_target=60.0, heat_flow=40.0)
         ),
-        "bb_minimiser": "rbf",
+        "bb_minimiser": "rbf_surrogate",
         "eta_penalty": 0.001,
         "rho_penalty": 10.0,
         "debug": False,

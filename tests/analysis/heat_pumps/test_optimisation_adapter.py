@@ -7,6 +7,7 @@ import pytest
 
 import OpenPinch.analysis.heat_pumps.optimisation_adapter as adapter
 from OpenPinch.contracts.hpr import HPRBackendResult, HPRThermoArtifacts
+from OpenPinch.domain.enums import BB_Minimiser
 from OpenPinch.domain.stream_collection import StreamCollection
 from OpenPinch.optimisation.errors import NoOptimisationCandidatesError
 from OpenPinch.optimisation.models import (
@@ -59,14 +60,41 @@ def test_initial_points_are_normalised_without_mutable_shape_state(values, expec
     ("configured", "expected"),
     [
         (None, OptimisationMethod.DUAL_ANNEALING),
-        ("da", OptimisationMethod.DUAL_ANNEALING),
-        ("cma-es", OptimisationMethod.CMA_ES),
-        ("bayesian_optimisation", OptimisationMethod.BAYESIAN),
-        ("rbf", OptimisationMethod.RBF),
+        ("dual_annealing", OptimisationMethod.DUAL_ANNEALING),
+        ("cmaes", OptimisationMethod.CMA_ES),
+        ("bo", OptimisationMethod.BAYESIAN),
+        ("rbf_surrogate", OptimisationMethod.RBF),
+        (OptimisationMethod.RBF, OptimisationMethod.RBF),
+        (BB_Minimiser.DA, OptimisationMethod.DUAL_ANNEALING),
+        (BB_Minimiser.CMAES, OptimisationMethod.CMA_ES),
+        (BB_Minimiser.BO, OptimisationMethod.BAYESIAN),
+        (BB_Minimiser.RBF, OptimisationMethod.RBF),
     ],
 )
-def test_configured_backend_aliases_resolve_to_package_methods(configured, expected):
-    assert adapter.normalise_hpr_method(configured) is expected
+def test_exact_configured_backend_identifiers_resolve_to_package_methods(
+    configured, expected
+):
+    assert adapter._resolve_hpr_optimisation_method(configured) is expected
+
+
+@pytest.mark.parametrize(
+    "configured",
+    ["rbf", "dual-annealing", "DUAL_ANNEALING", " dual_annealing", "bo "],
+)
+def test_noncanonical_backend_identifiers_are_rejected(configured):
+    with pytest.raises(ValueError, match="Unsupported optimiser identifier"):
+        adapter._resolve_hpr_optimisation_method(configured)
+
+
+@pytest.mark.parametrize("configured", [1, 1.5, object()])
+def test_non_string_backend_identifiers_are_rejected(configured):
+    with pytest.raises(TypeError, match="must be a string or enum value"):
+        adapter._resolve_hpr_optimisation_method(configured)
+
+
+def test_legacy_hpr_method_normaliser_is_absent():
+    assert not hasattr(adapter, "normalise_hpr_method")
+    assert "normalise_hpr_method" not in adapter.__all__
 
 
 def test_adapter_executes_reusable_optimiser_without_legacy_wrapper():
@@ -123,7 +151,7 @@ def test_warm_start_is_ranked_with_backend_candidates():
         objective=lambda x, _args, debug=False: _result(float(x[0])),
         initial_points=np.array([0.2]),
         bounds=[(0.0, 1.0)],
-        args=_base_args(bb_minimiser="rbf"),
+        args=_base_args(bb_minimiser="rbf_surrogate"),
         optimiser=optimiser,
     )
 

@@ -332,3 +332,56 @@ resolve GitHub, and local `develop` is four approved baseline commits ahead of
 `origin/develop`. No remote branch was pushed and no pull request was opened
 because doing so without identifying the intended baseline would produce an
 incorrect stack or mutate `develop` without authorization.
+
+## Residual Compatibility Shim Removal Evidence
+
+### Build Status
+
+- Build tool: Hatchling through `scripts/build_dist.py`.
+- Build status: passed.
+- Artifacts: OpenPinch 0.5.0 wheel and source distribution under
+  `/private/tmp/openpinch-residual-shims-20260717`.
+- Documentation: a fresh 60-source Sphinx build passed with `-E -W` and
+  `--keep-going`.
+
+### Test Execution Summary
+
+- Focused HPR, configuration, StreamCollection, architecture, and protected-main
+  gate: 277 passed.
+- Affected cycle tests after attribute-only migration: 37 passed.
+- Complete non-solver suite: 2,063 passed; four solver-tagged tests deselected.
+- Ruff lint: passed repository-wide.
+- Ruff format: all 459 Python files formatted.
+- Stale-surface searches: no helper retry test, alias table, old method export,
+  HPR dictionary-emulation method, legacy pickle repair, or noncanonical runtime
+  optimiser input remains.
+- Patch hygiene: `git diff --check` passed.
+
+### Additional Test Classification
+
+- Contract and end-to-end tests: passed through the focused and complete suites.
+- Performance tests: N/A because no numerical or scaling algorithm changed.
+- Security tests: N/A because the Security extension is disabled.
+- Resiliency tests: N/A because the Resiliency extension is disabled.
+- Property-Based Testing additions: N/A because no numerical algorithm changed;
+  direct deterministic regressions cover every removed behaviour.
+- Solver tests: unaffected and excluded by marker; they are not counted as
+  passes in this unit.
+
+### Overall Status
+
+Build and Test passes for the approved residual compatibility-shim cleanup.
+`OpenPinch.main.pinch_analysis_service` remains unchanged, and the generated
+code is ready for explicit review. Operations is N/A because no deployment or
+infrastructure work was requested.
+
+## Post-Implementation Import and Type Correction Evidence
+
+- Regression-first baseline: five expected failures.
+- Focused architecture, total-site, and heat-transfer gate: 96 passed.
+- Runtime import sweep: all 301 discoverable package modules imported.
+- Targeted Pylint errors: none for the five corrected modules.
+- Complete non-solver suite: 2,067 passed; four solver-tagged tests deselected.
+- Ruff lint and formatting: passed for all 459 Python files.
+- Patch hygiene: passed.
+- Protected main service: unchanged.

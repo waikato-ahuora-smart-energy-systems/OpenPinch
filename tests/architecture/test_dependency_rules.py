@@ -102,6 +102,25 @@ def _import_targets(path: Path) -> set[str]:
     return targets
 
 
+def test_all_internal_import_targets_resolve_without_self_imports() -> None:
+    unresolved: list[tuple[str, str]] = []
+    self_imports: list[str] = []
+
+    for path in PACKAGE_DIR.rglob("*.py"):
+        module_name = _module_name(path)
+        for target in _import_targets(path):
+            if target == module_name:
+                self_imports.append(str(path.relative_to(PACKAGE_DIR)))
+            if (
+                target.startswith("OpenPinch")
+                and importlib.util.find_spec(target) is None
+            ):
+                unresolved.append((str(path.relative_to(PACKAGE_DIR)), target))
+
+    assert unresolved == []
+    assert self_imports == []
+
+
 def test_layer_dependencies_follow_explicit_allowed_directions() -> None:
     observed_exceptions: dict[str, set[str]] = {}
     for layer, allowed_roots in LAYER_ALLOWED_ROOTS.items():

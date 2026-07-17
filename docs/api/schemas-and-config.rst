@@ -177,7 +177,14 @@ HPR Schemas
 The HPR schema layer carries the prepared configuration values, parsed backend
 state, and simulated-cycle annualized cost accounting used by the targeting
 services. Report-facing HPR cost fields use ``Value`` instances with serialized
-units ``$`` and ``$/y``.
+units ``$`` and ``$/y``. Internal parsed-state and backend-result records are
+attribute-only; call ``model_dump()`` only when mapping data is required. HPR
+optimiser configuration accepts the exact identifiers ``dual_annealing``,
+``cmaes``, ``bo``, and ``rbf_surrogate``.
+
+.. autoclass:: OpenPinch.contracts.hpr.HPRParsedState
+   :members:
+   :no-index:
 
 .. autoclass:: OpenPinch.contracts.hpr.HeatPumpTargetInputs
    :members:

@@ -56,3 +56,29 @@ uv run pytest -q --hypothesis-seed=20260715 \
 Verified result: 79 passed in 4.81 seconds. This covers process-duty
 classification, cascade collection union behavior, positive and negative
 duties, and strict segmented-profile invariants.
+
+## Residual Compatibility Shim Removal
+
+The integration gate covers four boundaries:
+
+- HPR cascade orchestration passes `period_idx` once to each helper and
+  propagates helper failures unchanged.
+- Parsed and backend HPR records flow through cycle targeting as attribute-only
+  Pydantic records.
+- Exact HPR optimiser identifiers cross the HPR-to-generic-optimisation adapter
+  without aliases.
+- Current `StreamCollection` state round-trips through `pickle` with period and
+  numeric-view behaviour intact.
+
+Run the architecture and sole protected-contract suites with the HPR owners:
+
+```bash
+uv run pytest -q \
+  tests/analysis/heat_pumps \
+  tests/architecture \
+  tests/e2e/test_main.py
+```
+
+No external endpoint or cleanup step is required. The tests operate on local
+fixtures and temporary paths only. The protected main suite includes all four
+canonical optimiser configuration values.

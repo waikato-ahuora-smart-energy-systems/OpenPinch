@@ -93,7 +93,7 @@ def test_calc_heat_pump_and_refrigeration_cascade_branches(
     monkeypatch.setattr(
         hp,
         "create_problem_table_with_t_int",
-        lambda streams, is_shifted=True: ProblemTable({PT.T: [120.0, 60.0]}),
+        lambda **_kwargs: ProblemTable({PT.T: [120.0, 60.0]}),
     )
     monkeypatch.setattr(
         hp,
@@ -157,7 +157,7 @@ def test_calc_hpr_cascade_uses_shared_temperature_intervals_for_hpr_and_air(
     monkeypatch.setattr(
         hp,
         "create_problem_table_with_t_int",
-        lambda streams, is_shifted=True: ProblemTable({PT.T: [120.0, 100.0, 60.0]}),
+        lambda **_kwargs: ProblemTable({PT.T: [120.0, 100.0, 60.0]}),
     )
     monkeypatch.setattr(
         hp,
@@ -207,7 +207,10 @@ def test_calc_hpr_cascade_uses_shared_temperature_intervals_for_hpr_and_air(
     np.testing.assert_allclose(out[PT.H_NET_COLD], np.array([9.0, 7.0, 6.0, 3.0]))
 
 
-def test_calc_hpr_cascade_forwards_selected_idx_to_nested_helpers(monkeypatch):
+@pytest.mark.parametrize("period_idx", [None, 3])
+def test_calc_hpr_cascade_forwards_period_idx_to_nested_helpers(
+    monkeypatch, period_idx
+):
     pt = ProblemTable(
         {
             PT.T: [120.0, 60.0],
@@ -222,7 +225,7 @@ def test_calc_hpr_cascade_forwards_selected_idx_to_nested_helpers(monkeypatch):
         hp,
         "create_problem_table_with_t_int",
         lambda **kwargs: (
-            calls.__setitem__("grid_idx", kwargs.get("period_idx"))
+            calls.__setitem__("grid_idx", kwargs["period_idx"])
             or ProblemTable({PT.T: [120.0, 60.0]})
         ),
     )
@@ -230,7 +233,7 @@ def test_calc_hpr_cascade_forwards_selected_idx_to_nested_helpers(monkeypatch):
         hp,
         "get_process_heat_cascade",
         lambda **kwargs: (
-            calls.__setitem__("air_idx", kwargs.get("period_idx"))
+            calls.__setitem__("air_idx", kwargs["period_idx"])
             or ProblemTable(
                 {
                     PT.T: [120.0, 60.0],
@@ -245,7 +248,7 @@ def test_calc_hpr_cascade_forwards_selected_idx_to_nested_helpers(monkeypatch):
         hp,
         "get_utility_heat_cascade",
         lambda **kwargs: (
-            calls.__setitem__("utility_idx", kwargs.get("period_idx"))
+            calls.__setitem__("utility_idx", kwargs["period_idx"])
             or {
                 "T_col": np.array(kwargs["T_int_vals"], dtype=float),
                 "updates": {
@@ -270,10 +273,14 @@ def test_calc_hpr_cascade_forwards_selected_idx_to_nested_helpers(monkeypatch):
         res,
         is_T_vals_shifted=True,
         is_heat_pumping=True,
-        period_idx=3,
+        period_idx=period_idx,
     )
 
-    assert calls == {"grid_idx": 3, "air_idx": 3, "utility_idx": 3}
+    assert calls == {
+        "grid_idx": period_idx,
+        "air_idx": period_idx,
+        "utility_idx": period_idx,
+    }
 
 
 def test_get_hpr_targets_forwards_selected_idx_to_preprocessing(monkeypatch):
@@ -1034,19 +1041,25 @@ def test_get_hpr_targets_rejects_unknown_backend(monkeypatch):
         )
 
 
-def test_calc_hpr_cascade_falls_back_for_helpers_without_period_idx(monkeypatch):
-    calls = {"grid": [], "air": [], "utility": []}
+@pytest.mark.parametrize(
+    ("failing_helper", "attribute"),
+    [
+        ("grid", "create_problem_table_with_t_int"),
+        ("air", "get_process_heat_cascade"),
+        ("utility", "get_utility_heat_cascade"),
+    ],
+)
+def test_calc_hpr_cascade_propagates_helper_type_error_once(
+    monkeypatch, failing_helper, attribute
+):
+    calls = {"grid": 0, "air": 0, "utility": 0}
 
-    def fake_problem_table_grid(**kwargs):
-        calls["grid"].append(kwargs)
-        if "period_idx" in kwargs:
-            raise TypeError("legacy helper")
+    def fake_problem_table_grid(**_kwargs):
+        calls["grid"] += 1
         return ProblemTable({PT.T: [120.0, 60.0]})
 
-    def fake_process_heat_cascade(**kwargs):
-        calls["air"].append(kwargs)
-        if "period_idx" in kwargs:
-            raise TypeError("legacy helper")
+    def fake_process_heat_cascade(**_kwargs):
+        calls["air"] += 1
         return ProblemTable(
             {
                 PT.T: [120.0, 60.0],
@@ -1057,9 +1070,7 @@ def test_calc_hpr_cascade_falls_back_for_helpers_without_period_idx(monkeypatch)
         )
 
     def fake_utility_heat_cascade(**kwargs):
-        calls["utility"].append(kwargs)
-        if "period_idx" in kwargs:
-            raise TypeError("legacy helper")
+        calls["utility"] += 1
         return {
             "T_col": np.array(kwargs["T_int_vals"], dtype=float),
             "updates": {
@@ -1069,9 +1080,20 @@ def test_calc_hpr_cascade_falls_back_for_helpers_without_period_idx(monkeypatch)
             },
         }
 
-    monkeypatch.setattr(hp, "create_problem_table_with_t_int", fake_problem_table_grid)
-    monkeypatch.setattr(hp, "get_process_heat_cascade", fake_process_heat_cascade)
-    monkeypatch.setattr(hp, "get_utility_heat_cascade", fake_utility_heat_cascade)
+    helpers = {
+        "grid": fake_problem_table_grid,
+        "air": fake_process_heat_cascade,
+        "utility": fake_utility_heat_cascade,
+    }
+
+    def fail_once(**_kwargs):
+        calls[failing_helper] += 1
+        raise TypeError("internal helper failure")
+
+    monkeypatch.setattr(hp, "create_problem_table_with_t_int", helpers["grid"])
+    monkeypatch.setattr(hp, "get_process_heat_cascade", helpers["air"])
+    monkeypatch.setattr(hp, "get_utility_heat_cascade", helpers["utility"])
+    monkeypatch.setattr(hp, attribute, fail_once)
 
     ambient_streams = StreamCollection()
     ambient_streams.add(
@@ -1091,23 +1113,16 @@ def test_calc_hpr_cascade_falls_back_for_helpers_without_period_idx(monkeypatch)
         amb_streams=ambient_streams,
     )
 
-    out = hp._calc_hpr_cascade(
-        pt,
-        res,
-        is_T_vals_shifted=True,
-        is_heat_pumping=False,
-        period_idx=5,
-    )
+    with pytest.raises(TypeError, match="internal helper failure"):
+        hp._calc_hpr_cascade(
+            pt,
+            res,
+            is_T_vals_shifted=True,
+            is_heat_pumping=False,
+            period_idx=5,
+        )
 
-    assert "period_idx" in calls["grid"][0]
-    assert "period_idx" not in calls["grid"][1]
-    assert "period_idx" in calls["air"][0]
-    assert "period_idx" not in calls["air"][1]
-    assert "period_idx" in calls["utility"][0]
-    assert "period_idx" not in calls["utility"][1]
-    np.testing.assert_allclose(out[PT.H_NET_RFRG], np.array([3.0, -3.0]))
-    np.testing.assert_allclose(out[PT.H_HOT_RFRG], np.array([0.0, -3.0]))
-    np.testing.assert_allclose(out[PT.H_COLD_RFRG], np.array([3.0, 0.0]))
+    assert calls[failing_helper] == 1
 
 
 def test_hpr_handler_registry_includes_brayton():

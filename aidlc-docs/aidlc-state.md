@@ -66,6 +66,14 @@
   clean-wheel tests, stale-path scans, and patch hygiene pass. Overall quality
   is 9.3/10 and Test Gates are 9.6/10. Generated code awaits explicit user
   review before Code Generation is closed.
+- **Generated-code review finding**: The package/import facade cleanup is
+  structurally complete, but a package-wide audit found residual behavioural
+  compatibility machinery: three HPR `TypeError` retries for helpers that now
+  accept `period_idx`, mapping-style access on typed HPR state/result records,
+  non-canonical optimiser spellings, and legacy `StreamCollection` pickle-state
+  repair. Public and convenience naming aliases also remain and require a
+  separate canonical-name decision. These findings are open; no runtime code
+  was changed by the audit.
 - **Deferred Follow-up**: Exact logarithmic LMTD in the continuous NLP
   formulation may be revisited later; it is not an immediate next step, and
   the Chen surrogate remains the accepted baseline
@@ -238,6 +246,11 @@
 - [x] CONSTRUCTION - Code Generation Part 1 explicit approval.
 - [x] CONSTRUCTION - Code Generation Part 2 implementation.
 - [x] CONSTRUCTION - Build and Test.
+- [x] CONSTRUCTION - Package-wide compatibility shim audit.
+- **Compatibility audit outcome**: Import facades, dynamic barrels, reverse
+  re-exports, module injections, and Pydantic field aliases are absent. Four
+  residual behavioural shim groups and several duplicate naming aliases remain
+  for generated-code review.
 - [x] OPERATIONS - N/A; no deployment work requested.
 - **External contract**: Only
   `OpenPinch.main.pinch_analysis_service` is compatibility protected.
@@ -373,3 +386,69 @@
   `aidlc-docs/construction/build-and-test/build-and-test-summary.md`.
 - **Current gate**: Build and Test is complete; explicit approval is required
   before closing at the Operations placeholder.
+
+## Residual Compatibility Shim Removal Progress
+
+- [x] CONSTRUCTION - Code Generation Part 1 plan approved by the user's explicit
+  implementation request.
+- [x] CONSTRUCTION - Baseline findings, affected owners, and protected main
+  contract verified.
+- [x] CONSTRUCTION - Obsolete HPR helper retries removed and verified.
+- [x] CONSTRUCTION - HPR typed records made attribute-only and verified.
+- [x] CONSTRUCTION - Optimiser identifiers restricted to canonical values.
+- [x] CONSTRUCTION - Legacy `StreamCollection` pickle repair removed.
+- [x] CONSTRUCTION - Documentation and release notes updated.
+- [x] CONSTRUCTION - Focused and complete Build and Test gates passed.
+- [x] CONSTRUCTION - Code Generation summary and review handoff complete.
+- **Current stage**: Build and Test complete; generated code awaits explicit
+  review. Operations is N/A because no deployment work was requested. The focused gate
+  passed 277 tests; the complete non-solver gate passed 2,063 tests with four
+  solver-tagged tests deselected. Ruff, warning-free Sphinx, stale-surface, and
+  patch-hygiene gates pass.
+- **Protected external contract**: `OpenPinch.main.pinch_analysis_service` and its
+  canonical request/response behaviour remain unchanged.
+- **Compatibility policy**: Intentional clean break for unsupported internals;
+  no deprecation period, aliases, migration loaders, or warnings.
+- **Plan**:
+  `aidlc-docs/construction/plans/residual-compatibility-shims-code-generation-plan.md`.
+- **Implementation summary**:
+  `aidlc-docs/construction/residual-compatibility-shim-removal/code/implementation-summary.md`.
+- **Build and Test summary**:
+  `aidlc-docs/construction/build-and-test/build-and-test-summary.md`.
+- **Extensions**: Security and Resiliency disabled (N/A); partial PBT is N/A
+  because no numerical algorithm changes.
+
+## Post-Implementation Import and Type Audit
+
+- [x] Resolve every internal import target statically, including imports under
+  `TYPE_CHECKING`.
+- [x] Cold-import all 301 discoverable package modules.
+- [x] Run repository-wide Pylint error analysis and classify dynamic-model false
+  positives separately from reproducible defects.
+- [x] Reproduce candidate runtime failures directly.
+- **Runtime import status**: all 301 package modules import successfully in the
+  locked development environment.
+- **Open findings**: two unresolved type-only module imports, one redundant
+  self-import/type redefinition, one wrong period keyword causing a runtime
+  `TypeError`, and one uninitialized heat-transfer result for unsupported row
+  counts.
+- **Type-gate limitation**: no mypy, Pyright, basedpyright, or `ty` executable or
+  configuration is present; the audit used AST resolution, runtime imports, and
+  Pylint error analysis.
+- **Current stage**: Generated-code review; findings reported for explicit fix
+  approval.
+
+## Post-Implementation Import and Type Fix Progress
+
+- [x] Code Generation plan approved by the user's explicit fix request.
+- [x] Five findings reproduced and classified.
+- [x] Regression tests added.
+- [x] Type-only imports and Zone self-import corrected.
+- [x] Total-site keyword and crossflow validation corrected.
+- [x] Focused and complete quality gates passed: 96 focused tests and 2,067
+  non-solver tests pass; four solver-tagged tests are deselected.
+- [x] Evidence and review handoff complete.
+- **Current stage**: Code Generation and Build and Test complete; generated-code
+  review requested. All five findings are resolved.
+- **Plan**:
+  `aidlc-docs/construction/plans/post-implementation-import-type-fixes-code-generation-plan.md`.

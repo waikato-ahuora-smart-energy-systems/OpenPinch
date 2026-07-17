@@ -241,7 +241,7 @@ def _build_site_utility_profile(
         hot_streams=hot_utilities,
         cold_streams=cold_utilities,
         is_shifted=is_shifted,
-        idx=idx,
+        period_idx=idx,
     )
     h_net_ut = pt_ut[PT.H_HOT] - pt_ut[PT.H_COLD]
     return {

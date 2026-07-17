@@ -401,59 +401,41 @@ def _calc_hpr_cascade(
     period_idx: int | None = None,
 ) -> ProblemTable:
     # Add new temperature intervals to the process heat cascade
-    pt_grid_kwargs = {
-        "streams": (
+    pt_hpr_grid = create_problem_table_with_t_int(
+        streams=(
             res.hpr_hot_streams
             + res.hpr_cold_streams
             + res.amb_streams.get_hot_streams()
             + res.amb_streams.get_cold_streams()
         ),
-        "is_shifted": is_T_vals_shifted,
-    }
-    if period_idx is not None:
-        pt_grid_kwargs["period_idx"] = period_idx
-    try:
-        pt_hpr_grid = create_problem_table_with_t_int(**pt_grid_kwargs)
-    except TypeError:
-        pt_grid_kwargs.pop("period_idx", None)
-        pt_hpr_grid = create_problem_table_with_t_int(**pt_grid_kwargs)
+        is_shifted=is_T_vals_shifted,
+        period_idx=period_idx,
+    )
     pt.share_temperature_intervals(pt_hpr_grid)
 
     # Ambient air addition to the process stream set
     pt[PT.H_NET_W_AIR] = pt[PT.H_NET_A]
     if len(res.amb_streams) > 0:
-        pt_air_kwargs = {
-            "hot_streams": res.amb_streams.get_hot_streams(),
-            "cold_streams": res.amb_streams.get_cold_streams(),
-            "is_shifted": is_T_vals_shifted,
-            "is_full_analysis": True,
-        }
-        if period_idx is not None:
-            pt_air_kwargs["period_idx"] = period_idx
-        try:
-            pt_air = get_process_heat_cascade(**pt_air_kwargs)
-        except TypeError:
-            pt_air_kwargs.pop("period_idx", None)
-            pt_air = get_process_heat_cascade(**pt_air_kwargs)
+        pt_air = get_process_heat_cascade(
+            hot_streams=res.amb_streams.get_hot_streams(),
+            cold_streams=res.amb_streams.get_cold_streams(),
+            is_shifted=is_T_vals_shifted,
+            is_full_analysis=True,
+            period_idx=period_idx,
+        )
         pt.share_temperature_intervals(pt_air)
         pt[PT.H_NET_W_AIR] += pt_air[PT.H_NET]
         pt[PT.H_NET_HOT] += pt_air[PT.H_NET_HOT]
         pt[PT.H_NET_COLD] += pt_air[PT.H_NET_COLD]
 
     # Heat pump or refrigeration cascade
-    hpr_cascade_kwargs = {
-        "T_int_vals": pt[PT.T],
-        "hot_utilities": res.hpr_hot_streams,
-        "cold_utilities": res.hpr_cold_streams,
-        "is_shifted": is_T_vals_shifted,
-    }
-    if period_idx is not None:
-        hpr_cascade_kwargs["period_idx"] = period_idx
-    try:
-        hpr_profile = get_utility_heat_cascade(**hpr_cascade_kwargs)
-    except TypeError:
-        hpr_cascade_kwargs.pop("period_idx", None)
-        hpr_profile = get_utility_heat_cascade(**hpr_cascade_kwargs)
+    hpr_profile = get_utility_heat_cascade(
+        T_int_vals=pt[PT.T],
+        hot_utilities=res.hpr_hot_streams,
+        cold_utilities=res.hpr_cold_streams,
+        is_shifted=is_T_vals_shifted,
+        period_idx=period_idx,
+    )
     hpr_updates = hpr_profile["updates"]
     if is_heat_pumping:
         pt.update(

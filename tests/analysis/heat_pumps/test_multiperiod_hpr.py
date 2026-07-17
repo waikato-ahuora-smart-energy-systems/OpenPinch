@@ -150,7 +150,7 @@ def test_solve_hpr_multiperiod_placement_scores_weighted_shared_vector(
         selected_period_idx=0,
         hpr_type=HPRcycle.CascadeCarnot.value,
         max_multi_start=2,
-        bb_minimiser="rbf",
+        bb_minimiser="rbf_surrogate",
     )
 
     def objective(x, args, debug=False):
@@ -220,7 +220,7 @@ def test_shared_hpr_candidate_score_uses_weighted_operation_and_peak_capital(
         selected_period_idx=0,
         hpr_type=HPRcycle.CascadeCarnot.value,
         max_multi_start=2,
-        bb_minimiser="rbf",
+        bb_minimiser="rbf_surrogate",
     )
 
     def objective(x, args, debug=False):
@@ -289,7 +289,7 @@ def test_shared_hpr_candidate_score_falls_back_when_cost_breakdown_absent():
         selected_period_idx=0,
         hpr_type=HPRcycle.CascadeCarnot.value,
         max_multi_start=1,
-        bb_minimiser="rbf",
+        bb_minimiser="rbf_surrogate",
     )
 
     def objective(x, args, debug=False):
@@ -338,7 +338,7 @@ def test_solve_hpr_multiperiod_placement_fails_when_any_period_fails(monkeypatch
         selected_period_idx=0,
         hpr_type=HPRcycle.CascadeCarnot.value,
         max_multi_start=1,
-        bb_minimiser="rbf",
+        bb_minimiser="rbf_surrogate",
     )
 
     def objective(x, args, debug=False):

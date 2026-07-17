@@ -178,9 +178,9 @@ def test_compute_parallel_carnot_objective_handles_mixed_lift_without_ambiguous_
         np.array([0.0, 0.0, 0.0, 0.25, 0.25, 1.0, 0.5, 1.0]), args
     )
 
-    assert np.isfinite(res["obj"])
-    assert np.isfinite(res["utility_tot"])
-    assert res["Q_cond"].shape == (2,)
+    assert np.isfinite(res.obj)
+    assert np.isfinite(res.utility_tot)
+    assert res.Q_cond.shape == (2,)
 
 
 def test_compute_parallel_carnot_utility_total_includes_residual_cold_utility():
@@ -206,8 +206,8 @@ def test_compute_parallel_carnot_utility_total_includes_residual_cold_utility():
 
     res = _compute_parallel_carnot_hp_opt_obj(np.array([0.0, 0.5, 0.5, 1.0, 1.0]), args)
 
-    assert res["Q_ext"] > 0.0
-    assert np.isclose(res["utility_tot"], res["w_net"] + res["Q_ext"])
+    assert res.Q_ext > 0.0
+    assert np.isclose(res.utility_tot, res.w_net + res.Q_ext)
 
 
 def test_parse_parallel_carnot_state_variables_uses_bounded_ambient_mapping():
@@ -229,12 +229,12 @@ def test_parse_parallel_carnot_state_variables_uses_bounded_ambient_mapping():
         args,
     )
 
-    np.testing.assert_allclose(vars["T_cond"], np.array([75.0]))
-    np.testing.assert_allclose(vars["T_evap"], np.array([65.0]))
-    assert vars["Q_amb_hot"] == 0.0
-    assert np.isclose(vars["Q_amb_cold"], 200.0 * np.arctanh(0.5))
-    assert vars["Q_heat_base"] == pytest.approx(200.0 + 200.0 * np.arctanh(0.5))
-    np.testing.assert_allclose(vars["x_heat_split"], np.array([1.0]))
+    np.testing.assert_allclose(vars.T_cond, np.array([75.0]))
+    np.testing.assert_allclose(vars.T_evap, np.array([65.0]))
+    assert vars.Q_amb_hot == 0.0
+    assert np.isclose(vars.Q_amb_cold, 200.0 * np.arctanh(0.5))
+    assert vars.Q_heat_base == pytest.approx(200.0 + 200.0 * np.arctanh(0.5))
+    np.testing.assert_allclose(vars.x_heat_split, np.array([1.0]))
 
 
 def test_parallel_carnot_optimise_normalises_stage_count_and_delegates(monkeypatch):

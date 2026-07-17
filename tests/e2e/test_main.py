@@ -97,6 +97,21 @@ def test_pinch_analysis_service_accepts_mapping_and_default_project() -> None:
 
 
 @pytest.mark.parametrize(
+    "optimiser_identifier",
+    ["dual_annealing", "cmaes", "bo", "rbf_surrogate"],
+)
+def test_pinch_analysis_service_accepts_canonical_optimiser_identifiers(
+    optimiser_identifier: str,
+) -> None:
+    data = json.loads((EXAMPLE_INPUTS / "p_illustrative.json").read_text())
+    data["options"] = {"HPR_BB_MINIMISER": optimiser_identifier}
+
+    result = pinch_analysis_service(data, project_name="Canonical Optimiser")
+
+    assert result.name == "Canonical Optimiser"
+
+
+@pytest.mark.parametrize(
     "problem_path",
     _example_problem_filepaths(),
     ids=lambda path: path.name,

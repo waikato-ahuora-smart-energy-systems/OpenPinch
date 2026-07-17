@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from ..domain.stream_collection import StreamCollection
-    from .config import Configuration
+    from .configuration import Configuration
 
 
 class CogenerationTarget(Protocol):

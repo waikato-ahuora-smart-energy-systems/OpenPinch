@@ -13,7 +13,6 @@ from .targets import BaseTargetModel
 
 if TYPE_CHECKING:
     from .stream import Stream
-    from .zone import Zone
 
 
 class Zone:

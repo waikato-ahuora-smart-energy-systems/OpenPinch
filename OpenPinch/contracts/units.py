@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 from ..domain.value import Value
 
 if TYPE_CHECKING:
-    from .config import Configuration
+    from ..domain.configuration import Configuration
 
 
 @dataclass(frozen=True)

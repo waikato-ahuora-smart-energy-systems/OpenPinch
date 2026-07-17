@@ -1585,3 +1585,228 @@ The Sphinx build is configured to treat warnings as errors (-W flag), so these i
 **Context**: CONSTRUCTION - Post-review Ruff diagnosis complete. The documentation and Ruff failures share one root cause: the HEN results source owner was absent from the submitted Git-visible change. No lint suppression or unrelated import rewrite was introduced.
 
 ---
+
+## Architecture Modernization - Compatibility Shim Audit Request
+**Timestamp**: 2026-07-17T02:23:49Z
+**User Input**: "Check for compatibility shims throughout the package."
+**AI Response**: "Started a package-wide read-only audit for deprecated aliases, forwarding modules, dynamic re-exports, import fallbacks, legacy signatures, and pickle-path accommodations. The review will distinguish the sole protected main service contract and intentional public APIs from compatibility-only machinery."
+**Context**: CONSTRUCTION - Package architecture modernization generated-code review. Security and Resiliency are disabled (N/A); partial PBT is N/A for this structural audit unless behavioural compatibility code is changed.
+
+---
+
+## Architecture Modernization - Compatibility Shim Audit Completion
+**Timestamp**: 2026-07-17T02:30:43Z
+**User Input**: "No new user input."
+**AI Response**: "Completed the package-wide read-only audit. Import and package facades are absent: package markers are import-free, retired paths do not resolve, no imported symbol is re-exported through __all__, and no dynamic module injection, reverse barrel, or Pydantic field alias remains. Four residual behavioural compatibility groups were confirmed: HPR TypeError retries for obsolete helper signatures, mapping emulation on typed HPR records, legacy optimiser spellings, and StreamCollection legacy pickle-state repair. Additional enum/schema/property and graph-selector aliases are duplicate naming or convenience surfaces rather than import facades. Forty-two focused architecture and HEN compatibility-absence tests passed."
+**Context**: CONSTRUCTION - Package architecture modernization generated-code review. The audit is complete and findings remain open for a separately approved removal change. Security and Resiliency are disabled (N/A); partial PBT is N/A because this interaction changed no runtime behaviour.
+
+---
+
+## Residual Compatibility Shim Removal - Code Generation Approval
+**Timestamp**: 2026-07-17T02:42:44Z
+**User Input**: "PLEASE IMPLEMENT THIS PLAN:
+# Remove the Four Residual Compatibility Shims
+
+## Summary
+
+Remove the four behavioural compatibility mechanisms identified by the package audit while preserving `OpenPinch.main.pinch_analysis_service`, its accepted canonical configuration values, numerical behaviour, and current-version serialization.
+
+This is an intentional clean break for unsupported internal APIs. No deprecation period, aliases, migration loader, or compatibility warning is added.
+
+## Implementation Changes
+
+1. **Remove obsolete HPR helper retries**
+
+   - Replace the three `try/except TypeError` retry blocks in heat-pump cascade processing with single direct calls that always pass `period_idx`, including `None`.
+   - Allow helper exceptions to propagate unchanged; do not catch broad `TypeError`.
+   - Delete the legacy-signature fallback test.
+   - Retain and strengthen the existing test that verifies all three helpers receive the selected period index.
+   - Add a parameterized regression proving an internal `TypeError` propagates and the failing helper is called exactly once.
+
+2. **Make typed HPR records attribute-only**
+
+   - Remove `__getitem__()` and `get()` from `HPRParsedState`.
+   - Remove `__getitem__()`, `get()`, and `__contains__()` from `HPRBackendResult`.
+   - Keep computed properties, `with_updates()`, `failure()`, `to_output_fields()`, Pydantic validation, and model serialization unchanged.
+   - Rewrite tests to use attributes and `model_dump()` where mapping data is actually required.
+   - Add an architecture regression asserting these typed records do not expose dictionary-emulation methods.
+
+3. **Accept only canonical optimiser identifiers**
+
+   - Delete `_METHOD_ALIASES` and reject all non-canonical spellings.
+   - Rename `normalise_hpr_method()` to the private `_resolve_hpr_optimisation_method()` and remove the old name from `__all__`.
+   - Accept only `dual_annealing`, `cmaes`, `bo`, and `rbf_surrogate`, plus corresponding enum instances; retain `None` as the existing default-selection path.
+   - Preserve `BB_Minimiser` as configuration metadata so the protected main contract and frontend enum choices remain unchanged.
+   - Replace direct internal/test uses of `rbf` and other aliases with canonical values.
+   - Test all four canonical values, enum input, `None`, invalid strings, whitespace/case variants, and non-string values.
+
+4. **Remove legacy `StreamCollection` pickle repair**
+
+   - Remove the missing-`_numeric_cache` repair from `__setstate__()` and the fallback default for missing `_sort_spec` in `__getstate__()`.
+   - Preserve current-version pickle support, including deterministic fallback when a configured callable sort key is not picklable.
+   - Delete tests that manually construct old state dictionaries.
+   - Add a real current-version pickle round trip covering stream order, period context, numeric-view operation, callable-sort fallback, and independence after restoration.
+   - Provide no special error or migration path for old pickles; unsupported state may fail naturally.
+
+## API and Documentation
+
+- `OpenPinch.main.pinch_analysis_service` and its canonical request/response behaviour remain unchanged.
+- Unsupported direct callers lose HPR mapping access, non-canonical optimiser spellings, old helper-signature retries, and old `StreamCollection` pickle repair.
+- Update HPR reference documentation and release notes to state that internal records are attribute-only and optimiser identifiers are exact.
+- Run stale searches for legacy helper tests, `_METHOD_ALIASES`, mapping-emulation methods, non-canonical optimiser strings, and legacy pickle-repair wording.
+- Update the AI-DLC checklist, state, audit, implementation summary, and build/test evidence immediately as each step completes.
+
+## Test Plan
+
+- Run focused HPR contract, targeting, optimiser-adapter, configuration, and stream-collection tests.
+- Run the protected end-to-end main contract suite, including validation of all four canonical optimiser values.
+- Run architecture tests confirming retired facades remain absent and the removed shim surfaces do not return.
+- Run the complete non-solver suite, available affected HPR tests, Ruff lint and format checks, warning-free Sphinx, and `git diff --check`.
+- Confirm test names and assertions describe canonical behaviour rather than compatibility implementation details.
+
+## Assumptions
+
+- The “four issues” are the HPR retry fallback, HPR mapping emulation, optimiser spelling aliases, and legacy pickle-state repair; the broader enum, schema, `Stream`, graph-selector, and documentation-navigation alias inventory is out of scope.
+- Unit-category aliases remain because they are intentional behaviour reachable through the protected main contract.
+- Optional-dependency guards, rendering adapters, and OpenHENS numerical/source-parity structures are not compatibility shims and remain unchanged.
+- Security and Resiliency extensions remain disabled; partial property-based-testing requirements are N/A because no numerical algorithm changes."
+**AI Response**: "Accepted the implementation plan as explicit Code Generation approval. Verified the four audited findings and protected contract, created a detailed ten-step checkbox plan, recorded extension applicability, and began dependency-ordered implementation with the obsolete HPR helper retries."
+**Context**: CONSTRUCTION - Code Generation Parts 1 and 2. Steps 1 and 2 completed in this interaction; Step 3 active. Security and Resiliency are disabled (N/A); partial PBT is N/A because no numerical algorithm changes.
+
+---
+
+## Residual Compatibility Shim Removal - HPR Helper Calls
+**Timestamp**: 2026-07-17T02:47:10Z
+**User Input**: "No new user input."
+**AI Response**: "Removed all three broad TypeError retry paths from HPR cascade processing. Grid, ambient-process, and utility helpers now receive period_idx exactly once, including None. Replaced the legacy-signature fallback test with parameterized behavioural regressions for explicit period forwarding and unchanged single-call TypeError propagation. Six focused cascade tests passed."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 3 complete; Step 4 active. Security and Resiliency are disabled (N/A); partial PBT is N/A because no numerical algorithm changed.
+
+---
+
+## Residual Compatibility Shim Removal - Attribute-Only HPR Records
+**Timestamp**: 2026-07-17T02:48:37Z
+**User Input**: "No new user input."
+**AI Response**: "Removed __getitem__ and get from HPRParsedState and removed __getitem__, get, and __contains__ from HPRBackendResult. Contract tests now use attributes and model_dump while retaining computed properties, update helpers, failure construction, and output projection. Added an architecture regression against dictionary emulation. All 14 focused contract and API-boundary tests passed."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 4 complete; Step 5 active. Security and Resiliency are disabled (N/A); partial PBT is N/A.
+
+---
+
+## Residual Compatibility Shim Removal - Canonical Optimiser Identifiers
+**Timestamp**: 2026-07-17T02:51:00Z
+**User Input**: "No new user input."
+**AI Response**: "Deleted the optimiser alias table and public normalise_hpr_method helper. HPR candidate search now uses a private exact resolver accepting only dual_annealing, cmaes, bo, rbf_surrogate, their enum values, and the existing None default. Updated direct inputs and added rejection coverage for aliases, case changes, whitespace, and non-string values. Added protected-main validation for all four canonical identifiers. All 51 focused optimiser, multiperiod, and main-contract selections passed."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 5 complete; Step 6 active. BB_Minimiser remains configuration metadata. Security and Resiliency are disabled (N/A); partial PBT is N/A.
+
+---
+
+## Residual Compatibility Shim Removal - Current-Version Pickling
+**Timestamp**: 2026-07-17T02:53:05Z
+**User Input**: "No new user input."
+**AI Response**: "Removed the missing-_numeric_cache repair and missing-_sort_spec fallback from StreamCollection state handling. Current-version pickle support now has a real round-trip regression covering period identifiers and weights, deterministic non-picklable callable-sort fallback, stream order, period-indexed numeric views, and restored-instance independence. Removed manually constructed old-state tests. All four focused pickle and edge selections passed."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 6 complete; Step 7 active. Unsupported old pickle state receives no migration path or special error. Security and Resiliency are disabled (N/A); partial PBT is N/A.
+
+---
+
+## Residual Compatibility Shim Removal - Documentation and Stale Surfaces
+**Timestamp**: 2026-07-17T02:54:21Z
+**User Input**: "No new user input."
+**AI Response**: "Updated both HPR API references and release notes to document attribute-only internal records, exact optimiser identifiers, single-signature helper calls, and current-version-only StreamCollection pickle support. Added the focused implementation summary. Source/test stale scans found no retired fallback test, alias table, HPR mapping methods, old pickle repair, or noncanonical runtime optimiser input. All 15 documentation-consistency tests passed."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 7 complete; Step 8 active. Ignored generated docs/_build output was excluded from source stale checks and will be replaced by the warning-free Sphinx gate. Security and Resiliency are disabled (N/A); partial PBT is N/A.
+
+---
+
+## Residual Compatibility Shim Removal - Focused Integration Gate
+**Timestamp**: 2026-07-17T02:55:30Z
+**User Input**: "No new user input."
+**AI Response**: "Ran the combined HPR contract, targeting, optimisation-adapter, multiperiod, configuration, StreamCollection, model round-trip, complete architecture, and protected-main suites. All 277 tests passed."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 8 complete; Step 9 complete quality matrix active. Security and Resiliency are disabled (N/A); partial PBT is N/A.
+
+---
+
+## Residual Compatibility Shim Removal - Complete Quality Matrix
+**Timestamp**: 2026-07-17T03:03:32Z
+**User Input**: "No new user input."
+**AI Response**: "The first complete non-solver run exposed 15 stale cycle-test assertions that still used dictionary syntax on typed HPR records. Migrated those assertions and parser doubles to attribute-based HPR records; all 37 affected cycle tests then passed. The clean rerun passed 2,063 tests with four solver-tagged tests deselected. A fresh 60-source Sphinx build passed with -E -W, Ruff lint passed, Ruff formatting confirmed all 459 Python files formatted, retired-surface scans were empty, and git diff --check passed."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 9 complete; Step 10 evidence finalization active. Solver tests are unaffected by this non-numerical compatibility cleanup and remain separately classified. Security and Resiliency are disabled (N/A); partial PBT is N/A.
+
+---
+
+## Residual Compatibility Shim Removal - Code Generation Completion
+**Timestamp**: 2026-07-17T03:06:24Z
+**User Input**: "No new user input."
+**AI Response**: "Completed all ten approved Code Generation checklist steps. Removed the four residual compatibility mechanisms, migrated all affected behavioural tests and documentation, produced the implementation summary, and finalized reproducible Build and Test evidence. The protected OpenPinch.main.pinch_analysis_service implementation and signature were not changed."
+**Context**: CONSTRUCTION - Code Generation Part 2 complete; generated code ready for review. Security and Resiliency are disabled and compliant as N/A. Partial PBT is N/A because no numerical algorithm changed; deterministic regressions cover each removed behaviour.
+
+---
+
+## Build and Test Stage
+**Timestamp**: 2026-07-17T03:06:24Z
+**User Input**: "No new user input."
+**Build Status**: Success
+**Test Status**: Pass
+**Files Generated or Updated**:
+- build-instructions.md
+- unit-test-instructions.md
+- integration-test-instructions.md
+- performance-test-instructions.md
+- build-and-test-summary.md
+**AI Response**: "Build and Test completed successfully: isolated OpenPinch 0.5.0 wheel and source distributions built; 277 focused and 2,063 complete non-solver tests passed; four solver-tagged tests were deselected and not counted as passes; fresh warning-free Sphinx, Ruff lint/format, stale-surface scans, and patch hygiene passed."
+**Context**: CONSTRUCTION - Build and Test complete. Operations is N/A because no deployment or infrastructure work was requested. Explicit generated-code and build-evidence review is required.
+
+---
+
+## Post-Implementation Unresolved Import and Type Audit Request
+**Timestamp**: 2026-07-17T03:07:34Z
+**User Input**: "Check for unresolved imports including type errors, such as in OpenPinch/domain/enums.py"
+**AI Response**: "Started a package-wide read-only import and static-type audit, with explicit inspection of TYPE_CHECKING-only imports and OpenPinch/domain/enums.py. Confirmed an initial suspicious reference from enums.py to the absent domain.config module; broader validation is in progress before classifying findings."
+**Context**: CONSTRUCTION - generated-code review. This interaction is diagnostic; no production fix is inferred until the package-wide finding set is established.
+
+---
+
+## Post-Implementation Unresolved Import and Type Audit Completion
+**Timestamp**: 2026-07-17T03:11:55Z
+**User Input**: "No new user input."
+**AI Response**: "Completed the package-wide diagnostic audit. All 301 discoverable OpenPinch modules import successfully at runtime. Static resolution found exactly two missing internal modules, both TYPE_CHECKING-only: OpenPinch.domain.config and OpenPinch.contracts.config. Pylint error analysis plus direct reproduction confirmed a wrong idx keyword in total-site utility profile construction, an uninitialized crossflow effectiveness result for Rows <= 0, and a Zone TYPE_CHECKING self-import/redefinition. Dynamic Pyomo, Pydantic, NumPy, and SciPy diagnostics were classified as false positives after source/runtime inspection. No production files were changed."
+**Context**: CONSTRUCTION - generated-code review diagnostic complete. Open findings require explicit fix approval. Security and Resiliency remain disabled (N/A); partial PBT is N/A for this read-only audit.
+
+---
+
+## Post-Implementation Import and Type Fix Approval
+**Timestamp**: 2026-07-17T03:14:47Z
+**User Input**: "Fix these please."
+**AI Response**: "Accepted explicit approval to fix all five confirmed findings. Created a seven-step regression-first Code Generation checklist covering type-import ownership, Zone self-import removal, total-site period forwarding, crossflow row validation, focused verification, and the complete non-solver gate."
+**Context**: CONSTRUCTION - Code Generation Parts 1 and 2. Steps 1 and 2 complete; Step 3 active. Security and Resiliency are disabled (N/A); partial PBT is N/A because no numerical algorithm changes.
+
+---
+
+## Post-Implementation Import and Type Fix Regressions
+**Timestamp**: 2026-07-17T03:14:47Z
+**User Input**: "No new user input."
+**AI Response**: "Added architecture coverage requiring every internal import target to resolve and prohibiting module self-imports, strengthened total-site coverage with an explicit period_idx-only helper signature, and added invalid crossflow row-count validation cases. The pre-fix run produced the expected five failures."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 3 complete; Steps 4 and 5 active. Security and Resiliency disabled (N/A); partial PBT N/A.
+
+---
+
+## Post-Implementation Import and Type Corrections
+**Timestamp**: 2026-07-17T03:16:33Z
+**User Input**: "No new user input."
+**AI Response**: "Corrected Configuration type imports to their concrete domain owner, removed the Zone self-import, forwarded total-site period_idx with the canonical keyword, and made CrossflowUnmixedEff2 reject non-positive or non-integral row counts explicitly. All five regression cases pass."
+**Context**: CONSTRUCTION - Code Generation Part 2, Steps 4 and 5 complete; Step 6 active. The protected main service is unchanged. Security and Resiliency disabled (N/A); partial PBT N/A.
+
+---
+
+## Post-Implementation Import and Type Focused Verification
+**Timestamp**: 2026-07-17T03:18:03Z
+**User Input**: "No new user input."
+**AI Response**: "The 96-test architecture, total-site, and heat-transfer gate passed. All 301 discoverable package modules import successfully. Targeted Pylint error analysis is clean after making the validated row branches structurally exhaustive. Repository-wide Ruff lint and formatting of 459 Python files pass, as does git diff --check."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 6 complete; Step 7 complete non-solver suite active. Security and Resiliency disabled (N/A); partial PBT N/A.
+
+---
+
+## Post-Implementation Import and Type Fix Completion
+**Timestamp**: 2026-07-17T03:20:27Z
+**User Input**: "No new user input."
+**AI Response**: "Completed all seven approved checklist steps. The complete non-solver suite passed 2,067 tests with four solver-tagged tests deselected. All 301 modules import, the targeted Pylint error gate is clean, Ruff lint and formatting pass for 459 Python files, and patch hygiene passes. Updated release notes, implementation evidence, state, audit, and Build and Test evidence."
+**Context**: CONSTRUCTION - Code Generation and Build and Test complete; generated code ready for review. Security and Resiliency disabled (N/A); partial PBT N/A. The protected main service remains unchanged.
+
+---

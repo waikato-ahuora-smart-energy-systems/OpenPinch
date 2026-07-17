@@ -1,6 +1,7 @@
 """Regression tests for the stream collection classes."""
 
 import csv
+import pickle
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -207,20 +208,8 @@ def test_numeric_view_updates_after_collection_mutation(sample_streams):
     assert sc.numeric_view().cp.shape == (2,)
 
 
-def test_numeric_view_none_values_and_legacy_pickle_state_rebuild_cache():
+def test_numeric_view_handles_none_values():
     assert np.isnan(value_at_idx(None))
-
-    stream = Stream(name="H1", t_supply=200, t_target=120, heat_flow=80.0)
-    sc = StreamCollection([stream])
-    state = sc.__getstate__()
-    state.pop("_numeric_cache", None)
-
-    restored = StreamCollection()
-    del restored.__dict__["_numeric_cache"]
-    restored.__setstate__(state)
-
-    assert restored._numeric_cache == {}
-    assert restored[0].name == "H1"
 
 
 def test_get_hot_streams_filters_and_preserves_sort_settings():
@@ -757,19 +746,47 @@ def test_stream_collection_period_context_validation_and_adoption_edges():
         right + different
 
 
-def test_stream_collection_pickle_state_and_sort_edge_helpers():
+def test_current_stream_collection_pickle_round_trip():
+    collection = StreamCollection()
+    collection.set_period_context({"base": 0, "peak": 1}, [0.25, 0.75], 2)
+    collection.add(
+        Stream(
+            name="A",
+            t_supply={"values": [200.0, 190.0], "unit": "degC"},
+            t_target={"values": [120.0, 110.0], "unit": "degC"},
+            heat_flow={"values": [80.0, 72.0], "unit": "kW"},
+        )
+    )
+    collection.add(
+        Stream(
+            name="Z",
+            t_supply={"values": [100.0, 90.0], "unit": "degC"},
+            t_target={"values": [160.0, 150.0], "unit": "degC"},
+            heat_flow={"values": [60.0, 54.0], "unit": "kW"},
+        )
+    )
+    collection.set_sort_key(lambda stream: stream.name, reverse=False)
+    assert [stream.name for stream in collection] == ["A", "Z"]
+
+    restored = pickle.loads(pickle.dumps(collection))
+
+    assert restored.period_ids == {"base": 0, "peak": 1}
+    np.testing.assert_allclose(restored.weights, [0.25, 0.75])
+    assert restored.num_periods == 2
+    assert restored._sort_spec == ("attr", "t_supply")
+    assert [stream.name for stream in restored] == ["Z", "A"]
+    numeric = restored.numeric_view(idx=1)
+    np.testing.assert_allclose(numeric.heat_flow, [72.0, 54.0])
+    assert numeric.period_index.tolist() == [1, 1]
+
+    restored.remove("A")
+    assert "A" in collection
+    assert "A" not in restored
+
+
+def test_stream_collection_sort_edge_helpers():
     collection = StreamCollection()
     collection.add(Stream(name="H1", t_supply=200, t_target=120, heat_flow=1.0))
-    collection.set_sort_key(lambda stream: stream.name)
-
-    state = collection.__getstate__()
-    assert state["_sort_spec"] == ("attr", "t_supply")
-    state.pop("_numeric_cache")
-
-    restored = StreamCollection()
-    restored.__setstate__(state)
-
-    assert restored.numeric_view().cp.tolist() == [pytest.approx(0.0125)]
     assert StreamCollection._descending_sort_value(float("nan")) == float("inf")
     assert (
         StreamCollection._dict_category(

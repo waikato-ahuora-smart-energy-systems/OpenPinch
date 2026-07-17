@@ -67,3 +67,30 @@ uv run coverage report --data-file=/tmp/openpinch-ci-coverage --fail-under=95
 
 Verified result: 1,964 passed, 4 deselected, and 98% total coverage.
 The fixed seed is logged in the command, and Hypothesis shrinking remains enabled.
+
+## Residual Compatibility Shim Removal
+
+Run the behavioural owners changed by this unit:
+
+```bash
+uv run pytest -q \
+  tests/contracts/test_hpr.py \
+  tests/analysis/heat_pumps/test_targeting.py \
+  tests/analysis/heat_pumps/test_optimisation_adapter.py \
+  tests/analysis/heat_pumps/test_multiperiod_hpr.py \
+  tests/domain/test_configuration.py \
+  tests/domain/test_configuration_fields.py \
+  tests/domain/test_stream_collection.py \
+  tests/domain/test_model_property_roundtrip.py
+```
+
+Run the complete non-solver suite:
+
+```bash
+uv run pytest -q -m "not solver"
+```
+
+Verified results are 277 focused integration tests and 2,063 complete
+non-solver tests passed, with four solver-tagged tests deselected. No separate
+coverage threshold was introduced for this non-algorithmic cleanup; the full
+suite remains the behavioural acceptance gate.

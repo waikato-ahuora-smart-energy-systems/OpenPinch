@@ -53,3 +53,30 @@ uv run python scripts/build_dist.py \
 
 Verified result: OpenPinch 0.4.5 wheel and source distribution built
 successfully without replacing workspace release artifacts.
+
+## Residual Compatibility Shim Removal
+
+### Prerequisites
+
+- Python 3.14.2 or newer.
+- The locked development environment installed with `uv sync --group dev`.
+- No environment variable, service, database, or external solver is required.
+
+### Static and Documentation Build
+
+```bash
+uv run ruff check .
+uv run ruff format --check .
+uv run python -m sphinx -E -W --keep-going -b html docs /tmp/openpinch-docs
+```
+
+### Isolated Distribution Build
+
+```bash
+uv run python scripts/build_dist.py \
+  --output-dir /tmp/openpinch-residual-shims-dist
+```
+
+The verified build produced OpenPinch 0.5.0 wheel and source distributions.
+The expected artifacts are `openpinch-0.5.0-py3-none-any.whl` and
+`openpinch-0.5.0.tar.gz`. Warnings are not accepted by the documentation gate.
