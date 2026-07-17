@@ -1548,3 +1548,40 @@ Resolve all 15 findings in four dependency-ordered PRs based on local `756c1128`
 **Context**: CONSTRUCTION - Build and Test complete. Generated files: build-instructions.md, unit-test-instructions.md, integration-test-instructions.md, performance-test-instructions.md, and build-and-test-summary.md under the package-architecture-modernization Build and Test directory. Operations is N/A because no deployment work was requested; generated code awaits explicit review.
 
 ---
+
+## Architecture Modernization - Missing HEN Results Package Report
+**Timestamp**: 2026-07-17T02:09:55Z
+**User Input**: "The documentation build is failing because **the** **OpenPinch.analysis.heat\_exchanger\_networks.results** **module is missing**. This is causing import failures in multiple modules that depend on it:
+
+context.py tries to import SynthesisWorkflowResult from .results.assembly
+open_hens_method.py, pinch_design_method.py, and thermal_derivative_method.py all import from ..results.assembly
+presentation/network_grid/results.py imports from the results module
+The Sphinx build is configured to treat warnings as errors (-W flag), so these import failures cause the build to fail."
+**AI Response**: "Confirmed that the results package existed only in the local working tree. A broad results/ rule in .gitignore hid every source file in that package, allowing local imports and builds to pass while clean checkouts omitted the module. Began a corrective packaging fix and regression coverage."
+**Context**: CONSTRUCTION - Package architecture modernization corrective review. Reopened source tracking, release artifact, and warning-free documentation gates.
+
+---
+
+## Architecture Modernization - HEN Results Package Correction
+**Timestamp**: 2026-07-17T02:14:42Z
+**User Input**: "No new user input."
+**AI Response**: "Corrected the clean-checkout failure by exempting the concrete HEN results source package from the broad generated-results ignore rule. Added a repository-wide gate that rejects any Git-ignored OpenPinch Python source and an artifact gate requiring results/assembly.py. Context, OpenHENS, PDM, TDM, and network-grid result dependants import successfully. A cache-independent 60-source Sphinx build passed with -E -W; 209 focused HEN, presentation, architecture, and packaging tests passed; Ruff lint/format checked 459 Python files; and patch hygiene passed."
+**Context**: CONSTRUCTION - Post-review correction complete. The four HEN result modules and the approved architecture checklist are visible to version-control discovery and must be included with the architecture changes. Security and Resiliency remain disabled (N/A); partial PBT is N/A for this source-tracking correction.
+
+---
+
+## Architecture Modernization - Ruff Failure Report
+**Timestamp**: 2026-07-17T02:17:31Z
+**User Input**: "ruff check  also fails."
+**AI Response**: "Reopened the corrective verification and ran the bare Ruff command, repository-qualified Ruff command, and environment-local Ruff command under Ruff 0.15.18. All passed in the current working tree; began comparing CI configuration and ignored/version-controlled source sets to reproduce the reported environment."
+**Context**: CONSTRUCTION - Post-review Ruff diagnosis active. No Ruff correction was assumed without reproducing the diagnostic.
+
+---
+
+## Architecture Modernization - Ruff Failure Resolution
+**Timestamp**: 2026-07-17T02:20:04Z
+**User Input**: "No new user input."
+**AI Response**: "Reproduced five Ruff I001 diagnostics in a temporary snapshot of the Git index, which omitted the ignored HEN results package. The tracked import blocks were already correct; without the package, Ruff classified the result imports differently. Copied only the four result modules and corrected .gitignore into the same snapshot, after which the exact CI command passed. Current-tree bare, repository-qualified, no-cache, GitHub-output, and no-respect-gitignore Ruff checks also pass under locked Ruff 0.15.18."
+**Context**: CONSTRUCTION - Post-review Ruff diagnosis complete. The documentation and Ruff failures share one root cause: the HEN results source owner was absent from the submitted Git-visible change. No lint suppression or unrelated import rewrite was introduced.
+
+---

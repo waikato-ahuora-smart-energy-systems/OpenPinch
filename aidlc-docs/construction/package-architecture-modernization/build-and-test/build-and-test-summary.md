@@ -24,10 +24,10 @@
 | HPR/HEN regressions | Exact parity, construction order, period state, area, and classification fixtures passed |
 | Architecture gates | Dependency direction, owner definitions, marker packages, no facades, cold imports, and repository entrypoints passed |
 | Property tests | PBT-02, PBT-03, PBT-07, PBT-08, and PBT-09 passed with seed `20260715` and shrinking enabled |
-| Ruff | Full lint and format checks passed for 455 Python files |
+| Ruff | Full lint and format checks passed for 459 Python files |
 | Documentation | Warning-free Sphinx build passed |
 | Notebooks | All 10 packaged notebooks parsed and passed support-path checks |
-| Packaging | Isolated wheel and sdist builds passed; clean install passed |
+| Packaging | Isolated wheel and sdist builds passed; HEN result assembly is required; clean install passed |
 | Patch hygiene | `git diff --check` passed after final documentation/state updates |
 
 The canonical HEN fixture and timeout/skip classification regressions are green.
@@ -45,6 +45,27 @@ and the fact that the long external seven-case solver matrix is a release/solver
 change gate rather than a routine architecture-refactor run. All approved
 blocking local, numerical, documentation, artifact, and clean-install gates
 passed.
+
+## Post-Review Corrective Verification
+
+- Root cause: `.gitignore` applied `results/` to the Python source package, so
+  its four modules were omitted from version-control discovery.
+- Source visibility: all four HEN result modules now appear in
+  `git ls-files --others --exclude-standard` and are ready to be included with
+  the architecture changes.
+- Direct imports: context, OpenHENS, PDM, TDM, and network-grid result modules
+  import successfully.
+- Ruff clean-snapshot reproduction: omitting the HEN results owner produces
+  five `I001` diagnostics; restoring the owner and ignore exception makes the
+  same index snapshot pass without import rewrites or suppressions.
+- Fresh documentation: all 60 Sphinx sources build with `-E -W` and no warning.
+- Corrective suite: 209 HEN, presentation, architecture, and packaging tests
+  pass.
+- Artifact regression: wheel and sdist must contain
+  `OpenPinch/analysis/heat_exchanger_networks/results/assembly.py`.
+- Repository regression: no Python source under `OpenPinch` may be hidden by
+  `.gitignore`.
+- Ruff lint/format and `git diff --check` pass after the correction.
 
 ## Extension Compliance
 

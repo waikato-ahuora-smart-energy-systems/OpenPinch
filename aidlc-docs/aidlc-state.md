@@ -245,6 +245,14 @@
   `aidlc-docs/construction/plans/package-architecture-modernization-code-generation-plan.md`.
 - **Current gate**: Implementation and Build and Test are complete; generated
   code is awaiting explicit user review.
+- **Post-review correction**: The HEN `results` package is no longer hidden by
+  the repository-wide `results/` ignore rule. All four source modules are
+  visible to version-control discovery; direct dependent imports, a fresh
+  `-E -W` Sphinx build, 209 focused tests, artifact content checks, Ruff, and
+  patch hygiene pass. A clean Git-index snapshot reproduced five Ruff `I001`
+  failures when the result owner was absent and passed unchanged when the owner
+  and ignore exception were restored. New gates reject Git-ignored Python
+  source and require HEN result assembly in wheel/sdist artifacts.
 - **Step 6 evidence**: HPR optimisation semantics now cross one explicit
   adapter into the reusable package-level optimiser; direct MVR, Process MVR,
   and multiperiod state have concrete owner packages with no legacy facades.

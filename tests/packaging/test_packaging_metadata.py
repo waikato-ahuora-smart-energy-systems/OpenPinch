@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import runpy
+import subprocess
 import tomllib
 
 from tests.support.paths import REPOSITORY_ROOT
@@ -54,6 +55,26 @@ def _minimum_python_version() -> str:
     requires_python = _read_pyproject()["project"]["requires-python"]
     assert requires_python.startswith(">=")
     return requires_python.removeprefix(">=")
+
+
+def test_python_package_sources_are_not_gitignored():
+    sources = sorted(
+        str(path.relative_to(REPO_ROOT))
+        for path in (REPO_ROOT / "OpenPinch").rglob("*.py")
+    )
+    completed = subprocess.run(
+        ["git", "check-ignore", "--no-index", "--stdin"],
+        cwd=REPO_ROOT,
+        input="\n".join(sources),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode in {0, 1}, completed.stderr
+    assert completed.stdout == "", (
+        "Python package sources are hidden by .gitignore:\n" + completed.stdout
+    )
 
 
 def test_notebook_extra_declares_jupyter_runtime_dependencies():

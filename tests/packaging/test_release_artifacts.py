@@ -62,6 +62,7 @@ def _assert_common_release_boundary(names: list[str], *, root_prefix: str = "") 
         "OpenPinch/optimisation/service.py",
         "OpenPinch/application/problem.py",
         "OpenPinch/analysis/targeting/cascade.py",
+        "OpenPinch/analysis/heat_exchanger_networks/results/assembly.py",
         "OpenPinch/adapters/io/json.py",
         "OpenPinch/presentation/reporting/results.py",
     ]

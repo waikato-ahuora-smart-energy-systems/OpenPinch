@@ -86,6 +86,29 @@ equation variant, serialization format, or independently changing algorithm.
 No line-count target, mixin, service locator, mutable registry, or speculative
 protocol was introduced.
 
+## Post-Review Source-Tracking Correction
+
+The HEN `results` owner was initially present in the working tree and release
+artifacts but hidden from Git by the repository-wide `results/` ignore rule.
+That made local imports pass while a clean checkout could omit `assembly.py`,
+`selection.py`, `seeds.py`, and the package marker. The ignore policy now has a
+narrow exception for this Python source package.
+
+Two regressions close the gap: every Python source under `OpenPinch` must be
+visible to Git even when checked with `--no-index`, and wheel/sdist inspection
+requires the HEN result assembly owner. This protects clean-checkout Sphinx and
+packaging builds rather than only working-tree builds.
+
+The missing package also explained the reported Ruff failure. A Git-index
+snapshot without `results` reproduced five `I001` import-order diagnostics:
+Ruff could not classify those HEN imports as first-party. Adding the four source
+modules and corrected ignore policy made the unchanged snapshot pass. No
+import-order workaround or per-file suppression was required.
+
+The same ignore-policy audit found the approved architecture checklist under an
+ignored `plans/` directory. A specific documentation exception now keeps that
+checklist visible without exposing generated solver plan directories.
+
 ## Quality Review
 
 | Quality question | Score | Evidence and deduction |
