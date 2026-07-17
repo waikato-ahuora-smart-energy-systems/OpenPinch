@@ -29,6 +29,28 @@ git diff --name-only -- '*.py' | xargs uv run ruff format --check
 
 The repository contains three pre-existing files that the current Ruff formatter would change. Acceptance therefore applied the formatting check to all changed Python files and the lint check to the full source and test trees.
 
+## Serialized HEN Target Input Unit and Contract Tests
+
+```bash
+uv run pytest -q \
+  tests/contracts/test_input.py \
+  tests/contracts/test_roundtrip.py \
+  tests/contracts/test_heat_exchanger_network_input.py \
+  tests/domain/test_heat_exchanger_network.py \
+  tests/domain/test_heat_exchanger_area_slices.py \
+  tests/analysis/test_heat_exchanger_network_controllability.py \
+  tests/analysis/heat_exchanger_networks/test_contracts.py \
+  tests/analysis/heat_exchanger_networks/test_schema_validators.py \
+  tests/architecture/test_api_boundary.py
+```
+
+Acceptance result: 177 passed before the final canonical-retention regression;
+the completed contract file passes 19 tests. The complete non-solver suite
+passes 2,091 tests with four solver-marked tests deselected.
+
+The generated network property uses fixed seed `20260717`, 30 bounded examples,
+normal Hypothesis shrinking, and exact mapping and ordering invariants.
+
 ## Segment Batch Update and Pricing Acceptance
 
 ```bash

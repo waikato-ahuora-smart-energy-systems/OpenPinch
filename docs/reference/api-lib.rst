@@ -63,6 +63,8 @@ The main schema modules are:
 Common request models include:
 
 - :class:`~OpenPinch.contracts.input.TargetInput`
+- :class:`~OpenPinch.contracts.input.HeatExchangerNetworkSchema`
+- :class:`~OpenPinch.contracts.input.HeatExchangerSchema`
 - :class:`~OpenPinch.contracts.input.StreamSchema`
 - :class:`~OpenPinch.contracts.input.UtilitySchema`
 - :class:`~OpenPinch.contracts.input.ZoneTreeSchema`

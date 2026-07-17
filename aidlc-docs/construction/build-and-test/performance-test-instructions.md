@@ -1,5 +1,12 @@
 # Performance Test Instructions
 
+## Serialized HEN Target Input
+
+No new release-blocking performance test is required. The change validates and
+serializes bounded Pydantic transport records and does not alter a numerical
+algorithm, solver formulation, or scaling path. The complete non-solver suite
+finished in 112.42 seconds in the acceptance environment.
+
 ## Scope
 
 Segment expansion is internal numeric work; parent collection and solver axes remain unchanged. Performance checks should therefore measure both profile expansion cost and HEN solve cost as segment count and operating-period count increase.

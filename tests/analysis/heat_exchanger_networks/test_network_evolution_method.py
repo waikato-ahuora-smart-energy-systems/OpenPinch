@@ -13,7 +13,7 @@ from OpenPinch.analysis.heat_exchanger_networks.targeting.network_evolution_meth
 )
 from OpenPinch.contracts.synthesis.task import HeatExchangerNetworkSynthesisTask
 from OpenPinch.domain._heat_exchanger.period_state import HeatExchangerPeriodState
-from OpenPinch.domain.enums import HeatExchangerKind, HeatExchangerStreamRole
+from OpenPinch.domain.enums import HeatExchangerKind, StreamID
 from OpenPinch.domain.heat_exchanger import HeatExchanger
 from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
 
@@ -136,8 +136,8 @@ def _recovery_exchanger(hot: str, cold: str, stage: int) -> HeatExchanger:
         kind=HeatExchangerKind.RECOVERY,
         source_stream=hot,
         sink_stream=cold,
-        source_stream_role=HeatExchangerStreamRole.PROCESS,
-        sink_stream_role=HeatExchangerStreamRole.PROCESS,
+        source_stream_role=StreamID.Process,
+        sink_stream_role=StreamID.Process,
         stage=stage,
         period_states=(
             HeatExchangerPeriodState(

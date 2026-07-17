@@ -14,7 +14,14 @@ import OpenPinch
 import OpenPinch.domain.heat_exchanger as heat_exchanger
 import OpenPinch.domain.stream as stream
 from OpenPinch.contracts.hpr import HPRBackendResult, HPRParsedState
-from OpenPinch.contracts.input import StreamSegmentSchema, TargetInput
+from OpenPinch.contracts.input import (
+    HeatExchangerAreaSliceSchema,
+    HeatExchangerNetworkSchema,
+    HeatExchangerPeriodStateSchema,
+    HeatExchangerSchema,
+    StreamSegmentSchema,
+    TargetInput,
+)
 
 PACKAGE_DIR = Path(OpenPinch.__file__).parent
 RETIRED_PACKAGES = (
@@ -66,6 +73,19 @@ def test_stream_segment_schema_remains_on_the_main_input_contract() -> None:
     assert StreamSegmentSchema.__module__ == "OpenPinch.contracts.input"
     schema = TargetInput.model_json_schema()
     assert "StreamSegmentSchema" in schema["$defs"]
+
+
+def test_serialized_hen_schemas_are_owned_by_the_main_input_contract() -> None:
+    schemas = (
+        HeatExchangerAreaSliceSchema,
+        HeatExchangerPeriodStateSchema,
+        HeatExchangerSchema,
+        HeatExchangerNetworkSchema,
+    )
+    assert all(schema.__module__ == "OpenPinch.contracts.input" for schema in schemas)
+    definitions = TargetInput.model_json_schema()["$defs"]
+    assert {schema.__name__ for schema in schemas} <= definitions.keys()
+    assert not hasattr(OpenPinch, "HeatExchangerNetworkSchema")
 
 
 def test_service_runtime_records_and_graph_specs_are_private() -> None:

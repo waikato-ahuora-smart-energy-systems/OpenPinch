@@ -80,6 +80,46 @@ Successful synthesis stores a design result on ``TargetOutput.design`` and
 - ``build_grid_diagram(design.network, period_id=period_id)`` for visual
   topology inspection
 
+Serialized Network Input
+------------------------
+
+A runtime network can be carried through a later targeting request by dumping
+its JSON-visible mapping into ``TargetInput.network``:
+
+.. code-block:: python
+
+   from OpenPinch.contracts.input import TargetInput
+
+   network_payload = design.network.model_dump(mode="json")
+   input_data = TargetInput.model_validate(
+       {
+           "streams": stream_payloads,
+           "utilities": utility_payloads,
+           "network": network_payload,
+       }
+   )
+
+   restored = TargetInput.model_validate_json(input_data.model_dump_json())
+   assert restored.model_dump(mode="json")["network"] == network_payload
+
+The nested value is a transport
+:class:`~OpenPinch.contracts.input.HeatExchangerNetworkSchema`, not a runtime
+network object. Supplying it preserves the serialized network in canonical
+problem data; it does not opt into retrofit synthesis or seed a design method.
+Pass runtime networks explicitly through ``initial_networks`` when invoking a
+method that supports seeds.
+
+Exchanger endpoints retain the field names ``source_stream_role`` and
+``sink_stream_role`` and use title-case :class:`~OpenPinch.domain.enums.StreamID`
+values. Recovery links are ``Process`` to ``Process``, hot-utility links are
+``Utility`` to ``Process``, and cold-utility links are ``Process`` to
+``Utility``. ``Unassigned`` and the retired lowercase values are invalid.
+
+The transport contract contains only fields emitted by
+``HeatExchangerNetwork.model_dump(mode="json")``. Solver-axis metadata,
+exchanger solver metadata, and source metadata are private runtime details and
+are rejected if manually added to the nested input.
+
 Interpretation
 --------------
 

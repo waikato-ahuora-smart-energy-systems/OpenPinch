@@ -385,3 +385,27 @@ infrastructure work was requested.
 - Ruff lint and formatting: passed for all 459 Python files.
 - Patch hygiene: passed.
 - Protected main service: unchanged.
+
+## Serialized HEN Target Input Evidence
+
+- Expanded focused contracts: 177 passed; the final serialized-HEN contract
+  file passes 19 tests including canonical input retention.
+- Complete non-solver HEN gate: 463 passed, four solver cases deselected.
+- Architecture gate: 43 passed.
+- Complete non-solver repository suite: 2,091 passed, four solver cases
+  deselected.
+- Ruff lint: passed repository-wide.
+- Ruff formatting: all 460 Python files formatted.
+- Documentation: warning-as-error Sphinx build passed for 60 sources.
+- Stale symbol guard: no `HeatExchangerStreamRole` or old enum-member spelling
+  remains in source, tests, authored docs, or rebuilt generated docs.
+- Patch hygiene: `git diff --check` passed.
+- Property-based testing: compliant with fixed seed `20260717`, 30 bounded
+  generated aligned networks, shrinking, deterministic discovery, and exact
+  mapping/ordering invariants.
+- Security: N/A, extension disabled.
+- Resiliency: N/A, extension disabled.
+- Performance: N/A, no numerical or scaling algorithm changed.
+
+The serialized HEN contract is ready for generated-code review. Operations is
+N/A because no deployment or infrastructure work was requested.

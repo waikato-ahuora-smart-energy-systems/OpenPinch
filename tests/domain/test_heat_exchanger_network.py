@@ -10,7 +10,7 @@ import OpenPinch.presentation.network_grid.service as grid_diagram
 from OpenPinch.domain._heat_exchanger.period_state import HeatExchangerPeriodState
 from OpenPinch.domain.enums import (
     HeatExchangerKind,
-    HeatExchangerStreamRole,
+    StreamID,
 )
 from OpenPinch.domain.enums import HeatExchangerNetworkLabel as HEN
 from OpenPinch.domain.heat_exchanger import HeatExchanger
@@ -30,8 +30,8 @@ def _recovery_exchanger(
         kind=HeatExchangerKind.RECOVERY,
         source_stream=source,
         sink_stream=sink,
-        source_stream_role=HeatExchangerStreamRole.PROCESS,
-        sink_stream_role=HeatExchangerStreamRole.PROCESS,
+        source_stream_role=StreamID.Process,
+        sink_stream_role=StreamID.Process,
         stage=stage,
         period_states=period_states
         or (
@@ -57,8 +57,8 @@ def _hot_utility_exchanger() -> HeatExchanger:
         kind=HeatExchangerKind.HOT_UTILITY,
         source_stream="Steam",
         sink_stream="C1",
-        source_stream_role=HeatExchangerStreamRole.UTILITY,
-        sink_stream_role=HeatExchangerStreamRole.PROCESS,
+        source_stream_role=StreamID.Utility,
+        sink_stream_role=StreamID.Process,
         period_states=(
             HeatExchangerPeriodState(period_id="base", period_idx=0, duty=30.0),
         ),
@@ -71,8 +71,8 @@ def _cold_utility_exchanger() -> HeatExchanger:
         kind=HeatExchangerKind.COLD_UTILITY,
         source_stream="H1",
         sink_stream="CoolingWater",
-        source_stream_role=HeatExchangerStreamRole.PROCESS,
-        sink_stream_role=HeatExchangerStreamRole.UTILITY,
+        source_stream_role=StreamID.Process,
+        sink_stream_role=StreamID.Utility,
         period_states=(
             HeatExchangerPeriodState(period_id="base", period_idx=0, duty=20.0),
         ),
@@ -100,8 +100,8 @@ def test_heat_exchanger_rejects_retired_scalar_operating_fields():
             kind=HeatExchangerKind.HOT_UTILITY,
             source_stream="Steam",
             sink_stream="C1",
-            source_stream_role=HeatExchangerStreamRole.UTILITY,
-            sink_stream_role=HeatExchangerStreamRole.PROCESS,
+            source_stream_role=StreamID.Utility,
+            sink_stream_role=StreamID.Process,
             period_states=(
                 HeatExchangerPeriodState(
                     period_id="base",
@@ -119,8 +119,8 @@ def test_heat_exchanger_does_not_infer_mid_temperature_from_one_endpoint():
         kind=HeatExchangerKind.RECOVERY,
         source_stream="H1",
         sink_stream="C1",
-        source_stream_role=HeatExchangerStreamRole.PROCESS,
-        sink_stream_role=HeatExchangerStreamRole.PROCESS,
+        source_stream_role=StreamID.Process,
+        sink_stream_role=StreamID.Process,
         stage=1,
         period_states=(
             HeatExchangerPeriodState(
@@ -147,25 +147,68 @@ def test_heat_exchanger_direction_semantics_are_enforced():
             kind=HeatExchangerKind.RECOVERY,
             source_stream="Steam",
             sink_stream="C1",
-            source_stream_role=HeatExchangerStreamRole.UTILITY,
-            sink_stream_role=HeatExchangerStreamRole.PROCESS,
+            source_stream_role=StreamID.Utility,
+            sink_stream_role=StreamID.Process,
             stage=1,
             period_states=(
                 HeatExchangerPeriodState(period_id="base", period_idx=0, duty=10.0),
             ),
         )
 
+    for role in (StreamID.Unassigned, "process"):
+        with pytest.raises(ValidationError):
+            HeatExchanger(
+                kind=HeatExchangerKind.RECOVERY,
+                source_stream="H1",
+                sink_stream="C1",
+                source_stream_role=role,
+                sink_stream_role=StreamID.Process,
+                stage=1,
+                period_states=(
+                    HeatExchangerPeriodState(period_id="base", period_idx=0, duty=10.0),
+                ),
+            )
+
     with pytest.raises(ValidationError, match="recovery exchangers must include"):
         HeatExchanger(
             kind=HeatExchangerKind.RECOVERY,
             source_stream="H1",
             sink_stream="C1",
-            source_stream_role=HeatExchangerStreamRole.PROCESS,
-            sink_stream_role=HeatExchangerStreamRole.PROCESS,
+            source_stream_role=StreamID.Process,
+            sink_stream_role=StreamID.Process,
             period_states=(
                 HeatExchangerPeriodState(period_id="base", period_idx=0, duty=10.0),
             ),
         )
+
+
+@pytest.mark.parametrize(
+    ("kind", "source_role", "sink_role"),
+    [
+        (HeatExchangerKind.RECOVERY, StreamID.Process, StreamID.Process),
+        (HeatExchangerKind.HOT_UTILITY, StreamID.Utility, StreamID.Process),
+        (HeatExchangerKind.COLD_UTILITY, StreamID.Process, StreamID.Utility),
+    ],
+)
+def test_runtime_endpoint_roles_use_canonical_stream_ids(
+    kind: HeatExchangerKind,
+    source_role: StreamID,
+    sink_role: StreamID,
+) -> None:
+    exchanger = HeatExchanger(
+        kind=kind,
+        source_stream="source",
+        sink_stream="sink",
+        source_stream_role=source_role,
+        sink_stream_role=sink_role,
+        stage=1 if kind is HeatExchangerKind.RECOVERY else None,
+        period_states=(
+            HeatExchangerPeriodState(period_id="base", period_idx=0, duty=10.0),
+        ),
+    )
+
+    assert exchanger.model_dump(mode="json")["source_stream_role"] == source_role.value
+    assert exchanger.model_dump(mode="json")["sink_stream_role"] == sink_role.value
 
 
 def test_heat_exchanger_validators_reject_invalid_edge_values():

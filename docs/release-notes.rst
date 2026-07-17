@@ -62,6 +62,13 @@ This pre-release changes the following contracts without compatibility shims:
   unknown versions, and the retired ``payload`` field are rejected.
 - Segmented process streams and utilities share the same semantic validation in
   reports and preparation, including parent aggregate consistency.
+- ``TargetInput.network`` accepts the exact mapping produced by
+  ``HeatExchangerNetwork.model_dump(mode="json")`` and preserves it through a
+  complete input JSON round trip. The transport contract rejects private
+  solver and source metadata and does not automatically seed HEN synthesis.
+- HEN endpoint classifications now use ``StreamID`` values ``Process`` and
+  ``Utility``. The retired lowercase endpoint-role enum and ``Unassigned``
+  endpoint values are not accepted.
 
 Private helper ownership
 ~~~~~~~~~~~~~~~~~~~~~~~~

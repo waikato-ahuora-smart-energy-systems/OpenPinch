@@ -83,13 +83,6 @@ class HeatExchangerKind(str, Enum):
     COLD_UTILITY = "cold_utility"
 
 
-class HeatExchangerStreamRole(str, Enum):
-    """Identity class for the source and sink streams on an exchanger link."""
-
-    PROCESS = "process"
-    UTILITY = "utility"
-
-
 class HeatExchangerNetworkDesignMethod(str, Enum):
     """User-selectable heat exchanger network design service methods."""
 
@@ -384,7 +377,6 @@ __all__ = [
     "HeatExchangerKind",
     "HEN",
     "HeatExchangerNetworkLabel",
-    "HeatExchangerStreamRole",
     "HeatExchangerTypes",
     "HeatFlowUnits",
     "HeatPump",

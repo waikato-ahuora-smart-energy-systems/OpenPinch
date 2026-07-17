@@ -29,6 +29,19 @@ uv run sphinx-build -W -b html docs docs/_build/html
 uv run python scripts/build_dist.py --output-dir /tmp/openpinch-dist
 ```
 
+## Serialized HEN Integration Gate
+
+```bash
+uv run pytest -q -m "not solver" \
+  tests/analysis/heat_exchanger_networks \
+  tests/analysis/test_heat_exchanger_network_controllability.py
+```
+
+Acceptance result: 463 passed and four solver-marked cases were deselected.
+This covers extraction, fake execution, reporting, controllability, method
+contracts, topology, validation, and non-solver synthesis workflows after the
+`StreamID` migration.
+
 Both the warning-free documentation build and wheel/source-distribution build passed.
 
 ## Segmented Utility Cost Integration

@@ -15,8 +15,8 @@ What Each Layer Does
 --------------------
 
 ``TargetInput`` and related schemas
-   Define the request format for process streams, utilities, and the
-   optional zone tree.
+   Define the request format for process streams, utilities, the optional
+   zone tree, and an optional serialized heat exchanger network.
 
 ``TargetOutput`` and target/result schemas
    Define the structured response returned by the top-level service boundary.
@@ -56,6 +56,48 @@ Input and Output Schemas
 ------------------------
 
 .. autoclass:: OpenPinch.contracts.input.TargetInput
+   :members:
+   :no-index:
+
+``TargetInput.network`` accepts the mapping emitted by a runtime
+:class:`~OpenPinch.domain.heat_exchanger_network.HeatExchangerNetwork`, while
+remaining an independent transport schema:
+
+.. code-block:: python
+
+   from OpenPinch.contracts.input import TargetInput
+
+   network_payload = network.model_dump(mode="json")
+   input_data = TargetInput.model_validate(
+       {
+           "streams": [],
+           "utilities": [],
+           "network": network_payload,
+       }
+   )
+
+   assert input_data.model_dump(mode="json")["network"] == network_payload
+
+Use ``model_dump(mode="json")`` for this bridge. ``model_dump_json()`` returns
+an encoded string and must be decoded before it can be supplied as the nested
+``network`` value. The network is retained in canonical input data, but it is
+not automatically consumed as a synthesis seed. Endpoint classifications use
+the exact :class:`~OpenPinch.domain.enums.StreamID` values ``Process`` and
+``Utility``; lowercase legacy values and ``Unassigned`` are rejected.
+
+.. autoclass:: OpenPinch.contracts.input.HeatExchangerNetworkSchema
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.contracts.input.HeatExchangerSchema
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.contracts.input.HeatExchangerPeriodStateSchema
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.contracts.input.HeatExchangerAreaSliceSchema
    :members:
    :no-index:
 

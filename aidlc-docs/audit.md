@@ -8,6 +8,279 @@
 
 ---
 
+## Serialized HEN TargetInput Implementation Approval
+**Timestamp**: 2026-07-17T04:19:28Z
+**User Input**: """PLEASE IMPLEMENT THIS PLAN:
+# Accept Serialized HENs Through `TargetInput.network`
+
+## Current-State Findings
+
+- The repository is clean at `f2b1c0bc`, version 0.5.2.
+- `TargetInput` currently has no `network` field, so Pydantic silently discards an incoming top-level `network`.
+- `HeatExchangerNetwork.model_dump(mode="json")` returns the intended JSON-compatible mapping.
+- That dump excludes `solver_axis_metadata`, exchanger `solver_metadata`, and all `source_metadata`, even though those fields appear in `model_json_schema()`.
+- HEN endpoints currently use `HeatExchangerStreamRole` with lowercase JSON values.
+- `StreamID` already exists with `Process`, `Utility`, and `Unassigned`, but HEN code does not use it.
+- The refreshed focused baseline passes: 143 tests.
+
+## Public Contract Changes
+
+### Runtime identity migration
+
+Replace:
+
+```python
+source_stream_role: HeatExchangerStreamRole
+sink_stream_role: HeatExchangerStreamRole
+```
+
+with:
+
+```python
+source_stream_role: StreamID
+sink_stream_role: StreamID
+```
+
+Remove `HeatExchangerStreamRole` from `OpenPinch.domain.enums` and migrate every production and test reference.
+
+Preserve the current field names because they describe each endpoint’s classification; only the enum type changes.
+
+The resulting JSON values are:
+
+```json
+{
+  "source_stream_role": "Process",
+  "sink_stream_role": "Utility"
+}
+```
+
+Enforce these combinations:
+
+| Exchanger kind | Source | Sink |
+|---|---|---|
+| `recovery` | `Process` | `Process` |
+| `hot_utility` | `Utility` | `Process` |
+| `cold_utility` | `Process` | `Utility` |
+
+`StreamID.Unassigned` is invalid on either exchanger endpoint. Legacy lowercase values and `HeatExchangerStreamRole` aliases will not be supported.
+
+### Input schema hierarchy
+
+Add these independent Pydantic contracts to `OpenPinch.contracts.input`:
+
+- `HeatExchangerAreaSliceSchema`
+- `HeatExchangerPeriodStateSchema`
+- `HeatExchangerSchema`
+- `HeatExchangerNetworkSchema`
+
+Then extend `TargetInput`:
+
+```python
+network: HeatExchangerNetworkSchema | None = None
+```
+
+Export the four schema types from the concrete input module. Keep the root `OpenPinch` and `OpenPinch.contracts` packages as import-free markers.
+
+`TargetInput.network` must remain a transport schema; it must not become a runtime `HeatExchangerNetwork`.
+
+## Exact `model_dump(mode="json")` Contract
+
+The supported bridge is:
+
+```python
+network_payload = network.model_dump(mode="json")
+
+input_data = TargetInput.model_validate(
+    {
+        "streams": [...],
+        "utilities": [...],
+        "network": network_payload,
+    }
+)
+```
+
+The required invariant is:
+
+```python
+input_data.model_dump(mode="json")["network"] == network_payload
+```
+
+It must remain true after serializing the complete input:
+
+```python
+restored = TargetInput.model_validate_json(input_data.model_dump_json())
+
+assert restored.model_dump(mode="json")["network"] == network_payload
+```
+
+The implementation must derive the contract from actual `model_dump(mode="json")` output, not blindly copy `HeatExchangerNetwork.model_json_schema()`. Pydantic’s generated schema currently lists fields marked `exclude=True`, while the actual dump omits them.
+
+### JSON-visible network fields
+
+`HeatExchangerNetworkSchema` includes:
+
+```python
+exchangers: list[HeatExchangerSchema] = Field(default_factory=list)
+run_id: str | None = None
+task_id: str | None = None
+period_id: str | None = None
+method: str | None = None
+stage_count: int | None = None
+objective_value: float | None = None
+total_annual_cost: float | None = None
+utility_cost: float | None = None
+capital_cost: float | None = None
+summary_metrics: dict[str, float | int | str | bool | None] = Field(
+    default_factory=dict
+)
+```
+
+It excludes and rejects:
+
+- `solver_axis_metadata`
+- `source_metadata`
+
+### JSON-visible exchanger fields
+
+`HeatExchangerSchema` includes:
+
+```python
+exchanger_id: str | None = None
+kind: HeatExchangerKind
+source_stream: str
+sink_stream: str
+source_stream_role: StreamID
+sink_stream_role: StreamID
+stage: int | None = None
+period_states: list[HeatExchangerPeriodStateSchema] = Field(min_length=1)
+area: float | None = None
+match_allowed: bool = True
+capital_cost: float | None = None
+segment_area_contributions: list[HeatExchangerAreaSliceSchema] = Field(
+    default_factory=list
+)
+```
+
+It excludes and rejects:
+
+- `solver_metadata`
+- `source_metadata`
+
+The period-state and area-slice schemas mirror all fields currently emitted by their runtime records.
+
+### Dump variants
+
+- The nested field accepts the mapping returned by `model_dump(mode="json")`.
+- It does not accept the encoded string returned by `model_dump_json()`; callers must decode that string first.
+- Default dumps must reproduce exact mapping equality.
+- Dumps created with `exclude_none`, `exclude_defaults`, or `exclude_unset` are accepted, but subsequent canonical dumps may restore omitted defaults.
+- Empty networks and explicit `network: null` remain valid.
+
+## Validation Behavior
+
+Mirror the current runtime invariants in the transport schemas:
+
+- non-empty trimmed identities;
+- distinct source and sink streams;
+- canonical `StreamID` endpoint classifications;
+- kind-specific endpoint combinations;
+- rejection of `Unassigned`;
+- required positive stage for recovery exchangers;
+- at least one period state per exchanger;
+- contiguous zero-based `period_idx` ordering;
+- unique period IDs;
+- identical ordered period IDs across a network;
+- finite and appropriately positive/non-negative numeric fields;
+- split fractions within `[0, 1]`;
+- segment-area/design-area consistency using the existing tolerances;
+- forbidden unknown nested fields.
+
+Do not add validation between network endpoint names and `TargetInput.streams` or `utilities`.
+
+## Implementation Impact
+
+- Update the HEN domain model and remove the superseded enum.
+- Migrate recovery/utility extraction, fake execution, and controllability comparisons to `StreamID`.
+- Add the transport schemas and `TargetInput.network`.
+- Allow existing canonical input preparation to retain the serialized network in problem data through `TargetInput.model_dump`; do not automatically consume it as a synthesis seed.
+- Update API and HEN documentation with the canonical `model_dump(mode="json")` bridge and title-case StreamID values.
+- Record the required AI-DLC requirements, user story, functional design, code-generation, build/test, state, and audit artifacts.
+
+## Test Plan
+
+### Runtime migration
+
+- Confirm no production, test, documentation, or generated-schema references to `HeatExchangerStreamRole` remain.
+- Test all three exchanger-kind/StreamID combinations.
+- Reject `Unassigned`, legacy lowercase values, and incorrect combinations.
+- Verify runtime JSON now emits `"Process"` and `"Utility"`.
+
+### Exact serialization parity
+
+For empty, recovery, utility, single-period, multiperiod, area-sliced, and fully populated networks:
+
+```python
+payload = network.model_dump(mode="json")
+validated = TargetInput.model_validate({"streams": [], "network": payload})
+
+assert isinstance(validated.network, HeatExchangerNetworkSchema)
+assert validated.model_dump(mode="json")["network"] == payload
+```
+
+Include fixtures with private metadata and verify that:
+
+- the runtime dump excludes it;
+- the remaining mapping round-trips exactly;
+- manually adding excluded metadata to input is rejected.
+
+### Drift protection
+
+Add contract tests comparing:
+
+- actual runtime dump keys;
+- nested actual exchanger dump keys;
+- transport-schema dump keys.
+
+Any future JSON-visible runtime field must fail this guard until the transport contract is deliberately updated. Excluded fields must remain explicitly accounted for.
+
+### Property-based testing
+
+Update the existing generated exchanger strategy to use `StreamID`, then generate valid aligned networks and verify:
+
+1. runtime JSON dump;
+2. `TargetInput` validation;
+3. complete JSON serialization/deserialization;
+4. exact nested mapping equality;
+5. exchanger, period, and area-slice ordering.
+
+Retain the fixed seed, shrinking, and CI execution required by the enabled partial PBT policy.
+
+### Verification gates
+
+Run:
+
+- the refreshed 143-test focused baseline plus new contract tests;
+- all HEN extraction, reporting, controllability, and synthesis contract tests;
+- architecture, import, and stale-symbol checks;
+- the complete non-solver suite;
+- Ruff lint/format checks;
+- warning-free Sphinx validation.
+
+## Acceptance Criteria
+
+- `HeatExchangerStreamRole` is fully removed.
+- Runtime HEN endpoints use `StreamID`.
+- Default runtime dumps emit title-case endpoint values.
+- Any valid `HeatExchangerNetwork.model_dump(mode="json")` mapping validates as `TargetInput.network`.
+- `TargetInput.model_dump(mode="json")["network"]` reproduces that mapping exactly.
+- Private runtime metadata remains absent.
+- Invalid, unassigned, or legacy endpoint classifications are rejected.
+- Existing inputs without a network remain unchanged."""
+**AI Response**: "Accepted the implementation plan. Re-read the refreshed package, recorded the requirements, user story, workflow plan, functional design, and code-generation checklist, and refreshed the 143-test focused baseline before beginning implementation."
+**Context**: INCEPTION approved and CONSTRUCTION active for serialized HEN transport support. Security and Resiliency are disabled (N/A); partial PBT controls PBT-02, PBT-03, PBT-07, PBT-08, and PBT-09 are enabled and included in the implementation plan.
+
+---
+
 ## Remove Compatibility Facades - Implementation Request
 **Timestamp**: 2026-07-16T17:35:52Z
 **User Input**: "Remove compatibility facades across the package."
@@ -1808,5 +2081,69 @@ This is an intentional clean break for unsupported internal APIs. No deprecation
 **User Input**: "No new user input."
 **AI Response**: "Completed all seven approved checklist steps. The complete non-solver suite passed 2,067 tests with four solver-tagged tests deselected. All 301 modules import, the targeted Pylint error gate is clean, Ruff lint and formatting pass for 459 Python files, and patch hygiene passes. Updated release notes, implementation evidence, state, audit, and Build and Test evidence."
 **Context**: CONSTRUCTION - Code Generation and Build and Test complete; generated code ready for review. Security and Resiliency disabled (N/A); partial PBT N/A. The protected main service remains unchanged.
+
+---
+
+## Serialized HEN Runtime Identity Migration
+**Timestamp**: 2026-07-17T04:22:10Z
+**User Input**: "No new user input."
+**AI Response**: "Removed HeatExchangerStreamRole, migrated runtime HEN endpoint classifications and production consumers to StreamID, mechanically updated existing tests, and passed the 89-test domain/controllability/contract regression gate."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 2 complete; Step 3 active. Security and Resiliency disabled (N/A); partial PBT controls remain scheduled for Step 5.
+
+---
+
+## Serialized HEN Transport Schema Implementation
+**Timestamp**: 2026-07-17T04:25:42Z
+**User Input**: "No new user input."
+**AI Response**: "Added four independent JSON transport schemas, connected HeatExchangerNetworkSchema to TargetInput.network, exported the concrete schema types, mirrored runtime validation and area tolerances, and confirmed empty-network exact dump and complete JSON round-trip parity. Excluded runtime metadata is absent from the schema and therefore forbidden at nested boundaries."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 3 complete; Step 4 active. No runtime conversion or synthesis seeding was introduced. Security and Resiliency disabled (N/A); partial PBT controls remain scheduled for Step 5.
+
+---
+
+## Serialized HEN Contract and Property Tests
+**Timestamp**: 2026-07-17T04:30:06Z
+**User Input**: "No new user input."
+**AI Response**: "Added exact mapping parity cases for empty, recovery, utility, multiperiod, area-sliced, and fully populated networks; metadata rejection and dump-variant coverage; runtime/schema key drift guards; canonical StreamID validation; schema ownership coverage; and seeded generated aligned-network round trips preserving exchanger, period, and area-slice ordering. The new 50-test contract, domain, architecture, and PBT gate passes."
+**Context**: CONSTRUCTION - Code Generation Part 2, Steps 4 and 5 complete; Step 6 active. Partial PBT is compliant: fixed seed 20260717, deterministic CI test discovery, bounded 30 examples, Hypothesis shrinking, and invariant-based assertions are present. Security and Resiliency disabled (N/A).
+
+---
+
+## Serialized HEN Documentation and Implementation Evidence
+**Timestamp**: 2026-07-17T04:32:18Z
+**User Input**: "No new user input."
+**AI Response**: "Documented the canonical model_dump(mode=\"json\") bridge, title-case StreamID endpoint values, encoded-string restriction, metadata boundary, retained-but-not-seeded behavior, and concrete transport schemas in the API guide, HEN guide, contributor reference, release notes, and implementation summary."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 6 complete; Step 7 active. Documentation contains text alternatives only and no diagrams requiring Mermaid or ASCII validation. Security and Resiliency disabled (N/A); partial PBT compliance recorded in implementation evidence.
+
+---
+
+## Serialized HEN Focused Verification
+**Timestamp**: 2026-07-17T04:35:07Z
+**User Input**: "No new user input."
+**AI Response**: "Passed the expanded 177-test focused input/domain/controllability/schema/architecture gate, the complete 463-test non-solver HEN extraction/reporting/controllability/synthesis gate with four solver cases deselected, the 43-test architecture gate, and the 19-test canonical network contract file. Stale-symbol scans of source, tests, and authored docs are clean, and patch whitespace validation passes."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 7 complete; Step 8 active. Canonical preparation retains TargetInput.network exactly as represented by TargetInput.model_dump(mode=\"python\") and does not consume it. Security and Resiliency disabled (N/A); partial PBT compliant.
+
+---
+
+## Serialized HEN Complete Verification Gates
+**Timestamp**: 2026-07-17T04:39:31Z
+**User Input**: "No new user input."
+**AI Response**: "Passed the complete non-solver suite with 2,091 tests and four solver-marked tests deselected; repository-wide Ruff lint and format checks across 460 Python files; warning-as-error Sphinx HTML validation across 60 sources; stale-symbol scanning; and git diff --check."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 8 complete; Step 9 and Build and Test evidence active. Security and Resiliency disabled (N/A). Partial PBT controls remain compliant and executed as part of the full suite.
+
+---
+
+## Serialized HEN Code Generation and Build and Test Completion
+**Timestamp**: 2026-07-17T04:42:11Z
+**User Input**: "No new user input."
+**AI Response**: "Completed all nine approved code-generation checklist steps and recorded build, unit, integration, performance classification, extension compliance, state, implementation, and verification evidence. The serialized HEN TargetInput contract is ready for generated-code review."
+**Context**: CONSTRUCTION - Code Generation and Build and Test complete. Operations is N/A because no deployment or infrastructure work was requested. Security and Resiliency disabled (N/A); partial PBT compliant.
+
+---
+
+## Serialized HEN Final Post-Format Regression
+**Timestamp**: 2026-07-17T04:44:03Z
+**User Input**: "No new user input."
+**AI Response**: "Passed the final 39-test serialized-HEN contract, property round-trip, and runtime-domain regression gate after formatting. All code-generation plan checkboxes are complete and git diff --check remains clean."
+**Context**: Generated code is ready for review. Operations remains N/A. Security and Resiliency disabled (N/A); partial PBT compliant.
 
 ---

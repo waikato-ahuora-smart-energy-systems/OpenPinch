@@ -24,6 +24,18 @@ uv run sphinx-build -W -b html docs docs/_build/html
 
 The segmented-stream API and input guide build warning-free.
 
+## Serialized HEN Target Input Build
+
+No generated source or binary build step is required for the schema change.
+Validate the importable package and documentation from the repository root:
+
+```bash
+uv run python -m sphinx -b html --fail-on-warning --keep-going \
+  docs docs/_build/html
+```
+
+The acceptance build passed against all 60 documentation sources.
+
 ## Segment Batch Update and Pricing Acceptance Build
 
 ```bash

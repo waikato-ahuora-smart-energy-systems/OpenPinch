@@ -15,7 +15,7 @@ from pydantic import (
 )
 
 from ..domain.configuration_fields import validate_configuration_options
-from ..domain.enums import ST, FluidPhase
+from ..domain.enums import ST, FluidPhase, HeatExchangerKind, StreamID
 from .common import ScalarOrVU
 
 
@@ -234,6 +234,309 @@ class ZoneTreeSchema(BaseModel):
         return float(value)
 
 
+class HeatExchangerAreaSliceSchema(BaseModel):
+    """JSON-visible area contribution for one exchanger segment pair."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    period: str
+    hot_segment_identity: str
+    cold_segment_identity: str
+    duty: float
+    hot_inlet_temperature: float
+    hot_outlet_temperature: float
+    cold_inlet_temperature: float
+    cold_outlet_temperature: float
+    hot_htc: float
+    cold_htc: float
+    overall_htc: float
+    lmtd: float
+    area: float
+
+    @field_validator("period", "hot_segment_identity", "cold_segment_identity")
+    @classmethod
+    def _validate_identity(cls, value: str) -> str:
+        text = str(value).strip()
+        if not text:
+            raise ValueError("segment area identities must not be empty")
+        return text
+
+    @field_validator("duty", "hot_htc", "cold_htc", "overall_htc", "lmtd", "area")
+    @classmethod
+    def _validate_positive_finite(cls, value: float) -> float:
+        if not math.isfinite(value) or value <= 0.0:
+            raise ValueError("segment area values must be finite and positive")
+        return float(value)
+
+    @field_validator(
+        "hot_inlet_temperature",
+        "hot_outlet_temperature",
+        "cold_inlet_temperature",
+        "cold_outlet_temperature",
+    )
+    @classmethod
+    def _validate_slice_temperature(cls, value: float) -> float:
+        if not math.isfinite(value):
+            raise ValueError("segment area temperatures must be finite")
+        return float(value)
+
+
+class HeatExchangerPeriodStateSchema(BaseModel):
+    """JSON-visible operating state for one exchanger and period."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    period_id: str
+    period_idx: int
+    duty: float
+    active: bool = True
+    approach_temperatures: list[float] = Field(default_factory=list)
+    source_split_fraction: float | None = None
+    sink_split_fraction: float | None = None
+    source_inlet_temperature: float | None = None
+    source_outlet_temperature: float | None = None
+    sink_inlet_temperature: float | None = None
+    sink_outlet_temperature: float | None = None
+
+    @field_validator("period_id")
+    @classmethod
+    def _validate_period_id(cls, value: str) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("period_id must be a non-empty string")
+        return value.strip()
+
+    @field_validator("period_idx")
+    @classmethod
+    def _validate_period_idx(cls, value: int) -> int:
+        if value < 0:
+            raise ValueError("period_idx must be non-negative")
+        return int(value)
+
+    @field_validator("duty")
+    @classmethod
+    def _validate_duty(cls, value: float) -> float:
+        if not math.isfinite(value) or value < 0.0:
+            raise ValueError("period duty must be finite and non-negative")
+        return float(value)
+
+    @field_validator("source_split_fraction", "sink_split_fraction")
+    @classmethod
+    def _validate_split_fraction(cls, value: float | None) -> float | None:
+        if value is None:
+            return value
+        if not math.isfinite(value) or not 0.0 <= value <= 1.0:
+            raise ValueError("split fractions must be finite values from zero to one")
+        return float(value)
+
+    @field_validator(
+        "source_inlet_temperature",
+        "source_outlet_temperature",
+        "sink_inlet_temperature",
+        "sink_outlet_temperature",
+    )
+    @classmethod
+    def _validate_finite_temperature(cls, value: float | None) -> float | None:
+        if value is None:
+            return value
+        if not math.isfinite(value):
+            raise ValueError("temperatures must be finite values")
+        return float(value)
+
+    @field_validator("approach_temperatures")
+    @classmethod
+    def _validate_approach_temperatures(cls, value: list[float]) -> list[float]:
+        for approach_temperature in value:
+            if not math.isfinite(approach_temperature) or approach_temperature < 0.0:
+                raise ValueError(
+                    "approach temperatures must be finite non-negative values"
+                )
+        return [float(approach_temperature) for approach_temperature in value]
+
+
+class HeatExchangerSchema(BaseModel):
+    """JSON transport contract for one runtime heat exchanger dump."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    exchanger_id: str | None = None
+    kind: HeatExchangerKind
+    source_stream: str
+    sink_stream: str
+    source_stream_role: StreamID
+    sink_stream_role: StreamID
+    stage: int | None = None
+    period_states: list[HeatExchangerPeriodStateSchema] = Field(min_length=1)
+    area: float | None = None
+    match_allowed: bool = True
+    capital_cost: float | None = None
+    segment_area_contributions: list[HeatExchangerAreaSliceSchema] = Field(
+        default_factory=list
+    )
+
+    @field_validator("exchanger_id", "source_stream", "sink_stream")
+    @classmethod
+    def _validate_identity(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(
+                "stream and exchanger identities must be non-empty strings"
+            )
+        return value.strip()
+
+    @field_validator("stage")
+    @classmethod
+    def _validate_stage(cls, value: int | None) -> int | None:
+        if value is not None and value <= 0:
+            raise ValueError("stage must be a positive integer when supplied")
+        return value
+
+    @field_validator("area", "capital_cost")
+    @classmethod
+    def _validate_non_negative_finite(cls, value: float | None) -> float | None:
+        if value is None:
+            return value
+        if not math.isfinite(value) or value < 0.0:
+            raise ValueError("numeric exchanger values must be finite and non-negative")
+        return float(value)
+
+    @model_validator(mode="after")
+    def _validate_period_states(self) -> Self:
+        expected_indices = tuple(range(len(self.period_states)))
+        actual_indices = tuple(state.period_idx for state in self.period_states)
+        if actual_indices != expected_indices:
+            raise ValueError("period_states must be ordered by contiguous period_idx")
+        period_ids = tuple(state.period_id for state in self.period_states)
+        if len(set(period_ids)) != len(period_ids):
+            raise ValueError("period_states must use unique period_id values")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_direction_semantics(self) -> Self:
+        if self.source_stream == self.sink_stream:
+            raise ValueError("source_stream and sink_stream must be distinct")
+
+        expected_roles = {
+            HeatExchangerKind.RECOVERY: (StreamID.Process, StreamID.Process),
+            HeatExchangerKind.HOT_UTILITY: (StreamID.Utility, StreamID.Process),
+            HeatExchangerKind.COLD_UTILITY: (StreamID.Process, StreamID.Utility),
+        }
+        expected_source_role, expected_sink_role = expected_roles[self.kind]
+        if (
+            self.source_stream_role != expected_source_role
+            or self.sink_stream_role != expected_sink_role
+        ):
+            raise ValueError(
+                f"{self.kind.value} exchangers must link "
+                f"{expected_source_role.value} -> {expected_sink_role.value}"
+            )
+        if self.kind is HeatExchangerKind.RECOVERY and self.stage is None:
+            raise ValueError("recovery exchangers must include a synthesis stage")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_area_contributions(self) -> Self:
+        totals: dict[str, float] = {}
+        for contribution in self.segment_area_contributions:
+            totals[contribution.period] = (
+                totals.get(contribution.period, 0.0) + contribution.area
+            )
+        design_area = max(totals.values()) if totals else None
+        if design_area is None:
+            return self
+        if self.area is not None and not math.isclose(
+            self.area,
+            design_area,
+            rel_tol=1e-4,
+            abs_tol=1e-3,
+        ):
+            raise ValueError(
+                "area must match the maximum period-total segment area "
+                f"{design_area:.12g}"
+            )
+        object.__setattr__(self, "area", design_area)
+        return self
+
+
+class HeatExchangerNetworkSchema(BaseModel):
+    """JSON transport contract for a runtime heat exchanger network dump."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    exchangers: list[HeatExchangerSchema] = Field(default_factory=list)
+    run_id: str | None = None
+    task_id: str | None = None
+    period_id: str | None = None
+    method: str | None = None
+    stage_count: int | None = None
+    objective_value: float | None = None
+    total_annual_cost: float | None = None
+    utility_cost: float | None = None
+    capital_cost: float | None = None
+    summary_metrics: dict[str, float | int | str | bool | None] = Field(
+        default_factory=dict
+    )
+
+    @field_validator("run_id", "task_id", "period_id", "method")
+    @classmethod
+    def _validate_optional_identity(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("network metadata identities must be non-empty strings")
+        return value.strip()
+
+    @field_validator("stage_count")
+    @classmethod
+    def _validate_stage_count(cls, value: int | None) -> int | None:
+        if value is not None and value <= 0:
+            raise ValueError("stage_count must be a positive integer when supplied")
+        return value
+
+    @field_validator(
+        "objective_value",
+        "total_annual_cost",
+        "utility_cost",
+        "capital_cost",
+    )
+    @classmethod
+    def _validate_optional_non_negative_finite(
+        cls,
+        value: float | None,
+    ) -> float | None:
+        if value is None:
+            return value
+        if not math.isfinite(value) or value < 0.0:
+            raise ValueError("network numeric values must be finite and non-negative")
+        return float(value)
+
+    @field_validator("summary_metrics")
+    @classmethod
+    def _validate_summary_metrics(
+        cls,
+        value: dict[str, float | int | str | bool | None],
+    ) -> dict[str, float | int | str | bool | None]:
+        for metric_name, metric_value in value.items():
+            if not isinstance(metric_name, str) or not metric_name.strip():
+                raise ValueError("summary metric names must be non-empty strings")
+            if isinstance(metric_value, float) and not math.isfinite(metric_value):
+                raise ValueError("summary metric values must be finite")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_period_state_alignment(self) -> Self:
+        if not self.exchangers:
+            return self
+        ordered = tuple(state.period_id for state in self.exchangers[0].period_states)
+        for exchanger in self.exchangers[1:]:
+            current = tuple(state.period_id for state in exchanger.period_states)
+            if current != ordered:
+                raise ValueError(
+                    "all exchangers in a network must use the same ordered period_ids"
+                )
+        return self
+
+
 class TargetInput(BaseModel):
     """Validated top-level input data for ``pinch_analysis_service``."""
 
@@ -241,6 +544,7 @@ class TargetInput(BaseModel):
     utilities: List[UtilitySchema] = Field(default_factory=list)
     options: Optional[dict] = None
     zone_tree: Optional[ZoneTreeSchema] = None
+    network: HeatExchangerNetworkSchema | None = None
 
     @field_validator("options")
     @classmethod
@@ -265,6 +569,10 @@ class NonLinearStream(BaseModel):
 
 
 __all__ = [
+    "HeatExchangerAreaSliceSchema",
+    "HeatExchangerNetworkSchema",
+    "HeatExchangerPeriodStateSchema",
+    "HeatExchangerSchema",
     "NonLinearStream",
     "StreamSchema",
     "StreamSegmentSchema",

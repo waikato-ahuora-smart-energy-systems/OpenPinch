@@ -12,7 +12,7 @@ from ._heat_exchanger.area import HeatExchangerAreaSlice as _HeatExchangerAreaSl
 from ._heat_exchanger.period_state import (
     HeatExchangerPeriodState as _HeatExchangerPeriodState,
 )
-from .enums import HeatExchangerKind, HeatExchangerStreamRole
+from .enums import HeatExchangerKind, StreamID
 
 
 class HeatExchanger(BaseModel):
@@ -24,8 +24,8 @@ class HeatExchanger(BaseModel):
     kind: HeatExchangerKind
     source_stream: str
     sink_stream: str
-    source_stream_role: HeatExchangerStreamRole
-    sink_stream_role: HeatExchangerStreamRole
+    source_stream_role: StreamID
+    sink_stream_role: StreamID
     stage: int | None = None
     period_states: tuple[_HeatExchangerPeriodState, ...] = Field(min_length=1)
     area: float | None = None
@@ -93,16 +93,16 @@ class HeatExchanger(BaseModel):
 
         expected_roles = {
             HeatExchangerKind.RECOVERY: (
-                HeatExchangerStreamRole.PROCESS,
-                HeatExchangerStreamRole.PROCESS,
+                StreamID.Process,
+                StreamID.Process,
             ),
             HeatExchangerKind.HOT_UTILITY: (
-                HeatExchangerStreamRole.UTILITY,
-                HeatExchangerStreamRole.PROCESS,
+                StreamID.Utility,
+                StreamID.Process,
             ),
             HeatExchangerKind.COLD_UTILITY: (
-                HeatExchangerStreamRole.PROCESS,
-                HeatExchangerStreamRole.UTILITY,
+                StreamID.Process,
+                StreamID.Utility,
             ),
         }
         expected_source_role, expected_sink_role = expected_roles[self.kind]

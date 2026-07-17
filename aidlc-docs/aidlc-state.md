@@ -452,3 +452,23 @@
   review requested. All five findings are resolved.
 - **Plan**:
   `aidlc-docs/construction/plans/post-implementation-import-type-fixes-code-generation-plan.md`.
+
+## Serialized HEN Target Input Progress
+
+- [x] INCEPTION - Workspace Detection and focused current-package scan.
+- [x] INCEPTION - Requirements Analysis approved by explicit implementation request.
+- [x] INCEPTION - User Stories and Workflow Planning.
+- [x] CONSTRUCTION - Functional Design.
+- [x] CONSTRUCTION - Code Generation Part 1 plan approved by explicit request.
+- [x] CONSTRUCTION - Code Generation Part 2 implementation.
+- [x] CONSTRUCTION - Build and Test.
+- [x] OPERATIONS - N/A; no deployment work requested.
+- **Current stage**: Code Generation and Build and Test complete; generated-code
+  review requested.
+- **Plan**:
+  `aidlc-docs/construction/plans/serialized-hen-target-input-code-generation-plan.md`.
+- **Extensions**: Security and Resiliency disabled; partial PBT requires exact
+  JSON round-trip, domain-specific generators, shrinking, and reproducibility.
+- **Verification**: 2,091 non-solver tests passed with four solver-marked tests
+  deselected; Ruff lint/format, warning-as-error Sphinx, architecture,
+  stale-symbol, and patch-hygiene gates passed.
