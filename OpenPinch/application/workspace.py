@@ -1,0 +1,559 @@
+"""Multi-case orchestration built around real :class:`PinchProblem` instances."""
+
+from __future__ import annotations
+
+from copy import deepcopy
+from typing import Any, Iterable, Optional
+
+import pandas as pd
+
+from ..adapters.io.workspace_bundles import (
+    load_workspace_bundle,
+    save_workspace_bundle,
+)
+from ..contracts.input import TargetInput
+from ..contracts.workspace import (
+    ConfigurationFieldMetadata,
+    PinchWorkspaceBundle,
+    ScenarioVariantBundleEntry,
+    ScenarioVariantView,
+    ScenarioWorkflowConfig,
+    VariantInputView,
+)
+from ._problem.input.validation import build_validation_report
+from ._workspace import state as _workspace_state
+from ._workspace.case_inputs import (
+    JsonDict,
+    PathLike,
+    canonical_case_input_from_source,
+    merge_case_inputs,
+    normalise_case_input,
+)
+from ._workspace.comparison import compare_workspace_variants
+from ._workspace.execution import (
+    solve_workspace_variant,
+)
+from ._workspace.views import (
+    configuration_field_metadata as _configuration_field_metadata,
+)
+from ._workspace.views import (
+    json_safe,
+    record_views,
+    zone_tree_view,
+)
+from .problem import PinchProblem
+
+
+class PinchWorkspace:
+    """Manage multiple named :class:`PinchProblem` cases with a script-native API."""
+
+    def __init__(
+        self,
+        source: (
+            TargetInput
+            | JsonDict
+            | PathLike
+            | tuple[PathLike, PathLike]
+            | PinchProblem
+            | None
+        ) = None,
+        *,
+        project_name: Optional[str] = "Site",
+        baseline_name: str = "baseline",
+    ) -> None:
+        self.baseline_name = baseline_name
+        self.project_name = project_name
+        self._variant_inputs: dict[str, JsonDict] = {}
+        self._variant_workflows: dict[str, ScenarioWorkflowConfig] = {}
+        self._cached_views: dict[str, ScenarioVariantView] = {}
+        self._case_cache: dict[str, PinchProblem] = {}
+        self._active_case_name: Optional[str] = None
+
+        if source is not None:
+            self.load(source, case_name=baseline_name, activate=True)
+
+    @classmethod
+    def from_json(
+        cls,
+        data: JsonDict,
+        *,
+        baseline_name: str = "baseline",
+        project_name: Optional[str] = None,
+    ) -> "PinchWorkspace":
+        return cls(
+            data,
+            baseline_name=baseline_name,
+            project_name=project_name,
+        )
+
+    @classmethod
+    def load_bundle(cls, path: PathLike) -> "PinchWorkspace":
+        """Load a previously persisted workspace bundle."""
+        bundle = load_workspace_bundle(path)
+        workspace = cls(
+            project_name=bundle.project_name,
+            baseline_name=bundle.baseline_name,
+        )
+        workspace._variant_inputs = {
+            name: deepcopy(entry.case_input) for name, entry in bundle.variants.items()
+        }
+        workspace._variant_workflows = {
+            name: entry.workflow.model_copy(deep=True)
+            for name, entry in bundle.variants.items()
+        }
+        workspace._cached_views = {
+            name: entry.cached_view.model_copy(deep=True)
+            for name, entry in bundle.variants.items()
+            if entry.cached_view is not None
+        }
+        workspace._active_case_name = workspace._default_case_name()
+        return workspace
+
+    def __repr__(self) -> str:
+        active = self._active_case_name or "<unset>"
+        return (
+            f"PinchWorkspace(cases={self.list_cases()}, "
+            f"active_case={active!r}, project_name={self.project_name!r})"
+        )
+
+    def load(
+        self,
+        source: (
+            TargetInput
+            | JsonDict
+            | PathLike
+            | tuple[PathLike, PathLike]
+            | PinchProblem
+            | None
+        ),
+        *,
+        case_name: Optional[str] = None,
+        activate: bool = True,
+        project_name: Optional[str] = None,
+    ) -> Optional[PinchProblem]:
+        """Load or replace a named case and return a live validated case."""
+        if source is None:
+            return self.case(case_name)
+
+        name = case_name or self._active_case_name or self.baseline_name
+        case_input, resolved_project_name = canonical_case_input_from_source(
+            source,
+            project_name=project_name,
+            workspace_project_name=self.project_name,
+        )
+
+        self.project_name = resolved_project_name
+        self._variant_inputs[name] = case_input
+        self._variant_workflows[name] = ScenarioWorkflowConfig()
+        self._invalidate_variant_state(name)
+
+        if activate or self._active_case_name is None:
+            self._active_case_name = name
+
+        if build_validation_report(case_input).valid:
+            return self.case(name)
+        return None
+
+    def list_variants(self) -> list[str]:
+        """Return the case names in stable insertion order."""
+        return list(self._variant_inputs)
+
+    def get_variant_input(self, name: str) -> JsonDict:
+        """Return a defensive copy of one stored case input."""
+        return deepcopy(self._get_variant_input(name))
+
+    def input_view(self, name: str) -> VariantInputView:
+        """Return a frontend-friendly editable case input view."""
+        case_input = self._get_variant_input(name)
+        zone_tree = case_input.get("zone_tree")
+        return VariantInputView(
+            variant_name=name,
+            zones=zone_tree_view(zone_tree),
+            streams=record_views(case_input.get("streams"), section="streams"),
+            utilities=record_views(case_input.get("utilities"), section="utilities"),
+            options=json_safe(case_input.get("options") or {}),
+        )
+
+    def validate_variant(self, name: str):
+        """Return a structured validation report for one case input."""
+        return build_validation_report(self._get_variant_input(name))
+
+    def validation_report(self, case_name: Optional[str] = None):
+        """Return a structured validation report for one case input."""
+        return self.validate_variant(self._resolve_case_name(case_name))
+
+    def set_variant_input(
+        self,
+        name: str,
+        case_input: TargetInput | JsonDict,
+        *,
+        base: Optional[str] = None,
+    ) -> JsonDict:
+        """Create or replace one stored case input."""
+        normalized = normalise_case_input(case_input)
+        if base is not None:
+            base_case_input = self._get_variant_input(base)
+            normalized = merge_case_inputs(base_case_input, normalized)
+        self._variant_inputs[name] = normalized
+        if name not in self._variant_workflows:
+            self._variant_workflows[name] = ScenarioWorkflowConfig()
+        if self._active_case_name is None:
+            self._active_case_name = name
+        self._invalidate_variant_state(name)
+        return deepcopy(normalized)
+
+    def solve_variant(
+        self,
+        name: str,
+        *,
+        workflow: str = "target",
+        workflow_options: Optional[dict[str, Any]] = None,
+    ) -> ScenarioVariantView:
+        """Solve one case and return a serializable frontend-facing view."""
+        return solve_workspace_variant(
+            self,
+            name,
+            workflow=workflow,
+            workflow_options=workflow_options,
+        )
+
+    def compare_variants(
+        self,
+        variant_names: Optional[Iterable[str]] = None,
+        *,
+        base: Optional[str] = None,
+    ):
+        """Return a deterministic comparison view across solved variants."""
+        return compare_workspace_variants(
+            self,
+            variant_names,
+            base=base,
+        )
+
+    def list_cases(self) -> list[str]:
+        """Return the loaded case names in stable insertion order."""
+        return self.list_variants()
+
+    def case(self, name: Optional[str] = None) -> PinchProblem:
+        """Return the live :class:`PinchProblem` for one named case."""
+        return _workspace_state.case_for_name(self, name)
+
+    def use_case(self, name: str) -> PinchProblem:
+        """Activate one named case and return it."""
+        self._active_case_name = self._resolve_case_name(name)
+        return self.case(self._active_case_name)
+
+    def copy_case(
+        self,
+        *,
+        source_name: str = "baseline",
+        new_name: str = "new",
+        activate: bool = False,
+    ) -> PinchProblem:
+        """Clone one existing case into a new named case."""
+        data_source = self.get_case_input(source_name, canonical=True)
+        return self.load(data_source, case_name=new_name, activate=activate)
+
+    def scenario(
+        self,
+        name: str,
+        *,
+        base: Optional[str] = None,
+        options: Optional[dict[str, Any]] = None,
+        replace_options: bool = False,
+        dt_cont_multiplier: float | None = None,
+        activate: bool = False,
+        solve: bool = False,
+        workflow: str = "target",
+        workflow_options: Optional[dict[str, Any]] = None,
+    ) -> PinchProblem:
+        """Create a named scenario from a base case and optional edits."""
+        source_name = base or self.baseline_name
+        case = self.copy_case(
+            source_name=source_name,
+            new_name=name,
+            activate=activate,
+        )
+        if options:
+            case.update_options(options, replace=replace_options)
+        if dt_cont_multiplier is not None:
+            case.set_dt_cont_multiplier(dt_cont_multiplier)
+        self._sync_case_input(name)
+        if solve:
+            self.solve_variant(
+                name,
+                workflow=workflow,
+                workflow_options=workflow_options,
+            )
+        return self.case(name)
+
+    def get_case_input(
+        self,
+        name: Optional[str] = None,
+        *,
+        canonical: bool = True,
+    ) -> JsonDict:
+        """Return one case input, optionally normalised to canonical form."""
+        resolved_name = self._resolve_case_name(name)
+        if canonical:
+            self._sync_case_input(resolved_name)
+        return deepcopy(self._variant_inputs[resolved_name])
+
+    def to_problem_json(
+        self,
+        *,
+        case_name: Optional[str] = None,
+        canonical: bool = True,
+    ) -> JsonDict:
+        """Return the case input for one case using :class:`PinchProblem` naming."""
+        return self.get_case_input(case_name, canonical=canonical)
+
+    @property
+    def active_case_name(self) -> Optional[str]:
+        """Return the currently active case name."""
+        return self._active_case_name
+
+    @property
+    def target(self):
+        """Delegate the ``target`` accessor to the active case."""
+        return self.case().target
+
+    @property
+    def plot(self):
+        """Delegate the ``plot`` accessor to the active case."""
+        return self.case().plot
+
+    @property
+    def problem_data(self):
+        """Return the active case input."""
+        return self.case().problem_data
+
+    @property
+    def problem_filepath(self):
+        """Return the active case filepath when available."""
+        return self.case().problem_filepath
+
+    @property
+    def results(self):
+        """Return the active case results when available."""
+        return self.case().results
+
+    @property
+    def master_zone(self):
+        """Return the active case master zone when available."""
+        return self.case().master_zone
+
+    def validate(self, case_name: Optional[str] = None):
+        """Validate one case input."""
+        return self.case(case_name).validate()
+
+    def summary_frame(
+        self,
+        *,
+        case_name: Optional[str] = None,
+        detailed: bool = False,
+        format: str | None = None,
+        periods: str = "selected",
+    ) -> pd.DataFrame:
+        """Return the solved summary for one case."""
+        return self.case(case_name).summary_frame(
+            detailed=detailed,
+            format=format,
+            periods=periods,
+        )
+
+    def metrics(
+        self,
+        *,
+        case_name: Optional[str] = None,
+        solve: bool = True,
+        periods: str = "selected",
+    ):
+        """Return typed metrics for one case."""
+        return self.case(case_name).metrics(solve=solve, periods=periods)
+
+    def report(
+        self,
+        *,
+        case_name: Optional[str] = None,
+        solve: bool = True,
+        periods: str = "selected",
+    ):
+        """Return a typed report for one case."""
+        return self.case(case_name).report(solve=solve, periods=periods)
+
+    def export_excel(
+        self,
+        results_dir: Optional[PathLike] = None,
+        *,
+        case_name: Optional[str] = None,
+        periods: str = "selected",
+    ) -> Any:
+        """Export one case to an Excel workbook."""
+        case = self.case(case_name)
+        if periods == "selected":
+            return case.export_excel(results_dir)
+        return case.export_excel(results_dir, periods=periods)
+
+    def set_dt_cont_multiplier(
+        self,
+        value: float,
+        *,
+        zone_name: Optional[str] = None,
+        case_name: Optional[str] = None,
+    ):
+        """Update one case multiplier and keep the stored case input in sync."""
+        resolved_name = self._resolve_case_name(case_name)
+        result = self.case(resolved_name).set_dt_cont_multiplier(
+            value,
+            zone_name=zone_name,
+        )
+        self._sync_case_input(resolved_name)
+        return result
+
+    def update_options(
+        self,
+        options: dict[str, Any],
+        *,
+        case_name: Optional[str] = None,
+        replace: bool = False,
+    ) -> PinchProblem:
+        """Update one case's options and keep the stored case input in sync."""
+        resolved_name = self._resolve_case_name(case_name)
+        problem = self.case(resolved_name)
+        problem.update_options(options, replace=replace)
+        self._sync_case_input(resolved_name)
+        return problem
+
+    def show_dashboard(
+        self,
+        *,
+        case_name: Optional[str] = None,
+        zone=None,
+        graph_data: Optional[dict[str, Any]] = None,
+        page_title: Optional[str] = "OpenPinch Dashboard",
+        value_rounding: int = 2,
+    ) -> None:
+        """Launch the dashboard for one case."""
+        self.case(case_name).show_dashboard(
+            zone=zone,
+            graph_data=graph_data,
+            page_title=page_title,
+            value_rounding=value_rounding,
+        )
+
+    def compare_to(
+        self,
+        other_problem: PinchProblem | "PinchWorkspace",
+        *,
+        case_name: Optional[str] = None,
+        other_case_name: Optional[str] = None,
+        target_name: Optional[str] = None,
+        base_label: str = "Base case",
+        other_label: str = "Scenario",
+    ) -> pd.DataFrame:
+        """Compare one workspace case to another problem or workspace case."""
+        base_problem = self.case(case_name)
+        if isinstance(other_problem, PinchWorkspace):
+            comparison_problem = other_problem.case(other_case_name)
+        else:
+            comparison_problem = other_problem
+        return base_problem.compare_to(
+            comparison_problem,
+            target_name=target_name,
+            base_label=base_label,
+            other_label=other_label,
+        )
+
+    def compare_cases(
+        self,
+        base_case: str,
+        other_case: str,
+        *,
+        target_name: Optional[str] = None,
+        base_label: Optional[str] = None,
+        other_label: Optional[str] = None,
+    ) -> pd.DataFrame:
+        """Compare two cases in the same workspace."""
+        return self.case(base_case).compare_to(
+            self.case(other_case),
+            target_name=target_name,
+            base_label=base_label or base_case,
+            other_label=other_label or other_case,
+        )
+
+    def save_bundle(self, path: PathLike) -> Any:
+        """Persist the current workspace, syncing any live case edits first."""
+        self._sync_all_cases()
+        bundle = PinchWorkspaceBundle(
+            project_name=self.project_name,
+            baseline_name=self.baseline_name,
+            variants={
+                name: ScenarioVariantBundleEntry(
+                    case_input=self.get_variant_input(name),
+                    workflow=self._variant_workflows.get(
+                        name,
+                        ScenarioWorkflowConfig(),
+                    ),
+                    cached_view=self._cached_views.get(name),
+                )
+                for name in self.list_variants()
+            },
+        )
+        return save_workspace_bundle(path, bundle)
+
+    @classmethod
+    def configuration_field_metadata(cls) -> list[ConfigurationFieldMetadata]:
+        """Return declarative metadata for editable configuration fields."""
+        return _configuration_field_metadata()
+
+    def _resolve_case_name(self, name: Optional[str]) -> str:
+        return _workspace_state.resolve_case_name(self, name)
+
+    def _default_case_name(self) -> Optional[str]:
+        return _workspace_state.default_case_name(self)
+
+    def _get_variant_input(self, name: str) -> JsonDict:
+        self._sync_case_input(name)
+        try:
+            return self._variant_inputs[name]
+        except KeyError as exc:
+            raise KeyError(
+                f"Unknown variant {name!r}. Available variants: "
+                f"{', '.join(self.list_variants())}"
+            ) from exc
+
+    def _ensure_solved_view(self, name: str) -> ScenarioVariantView:
+        if name in self._cached_views:
+            view = self._cached_views[name]
+        else:
+            workflow_config = self._variant_workflows.get(
+                name,
+                ScenarioWorkflowConfig(),
+            )
+            view = self.solve_variant(
+                name,
+                workflow=workflow_config.workflow,
+                workflow_options=workflow_config.workflow_options,
+            )
+
+        if view.status != "solved":
+            raise ValueError(
+                f"Variant {name!r} is not solved and cannot be compared "
+                f"(status={view.status!r})."
+            )
+        return view
+
+    def _invalidate_variant_state(self, name: str) -> None:
+        """Drop cached case and view state for one variant case input."""
+        _workspace_state.invalidate_variant_state(self, name)
+
+    def _sync_case_input(self, name: str) -> None:
+        _workspace_state.sync_case_input(self, name)
+
+    def _sync_all_cases(self) -> None:
+        for name in list(self._case_cache):
+            self._sync_case_input(name)
+
+
+__all__ = ["PinchWorkspace"]
