@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Optional, Sequence
 if TYPE_CHECKING:
     from ....contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
     from ....domain.enums import HeatExchangerNetworkDesignMethod
-    from ...heat_exchanger_network import HeatExchangerNetwork
+    from ....domain.heat_exchanger_network import HeatExchangerNetwork
     from ...problem import PinchProblem
 
 
@@ -20,27 +20,27 @@ class _DesignNetworkAccessor:
     @property
     def total_heat_recovery(self) -> float:
         """Return the selected network's total process heat recovery duty."""
-        from ...heat_exchanger import HeatExchangerKind
+        from ....domain.enums import HeatExchangerKind
 
         return self._selected_network().total_duty(kind=HeatExchangerKind.RECOVERY)
 
     @property
     def total_hot_utility(self) -> float:
         """Return the selected network's total hot utility duty."""
-        from ...heat_exchanger import HeatExchangerKind
+        from ....domain.enums import HeatExchangerKind
 
         return self._selected_network().total_duty(kind=HeatExchangerKind.HOT_UTILITY)
 
     @property
     def total_cold_utility(self) -> float:
         """Return the selected network's total cold utility duty."""
-        from ...heat_exchanger import HeatExchangerKind
+        from ....domain.enums import HeatExchangerKind
 
         return self._selected_network().total_duty(kind=HeatExchangerKind.COLD_UTILITY)
 
     def utility(self, name: str, *, period_id: str | None = None) -> float:
         """Return selected-network hot/cold utility exchanger duty for ``name``."""
-        from ...heat_exchanger import HeatExchangerKind
+        from ....domain.enums import HeatExchangerKind
 
         if not isinstance(name, str) or not name.strip():
             raise ValueError("utility name must be a non-empty string")
@@ -91,8 +91,8 @@ class _DesignAccessor:
         workspace_variant: Optional[str] = None,
     ) -> "HeatExchangerNetworkSynthesisResult":
         """Run a selected HEN design method and cache the design result."""
-        from ....services.heat_exchanger_network_synthesis import (
-            heat_exchanger_network_synthesis_entry as hens_entry,
+        from ....analysis.heat_exchanger_networks import (
+            service as hens_entry,
         )
 
         return hens_entry.heat_exchanger_network_synthesis_service(
@@ -112,8 +112,8 @@ class _DesignAccessor:
         workspace_variant: Optional[str] = None,
     ) -> "HeatExchangerNetworkSynthesisResult":
         """Run OpenHENS synthesis with an explicit quality tier."""
-        from ....services.heat_exchanger_network_synthesis import (
-            heat_exchanger_network_synthesis_entry as hens_entry,
+        from ....analysis.heat_exchanger_networks import (
+            service as hens_entry,
         )
 
         return hens_entry._heat_exchanger_network_enhanced_synthesis_method_service(
@@ -131,8 +131,8 @@ class _DesignAccessor:
         workspace_variant: Optional[str] = None,
     ) -> "HeatExchangerNetworkSynthesisResult":
         """Run the original tier-1 OpenHENS PDM -> TDM -> EVM method."""
-        from ....services.heat_exchanger_network_synthesis import (
-            heat_exchanger_network_synthesis_entry as hens_entry,
+        from ....analysis.heat_exchanger_networks import (
+            service as hens_entry,
         )
 
         return hens_entry.heat_exchanger_network_open_hens_method_service(
@@ -149,8 +149,8 @@ class _DesignAccessor:
         workspace_variant: Optional[str] = None,
     ) -> "HeatExchangerNetworkSynthesisResult":
         """Run only the PDM method and cache the design result."""
-        from ....services.heat_exchanger_network_synthesis import (
-            heat_exchanger_network_synthesis_entry as hens_entry,
+        from ....analysis.heat_exchanger_networks import (
+            service as hens_entry,
         )
 
         return hens_entry.heat_exchanger_network_pinch_design_method_service(
@@ -170,8 +170,8 @@ class _DesignAccessor:
         workspace_variant: Optional[str] = None,
     ) -> "HeatExchangerNetworkSynthesisResult":
         """Run only seeded TDM and cache the design result."""
-        from ....services.heat_exchanger_network_synthesis import (
-            heat_exchanger_network_synthesis_entry as hens_entry,
+        from ....analysis.heat_exchanger_networks import (
+            service as hens_entry,
         )
 
         return hens_entry.heat_exchanger_network_thermal_derivative_method_service(
@@ -192,8 +192,8 @@ class _DesignAccessor:
         workspace_variant: Optional[str] = None,
     ) -> "HeatExchangerNetworkSynthesisResult":
         """Run only seeded network evolution and cache the design result."""
-        from ....services.heat_exchanger_network_synthesis import (
-            heat_exchanger_network_synthesis_entry as hens_entry,
+        from ....analysis.heat_exchanger_networks import (
+            service as hens_entry,
         )
 
         return hens_entry.heat_exchanger_network_evolution_method_service(
@@ -208,11 +208,9 @@ class _DesignAccessor:
         options: Optional[dict[str, Any]],
         period_id: Optional[str],
     ) -> dict[str, Any]:
-        from ....services.heat_exchanger_network_synthesis.common import (
-            service_context,
-        )
+        from ....analysis.heat_exchanger_networks import context
 
-        runtime_options = service_context.normalise_runtime_options(options)
+        runtime_options = context.normalise_runtime_options(options)
         if period_id is not None:
             runtime_options["period_id"] = period_id
         return runtime_options

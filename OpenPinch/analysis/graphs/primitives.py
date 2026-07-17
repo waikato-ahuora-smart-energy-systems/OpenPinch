@@ -9,8 +9,7 @@ import numpy as np
 from ...domain.configuration import tol
 from ...domain.enums import ArrowHead, LineColour, StreamLoc
 from ...domain.problem_table import ProblemTable
-from .metadata import GRAPH_SERIES_META
-from .metadata import GraphSeriesMeta as _GraphSeriesMeta
+from .metadata import GRAPH_SERIES_META, _GraphSeriesMeta
 
 DECIMAL_PLACES = 2
 
@@ -47,7 +46,7 @@ def _should_plot_series(values: list[float]) -> bool:
     """Return whether a graph series contains meaningful finite values."""
     try:
         numeric = np.asarray(values, dtype=float)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         numeric = np.array(
             [float(value) for value in values if value is not None],
             dtype=float,
@@ -115,7 +114,9 @@ def _create_curve(
             None if is_utility_stream is None else bool(is_utility_stream)
         ),
     }
-    curve.update({key: value for key, value in optional_fields.items() if value is not None})
+    curve.update(
+        {key: value for key, value in optional_fields.items() if value is not None}
+    )
     curve["data_points"] = [
         {"x": round(x, DECIMAL_PLACES), "y": round(y, DECIMAL_PLACES)}
         for x, y in zip(x_vals, y_vals)

@@ -1,15 +1,10 @@
-"""High-level orchestration for running an OpenPinch analysis.
-
-The functions in this module wire together data validation, pinch targeting,
-and output formatting.  They act as the main entry points used by the
-``PinchProblem`` helper class as well as external callers embedding OpenPinch
-in larger workflows.
-"""
+"""Compatibility-protected service for running an OpenPinch analysis."""
 
 from typing import Any
 
-from .classes.pinch_problem import PinchProblem
-from .lib.schemas.io import TargetInput, TargetOutput
+from .application.problem import PinchProblem
+from .contracts.input import TargetInput
+from .contracts.output import TargetOutput
 
 __all__ = ["pinch_analysis_service"]
 
@@ -28,7 +23,7 @@ def pinch_analysis_service(
     Parameters
     ----------
     data:
-        Raw request data matching :class:`OpenPinch.lib.schemas.io.TargetInput`.
+        Raw request data matching :class:`OpenPinch.contracts.input.TargetInput`.
         Dictionaries, Pydantic models, and dataclass-like objects are accepted.
     project_name:
         Optional label used in generated graphs and result files.

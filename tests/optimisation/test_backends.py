@@ -1,0 +1,1018 @@
+"""Regression and edge-path tests for scalar optimisation backends."""
+
+import time
+
+import numpy as np
+import pytest
+
+import OpenPinch.optimisation.backends.bayesian as bb_bo
+import OpenPinch.optimisation.backends.cma_es as bb_cma
+import OpenPinch.optimisation.backends.dual_annealing as bb_da
+import OpenPinch.optimisation.backends.rbf as bb_rbf
+import OpenPinch.optimisation.candidates as bb_common
+import OpenPinch.optimisation.execution as bb_execution
+from OpenPinch.optimisation.models import OptimisationOptions, OptimisationProblem
+from OpenPinch.optimisation.service import run_multistart_minimisation
+
+# Backend edge-path coverage.
+
+
+class _FakePool:
+    def __init__(self, max_workers):
+        self.max_workers = max_workers
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def map(self, fn, iterable):
+        return [fn(i) for i in iterable]
+
+
+def _quadratic(x, *args):
+    x = np.asarray(x, dtype=float)
+    return float(np.sum(x * x))
+
+
+def test_get_cma_multiminima_empty_collection(monkeypatch):
+    monkeypatch.setattr(
+        bb_cma,
+        "_collect_cma_candidates",
+        lambda **kwargs: (np.asarray([]), np.asarray([])),
+    )
+    xs, fs = bb_cma._get_cma_multiminima_in_parallel(
+        func=_quadratic,
+        bounds=((0.0, 1.0),),
+        n_runs=1,
+    )
+    assert xs.size == 0
+    assert fs.size == 0
+
+
+def test_get_cma_multiminima_empty_polish(monkeypatch):
+    monkeypatch.setattr(
+        bb_cma,
+        "_collect_cma_candidates",
+        lambda **kwargs: (np.asarray([[0.1], [0.2]]), np.asarray([1.0, 2.0])),
+    )
+    monkeypatch.setattr(bb_cma, "_cluster_candidates", lambda **kwargs: [0])
+    monkeypatch.setattr(
+        bb_cma,
+        "_polish_candidates",
+        lambda **kwargs: (np.asarray([]), np.asarray([])),
+    )
+    xs, fs = bb_cma._get_cma_multiminima_in_parallel(
+        func=_quadratic,
+        bounds=((0.0, 1.0),),
+        n_runs=1,
+    )
+    assert xs.size == 0
+    assert fs.size == 0
+
+
+def test_collect_cma_candidates_reshape_and_pool_path(monkeypatch):
+    monkeypatch.setattr(bb_cma, "ProcessPoolExecutor", _FakePool)
+    monkeypatch.setattr(
+        bb_cma,
+        "_run_cma_single",
+        lambda run, **kwargs: ([np.array([float(run)])], [float(run)]),
+    )
+    xs, fs = bb_cma._collect_cma_candidates(
+        func=_quadratic,
+        bounds=np.asarray([[0.0, 1.0]], dtype=float),
+        x0_ls=np.asarray([0.3]),
+        args=(),
+        n_runs=2,
+        maxiter=1,
+        seed=0,
+        maxfevals=5,
+        popsize=None,
+        sigma0=None,
+        tolx=1e-8,
+        tolfun=1e-10,
+    )
+    assert xs.shape == (2, 1)
+    assert fs.shape == (2,)
+
+
+def test_run_cma_single_fixed_bounds_branch():
+    xs, fs = bb_cma._run_cma_single(
+        run=0,
+        func=_quadratic,
+        bounds=np.asarray([[1.0, 1.0]], dtype=float),
+        x0_ls=None,
+        args=(),
+        maxiter=5,
+        seed=0,
+        maxfevals=5,
+        popsize=None,
+        sigma0=None,
+        tolx=1e-8,
+        tolfun=1e-10,
+    )
+    assert len(xs) == 1
+    assert len(fs) == 1
+
+
+def test_run_cma_single_breaks_on_remaining_budget_and_adds_fallback():
+    xs, fs = bb_cma._run_cma_single(
+        run=0,
+        func=_quadratic,
+        bounds=np.asarray([[0.0, 1.0]], dtype=float),
+        x0_ls=None,
+        args=(),
+        maxiter=5,
+        seed=0,
+        maxfevals=0,
+        popsize=None,
+        sigma0=None,
+        tolx=1e-8,
+        tolfun=1e-10,
+    )
+    assert len(xs) == 1
+    assert np.isfinite(fs[0])
+
+
+def test_run_cma_single_breaks_when_generation_eval_count_below_two():
+    xs, fs = bb_cma._run_cma_single(
+        run=0,
+        func=_quadratic,
+        bounds=np.asarray([[0.0, 1.0]], dtype=float),
+        x0_ls=None,
+        args=(),
+        maxiter=5,
+        seed=0,
+        maxfevals=1,
+        popsize=None,
+        sigma0=None,
+        tolx=1e-8,
+        tolfun=1e-10,
+    )
+    assert len(xs) == 1
+    assert len(fs) == 1
+
+
+def test_run_cma_single_stops_by_tolx_and_stall():
+    xs_tolx, fs_tolx = bb_cma._run_cma_single(
+        run=0,
+        func=_quadratic,
+        bounds=np.asarray([[0.0, 1.0]], dtype=float),
+        x0_ls=np.asarray([[0.2]]),
+        args=(),
+        maxiter=50,
+        seed=1,
+        maxfevals=1000,
+        popsize=4,
+        sigma0=0.1,
+        tolx=1e9,
+        tolfun=1e-10,
+    )
+    assert len(xs_tolx) >= 1
+    assert len(fs_tolx) >= 1
+
+    xs_stall, fs_stall = bb_cma._run_cma_single(
+        run=0,
+        func=_quadratic,
+        bounds=np.asarray([[0.0, 1.0]], dtype=float),
+        x0_ls=np.asarray([[0.2]]),
+        args=(),
+        maxiter=25,
+        seed=2,
+        maxfevals=1000,
+        popsize=4,
+        sigma0=0.1,
+        tolx=1e-12,
+        tolfun=float("inf"),
+    )
+    assert len(xs_stall) >= 1
+    assert len(fs_stall) >= 1
+
+
+def test_run_cma_single_nan_objective_appends_mean_fallback(monkeypatch):
+    monkeypatch.setattr(
+        bb_cma, "_evaluate_scalar_objective", lambda func, x, args: float("nan")
+    )
+    xs, fs = bb_cma._run_cma_single(
+        run=0,
+        func=_quadratic,
+        bounds=np.asarray([[0.0, 1.0]], dtype=float),
+        x0_ls=None,
+        args=(),
+        maxiter=3,
+        seed=0,
+        maxfevals=50,
+        popsize=4,
+        sigma0=0.1,
+        tolx=1e-8,
+        tolfun=1e-10,
+    )
+    assert len(xs) == 1
+    assert np.isnan(fs[0])
+
+
+def test_default_cma_sigma_and_evaluate_scalar_objective_args_path():
+    sigma = bb_cma._default_cma_sigma(np.asarray([[2.0, 2.0]], dtype=float))
+    assert sigma == 1.0
+
+    out = bb_cma._evaluate_scalar_objective(
+        lambda x, a, b: float(np.sum(x) + a + b),
+        x=np.asarray([1.0, 2.0]),
+        args=(3.0, 4.0),
+    )
+    assert out == 10.0
+
+
+def test_get_bo_multiminima_empty_paths(monkeypatch):
+    monkeypatch.setattr(
+        bb_bo,
+        "_collect_bo_candidates",
+        lambda **kwargs: (np.asarray([]), np.asarray([])),
+    )
+    xs0, fs0 = bb_bo._get_bo_multiminima_in_parallel(
+        func=_quadratic,
+        bounds=((0.0, 1.0),),
+        n_runs=1,
+    )
+    assert xs0.size == 0
+    assert fs0.size == 0
+
+    monkeypatch.setattr(
+        bb_bo,
+        "_collect_bo_candidates",
+        lambda **kwargs: (np.asarray([[0.2]]), np.asarray([1.0])),
+    )
+    monkeypatch.setattr(bb_bo, "_cluster_candidates", lambda **kwargs: [0])
+    monkeypatch.setattr(
+        bb_bo, "_polish_candidates", lambda **kwargs: (np.asarray([]), np.asarray([]))
+    )
+    xs1, fs1 = bb_bo._get_bo_multiminima_in_parallel(
+        func=_quadratic,
+        bounds=((0.0, 1.0),),
+        n_runs=1,
+    )
+    assert xs1.size == 0
+    assert fs1.size == 0
+
+
+def test_run_bo_single_uses_random_fallback_when_gp_fit_fails(monkeypatch):
+    monkeypatch.setattr(
+        bb_bo,
+        "_fit_bo_gp_model",
+        lambda **kwargs: (_ for _ in ()).throw(ValueError("bad covariance")),
+    )
+
+    xs, fs = bb_bo._run_bo_single(
+        run=0,
+        func=_quadratic,
+        bounds=((0.0, 1.0),),
+        x0_ls=np.asarray([[0.25]], dtype=float),
+        args=(),
+        seed=0,
+        maxiter=1,
+        maxfevals=3,
+        n_init=1,
+        acq_candidates=4,
+        lengthscale=None,
+        noise=1e-6,
+        xi=0.01,
+    )
+
+    assert len(xs) >= 1
+    assert len(fs) >= 1
+
+
+def test_run_bo_single_jitters_duplicate_proposals(monkeypatch):
+    monkeypatch.setattr(bb_bo, "_fit_bo_gp_model", lambda **kwargs: object())
+    monkeypatch.setattr(
+        bb_bo,
+        "_propose_bo_candidate",
+        lambda **kwargs: np.asarray([0.25], dtype=float),
+    )
+
+    xs, fs = bb_bo._run_bo_single(
+        run=0,
+        func=lambda x, *_args: -float(x[0]),
+        bounds=((0.0, 1.0),),
+        x0_ls=np.asarray([[0.25]], dtype=float),
+        args=(),
+        seed=0,
+        maxiter=1,
+        maxfevals=3,
+        n_init=1,
+        acq_candidates=4,
+        lengthscale=None,
+        noise=1e-6,
+        xi=0.01,
+    )
+
+    assert len(xs) >= 1
+    assert len(fs) >= 1
+
+
+def test_collect_bo_candidates_reshape_and_pool_path(monkeypatch):
+    monkeypatch.setattr(bb_bo, "ProcessPoolExecutor", _FakePool)
+    monkeypatch.setattr(
+        bb_bo,
+        "_run_bo_single",
+        lambda run, **kwargs: ([np.array([float(run)])], [float(run)]),
+    )
+    xs, fs = bb_bo._collect_bo_candidates(
+        func=_quadratic,
+        bounds=np.asarray([[0.0, 1.0]], dtype=float),
+        x0_ls=np.asarray([0.4]),
+        args=(),
+        n_runs=2,
+        maxiter=1,
+        seed=0,
+        maxfevals=5,
+        n_init=1,
+        acq_candidates=32,
+        lengthscale=None,
+        noise=1e-8,
+        xi=1e-3,
+    )
+    assert xs.shape == (2, 1)
+    assert fs.shape == (2,)
+
+
+def test_run_bo_single_fixed_bounds_branch():
+    xs, fs = bb_bo._run_bo_single(
+        run=0,
+        func=_quadratic,
+        bounds=np.asarray([[1.0, 1.0]], dtype=float),
+        x0_ls=None,
+        args=(),
+        maxiter=5,
+        seed=0,
+        maxfevals=5,
+        n_init=1,
+        acq_candidates=32,
+        lengthscale=None,
+        noise=1e-8,
+        xi=1e-3,
+    )
+    assert len(xs) == 1
+    assert len(fs) == 1
+
+
+def test_run_bo_single_seeded_path_and_budget_break(monkeypatch):
+    monkeypatch.setattr(
+        bb_bo,
+        "_fit_bo_gp_model",
+        lambda **kwargs: (_ for _ in ()).throw(np.linalg.LinAlgError()),
+    )
+    xs, fs = bb_bo._run_bo_single(
+        run=0,
+        func=_quadratic,
+        bounds=np.asarray([[0.0, 1.0]], dtype=float),
+        x0_ls=np.asarray([[0.3]]),
+        args=(),
+        maxiter=2,
+        seed=0,
+        maxfevals=1,
+        n_init=1,
+        acq_candidates=32,
+        lengthscale=None,
+        noise=1e-8,
+        xi=1e-3,
+    )
+    assert len(xs) >= 1
+    assert len(fs) >= 1
+
+
+def test_run_bo_single_gp_failure_falls_back_to_random_step(monkeypatch):
+    monkeypatch.setattr(
+        bb_bo,
+        "_fit_bo_gp_model",
+        lambda **kwargs: (_ for _ in ()).throw(np.linalg.LinAlgError()),
+    )
+    xs, fs = bb_bo._run_bo_single(
+        run=0,
+        func=_quadratic,
+        bounds=np.asarray([[0.0, 1.0]], dtype=float),
+        x0_ls=None,
+        args=(),
+        maxiter=1,
+        seed=0,
+        maxfevals=2,
+        n_init=1,
+        acq_candidates=16,
+        lengthscale=None,
+        noise=1e-8,
+        xi=1e-3,
+    )
+    assert len(xs) >= 1
+    assert len(fs) >= 1
+
+
+def test_run_bo_single_nan_objective_fallback_minimum(monkeypatch):
+    monkeypatch.setattr(
+        bb_bo, "_evaluate_scalar_objective", lambda func, x, args: float("nan")
+    )
+    xs, fs = bb_bo._run_bo_single(
+        run=0,
+        func=_quadratic,
+        bounds=np.asarray([[0.0, 1.0]], dtype=float),
+        x0_ls=None,
+        args=(),
+        maxiter=0,
+        seed=0,
+        maxfevals=3,
+        n_init=2,
+        acq_candidates=16,
+        lengthscale=None,
+        noise=1e-8,
+        xi=1e-3,
+    )
+    assert len(xs) == 1
+    assert np.isnan(fs[0])
+
+
+def test_fit_bo_gp_model_finite_filter_and_no_observations_error():
+    X = np.asarray([[0.0], [1.0]], dtype=float)
+    y = np.asarray([np.nan, np.nan], dtype=float)
+    with pytest.raises(ValueError, match="No finite BO observations"):
+        bb_bo._fit_bo_gp_model(X, y, lengthscale=None, noise=1e-8)
+
+
+def test_fit_bo_gp_model_lengthscale_and_duplicate_points_branches():
+    X_dup = np.asarray([[0.5], [0.5]], dtype=float)
+    y_dup = np.asarray([1.0, 1.0], dtype=float)
+    model_dup = bb_bo._fit_bo_gp_model(X_dup, y_dup, lengthscale=None, noise=1e-8)
+    assert model_dup["lengthscale"] > 0
+
+    X_one = np.asarray([[0.2]], dtype=float)
+    y_one = np.asarray([1.0], dtype=float)
+    model_one = bb_bo._fit_bo_gp_model(X_one, y_one, lengthscale=None, noise=1e-8)
+    assert model_one["lengthscale"] > 0
+
+    model_fixed = bb_bo._fit_bo_gp_model(X_dup, y_dup, lengthscale=0.0, noise=1e-8)
+    assert model_fixed["lengthscale"] >= 1e-6
+
+
+def test_fit_bo_gp_model_cholesky_and_alpha_failure_paths(monkeypatch):
+    X = np.asarray([[0.0], [1.0]], dtype=float)
+    y = np.asarray([0.0, 1.0], dtype=float)
+
+    monkeypatch.setattr(
+        bb_bo.np.linalg,
+        "cholesky",
+        lambda matrix: (_ for _ in ()).throw(np.linalg.LinAlgError()),
+    )
+    model_no_chol = bb_bo._fit_bo_gp_model(X, y, lengthscale=None, noise=1e-8)
+    assert model_no_chol["L"] is None
+
+    monkeypatch.undo()
+    monkeypatch.setattr(
+        bb_bo.np.linalg,
+        "solve",
+        lambda *args, **kwargs: (_ for _ in ()).throw(np.linalg.LinAlgError()),
+    )
+    model_no_solve = bb_bo._fit_bo_gp_model(X, y, lengthscale=None, noise=1e-8)
+    assert np.allclose(model_no_solve["alpha"], np.zeros(2))
+
+
+def test_predict_bo_gp_l_none_and_solve_failure(monkeypatch):
+    model_none = {
+        "X": np.asarray([[0.0]], dtype=float),
+        "alpha": np.asarray([0.0], dtype=float),
+        "L": None,
+        "y_mean": 2.0,
+        "lengthscale": 0.5,
+        "signal": 1.0,
+    }
+    mu0, var0 = bb_bo._predict_bo_gp(
+        model_none, np.asarray([[0.1], [0.2]], dtype=float)
+    )
+    assert np.allclose(mu0, [2.0, 2.0])
+    assert np.all(var0 > 0)
+
+    model = {
+        "X": np.asarray([[0.0], [1.0]], dtype=float),
+        "alpha": np.asarray([0.1, 0.2], dtype=float),
+        "L": np.eye(2),
+        "y_mean": 1.0,
+        "lengthscale": 0.5,
+        "signal": 1.0,
+    }
+    monkeypatch.setattr(
+        bb_bo.np.linalg,
+        "solve",
+        lambda *args, **kwargs: (_ for _ in ()).throw(np.linalg.LinAlgError()),
+    )
+    mu1, var1 = bb_bo._predict_bo_gp(model, np.asarray([[0.5]], dtype=float))
+    assert mu1.shape == (1,)
+    assert var1.shape == (1,)
+
+
+def test_get_rbf_multiminima_empty_paths(monkeypatch):
+    monkeypatch.setattr(
+        bb_rbf,
+        "_collect_rbf_surrogate_candidates",
+        lambda **kwargs: (np.asarray([]), np.asarray([])),
+    )
+    xs0, fs0 = bb_rbf._get_rbf_surrogate_multiminima_in_parallel(
+        func=_quadratic,
+        bounds=((0.0, 1.0),),
+        n_runs=1,
+    )
+    assert xs0.size == 0
+    assert fs0.size == 0
+
+    monkeypatch.setattr(
+        bb_rbf,
+        "_collect_rbf_surrogate_candidates",
+        lambda **kwargs: (np.asarray([[0.2]]), np.asarray([1.0])),
+    )
+    monkeypatch.setattr(bb_rbf, "_cluster_candidates", lambda **kwargs: [0])
+    monkeypatch.setattr(
+        bb_rbf, "_polish_candidates", lambda **kwargs: (np.asarray([]), np.asarray([]))
+    )
+    xs1, fs1 = bb_rbf._get_rbf_surrogate_multiminima_in_parallel(
+        func=_quadratic,
+        bounds=((0.0, 1.0),),
+        n_runs=1,
+    )
+    assert xs1.size == 0
+    assert fs1.size == 0
+
+
+def test_collect_rbf_candidates_reshape_and_pool_path(monkeypatch):
+    monkeypatch.setattr(bb_rbf, "ProcessPoolExecutor", _FakePool)
+    monkeypatch.setattr(
+        bb_rbf,
+        "_run_rbf_surrogate_single",
+        lambda run, **kwargs: ([np.array([float(run)])], [float(run)]),
+    )
+    xs, fs = bb_rbf._collect_rbf_surrogate_candidates(
+        func=_quadratic,
+        bounds=np.asarray([[0.0, 1.0]], dtype=float),
+        x0_ls=np.asarray([0.4]),
+        args=(),
+        n_runs=2,
+        maxiter=1,
+        seed=0,
+        maxfevals=5,
+        n_init=1,
+        n_candidates=16,
+        kernel="cubic",
+        epsilon=1.0,
+        smoothing=1e-8,
+        degree=1,
+        distance_tol=1e-6,
+    )
+    assert xs.shape == (2, 1)
+    assert fs.shape == (2,)
+
+
+def test_run_rbf_single_fixed_bounds_branch():
+    xs, fs = bb_rbf._run_rbf_surrogate_single(
+        run=0,
+        func=_quadratic,
+        bounds=np.asarray([[1.0, 1.0]], dtype=float),
+        x0_ls=None,
+        args=(),
+        maxiter=5,
+        seed=0,
+        maxfevals=5,
+        n_init=1,
+        n_candidates=16,
+        kernel="cubic",
+        epsilon=1.0,
+        smoothing=1e-8,
+        degree=1,
+        distance_tol=1e-6,
+    )
+    assert len(xs) == 1
+    assert len(fs) == 1
+
+
+def test_run_rbf_single_seed_and_budget_break():
+    xs, fs = bb_rbf._run_rbf_surrogate_single(
+        run=0,
+        func=_quadratic,
+        bounds=np.asarray([[0.0, 1.0]], dtype=float),
+        x0_ls=np.asarray([[0.3]]),
+        args=(),
+        maxiter=3,
+        seed=0,
+        maxfevals=1,
+        n_init=1,
+        n_candidates=16,
+        kernel="cubic",
+        epsilon=1.0,
+        smoothing=1e-8,
+        degree=1,
+        distance_tol=1e-6,
+    )
+    assert len(xs) >= 1
+    assert len(fs) >= 1
+
+
+def test_run_rbf_single_nan_objective_fallback_minimum(monkeypatch):
+    monkeypatch.setattr(
+        bb_rbf, "_evaluate_scalar_objective", lambda func, x, args: float("nan")
+    )
+    xs, fs = bb_rbf._run_rbf_surrogate_single(
+        run=0,
+        func=_quadratic,
+        bounds=np.asarray([[0.0, 1.0]], dtype=float),
+        x0_ls=None,
+        args=(),
+        maxiter=0,
+        seed=0,
+        maxfevals=3,
+        n_init=2,
+        n_candidates=16,
+        kernel="cubic",
+        epsilon=1.0,
+        smoothing=1e-8,
+        degree=1,
+        distance_tol=1e-6,
+    )
+    assert len(xs) == 1
+    assert np.isnan(fs[0])
+
+
+def test_fit_rbf_surrogate_model_branches(monkeypatch):
+    X_small = np.asarray([[0.0]], dtype=float)
+    y_small = np.asarray([1.0], dtype=float)
+    assert (
+        bb_rbf._fit_rbf_surrogate_model(X_small, y_small, "cubic", 1.0, 1e-8, 1) is None
+    )
+
+    monkeypatch.setattr(
+        bb_rbf,
+        "RBFInterpolator",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError()),
+    )
+    X = np.asarray([[0.0], [1.0]], dtype=float)
+    y = np.asarray([0.0, 1.0], dtype=float)
+    assert bb_rbf._fit_rbf_surrogate_model(X, y, "cubic", 1.0, 1e-8, 1) is None
+
+
+def test_propose_rbf_candidate_model_none_returns_farthest():
+    rng = np.random.default_rng(0)
+    X_obs = np.asarray([[0.1], [0.2]], dtype=float)
+    out = bb_rbf._propose_rbf_surrogate_candidate(
+        model=None,
+        X_obs=X_obs,
+        rng=rng,
+        n_candidates=16,
+        n_dim=1,
+        best_u=np.asarray([0.15]),
+        merit_weight=0.5,
+        distance_tol=1e-6,
+    )
+    assert out.shape == (1,)
+
+
+def test_propose_rbf_candidate_uses_farthest_point_when_merit_pick_is_too_close():
+    class FakeRng:
+        def uniform(self, _low, _high, *, size):
+            assert size == (2, 1)
+            return np.asarray([[0.0], [0.9]], dtype=float)
+
+    out = bb_rbf._propose_rbf_surrogate_candidate(
+        model=lambda U: np.asarray([0.0, 100.0]),
+        X_obs=np.asarray([[0.0]], dtype=float),
+        rng=FakeRng(),
+        n_candidates=2,
+        n_dim=1,
+        best_u=None,
+        merit_weight=1.0,
+        distance_tol=1e-6,
+    )
+
+    np.testing.assert_allclose(out, np.asarray([0.9]))
+
+
+def test_collect_da_candidates_pool_success(monkeypatch):
+    monkeypatch.setattr(bb_da, "ProcessPoolExecutor", _FakePool)
+    monkeypatch.setattr(
+        bb_da,
+        "_run_da_single",
+        lambda run, **kwargs: ([np.array([float(run)])], [float(run)]),
+    )
+    xs, fs = bb_da._collect_da_candidates(
+        func=_quadratic,
+        bounds=((0.0, 1.0),),
+        x0_ls=None,
+        args=(),
+        n_runs=2,
+        maxiter=1,
+        seed=0,
+        initial_temp=10.0,
+        restart_temp_ratio=1e-3,
+        visit=2.0,
+        accept=-5.0,
+        maxfun=50,
+    )
+    assert xs.shape == (2, 1)
+    assert fs.shape == (2,)
+
+
+def test_cluster_candidates_zero_span_branch():
+    xs = np.asarray([[1.0], [1.0]], dtype=float)
+    fs = np.asarray([2.0, 1.0], dtype=float)
+    lb = np.asarray([1.0], dtype=float)
+    ub = np.asarray([1.0], dtype=float)
+    idx = bb_common._cluster_candidates(xs=xs, fs=fs, lb=lb, ub=ub, tol_norm=0.1)
+    assert idx == [1]
+
+
+def test_polish_candidates_empty_single_worker_and_pool_paths(monkeypatch):
+    out_empty = bb_common._polish_candidates(
+        func=_quadratic,
+        args=(),
+        all_x=np.asarray([[0.2], [0.4]], dtype=float),
+        all_f=np.asarray([0.04, 0.16], dtype=float),
+        basin_reps_idx=[],
+        local_method="SLSQP",
+        bounds=np.asarray([[0.0, 1.0]], dtype=float),
+        constraints=(),
+    )
+    assert out_empty[0].size == 0
+
+    monkeypatch.setattr(
+        bb_common,
+        "_polish_single_candidate",
+        lambda idx, all_x, all_f, func, args, local_method, bounds_arg, constraints: (
+            all_x[idx],
+            float(idx),
+        ),
+    )
+    monkeypatch.setattr(bb_common.os, "cpu_count", lambda: 1)
+    x1, f1 = bb_common._polish_candidates(
+        func=_quadratic,
+        args=(),
+        all_x=np.asarray([[0.2], [0.4]], dtype=float),
+        all_f=np.asarray([0.04, 0.16], dtype=float),
+        basin_reps_idx=[0, 1],
+        local_method="SLSQP",
+        bounds=np.asarray([[0.0, 1.0]], dtype=float),
+        constraints=(),
+    )
+    assert x1.shape == (2, 1)
+    assert f1.shape == (2,)
+
+    monkeypatch.setattr(bb_common.os, "cpu_count", lambda: 8)
+    monkeypatch.setattr(bb_common, "ProcessPoolExecutor", _FakePool)
+    x2, f2 = bb_common._polish_candidates(
+        func=_quadratic,
+        args=(),
+        all_x=np.asarray([[0.2], [0.4]], dtype=float),
+        all_f=np.asarray([0.04, 0.16], dtype=float),
+        basin_reps_idx=[0, 1],
+        local_method="SLSQP",
+        bounds=np.asarray([[0.0, 1.0]], dtype=float),
+        constraints=(),
+    )
+    assert x2.shape == (2, 1)
+    assert f2.shape == (2,)
+
+
+def test_polish_single_candidate_keeps_seed_when_polish_is_worse(monkeypatch):
+    class _WorseResult:
+        success = True
+        x = np.asarray([0.9], dtype=float)
+        fun = 10.0
+
+    monkeypatch.setattr(bb_common, "minimize", lambda **kwargs: _WorseResult())
+
+    x, f = bb_common._polish_single_candidate(
+        idx=0,
+        all_x=np.asarray([[0.2]], dtype=float),
+        all_f=np.asarray([0.04], dtype=float),
+        func=_quadratic,
+        args=(),
+        local_method="SLSQP",
+        bounds_arg=np.asarray([[0.0, 1.0]], dtype=float),
+        constraints=(),
+    )
+
+    np.testing.assert_allclose(x, np.asarray([0.2]))
+    assert f == pytest.approx(0.04)
+
+
+def test_polish_single_candidate_keeps_seed_when_minimize_raises(monkeypatch):
+    monkeypatch.setattr(
+        bb_common,
+        "minimize",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("solver failed")),
+    )
+
+    x, f = bb_common._polish_single_candidate(
+        idx=0,
+        all_x=np.asarray([[0.2]], dtype=float),
+        all_f=np.asarray([0.04], dtype=float),
+        func=_quadratic,
+        args=(),
+        local_method="SLSQP",
+        bounds_arg=np.asarray([[0.0, 1.0]], dtype=float),
+        constraints=(),
+    )
+
+    np.testing.assert_allclose(x, np.asarray([0.2]))
+    assert f == pytest.approx(0.04)
+
+
+def test_polish_candidates_falls_back_when_pool_is_unavailable(monkeypatch):
+    class RaisingPool:
+        def __init__(self, max_workers):
+            self.max_workers = max_workers
+
+        def __enter__(self):
+            raise RuntimeError("pool unavailable")
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    monkeypatch.setattr(bb_common.os, "cpu_count", lambda: 2)
+    monkeypatch.setattr(bb_common, "ProcessPoolExecutor", RaisingPool)
+
+    x, f = bb_common._polish_candidates(
+        func=_quadratic,
+        args=(),
+        all_x=np.asarray([[0.2], [0.4]], dtype=float),
+        all_f=np.asarray([0.04, 0.16], dtype=float),
+        basin_reps_idx=[0, 1],
+        local_method="SLSQP",
+        bounds=np.asarray([[0.0, 1.0]], dtype=float),
+        constraints=(),
+    )
+
+    assert x.shape == (2, 1)
+    assert f.shape == (2,)
+
+
+def test_collect_candidates_in_parallel_falls_back_when_pool_raises():
+    class RaisingPool:
+        def __init__(self, max_workers):
+            self.max_workers = max_workers
+
+        def __enter__(self):
+            raise RuntimeError("pool unavailable")
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    xs, fs = bb_execution._collect_candidates_in_parallel(
+        lambda run: ([np.asarray([float(run)])], [float(run)]),
+        n_runs=2,
+        pool_executor_cls=RaisingPool,
+    )
+
+    assert xs.shape == (2, 1)
+    assert fs.tolist() == [0.0, 1.0]
+
+
+"""Regression tests for optimiser benchmarks utility helpers."""
+
+
+def _rugged_noisy_surface(x):
+    """Deterministic pseudo-noisy multimodal objective."""
+    x = np.asarray(x, dtype=float)
+    base = 0.25 * (x[0] + 0.8) ** 2 + 0.18 * (x[1] - 0.25) ** 2
+    nonconvex = 0.7 * np.sin(2.8 * x[0]) * np.cos(3.4 * x[1])
+    fuzzy = 0.05 * np.sin(29 * x[0] + 17 * x[1]) + 0.03 * np.cos(31 * x[0] - 13 * x[1])
+    return float(base + nonconvex + fuzzy)
+
+
+def _rippled_rosenbrock_surface(x):
+    """Rosenbrock valley with additional ripples to induce local minima."""
+    x = np.asarray(x, dtype=float)
+    valley = (1.0 - x[0]) ** 2 + 40.0 * (x[1] - x[0] ** 2) ** 2
+    ripples = 0.08 * np.sin(18 * x[0]) + 0.06 * np.cos(22 * x[1])
+    return float(valley + ripples)
+
+
+def _run_benchmark(
+    optimiser_handle,
+    objective,
+    bounds,
+    opt_kwargs,
+):
+    """Run benchmark for this test module."""
+    start = time.perf_counter()
+    result = run_multistart_minimisation(
+        OptimisationProblem(objective=objective, bounds=bounds),
+        method=optimiser_handle,
+        options=OptimisationOptions.from_mapping(opt_kwargs),
+    )
+    elapsed = time.perf_counter() - start
+
+    minima = np.asarray([candidate.point for candidate in result.candidates])
+    assert minima.ndim == 2
+    assert minima.shape[0] >= 1
+    assert minima.shape[1] == len(bounds)
+
+    f_vals = np.asarray([candidate.objective for candidate in result.candidates])
+    assert f_vals.shape == (minima.shape[0],)
+    return {
+        "elapsed_s": float(elapsed),
+        "best_f": float(np.min(f_vals)),
+        "n_minima": int(minima.shape[0]),
+    }
+
+
+def test_benchmark_dual_annealing_vs_cmaes_on_rugged_surface():
+    bounds = ((-2.5, 2.5), (-2.5, 2.5))
+    opt_kwargs = {
+        "n_runs": 4,
+        "maxiter": 45,
+        "maxfun": 15_000,
+        "seed": 2,
+        "max_minima": 4,
+    }
+
+    da = _run_benchmark(
+        optimiser_handle="dual_annealing",
+        objective=_rugged_noisy_surface,
+        bounds=bounds,
+        opt_kwargs=opt_kwargs,
+    )
+    cma = _run_benchmark(
+        optimiser_handle="cmaes",
+        objective=_rugged_noisy_surface,
+        bounds=bounds,
+        opt_kwargs=opt_kwargs,
+    )
+    bo = _run_benchmark(
+        optimiser_handle="bo",
+        objective=_rugged_noisy_surface,
+        bounds=bounds,
+        opt_kwargs=opt_kwargs,
+    )
+    rbf = _run_benchmark(
+        optimiser_handle="rbf_surrogate",
+        objective=_rugged_noisy_surface,
+        bounds=bounds,
+        opt_kwargs=opt_kwargs,
+    )
+
+    # Both optimizers should consistently locate the same low basin.
+    assert da["best_f"] < -0.70
+    assert cma["best_f"] < -0.70
+    assert bo["best_f"] < -0.70
+    assert rbf["best_f"] < -0.70
+    assert cma["best_f"] <= da["best_f"] + 1e-3
+    assert bo["best_f"] <= da["best_f"] + 1e-2
+    assert rbf["best_f"] <= da["best_f"] + 0.05
+
+    # Runtime check is intentionally loose to avoid platform-specific flakiness.
+    assert cma["elapsed_s"] <= 5.0 * da["elapsed_s"] + 0.1
+    assert bo["elapsed_s"] <= 200.0 * da["elapsed_s"] + 1.0
+    assert rbf["elapsed_s"] <= 200.0 * da["elapsed_s"] + 1.0
+
+
+def test_benchmark_dual_annealing_vs_cmaes_on_rippled_rosenbrock():
+    bounds = ((-2.0, 2.0), (-1.0, 3.0))
+    opt_kwargs = {
+        "n_runs": 4,
+        "maxiter": 45,
+        "maxfun": 15_000,
+        "seed": 2,
+        "max_minima": 4,
+    }
+
+    da = _run_benchmark(
+        optimiser_handle="dual_annealing",
+        objective=_rippled_rosenbrock_surface,
+        bounds=bounds,
+        opt_kwargs=opt_kwargs,
+    )
+    cma = _run_benchmark(
+        optimiser_handle="cmaes",
+        objective=_rippled_rosenbrock_surface,
+        bounds=bounds,
+        opt_kwargs=opt_kwargs,
+    )
+    bo = _run_benchmark(
+        optimiser_handle="bo",
+        objective=_rippled_rosenbrock_surface,
+        bounds=bounds,
+        opt_kwargs=opt_kwargs,
+    )
+    rbf = _run_benchmark(
+        optimiser_handle="rbf_surrogate",
+        objective=_rippled_rosenbrock_surface,
+        bounds=bounds,
+        opt_kwargs=opt_kwargs,
+    )
+
+    # Both optimizers should reach the high-quality valley region.
+    assert da["best_f"] < 0.05
+    assert cma["best_f"] < 0.05
+    assert bo["best_f"] < 0.05
+    assert rbf["best_f"] < 0.05
+
+    # On this surface dual annealing can be slightly better; keep CMA within tolerance.
+    assert cma["best_f"] <= da["best_f"] + 0.15
+    assert bo["best_f"] <= da["best_f"] + 0.15
+    assert rbf["best_f"] <= da["best_f"] + 0.15
+    assert cma["elapsed_s"] <= 5.0 * da["elapsed_s"] + 0.1
+    assert bo["elapsed_s"] <= 200.0 * da["elapsed_s"] + 1.0
+    assert rbf["elapsed_s"] <= 200.0 * da["elapsed_s"] + 1.0

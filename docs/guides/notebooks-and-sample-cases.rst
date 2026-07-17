@@ -5,7 +5,9 @@ Purpose
 -------
 
 Use packaged notebooks and sample cases when you want maintained, reproducible
-learning assets that exercise the public OpenPinch API.
+learning assets. The notebooks are advanced repository examples that exercise
+unsupported internal owners. Only their calls through
+``OpenPinch.main.pinch_analysis_service`` are compatibility protected.
 
 Prerequisites
 -------------
@@ -54,7 +56,8 @@ Load a packaged sample case directly when no local file with that name exists:
 
 .. code-block:: python
 
-   from OpenPinch import PinchProblem, PinchWorkspace
+   from OpenPinch.application.problem import PinchProblem
+   from OpenPinch.application.workspace import PinchWorkspace
 
    problem = PinchProblem("basic_pinch.json")
    workspace = PinchWorkspace(source="crude_preheat_train.json")
@@ -122,7 +125,7 @@ I am integrating or extending OpenPinch
    Use ``09_schema_service_exports_and_bundles.ipynb`` for typed
    ``TargetInput`` requests, ``pinch_analysis_service(...)``, exports,
    workspace variant views, and bundle persistence. Pair it with
-   :doc:`../api/index` when you need public contract details, and use
+   :doc:`../api/package-root` for protected contract details, and use
    ``07_heat_exchanger_network_synthesis.ipynb`` when extending synthesis
    workflows.
 

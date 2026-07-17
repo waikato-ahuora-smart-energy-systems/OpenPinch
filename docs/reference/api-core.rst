@@ -1,25 +1,22 @@
-Core API
-========
+Main Contract and Application Internals
+=======================================
 
-The core API is the supported front door to OpenPinch. It is intentionally
-small: one high-level service function, two convenience wrapper classes, and a
-small number of lower-level orchestration helpers for callers that need to
-operate on prepared zone trees directly.
+Only :func:`OpenPinch.main.pinch_analysis_service` is a protected external
+Python contract. The convenience coordinators and lower-level orchestration
+helpers below are unsupported contributor references.
 
 Recommended Usage
 -----------------
 
-For new code, prefer one of these two patterns:
+For external code, pass a request mapping to
+:func:`~OpenPinch.main.pinch_analysis_service`.
 
-1. Build a :class:`~OpenPinch.lib.schemas.io.TargetInput` input object and call
-   :func:`~OpenPinch.main.pinch_analysis_service`.
-2. Load a problem file into
-   :class:`~OpenPinch.classes.pinch_problem.PinchProblem`, call
-   :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.target`, and inspect or
-   export the cached results.
-3. Use :class:`~OpenPinch.classes.pinch_workspace.PinchWorkspace` when the
-   study needs named baseline and variant cases rather than one case at a
-   time.
+For repository development where internal churn is acceptable, load a problem
+file into :class:`~OpenPinch.application.problem.PinchProblem`, call
+:meth:`~OpenPinch.application.problem.PinchProblem.target`, and inspect or
+export the cached results. Use
+:class:`~OpenPinch.application.workspace.PinchWorkspace` when the study needs
+named baseline and variant cases rather than one case at a time.
 
 The lower-level helpers documented on this page are still useful when you want
 to separate validation, preparation, targeting, and result extraction into
@@ -30,8 +27,8 @@ Service-Layer Example
 
 .. code-block:: python
 
-   from OpenPinch import pinch_analysis_service
-   from OpenPinch.lib.schemas.io import StreamSchema, TargetInput
+   from OpenPinch.main import pinch_analysis_service
+   from OpenPinch.contracts.input import StreamSchema, TargetInput
 
    input_data = TargetInput(
        streams=[
@@ -49,20 +46,19 @@ Service-Layer Example
 
    result = pinch_analysis_service(input_data, project_name="Example")
 
-Top-Level Package Re-Exports
-----------------------------
+Concrete Owner Imports
+----------------------
 
-The :mod:`OpenPinch` package re-exports the small subset of classes and helpers
-that are intended to be imported most often. This makes it practical to work
-from ``from OpenPinch import ...`` in notebooks and scripts without traversing
-the full package layout.
+The :mod:`OpenPinch` package is an import-free marker. Import the protected
+service from :mod:`OpenPinch.main` and advanced objects from their concrete
+application, contract, domain, analysis, adapter, or presentation owners.
 
-In particular, the package root exposes:
+Common advanced imports include:
 
-- :class:`~OpenPinch.classes.pinch_problem.PinchProblem`
-- :class:`~OpenPinch.classes.pinch_workspace.PinchWorkspace`
+- :class:`~OpenPinch.application.problem.PinchProblem`
+- :class:`~OpenPinch.application.workspace.PinchWorkspace`
 - :func:`~OpenPinch.main.pinch_analysis_service`
-- :func:`~OpenPinch.utils.stream_linearisation.get_piecewise_linearisation_for_streams`
+- :func:`~OpenPinch.domain._stream.linearisation.get_piecewise_linearisation_for_streams`
 
 Package Entrypoints
 -------------------
@@ -72,10 +68,10 @@ Package Entrypoints
 
 .. autofunction:: OpenPinch.main.pinch_analysis_service
 
-.. autoclass:: OpenPinch.classes.pinch_problem.PinchProblem
+.. autoclass:: OpenPinch.application.problem.PinchProblem
    :members:
 
-.. autoclass:: OpenPinch.classes.pinch_workspace.PinchWorkspace
+.. autoclass:: OpenPinch.application.workspace.PinchWorkspace
    :members:
 
 Core Service Functions
@@ -88,8 +84,9 @@ modules.
   prepares the zone hierarchy, runs the appropriate direct and indirect
   targeting steps, and returns a structured response.
 
-Private dispatch and result-extraction helpers support the public problem and
-service entry points but are not documented as stable user interfaces.
+Private dispatch and result-extraction helpers support the internal problem
+coordinator and the protected service entry point. They are not stable user
+interfaces.
 
 .. automodule:: OpenPinch.main
    :no-members:
@@ -97,7 +94,7 @@ service entry points but are not documented as stable user interfaces.
 PinchProblem Convenience Wrapper
 --------------------------------
 
-:class:`~OpenPinch.classes.pinch_problem.PinchProblem` adds file loading,
+:class:`~OpenPinch.application.problem.PinchProblem` adds file loading,
 cached execution state, tabular summaries, graph generation, Excel export, and
 Streamlit dashboard integration on top of the core service layer. It also owns
 the ``add_component`` accessor used for memory-only process mutations such as
@@ -115,26 +112,26 @@ Use it when you want:
 
 The main user-facing methods are:
 
-- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.target`
-- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.validate`
-- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.summary_frame`
-- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.plot.composite_curve`
-- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.plot.grand_composite_curve`
-- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.compare_to`
-- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.export_excel`
-- :meth:`~OpenPinch.classes.pinch_problem.PinchProblem.show_dashboard`
+- :meth:`~OpenPinch.application.problem.PinchProblem.target`
+- :meth:`~OpenPinch.application.problem.PinchProblem.validate`
+- :meth:`~OpenPinch.application.problem.PinchProblem.summary_frame`
+- :meth:`~OpenPinch.application.problem.PinchProblem.plot.composite_curve`
+- :meth:`~OpenPinch.application.problem.PinchProblem.plot.grand_composite_curve`
+- :meth:`~OpenPinch.application.problem.PinchProblem.compare_to`
+- :meth:`~OpenPinch.application.problem.PinchProblem.export_excel`
+- :meth:`~OpenPinch.application.problem.PinchProblem.show_dashboard`
 - ``problem.add_component.process_mvr(...)``
 
 The wrapper is intentionally light. Once targeting has run, the same solved
-:class:`~OpenPinch.classes.zone.Zone` hierarchy and
-:class:`~OpenPinch.lib.schemas.io.TargetOutput` objects remain available for direct
+:class:`~OpenPinch.domain.zone.Zone` hierarchy and
+:class:`~OpenPinch.contracts.output.TargetOutput` objects remain available for direct
 inspection.
 
 The ``problem.target.*`` accessor is the explicit advanced post-processing
 entrypoint family. Each named workflow returns the affected
-:class:`~OpenPinch.lib.schemas.targets.BaseTargetModel` and refreshes cached
-:class:`~OpenPinch.lib.schemas.io.TargetOutput` results on the same
-:class:`~OpenPinch.classes.pinch_problem.PinchProblem` instance. Heat pump and
+:class:`~OpenPinch.domain.targets.BaseTargetModel` and refreshes cached
+:class:`~OpenPinch.contracts.output.TargetOutput` results on the same
+:class:`~OpenPinch.application.problem.PinchProblem` instance. Heat pump and
 refrigeration targets also surface HPR summary fields such as ``hpr_cycle``,
 ``hpr_utility_total``, ``hpr_work``, ``hpr_external_utility``, and
 ``StreamCollection`` objects on ``hpr_hot_streams`` and ``hpr_cold_streams``.

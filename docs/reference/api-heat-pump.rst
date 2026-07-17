@@ -1,16 +1,19 @@
 Heat Pump and Refrigeration
 ===========================
 
+This package is an unsupported advanced owner. Its concrete imports and parent
+accessors may change without a compatibility layer.
+
 The Heat Pump and refrigeration stack is the most specialised part of the
 OpenPinch codebase. It combines preprocessing of background cascades,
-thermodynamic cycle models, and black-box optimisation to screen direct and
-indirect integration opportunities.
+thermodynamic cycle models, and the package-level scalar optimisation service
+to screen direct and indirect integration opportunities.
 
 Where To Start
 --------------
 
-Most users should still begin with the higher-level surfaces documented in
-:doc:`api-core`:
+Repository developers can begin with the parent-owned internal surfaces
+documented in :doc:`api-core`:
 
 - ``problem.target.direct_heat_pump(...)``
 - ``problem.target.indirect_heat_pump(...)``
@@ -23,17 +26,18 @@ those helpers.
 Package Overview
 ----------------
 
-.. automodule:: OpenPinch.services.heat_pump_integration
+.. automodule:: OpenPinch.analysis.heat_pumps
    :no-members:
+   :no-index:
 
 Public HPR Entrypoints
 ----------------------
 
-.. automodule:: OpenPinch.services.heat_pump_integration.heat_pump_and_refrigeration_entry
+.. automodule:: OpenPinch.analysis.heat_pumps.service
    :members:
 
-Shared Preprocessing and Optimisation Helpers
----------------------------------------------
+Shared Preprocessing and Optimisation Boundary
+----------------------------------------------
 
 The targeting parsers decode optimiser vectors into temperatures, ambient
 duties, base duty scales, split vectors, and process availability arrays. The
@@ -43,32 +47,37 @@ penalty term. Leaf physical unit models receive only concrete model duties.
 Simulated vapour-compression backends then combine the HPR streams with the
 background and ambient streams into one residual GCC. The pocket-free GCC end
 points provide residual external utilities for operating-cost accounting;
-cycle penalties remain separate feasibility terms.
+cycle penalties remain separate feasibility terms. HPR objective and failure
+semantics are translated to the reusable optimiser only by
+``optimisation_adapter``; the generic optimiser has no heat-pump dependency.
 
-.. automodule:: OpenPinch.services.heat_pump_integration.common
+.. automodule:: OpenPinch.analysis.heat_pumps.common
    :no-members:
 
-.. automodule:: OpenPinch.services.heat_pump_integration.common.encoding
+.. automodule:: OpenPinch.analysis.heat_pumps.common.encoding
    :members:
 
-.. automodule:: OpenPinch.services.heat_pump_integration.common.preprocessing
+.. automodule:: OpenPinch.analysis.heat_pumps.common.preprocessing
    :members:
 
-.. automodule:: OpenPinch.services.heat_pump_integration.common.shared
+.. automodule:: OpenPinch.analysis.heat_pumps.common.shared
+   :members:
+
+.. automodule:: OpenPinch.analysis.heat_pumps.optimisation_adapter
    :members:
 
 HPR Schemas
 -----------
 
-.. autoclass:: OpenPinch.lib.schemas.hpr.HeatPumpTargetInputs
+.. autoclass:: OpenPinch.contracts.hpr.HeatPumpTargetInputs
    :members:
    :no-index:
 
-.. autoclass:: OpenPinch.lib.schemas.hpr.HPRBackendResult
+.. autoclass:: OpenPinch.contracts.hpr.HPRBackendResult
    :members:
    :no-index:
 
-.. autoclass:: OpenPinch.lib.schemas.hpr.SimulatedHPRAnnualizedCostAccounting
+.. autoclass:: OpenPinch.contracts.hpr.SimulatedHPRAnnualizedCostAccounting
    :members:
    :no-index:
 
@@ -76,30 +85,30 @@ Cycle Optimisation Services
 ---------------------------
 
 These modules place or size Heat Pump and refrigeration cycle models against
-prepared cascade data. The detailed cycle physics live in the
-``unit_models`` modules documented in :doc:`api-classes`.
+prepared cascade data. The detailed cycle physics live in the concrete
+``cycles`` modules documented in :doc:`api-classes`.
 
-Only the current public cycle names are routed here, for example
+Only the current internal cycle names are routed here, for example
 ``"Cascade Carnot cycles"``, ``"Parallel Carnot cycles"``, and
 ``"Parallel vapour compression cycles"``.
 
-.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services
+.. automodule:: OpenPinch.analysis.heat_pumps.targeting
    :no-members:
 
-.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.brayton
+.. automodule:: OpenPinch.analysis.heat_pumps.targeting.brayton
    :members:
 
-.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.cascade_vapour_compression
+.. automodule:: OpenPinch.analysis.heat_pumps.targeting.cascade_vapour_compression
    :members:
 
-.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.parallel_carnot
+.. automodule:: OpenPinch.analysis.heat_pumps.targeting.parallel_carnot
    :members:
 
-.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.parallel_vapour_compression
+.. automodule:: OpenPinch.analysis.heat_pumps.targeting.parallel_vapour_compression
    :members:
 
-.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.cascade_carnot
+.. automodule:: OpenPinch.analysis.heat_pumps.targeting.cascade_carnot
    :members:
 
-.. automodule:: OpenPinch.services.heat_pump_integration.targeting_services.vapour_compression_mvr
+.. automodule:: OpenPinch.analysis.heat_pumps.targeting.vapour_compression_mvr
    :members:

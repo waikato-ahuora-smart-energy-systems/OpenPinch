@@ -8,37 +8,20 @@ import numpy as np
 
 from ....contracts.input import StreamSchema, UtilitySchema, ZoneTreeSchema
 from ....contracts.units import standardise_input_value
+from ....domain._value.resolution import resolve_value_array
 from ....domain.configuration import tol
 from ....domain.enums import ST
 from ....domain.stream import Stream
 from ....domain.stream_collection import StreamCollection
 from ....domain.zone import Zone
-from ....utils.value_resolution import resolve_value_array
-from .canonicalization import (
-    _apply_zone_dt_cont_multiplier,
-    _build_zone_config,
-    _create_nested_zones,
-    _get_validated_zone_info,
-    _validate_config_data_completed,
-    _validate_input_data,
-    _validate_zone_tree_structure,
-)
+from . import canonicalization as _canonicalization
 from .segments import _create_segmented_process_stream
 from .utilities import (
     _get_hot_and_cold_utilities,
     _set_utilities_for_zone_and_subzones,
 )
 
-__all__ = [
-    "prepare_problem",
-    "_apply_zone_dt_cont_multiplier",
-    "_build_zone_config",
-    "_create_nested_zones",
-    "_get_validated_zone_info",
-    "_validate_config_data_completed",
-    "_validate_input_data",
-    "_validate_zone_tree_structure",
-]
+__all__ = ["prepare_problem"]
 
 
 def prepare_problem(
@@ -52,16 +35,16 @@ def prepare_problem(
     streams = [] if streams is None else list(streams)
     utilities = [] if utilities is None else list(utilities)
 
-    top_zone_name, top_zone_identifier = _get_validated_zone_info(
+    top_zone_name, top_zone_identifier = _canonicalization._get_validated_zone_info(
         zone_tree,
         project_name,
     )
-    config = _build_zone_config(
+    config = _canonicalization._build_zone_config(
         options=options,
         top_zone_name=top_zone_name,
         top_zone_identifier=top_zone_identifier,
     )
-    zone_tree, streams, utilities, config = _validate_input_data(
+    zone_tree, streams, utilities, config = _canonicalization._validate_input_data(
         zone_tree=zone_tree,
         streams=streams,
         utilities=utilities,
@@ -72,7 +55,7 @@ def prepare_problem(
         type=config.problem.top_zone_identifier,
         config=config,
     )
-    master_zone = _create_nested_zones(
+    master_zone = _canonicalization._create_nested_zones(
         parent_zone=master_zone,
         zone_tree=zone_tree,
         config=master_zone.config,
@@ -93,7 +76,7 @@ def prepare_problem(
         hot_utilities=prepared_streams.get_hot_utility_streams(),
         cold_utilities=prepared_streams.get_cold_utility_streams(),
     )
-    master_zone = _apply_zone_dt_cont_multiplier(
+    master_zone = _canonicalization._apply_zone_dt_cont_multiplier(
         parent_zone=master_zone,
         zone_tree=zone_tree,
     )

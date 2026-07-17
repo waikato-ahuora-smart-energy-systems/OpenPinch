@@ -7,8 +7,8 @@ from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .enums import HeatExchangerNetworkLabel
-from .heat_exchanger import HeatExchanger, HeatExchangerKind
+from .enums import HeatExchangerKind, HeatExchangerNetworkLabel
+from .heat_exchanger import HeatExchanger
 
 _DUTY_LABEL_KINDS = {
     HeatExchangerNetworkLabel.RECOVERY_DUTY: HeatExchangerKind.RECOVERY,

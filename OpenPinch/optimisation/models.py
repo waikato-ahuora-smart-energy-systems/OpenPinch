@@ -38,8 +38,7 @@ class OptimisationProblem:
             self,
             "initial_points",
             tuple(
-                tuple(float(value) for value in point)
-                for point in self.initial_points
+                tuple(float(value) for value in point) for point in self.initial_points
             ),
         )
         object.__setattr__(self, "args", tuple(self.args))
@@ -77,9 +76,7 @@ class OptimisationOptions:
             "local_method",
         }
         generic = {
-            name: values.pop(name)
-            for name in tuple(values)
-            if name in generic_names
+            name: values.pop(name) for name in tuple(values) if name in generic_names
         }
         return cls(
             **generic,

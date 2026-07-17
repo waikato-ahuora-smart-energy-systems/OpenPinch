@@ -9,7 +9,11 @@ from typing import TYPE_CHECKING, Any
 from ...contracts.workspace import ScenarioVariantView, ScenarioWorkflowConfig
 from .._problem.input.validation import build_validation_report
 from ..problem import PinchProblem
-from .views import error_variant_view, invalid_variant_view, problem_to_variant_view
+from .views.comparison import (
+    error_variant_view,
+    invalid_variant_view,
+    problem_to_variant_view,
+)
 
 if TYPE_CHECKING:
     from ..workspace import PinchWorkspace

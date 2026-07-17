@@ -24,8 +24,8 @@ Python.
 Packaged Resources
 ------------------
 
-The resources module exposes the packaged sample cases and notebooks used
-throughout the guides and examples.
+The unsupported internal resources module exposes the packaged sample cases
+and notebooks used throughout the guides and examples.
 
 The main helpers are:
 
@@ -35,13 +35,13 @@ The main helpers are:
 - ``list_notebooks()``, ``notebook_metadata()``, and ``copy_notebook()`` for
   the packaged notebook series
 
-``PinchProblem`` and ``PinchWorkspace`` also resolve packaged sample-case names
-such as ``basic_pinch.json`` directly when no local file with the same name
-exists.
+The internal ``PinchProblem`` and ``PinchWorkspace`` coordinators also resolve
+packaged sample-case names such as ``basic_pinch.json`` directly when no local
+file with the same name exists.
 
 The packaged notebooks are intended to be copied as clean source assets. They
-ship without stored execution output and rely on the same public
-``PinchWorkspace`` and plotting surfaces documented elsewhere in RTD. The
+ship without stored execution output and exercise the same unsupported
+``PinchWorkspace`` and plotting internals documented elsewhere in RTD. The
 series is ordered around first solves, Total Site method interpretation,
 multiperiod studies, advanced Heat Pump screening, direct gas/vapour MVR,
 VC+MVR cascade mechanics, HEN synthesis, energy-transfer analysis, and
@@ -83,9 +83,10 @@ interactive exploration after solving a problem. Install
 ``openpinch[dashboard]`` before using this surface.
 
 The repository-level ``streamlit_app.py`` module is documented here as a local
-demo entrypoint for contributors. It is not part of the published wheel. For
-installed package usage, prefer :meth:`OpenPinch.PinchProblem.show_dashboard`
-or :func:`OpenPinch.streamlit_webviewer.web_graphing.render_streamlit_dashboard`.
+demo entrypoint for contributors. It is not part of the published wheel. The
+dashboard modules are unsupported internals. External Python integrations
+should use :func:`OpenPinch.main.pinch_analysis_service` and render the returned
+data in their own supported application boundary.
 
 .. automodule:: streamlit_app
    :members:
@@ -95,5 +96,6 @@ Where This Fits
 ---------------
 
 Use packaged resources when you want reproducible examples, shareable learning
-assets, or a fast onboarding path. Use the Python API pages when you need
-integration into scripts, notebooks, or larger applications.
+assets, or a fast onboarding path. Use :doc:`package-root` for the protected
+integration contract; use the other API pages only when internal churn is
+acceptable.

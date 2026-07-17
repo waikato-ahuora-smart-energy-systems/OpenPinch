@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
-    from ....services.components.process_mvr import ProcessMVRComponent
+    from ....analysis.heat_pumps.process_mvr import ProcessMVRComponent
     from ...problem import PinchProblem
 
 
@@ -22,12 +22,11 @@ class _ComponentAccessor:
         liquid_injection: bool = True,
         mvr_stage_t_lift: Optional[float] = None,
         mvr_stage_pressure_ratio: Optional[float] = None,
-        max_stage_t_sat_lift: Optional[float] = None,
         options: Optional[dict[str, Any]] = None,
         period_id: Optional[str] = None,
     ) -> "ProcessMVRComponent":
         """Add a direct process MVR component to selected hot gas stream(s)."""
-        from ....services.components.process_mvr import (
+        from ....analysis.heat_pumps.process_mvr import (
             create_process_mvr_component,
         )
 
@@ -39,7 +38,6 @@ class _ComponentAccessor:
             liquid_injection=liquid_injection,
             mvr_stage_t_lift=mvr_stage_t_lift,
             mvr_stage_pressure_ratio=mvr_stage_pressure_ratio,
-            max_stage_t_sat_lift=max_stage_t_sat_lift,
             options=options,
             period_id=period_id,
         )

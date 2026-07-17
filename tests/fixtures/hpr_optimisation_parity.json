@@ -1,0 +1,35 @@
+{
+  "single_period": {
+    "candidate_objectives": [0.8, 0.2],
+    "selected_objective": 0.2
+  },
+  "multiperiod": {
+    "weights": [1.0, 3.0],
+    "periods": {
+      "p0": {
+        "objective": 4.0,
+        "utility_total": 3.0,
+        "operating_cost": 500.0,
+        "capital_cost": 1000.0,
+        "annualized_capital_cost": 200.0,
+        "feasibility_penalty": 0.0
+      },
+      "p1": {
+        "objective": 0.0,
+        "utility_total": 13.0,
+        "operating_cost": 110.0,
+        "capital_cost": 1100.0,
+        "annualized_capital_cost": 220.0,
+        "feasibility_penalty": 0.0
+      }
+    },
+    "expected": {
+      "objective": 427.5,
+      "utility_total": 10.5,
+      "operating_cost": 207.5,
+      "capital_cost": 1100.0,
+      "annualized_capital_cost": 220.0,
+      "annualized_total_cost": 427.5
+    }
+  }
+}

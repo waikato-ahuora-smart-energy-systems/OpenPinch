@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: CONSTRUCTION - Remove Compatibility Facades Complete
+- **Current Stage**: CONSTRUCTION - Package Architecture Modernization Generated Code Review
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -53,26 +53,19 @@
 
 ## Current Status
 - **Lifecycle Phase**: CONSTRUCTION
-- **Current Unit**: HEN solver benchmark
-- **Current Stage**: Follow-up Requirements Selection
-- **Status**: Steps 1 through 9 are complete. Aggregation compares total annual
-  cost only within each fixture and only for OpenPinch-verified networks, while
-  retaining timeouts, failures, termination evidence, and solver-call errors.
-  The smoke matrix verified all three APOPT networks; Couenne and Discopt both
-  constructed and attempted all three networks but reached the common
-  60-second case limit. Their raw traces and solver limitations are preserved.
-  The seven-case, three-repetition canonical matrix completed all 63 attempts.
-  APOPT returned 15 verified networks across five fixtures; Couenne and Discopt
-  returned no verified networks under the common 60-second case limit. The raw
-  JSON, derived summary, and per-case-first Markdown report are complete.
-  Engineering verification passed: 107 focused tests, 1,964 non-solver tests,
-  98% line coverage, 3 passed and 1 intentionally skipped solver-marked tests,
-  Ruff format/lint, artifact validation, and patch hygiene checks. Documentation
-  and final handoff. Sphinx documentation and wheel/sdist builds also pass.
-  Discopt remains a private benchmark-only optional bridge pending separately
-  approved public integration work. Post-run triage is complete and the next
-  implementation unit is awaiting selection in
-  `aidlc-docs/inception/requirements/hen-benchmark-follow-up-questions.md`.
+- **Current Unit**: Package architecture modernization
+- **Current Stage**: Generated Code Review
+- **Status**: All ten dependency-ordered implementation steps and Build and Test
+  are complete. `OpenPinch.main.pinch_analysis_service` is the sole protected
+  Python contract; domain, contracts, optimisation, application, analysis,
+  adapters, and presentation have concrete owners; retired package trees and
+  compatibility facades are absent. The final seeded non-solver suite passed
+  2,039 tests with four solver tests deselected, supported solver tests passed
+  three with one explicit skip, statement coverage is 97.95%, and branch
+  coverage is 92.79%. Ruff, warning-free Sphinx, notebooks, isolated artifacts,
+  clean-wheel tests, stale-path scans, and patch hygiene pass. Overall quality
+  is 9.3/10 and Test Gates are 9.6/10. Generated code awaits explicit user
+  review before Code Generation is closed.
 - **Deferred Follow-up**: Exact logarithmic LMTD in the continuous NLP
   formulation may be revisited later; it is not an immediate next step, and
   the Chen surrogate remains the accepted baseline
@@ -107,6 +100,13 @@
   contract; focused multiperiod and segmented-stream tests also pass.
 
 ## Follow-up Plans
+- **Package architecture modernization**: A detailed dependency-ordered Code
+  Generation checklist is ready for explicit review at
+  `aidlc-docs/construction/plans/package-architecture-modernization-code-generation-plan.md`.
+  It keeps `OpenPinch/main.py` as the sole current external contract, creates a
+  reusable package-level optimisation capability, moves code into domain,
+  contracts, application, analysis, adapters, and presentation owners, and
+  retires the old top-level namespaces without facades.
 - **Remove compatibility facades**: The user requested a package-wide clean
   break from compatibility-only synthesis import and pickle paths. Requirements
   are approved and Code Generation is active. Intentional root/lib/schema API
@@ -229,6 +229,86 @@
   artifact, and patch checks passed.
 - **Extensions**: Security and Resiliency disabled (N/A); partial PBT is N/A
   because this cleanup changes import ownership without algorithmic behavior.
+
+## Package Architecture Modernization Progress
+
+- [x] INCEPTION - Approved architecture direction captured through iterative
+  package scan and design review.
+- [x] CONSTRUCTION - Code Generation Part 1 detailed checklist created.
+- [x] CONSTRUCTION - Code Generation Part 1 explicit approval.
+- [x] CONSTRUCTION - Code Generation Part 2 implementation.
+- [x] CONSTRUCTION - Build and Test.
+- [x] OPERATIONS - N/A; no deployment work requested.
+- **External contract**: Only
+  `OpenPinch.main.pinch_analysis_service` is compatibility protected.
+- **Plan**:
+  `aidlc-docs/construction/plans/package-architecture-modernization-code-generation-plan.md`.
+- **Current gate**: Implementation and Build and Test are complete; generated
+  code is awaiting explicit user review.
+- **Step 6 evidence**: HPR optimisation semantics now cross one explicit
+  adapter into the reusable package-level optimiser; direct MVR, Process MVR,
+  and multiperiod state have concrete owner packages with no legacy facades.
+  Exact single/multiperiod fixtures pass alongside 344 HPR/MVR/cycle/contract
+  tests, 55 optimisation tests, 59 protected main-contract tests, 14 notebook
+  tests, architecture/API gates, and repository-wide Ruff lint/format checks.
+- **Requirements**:
+  `aidlc-docs/inception/requirements/package-architecture-modernization-requirements.md`.
+- **Application design**:
+  `aidlc-docs/inception/application-design/package-architecture-modernization-design.md`.
+- **Implementation summary**:
+  `aidlc-docs/construction/package-architecture-modernization/code/implementation-summary.md`.
+- **Build and Test summary**:
+  `aidlc-docs/construction/package-architecture-modernization/build-and-test/build-and-test-summary.md`.
+- **Final evidence**: 2,039 non-solver tests passed; 3 solver tests passed and
+  1 explicitly skipped; combined coverage 96.73%, statement coverage 97.95%,
+  branch coverage 92.79%; 59 clean-wheel external-contract tests passed under
+  warnings-as-errors; wheel and sdist each contain 326 intended entries.
+- **Scores**: Overall quality 9.3/10; Test Gates 9.6/10.
+- **Step 7 evidence**: HEN base, StageWise, and pinch-decomposition models are
+  concrete coordinators over explicit owner-state composition helpers. Solver
+  extraction is split into recovery, utility, period-state, segment-area, and
+  metadata owners; controllability models and analysis have separate contract
+  and HEN owners; the former HEN `common` package and model barrel are retired.
+  The final matrix passed 419 non-solver HEN tests, 3 solver tests with 1
+  intentional skip, 2 construction-order regressions, 77 architecture/API/main
+  tests, and repository-wide Ruff, format, stale-path, and patch checks.
+- **Step 8 evidence**: Production, tests, scripts, notebooks, and source
+  documentation import concrete owners. The root package and owner package
+  initializers are import-free markers; `classes`, `lib`, `services`, `utils`,
+  and `streamlit_webviewer` are physically removed with no aliases, dynamic
+  export barrels, or pickle accommodations. The protected `main.py` signature
+  and implementation remain unchanged apart from concrete owner imports and a
+  corrected module description. The final gate passed 124 focused contract,
+  architecture, documentation, notebook, and cold-import tests; full-suite
+  collection; Ruff lint; formatting of all 443 Python files; retired-path
+  searches; and patch hygiene.
+- **Step 9 evidence**: Tests now follow e2e, application, domain, analysis,
+  optimisation, adapters, presentation, contracts, architecture, and packaging
+  owner layers. Stable test-support paths replaced depth-sensitive fixture
+  lookups; private export/helper-only assertions were removed; HPR optimisation
+  accepts explicit candidate-search and optimiser seams. AST gates enforce
+  allowed directions, exact boundary exceptions, concrete module imports, and
+  owner-layer test placement. Fresh-process imports cover every package layer,
+  and the installed-wheel smoke protects only `OpenPinch.main`. The seeded
+  non-solver matrix passed 2,033 tests with four solver tests deselected;
+  combined statement/branch coverage is 97%, the focused main/architecture/PBT
+  gate passed 125 tests, and Ruff lint, formatting of 457 files, and patch
+  hygiene passed. No shrunk Hypothesis defect occurred.
+- **Step 10 interim evidence**: Architecture, support-policy, API, guide,
+  example, notebook, and release documentation now identifies
+  `OpenPinch.main.pinch_analysis_service` as the sole protected Python import.
+  Every advanced notebook carries an unsupported-internal notice, and notebook
+  09 contrasts the protected main call with internal owner workflows. Package
+  discovery includes all seven owners. A warning-free Sphinx build passes. A
+  final PEP 517 isolated 0.5.0 wheel and sdist each contain 322 files with all
+  intended owners and no retired package or forwarding-module path. Explicit
+  Pydantic v2 report serializers replaced the deprecated encoder configuration.
+  A fresh Python 3.14.2 environment installed the wheel and current declared
+  dependencies, imported OpenPinch only from site-packages, passed the artifact
+  smoke, and passed all 59 external-contract tests with warnings treated as
+  errors. The complete final gate remains active.
+- **Extensions**: Security and Resiliency disabled (N/A); partial PBT requires
+  PBT-02, PBT-03, PBT-07, PBT-08, and PBT-09.
 
 ## Pre-Release Corrective Review Progress
 

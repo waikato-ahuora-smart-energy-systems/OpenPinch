@@ -8,7 +8,7 @@ from collections.abc import Iterable
 from ...domain.configuration import tol
 from ...domain.enums import PT, ArrowHead, LineColour, StreamLoc
 from .composite import clean_composite_curve
-from .metadata import GraphSeriesMeta as _GraphSeriesMeta
+from .metadata import _GraphSeriesMeta
 from .primitives import (
     _column_key,
     _column_to_list,

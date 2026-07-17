@@ -10,7 +10,6 @@ from typing import Any, Callable, Dict, Optional
 import pandas as pd
 from pydantic import ValidationError
 
-from ..adapters.io.target_workbook import export_target_workbook
 from ..contracts.input import TargetInput
 from ..contracts.output import TargetOutput
 from ..contracts.reporting import ProblemReport, ReportMetric
@@ -18,9 +17,6 @@ from ..contracts.workspace import ValidationReport
 from ..domain.stream_collection import StreamCollection
 from ..domain.targets import BaseTargetModel
 from ..domain.zone import Zone
-from ..presentation.dashboard.problem import render_problem_dashboard
-from ..utils.export import build_summary_dataframe
-from .targeting import data_preprocessing_service
 from ._problem.accessors.component import _ComponentAccessorDescriptor
 from ._problem.accessors.design import _DesignAccessorDescriptor
 from ._problem.accessors.plot import _PlotAccessorDescriptor
@@ -56,6 +52,7 @@ from ._problem.periods import execution as _period_execution
 from ._problem.targeting import execution as _target_execution
 from ._problem.targeting.dispatch import run_targeting_for_zone_and_subzones
 from ._problem.targeting.plan import _TargetRunSpec
+from .targeting import data_preprocessing_service
 
 ZoneService = Callable[["Zone", Optional[dict[str, Any]]], "Zone"]
 
@@ -447,6 +444,8 @@ class PinchProblem:
         elif detailed and format != "detailed":
             raise ValueError("Use either detailed=True or format=..., not both.")
         if detailed:
+            from ..presentation.reporting.workbook import build_summary_dataframe
+
             return build_summary_dataframe(results.targets)
         return build_problem_summary_frame(results, format=format)
 
@@ -485,16 +484,20 @@ class PinchProblem:
         periods: str = "selected",
     ) -> Any:
         """Export the solved target summary and problem tables to an Excel file."""
+        from ..presentation.reporting.workbook import (
+            export_target_summary_to_excel_with_units,
+        )
+
         if results_dir is not None:
             self.results_dir = results_dir
         if self.results_dir is None:
             raise ValueError("No results_dir set. Provide a path to export results.")
         results = self._summary_results(periods=periods)
 
-        return export_target_workbook(
-            results,
-            self._master_zone,
-            self.results_dir,
+        return export_target_summary_to_excel_with_units(
+            target_response=results,
+            master_zone=self._master_zone,
+            out_dir=self.results_dir,
         )
 
     def compare_to(
@@ -679,7 +682,9 @@ class PinchProblem:
         if dashboard_graph_data is None and self._results is not None:
             dashboard_graph_data = build_graph_data(self._results)
 
-        render_problem_dashboard(
+        from ..presentation.dashboard.rendering import render_streamlit_dashboard
+
+        render_streamlit_dashboard(
             active_zone,
             graph_data=dashboard_graph_data,
             page_title=page_title,

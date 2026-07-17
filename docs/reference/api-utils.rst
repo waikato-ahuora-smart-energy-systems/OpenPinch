@@ -1,6 +1,10 @@
 Utilities and I/O
 =================
 
+These adapter, numerical, optimisation, and presentation modules are
+unsupported contributor APIs. They are documented to aid maintenance, not as
+compatibility promises.
+
 The utilities layer supports the main targeting workflow with import/export
 helpers, physical-property utilities, optimisation routines, and plotting
 support. Several of these modules are also useful independently of the full
@@ -12,27 +16,27 @@ Data Conversion and Validation
 These modules translate spreadsheet- or table-oriented data sources into the
 schema-compatible structures consumed by the service layer.
 
-.. automodule:: OpenPinch.utils
+.. automodule:: OpenPinch.adapters
    :no-members:
 
-.. automodule:: OpenPinch.utils.wkbook_to_json
+.. automodule:: OpenPinch.adapters.io.workbook
    :members:
 
-.. automodule:: OpenPinch.utils.csv_to_json
+.. automodule:: OpenPinch.adapters.io.csv
    :members:
 
-.. automodule:: OpenPinch.utils.input_validation
+.. automodule:: OpenPinch.adapters.io.records
    :members:
 
 Export and Reporting
 --------------------
 
 Use the export helpers when you want the solved
-:class:`~OpenPinch.lib.schemas.io.TargetOutput` and
-:class:`~OpenPinch.classes.zone.Zone` hierarchy written back to an Excel
+:class:`~OpenPinch.contracts.output.TargetOutput` and
+:class:`~OpenPinch.domain.zone.Zone` hierarchy written back to an Excel
 workbook for review or archiving.
 
-.. automodule:: OpenPinch.utils.export
+.. automodule:: OpenPinch.presentation.reporting.workbook
    :members:
 
 Math, Optimisation, and Utility Helpers
@@ -41,43 +45,46 @@ Math, Optimisation, and Utility Helpers
 These modules provide reusable numerical support for targeting and post-
 processing tasks.
 
-.. automodule:: OpenPinch.services.common.miscellaneous
+.. automodule:: OpenPinch.analysis.numerics
    :members:
 
-.. automodule:: OpenPinch.utils.blackbox_minimisers
+.. automodule:: OpenPinch.optimisation.service
    :members:
 
-.. automodule:: OpenPinch.utils.stream_linearisation
+.. automodule:: OpenPinch.optimisation.models
    :members:
 
-.. automodule:: OpenPinch.utils.heat_exchanger
+.. automodule:: OpenPinch.domain._stream.linearisation
    :members:
 
-.. automodule:: OpenPinch.utils.costing
+.. automodule:: OpenPinch.analysis.heat_transfer
    :members:
 
-.. automodule:: OpenPinch.utils.water_properties
+.. automodule:: OpenPinch.analysis.economics
+   :members:
+
+.. automodule:: OpenPinch.analysis.thermodynamics.water
    :members:
 
 Internal Optimiser Backends
 ---------------------------
 
-The modules below back :func:`OpenPinch.utils.blackbox_minimisers.multiminima`.
-They are primarily useful when you need to inspect or extend the optimiser
-implementations themselves.
+The modules below back
+:func:`OpenPinch.optimisation.service.run_multistart_minimisation`. They are
+primarily useful when inspecting or extending optimiser implementations.
 
-.. automodule:: OpenPinch.utils.bb_optimisers
+.. automodule:: OpenPinch.optimisation.backends
    :no-members:
 
-.. automodule:: OpenPinch.utils.bb_optimisers.common
+.. automodule:: OpenPinch.optimisation.candidates
 
-.. automodule:: OpenPinch.utils.bb_optimisers.dual_annealing
+.. automodule:: OpenPinch.optimisation.backends.dual_annealing
 
-.. automodule:: OpenPinch.utils.bb_optimisers.cmaes
+.. automodule:: OpenPinch.optimisation.backends.cma_es
 
-.. automodule:: OpenPinch.utils.bb_optimisers.bayesian_optimisation
+.. automodule:: OpenPinch.optimisation.backends.bayesian
 
-.. automodule:: OpenPinch.utils.bb_optimisers.rbf_surrogate
+.. automodule:: OpenPinch.optimisation.backends.rbf
 
 Plotting and Instrumentation
 ----------------------------
@@ -89,11 +96,11 @@ Install ``openpinch[notebook]`` for the standalone Plotly plotting helpers and
 Excel-oriented utility modules. Install ``openpinch[dashboard]`` for the
 Streamlit dashboard path.
 
-.. automodule:: OpenPinch.utils.plots
+.. automodule:: OpenPinch.presentation.graphs.simple
    :members:
 
-.. automodule:: OpenPinch.utils.decorators
+.. automodule:: OpenPinch.application
    :members:
 
-.. automodule:: OpenPinch.streamlit_webviewer.web_graphing
+.. automodule:: OpenPinch.presentation.dashboard.rendering
    :members:

@@ -18,14 +18,13 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any
 
-from OpenPinch import PinchProblem
+from OpenPinch.analysis.heat_exchanger_networks.results.selection import ranked_networks
+from OpenPinch.application.problem import PinchProblem
 
-_HENS_PACKAGE = "OpenPinch.services.heat_exchanger_network_synthesis"
+_HENS_PACKAGE = "OpenPinch.analysis.heat_exchanger_networks"
 _executor_module = import_module(f"{_HENS_PACKAGE}.common.execution.executor")
 _settings_module = import_module(f"{_HENS_PACKAGE}.common.execution.settings")
-_open_hens_module = import_module(
-    f"{_HENS_PACKAGE}.targeting_services.open_hens_method"
-)
+_open_hens_module = import_module(f"{_HENS_PACKAGE}.targeting.open_hens_method")
 LocalSynthesisExecutor = _executor_module.LocalSynthesisExecutor
 workflow_settings_from_problem = _settings_module.workflow_settings_from_problem
 execute_open_hens_method = _open_hens_module.execute_open_hens_method
@@ -868,7 +867,7 @@ def _run_openpinch_grid(
     )
     return _openpinch_ranked_networks(
         case_id,
-        workflow_result.accepted_result.get_n_best_networks(top_n),
+        ranked_networks(workflow_result.accepted_result, top_n),
         fixture_path=fixture_path,
     )
 

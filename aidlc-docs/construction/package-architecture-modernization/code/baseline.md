@@ -33,7 +33,7 @@ The main contract suite protects:
 - validation error type and location for missing stream input;
 - top-level and target-result serialized field ordering;
 - representative target values and graph keys;
-- validated Pydantic input handling;
+- caller-mapping handling with explicit and default project names;
 - successful finite targets for every shipped example; and
 - importability when optional feature packages are unavailable.
 

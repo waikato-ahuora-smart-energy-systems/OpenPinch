@@ -1,0 +1,299 @@
+"""Checks for packaging metadata declared in ``pyproject.toml``."""
+
+from __future__ import annotations
+
+import runpy
+import tomllib
+
+from tests.support.paths import REPOSITORY_ROOT
+
+REPO_ROOT = REPOSITORY_ROOT
+BUMPVERSION = REPO_ROOT / ".bumpversion.toml"
+PYPROJECT = REPO_ROOT / "pyproject.toml"
+UV_LOCK = REPO_ROOT / "uv.lock"
+PYTHON_VERSION = REPO_ROOT / ".python-version"
+PYTEST_INI = REPO_ROOT / "pytest.ini"
+UPDATE_TOOLCHAIN = REPO_ROOT / "scripts" / "update_toolchain.py"
+WORKFLOWS = [
+    REPO_ROOT / ".github" / "workflows" / "ci-develop.yml",
+    REPO_ROOT / ".github" / "workflows" / "ci-pull-request.yml",
+    REPO_ROOT / ".github" / "workflows" / "ci-publish.yml",
+]
+
+
+def _read_pyproject() -> dict:
+    with PYPROJECT.open("rb") as handle:
+        return tomllib.load(handle)
+
+
+def _read_uv_lock() -> dict:
+    with UV_LOCK.open("rb") as handle:
+        return tomllib.load(handle)
+
+
+def _read_bumpversion() -> dict:
+    with BUMPVERSION.open("rb") as handle:
+        return tomllib.load(handle)
+
+
+def _optional_deps() -> dict:
+    return _read_pyproject()["project"]["optional-dependencies"]
+
+
+def _dependency_groups() -> dict:
+    return _read_pyproject()["dependency-groups"]
+
+
+def _dependency_name(requirement: str) -> str:
+    for separator in ("<", ">", "=", "!", "~", "[", ";"):
+        requirement = requirement.split(separator, maxsplit=1)[0]
+    return requirement.strip().lower().replace("_", "-")
+
+
+def _minimum_python_version() -> str:
+    requires_python = _read_pyproject()["project"]["requires-python"]
+    assert requires_python.startswith(">=")
+    return requires_python.removeprefix(">=")
+
+
+def test_notebook_extra_declares_jupyter_runtime_dependencies():
+    assert _optional_deps()["notebook"] == [
+        "ipykernel>=7.2.0",
+        "nbformat>=5.10.4",
+        "plotly",
+        "openpyxl",
+        "pyxlsb",
+    ]
+
+
+def test_dashboard_and_brayton_cycle_extras_are_declared():
+    optional_deps = _optional_deps()
+    assert optional_deps["dashboard"] == [
+        "streamlit",
+        "plotly",
+        "openpyxl",
+        "pyxlsb",
+    ]
+    assert optional_deps["brayton_cycle"] == [
+        "tespy",
+    ]
+
+
+def test_synthesis_extra_declares_optional_solver_stack_only():
+    optional_deps = _optional_deps()
+
+    assert optional_deps["synthesis"] == [
+        "pyomo>=6.10.0",
+        "gekko>=1.3.2",
+        "plotly>=6.8.0",
+        "kaleido>=1.3.0",
+        "openpyxl>=3.1.5",
+        "wakepy>=1.0.0",
+        "idaes-pse>=2.11.0",
+    ]
+
+    synthesis_only = {"pyomo", "gekko", "kaleido", "wakepy", "idaes-pse"}
+    core_deps = {
+        _dependency_name(dep) for dep in _read_pyproject()["project"]["dependencies"]
+    }
+    full_deps = {_dependency_name(dep) for dep in optional_deps["full"]}
+    unrelated_optional_deps = {
+        _dependency_name(dep)
+        for extra_name, deps in optional_deps.items()
+        if extra_name not in {"synthesis", "full"}
+        for dep in deps
+    }
+
+    assert synthesis_only.isdisjoint(core_deps)
+    assert synthesis_only <= full_deps
+    assert synthesis_only.isdisjoint(unrelated_optional_deps)
+
+
+def test_full_extra_aggregates_every_optional_runtime_surface_without_duplicates():
+    optional_deps = _optional_deps()
+    full = optional_deps["full"]
+    full_names = [_dependency_name(dep) for dep in full]
+    expected_names = {
+        _dependency_name(dep)
+        for extra_name, dependencies in optional_deps.items()
+        if extra_name != "full"
+        for dep in dependencies
+    }
+
+    assert set(full_names) == expected_names
+    assert len(full_names) == len(set(full_names))
+
+
+def test_dev_dependency_group_retains_notebook_dependencies():
+    dev_group = _dependency_groups()["dev"]
+
+    assert "ipykernel>=7.2.0" in dev_group
+    assert "nbformat>=5.10.4" in dev_group
+
+
+def test_dev_dependency_group_has_one_ruff_entry():
+    dev_group = _dependency_groups()["dev"]
+    ruff_entries = [entry for entry in dev_group if entry.startswith("ruff")]
+
+    assert ruff_entries == ["ruff>=0.15.8"]
+
+
+def test_requires_python_matches_python_version_files_and_ci():
+    minimum_version = _minimum_python_version()
+
+    assert minimum_version == PYTHON_VERSION.read_text(encoding="utf-8").strip()
+
+    update_toolchain = UPDATE_TOOLCHAIN.read_text(encoding="utf-8")
+    assert "_read_python_minor" in update_toolchain
+    assert "requires-python" in update_toolchain
+
+    for workflow in WORKFLOWS:
+        text = workflow.read_text(encoding="utf-8")
+        assert f'PYTHON_VERSION: "{minimum_version}"' in text
+        assert "python-version: ${{ env.PYTHON_VERSION }}" in text
+
+
+def test_update_toolchain_uses_minor_selector_for_python_install():
+    namespace = runpy.run_path(str(UPDATE_TOOLCHAIN))
+
+    assert namespace["_read_python_version"](REPO_ROOT) == "3.14.2"
+    assert namespace["_read_python_minor"](REPO_ROOT) == "3.14"
+    assert namespace["_python_minor_from_version"]("3.14.2") == "3.14"
+
+
+def test_requires_python_classifier_matches_minimum_version():
+    project = _read_pyproject()["project"]
+
+    assert project["requires-python"] == ">=3.14.2"
+    assert "Programming Language :: Python :: 3.14" in project["classifiers"]
+
+
+def test_pytest_marker_policy_declares_synthesis_and_solver_tiers():
+    pytest_ini = PYTEST_INI.read_text(encoding="utf-8")
+
+    assert (
+        "synthesis: optional heat exchanger network synthesis tests that require the synthesis extra"
+        in pytest_ini
+    )
+    assert (
+        "solver: tests that require external solver binaries such as Couenne or IPOPT"
+        in pytest_ini
+    )
+
+
+def test_lockfile_project_version_matches_pyproject():
+    project_version = _read_pyproject()["project"]["version"]
+    lock = _read_uv_lock()
+    package = next(
+        package
+        for package in lock["package"]
+        if package["name"] == "openpinch" and package["source"] == {"editable": "."}
+    )
+
+    assert package["version"] == project_version
+
+
+def test_bumpversion_updates_lockfile_project_version():
+    config = _read_bumpversion()["tool"]["bumpversion"]
+    uv_lock_entries = [
+        entry
+        for entry in config["files"]
+        if entry["filename"] in {"uv.lock", "./uv.lock"}
+    ]
+
+    assert len(uv_lock_entries) == 1
+
+    entry = uv_lock_entries[0]
+    current_search = entry["search"].replace(
+        "{current_version}", config["current_version"]
+    )
+
+    assert 'name = "openpinch"' in entry["search"]
+    assert "source = " in entry["search"]
+    assert "{ editable" not in entry["search"]
+    assert 'version = "{new_version}"' in entry["replace"]
+    assert current_search in UV_LOCK.read_text(encoding="utf-8")
+
+
+def test_ci_workflows_check_lockfile_project_version():
+    command = "python scripts/check_lockfile_version.py"
+
+    for workflow in WORKFLOWS:
+        text = workflow.read_text(encoding="utf-8")
+        assert command in text
+
+    pull_request_workflow = (
+        REPO_ROOT / ".github" / "workflows" / "ci-pull-request.yml"
+    ).read_text(encoding="utf-8")
+    assert pull_request_workflow.count(command) >= 2
+
+
+def test_ci_measures_branch_coverage_with_the_documented_hypothesis_seed():
+    for workflow in WORKFLOWS:
+        text = workflow.read_text(encoding="utf-8")
+        assert "coverage run --branch --source=OpenPinch" in text
+        assert "--hypothesis-seed=20260715" in text
+        assert "coverage report --fail-under=95" in text
+
+
+def test_testpypi_publish_skips_existing_files_but_pypi_publish_does_not():
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci-publish.yml").read_text(
+        encoding="utf-8"
+    )
+    testpypi_block = workflow.split("publish-testpypi:", 1)[1].split(
+        "publish-pypi:", 1
+    )[0]
+    pypi_block = workflow.split("publish-pypi:", 1)[1]
+
+    assert "skip-existing: true" in testpypi_block
+    assert "skip-existing: true" not in pypi_block
+
+
+def test_publish_workflow_is_tag_only_and_validation_gated():
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci-publish.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'tags: ["v*.*.*"]' in workflow
+    assert "branches:" not in workflow
+    assert "workflow_dispatch:" not in workflow
+    assert 'python scripts/check_release_tag.py "${{ github.ref_name }}"' in workflow
+    assert "needs: [test, docs, optional-install-smoke]" in workflow
+    assert "coverage report --fail-under=95" in workflow
+    assert "surface: [core, dashboard, notebook, brayton_cycle, synthesis]" in workflow
+    assert "os: [ubuntu-latest, windows-latest, macos-latest]" in workflow
+
+
+def test_pr_version_bump_waits_for_validation():
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci-pull-request.yml").read_text(
+        encoding="utf-8"
+    )
+    bump_block = workflow.split("  bump-version:", 1)[1]
+
+    assert "needs: [test, optional-install-smoke]" in bump_block
+    assert "coverage report --fail-under=95" in workflow
+    assert "surface: [core, dashboard, notebook, brayton_cycle, synthesis]" in workflow
+
+
+def test_installed_wheel_smoke_protects_only_the_main_python_contract():
+    smoke = (REPO_ROOT / "scripts" / "artifact_install_smoke.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "from OpenPinch.main import pinch_analysis_service" in smoke
+    assert "Installed wheel failed the protected main contract" in smoke
+    assert "Root package exposes unsupported aliases" in smoke
+    assert "Installed wheel contains retired packages" in smoke
+
+
+def test_core_dependencies_have_incompatible_major_release_ceilings():
+    dependencies = _read_pyproject()["project"]["dependencies"]
+
+    assert dependencies == [
+        "numpy<3",
+        "pint<1",
+        "pandas<3",
+        "coolprop<8",
+        "pydantic<3",
+        "scipy<2",
+    ]

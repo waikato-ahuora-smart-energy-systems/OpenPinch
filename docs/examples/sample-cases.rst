@@ -1,9 +1,9 @@
 Sample Cases
 ============
 
-The packaged sample cases are not filler assets. They are the fastest path to a
-reproducible OpenPinch workflow and each one corresponds to a specific part of
-the supported surface.
+The packaged sample cases are not filler assets. They provide reproducible
+inputs for the protected main contract and for explicitly unsupported advanced
+repository workflows.
 
 Included Cases
 --------------
@@ -47,8 +47,8 @@ Included Cases
 How To Copy Them
 ----------------
 
-Browse or copy the packaged cases through :mod:`OpenPinch.resources` when you
-want a local editable copy:
+Contributors can browse or copy the packaged cases through the unsupported
+:mod:`OpenPinch.resources` helper when they want a local editable copy:
 
 .. code-block:: python
 
@@ -57,12 +57,13 @@ want a local editable copy:
    print(list_sample_cases())
    copy_sample_case("basic_pinch.json", "basic_pinch.json")
 
-You can also load a packaged case by name directly from Python when no local
-file with that name exists:
+Unsupported internal coordinators can also load a packaged case by name when
+no local file with that name exists:
 
 .. code-block:: python
 
-   from OpenPinch import PinchProblem, PinchWorkspace
+   from OpenPinch.application.problem import PinchProblem
+   from OpenPinch.application.workspace import PinchWorkspace
 
    problem = PinchProblem("basic_pinch.json")
    workspace = PinchWorkspace(

@@ -6,11 +6,9 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 import pandas as pd
 
+from ...analysis.graphs.service import get_output_graph_data
 from ...domain.enums import GT
-from ...services.common.graph_data import get_output_graph_data
-from ...streamlit_webviewer.web_graphing import (
-    _build_plotly_graph,
-)
+from .plotly import build_plotly_figure
 
 if TYPE_CHECKING:
     from ...application.problem import PinchProblem
@@ -135,7 +133,7 @@ class _PlotAccessor:
         show: bool = False,
     ):
         """Build a Plotly figure from serialized graph data."""
-        figure = _build_plotly_graph(graph_data)
+        figure = build_plotly_figure(graph_data)
         if hasattr(figure, "show") and show:
             figure.show()
         return figure

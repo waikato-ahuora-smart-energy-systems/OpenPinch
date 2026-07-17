@@ -12,8 +12,8 @@ from ....adapters.io.problem_sources import (
     PathLike,
     load_external_problem_source,
 )
+from ....adapters.io.records import validate_stream_data, validate_utility_data
 from ....contracts.input import TargetInput
-from ....utils.input_validation import validate_stream_data, validate_utility_data
 from .validation import build_validation_context
 
 if TYPE_CHECKING:

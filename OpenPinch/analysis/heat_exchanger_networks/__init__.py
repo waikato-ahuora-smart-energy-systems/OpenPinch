@@ -1,1 +1,1 @@
-"""Heat exchanger network analysis."""
+"""Heat-exchanger-network analysis package."""

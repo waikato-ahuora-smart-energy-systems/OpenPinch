@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 from ..domain.stream_collection import StreamCollection
 from ..domain.value import Value
@@ -14,8 +14,21 @@ from .workspace import ValidationReport
 
 _REPORT_MODEL_CONFIG = ConfigDict(
     arbitrary_types_allowed=True,
-    json_encoders={Value: lambda value: value.to_dict()},
 )
+
+
+class _ReportModel(BaseModel):
+    """Serialize report-owned domain values through explicit Pydantic v2 hooks."""
+
+    model_config = _REPORT_MODEL_CONFIG
+
+    @field_serializer("*", mode="wrap", when_used="json", check_fields=False)
+    def _serialize_report_field(self, value, handler):
+        if isinstance(value, Value):
+            return value.to_dict()
+        if isinstance(value, StreamCollection):
+            return value.to_dict()
+        return handler(value)
 
 
 def _report_value_data(value, *, metric_name: str) -> Value | None:
@@ -32,10 +45,8 @@ def _report_value_data(value, *, metric_name: str) -> Value | None:
     return coerce_output_value(value, metric_name=metric_name)
 
 
-class HeatUtility(BaseModel):
+class HeatUtility(_ReportModel):
     """Report-friendly representation of a utility contribution."""
-
-    model_config = _REPORT_MODEL_CONFIG
 
     name: str
     heat_flow: Value
@@ -46,10 +57,8 @@ class HeatUtility(BaseModel):
         return _report_value_data(value, metric_name="utility_heat_flow")
 
 
-class PinchTemp(BaseModel):
+class PinchTemp(_ReportModel):
     """Hot and cold pinch temperatures attached to a targeting record."""
-
-    model_config = _REPORT_MODEL_CONFIG
 
     cold_temp: Value | None = None
     hot_temp: Value | None = None
@@ -65,10 +74,8 @@ class PinchTemp(BaseModel):
         return _report_value_data(value, metric_name="hot_temp")
 
 
-class TargetResults(BaseModel):
+class TargetResults(_ReportModel):
     """Summary metrics for a single zone/target returned by the analysis."""
-
-    model_config = _REPORT_MODEL_CONFIG
 
     name: str
     period_idx: Optional[int] = None

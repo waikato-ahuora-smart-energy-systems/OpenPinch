@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 from hypothesis import strategies as st
 
-from OpenPinch.lib.config import tol
+from OpenPinch.domain.configuration import tol
 
 
 @dataclass(frozen=True)

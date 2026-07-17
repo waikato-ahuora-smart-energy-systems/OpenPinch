@@ -1,6 +1,11 @@
 Cogeneration Workflows
 ======================
 
+.. warning::
+
+   This advanced guide uses unsupported internal owner modules. Only
+   :func:`OpenPinch.main.pinch_analysis_service` is compatibility protected.
+
 Purpose
 -------
 
@@ -24,7 +29,7 @@ Runnable Workflow
 
 .. code-block:: python
 
-   from OpenPinch import PinchProblem
+   from OpenPinch.application.problem import PinchProblem
 
    problem = PinchProblem("pulp_mill.json")
    problem.target.indirect_heat_integration()
@@ -55,5 +60,5 @@ Next Steps
 ----------
 
 - :doc:`../fundamentals/cogeneration-methods` for method framing.
-- :doc:`../api/pinchproblem` for the public accessor.
+- :doc:`../api/pinchproblem` for the internal parent accessor.
 - :doc:`../api/service-layer` for lower-level orchestration.

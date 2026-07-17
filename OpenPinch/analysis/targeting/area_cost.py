@@ -8,9 +8,9 @@ from ...domain._problem_table.types import ProblemTableUpdateKwargs
 from ...domain.configuration import Configuration, tol
 from ...domain.enums import PT
 from ...domain.stream_collection import StreamCollection
-from ...utils.costing import compute_annual_capital_cost, compute_capital_cost
-from ...utils.heat_exchanger import compute_LMTD_from_dts
-from .graph_data import clean_composite_curve_ends
+from ..economics import compute_annual_capital_cost, compute_capital_cost
+from ..graphs.composite import clean_composite_curve_ends
+from ..heat_transfer import compute_LMTD_from_dts
 from .temperature_driving_force import get_temperature_driving_forces
 
 __all__ = [

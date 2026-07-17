@@ -140,7 +140,9 @@ def test_candidate_result_preserves_and_orders_finite_backend_values(
         result = run_multistart_minimisation(problem, options={"n_runs": 1})
 
     assert len(result.candidates) == len(points)
-    assert [candidate.objective for candidate in result.candidates] == sorted(objectives)
+    assert [candidate.objective for candidate in result.candidates] == sorted(
+        objectives
+    )
     assert all(len(candidate.point) == 2 for candidate in result.candidates)
     assert all(
         math.isfinite(value)
@@ -186,7 +188,9 @@ def test_unknown_method_and_backend_option_are_rejected() -> None:
         objective=_convex_objective,
         bounds=((-1.0, 1.0),),
     )
-    with pytest.raises(InvalidOptimisationProblemError, match="Unsupported optimisation"):
+    with pytest.raises(
+        InvalidOptimisationProblemError, match="Unsupported optimisation"
+    ):
         run_multistart_minimisation(problem, method="unknown")
     with pytest.raises(InvalidOptimisationProblemError, match="unsupported_option"):
         run_multistart_minimisation(

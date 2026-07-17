@@ -9,7 +9,7 @@ import numpy as np
 from ...contracts.turbine import TurbineSolveResult, TurbineStageResult
 from ...domain.configuration import tol
 from ...domain.enums import TurbineModel
-from ...utils.water_properties import Tsat_p, h_ps, h_pT, hL_p, hV_p, psat_T, s_ph
+from ..thermodynamics.water import Tsat_p, h_ps, h_pT, hL_p, hV_p, psat_T, s_ph
 
 __all__ = ["MultiStageSteamTurbine"]
 

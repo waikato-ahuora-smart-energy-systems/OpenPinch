@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 from ...contracts.workspace import ScenarioComparisonView, ScenarioVariantView
-from .views import problem_table_diffs, summary_metric_deltas
+from .views.comparison import problem_table_diffs, summary_metric_deltas
 
 if TYPE_CHECKING:
     from ..workspace import PinchWorkspace

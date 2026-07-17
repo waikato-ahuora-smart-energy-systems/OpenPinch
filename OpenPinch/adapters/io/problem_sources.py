@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from ...resources import list_sample_cases, read_sample_case
-from ...utils.csv_to_json import get_problem_from_csv
-from ...utils.wkbook_to_json import get_problem_from_excel
+from .csv import get_problem_from_csv
+from .json import parse_json, read_json
+from .workbook import get_problem_from_excel
 
 JsonDict = dict[str, Any]
 PathLike = str | Path
@@ -91,10 +91,10 @@ def _load_json_inputs(source_path: Path, *, source: PathLike) -> JsonDict:
     try:
         sample_case_name = _packaged_sample_case_name(source, source_path)
         if sample_case_name is not None:
-            input_data = json.loads(read_sample_case(sample_case_name))
+            input_data = parse_json(read_sample_case(sample_case_name))
         else:
-            input_data = json.loads(source_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+            input_data = read_json(source_path)
+    except (OSError, ValueError) as exc:
         raise ValueError(f"Failed to parse JSON from {source_path}: {exc}") from exc
     if not isinstance(input_data, dict):
         raise ValueError(f"JSON inputs in {source_path} must be an object.")

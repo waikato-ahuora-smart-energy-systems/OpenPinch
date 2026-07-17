@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
+from ....analysis.numerics import get_period_index
 from ....contracts.output import TargetOutput
 from ....domain.targets import BaseTargetModel
 from ....domain.zone import Zone
-from ....analysis.numerics import get_period_index
 from ..output.result_extraction import extract_results
 from .dispatch import run_targeting_for_zone_and_subzones
 

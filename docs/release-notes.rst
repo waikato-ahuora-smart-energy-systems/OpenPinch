@@ -4,6 +4,38 @@ Pre-Release Notes
 Unreleased
 ----------
 
+0.5.0 architecture clean break
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``OpenPinch.main.pinch_analysis_service`` is the sole current
+  compatibility-protected Python contract. Its signature, validation order,
+  return structure, serialization, ordering, exceptions, and numerical
+  behaviour are unchanged.
+- The package root is now an import-free marker. It no longer exports workflow
+  classes, schemas, enums, resource helpers, or the main service.
+- Business state, wire contracts, reusable optimisation, orchestration,
+  engineering analysis, infrastructure adapters, and presentation now have
+  explicit ``domain``, ``contracts``, ``optimisation``, ``application``,
+  ``analysis``, ``adapters``, and ``presentation`` owners.
+- ``OpenPinch.classes``, ``OpenPinch.lib``, ``OpenPinch.services``,
+  ``OpenPinch.utils``, and ``OpenPinch.streamlit_webviewer`` are removed.
+  There are no aliases, forwarding facades, dynamic export barrels, pickle
+  shims, or migration package. Old deep imports and Python pickles are not
+  migrated.
+- Runtime stream segments, exchanger period states, exchanger area slices,
+  process-MVR records, multiperiod HPR cases, dashboard state, graph build
+  records, and HEN solver state remain private to their parent or service
+  owner.
+- Optimisation is a reusable package-level capability. Heat-pump targeting
+  crosses one explicit adapter; new services can reuse optimisation without
+  importing heat-pump code.
+- Tests now mirror observable owner layers. The external main contract is
+  authoritative, architecture directions are AST-enforced, and CI measures
+  seeded statement and branch coverage with Hypothesis seed ``20260715``.
+
+This is an intentional pre-1.0 clean break. No data migration, import migration,
+pickle migration, or compatibility layer is provided.
+
 Domain and input contracts
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -29,21 +61,24 @@ Private helper ownership
   heat exchangers.
 - Runtime stream-segment, exchanger-period, and exchanger-area-slice record
   classes are parent-owned implementation details. Construct them through
-  ``Stream`` and ``HeatExchanger`` mappings; ``StreamSegmentSchema`` remains the
-  supported external segment input contract.
+  ``Stream`` and ``HeatExchanger`` mappings. The equivalent segment wire shape
+  remains accepted through ``pinch_analysis_service(...)``; direct schema
+  imports are not compatibility-protected.
 - The former public record imports and their Python pickle paths are removed
   without aliases or compatibility shims.
 - Synthesis schemas now have concrete common, topology, method, task, and result
   owners. The compatibility-only ``methods``, ``tasks``, and ``results`` modules
   and the synthesis package re-export barrel are removed. Import concrete owner
   modules instead; old barrel-qualified pickle paths are unsupported.
-- Intentional public barrels at ``OpenPinch``, ``OpenPinch.lib``, and
-  ``OpenPinch.lib.schemas`` remain, but their lazy synthesis exports resolve
-  directly to concrete owner modules.
+- The package root and owner package ``__init__`` files are import-free markers.
+  The retired ``classes``, ``lib``, ``services``, ``utils``, and
+  ``streamlit_webviewer`` package paths have no compatibility facades; advanced
+  callers import concrete owner modules.
 - Process-MVR records, multiperiod HPR period cases, dashboard graph state,
   graph specifications/metadata, and HEN solver runtime records are private to
-  their owning services. Documented parent components, schemas, direct-MVR
-  models, and HEN equation-model classes remain available.
+  their owning services. Concrete parent components, schemas, direct-MVR
+  models, and HEN equation-model classes remain available as unsupported
+  internals.
 
 Period-native PDM and utility constraints
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -89,7 +124,7 @@ Isolated summaries and HPR economics
 - Shared simulated-HPR candidates are ranked by weighted operating cost plus
   weighted feasibility penalty plus maximum annualized capital cost. Weighted
   backend ``obj`` is used only for backends that provide no cost breakdown.
-- Weighted public HPR summaries average operating fields, use the maximum
+- Weighted internal HPR summaries average operating fields, use the maximum
   capital, annualized-capital, compressor-capital, and heat-exchanger-capital
   fields, and recompute total annualized cost as weighted operating cost plus
   maximum annualized capital. Non-HPR fields retain weighted averaging.

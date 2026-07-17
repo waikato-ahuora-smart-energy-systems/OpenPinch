@@ -20,6 +20,9 @@ from ..contracts.workspace import (
     ScenarioWorkflowConfig,
     VariantInputView,
 )
+from ..presentation.configuration import (
+    configuration_field_metadata as _configuration_field_metadata,
+)
 from ._problem.input.validation import build_validation_report
 from ._workspace import state as _workspace_state
 from ._workspace.case_inputs import (
@@ -33,14 +36,11 @@ from ._workspace.comparison import compare_workspace_variants
 from ._workspace.execution import (
     solve_workspace_variant,
 )
-from ._workspace.views import (
-    configuration_field_metadata as _configuration_field_metadata,
-)
-from ._workspace.views import (
-    json_safe,
+from ._workspace.views.input import (
     record_views,
     zone_tree_view,
 )
+from ._workspace.views.serialization import json_safe
 from .problem import PinchProblem
 
 

@@ -1,6 +1,12 @@
 Zonal and Total Site Workflows
 ==============================
 
+.. warning::
+
+   This advanced guide uses unsupported internal application and analysis
+   owners. Only :func:`OpenPinch.main.pinch_analysis_service` is compatibility
+   protected.
+
 Purpose
 -------
 
@@ -26,7 +32,7 @@ Runnable Workflow
 
 .. code-block:: python
 
-   from OpenPinch import PinchWorkspace
+   from OpenPinch.application.workspace import PinchWorkspace
 
    workspace = PinchWorkspace(source="pulp_mill.json", project_name="Site")
    case = workspace.case("baseline")

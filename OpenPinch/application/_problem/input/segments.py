@@ -111,7 +111,7 @@ def _segments_from_profile(
     config,
     common: dict[str, Any],
 ) -> list[StreamSegment]:
-    from ...domain._stream.linearisation import (
+    from ....domain._stream.linearisation import (
         align_temperature_heat_profiles,
         get_piecewise_data_points,
         normalise_temperature_heat_profile,

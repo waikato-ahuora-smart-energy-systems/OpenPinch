@@ -1,20 +1,21 @@
 Schemas and Config
 ==================
 
-OpenPinch has two distinct but closely related typed surfaces:
+OpenPinch has two distinct but closely related internal typed surfaces:
 
 - schema models for external inputs and returned results
-- a runtime :class:`~OpenPinch.lib.config.Configuration` object attached to
+- a runtime :class:`~OpenPinch.domain.configuration.Configuration` object attached to
   each prepared zone
 
-Together they define the stable wire format and the per-zone analysis behavior
-that the rest of the package consumes.
+Together they implement the wire format protected through
+:func:`OpenPinch.main.pinch_analysis_service` and the per-zone analysis
+behaviour. Their direct import paths are not compatibility contracts.
 
 What Each Layer Does
 --------------------
 
 ``TargetInput`` and related schemas
-   Define the public request format for process streams, utilities, and the
+   Define the request format for process streams, utilities, and the
    optional zone tree.
 
 ``TargetOutput`` and target/result schemas
@@ -23,7 +24,7 @@ What Each Layer Does
 ``Configuration``
    Stores runtime knobs for targeting flags, heat pump parameters, utility
    assumptions, costing inputs, and turbine settings. Each prepared
-   :class:`~OpenPinch.classes.zone.Zone` owns one config object.
+   :class:`~OpenPinch.domain.zone.Zone` owns one config object.
 
 Discovering Options
 -------------------
@@ -34,7 +35,7 @@ enum choices, numeric bounds, and config paths:
 
 .. code-block:: python
 
-   from OpenPinch import config_options
+   from OpenPinch.presentation.configuration import configuration_options as config_options
 
    options = config_options()
    hpr_options = [field for field in options if field.group == "hpr"]
@@ -47,42 +48,42 @@ and refrigeration workflows.
 Configuration
 -------------
 
-.. autoclass:: OpenPinch.lib.config.Configuration
+.. autoclass:: OpenPinch.domain.configuration.Configuration
    :members:
    :no-index:
 
 Input and Output Schemas
 ------------------------
 
-.. autoclass:: OpenPinch.lib.schemas.io.TargetInput
+.. autoclass:: OpenPinch.contracts.input.TargetInput
    :members:
    :no-index:
 
-.. autoclass:: OpenPinch.lib.schemas.io.TargetOutput
+.. autoclass:: OpenPinch.contracts.output.TargetOutput
    :members:
    :no-index:
 
-.. autoclass:: OpenPinch.lib.schemas.io.StreamSchema
+.. autoclass:: OpenPinch.contracts.input.StreamSchema
    :members:
    :no-index:
 
-.. autoclass:: OpenPinch.lib.schemas.io.StreamSegmentSchema
+.. autoclass:: OpenPinch.contracts.input.StreamSegmentSchema
    :members:
    :no-index:
 
-.. autoclass:: OpenPinch.lib.schemas.io.TemperatureHeatPointSchema
+.. autoclass:: OpenPinch.contracts.input.TemperatureHeatPointSchema
    :members:
    :no-index:
 
-.. autoclass:: OpenPinch.lib.schemas.io.TemperatureHeatProfileSchema
+.. autoclass:: OpenPinch.contracts.input.TemperatureHeatProfileSchema
    :members:
    :no-index:
 
-.. autoclass:: OpenPinch.lib.schemas.io.UtilitySchema
+.. autoclass:: OpenPinch.contracts.input.UtilitySchema
    :members:
    :no-index:
 
-.. autoclass:: OpenPinch.lib.schemas.io.ZoneTreeSchema
+.. autoclass:: OpenPinch.contracts.input.ZoneTreeSchema
    :members:
    :no-index:
 
@@ -90,7 +91,7 @@ Heat Exchanger Network Design Results
 -------------------------------------
 
 ``TargetOutput.design`` stores a
-:class:`~OpenPinch.lib.schemas.synthesis.result.HeatExchangerNetworkSynthesisResult`
+:class:`~OpenPinch.contracts.synthesis.result.HeatExchangerNetworkSynthesisResult`
 after ``problem.design.enhanced_synthesis_method(quality_tier=...)``,
 ``problem.design.open_hens_method()``,
 ``problem.design.heat_exchanger_network_synthesis()``, or one of the direct
@@ -99,9 +100,9 @@ and the ranked unique network candidates are available as
 ``design.ranked_networks``.
 
 The same
-:class:`~OpenPinch.lib.enums.HeatExchangerNetworkDesignMethod` enum is used for
-public dispatch and task/result method metadata. ``HENDesignMethod`` is the
-short public alias. ``design.design_method`` records the user-facing design
+:class:`~OpenPinch.domain.enums.HeatExchangerNetworkDesignMethod` enum is used for
+internal dispatch and task/result method metadata. ``HENDesignMethod`` is the
+short internal alias. ``design.design_method`` records the requested design
 service that was requested, such as ``HENDesignMethod.OpenHENS``. ``design.method``
 records the task method that produced the selected network, such as
 ``HENDesignMethod.NetworkEvolution`` for a normal OpenHENS sequence result.
@@ -134,32 +135,29 @@ network at ``problem.design.network``:
 ``utility(name)``.
 
 Grid diagrams for the selected network are created with
-``design.network.build_grid_diagram(period_id=...)``. The standalone
-:func:`OpenPinch.services.network_grid_diagram.build_grid_diagram` service still
-accepts one or more
-:class:`~OpenPinch.classes.heat_exchanger_network.HeatExchangerNetwork`
-objects, and
-``design.grid_diagram(solution_rank=..., period_id=...)`` remains available as
-a convenience wrapper that selects a ranked network first. Multiperiod networks
+:func:`OpenPinch.presentation.network_grid.service.build_grid_diagram`. The
+service accepts one or more
+:class:`~OpenPinch.domain.heat_exchanger_network.HeatExchangerNetwork`
+objects. Select a ranked network first when needed. Multiperiod networks
 require an explicit period for duties, temperatures, diagrams, exports, and
 controllability; omission is accepted only for a single-period network. The
 returned object wraps the
 Plotly ``fig``, a lightweight drawing adapter ``ax``, the selected ``network``,
 and the normalized ``grid_model`` used to draw the topology.
 
-.. autoclass:: OpenPinch.lib.schemas.synthesis.result.HeatExchangerNetworkSynthesisResult
+.. autoclass:: OpenPinch.contracts.synthesis.result.HeatExchangerNetworkSynthesisResult
    :members:
    :no-index:
 
-.. autoclass:: OpenPinch.lib.schemas.synthesis.method.HeatExchangerNetworkSynthesisMethodInput
+.. autoclass:: OpenPinch.contracts.synthesis.method.HeatExchangerNetworkSynthesisMethodInput
    :members:
    :no-index:
 
-.. autoclass:: OpenPinch.lib.schemas.synthesis.method.HeatExchangerNetworkSynthesisMethodOutput
+.. autoclass:: OpenPinch.contracts.synthesis.method.HeatExchangerNetworkSynthesisMethodOutput
    :members:
    :no-index:
 
-.. autoclass:: OpenPinch.lib.enums.HeatExchangerNetworkDesignMethod
+.. autoclass:: OpenPinch.domain.enums.HeatExchangerNetworkDesignMethod
    :members:
    :no-index:
 
@@ -169,7 +167,7 @@ Target Models
 Solved targets are normalized through the target schema layer before they are
 returned to users or exported.
 
-.. autoclass:: OpenPinch.lib.schemas.targets.BaseTargetModel
+.. autoclass:: OpenPinch.domain.targets.BaseTargetModel
    :members:
    :no-index:
 
@@ -178,30 +176,29 @@ HPR Schemas
 
 The HPR schema layer carries the prepared configuration values, parsed backend
 state, and simulated-cycle annualized cost accounting used by the targeting
-services. Report-facing HPR cost fields use ``Value`` instances with public
+services. Report-facing HPR cost fields use ``Value`` instances with serialized
 units ``$`` and ``$/y``.
 
-.. autoclass:: OpenPinch.lib.schemas.hpr.HeatPumpTargetInputs
+.. autoclass:: OpenPinch.contracts.hpr.HeatPumpTargetInputs
    :members:
    :no-index:
 
-.. autoclass:: OpenPinch.lib.schemas.hpr.HPRBackendResult
+.. autoclass:: OpenPinch.contracts.hpr.HPRBackendResult
    :members:
    :no-index:
 
-.. autoclass:: OpenPinch.lib.schemas.hpr.SimulatedHPRAnnualizedCostAccounting
+.. autoclass:: OpenPinch.contracts.hpr.SimulatedHPRAnnualizedCostAccounting
    :members:
    :no-index:
 
 Enums and Typed Constants
 -------------------------
 
-The :mod:`OpenPinch.lib` package also re-exports enums used across the public
-API, including stream types, target labels, HPR cycle selectors, and turbine
-model choices.
+The :mod:`OpenPinch.domain.enums` module owns stream types, target labels, HPR
+cycle selectors, turbine model choices, and other canonical identifiers.
 
-.. automodule:: OpenPinch.lib
-   :no-members:
+.. automodule:: OpenPinch.domain.enums
+   :members:
    :no-index:
 
 Design Notes

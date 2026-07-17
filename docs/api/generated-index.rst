@@ -1,13 +1,12 @@
 Generated Appendix
 ==================
 
-The curated API pages in this section document the public package surface by
-workflow and intent. The appendix below keeps the older exhaustive module-level
-reference so advanced users can still browse the full package layout.
+The external-contract page documents the supported Python call. The appendix
+below is an unsupported module-level reference for contributors inspecting the
+full package layout.
 
-Use the curated pages first when you are learning the API. Use the appendix
-when you need module-by-module detail or want to inspect internals that sit
-below the main supported interfaces.
+Do not treat appendix paths as stable imports. Use them only when accepting
+internal API churn.
 
 .. toctree::
    :maxdepth: 1

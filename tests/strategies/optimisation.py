@@ -24,7 +24,9 @@ def finite_candidate_clouds(draw):
         allow_infinity=False,
         width=32,
     )
-    points = draw(st.lists(st.tuples(coordinates, coordinates), min_size=count, max_size=count))
+    points = draw(
+        st.lists(st.tuples(coordinates, coordinates), min_size=count, max_size=count)
+    )
     values = draw(st.lists(objectives, min_size=count, max_size=count))
     return np.asarray(points, dtype=float), np.asarray(values, dtype=float)
 

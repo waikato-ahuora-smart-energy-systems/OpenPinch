@@ -69,8 +69,8 @@ Coverage Expectations
 
 The target state for docs coverage is:
 
-- every stable package-root export documented in the curated API pages
-- the full ``PinchProblem`` workflow documented in both guides and reference
+- the sole main-service contract documented in the curated API pages
+- internal ``PinchProblem`` workflows explicitly labelled unsupported
 - every packaged sample case and notebook represented in the examples section
 - support status called out explicitly for partial or expert-only subsystems
 

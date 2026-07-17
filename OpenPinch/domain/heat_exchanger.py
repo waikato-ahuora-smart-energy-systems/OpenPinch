@@ -192,6 +192,4 @@ class HeatExchanger(BaseModel):
 
 __all__ = [
     "HeatExchanger",
-    "HeatExchangerKind",
-    "HeatExchangerStreamRole",
 ]

@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import List
 
+from ....analysis.graphs.service import get_output_graph_data
 from ....domain.stream import Stream
 from ....domain.stream_collection import StreamCollection
 from ....domain.zone import Zone
-from ....presentation.reporting.targets import serialize_target
-from ....services.common.graph_data import get_output_graph_data
+from ....presentation.reporting.results import serialize_target
 
 __all__ = ["extract_results"]
 

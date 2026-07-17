@@ -1,24 +1,28 @@
 Schema and Configuration
 ========================
 
-The :mod:`OpenPinch.lib` package defines the typed contract between external
-callers and the analysis engine. If you are building an application around
-OpenPinch, this is the package that tells you what inputs are accepted, what
-outputs are returned, and which enumerated labels and configuration flags are
-expected throughout the workflow.
+These direct contract and domain imports are unsupported contributor APIs.
+Their wire behaviour is protected only when reached through
+:func:`OpenPinch.main.pinch_analysis_service`.
+
+The :mod:`OpenPinch.contracts` and :mod:`OpenPinch.domain` packages define the
+typed boundary between callers and the analysis engine. Contracts describe
+accepted inputs and returned outputs; domain modules own runtime values,
+enumerated labels, and configuration.
 
 Configuration and Numeric Conventions
 -------------------------------------
 
-:mod:`OpenPinch.lib.config` provides the runtime configuration object and the
+:mod:`OpenPinch.domain.configuration` provides the runtime configuration object and the
 global constants used across multiple modules. Many option names intentionally
 mirror the long-standing Excel workbook so workbook and Python workflows can
 share the same mental model.
 
-.. automodule:: OpenPinch.lib
+.. automodule:: OpenPinch.contracts
    :no-members:
+   :no-index:
 
-.. automodule:: OpenPinch.lib.config
+.. automodule:: OpenPinch.domain.configuration
    :members:
 
 Enumerations and Labels
@@ -26,83 +30,80 @@ Enumerations and Labels
 
 The enums module centralises the canonical names used for zones, targets,
 streams, graph series, heat exchanger network design methods, and
-workbook-compatible option keys. Refer to these when you need stable
+workbook-compatible option keys. Refer to these when you need deterministic
 identifiers instead of free-form strings. Heat exchanger network synthesis uses
-``HeatExchangerNetworkDesignMethod`` for both public dispatch and task/result
+``HeatExchangerNetworkDesignMethod`` for both internal dispatch and task/result
 method metadata, with ``HENDesignMethod`` as the shorter alias.
 
-.. automodule:: OpenPinch.lib.enums
+.. automodule:: OpenPinch.domain.enums
    :members:
 
 Pydantic Schemas
 ----------------
 
 The schema layer is the primary programmatic interface to OpenPinch. It is now
-split by concern under :mod:`OpenPinch.lib.schemas` rather than concentrated in
+split by concern under :mod:`OpenPinch.contracts` rather than concentrated in
 one large module.
 
 The main schema modules are:
 
-- :mod:`OpenPinch.lib.schemas.common` for shared primitives such as
+- :mod:`OpenPinch.contracts.common` for shared primitives such as
   ``ValueWithUnit``
-- :mod:`OpenPinch.lib.schemas.graphs` for graph data contracts
-- :mod:`OpenPinch.lib.schemas.io` for public request and response models
-- :mod:`OpenPinch.lib.schemas.reporting` for summary and report-facing models
-- :mod:`OpenPinch.lib.schemas.hpr` for lower-level heat pump solver data models
-- :mod:`OpenPinch.lib.schemas.synthesis` for heat exchanger network synthesis
+- :mod:`OpenPinch.contracts.graphs` for graph data contracts
+- :mod:`OpenPinch.contracts.input` for request and response models
+- :mod:`OpenPinch.contracts.reporting` for summary and report-facing models
+- :mod:`OpenPinch.contracts.hpr` for lower-level heat pump solver data models
+- :mod:`OpenPinch.contracts.synthesis` for heat exchanger network synthesis
   method input/output, task, manifest, optional export, and design-result
   result data
-- :mod:`OpenPinch.lib.schemas.targets` for runtime target models stored on
+- :mod:`OpenPinch.domain.targets` for runtime target models stored on
   solved zones
-- :mod:`OpenPinch.lib.schemas.turbine` for turbine solve result models
+- :mod:`OpenPinch.contracts.turbine` for turbine solve result models
 
 Common request models include:
 
-- :class:`~OpenPinch.lib.schemas.io.TargetInput`
-- :class:`~OpenPinch.lib.schemas.io.StreamSchema`
-- :class:`~OpenPinch.lib.schemas.io.UtilitySchema`
-- :class:`~OpenPinch.lib.schemas.io.ZoneTreeSchema`
+- :class:`~OpenPinch.contracts.input.TargetInput`
+- :class:`~OpenPinch.contracts.input.StreamSchema`
+- :class:`~OpenPinch.contracts.input.UtilitySchema`
+- :class:`~OpenPinch.contracts.input.ZoneTreeSchema`
 
 Common response and reporting models include:
 
-- :class:`~OpenPinch.lib.schemas.io.TargetOutput`
-- :class:`~OpenPinch.lib.schemas.reporting.TargetResults`
-- :class:`~OpenPinch.lib.schemas.graphs.GraphSet`
-- :class:`~OpenPinch.lib.schemas.graphs.Graph`
-- :class:`~OpenPinch.lib.schemas.graphs.Segment`
-- :class:`~OpenPinch.lib.schemas.graphs.DataPoint`
+- :class:`~OpenPinch.contracts.output.TargetOutput`
+- :class:`~OpenPinch.contracts.reporting.TargetResults`
+- :class:`~OpenPinch.contracts.graphs.GraphSet`
+- :class:`~OpenPinch.contracts.graphs.Graph`
+- :class:`~OpenPinch.contracts.graphs.Segment`
+- :class:`~OpenPinch.contracts.graphs.DataPoint`
 
 Heat pump integration helper models include:
 
-- :class:`~OpenPinch.lib.schemas.hpr.HeatPumpTargetOutputs`
+- :class:`~OpenPinch.contracts.hpr.HeatPumpTargetOutputs`
 
 Specialised helper models also capture lower-level Heat Pump optimisation
 inputs/outputs, integrated Heat Pump screening comparisons, piecewise stream
 linearisation requests, and structured targeting/graph outputs.
 
-.. automodule:: OpenPinch.lib.schemas
-   :no-members:
-
-.. automodule:: OpenPinch.lib.schemas.common
+.. automodule:: OpenPinch.contracts.common
    :members:
 
-.. automodule:: OpenPinch.lib.schemas.graphs
+.. automodule:: OpenPinch.contracts.graphs
    :members:
 
-.. automodule:: OpenPinch.lib.schemas.hpr
+.. automodule:: OpenPinch.contracts.hpr
    :members:
 
-.. automodule:: OpenPinch.lib.schemas.io
+.. automodule:: OpenPinch.contracts.input
    :members:
 
-.. automodule:: OpenPinch.lib.schemas.reporting
+.. automodule:: OpenPinch.contracts.reporting
    :members:
 
-.. automodule:: OpenPinch.lib.schemas.synthesis
+.. automodule:: OpenPinch.contracts.synthesis
    :members:
 
-.. automodule:: OpenPinch.lib.schemas.targets
+.. automodule:: OpenPinch.domain.targets
    :members:
 
-.. automodule:: OpenPinch.lib.schemas.turbine
+.. automodule:: OpenPinch.contracts.turbine
    :members:

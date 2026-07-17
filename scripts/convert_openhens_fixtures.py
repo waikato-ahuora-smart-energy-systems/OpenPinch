@@ -16,10 +16,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from OpenPinch.classes.pinch_problem import PinchProblem
-from OpenPinch.services.heat_exchanger_network_synthesis.common.solver.arrays import (
+from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
     problem_to_solver_arrays,
 )
+from OpenPinch.application.problem import PinchProblem
 
 CASE_IDS = (
     "Four-stream-Escobar-and-Trierweiler-2013-1",

@@ -17,6 +17,8 @@ def problem_table_frame(
     """Return a detached dataframe view of a problem table."""
     if table is None or table.data is None:
         return pd.DataFrame()
+    if table.data.size == 0 or len(table.columns) == 0:
+        return pd.DataFrame(columns=table.columns)
     frame = pd.DataFrame(table.data.copy(), columns=table.columns)
     if round_decimals is not None and not frame.empty:
         numeric_columns = frame.select_dtypes(include="number").columns

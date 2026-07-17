@@ -46,45 +46,53 @@ idaes get-extensions
 
 ## First Solve
 
-`PinchProblem` is the main single-case front door. If no local
-`basic_pinch.json` exists, OpenPinch resolves the packaged sample case.
+OpenPinch currently compatibility-protects one Python entry point:
+`OpenPinch.main.pinch_analysis_service`. Pass it a mapping and receive the
+validated target-output model.
 
 ```python
-from OpenPinch import PinchProblem
+from OpenPinch.main import pinch_analysis_service
 
-problem = PinchProblem("basic_pinch.json", project_name="basic_pinch")
-
-validation = problem.validation_report()
-result = problem.target()
-summary = problem.summary_frame()
-
-print(validation.valid)
-print(summary[["Target", "Hot Utility Target", "Cold Utility Target"]])
-```
-
-For named baseline-versus-variant studies, use `PinchWorkspace`:
-
-```python
-from OpenPinch import PinchWorkspace
-
-workspace = PinchWorkspace(
-    source="crude_preheat_train.json",
-    project_name="crude_preheat_train",
+result = pinch_analysis_service(
+    {
+        "streams": [
+            {
+                "name": "Hot feed",
+                "zone": "Process",
+                "t_supply": 180.0,
+                "t_target": 80.0,
+                "heat_flow": 1000.0,
+            },
+            {
+                "name": "Cold feed",
+                "zone": "Process",
+                "t_supply": 20.0,
+                "t_target": 120.0,
+                "heat_flow": 800.0,
+            },
+        ],
+        "utilities": [],
+    },
+    project_name="first-solve",
 )
-workspace.scenario("wide_dt", dt_cont_multiplier=0.5)
-comparison = workspace.compare_cases("baseline", "wide_dt")
+
+print(result.model_dump(mode="json"))
 ```
 
-For application integration, build a typed `TargetInput` and call
-`pinch_analysis_service(...)`.
+Concrete modules under `OpenPinch.application`, `OpenPinch.analysis`,
+`OpenPinch.domain`, `OpenPinch.contracts`, `OpenPinch.adapters`,
+`OpenPinch.optimisation`, and `OpenPinch.presentation` are available for
+repository development and advanced experiments, but they are not currently
+compatibility-protected external APIs.
 
 ## Packaged Resources
 
-OpenPinch ships maintained sample cases and notebook workflows. Discover them
-from Python:
+OpenPinch ships maintained sample cases and notebook workflows. The resource
+helpers below are useful repository tooling, but are not compatibility
+protected:
 
 ```python
-from OpenPinch import (
+from OpenPinch.resources import (
     list_notebooks,
     list_sample_cases,
     notebook_metadata,
@@ -125,7 +133,7 @@ Run the test suite locally:
 python -m pip install -e .
 python -m pip install --group dev
 ruff check .
-coverage run --source=OpenPinch -m pytest -m "not solver"
+coverage run --branch --source=OpenPinch -m pytest --hypothesis-seed=20260715 -m "not solver"
 coverage report --fail-under=95
 python scripts/build_docs.py
 python scripts/build_dist.py
@@ -171,7 +179,7 @@ Optimization for Sustainability. https://doi.org/10.1007/s41660-026-00729-6
 Founder: Tim Walmsley, University of Waikato
 
 Stephen Burroughs, Benjamin Lincoln, Alex Geary, Harrison Whiting, Khang Tran,
-Roger Padulles, Jasper Walden
+Roger Padulles, Jasper Walden, Caleb Archer
 
 ## License
 

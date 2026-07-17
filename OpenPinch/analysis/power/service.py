@@ -8,14 +8,14 @@ import numpy as np
 
 from ...domain.configuration import T_CRIT, Configuration, tol
 from ...domain.enums import TT, CogenerationTarget
-from ...utils.water_properties import psat_T
+from ..numerics import get_period_index
 from ..targeting.context import (
     apply_zone_config_overrides,
     format_selected_period_suffix,
     record_selected_period,
     target_matches_requested_period,
 )
-from ..numerics import get_period_index
+from ..thermodynamics.water import psat_T
 from .steam_turbine import MultiStageSteamTurbine
 
 if TYPE_CHECKING:

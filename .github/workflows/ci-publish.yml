@@ -29,7 +29,7 @@ jobs:
           pip install -e .
           pip install --group dev
       - run: ruff check .
-      - run: coverage run --source=OpenPinch -m pytest --hypothesis-seed=20260715 -m "not solver"
+      - run: coverage run --branch --source=OpenPinch -m pytest --hypothesis-seed=20260715 -m "not solver"
       - run: coverage report --fail-under=95
 
   docs:

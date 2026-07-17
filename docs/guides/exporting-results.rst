@@ -1,6 +1,11 @@
 Exporting Results
 =================
 
+.. warning::
+
+   The export and dashboard examples use unsupported internal owners. Only
+   :func:`OpenPinch.main.pinch_analysis_service` is compatibility protected.
+
 Purpose
 -------
 
@@ -24,7 +29,7 @@ Runnable Workflow
 
 .. code-block:: python
 
-   from OpenPinch import PinchProblem
+   from OpenPinch.application.problem import PinchProblem
 
    problem = PinchProblem("basic_pinch.json")
    problem.target()

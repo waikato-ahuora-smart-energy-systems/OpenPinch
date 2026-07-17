@@ -4,6 +4,10 @@ Decision Workflows
 This page maps common user questions to the right OpenPinch entry point,
 example asset, and supporting documentation page.
 
+Except for calls through ``OpenPinch.main.pinch_analysis_service``, the
+advanced notebook and owner-module paths on this page are unsupported internal
+workflows.
+
 Which Workflow Should I Use?
 ----------------------------
 
@@ -33,12 +37,12 @@ Which Workflow Should I Use?
    Use ``heat_pump_targeting.json`` with
    :doc:`../guides/heat-pump-workflows`. The dedicated explicit
    ``problem.target.direct_heat_pump(...)`` /
-   ``problem.target.indirect_heat_pump(...)`` workflows are the supported
-   advanced route.
+   ``problem.target.indirect_heat_pump(...)`` workflows are the current
+   internal advanced route.
 
 ``How do I compare direct and indirect HPR or refrigeration targets?``
    Use ``chocolate_factory.json`` and
-   ``04_carnot_heat_pump_screening.ipynb``. That workflow stays on the public
+   ``04_carnot_heat_pump_screening.ipynb``. That workflow stays on the parent
    ``problem.target.*`` and ``problem.plot.*`` surfaces rather than lower-level
    cycle internals.
 
@@ -62,16 +66,16 @@ Which Workflow Should I Use?
 ``How do I synthesize a compact heat exchanger network?``
    Use ``07_heat_exchanger_network_synthesis.ipynb`` with
    :doc:`../guides/heat-exchanger-network-synthesis`. It demonstrates the
-   public design accessors, ranked network selection, and grid diagram output.
+   internal design accessors, ranked network selection, and grid diagram output.
 
 ``How do interval heat surplus and deficit values explain a target?``
    Use ``08_energy_transfer_analysis.ipynb``. It connects a solved thermal
    target to surplus/deficit tables and energy-transfer diagram data.
 
 ``I need a typed request/response service contract, not a notebook wrapper.``
-   Start from :doc:`../api/service-layer`,
-   :doc:`../api/schemas-and-config`, and
-   ``09_schema_service_exports_and_bundles.ipynb``.
+   Start from :doc:`../guides/first-solve-python` and
+   :doc:`../api/package-root`. Notebook 09 also contrasts the protected call
+   with unsupported file, export, and workspace internals.
 
 ``I need to inspect prepared streams, zones, or Problem Tables directly.``
    Start from :doc:`../api/domain-model`.

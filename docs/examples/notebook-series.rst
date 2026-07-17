@@ -1,10 +1,11 @@
 Notebook Series
 ===============
 
-OpenPinch ships with a packaged notebook series that is treated as part of the
-supported learning and regression surface. The notebooks are ordered so users
-can choose one of three paths: solve a case with advanced methods, understand
-the method behind the outputs, or integrate OpenPinch into another application.
+OpenPinch ships a maintained notebook series for learning and regression. The
+notebooks are advanced repository examples: they deliberately exercise
+unsupported internal owners and say so in their opening cell. Only the
+``pinch_analysis_service(...)`` section in notebook 09 demonstrates the
+compatibility-protected Python contract.
 
 Included Notebooks
 ------------------
@@ -28,7 +29,7 @@ Included Notebooks
 
 ``04_carnot_heat_pump_screening.ipynb``
    Advanced-method notebook for direct and indirect Heat Pump screening on
-   ``chocolate_factory.json``. It uses the public ``problem.target.*`` and
+   ``chocolate_factory.json``. It uses the internal ``problem.target.*`` and
    ``problem.plot.*`` surfaces with ``HPRcycle.CascadeCarnot`` and
    ``HPRcycle.ParallelCarnot`` options.
 
@@ -44,11 +45,11 @@ Included Notebooks
    stream profiles, graph interpretation, and external stream accounting.
 
 ``07_heat_exchanger_network_synthesis.ipynb``
-   Advanced-method notebook for the public HEN design accessors on the compact
+   Advanced-method notebook for the internal HEN design accessors on the compact
    four-stream Yee and Grossmann benchmark. It covers
    ``problem.design.enhanced_synthesis_method(...)``,
    ``problem.design.open_hens_method()``, ranked network selection, manifests,
-   and grid diagrams. The public ``open_hens`` name is retained.
+   and grid diagrams.
 
 ``08_energy_transfer_analysis.ipynb``
    Method notebook for energy-transfer targeting on ``pulp_mill.json``,
@@ -109,7 +110,7 @@ The notebooks do more than demonstrate commands. They reveal the practical
 power of the package: direct single-case solves, named-case comparison,
 hierarchical targeting, graph-based interpretation, real multiperiod studies,
 advanced HPR cycle targeting, weighted shared HPR design, process-component
-MVR mutation, heat exchanger network synthesis, and stable programmatic
-boundaries built on the same packaged assets. The distributed copies are kept
+MVR mutation, heat exchanger network synthesis, and the protected main-service
+boundary built on the same packaged assets. The distributed copies are kept
 output-free so they do not ship stale plots, tracebacks, or machine-specific
 execution state.

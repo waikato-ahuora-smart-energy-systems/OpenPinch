@@ -1,31 +1,31 @@
 Workflow Map
 ============
 
-OpenPinch has several valid entrypoints. Choose by what owns the study state
-and how much control you need.
+OpenPinch has one supported Python entrypoint and several unsupported internal
+owners used by repository applications and advanced notebooks.
 
 Choose an Entrypoint
 --------------------
 
-Use ``PinchProblem`` when:
+Use ``OpenPinch.main.pinch_analysis_service`` when:
+
+- another system wants the compatibility-protected request/response boundary
+- you do not need live wrapper state or internal graph/export helpers
+
+Use ``PinchProblem`` internally when:
 
 - you are solving one active case
 - inputs come from JSON, Excel, CSV, sample cases, ``TargetInput``, or mappings
 - you want validation, targeting, summaries, graphs, exports, period selection,
   advanced target accessors, and HEN design from one object
 
-Use ``PinchWorkspace`` when:
+Use ``PinchWorkspace`` internally when:
 
 - the study has named baseline and variant cases
 - you need case copying, scenario edits, comparisons, or bundle save/load
 - an application needs serializable variant views as well as live cases
 
-Use ``pinch_analysis_service`` when:
-
-- another system wants a typed ``TargetInput`` to ``TargetOutput`` boundary
-- you do not need wrapper state, period reruns, graph accessors, or exports
-
-Use ``OpenPinch.resources`` when:
+Use ``OpenPinch.resources`` as repository tooling when:
 
 - you need to list, inspect, read, or copy packaged sample cases and notebooks
 - you want examples without hard-coding repository paths
@@ -45,13 +45,15 @@ Workflow Layering
 
 .. code-block:: text
 
-   notebooks / scripts / external applications
-                 |
-                 +--> openpinch notebook
-                 +--> OpenPinch.resources
+   external applications
                  |
                  v
-   PinchWorkspace / PinchProblem / pinch_analysis_service
+        OpenPinch.main.pinch_analysis_service
+                 |
+                 v
+          unsupported internal owners
+   application / analysis / domain / contracts
+   adapters / optimisation / presentation
                  |
                  v
         validation and data preparation
@@ -69,7 +71,7 @@ Common User Paths
 -----------------
 
 First-time solve
-   ``PinchProblem("basic_pinch.json") -> validation_report -> target -> summary_frame``
+   ``mapping -> pinch_analysis_service(...) -> serialized result``
 
 Named sensitivity study
    ``PinchWorkspace(source=...) -> scenario -> compare_cases``
@@ -87,11 +89,11 @@ Direct process MVR
    ``workspace.copy_case -> problem.add_component.process_mvr(...) -> re-solve -> compare_cases``
 
 Typed application integration
-   ``TargetInput -> pinch_analysis_service(...) -> TargetOutput``
+   ``mapping -> pinch_analysis_service(...) -> target output``
 
 Next Steps
 ----------
 
 - :doc:`../getting-started` for the first runnable solve.
 - :doc:`../guides/index` for task workflows.
-- :doc:`../api/index` for exact public contracts.
+- :doc:`../api/package-root` for the exact external contract.

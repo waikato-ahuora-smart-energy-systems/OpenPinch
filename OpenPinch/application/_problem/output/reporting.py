@@ -11,7 +11,7 @@ from ....contracts.report_units import split_report_value
 from ....contracts.reporting import GraphAvailability, ProblemReport, ReportMetric
 from ....contracts.workspace import ValidationReport
 from ....domain.value import Value
-from ....utils.export import build_summary_dataframe
+from ....presentation.reporting.workbook import build_summary_dataframe
 
 _SUMMARY_METRICS = {
     "Hot Utility Target": "Qh",

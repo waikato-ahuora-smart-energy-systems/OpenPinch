@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-from ..contracts.input import TargetInput
-from ..domain.enums import TT
-from ..domain.zone import Zone
+from ..analysis.energy_transfer.diagram import compute_energy_transfer_target
+from ..analysis.energy_transfer.service import run_energy_transfer_analysis_service
 from ..analysis.exergy.service import (
     apply_exergy_if_enabled,
     apply_exergy_targeting,
     run_exergy_targeting_service,
+)
+from ..analysis.heat_pumps.service import (
+    compute_direct_heat_pump_or_refrigeration_target,
+    compute_indirect_heat_pump_or_refrigeration_target,
 )
 from ..analysis.power.service import (
     get_power_cogeneration_above_pinch,
@@ -24,14 +27,9 @@ from ..analysis.targeting.total_site import (
     compute_indirect_integration_targets,
     compute_total_subzone_utility_targets,
 )
-from ..services.energy_transfer_analysis.energy_transfer_entry import (
-    compute_energy_transfer_target,
-    run_energy_transfer_analysis_service,
-)
-from ..services.heat_pump_integration.heat_pump_and_refrigeration_entry import (
-    compute_direct_heat_pump_or_refrigeration_target,
-    compute_indirect_heat_pump_or_refrigeration_target,
-)
+from ..contracts.input import TargetInput
+from ..domain.enums import TT
+from ..domain.zone import Zone
 from ._problem.input.construction import prepare_problem
 
 __all__ = [

@@ -26,7 +26,7 @@ def _collect_candidates_in_parallel(
         try:
             with pool_executor_cls(max_workers=run_count) as pool:
                 run_results = list(pool.map(run_fn, range(run_count)))
-        except (PermissionError, OSError, RuntimeError, broken_pool_exc):
+        except PermissionError, OSError, RuntimeError, broken_pool_exc:
             run_results = map(run_fn, range(run_count))
 
     for run_minima_x, run_minima_f in run_results:

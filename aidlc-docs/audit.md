@@ -1412,3 +1412,139 @@ Resolve all 15 findings in four dependency-ordered PRs based on local `756c1128`
 **Context**: CONSTRUCTION - Code Generation and Build and Test complete. All checklist and state updates were recorded in the same interaction. Security and Resiliency are disabled (N/A); partial PBT is N/A for this import-only cleanup.
 
 ---
+
+## Architecture Modernization - Checklist Request
+**Timestamp**: 2026-07-16T18:46:32Z
+**User Input**: "Write a detailed checklist based on the plan."
+**AI Response**: "Resumed the approved architecture-planning context and began converting it into a dependency-ordered Code Generation checklist. The checklist preserves `OpenPinch/main.py` as the sole current external contract and establishes shared optimisation as a package-level capability."
+**Context**: CONSTRUCTION - Code Generation Part 1 planning for the package architecture modernization follow-up. No application code changes are authorized by this request.
+
+---
+
+## Architecture Modernization - Code Generation Plan Review
+**Timestamp**: 2026-07-16T18:50:35Z
+**AI Prompt**: "Please review `aidlc-docs/construction/plans/package-architecture-modernization-code-generation-plan.md`. You may request changes or explicitly approve it to begin Code Generation Part 2."
+**AI Response**: "Created the detailed architecture-modernization checklist, marked its completed planning items, updated stage-level state, and validated its Markdown structure. The plan contains ten dependency-ordered implementation steps, target file ownership and line estimates, partial-PBT obligations, and blocking quality/test gates."
+**Context**: CONSTRUCTION - Code Generation Part 1 complete and awaiting explicit user approval. Security and Resiliency are disabled (N/A); PBT-02, PBT-03, PBT-07, PBT-08, and PBT-09 are compliant in the planning artifact.
+
+---
+
+## Architecture Modernization - Code Generation Approval
+**Timestamp**: 2026-07-16T18:55:25Z
+**User Input**: "Go."
+**AI Response**: "Recorded explicit approval of the complete architecture-modernization checklist and began Code Generation Part 2 with Step 1, freezing the `OpenPinch.main` contract and behavioural baselines before moving package owners."
+**Context**: CONSTRUCTION - Code Generation Part 1 approved; Part 2 Step 1 active. No compatibility facades will be introduced. Security and Resiliency remain disabled; partial PBT remains blocking.
+
+---
+
+## Architecture Modernization - Step 1 Completion
+**Timestamp**: 2026-07-16T19:02:10Z
+**User Input**: "No new user input."
+**AI Response**: "Completed Step 1. Replaced disabled end-to-end diagnostics with 59 active caller-visible contract tests covering signature, validation, output structure and ordering, representative numerics, default and explicit project names, validated input models, all shipped examples, and core-only importability. Recorded revision f93f34a, 60,201 package lines, 251 files, 132 imported OpenPinch modules, and a 1.375103-second diagnostic import. Segmented-stream (46), multiperiod-summary (9), multiperiod-HPR (13), and HEN contract/segmented (83) baseline tests passed; Ruff passed."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 1 complete. Security and Resiliency disabled (N/A); partial PBT obligations remain active for later algorithmic units. Step 2 shared optimisation is active.
+
+---
+
+## Architecture Modernization - Step 2 Completion
+**Timestamp**: 2026-07-16T19:11:52Z
+**User Input**: "No new user input."
+**AI Response**: "Completed Step 2. Created package-level immutable optimisation models, explicit errors, deterministic candidate handling, process-safe execution, backend protocol, and validated service dispatch. Moved dual annealing, CMA-ES, Bayesian, and RBF implementations out of utils without an HPR dependency or mutable backend registry. Sixteen new scalar-service tests passed, including all four methods, fixed-seed reproducibility, explicit invalid-result handling, unexpected-error propagation, dependency direction, and 40 seeded generated candidate clouds. All 66 existing backend regressions, 13 multiperiod-HPR tests, 59 main-contract tests, Ruff, and patch hygiene passed."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 2 complete. PBT-03, PBT-07, PBT-08, and PBT-09 are compliant; PBT-02 is N/A for this non-serializing unit. Security and Resiliency are disabled (N/A). Step 3 contracts and domain owners is active.
+
+---
+
+## Architecture Modernization - Step 3 Completion
+**Timestamp**: 2026-07-16T19:45:07Z
+**User Input**: "No new user input."
+**AI Response**: "Completed Step 3. Moved external schemas to contracts and business state to domain, retaining private parent-owned stream and heat-exchanger records. Removed dataframe, filesystem-export, plotting, dashboard, solver, and report assembly responsibilities from domain owners and routed callers through analysis or presentation functions. Domain and contracts pass AST boundary and cold-import checks. Seeded input/output JSON round-trip properties passed, as did 241 focused domain tests, 111 contract/lib/export tests, 208 boundary/main/synthesis tests, Ruff formatting and lint, full collection of 2,050 tests, and patch hygiene."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 3 complete. PBT-02, PBT-03, PBT-07, PBT-08, and PBT-09 are compliant with seed `20260715`; Security and Resiliency are disabled (N/A). Step 4 application orchestration is active.
+
+---
+
+## Architecture Modernization - Step 4 Completion
+**Timestamp**: 2026-07-16T20:09:37Z
+**User Input**: "No new user input."
+**AI Response**: "Completed Step 4. Moved PinchProblem and PinchWorkspace with their private helpers to application owners. Parent use cases now delegate targeting execution, immutable replay intent, period execution/aggregation, source normalization, result shaping, variant solving, comparison, and cache/state operations to cohesive helpers. Concrete source and bundle filesystem operations moved behind adapters; graph and dashboard work moved behind presentation owners. Application has AST-enforced exclusions for concrete Plotly, Streamlit, pathlib, and solver-backend imports. The 166-test application behavior gate, 65-test main/architecture gate, 9 replay tests, Ruff, 2,052-test collection, and patch hygiene passed."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 4 complete. Existing seeded state, replay, and serialization properties remain compliant with PBT-02, PBT-03, PBT-07, PBT-08, and PBT-09; Security and Resiliency are disabled (N/A). Step 5 foundational analysis, adapters, and presentation is active.
+
+---
+
+## Architecture Modernization - Step 5 Completion
+**Timestamp**: 2026-07-16T21:23:28Z
+**User Input**: "No new user input."
+**AI Response**: "Completed Step 5. Foundational targeting, graph, energy-transfer, exergy, power, economics, heat-transfer, and water-property calculations now have deterministic analysis owners. JSON, CSV, workbook, record validation, problem-source loading, and optional dependency handling now have adapter owners. Reporting, Plotly conversion, dashboard rendering/export/state, and network-grid geometry/labels/temperature/Plotly concerns now have presentation owners. Retired service, utility, Streamlit-webviewer, and network-grid facades were removed without aliases. The 662-test analysis suite, 158-test adapter/presentation/domain-helper suite, 101-test network-grid/HEN slice, 59-test protected main contract, 14 notebook tests, 41 API/graph tests, cold-import checks, 2,055-test collection, Ruff, stale-path, and patch-hygiene gates passed."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 5 complete. The seeded JSON adapter round-trip property uses seed `20260715`; existing PBT-02, PBT-03, PBT-07, PBT-08, and PBT-09 obligations remain compliant. Security and Resiliency are disabled (N/A). Step 6 heat-pump analysis ownership is active.
+
+---
+
+## Architecture Modernization - Step 6 Completion
+**Timestamp**: 2026-07-16T22:02:36Z
+**User Input**: "No new user input."
+**AI Response**: "Completed Step 6. Direct MVR models, thermodynamics, units, and execution now have concrete owners; ProcessMVRComponent delegates selection, replacement-stream construction, work accounting, membership, and private record state to its owner package. Multiperiod HPR preparation, private state, cycle setup, aggregation, and shared-design execution moved under `_multiperiod`. One HPR optimisation adapter now owns backend alias resolution, finite penalties for explicit candidate failures, warm-start ranking, objective/cost policy interpretation, and result translation into the reusable package-level optimiser. Unexpected optimiser and objective errors propagate. Retired heat-pump, direct-MVR, multiperiod, component, and black-box optimiser facades were removed. Exact parity fixtures, 344 HPR/MVR/cycle/contract tests, 55 optimisation tests, 59 protected main-contract tests, 14 notebook tests, architecture/API gates, and repository-wide Ruff lint/format checks passed."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 6 complete. Deterministic starts, backend selection, weighted operating cost, peak capital, weighted feasibility penalty, and annualized-total policies are preserved. Existing PBT-02, PBT-03, PBT-07, PBT-08, and PBT-09 obligations remain compliant; Security and Resiliency are disabled (N/A). Step 7 HEN model and extraction decomposition is active.
+
+---
+
+## Architecture Modernization - Step 7 Completion
+**Timestamp**: 2026-07-16T22:43:45Z
+**User Input**: "No new user input."
+**AI Response**: "Completed Step 7. Moved HEN synthesis and controllability beneath concrete analysis owners without old-path facades. Base, StageWise, and pinch-decomposition classes are small coordinators over explicit parameter, equation, approach, execution, warm-start, evolution, objective, post-processing, verification, and amalgamation helpers. Solver extraction is split into recovery, utility, period-state, segment-area, metadata, and service modules. The former HEN common package, solver extraction monolith, pinch-design filename, model export barrel, and controllability service package are retired. The final evidence is 419 non-solver HEN tests, 3 solver tests with 1 intentional skip, 2 solver construction-order regressions, 77 architecture/API/main tests, and clean repository-wide Ruff lint, format, stale-path, and patch-integrity gates."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 7 complete. Exact numerical fixtures preserve solver axes, equation and parameter order, warm starts, period-native targets, utility dt_cont, branch temperatures, typed period states, and segment-area outputs. Security and Resiliency are disabled (N/A); partial PBT remains compliant through existing seed `20260715` properties and deterministic fixture regressions. Step 8 retired-package and compatibility-machinery cleanup is active.
+
+---
+
+## Architecture Modernization - Step 8 Completion
+**Timestamp**: 2026-07-16T23:09:28Z
+**User Input**: "No new user input."
+**AI Response**: "Completed Step 8. Production code, tests, scripts, notebooks, examples, and source documentation now import concrete owners. Reduced the root package and owner package initializers to import-free markers, retained the protected main service, and physically removed classes, lib, services, utils, streamlit_webviewer, compatibility aliases, dynamic export barrels, and pickle-path accommodations. Corrected a masked relative segment import and made Plotly loading genuinely optional. The final matrix passed 124 focused contract, architecture, documentation, notebook, and cold-import tests; full-suite collection; Ruff lint; formatting of all 443 Python files; retired-path checks; and patch hygiene."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 8 complete. `OpenPinch.main.pinch_analysis_service` remains the sole compatibility-protected Python contract. Security and Resiliency are disabled (N/A); existing seeded PBT behaviours remain intact. Step 9 behavioural test architecture is active.
+
+---
+
+## Architecture Modernization - Step 9 Completion
+**Timestamp**: 2026-07-16T23:35:46Z
+**User Input**: "No new user input."
+**AI Response**: "Completed Step 9. Reorganized tests by observable owner layer; centralized stable fixture paths and realistic Hypothesis strategies; removed private export/helper-only assertions; introduced explicit HPR candidate-search and optimiser seams; and added AST direction, exact boundary-exception, concrete-import, owner-layer placement, fresh-process cold-import, and installed-wheel contract tests. The seeded non-solver matrix passed 2,033 tests with four solver tests deselected. Combined statement/branch coverage is 97%; the focused main, architecture, and property gate passed 125 tests; Ruff lint, formatting of all 457 Python files, and patch hygiene passed. No shrunk property-test defect occurred."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 9 complete. `tests/e2e/test_main.py` is the authoritative compatibility suite for the sole protected Python contract. Security and Resiliency are disabled (N/A); PBT-02, PBT-03, PBT-07, PBT-08, and PBT-09 are compliant with seed `20260715`. The warning-free Sphinx build is intentionally deferred to Step 10, which is active.
+
+---
+
+## Architecture Modernization - Step 10 Documentation and Packaging Interim
+**Timestamp**: 2026-07-17T00:03:58Z
+**User Input**: "No new user input."
+**AI Response**: "Completed the documentation, support-policy, release-note, notebook-labelling, and package-discovery portions of Step 10. The docs now identify OpenPinch.main.pinch_analysis_service as the sole protected Python import; advanced guides and all ten notebooks explicitly label concrete owners unsupported. A warning-free Sphinx build passes. A PEP 517 isolated 0.5.0 wheel and sdist each contained 322 intended files and no retired package or forwarding-module path. The first clean-wheel contract run passed all 59 cases and exposed a Pydantic 2.13 legacy-serializer warning; replaced json_encoders with explicit Pydantic v2 field serializers and added a regression before the final artifact rebuild."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 10 active. Marked the seven completed Step 10 documentation and package-discovery checkboxes immediately. Security and Resiliency remain disabled (N/A); partial PBT remains blocking with seed `20260715`.
+
+---
+
+## Architecture Modernization - Final Isolated Artifact Build
+**Timestamp**: 2026-07-17T00:14:22Z
+**User Input**: "No new user input."
+**AI Response**: "Built the final OpenPinch 0.5.0 wheel and source distribution with separate PEP 517 isolated environments. Both artifacts contain 322 files, include main plus domain, contracts, optimisation, application, analysis, adapters, and presentation owners, and contain no retired package or removed forwarding-module path."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 10. Marked the isolated-build and artifact-inspection checkboxes complete immediately. Clean wheel installation remains active.
+
+---
+
+## Architecture Modernization - Clean Wheel Contract Gate
+**Timestamp**: 2026-07-17T00:16:26Z
+**User Input**: "No new user input."
+**AI Response**: "Installed the final 0.5.0 wheel and all declared runtime dependencies into a fresh Python 3.14.2 environment. The artifact smoke resolved OpenPinch from site-packages, verified packaged resources and CLI help, exercised the protected main service, found no root aliases or retired packages, and passed. A copied checkout-independent external-contract suite then passed all 59 tests with warnings treated as errors."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 10. Marked the clean-install contract checkbox complete immediately. The complete source and solver quality matrix remains active.
+
+---
+
+## Architecture Modernization - Step 10 and Quality Gates Completion
+**Timestamp**: 2026-07-17T00:51:00Z
+**User Input**: "No new user input."
+**AI Response**: "Completed Step 10 and the blocking quality review. Corrected the final stale example import and added a repository-entrypoint architecture regression. Updated requirements, as-built application design, implementation summary, reproducible build/test instructions, release/support documentation, state, audit, and checklist. The owner architecture scores 9.3/10 overall: Ease of Change 9.4, Simplicity 9.1, Behavioural Tests 9.5, Clear Boundaries 9.2, Low Coupling 9.2, and Project Coherence 9.3."
+**Context**: CONSTRUCTION - Code Generation Part 2 complete and awaiting generated-code review. `PinchProblem` composition-hub and package over-splitting reviews are complete. Security and Resiliency are disabled (N/A); partial Property-Based Testing is compliant.
+
+---
+
+## Build and Test Stage - Package Architecture Modernization
+**Timestamp**: 2026-07-17T00:51:01Z
+**User Input**: "No new user input."
+**AI Response**: "Build and Test completed successfully. The final seeded non-solver suite passed 2,039 tests with four solver tests deselected; supported solver tests passed three with one explicit nine-stream live-benchmark skip. Coverage is 96.73% combined, 97.95% statements, and 92.79% branches. Ruff lint/format, warning-free Sphinx, ten notebook parses, HPR/HEN regressions, cold imports, retired-path scans, isolated 0.5.0 wheel/sdist builds, 326-entry artifact inspection, artifact smoke, 59 checkout-independent clean-wheel contract tests under warnings-as-errors, and patch hygiene passed. Test Gates score 9.6/10."
+**Context**: CONSTRUCTION - Build and Test complete. Generated files: build-instructions.md, unit-test-instructions.md, integration-test-instructions.md, performance-test-instructions.md, and build-and-test-summary.md under the package-architecture-modernization Build and Test directory. Operations is N/A because no deployment work was requested; generated code awaits explicit review.
+
+---

@@ -1,6 +1,11 @@
 Heat Exchanger Network Synthesis
 ================================
 
+.. warning::
+
+   HEN synthesis is an advanced unsupported internal workflow. Only
+   :func:`OpenPinch.main.pinch_analysis_service` is compatibility protected.
+
 Purpose
 -------
 
@@ -32,8 +37,9 @@ Runnable Workflow
 
 .. code-block:: python
 
-   from OpenPinch import PinchProblem
-   from OpenPinch.lib import HENDesignMethod
+   from OpenPinch.application.problem import PinchProblem
+   from OpenPinch.domain.enums import HENDesignMethod
+   from OpenPinch.presentation.network_grid.service import build_grid_diagram
 
    problem = PinchProblem(
        "Four-stream-Yee-and-Grossmann-1990-1.json",
@@ -43,7 +49,7 @@ Runnable Workflow
    design = problem.design.enhanced_synthesis_method(quality_tier=2)
    network = design.network
    period_id = network.period_ids[0]
-   diagram = network.build_grid_diagram(period_id=period_id)
+   diagram = build_grid_diagram(network, period_id=period_id)
 
 Explicit design-method accessors are also available:
 
@@ -64,20 +70,20 @@ Expected Output
 Successful synthesis stores a design result on ``TargetOutput.design`` and
 ``problem.results.design``. Inspect:
 
-- ``design.design_method`` for the requested public design service
+- ``design.design_method`` for the requested internal design service
 - ``design.manifest.method_sequence`` for executed task-level methods
 - ``design.network`` for the selected network
 - ``design.ranked_networks`` for ranked unique candidates
 - ``design.network.exchangers[0].state(period_id)`` for one match's operating
   duty, activity, approaches, split fractions, and temperatures
 - ``design.network.total_duty(period_id=period_id)`` for period duty totals
-- ``design.network.build_grid_diagram(period_id=period_id)`` for visual
+- ``build_grid_diagram(design.network, period_id=period_id)`` for visual
   topology inspection
 
 Interpretation
 --------------
 
-The public design accessor is problem-rooted. Persistent synthesis controls
+The internal design accessor is problem-rooted. Persistent synthesis controls
 belong in loaded ``TargetInput.options`` keys such as ``HENS_APPROACH_TEMPERATURES``,
 ``HENS_METHOD_SEQUENCE``, ``HENS_SYNTHESIS_QUALITY_TIER``, solver names,
 tolerance, output formats, and run id. Do not pass persistent design-space or
@@ -107,13 +113,13 @@ area calculations. Segment count therefore does not inflate physical stream,
 match, exchanger, or stage-position counts.
 
 HEN preparation carries ordered segment temperatures, cumulative duties,
-local heat-capacity flowrates, heat-transfer coefficients, and stable segment
+local heat-capacity flowrates, heat-transfer coefficients, and deterministic segment
 identities alongside the parent axes. Stage balances advance a cumulative
 parent heat coordinate and map that coordinate through the piecewise
 ``T(Q)`` profile. Pinch decomposition may clip or split the active profile,
 but it preserves the parent identity.
 
-The supported solver behavior is explicit:
+The current internal solver behavior is explicit:
 
 - APOPT and Couenne use interval-disjunctive piecewise mappings.
 - IPOPT uses active-segment refinement and repeats the continuous solve until
@@ -167,7 +173,7 @@ This separation is intentional: the Chen expression remains the accepted
 optimization baseline, while exact local LMTD areas remain authoritative for
 reported segmented exchangers. A possible future exact logarithmic-LMTD
 formulation is limited to the continuous NLP path and is not part of the
-current public behavior.
+current internal behavior.
 
 Migration and Support Notes
 ---------------------------
