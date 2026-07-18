@@ -1,58 +1,37 @@
 # Integration Test Instructions
 
-## Solver-Marked HEN Matrix
+## Process-Engineer Workflow Scenarios
+
+Run the architecture, package, documentation, notebook, and root workflow
+integration checks:
 
 ```bash
-uv run pytest -q -m synthesis
+uv run pytest -q tests/architecture tests/packaging tests/e2e/test_main.py
 ```
 
-Quality-audit result: 5 passed. The segmented cases cover APOPT PDM pinch
-clipping, TDM parent heat coordinates, isothermal and non-isothermal branches,
-post-solve total-cost verification, process/utility segment area contributions,
-and the IPOPT solve-or-actionable-rejection path.
+These tests verify:
 
-## Optional Surface Smoke Checks
+- package-root `PinchProblem` and `PinchWorkspace` imports;
+- explicit target, design, component, plot, report, and workspace interactions;
+- exact operation-manifest parity with all eighteen tutorials;
+- `HeatExchangerNetwork.model_dump(mode="json")` transport through
+  `TargetInput.network`;
+- workspace schema version 3 case-input persistence;
+- warning-free RTD source consistency and packaged resource inventory;
+- wheel and source-distribution package boundaries.
+
+## Installed-Artifact Scenario
+
+Build a wheel, install it with declared dependencies into a clean temporary
+environment, then run:
 
 ```bash
-uv run python scripts/optional_install_smoke.py notebook
-uv run python scripts/optional_install_smoke.py synthesis
+python scripts/artifact_install_smoke.py --repo-root /path/to/OpenPinch
 ```
 
-Notebook/resource structure tests passed (15 tests), and a structured
-segmented-input targeting example passed. The unrelated first-solve notebook
-edit made during initial verification was removed during the scope audit.
+Run the script outside the checkout. It must import from site-packages, solve a
+direct target, construct a workspace, expose exactly the two root workflow
+classes, find all packaged assets, and execute CLI help.
 
-## Documentation and Packaging
-
-```bash
-uv run sphinx-build -W -b html docs docs/_build/html
-uv run python scripts/build_dist.py --output-dir /tmp/openpinch-dist
-```
-
-Both the warning-free documentation build and wheel/source-distribution build passed.
-
-## Segmented Utility Cost Integration
-
-The segmented synthesis module exercises exact ordered utility costs for partial
-segment use, exact boundary use, boundary crossing, complete profile use, hot
-and cold utilities, local exchanger area slices, and the IPOPT active-segment
-solve-or-guidance path. It is included in the complete non-solver and
-solver-marked acceptance commands above.
-
-The complete notebook/resource, direct and indirect integration, HPR, packaging,
-and documentation tests are included in the 1,978-test non-solver result.
-
-## GitHub CI Heat-Pump Zero-Duty Follow-Up
-
-### Heat-Pump and Segmented-Profile Integration
-
-```bash
-uv run pytest -q --hypothesis-seed=20260715 \
-  tests/test_classes/test_simple_heat_pump_cycle.py \
-  tests/test_classes/test_cascade_heat_pump_cycle.py \
-  tests/test_classes/test_stream_segments.py
-```
-
-Verified result: 79 passed in 4.81 seconds. This covers process-duty
-classification, cascade collection union behavior, positive and negative
-duties, and strict segmented-profile invariants.
+Temporary build environments can be removed after verification; no service or
+database cleanup is required.

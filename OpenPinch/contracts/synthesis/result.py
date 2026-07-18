@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from ...domain.enums import HeatExchangerNetworkDesignMethod
 from ...domain.heat_exchanger_network import HeatExchangerNetwork
 from .common import (
     HeatExchangerNetworkSynthesisManifest,
-    SynthesisDesignMethod,
-    SynthesisMethod,
     _validate_non_negative_finite,
     _validate_optional_identity,
     _validate_run_id,
@@ -29,8 +28,8 @@ class HeatExchangerNetworkSynthesisResult(BaseModel):
     period_id: str | None = None
     solver_name: str | None = None
     solver_status: str | None = None
-    design_method: SynthesisDesignMethod | None = None
-    method: SynthesisMethod | None = None
+    design_method: HeatExchangerNetworkDesignMethod | None = None
+    method: HeatExchangerNetworkDesignMethod | None = None
     stage_count: int | None = None
     objective_values: dict[str, float] = Field(default_factory=dict)
     ranked_networks: tuple[HeatExchangerNetworkSynthesisTaskOutcome, ...] = Field(

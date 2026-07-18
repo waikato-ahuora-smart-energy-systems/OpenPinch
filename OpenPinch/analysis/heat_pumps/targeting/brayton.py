@@ -5,7 +5,7 @@ from typing import List, Tuple
 import numpy as np
 
 from ....contracts.hpr import HeatPumpTargetInputs
-from ....domain.enums import PT
+from ....domain.enums import ProblemTableLabel
 from ....domain.stream_collection import StreamCollection
 from ...targeting.cascade import get_process_heat_cascade
 from ..cycles.brayton_heat_pump import SimpleBraytonHeatPumpCycle
@@ -140,8 +140,11 @@ def _compute_brayton_hp_system_obj(
     )
 
     w_hpr = sum([hp.work_net for hp in hp_list])
-    c = (pt_gas_cooler[PT.H_NET][-1] + pt_gas_heater[PT.H_NET][0]) * 10
-    Q_ext = pt_gas_cooler[PT.H_NET][0]
+    c = (
+        pt_gas_cooler[ProblemTableLabel.H_NET][-1]
+        + pt_gas_heater[ProblemTableLabel.H_NET][0]
+    ) * 10
+    Q_ext = pt_gas_cooler[ProblemTableLabel.H_NET][0]
     Q_cool = np.array([hp.Q_cool for hp in hp_list])
     cop = (args.Q_hpr_target - Q_ext) / (w_hpr + 1e-9)
     Q_amb = 0.0

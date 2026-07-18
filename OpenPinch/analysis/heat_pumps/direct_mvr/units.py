@@ -106,10 +106,12 @@ def convert_value(value: float, source_unit: str, target_unit: str) -> float:
 def source_output_units(stream: Stream) -> DirectGasMVROutputUnits:
     """Derive public result units from the source stream's configured Values."""
     return DirectGasMVROutputUnits(
-        temperature=stream_value_unit(stream.t_supply, DEFAULT_TEMPERATURE_UNIT),
-        pressure=stream_value_unit(stream.p_supply, DEFAULT_PRESSURE_UNIT),
+        temperature=stream_value_unit(
+            stream.supply_temperature, DEFAULT_TEMPERATURE_UNIT
+        ),
+        pressure=stream_value_unit(stream.supply_pressure, DEFAULT_PRESSURE_UNIT),
         enthalpy=stream_value_unit(
-            stream.h_supply or stream.h_target,
+            stream.supply_enthalpy or stream.target_enthalpy,
             DEFAULT_ENTHALPY_UNIT,
         ),
         heat_flow=stream_value_unit(stream.heat_flow, DEFAULT_HEAT_FLOW_UNIT),

@@ -29,8 +29,8 @@ def _stream_collection() -> StreamCollection:
         collection.add(
             Stream(
                 name=spec["name"],
-                t_supply=spec["t_supply"],
-                t_target=spec["t_target"],
+                supply_temperature=spec["t_supply"],
+                target_temperature=spec["t_target"],
                 heat_flow=spec["heat_flow"],
                 is_process_stream=False,
             )
@@ -60,12 +60,11 @@ def _backend_payload(**updates) -> dict:
     return payload
 
 
-def test_hpr_parsed_state_supports_mapping_style_access():
+def test_hpr_parsed_state_supports_attributes_and_model_serialization():
     state = HPRParsedState(Q_amb_hot=1.5)
 
-    assert state["Q_amb_hot"] == pytest.approx(1.5)
-    assert state.get("Q_amb_hot") == pytest.approx(1.5)
-    assert state.get("missing", "fallback") == "fallback"
+    assert state.Q_amb_hot == pytest.approx(1.5)
+    assert state.model_dump()["Q_amb_hot"] == pytest.approx(1.5)
 
 
 def test_hpr_backend_result_projects_empty_artifacts_and_failure_state():
@@ -76,15 +75,10 @@ def test_hpr_backend_result_projects_empty_artifacts_and_failure_state():
     assert result.hpr_hot_streams is None
     assert result.hpr_cold_streams is None
     assert result.model is None
-    assert result["Q_ext"] == pytest.approx(7.0)
-    assert result["hpr_streams"] is None
-    assert result["hpr_hot_streams"] is None
-    assert result["hpr_cold_streams"] is None
-    assert result["model"] is None
-    assert result.get("missing", "fallback") == "fallback"
-    assert "Q_ext" in result
-    assert "obj" in result
-    assert 123 not in result
+    serialized = result.model_dump()
+    assert serialized["Q_ext_heat"] == pytest.approx(3.0)
+    assert serialized["Q_ext_cold"] == pytest.approx(4.0)
+    assert serialized["artifacts"] is None
 
     updated = result.with_updates(utility_tot=30.0)
     assert updated.utility_tot == pytest.approx(30.0)

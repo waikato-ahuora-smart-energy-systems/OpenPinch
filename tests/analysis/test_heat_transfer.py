@@ -235,6 +235,17 @@ def test_crossflow_unmixed_eff2_all_row_branches(rows, cmin_fluid):
     assert eff >= 0.0
 
 
+@pytest.mark.parametrize("rows", [0, -1, 1.5])
+def test_crossflow_unmixed_eff2_rejects_invalid_row_counts(rows):
+    with pytest.raises(ValueError, match="Rows must be a positive integer"):
+        hx.CrossflowUnmixedEff2(
+            Ntu=2.0,
+            c=0.5,
+            Rows=rows,
+            Cmin_fluid="Air",
+        )
+
+
 def test_hx_ntu_numerical_raises_when_not_converging(monkeypatch):
     monkeypatch.setattr(
         hx,

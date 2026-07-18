@@ -7,7 +7,7 @@ from hypothesis import assume, given, seed, settings
 from hypothesis import strategies as st
 
 from OpenPinch.contracts.input import StreamSegmentSchema
-from OpenPinch.domain.enums import ProblemTableLabel as PT
+from OpenPinch.domain.enums import ProblemTableLabel as ProblemTableLabel
 from OpenPinch.domain.heat_exchanger import HeatExchanger
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream import Stream
@@ -20,8 +20,8 @@ def test_heat_exchanger_normalizes_parent_owned_records_from_mappings() -> None:
         kind="recovery",
         source_stream="hot",
         sink_stream="cold",
-        source_stream_role="process",
-        sink_stream_role="process",
+        source_stream_role="Process",
+        sink_stream_role="Process",
         stage=1,
         period_states=[{"period_id": "base", "period_idx": 0, "duty": 10.0}],
         area=2.0,
@@ -73,11 +73,11 @@ def test_mapping_schema_and_owned_segment_normalization_are_equivalent(stream) -
     mappings = [
         {
             "name": segment.name,
-            "t_supply": float(segment.t_supply),
-            "t_target": float(segment.t_target),
+            "t_supply": float(segment.supply_temperature),
+            "t_target": float(segment.target_temperature),
             "heat_flow": float(segment.heat_flow),
-            "dt_cont": float(segment.dt_cont),
-            "htc": float(segment.htc),
+            "dt_cont": float(segment.delta_t_contribution),
+            "htc": float(segment.heat_transfer_coefficient),
         }
         for segment in stream.segments
     ]
@@ -101,8 +101,8 @@ def test_mapping_schema_and_owned_segment_normalization_are_equivalent(stream) -
         actual = np.asarray(
             [
                 [
-                    float(segment.t_supply),
-                    float(segment.t_target),
+                    float(segment.supply_temperature),
+                    float(segment.target_temperature),
                     float(segment.heat_flow),
                 ]
                 for segment in parent.segments
@@ -166,14 +166,16 @@ def test_problem_table_generated_interval_insertion_invariants(
     assume(ordered[-1] < candidate < ordered[0])
     assume(np.min(np.abs(ordered - candidate)) > 1e-6)
     heat = ordered * 2.0 + 7.0
-    table = ProblemTable({PT.T: ordered, PT.H_NET: heat})
+    table = ProblemTable({ProblemTableLabel.T: ordered, ProblemTableLabel.H_NET: heat})
     before = {float(t): float(h) for t, h in zip(ordered, heat)}
 
     assert table.insert_temperature_interval(candidate) == 1
     assert table.shape[0] == len(ordered) + 1
-    assert np.all(np.diff(table[PT.T]) < 0.0)
+    assert np.all(np.diff(table[ProblemTableLabel.T]) < 0.0)
     for temperature, original_heat in before.items():
-        index = int(np.flatnonzero(np.isclose(table[PT.T], temperature))[0])
-        assert table.loc[index, PT.H_NET] == original_heat
+        index = int(
+            np.flatnonzero(np.isclose(table[ProblemTableLabel.T], temperature))[0]
+        )
+        assert table.loc[index, ProblemTableLabel.H_NET] == original_heat
     assert table.insert_temperature_interval(candidate) == 0
     assert table.shape[0] == len(ordered) + 1

@@ -11,8 +11,8 @@ A `Stream` represents a thermal source or sink with:
 
 - supply and target temperatures
 - heat flow
-- heat-transfer information such as `htc`
-- temperature-approach assumptions such as `dt_cont`
+- heat-transfer information such as ``heat_transfer_coefficient``
+- temperature-approach assumptions such as ``delta_t_contribution``
 
 Process streams are the primary objects used to build direct pinch targets.
 Utility streams are used to model heating and cooling services explicitly when

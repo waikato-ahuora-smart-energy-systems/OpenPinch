@@ -6,7 +6,7 @@ from dataclasses import replace
 from time import perf_counter
 
 from ....contracts.synthesis.task import HeatExchangerNetworkSynthesisTask
-from ....domain.enums import HENDesignMethod
+from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ..execution.executor import LocalSynthesisExecutor, SynthesisExecutor
 from ..execution.pathways import (
     TierPathway,
@@ -41,8 +41,8 @@ def _execute_pinch_design_method_workflow(
     """Execute only the PDM method and collect validated method outputs."""
     method_settings = replace(
         settings,
-        method_sequence=("pinch_design_method",),
-        design_method=HENDesignMethod.PinchDesign,
+        method_sequence=(HeatExchangerNetworkDesignMethod.PinchDesign,),
+        design_method=HeatExchangerNetworkDesignMethod.PinchDesign,
     )
     start = perf_counter()
     tasks, outcomes = execute_pinch_design_method_stage(

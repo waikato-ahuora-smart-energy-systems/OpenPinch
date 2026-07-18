@@ -14,7 +14,7 @@ from ....contracts.input import (
     ZoneTreeSchema,
 )
 from ....domain.configuration import Configuration
-from ....domain.enums import ZT
+from ....domain.enums import ZoneType
 from ....domain.zone import Zone
 
 
@@ -79,14 +79,14 @@ def _get_validated_zone_info(
     if isinstance(zone_tree, ZoneTreeSchema):
         normalized_type = (zone_tree.type or "").strip()
         type_map = {
-            "Zone": ZT.P.value,
-            "Sub-Zone": ZT.P.value,
-            "Process Zone": ZT.P.value,
-            "Unit Operation": ZT.O.value,
-            "Site": ZT.S.value,
-            "Community": ZT.C.value,
-            "Region": ZT.R.value,
-            "Utility Zone": ZT.U.value,
+            "Zone": ZoneType.P.value,
+            "Sub-Zone": ZoneType.P.value,
+            "Process Zone": ZoneType.P.value,
+            "Unit Operation": ZoneType.O.value,
+            "Site": ZoneType.S.value,
+            "Community": ZoneType.C.value,
+            "Region": ZoneType.R.value,
+            "Utility Zone": ZoneType.U.value,
         }
         if normalized_type:
             try:
@@ -100,15 +100,15 @@ def _get_validated_zone_info(
 
         if not normalized_type or normalized_type == "Zone":
             if depth == 0:
-                zone_type = ZT.S.value
+                zone_type = ZoneType.S.value
             elif depth == 1:
-                zone_type = ZT.P.value
+                zone_type = ZoneType.P.value
             else:
-                zone_type = ZT.O.value
+                zone_type = ZoneType.O.value
 
         zone_name = zone_tree.name
     else:
-        zone_type = ZT.S.value
+        zone_type = ZoneType.S.value
         zone_name = project_name
     return zone_name, zone_type
 
@@ -235,7 +235,9 @@ def _rewrite_stream_zones_from_tree(
                 counter += 1
                 process_name = f"{base_name}_{counter}"
 
-            new_node = ZoneTreeSchema(name=process_name, type=ZT.P.value, children=None)
+            new_node = ZoneTreeSchema(
+                name=process_name, type=ZoneType.P.value, children=None
+            )
             zone_tree.children.append(new_node)
             root_child_names.add(process_name)
 
@@ -269,7 +271,7 @@ def _validate_zone_tree_structure(
 ) -> ZoneTreeSchema:
     """Normalise a provided zone tree or synthesise one from stream zone paths."""
     if isinstance(zone_tree, ZoneTreeSchema):
-        if zone_tree.type == ZT.U.value:
+        if zone_tree.type == ZoneType.U.value:
             raise ValueError("Pinch analysis does not apply to Utility Zones.")
 
         def _check_zone_tree(
@@ -297,9 +299,9 @@ def _validate_zone_tree_structure(
         return zone_tree
 
     if not isinstance(top_zone_name, str):
-        top_zone_name = ZT.S.value
+        top_zone_name = ZoneType.S.value
 
-    root = {"name": top_zone_name, "type": ZT.S.value, "children": {}}
+    root = {"name": top_zone_name, "type": ZoneType.S.value, "children": {}}
     stream_iter = [stream for stream in (streams or []) if stream.zone]
 
     def _split_zone_name(name: str):
@@ -322,7 +324,7 @@ def _validate_zone_tree_structure(
             if zone_name not in current["children"]:
                 current["children"][zone_name] = {
                     "name": zone_name,
-                    "type": ZT.P.value,
+                    "type": ZoneType.P.value,
                     "children": {},
                 }
             current = current["children"][zone_name]
@@ -335,7 +337,7 @@ def _validate_zone_tree_structure(
 
         current["children"][operation_zone_name] = {
             "name": operation_zone_name,
-            "type": ZT.O.value,
+            "type": ZoneType.O.value,
             "children": {},
         }
         stream.zone = _build_full_path(path_components, operation_zone_name)

@@ -32,9 +32,6 @@ from OpenPinch.analysis.heat_exchanger_networks.execution.fake_executor import (
 from OpenPinch.analysis.heat_exchanger_networks.execution.pathways import (
     pathways_from_metadata,
 )
-from OpenPinch.analysis.heat_exchanger_networks.execution.settings import (
-    SynthesisWorkflowSettings,
-)
 from OpenPinch.analysis.heat_exchanger_networks.models._stagewise import (
     verification as stagewise_verification,
 )
@@ -55,9 +52,6 @@ from OpenPinch.analysis.heat_exchanger_networks.solver import (
 from OpenPinch.analysis.heat_exchanger_networks.targeting import (
     network_evolution_method as evolution,
 )
-from OpenPinch.analysis.heat_exchanger_networks.targeting import (
-    open_hens_method,
-)
 from OpenPinch.analysis.heat_exchanger_networks.targeting.topology import (
     canonical_stage_count,
     canonical_topology_restrictions,
@@ -74,7 +68,7 @@ from OpenPinch.contracts.synthesis.task import (
 from OpenPinch.domain._heat_exchanger.period_state import HeatExchangerPeriodState
 from OpenPinch.domain.enums import (
     HeatExchangerKind,
-    HeatExchangerStreamRole,
+    StreamID,
 )
 from OpenPinch.domain.heat_exchanger import HeatExchanger
 from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
@@ -261,8 +255,8 @@ def test_export_ranking_and_result_summary_edge_paths(monkeypatch, tmp_path: Pat
                 kind=HeatExchangerKind.RECOVERY,
                 source_stream="H1",
                 sink_stream="C1",
-                source_stream_role=HeatExchangerStreamRole.PROCESS,
-                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Process,
                 stage=1,
                 period_states=(
                     HeatExchangerPeriodState(period_id="base", period_idx=0, duty=10.0),
@@ -529,29 +523,6 @@ def test_topology_helpers_handle_empty_restrictions():
     assert canonical_topology_restrictions(()) == ()
     with pytest.raises(ValueError, match="at least one match"):
         canonical_stage_count(())
-
-
-def test_open_hens_rejects_modified_method_sequence():
-    settings = SynthesisWorkflowSettings(
-        run_id="open-hens",
-        approach_temperatures=(10.0,),
-        derivative_thresholds=(0.5,),
-        stage_selection=(1,),
-        method_sequence=("pinch_design_method", "network_evolution_method"),
-        output_formats=(),
-        solve_tolerance=1e-3,
-        best_solutions_to_save=1,
-        max_parallel=1,
-        pdm_solver="couenne",
-        tdm_solver="couenne",
-        pdm_solver_options={},
-        tdm_solver_options={},
-        evm_solver="ipopt",
-        evm_solver_options={},
-    )
-
-    with pytest.raises(WorkflowContractError, match="must preserve"):
-        open_hens_method.execute_open_hens_method(object(), settings)
 
 
 def test_internal_problem_error_and_pdm_print_paths():

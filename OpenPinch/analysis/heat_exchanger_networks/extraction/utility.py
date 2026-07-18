@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ....domain.enums import HeatExchangerKind, HeatExchangerStreamRole
+from ....domain.enums import HeatExchangerKind, StreamID
 from ....domain.heat_exchanger import HeatExchanger
 from .metadata import _allowed, _index, _optional_float, _optional_int
 from .period_state import _cold_utility_period_state, _hot_utility_period_state
@@ -54,8 +54,8 @@ def _hot_utility_exchangers(
                 kind=HeatExchangerKind.HOT_UTILITY,
                 source_stream=hot_utility,
                 sink_stream=cold_stream,
-                source_stream_role=HeatExchangerStreamRole.UTILITY,
-                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                source_stream_role=StreamID.Utility,
+                sink_stream_role=StreamID.Process,
                 period_states=states,
                 area=area,
                 segment_area_contributions=segment_contributions,
@@ -112,8 +112,8 @@ def _cold_utility_exchangers(
                 kind=HeatExchangerKind.COLD_UTILITY,
                 source_stream=hot_stream,
                 sink_stream=cold_utility,
-                source_stream_role=HeatExchangerStreamRole.PROCESS,
-                sink_stream_role=HeatExchangerStreamRole.UTILITY,
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Utility,
                 period_states=states,
                 area=area,
                 segment_area_contributions=segment_contributions,

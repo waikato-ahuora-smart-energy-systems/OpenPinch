@@ -76,23 +76,87 @@ class Stream:
         "_rcp_prod",
         "_t_entr_mean",
     )
-    _MUTABLE_VALUE_ATTRS = frozenset(
-        attr.lstrip("_") for attr in _CORE_VALUE_ATTRS
-    ) | frozenset(_CORE_VALUE_ATTRS)
+    _PUBLIC_VALUE_ATTRS = {
+        "supply_temperature": "_t_supply",
+        "target_temperature": "_t_target",
+        "supply_pressure": "_p_supply",
+        "target_pressure": "_p_target",
+        "supply_enthalpy": "_h_supply",
+        "target_enthalpy": "_h_target",
+        "delta_t_contribution": "_dt_cont",
+        "heat_flow": "_heat_flow",
+        "heat_transfer_coefficient": "_htc",
+        "price": "_price",
+        "effective_delta_t_contribution": "_dt_cont_act",
+        "minimum_temperature": "_t_min",
+        "maximum_temperature": "_t_max",
+        "shifted_minimum_temperature": "_t_min_star",
+        "shifted_maximum_temperature": "_t_max_star",
+        "heat_capacity_flowrate": "_cp",
+        "heat_transfer_resistance": "_htr",
+        "utility_cost": "_cost",
+        "resistance_capacity_product": "_rcp_prod",
+        "entropic_mean_temperature": "_t_entr_mean",
+    }
+    _PUBLIC_ATTRS = {
+        **_PUBLIC_VALUE_ATTRS,
+        "name": "_name",
+        "is_process_stream": "_is_process_stream",
+        "fluid_name": "_fluid_name",
+        "fluid_phase": "_fluid_phase",
+        "num_periods": "_num_periods",
+        "stream_type": "_type",
+        "is_active": "_active",
+        "delta_t_contribution_multiplier": "_dt_cont_multiplier",
+        "delta_t_contribution_multiplier_locked": "_dt_cont_multiplier_locked",
+    }
+    _RETIRED_PUBLIC_ATTRS = frozenset(
+        {
+            "t_supply",
+            "t_target",
+            "p_supply",
+            "p_target",
+            "h_supply",
+            "h_target",
+            "dt_cont",
+            "dt_cont_act",
+            "dt_cont_multiplier",
+            "dt_cont_multiplier_locked",
+            "htc",
+            "htr",
+            "ut_cost",
+            "CP",
+            "rCP",
+            "t_min",
+            "t_max",
+            "t_min_star",
+            "t_max_star",
+            "t_entr_mean",
+            "type",
+            "active",
+        }
+    )
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name in self._RETIRED_PUBLIC_ATTRS:
+            raise AttributeError(
+                f"Stream has no attribute {name!r}; use the descriptive runtime name."
+            )
+        super().__setattr__(name, value)
 
     def __init__(
         self,
         name: str = "Stream",
-        t_supply: Optional[MaybeVU] = None,
-        t_target: Optional[MaybeVU] = None,
-        p_supply: Optional[MaybeVU] = None,
-        p_target: Optional[MaybeVU] = None,
-        h_supply: Optional[MaybeVU] = None,
-        h_target: Optional[MaybeVU] = None,
-        dt_cont: MaybeVU = 0.0,
-        dt_cont_multiplier: float = 1.0,
+        supply_temperature: Optional[MaybeVU] = None,
+        target_temperature: Optional[MaybeVU] = None,
+        supply_pressure: Optional[MaybeVU] = None,
+        target_pressure: Optional[MaybeVU] = None,
+        supply_enthalpy: Optional[MaybeVU] = None,
+        target_enthalpy: Optional[MaybeVU] = None,
+        delta_t_contribution: MaybeVU = 0.0,
+        delta_t_contribution_multiplier: float = 1.0,
         heat_flow: MaybeVU = 0.0,
-        htc: MaybeVU = 1.0,
+        heat_transfer_coefficient: MaybeVU = 1.0,
         price: Optional[MaybeVU] = None,
         is_process_stream: bool = True,
         fluid_name: Optional[str] = None,
@@ -108,7 +172,7 @@ class Stream:
         self._fluid_phase = self._normalise_fluid_phase(fluid_phase)
         self._active = True
         self._dt_cont_multiplier_locked = False
-        self._dt_cont_multiplier = float(dt_cont_multiplier or 1.0)
+        self._dt_cont_multiplier = float(delta_t_contribution_multiplier or 1.0)
         self._numeric_revision = 0
 
         self._period_ids: dict[str, int] | None = None
@@ -138,16 +202,26 @@ class Stream:
         self._cost: Value | None = None
         self._rcp_prod: Value | None = None
 
-        self.set_value_attr("_t_supply", t_supply, update_derived=False)
-        self.set_value_attr("_t_target", t_target, update_derived=False)
-        self.set_value_attr("_p_supply", p_supply, update_derived=False)
-        self.set_value_attr("_p_target", p_target, update_derived=False)
-        self.set_value_attr("_h_supply", h_supply, update_derived=False)
-        self.set_value_attr("_h_target", h_target, update_derived=False)
-        self.set_value_attr("_dt_cont", dt_cont, update_derived=False)
-        self.set_value_attr("_heat_flow", heat_flow, update_derived=False)
-        self.set_value_attr("_htc", htc, update_derived=False)
-        self.set_value_attr("_price", price, update_derived=False)
+        self.set_value_attr(
+            "supply_temperature", supply_temperature, update_derived=False
+        )
+        self.set_value_attr(
+            "target_temperature", target_temperature, update_derived=False
+        )
+        self.set_value_attr("supply_pressure", supply_pressure, update_derived=False)
+        self.set_value_attr("target_pressure", target_pressure, update_derived=False)
+        self.set_value_attr("supply_enthalpy", supply_enthalpy, update_derived=False)
+        self.set_value_attr("target_enthalpy", target_enthalpy, update_derived=False)
+        self.set_value_attr(
+            "delta_t_contribution", delta_t_contribution, update_derived=False
+        )
+        self.set_value_attr("heat_flow", heat_flow, update_derived=False)
+        self.set_value_attr(
+            "heat_transfer_coefficient",
+            heat_transfer_coefficient,
+            update_derived=False,
+        )
+        self.set_value_attr("price", price, update_derived=False)
         self._validate_num_periods()
         self._calculate_missing_properties()
         self.update_derived_properties()
@@ -218,7 +292,7 @@ class Stream:
         return len(self._segments)
 
     @property
-    def type(self) -> Optional[str]:
+    def stream_type(self) -> Optional[str]:
         """Stream type (Hot, Cold, Both)."""
         return self._type
 
@@ -236,80 +310,80 @@ class Stream:
         return self._weights
 
     @property
-    def t_supply(self) -> Optional[Value]:
+    def supply_temperature(self) -> Optional[Value]:
         """Supply temperature (e.g., degC)."""
         return self._t_supply
 
-    @t_supply.setter
-    def t_supply(self, value):
-        self.set_value_attr("_t_supply", value)
+    @supply_temperature.setter
+    def supply_temperature(self, value):
+        self.set_value_attr("supply_temperature", value)
 
     @property
-    def t_target(self) -> Optional[Value]:
+    def target_temperature(self) -> Optional[Value]:
         """Target temperature (e.g., degC)."""
         return self._t_target
 
-    @t_target.setter
-    def t_target(self, value):
-        self.set_value_attr("_t_target", value)
+    @target_temperature.setter
+    def target_temperature(self, value):
+        self.set_value_attr("target_temperature", value)
 
     @property
-    def p_supply(self) -> Optional[Value]:
+    def supply_pressure(self) -> Optional[Value]:
         """Supply pressure (e.g., kPa)."""
         return self._p_supply
 
-    @p_supply.setter
-    def p_supply(self, value):
-        self.set_value_attr("_p_supply", value)
+    @supply_pressure.setter
+    def supply_pressure(self, value):
+        self.set_value_attr("supply_pressure", value)
 
     @property
-    def p_target(self) -> Optional[Value]:
+    def target_pressure(self) -> Optional[Value]:
         """Target pressure (e.g., kPa)."""
         return self._p_target
 
-    @p_target.setter
-    def p_target(self, value):
-        self.set_value_attr("_p_target", value)
+    @target_pressure.setter
+    def target_pressure(self, value):
+        self.set_value_attr("target_pressure", value)
 
     @property
-    def h_supply(self) -> Optional[Value]:
+    def supply_enthalpy(self) -> Optional[Value]:
         """Supply enthalpy (e.g., kJ/kg)."""
         return self._h_supply
 
-    @h_supply.setter
-    def h_supply(self, value):
-        self.set_value_attr("_h_supply", value)
+    @supply_enthalpy.setter
+    def supply_enthalpy(self, value):
+        self.set_value_attr("supply_enthalpy", value)
 
     @property
-    def h_target(self) -> Optional[Value]:
+    def target_enthalpy(self) -> Optional[Value]:
         """Target enthalpy (e.g., kJ/kg)."""
         return self._h_target
 
-    @h_target.setter
-    def h_target(self, value):
-        self.set_value_attr("_h_target", value)
+    @target_enthalpy.setter
+    def target_enthalpy(self, value):
+        self.set_value_attr("target_enthalpy", value)
 
     @property
-    def dt_cont(self) -> Value:
+    def delta_t_contribution(self) -> Value:
         """Preserved base delta-T contribution before any zone multiplier."""
         return self._dt_cont
 
-    @dt_cont.setter
-    def dt_cont(self, value):
-        self.set_value_attr("_dt_cont", value)
+    @delta_t_contribution.setter
+    def delta_t_contribution(self, value):
+        self.set_value_attr("delta_t_contribution", value)
 
     @property
-    def dt_cont_act(self) -> Value:
+    def effective_delta_t_contribution(self) -> Value:
         """Effective delta-T contribution used in shifted-temperature calculations."""
         return self._dt_cont_act
 
     @property
-    def dt_cont_multiplier(self) -> float:
+    def delta_t_contribution_multiplier(self) -> float:
         """Effective delta-T contribution used in shifted-temperature calculations."""
         return self._dt_cont_multiplier
 
-    @dt_cont_multiplier.setter
-    def dt_cont_multiplier(self, value: float):
+    @delta_t_contribution_multiplier.setter
+    def delta_t_contribution_multiplier(self, value: float):
         """Set the effective shifted-temperature contribution in active use."""
         if not self._dt_cont_multiplier_locked:
             self._dt_cont_multiplier = float(value)
@@ -320,17 +394,18 @@ class Stream:
             self.update_derived_properties()
         else:
             warnings.warn(
-                "Attempted to change dt_cont_multiplier, but it is locked. "
+                "Attempted to change delta_t_contribution_multiplier, but it is "
+                "locked. "
                 "No changes were made."
             )
 
     @property
-    def dt_cont_multiplier_locked(self) -> bool:
+    def delta_t_contribution_multiplier_locked(self) -> bool:
         """Whether the delta-T contribution multiplier is locked against changes."""
         return self._dt_cont_multiplier_locked
 
-    @dt_cont_multiplier_locked.setter
-    def dt_cont_multiplier_locked(self, value: bool):
+    @delta_t_contribution_multiplier_locked.setter
+    def delta_t_contribution_multiplier_locked(self, value: bool):
         """Lock or unlock the delta-T contribution multiplier."""
         self._dt_cont_multiplier_locked = bool(value)
 
@@ -341,19 +416,19 @@ class Stream:
 
     @heat_flow.setter
     def heat_flow(self, value):
-        self.set_value_attr("_heat_flow", value)
+        self.set_value_attr("heat_flow", value)
 
     @property
-    def htc(self) -> float:
+    def heat_transfer_coefficient(self) -> Value:
         """Heat transfer coefficient (e.g., kW/m^2/K)."""
         return self._htc
 
-    @htc.setter
-    def htc(self, value):
-        self.set_value_attr("_htc", value)
+    @heat_transfer_coefficient.setter
+    def heat_transfer_coefficient(self, value):
+        self.set_value_attr("heat_transfer_coefficient", value)
 
     @property
-    def htr(self) -> Optional[Value]:
+    def heat_transfer_resistance(self) -> Optional[Value]:
         """Heat transfer resistance (e.g., m^2.K/kW)."""
         return self._copy_value(self._htr)
 
@@ -364,30 +439,30 @@ class Stream:
 
     @price.setter
     def price(self, value):
-        self.set_value_attr("_price", value)
+        self.set_value_attr("price", value)
 
     @property
-    def ut_cost(self) -> Optional[Value]:
+    def utility_cost(self) -> Optional[Value]:
         """Utility cost (e.g., $/y)."""
         return self._copy_value(self._cost)
 
     @property
-    def CP(self) -> Optional[Value]:
+    def heat_capacity_flowrate(self) -> Optional[Value]:
         """Heat capacity flowrate (e.g., kW/K)."""
         return self._copy_value(self._cp)
 
     @property
-    def rCP(self) -> Optional[Value]:
+    def resistance_capacity_product(self) -> Optional[Value]:
         """Resistance-capacity product (1/heat transfer rate)."""
         return self._copy_value(self._rcp_prod)
 
     @property
-    def active(self) -> bool:
+    def is_active(self) -> bool:
         """Whether the stream is active in analysis."""
         return self._active
 
-    @active.setter
-    def active(self, value: bool):
+    @is_active.setter
+    def is_active(self, value: bool):
         """Activate or deactivate the stream for downstream analysis."""
         self._active = bool(value)
         for segment in self._segments:
@@ -398,136 +473,29 @@ class Stream:
     # === Computed Temperature Properties ===
 
     @property
-    def t_min(self) -> Optional[Value]:
+    def minimum_temperature(self) -> Optional[Value]:
         """Minimum temperature (supply or target depending on hot/cold)."""
         return self._copy_value(self._t_min)
 
     @property
-    def t_max(self) -> Optional[Value]:
+    def maximum_temperature(self) -> Optional[Value]:
         """Maximum temperature (supply or target depending on hot/cold)."""
         return self._copy_value(self._t_max)
 
     @property
-    def t_min_star(self) -> Optional[Value]:
+    def shifted_minimum_temperature(self) -> Optional[Value]:
         """Shifted minimum temperature."""
         return self._copy_value(self._t_min_star)
 
     @property
-    def t_max_star(self) -> Optional[Value]:
+    def shifted_maximum_temperature(self) -> Optional[Value]:
         """Shifted maximum temperature."""
         return self._copy_value(self._t_max_star)
 
     @property
-    def t_entr_mean(self) -> Optional[Value]:
+    def entropic_mean_temperature(self) -> Optional[Value]:
         """Entropic mean temperature of supply and target temperatures."""
         return self._copy_value(self._t_entr_mean)
-
-    # === Readable Alias Properties ===
-
-    @property
-    def stream_type(self) -> Optional[str]:
-        """Alias for the stream thermal type."""
-        return self.type
-
-    @property
-    def is_active(self) -> bool:
-        """Alias for whether the stream participates in analysis."""
-        return self.active
-
-    @is_active.setter
-    def is_active(self, value: bool):
-        """Activate or deactivate the stream via a descriptive alias."""
-        self.active = value
-
-    @property
-    def supply_temperature(self) -> Optional[Value]:
-        """Alias for the supply temperature."""
-        return self.t_supply
-
-    @property
-    def target_temperature(self) -> Optional[Value]:
-        """Alias for the target temperature."""
-        return self.t_target
-
-    @property
-    def minimum_temperature(self) -> Optional[Value]:
-        """Alias for the minimum stream temperature."""
-        return self.t_min
-
-    @property
-    def maximum_temperature(self) -> Optional[Value]:
-        """Alias for the maximum stream temperature."""
-        return self.t_max
-
-    @property
-    def shifted_minimum_temperature(self) -> Optional[Value]:
-        """Alias for the shifted minimum stream temperature."""
-        return self.t_min_star
-
-    @property
-    def entropic_mean_temperature(self) -> Optional[Value]:
-        """Alias for the entropic mean temperature."""
-        return self.t_entr_mean
-
-    @property
-    def shifted_maximum_temperature(self) -> Optional[Value]:
-        """Alias for the shifted maximum stream temperature."""
-        return self.t_max_star
-
-    @property
-    def supply_pressure(self) -> Optional[Value]:
-        """Alias for the supply pressure."""
-        return self.p_supply
-
-    @property
-    def target_pressure(self) -> Optional[Value]:
-        """Alias for the target pressure."""
-        return self.p_target
-
-    @property
-    def supply_enthalpy(self) -> Optional[Value]:
-        """Alias for the supply enthalpy."""
-        return self.h_supply
-
-    @property
-    def target_enthalpy(self) -> Optional[Value]:
-        """Alias for the target enthalpy."""
-        return self.h_target
-
-    @property
-    def delta_t_contribution(self) -> Value:
-        """Alias for the base shifted-temperature contribution."""
-        return self.dt_cont
-
-    @property
-    def delta_t_contribution_multiplier(self) -> float:
-        """Alias for the shifted-temperature contribution multiplier."""
-        return self.dt_cont_multiplier
-
-    @property
-    def effective_delta_t_contribution(self) -> Value:
-        """Alias for the effective shifted-temperature contribution."""
-        return self.dt_cont_act
-
-    @property
-    def heat_transfer_coefficient(self) -> Value:
-        """Alias for the heat transfer coefficient."""
-        return self.htc
-
-    @property
-    def heat_transfer_resistance(self) -> Optional[Value]:
-        """Alias for the heat-transfer resistance."""
-        return self.htr
-
-    @property
-    def utility_cost(self) -> Optional[Value]:
-        """Alias for the derived utility cost."""
-        return self.ut_cost
-
-    @property
-    def resistance_capacity_product(self) -> Optional[Value]:
-        """Alias for the stream resistance-capacity product."""
-        return self.rCP
 
     # === Methods ===
 
@@ -543,7 +511,7 @@ class Stream:
             and not self._syncing_segments
             and internal_name in {"_dt_cont", "_price"}
         ):
-            self._update_all_segments_value_attr(internal_name, value)
+            self._update_all_segments_value_attr(attr_name, value)
             return
         if (
             self.has_segments
@@ -620,7 +588,7 @@ class Stream:
             and not self._syncing_segments
             and internal_name in {"_dt_cont", "_price"}
         ):
-            self._update_all_segments_value_attr(internal_name, value, idx=idx)
+            self._update_all_segments_value_attr(attr_name, value, idx=idx)
             return
         if (
             self.has_segments
@@ -650,7 +618,7 @@ class Stream:
             )
 
         current[idx if current.num_periods > 1 else 0] = value
-        self.set_value_attr(
+        self._set_internal_value_attr(
             internal_name,
             current,
             update_derived=update_derived,
@@ -873,11 +841,11 @@ class Stream:
         segment_kwargs = {
             key: common[key]
             for key in (
-                "p_supply",
-                "p_target",
-                "dt_cont",
-                "dt_cont_multiplier",
-                "htc",
+                "supply_pressure",
+                "target_pressure",
+                "delta_t_contribution",
+                "delta_t_contribution_multiplier",
+                "heat_transfer_coefficient",
                 "price",
                 "is_process_stream",
                 "fluid_name",
@@ -888,8 +856,8 @@ class Stream:
         segments = [
             _StreamSegment(
                 name=spec.name,
-                t_supply=spec.t_supply,
-                t_target=spec.t_target,
+                supply_temperature=spec.t_supply,
+                target_temperature=spec.t_target,
                 heat_flow=spec.heat_flow,
                 segment_index=spec.segment_index,
                 **segment_kwargs,
@@ -945,13 +913,28 @@ class Stream:
                 self._read_only_value(value)
 
     def _resolve_attr_name(self, attr_name: str) -> str:
-        if attr_name in self._MUTABLE_VALUE_ATTRS:
-            return attr_name if attr_name.startswith("_") else f"_{attr_name}"
-        if hasattr(self, attr_name):
-            return attr_name
-        if hasattr(self, f"_{attr_name}"):
-            return f"_{attr_name}"
+        if attr_name in self._PUBLIC_ATTRS:
+            return self._PUBLIC_ATTRS[attr_name]
         raise AttributeError(f"Stream has no attribute {attr_name!r}.")
+
+    def _set_internal_value_attr(
+        self,
+        internal_name: str,
+        value: float | Value | np.ndarray | Mapping | None,
+        *,
+        update_derived: bool = True,
+    ) -> None:
+        public_name = next(
+            (
+                name
+                for name, candidate in self._PUBLIC_VALUE_ATTRS.items()
+                if candidate == internal_name
+            ),
+            None,
+        )
+        if public_name is None:
+            raise AttributeError(f"Stream has no mutable state {internal_name!r}.")
+        self.set_value_attr(public_name, value, update_derived=update_derived)
 
     @staticmethod
     def _is_period_value_data(value: Mapping) -> bool:

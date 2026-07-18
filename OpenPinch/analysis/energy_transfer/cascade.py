@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 
 from ...domain.configuration import tol
-from ...domain.enums import PT
+from ...domain.enums import ProblemTableLabel
 from ...domain.problem_table import ProblemTable
 from .serialization import _as_float_array, _clean_array, _decimal_places
 
@@ -20,9 +20,11 @@ def compile_temperature_intervals(
     base_table: ProblemTable | None,
 ) -> np.ndarray:
     """Return the descending union of all source temperature grids."""
-    arrays = [_as_float_array(record["pt"][PT.T]) for record in source_records]
+    arrays = [
+        _as_float_array(record["pt"][ProblemTableLabel.T]) for record in source_records
+    ]
     if base_table is not None:
-        arrays.append(_as_float_array(base_table[PT.T]))
+        arrays.append(_as_float_array(base_table[ProblemTableLabel.T]))
     arrays = [array for array in arrays if array.size]
     if not arrays:
         return np.array([], dtype=float)
@@ -48,20 +50,20 @@ def transpose_operation_cascades(
     delta_t = common_upper - common_lower
     for row, record in enumerate(source_records):
         table = record["pt"]
-        source_t = _as_float_array(table[PT.T])
-        h_net = _as_float_array(table[PT.H_NET])
+        source_t = _as_float_array(table[ProblemTableLabel.T])
+        h_net = _as_float_array(table[ProblemTableLabel.H_NET])
         cascades[row, 0] = h_net[0] if h_net.size else 0.0
         if source_t.size < 2 or h_net.size < 2:
             cascades[row] = cascades[row, 0]
             continue
-        if not has_problem_table_values(table, PT.CP_NET):
+        if not has_problem_table_values(table, ProblemTableLabel.CP_NET):
             source_heat = interp_descending_temperature(common_upper, source_t, h_net)
             sink_heat = interp_descending_temperature(common_lower, source_t, h_net)
             interval_heat[row] = sink_heat - source_heat
             cascades[row, 1:] = cascades[row, 0] + np.cumsum(interval_heat[row])
             continue
 
-        cp_net = _as_float_array(table[PT.CP_NET])
+        cp_net = _as_float_array(table[ProblemTableLabel.CP_NET])
         source_upper = source_t[:-1]
         source_lower = source_t[1:]
         active = (common_upper[:, np.newaxis] <= source_upper[np.newaxis, :] + tol) & (
@@ -259,7 +261,7 @@ def empty_header(name: str, mode: str) -> dict[str, Any]:
     }
 
 
-def has_problem_table_values(table: ProblemTable, column: PT) -> bool:
+def has_problem_table_values(table: ProblemTable, column: ProblemTableLabel) -> bool:
     try:
         values = _as_float_array(table[column])
     except KeyError, TypeError, ValueError:

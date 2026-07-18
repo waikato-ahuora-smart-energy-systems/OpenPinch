@@ -8,7 +8,7 @@ from ....analysis.graphs.composite import clean_composite_curve
 from ....analysis.numerics import delta_vals, linear_interpolation
 from ....contracts.hpr import HeatPumpTargetInputs
 from ....domain.configuration import Configuration, tol
-from ....domain.enums import PT
+from ....domain.enums import ProblemTableLabel
 from ....domain.problem_table import ProblemTable
 from ....domain.stream import Stream
 from ....domain.stream_collection import StreamCollection
@@ -172,16 +172,16 @@ def _create_stream_collection_of_background_profile(
         if dh_vals[i] > tol:
             s.add(
                 Stream(
-                    t_supply=T_vals[i + 1],
-                    t_target=T_vals[i],
+                    supply_temperature=T_vals[i + 1],
+                    target_temperature=T_vals[i],
                     heat_flow=dh_vals[i],
                 )
             )
         elif -dh_vals[i] > tol:
             s.add(
                 Stream(
-                    t_supply=T_vals[i],
-                    t_target=T_vals[i + 1],
+                    supply_temperature=T_vals[i],
+                    target_temperature=T_vals[i + 1],
                     heat_flow=-dh_vals[i],
                 )
             )
@@ -279,15 +279,15 @@ def _add_T_amb_interval(
     dt_phase_change: float,
     is_cold: bool,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    H_label = PT.H_NET_COLD if is_cold else PT.H_NET_HOT
-    pt = ProblemTable({PT.T: T_vals, H_label: H_vals})
+    H_label = ProblemTableLabel.H_NET_COLD if is_cold else ProblemTableLabel.H_NET_HOT
+    pt = ProblemTable({ProblemTableLabel.T: T_vals, H_label: H_vals})
     T_amb_ls = (
         [T_amb, T_amb + dt_phase_change]
         if is_cold
         else [T_amb, T_amb - dt_phase_change]
     )
     pt.insert_temperature_interval(T_amb_ls)
-    return pt[PT.T], pt[H_label]
+    return pt[ProblemTableLabel.T], pt[H_label]
 
 
 def _extend_profile_with_temperature_margin(

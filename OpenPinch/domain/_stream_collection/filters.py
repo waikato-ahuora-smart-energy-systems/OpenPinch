@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from copy import copy
 
-from ..enums import ST
+from ..enums import StreamType
 
 
 def build_stream_subset(
@@ -32,7 +32,7 @@ def build_stream_subset(
     for key, stream in collection._streams.items():
         if stream.is_process_stream:
             if include_process_streams and (
-                target_type is None or stream.type == target_type
+                target_type is None or stream.stream_type == target_type
             ):
                 subset._streams[key] = stream
             continue
@@ -40,14 +40,16 @@ def build_stream_subset(
             continue
         if invert_utility:
             opposite_type = (
-                ST.Cold.value if target_type == ST.Hot.value else ST.Hot.value
+                StreamType.Cold.value
+                if target_type == StreamType.Hot.value
+                else StreamType.Hot.value
             )
-            if stream.type != opposite_type:
+            if stream.stream_type != opposite_type:
                 continue
             inverted_stream = copy(stream)
             inverted_stream.invert()
             subset._streams[key] = inverted_stream
-        elif target_type is None or stream.type == target_type:
+        elif target_type is None or stream.stream_type == target_type:
             subset._streams[key] = stream
 
     if sort_attr is None:

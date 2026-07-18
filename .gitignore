@@ -230,3 +230,5 @@ plans/
 # This approved AI-DLC checklist is project documentation, not solver output.
 !aidlc-docs/construction/plans/
 !aidlc-docs/construction/plans/package-architecture-modernization-code-generation-plan.md
+!aidlc-docs/construction/plans/residual-compatibility-shims-code-generation-plan.md
+!aidlc-docs/construction/plans/post-implementation-import-type-fixes-code-generation-plan.md

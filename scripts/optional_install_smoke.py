@@ -38,10 +38,10 @@ def _exercise_cli_help() -> None:
 
 def _check_core_surface() -> None:
     import OpenPinch
+    from OpenPinch import PinchProblem
     from OpenPinch.analysis.heat_pumps.cycles.brayton_heat_pump import (
         SimpleBraytonHeatPumpCycle,
     )
-    from OpenPinch.application.problem import PinchProblem
     from OpenPinch.presentation.dashboard import dependencies as dashboard_dependencies
     from OpenPinch.presentation.graphs.simple import graph_simple_cc_plot
 

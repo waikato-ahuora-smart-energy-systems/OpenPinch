@@ -60,15 +60,15 @@ def collection_to_dict(
             "segment_identity": segment_identity,
             "name": stream.name,
             "category": collection._dict_category(stream),
-            "type": stream.type,
+            "type": stream.stream_type,
             "is_process_stream": stream.is_process_stream,
             "t_supply": collection._value_at_idx(stream._t_supply, idx),
             "t_target": collection._value_at_idx(stream._t_target, idx),
             "heat_flow": collection._value_at_idx(stream._heat_flow, idx),
             "dt_cont": collection._value_at_idx(stream._dt_cont, idx),
-            "dt_cont_multiplier": stream.dt_cont_multiplier,
+            "dt_cont_multiplier": stream.delta_t_contribution_multiplier,
             "htc": collection._value_at_idx(stream._htc, idx),
-            "active": stream.active,
+            "active": stream.is_active,
         }
         for parent_key, parent_name, segment_index, segment_identity, stream in (
             report_streams

@@ -1,75 +1,30 @@
-External Python Contract
-========================
+Package-Root API
+================
 
-OpenPinch currently compatibility-protects exactly one Python import:
+Process-engineer workflows begin with exactly these imports:
 
 .. code-block:: python
 
-   from OpenPinch.main import pinch_analysis_service
+   from OpenPinch import PinchProblem, PinchWorkspace
 
-The package root is an import-free marker. It has no ``__all__`` declaration
-and does not re-export workflow classes, schemas, enums, resources, or the main
-service.
+``PinchProblem`` owns one prepared case. ``PinchWorkspace`` owns named cases,
+scenario creation, case batches, comparison, and persistence. Analysis methods
+are grouped under descriptive accessors such as ``problem.target``,
+``problem.design``, ``problem.components``, and ``problem.plot``.
 
-Service Function
-----------------
+The package root intentionally remains small. Schemas, domain records, and
+analysis services have concrete owner modules for contributors, but process
+engineers do not need those imports for supported workflows.
 
-.. autofunction:: OpenPinch.main.pinch_analysis_service
+.. autoclass:: OpenPinch.PinchProblem
    :no-index:
 
-Contract
+.. autoclass:: OpenPinch.PinchWorkspace
+   :no-index:
+
+See Also
 --------
 
-The protected signature is:
-
-.. code-block:: python
-
-   pinch_analysis_service(data, project_name="Project")
-
-``data`` is a caller mapping accepted by the request contract. The call returns
-the structured target-output model. Validation errors, field ordering,
-serialization, and numerical results are part of the same protected boundary.
-
-Example
--------
-
-.. code-block:: python
-
-   from OpenPinch.main import pinch_analysis_service
-
-   result = pinch_analysis_service(
-       {
-           "streams": [
-               {
-                   "name": "Hot feed",
-                   "zone": "Process",
-                   "t_supply": 180.0,
-                   "t_target": 80.0,
-                   "heat_flow": 1000.0,
-               },
-               {
-                   "name": "Cold feed",
-                   "zone": "Process",
-                   "t_supply": 20.0,
-                   "t_target": 120.0,
-                   "heat_flow": 800.0,
-               },
-           ],
-           "utilities": [],
-       },
-       project_name="example",
-   )
-
-   print(result.model_dump(mode="json"))
-
-Unsupported Internal Owners
----------------------------
-
-Concrete modules under ``application``, ``analysis``, ``domain``,
-``contracts``, ``adapters``, ``optimisation``, and ``presentation`` are
-documented for contributors and advanced experiments. They are not external
-compatibility contracts. No deep import, root alias, package barrel, or Python
-pickle path is preserved across releases.
-
-See :doc:`../developer/architecture` for the internal dependency map and
-:doc:`../overview/support-and-stability` for the support policy.
+- :doc:`pinchproblem`
+- :doc:`pinchworkspace`
+- :doc:`../examples/tutorial-coverage-map`

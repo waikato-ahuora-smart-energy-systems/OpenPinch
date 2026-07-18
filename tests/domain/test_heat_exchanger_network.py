@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from pydantic import ValidationError
 
@@ -10,9 +12,11 @@ import OpenPinch.presentation.network_grid.service as grid_diagram
 from OpenPinch.domain._heat_exchanger.period_state import HeatExchangerPeriodState
 from OpenPinch.domain.enums import (
     HeatExchangerKind,
-    HeatExchangerStreamRole,
+    StreamID,
 )
-from OpenPinch.domain.enums import HeatExchangerNetworkLabel as HEN
+from OpenPinch.domain.enums import (
+    HeatExchangerNetworkLabel as HeatExchangerNetworkLabel,
+)
 from OpenPinch.domain.heat_exchanger import HeatExchanger
 from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
 
@@ -30,8 +34,8 @@ def _recovery_exchanger(
         kind=HeatExchangerKind.RECOVERY,
         source_stream=source,
         sink_stream=sink,
-        source_stream_role=HeatExchangerStreamRole.PROCESS,
-        sink_stream_role=HeatExchangerStreamRole.PROCESS,
+        source_stream_role=StreamID.Process,
+        sink_stream_role=StreamID.Process,
         stage=stage,
         period_states=period_states
         or (
@@ -57,8 +61,8 @@ def _hot_utility_exchanger() -> HeatExchanger:
         kind=HeatExchangerKind.HOT_UTILITY,
         source_stream="Steam",
         sink_stream="C1",
-        source_stream_role=HeatExchangerStreamRole.UTILITY,
-        sink_stream_role=HeatExchangerStreamRole.PROCESS,
+        source_stream_role=StreamID.Utility,
+        sink_stream_role=StreamID.Process,
         period_states=(
             HeatExchangerPeriodState(period_id="base", period_idx=0, duty=30.0),
         ),
@@ -71,8 +75,8 @@ def _cold_utility_exchanger() -> HeatExchanger:
         kind=HeatExchangerKind.COLD_UTILITY,
         source_stream="H1",
         sink_stream="CoolingWater",
-        source_stream_role=HeatExchangerStreamRole.PROCESS,
-        sink_stream_role=HeatExchangerStreamRole.UTILITY,
+        source_stream_role=StreamID.Process,
+        sink_stream_role=StreamID.Utility,
         period_states=(
             HeatExchangerPeriodState(period_id="base", period_idx=0, duty=20.0),
         ),
@@ -94,14 +98,21 @@ def test_heat_exchanger_serialization_round_trip_excludes_solver_metadata():
     assert "source_metadata" not in exchanger.model_dump()
 
 
+def test_heat_exchanger_python_dump_is_json_safe() -> None:
+    payload = json.loads(json.dumps(_recovery_exchanger().model_dump()))
+
+    assert payload["source_stream_role"] == "Process"
+    assert payload["sink_stream_role"] == "Process"
+
+
 def test_heat_exchanger_rejects_retired_scalar_operating_fields():
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         HeatExchanger(
             kind=HeatExchangerKind.HOT_UTILITY,
             source_stream="Steam",
             sink_stream="C1",
-            source_stream_role=HeatExchangerStreamRole.UTILITY,
-            sink_stream_role=HeatExchangerStreamRole.PROCESS,
+            source_stream_role=StreamID.Utility,
+            sink_stream_role=StreamID.Process,
             period_states=(
                 HeatExchangerPeriodState(
                     period_id="base",
@@ -119,8 +130,8 @@ def test_heat_exchanger_does_not_infer_mid_temperature_from_one_endpoint():
         kind=HeatExchangerKind.RECOVERY,
         source_stream="H1",
         sink_stream="C1",
-        source_stream_role=HeatExchangerStreamRole.PROCESS,
-        sink_stream_role=HeatExchangerStreamRole.PROCESS,
+        source_stream_role=StreamID.Process,
+        sink_stream_role=StreamID.Process,
         stage=1,
         period_states=(
             HeatExchangerPeriodState(
@@ -147,25 +158,68 @@ def test_heat_exchanger_direction_semantics_are_enforced():
             kind=HeatExchangerKind.RECOVERY,
             source_stream="Steam",
             sink_stream="C1",
-            source_stream_role=HeatExchangerStreamRole.UTILITY,
-            sink_stream_role=HeatExchangerStreamRole.PROCESS,
+            source_stream_role=StreamID.Utility,
+            sink_stream_role=StreamID.Process,
             stage=1,
             period_states=(
                 HeatExchangerPeriodState(period_id="base", period_idx=0, duty=10.0),
             ),
         )
 
+    for role in (StreamID.Unassigned, "process"):
+        with pytest.raises(ValidationError):
+            HeatExchanger(
+                kind=HeatExchangerKind.RECOVERY,
+                source_stream="H1",
+                sink_stream="C1",
+                source_stream_role=role,
+                sink_stream_role=StreamID.Process,
+                stage=1,
+                period_states=(
+                    HeatExchangerPeriodState(period_id="base", period_idx=0, duty=10.0),
+                ),
+            )
+
     with pytest.raises(ValidationError, match="recovery exchangers must include"):
         HeatExchanger(
             kind=HeatExchangerKind.RECOVERY,
             source_stream="H1",
             sink_stream="C1",
-            source_stream_role=HeatExchangerStreamRole.PROCESS,
-            sink_stream_role=HeatExchangerStreamRole.PROCESS,
+            source_stream_role=StreamID.Process,
+            sink_stream_role=StreamID.Process,
             period_states=(
                 HeatExchangerPeriodState(period_id="base", period_idx=0, duty=10.0),
             ),
         )
+
+
+@pytest.mark.parametrize(
+    ("kind", "source_role", "sink_role"),
+    [
+        (HeatExchangerKind.RECOVERY, StreamID.Process, StreamID.Process),
+        (HeatExchangerKind.HOT_UTILITY, StreamID.Utility, StreamID.Process),
+        (HeatExchangerKind.COLD_UTILITY, StreamID.Process, StreamID.Utility),
+    ],
+)
+def test_runtime_endpoint_roles_use_canonical_stream_ids(
+    kind: HeatExchangerKind,
+    source_role: StreamID,
+    sink_role: StreamID,
+) -> None:
+    exchanger = HeatExchanger(
+        kind=kind,
+        source_stream="source",
+        sink_stream="sink",
+        source_stream_role=source_role,
+        sink_stream_role=sink_role,
+        stage=1 if kind is HeatExchangerKind.RECOVERY else None,
+        period_states=(
+            HeatExchangerPeriodState(period_id="base", period_idx=0, duty=10.0),
+        ),
+    )
+
+    assert exchanger.model_dump(mode="json")["source_stream_role"] == source_role.value
+    assert exchanger.model_dump(mode="json")["sink_stream_role"] == sink_role.value
 
 
 def test_heat_exchanger_validators_reject_invalid_edge_values():
@@ -283,49 +337,51 @@ def test_heat_exchanger_network_labelled_access_and_totals():
         == network.exchangers[0]
     )
     assert network.labelled_value(
-        HEN.RECOVERY_DUTY,
+        HeatExchangerNetworkLabel.RECOVERY_DUTY,
         source_stream="H1",
         sink_stream="C1",
         stage=1,
     ) == pytest.approx(100.0)
     assert network.labelled_value(
-        HEN.HOT_RECOVERY_OUTLET_TEMPERATURE,
+        HeatExchangerNetworkLabel.HOT_RECOVERY_OUTLET_TEMPERATURE,
         source_stream="H1",
         sink_stream="C1",
         stage=1,
     ) == pytest.approx(120.0)
     assert network.labelled_value(
-        HEN.MATCH_ACTIVE,
+        HeatExchangerNetworkLabel.MATCH_ACTIVE,
         source_stream="H1",
         sink_stream="C1",
         stage=1,
     )
     assert network.total_duty(kind=HeatExchangerKind.RECOVERY) == pytest.approx(100.0)
     assert network.total_duty(stream="H1") == pytest.approx(120.0)
-    assert network.total(HEN.HOT_UTILITY_DUTY, stream="C1") == pytest.approx(30.0)
-    assert network.total(HEN.RECOVERY_AREA) == pytest.approx(25.0)
+    assert network.total(
+        HeatExchangerNetworkLabel.HOT_UTILITY_DUTY, stream="C1"
+    ) == pytest.approx(30.0)
+    assert network.total(HeatExchangerNetworkLabel.RECOVERY_AREA) == pytest.approx(25.0)
     assert network.total_area(kind="cold_utility") == pytest.approx(5.0)
     assert network.labelled_value(
-        HEN.RECOVERY_AREA,
+        HeatExchangerNetworkLabel.RECOVERY_AREA,
         source_stream="H1",
         sink_stream="C1",
         stage=1,
     ) == pytest.approx(25.0)
     assert network.labelled_value(
-        HEN.COLD_RECOVERY_OUTLET_TEMPERATURE,
+        HeatExchangerNetworkLabel.COLD_RECOVERY_OUTLET_TEMPERATURE,
         source_stream="H1",
         sink_stream="C1",
         stage=1,
     ) == pytest.approx(110.0)
     assert network.labelled_value(
-        HEN.MATCH_ALLOWED,
+        HeatExchangerNetworkLabel.MATCH_ALLOWED,
         source_stream="H1",
         sink_stream="C1",
         stage=1,
     )
     assert (
         network.labelled_value(
-            HEN.RECOVERY_DUTY,
+            HeatExchangerNetworkLabel.RECOVERY_DUTY,
             source_stream="missing",
             sink_stream="C1",
         )
@@ -377,7 +433,7 @@ def test_multiperiod_queries_require_explicit_period_identity():
     assert network.total_duty(period_id="base") == pytest.approx(0.0)
     assert network.total_duty(period_id="peak") == pytest.approx(125.0)
     assert network.labelled_value(
-        HEN.MATCH_ACTIVE,
+        HeatExchangerNetworkLabel.MATCH_ACTIVE,
         source_stream="H1",
         sink_stream="C1",
         stage=1,
@@ -437,16 +493,18 @@ def test_heat_exchanger_network_rejects_ambiguous_or_incompatible_labels():
 
     network = HeatExchangerNetwork(exchangers=(_hot_utility_exchanger(),))
     with pytest.raises(ValueError, match="label cannot be used"):
-        network.total(HEN.RECOVERY_DUTY, kind=HeatExchangerKind.HOT_UTILITY)
+        network.total(
+            HeatExchangerNetworkLabel.RECOVERY_DUTY, kind=HeatExchangerKind.HOT_UTILITY
+        )
     with pytest.raises(ValueError, match="only valid for recovery"):
         network.labelled_value(
-            HEN.HOT_RECOVERY_OUTLET_TEMPERATURE,
+            HeatExchangerNetworkLabel.HOT_RECOVERY_OUTLET_TEMPERATURE,
             source_stream="Steam",
             sink_stream="C1",
             kind=HeatExchangerKind.HOT_UTILITY,
         )
     with pytest.raises(ValueError, match="not a numeric total label"):
-        network.total(HEN.MATCH_ACTIVE)
+        network.total(HeatExchangerNetworkLabel.MATCH_ACTIVE)
 
 
 def test_heat_exchanger_network_totals_honour_active_stream_stage_and_none_values():
@@ -506,7 +564,7 @@ def test_labelled_access_is_stable_when_solver_axes_and_rows_reorder():
 
     for network in (first, reordered):
         assert network.labelled_value(
-            HEN.RECOVERY_DUTY,
+            HeatExchangerNetworkLabel.RECOVERY_DUTY,
             source_stream="H1",
             sink_stream="C1",
             stage=1,

@@ -75,15 +75,19 @@ def test_period_weight_expansion_invariant(period_count, data):
 def test_segmented_stream_preserves_continuity_and_aggregate_invariants(stream):
     assert all(
         np.allclose(
-            left.t_target.period_values,
-            right.t_supply.period_values,
+            left.target_temperature.period_values,
+            right.supply_temperature.period_values,
             rtol=0.0,
             atol=tol,
         )
         for left, right in zip(stream.segments[:-1], stream.segments[1:])
     )
-    assert float(stream.t_supply) == float(stream.segments[0].t_supply)
-    assert float(stream.t_target) == float(stream.segments[-1].t_target)
+    assert float(stream.supply_temperature) == float(
+        stream.segments[0].supply_temperature
+    )
+    assert float(stream.target_temperature) == float(
+        stream.segments[-1].target_temperature
+    )
     assert np.isclose(
         float(stream.heat_flow),
         sum(float(segment.heat_flow) for segment in stream.segments),
@@ -104,8 +108,8 @@ def test_segment_schema_json_round_trip_preserves_order(stream):
                 "segments": [
                     {
                         "name": segment.name,
-                        "t_supply": float(segment.t_supply),
-                        "t_target": float(segment.t_target),
+                        "t_supply": float(segment.supply_temperature),
+                        "t_target": float(segment.target_temperature),
                         "heat_flow": float(segment.heat_flow),
                     }
                     for segment in stream.segments
@@ -129,10 +133,10 @@ def test_flat_and_segmented_problem_tables_are_property_equivalent(stream):
         [
             Stream(
                 name=f"Flat {index}",
-                t_supply=segment.t_supply,
-                t_target=segment.t_target,
+                supply_temperature=segment.supply_temperature,
+                target_temperature=segment.target_temperature,
                 heat_flow=segment.heat_flow,
-                htc=segment.htc,
+                heat_transfer_coefficient=segment.heat_transfer_coefficient,
             )
             for index, segment in enumerate(stream.segments)
         ]

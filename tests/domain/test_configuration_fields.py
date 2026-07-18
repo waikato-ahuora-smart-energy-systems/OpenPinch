@@ -10,7 +10,7 @@ import pytest
 
 import OpenPinch.domain.configuration_fields as meta
 from OpenPinch.domain.configuration_fields import ConfigurationFieldSpec
-from OpenPinch.domain.enums import HPRcycle
+from OpenPinch.domain.enums import HeatPumpAndRefrigerationCycle
 from tests.support.paths import FIXTURES_ROOT
 
 FIXTURE_PATH = FIXTURES_ROOT / "config_metadata_cases.json"
@@ -23,7 +23,7 @@ def _fixture() -> dict:
 def test_configuration_metadata_group_status_and_support_level_edges():
     assert meta.configuration_group("NOT_A_REAL_OPTION") == "problem"
     assert meta.configuration_field_support_level("THERMAL_DT_CONT") == "stable"
-    assert meta.configuration_field_support_level("HPR_TYPE") == "advanced"
+    assert meta.configuration_option_status("HPR_TYPE").runtime_status == "dead"
 
 
 def test_validate_configuration_options_rejects_non_dict_and_unknown_keys():
@@ -62,10 +62,6 @@ def test_validate_configuration_option_value_accepts_static_valid_cases():
         "HENS_STAGE_SELECTION",
         valid_values["HENS_STAGE_SELECTION"],
     ) == [1, 2, 3]
-    assert meta.validate_configuration_option_value(
-        "HENS_METHOD_SEQUENCE",
-        valid_values["HENS_METHOD_SEQUENCE"],
-    ) == ["pinch_design_method", "network_evolution_method"]
     assert meta.validate_configuration_option_value(
         "HENS_OUTPUT_FORMATS",
         valid_values["HENS_OUTPUT_FORMATS"],
@@ -154,13 +150,6 @@ def test_validate_configuration_option_value_accepts_static_valid_cases():
     )
     assert (
         meta.validate_configuration_option_value(
-            "TARGETING_DIRECT_SITE_ENABLED",
-            valid_values["TARGETING_DIRECT_SITE_ENABLED"],
-        )
-        is True
-    )
-    assert (
-        meta.validate_configuration_option_value(
             "REPORTING_DECIMAL_PLACES",
             valid_values["REPORTING_DECIMAL_PLACES"],
         )
@@ -183,18 +172,13 @@ def test_validate_configuration_option_value_accepts_static_valid_cases():
     ) == {"bound_push": 1e-4}
 
 
-def test_validate_configuration_option_value_accepts_enum_instances():
-    assert (
-        meta.validate_configuration_option_value("HPR_TYPE", HPRcycle.CascadeCarnot)
-        == HPRcycle.CascadeCarnot.value
-    )
-    assert (
+def test_public_configuration_rejects_internal_method_selectors():
+    with pytest.raises(ValueError, match="Unknown configuration option"):
         meta.validate_configuration_option_value(
-            "HPR_TYPE",
-            HPRcycle.ParallelCarnot.value,
+            "HPR_TYPE", HeatPumpAndRefrigerationCycle.CascadeCarnot
         )
-        == HPRcycle.ParallelCarnot.value
-    )
+    with pytest.raises(ValueError, match="Unknown configuration option"):
+        meta.validate_configuration_options({"POWER_TURB_MODEL": "Medina-Flores"})
 
 
 def test_unit_option_maps_use_flat_configuration_defaults():
@@ -212,7 +196,6 @@ def test_unit_option_maps_use_flat_configuration_defaults():
         ("INPUT_UNIT_TEMPERATURE", "bad_unit", "compatible"),
         ("HENS_OUTPUT_FOLDER", "bad_output_folder", "must be a string"),
         ("HENS_STAGE_SELECTION", "duplicate_stage_selection", "must be unique"),
-        ("HENS_METHOD_SEQUENCE", "bad_method_sequence", "must be one of"),
         ("HENS_STAGE_PACKING", "bad_stage_packing", "must be one of"),
         ("HENS_SOLVE_TOLERANCE", "bad_positive_float", "positive number"),
         ("HENS_MAX_PARALLEL", "bad_positive_int", "positive integer"),
@@ -221,7 +204,6 @@ def test_unit_option_maps_use_flat_configuration_defaults():
         ("HENS_SOLVER_OPTIONS_PDM", "bad_solver_options", "empty option names"),
         ("HPR_LOAD_PERIOD_VALUES", "bad_period_value", "greater than or equal"),
         ("HPR_MVR_ETA_COMP", "bad_fraction", "less than or equal"),
-        ("TARGETING_DIRECT_SITE_ENABLED", "empty_solver_name", "boolean"),
         ("REPORTING_DECIMAL_PLACES", "bad_int", "integer"),
         ("THERMAL_DT_CONT", "bad_float", "finite number"),
     ],
@@ -240,13 +222,10 @@ def test_validate_configuration_option_value_rejects_static_invalid_cases(
 @pytest.mark.parametrize(
     ("name", "value", "message"),
     [
-        ("HENS_METHOD_SEQUENCE", "pinch_design_method", "must be provided as a list"),
-        ("HENS_METHOD_SEQUENCE", [], "must contain at least one value"),
         ("HENS_APPROACH_TEMPERATURES", [math.inf], "finite number"),
         ("PROBLEM_PERIOD_IDS", [1], "values must be strings"),
         ("HENS_SOLVER_OPTIONS_TDM", [], "must be provided as a dict"),
         ("HPR_LOAD_PERIOD_VALUES", [], "must be provided as a dict"),
-        ("HPR_TYPE", "Not a real HPR cycle", "Invalid value"),
         ("PROBLEM_TOP_ZONE_NAME", 123, "must be a string"),
     ],
 )

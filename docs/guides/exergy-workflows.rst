@@ -1,11 +1,6 @@
 Exergy Workflows
 ================
 
-.. warning::
-
-   This advanced guide uses unsupported internal owner modules. Only
-   :func:`OpenPinch.main.pinch_analysis_service` is compatibility protected.
-
 Purpose
 -------
 
@@ -30,13 +25,12 @@ Runnable Workflow
 
 .. code-block:: python
 
-   from OpenPinch.application.problem import PinchProblem
+   from OpenPinch import PinchProblem
 
    problem = PinchProblem("pulp_mill.json")
-   problem.target.indirect_heat_integration()
-   exergy_target = problem.target.exergy(
-       options={"base_target_type": "Total Site Target"},
-   )
+   problem.target.all_heat_integration()
+   base = problem.target.total_site_heat_integration()
+   exergy_target = problem.target.exergy(base_target=base)
    summary = problem.summary_frame()
 
 Expected Output

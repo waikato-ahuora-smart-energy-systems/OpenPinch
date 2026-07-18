@@ -15,7 +15,7 @@ from ....domain.configuration_fields import (
     CONFIG_FIELD_SPECS,
     input_unit_options_to_map,
 )
-from ....domain.enums import ST
+from ....domain.enums import StreamType
 from ....domain.value import Value
 
 ValidationContext = dict[str, list[dict[str, Any]]]
@@ -306,9 +306,9 @@ def _validate_stream_record_states(
         return issues
 
     classifications: dict[str, list[str]] = {
-        ST.Hot.value: [],
-        ST.Cold.value: [],
-        ST.Neutral.value: [],
+        StreamType.Hot.value: [],
+        StreamType.Cold.value: [],
+        StreamType.Neutral.value: [],
     }
 
     num_periods = 1
@@ -345,9 +345,9 @@ def _validate_stream_record_states(
                 )
             )
         elif t_supply_value > t_target_value:
-            classifications[ST.Hot.value].append(str(idx))
+            classifications[StreamType.Hot.value].append(str(idx))
         elif t_supply_value < t_target_value:
-            classifications[ST.Cold.value].append(str(idx))
+            classifications[StreamType.Cold.value].append(str(idx))
 
     active_classes = {
         stream_type: period_group
@@ -365,9 +365,9 @@ def _validate_stream_record_states(
                 field="t_supply/t_target",
                 message=(
                     "Stream states must classify consistently. "
-                    f"Hot={classifications[ST.Hot.value]}, "
-                    f"Cold={classifications[ST.Cold.value]}, "
-                    f"Neutral={classifications[ST.Neutral.value]}."
+                    f"Hot={classifications[StreamType.Hot.value]}, "
+                    f"Cold={classifications[StreamType.Cold.value]}, "
+                    f"Neutral={classifications[StreamType.Neutral.value]}."
                 ),
             )
         )

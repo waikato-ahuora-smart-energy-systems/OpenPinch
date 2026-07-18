@@ -1,191 +1,131 @@
 Heat Exchanger Network Synthesis
 ================================
 
-.. warning::
-
-   HEN synthesis is an advanced unsupported internal workflow. Only
-   :func:`OpenPinch.main.pinch_analysis_service` is compatibility protected.
-
-Purpose
--------
-
-Use heat exchanger network synthesis when a solved OpenPinch case should be
-converted into ranked network candidates and grid-diagram views.
-
-Prerequisites
--------------
-
-Install the synthesis extra and IDAES solver extensions before running
-solver-backed HEN synthesis:
+Install the HEN synthesis extra and the IDAES solver extensions before running
+solver-backed methods:
 
 .. code-block:: bash
 
    python -m pip install "openpinch[synthesis]"
    idaes get-extensions
 
-Source OpenHENS CSV files are migration source material only. Convert them
-once into OpenPinch JSON or native ``TargetInput`` models before synthesis.
-
-Sample Case
------------
-
-Use ``Four-stream-Yee-and-Grossmann-1990-1.json`` for the compact converted
-OpenHENS benchmark used in the packaged HEN notebook.
-
-Runnable Workflow
------------------
+Ranked Synthesis
+----------------
 
 .. code-block:: python
 
-   from OpenPinch.application.problem import PinchProblem
-   from OpenPinch.domain.enums import HENDesignMethod
-   from OpenPinch.presentation.network_grid.service import build_grid_diagram
+   from OpenPinch import PinchProblem
 
    problem = PinchProblem(
        "Four-stream-Yee-and-Grossmann-1990-1.json",
-       project_name="Four-stream converted OpenHENS example",
+       project_name="Four Stream",
+   )
+   design = problem.design.heat_exchanger_network(
+       approach_temperatures=[10.0, 14.0, 18.0],
+       stages=[3],
+       best_solutions=3,
    )
 
-   design = problem.design.enhanced_synthesis_method(quality_tier=2)
-   network = design.network
-   period_id = network.period_ids[0]
-   diagram = build_grid_diagram(network, period_id=period_id)
+   top = design.top(3)
+   network = design.network(rank=1)
+   grid = design.grid(rank=1)
 
-Explicit design-method accessors are also available:
+The design view also exposes ``selected_network``, total recovery, hot and cold
+utility duty, and ``utility(name)``. Serialize the complete result with
+``design.result.model_dump(mode="json")``.
+
+Named Advanced Methods
+----------------------
 
 .. code-block:: python
 
-   problem.design.open_hens_method()
-   problem.design.heat_exchanger_network_synthesis()
-   problem.design.heat_exchanger_network_synthesis(
-       method=HENDesignMethod.OpenHENS,
+   enhanced = problem.design.enhanced_heat_exchanger_network(quality_tier=2)
+   open_hens = problem.design.open_hens()
+   pinch_design = problem.design.pinch_design()
+   thermal = problem.design.thermal_derivative(
+       (pinch_design.selected_network,)
    )
-   problem.design.pinch_design_method()
-   problem.design.thermal_derivative_method(initial_networks=(seed_network,))
-   problem.design.network_evolution_method(initial_networks=(existing_network,))
+   evolved = problem.design.network_evolution(
+       (thermal.selected_network,)
+   )
 
-Expected Output
----------------
+Successful synthesis stores the serializable result on
+``problem.results.design`` (the ``TargetOutput.design`` field). The design view
+provides the selected network, ranked candidates, manifest, diagnostics, and
+task metadata without requiring process engineers to call contributor services.
 
-Successful synthesis stores a design result on ``TargetOutput.design`` and
-``problem.results.design``. Inspect:
+For multiple operating periods, call
+``problem.design.multiperiod_heat_exchanger_network(...)`` after explicit
+all-period targeting.
 
-- ``design.design_method`` for the requested internal design service
-- ``design.manifest.method_sequence`` for executed task-level methods
-- ``design.network`` for the selected network
-- ``design.ranked_networks`` for ranked unique candidates
-- ``design.network.exchangers[0].state(period_id)`` for one match's operating
-  duty, activity, approaches, split fractions, and temperatures
-- ``design.network.total_duty(period_id=period_id)`` for period duty totals
-- ``build_grid_diagram(design.network, period_id=period_id)`` for visual
-  topology inspection
+Serialized Network Input
+------------------------
 
-Interpretation
---------------
+The supported bridge carries the exact JSON-visible runtime dump through
+``TargetInput.network``:
 
-The internal design accessor is problem-rooted. Persistent synthesis controls
-belong in loaded ``TargetInput.options`` keys such as ``HENS_APPROACH_TEMPERATURES``,
-``HENS_METHOD_SEQUENCE``, ``HENS_SYNTHESIS_QUALITY_TIER``, solver names,
-tolerance, output formats, and run id. Do not pass persistent design-space or
-solver controls as a separate runtime object to the design call.
+.. code-block:: python
 
-Use ``enhanced_synthesis_method(quality_tier=...)`` for the recommended
-quality-tier workflow, ``open_hens_method()`` for the original tier 1 OpenHENS
-sequence, and ``network_evolution_method(initial_networks=...)`` for retrofit
-evolution from an existing network.
+   from OpenPinch.contracts.input import TargetInput
 
-When Couenne is unavailable for Couenne-backed stages, OpenPinch warns and
-attempts the configured network-evolution route where possible.
+   network_payload = network.model_dump(mode="json")
+   input_data = TargetInput.model_validate(
+       {
+           "streams": stream_payloads,
+           "utilities": utility_payloads,
+           "network": network_payload,
+       }
+   )
 
-Each exchanger stores shared design topology, area, and capital values once;
-ordered parent-owned period-state records hold operating values. A
-single-period network allows ``exchanger.state()`` and omitted query periods.
-A multiperiod network requires the explicit identity for duty, temperature,
-diagram, export, and controllability access.
+   restored = TargetInput.model_validate_json(input_data.model_dump_json())
+   assert restored.model_dump(mode="json")["network"] == network_payload
+
+The nested value is a transport schema, not a synthesis seed. Private solver
+and source metadata are absent from the dump and rejected if manually added.
+Endpoint classifications use title-case ``StreamID`` values: ``Process`` and
+``Utility``. ``Unassigned`` and legacy lowercase values are invalid.
 
 Segmented Variable-Heat-Capacity Streams
 ----------------------------------------
 
-A variable-heat-capacity process stream remains one physical parent on the
-hot or cold solver axis. Its ordered internal segment records define the
-local temperature--duty relation, heat-transfer coefficients, and exchanger
-area calculations. Segment count therefore does not inflate physical stream,
-match, exchanger, or stage-position counts.
+A variable-heat-capacity process stream remains one physical parent on the hot
+or cold solver axis. Its ordered internal segments define the local
+temperature--duty relation, heat-transfer coefficients, and exchanger area;
+segment count does not inflate physical stream, match, exchanger, or stage
+counts.
 
-HEN preparation carries ordered segment temperatures, cumulative duties,
-local heat-capacity flowrates, heat-transfer coefficients, and deterministic segment
-identities alongside the parent axes. Stage balances advance a cumulative
-parent heat coordinate and map that coordinate through the piecewise
-``T(Q)`` profile. Pinch decomposition may clip or split the active profile,
-but it preserves the parent identity.
+HEN preparation retains ordered segment temperatures, cumulative duties, local
+heat-capacity flowrates, heat-transfer coefficients, and deterministic segment
+identities. Stage balances advance a cumulative parent heat coordinate through
+the piecewise ``T(Q)`` profile. Pinch decomposition can split the active profile
+while preserving the one physical parent identity.
 
-The current internal solver behavior is explicit:
-
-- APOPT and Couenne use interval-disjunctive piecewise mappings.
-- IPOPT uses active-segment refinement and repeats the continuous solve until
-  the selected intervals stabilize.
-- An unresolved active-segment solve is rejected with guidance to use APOPT or
-  Couenne. OpenPinch does not silently substitute an average parent ``CP``.
-
-The selected hot and cold utility parents may also be segmented. Their local
-prices are integrated over the utility duty actually traversed, including a
-partial final segment. Cost objectives, solved totals, verification, and
-ranking therefore use the exact piecewise utility cost instead of multiplying
-total duty by an average parent price. APOPT and Couenne use the interval
-mapping; IPOPT uses the same active-segment refinement policy described above.
-The current one-hot-utility and one-cold-utility HEN selection behavior is
-unchanged; optimization across multiple utility parents is a future extension.
-
-Segmented utility HTCs and temperatures are also retained in the post-solve
-duty-aligned area slices. Flat utilities continue to behave as one virtual
-segment and retain their previous objective and reporting results.
+APOPT and Couenne use interval-disjunctive piecewise mappings. IPOPT uses
+active-segment refinement and repeats the continuous solve until the selected
+intervals stabilize. An unresolved active-segment solve is rejected with solver
+guidance; OpenPinch does not silently substitute an average parent ``CP``.
 
 Each selected parent-level exchanger can expose ordered
-``segment_area_contributions``. A contribution records its period, hot and
-cold segment identities, slice duty, local endpoint temperatures, local heat-
-transfer coefficients, LMTD, and area. The exchanger duty is the sum of its
-local slices for the applicable period. Its multiperiod design area is the
-maximum period-total slice area, not a sum of per-segment maxima drawn from
-different periods.
-
-.. code-block:: python
-
-   for exchanger in design.network.exchangers:
-       if exchanger.has_segment_area_contributions:
-           print(exchanger.exchanger_id)
-           print(exchanger.segment_area_by_period)
-           print(exchanger.segment_design_area)
-
-Grid diagrams and controllability remain parent-based. Segment details are
-diagnostic metadata and do not become additional topology nodes.
+``segment_area_contributions``. A contribution records its period, hot and cold
+segment identities, slice duty, local endpoint temperatures, local heat-transfer
+coefficients, LMTD, and area. The multiperiod design area is the maximum
+period-total slice area, not a sum of segment maxima taken from different
+periods.
 
 Area Objective and Reported Area
 --------------------------------
 
 The nonlinear topology and total-cost objective retains the smooth Chen area
-surrogate. After a solution is found, OpenPinch calculates the reported
-exchanger area from ordered, duty-aligned segment slices using their local
-terminal temperatures and heat-transfer coefficients. Those segment-summed
-areas are also used for result verification and downstream ranking and
-derivative calculations.
+surrogate. After solving, OpenPinch calculates reported exchanger area from
+ordered duty-aligned slices with their local terminal temperatures and
+heat-transfer coefficients. These segment-summed areas are used for result
+verification, ranking, and derivative calculations. A future exact
+logarithmic-LMTD formulation would be limited to the continuous NLP path and is
+not the current contract.
 
-This separation is intentional: the Chen expression remains the accepted
-optimization baseline, while exact local LMTD areas remain authoritative for
-reported segmented exchangers. A possible future exact logarithmic-LMTD
-formulation is limited to the continuous NLP path and is not part of the
-current internal behavior.
 
-Migration and Support Notes
----------------------------
-
-Old import paths and OpenHENS field aliases have been removed from the runtime
-API. OpenPinch does not provide runtime import aliases, OpenHENS field aliases,
-or command parity with the original OpenHENS scripts. Use the conversion
-scripts and converted JSON case inputs instead.
-The old import paths should be treated as migration-only references, not as
-compatibility aliases.
-
-For development checks, use:
+Contributor verification separates ordinary, synthesis, and external-solver
+profiles:
 
 .. code-block:: bash
 
@@ -193,9 +133,4 @@ For development checks, use:
    pytest -m synthesis
    pytest -m solver
 
-Next Steps
-----------
-
-- :doc:`../examples/notebook-series` for notebook 09.
-- :doc:`../api/schemas-and-config` for ``TargetOutput.design`` schemas.
-- :doc:`../api/service-layer` for the internal method-oriented service stack.
+See notebooks 15 through 17 in :doc:`../examples/notebook-series`.

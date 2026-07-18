@@ -10,7 +10,7 @@ from enum import Enum
 from types import UnionType
 from typing import Any, List, get_args, get_origin
 
-from .enums import ZT, BB_Minimiser, HPRcycle, TurbineModel
+from .enums import BB_Minimiser, HeatPumpAndRefrigerationCycle, TurbineModel, ZoneType
 
 
 @dataclass(frozen=True)
@@ -35,13 +35,6 @@ class ConfigurationOptionStatus:
     runtime_status: str
 
 
-HENS_METHOD_SEQUENCE_VALUES = frozenset(
-    {
-        "pinch_design_method",
-        "thermal_derivative_method",
-        "network_evolution_method",
-    }
-)
 HENS_OUTPUT_FORMAT_VALUES = frozenset({"json", "csv", "xlsx"})
 HENS_STAGE_PACKING_VALUES = frozenset({"auto", "none", "pdm", "tdm", "all"})
 HPR_LOAD_MODE_VALUES = frozenset({"fraction", "duty", "period_values"})
@@ -98,7 +91,7 @@ def _spec(
 CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     # Problem shape and state handling.
     "PROBLEM_TOP_ZONE_NAME": _spec(str, "Site", "problem", "top_zone_name"),
-    "PROBLEM_TOP_ZONE_IDENTIFIER": _spec(str, ZT.S.value, "problem", "top_zone_identifier", enum_cls=ZT),
+    "PROBLEM_TOP_ZONE_IDENTIFIER": _spec(str, ZoneType.S.value, "problem", "top_zone_identifier", enum_cls=ZoneType),
     "PROBLEM_PERIOD_IDS": _spec(List[str], ["0"], "problem", "period_ids"),
     "PROBLEM_PERIOD_WEIGHTS": _spec(List[float], [1.0], "problem", "period_weights", numeric_min=0.0),
 
@@ -128,18 +121,6 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "THERMAL_DT_CONT": _spec(float, 5.0, "thermal", "dt_cont", numeric_min=0.0),
     "THERMAL_DT_PHASE_CHANGE": _spec(float, 0.01, "thermal", "dt_phase_change", numeric_min=0.0),
     "THERMAL_HTC": _spec(float, 1.0, "thermal", "htc", numeric_min=0.0),
-
-    # Targeting selectors.
-    "TARGETING_DIRECT_SITE_ENABLED": _spec(bool, True, "targeting", "direct_site_enabled"),
-    "TARGETING_DIRECT_OPERATION_ENABLED": _spec(bool, False, "targeting", "direct_operation_enabled"),
-    "TARGETING_INDIRECT_PROCESS_ENABLED": _spec(bool, False, "targeting", "indirect_process_enabled"),
-    "TARGETING_PROCESS_HP_ENABLED": _spec(bool, False, "targeting", "process_hp_enabled"),
-    "TARGETING_PROCESS_RFRG_ENABLED": _spec(bool, False, "targeting", "process_rfrg_enabled"),
-    "TARGETING_UTILITY_HP_ENABLED": _spec(bool, False, "targeting", "utility_hp_enabled"),
-    "TARGETING_UTILITY_RFRG_ENABLED": _spec(bool, False, "targeting", "utility_rfrg_enabled"),
-    "TARGETING_TURBINE_ENABLED": _spec(bool, False, "targeting", "turbine_enabled"),
-    "TARGETING_EXERGY_ENABLED": _spec(bool, False, "targeting", "exergy_enabled", runtime_status="experimental"),
-    "TARGETING_AREA_COST_ENABLED": _spec(bool, False, "targeting", "area_cost_enabled"),
 
     # Direct integration.
     "DIRECT_BALANCED_CC_ENABLED": _spec(bool, True, "direct", "balanced_cc_enabled"),
@@ -174,7 +155,6 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HENS_TDM_PARENT_LIMIT": _spec(int | None, None, "hens", "tdm_parent_limit", numeric_min=1.0),
     "HENS_STAGE_PACKING": _spec(str, "auto", "hens", "stage_packing"),
     "HENS_STAGE_SELECTION": _spec(List[int], [1, 2, 3], "hens", "stage_selection"),
-    "HENS_METHOD_SEQUENCE": _spec(List[str], ["pinch_design_method", "thermal_derivative_method", "network_evolution_method"], "hens", "method_sequence"),
     "HENS_SOLVER_PDM": _spec(str, "couenne", "hens", "solver_pdm"),
     "HENS_SOLVER_TDM": _spec(str, "couenne", "hens", "solver_tdm"),
     "HENS_SOLVER_EVM": _spec(str, "ipopt-pyomo", "hens", "solver_evm"),
@@ -191,7 +171,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HENS_RUN_ID": _spec(str, "default", "hens", "run_id"),
     "HENS_BEST_SOLUTIONS_TO_SAVE": _spec(int, 1, "hens", "best_solutions_to_save", numeric_min=1.0),
     # Heat pump and refrigeration.
-    "HPR_TYPE": _spec(str, HPRcycle.CascadeCarnot.value, "hpr", "type", enum_cls=HPRcycle),
+    "HPR_TYPE": _spec(str, HeatPumpAndRefrigerationCycle.CascadeCarnot.value, "hpr", "type", enum_cls=HeatPumpAndRefrigerationCycle),
     "HPR_LOAD_MODE": _spec(str, "fraction", "hpr", "load_mode"),
     "HPR_LOAD_FRACTION": _spec(float, 1.0, "hpr", "load_fraction", numeric_min=0.0),
     "HPR_LOAD_DUTY": _spec(float | None, None, "hpr", "load_duty", numeric_min=0.0),
@@ -234,6 +214,13 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
 }
 # fmt: on
 
+INTERNAL_METHOD_OPTION_KEYS = frozenset({"HPR_TYPE", "POWER_TURB_MODEL"})
+USER_CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
+    name: spec
+    for name, spec in CONFIG_FIELD_SPECS.items()
+    if name not in INTERNAL_METHOD_OPTION_KEYS
+}
+
 CONFIG_ENUMS: dict[str, type[Enum]] = {
     name: spec.enum_cls
     for name, spec in CONFIG_FIELD_SPECS.items()
@@ -261,8 +248,8 @@ def configuration_group(name: str) -> str:
 
 def configuration_option_status(name: str) -> ConfigurationOptionStatus:
     """Classify one configuration option key by runtime support status."""
-    if name in CONFIG_FIELD_SPECS:
-        spec = CONFIG_FIELD_SPECS[name]
+    if name in USER_CONFIG_FIELD_SPECS:
+        spec = USER_CONFIG_FIELD_SPECS[name]
         return ConfigurationOptionStatus(name=name, runtime_status=spec.runtime_status)
     return ConfigurationOptionStatus(name=name, runtime_status="dead")
 
@@ -287,18 +274,31 @@ def configuration_field_support_level(name: str) -> str:
 
 def validate_configuration_options(options: dict) -> dict:
     """Validate user-provided configuration option keys and values."""
+    return _validate_configuration_options(options, allow_method_selectors=False)
+
+
+def validate_internal_configuration_options(options: dict) -> dict:
+    """Validate call-local overrides, including private method selectors."""
+    return _validate_configuration_options(options, allow_method_selectors=True)
+
+
+def _validate_configuration_options(
+    options: dict,
+    *,
+    allow_method_selectors: bool,
+) -> dict:
     if not isinstance(options, dict):
         raise ValueError("Configuration options must be provided as a dict.")
 
-    statuses = {str(key): configuration_option_status(str(key)) for key in options}
-    dead_keys = sorted(
-        key for key, status in statuses.items() if status.runtime_status == "dead"
+    supported = (
+        CONFIG_FIELD_SPECS if allow_method_selectors else USER_CONFIG_FIELD_SPECS
     )
+    dead_keys = sorted(str(key) for key in options if str(key) not in supported)
     if dead_keys:
         raise ValueError(f"Unknown configuration option(s): {', '.join(dead_keys)}.")
 
     validated = {
-        str(key): validate_configuration_option_value(str(key), value)
+        str(key): _validate_configuration_option_value(str(key), value)
         for key, value in options.items()
     }
     effective_options = {
@@ -310,6 +310,12 @@ def validate_configuration_options(options: dict) -> dict:
 
 def validate_configuration_option_value(name: str, value: Any) -> Any:
     """Validate one supported configuration value."""
+    if name not in USER_CONFIG_FIELD_SPECS:
+        raise ValueError(f"Unknown configuration option: {name}.")
+    return _validate_configuration_option_value(name, value)
+
+
+def _validate_configuration_option_value(name: str, value: Any) -> Any:
     spec = CONFIG_FIELD_SPECS[name]
     if name in _UNIT_TARGETS:
         return _unit_string(name, value, _UNIT_TARGETS[name])
@@ -321,13 +327,6 @@ def validate_configuration_option_value(name: str, value: Any) -> Any:
         return _positive_float_grid(name, value)
     if name == "HENS_STAGE_SELECTION":
         return _positive_unique_int_grid(name, value)
-    if name == "HENS_METHOD_SEQUENCE":
-        return _string_choice_grid(
-            name,
-            value,
-            HENS_METHOD_SEQUENCE_VALUES,
-            allow_empty=False,
-        )
     if name == "HENS_OUTPUT_FORMATS":
         return _string_choice_grid(
             name,

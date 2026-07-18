@@ -7,6 +7,9 @@ from types import SimpleNamespace
 import openpyxl
 import pytest
 
+from OpenPinch.application._problem.output.reporting import (
+    _build_numeric_summary_frame,
+)
 from OpenPinch.application._problem.periods.aggregation import (
     WEIGHTED_AVERAGE_PERIOD_ID,
     weighted_average_output,
@@ -14,7 +17,7 @@ from OpenPinch.application._problem.periods.aggregation import (
 from OpenPinch.application.problem import PinchProblem
 from OpenPinch.contracts.output import TargetOutput
 from OpenPinch.contracts.reporting import HeatUtility, PinchTemp, TargetResults
-from OpenPinch.domain.enums import TT
+from OpenPinch.domain.enums import TargetType
 from OpenPinch.domain.value import Value
 from OpenPinch.domain.zone import Zone
 
@@ -184,7 +187,32 @@ def test_weighted_average_output_rejects_partially_missing_numeric_fields():
         weighted_average_output([base, peak], [1.0, 1.0])
 
 
-def test_weighted_summary_replays_last_named_target_accessor(monkeypatch):
+def test_weighted_average_output_tolerates_partially_missing_pinch_diagnostic():
+    base_target = _target(period_id="base", qh=10.0)
+    peak_target = _target(period_id="peak", qh=30.0).model_copy(
+        update={
+            "pinch_temp": PinchTemp(
+                cold_temp=None,
+                hot_temp=Value(150.0, "degC"),
+            )
+        }
+    )
+
+    output = weighted_average_output(
+        [
+            TargetOutput(name="Site", period_id="base", targets=[base_target]),
+            TargetOutput(name="Site", period_id="peak", targets=[peak_target]),
+        ],
+        [1.0, 3.0],
+    )
+    target = output.targets[0]
+
+    assert target.pinch_temp.cold_temp is None
+    assert target.pinch_temp.hot_temp.value == pytest.approx(145.0)
+    assert target.Qh.value == pytest.approx(25.0)
+
+
+def test_weighted_summary_uses_explicit_cached_all_period_results(monkeypatch):
     root = Zone("Site")
     root.set_period_context({"base": 0, "peak": 1}, [1.0, 3.0], 2)
     problem = PinchProblem()
@@ -221,16 +249,28 @@ def test_weighted_summary_replays_last_named_target_accessor(monkeypatch):
     )
 
     problem.target.direct_heat_integration(
-        zone_name="AreaA",
+        zone="AreaA",
         include_subzones=True,
         period_id="peak",
     )
-    frame = problem.summary_frame(periods="weighted_average", format="plain")
+    problem._period_results = {
+        "base": TargetOutput(
+            name="Site",
+            period_id="base",
+            targets=[_target(period_id="base", qh=10.0)],
+        ),
+        "peak": TargetOutput(
+            name="Site",
+            period_id="peak",
+            targets=[_target(period_id="peak", qh=30.0)],
+        ),
+    }
+    frame = _build_numeric_summary_frame(
+        problem._summary_results(periods="weighted_average")
+    )
 
     assert calls == [
-        (TT.DI.value, "AreaA", True, "peak"),
-        (TT.DI.value, "AreaA", True, "base"),
-        (TT.DI.value, "AreaA", True, "peak"),
+        (TargetType.DI.value, "AreaA", True, "peak"),
     ]
     assert frame.iloc[0]["Period ID"] == WEIGHTED_AVERAGE_PERIOD_ID
     assert frame.iloc[0]["Hot Utility Target"] == pytest.approx(25.0)
@@ -354,8 +394,11 @@ def test_weighted_summary_replay_restores_state_when_a_period_fails(monkeypatch)
 def test_weighted_summary_matches_sample_period_weights(source):
     problem = PinchProblem(source=source, project_name=source)
 
-    frame = problem.summary_frame(periods="weighted_average", format="plain")
-    period_outputs = list(problem.target_all_periods().values())
+    period_results = problem.target.all_periods.direct_heat_integration()
+    frame = _build_numeric_summary_frame(
+        problem._summary_results(periods="weighted_average")
+    )
+    period_outputs = list(period_results.values())
     weights = list(problem.master_zone.weights)
     target_name = period_outputs[0].targets[0].name
     row = frame.loc[frame["Target"] == target_name].iloc[0]
@@ -382,9 +425,10 @@ def test_weighted_summary_surfaces_metrics_report_and_export(tmp_path):
         project_name="weighted_summary_export",
     )
 
-    metrics = problem.metrics(periods="weighted_average")
-    report = problem.report(periods="weighted_average")
-    export_path = problem.export_excel(tmp_path, periods="weighted_average")
+    problem.target.all_periods.direct_heat_integration()
+    metrics = problem.metrics(include_weighted_average=True)
+    report = problem.report(include_weighted_average=True)
+    export_path = problem.export_excel(tmp_path, include_weighted_average=True)
 
     assert metrics
     assert {metric.period_id for metric in metrics} == {WEIGHTED_AVERAGE_PERIOD_ID}

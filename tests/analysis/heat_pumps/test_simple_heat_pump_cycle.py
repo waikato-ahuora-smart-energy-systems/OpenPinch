@@ -137,7 +137,7 @@ def _validate_results(
     if cond_streams:
         assert np.isclose(
             min(
-                segment.t_target
+                segment.target_temperature
                 for stream in cond_streams
                 for segment in stream.segments
             )
@@ -147,10 +147,12 @@ def _validate_results(
         )
     if evap_streams:
         assert np.isclose(
-            evap_streams[-1].t_target - (T_evap + dT_superheat), 0, atol=0.02
+            evap_streams[-1].target_temperature - (T_evap + dT_superheat),
+            0,
+            atol=0.02,
         )
 
-    if evap_streams and evap_streams[0].type == ST.Cold.value:
+    if evap_streams and evap_streams[0].stream_type == StreamType.Cold.value:
         assert np.isclose(sum([s.heat_flow for s in evap_streams]) - cycle.Q_cool, 0)
     elif evap_streams:
         assert np.isclose(
@@ -560,12 +562,16 @@ def test_heat_pump_cycle_with_zeotropic_mixture_generates_gliding_profiles():
     # Zeotropic blends should preserve glide across the phase-change profiles.
     cond_segments = [segment for stream in cond_streams for segment in stream.segments]
     evap_segments = [segment for stream in evap_streams for segment in stream.segments]
-    assert min(s.t_target for s in cond_segments) < T_cond
-    assert max(s.t_target for s in cond_segments) > T_cond
-    assert min(s.t_supply for s in evap_segments) < T_evap
-    assert max(s.t_target for s in evap_segments) > T_evap
-    assert all(abs(s.t_supply - s.t_target) > 0.05 for s in cond_segments)
-    assert all(abs(s.t_supply - s.t_target) > 0.05 for s in evap_segments)
+    assert min(s.target_temperature for s in cond_segments) < T_cond
+    assert max(s.target_temperature for s in cond_segments) > T_cond
+    assert min(s.supply_temperature for s in evap_segments) < T_evap
+    assert max(s.target_temperature for s in evap_segments) > T_evap
+    assert all(
+        abs(s.supply_temperature - s.target_temperature) > 0.05 for s in cond_segments
+    )
+    assert all(
+        abs(s.supply_temperature - s.target_temperature) > 0.05 for s in evap_segments
+    )
 
 
 def test_heat_pump_cycle_accepts_binary_mole_fraction_refrigerant_string():

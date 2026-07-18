@@ -23,7 +23,7 @@ from OpenPinch.contracts.synthesis.task import (
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
 from OpenPinch.domain._heat_exchanger.period_state import HeatExchangerPeriodState
-from OpenPinch.domain.enums import HeatExchangerKind, HeatExchangerStreamRole
+from OpenPinch.domain.enums import HeatExchangerKind, StreamID
 from OpenPinch.domain.heat_exchanger import HeatExchanger
 from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
 
@@ -362,8 +362,8 @@ def _seed_network(*, method: str) -> HeatExchangerNetwork:
                 kind=HeatExchangerKind.RECOVERY,
                 source_stream="H1",
                 sink_stream="C1",
-                source_stream_role=HeatExchangerStreamRole.PROCESS,
-                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Process,
                 stage=1,
                 period_states=(
                     HeatExchangerPeriodState(

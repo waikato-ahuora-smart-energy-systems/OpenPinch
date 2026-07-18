@@ -7,7 +7,7 @@ from typing import List, Tuple
 import numpy as np
 
 from ...domain.configuration import tol
-from ...domain.enums import GT, PT, ST, TT
+from ...domain.enums import GraphType, ProblemTableLabel, StreamType, TargetType
 from ...domain.problem_table import ProblemTable
 from ...domain.stream import Stream
 from ...domain.stream_collection import StreamCollection
@@ -64,7 +64,7 @@ def compute_direct_integration_targets(
     )
     hot_pinch, cold_pinch = pt.pinch_temperatures()
     direct = zone.config.direct
-    targeting = zone.config.targeting
+    calculate_area_cost = bool((args or {}).get("_calculate_area_cost", False))
     pt = get_additional_GCCs(
         pt,
         do_vert_cc_calc=direct.vertical_gcc_enabled,
@@ -82,38 +82,44 @@ def compute_direct_integration_targets(
     )
     zone.net_hot_streams, zone.net_cold_streams = (
         _create_net_hot_and_cold_stream_collections_for_site_analysis(
-            T_vals=pt[PT.T],
-            H_vals=pt[PT.H_NET_A],
+            T_vals=pt[ProblemTableLabel.T],
+            H_vals=pt[ProblemTableLabel.H_NET_A],
             hot_utilities=zone.hot_utilities,
             cold_utilities=zone.cold_utilities,
             idx=idx,
         )
     )
-    if should_update_balanced_composite_curves(direct, targeting):
+    if should_update_balanced_composite_curves(direct, calculate_area_cost):
         pt.update(
             **get_balanced_CC(
-                T_col=pt[PT.T],
-                H_hot=pt[PT.H_HOT],
-                H_cold=pt[PT.H_COLD],
-                H_hot_ut=pt[PT.H_HOT_UT],
-                H_cold_ut=pt[PT.H_COLD_UT],
+                T_col=pt[ProblemTableLabel.T],
+                H_hot=pt[ProblemTableLabel.H_HOT],
+                H_cold=pt[ProblemTableLabel.H_COLD],
+                H_hot_ut=pt[ProblemTableLabel.H_HOT_UT],
+                H_cold_ut=pt[ProblemTableLabel.H_COLD_UT],
             )
         )
         pt_real.update(
             **get_balanced_CC(
-                T_col=pt_real[PT.T],
-                H_hot=pt_real[PT.H_HOT],
-                H_cold=pt_real[PT.H_COLD],
-                H_hot_ut=pt_real[PT.H_HOT_UT],
-                H_cold_ut=pt_real[PT.H_COLD_UT],
-                dT_vals=pt_real[PT.DELTA_T],
-                RCP_hot=pt_real[PT.RCP_HOT],
-                RCP_cold=pt_real[PT.RCP_COLD],
-                RCP_hot_ut=pt_real[PT.RCP_HOT_UT],
-                RCP_cold_ut=pt_real[PT.RCP_COLD_UT],
+                T_col=pt_real[ProblemTableLabel.T],
+                H_hot=pt_real[ProblemTableLabel.H_HOT],
+                H_cold=pt_real[ProblemTableLabel.H_COLD],
+                H_hot_ut=pt_real[ProblemTableLabel.H_HOT_UT],
+                H_cold_ut=pt_real[ProblemTableLabel.H_COLD_UT],
+                dT_vals=pt_real[ProblemTableLabel.DELTA_T],
+                RCP_hot=pt_real[ProblemTableLabel.RCP_HOT],
+                RCP_cold=pt_real[ProblemTableLabel.RCP_COLD],
+                RCP_hot_ut=pt_real[ProblemTableLabel.RCP_HOT_UT],
+                RCP_cold_ut=pt_real[ProblemTableLabel.RCP_COLD_UT],
             )
         )
-        area_data = build_area_cost_target_data(pt, pt_real, zone, idx)
+        area_data = build_area_cost_target_data(
+            pt,
+            pt_real,
+            zone,
+            idx,
+            enabled=calculate_area_cost,
+        )
     else:
         area_data = {}
 
@@ -124,7 +130,7 @@ def compute_direct_integration_targets(
         )
         | {
             "zone_name": zone.name,
-            "type": TT.DI.value,
+            "type": TargetType.DI.value,
             "parent_zone": zone.parent_zone,
             "config": zone.config,
             "pt": pt,
@@ -147,9 +153,12 @@ def compute_direct_integration_targets(
 ################################################################################
 
 
-def should_update_balanced_composite_curves(direct_config, targeting_config) -> bool:
+def should_update_balanced_composite_curves(
+    direct_config,
+    calculate_area_cost: bool = False,
+) -> bool:
     """Return True when balanced composite curves are needed downstream."""
-    return bool(direct_config.balanced_cc_enabled or targeting_config.area_cost_enabled)
+    return bool(direct_config.balanced_cc_enabled or calculate_area_cost)
 
 
 def build_area_cost_target_data(
@@ -157,15 +166,17 @@ def build_area_cost_target_data(
     pt_real: ProblemTable,
     zone: Zone,
     idx: int | None,
+    *,
+    enabled: bool,
 ) -> dict:
     """Calculate direct-integration area and capital-cost target fields."""
-    if not zone.config.targeting.area_cost_enabled:
+    if not enabled:
         return {}
 
     num_units = get_min_number_hx(
-        T_vals=pt[PT.T],
-        H_hot_bal=pt[PT.H_HOT_BAL],
-        H_cold_bal=pt[PT.H_COLD_BAL],
+        T_vals=pt[ProblemTableLabel.T],
+        H_hot_bal=pt[ProblemTableLabel.H_HOT_BAL],
+        H_cold_bal=pt[ProblemTableLabel.H_COLD_BAL],
         hot_streams=zone.hot_streams,
         cold_streams=zone.cold_streams,
         hot_utilities=zone.hot_utilities,
@@ -173,11 +184,11 @@ def build_area_cost_target_data(
         idx=idx,
     )
     area = get_area_targets(
-        T_vals=pt_real[PT.T],
-        H_hot_bal=pt_real[PT.H_HOT_BAL],
-        H_cold_bal=pt_real[PT.H_COLD_BAL],
-        R_hot_bal=pt_real[PT.R_HOT_BAL],
-        R_cold_bal=pt_real[PT.R_COLD_BAL],
+        T_vals=pt_real[ProblemTableLabel.T],
+        H_hot_bal=pt_real[ProblemTableLabel.H_HOT_BAL],
+        H_cold_bal=pt_real[ProblemTableLabel.H_COLD_BAL],
+        R_hot_bal=pt_real[ProblemTableLabel.R_HOT_BAL],
+        R_cold_bal=pt_real[ProblemTableLabel.R_COLD_BAL],
     )
     capital_cost, annual_capital_cost = get_capital_cost_targets(
         area=area,
@@ -301,12 +312,22 @@ def _add_net_segment_period(
         net_streams.add(
             Stream(
                 name=f"Segment {k}" if split_idx == 0 else f"Segment {k}-{split_idx}",
-                t_supply=split_temp if curr_u.type == ST.Hot.value else segment_upper,
-                t_target=segment_upper if curr_u.type == ST.Hot.value else split_temp,
+                supply_temperature=(
+                    split_temp
+                    if curr_u.stream_type == StreamType.Hot.value
+                    else segment_upper
+                ),
+                target_temperature=(
+                    segment_upper
+                    if curr_u.stream_type == StreamType.Hot.value
+                    else split_temp
+                ),
                 heat_flow=dh_curr,
-                dt_cont=StreamCollection._value_at_idx(curr_u._dt_cont, idx),
-                dt_cont_multiplier=curr_u.dt_cont_multiplier,
-                htc=1.0,
+                delta_t_contribution=StreamCollection._value_at_idx(
+                    curr_u._dt_cont, idx
+                ),
+                delta_t_contribution_multiplier=curr_u.delta_t_contribution_multiplier,
+                heat_transfer_coefficient=1.0,
                 is_process_stream=True,
             )
         )
@@ -354,23 +375,48 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> dict:
     pt.round(decimals=4)
     pt_real.round(decimals=4)
     return {
-        GT.CC.value: pt_real.slice([PT.T, PT.H_HOT, PT.H_COLD]),
-        GT.SCC.value: pt.slice([PT.T, PT.H_HOT, PT.H_COLD]),
-        GT.BCC.value: pt_real.slice([PT.T, PT.H_HOT_BAL, PT.H_COLD_BAL]),
-        GT.GCC.value: pt.slice(
-            [PT.T, PT.H_NET, PT.H_NET_NP, PT.H_NET_V, PT.H_NET_A, PT.H_NET_UT]
+        GraphType.CC.value: pt_real.slice(
+            [ProblemTableLabel.T, ProblemTableLabel.H_HOT, ProblemTableLabel.H_COLD]
         ),
-        GT.GCC_R.value: pt_real.slice([PT.T, PT.H_NET, PT.H_NET_UT]),
-        GT.NLP.value: pt.slice(
+        GraphType.SCC.value: pt.slice(
+            [ProblemTableLabel.T, ProblemTableLabel.H_HOT, ProblemTableLabel.H_COLD]
+        ),
+        GraphType.BCC.value: pt_real.slice(
             [
-                PT.T,
-                PT.H_NET_HOT,
-                PT.H_NET_COLD,
-                PT.H_HOT_UT,
-                PT.H_COLD_UT,
-                PT.H_HOT_HP,
-                PT.H_COLD_HP,
+                ProblemTableLabel.T,
+                ProblemTableLabel.H_HOT_BAL,
+                ProblemTableLabel.H_COLD_BAL,
             ]
         ),
-        GT.GCC_HP.value: pt.slice([PT.T, PT.H_NET_W_AIR, PT.H_NET_HP]),
+        GraphType.GCC.value: pt.slice(
+            [
+                ProblemTableLabel.T,
+                ProblemTableLabel.H_NET,
+                ProblemTableLabel.H_NET_NP,
+                ProblemTableLabel.H_NET_V,
+                ProblemTableLabel.H_NET_A,
+                ProblemTableLabel.H_NET_UT,
+            ]
+        ),
+        GraphType.GCC_R.value: pt_real.slice(
+            [ProblemTableLabel.T, ProblemTableLabel.H_NET, ProblemTableLabel.H_NET_UT]
+        ),
+        GraphType.NLP.value: pt.slice(
+            [
+                ProblemTableLabel.T,
+                ProblemTableLabel.H_NET_HOT,
+                ProblemTableLabel.H_NET_COLD,
+                ProblemTableLabel.H_HOT_UT,
+                ProblemTableLabel.H_COLD_UT,
+                ProblemTableLabel.H_HOT_HP,
+                ProblemTableLabel.H_COLD_HP,
+            ]
+        ),
+        GraphType.GCC_HP.value: pt.slice(
+            [
+                ProblemTableLabel.T,
+                ProblemTableLabel.H_NET_W_AIR,
+                ProblemTableLabel.H_NET_HP,
+            ]
+        ),
     }

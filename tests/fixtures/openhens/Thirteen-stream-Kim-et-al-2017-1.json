@@ -30,11 +30,6 @@
     ],
     "HENS_LOG_LEVEL": "WARNING",
     "HENS_MAX_PARALLEL": 10,
-    "HENS_METHOD_SEQUENCE": [
-      "pinch_design_method",
-      "thermal_derivative_method",
-      "network_evolution_method"
-    ],
     "HENS_OUTPUT_FOLDER": "tests/fixtures/openhens/solver_baselines/Thirteen-stream-Kim-et-al-2017-1",
     "HENS_OUTPUT_FORMATS": [
       "json",

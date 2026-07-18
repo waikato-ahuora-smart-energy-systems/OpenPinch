@@ -10,7 +10,7 @@ from ....contracts.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
-from ....domain.enums import HENDesignMethod
+from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..execution.executor import LocalSynthesisExecutor, SynthesisExecutor
 from ..execution.pathways import pathway_metadata, pathways_from_metadata
@@ -41,8 +41,8 @@ def _execute_thermal_derivative_method_workflow(
     """Execute only the seeded TDM method and collect validated method outputs."""
     method_settings = replace(
         settings,
-        method_sequence=("thermal_derivative_method",),
-        design_method=HENDesignMethod.ThermalDerivative,
+        method_sequence=(HeatExchangerNetworkDesignMethod.ThermalDerivative,),
+        design_method=HeatExchangerNetworkDesignMethod.ThermalDerivative,
     )
     start = perf_counter()
 

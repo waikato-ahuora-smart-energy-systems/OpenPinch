@@ -98,7 +98,7 @@ class UtilitySummaryTarget(BaseTargetModel):
 
     def calc_utility_cost(self) -> float:
         """Calculate and cache the total utility cost across attached utilities."""
-        self.utility_cost = sum(u.ut_cost for u in self.utility_streams)
+        self.utility_cost = sum(u.utility_cost for u in self.utility_streams)
         return float(self.utility_cost)
 
 

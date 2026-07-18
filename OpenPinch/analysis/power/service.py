@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from ...domain.configuration import T_CRIT, Configuration, tol
-from ...domain.enums import TT, CogenerationTarget
+from ...domain.enums import CogenerationTarget, TargetType
 from ..numerics import get_period_index
 from ..targeting.context import (
     apply_zone_config_overrides,
@@ -30,12 +30,12 @@ __all__ = [
 ]
 
 _COGENERATION_TARGET_ORDER = (
-    TT.TS.value,
-    TT.IHP.value,
-    TT.IR.value,
-    TT.DHP.value,
-    TT.DR.value,
-    TT.DI.value,
+    TargetType.TS.value,
+    TargetType.IHP.value,
+    TargetType.IR.value,
+    TargetType.DHP.value,
+    TargetType.DR.value,
+    TargetType.DI.value,
 )
 
 
@@ -45,9 +45,13 @@ def get_power_cogeneration_above_pinch(
 ) -> CogenerationTarget:
     """Calculate above-Pinch cogeneration for a compatible thermal target object."""
     turbine_params = _prepare_turbine_parameters(target.config)
+    period_ids = getattr(target, "period_ids", None)
+    period_args = dict(args or {})
+    if not period_ids and "period_idx" in period_args:
+        period_args.pop("period_id", None)
     idx, sid = get_period_index(
-        period_ids=getattr(target, "period_ids", None),
-        args=args,
+        period_ids=period_ids,
+        args=period_args,
     )
     utility_data = _preprocess_utilities(target, turbine_params, idx=idx)
     if utility_data is None:
@@ -233,10 +237,10 @@ def _preprocess_utilities(
 
     u: Stream
     for i, u in enumerate(target.hot_utilities):
-        t_supply = float(u.t_supply[idx])
-        t_target = float(u.t_target[idx])
+        t_supply = float(u.supply_temperature[idx])
+        t_target = float(u.target_temperature[idx])
         heat_flow = float(u.heat_flow[idx])
-        dt_cont_act = float(u.dt_cont_act[idx])
+        dt_cont_act = float(u.effective_delta_t_contribution[idx])
         if t_supply >= T_CRIT or heat_flow <= tol:
             continue
 

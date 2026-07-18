@@ -158,8 +158,8 @@ def test_brayton_stream_build_handles_zero_temperature_span(monkeypatch):
     hp._states[0]["T"] = 40.0
 
     hot_sc, cold_sc = hp.get_hp_hot_and_cold_streams()
-    assert hot_sc[0].t_supply != hot_sc[0].t_target
-    assert cold_sc[0].t_supply != cold_sc[0].t_target
+    assert hot_sc[0].supply_temperature != hot_sc[0].target_temperature
+    assert cold_sc[0].supply_temperature != cold_sc[0].target_temperature
 
 
 def test_brayton_cycle_raises_runtime_error_on_result_extraction_failure(monkeypatch):

@@ -10,8 +10,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ...domain.enums import HeatExchangerNetworkDesignMethod
 
-SynthesisMethod = HeatExchangerNetworkDesignMethod
-SynthesisDesignMethod = HeatExchangerNetworkDesignMethod
 SynthesisTaskStatus = Literal["pending", "success", "failed", "skipped"]
 SynthesisOutputFormat = Literal["json", "csv", "xlsx"]
 
@@ -85,7 +83,7 @@ class HeatExchangerNetworkSynthesisManifest(BaseModel):
     approach_temperatures: tuple[float, ...]
     derivative_thresholds: tuple[float, ...]
     stage_selection: tuple[int, ...]
-    method_sequence: tuple[SynthesisMethod, ...] = (
+    method_sequence: tuple[HeatExchangerNetworkDesignMethod, ...] = (
         HeatExchangerNetworkDesignMethod.PinchDesign,
         HeatExchangerNetworkDesignMethod.ThermalDerivative,
         HeatExchangerNetworkDesignMethod.NetworkEvolution,
@@ -103,7 +101,7 @@ class HeatExchangerNetworkSynthesisManifest(BaseModel):
     problem_id: str | None = None
     workspace_variant: str | None = None
     period_id: str | None = None
-    design_method: SynthesisDesignMethod | None = None
+    design_method: HeatExchangerNetworkDesignMethod | None = None
     selected_pathway_id: str | None = None
     selected_pathway_kind: str | None = None
     selected_pdm_mode: str | None = None

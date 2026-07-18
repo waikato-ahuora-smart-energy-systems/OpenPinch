@@ -5,6 +5,18 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+_WIRE_TO_RUNTIME = {
+    "t_supply": "supply_temperature",
+    "t_target": "target_temperature",
+    "p_supply": "supply_pressure",
+    "p_target": "target_pressure",
+    "h_supply": "supply_enthalpy",
+    "h_target": "target_enthalpy",
+    "dt_cont": "delta_t_contribution",
+    "dt_cont_multiplier": "delta_t_contribution_multiplier",
+    "htc": "heat_transfer_coefficient",
+}
+
 
 def normalise_segment_input(segment: Any, *, segment_type: type):
     """Return one detached internal segment from a supported parent input."""
@@ -22,7 +34,9 @@ def normalise_segment_input(segment: Any, *, segment_type: type):
             "providing model_dump()."
         )
 
-    values = dict(raw_segment)
+    values = {
+        _WIRE_TO_RUNTIME.get(key, key): value for key, value in raw_segment.items()
+    }
     values.pop("segment_index", None)
     if values.get("name") is None:
         values.pop("name", None)
@@ -78,7 +92,7 @@ def update_transaction(
             if not isinstance(attr_name, str):
                 raise TypeError("Segment update attribute names must be strings.")
             if attr_name in {
-                "active",
+                "is_active",
                 "is_process_stream",
                 "fluid_name",
                 "fluid_phase",
@@ -91,7 +105,7 @@ def update_transaction(
                 raise ValueError(
                     f"Attribute {attr_name!r} is not mutable segment state."
                 )
-            validated_changes[internal_name] = value
+            validated_changes[attr_name] = value
         normalised[segment_index] = validated_changes
 
     if not normalised:
@@ -176,19 +190,19 @@ def sync_aggregate(parent) -> None:
     parent._syncing_segments = True
     try:
         assignments = {
-            "_t_supply": aggregate.t_supply,
-            "_t_target": aggregate.t_target,
-            "_p_supply": aggregate.p_supply,
-            "_p_target": aggregate.p_target,
-            "_h_supply": aggregate.h_supply,
-            "_h_target": aggregate.h_target,
-            "_dt_cont": aggregate.dt_cont,
-            "_heat_flow": parent._build_value(aggregate.heat_flow, unit="kW"),
-            "_htc": parent._build_value(
+            "supply_temperature": aggregate.t_supply,
+            "target_temperature": aggregate.t_target,
+            "supply_pressure": aggregate.p_supply,
+            "target_pressure": aggregate.p_target,
+            "supply_enthalpy": aggregate.h_supply,
+            "target_enthalpy": aggregate.h_target,
+            "delta_t_contribution": aggregate.dt_cont,
+            "heat_flow": parent._build_value(aggregate.heat_flow, unit="kW"),
+            "heat_transfer_coefficient": parent._build_value(
                 aggregate.effective_htc,
                 unit="kW/m^2/delta_degC",
             ),
-            "_price": aggregate.price,
+            "price": aggregate.price,
         }
         for attr_name, value in assignments.items():
             parent.set_value_attr(attr_name, value, update_derived=False)

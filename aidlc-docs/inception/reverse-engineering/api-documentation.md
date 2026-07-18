@@ -16,7 +16,7 @@ The package root exports the supported high-level surface:
 - `list_sample_cases`, `read_sample_case`, `copy_sample_case`, and sample metadata functions - packaged case discovery.
 - `list_notebooks`, `copy_notebook`, and notebook metadata functions - packaged notebook discovery.
 - `get_piecewise_linearisation_for_streams` - nonlinear-stream preprocessing utility.
-- Public enums and report models, including `TargetType`, `GraphType`, `HPRcycle`, `ProblemReport`, and `ValidationReport`.
+- Public enums and report models, including `TargetType`, `GraphType`, `HeatPumpAndRefrigerationCycle`, `ProblemReport`, and `ValidationReport`.
 
 ## `PinchProblem` API Families
 
@@ -55,7 +55,7 @@ The package root exports the supported high-level surface:
 - `list_variants`, `copy_case`, `scenario`, `case`, and active-case helpers - manage named variants.
 - `validate_variant` and `validation_report` - produce structured validation results.
 - `solve_variant(workflow=..., workflow_options=...)` - execute a configured case workflow and return a serializable view.
-- `compare_variants` and compatibility aliases such as `compare_cases` - calculate metric and problem-table deltas.
+- `compare_cases` and `compare_to` calculate metric and problem-table deltas.
 - `save_bundle` and `load_bundle` - persist scenario inputs, workflow metadata, and cached views as JSON.
 
 ## Internal Service APIs
@@ -113,4 +113,3 @@ These functions mutate or enrich a prepared `Zone` graph and return the zone. Th
 - `ValidationReport` preserves semantic input issues for application-facing workflows.
 - Optional dependency helpers raise targeted installation guidance when advanced surfaces are unavailable.
 - `PinchWorkspace.solve_variant` converts expected workflow errors and unexpected exceptions into structured error views; direct `PinchProblem` calls generally raise exceptions.
-

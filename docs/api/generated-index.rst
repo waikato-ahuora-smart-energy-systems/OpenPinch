@@ -15,6 +15,5 @@ internal API churn.
    ../reference/api-analysis
    ../reference/api-heat-pump
    ../reference/api-classes
-   ../reference/api-lib
    ../reference/api-utils
    ../reference/api-entrypoints

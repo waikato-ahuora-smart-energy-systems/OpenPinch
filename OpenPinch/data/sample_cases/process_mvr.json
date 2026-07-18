@@ -1,0 +1,36 @@
+{
+  "streams": [
+    {
+      "zone": "Site/Evaporation Train",
+      "name": "Evaporator vapour",
+      "t_supply": 120.0,
+      "t_target": 80.0,
+      "p_supply": 101.325,
+      "heat_flow": 100.0,
+      "dt_cont": 0.0,
+      "htc": 1.0,
+      "fluid_name": "Air",
+      "fluid_phase": "gas"
+    },
+    {
+      "zone": "Site/Evaporation Train",
+      "name": "Product heating",
+      "t_supply": 30.0,
+      "t_target": 100.0,
+      "heat_flow": 120.0,
+      "dt_cont": 0.0,
+      "htc": 1.0
+    }
+  ],
+  "utilities": [],
+  "zone_tree": {
+    "name": "Site",
+    "type": "Site",
+    "children": [
+      {
+        "name": "Evaporation Train",
+        "type": "Process Zone"
+      }
+    ]
+  }
+}

@@ -10,7 +10,7 @@ from ....contracts.input import StreamSchema, UtilitySchema
 from ....contracts.units import standardise_input_value
 from ....domain._stream.segment import StreamSegment
 from ....domain.configuration import tol
-from ....domain.enums import ST
+from ....domain.enums import StreamType
 from ....domain.stream import Stream
 from ....domain.value import Value
 from ....domain.zone import Zone
@@ -20,13 +20,13 @@ def _create_segmented_process_stream(stream: StreamSchema, zone: Zone) -> Stream
     """Create one physical parent stream from ordered nested thermal data."""
     _validate_nested_record_semantics(stream, config=zone.config, section="streams")
     common = {
-        "dt_cont": standardise_input_value(
+        "delta_t_contribution": standardise_input_value(
             stream.dt_cont,
             field_name="dt_cont",
             config=zone.config,
         ),
-        "dt_cont_multiplier": zone.dt_cont_multiplier,
-        "htc": standardise_input_value(
+        "delta_t_contribution_multiplier": zone.dt_cont_multiplier,
+        "heat_transfer_coefficient": standardise_input_value(
             stream.htc,
             field_name="htc",
             config=zone.config,
@@ -39,32 +39,32 @@ def _create_segmented_process_stream(stream: StreamSchema, zone: Zone) -> Stream
         segments = [
             StreamSegment(
                 name=segment.name or f"{stream.name}.S{index + 1}",
-                t_supply=standardise_input_value(
+                supply_temperature=standardise_input_value(
                     segment.t_supply,
                     field_name="t_supply",
                     config=zone.config,
                 ),
-                t_target=standardise_input_value(
+                target_temperature=standardise_input_value(
                     segment.t_target,
                     field_name="t_target",
                     config=zone.config,
                 ),
-                p_supply=standardise_input_value(
+                supply_pressure=standardise_input_value(
                     segment.p_supply,
                     field_name="p_supply",
                     config=zone.config,
                 ),
-                p_target=standardise_input_value(
+                target_pressure=standardise_input_value(
                     segment.p_target,
                     field_name="p_target",
                     config=zone.config,
                 ),
-                h_supply=standardise_input_value(
+                supply_enthalpy=standardise_input_value(
                     segment.h_supply,
                     field_name="h_supply",
                     config=zone.config,
                 ),
-                h_target=standardise_input_value(
+                target_enthalpy=standardise_input_value(
                     segment.h_target,
                     field_name="h_target",
                     config=zone.config,
@@ -74,12 +74,12 @@ def _create_segmented_process_stream(stream: StreamSchema, zone: Zone) -> Stream
                     field_name="heat_flow",
                     config=zone.config,
                 ),
-                dt_cont=standardise_input_value(
+                delta_t_contribution=standardise_input_value(
                     segment.dt_cont if segment.dt_cont is not None else stream.dt_cont,
                     field_name="dt_cont",
                     config=zone.config,
                 ),
-                htc=standardise_input_value(
+                heat_transfer_coefficient=standardise_input_value(
                     segment.htc if segment.htc is not None else stream.htc,
                     field_name="htc",
                     config=zone.config,
@@ -89,7 +89,7 @@ def _create_segmented_process_stream(stream: StreamSchema, zone: Zone) -> Stream
                     field_name="price",
                     config=zone.config,
                 ),
-                dt_cont_multiplier=zone.dt_cont_multiplier,
+                delta_t_contribution_multiplier=zone.dt_cont_multiplier,
                 is_process_stream=True,
                 fluid_name=stream.fluid_name,
                 fluid_phase=stream.fluid_phase,
@@ -101,7 +101,7 @@ def _create_segmented_process_stream(stream: StreamSchema, zone: Zone) -> Stream
         segments = _segments_from_profile(stream, zone.config, common)
 
     parent = Stream(name=stream.name, segments=segments, **common)
-    parent.active = stream.active
+    parent.is_active = stream.active
     _validate_supplied_parent_aggregates(stream, parent, zone)
     return parent
 
@@ -152,9 +152,9 @@ def _segments_from_profile(
     segment_common = {
         key: common[key]
         for key in (
-            "dt_cont",
-            "dt_cont_multiplier",
-            "htc",
+            "delta_t_contribution",
+            "delta_t_contribution_multiplier",
+            "heat_transfer_coefficient",
             "price",
             "is_process_stream",
             "fluid_name",
@@ -226,8 +226,8 @@ def _segments_from_profile(
         segments.append(
             StreamSegment(
                 name=f"{stream.name}.S{index + 1}",
-                t_supply=Value(start_t, temperatures[0].unit),
-                t_target=Value(end_t, temperatures[0].unit),
+                supply_temperature=Value(start_t, temperatures[0].unit),
+                target_temperature=Value(end_t, temperatures[0].unit),
                 heat_flow=Value(np.abs(end_h - start_h), cumulative_heat[0].unit),
                 segment_index=index,
                 **segment_common,
@@ -246,13 +246,13 @@ def _create_segmented_utility_stream(
     """Create one ordered segmented utility, preserving local segment prices."""
     _validate_nested_record_semantics(utility, config=config, section="utilities")
     common = {
-        "dt_cont": standardise_input_value(
+        "delta_t_contribution": standardise_input_value(
             utility.dt_cont,
             field_name="dt_cont",
             config=config,
         ),
-        "dt_cont_multiplier": dt_cont_multiplier,
-        "htc": standardise_input_value(
+        "delta_t_contribution_multiplier": dt_cont_multiplier,
+        "heat_transfer_coefficient": standardise_input_value(
             utility.htc,
             field_name="htc",
             config=config,
@@ -270,32 +270,32 @@ def _create_segmented_utility_stream(
         segments = [
             StreamSegment(
                 name=segment.name or f"{utility.name}.S{index + 1}",
-                t_supply=standardise_input_value(
+                supply_temperature=standardise_input_value(
                     segment.t_supply,
                     field_name="t_supply",
                     config=config,
                 ),
-                t_target=standardise_input_value(
+                target_temperature=standardise_input_value(
                     segment.t_target,
                     field_name="t_target",
                     config=config,
                 ),
-                p_supply=standardise_input_value(
+                supply_pressure=standardise_input_value(
                     segment.p_supply,
                     field_name="p_supply",
                     config=config,
                 ),
-                p_target=standardise_input_value(
+                target_pressure=standardise_input_value(
                     segment.p_target,
                     field_name="p_target",
                     config=config,
                 ),
-                h_supply=standardise_input_value(
+                supply_enthalpy=standardise_input_value(
                     segment.h_supply,
                     field_name="h_supply",
                     config=config,
                 ),
-                h_target=standardise_input_value(
+                target_enthalpy=standardise_input_value(
                     segment.h_target,
                     field_name="h_target",
                     config=config,
@@ -305,12 +305,12 @@ def _create_segmented_utility_stream(
                     field_name="heat_flow",
                     config=config,
                 ),
-                dt_cont=standardise_input_value(
+                delta_t_contribution=standardise_input_value(
                     segment.dt_cont if segment.dt_cont is not None else utility.dt_cont,
                     field_name="dt_cont",
                     config=config,
                 ),
-                htc=standardise_input_value(
+                heat_transfer_coefficient=standardise_input_value(
                     segment.htc if segment.htc is not None else utility.htc,
                     field_name="htc",
                     config=config,
@@ -320,7 +320,7 @@ def _create_segmented_utility_stream(
                     field_name="price",
                     config=config,
                 ),
-                dt_cont_multiplier=dt_cont_multiplier,
+                delta_t_contribution_multiplier=dt_cont_multiplier,
                 is_process_stream=False,
                 fluid_name=utility.fluid_name,
                 fluid_phase=utility.fluid_phase,
@@ -336,9 +336,9 @@ def _create_segmented_utility_stream(
         )
 
     parent = Stream(name=utility.name, segments=segments, price=None, **common)
-    parent.active = utility.active
+    parent.is_active = utility.active
     _validate_supplied_parent_aggregates(utility, parent, config)
-    if parent.type != utility_type:
+    if parent.stream_type != utility_type:
         candidates = []
         for segment in reversed(parent.segments):
             candidate = parent._detached_segment(segment)
@@ -357,7 +357,10 @@ def _create_segmented_utility_stream(
             candidate.update_derived_properties()
             candidates.append(candidate)
         parent.replace_segments(candidates)
-    if parent.type != utility_type or utility_type not in {ST.Hot.value, ST.Cold.value}:
+    if parent.stream_type != utility_type or utility_type not in {
+        StreamType.Hot.value,
+        StreamType.Cold.value,
+    }:
         raise ValueError(
             f"Segmented utility {utility.name!r} cannot be oriented as "
             f"{utility_type!r}."
@@ -372,8 +375,8 @@ def _validate_supplied_parent_aggregates(
 ) -> None:
     config = getattr(zone_or_config, "config", zone_or_config)
     fields = {
-        "t_supply": parent.t_supply,
-        "t_target": parent.t_target,
+        "t_supply": parent.supply_temperature,
+        "t_target": parent.target_temperature,
         "heat_flow": parent.heat_flow,
     }
     for field_name, actual in fields.items():

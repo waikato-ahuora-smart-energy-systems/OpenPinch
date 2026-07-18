@@ -82,9 +82,9 @@ from OpenPinch.contracts.input import (
 from OpenPinch.domain._stream.segment import StreamSegment
 from OpenPinch.domain.configuration import Configuration
 from OpenPinch.domain.enums import (
-    ST,
-    ZT,
     StreamLoc,
+    StreamType,
+    ZoneType,
 )
 from OpenPinch.domain.stream import Stream
 from OpenPinch.domain.stream_collection import StreamCollection
@@ -225,17 +225,17 @@ def test_default_utility_extrema_use_authoritative_segment_shifted_temperatures(
         segments=[
             StreamSegment(
                 name="S1",
-                t_supply=200.0,
-                t_target=150.0,
+                supply_temperature=200.0,
+                target_temperature=150.0,
                 heat_flow=50.0,
-                dt_cont=20.0,
+                delta_t_contribution=20.0,
             ),
             StreamSegment(
                 name="S2",
-                t_supply=150.0,
-                t_target=100.0,
+                supply_temperature=150.0,
+                target_temperature=100.0,
                 heat_flow=50.0,
-                dt_cont=0.0,
+                delta_t_contribution=0.0,
             ),
         ],
     )
@@ -247,10 +247,10 @@ def test_default_utility_extrema_use_authoritative_segment_shifted_temperatures(
         StreamCollection(),
     )
 
-    assert float(hot.t_min_star) == pytest.approx(80.0)
-    assert min(float(segment.t_min_star) for segment in hot.segments) == pytest.approx(
-        100.0
-    )
+    assert float(hot.shifted_minimum_temperature) == pytest.approx(80.0)
+    assert min(
+        float(segment.shifted_minimum_temperature) for segment in hot.segments
+    ) == pytest.approx(100.0)
     assert hu_t_min == pytest.approx(100.0)
     assert cu_t_max == pytest.approx(100.0)
 
@@ -263,8 +263,14 @@ def test_stream_attributes_are_computed_correctly(dummy_streams):
     z1 = site.subzones["Z1"]
     hot = next(s for s in z1.hot_streams if s.name == "H1")
     cold = next(s for s in z1.cold_streams if s.name == "C1")
-    assert hot.t_max_star[0] == hot.t_supply[0] - hot.dt_cont_act[0]
-    assert cold.t_min_star[0] == cold.t_supply[0] + cold.dt_cont_act[0]
+    assert (
+        hot.shifted_maximum_temperature[0]
+        == hot.supply_temperature[0] - hot.effective_delta_t_contribution[0]
+    )
+    assert (
+        cold.shifted_minimum_temperature[0]
+        == cold.supply_temperature[0] + cold.effective_delta_t_contribution[0]
+    )
 
 
 def test_prepare_problem_preserves_stream_fluid_pressure_and_enthalpy_fields():
@@ -291,12 +297,12 @@ def test_prepare_problem_preserves_stream_fluid_pressure_and_enthalpy_fields():
 
     assert hot.fluid_name == "HEOS::Water"
     assert hot.fluid_phase == "gas"
-    assert hot.p_supply.value == pytest.approx(200.0)
-    assert hot.p_supply.unit == "kPa"
-    assert hot.p_target.value == pytest.approx(150.0)
-    assert hot.h_supply.value == pytest.approx(2_800.0)
-    assert hot.h_supply.unit == "kJ/kg"
-    assert hot.h_target.value == pytest.approx(2_300.0)
+    assert hot.supply_pressure.value == pytest.approx(200.0)
+    assert hot.supply_pressure.unit == "kPa"
+    assert hot.target_pressure.value == pytest.approx(150.0)
+    assert hot.supply_enthalpy.value == pytest.approx(2_800.0)
+    assert hot.supply_enthalpy.unit == "kJ/kg"
+    assert hot.target_enthalpy.value == pytest.approx(2_300.0)
 
 
 def test_prepare_problem_preserves_utility_fluid_pressure_and_enthalpy_fields(
@@ -324,10 +330,10 @@ def test_prepare_problem_preserves_utility_fluid_pressure_and_enthalpy_fields(
 
     assert steam.fluid_name == "Water"
     assert steam.fluid_phase == "vle"
-    assert steam.p_supply.value == pytest.approx(800.0)
-    assert steam.p_target.value == pytest.approx(700.0)
-    assert steam.h_supply.value == pytest.approx(2_750.0)
-    assert steam.h_target.value == pytest.approx(700.0)
+    assert steam.supply_pressure.value == pytest.approx(800.0)
+    assert steam.target_pressure.value == pytest.approx(700.0)
+    assert steam.supply_enthalpy.value == pytest.approx(2_750.0)
+    assert steam.target_enthalpy.value == pytest.approx(700.0)
 
 
 def test_prepare_problem_rejects_invalid_coolprop_stream_fluid_name():
@@ -369,12 +375,12 @@ def test_prepare_problem_orients_utility_pressure_and_enthalpy_with_temperature(
     site = prepare_problem(streams=dummy_streams, utilities=utilities)
     cooling = next(s for s in site.cold_utilities if s.name == "Cooling")
 
-    assert cooling.t_supply.value == pytest.approx(20.0)
-    assert cooling.t_target.value == pytest.approx(80.0)
-    assert cooling.p_supply.value == pytest.approx(700.0)
-    assert cooling.p_target.value == pytest.approx(800.0)
-    assert cooling.h_supply.value == pytest.approx(20.0)
-    assert cooling.h_target.value == pytest.approx(80.0)
+    assert cooling.supply_temperature.value == pytest.approx(20.0)
+    assert cooling.target_temperature.value == pytest.approx(80.0)
+    assert cooling.supply_pressure.value == pytest.approx(700.0)
+    assert cooling.target_pressure.value == pytest.approx(800.0)
+    assert cooling.supply_enthalpy.value == pytest.approx(20.0)
+    assert cooling.target_enthalpy.value == pytest.approx(80.0)
 
 
 def test_zone_names_and_ordering(dummy_streams):
@@ -504,18 +510,18 @@ def test_prepare_problem_applies_configured_input_unit_defaults():
     hot_utility = next(u for u in site.hot_utilities if u.name == "HU_K")
     cold_utility = next(u for u in site.cold_utilities if u.name == "CU_K")
 
-    assert float(hot.t_supply) == pytest.approx(250.0)
-    assert float(hot.t_target) == pytest.approx(100.0)
-    assert float(cold.t_supply) == pytest.approx(30.0)
-    assert float(cold.t_target) == pytest.approx(150.0)
-    assert float(hot_utility.t_supply) == pytest.approx(300.0)
-    assert float(hot_utility.t_target) == pytest.approx(250.0)
-    assert float(hot_utility.dt_cont) == pytest.approx(10.0)
-    assert float(hot_utility.htc) == pytest.approx(0.5)
-    assert float(cold_utility.t_supply) == pytest.approx(20.0)
-    assert float(cold_utility.t_target) == pytest.approx(40.0)
-    assert float(cold_utility.dt_cont) == pytest.approx(10.0)
-    assert float(cold_utility.htc) == pytest.approx(0.5)
+    assert float(hot.supply_temperature) == pytest.approx(250.0)
+    assert float(hot.target_temperature) == pytest.approx(100.0)
+    assert float(cold.supply_temperature) == pytest.approx(30.0)
+    assert float(cold.target_temperature) == pytest.approx(150.0)
+    assert float(hot_utility.supply_temperature) == pytest.approx(300.0)
+    assert float(hot_utility.target_temperature) == pytest.approx(250.0)
+    assert float(hot_utility.delta_t_contribution) == pytest.approx(10.0)
+    assert float(hot_utility.heat_transfer_coefficient) == pytest.approx(0.5)
+    assert float(cold_utility.supply_temperature) == pytest.approx(20.0)
+    assert float(cold_utility.target_temperature) == pytest.approx(40.0)
+    assert float(cold_utility.delta_t_contribution) == pytest.approx(10.0)
+    assert float(cold_utility.heat_transfer_coefficient) == pytest.approx(0.5)
 
 
 def test_prepare_problem_preserves_period_dt_cont_and_htc_values():
@@ -550,10 +556,18 @@ def test_prepare_problem_preserves_period_dt_cont_and_htc_values():
     stream = next(s for s in site.subzones["Z1"].hot_streams if s.name == "H_period")
     utility = next(u for u in site.hot_utilities if u.name == "HU_period")
 
-    assert stream.dt_cont.period_values.tolist() == pytest.approx([2.0, 3.0])
-    assert stream.htc.period_values.tolist() == pytest.approx([0.4, 0.5])
-    assert utility.dt_cont.period_values.tolist() == pytest.approx([4.0, 5.0])
-    assert utility.htc.period_values.tolist() == pytest.approx([0.6, 0.7])
+    assert stream.delta_t_contribution.period_values.tolist() == pytest.approx(
+        [2.0, 3.0]
+    )
+    assert stream.heat_transfer_coefficient.period_values.tolist() == pytest.approx(
+        [0.4, 0.5]
+    )
+    assert utility.delta_t_contribution.period_values.tolist() == pytest.approx(
+        [4.0, 5.0]
+    )
+    assert utility.heat_transfer_coefficient.period_values.tolist() == pytest.approx(
+        [0.6, 0.7]
+    )
 
 
 # ---------------- Invalid Input Tests ---------------- #
@@ -735,7 +749,7 @@ def test_htc_zero_stream_is_preserved():
     ]
     site = prepare_problem(streams=streams)
     stream = site.subzones["Z1"].hot_streams[0]
-    assert stream.htc[0] == 0.0
+    assert stream.heat_transfer_coefficient[0] == 0.0
     assert stream.name == "ZeroHTC"
 
 
@@ -993,7 +1007,7 @@ def test_utility_sorting_by_temp(dummy_streams):
         ),
     ]
     site = prepare_problem(streams=dummy_streams, utilities=utilities)
-    temps = [u.t_supply for u in site.hot_utilities]
+    temps = [u.supply_temperature for u in site.hot_utilities]
     assert temps == sorted(temps, reverse=True)
 
 
@@ -1075,8 +1089,8 @@ def test_zero_dtcont_and_dtglide():
     ]
     site = prepare_problem(streams=streams)
     stream = site.subzones["Z1"].hot_streams[0]
-    assert stream.t_min_star == stream.t_target
-    assert stream.t_max_star == stream.t_supply
+    assert stream.shifted_minimum_temperature == stream.target_temperature
+    assert stream.shifted_maximum_temperature == stream.supply_temperature
 
 
 def test_zone_tree_dt_cont_multiplier_validation():
@@ -1136,11 +1150,11 @@ def test_zone_dt_cont_multiplier_inherits_from_root_for_streams_and_utilities():
 
     assert site.dt_cont_multiplier == 2.0
     assert area.dt_cont_multiplier == 2.0
-    assert hot_stream.dt_cont[0] == 10.0
-    assert hot_stream.dt_cont_act[0] == 20.0
-    assert hot_stream.t_min_star[0] == 80.0
-    assert hot_utility.dt_cont[0] == 8.0
-    assert hot_utility.dt_cont_act[0] == 16.0
+    assert hot_stream.delta_t_contribution[0] == 10.0
+    assert hot_stream.effective_delta_t_contribution[0] == 20.0
+    assert hot_stream.shifted_minimum_temperature[0] == 80.0
+    assert hot_utility.delta_t_contribution[0] == 8.0
+    assert hot_utility.effective_delta_t_contribution[0] == 16.0
 
 
 def test_zone_dt_cont_multiplier_child_override_is_absolute():
@@ -1193,10 +1207,10 @@ def test_zone_dt_cont_multiplier_child_override_is_absolute():
 
     assert area_a.dt_cont_multiplier == 2.0
     assert area_b.dt_cont_multiplier == 0.5
-    assert hot_a.dt_cont[0] == 10.0
-    assert hot_a.dt_cont_act[0] == 20.0
-    assert hot_b.dt_cont[0] == 10.0
-    assert hot_b.dt_cont_act[0] == 5.0
+    assert hot_a.delta_t_contribution[0] == 10.0
+    assert hot_a.effective_delta_t_contribution[0] == 20.0
+    assert hot_b.delta_t_contribution[0] == 10.0
+    assert hot_b.effective_delta_t_contribution[0] == 5.0
 
 
 def test_default_utilities_use_zone_effective_dt_cont_multiplier():
@@ -1233,10 +1247,10 @@ def test_default_utilities_use_zone_effective_dt_cont_multiplier():
     cu = next(utility for utility in area.cold_utilities if utility.name == "CU")
 
     dt_cont = area.config.thermal.dt_cont
-    assert float(hu.dt_cont[0]) == pytest.approx(dt_cont)
-    assert float(hu.dt_cont_act[0]) == pytest.approx(dt_cont * 3.0)
-    assert float(cu.dt_cont[0]) == pytest.approx(dt_cont)
-    assert float(cu.dt_cont_act[0]) == pytest.approx(dt_cont * 3.0)
+    assert float(hu.delta_t_contribution[0]) == pytest.approx(dt_cont)
+    assert float(hu.effective_delta_t_contribution[0]) == pytest.approx(dt_cont * 3.0)
+    assert float(cu.delta_t_contribution[0]) == pytest.approx(dt_cont)
+    assert float(cu.effective_delta_t_contribution[0]) == pytest.approx(dt_cont * 3.0)
 
 
 def test_phase_change_utility_with_null_target_is_completed_near_supply_temperature():
@@ -1272,10 +1286,10 @@ def test_phase_change_utility_with_null_target_is_completed_near_supply_temperat
     hot_hps = site.hot_utilities[".".join([StreamLoc.HotU.value, "HPS"])]
     cold_hps = site.cold_utilities[".".join([StreamLoc.ColdU.value, "HPS"])]
 
-    assert float(hot_hps.t_supply[0]) == pytest.approx(280.0)
-    assert float(hot_hps.t_target[0]) == pytest.approx(279.99)
-    assert float(cold_hps.t_supply[0]) == pytest.approx(279.99)
-    assert float(cold_hps.t_target[0]) == pytest.approx(280.0)
+    assert float(hot_hps.supply_temperature[0]) == pytest.approx(280.0)
+    assert float(hot_hps.target_temperature[0]) == pytest.approx(279.99)
+    assert float(cold_hps.supply_temperature[0]) == pytest.approx(279.99)
+    assert float(cold_hps.target_temperature[0]) == pytest.approx(280.0)
 
 
 def test_process_stream_with_null_dt_cont_defaults_to_zero():
@@ -1296,8 +1310,8 @@ def test_process_stream_with_null_dt_cont_defaults_to_zero():
     site = prepare_problem(streams=streams)
     hot_a = next(stream for stream in site.hot_streams if stream.name == "HotA")
 
-    assert float(hot_a.dt_cont[0]) == pytest.approx(0.0)
-    assert float(hot_a.dt_cont_act[0]) == pytest.approx(0.0)
+    assert float(hot_a.delta_t_contribution[0]) == pytest.approx(0.0)
+    assert float(hot_a.effective_delta_t_contribution[0]) == pytest.approx(0.0)
 
 
 def test_period_process_extrema_use_all_periods_for_default_hot_utility():
@@ -1342,8 +1356,8 @@ def test_period_process_extrema_use_all_periods_for_default_hot_utility():
     site = prepare_problem(streams=streams, options=options)
     hu = next(utility for utility in site.hot_utilities if utility.name == "HU")
 
-    assert float(hu.t_max_star[0]) == pytest.approx(210.0)
-    assert float(hu.t_max_star[1]) == pytest.approx(210.0)
+    assert float(hu.shifted_maximum_temperature[0]) == pytest.approx(210.0)
+    assert float(hu.shifted_maximum_temperature[1]) == pytest.approx(210.0)
 
 
 def test_period_process_extrema_use_selected_period_for_default_hot_utility():
@@ -1384,8 +1398,8 @@ def test_period_process_extrema_use_selected_period_for_default_hot_utility():
     site = prepare_problem(streams=streams)
     hu = next(utility for utility in site.hot_utilities if utility.name == "HU")
 
-    assert float(hu.t_max_star[0]) == pytest.approx(210.0)
-    assert float(hu.t_max_star[1]) == pytest.approx(210.0)
+    assert float(hu.shifted_maximum_temperature[0]) == pytest.approx(210.0)
+    assert float(hu.shifted_maximum_temperature[1]) == pytest.approx(210.0)
 
 
 def test_period_hot_utility_sorting_uses_all_period_envelope(dummy_streams):
@@ -1483,10 +1497,10 @@ def test_period_hot_utility_sorting_uses_selected_period(dummy_streams):
 
 
 def test_build_prepared_stream_collection_rejects_neutral_process_stream():
-    master_zone = Zone(name="Site", type=ZT.S.value, config=Configuration())
+    master_zone = Zone(name="Site", type=ZoneType.S.value, config=Configuration())
     area = Zone(
         name="AreaA",
-        type=ZT.P.value,
+        type=ZoneType.P.value,
         config=master_zone.config,
         parent_zone=master_zone,
     )
@@ -1541,11 +1555,13 @@ def test_utility_temperature_helpers_reject_missing_and_inconsistent_inputs():
     )
 
     with pytest.raises(ValueError, match="cannot be oriented consistently"):
-        _orient_utility_temperatures(inconsistent, ST.Hot.value, Configuration())
+        _orient_utility_temperatures(
+            inconsistent, StreamType.Hot.value, Configuration()
+        )
 
 
 def test_build_prepared_stream_collection_rejects_unresolved_stream_zone():
-    master_zone = Zone(name="Site", type=ZT.S.value, config=Configuration())
+    master_zone = Zone(name="Site", type=ZoneType.S.value, config=Configuration())
     stream = StreamSchema.model_validate(
         {
             "name": "H_missing",
@@ -1652,8 +1668,16 @@ def test_prepare_problem_utilities_are_copied_per_zone():
 
     assert root_utility is not area_a_utility
     assert area_a_utility is not area_b_utility
-    assert root_utility.t_supply == area_a_utility.t_supply == area_b_utility.t_supply
-    assert root_utility.t_target == area_a_utility.t_target == area_b_utility.t_target
+    assert (
+        root_utility.supply_temperature
+        == area_a_utility.supply_temperature
+        == area_b_utility.supply_temperature
+    )
+    assert (
+        root_utility.target_temperature
+        == area_a_utility.target_temperature
+        == area_b_utility.target_temperature
+    )
 
 
 def test_zone_dt_cont_multiplier_changes_only_zone_utility_copies():
@@ -1719,24 +1743,24 @@ def test_zone_dt_cont_multiplier_changes_only_zone_utility_copies():
 
     area_a.dt_cont_multiplier = 2.0
 
-    assert float(area_a_hot.dt_cont_act[0]) == pytest.approx(
-        float(area_a_hot.dt_cont[0]) * 2.0
+    assert float(area_a_hot.effective_delta_t_contribution[0]) == pytest.approx(
+        float(area_a_hot.delta_t_contribution[0]) * 2.0
     )
     assert root_hot_ref is area_a_hot
-    assert float(root_hot_ref.dt_cont_act[0]) == pytest.approx(
-        float(area_a_hot.dt_cont[0]) * 2.0
+    assert float(root_hot_ref.effective_delta_t_contribution[0]) == pytest.approx(
+        float(area_a_hot.delta_t_contribution[0]) * 2.0
     )
-    assert float(area_b_hot.dt_cont_act[0]) == pytest.approx(
-        float(area_b_hot.dt_cont[0])
+    assert float(area_b_hot.effective_delta_t_contribution[0]) == pytest.approx(
+        float(area_b_hot.delta_t_contribution[0])
     )
-    assert float(area_a_utility.dt_cont_act[0]) == pytest.approx(
-        float(area_a_utility.dt_cont[0]) * 2.0
+    assert float(area_a_utility.effective_delta_t_contribution[0]) == pytest.approx(
+        float(area_a_utility.delta_t_contribution[0]) * 2.0
     )
-    assert float(root_utility.dt_cont_act[0]) == pytest.approx(
-        float(root_utility.dt_cont[0])
+    assert float(root_utility.effective_delta_t_contribution[0]) == pytest.approx(
+        float(root_utility.delta_t_contribution[0])
     )
-    assert float(area_b_utility.dt_cont_act[0]) == pytest.approx(
-        float(area_b_utility.dt_cont[0])
+    assert float(area_b_utility.effective_delta_t_contribution[0]) == pytest.approx(
+        float(area_b_utility.delta_t_contribution[0])
     )
 
 
@@ -1760,12 +1784,12 @@ def test_flat_single_zone():
     assert len(tree.children) == 1
     process_zone = tree.children[0]
     assert process_zone.name == "Boiler"
-    assert process_zone.type == ZT.P.value
+    assert process_zone.type == ZoneType.P.value
     assert process_zone.children is not None
     assert len(process_zone.children) == 1
     operation_zone = process_zone.children[0]
     assert operation_zone.name == "O1"
-    assert operation_zone.type == ZT.O.value
+    assert operation_zone.type == ZoneType.O.value
     assert operation_zone.children is None
 
 
@@ -1818,10 +1842,10 @@ def test_nested_zone_with_slash():
     assert plant.name == "Plant"
     line1 = plant.children[0]
     assert line1.name == "Line1"
-    assert line1.type == ZT.P.value
+    assert line1.type == ZoneType.P.value
     assert len(line1.children) == 1
     assert line1.children[0].name == "O1"
-    assert line1.children[0].type == ZT.O.value
+    assert line1.children[0].type == ZoneType.O.value
 
 
 def test_generic_zone_tree_defaults_by_depth():
@@ -1837,9 +1861,9 @@ def test_generic_zone_tree_defaults_by_depth():
         ],
     )
     normalised = _validate_zone_tree_structure(zone_tree, [])
-    assert normalised.type == ZT.S.value
-    assert normalised.children[0].type == ZT.P.value
-    assert normalised.children[0].children[0].type == ZT.O.value
+    assert normalised.type == ZoneType.S.value
+    assert normalised.children[0].type == ZoneType.P.value
+    assert normalised.children[0].children[0].type == ZoneType.O.value
 
 
 def test_canonical_zone_helpers_reject_invalid_config_and_multiplier_edges():
@@ -1866,11 +1890,11 @@ def test_canonical_zone_helpers_reject_invalid_config_and_multiplier_edges():
         depth=0,
     )
     assert blank_type_name == "Blank"
-    assert blank_type == ZT.S.value
+    assert blank_type == ZoneType.S.value
 
 
 def test_apply_zone_dt_cont_multiplier_skips_missing_child_zone():
-    parent_zone = Zone(name="Site", type=ZT.S.value, config=Configuration())
+    parent_zone = Zone(name="Site", type=ZoneType.S.value, config=Configuration())
     zone_tree = ZoneTreeSchema(
         name="Site",
         type="Zone",
@@ -1894,10 +1918,10 @@ def test_apply_zone_dt_cont_multiplier_skips_missing_child_zone():
 
 
 def test_apply_zone_dt_cont_multiplier_applies_existing_child_zone():
-    parent_zone = Zone(name="Site", type=ZT.S.value, config=Configuration())
+    parent_zone = Zone(name="Site", type=ZoneType.S.value, config=Configuration())
     child_zone = Zone(
         name="AreaA",
-        type=ZT.P.value,
+        type=ZoneType.P.value,
         config=parent_zone.config,
         parent_zone=parent_zone,
     )
@@ -1940,7 +1964,7 @@ def test_rewrite_stream_zones_handles_empty_labels_and_root_name_collisions():
     collision_tree = ZoneTreeSchema(
         name="Site",
         type="Zone",
-        children=[ZoneTreeSchema(name="TestStream", type=ZT.P.value)],
+        children=[ZoneTreeSchema(name="TestStream", type=ZoneType.P.value)],
     )
     site_stream = make_stream(zone="Site")
     site_stream.name = "TestStream"
@@ -1963,8 +1987,8 @@ def test_generated_zone_tree_handles_non_string_root_and_empty_zone_path():
         top_zone_name=object(),
     )
 
-    assert normalised.name == ZT.S.value
-    assert stream.zone == f"{ZT.S.value}/O1"
+    assert normalised.name == ZoneType.S.value
+    assert stream.zone == f"{ZoneType.S.value}/O1"
 
 
 def test_site_level_streams_get_individual_process_zones():
@@ -2000,7 +2024,7 @@ def test_site_level_streams_get_individual_process_zones():
 
     for child in normalised.children:
         if child.name in {"HotStream", "ColdStream"}:
-            assert child.type == ZT.P.value
+            assert child.type == ZoneType.P.value
             assert child.children is None
 
     assert streams[0].zone == "SiteRoot/HotStream"
@@ -2146,13 +2170,13 @@ def test_prepare_problem_rejects_removed_legacy_turbine_gateway(dummy_streams):
 @pytest.mark.parametrize(
     "zone_type_str, expected_zone_type",
     [
-        ("Zone", ZT.S.value),
-        ("Sub-Zone", ZT.P.value),
-        ("Process Zone", ZT.P.value),
-        ("Site", ZT.S.value),
-        ("Community", ZT.C.value),
-        ("Region", ZT.R.value),
-        ("Utility Zone", ZT.U.value),
+        ("Zone", ZoneType.S.value),
+        ("Sub-Zone", ZoneType.P.value),
+        ("Process Zone", ZoneType.P.value),
+        ("Site", ZoneType.S.value),
+        ("Community", ZoneType.C.value),
+        ("Region", ZoneType.R.value),
+        ("Utility Zone", ZoneType.U.value),
     ],
 )
 def test_valid_zone_types(zone_type_str, expected_zone_type):
@@ -2171,8 +2195,8 @@ def test_zone_type_defaults_with_depth():
     _, grandchild_type = _get_validated_zone_info(
         ZoneTreeSchema(name="Grandchild", type="Zone"), depth=2
     )
-    assert child_type == ZT.P.value
-    assert grandchild_type == ZT.O.value
+    assert child_type == ZoneType.P.value
+    assert grandchild_type == ZoneType.O.value
 
 
 def test_unexpected_zone_type_raises():
@@ -2187,7 +2211,7 @@ def test_unexpected_zone_type_raises():
 
 def test_non_schema_input_returns_site_zone_type():
     _, actual_zone_type = _get_validated_zone_info("not_a_schema")
-    assert actual_zone_type == ZT.S.value
+    assert actual_zone_type == ZoneType.S.value
 
 
 @pytest.fixture
@@ -2201,7 +2225,7 @@ def config():
             (),
             {
                 "top_zone_name": "MySite",
-                "top_zone_identifier": ZT.S.value,
+                "top_zone_identifier": ZoneType.S.value,
             },
         )()
 
@@ -2213,12 +2237,12 @@ def make_zone_tree_schema():
     """Build zone tree schema data used by this test module."""
     return ZoneTreeSchema(
         name="MySite",
-        type=ZT.S.value,
+        type=ZoneType.S.value,
         children=[
             ZoneTreeSchema(
                 name="Area1",
-                type=ZT.P.value,
-                children=[ZoneTreeSchema(name="Line1", type=ZT.P.value)],
+                type=ZoneType.P.value,
+                children=[ZoneTreeSchema(name="Line1", type=ZoneType.P.value)],
             )
         ],
     )
@@ -2240,19 +2264,19 @@ def test_creates_nested_zones_correctly():
 
     area1 = result.subzones["Area1"]
     assert area1.name == "Area1"
-    assert area1.type == ZT.P.value
+    assert area1.type == ZoneType.P.value
     assert len(area1.subzones) == 1
 
     line1 = area1.subzones["Line1"]
     assert line1.name == "Line1"
-    assert line1.type == ZT.P.value
+    assert line1.type == ZoneType.P.value
     assert line1.subzones == {}
 
 
 def test_empty_zone_tree_returns_parent():
     config = Configuration()
-    zone_tree = ZoneTreeSchema(name="MySite", type=ZT.S.value, children=None)
-    parent_zone = Zone(name="MySite", type=ZT.S.value, config=config)
+    zone_tree = ZoneTreeSchema(name="MySite", type=ZoneType.S.value, children=None)
+    parent_zone = Zone(name="MySite", type=ZoneType.S.value, config=config)
 
     result = _create_nested_zones(parent_zone, zone_tree, config)
 
@@ -2261,16 +2285,16 @@ def test_empty_zone_tree_returns_parent():
 
 
 def test_assign_process_streams_to_subzones_requires_zone_mapping():
-    master_zone = Zone(name="Site", type=ZT.S.value, config=Configuration())
+    master_zone = Zone(name="Site", type=ZoneType.S.value, config=Configuration())
     process_streams = StreamCollection()
     process_streams.add(
         Stream(
             name="H1",
-            t_supply=200.0,
-            t_target=100.0,
+            supply_temperature=200.0,
+            target_temperature=100.0,
             heat_flow=10.0,
-            dt_cont=5.0,
-            htc=1.0,
+            delta_t_contribution=5.0,
+            heat_transfer_coefficient=1.0,
             is_process_stream=True,
         ),
         key="Site.Hot Stream.H1",
@@ -2285,15 +2309,15 @@ def test_assign_process_streams_to_subzones_requires_zone_mapping():
 
 
 def test_assign_process_streams_to_subzones_rejects_unresolved_and_neutral_streams():
-    master_zone = Zone(name="Site", type=ZT.S.value, config=Configuration())
+    master_zone = Zone(name="Site", type=ZoneType.S.value, config=Configuration())
     process_streams = StreamCollection()
     hot_stream = Stream(
         name="H1",
-        t_supply=200.0,
-        t_target=100.0,
+        supply_temperature=200.0,
+        target_temperature=100.0,
         heat_flow=10.0,
-        dt_cont=5.0,
-        htc=1.0,
+        delta_t_contribution=5.0,
+        heat_transfer_coefficient=1.0,
         is_process_stream=True,
     )
     process_streams.add(hot_stream, key="Site.Hot Stream.H1")
@@ -2308,7 +2332,7 @@ def test_assign_process_streams_to_subzones_rejects_unresolved_and_neutral_strea
 
     area = Zone(
         name="AreaA",
-        type=ZT.P.value,
+        type=ZoneType.P.value,
         config=master_zone.config,
         parent_zone=master_zone,
     )
@@ -2317,11 +2341,11 @@ def test_assign_process_streams_to_subzones_rejects_unresolved_and_neutral_strea
     neutral_streams.add(
         Stream(
             name="NeutralA",
-            t_supply=100.0,
-            t_target=100.0,
+            supply_temperature=100.0,
+            target_temperature=100.0,
             heat_flow=0.0,
-            dt_cont=5.0,
-            htc=1.0,
+            delta_t_contribution=5.0,
+            heat_transfer_coefficient=1.0,
             is_process_stream=True,
         ),
         key="Site.AreaA.NeutralA",

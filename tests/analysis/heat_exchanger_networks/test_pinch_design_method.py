@@ -427,7 +427,7 @@ def test_couenne_without_user_options_matches_source_no_option_file(
     assert solve_run.solver_options is None
 
 
-def test_ipopt_pyomo_option_file_uses_factory_availability_fallback(
+def test_ipopt_pyomo_option_file_uses_keyword_factory_availability(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -435,16 +435,16 @@ def test_ipopt_pyomo_option_file_uses_factory_availability_fallback(
         del purpose
         return f"/usr/local/bin/{binary_name}"
 
-    class _FallbackSolverFactory:
-        def available(self, *args, **kwargs) -> bool:
-            if kwargs:
-                raise TypeError("keyword form unsupported")
-            assert args == (False,)
+    availability_calls = []
+
+    class _CurrentSolverFactory:
+        def available(self, *, exception_flag: bool) -> bool:
+            availability_calls.append(exception_flag)
             return True
 
     def present_dependency(import_name: str, **_kwargs):
         if import_name == "pyomo.environ":
-            return SimpleNamespace(SolverFactory=lambda _name: _FallbackSolverFactory())
+            return SimpleNamespace(SolverFactory=lambda _name: _CurrentSolverFactory())
         return object()
 
     monkeypatch.setattr(backend, "require_solver_binary", present_binary)
@@ -461,6 +461,37 @@ def test_ipopt_pyomo_option_file_uses_factory_availability_fallback(
     assert run.option_file == str(option_file)
     assert run.solver_options == {"tol": "1e-6"}
     assert option_file.read_text(encoding="utf-8") == "tol 1e-6\n"
+    assert availability_calls == [False]
+
+
+def test_pyomo_factory_signature_type_error_propagates_without_retry(
+    monkeypatch,
+) -> None:
+    def present_binary(binary_name: str, *, purpose: str | None = None) -> str:
+        del purpose
+        return f"/usr/local/bin/{binary_name}"
+
+    availability_calls = []
+
+    class _IncompatibleSolverFactory:
+        def available(self, *args, **kwargs) -> bool:
+            availability_calls.append((args, kwargs))
+            raise TypeError("keyword form unsupported")
+
+    def present_dependency(import_name: str, **_kwargs):
+        if import_name == "pyomo.environ":
+            return SimpleNamespace(
+                SolverFactory=lambda _name: _IncompatibleSolverFactory()
+            )
+        return object()
+
+    monkeypatch.setattr(backend, "require_solver_binary", present_binary)
+    monkeypatch.setattr(backend, "require_synthesis_dependency", present_dependency)
+
+    with pytest.raises(TypeError, match="keyword form unsupported"):
+        backend.configure_gekko_solver(_FakeGekkoModel(), "ipopt-pyomo")
+
+    assert availability_calls == [((), {"exception_flag": False})]
 
 
 def test_pyomo_solver_configuration_reports_unavailable_factory(monkeypatch) -> None:
@@ -820,16 +851,13 @@ def test_solver_array_private_helpers_cover_period_and_value_edges() -> None:
             SimpleNamespace(period_ids=_TruthyEmptyMapping(), weights=[])
         )
 
-    assert (
-        arrays_module._temperature_contribution(
-            SimpleNamespace(dt_cont=_SinglePeriodValue(0.25)),
-            20.0,
-        )
-        == 5.0
-    )
+    assert arrays_module._temperature_contribution(
+        SimpleNamespace(delta_t_contribution=_SinglePeriodValue(0.25)),
+        20.0,
+    ) == pytest.approx(5.0)
     assert (
         arrays_module._stream_heat_capacity_flowrate(
-            SimpleNamespace(CP=_SinglePeriodValue(8.0)),
+            SimpleNamespace(heat_capacity_flowrate=_SinglePeriodValue(8.0)),
             SimpleNamespace(),
         )
         == 8.0

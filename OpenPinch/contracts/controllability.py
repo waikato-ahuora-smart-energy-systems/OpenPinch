@@ -42,7 +42,7 @@ class HeatExchangerNetworkControllabilityEndpoint(BaseModel):
 
 
 class HeatExchangerNetworkControllabilityActuator(BaseModel):
-    """One manipulated variable available to control the HEN."""
+    """One manipulated variable available to control the HeatExchangerNetworkLabel."""
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 

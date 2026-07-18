@@ -7,7 +7,7 @@ from collections.abc import Callable
 import numpy as np
 
 from ....contracts.hpr import HPRPeriodCase
-from ....domain.enums import HPRcycle
+from ....domain.enums import HeatPumpAndRefrigerationCycle
 from ..common.shared import validate_vapour_hp_refrigerant_ls
 from ..targeting.cascade_carnot import (
     _compute_cascade_carnot_cycle_obj,
@@ -42,18 +42,18 @@ def get_multiperiod_hpr_optimisation_setup(
 ) -> tuple[np.ndarray | None, list, Callable]:
     """Return starts, bounds, and the period objective for one HPR cycle."""
     hpr_type = selected_case.args.hpr_type
-    if hpr_type == HPRcycle.CascadeCarnot.value:
+    if hpr_type == HeatPumpAndRefrigerationCycle.CascadeCarnot.value:
         x0_ls, bounds = _get_cascade_carnot_hp_opt_setup(selected_case.args)
         return x0_ls, bounds, _compute_cascade_carnot_cycle_obj
 
-    if hpr_type == HPRcycle.ParallelCarnot.value:
+    if hpr_type == HeatPumpAndRefrigerationCycle.ParallelCarnot.value:
         n_stages = max(selected_case.args.n_cond, selected_case.args.n_evap)
         for case in period_cases:
             case.args.n_cond = case.args.n_evap = n_stages
         x0_ls, bounds = _get_parallel_carnot_hp_opt_setup(selected_case.args)
         return x0_ls, bounds, _compute_parallel_carnot_hp_opt_obj
 
-    if hpr_type == HPRcycle.CascadeVapourComp.value:
+    if hpr_type == HeatPumpAndRefrigerationCycle.CascadeVapourComp.value:
         num_stages = int(selected_case.args.n_cond + selected_case.args.n_evap - 1)
         initial_result = (
             optimise_cascade_carnot_heat_pump_placement(selected_case.args)
@@ -71,7 +71,7 @@ def get_multiperiod_hpr_optimisation_setup(
         )
         return x0_ls, bounds, _compute_cascade_hp_system_obj
 
-    if hpr_type == HPRcycle.ParallelVapourComp.value:
+    if hpr_type == HeatPumpAndRefrigerationCycle.ParallelVapourComp.value:
         num_stages = max(selected_case.args.n_cond, selected_case.args.n_evap)
         for case in period_cases:
             case.args.n_cond = case.args.n_evap = int(num_stages)
@@ -91,7 +91,7 @@ def get_multiperiod_hpr_optimisation_setup(
         )
         return x0_ls, bounds, _compute_parallel_hp_system_obj
 
-    if hpr_type == HPRcycle.VapourCompMVR.value:
+    if hpr_type == HeatPumpAndRefrigerationCycle.VapourCompMVR.value:
         if not selected_case.args.is_heat_pumping:
             raise ValueError(
                 "Vapour compression with MVR cascade is heat-pump-only; "
@@ -112,7 +112,7 @@ def get_multiperiod_hpr_optimisation_setup(
         x0_ls, bounds = _get_vc_mvr_opt_setup(initial_result, selected_case.args)
         return x0_ls, bounds, _compute_vc_mvr_system_obj
 
-    if hpr_type == HPRcycle.Brayton.value:
+    if hpr_type == HeatPumpAndRefrigerationCycle.Brayton.value:
         raise NotImplementedError(
             "Brayton HPR targeting is not supported for multi-period optimisation."
         )

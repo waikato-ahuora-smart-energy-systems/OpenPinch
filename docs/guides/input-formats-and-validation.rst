@@ -1,12 +1,6 @@
 Input Formats and Validation
 ============================
 
-.. warning::
-
-   Direct schema and validation-owner imports in this advanced guide are
-   unsupported. Only :func:`OpenPinch.main.pinch_analysis_service` is
-   compatibility protected.
-
 Purpose
 -------
 
@@ -17,8 +11,8 @@ Prerequisites
 -------------
 
 Start with :doc:`first-solve-python` if you have not run a packaged sample
-case yet. For internal schema-first experiments, import models from
-``OpenPinch.contracts.input`` and accept that their path may change.
+case yet. Transport schemas are available from ``OpenPinch.contracts.input``
+when an integration needs explicit model validation.
 
 Sample Case
 -----------
@@ -34,7 +28,7 @@ Wrapper-based validation:
 
 .. code-block:: python
 
-   from OpenPinch.application.problem import PinchProblem
+   from OpenPinch import PinchProblem
 
    problem = PinchProblem("basic_pinch.json")
    validation = problem.validation_report()
@@ -99,7 +93,7 @@ non-positive segment duties or heat-transfer coefficients.
 
 .. code-block:: python
 
-   from OpenPinch.application.problem import PinchProblem
+   from OpenPinch import PinchProblem
 
    problem = PinchProblem(
        {

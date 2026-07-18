@@ -18,16 +18,17 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any
 
+from OpenPinch import PinchProblem
+from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
+    LocalSynthesisExecutor,
+)
+from OpenPinch.analysis.heat_exchanger_networks.execution.settings import (
+    workflow_settings_from_problem,
+)
 from OpenPinch.analysis.heat_exchanger_networks.results.selection import ranked_networks
-from OpenPinch.application.problem import PinchProblem
-
-_HENS_PACKAGE = "OpenPinch.analysis.heat_exchanger_networks"
-_executor_module = import_module(f"{_HENS_PACKAGE}.common.execution.executor")
-_settings_module = import_module(f"{_HENS_PACKAGE}.common.execution.settings")
-_open_hens_module = import_module(f"{_HENS_PACKAGE}.targeting.open_hens_method")
-LocalSynthesisExecutor = _executor_module.LocalSynthesisExecutor
-workflow_settings_from_problem = _settings_module.workflow_settings_from_problem
-execute_open_hens_method = _open_hens_module.execute_open_hens_method
+from OpenPinch.analysis.heat_exchanger_networks.targeting.open_hens_method import (
+    execute_open_hens_method,
+)
 
 CASE_IDS = (
     "Four-stream-Escobar-and-Trierweiler-2013-1",
@@ -108,11 +109,8 @@ def main() -> None:
     repo_root = args.repo_root.resolve()
     openhens_root = args.openhens_root.resolve()
     _configure_solver_path()
-    _install_openhens_compatibility(
-        openhens_root,
-        source_runner=args.source_runner,
-        source_task_timeout=args.source_task_timeout,
-    )
+    if not args.report_only and not args.openpinch_diagnostics_only:
+        _require_supported_openhens(openhens_root)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     rows_by_engine: list[RankedNetwork] = []
@@ -447,18 +445,7 @@ def _parse_args() -> argparse.Namespace:
         help="Comma-separated min dQ/dA grid. Defaults to the OpenHENS grid.",
     )
     parser.add_argument("--top", type=int, default=5)
-    parser.add_argument(
-        "--source-runner",
-        choices=("parallel", "bounded", "sequential"),
-        default="bounded",
-    )
     parser.add_argument("--source-max-parallel", type=int, default=10)
-    parser.add_argument(
-        "--source-task-timeout",
-        type=float,
-        default=600.0,
-        help="Per-source-task wall-clock timeout in bounded source mode.",
-    )
     parser.add_argument("--openpinch-max-parallel", type=int, default=10)
     parser.add_argument(
         "--openpinch-task-timeout",
@@ -518,200 +505,60 @@ def _configure_solver_path() -> None:
     os.environ["PATH"] = str(idaes_bin) + os.pathsep + os.environ.get("PATH", "")
 
 
-def _install_openhens_compatibility(
-    openhens_root: Path,
+def _require_supported_openhens(openhens_root: Path) -> None:
+    """Require the unmodified upstream capability surface used by this tool."""
+    if not openhens_root.is_dir():
+        raise RuntimeError(
+            f"Unsupported OpenHENS checkout at {openhens_root}: directory not found."
+        )
+
+    module_names = (
+        "openhens",
+        "openhens.main",
+        "openhens.classes.pinch_classes.process",
+        "openhens.classes.pinch_classes.publicOperations",
+    )
+    root_text = str(openhens_root)
+    inserted_path = root_text not in sys.path
+    if inserted_path:
+        sys.path.insert(0, root_text)
+    try:
+        modules = {name: import_module(name) for name in module_names}
+    except Exception as exc:
+        raise RuntimeError(
+            f"Unsupported OpenHENS checkout at {openhens_root}: could not import "
+            f"the required upstream modules ({type(exc).__name__}: {exc})."
+        ) from exc
+    finally:
+        if inserted_path:
+            sys.path.remove(root_text)
+
+    _validate_openhens_capabilities(modules, openhens_root=openhens_root)
+
+
+def _validate_openhens_capabilities(
+    modules: dict[str, Any],
     *,
-    source_runner: str,
-    source_task_timeout: float,
+    openhens_root: Path,
 ) -> None:
-    sys.path.insert(0, str(openhens_root))
-    import openhens.main as source_main
-    from openhens.classes.pinch_classes import process as process_module
-    from openhens.classes.pinch_classes import publicOperations as public_ops
-
-    def organise_array(input_array, num_dim=2, reverse=True):
-        if num_dim == 2:
-            input_array[0] = [item for item in input_array[0] if item is not None]
-            public_ops.QuickSort_2D(input_array)
-            public_ops.RemoveDuplicates_2D(input_array)
-            if reverse:
-                public_ops.ReverseArray_2D(input_array)
-        else:
-            input_array = [item for item in input_array if item is not None]
-            public_ops.QuickSort_1D(input_array)
-            input_array = public_ops.RemoveDuplicates_1D(input_array)
-            if reverse:
-                public_ops.ReverseArray_1D(input_array)
-        return input_array
-
-    public_ops.OrganiseArray = organise_array
-    process_module.OrganiseArray = organise_array
-
-    if source_runner in {"parallel", "bounded"}:
-        multiprocessing.set_start_method("fork", force=True)
-    if source_runner == "parallel":
-        return
-
-    from openhens.utils.branching import run_single_solution
-
-    if source_runner == "bounded":
-        source_main.run_parallel_solutions = _bounded_source_runner(
-            run_single_solution,
-            task_timeout=source_task_timeout,
-        )
-        return
-
-    def run_sequential_solutions(
-        problems,
-        max_parallel=1,
-        print_output=False,
-        evolution=False,
-    ):
-        del max_parallel
-        solved_cases = []
-        for problem in problems:
-            solved = run_single_solution(problem, print_output, evolution)
-            if solved:
-                solved_cases.extend(solved)
-        return solved_cases
-
-    source_main.run_parallel_solutions = run_sequential_solutions
-
-
-def _bounded_source_runner(run_single_solution, *, task_timeout: float):
-    def run_bounded_solutions(
-        problems,
-        max_parallel=1,
-        print_output=False,
-        evolution=False,
-    ):
-        solved_cases = []
-        pending = list(problems)
-        active: list[dict[str, Any]] = []
-
-        def launch_next() -> None:
-            if not pending:
-                return
-            problem = pending.pop(0)
-            queue = multiprocessing.Queue(maxsize=1)
-            process = multiprocessing.Process(
-                target=_run_source_problem_child,
-                args=(run_single_solution, problem, print_output, evolution, queue),
-            )
-            process.start()
-            active.append(
-                {
-                    "problem": problem,
-                    "process": process,
-                    "queue": queue,
-                    "start": time.monotonic(),
-                }
-            )
-
-        for _ in range(max(1, int(max_parallel))):
-            launch_next()
-
-        while active:
-            for item in list(active):
-                process = item["process"]
-                problem = item["problem"]
-                elapsed = time.monotonic() - item["start"]
-                solved = _queue_result(item["queue"], problem)
-                if solved is not _NO_RESULT:
-                    if solved:
-                        solved_cases.extend(solved)
-                    process.join(timeout=5)
-                    if process.is_alive():
-                        process.terminate()
-                        process.join(timeout=5)
-                    item["queue"].close()
-                    active.remove(item)
-                    launch_next()
-                    continue
-                if process.is_alive() and elapsed <= task_timeout:
-                    continue
-                if process.is_alive():
-                    process.terminate()
-                    process.join(timeout=5)
-                    if process.is_alive():
-                        process.kill()
-                        process.join(timeout=5)
-                    d_tmin, min_dqda = _source_problem_grid_values(problem)
-                    timeout_record = {
-                        "problem": getattr(problem, "name", repr(problem)),
-                        "framework": getattr(problem, "framework", None),
-                        "dTmin": d_tmin,
-                        "min_dqda": min_dqda,
-                        "timeout_seconds": task_timeout,
-                    }
-                    _SOURCE_TIMEOUTS.append(timeout_record)
-                    logging.getLogger("openhens").warning(
-                        "[Timeout] skipped OpenHENS task %s after %.1fs",
-                        timeout_record["problem"],
-                        task_timeout,
-                    )
-                else:
-                    process.join()
-                    solved = _queue_result(item["queue"], problem)
-                    if solved is not _NO_RESULT and solved:
-                        solved_cases.extend(solved)
-                item["queue"].close()
-                active.remove(item)
-                launch_next()
-            time.sleep(0.2)
-        return solved_cases
-
-    return run_bounded_solutions
-
-
-def _run_source_problem_child(
-    run_single_solution,
-    problem,
-    print_output: bool,
-    evolution: bool,
-    queue,
-) -> None:
-    try:
-        queue.put(("ok", run_single_solution(problem, print_output, evolution)))
-    except BaseException as exc:
-        queue.put(("error", f"{type(exc).__name__}: {exc}"))
-
-
-def _queue_result(queue, problem) -> Any:
-    try:
-        status, result = queue.get_nowait()
-    except queue_module.Empty:
-        return _NO_RESULT
-    if status == "ok":
-        return result
-    error_message = result
-    logging.getLogger("openhens").warning(
-        "[Failed] source task %s raised %s",
-        getattr(problem, "name", repr(problem)),
-        error_message,
+    required = (
+        ("openhens", "OpenHENS"),
+        ("openhens.main", "run_parallel_solutions"),
+        ("openhens.classes.pinch_classes.process", "OrganiseArray"),
+        ("openhens.classes.pinch_classes.publicOperations", "OrganiseArray"),
     )
-    return None
-
-
-def _source_problem_grid_values(problem: Any) -> tuple[Any, Any]:
-    framework = getattr(problem, "framework", None)
-    if framework == "ESM":
-        tdm = getattr(problem, "parent", None)
-        pdm = getattr(tdm, "parent", None)
-        return (
-            getattr(pdm, "dTmin", getattr(problem, "dTmin", None)),
-            getattr(tdm, "min_dqda", getattr(problem, "min_dqda", None)),
+    missing = [
+        f"{module_name}.{attribute_name}"
+        for module_name, attribute_name in required
+        if not callable(getattr(modules.get(module_name), attribute_name, None))
+    ]
+    if missing:
+        capabilities = ", ".join(missing)
+        raise RuntimeError(
+            f"Unsupported OpenHENS checkout at {openhens_root}: missing required "
+            f"upstream capabilities: {capabilities}. Install a supported OpenHENS "
+            "revision; OpenPinch does not patch upstream modules."
         )
-    if framework == "TDM":
-        pdm = getattr(problem, "parent", None)
-        return (
-            getattr(pdm, "dTmin", getattr(problem, "dTmin", None)),
-            getattr(problem, "min_dqda", None),
-        )
-    return (
-        getattr(problem, "dTmin", None),
-        getattr(problem, "min_dqda", None),
-    )
 
 
 def _run_source_openhens(
@@ -852,7 +699,7 @@ def _run_openpinch_grid(
 ) -> list[RankedNetwork]:
     fixture_path = repo_root / "tests" / "fixtures" / "openhens" / f"{case_id}.json"
     problem = PinchProblem(source=fixture_path)
-    problem.target()
+    problem.target.all_heat_integration()
     settings = replace(
         workflow_settings_from_problem(problem),
         approach_temperatures=d_tmin_grid,

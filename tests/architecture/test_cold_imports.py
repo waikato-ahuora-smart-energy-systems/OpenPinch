@@ -21,8 +21,7 @@ BLOCKED_OPTIONAL_PACKAGES = {
     "wakepy",
 }
 IMPORT_CASES = {
-    "root-marker": ("OpenPinch",),
-    "main-contract": ("OpenPinch.main",),
+    "root-workflows": ("OpenPinch",),
     "contracts": (
         "OpenPinch.contracts.input",
         "OpenPinch.contracts.output",
@@ -91,24 +90,15 @@ if loaded:
     assert completed.returncode == 0, completed.stderr
 
 
-def test_root_marker_does_not_load_owner_layers() -> None:
+def test_root_exports_resolve_to_concrete_workflow_owners() -> None:
     code = """
-import sys
 import OpenPinch
+from OpenPinch.application.problem import PinchProblem
+from OpenPinch.application.workspace import PinchWorkspace
 
-forbidden = {
-    "OpenPinch.adapters",
-    "OpenPinch.analysis",
-    "OpenPinch.application",
-    "OpenPinch.contracts",
-    "OpenPinch.domain",
-    "OpenPinch.main",
-    "OpenPinch.optimisation",
-    "OpenPinch.presentation",
-}
-loaded = sorted(forbidden.intersection(sys.modules))
-if loaded:
-    raise AssertionError(f"root marker loaded owner layers: {loaded}")
+assert OpenPinch.__all__ == ["PinchProblem", "PinchWorkspace"]
+assert OpenPinch.PinchProblem is PinchProblem
+assert OpenPinch.PinchWorkspace is PinchWorkspace
 """
     completed = subprocess.run(
         [sys.executable, "-c", code],

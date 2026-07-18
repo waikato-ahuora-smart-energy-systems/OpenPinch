@@ -18,7 +18,7 @@ def case_for_name(workspace, name: Optional[str]):
             cached.project_name = workspace.project_name
         return cached
 
-    case_input = deepcopy(workspace._variant_inputs[resolved_name])
+    case_input = deepcopy(workspace._case_inputs[resolved_name])
     project_name = (
         workspace.project_name or project_name_from_case_input(case_input) or "Site"
     )
@@ -31,13 +31,13 @@ def case_for_name(workspace, name: Optional[str]):
 
 def default_case_name(workspace) -> Optional[str]:
     """Return and activate the deterministic default case, when one exists."""
-    if workspace._active_case_name in workspace._variant_inputs:
+    if workspace._active_case_name in workspace._case_inputs:
         return workspace._active_case_name
-    if workspace.baseline_name in workspace._variant_inputs:
+    if workspace.baseline_name in workspace._case_inputs:
         workspace._active_case_name = workspace.baseline_name
         return workspace._active_case_name
-    if workspace._variant_inputs:
-        workspace._active_case_name = next(iter(workspace._variant_inputs))
+    if workspace._case_inputs:
+        workspace._active_case_name = next(iter(workspace._case_inputs))
         return workspace._active_case_name
     return None
 
@@ -49,15 +49,14 @@ def resolve_case_name(workspace, name: Optional[str]) -> str:
         if resolved is None:
             raise KeyError("No cases are loaded in this PinchWorkspace.")
         return resolved
-    if name not in workspace._variant_inputs:
+    if name not in workspace._case_inputs:
         available = ", ".join(workspace.list_cases())
         raise KeyError(f"Unknown case {name!r}. Available cases: {available}")
     return name
 
 
-def invalidate_variant_state(workspace, name: str) -> None:
-    """Drop cached case and view state for one variant input."""
-    workspace._cached_views.pop(name, None)
+def invalidate_case_state(workspace, name: str) -> None:
+    """Drop cached state for one case input."""
     workspace._case_cache.pop(name, None)
 
 
@@ -66,7 +65,6 @@ def sync_case_input(workspace, name: str) -> None:
     problem = workspace._case_cache.get(name)
     if problem is None:
         return
-    case_input = problem.canonical_problem_json()
-    if workspace._variant_inputs.get(name) != case_input:
-        workspace._variant_inputs[name] = case_input
-        workspace._cached_views.pop(name, None)
+    case_input = problem.to_problem_json()
+    if workspace._case_inputs.get(name) != case_input:
+        workspace._case_inputs[name] = case_input

@@ -17,8 +17,6 @@ from ._problem_table.types import ProblemTableColumnUpdates
 from .configuration import tol
 from .enums import ProblemTableLabel
 
-PT = ProblemTableLabel
-
 
 class ProblemTable:
     """NumPy-backed pinch problem table with enum-friendly accessors."""
@@ -322,7 +320,7 @@ class ProblemTable:
         self.data = np.round(self.data, decimals)
 
     def pinch_idx(
-        self, col: Union[int, str, ProblemTableLabel] = PT.H_NET
+        self, col: Union[int, str, ProblemTableLabel] = ProblemTableLabel.H_NET
     ) -> Tuple[int, int, bool]:
         """Return the row indices of the hot and cold pinch temperatures."""
         if isinstance(col, int):
@@ -360,8 +358,8 @@ class ProblemTable:
 
     def pinch_temperatures(
         self,
-        col_T: str | ProblemTableLabel = PT.T,
-        col_H: Union[int, str, ProblemTableLabel] = PT.H_NET,
+        col_T: str | ProblemTableLabel = ProblemTableLabel.T,
+        col_H: Union[int, str, ProblemTableLabel] = ProblemTableLabel.H_NET,
     ) -> Tuple[float | None, float | None]:
         """Determine the hottest hot and coldest cold pinch temperatures."""
         hot_idx, cold_idx, valid = self.pinch_idx(col_H)
@@ -388,8 +386,12 @@ class ProblemTable:
         if not isinstance(other, ProblemTable):
             raise TypeError("`other` must be a ProblemTable instance.")
 
-        inserted_self = self.insert_temperature_interval(other[PT.T].tolist())
-        inserted_other = other.insert_temperature_interval(self[PT.T].tolist())
+        inserted_self = self.insert_temperature_interval(
+            other[ProblemTableLabel.T].tolist()
+        )
+        inserted_other = other.insert_temperature_interval(
+            self[ProblemTableLabel.T].tolist()
+        )
         return inserted_self, inserted_other
 
     def insert_temperature_interval(self, T_ls: List[float] | float) -> int:
@@ -438,7 +440,7 @@ class ProblemTable:
 
         for key, values in updates.items():
             col_name = self._validate_column_name(key)
-            if col_name == self._validate_column_name(PT.T):
+            if col_name == self._validate_column_name(ProblemTableLabel.T):
                 raise ValueError(
                     "`ProblemTable.update()` does not accept updates to the "
                     "temperature column. Use interval helpers or construct a "
@@ -476,7 +478,7 @@ class ProblemTable:
 
         T_col = self._validate_T_col(T_col)
         updates = self._validate_updates(updates, T_col)
-        target_temperatures = np.asarray(self[PT.T], dtype=float)
+        target_temperatures = np.asarray(self[ProblemTableLabel.T], dtype=float)
 
         if target_temperatures.shape != T_col.shape or not np.allclose(
             a=target_temperatures,
@@ -484,7 +486,7 @@ class ProblemTable:
             atol=tol,
             rtol=tol,
         ):
-            source_pt = ProblemTable({PT.T: T_col, **updates})
+            source_pt = ProblemTable({ProblemTableLabel.T: T_col, **updates})
             self.share_temperature_intervals(source_pt)
             for col_name in updates:
                 updates[col_name] = source_pt[col_name]

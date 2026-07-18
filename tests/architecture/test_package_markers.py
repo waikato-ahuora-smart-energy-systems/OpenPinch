@@ -27,10 +27,9 @@ from OpenPinch.contracts.synthesis.topology import (
 )
 
 
-def test_root_and_owner_package_markers_have_no_runtime_imports() -> None:
+def test_owner_package_markers_have_no_runtime_imports() -> None:
     package_root = Path(OpenPinch.__file__).parent
     paths = (
-        package_root / "__init__.py",
         package_root / "contracts" / "__init__.py",
         package_root / "domain" / "__init__.py",
         package_root / "analysis" / "__init__.py",
@@ -113,7 +112,6 @@ def guarded_import(name, *args, **kwargs):
     return real_import(name, *args, **kwargs)
 builtins.__import__ = guarded_import
 import OpenPinch
-import OpenPinch.main
 import OpenPinch.contracts.input
 import OpenPinch.contracts.synthesis.common
 import OpenPinch.contracts.synthesis.topology

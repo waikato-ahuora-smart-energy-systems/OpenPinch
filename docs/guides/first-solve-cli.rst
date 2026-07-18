@@ -50,7 +50,7 @@ The packaged notebook series is:
 - ``04_carnot_heat_pump_screening.ipynb``
 - ``05_direct_gas_stream_mvr_scenarios.ipynb``
 - ``06_vapour_compression_mvr_cascade_hpr.ipynb``
-- ``07_heat_exchanger_network_synthesis.ipynb``
+- ``07_multiperiod_heat_exchanger_network.ipynb``
 - ``08_energy_transfer_analysis.ipynb``
 - ``09_schema_service_exports_and_bundles.ipynb``
 - ``10_multiperiod_hpr_shared_design.ipynb``

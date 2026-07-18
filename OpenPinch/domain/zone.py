@@ -7,13 +7,12 @@ from typing import TYPE_CHECKING, Optional
 
 from ._stream.value_state import resolve_period_weights
 from .configuration import Configuration
-from .enums import ZT
+from .enums import ZoneType
 from .stream_collection import StreamCollection
 from .targets import BaseTargetModel
 
 if TYPE_CHECKING:
     from .stream import Stream
-    from .zone import Zone
 
 
 class Zone:
@@ -29,7 +28,7 @@ class Zone:
     def __init__(
         self,
         name: str = "Zone",
-        type: str = ZT.P.value,
+        type: str = ZoneType.P.value,
         config: Optional[Configuration] = None,
         parent_zone: "Zone" = None,
     ):
@@ -166,7 +165,9 @@ class Zone:
             if not (zone._lock_dt_cont_multiplier):
                 zone.dt_cont_multiplier = value
         self._dt_cont_multiplier = float(value)
-        self.all_streams.set_common_stream_attribute("dt_cont_multiplier", value)
+        self.all_streams.set_common_stream_attribute(
+            "delta_t_contribution_multiplier", value
+        )
         self._targets.clear()
 
     @property
@@ -413,7 +414,7 @@ class Zone:
 
     def calc_utility_cost(self):
         """Calculate and cache the annual utility cost across assigned utilities."""
-        self._utility_cost = sum([u.ut_cost for u in self.utility_streams])
+        self._utility_cost = sum([u.utility_cost for u in self.utility_streams])
         return self._utility_cost
 
     def _zone_is_equal(self, zone1: "Zone", zone2: "Zone"):
@@ -481,4 +482,6 @@ class Zone:
     def lock_dt_cont_multiplier(self):
         """Lock the dt_cont_multiplier to prevent further changes."""
         self._lock_dt_cont_multiplier = True
-        self.all_streams.set_common_stream_attribute("dt_cont_multiplier_locked", True)
+        self.all_streams.set_common_stream_attribute(
+            "delta_t_contribution_multiplier_locked", True
+        )

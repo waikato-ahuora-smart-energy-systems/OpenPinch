@@ -83,7 +83,8 @@ def ensure_target_results(
         and (period_id is None or cached.period_id == period_id)
     ):
         return cached
-    return TargetOutput.model_validate(problem.target(options=runtime_options))
+    problem.target.direct_heat_integration(options=runtime_options)
+    return TargetOutput.model_validate(problem.results)
 
 
 def normalise_runtime_options(options: dict[str, Any] | None) -> dict[str, Any]:

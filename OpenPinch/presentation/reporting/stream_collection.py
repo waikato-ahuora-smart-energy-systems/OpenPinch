@@ -38,12 +38,12 @@ def export_stream_collection(
             writer.writerow(
                 [
                     stream.name,
-                    stream.t_supply,
-                    stream.t_target,
+                    stream.supply_temperature,
+                    stream.target_temperature,
                     stream.heat_flow,
-                    stream.dt_cont,
-                    stream.dt_cont_multiplier,
-                    stream.htc,
+                    stream.delta_t_contribution,
+                    stream.delta_t_contribution_multiplier,
+                    stream.heat_transfer_coefficient,
                 ]
             )
     return output_path

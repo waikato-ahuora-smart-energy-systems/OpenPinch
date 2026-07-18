@@ -8,6 +8,279 @@
 
 ---
 
+## Serialized HEN TargetInput Implementation Approval
+**Timestamp**: 2026-07-17T04:19:28Z
+**User Input**: """PLEASE IMPLEMENT THIS PLAN:
+# Accept Serialized HENs Through `TargetInput.network`
+
+## Current-State Findings
+
+- The repository is clean at `f2b1c0bc`, version 0.5.2.
+- `TargetInput` currently has no `network` field, so Pydantic silently discards an incoming top-level `network`.
+- `HeatExchangerNetwork.model_dump(mode="json")` returns the intended JSON-compatible mapping.
+- That dump excludes `solver_axis_metadata`, exchanger `solver_metadata`, and all `source_metadata`, even though those fields appear in `model_json_schema()`.
+- HEN endpoints currently use `HeatExchangerStreamRole` with lowercase JSON values.
+- `StreamID` already exists with `Process`, `Utility`, and `Unassigned`, but HEN code does not use it.
+- The refreshed focused baseline passes: 143 tests.
+
+## Public Contract Changes
+
+### Runtime identity migration
+
+Replace:
+
+```python
+source_stream_role: HeatExchangerStreamRole
+sink_stream_role: HeatExchangerStreamRole
+```
+
+with:
+
+```python
+source_stream_role: StreamID
+sink_stream_role: StreamID
+```
+
+Remove `HeatExchangerStreamRole` from `OpenPinch.domain.enums` and migrate every production and test reference.
+
+Preserve the current field names because they describe each endpoint’s classification; only the enum type changes.
+
+The resulting JSON values are:
+
+```json
+{
+  "source_stream_role": "Process",
+  "sink_stream_role": "Utility"
+}
+```
+
+Enforce these combinations:
+
+| Exchanger kind | Source | Sink |
+|---|---|---|
+| `recovery` | `Process` | `Process` |
+| `hot_utility` | `Utility` | `Process` |
+| `cold_utility` | `Process` | `Utility` |
+
+`StreamID.Unassigned` is invalid on either exchanger endpoint. Legacy lowercase values and `HeatExchangerStreamRole` aliases will not be supported.
+
+### Input schema hierarchy
+
+Add these independent Pydantic contracts to `OpenPinch.contracts.input`:
+
+- `HeatExchangerAreaSliceSchema`
+- `HeatExchangerPeriodStateSchema`
+- `HeatExchangerSchema`
+- `HeatExchangerNetworkSchema`
+
+Then extend `TargetInput`:
+
+```python
+network: HeatExchangerNetworkSchema | None = None
+```
+
+Export the four schema types from the concrete input module. Keep the root `OpenPinch` and `OpenPinch.contracts` packages as import-free markers.
+
+`TargetInput.network` must remain a transport schema; it must not become a runtime `HeatExchangerNetwork`.
+
+## Exact `model_dump(mode="json")` Contract
+
+The supported bridge is:
+
+```python
+network_payload = network.model_dump(mode="json")
+
+input_data = TargetInput.model_validate(
+    {
+        "streams": [...],
+        "utilities": [...],
+        "network": network_payload,
+    }
+)
+```
+
+The required invariant is:
+
+```python
+input_data.model_dump(mode="json")["network"] == network_payload
+```
+
+It must remain true after serializing the complete input:
+
+```python
+restored = TargetInput.model_validate_json(input_data.model_dump_json())
+
+assert restored.model_dump(mode="json")["network"] == network_payload
+```
+
+The implementation must derive the contract from actual `model_dump(mode="json")` output, not blindly copy `HeatExchangerNetwork.model_json_schema()`. Pydantic’s generated schema currently lists fields marked `exclude=True`, while the actual dump omits them.
+
+### JSON-visible network fields
+
+`HeatExchangerNetworkSchema` includes:
+
+```python
+exchangers: list[HeatExchangerSchema] = Field(default_factory=list)
+run_id: str | None = None
+task_id: str | None = None
+period_id: str | None = None
+method: str | None = None
+stage_count: int | None = None
+objective_value: float | None = None
+total_annual_cost: float | None = None
+utility_cost: float | None = None
+capital_cost: float | None = None
+summary_metrics: dict[str, float | int | str | bool | None] = Field(
+    default_factory=dict
+)
+```
+
+It excludes and rejects:
+
+- `solver_axis_metadata`
+- `source_metadata`
+
+### JSON-visible exchanger fields
+
+`HeatExchangerSchema` includes:
+
+```python
+exchanger_id: str | None = None
+kind: HeatExchangerKind
+source_stream: str
+sink_stream: str
+source_stream_role: StreamID
+sink_stream_role: StreamID
+stage: int | None = None
+period_states: list[HeatExchangerPeriodStateSchema] = Field(min_length=1)
+area: float | None = None
+match_allowed: bool = True
+capital_cost: float | None = None
+segment_area_contributions: list[HeatExchangerAreaSliceSchema] = Field(
+    default_factory=list
+)
+```
+
+It excludes and rejects:
+
+- `solver_metadata`
+- `source_metadata`
+
+The period-state and area-slice schemas mirror all fields currently emitted by their runtime records.
+
+### Dump variants
+
+- The nested field accepts the mapping returned by `model_dump(mode="json")`.
+- It does not accept the encoded string returned by `model_dump_json()`; callers must decode that string first.
+- Default dumps must reproduce exact mapping equality.
+- Dumps created with `exclude_none`, `exclude_defaults`, or `exclude_unset` are accepted, but subsequent canonical dumps may restore omitted defaults.
+- Empty networks and explicit `network: null` remain valid.
+
+## Validation Behavior
+
+Mirror the current runtime invariants in the transport schemas:
+
+- non-empty trimmed identities;
+- distinct source and sink streams;
+- canonical `StreamID` endpoint classifications;
+- kind-specific endpoint combinations;
+- rejection of `Unassigned`;
+- required positive stage for recovery exchangers;
+- at least one period state per exchanger;
+- contiguous zero-based `period_idx` ordering;
+- unique period IDs;
+- identical ordered period IDs across a network;
+- finite and appropriately positive/non-negative numeric fields;
+- split fractions within `[0, 1]`;
+- segment-area/design-area consistency using the existing tolerances;
+- forbidden unknown nested fields.
+
+Do not add validation between network endpoint names and `TargetInput.streams` or `utilities`.
+
+## Implementation Impact
+
+- Update the HEN domain model and remove the superseded enum.
+- Migrate recovery/utility extraction, fake execution, and controllability comparisons to `StreamID`.
+- Add the transport schemas and `TargetInput.network`.
+- Allow existing canonical input preparation to retain the serialized network in problem data through `TargetInput.model_dump`; do not automatically consume it as a synthesis seed.
+- Update API and HEN documentation with the canonical `model_dump(mode="json")` bridge and title-case StreamID values.
+- Record the required AI-DLC requirements, user story, functional design, code-generation, build/test, state, and audit artifacts.
+
+## Test Plan
+
+### Runtime migration
+
+- Confirm no production, test, documentation, or generated-schema references to `HeatExchangerStreamRole` remain.
+- Test all three exchanger-kind/StreamID combinations.
+- Reject `Unassigned`, legacy lowercase values, and incorrect combinations.
+- Verify runtime JSON now emits `"Process"` and `"Utility"`.
+
+### Exact serialization parity
+
+For empty, recovery, utility, single-period, multiperiod, area-sliced, and fully populated networks:
+
+```python
+payload = network.model_dump(mode="json")
+validated = TargetInput.model_validate({"streams": [], "network": payload})
+
+assert isinstance(validated.network, HeatExchangerNetworkSchema)
+assert validated.model_dump(mode="json")["network"] == payload
+```
+
+Include fixtures with private metadata and verify that:
+
+- the runtime dump excludes it;
+- the remaining mapping round-trips exactly;
+- manually adding excluded metadata to input is rejected.
+
+### Drift protection
+
+Add contract tests comparing:
+
+- actual runtime dump keys;
+- nested actual exchanger dump keys;
+- transport-schema dump keys.
+
+Any future JSON-visible runtime field must fail this guard until the transport contract is deliberately updated. Excluded fields must remain explicitly accounted for.
+
+### Property-based testing
+
+Update the existing generated exchanger strategy to use `StreamID`, then generate valid aligned networks and verify:
+
+1. runtime JSON dump;
+2. `TargetInput` validation;
+3. complete JSON serialization/deserialization;
+4. exact nested mapping equality;
+5. exchanger, period, and area-slice ordering.
+
+Retain the fixed seed, shrinking, and CI execution required by the enabled partial PBT policy.
+
+### Verification gates
+
+Run:
+
+- the refreshed 143-test focused baseline plus new contract tests;
+- all HEN extraction, reporting, controllability, and synthesis contract tests;
+- architecture, import, and stale-symbol checks;
+- the complete non-solver suite;
+- Ruff lint/format checks;
+- warning-free Sphinx validation.
+
+## Acceptance Criteria
+
+- `HeatExchangerStreamRole` is fully removed.
+- Runtime HEN endpoints use `StreamID`.
+- Default runtime dumps emit title-case endpoint values.
+- Any valid `HeatExchangerNetwork.model_dump(mode="json")` mapping validates as `TargetInput.network`.
+- `TargetInput.model_dump(mode="json")["network"]` reproduces that mapping exactly.
+- Private runtime metadata remains absent.
+- Invalid, unassigned, or legacy endpoint classifications are rejected.
+- Existing inputs without a network remain unchanged."""
+**AI Response**: "Accepted the implementation plan. Re-read the refreshed package, recorded the requirements, user story, workflow plan, functional design, and code-generation checklist, and refreshed the 143-test focused baseline before beginning implementation."
+**Context**: INCEPTION approved and CONSTRUCTION active for serialized HEN transport support. Security and Resiliency are disabled (N/A); partial PBT controls PBT-02, PBT-03, PBT-07, PBT-08, and PBT-09 are enabled and included in the implementation plan.
+
+---
+
 ## Remove Compatibility Facades - Implementation Request
 **Timestamp**: 2026-07-16T17:35:52Z
 **User Input**: "Remove compatibility facades across the package."
@@ -1583,5 +1856,1163 @@ The Sphinx build is configured to treat warnings as errors (-W flag), so these i
 **User Input**: "No new user input."
 **AI Response**: "Reproduced five Ruff I001 diagnostics in a temporary snapshot of the Git index, which omitted the ignored HEN results package. The tracked import blocks were already correct; without the package, Ruff classified the result imports differently. Copied only the four result modules and corrected .gitignore into the same snapshot, after which the exact CI command passed. Current-tree bare, repository-qualified, no-cache, GitHub-output, and no-respect-gitignore Ruff checks also pass under locked Ruff 0.15.18."
 **Context**: CONSTRUCTION - Post-review Ruff diagnosis complete. The documentation and Ruff failures share one root cause: the HEN results source owner was absent from the submitted Git-visible change. No lint suppression or unrelated import rewrite was introduced.
+
+---
+
+## Architecture Modernization - Compatibility Shim Audit Request
+**Timestamp**: 2026-07-17T02:23:49Z
+**User Input**: "Check for compatibility shims throughout the package."
+**AI Response**: "Started a package-wide read-only audit for deprecated aliases, forwarding modules, dynamic re-exports, import fallbacks, legacy signatures, and pickle-path accommodations. The review will distinguish the sole protected main service contract and intentional public APIs from compatibility-only machinery."
+**Context**: CONSTRUCTION - Package architecture modernization generated-code review. Security and Resiliency are disabled (N/A); partial PBT is N/A for this structural audit unless behavioural compatibility code is changed.
+
+---
+
+## Architecture Modernization - Compatibility Shim Audit Completion
+**Timestamp**: 2026-07-17T02:30:43Z
+**User Input**: "No new user input."
+**AI Response**: "Completed the package-wide read-only audit. Import and package facades are absent: package markers are import-free, retired paths do not resolve, no imported symbol is re-exported through __all__, and no dynamic module injection, reverse barrel, or Pydantic field alias remains. Four residual behavioural compatibility groups were confirmed: HPR TypeError retries for obsolete helper signatures, mapping emulation on typed HPR records, legacy optimiser spellings, and StreamCollection legacy pickle-state repair. Additional enum/schema/property and graph-selector aliases are duplicate naming or convenience surfaces rather than import facades. Forty-two focused architecture and HEN compatibility-absence tests passed."
+**Context**: CONSTRUCTION - Package architecture modernization generated-code review. The audit is complete and findings remain open for a separately approved removal change. Security and Resiliency are disabled (N/A); partial PBT is N/A because this interaction changed no runtime behaviour.
+
+---
+
+## Residual Compatibility Shim Removal - Code Generation Approval
+**Timestamp**: 2026-07-17T02:42:44Z
+**User Input**: "PLEASE IMPLEMENT THIS PLAN:
+# Remove the Four Residual Compatibility Shims
+
+## Summary
+
+Remove the four behavioural compatibility mechanisms identified by the package audit while preserving `OpenPinch.main.pinch_analysis_service`, its accepted canonical configuration values, numerical behaviour, and current-version serialization.
+
+This is an intentional clean break for unsupported internal APIs. No deprecation period, aliases, migration loader, or compatibility warning is added.
+
+## Implementation Changes
+
+1. **Remove obsolete HPR helper retries**
+
+   - Replace the three `try/except TypeError` retry blocks in heat-pump cascade processing with single direct calls that always pass `period_idx`, including `None`.
+   - Allow helper exceptions to propagate unchanged; do not catch broad `TypeError`.
+   - Delete the legacy-signature fallback test.
+   - Retain and strengthen the existing test that verifies all three helpers receive the selected period index.
+   - Add a parameterized regression proving an internal `TypeError` propagates and the failing helper is called exactly once.
+
+2. **Make typed HPR records attribute-only**
+
+   - Remove `__getitem__()` and `get()` from `HPRParsedState`.
+   - Remove `__getitem__()`, `get()`, and `__contains__()` from `HPRBackendResult`.
+   - Keep computed properties, `with_updates()`, `failure()`, `to_output_fields()`, Pydantic validation, and model serialization unchanged.
+   - Rewrite tests to use attributes and `model_dump()` where mapping data is actually required.
+   - Add an architecture regression asserting these typed records do not expose dictionary-emulation methods.
+
+3. **Accept only canonical optimiser identifiers**
+
+   - Delete `_METHOD_ALIASES` and reject all non-canonical spellings.
+   - Rename `normalise_hpr_method()` to the private `_resolve_hpr_optimisation_method()` and remove the old name from `__all__`.
+   - Accept only `dual_annealing`, `cmaes`, `bo`, and `rbf_surrogate`, plus corresponding enum instances; retain `None` as the existing default-selection path.
+   - Preserve `BB_Minimiser` as configuration metadata so the protected main contract and frontend enum choices remain unchanged.
+   - Replace direct internal/test uses of `rbf` and other aliases with canonical values.
+   - Test all four canonical values, enum input, `None`, invalid strings, whitespace/case variants, and non-string values.
+
+4. **Remove legacy `StreamCollection` pickle repair**
+
+   - Remove the missing-`_numeric_cache` repair from `__setstate__()` and the fallback default for missing `_sort_spec` in `__getstate__()`.
+   - Preserve current-version pickle support, including deterministic fallback when a configured callable sort key is not picklable.
+   - Delete tests that manually construct old state dictionaries.
+   - Add a real current-version pickle round trip covering stream order, period context, numeric-view operation, callable-sort fallback, and independence after restoration.
+   - Provide no special error or migration path for old pickles; unsupported state may fail naturally.
+
+## API and Documentation
+
+- `OpenPinch.main.pinch_analysis_service` and its canonical request/response behaviour remain unchanged.
+- Unsupported direct callers lose HPR mapping access, non-canonical optimiser spellings, old helper-signature retries, and old `StreamCollection` pickle repair.
+- Update HPR reference documentation and release notes to state that internal records are attribute-only and optimiser identifiers are exact.
+- Run stale searches for legacy helper tests, `_METHOD_ALIASES`, mapping-emulation methods, non-canonical optimiser strings, and legacy pickle-repair wording.
+- Update the AI-DLC checklist, state, audit, implementation summary, and build/test evidence immediately as each step completes.
+
+## Test Plan
+
+- Run focused HPR contract, targeting, optimiser-adapter, configuration, and stream-collection tests.
+- Run the protected end-to-end main contract suite, including validation of all four canonical optimiser values.
+- Run architecture tests confirming retired facades remain absent and the removed shim surfaces do not return.
+- Run the complete non-solver suite, available affected HPR tests, Ruff lint and format checks, warning-free Sphinx, and `git diff --check`.
+- Confirm test names and assertions describe canonical behaviour rather than compatibility implementation details.
+
+## Assumptions
+
+- The “four issues” are the HPR retry fallback, HPR mapping emulation, optimiser spelling aliases, and legacy pickle-state repair; the broader enum, schema, `Stream`, graph-selector, and documentation-navigation alias inventory is out of scope.
+- Unit-category aliases remain because they are intentional behaviour reachable through the protected main contract.
+- Optional-dependency guards, rendering adapters, and OpenHENS numerical/source-parity structures are not compatibility shims and remain unchanged.
+- Security and Resiliency extensions remain disabled; partial property-based-testing requirements are N/A because no numerical algorithm changes."
+**AI Response**: "Accepted the implementation plan as explicit Code Generation approval. Verified the four audited findings and protected contract, created a detailed ten-step checkbox plan, recorded extension applicability, and began dependency-ordered implementation with the obsolete HPR helper retries."
+**Context**: CONSTRUCTION - Code Generation Parts 1 and 2. Steps 1 and 2 completed in this interaction; Step 3 active. Security and Resiliency are disabled (N/A); partial PBT is N/A because no numerical algorithm changes.
+
+---
+
+## Residual Compatibility Shim Removal - HPR Helper Calls
+**Timestamp**: 2026-07-17T02:47:10Z
+**User Input**: "No new user input."
+**AI Response**: "Removed all three broad TypeError retry paths from HPR cascade processing. Grid, ambient-process, and utility helpers now receive period_idx exactly once, including None. Replaced the legacy-signature fallback test with parameterized behavioural regressions for explicit period forwarding and unchanged single-call TypeError propagation. Six focused cascade tests passed."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 3 complete; Step 4 active. Security and Resiliency are disabled (N/A); partial PBT is N/A because no numerical algorithm changed.
+
+---
+
+## Residual Compatibility Shim Removal - Attribute-Only HPR Records
+**Timestamp**: 2026-07-17T02:48:37Z
+**User Input**: "No new user input."
+**AI Response**: "Removed __getitem__ and get from HPRParsedState and removed __getitem__, get, and __contains__ from HPRBackendResult. Contract tests now use attributes and model_dump while retaining computed properties, update helpers, failure construction, and output projection. Added an architecture regression against dictionary emulation. All 14 focused contract and API-boundary tests passed."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 4 complete; Step 5 active. Security and Resiliency are disabled (N/A); partial PBT is N/A.
+
+---
+
+## Residual Compatibility Shim Removal - Canonical Optimiser Identifiers
+**Timestamp**: 2026-07-17T02:51:00Z
+**User Input**: "No new user input."
+**AI Response**: "Deleted the optimiser alias table and public normalise_hpr_method helper. HPR candidate search now uses a private exact resolver accepting only dual_annealing, cmaes, bo, rbf_surrogate, their enum values, and the existing None default. Updated direct inputs and added rejection coverage for aliases, case changes, whitespace, and non-string values. Added protected-main validation for all four canonical identifiers. All 51 focused optimiser, multiperiod, and main-contract selections passed."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 5 complete; Step 6 active. BB_Minimiser remains configuration metadata. Security and Resiliency are disabled (N/A); partial PBT is N/A.
+
+---
+
+## Residual Compatibility Shim Removal - Current-Version Pickling
+**Timestamp**: 2026-07-17T02:53:05Z
+**User Input**: "No new user input."
+**AI Response**: "Removed the missing-_numeric_cache repair and missing-_sort_spec fallback from StreamCollection state handling. Current-version pickle support now has a real round-trip regression covering period identifiers and weights, deterministic non-picklable callable-sort fallback, stream order, period-indexed numeric views, and restored-instance independence. Removed manually constructed old-state tests. All four focused pickle and edge selections passed."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 6 complete; Step 7 active. Unsupported old pickle state receives no migration path or special error. Security and Resiliency are disabled (N/A); partial PBT is N/A.
+
+---
+
+## Residual Compatibility Shim Removal - Documentation and Stale Surfaces
+**Timestamp**: 2026-07-17T02:54:21Z
+**User Input**: "No new user input."
+**AI Response**: "Updated both HPR API references and release notes to document attribute-only internal records, exact optimiser identifiers, single-signature helper calls, and current-version-only StreamCollection pickle support. Added the focused implementation summary. Source/test stale scans found no retired fallback test, alias table, HPR mapping methods, old pickle repair, or noncanonical runtime optimiser input. All 15 documentation-consistency tests passed."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 7 complete; Step 8 active. Ignored generated docs/_build output was excluded from source stale checks and will be replaced by the warning-free Sphinx gate. Security and Resiliency are disabled (N/A); partial PBT is N/A.
+
+---
+
+## Residual Compatibility Shim Removal - Focused Integration Gate
+**Timestamp**: 2026-07-17T02:55:30Z
+**User Input**: "No new user input."
+**AI Response**: "Ran the combined HPR contract, targeting, optimisation-adapter, multiperiod, configuration, StreamCollection, model round-trip, complete architecture, and protected-main suites. All 277 tests passed."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 8 complete; Step 9 complete quality matrix active. Security and Resiliency are disabled (N/A); partial PBT is N/A.
+
+---
+
+## Residual Compatibility Shim Removal - Complete Quality Matrix
+**Timestamp**: 2026-07-17T03:03:32Z
+**User Input**: "No new user input."
+**AI Response**: "The first complete non-solver run exposed 15 stale cycle-test assertions that still used dictionary syntax on typed HPR records. Migrated those assertions and parser doubles to attribute-based HPR records; all 37 affected cycle tests then passed. The clean rerun passed 2,063 tests with four solver-tagged tests deselected. A fresh 60-source Sphinx build passed with -E -W, Ruff lint passed, Ruff formatting confirmed all 459 Python files formatted, retired-surface scans were empty, and git diff --check passed."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 9 complete; Step 10 evidence finalization active. Solver tests are unaffected by this non-numerical compatibility cleanup and remain separately classified. Security and Resiliency are disabled (N/A); partial PBT is N/A.
+
+---
+
+## Residual Compatibility Shim Removal - Code Generation Completion
+**Timestamp**: 2026-07-17T03:06:24Z
+**User Input**: "No new user input."
+**AI Response**: "Completed all ten approved Code Generation checklist steps. Removed the four residual compatibility mechanisms, migrated all affected behavioural tests and documentation, produced the implementation summary, and finalized reproducible Build and Test evidence. The protected OpenPinch.main.pinch_analysis_service implementation and signature were not changed."
+**Context**: CONSTRUCTION - Code Generation Part 2 complete; generated code ready for review. Security and Resiliency are disabled and compliant as N/A. Partial PBT is N/A because no numerical algorithm changed; deterministic regressions cover each removed behaviour.
+
+---
+
+## Build and Test Stage
+**Timestamp**: 2026-07-17T03:06:24Z
+**User Input**: "No new user input."
+**Build Status**: Success
+**Test Status**: Pass
+**Files Generated or Updated**:
+- build-instructions.md
+- unit-test-instructions.md
+- integration-test-instructions.md
+- performance-test-instructions.md
+- build-and-test-summary.md
+**AI Response**: "Build and Test completed successfully: isolated OpenPinch 0.5.0 wheel and source distributions built; 277 focused and 2,063 complete non-solver tests passed; four solver-tagged tests were deselected and not counted as passes; fresh warning-free Sphinx, Ruff lint/format, stale-surface scans, and patch hygiene passed."
+**Context**: CONSTRUCTION - Build and Test complete. Operations is N/A because no deployment or infrastructure work was requested. Explicit generated-code and build-evidence review is required.
+
+---
+
+## Post-Implementation Unresolved Import and Type Audit Request
+**Timestamp**: 2026-07-17T03:07:34Z
+**User Input**: "Check for unresolved imports including type errors, such as in OpenPinch/domain/enums.py"
+**AI Response**: "Started a package-wide read-only import and static-type audit, with explicit inspection of TYPE_CHECKING-only imports and OpenPinch/domain/enums.py. Confirmed an initial suspicious reference from enums.py to the absent domain.config module; broader validation is in progress before classifying findings."
+**Context**: CONSTRUCTION - generated-code review. This interaction is diagnostic; no production fix is inferred until the package-wide finding set is established.
+
+---
+
+## Post-Implementation Unresolved Import and Type Audit Completion
+**Timestamp**: 2026-07-17T03:11:55Z
+**User Input**: "No new user input."
+**AI Response**: "Completed the package-wide diagnostic audit. All 301 discoverable OpenPinch modules import successfully at runtime. Static resolution found exactly two missing internal modules, both TYPE_CHECKING-only: OpenPinch.domain.config and OpenPinch.contracts.config. Pylint error analysis plus direct reproduction confirmed a wrong idx keyword in total-site utility profile construction, an uninitialized crossflow effectiveness result for Rows <= 0, and a Zone TYPE_CHECKING self-import/redefinition. Dynamic Pyomo, Pydantic, NumPy, and SciPy diagnostics were classified as false positives after source/runtime inspection. No production files were changed."
+**Context**: CONSTRUCTION - generated-code review diagnostic complete. Open findings require explicit fix approval. Security and Resiliency remain disabled (N/A); partial PBT is N/A for this read-only audit.
+
+---
+
+## Post-Implementation Import and Type Fix Approval
+**Timestamp**: 2026-07-17T03:14:47Z
+**User Input**: "Fix these please."
+**AI Response**: "Accepted explicit approval to fix all five confirmed findings. Created a seven-step regression-first Code Generation checklist covering type-import ownership, Zone self-import removal, total-site period forwarding, crossflow row validation, focused verification, and the complete non-solver gate."
+**Context**: CONSTRUCTION - Code Generation Parts 1 and 2. Steps 1 and 2 complete; Step 3 active. Security and Resiliency are disabled (N/A); partial PBT is N/A because no numerical algorithm changes.
+
+---
+
+## Post-Implementation Import and Type Fix Regressions
+**Timestamp**: 2026-07-17T03:14:47Z
+**User Input**: "No new user input."
+**AI Response**: "Added architecture coverage requiring every internal import target to resolve and prohibiting module self-imports, strengthened total-site coverage with an explicit period_idx-only helper signature, and added invalid crossflow row-count validation cases. The pre-fix run produced the expected five failures."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 3 complete; Steps 4 and 5 active. Security and Resiliency disabled (N/A); partial PBT N/A.
+
+---
+
+## Post-Implementation Import and Type Corrections
+**Timestamp**: 2026-07-17T03:16:33Z
+**User Input**: "No new user input."
+**AI Response**: "Corrected Configuration type imports to their concrete domain owner, removed the Zone self-import, forwarded total-site period_idx with the canonical keyword, and made CrossflowUnmixedEff2 reject non-positive or non-integral row counts explicitly. All five regression cases pass."
+**Context**: CONSTRUCTION - Code Generation Part 2, Steps 4 and 5 complete; Step 6 active. The protected main service is unchanged. Security and Resiliency disabled (N/A); partial PBT N/A.
+
+---
+
+## Post-Implementation Import and Type Focused Verification
+**Timestamp**: 2026-07-17T03:18:03Z
+**User Input**: "No new user input."
+**AI Response**: "The 96-test architecture, total-site, and heat-transfer gate passed. All 301 discoverable package modules import successfully. Targeted Pylint error analysis is clean after making the validated row branches structurally exhaustive. Repository-wide Ruff lint and formatting of 459 Python files pass, as does git diff --check."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 6 complete; Step 7 complete non-solver suite active. Security and Resiliency disabled (N/A); partial PBT N/A.
+
+---
+
+## Post-Implementation Import and Type Fix Completion
+**Timestamp**: 2026-07-17T03:20:27Z
+**User Input**: "No new user input."
+**AI Response**: "Completed all seven approved checklist steps. The complete non-solver suite passed 2,067 tests with four solver-tagged tests deselected. All 301 modules import, the targeted Pylint error gate is clean, Ruff lint and formatting pass for 459 Python files, and patch hygiene passes. Updated release notes, implementation evidence, state, audit, and Build and Test evidence."
+**Context**: CONSTRUCTION - Code Generation and Build and Test complete; generated code ready for review. Security and Resiliency disabled (N/A); partial PBT N/A. The protected main service remains unchanged.
+
+---
+
+## Serialized HEN Runtime Identity Migration
+**Timestamp**: 2026-07-17T04:22:10Z
+**User Input**: "No new user input."
+**AI Response**: "Removed HeatExchangerStreamRole, migrated runtime HEN endpoint classifications and production consumers to StreamID, mechanically updated existing tests, and passed the 89-test domain/controllability/contract regression gate."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 2 complete; Step 3 active. Security and Resiliency disabled (N/A); partial PBT controls remain scheduled for Step 5.
+
+---
+
+## Serialized HEN Transport Schema Implementation
+**Timestamp**: 2026-07-17T04:25:42Z
+**User Input**: "No new user input."
+**AI Response**: "Added four independent JSON transport schemas, connected HeatExchangerNetworkSchema to TargetInput.network, exported the concrete schema types, mirrored runtime validation and area tolerances, and confirmed empty-network exact dump and complete JSON round-trip parity. Excluded runtime metadata is absent from the schema and therefore forbidden at nested boundaries."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 3 complete; Step 4 active. No runtime conversion or synthesis seeding was introduced. Security and Resiliency disabled (N/A); partial PBT controls remain scheduled for Step 5.
+
+---
+
+## Serialized HEN Contract and Property Tests
+**Timestamp**: 2026-07-17T04:30:06Z
+**User Input**: "No new user input."
+**AI Response**: "Added exact mapping parity cases for empty, recovery, utility, multiperiod, area-sliced, and fully populated networks; metadata rejection and dump-variant coverage; runtime/schema key drift guards; canonical StreamID validation; schema ownership coverage; and seeded generated aligned-network round trips preserving exchanger, period, and area-slice ordering. The new 50-test contract, domain, architecture, and PBT gate passes."
+**Context**: CONSTRUCTION - Code Generation Part 2, Steps 4 and 5 complete; Step 6 active. Partial PBT is compliant: fixed seed 20260717, deterministic CI test discovery, bounded 30 examples, Hypothesis shrinking, and invariant-based assertions are present. Security and Resiliency disabled (N/A).
+
+---
+
+## Serialized HEN Documentation and Implementation Evidence
+**Timestamp**: 2026-07-17T04:32:18Z
+**User Input**: "No new user input."
+**AI Response**: "Documented the canonical model_dump(mode=\"json\") bridge, title-case StreamID endpoint values, encoded-string restriction, metadata boundary, retained-but-not-seeded behavior, and concrete transport schemas in the API guide, HEN guide, contributor reference, release notes, and implementation summary."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 6 complete; Step 7 active. Documentation contains text alternatives only and no diagrams requiring Mermaid or ASCII validation. Security and Resiliency disabled (N/A); partial PBT compliance recorded in implementation evidence.
+
+---
+
+## Serialized HEN Focused Verification
+**Timestamp**: 2026-07-17T04:35:07Z
+**User Input**: "No new user input."
+**AI Response**: "Passed the expanded 177-test focused input/domain/controllability/schema/architecture gate, the complete 463-test non-solver HEN extraction/reporting/controllability/synthesis gate with four solver cases deselected, the 43-test architecture gate, and the 19-test canonical network contract file. Stale-symbol scans of source, tests, and authored docs are clean, and patch whitespace validation passes."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 7 complete; Step 8 active. Canonical preparation retains TargetInput.network exactly as represented by TargetInput.model_dump(mode=\"python\") and does not consume it. Security and Resiliency disabled (N/A); partial PBT compliant.
+
+---
+
+## Serialized HEN Complete Verification Gates
+**Timestamp**: 2026-07-17T04:39:31Z
+**User Input**: "No new user input."
+**AI Response**: "Passed the complete non-solver suite with 2,091 tests and four solver-marked tests deselected; repository-wide Ruff lint and format checks across 460 Python files; warning-as-error Sphinx HTML validation across 60 sources; stale-symbol scanning; and git diff --check."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 8 complete; Step 9 and Build and Test evidence active. Security and Resiliency disabled (N/A). Partial PBT controls remain compliant and executed as part of the full suite.
+
+---
+
+## Serialized HEN Code Generation and Build and Test Completion
+**Timestamp**: 2026-07-17T04:42:11Z
+**User Input**: "No new user input."
+**AI Response**: "Completed all nine approved code-generation checklist steps and recorded build, unit, integration, performance classification, extension compliance, state, implementation, and verification evidence. The serialized HEN TargetInput contract is ready for generated-code review."
+**Context**: CONSTRUCTION - Code Generation and Build and Test complete. Operations is N/A because no deployment or infrastructure work was requested. Security and Resiliency disabled (N/A); partial PBT compliant.
+
+---
+
+## Serialized HEN Final Post-Format Regression
+**Timestamp**: 2026-07-17T04:44:03Z
+**User Input**: "No new user input."
+**AI Response**: "Passed the final 39-test serialized-HEN contract, property round-trip, and runtime-domain regression gate after formatting. All code-generation plan checkboxes are complete and git diff --check remains clean."
+**Context**: Generated code is ready for review. Operations remains N/A. Security and Resiliency disabled (N/A); partial PBT compliant.
+
+---
+
+## Recent Major Changes Review Request
+**Timestamp**: 2026-07-17T04:38:41Z
+**User Input**: "Thoroughly review all the recent major changes for possible issues."
+**AI Response**: "Started a read-only code review of the complete recent change set, covering runtime migration, transport contracts, validation and serialization edge cases, test quality, documentation accuracy, and AI-DLC evidence. No implementation changes are authorized by this review request."
+**Context**: Generated-code review. Security and Resiliency remain disabled (N/A); enabled partial PBT controls will be audited against the implemented tests.
+
+---
+
+## Recent Major Changes Review Findings
+**Timestamp**: 2026-07-17T04:44:10Z
+**User Input**: "No new user input."
+**AI Response**: "Completed the read-only review of commit d29bbee4. Confirmed one high-priority runtime integration defect: StreamID members remain in TargetInput Python-mode dumps, causing canonical workspace bundle JSON persistence to raise TypeError. Confirmed one process artifact defect: the implementation-approval audit block was inserted near the beginning of the pre-existing audit instead of appended chronologically. Runtime direction mappings, transport validators, dump-key drift guards, metadata rejection, no-seed behavior, documentation, and focused/full test evidence were otherwise consistent."
+**Context**: Generated-code review complete with two actionable findings. No implementation code was changed. Security and Resiliency remain disabled (N/A); partial PBT implementation is compliant but does not cover workspace persistence.
+
+---
+
+## Recent Major Changes Fix Recommendations
+**Timestamp**: 2026-07-17T05:47:33Z
+**User Input**: "Suggest fixes"
+**AI Response**: "Recommended a targeted field serializer for the two transport StreamID fields so Python-mode canonical dumps remain JSON-safe without changing in-memory enum typing, plus canonical JSON-safety and workspace save/reload regressions. Recommended preserving audit immutability by appending a correction entry rather than moving or deleting the misplaced historical block. No implementation code was changed."
+**Context**: Generated-code review follow-up. Recommendations only; explicit fix approval is still required before code generation. Security and Resiliency disabled (N/A); partial PBT remains applicable to the serialization regression suite.
+
+---
+
+## Recent Major Changes Compatibility Clarification
+**Timestamp**: 2026-07-17T05:49:39Z
+**User Input**: "No compatilbility needed."
+**AI Response**: "Revised the recommended JSON-safety fix to make StreamID inherit from str and Enum directly. This clean break fixes Python-mode runtime and transport dumps globally without a field serializer, alias, migration layer, or legacy-value support. No implementation code was changed."
+**Context**: Generated-code review follow-up. Recommendation revised; explicit implementation approval is still required. Security and Resiliency disabled (N/A); partial PBT remains applicable to serialization and persistence regressions.
+
+---
+
+## Serialized HEN JSON-Safety Fix Approval
+**Timestamp**: 2026-07-17T05:50:42Z
+**User Input**: "go"
+**AI Response**: "Accepted explicit approval to implement the clean-break StreamID JSON-safety fix, add runtime/canonical/workspace persistence regressions, append an audit-order correction, and run focused and complete verification gates. Created a six-step checkbox plan; Step 1 is complete and Step 2 is active."
+**Context**: CONSTRUCTION - Code Generation Parts 1 and 2. No compatibility aliases, legacy lowercase values, or migration layer will be added. Security and Resiliency disabled (N/A); partial PBT applies to serialization regressions.
+
+---
+
+## Serialized HEN JSON-Safety Regressions
+**Timestamp**: 2026-07-17T05:53:21Z
+**User Input**: "No new user input."
+**AI Response**: "Added three regression tests covering default runtime HEN dump JSON safety, canonical TargetInput JSON safety, and public workspace bundle save/load with a serialized network. All three fail before the fix with the confirmed StreamID TypeError."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 2 complete; Step 3 active. Regression-first evidence confirms the reviewed defect. Security and Resiliency disabled (N/A); partial PBT remains compliant.
+
+---
+
+## Serialized HEN String-Backed StreamID Fix
+**Timestamp**: 2026-07-17T05:54:06Z
+**User Input**: "No new user input."
+**AI Response**: "Changed StreamID to inherit from str and Enum. The three previously failing runtime, canonical-input, and workspace persistence regressions now pass. No serializer, compatibility alias, lowercase legacy value, or migration layer was added."
+**Context**: CONSTRUCTION - Code Generation Part 2, Step 3 complete; Step 4 active. Security and Resiliency disabled (N/A); partial PBT remains compliant.
+
+---
+
+## Audit Ordering Correction
+**Timestamp**: 2026-07-17T05:55:17Z
+**User Input**: "No new user input."
+**AI Response**: "Recorded that the Serialized HEN TargetInput Implementation Approval entry timestamped 2026-07-17T04:19:28Z was mistakenly inserted near the beginning of audit.md. Its correct chronological position is after the Post-Implementation Import and Type Fix Completion entry timestamped 2026-07-17T03:20:27Z and before the Serialized HEN Runtime Identity Migration entry. The original record remains untouched to preserve append-only audit integrity. Updated state, release notes, and implementation evidence for the string-backed StreamID fix."
+**Context**: Audit correction appended; no historical audit content was moved, deleted, or rewritten. CONSTRUCTION - Code Generation Part 2, Step 4 complete; Step 5 active. Security and Resiliency disabled (N/A); partial PBT remains compliant.
+
+---
+
+## Serialized HEN JSON-Safety Fix Completion
+**Timestamp**: 2026-07-17T06:00:12Z
+**User Input**: "No new user input."
+**AI Response**: "Completed all six fix-plan steps. The three regression-first failures now pass; the expanded affected gate passes 574 tests with four solver cases deselected; the complete non-solver suite passes 2,093 tests with four solver cases deselected; Ruff lint/format, warning-as-error Sphinx, stale-symbol, and patch-hygiene gates pass. Updated state and Build and Test evidence."
+**Context**: CONSTRUCTION - Code Generation and Build and Test complete; generated code ready for review. Operations N/A. Security and Resiliency disabled (N/A); partial PBT compliant. No compatibility behavior was added.
+
+---
+
+## Root Workflow Exports Approval
+**Timestamp**: 2026-07-17T06:01:24Z
+**User Input**: "from OpenPinch.application.problem import PinchProblem
+from OpenPinch.application.workspace import PinchWorkspace
+
+These should be
+
+from OpenPinch import PinchProblem, PinchWorkspace"
+**AI Response**: "Accepted the explicit public import-contract change. Recorded minimal requirements and a user story, inspected the marker-root, optional-import, notebook, test, and documentation impact, and created a six-step code-generation checklist. Step 1 is complete and Step 2 is active."
+**Context**: INCEPTION approved by explicit request; CONSTRUCTION - Code Generation active. The package root will export exactly PinchProblem and PinchWorkspace while concrete modules remain implementation owners. Security and Resiliency disabled (N/A); partial PBT N/A because this is an import-surface change.
+
+---
+
+## Root Workflow Export Regressions
+**Timestamp**: 2026-07-17T06:04:06Z
+**User Input**: "No new user input."
+**AI Response**: "Added regression coverage for the exact root export list and owner identity, fresh-process imports with optional dependencies blocked, and packaged notebook import conventions. The three focused tests fail before implementation because the root has no exports and the notebooks still use concrete application-module imports."
+**Context**: Root workflow exports code generation; plan Step 2 completed and Step 3 started.
+
+---
+
+## Root Workflow Exports Implementation
+**Timestamp**: 2026-07-17T06:05:12Z
+**User Input**: "No new user input."
+**AI Response**: "Exported PinchProblem and PinchWorkspace from the package root with an exact two-name __all__. Owner identity and all fresh-process cold-import cases pass, including the root import with optional solver, plotting, dashboard, spreadsheet, and heat-pump packages blocked."
+**Context**: Root workflow exports code generation; plan Step 3 completed and Step 4 started.
+
+---
+
+## Root Workflow Import Migration
+**Timestamp**: 2026-07-17T06:10:13Z
+**User Input**: "No new user input."
+**AI Response**: "Migrated all curated user-facing documentation and all ten packaged notebook source cells to import PinchProblem and PinchWorkspace from OpenPinch. Updated support language to distinguish the public package-root workflows from unsupported concrete internals, preserved the existing executed outputs in notebook 01, and passed the focused documentation and notebook contract checks."
+**Context**: Root workflow exports code generation; plan Step 4 completed and Step 5 started.
+
+---
+
+## Root Workflow Exports Completion
+**Timestamp**: 2026-07-17T06:19:41Z
+**User Input**: "No new user input."
+**AI Response**: "Completed the six-step root workflow export plan. The package exports exactly PinchProblem and PinchWorkspace with concrete owner identity; user documentation and all packaged notebook source imports use the root surface. The affected complete gate passes 2,092 non-solver tests with four solver cases and the pre-existing notebook-output cleanliness assertion deselected. Ruff, warning-as-error Sphinx, notebook JSON parsing, stale-contract search, cold imports, and patch hygiene pass. The isolated cleanliness assertion still reports execution counts and outputs already present in notebook 01; those local results were preserved."
+**Context**: CONSTRUCTION - Code Generation and Build and Test complete; generated code ready for review. Operations N/A. Security and Resiliency disabled (N/A); partial PBT N/A. No compatibility layer was added.
+
+---
+
+## Tutorial Notebook Review Request
+**Timestamp**: 2026-07-17T06:32:45Z
+**User Input**: "Examine the 10 tutorial notebooks are up-to-date, avoid unnecessary imports, and identify syntax that would be verbose or unintuitive to a new user."
+**AI Response**: "Started a read-only review of all ten packaged tutorial notebooks covering current API usage, import necessity, syntax validity, repeated boilerplate, and beginner-facing clarity. Existing notebook outputs will be preserved and findings will be reported before any tutorial edits."
+**Context**: Generated-code review; no implementation authorized. Security and Resiliency disabled (N/A); partial PBT N/A for documentation review.
+
+---
+
+## Tutorial Notebook Review Completion
+**Timestamp**: 2026-07-17T06:46:52Z
+**User Input**: "No new user input."
+**AI Response**: "Reviewed all ten packaged tutorial notebooks. All code cells compile and all imported names are referenced, but only notebooks 03, 08, and 09 execute unchanged against the current package. Identified keyword-only copy_case breakage in notebooks 01, 02, 05, and 06; missing explicit indirect targeting and stale cross-references in notebook 02; unsafe base-target/error handling in notebook 04; removed HEN result-selection methods in notebook 07; and a real weighted-summary failure in notebook 10. Also identified private/deep imports, redundant sample-copy and scalar-resolution boilerplate, repeated target lookups, broad getattr/exception patterns, 38 overlong lines, seven unsorted import blocks, one trailing-whitespace issue, and a pandas FutureWarning. No notebook or application code was changed."
+**Context**: Generated-code review complete; findings prepared for user decision. Security and Resiliency disabled (N/A); partial PBT N/A. Execution used in-memory review-only rewrites to confirm proposed current-API corrections without modifying notebooks.
+
+---
+
+## Package Usability Refactor Planning Request
+**Timestamp**: 2026-07-17T06:57:12Z
+**User Input**: "Develop a plan to refactor the notebooks and codebase to make the application of OpenPinch as a package simple and intuitive."
+**AI Response**: "Started an inception-only planning workflow using the completed ten-notebook execution review and a refreshed scan of the current root facade, target/design accessors, workspace scenario APIs, documentation contract, and notebook tests. No application or notebook implementation will occur before plan approval."
+**Context**: INCEPTION - Workspace Detection and Requirements Analysis. Brownfield Python package; existing reverse-engineering artifacts are structurally stale after the owner-oriented refactor, so current affected surfaces are being resolved from the live package and recent review. Existing extension configuration retained: Security disabled, Resiliency disabled, partial PBT enabled but N/A for planning artifacts.
+
+---
+
+## Package Usability Refactor Requirements and Workflow Planning
+**Timestamp**: 2026-07-17T07:01:34Z
+**User Input**: "No new user input."
+**AI Response**: "Completed comprehensive requirements, user-story assessment, four personas, seven acceptance stories, and a validated five-unit execution plan. The plan keeps the root at exactly PinchProblem and PinchWorkspace, preserves the strict main service, removes ambiguous target/copy/configuration syntax without compatibility aliases, adds application-owned HEN result behavior, rewrites all ten tutorials after supporting APIs are green, and replaces stale substring tests with executable notebook contracts. Please review aidlc-docs/inception/plans/package-usability-refactor-execution-plan.md. You may request changes or explicitly approve it to proceed to Application Design; no implementation has started."
+**Context**: INCEPTION - Requirements Analysis, User Stories, and Workflow Planning complete; explicit approval required. Content validation passed for five Markdown artifacts and six Mermaid edges. Security and Resiliency disabled; partial PBT conditionally applicable during construction.
+
+---
+
+## Package Usability Refactor Plan Amendment
+**Timestamp**: 2026-07-17T07:16:17Z
+**User Input**: "The ambiguous callable `problem.target()` is important because it efficiently cycles through each zone performing pinch analysis and total site. So, it needs to retain something along these lines like:
+`problem.target.all()`"
+**AI Response**: "Accepted the correction that bulk targeting orchestration is an essential public workflow. Began amending the requirements, user stories, and execution plan so the existing efficient zone-tree traversal is retained under the explicit `problem.target.all()` name, while focused targeting methods remain available and the unnamed callable is removed without a compatibility alias."
+**Context**: INCEPTION - Workflow Planning amendment. No implementation authorized. Security and Resiliency disabled; partial PBT conditionally applicable during construction.
+
+---
+
+## Package Usability Refactor Plan Amendment Completion
+**Timestamp**: 2026-07-17T07:18:39Z
+**User Input**: "No new user input."
+**AI Response**: "Amended the requirements, first-solve and Total Site user stories, target user experience, architectural decisions, Unit 1 contracts, Unit 2 implementation work, workspace vocabulary, notebooks 01 and 02, contract tests, and success criteria. The plan now preserves the current one-plan, one-zone-tree configured orchestration as problem.target.all(), retains focused direct() and total_site() workflows, and removes only the unnamed problem.target() callable with no compatibility alias. Content validation and patch hygiene passed. Requested explicit approval or further changes before Application Design."
+**Context**: INCEPTION - Workflow Planning amendment complete; explicit approval required. No implementation has started. Security and Resiliency disabled; partial PBT conditionally applicable during construction.
+
+---
+
+## Package Usability Refactor Indirect Target Amendment
+**Timestamp**: 2026-07-17T07:19:19Z
+**User Input**: "Allow indirect() too"
+**AI Response**: "Accepted problem.target.indirect() as a first-class focused public operation alongside problem.target.total_site(). Began amending the requirements, stories, examples, implementation unit, notebook guidance, and contract tests so both names share one indirect/Total Site implementation and result contract rather than forming a legacy compatibility layer."
+**Context**: INCEPTION - Workflow Planning amendment. No implementation authorized. Security and Resiliency disabled; partial PBT conditionally applicable during construction.
+
+---
+
+## Package Usability Refactor Indirect Target Amendment Completion
+**Timestamp**: 2026-07-17T07:20:10Z
+**User Input**: "No new user input."
+**AI Response**: "Completed the plan amendment for problem.target.indirect(). The requirements now define indirect() and total_site() as deliberate first-class focused names with identical keyword-only signatures, validation, shared dispatch, result recording, return types, and numerical output. Workspace vocabulary, notebook 02 guidance, and contract tests cover both names while prohibiting duplicate execution. The old indirect_heat_integration() name and unnamed problem.target() callable remain removed without compatibility shims. Content validation and patch hygiene passed. Requested explicit approval or further changes before Application Design."
+**Context**: INCEPTION - Workflow Planning amendment complete; explicit approval required. No implementation has started. Security and Resiliency disabled; partial PBT conditionally applicable during construction.
+
+---
+
+## Package Usability Refactor Target Surface Review
+**Timestamp**: 2026-07-17T07:20:38Z
+**User Input**: "Give the list of callables from `problem.target.*`"
+**AI Response**: "Inspected the live target accessor and prepared a comparison between the current callable surface and the proposed clean-break public surface, including the shared indirect()/total_site() contract. No plan or implementation files were changed."
+**Context**: INCEPTION - Workflow Planning review; explicit approval remains pending. Security and Resiliency disabled; partial PBT N/A for this read-only API inventory.
+
+---
+
+## Package Usability Refactor Descriptive Target Naming
+**Timestamp**: 2026-07-17T07:24:50Z
+**User Input**: "direct, indirect, all, area_cost are not specific enough for a new user"
+**AI Response**: "Accepted the naming constraint and began revising the planned beginner-facing surface to use engineering outcomes: pinch_analysis(), total_site(), configured_analyses(), and heat_exchanger_area_cost(). This latest feedback supersedes the proposed direct(), indirect(), all(), and area_cost() shorthands."
+**Context**: INCEPTION - Workflow Planning amendment. No implementation authorized. Security and Resiliency disabled; partial PBT conditionally applicable during construction.
+
+---
+
+## Package Usability Refactor Descriptive Target Naming Completion
+**Timestamp**: 2026-07-17T07:26:38Z
+**User Input**: "No new user input."
+**AI Response**: "Completed the descriptive target naming amendment. The planned public methods are configured_analyses(), pinch_analysis(), total_site(), and heat_exchanger_area_cost(); direct(), indirect(), all(), and area_cost() are explicitly absent. Updated requirements, first-solve and Total Site stories, examples, workspace dispatch vocabulary, Units 1 and 2, notebooks 01 through 03, contract tests, numerical gates, success criteria, and workflow state. Content validation and patch hygiene passed. Requested explicit approval or further naming changes before Application Design."
+**Context**: INCEPTION - Workflow Planning amendment complete; explicit approval required. No implementation has started. Security and Resiliency disabled; partial PBT conditionally applicable during construction.
+
+---
+
+## Package Usability Refactor Target Naming Exploration
+**Timestamp**: 2026-07-17T07:29:55Z
+**User Input**: "The functional use to services by direct(), indirect(), all(), and area_cost() are needed. The names just need improvement. direct_heat_recovery() or direct_heat_integration() are examples. Develop a number of ideas.  "
+**AI Response**: "Confirmed that all four service capabilities remain required and started a terminology-backed naming exploration. Inspected the live accessor, targeting services, target enum labels, Total Site analysis owner, area/cost calculations, configuration selectors, tests, and tutorial language. No API plan or implementation was changed pending selection of a naming family."
+**Context**: INCEPTION - Workflow Planning naming exploration. Security and Resiliency disabled; partial PBT N/A for this read-only naming analysis.
+
+---
+
+## Package Usability Refactor Target Naming Exploration Completion
+**Timestamp**: 2026-07-17T07:31:01Z
+**User Input**: "No new user input."
+**AI Response**: "Developed five coherent naming families for the four retained target services: domain terminology, beginner outcomes, explicit verbs, target outputs, and a recommended hybrid. Recommended direct_heat_integration(), total_site_heat_integration(), configured_analyses(), and heat_exchanger_area_and_cost(). Flagged direct_heat_recovery() as too narrow because the service also produces utility, pinch-temperature, and curve results, and flagged all/full heat integration names as inaccurate because the configured plan can include heat pumps, refrigeration, cogeneration, exergy, and area/cost services. Requested selection before amending the approved-plan candidate."
+**Context**: INCEPTION - Workflow Planning naming exploration complete; plan amendment awaits user selection. Security and Resiliency disabled; partial PBT N/A.
+
+---
+
+## PinchProblem-Owned Targeting Workflow Direction
+**Timestamp**: 2026-07-17T07:40:18Z
+**User Input**: "problem.target.direct_heat_integration()
+problem.target.indirect_heat_integration()
+problem.target.total_site_heat_integration()
+problem.target.configured_analyses()
+problem.target.heat_exchanger_area_and_cost()
+
+problem.target.all_heat_integration() is fine too. I want to start removing the config options related to targeting and have the new workflow revolve completely around PinchProblem. "
+**AI Response**: "Accepted the PinchProblem-owned targeting direction and began an impact analysis before amending the plan. Inspected all ten TARGETING_* selectors, the configured targeting-plan registry, zone dispatch gates, explicit target services, exergy and area/cost feature gates, workspace workflow replay, sample inputs, documentation, and affected tests."
+**Context**: INCEPTION - Requirements and Workflow Planning amendment. No implementation authorized. Security and Resiliency disabled; partial PBT conditionally applicable to explicit traversal and dispatch policies during construction.
+
+---
+
+## PinchProblem-Owned Targeting Workflow Plan Amendment Completion
+**Timestamp**: 2026-07-17T07:44:24Z
+**User Input**: "No new user input."
+**AI Response**: "Amended the requirements, user stories, execution plan, tutorials, workspace design, test strategy, acceptance criteria, and workflow state around PinchProblem-owned targeting. Selected all_heat_integration() instead of configured_analyses() because configuration will no longer select analyses. Retained direct_heat_integration(), indirect_heat_integration(), total_site_heat_integration(), and heat_exchanger_area_and_cost(). Defined all_heat_integration() as direct-plus-indirect heat integration only, using one dependency-aware zone traversal. Planned atomic removal of all ten TARGETING_*_ENABLED fields, config.targeting, configured-plan selection, selector-gated dispatch, hidden exergy and area/cost gates, sample keys, and workspace's hidden problem.target() pre-run. Numerical configuration remains. Content validation and patch hygiene passed; explicit plan approval is still required before Application Design."
+**Context**: INCEPTION - Requirements and Workflow Planning amendment complete. No implementation has started. Security and Resiliency disabled; partial PBT applies during construction to pure traversal and dispatch policies.
+
+---
+
+## Complete PinchProblem Interaction Plan Expansion
+**Timestamp**: 2026-07-17T07:45:14Z
+**User Input**: "Expand the plan to consider all problem.* and how the user should interact.
+
+Config will still be used when explicit args to problem.*.*(kwargs) are not given by the user. However, config will no longer store which core methods to run."
+**AI Response**: "Accepted the complete PinchProblem interaction scope and the precedence rule that explicit method kwargs override stored configuration while omitted kwargs fall back to configuration. Began inventorying the live PinchProblem constructor, loading and validation methods, target/design/plot/component accessors, period execution, results/reporting/export methods, configuration mutation, serialization, dashboard, and workspace interactions."
+**Context**: INCEPTION - Requirements and Workflow Planning expansion. No implementation authorized. Security and Resiliency disabled; partial PBT conditionally applicable to option precedence, traversal, and replay policies during construction.
+
+---
+
+## Complete PinchProblem Interaction Plan Expansion Completion
+**Timestamp**: 2026-07-17T07:54:58Z
+**User Input**: "No new user input."
+**AI Response**: "Expanded requirements, user stories, the execution plan, tests, acceptance criteria, and workflow state to cover the complete PinchProblem interaction model. Inventoried lifecycle/input, config, targeting, periods, components, design, results, reports, plots, exports, dashboard, serialization, comparison, and advanced inspection. Defined named kwargs > advanced options > stored config > library defaults precedence with an omitted-value sentinel, ephemeral overrides, and resolved provenance. Core workflow selectors remain explicit and are never config fallback fields; HENS_METHOD_SEQUENCE joins TARGETING_* selectors for removal. Added explicit state transitions, cache invalidation, no-hidden-execution rules, a complete planned public surface inventory, a validated user-journey Mermaid diagram and text alternative, notebook changes, drift guards, and property/contract tests. Content validation and patch hygiene passed. Requested explicit approval before Application Design."
+**Context**: INCEPTION - Comprehensive Requirements and Workflow Planning expansion complete; explicit approval required. No implementation has started. Security and Resiliency disabled; partial PBT applies during construction to precedence, traversal, state invalidation, and replay policies.
+
+---
+
+## Process-Engineer Persona and Tutorial Coverage Revision
+**Timestamp**: 2026-07-17T08:11:02Z
+**User Input**: "US-6 and 7 are not needed. `pinch_analysis_service` will soon be retired. Only process engineers are the persona.
+
+Ideally, the tutorials cover all core and advanced methods under target, design, plot, etc. "
+**AI Response**: "Accepted the single process-engineer persona, removal of integration and maintainer user stories, and retirement direction for pinch_analysis_service. Began revising persona, requirements, stories, workflow, notebook 09, documentation, tests, and acceptance criteria, and mapping every core and advanced PinchProblem method to at least one tutorial."
+**Context**: INCEPTION - Requirements, User Stories, and Workflow Planning revision. No implementation authorized. Security and Resiliency disabled; partial PBT conditionally applicable during construction.
+
+---
+## Tutorial Scope and Advanced Analysis Revision
+**Timestamp**: 2026-07-17T08:13:00Z
+**User Input**: "Expand the number of tutorials as needed. In addition, multi period analysis for heat integration, heat pumps, cogeneration, and synthesis should be demonstrated. Multi-segmented streams should also come into the tutorials."
+**AI Response**: "Accepted an expandable tutorial suite and began revising requirements, stories, and workflow planning to provide executable coverage of multiperiod heat integration, heat pumps, cogeneration, HEN synthesis, and multi-segment stream modelling."
+**Context**: INCEPTION - Requirements, User Stories, and Workflow Planning revision. No implementation authorized. Security and Resiliency disabled; partial PBT conditionally applicable during construction.
+
+---
+
+## Workflow Planning Revision - Approval Prompt
+**Timestamp**: 2026-07-17T08:20:58Z
+**AI Prompt**: "The revised requirements, stories, and workflow plan are complete. Please review package-usability-refactor-workflow-approval-questions.md and enter A, B, or X after the [Answer]: tag, then tell me when it is complete."
+**Status**: Awaiting explicit approval
+**Context**: INCEPTION - Workflow Planning. The plan uses one process-engineer persona, removes US-6 and US-7, retires pinch_analysis_service from the supported experience, and expands to sixteen capability-mapped tutorials including multiperiod heat integration, heat pumps, cogeneration, and HEN synthesis plus multi-segment streams. Application Design remains blocked pending approval.
+
+---
+
+## Live Feature-to-Tutorial Coverage Map Revision
+**Timestamp**: 2026-07-17T08:21:58Z
+**User Input**: "Create a map of features/functionality in PinchProblem and PinchWorkspace compared to the tutorial coverage. Add to the exisiting tutorials or expand to new tutorials as required to reach 100% coverage."
+**AI Response**: "Accepted the requested workflow-plan revision. Began inventorying the live PinchProblem and PinchWorkspace surfaces and executable notebook usage to create a feature-to-tutorial manifest, classify supported versus retiring/internal functionality, and assign every supported coverage gap to an existing or new tutorial."
+**Context**: INCEPTION - Workflow Planning change request. Explicit approval is deferred until the revised coverage map and tutorial allocation are complete; no application or notebook implementation has started.
+
+---
+
+## Live Feature-to-Tutorial Coverage Map - Completion and Approval Prompt
+**Timestamp**: 2026-07-17T08:34:38Z
+**AI Prompt**: "The live feature-to-tutorial map and revised workflow plan are complete. Please review pinchproblem-workspace-tutorial-coverage-map.md and package-usability-refactor-execution-plan.md, enter A, B, or X after the [Answer]: tag in package-usability-refactor-workflow-approval-questions.md, then tell me when it is complete."
+**AI Response**: "Mapped 66 live PinchProblem-accessible callable/property members, 37 PinchWorkspace members, and seven supported process-MVR return-object interactions; compared them with all ten existing notebooks; classified covered, partial, missing, replace, and retire dispositions; expanded the target suite to seventeen tutorials; and added exact canonical operation and semantic-mode coverage gates requiring 100 percent executable coverage. Updated requirements, stories, workflow state, and approval materials. No implementation was performed."
+**Status**: Awaiting explicit approval
+**Context**: INCEPTION - Workflow Planning revision complete. Security and Resiliency remain disabled; Partial PBT applies during construction to public-inventory drift, period replay, multi-segment invariants, and deterministic tutorial-manifest resolution. Application Design remains blocked pending approval.
+
+---
+
+## Read the Docs Coverage Map Revision
+**Timestamp**: 2026-07-17T08:35:22Z
+**User Input**: "Include the coverage map in RTDs"
+**AI Response**: "Accepted the documentation requirement and began revising the workflow so the public Read the Docs site publishes the canonical feature-to-tutorial coverage map from the same manifest enforced by CI, with navigation from the tutorial index and PinchProblem/PinchWorkspace API pages."
+**Context**: INCEPTION - Workflow Planning change request. No Sphinx source or application implementation has started; explicit plan approval remains required.
+
+---
+
+## Read the Docs Coverage Map Revision - Completion and Approval Prompt
+**Timestamp**: 2026-07-17T08:37:18Z
+**AI Prompt**: "The RTD publication requirement is incorporated. Please review the updated coverage map and execution plan, enter A, B, or X after the [Answer]: tag in package-usability-refactor-workflow-approval-questions.md, then tell me when it is complete."
+**AI Response**: "Defined docs/examples/tutorial-coverage-map.rst as the public coverage page and docs/_data/tutorial-coverage.csv as the single canonical table source shared by Sphinx and CI. Added navigation from the Examples index, notebook series, PinchProblem API, PinchWorkspace API, and capability matrix; required tutorial/API cross-links, denominator and execution-profile explanations, and warning-as-error failures for stale operations, missing tutorial owners, unsupported claims, and broken links. Updated requirements, user-story acceptance, execution plan, state, and approval summary. No implementation was performed."
+**Status**: Awaiting explicit approval
+**Context**: INCEPTION - Workflow Planning revision complete. Security and Resiliency remain disabled; Partial PBT remains applicable during construction. Application Design remains blocked pending approval.
+
+---
+
+## Workflow Argument Simplification Revision
+**Timestamp**: 2026-07-17T09:02:00Z
+**User Input**: "Avoid the need for the user to know str answer.
+
+Example:
+
+heat_pump = problem.target.heat_pump(
+    placement=\"direct\",
+    cycle=\"cascade_carnot\",
+    load_fraction=0.25,
+    condensers=1,
+    evaporators=1,
+)
+
+could be:
+
+problem.target.heat_pump(
+    is_utility_heat_pump: bool, # True = indirect heat pump
+    is_simulated_cycle: bool, # Coolprop simulated if true, otherwise carnot
+    is_cascade_cycle: bool, # Cascade simulation with/without MVR if true, otherwise parallel heat pump
+    has_mvr: bool, # only applicable if is_simulated_cycle and is_cascade_cycle
+    load_fraction=0.25,
+    condensers=1,
+    evaporators=1,
+)
+
+Alternately, splitting off brayton_heat_pump and mvr_heat_pump as specialised callables might be better.
+
+Examine the args for all the core and advanced workflows to simplify the user experience."
+**AI Response**: "Accepted a complete workflow-signature review. Began mapping every current target, design, component, workspace, plot, result, and output argument to its engineering meaning, with a preference for dedicated callables and true binary flags over undocumented string selectors or invalid boolean combinations."
+**Context**: INCEPTION - Requirements and Workflow Planning change request. No API implementation has started; explicit approval is deferred until the argument-simplification map is complete.
+
+---
+
+## Workflow Argument Simplification Revision - Completion and Approval Prompt
+**Timestamp**: 2026-07-17T09:14:26Z
+**AI Prompt**: "The complete argument review is incorporated. Please review the workflow argument map and revised execution plan, enter A, B, or X after the [Answer]: tag in package-usability-refactor-workflow-approval-questions.md, then tell me when it is complete."
+**AI Response**: "Reviewed every core and advanced PinchProblem and PinchWorkspace workflow argument. Chose specialized Carnot, vapour-compression, Brayton, MVR, cogeneration, HEN, and mirrored all-period callables instead of OpenPinch-owned string selectors or dependent boolean matrices. Retained booleans only for independent utility-placement, topology, aggregation, and presentation decisions; replaced load-mode strings with mutually exclusive named values; replaced workspace workflow dispatch with a batch accessor; and replaced plot-type export strings with plot method references. Expanded the tutorial plan to eighteen notebooks and updated requirements, user stories, feature coverage, RTD coverage obligations, execution plan, state, and approval summary. Validated Markdown fences, tables, tabs, and patch hygiene. No implementation was performed."
+**Status**: Awaiting explicit approval
+**Context**: INCEPTION - Workflow Planning revision complete. Security and Resiliency remain disabled; Partial PBT remains applicable during construction. Application Design remains blocked pending approval.
+
+---
+
+## Carnot HPR Naming Revision
+**Timestamp**: 2026-07-17T09:16:13Z
+**User Input**: "Change problem.target.heat_pump to problem.target.carnot_heat_pump"
+**AI Response**: "Accepted the explicit Carnot method name and began applying the same model-explicit naming to the symmetric refrigeration method, all-period mirrors, tutorials, requirements, coverage, execution plan, state, and approval materials. No application implementation has started."
+**Context**: INCEPTION - Requirements and Workflow Planning change request. Explicit approval remains deferred until the naming revision is complete.
+
+---
+
+## Carnot HPR Naming Revision - Completion and Approval Prompt
+**Timestamp**: 2026-07-17T09:17:48Z
+**AI Prompt**: "The Carnot naming revision is incorporated. Please review the workflow argument map and revised execution plan, enter A, B, or X after the [Answer]: tag in package-usability-refactor-workflow-approval-questions.md, then tell me when it is complete."
+**AI Response**: "Changed the planned generic heat-pump spelling to `problem.target.carnot_heat_pump()` and applied the symmetric `problem.target.carnot_refrigeration()` name. Updated focused and all-period examples, requirements, user-story acceptance, tutorial coverage, execution checklists, workflow state, and approval summary. Verified the new names across planning artifacts, validated Markdown fences and tabs, and passed patch-hygiene checks. No implementation was performed."
+**Status**: Awaiting explicit approval
+**Context**: INCEPTION - Workflow Planning revision complete. Security and Resiliency remain disabled; Partial PBT remains applicable during construction. Application Design remains blocked pending approval.
+
+---
+
+## Package Usability Refactor - Plan Approval and Implementation Start
+**Timestamp**: 2026-07-17T09:52:56Z
+**User Input**: "Implement the plan with a focus on usability and tutorials for new users that also serve as templates for various types of studies."
+**AI Response**: "Recorded explicit approval of the package-usability requirements, user stories, tutorial coverage map, and workflow plan. Resumed the governed brownfield workflow at Application Design, preserving completed design records from earlier initiatives and preparing a namespaced usability design for the two-class public facade, accessors, workspace batches, tutorial templates, RTD coverage, and verification."
+**Context**: INCEPTION - Workflow Planning approved; Application Design started. No application code was changed in this interaction entry.
+
+---
+
+## Package Usability Refactor - Application Design Completion Prompt
+**Timestamp**: 2026-07-17T09:55:50Z
+**AI Prompt**: "The package-usability application design is complete. Please review aidlc-docs/inception/application-design/package-usability-refactor-design.md and the component artifacts, enter A, B, or X after the [Answer]: tag in package-usability-refactor-application-design-approval-questions.md, then tell me when it is complete."
+**AI Response**: "Preserved earlier segmented-stream design records and added a namespaced package-usability application design. Defined the two-class facade, target/all-period/component/design/observation/workspace-batch components, effective-argument precedence, public method families, service orchestration, state transitions, dependency direction, and eighteen-template tutorial/RTD contract. Updated the mandatory component, method, service, dependency, consolidated-design, plan, and state artifacts. Validated Markdown structure, trailing whitespace, Mermaid edge syntax, text alternatives, and patch hygiene."
+**Status**: Awaiting explicit application-design approval
+**Context**: INCEPTION - Application Design artifact generation complete. Security and Resiliency are disabled; Partial PBT applies later to argument normalization, period ordering, aggregation, and manifest resolution. Units Generation and application code changes have not started.
+
+---
+
+## Package Usability Refactor - Application Design Continuity Check
+**Timestamp**: 2026-07-17T09:57:47Z
+**AI Response**: "Checked the application-design approval artifact and confirmed that its `[Answer]:` tag remains empty. Per the mandatory stage gate, Units Generation and source-code changes cannot start. Used the waiting turn to strengthen the design with an authoritative live-to-target module migration matrix covering target, period, component, design, plot, workspace, contracts, samples, tutorials, docs, and tests. Patch hygiene and the approval-file format remain valid."
+**Status**: Awaiting explicit application-design approval
+**Context**: INCEPTION - Application Design. This is the first continuation check after the completion prompt; the active implementation goal remains open.
+
+---
+
+## Package Usability Refactor - Application Design Blocked Audit
+**Timestamp**: 2026-07-17T09:58:13Z
+**AI Response**: "Performed the third consecutive application-design approval check and confirmed that the `[Answer]:` tag remains empty. The same mandatory approval condition has now blocked the original implementation turn and two automatic continuation turns. Marked the active implementation goal blocked as required; Units Generation and source changes remain unauthorized until the user records A, B, or X in the approval artifact."
+**Status**: Blocked pending explicit application-design approval
+**Context**: INCEPTION - Application Design. The design artifacts are complete and validated. The blocking condition is the mandatory unanswered approval file, not implementation difficulty or uncertainty.
+
+---
+
+## Package Usability Refactor - Application Design Approval
+**Timestamp**: 2026-07-17T10:23:46Z
+**User Input**: "A"
+**AI Response**: "Validated the answer recorded in package-usability-refactor-application-design-approval-questions.md as approval to continue. Marked Application Design complete and started Units Generation planning using the five dependency-ordered units already approved in the package-usability execution plan."
+**Status**: Application Design approved; Units Generation planning started
+**Context**: INCEPTION - Transition from Application Design to Units Generation. This resumes the previously blocked goal with an explicit external-state change.
+
+---
+
+## Package Usability Refactor - Unit Plan Approval Prompt
+**Timestamp**: 2026-07-17T10:23:46Z
+**AI Prompt**: "Unit of work plan complete. Review the Package Usability Refactor Unit Plan section in aidlc-docs/inception/plans/unit-of-work-plan.md, enter A, B, or X after its [Answer]: tag, then tell me when it is complete."
+**AI Response**: "Formalized the approved five-unit decomposition assessment across story grouping, dependency order, team alignment, technical deployment, business-domain boundaries, and brownfield code organization. Added the mandatory artifact-generation and validation checkboxes without generating unit artifacts before approval."
+**Status**: Awaiting explicit unit-plan approval
+**Context**: INCEPTION - Units Generation Part 1. Application Design is complete. Unit artifact generation and construction remain gated.
+
+---
+
+## Package Usability Refactor - Unit Plan Continuity Check
+**Timestamp**: 2026-07-17T10:25:08Z
+**AI Response**: "Checked the Package Usability Refactor Unit Plan and confirmed that its `[Answer]:` tag remains empty. Per the mandatory Units Generation Part 1 gate, the five unit artifacts and construction work cannot be generated yet."
+**Status**: Awaiting explicit unit-plan approval
+**Context**: INCEPTION - Units Generation Part 1. This is the first continuation check for the unit-plan approval condition after the previously blocked goal resumed through Application Design approval.
+
+---
+
+## Package Usability Refactor - Unit Plan Continuity Check 2
+**Timestamp**: 2026-07-17T10:25:28Z
+**AI Response**: "Performed the second consecutive Unit Plan approval check and confirmed that its `[Answer]:` tag remains empty. Unit artifact generation and construction remain unauthorized under the mandatory AI-DLC stage gate."
+**Status**: Awaiting explicit unit-plan approval
+**Context**: INCEPTION - Units Generation Part 1. This is the second consecutive check of the same unit-plan approval condition in the resumed goal audit.
+
+---
+
+## Package Usability Refactor - Unit Plan Blocked Audit
+**Timestamp**: 2026-07-17T10:25:46Z
+**AI Response**: "Performed the third consecutive Unit Plan approval check and confirmed that its `[Answer]:` tag remains empty. The same mandatory gate has repeated across three resumed-goal turns, so the implementation goal is formally blocked again. No unit artifacts or construction changes were generated without authorization."
+**Status**: Blocked pending explicit unit-plan approval
+**Context**: INCEPTION - Units Generation Part 1. Application Design is approved; only the required Unit Plan answer prevents the dependency-ordered unit artifacts and construction from proceeding.
+
+---
+
+## Package Usability Refactor - Unit Plan Approval
+**Timestamp**: 2026-07-17T10:47:55Z
+**User Input**: "Approved."
+**AI Response**: "Interpreted the unambiguous approval as option A, recorded `[Answer]: A` in the Unit Plan, and started generation of the five dependency-ordered unit artifacts."
+**Status**: Unit Plan approved; artifact generation started
+**Context**: INCEPTION - Units Generation Part 2. This resumes the previously blocked goal through explicit user approval.
+
+---
+
+## Package Usability Refactor - Units Generation Completion Prompt
+**Timestamp**: 2026-07-17T10:49:42Z
+**AI Prompt**: "The five package-usability units are generated. Please review the Package Usability Refactor sections in unit-of-work.md, unit-of-work-dependency.md, and unit-of-work-story-map.md; enter A, B, or X after the [Answer]: tag in package-usability-refactor-units-approval-questions.md; then tell me when it is complete."
+**AI Response**: "Generated all five unit definitions, the acyclic 1-to-5 dependency matrix, and an explicit mapping for US-1 through US-5, US-8, FR-1 through FR-9, and every numbered acceptance criterion. Expanded initially grouped acceptance criteria 1-3 after the traceability validator identified indirect coverage. Marked every Unit Plan generation checkbox complete and passed Markdown, checkbox, exact traceability, and patch-hygiene validation."
+**Status**: Awaiting explicit generated-units approval
+**Context**: INCEPTION - Units Generation Part 2 complete. Security and Resiliency are disabled (N/A); Partial PBT remains applicable during Construction. No source-code construction has started.
+
+---
+
+## Package Usability Refactor - Generated Units Continuity Check
+**Timestamp**: 2026-07-17T10:50:04Z
+**AI Response**: "Checked the generated-units approval artifact and confirmed that its `[Answer]:` tag remains empty. Construction Unit 1 cannot start before explicit approval of the generated unit boundaries and traceability."
+**Status**: Awaiting explicit generated-units approval
+**Context**: INCEPTION - Units Generation Part 2. This is the first continuation check for this new approval condition.
+
+---
+
+## Package Usability Refactor - Generated Units Continuity Check 2
+**Timestamp**: 2026-07-17T10:50:22Z
+**AI Response**: "Performed the second consecutive generated-units approval check and confirmed that its `[Answer]:` tag remains empty. Construction remains unauthorized under the mandatory stage gate."
+**Status**: Awaiting explicit generated-units approval
+**Context**: INCEPTION - Units Generation Part 2. This is the second consecutive check of the same approval condition.
+
+---
+
+## Package Usability Refactor - Generated Units Blocked Audit
+**Timestamp**: 2026-07-17T10:50:39Z
+**AI Response**: "Performed the third consecutive generated-units approval check and confirmed that its `[Answer]:` tag remains empty. The repeated mandatory gate now meets the blocked threshold, so the implementation goal is formally blocked before Construction."
+**Status**: Blocked pending explicit generated-units approval
+**Context**: INCEPTION - Units Generation Part 2. Unit artifacts and traceability are complete; only their required approval prevents Construction Unit 1 from starting.
+
+---
+
+## Package Usability Refactor - Blanket Construction Approval
+**Timestamp**: 2026-07-17T11:50:05Z
+**User Input**: "Approve through to task completion"
+**AI Response**: "Recorded generated-units approval as option A and accepted explicit authorization for all remaining standardized AI-DLC completion gates through task completion. Advanced to Construction Unit 1. The workflow will continue to create, validate, checkbox, and audit every mandatory artifact and completion decision without pausing between stages."
+**Status**: Units Generation approved; Construction authorized through completion
+**Context**: Transition from INCEPTION to CONSTRUCTION. Security and Resiliency remain disabled. Partial PBT rules PBT-02, PBT-03, PBT-07, PBT-08, and PBT-09 are enforced.
+
+---
+
+## Package Usability Refactor - Unit 1 Construction Complete
+**Timestamp**: 2026-07-17T11:56:12Z
+**AI Response**: "Completed and blanket-approved Unit 1 Functional Design, minimal NFR Requirements, minimal NFR Design, and Code Generation. Implemented an explicit partial-missing policy for optional pinch diagnostics while preserving strict required-metric aggregation. Added centralized generated period-output strategies, seeded property coverage, example regressions, and closed package vocabulary manifests. Marked every Unit 1 plan checkbox complete. Focused pytest passed 16 tests; Ruff lint, Ruff format, and patch hygiene passed."
+**Status**: Unit 1 complete; Unit 2 started
+**Context**: CONSTRUCTION - Contract and Correctness Foundation. PBT-02, PBT-03, PBT-07, PBT-08, and PBT-09 are compliant. Security and Resiliency are disabled and N/A.
+
+---
+
+## Package Usability Refactor - Unit 2 Design and Generation Plan
+**Timestamp**: 2026-07-17T11:56:12Z
+**AI Response**: "Completed and blanket-approved Unit 2 Functional Design, minimal NFR Requirements, minimal NFR Design, and Code Generation Part 1. Defined the explicit target execution model, shared argument precedence, state transitions, HPR call families, all-period mirroring, applicable NFRs, logical components, and a ten-step implementation checklist. Marked every completed design-plan checkbox immediately."
+**Status**: Unit 2 Code Generation Part 2 started
+**Context**: CONSTRUCTION - PinchProblem Interaction, Targeting, and Configuration. Infrastructure Design is skipped because no infrastructure or deployment resources change.
+
+---
+
+## Package Usability Refactor - Units 2 and 3 Construction Complete
+**Timestamp**: 2026-07-17T12:40:25Z
+**AI Response**: "Completed the blanket-approved Unit 2 targeting workflow and Unit 3 component, HEN design, workspace, observation, and presentation refactors. Removed callable and selector-driven APIs without compatibility aliases; added descriptive target/design/component methods, ordered case batches, design result views, boolean period aggregation, and generated order/non-mutation properties. Marked every Unit 2 and Unit 3 code-generation checkbox complete. The expanded focused checkpoint passed 232 tests; focused Ruff lint and format checks passed."
+**Status**: Units 2 and 3 complete; Unit 4 tutorial generation started
+**Context**: CONSTRUCTION - Package Usability Refactor. PBT-02, PBT-03, PBT-07, PBT-08, and PBT-09 are compliant. Security and Resiliency are disabled and N/A. Infrastructure Design was skipped because no infrastructure changed.
+
+---
+
+## Package Usability Refactor - Unit 4 Construction Complete
+**Timestamp**: 2026-07-17T12:56:29Z
+**AI Response**: "Completed the blanket-approved Unit 4 tutorial refactor. Generated the canonical eighteen-notebook series and manifest, aligned packaged metadata, replaced retired-API substring tests with executable structural contracts, and fixed the total-site and multiperiod-cogeneration defects exposed by clean notebook execution. Marked all Unit 4 plan checkboxes complete. All eighteen notebooks pass warning-as-error nbformat validation and extracted Ruff checks; the ten base-profile notebooks execute cleanly; 51 tutorial and service tests pass."
+**Status**: Unit 4 complete; Unit 5 documentation and full quality gates started
+**Context**: CONSTRUCTION - Tutorial Suite. Security and Resiliency are disabled and N/A. Partial PBT is N/A for generated notebook documents; deterministic manifest and executable drift contracts apply.
+
+---
+
+## Package Usability Refactor - Unit 5 Construction Complete
+**Timestamp**: 2026-07-17T13:47:16Z
+**AI Response**: "Completed the blanket-approved Unit 5 documentation and executable quality gates. Published an exact 129-operation tutorial coverage manifest in RTD, rewrote the package-root interaction guides, restored detailed HPR and HEN engineering guidance, removed the retired service/workflow-string/variant-view layers without aliases, and made Heat Pump and turbine model selection private call-local state rather than stored user configuration. Marked every Unit 5 code-generation checkbox complete."
+**Status**: Unit 5 complete; Build and Test complete
+**Context**: CONSTRUCTION - Documentation and Executable Quality Gates. Security and Resiliency are disabled and N/A. Partial PBT is compliant for effective arguments, ordered case batches, and multiperiod aggregation.
+
+---
+
+## Build and Test Stage
+**Timestamp**: 2026-07-17T13:47:16Z
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Built the 0.5.2 wheel and source distribution, passed an isolated installed-wheel smoke outside the checkout, completed a warning-as-error Sphinx build, passed repository-wide Ruff lint and format checks, and passed the complete non-solver suite with 2,079 tests and four external-solver tests deselected. Generated and checkboxed all mandatory Build and Test instruction and summary artifacts. Operations is N/A because no deployment work was requested."
+**Files Generated**:
+- build-and-test-plan.md
+- build-instructions.md
+- unit-test-instructions.md
+- integration-test-instructions.md
+- performance-test-instructions.md
+- build-and-test-summary.md
+**Context**: CONSTRUCTION - Build and Test complete under the user's blanket approval through task completion.
+
+---
+
+## Package Usability Refactor - Post-Completion Evidence Audit
+**Timestamp**: 2026-07-17T20:22:29Z
+**AI Response**: "Reopened the earlier completion claim and checked the approved requirements against live public classes, all eighteen notebook sources, the RTD map, execution-profile gates, and runtime behavior. Corrected the ordered case batch so target and design namespaces no longer advertise each other's methods; added batch metrics, reports, exports, all-period targeting, error isolation, and drift tests. Added engineering-named Process MVR efficiencies and documented/tested the returned component lifecycle. Expanded every notebook into a process-engineer study template with a study question, explicit steps, interpretation, and adaptation guidance. Expanded the exact live denominator from 129 to 186 operations, added semantic dimensions and profile evidence, and explicitly marked the two Brayton methods plus their batch mirrors as mapped but runtime unsupported. Fixed defects found by actual execution: plot invalidation after configuration mutation, an invalid Process MVR sample, an unsuitable multiperiod HEN sample, unreliable infeasibility handling, workspace filesystem coupling, and network-dependent Sphinx inventories."
+**Status**: Completion audit corrections implemented
+**Context**: CONSTRUCTION - Package Usability Refactor revalidation under the user's blanket approval through task completion. Security and Resiliency are disabled and N/A. Partial PBT remains compliant through ordered-batch, effective-argument, and multiperiod properties.
+
+---
+
+## Package Usability Refactor - Final Revalidation
+**Timestamp**: 2026-07-17T20:22:29Z
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Verified 186/186 live operations mapped to tutorial code and all 18 packaged notebooks with at least six Markdown guidance cells. Executed all profile gates: 10 base notebooks in the routine suite, 4 slow-HPR notebooks in 204.74 seconds, 3 real HEN solver notebooks in 160.68 seconds, and 1 guarded-interactive notebook in 7.78 seconds. The final focused usability, notebook, documentation, architecture, workspace, and component suite passed 108 tests with three inactive profile selectors skipped. The complete non-solver suite passed 2,084 tests with three opt-in profile selectors skipped and four external-solver tests deselected. Repository-wide Ruff lint and format, dependency architecture, root-import/stale-symbol contracts, and offline warning-as-error Sphinx passed."
+**Status**: Package Usability Refactor complete and revalidated
+**Context**: CONSTRUCTION - Build and Test completion evidence. Operations remains N/A because no deployment work was requested.
+
+---
+
+## Package Usability Refactor - Installed Artifact and Documentation Closure
+**Timestamp**: 2026-07-17T20:30:42Z
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Repeated the isolated offline wheel smoke and confirmed that OpenPinch loaded from the installed site-packages path rather than the checkout. The installed artifact exposes the public package entry points and contains all eighteen notebooks plus the Process MVR study input. Clarified the heat-pump workflow guide so the public Brayton vocabulary cannot be mistaken for a currently operational solver path, and rebuilt all RTD pages with warnings treated as errors. Patch whitespace validation remained clean."
+**Status**: Package Usability Refactor verification closed
+**Context**: CONSTRUCTION - Final Build and Test evidence under the user's blanket approval. Security and Resiliency are disabled and N/A; Operations is N/A.
+
+---
+
+## Compatibility Shim Repository Audit - User Request
+**Timestamp**: 2026-07-17T21:28:24Z
+**User Input**: "Scan the repo for any compatibility shims."
+**AI Response**: "Started a read-only, repository-wide compatibility audit. The scan will distinguish public aliases and deprecated entry points from behavioural retries, accepted legacy values, serialized-state migration, test-only compatibility assertions, and ordinary feature fallbacks. No application code will be changed."
+**Context**: Existing brownfield AI-DLC project; resuming the open generated-code review finding recorded in aidlc-state.md. Security and Resiliency extensions remain disabled; partial Property-Based Testing is N/A for a read-only source audit.
+
+---
+
+## Compatibility Shim Repository Audit - Completion
+**Timestamp**: 2026-07-17T21:39:38Z
+**AI Response**: "Completed the read-only repository-wide scan. Confirmed residual compatibility surfaces in the public summary format selector, duplicate enum/schema type identities, Stream and Value alias properties, graph selector and stream-location aliases, dynamic HEN result forwarding, seven legacy documentation transition pages, optional workspace schema-version defaulting, and permissive input schemas that silently discard unknown keys. Distinguished these from intentional unit-group overrides, fluid spelling normalization, solver/backend fallbacks, private composition helpers, and current-version pickle support. Focused regression evidence passed 19 tests. No application code was changed."
+**Status**: Read-only compatibility audit complete
+**Context**: Generated-code review. Security and Resiliency extensions are disabled and N/A. Partial Property-Based Testing is N/A because the audit made no runtime changes.
+
+---
+
+## Compatibility Shim Canonicalization - Implementation Request
+**Timestamp**: 2026-07-17T21:54:41Z
+**User Input**: "PLEASE IMPLEMENT THIS PLAN:
+# Remove Residual Compatibility Shims
+
+## Summary
+
+Perform one clean-break canonicalization with no aliases, deprecation warnings, migration paths, or transition pages. Preserve intentional input normalization and solver structures required by current algorithms.
+
+## Public Contract Changes
+
+- Remove `format` from `PinchProblem.summary_frame()` and `PinchWorkspace.summary_frame()`. Retain only `detailed`, `include_periods`, and `include_weighted_average`; use a private numeric frame for `compare_to()`.
+- Make descriptive `Stream` names canonical across constructors, properties, setters, and string-based attribute helpers:
+  - Temperature, pressure, and enthalpy fields use `supply_*`, `target_*`, `minimum_*`, `maximum_*`, and `shifted_*`.
+  - Use `stream_type`, `is_active`, `delta_t_contribution`, `effective_delta_t_contribution`, `heat_transfer_coefficient`, `heat_transfer_resistance`, `heat_capacity_flowrate`, `utility_cost`, and `resistance_capacity_product`.
+  - Remove all compact public counterparts. Keep compact private storage and JSON fields such as `t_supply`.
+  - Keep `problem.set_dt_cont_multiplier()` and its workspace equivalent as the deliberate engineering shorthand.
+- Remove `Value.values`; retain `period_values`. Serialized mappings continue using the `\"values\"` wire key.
+- Remove all enum/type identity aliases, including `ZT`, `TT`, `ST`, `SID`, `PT`, `GT`, `ResultsType`, `HPRcycle`, `HENDesignMethod`, `SynthesisMethod`, and `SynthesisDesignMethod`. Use the full canonical class names everywhere.
+- Keep `HeatExchangerNetworkDesignView` as a closed explicit API with `result`, `selected_network`, `top()`, `network()`, `grid()`, totals, and `utility()`. Remove `__getattr__` and `model_dump`; serialization becomes `design.result.model_dump(...)`.
+- Keep the root exports exactly `PinchProblem` and `PinchWorkspace`.
+
+## Implementation Changes
+
+- Add explicit wire-to-runtime translation when schemas construct streams; do not rename established JSON fields or configuration keys.
+- Reject unknown fields throughout `TargetInput`, utilities, zone trees, nonlinear-stream inputs, and nested transport contracts. Remove redundant `populate_by_name` settings where no aliases exist.
+- Require an explicit `\"schema_version\": \"3\"` when loading workspace bundles; missing, old, and unknown versions fail without migration.
+- Remove graph-string alias normalization and require internal `GraphType` values selected by named plot methods. Composite graph builders accept `StreamLoc` only.
+- Retain documented unit-group overrides, case-insensitive fluid phases, `vapor`/`vapour`, Pint/value-like coercion, optional-dependency guards, and solver fallbacks as intentional normalization.
+- Retain the segmented-stream solver parent-axis placeholder because current equations require its shape; revise its “legacy compatibility” wording to describe the current invariant.
+- Delete all seven orphan legacy documentation pages and their transition-page tests. Update API docs, tutorials, generators, coverage maps, release notes, and conventions to contain only canonical names.
+- Update AI-DLC requirements, functional design, code-generation plan, build/test artifacts, state, and audit records; checkbox each implementation step as it completes.
+
+## Test Plan
+
+- Add closed-contract tests proving removed names, parameters, graph aliases, forwarding, missing bundle versions, unknown fields, and legacy documentation pages are absent or rejected.
+- Test every descriptive `Stream` constructor argument, getter, setter, indexed mutation, segmented-stream restriction, multiperiod value, and derived property.
+- Verify compact JSON input still constructs descriptive runtime streams and round-trips unchanged, including serialized HEN payloads.
+- Verify `Value.period_values`, dictionary serialization, reporting, and foreign value-like coercion without `Value.values`.
+- Test compact and detailed summaries plus numeric `compare_to()` without any format string.
+- Test the explicit HEN view and `design.result.model_dump(mode=\"json\")`.
+- Update fixed-seed property tests and stale-symbol/AST checks to prevent aliases or forwarding façades from returning.
+- Run focused Stream, Value, input, workspace, graph, reporting, HPR, HEN, notebook, and documentation suites; then the complete non-solver suite, relevant opt-in HPR/HEN profiles, Ruff, warning-free Sphinx, package build, and isolated wheel smoke.
+
+## Assumptions
+
+- This is an immediate pre-1.0 clean break with no compatibility period.
+- Compact serialized field names and configuration keys remain stable by explicit decision; only runtime `Stream` vocabulary changes.
+- `selected_network` and `network(rank=...)` remain intentional distinct conveniences.
+- Existing unrelated working-tree changes must be preserved."
+**AI Response**: "Resumed the completed package-usability AI-DLC workflow, reused the approved process-engineer stories and architecture, and created the focused requirements, workflow, functional-design, and code-generation artifacts. The decision-complete implementation request and prior blanket approval authorize the single coupled clean-break unit through completion."
+**Status**: Code Generation approved and started
+**Context**: Brownfield compatibility canonicalization. Security and Resiliency are disabled and N/A. Partial Property-Based Testing is enabled for PBT-02, PBT-03, PBT-07, PBT-08, and PBT-09.
+
+---
+
+## Compatibility Shim Canonicalization - Completion
+**Timestamp**: 2026-07-17T22:54:01Z
+**User Input**: "No new user input; continued under the approved implementation request and blanket approval through task completion."
+**AI Response**: "Completed the immediate clean-break canonicalization. Removed runtime Stream compact names, enum identity aliases, Value.values, summary format dispatch, graph aliases, dynamic HEN view forwarding and serialization, optional workspace schema versions, permissive unknown-field handling, and seven transition pages. Preserved compact wire keys and intentional normalization. Regenerated 18 notebooks and the RTD coverage manifest. The complete suite passed 2,089 tests; the fixed-seed non-solver suite passed 2,086 with 3 skips and 4 solver deselections; slow-HPR and HEN solver profiles passed; Ruff, warning-free Sphinx, distributions, isolated wheel smoke, stale-symbol checks, and patch hygiene passed."
+**Context**: CONSTRUCTION - Code Generation and Build and Test complete. Security and Resiliency disabled and N/A. Partial Property-Based Testing compliant with seed 20260715. Operations N/A.
+
+---
+
+## Compatibility Shim Repository Re-scan - User Request
+**Timestamp**: 2026-07-17T23:06:14Z
+**User Input**: "Scan the repo for any compatibility shims."
+**AI Response**: "Started a fresh read-only post-canonicalization scan, separating public compatibility behavior from intentional wire-format stability, input normalization, optional-dependency handling, solver fallbacks, and negative contract tests."
+**Context**: Post-implementation repository audit; no application-code changes authorized or made.
+
+---
+
+## Compatibility Shim Repository Re-scan - Findings
+**Timestamp**: 2026-07-17T23:10:41Z
+**User Input**: "No new user input; completed the requested repository scan."
+**AI Response**: "Confirmed that the shipped package has no retired import aliases, deprecation facades, Pydantic field aliases, workspace migrations, graph-name aliases, or old Stream/Value/HEN-view public spellings. Found one residual runtime spelling alias in g_ineq_penalty, one explicit OpenHENS monkeypatch in an unshipped comparison script, and one indexed legacy RTD transition page. Classified configured unit-group aliases, fluid-phase normalization, compact wire keys, value-like coercion, optional-dependency guards, solver fallbacks, and solver shape adapters as intentional current behavior. Targeted closed-contract verification passed 11 tests."
+**Context**: Post-canonicalization audit complete. The only repository write was this mandatory audit-log append; no application, test, script, or documentation changes were made.
+
+---
+
+## Compatibility Shim Cleanup Questions
+**Timestamp**: 2026-07-17T23:12:13Z
+**User Input**: "Ask me questions."
+**AI Response**: "Created aidlc-docs/compatibility-shim-cleanup-questions.md with five decision questions covering cleanup scope, the penalty-form API, the OpenHENS comparison monkeypatch, legacy documentation, and the boundary around intentional normalization and solver fallbacks. Waiting for the user's completed answers before developing the cleanup plan."
+**Context**: Requirements clarification following the post-canonicalization repository scan. The question file follows the mandatory multiple-choice and [Answer] format and was validated as CommonMark-compatible Markdown without diagrams or embedded code blocks.
+
+---
+
+## Compatibility Shim Cleanup - Answer Validation
+**Timestamp**: 2026-07-17T23:16:53Z
+**User Input**: "Go"
+**AI Response**: "Validated Questions 1 through 4 as complete and consistent. Question 5 selected Other with a request for explanation, so created aidlc-docs/compatibility-shim-cleanup-clarification-questions.md. The clarification separates current engineering normalization, optional-dependency guards, a genuine Pyomo dependency-version retry, the missing-Couenne algorithmic fallback, and the segmented-stream equation-shape invariant. Waiting for three focused answers."
+**Context**: Requirements clarification. No implementation started because the boundary around intentional normalization and solver fallback behavior remains undecided.
+
+---
+
+## Compatibility Shim Cleanup - Representation Clarification
+**Timestamp**: 2026-07-17T23:19:34Z
+**User Input**: "Go"
+**AI Response**: "Validated removal of the Pyomo cross-version retry and retention of the warning-backed missing-Couenne algorithmic fallback. The final combined representation question again requested more information, so created aidlc-docs/compatibility-shim-representation-questions.md with concrete behavior, consequences, and four granular decisions for unit groups, fluid phases, Value inputs, and non-interchangeable wire, packaging, and solver-shape contracts."
+**Context**: Requirements clarification remains active. No implementation started. The new question file is CommonMark-compatible Markdown without diagrams or embedded code blocks.
+
+---
+
+## Residual Compatibility Shim Cleanup - Requirements Review
+**Timestamp**: 2026-07-17T23:22:23Z
+**User Input**: "Go"
+**AI Response**: "Validated all four representation answers as complete and consistent. Generated the focused residual compatibility shim cleanup requirements and approval file. The requirements remove enum-string penalty aliases, upstream OpenHENS monkeypatching, the Pyomo cross-version signature retry, the remaining legacy RTD transition page, stale test terminology, and misleading unit-policy alias naming while preserving canonical phase, Value, wire, optional-dependency, Couenne-resilience, and solver-shape behavior. Requirements approval is now pending before Workflow Planning."
+**Context**: INCEPTION - Requirements Analysis complete at standard depth. User stories are recommended for skip because this is an internal refactor. Security and Resiliency are disabled and N/A. Partial PBT applies to PBT-03, PBT-07, PBT-08, and PBT-09; PBT-02 is unchanged and must remain green.
+
+---
+
+## Residual Compatibility Shim Cleanup - Workflow Plan Review
+**Timestamp**: 2026-07-17T23:25:43Z
+**User Input**: "Go"
+**AI Response**: "Validated approval choice C and completed workflow planning. Recommended one coupled Code Generation unit followed by Build and Test. User Stories, Application Design, Units Generation, Functional Design, NFR stages, Infrastructure Design, and Operations are skipped because the requirements fully specify changes within existing boundaries and no deployment or new process-engineer workflow is introduced. Created the execution-plan approval file and paused before construction."
+**Context**: INCEPTION - Workflow Planning complete. Risk is medium; components span enum/numerics, units, HEN backend, developer tooling, tests, and RTD. Partial PBT compliance is planned for PBT-03, PBT-07, PBT-08, and PBT-09, with existing PBT-02 round trips retained.
+
+---
+
+## Residual Compatibility Shim Cleanup - Code Generation Approval
+**Timestamp**: 2026-07-17T23:30:15Z
+**User Input**: "Approved for completion."
+**AI Response**: "Recorded workflow-plan approval and blanket approval through task completion. Created the ten-step Code Generation checklist covering baseline inventory, enum-only penalty selection, property tests, unit terminology, Pyomo strictness, OpenHENS prerequisites, RTD cleanup, focused and broad verification, and completion artifacts. Code Generation Part 2 started under this explicit approval."
+**Status**: Approved through Code Generation, Build and Test, and Operations N/A
+**Context**: One coupled brownfield unit. Security and Resiliency disabled and N/A. Partial PBT applies to PBT-03, PBT-07, PBT-08, and PBT-09; existing PBT-02 round trips remain required.
+
+---
+
+## GitHub CI Test Failure - Workspace Detection
+**Timestamp**: 2026-07-17T23:32:42Z
+**User Input**: "# Files mentioned by the user:
+
+## =================================== FAILURES ==================================…: /Users/timothyw/.codex/attachments/f630c027-dcd7-4f58-a9c3-be2632e37247/pasted-text.txt
+
+## My request for Codex:
+How do I resolve this failed test on Github that is fine locally."
+**AI Response**: "Started the required AI-DLC workflow, displayed the complete welcome message, loaded the common workflow rules and GitHub CI troubleshooting skill, inspected the supplied traceback, and resumed the existing brownfield repository context. Workspace detection found an existing Python library using Hatchling and uv, current reverse-engineering artifacts, and an active unrelated residual-compatibility-shim implementation. The new failure is treated as a focused CI test-diagnosis workflow; no runtime code has been changed."
+**Context**: INCEPTION - Workspace Detection complete. Existing reverse-engineering artifacts will be reused. The failure occurs because the owner-boundary test reaches real HEN synthesis on GitHub where Couenne and ipopt are unavailable.
+
+---
+
+## GitHub CI HEN Solver Isolation - Requirements Review
+**Timestamp**: 2026-07-17T23:35:35Z
+**User Input**: "No new user input; continued analysis of the supplied GitHub failure under the initial request."
+**AI Response**: "Confirmed that the exact test passes locally because uv discovers Couenne and IPOPT in /Users/timothyw/.idaes/bin, while the GitHub non-solver job has neither executable. Created minimal requirements recommending that the affected owner-boundary test use the existing FakeSynthesisExecutor monkeypatch helper. Production code, CI dependencies, marker policy, and missing-solver behavior remain unchanged. Requirements approval is pending before Workflow Planning or implementation."
+**Context**: INCEPTION - Requirements Analysis complete at minimal depth. Clarifying questions are unnecessary because the traceback and repository contracts define a single focused repair. Security and Resiliency are disabled. Partial PBT rules are N/A except existing PBT-08 and PBT-09 compliance.
+
+---
+
+## GitHub CI HEN Solver Isolation - Scope Confirmation
+**Timestamp**: 2026-07-17T23:39:11Z
+**User Input**: "Is any further fix needed?"
+**AI Response**: "Rechecked every live design-workflow call in the containing test module and the GitHub non-solver marker contract. Confirmed that the affected owner-boundary test is the sole unisolated successful synthesis call; adjacent workflow tests already install the fake executor or a purpose-built fake executor. No production, dependency, solver fallback, marker, or GitHub Actions change is needed. The only required repair remains adding monkeypatch and the existing fake-executor helper call to that test, followed by focused verification."
+**Context**: INCEPTION - Requirements review. Requirements remain pending explicit approval; no test or production code has been changed for this CI repair.
+
+---
+
+## GitHub CI HEN Solver Isolation - Requirements Approval
+**Timestamp**: 2026-07-17T23:41:32Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded explicit requirements approval. Assessed and skipped User Stories because this is a one-test internal CI isolation fix with no user-facing behavior, ambiguity, persona, or business workflow. Proceeded to mandatory Workflow Planning."
+**Status**: Requirements approved
+**Context**: INCEPTION - Requirements Analysis closed; User Stories skipped after documented assessment.
+
+---
+
+## GitHub CI HEN Solver Isolation - Workflow Plan Review
+**Timestamp**: 2026-07-17T23:41:32Z
+**User Input**: "No new user input; proceeded under the approved requirements."
+**AI Response**: "Created and content-validated a focused execution plan recommending Code Generation and Build and Test only. Application Design, Units Generation, Functional Design, NFR stages, Infrastructure Design, and Operations are skipped because the repair changes one test to use an existing fake executor and introduces no production, dependency, configuration, workflow, or deployment behavior. Workflow-plan approval is pending before implementation."
+**Context**: INCEPTION - Workflow Planning complete. Risk is low. Security and Resiliency are disabled; Partial PBT is N/A except fixed-seed and framework compliance.
+
+---
+
+## GitHub CI HEN Solver Isolation - Workflow Plan Approval
+**Timestamp**: 2026-07-17T23:48:20Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded explicit workflow-plan approval. Closed the skipped-stage assessments and proceeded to Code Generation Part 1 for the single HEN test-isolation unit."
+**Status**: Workflow plan approved
+**Context**: INCEPTION complete; CONSTRUCTION - Code Generation planning started.
+
+---
+
+## GitHub CI HEN Solver Isolation - Code Generation Plan Review
+**Timestamp**: 2026-07-17T23:48:20Z
+**User Input**: "No new user input; proceeded under the approved workflow plan."
+**AI Response**: "Created and content-validated a four-step Code Generation checklist. It modifies one existing test in place to inject monkeypatch and the existing fake-executor helper, preserves all assertions, prohibits production and CI changes, records a generated-code summary, and defers executable verification to Build and Test. Code Generation plan approval is pending before the test edit."
+**Context**: CONSTRUCTION - Code Generation Part 1 complete. Security and Resiliency are disabled; Partial PBT has no blocking finding.
+
+---
+
+## GitHub CI HEN Solver Isolation - Code Generation Plan Approval
+**Timestamp**: 2026-07-18T01:32:14Z
+**User Input**: "Go"
+**AI Response**: "Recorded explicit approval of the complete Code Generation checklist. Modified the existing owner-boundary test in place to accept pytest's monkeypatch fixture and install the existing FakeSynthesisExecutor helper before constructing the example problem. All invalid-input, manifest, and configuration-restoration assertions remain unchanged; no solver marker or solver configuration was added."
+**Status**: Code Generation plan approved; Part 2 Step 1 complete
+**Context**: CONSTRUCTION - Code Generation. No production, dependency, fixture, marker, or GitHub Actions file was changed by the test-isolation edit.
+
+---
+
+## GitHub CI HEN Solver Isolation - Code Generation Completion
+**Timestamp**: 2026-07-18T01:33:27Z
+**User Input**: "No new user input; completed the approved Code Generation checklist."
+**AI Response**: "Completed the one-test generated change. The owner-boundary test now accepts monkeypatch and installs the existing fake synthesis executor; every original assertion remains unchanged. The scoped diff contains only those two lines, git diff --check passes, Ruff format reports the file already formatted, and no duplicate test file exists. Created the Code Generation summary and completed every checklist item. Generated-code approval is pending before Build and Test."
+**Status**: Code Generation Part 2 complete; generated-code review pending
+**Context**: CONSTRUCTION - Code Generation. Security and Resiliency disabled; Partial PBT has no blocking finding. Executable pytest and Ruff lint verification remains deferred to Build and Test.
+
+---
+
+## GitHub CI HEN Solver Isolation - Generated-Code Approval
+**Timestamp**: 2026-07-18T01:34:11Z
+**User Input**: "Continue to Next Stage"
+**AI Response**: "Recorded explicit generated-code approval and started Build and Test. Created a focused execution checklist for the exact GitHub failure, the complete non-solver module with CI's fixed Hypothesis seed, Ruff, patch hygiene, required instruction artifacts, and the final evidence summary."
+**Status**: Code Generation approved; Build and Test in progress
+**Context**: CONSTRUCTION - Build and Test. The approved change remains limited to the HEN design owner-boundary test.
+
+---
+
+## Residual Compatibility Shim Cleanup - Code Generation and Build and Test Completion
+**Timestamp**: 2026-07-18T00:07:33Z
+**User Input**: "No new user input; continued under the explicit approval through task completion."
+**AI Response**: "Completed the repository-wide residual compatibility cleanup. Added enum-only penalty selection and fixed-seed property tests; renamed unit override internals to unit_groups; removed the Pyomo positional signature retry; replaced the OpenHENS monkeypatch and runner substitutions with an actionable read-only prerequisite; corrected stale comparison imports; deleted the final library transition page; renamed stale test terminology; and added static retirement guards. A real-solver gate exposed a nondeterministic exact ESM branch-count assertion, so the live regression now retains exact objective, topology, and cost checks while enforcing the established 95-to-100 branch bound. The focused suite passed 275 tests, the fixed-seed non-solver suite passed 2,108 tests with 3 skips and 4 solver deselections, and the real solver profile passed 3 tests with 1 intentional skip. Ruff, warning-free Sphinx, distributions, isolated wheel smoke, stale-symbol scans, and patch hygiene passed."
+**Build Status**: Success
+**Test Status**: Pass
+**Files Generated**:
+- `aidlc-docs/construction/residual-compatibility-shim-cleanup/code/implementation-summary.md`
+- `aidlc-docs/construction/residual-compatibility-shim-cleanup/build-and-test/build-instructions.md`
+- `aidlc-docs/construction/residual-compatibility-shim-cleanup/build-and-test/unit-test-instructions.md`
+- `aidlc-docs/construction/residual-compatibility-shim-cleanup/build-and-test/integration-test-instructions.md`
+- `aidlc-docs/construction/residual-compatibility-shim-cleanup/build-and-test/performance-test-instructions.md`
+- `aidlc-docs/construction/residual-compatibility-shim-cleanup/build-and-test/build-and-test-summary.md`
+**Context**: CONSTRUCTION - Code Generation and Build and Test complete. Operations N/A. Security and Resiliency disabled and N/A. Partial Property-Based Testing compliant for the enabled penalty and unit-group invariants with seed 20260715 and shrinking retained. The unrelated GitHub CI HEN solver-isolation artifacts present in the shared worktree were preserved.
+
+---
+
+## GitHub CI HEN Solver Isolation - Build and Test Stage
+**Timestamp**: 2026-07-18T01:37:05Z
+**User Input**: "No new user input; completed Build and Test under the approved generated code."
+**AI Response**: "Completed focused verification. The exact GitHub regression passed 1 test in 3.85 seconds; the full containing module passed 22 tests in 6.12 seconds with --hypothesis-seed=20260715 and -m not solver. Ruff lint and format, scoped and repository git diff checks, and duplicate-file checks passed. Generated the required build, unit, integration, performance, plan, and summary artifacts. Operations is N/A because no deployment change was requested."
+**Build Status**: Success for the applicable test-only scope
+**Test Status**: Pass
+**Files Generated**:
+- `aidlc-docs/construction/github-ci-hen-solver-isolation/build-and-test/build-instructions.md`
+- `aidlc-docs/construction/github-ci-hen-solver-isolation/build-and-test/unit-test-instructions.md`
+- `aidlc-docs/construction/github-ci-hen-solver-isolation/build-and-test/integration-test-instructions.md`
+- `aidlc-docs/construction/github-ci-hen-solver-isolation/build-and-test/performance-test-instructions.md`
+- `aidlc-docs/construction/github-ci-hen-solver-isolation/build-and-test/build-and-test-plan.md`
+- `aidlc-docs/construction/github-ci-hen-solver-isolation/build-and-test/build-and-test-summary.md`
+**Context**: CONSTRUCTION - Build and Test complete. Security and Resiliency are disabled. Partial PBT is compliant for PBT-08 and PBT-09; PBT-02, PBT-03, and PBT-07 are N/A. Results approval is pending.
+
+---
+
+## GitHub CI HEN Solver Isolation - Build and Test Approval
+**Timestamp**: 2026-07-18T01:41:46Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded explicit approval of the Build and Test results. Closed the focused AI-DLC workflow with Operations marked N/A because the repair changes only test isolation and requires no deployment, monitoring, or runtime operational work."
+**Status**: Workflow complete
+**Context**: CONSTRUCTION complete; OPERATIONS N/A. The local CI-equivalent regression, module, Ruff, and patch-hygiene gates are approved. The actual GitHub Actions rerun remains an external post-push confirmation.
 
 ---

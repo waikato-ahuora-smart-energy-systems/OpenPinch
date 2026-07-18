@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from ..domain.stream_collection import StreamCollection
-    from .config import Configuration
+    from .configuration import Configuration
 
 
 class CogenerationTarget(Protocol):
@@ -38,9 +38,6 @@ class ZoneType(Enum):
         return self.value
 
 
-ZT = ZoneType
-
-
 class TargetType(Enum):
     """Different target calculation categories."""
 
@@ -57,9 +54,6 @@ class TargetType(Enum):
 
     def __str__(self):
         return self.value
-
-
-TT = TargetType
 
 
 class HeatExchangerTypes(Enum):
@@ -83,13 +77,6 @@ class HeatExchangerKind(str, Enum):
     COLD_UTILITY = "cold_utility"
 
 
-class HeatExchangerStreamRole(str, Enum):
-    """Identity class for the source and sink streams on an exchanger link."""
-
-    PROCESS = "process"
-    UTILITY = "utility"
-
-
 class HeatExchangerNetworkDesignMethod(str, Enum):
     """User-selectable heat exchanger network design service methods."""
 
@@ -100,9 +87,6 @@ class HeatExchangerNetworkDesignMethod(str, Enum):
 
     def __str__(self):
         return self.value
-
-
-HENDesignMethod = HeatExchangerNetworkDesignMethod
 
 
 class HeatPump(Enum):
@@ -126,9 +110,6 @@ class HeatPumpAndRefrigerationCycle(str, Enum):
     VapourCompMVR = "Vapour compression with MVR cascade"
 
 
-HPRcycle = HeatPumpAndRefrigerationCycle
-
-
 class HeatFlowUnits(Enum):
     """Heat flow units"""
 
@@ -136,6 +117,13 @@ class HeatFlowUnits(Enum):
     kW = "kW"
     MW = "MW"
     GW = "GW"
+
+
+class PenaltyForm(Enum):
+    """Canonical inequality-constraint penalty algorithms."""
+
+    SQUARE = "square"
+    SQUARE_ROOT_SMOOTHING = "square_root_smoothing"
 
 
 class StreamType(Enum):
@@ -146,9 +134,6 @@ class StreamType(Enum):
     Both = "Both"
     Neutral = "Neutral"
     Unassigned = ""
-
-
-ST = StreamType
 
 
 class FluidPhase(str, Enum):
@@ -177,15 +162,12 @@ class FluidPhase(str, Enum):
         raise ValueError(f"Unknown fluid phase: {value!r}.")
 
 
-class StreamID(Enum):
+class StreamID(str, Enum):
     """Stream identity"""
 
     Process = "Process"
     Utility = "Utility"
     Unassigned = "Unassigned"
-
-
-SID = StreamID
 
 
 class StreamLoc(Enum):
@@ -263,9 +245,6 @@ class ProblemTableLabel(Enum):
     X_DEF = "X(deficit)"
 
 
-PT = ProblemTableLabel
-
-
 class HeatExchangerNetworkLabel(Enum):
     """Heat exchanger network metric labels for labelled accessors."""
 
@@ -281,9 +260,6 @@ class HeatExchangerNetworkLabel(Enum):
     MATCH_ALLOWED = "match_allowed"
 
 
-HEN = HeatExchangerNetworkLabel
-
-
 class StreamDataLabel(Enum):
     """Stream data column header labels"""
 
@@ -294,9 +270,6 @@ class StreamDataLabel(Enum):
     H = "heat_flow"
     DT_CONT = "\N{GREEK CAPITAL LETTER DELTA}T_cont"
     HTC = "heat_transfer_coefficient"
-
-
-SD = StreamDataLabel
 
 
 class ArrowHead(Enum):
@@ -334,9 +307,6 @@ class GraphType(Enum):
     ETD = "Energy Transfer Diagram"
     TSP = "Total Site Profiles"
     SUGCC = "Site Utility Grand Composite Curve"
-
-
-ResultsType = GT = GraphType
 
 
 class LegendSeries(Enum):
@@ -380,32 +350,23 @@ __all__ = [
     "CogenerationTarget",
     "FluidPhase",
     "GraphType",
-    "GT",
     "HeatExchangerKind",
-    "HEN",
     "HeatExchangerNetworkLabel",
-    "HeatExchangerStreamRole",
+    "HeatExchangerNetworkDesignMethod",
     "HeatExchangerTypes",
     "HeatFlowUnits",
     "HeatPump",
     "HeatPumpAndRefrigerationCycle",
-    "HPRcycle",
     "LegendSeries",
     "LineColour",
+    "PenaltyForm",
     "ProblemTableLabel",
-    "PT",
-    "ResultsType",
-    "SID",
-    "SD",
-    "ST",
-    "StreamDataLabel",
     "StreamID",
-    "StreamLoc",
+    "StreamDataLabel",
     "StreamType",
+    "StreamLoc",
     "SummaryRowType",
     "TargetType",
-    "TT",
     "TurbineModel",
     "ZoneType",
-    "ZT",
 ]

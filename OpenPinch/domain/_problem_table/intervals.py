@@ -12,8 +12,6 @@ from ..configuration import tol
 from ..enums import ProblemTableLabel
 from .constants import HEAT_CAPACITY_PAIRS, INTERPOLATION_KEYS
 
-PT = ProblemTableLabel
-
 
 class TemperatureIntervalEngine:
     """Apply interval insertion operations to one parent table."""
@@ -28,7 +26,7 @@ class TemperatureIntervalEngine:
         """Filter temperatures that are not within tolerance of existing rows."""
         if T_vals.size == 0:
             return T_vals
-        T_col = self.data[:, self._column_index_for(PT.T)]
+        T_col = self.data[:, self._column_index_for(ProblemTableLabel.T)]
         gaps = np.abs(T_col[:, None] - T_vals[None, :])
         mask = np.nanmin(gaps, axis=0) > tol
         return T_vals[mask]
@@ -40,7 +38,7 @@ class TemperatureIntervalEngine:
         if T_vals.size == 0:
             return np.array([], dtype=float), {}, np.array([], dtype=float)
         data = self.data
-        T_col = data[:, self._column_index_for(PT.T)]
+        T_col = data[:, self._column_index_for(ProblemTableLabel.T)]
         top_mask = T_vals > T_col[0]
         bottom_mask = T_vals < T_col[-1]
         middle_mask = ~(top_mask | bottom_mask)
@@ -113,7 +111,7 @@ class TemperatureIntervalEngine:
             row_meta[idx] = {"type": "orig", "orig_idx": idx}
 
         # 3) Append placeholder rows for every new temperature (only T populated).
-        T_idx = self._column_index_for(PT.T)
+        T_idx = self._column_index_for(ProblemTableLabel.T)
         next_row = n_rows
         next_row = self._append_placeholders(
             new_data, row_meta, next_row, top_temps, label="top"
@@ -204,7 +202,7 @@ class TemperatureIntervalEngine:
             return
 
         edge_type = "top" if is_top else "bottom"
-        T_idx = self._column_index_for(PT.T)
+        T_idx = self._column_index_for(ProblemTableLabel.T)
 
         if is_top:
             neighbor_idx = next(
@@ -253,7 +251,7 @@ class TemperatureIntervalEngine:
         positions = sorted(positions)
         if upper_pos < 0 or lower_pos < 0:
             return
-        T_idx = self._column_index_for(PT.T)
+        T_idx = self._column_index_for(ProblemTableLabel.T)
         temps_mid = new_data[np.asarray(positions), T_idx]
 
         block, top_adjusted, bottom_adjusted = self._build_mid_block(
@@ -279,7 +277,7 @@ class TemperatureIntervalEngine:
         temps_arr = np.asarray(temps, dtype=float)
         if temps_arr.size == 0:
             return start_idx
-        T_idx = self._column_index_for(PT.T)
+        T_idx = self._column_index_for(ProblemTableLabel.T)
         next_row = start_idx
         for temp in temps_arr:
             new_data[next_row, T_idx] = float(temp)
@@ -300,8 +298,8 @@ class TemperatureIntervalEngine:
         relevant_cp_source: np.ndarray | None = None,
     ) -> None:
         """Populate non-interpolated columns based on a neighbouring row."""
-        t_col = self._validate_column_name(PT.T)
-        delta_t_col = self._validate_column_name(PT.DELTA_T)
+        t_col = self._validate_column_name(ProblemTableLabel.T)
+        delta_t_col = self._validate_column_name(ProblemTableLabel.DELTA_T)
         for key in self.columns:
             if key in (t_col, delta_t_col):
                 continue
@@ -332,8 +330,8 @@ class TemperatureIntervalEngine:
         if T_vals.size == 0:
             return np.empty((0, n_cols), dtype=self.data.dtype), row_neighbor.copy()
 
-        T_idx = self._column_index_for(PT.T)
-        delta_T_idx = self._column_index_for(PT.DELTA_T)
+        T_idx = self._column_index_for(ProblemTableLabel.T)
+        delta_T_idx = self._column_index_for(ProblemTableLabel.DELTA_T)
 
         temps_sorted = np.sort(T_vals)
         block = np.full((temps_sorted.size, n_cols), np.nan, dtype=self.data.dtype)
@@ -373,13 +371,13 @@ class TemperatureIntervalEngine:
         n_cols = self.data.shape[1]
         rows = np.full((n_rows, n_cols), np.nan, dtype=self.data.dtype)
         if n_rows == 0:
-            t_idx = self._column_index_for(PT.T)
-            delta_idx = self._column_index_for(PT.DELTA_T)
+            t_idx = self._column_index_for(ProblemTableLabel.T)
+            delta_idx = self._column_index_for(ProblemTableLabel.DELTA_T)
             return rows, (t_idx, delta_idx)
 
         temps_sorted = np.sort(T_vals)[::-1]
-        t_idx = self._column_index_for(PT.T)
-        delta_idx = self._column_index_for(PT.DELTA_T)
+        t_idx = self._column_index_for(ProblemTableLabel.T)
+        delta_idx = self._column_index_for(ProblemTableLabel.DELTA_T)
 
         for i, temp in enumerate(temps_sorted):
             row = rows[i]

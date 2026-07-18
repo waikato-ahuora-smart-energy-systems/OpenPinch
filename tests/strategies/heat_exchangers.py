@@ -4,8 +4,9 @@ from hypothesis import strategies as st
 
 from OpenPinch.domain._heat_exchanger.area import HeatExchangerAreaSlice
 from OpenPinch.domain._heat_exchanger.period_state import HeatExchangerPeriodState
-from OpenPinch.domain.enums import HeatExchangerKind, HeatExchangerStreamRole
+from OpenPinch.domain.enums import HeatExchangerKind, StreamID
 from OpenPinch.domain.heat_exchanger import HeatExchanger
+from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
 
 _POSITIVE_FLOATS = st.floats(
     min_value=0.1,
@@ -72,8 +73,8 @@ def heat_exchangers_with_area_slices(draw) -> HeatExchanger:
         kind=HeatExchangerKind.RECOVERY,
         source_stream="hot",
         sink_stream="cold",
-        source_stream_role=HeatExchangerStreamRole.PROCESS,
-        sink_stream_role=HeatExchangerStreamRole.PROCESS,
+        source_stream_role=StreamID.Process,
+        sink_stream_role=StreamID.Process,
         stage=1,
         period_states=tuple(
             HeatExchangerPeriodState(
@@ -84,4 +85,28 @@ def heat_exchangers_with_area_slices(draw) -> HeatExchanger:
             for period_index, period_duty in enumerate(period_duties)
         ),
         segment_area_contributions=tuple(slices),
+    )
+
+
+@st.composite
+def aligned_heat_exchanger_networks(draw) -> HeatExchangerNetwork:
+    """Generate ordered networks whose exchangers share period identities."""
+
+    template = draw(heat_exchangers_with_area_slices())
+    exchanger_count = draw(st.integers(min_value=1, max_value=3))
+    exchangers = tuple(
+        template.model_copy(
+            update={
+                "exchanger_id": f"generated-recovery-{index}",
+                "source_stream": f"hot-{index}",
+                "sink_stream": f"cold-{index}",
+            }
+        )
+        for index in range(exchanger_count)
+    )
+    return HeatExchangerNetwork(
+        exchangers=exchangers,
+        method="generated",
+        stage_count=1,
+        summary_metrics={"exchanger_count": exchanger_count},
     )

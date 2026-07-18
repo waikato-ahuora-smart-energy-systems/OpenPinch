@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any, Iterable, Optional
+from dataclasses import dataclass
+from types import MappingProxyType
+from typing import Any, Iterable, Mapping, Optional
 
 import pandas as pd
 
@@ -13,15 +15,8 @@ from ..adapters.io.workspace_bundles import (
 )
 from ..contracts.input import TargetInput
 from ..contracts.workspace import (
-    ConfigurationFieldMetadata,
     PinchWorkspaceBundle,
-    ScenarioVariantBundleEntry,
-    ScenarioVariantView,
-    ScenarioWorkflowConfig,
-    VariantInputView,
-)
-from ..presentation.configuration import (
-    configuration_field_metadata as _configuration_field_metadata,
+    WorkspaceCaseBundleEntry,
 )
 from ._problem.input.validation import build_validation_report
 from ._workspace import state as _workspace_state
@@ -32,16 +27,233 @@ from ._workspace.case_inputs import (
     merge_case_inputs,
     normalise_case_input,
 )
-from ._workspace.comparison import compare_workspace_variants
-from ._workspace.execution import (
-    solve_workspace_variant,
-)
-from ._workspace.views.input import (
-    record_views,
-    zone_tree_view,
-)
-from ._workspace.views.serialization import json_safe
 from .problem import PinchProblem
+
+
+@dataclass(frozen=True)
+class CaseBatchResult:
+    """Ordered successes and failures from one explicit batch operation."""
+
+    results: Mapping[str, Any]
+    errors: Mapping[str, Exception]
+
+
+class _CaseBatchAccessor:
+    def __init__(self, batch: "_CaseBatch", surface: str) -> None:
+        self._batch = batch
+        self._surface = surface
+
+    def _run(self, method: str, **kwargs) -> CaseBatchResult:
+        results: dict[str, Any] = {}
+        errors: dict[str, Exception] = {}
+        for name in self._batch.names:
+            try:
+                accessor = self._batch.workspace.case(name)
+                for segment in self._surface.split("."):
+                    accessor = getattr(accessor, segment)
+                results[name] = getattr(accessor, method)(**kwargs)
+            except Exception as exc:  # batch isolation is the public contract
+                errors[name] = exc
+        return CaseBatchResult(
+            results=MappingProxyType(results),
+            errors=MappingProxyType(errors),
+        )
+
+
+class _CaseBatchTargetAccessor(_CaseBatchAccessor):
+    """Mirror focused target workflows over an ordered case selection."""
+
+    @property
+    def all_periods(self) -> "_CaseBatchAllPeriodsTargetAccessor":
+        return _CaseBatchAllPeriodsTargetAccessor(self._batch, "target.all_periods")
+
+    def direct_heat_integration(self, **kwargs):
+        return self._run("direct_heat_integration", **kwargs)
+
+    def indirect_heat_integration(self, **kwargs):
+        return self._run("indirect_heat_integration", **kwargs)
+
+    def total_site_heat_integration(self, **kwargs):
+        return self._run("total_site_heat_integration", **kwargs)
+
+    def all_heat_integration(self, **kwargs):
+        return self._run("all_heat_integration", **kwargs)
+
+    def heat_exchanger_area_and_cost(self, **kwargs):
+        return self._run("heat_exchanger_area_and_cost", **kwargs)
+
+    def carnot_heat_pump(self, **kwargs):
+        return self._run("carnot_heat_pump", **kwargs)
+
+    def carnot_refrigeration(self, **kwargs):
+        return self._run("carnot_refrigeration", **kwargs)
+
+    def vapour_compression_heat_pump(self, **kwargs):
+        return self._run("vapour_compression_heat_pump", **kwargs)
+
+    def vapour_compression_refrigeration(self, **kwargs):
+        return self._run("vapour_compression_refrigeration", **kwargs)
+
+    def brayton_heat_pump(self, **kwargs):
+        return self._run("brayton_heat_pump", **kwargs)
+
+    def brayton_refrigeration(self, **kwargs):
+        return self._run("brayton_refrigeration", **kwargs)
+
+    def mvr_heat_pump(self, **kwargs):
+        return self._run("mvr_heat_pump", **kwargs)
+
+    def cogeneration(self, **kwargs):
+        return self._run("cogeneration", **kwargs)
+
+    def sun_smith_cogeneration(self, **kwargs):
+        return self._run("sun_smith_cogeneration", **kwargs)
+
+    def varbanov_cogeneration(self, **kwargs):
+        return self._run("varbanov_cogeneration", **kwargs)
+
+    def isentropic_cogeneration(self, **kwargs):
+        return self._run("isentropic_cogeneration", **kwargs)
+
+    def exergy(self, **kwargs):
+        return self._run("exergy", **kwargs)
+
+    def energy_transfer(self, **kwargs):
+        return self._run("energy_transfer", **kwargs)
+
+
+class _CaseBatchAllPeriodsTargetAccessor(_CaseBatchAccessor):
+    """Mirror supported all-period target workflows over selected cases."""
+
+    def direct_heat_integration(self, **kwargs):
+        return self._run("direct_heat_integration", **kwargs)
+
+    def indirect_heat_integration(self, **kwargs):
+        return self._run("indirect_heat_integration", **kwargs)
+
+    def total_site_heat_integration(self, **kwargs):
+        return self._run("total_site_heat_integration", **kwargs)
+
+    def all_heat_integration(self, **kwargs):
+        return self._run("all_heat_integration", **kwargs)
+
+    def heat_exchanger_area_and_cost(self, **kwargs):
+        return self._run("heat_exchanger_area_and_cost", **kwargs)
+
+    def carnot_heat_pump(self, **kwargs):
+        return self._run("carnot_heat_pump", **kwargs)
+
+    def carnot_refrigeration(self, **kwargs):
+        return self._run("carnot_refrigeration", **kwargs)
+
+    def vapour_compression_heat_pump(self, **kwargs):
+        return self._run("vapour_compression_heat_pump", **kwargs)
+
+    def vapour_compression_refrigeration(self, **kwargs):
+        return self._run("vapour_compression_refrigeration", **kwargs)
+
+    def mvr_heat_pump(self, **kwargs):
+        return self._run("mvr_heat_pump", **kwargs)
+
+    def cogeneration(self, **kwargs):
+        return self._run("cogeneration", **kwargs)
+
+    def sun_smith_cogeneration(self, **kwargs):
+        return self._run("sun_smith_cogeneration", **kwargs)
+
+    def varbanov_cogeneration(self, **kwargs):
+        return self._run("varbanov_cogeneration", **kwargs)
+
+    def isentropic_cogeneration(self, **kwargs):
+        return self._run("isentropic_cogeneration", **kwargs)
+
+    def exergy(self, **kwargs):
+        return self._run("exergy", **kwargs)
+
+    def energy_transfer(self, **kwargs):
+        return self._run("energy_transfer", **kwargs)
+
+
+class _CaseBatchDesignAccessor(_CaseBatchAccessor):
+    """Mirror HEN design workflows over an ordered case selection."""
+
+    def heat_exchanger_network(self, **kwargs):
+        return self._run("heat_exchanger_network", **kwargs)
+
+    def enhanced_heat_exchanger_network(self, **kwargs):
+        return self._run("enhanced_heat_exchanger_network", **kwargs)
+
+    def multiperiod_heat_exchanger_network(self, **kwargs):
+        return self._run("multiperiod_heat_exchanger_network", **kwargs)
+
+    def open_hens(self, **kwargs):
+        return self._run("open_hens", **kwargs)
+
+    def pinch_design(self, **kwargs):
+        return self._run("pinch_design", **kwargs)
+
+    def thermal_derivative(self, **kwargs):
+        return self._run("thermal_derivative", **kwargs)
+
+    def network_evolution(self, **kwargs):
+        return self._run("network_evolution", **kwargs)
+
+
+class _CaseBatch:
+    def __init__(self, workspace: "PinchWorkspace", names: Iterable[str]) -> None:
+        self.workspace = workspace
+        self.names = tuple(workspace._resolve_case_name(name) for name in names)
+        if not self.names:
+            raise ValueError("cases requires at least one case name.")
+        if len(set(self.names)) != len(self.names):
+            raise ValueError("case names must be unique.")
+        self.target = _CaseBatchTargetAccessor(self, "target")
+        self.design = _CaseBatchDesignAccessor(self, "design")
+
+    def _run_problem_method(self, method: str, **kwargs) -> CaseBatchResult:
+        results: dict[str, Any] = {}
+        errors: dict[str, Exception] = {}
+        for name in self.names:
+            try:
+                results[name] = getattr(self.workspace.case(name), method)(**kwargs)
+            except Exception as exc:  # batch isolation is the public contract
+                errors[name] = exc
+        return CaseBatchResult(
+            MappingProxyType(results),
+            MappingProxyType(errors),
+        )
+
+    def summary_frames(self, **kwargs) -> CaseBatchResult:
+        """Return ordered summary frames for solved cases."""
+        return self._run_problem_method("summary_frame", **kwargs)
+
+    def metrics(self, **kwargs) -> CaseBatchResult:
+        """Return ordered typed metrics for solved cases."""
+        return self._run_problem_method("metrics", **kwargs)
+
+    def reports(self, **kwargs) -> CaseBatchResult:
+        """Return ordered typed reports for solved cases."""
+        return self._run_problem_method("report", **kwargs)
+
+    def export_excel(self, destination: PathLike, **kwargs) -> CaseBatchResult:
+        """Export each selected case into a distinct case subdirectory."""
+        output_dir = str(destination).rstrip("/\\")
+        if not output_dir:
+            raise ValueError("destination is required for batch Excel export.")
+        results: dict[str, Any] = {}
+        errors: dict[str, Exception] = {}
+        for name in self.names:
+            try:
+                results[name] = self.workspace.case(name).export_excel(
+                    f"{output_dir}/{name}",
+                    **kwargs,
+                )
+            except Exception as exc:  # batch isolation is the public contract
+                errors[name] = exc
+        return CaseBatchResult(
+            MappingProxyType(results),
+            MappingProxyType(errors),
+        )
 
 
 class PinchWorkspace:
@@ -63,28 +275,12 @@ class PinchWorkspace:
     ) -> None:
         self.baseline_name = baseline_name
         self.project_name = project_name
-        self._variant_inputs: dict[str, JsonDict] = {}
-        self._variant_workflows: dict[str, ScenarioWorkflowConfig] = {}
-        self._cached_views: dict[str, ScenarioVariantView] = {}
+        self._case_inputs: dict[str, JsonDict] = {}
         self._case_cache: dict[str, PinchProblem] = {}
         self._active_case_name: Optional[str] = None
 
         if source is not None:
             self.load(source, case_name=baseline_name, activate=True)
-
-    @classmethod
-    def from_json(
-        cls,
-        data: JsonDict,
-        *,
-        baseline_name: str = "baseline",
-        project_name: Optional[str] = None,
-    ) -> "PinchWorkspace":
-        return cls(
-            data,
-            baseline_name=baseline_name,
-            project_name=project_name,
-        )
 
     @classmethod
     def load_bundle(cls, path: PathLike) -> "PinchWorkspace":
@@ -94,17 +290,8 @@ class PinchWorkspace:
             project_name=bundle.project_name,
             baseline_name=bundle.baseline_name,
         )
-        workspace._variant_inputs = {
-            name: deepcopy(entry.case_input) for name, entry in bundle.variants.items()
-        }
-        workspace._variant_workflows = {
-            name: entry.workflow.model_copy(deep=True)
-            for name, entry in bundle.variants.items()
-        }
-        workspace._cached_views = {
-            name: entry.cached_view.model_copy(deep=True)
-            for name, entry in bundle.variants.items()
-            if entry.cached_view is not None
+        workspace._case_inputs = {
+            name: deepcopy(entry.case_input) for name, entry in bundle.cases.items()
         }
         workspace._active_case_name = workspace._default_case_name()
         return workspace
@@ -143,9 +330,8 @@ class PinchWorkspace:
         )
 
         self.project_name = resolved_project_name
-        self._variant_inputs[name] = case_input
-        self._variant_workflows[name] = ScenarioWorkflowConfig()
-        self._invalidate_variant_state(name)
+        self._case_inputs[name] = case_input
+        self._invalidate_case_state(name)
 
         if activate or self._active_case_name is None:
             self._active_case_name = name
@@ -154,35 +340,13 @@ class PinchWorkspace:
             return self.case(name)
         return None
 
-    def list_variants(self) -> list[str]:
-        """Return the case names in stable insertion order."""
-        return list(self._variant_inputs)
-
-    def get_variant_input(self, name: str) -> JsonDict:
-        """Return a defensive copy of one stored case input."""
-        return deepcopy(self._get_variant_input(name))
-
-    def input_view(self, name: str) -> VariantInputView:
-        """Return a frontend-friendly editable case input view."""
-        case_input = self._get_variant_input(name)
-        zone_tree = case_input.get("zone_tree")
-        return VariantInputView(
-            variant_name=name,
-            zones=zone_tree_view(zone_tree),
-            streams=record_views(case_input.get("streams"), section="streams"),
-            utilities=record_views(case_input.get("utilities"), section="utilities"),
-            options=json_safe(case_input.get("options") or {}),
-        )
-
-    def validate_variant(self, name: str):
-        """Return a structured validation report for one case input."""
-        return build_validation_report(self._get_variant_input(name))
-
     def validation_report(self, case_name: Optional[str] = None):
         """Return a structured validation report for one case input."""
-        return self.validate_variant(self._resolve_case_name(case_name))
+        return build_validation_report(
+            self._get_case_input(self._resolve_case_name(case_name))
+        )
 
-    def set_variant_input(
+    def _set_case_input(
         self,
         name: str,
         case_input: TargetInput | JsonDict,
@@ -192,47 +356,21 @@ class PinchWorkspace:
         """Create or replace one stored case input."""
         normalized = normalise_case_input(case_input)
         if base is not None:
-            base_case_input = self._get_variant_input(base)
+            base_case_input = self._get_case_input(base)
             normalized = merge_case_inputs(base_case_input, normalized)
-        self._variant_inputs[name] = normalized
-        if name not in self._variant_workflows:
-            self._variant_workflows[name] = ScenarioWorkflowConfig()
+        self._case_inputs[name] = normalized
         if self._active_case_name is None:
             self._active_case_name = name
-        self._invalidate_variant_state(name)
+        self._invalidate_case_state(name)
         return deepcopy(normalized)
-
-    def solve_variant(
-        self,
-        name: str,
-        *,
-        workflow: str = "target",
-        workflow_options: Optional[dict[str, Any]] = None,
-    ) -> ScenarioVariantView:
-        """Solve one case and return a serializable frontend-facing view."""
-        return solve_workspace_variant(
-            self,
-            name,
-            workflow=workflow,
-            workflow_options=workflow_options,
-        )
-
-    def compare_variants(
-        self,
-        variant_names: Optional[Iterable[str]] = None,
-        *,
-        base: Optional[str] = None,
-    ):
-        """Return a deterministic comparison view across solved variants."""
-        return compare_workspace_variants(
-            self,
-            variant_names,
-            base=base,
-        )
 
     def list_cases(self) -> list[str]:
         """Return the loaded case names in stable insertion order."""
-        return self.list_variants()
+        return list(self._case_inputs)
+
+    def cases(self, names: Iterable[str] | None = None) -> _CaseBatch:
+        """Return an ordered batch view over selected cases."""
+        return _CaseBatch(self, self.list_cases() if names is None else names)
 
     def case(self, name: Optional[str] = None) -> PinchProblem:
         """Return the live :class:`PinchProblem` for one named case."""
@@ -243,7 +381,7 @@ class PinchWorkspace:
         self._active_case_name = self._resolve_case_name(name)
         return self.case(self._active_case_name)
 
-    def copy_case(
+    def _create_case_from_base(
         self,
         *,
         source_name: str = "baseline",
@@ -251,7 +389,7 @@ class PinchWorkspace:
         activate: bool = False,
     ) -> PinchProblem:
         """Clone one existing case into a new named case."""
-        data_source = self.get_case_input(source_name, canonical=True)
+        data_source = self.to_problem_json(case_name=source_name)
         return self.load(data_source, case_name=new_name, activate=activate)
 
     def scenario(
@@ -263,13 +401,10 @@ class PinchWorkspace:
         replace_options: bool = False,
         dt_cont_multiplier: float | None = None,
         activate: bool = False,
-        solve: bool = False,
-        workflow: str = "target",
-        workflow_options: Optional[dict[str, Any]] = None,
     ) -> PinchProblem:
-        """Create a named scenario from a base case and optional edits."""
+        """Create and return an unsolved named scenario."""
         source_name = base or self.baseline_name
-        case = self.copy_case(
+        case = self._create_case_from_base(
             source_name=source_name,
             new_name=name,
             activate=activate,
@@ -279,34 +414,17 @@ class PinchWorkspace:
         if dt_cont_multiplier is not None:
             case.set_dt_cont_multiplier(dt_cont_multiplier)
         self._sync_case_input(name)
-        if solve:
-            self.solve_variant(
-                name,
-                workflow=workflow,
-                workflow_options=workflow_options,
-            )
         return self.case(name)
-
-    def get_case_input(
-        self,
-        name: Optional[str] = None,
-        *,
-        canonical: bool = True,
-    ) -> JsonDict:
-        """Return one case input, optionally normalised to canonical form."""
-        resolved_name = self._resolve_case_name(name)
-        if canonical:
-            self._sync_case_input(resolved_name)
-        return deepcopy(self._variant_inputs[resolved_name])
 
     def to_problem_json(
         self,
         *,
         case_name: Optional[str] = None,
-        canonical: bool = True,
     ) -> JsonDict:
-        """Return the case input for one case using :class:`PinchProblem` naming."""
-        return self.get_case_input(case_name, canonical=canonical)
+        """Return canonical problem input for one named case."""
+        resolved_name = self._resolve_case_name(case_name)
+        self._sync_case_input(resolved_name)
+        return deepcopy(self._case_inputs[resolved_name])
 
     @property
     def active_case_name(self) -> Optional[str]:
@@ -322,6 +440,21 @@ class PinchWorkspace:
     def plot(self):
         """Delegate the ``plot`` accessor to the active case."""
         return self.case().plot
+
+    @property
+    def design(self):
+        """Delegate the ``design`` accessor to the active case."""
+        return self.case().design
+
+    @property
+    def components(self):
+        """Delegate the ``components`` accessor to the active case."""
+        return self.case().components
+
+    @property
+    def config(self):
+        """Return the active case's read-only configuration view."""
+        return self.case().config
 
     @property
     def problem_data(self):
@@ -352,48 +485,56 @@ class PinchWorkspace:
         *,
         case_name: Optional[str] = None,
         detailed: bool = False,
-        format: str | None = None,
-        periods: str = "selected",
+        include_periods: bool = False,
+        include_weighted_average: bool = False,
     ) -> pd.DataFrame:
         """Return the solved summary for one case."""
         return self.case(case_name).summary_frame(
             detailed=detailed,
-            format=format,
-            periods=periods,
+            include_periods=include_periods,
+            include_weighted_average=include_weighted_average,
         )
 
     def metrics(
         self,
         *,
         case_name: Optional[str] = None,
-        solve: bool = True,
-        periods: str = "selected",
+        include_periods: bool = False,
+        include_weighted_average: bool = False,
     ):
         """Return typed metrics for one case."""
-        return self.case(case_name).metrics(solve=solve, periods=periods)
+        return self.case(case_name).metrics(
+            include_periods=include_periods,
+            include_weighted_average=include_weighted_average,
+        )
 
     def report(
         self,
         *,
         case_name: Optional[str] = None,
-        solve: bool = True,
-        periods: str = "selected",
+        include_periods: bool = False,
+        include_weighted_average: bool = False,
     ):
         """Return a typed report for one case."""
-        return self.case(case_name).report(solve=solve, periods=periods)
+        return self.case(case_name).report(
+            include_periods=include_periods,
+            include_weighted_average=include_weighted_average,
+        )
 
     def export_excel(
         self,
-        results_dir: Optional[PathLike] = None,
+        destination: PathLike,
         *,
         case_name: Optional[str] = None,
-        periods: str = "selected",
+        include_periods: bool = False,
+        include_weighted_average: bool = False,
     ) -> Any:
         """Export one case to an Excel workbook."""
-        case = self.case(case_name)
-        if periods == "selected":
-            return case.export_excel(results_dir)
-        return case.export_excel(results_dir, periods=periods)
+        return self.case(case_name).export_excel(
+            destination,
+            include_periods=include_periods,
+            include_weighted_average=include_weighted_average,
+        )
 
     def set_dt_cont_multiplier(
         self,
@@ -486,26 +627,17 @@ class PinchWorkspace:
         """Persist the current workspace, syncing any live case edits first."""
         self._sync_all_cases()
         bundle = PinchWorkspaceBundle(
+            schema_version="3",
             project_name=self.project_name,
             baseline_name=self.baseline_name,
-            variants={
-                name: ScenarioVariantBundleEntry(
-                    case_input=self.get_variant_input(name),
-                    workflow=self._variant_workflows.get(
-                        name,
-                        ScenarioWorkflowConfig(),
-                    ),
-                    cached_view=self._cached_views.get(name),
+            cases={
+                name: WorkspaceCaseBundleEntry(
+                    case_input=deepcopy(self._get_case_input(name)),
                 )
-                for name in self.list_variants()
+                for name in self.list_cases()
             },
         )
         return save_workspace_bundle(path, bundle)
-
-    @classmethod
-    def configuration_field_metadata(cls) -> list[ConfigurationFieldMetadata]:
-        """Return declarative metadata for editable configuration fields."""
-        return _configuration_field_metadata()
 
     def _resolve_case_name(self, name: Optional[str]) -> str:
         return _workspace_state.resolve_case_name(self, name)
@@ -513,40 +645,19 @@ class PinchWorkspace:
     def _default_case_name(self) -> Optional[str]:
         return _workspace_state.default_case_name(self)
 
-    def _get_variant_input(self, name: str) -> JsonDict:
+    def _get_case_input(self, name: str) -> JsonDict:
         self._sync_case_input(name)
         try:
-            return self._variant_inputs[name]
+            return self._case_inputs[name]
         except KeyError as exc:
             raise KeyError(
-                f"Unknown variant {name!r}. Available variants: "
-                f"{', '.join(self.list_variants())}"
+                f"Unknown case {name!r}. Available cases: "
+                f"{', '.join(self.list_cases())}"
             ) from exc
 
-    def _ensure_solved_view(self, name: str) -> ScenarioVariantView:
-        if name in self._cached_views:
-            view = self._cached_views[name]
-        else:
-            workflow_config = self._variant_workflows.get(
-                name,
-                ScenarioWorkflowConfig(),
-            )
-            view = self.solve_variant(
-                name,
-                workflow=workflow_config.workflow,
-                workflow_options=workflow_config.workflow_options,
-            )
-
-        if view.status != "solved":
-            raise ValueError(
-                f"Variant {name!r} is not solved and cannot be compared "
-                f"(status={view.status!r})."
-            )
-        return view
-
-    def _invalidate_variant_state(self, name: str) -> None:
+    def _invalidate_case_state(self, name: str) -> None:
         """Drop cached case and view state for one variant case input."""
-        _workspace_state.invalidate_variant_state(self, name)
+        _workspace_state.invalidate_case_state(self, name)
 
     def _sync_case_input(self, name: str) -> None:
         _workspace_state.sync_case_input(self, name)

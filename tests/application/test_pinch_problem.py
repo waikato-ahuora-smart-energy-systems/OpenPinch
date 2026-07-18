@@ -15,12 +15,12 @@ from OpenPinch.adapters.io.problem_sources import (
     _load_json_inputs,
     _packaged_sample_case_name,
 )
-from OpenPinch.application._problem.accessors.target import _TargetAccessor
 from OpenPinch.application._problem.input.loading import (
     find_zone_tree_node,
     load_problem_source,
 )
 from OpenPinch.application._problem.output.reporting import (
+    _build_numeric_summary_frame,
     _target_attr,
     build_graph_availability,
     build_graph_data,
@@ -57,7 +57,9 @@ def sample_problem():
                 "dt_cont": 1,
             }
         ],
-        "utilities": [{"name": "LP Steam", "t_supply": 150, "type": "Hot", "cost": 20}],
+        "utilities": [
+            {"name": "LP Steam", "t_supply": 150, "type": "Hot", "price": 20}
+        ],
     }
 
 
@@ -71,8 +73,8 @@ def test_load_json(tmp_path: Path, sample_problem):
     assert isinstance(out, Zone)
     assert obj.problem_filepath == p
     assert obj.results is None
-    # to_problem_json should mirror problem_data
-    assert obj.to_problem_json() == sample_problem
+    assert obj.to_problem_json() == obj._canonical_problem_inputs()
+    assert obj.to_problem_json()["streams"][0]["name"] == "H1"
 
 
 def test_load_excel_calls_reader_and_sets_path(
@@ -171,7 +173,7 @@ def test_load_unrecognized_source_raises(tmp_path: Path):
 def test_target_raises_without_problem_loaded():
     obj = PinchProblem()
     with pytest.raises(RuntimeError):
-        obj.target()
+        obj.target.direct_heat_integration()
 
 
 def test_export_without_results_dir_raises(sample_problem, capsys):
@@ -218,8 +220,6 @@ def test_export_calls_writer_with_results(monkeypatch, tmp_path: Path):
     assert called["kwargs"]["target_response"] == {"foo": "bar"}
     assert called["kwargs"]["master_zone"] is None
     assert called["kwargs"]["out_dir"] == dest
-    # object state updated
-    assert obj.results_dir == dest
 
 
 def test_to_problem_json_without_data_raises():
@@ -232,20 +232,16 @@ def test_repr_changes_with_state(tmp_path: Path):
     obj = PinchProblem()
     r = repr(obj)
     assert "<in-memory or CSV tuple>" in r
-    assert "export=<unset>" in r
     assert "results=no" in r
 
-    # set paths / results and check
-    obj.results_dir = tmp_path / "out"
     obj._results = {}
     r2 = repr(obj)
-    assert str(obj.results_dir) in r2
     assert "results=yes" in r2
 
 
-def test_from_json_builds_and_roundtrips(sample_problem):
-    obj = PinchProblem.from_json(sample_problem)
-    assert obj.to_problem_json() == sample_problem
+def test_constructor_builds_and_roundtrips_canonical_input(sample_problem):
+    obj = PinchProblem(sample_problem)
+    assert obj.to_problem_json() == obj._canonical_problem_inputs()
 
 
 def test_load_in_memory_mapping_builds_zone(sample_problem):
@@ -302,38 +298,11 @@ def test_load_json_parse_error_raises_value_error(tmp_path: Path):
         obj.load(broken)
 
 
-def test_export_calls_target_when_results_missing(
-    monkeypatch, tmp_path: Path, sample_problem
-):
-    from OpenPinch.presentation.reporting import workbook
-
-    called = {"target": 0, "write": 0}
-
-    def fake_target(self):
-        called["target"] += 1
-        self._results = {"ok": 1}
-        self._master_zone = {"zone": 1}
-        return self._results
-
-    def fake_writer(target_response, master_zone, out_dir):
-        called["write"] += 1
-        return Path(out_dir) / "export.xlsx"
-
-    monkeypatch.setattr(PinchProblem, "target", fake_target)
-    monkeypatch.setattr(
-        workbook,
-        "export_target_summary_to_excel_with_units",
-        fake_writer,
-        raising=True,
-    )
-
+def test_export_requires_explicit_analysis(tmp_path: Path, sample_problem):
     obj = PinchProblem()
     obj._problem_data = sample_problem
-    out = obj.export_excel(tmp_path)
-
-    assert called["target"] == 1
-    assert called["write"] == 1
-    assert out == tmp_path / "export.xlsx"
+    with pytest.raises(RuntimeError, match="Run a problem.target"):
+        obj.export_excel(tmp_path)
 
 
 def test_problem_data_and_master_zone_properties():
@@ -366,8 +335,8 @@ def test_root_stream_views_are_exposed_on_problem():
             },
         ],
         "utilities": [
-            {"name": "Steam", "t_supply": 220.0, "type": "Hot", "cost": 20.0},
-            {"name": "CW", "t_supply": 25.0, "type": "Cold", "cost": 5.0},
+            {"name": "Steam", "t_supply": 220.0, "type": "Hot", "price": 20.0},
+            {"name": "CW", "t_supply": 25.0, "type": "Cold", "price": 5.0},
         ],
     }
 
@@ -405,13 +374,15 @@ def test_problem_hot_stream_temperature_mutation_updates_root_zone_stream():
     problem = PinchProblem(source=payload, project_name="Site")
 
     hot_stream = problem.hot_streams["Area1.H1"]
-    hot_stream.t_supply = 195.0
+    hot_stream.supply_temperature = 195.0
 
-    assert float(problem.hot_streams["Area1.H1"].t_supply) == pytest.approx(195.0)
-    assert float(problem.master_zone.hot_streams["Area1.H1"].t_supply) == pytest.approx(
+    assert float(problem.hot_streams["Area1.H1"].supply_temperature) == pytest.approx(
         195.0
     )
-    assert float(hot_stream.t_max) == pytest.approx(195.0)
+    assert float(
+        problem.master_zone.hot_streams["Area1.H1"].supply_temperature
+    ) == pytest.approx(195.0)
+    assert float(hot_stream.maximum_temperature) == pytest.approx(195.0)
 
 
 def test_show_dashboard_builds_graph_data(monkeypatch):
@@ -453,7 +424,7 @@ def test_show_dashboard_builds_graph_data(monkeypatch):
 
 def test_show_dashboard_requires_available_zone():
     obj = PinchProblem()
-    with pytest.raises(RuntimeError, match="No analysed zone is available"):
+    with pytest.raises(RuntimeError, match="No target analysis is available"):
         obj.show_dashboard()
 
 
@@ -504,8 +475,9 @@ def test_target_accessor_supports_named_workflow(monkeypatch):
     )
 
     obj = PinchProblem()
+    obj._master_zone = Zone("Site")
     out = obj.target.direct_heat_integration(
-        zone_name="Plant/DI",
+        zone="Plant/DI",
         options={"dt_min": 15},
     )
 
@@ -542,8 +514,9 @@ def test_target_accessor_supports_named_workflow_with_period_id(monkeypatch):
     )
 
     obj = PinchProblem()
+    obj._master_zone = Zone("Site")
     out = obj.target.direct_heat_integration(
-        zone_name="Plant/DI",
+        zone="Plant/DI",
         options={"dt_min": 15},
         period_id="peak",
     )
@@ -579,8 +552,9 @@ def test_target_accessor_cogeneration_uses_dedicated_execution_path(monkeypatch)
     )
 
     obj = PinchProblem()
+    obj._master_zone = Zone("Site")
     out = obj.target.cogeneration(
-        zone_name="Plant/TS",
+        zone="Plant/TS",
         options={"base_target_type": "Total Site Target"},
         period_id="peak",
     )
@@ -620,8 +594,9 @@ def test_target_accessor_exergy_uses_dedicated_execution_path(monkeypatch):
     )
 
     obj = PinchProblem()
+    obj._master_zone = Zone("Site")
     out = obj.target.exergy(
-        zone_name="Plant",
+        zone="Plant",
         options={"base_target_type": "Direct Integration"},
         period_id="peak",
     )
@@ -662,8 +637,9 @@ def test_target_accessor_include_subzones_uses_run_targeting(monkeypatch):
     monkeypatch.setattr(PinchProblem, "_execute_targeting", fake_execute_targeting)
 
     obj = PinchProblem()
+    obj._master_zone = Zone("Site")
     out = obj.target.direct_heat_integration(
-        zone_name="Plant/DI",
+        zone="Plant/DI",
         include_subzones=True,
     )
 
@@ -677,32 +653,32 @@ def test_target_accessor_include_subzones_uses_run_targeting(monkeypatch):
 
 def test_execute_cogeneration_targeting_returns_selected_target_family():
     from OpenPinch.domain.configuration import Configuration
-    from OpenPinch.domain.enums import TT, ZT
-    from OpenPinch.domain.enums import ProblemTableLabel as PT
+    from OpenPinch.domain.enums import ProblemTableLabel as ProblemTableLabel
+    from OpenPinch.domain.enums import TargetType, ZoneType
     from OpenPinch.domain.problem_table import ProblemTable
     from OpenPinch.domain.targets import (
         DirectIntegrationTarget,
         TotalSiteTarget,
     )
 
-    zone = Zone(name="Plant", type=ZT.S.value, config=Configuration())
+    zone = Zone(name="Plant", type=ZoneType.S.value, config=Configuration())
     ts_target = TotalSiteTarget(
         zone_name=zone.name,
-        type=TT.TS.value,
+        type=TargetType.TS.value,
         parent_zone=zone.parent_zone,
         config=zone.config,
-        pt=ProblemTable({PT.T: [120.0, 60.0]}),
+        pt=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]}),
         hot_utility_target=0.0,
         cold_utility_target=0.0,
         heat_recovery_target=0.0,
     )
     di_target = DirectIntegrationTarget(
         zone_name=zone.name,
-        type=TT.DI.value,
+        type=TargetType.DI.value,
         parent_zone=zone.parent_zone,
         config=zone.config,
-        pt=ProblemTable({PT.T: [120.0, 60.0]}),
-        pt_real=ProblemTable({PT.T: [120.0, 60.0]}),
+        pt=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]}),
+        pt_real=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]}),
         hot_utility_target=0.0,
         cold_utility_target=0.0,
         heat_recovery_target=0.0,
@@ -714,7 +690,7 @@ def test_execute_cogeneration_targeting_returns_selected_target_family():
     problem._master_zone = zone
 
     def fake_cogeneration_service(target_zone: Zone, args=None) -> Zone:
-        target_zone._selected_cogeneration_target_type = TT.TS.value
+        target_zone._selected_cogeneration_target_type = TargetType.TS.value
         return target_zone
 
     out = problem._execute_cogeneration_targeting(
@@ -729,32 +705,32 @@ def test_execute_cogeneration_targeting_returns_selected_target_family():
 
 def test_execute_exergy_targeting_returns_selected_target_family():
     from OpenPinch.domain.configuration import Configuration
-    from OpenPinch.domain.enums import TT, ZT
-    from OpenPinch.domain.enums import ProblemTableLabel as PT
+    from OpenPinch.domain.enums import ProblemTableLabel as ProblemTableLabel
+    from OpenPinch.domain.enums import TargetType, ZoneType
     from OpenPinch.domain.problem_table import ProblemTable
     from OpenPinch.domain.targets import (
         DirectIntegrationTarget,
         TotalSiteTarget,
     )
 
-    zone = Zone(name="Plant", type=ZT.S.value, config=Configuration())
+    zone = Zone(name="Plant", type=ZoneType.S.value, config=Configuration())
     ts_target = TotalSiteTarget(
         zone_name=zone.name,
-        type=TT.TS.value,
+        type=TargetType.TS.value,
         parent_zone=zone.parent_zone,
         config=zone.config,
-        pt=ProblemTable({PT.T: [120.0, 60.0]}),
+        pt=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]}),
         hot_utility_target=0.0,
         cold_utility_target=0.0,
         heat_recovery_target=0.0,
     )
     di_target = DirectIntegrationTarget(
         zone_name=zone.name,
-        type=TT.DI.value,
+        type=TargetType.DI.value,
         parent_zone=zone.parent_zone,
         config=zone.config,
-        pt=ProblemTable({PT.T: [120.0, 60.0]}),
-        pt_real=ProblemTable({PT.T: [120.0, 60.0]}),
+        pt=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]}),
+        pt_real=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]}),
         hot_utility_target=0.0,
         cold_utility_target=0.0,
         heat_recovery_target=0.0,
@@ -766,7 +742,7 @@ def test_execute_exergy_targeting_returns_selected_target_family():
     problem._master_zone = zone
 
     def fake_exergy_service(target_zone: Zone, args=None) -> Zone:
-        target_zone._selected_exergy_target_type = TT.TS.value
+        target_zone._selected_exergy_target_type = TargetType.TS.value
         return target_zone
 
     out = problem._execute_exergy_targeting(
@@ -781,20 +757,20 @@ def test_execute_exergy_targeting_returns_selected_target_family():
 
 def test_execute_exergy_targeting_does_not_walk_children_without_include_subzones():
     from OpenPinch.domain.configuration import Configuration
-    from OpenPinch.domain.enums import TT, ZT
-    from OpenPinch.domain.enums import ProblemTableLabel as PT
+    from OpenPinch.domain.enums import ProblemTableLabel as ProblemTableLabel
+    from OpenPinch.domain.enums import TargetType, ZoneType
     from OpenPinch.domain.problem_table import ProblemTable
     from OpenPinch.domain.targets import TotalSiteTarget
 
-    root = Zone(name="Root", type=ZT.S.value, config=Configuration())
+    root = Zone(name="Root", type=ZoneType.S.value, config=Configuration())
     child = Zone(name="Child", parent_zone=root)
     root._subzones = {"Child": child}
     ts_target = TotalSiteTarget(
         zone_name=root.name,
-        type=TT.TS.value,
+        type=TargetType.TS.value,
         parent_zone=root.parent_zone,
         config=root.config,
-        pt=ProblemTable({PT.T: [120.0, 60.0]}),
+        pt=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]}),
         hot_utility_target=0.0,
         cold_utility_target=0.0,
         heat_recovery_target=0.0,
@@ -807,7 +783,7 @@ def test_execute_exergy_targeting_does_not_walk_children_without_include_subzone
 
     def fake_exergy_service(target_zone: Zone, args=None) -> Zone:
         calls.append(target_zone.name)
-        target_zone._selected_exergy_target_type = TT.TS.value
+        target_zone._selected_exergy_target_type = TargetType.TS.value
         return target_zone
 
     out = problem._execute_exergy_targeting(
@@ -916,7 +892,6 @@ def test_validate_rejects_period_streams_with_mixed_hot_cold_classification():
 
 
 def test_summary_frame_compact_and_detailed(monkeypatch):
-    from OpenPinch.presentation.reporting import workbook
 
     class _Value:
         def __init__(self, value, unit="kW"):
@@ -947,17 +922,17 @@ def test_summary_frame_compact_and_detailed(monkeypatch):
     )()
     results = type("Results", (), {"targets": [target]})()
 
-    monkeypatch.setattr(PinchProblem, "target", lambda self: results)
     monkeypatch.setattr(
-        workbook,
+        sys.modules[build_problem_summary_frame.__module__],
         "build_summary_dataframe",
         lambda targets: __import__("pandas").DataFrame([{"Target": targets[0].name}]),
         raising=True,
     )
 
     obj = PinchProblem()
+    obj._results = results
     compact = obj.summary_frame()
-    plain = obj.summary_frame(format="plain")
+    numeric = _build_numeric_summary_frame(results)
     detailed = obj.summary_frame(detailed=True)
 
     assert list(compact.columns[:7]) == [
@@ -970,8 +945,8 @@ def test_summary_frame_compact_and_detailed(monkeypatch):
         "Cold Pinch",
     ]
     assert compact.iloc[0]["Hot Utilities"] == "Steam: 10.00 kW"
-    assert plain.iloc[0]["Hot Utility Target"] == 10.0
-    assert plain.iloc[0]["Hot Utility Target (unit)"] == "kW"
+    assert numeric.iloc[0]["Hot Utility Target"] == 10.0
+    assert numeric.iloc[0]["Hot Utility Target (unit)"] == "kW"
     assert detailed.iloc[0]["Target"] == "Plant/DI"
 
 
@@ -999,12 +974,12 @@ def test_validation_report_returns_structured_errors_without_raising():
 def test_report_and_metrics_are_typed_and_do_not_require_exports(sample_problem):
     problem = PinchProblem(source=sample_problem)
 
-    dry_report = problem.report(solve=False)
+    with pytest.raises(RuntimeError, match="Run a problem.target"):
+        problem.report()
+    problem.target.direct_heat_integration()
     solved_report = problem.report()
     metrics = problem.metrics()
 
-    assert dry_report.solved is False
-    assert dry_report.validation.valid is True
     assert solved_report.solved is True
     assert solved_report.targets
     assert any(metric.metric == "Hot Utility Target" for metric in metrics)
@@ -1039,7 +1014,7 @@ def test_summary_frame_preserves_equal_hot_and_cold_pinch_values():
     )()
     obj = PinchProblem()
     results = type("Results", (), {"targets": [target]})()
-    obj.target = lambda: results
+    obj._results = results
 
     summary = obj.summary_frame()
 
@@ -1126,7 +1101,7 @@ def test_graph_data_uses_results_then_master_zone(monkeypatch):
         },
     )()
     monkeypatch.setattr(PinchProblem, "target", lambda self: obj._results)
-    assert obj.plot.get_graph_data() == {
+    assert obj.plot.data() == {
         "Plant": {
             "name": "Plant/Direct Integration",
             "zone_name": "Plant",
@@ -1136,17 +1111,8 @@ def test_graph_data_uses_results_then_master_zone(monkeypatch):
     }
 
     obj._results = type("Results", (), {"graphs": None})()
-    obj._master_zone = {"zone": "ok"}
-    monkeypatch.setattr(
-        sys.modules[_PlotAccessor.__module__],
-        "get_output_graph_data",
-        lambda zone: {"Fallback": {"graphs": [{"type": "Grand Composite Curve"}]}},
-        raising=True,
-    )
-    assert (
-        obj.plot.get_graph_data()["Fallback"]["graphs"][0]["type"]
-        == "Grand Composite Curve"
-    )
+    with pytest.raises(RuntimeError, match="No graph data is available"):
+        obj.plot.data()
 
 
 def test_graph_catalog_and_plot_helpers(monkeypatch):
@@ -1162,7 +1128,7 @@ def test_graph_catalog_and_plot_helpers(monkeypatch):
             ],
         }
     }
-    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
+    monkeypatch.setattr(_PlotAccessor, "data", lambda self: payload)
     monkeypatch.setattr(
         sys.modules[_PlotAccessor.__module__],
         "build_plotly_figure",
@@ -1171,7 +1137,7 @@ def test_graph_catalog_and_plot_helpers(monkeypatch):
     )
 
     obj = PinchProblem()
-    catalog = obj.plot()
+    catalog = obj.plot.catalog()
     fig = obj.plot.grand_composite_curve(zone_name="Plant/DI")
 
     assert set(catalog["Graph Name"]) == {"Composite", "GCC"}
@@ -1196,7 +1162,7 @@ def test_plot_helper_executes_display_hook_when_available(monkeypatch):
         def show(self):
             shown["count"] += 1
 
-    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
+    monkeypatch.setattr(_PlotAccessor, "data", lambda self: payload)
     monkeypatch.setattr(
         sys.modules[_PlotAccessor.__module__],
         "build_plotly_figure",
@@ -1229,7 +1195,7 @@ def test_plot_helper_can_return_selected_graph_data(monkeypatch):
         build_calls["count"] += 1
         return {"built": graph["name"]}
 
-    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
+    monkeypatch.setattr(_PlotAccessor, "data", lambda self: payload)
     monkeypatch.setattr(
         sys.modules[_PlotAccessor.__module__],
         "build_plotly_figure",
@@ -1259,7 +1225,7 @@ def test_plot_helper_can_return_exergy_graph_data(monkeypatch):
             ],
         }
     }
-    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
+    monkeypatch.setattr(_PlotAccessor, "data", lambda self: payload)
 
     obj = PinchProblem()
     gcc_graph = obj.plot.exergetic_grand_composite_curve(
@@ -1290,7 +1256,7 @@ def test_plot_helper_can_return_heat_pump_net_load_graph_data(monkeypatch):
             ],
         }
     }
-    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
+    monkeypatch.setattr(_PlotAccessor, "data", lambda self: payload)
 
     obj = PinchProblem()
     nlp_hp_graph = obj.plot.net_load_profiles_with_heat_pump(
@@ -1319,7 +1285,7 @@ def test_plot_helper_can_build_energy_transfer_diagram(monkeypatch):
             ],
         }
     }
-    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
+    monkeypatch.setattr(_PlotAccessor, "data", lambda self: payload)
     monkeypatch.setattr(
         sys.modules[_PlotAccessor.__module__],
         "build_plotly_figure",
@@ -1437,7 +1403,7 @@ def test_plot_helper_rejects_show_when_returning_graph_data(monkeypatch):
             ],
         }
     }
-    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
+    monkeypatch.setattr(_PlotAccessor, "data", lambda self: payload)
 
     obj = PinchProblem()
 
@@ -1460,7 +1426,7 @@ def test_plot_helper_uses_default_notebook_dimensions(monkeypatch):
             ],
         }
     }
-    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
+    monkeypatch.setattr(_PlotAccessor, "data", lambda self: payload)
 
     obj = PinchProblem()
     fig = obj.plot.composite_curve(zone_name="Plant/DI")
@@ -1482,7 +1448,7 @@ def test_plot_helpers_accept_qualified_target_name_with_identifier_key(monkeypat
             ],
         }
     }
-    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
+    monkeypatch.setattr(_PlotAccessor, "data", lambda self: payload)
     monkeypatch.setattr(
         sys.modules[_PlotAccessor.__module__],
         "build_plotly_figure",
@@ -1517,7 +1483,7 @@ def test_plot_helpers_match_zone_address_when_target_types_repeat(monkeypatch):
             ],
         },
     }
-    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
+    monkeypatch.setattr(_PlotAccessor, "data", lambda self: payload)
     monkeypatch.setattr(
         sys.modules[_PlotAccessor.__module__],
         "build_plotly_figure",
@@ -1546,7 +1512,7 @@ def test_export_graphs_writes_html(monkeypatch, tmp_path: Path):
             ],
         }
     }
-    monkeypatch.setattr(_PlotAccessor, "get_graph_data", lambda self: payload)
+    monkeypatch.setattr(_PlotAccessor, "data", lambda self: payload)
 
     class FakeFigure:
         def write_html(self, path):
@@ -1606,12 +1572,20 @@ def test_compare_to_builds_delta_table(monkeypatch):
     )
     base_problem = PinchProblem()
     other_problem = PinchProblem()
-
-    monkeypatch.setattr(base_problem, "summary_frame", lambda **_kwargs: base_frame)
+    base_results = object()
+    other_results = object()
+    monkeypatch.setattr(
+        base_problem, "_summary_results", lambda **_kwargs: base_results
+    )
     monkeypatch.setattr(
         other_problem,
-        "summary_frame",
-        lambda **_kwargs: other_frame,
+        "_summary_results",
+        lambda **_kwargs: other_results,
+    )
+    monkeypatch.setattr(
+        sys.modules[PinchProblem.__module__],
+        "_build_numeric_summary_frame",
+        lambda results: base_frame if results is base_results else other_frame,
     )
 
     comparison = base_problem.compare_to(other_problem)
@@ -1660,12 +1634,20 @@ def test_compare_to_suppresses_delta_when_units_do_not_match(monkeypatch):
     )
     base_problem = PinchProblem()
     other_problem = PinchProblem()
-
-    monkeypatch.setattr(base_problem, "summary_frame", lambda **_kwargs: base_frame)
+    base_results = object()
+    other_results = object()
+    monkeypatch.setattr(
+        base_problem, "_summary_results", lambda **_kwargs: base_results
+    )
     monkeypatch.setattr(
         other_problem,
-        "summary_frame",
-        lambda **_kwargs: other_frame,
+        "_summary_results",
+        lambda **_kwargs: other_results,
+    )
+    monkeypatch.setattr(
+        sys.modules[PinchProblem.__module__],
+        "_build_numeric_summary_frame",
+        lambda results: base_frame if results is base_results else other_frame,
     )
 
     comparison = base_problem.compare_to(other_problem)
@@ -1736,8 +1718,8 @@ def test_validate_normalizes_invalid_utility_temperature_direction(tmp_path: Pat
 
     utility = problem.cold_utilities[0]
     assert utility.name == "Cooling Water"
-    assert float(utility.t_supply) == pytest.approx(25.0)
-    assert float(utility.t_target) == pytest.approx(35.0)
+    assert float(utility.supply_temperature) == pytest.approx(25.0)
+    assert float(utility.target_temperature) == pytest.approx(35.0)
 
 
 def test_load_allows_missing_optional_utility_and_stream_fields():
@@ -1871,7 +1853,7 @@ def test_packaged_sample_case_name_can_be_loaded_directly():
     )
 
     validated = problem.validate()
-    canonical = problem.to_problem_json(canonical=True)
+    canonical = problem.to_problem_json()
 
     assert problem.problem_filepath == Path("crude_preheat_train.json")
     assert validated.zone_tree is None
@@ -1886,6 +1868,7 @@ def test_set_dt_cont_multiplier_rebuilds_targets_and_stream_state(tmp_path: Path
     )
     problem = PinchProblem(source=case_path, project_name=case_path.stem)
 
+    problem.target.direct_heat_integration()
     baseline = problem.summary_frame()
     baseline_row = baseline.loc[
         baseline["Target"] == f"{case_path.stem}/Direct Integration"
@@ -1893,7 +1876,7 @@ def test_set_dt_cont_multiplier_rebuilds_targets_and_stream_state(tmp_path: Path
     unit = problem.master_zone.get_subzone("Crude Unit")
     hot_stream = next(iter(unit.hot_streams))
 
-    assert hot_stream.dt_cont == hot_stream.dt_cont_act
+    assert hot_stream.delta_t_contribution == hot_stream.effective_delta_t_contribution
 
     problem.set_dt_cont_multiplier(0.5)
 
@@ -1901,11 +1884,14 @@ def test_set_dt_cont_multiplier_rebuilds_targets_and_stream_state(tmp_path: Path
 
     unit = problem.master_zone.get_subzone("Crude Unit")
     updated_stream = next(iter(unit.hot_streams))
-    assert float(updated_stream.dt_cont) == pytest.approx(float(hot_stream.dt_cont))
-    assert float(updated_stream.dt_cont_act) == pytest.approx(
-        float(hot_stream.dt_cont) * 0.5
+    assert float(updated_stream.delta_t_contribution) == pytest.approx(
+        float(hot_stream.delta_t_contribution)
+    )
+    assert float(updated_stream.effective_delta_t_contribution) == pytest.approx(
+        float(hot_stream.delta_t_contribution) * 0.5
     )
 
+    problem.target.direct_heat_integration()
     updated = problem.summary_frame()
     updated_row = updated.loc[
         updated["Target"] == f"{case_path.stem}/Direct Integration"
@@ -1926,14 +1912,16 @@ def test_prepared_zone_dt_cont_multiplier_setter_guides_callers_to_problem_api(
 
     unit = problem.master_zone.get_subzone("Crude Unit")
     hot_stream = next(iter(unit.hot_streams))
-    former_value = hot_stream.dt_cont_act
+    former_value = hot_stream.effective_delta_t_contribution
 
     m = 2.0
     problem.master_zone.dt_cont_multiplier = m
-    present_value = hot_stream.dt_cont_act
+    present_value = hot_stream.effective_delta_t_contribution
 
     assert former_value != present_value
-    assert float(present_value) == pytest.approx(float(hot_stream.dt_cont) * m)
+    assert float(present_value) == pytest.approx(
+        float(hot_stream.delta_t_contribution) * m
+    )
 
 
 def test_set_dt_cont_multiplier_rebuilds_default_utilities_and_net_streams():
@@ -1959,33 +1947,27 @@ def test_set_dt_cont_multiplier_rebuilds_default_utilities_and_net_streams():
     }
 
     problem = PinchProblem(source=payload, project_name="Site")
-    problem.target()
+    problem.target.all_heat_integration()
 
     area = problem.master_zone.get_subzone("AreaA")
     cold_utility = next(
         utility for utility in area.cold_utilities if utility.name == "CU"
     )
     dt_cont = area.config.thermal.dt_cont
-    assert float(cold_utility.dt_cont) == pytest.approx(dt_cont)
-    assert float(cold_utility.dt_cont_act) == pytest.approx(dt_cont)
-    assert len(area.net_hot_streams) > 0
+    assert float(cold_utility.delta_t_contribution) == pytest.approx(dt_cont)
+    assert float(cold_utility.effective_delta_t_contribution) == pytest.approx(dt_cont)
 
     problem.set_dt_cont_multiplier(3.0, zone_name="AreaA")
-    problem.target()
+    problem.target.all_heat_integration()
 
     area = problem.master_zone.get_subzone("AreaA")
     cold_utility = next(
         utility for utility in area.cold_utilities if utility.name == "CU"
     )
     dt_cont = area.config.thermal.dt_cont
-    assert float(cold_utility.dt_cont) == pytest.approx(dt_cont)
-    assert float(cold_utility.dt_cont_act) == pytest.approx(dt_cont * 3.0)
-    assert len(area.net_hot_streams) > 0
-
-    net_stream = area.net_hot_streams[0]
-    assert float(net_stream.dt_cont) == pytest.approx(float(cold_utility.dt_cont))
-    assert float(net_stream.dt_cont_act) == pytest.approx(
-        float(cold_utility.dt_cont_act)
+    assert float(cold_utility.delta_t_contribution) == pytest.approx(dt_cont)
+    assert float(cold_utility.effective_delta_t_contribution) == pytest.approx(
+        dt_cont * 3.0
     )
 
 
@@ -2012,10 +1994,10 @@ def test_set_dt_cont_multiplier_below_one_rebuilds_default_utilities_and_net_str
     }
 
     problem = PinchProblem(source=payload, project_name="Site")
-    problem.target()
+    problem.target.all_heat_integration()
 
     problem.set_dt_cont_multiplier(0.5, zone_name="AreaA")
-    problem.target()
+    problem.target.all_heat_integration()
 
     area = problem.master_zone.get_subzone("AreaA")
     cold_utility = next(
@@ -2023,14 +2005,9 @@ def test_set_dt_cont_multiplier_below_one_rebuilds_default_utilities_and_net_str
     )
 
     dt_cont = area.config.thermal.dt_cont
-    assert float(cold_utility.dt_cont) == pytest.approx(dt_cont)
-    assert float(cold_utility.dt_cont_act) == pytest.approx(dt_cont * 0.5)
-    assert len(area.net_hot_streams) > 0
-
-    net_stream = area.net_hot_streams[0]
-    assert float(net_stream.dt_cont) == pytest.approx(float(cold_utility.dt_cont))
-    assert float(net_stream.dt_cont_act) == pytest.approx(
-        float(cold_utility.dt_cont_act)
+    assert float(cold_utility.delta_t_contribution) == pytest.approx(dt_cont)
+    assert float(cold_utility.effective_delta_t_contribution) == pytest.approx(
+        dt_cont * 0.5
     )
 
 
@@ -2102,7 +2079,7 @@ def test_direct_heat_pump_accepts_period_id_and_returns_period_specific_results(
     monkeypatch,
 ):
     import OpenPinch.application.targeting as svc
-    from OpenPinch.domain.enums import PT, TT
+    from OpenPinch.domain.enums import ProblemTableLabel, TargetType
     from OpenPinch.domain.problem_table import ProblemTable
     from OpenPinch.domain.stream_collection import StreamCollection
     from OpenPinch.domain.targets import DirectHeatPumpTarget
@@ -2143,10 +2120,10 @@ def test_direct_heat_pump_accepts_period_id_and_returns_period_specific_results(
             zone_name=target_zone.name,
             period_id=sid,
             period_idx=idx,
-            type=TT.DHP.value,
+            type=TargetType.DHP.value,
             parent_zone=target_zone.parent_zone,
             config=target_zone.config,
-            pt=ProblemTable({PT.T: [120.0, 60.0]}),
+            pt=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]}),
             hpr_cycle="stub",
             hpr_utility_total=10.0 + idx,
             hpr_work=1.0 + idx,
@@ -2169,20 +2146,20 @@ def test_direct_heat_pump_accepts_period_id_and_returns_period_specific_results(
 
     problem = PinchProblem(source=payload, project_name="Site")
 
-    offpeak = problem.target.direct_heat_pump(period_id="0")
-    peak = problem.target.direct_heat_pump(period_id="peak")
+    offpeak = problem.target.carnot_heat_pump(period_id="0")
+    peak = problem.target.carnot_heat_pump(period_id="peak")
 
     assert offpeak.period_id == "0"
     assert peak.period_id == "peak"
     assert peak.hpr_utility_total != offpeak.hpr_utility_total
-    assert problem.master_zone.targets[TT.DI.value].period_idx == 1
+    assert problem.master_zone.targets[TargetType.DI.value].period_idx == 1
 
 
 def test_indirect_heat_pump_accepts_period_id_and_returns_period_specific_results(
     monkeypatch,
 ):
     import OpenPinch.application.targeting as svc
-    from OpenPinch.domain.enums import PT, TT
+    from OpenPinch.domain.enums import ProblemTableLabel, TargetType
     from OpenPinch.domain.problem_table import ProblemTable
     from OpenPinch.domain.stream_collection import StreamCollection
     from OpenPinch.domain.targets import IndirectHeatPumpTarget, TotalSiteTarget
@@ -2223,10 +2200,10 @@ def test_indirect_heat_pump_accepts_period_id_and_returns_period_specific_result
             zone_name=target_zone.name,
             period_id=sid,
             period_idx=idx,
-            type=TT.IHP.value,
+            type=TargetType.IHP.value,
             parent_zone=target_zone.parent_zone,
             config=target_zone.config,
-            pt=ProblemTable({PT.T: [120.0, 60.0]}),
+            pt=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]}),
             hpr_cycle="stub",
             hpr_utility_total=20.0 + idx,
             hpr_work=1.0 + idx,
@@ -2255,10 +2232,10 @@ def test_indirect_heat_pump_accepts_period_id_and_returns_period_specific_result
                     zone_name=target_zone.name,
                     period_id=args.get("period_id"),
                     period_idx=args["period_idx"],
-                    type=TT.TS.value,
+                    type=TargetType.TS.value,
                     parent_zone=target_zone.parent_zone,
                     config=target_zone.config,
-                    pt=ProblemTable({PT.T: [120.0, 60.0]}),
+                    pt=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]}),
                     hot_utilities=StreamCollection(),
                     cold_utilities=StreamCollection(),
                     hot_utility_target=10.0 + args["period_idx"],
@@ -2272,13 +2249,13 @@ def test_indirect_heat_pump_accepts_period_id_and_returns_period_specific_result
 
     problem = PinchProblem(source=payload, project_name="Site")
 
-    offpeak = problem.target.indirect_heat_pump(period_id="0")
-    peak = problem.target.indirect_heat_pump(period_id="peak")
+    offpeak = problem.target.carnot_heat_pump(is_utility_heat_pump=True, period_id="0")
+    peak = problem.target.carnot_heat_pump(is_utility_heat_pump=True, period_id="peak")
 
     assert offpeak.period_id == "0"
     assert peak.period_id == "peak"
     assert peak.hpr_utility_total != offpeak.hpr_utility_total
-    assert problem.master_zone.targets[TT.TS.value].period_idx == 1
+    assert problem.master_zone.targets[TargetType.TS.value].period_idx == 1
 
 
 def test_direct_heat_integration_rejects_unknown_period_id():
@@ -2411,7 +2388,7 @@ def test_target_all_periods_runs_each_period_and_preserves_call_order():
 
     problem = PinchProblem(source=payload, project_name="Site")
 
-    results = problem.target_all_periods()
+    results = problem.target.all_periods.direct_heat_integration()
 
     assert list(results) == ["0", "peak"]
     assert results["0"].targets[0].period_id == "0"
@@ -2419,11 +2396,7 @@ def test_target_all_periods_runs_each_period_and_preserves_call_order():
     assert results["0"].targets[0].Qc != results["peak"].targets[0].Qc
 
 
-def test_target_all_periods_uses_validated_output_period_id_for_serial_keys(
-    monkeypatch,
-):
-    from OpenPinch.contracts.output import TargetOutput
-
+def test_target_all_periods_uses_canonical_period_ids_for_serial_keys():
     payload = {
         "streams": [
             {
@@ -2445,20 +2418,10 @@ def test_target_all_periods_uses_validated_output_period_id_for_serial_keys(
         "options": {"PROBLEM_PERIOD_IDS": ["0", "peak"]},
     }
 
-    monkeypatch.setattr(
-        PinchProblem,
-        "_solve_target_for_period",
-        lambda self, period_id: TargetOutput(
-            name="Site",
-            period_id=f"{period_id}-resolved",
-            targets=[],
-        ),
-    )
-
     problem = PinchProblem(source=payload, project_name="Site")
-    results = problem.target_all_periods()
+    results = problem.target.all_periods.direct_heat_integration()
 
-    assert list(results) == ["0-resolved", "peak-resolved"]
+    assert list(results) == ["0", "peak"]
 
 
 def test_target_all_periods_supports_thread_parallel_execution():
@@ -2514,17 +2477,13 @@ def test_target_all_periods_supports_thread_parallel_execution():
 
     problem = PinchProblem(source=payload, project_name="Site")
 
-    results = problem.target_all_periods(parallel="thread", max_workers=2)
+    results = problem.target.all_periods.direct_heat_integration(workers=2)
 
     assert list(results) == ["0", "peak"]
     assert {result.targets[0].period_id for result in results.values()} == {"0", "peak"}
 
 
-def test_target_all_periods_uses_validated_output_period_id_for_parallel_keys(
-    monkeypatch,
-):
-    from OpenPinch.application._problem.periods import execution
-
+def test_target_all_periods_uses_canonical_period_ids_for_parallel_keys():
     payload = {
         "streams": [
             {
@@ -2546,30 +2505,21 @@ def test_target_all_periods_uses_validated_output_period_id_for_parallel_keys(
         "options": {"PROBLEM_PERIOD_IDS": ["0", "peak"]},
     }
 
-    monkeypatch.setattr(
-        execution,
-        "solve_default_target_for_period",
-        lambda problem_inputs, project_name, period_id: {
-            "name": project_name,
-            "period_id": f"{period_id}-resolved",
-            "targets": [],
-        },
-    )
-
     problem = PinchProblem(source=payload, project_name="Site")
-    results = problem.target_all_periods(parallel="thread", max_workers=2)
+    results = problem.target.all_periods.direct_heat_integration(workers=2)
 
-    assert list(results) == ["0-resolved", "peak-resolved"]
+    assert list(results) == ["0", "peak"]
 
 
 def test_target_all_periods_rejects_scalar_only_problems(sample_problem):
     problem = PinchProblem(source=sample_problem, project_name="Site")
-    results = problem.target_all_periods()
+    results = problem.target.all_periods.direct_heat_integration()
     assert list(results) == ["0"]
 
 
-def test_load_without_source_and_without_filepath_returns_none():
-    assert PinchProblem().load() is None
+def test_load_without_source_and_without_filepath_raises():
+    with pytest.raises(RuntimeError, match="No source was supplied"):
+        PinchProblem().load()
 
 
 def test_run_targeting_for_zone_and_subzones_uses_prepared_zone(monkeypatch):
@@ -2767,15 +2717,16 @@ def test_validation_summary_metrics_and_update_guards(sample_problem):
         problem.validate()
     with pytest.raises(RuntimeError, match="No input loaded"):
         problem.validation_report()
-    with pytest.raises(ValueError, match="no canonical period_ids"):
-        empty_period_problem = PinchProblem(source=sample_problem)
-        empty_period_problem.master_zone._period_ids = {}
-        empty_period_problem.target_all_periods()
+    with pytest.raises(ValueError, match="workers must be a positive integer"):
+        PinchProblem(source=sample_problem).target.all_periods.direct_heat_integration(
+            workers=0
+        )
 
     problem._results = SimpleNamespace(targets=[])
-    with pytest.raises(ValueError, match="Use either detailed=True"):
+    with pytest.raises(TypeError, match="unexpected keyword argument 'format'"):
         problem.summary_frame(detailed=True, format="compact")
-    assert PinchProblem().metrics(solve=False) == []
+    with pytest.raises(RuntimeError, match="Run a problem.target"):
+        PinchProblem().metrics()
     with pytest.raises(ValueError, match="No validated data"):
         PinchProblem()._data_preprocessing()
     with pytest.raises(TypeError, match="options must"):
@@ -2873,7 +2824,7 @@ def test_resolve_subzone_and_project_name_property_paths():
     child = Zone("Area", parent_zone=root)
     root.subzones["Area"] = child
 
-    assert PinchProblem.add_component is PinchProblem.__dict__["add_component"]
+    assert PinchProblem.components is PinchProblem.__dict__["components"]
     assert PinchProblem.design is PinchProblem.__dict__["design"]
     assert problem._resolve_target_zone("Area", master_zone=root) is child
     assert problem.process_components == {}
@@ -2885,12 +2836,12 @@ def test_resolve_subzone_and_project_name_property_paths():
     assert root.name == "Renamed"
 
 
-def test_metrics_solves_when_requested_and_compare_handles_non_numeric_units(
+def test_metrics_uses_cached_results_and_compare_handles_non_numeric_units(
     monkeypatch,
 ):
     problem = PinchProblem()
     solved_results = SimpleNamespace(targets=[])
-    monkeypatch.setattr(problem, "target", lambda: solved_results)
+    problem._results = solved_results
     monkeypatch.setattr(
         sys.modules[PinchProblem.__module__],
         "build_report_metrics",
@@ -2918,8 +2869,13 @@ def test_metrics_solves_when_requested_and_compare_handles_non_numeric_units(
             }
         ]
     )
-    monkeypatch.setattr(base, "summary_frame", lambda format=None: frame)
-    monkeypatch.setattr(other, "summary_frame", lambda format=None: frame)
+    monkeypatch.setattr(base, "_summary_results", lambda **_kwargs: object())
+    monkeypatch.setattr(other, "_summary_results", lambda **_kwargs: object())
+    monkeypatch.setattr(
+        sys.modules[PinchProblem.__module__],
+        "_build_numeric_summary_frame",
+        lambda _results: frame,
+    )
 
     comparison = base.compare_to(other)
 
@@ -2950,50 +2906,30 @@ def test_update_options_replaces_inputs_and_preserves_filepath(
     assert problem.problem_data["options"] == {"THERMAL_DT_CONT": 25}
 
 
-def test_target_accessor_delegates_named_workflows_with_period_options():
-    class RecordingProblem:
-        def __init__(self):
-            self.calls = []
+def test_target_accessor_exposes_only_descriptive_workflow_names():
+    accessor = PinchProblem().target
 
-        def _execute_targeting(self, **kwargs):
-            self.calls.append(("targeting", kwargs))
-            return kwargs["target_id"]
+    for name in (
+        "direct_heat_integration",
+        "indirect_heat_integration",
+        "all_heat_integration",
+        "heat_exchanger_area_and_cost",
+        "carnot_heat_pump",
+        "carnot_refrigeration",
+        "energy_transfer",
+        "cogeneration",
+        "exergy",
+    ):
+        assert callable(getattr(accessor, name))
 
-        def _execute_cogeneration_targeting(self, **kwargs):
-            self.calls.append(("cogeneration", kwargs))
-            return "cogeneration"
-
-        def _execute_exergy_targeting(self, **kwargs):
-            self.calls.append(("exergy", kwargs))
-            return "exergy"
-
-    problem = RecordingProblem()
-    accessor = _TargetAccessor(problem)
-
-    assert (
-        accessor.indirect_heat_integration(
-            zone_name="Site",
-            options={"existing": True},
-            include_subzones=True,
-            period_id="peak",
-        )
-        == "Total Site Target"
-    )
-    assert accessor.direct_heat_pump(period_id="peak") == "Direct Heat Pump"
-    assert accessor.indirect_heat_pump(period_id="peak") == "Indirect Heat Pump"
-    assert accessor.direct_refrigeration(period_id="peak") == "Direct Refrigeration"
-    assert accessor.indirect_refrigeration(period_id="peak") == (
-        "Indirect Refrigeration"
-    )
-    assert accessor.area_cost(period_id="peak") == "Direct Integration"
-    assert accessor.energy_transfer(period_id="peak") == "Energy Transfer Analysis"
-    assert accessor.cogeneration(period_id="peak") == "cogeneration"
-    assert accessor.exergy(period_id="peak") == "exergy"
-
-    assert problem.calls[0][1]["application_zone"] == "Site"
-    assert problem.calls[0][1]["include_subzones"] is True
-    assert problem.calls[0][1]["options"] == {"existing": True, "period_id": "peak"}
-    assert all(call[1]["options"]["period_id"] == "peak" for call in problem.calls)
+    for retired_name in (
+        "direct_heat_pump",
+        "indirect_heat_pump",
+        "direct_refrigeration",
+        "indirect_refrigeration",
+        "area_cost",
+    ):
+        assert not hasattr(accessor, retired_name)
 
 
 def test_loading_zone_tree_and_packaged_sample_edges(monkeypatch, tmp_path: Path):
@@ -3124,13 +3060,10 @@ def test_output_helpers_cover_report_summary_and_formatting_edges():
     )
 
     assert build_problem_summary_frame(SimpleNamespace(targets=[]), detailed=True).empty
-    with pytest.raises(ValueError, match="summary format"):
-        build_problem_summary_frame(results, format="wide")
-
-    plain = build_problem_summary_frame(results, format="plain")
-    assert plain.loc[0, "Hot Utility Target"] == pytest.approx(100.0)
-    assert plain.loc[0, "Hot Utilities"] == "Steam: n/a"
-    assert plain.loc[0, "Cold Utilities"] == "Cooling Water: 50.00 kW"
+    numeric = _build_numeric_summary_frame(results)
+    assert numeric.loc[0, "Hot Utility Target"] == pytest.approx(100.0)
+    assert numeric.loc[0, "Hot Utilities"] == "Steam: n/a"
+    assert numeric.loc[0, "Cold Utilities"] == "Cooling Water: 50.00 kW"
 
     frame = pd.DataFrame(
         [

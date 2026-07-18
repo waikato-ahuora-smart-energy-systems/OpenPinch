@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from ...domain.enums import GT, ArrowHead, StreamLoc
+from ...domain.enums import ArrowHead, GraphType, StreamLoc
 from ...domain.targets import BaseTargetModel
 from ...domain.zone import Zone
 from .composite import _make_composite_graph
@@ -120,7 +120,7 @@ def _make_energy_transfer_diagram_graph(
     graph_title: str,
     target_graphs: dict,
 ) -> dict:
-    diagram = target_graphs[GT.ETD.value]
+    diagram = target_graphs[GraphType.ETD.value]
     temperatures = diagram.get("temperatures", [])
     segments = [
         _create_curve(
@@ -130,13 +130,13 @@ def _make_energy_transfer_diagram_graph(
             y_vals=temperatures,
             arrow=ArrowHead.NO_ARROW.value,
             series_label=str(operation.get("name", "Operation")),
-            series_id=f"{GT.ETD.value}:{operation.get('name', 'Operation')}",
+            series_id=f"{GraphType.ETD.value}:{operation.get('name', 'Operation')}",
             series_description=f"{operation.get('mode', 'R')} cascade",
         )
         for operation in diagram.get("operations", [])
     ]
     return {
-        "type": GT.ETD.value,
+        "type": GraphType.ETD.value,
         "name": f"Energy Transfer Diagram: {graph_title}",
         "segments": segments,
     }

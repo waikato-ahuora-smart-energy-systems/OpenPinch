@@ -1,6 +1,7 @@
 """Regression tests for the stream collection classes."""
 
 import csv
+import pickle
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -9,7 +10,7 @@ import pandas as pd
 import pytest
 
 from OpenPinch.domain._stream_collection.numeric_view import value_at_idx
-from OpenPinch.domain.enums import ST
+from OpenPinch.domain.enums import StreamType
 from OpenPinch.domain.stream import Stream
 from OpenPinch.domain.stream_collection import StreamCollection
 from OpenPinch.presentation.reporting.stream_collection import (
@@ -22,9 +23,9 @@ from OpenPinch.presentation.reporting.stream_collection import (
 @pytest.fixture
 def sample_streams():
     """Return sample streams data used by this test module."""
-    s1 = Stream(name="A", t_supply=150, t_target=100, heat_flow=1)
-    s2 = Stream(name="B", t_supply=180, t_target=120, heat_flow=1)
-    s3 = Stream(name="C", t_supply=130, t_target=90, heat_flow=1)
+    s1 = Stream(name="A", supply_temperature=150, target_temperature=100, heat_flow=1)
+    s2 = Stream(name="B", supply_temperature=180, target_temperature=120, heat_flow=1)
+    s3 = Stream(name="C", supply_temperature=130, target_temperature=90, heat_flow=1)
     return s1, s2, s3
 
 
@@ -43,7 +44,7 @@ def test_no_overwrite(sample_streams):
     sc = StreamCollection()
     sc.add(s1)
     # Add another stream with same name
-    s1_dup = Stream(name="A", t_supply=100, t_target=50)
+    s1_dup = Stream(name="A", supply_temperature=100, target_temperature=50)
     sc.add(s1_dup)
 
     names = [s.name for s in sc]
@@ -55,11 +56,11 @@ def test_overwrite_allowed(sample_streams):
     s1, _, _ = sample_streams
     sc = StreamCollection()
     sc.add(s1)
-    s1_new = Stream(name="A", t_supply=10, t_target=20)
+    s1_new = Stream(name="A", supply_temperature=10, target_temperature=20)
     sc.add(s1_new, prevent_overwrite=False)
 
     assert len(list(sc)) == 1
-    assert sc._streams["A"].t_supply == 10  # Overwritten
+    assert sc._streams["A"].supply_temperature == 10  # Overwritten
 
 
 def test_remove(sample_streams):
@@ -81,8 +82,8 @@ def test_sort_by_supply_temp(sample_streams):
     sc.add(s3)
 
     # Sort descending by t_supply
-    sc.set_sort_key(lambda s: s.t_supply, reverse=True)
-    temps = [s.t_supply for s in sc]
+    sc.set_sort_key(lambda s: s.supply_temperature, reverse=True)
+    temps = [s.supply_temperature for s in sc]
     assert temps == [180, 150, 130]
 
 
@@ -94,8 +95,10 @@ def test_sort_by_target_then_supply(sample_streams):
     sc.add(s3)
 
     # Sort descending by (t_target, t_supply)
-    sc.set_sort_key(lambda s: (s.t_target, s.t_supply), reverse=True)
-    targets = [s.t_target for s in sc]
+    sc.set_sort_key(
+        lambda s: (s.target_temperature, s.supply_temperature), reverse=True
+    )
+    targets = [s.target_temperature for s in sc]
     assert targets == [120, 100, 90]
 
 
@@ -120,15 +123,15 @@ def test_dynamic_sort_after_adding(sample_streams):
     sc.add(s2)
 
     # Set sort by t_supply descending
-    sc.set_sort_key(lambda s: s.t_supply, reverse=True)
+    sc.set_sort_key(lambda s: s.supply_temperature, reverse=True)
 
     # Now add a new stream AFTER setting the sort
-    new_stream = Stream(name="D", t_supply=160, t_target=110)
+    new_stream = Stream(name="D", supply_temperature=160, target_temperature=110)
     sc.add(new_stream)
 
     # Check that new stream appears in the correct position
     names_in_order = [s.name for s in sc]
-    temps_in_order = [s.t_supply for s in sc]
+    temps_in_order = [s.supply_temperature for s in sc]
 
     assert names_in_order == ["B", "D", "A"]
     assert temps_in_order == [180, 160, 150]
@@ -139,8 +142,8 @@ def test_copy_preserves_keys_and_can_deep_copy_streams():
     sc.add(
         Stream(
             name="Steam",
-            t_supply=220,
-            t_target=180,
+            supply_temperature=220,
+            target_temperature=180,
             heat_flow=1,
             is_process_stream=False,
         ),
@@ -151,12 +154,17 @@ def test_copy_preserves_keys_and_can_deep_copy_streams():
 
     assert list(copied._streams.keys()) == ["Hot Utility.Steam"]
     assert copied["Hot Utility.Steam"] is not sc["Hot Utility.Steam"]
-    assert copied["Hot Utility.Steam"].t_supply == sc["Hot Utility.Steam"].t_supply
+    assert (
+        copied["Hot Utility.Steam"].supply_temperature
+        == sc["Hot Utility.Steam"].supply_temperature
+    )
 
 
 def test_copy_without_deep_shares_stream_references():
     sc = StreamCollection()
-    stream = Stream(name="H1", t_supply=200, t_target=120, heat_flow=1)
+    stream = Stream(
+        name="H1", supply_temperature=200, target_temperature=120, heat_flow=1
+    )
     sc.add(stream, key="AreaA.H1")
 
     copied = sc.copy()
@@ -166,8 +174,14 @@ def test_copy_without_deep_shares_stream_references():
 
 def test_reset_heat_flows_zeros_all_streams_in_place():
     sc = StreamCollection()
-    sc.add(Stream(name="H1", t_supply=200, t_target=120, heat_flow=15.0))
-    sc.add(Stream(name="C1", t_supply=60, t_target=140, heat_flow=25.0))
+    sc.add(
+        Stream(
+            name="H1", supply_temperature=200, target_temperature=120, heat_flow=15.0
+        )
+    )
+    sc.add(
+        Stream(name="C1", supply_temperature=60, target_temperature=140, heat_flow=25.0)
+    )
 
     returned = sc.set_common_stream_attribute("heat_flow", 0.0)
 
@@ -177,14 +191,22 @@ def test_reset_heat_flows_zeros_all_streams_in_place():
 
 def test_sum_heat_flow_returns_total_for_all_streams():
     sc = StreamCollection()
-    sc.add(Stream(name="H1", t_supply=200, t_target=120, heat_flow=15.0))
-    sc.add(Stream(name="C1", t_supply=60, t_target=140, heat_flow=25.0))
+    sc.add(
+        Stream(
+            name="H1", supply_temperature=200, target_temperature=120, heat_flow=15.0
+        )
+    )
+    sc.add(
+        Stream(name="C1", supply_temperature=60, target_temperature=140, heat_flow=25.0)
+    )
 
     assert sc.sum_stream_attribute("heat_flow") == pytest.approx(40.0)
 
 
 def test_numeric_view_updates_after_stream_mutation():
-    stream = Stream(name="H1", t_supply=200, t_target=120, heat_flow=80.0)
+    stream = Stream(
+        name="H1", supply_temperature=200, target_temperature=120, heat_flow=80.0
+    )
     sc = StreamCollection([stream])
 
     initial = sc.numeric_view()
@@ -207,28 +229,22 @@ def test_numeric_view_updates_after_collection_mutation(sample_streams):
     assert sc.numeric_view().cp.shape == (2,)
 
 
-def test_numeric_view_none_values_and_legacy_pickle_state_rebuild_cache():
+def test_numeric_view_handles_none_values():
     assert np.isnan(value_at_idx(None))
-
-    stream = Stream(name="H1", t_supply=200, t_target=120, heat_flow=80.0)
-    sc = StreamCollection([stream])
-    state = sc.__getstate__()
-    state.pop("_numeric_cache", None)
-
-    restored = StreamCollection()
-    del restored.__dict__["_numeric_cache"]
-    restored.__setstate__(state)
-
-    assert restored._numeric_cache == {}
-    assert restored[0].name == "H1"
 
 
 def test_get_hot_streams_filters_and_preserves_sort_settings():
     sc = StreamCollection()
-    sc.add(Stream(name="H1", t_supply=200, t_target=120, heat_flow=1))
-    sc.add(Stream(name="C1", t_supply=90, t_target=160, heat_flow=1))
-    sc.add(Stream(name="H2", t_supply=180, t_target=100, heat_flow=1))
-    sc.set_sort_key("t_supply", reverse=False)
+    sc.add(
+        Stream(name="H1", supply_temperature=200, target_temperature=120, heat_flow=1)
+    )
+    sc.add(
+        Stream(name="C1", supply_temperature=90, target_temperature=160, heat_flow=1)
+    )
+    sc.add(
+        Stream(name="H2", supply_temperature=180, target_temperature=100, heat_flow=1)
+    )
+    sc.set_sort_key("supply_temperature", reverse=False)
 
     hot_streams = sc.get_hot_streams()
 
@@ -243,8 +259,8 @@ def test_get_hot_streams_includes_process_and_utility_when_enabled():
     sc.add(
         Stream(
             name="H_PRO",
-            t_supply=200,
-            t_target=150,
+            supply_temperature=200,
+            target_temperature=150,
             heat_flow=1,
             is_process_stream=True,
         )
@@ -252,20 +268,28 @@ def test_get_hot_streams_includes_process_and_utility_when_enabled():
     sc.add(
         Stream(
             name="H_UT",
-            t_supply=220,
-            t_target=170,
+            supply_temperature=220,
+            target_temperature=170,
             heat_flow=1,
             is_process_stream=False,
         )
     )
     sc.add(
         Stream(
-            name="C_PRO", t_supply=80, t_target=120, heat_flow=1, is_process_stream=True
+            name="C_PRO",
+            supply_temperature=80,
+            target_temperature=120,
+            heat_flow=1,
+            is_process_stream=True,
         )
     )
     sc.add(
         Stream(
-            name="C_UT", t_supply=70, t_target=130, heat_flow=1, is_process_stream=False
+            name="C_UT",
+            supply_temperature=70,
+            target_temperature=130,
+            heat_flow=1,
+            is_process_stream=False,
         )
     )
 
@@ -281,22 +305,26 @@ def test_get_hot_streams_can_invert_utility_without_mutating_original_streams():
     sc.add(
         Stream(
             name="H_PRO",
-            t_supply=180,
-            t_target=100,
+            supply_temperature=180,
+            target_temperature=100,
             heat_flow=1,
             is_process_stream=True,
         )
     )
     sc.add(
         Stream(
-            name="C_UT", t_supply=60, t_target=140, heat_flow=1, is_process_stream=False
+            name="C_UT",
+            supply_temperature=60,
+            target_temperature=140,
+            heat_flow=1,
+            is_process_stream=False,
         )
     )
 
     original_utility = sc["C_UT"]
-    original_supply = original_utility.t_supply
-    original_target = original_utility.t_target
-    original_type = original_utility.type
+    original_supply = original_utility.supply_temperature
+    original_target = original_utility.target_temperature
+    original_type = original_utility.stream_type
 
     hot_streams = sc.get_hot_streams(
         include_process_streams=True,
@@ -305,21 +333,27 @@ def test_get_hot_streams_can_invert_utility_without_mutating_original_streams():
     )
 
     assert set(hot_streams._streams.keys()) == {"C_UT"}
-    assert hot_streams["C_UT"].type == ST.Hot.value
-    assert hot_streams["C_UT"].t_supply == original_target
-    assert hot_streams["C_UT"].t_target == original_supply
+    assert hot_streams["C_UT"].stream_type == StreamType.Hot.value
+    assert hot_streams["C_UT"].supply_temperature == original_target
+    assert hot_streams["C_UT"].target_temperature == original_supply
 
-    assert original_utility.type == original_type
-    assert original_utility.t_supply == original_supply
-    assert original_utility.t_target == original_target
+    assert original_utility.stream_type == original_type
+    assert original_utility.supply_temperature == original_supply
+    assert original_utility.target_temperature == original_target
 
 
 def test_get_cold_streams_filters_and_preserves_sort_settings():
     sc = StreamCollection()
-    sc.add(Stream(name="C1", t_supply=80, t_target=140, heat_flow=1))
-    sc.add(Stream(name="H1", t_supply=220, t_target=160, heat_flow=1))
-    sc.add(Stream(name="C2", t_supply=70, t_target=160, heat_flow=1))
-    sc.set_sort_key("t_target", reverse=True)
+    sc.add(
+        Stream(name="C1", supply_temperature=80, target_temperature=140, heat_flow=1)
+    )
+    sc.add(
+        Stream(name="H1", supply_temperature=220, target_temperature=160, heat_flow=1)
+    )
+    sc.add(
+        Stream(name="C2", supply_temperature=70, target_temperature=160, heat_flow=1)
+    )
+    sc.set_sort_key("target_temperature", reverse=True)
 
     cold_streams = sc.get_cold_streams()
 
@@ -333,19 +367,27 @@ def test_get_cold_streams_includes_process_and_utility_when_enabled():
     sc = StreamCollection()
     sc.add(
         Stream(
-            name="C_PRO", t_supply=80, t_target=140, heat_flow=1, is_process_stream=True
+            name="C_PRO",
+            supply_temperature=80,
+            target_temperature=140,
+            heat_flow=1,
+            is_process_stream=True,
         )
     )
     sc.add(
         Stream(
-            name="C_UT", t_supply=90, t_target=150, heat_flow=1, is_process_stream=False
+            name="C_UT",
+            supply_temperature=90,
+            target_temperature=150,
+            heat_flow=1,
+            is_process_stream=False,
         )
     )
     sc.add(
         Stream(
             name="H_PRO",
-            t_supply=210,
-            t_target=120,
+            supply_temperature=210,
+            target_temperature=120,
             heat_flow=1,
             is_process_stream=True,
         )
@@ -353,8 +395,8 @@ def test_get_cold_streams_includes_process_and_utility_when_enabled():
     sc.add(
         Stream(
             name="H_UT",
-            t_supply=220,
-            t_target=130,
+            supply_temperature=220,
+            target_temperature=130,
             heat_flow=1,
             is_process_stream=False,
         )
@@ -371,23 +413,27 @@ def test_get_cold_streams_can_invert_utility_without_mutating_original_streams()
     sc = StreamCollection()
     sc.add(
         Stream(
-            name="C_PRO", t_supply=90, t_target=160, heat_flow=1, is_process_stream=True
+            name="C_PRO",
+            supply_temperature=90,
+            target_temperature=160,
+            heat_flow=1,
+            is_process_stream=True,
         )
     )
     sc.add(
         Stream(
             name="H_UT",
-            t_supply=220,
-            t_target=130,
+            supply_temperature=220,
+            target_temperature=130,
             heat_flow=1,
             is_process_stream=False,
         )
     )
 
     original_utility = sc["H_UT"]
-    original_supply = original_utility.t_supply
-    original_target = original_utility.t_target
-    original_type = original_utility.type
+    original_supply = original_utility.supply_temperature
+    original_target = original_utility.target_temperature
+    original_type = original_utility.stream_type
 
     cold_streams = sc.get_cold_streams(
         include_process_streams=True,
@@ -396,13 +442,13 @@ def test_get_cold_streams_can_invert_utility_without_mutating_original_streams()
     )
 
     assert set(cold_streams._streams.keys()) == {"H_UT"}
-    assert cold_streams["H_UT"].type == ST.Cold.value
-    assert cold_streams["H_UT"].t_supply == original_target
-    assert cold_streams["H_UT"].t_target == original_supply
+    assert cold_streams["H_UT"].stream_type == StreamType.Cold.value
+    assert cold_streams["H_UT"].supply_temperature == original_target
+    assert cold_streams["H_UT"].target_temperature == original_supply
 
-    assert original_utility.type == original_type
-    assert original_utility.t_supply == original_supply
-    assert original_utility.t_target == original_target
+    assert original_utility.stream_type == original_type
+    assert original_utility.supply_temperature == original_supply
+    assert original_utility.target_temperature == original_target
 
 
 def test_get_process_streams_returns_hot_and_cold_process_streams():
@@ -410,8 +456,8 @@ def test_get_process_streams_returns_hot_and_cold_process_streams():
     sc.add(
         Stream(
             name="H_PRO",
-            t_supply=200,
-            t_target=150,
+            supply_temperature=200,
+            target_temperature=150,
             heat_flow=1,
             is_process_stream=True,
         ),
@@ -420,8 +466,8 @@ def test_get_process_streams_returns_hot_and_cold_process_streams():
     sc.add(
         Stream(
             name="C_PRO",
-            t_supply=80,
-            t_target=140,
+            supply_temperature=80,
+            target_temperature=140,
             heat_flow=1,
             is_process_stream=True,
         ),
@@ -430,14 +476,14 @@ def test_get_process_streams_returns_hot_and_cold_process_streams():
     sc.add(
         Stream(
             name="H_UT",
-            t_supply=220,
-            t_target=170,
+            supply_temperature=220,
+            target_temperature=170,
             heat_flow=1,
             is_process_stream=False,
         ),
         key="Hot Utility.H_UT",
     )
-    sc.set_sort_key("t_supply", reverse=False)
+    sc.set_sort_key("supply_temperature", reverse=False)
 
     process_streams = sc.get_process_streams()
 
@@ -451,8 +497,8 @@ def test_get_utility_streams_returns_hot_and_cold_utility_streams():
     sc.add(
         Stream(
             name="H_PRO",
-            t_supply=200,
-            t_target=150,
+            supply_temperature=200,
+            target_temperature=150,
             heat_flow=1,
             is_process_stream=True,
         ),
@@ -461,8 +507,8 @@ def test_get_utility_streams_returns_hot_and_cold_utility_streams():
     sc.add(
         Stream(
             name="H_UT",
-            t_supply=220,
-            t_target=170,
+            supply_temperature=220,
+            target_temperature=170,
             heat_flow=1,
             is_process_stream=False,
         ),
@@ -471,14 +517,14 @@ def test_get_utility_streams_returns_hot_and_cold_utility_streams():
     sc.add(
         Stream(
             name="C_UT",
-            t_supply=90,
-            t_target=150,
+            supply_temperature=90,
+            target_temperature=150,
             heat_flow=1,
             is_process_stream=False,
         ),
         key="Cold Utility.C_UT",
     )
-    sc.set_sort_key("t_target", reverse=True)
+    sc.set_sort_key("target_temperature", reverse=True)
 
     utility_streams = sc.get_utility_streams()
 
@@ -495,37 +541,37 @@ def test_to_dict_exports_streams_in_standard_reporting_order():
     streams = [
         Stream(
             name="CU1",
-            t_supply=50,
-            t_target=100,
+            supply_temperature=50,
+            target_temperature=100,
             heat_flow=1,
             is_process_stream=False,
         ),
-        Stream(name="C2", t_supply=80, t_target=180, heat_flow=1),
-        Stream(name="H1", t_supply=200, t_target=100, heat_flow=1),
+        Stream(name="C2", supply_temperature=80, target_temperature=180, heat_flow=1),
+        Stream(name="H1", supply_temperature=200, target_temperature=100, heat_flow=1),
         Stream(
             name="HU1",
-            t_supply=240,
-            t_target=230,
+            supply_temperature=240,
+            target_temperature=230,
             heat_flow=1,
             is_process_stream=False,
         ),
-        Stream(name="H2", t_supply=220, t_target=90, heat_flow=1),
+        Stream(name="H2", supply_temperature=220, target_temperature=90, heat_flow=1),
         Stream(
             name="CU2",
-            t_supply=90,
-            t_target=140,
+            supply_temperature=90,
+            target_temperature=140,
             heat_flow=1,
             is_process_stream=False,
         ),
-        Stream(name="C1", t_supply=120, t_target=150, heat_flow=1),
+        Stream(name="C1", supply_temperature=120, target_temperature=150, heat_flow=1),
         Stream(
             name="HU2",
-            t_supply=260,
-            t_target=200,
+            supply_temperature=260,
+            target_temperature=200,
             heat_flow=1,
             is_process_stream=False,
         ),
-        Stream(name="H3", t_supply=200, t_target=150, heat_flow=1),
+        Stream(name="H3", supply_temperature=200, target_temperature=150, heat_flow=1),
     ]
     for stream in streams:
         sc.add(stream)
@@ -565,8 +611,8 @@ def test_to_dict_uses_requested_period_index_for_period_stream_values():
     sc.add(
         Stream(
             name="H1",
-            t_supply={"values": [200.0, 180.0], "unit": "degC"},
-            t_target={"values": [120.0, 100.0], "unit": "degC"},
+            supply_temperature={"values": [200.0, 180.0], "unit": "degC"},
+            target_temperature={"values": [120.0, 100.0], "unit": "degC"},
             heat_flow={"values": [100.0, 80.0], "unit": "kW"},
         )
     )
@@ -589,24 +635,24 @@ def test_validate_period_alignment_uses_first_period_stream_as_canonical():
     sc.add(
         Stream(
             name="H1",
-            t_supply={
+            supply_temperature={
                 "values": [200.0, 180.0],
                 "unit": "degC",
             },
-            t_target={
+            target_temperature={
                 "values": [120.0, 100.0],
                 "unit": "degC",
             },
             heat_flow={"values": [100.0, 80.0], "period_ids": ["0", "1"], "unit": "kW"},
-            htc=1.0,
+            heat_transfer_coefficient=1.0,
         ),
         key="AreaA.H1",
     )
     sc.add(
         Stream(
             name="HU",
-            t_supply=260.0,
-            t_target=220.0,
+            supply_temperature=260.0,
+            target_temperature=220.0,
             heat_flow=0.0,
             is_process_stream=False,
         )
@@ -628,11 +674,11 @@ def test_state_context_is_preserved_on_copy_and_subset():
     sc.add(
         Stream(
             name="H1",
-            t_supply={
+            supply_temperature={
                 "values": [200.0, 180.0],
                 "unit": "degC",
             },
-            t_target={
+            target_temperature={
                 "values": [120.0, 100.0],
                 "unit": "degC",
             },
@@ -640,14 +686,14 @@ def test_state_context_is_preserved_on_copy_and_subset():
                 "values": [100.0, 80.0],
                 "unit": "kW",
             },
-            htc=1.0,
+            heat_transfer_coefficient=1.0,
         ),
     )
     sc.add(
         Stream(
             name="HU",
-            t_supply=260.0,
-            t_target=220.0,
+            supply_temperature=260.0,
+            target_temperature=220.0,
             heat_flow=0.0,
             is_process_stream=False,
         )
@@ -696,8 +742,20 @@ def test_export_to_csv(sample_streams):
 
 def test_stream_collection_get_index_and_getitem_by_name():
     collection = StreamCollection()
-    s1 = Stream(name="S1", t_supply=120.0, t_target=80.0, heat_flow=10.0, htc=1.0)
-    s2 = Stream(name="S2", t_supply=130.0, t_target=90.0, heat_flow=20.0, htc=1.0)
+    s1 = Stream(
+        name="S1",
+        supply_temperature=120.0,
+        target_temperature=80.0,
+        heat_flow=10.0,
+        heat_transfer_coefficient=1.0,
+    )
+    s2 = Stream(
+        name="S2",
+        supply_temperature=130.0,
+        target_temperature=90.0,
+        heat_flow=20.0,
+        heat_transfer_coefficient=1.0,
+    )
     collection.add(s1)
     collection.add(s2)
 
@@ -716,7 +774,11 @@ def test_stream_collection_warning_paths_and_name_helpers():
         assert empty.set_common_stream_attribute("heat_flow", 0.0) == pytest.approx(0.0)
 
     collection = StreamCollection()
-    collection.add(Stream(name="Steam", t_supply=200, t_target=150, heat_flow=10.0))
+    collection.add(
+        Stream(
+            name="Steam", supply_temperature=200, target_temperature=150, heat_flow=10.0
+        )
+    )
 
     assert collection.get_stream_by_name("tea", approximate=True).name == "Steam"
     assert collection.get_stream_names() == ["Steam"]
@@ -735,8 +797,8 @@ def test_stream_collection_period_context_validation_and_adoption_edges():
     collection.set_period_context({"0": 0, "1": 1}, [0.5, 0.5], 2)
     three_period_stream = Stream(
         name="H3",
-        t_supply={"values": [200.0, 190.0, 180.0], "unit": "degC"},
-        t_target={"values": [120.0, 110.0, 100.0], "unit": "degC"},
+        supply_temperature={"values": [200.0, 190.0, 180.0], "unit": "degC"},
+        target_temperature={"values": [120.0, 110.0, 100.0], "unit": "degC"},
         heat_flow={"values": [1.0, 1.0, 1.0], "unit": "kW"},
     )
 
@@ -757,23 +819,53 @@ def test_stream_collection_period_context_validation_and_adoption_edges():
         right + different
 
 
-def test_stream_collection_pickle_state_and_sort_edge_helpers():
+def test_current_stream_collection_pickle_round_trip():
     collection = StreamCollection()
-    collection.add(Stream(name="H1", t_supply=200, t_target=120, heat_flow=1.0))
-    collection.set_sort_key(lambda stream: stream.name)
+    collection.set_period_context({"base": 0, "peak": 1}, [0.25, 0.75], 2)
+    collection.add(
+        Stream(
+            name="A",
+            supply_temperature={"values": [200.0, 190.0], "unit": "degC"},
+            target_temperature={"values": [120.0, 110.0], "unit": "degC"},
+            heat_flow={"values": [80.0, 72.0], "unit": "kW"},
+        )
+    )
+    collection.add(
+        Stream(
+            name="Z",
+            supply_temperature={"values": [100.0, 90.0], "unit": "degC"},
+            target_temperature={"values": [160.0, 150.0], "unit": "degC"},
+            heat_flow={"values": [60.0, 54.0], "unit": "kW"},
+        )
+    )
+    collection.set_sort_key(lambda stream: stream.name, reverse=False)
+    assert [stream.name for stream in collection] == ["A", "Z"]
 
-    state = collection.__getstate__()
-    assert state["_sort_spec"] == ("attr", "t_supply")
-    state.pop("_numeric_cache")
+    restored = pickle.loads(pickle.dumps(collection))
 
-    restored = StreamCollection()
-    restored.__setstate__(state)
+    assert restored.period_ids == {"base": 0, "peak": 1}
+    np.testing.assert_allclose(restored.weights, [0.25, 0.75])
+    assert restored.num_periods == 2
+    assert restored._sort_spec == ("attr", "supply_temperature")
+    assert [stream.name for stream in restored] == ["Z", "A"]
+    numeric = restored.numeric_view(idx=1)
+    np.testing.assert_allclose(numeric.heat_flow, [72.0, 54.0])
+    assert numeric.period_index.tolist() == [1, 1]
 
-    assert restored.numeric_view().cp.tolist() == [pytest.approx(0.0125)]
+    restored.remove("A")
+    assert "A" in collection
+    assert "A" not in restored
+
+
+def test_stream_collection_sort_edge_helpers():
+    collection = StreamCollection()
+    collection.add(
+        Stream(name="H1", supply_temperature=200, target_temperature=120, heat_flow=1.0)
+    )
     assert StreamCollection._descending_sort_value(float("nan")) == float("inf")
     assert (
         StreamCollection._dict_category(
-            SimpleNamespace(is_process_stream=False, type="Other")
+            SimpleNamespace(is_process_stream=False, stream_type="Other")
         )
         == "other"
     )
@@ -784,8 +876,8 @@ def test_stream_collection_subset_sort_and_inverted_utility_edges():
     collection.add(
         Stream(
             name="HU",
-            t_supply=220,
-            t_target=180,
+            supply_temperature=220,
+            target_temperature=180,
             heat_flow=1.0,
             is_process_stream=False,
         )
@@ -793,13 +885,15 @@ def test_stream_collection_subset_sort_and_inverted_utility_edges():
     collection.add(
         Stream(
             name="CU",
-            t_supply=40,
-            t_target=80,
+            supply_temperature=40,
+            target_temperature=80,
             heat_flow=1.0,
             is_process_stream=False,
         )
     )
-    collection.add(Stream(name="H1", t_supply=200, t_target=100, heat_flow=1.0))
+    collection.add(
+        Stream(name="H1", supply_temperature=200, target_temperature=100, heat_flow=1.0)
+    )
 
     hot_subset = collection.get_hot_streams(sort_attr="name")
     inverted_hot_utilities = collection.get_inverted_hot_utility_streams()
@@ -807,6 +901,6 @@ def test_stream_collection_subset_sort_and_inverted_utility_edges():
 
     assert [stream.name for stream in hot_subset] == ["HU", "H1"]
     assert set(inverted_hot_utilities._streams) == {"CU"}
-    assert inverted_hot_utilities["CU"].type == ST.Hot.value
+    assert inverted_hot_utilities["CU"].stream_type == StreamType.Hot.value
     assert set(inverted_cold_utilities._streams) == {"HU"}
-    assert inverted_cold_utilities["HU"].type == ST.Cold.value
+    assert inverted_cold_utilities["HU"].stream_type == StreamType.Cold.value

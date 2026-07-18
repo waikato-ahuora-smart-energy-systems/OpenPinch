@@ -46,7 +46,7 @@ from OpenPinch.domain.enums import (
     HeatExchangerKind,
     HeatExchangerNetworkDesignMethod,
     HeatExchangerNetworkLabel,
-    HeatExchangerStreamRole,
+    StreamID,
 )
 from OpenPinch.domain.heat_exchanger import HeatExchanger
 from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
@@ -63,8 +63,8 @@ def _network() -> HeatExchangerNetwork:
                 kind=HeatExchangerKind.RECOVERY,
                 source_stream="H1",
                 sink_stream="C1",
-                source_stream_role=HeatExchangerStreamRole.PROCESS,
-                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Process,
                 stage=1,
                 period_states=(
                     HeatExchangerPeriodState(
@@ -367,7 +367,6 @@ def test_hen_config_field_specs_use_openpinch_names():
         "HENS_APPROACH_TEMPERATURES",
         "HENS_DERIVATIVE_THRESHOLDS",
         "HENS_STAGE_SELECTION",
-        "HENS_METHOD_SEQUENCE",
         "HENS_SOLVER_PDM",
         "HENS_SOLVER_TDM",
         "HENS_SOLVER_EVM",
@@ -425,11 +424,6 @@ def test_hen_config_options_accept_valid_values_on_canonical_paths():
         "HENS_DT_CONT_MULTIPLIERS": [1.0, 1.5],
         "HENS_DERIVATIVE_THRESHOLDS": [0.5, 0.9],
         "HENS_STAGE_SELECTION": [2, 3],
-        "HENS_METHOD_SEQUENCE": [
-            "pinch_design_method",
-            "thermal_derivative_method",
-            "network_evolution_method",
-        ],
         "HENS_OUTPUT_FORMATS": ["json", "csv"],
         "HENS_SOLVE_TOLERANCE": 1e-3,
         "HENS_MAX_PARALLEL": 2,
@@ -536,8 +530,8 @@ def test_task_builder_helpers_fall_back_to_seed_network_metadata() -> None:
                 kind=HeatExchangerKind.RECOVERY,
                 source_stream="H1",
                 sink_stream="C1",
-                source_stream_role=HeatExchangerStreamRole.PROCESS,
-                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Process,
                 stage=3,
                 period_states=(
                     HeatExchangerPeriodState(
@@ -557,8 +551,8 @@ def test_task_builder_helpers_fall_back_to_seed_network_metadata() -> None:
                 kind=HeatExchangerKind.HOT_UTILITY,
                 source_stream="Steam",
                 sink_stream="C1",
-                source_stream_role=HeatExchangerStreamRole.UTILITY,
-                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                source_stream_role=StreamID.Utility,
+                sink_stream_role=StreamID.Process,
                 period_states=(
                     HeatExchangerPeriodState(
                         period_id="0",
@@ -575,8 +569,8 @@ def test_task_builder_helpers_fall_back_to_seed_network_metadata() -> None:
                 kind=HeatExchangerKind.RECOVERY,
                 source_stream="H1",
                 sink_stream="C1",
-                source_stream_role=HeatExchangerStreamRole.PROCESS,
-                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Process,
                 stage=1,
                 period_states=(
                     HeatExchangerPeriodState(
@@ -729,7 +723,7 @@ def test_public_synthesis_exports_are_openpinch_native():
         HeatExchanger: "OpenPinch.domain.heat_exchanger",
         HeatExchangerNetwork: "OpenPinch.domain.heat_exchanger_network",
         HeatExchangerKind: "OpenPinch.domain.enums",
-        HeatExchangerStreamRole: "OpenPinch.domain.enums",
+        StreamID: "OpenPinch.domain.enums",
         HeatExchangerNetworkSynthesisManifest: ("OpenPinch.contracts.synthesis.common"),
         HeatExchangerNetworkSynthesisMethodInput: (
             "OpenPinch.contracts.synthesis.method"

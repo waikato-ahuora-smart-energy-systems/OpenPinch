@@ -19,7 +19,7 @@ from OpenPinch.analysis.heat_pumps.cycles.vapour_compression_mvr_cascade import 
 )
 from OpenPinch.contracts.hpr import HPRBackendResult, HPRThermoArtifacts
 from OpenPinch.domain.configuration import Configuration
-from OpenPinch.domain.enums import HPRcycle
+from OpenPinch.domain.enums import HeatPumpAndRefrigerationCycle
 
 from .helpers import (
     _base_args,
@@ -1435,12 +1435,13 @@ def test_vc_mvr_refrigeration_rejected_clearly():
 def test_vc_mvr_config_schema_and_dispatch(monkeypatch):
     config = Configuration(
         {
-            "HPR_TYPE": HPRcycle.VapourCompMVR.value,
             "HPR_MVR_COUNT": 2,
             "HPR_MVR_FLUIDS": ["Water", "R134A"],
             "HPR_MVR_ETA_COMP": 0.65,
         }
     )
+    config._values["HPR_TYPE"] = HeatPumpAndRefrigerationCycle.VapourCompMVR.value
+    config._build_groups(config._values)
     args = construct_HPRTargetInputs(
         Q_hpr_target=10.0,
         T_vals=np.array([120.0, 80.0, 40.0]),
@@ -1457,11 +1458,13 @@ def test_vc_mvr_config_schema_and_dispatch(monkeypatch):
     monkeypatch.setattr(
         hp,
         "construct_HPRTargetInputs",
-        lambda **kwargs: SimpleNamespace(hpr_type=HPRcycle.VapourCompMVR.value),
+        lambda **kwargs: SimpleNamespace(
+            hpr_type=HeatPumpAndRefrigerationCycle.VapourCompMVR.value
+        ),
     )
     monkeypatch.setitem(
         hp._HP_PLACEMENT_HANDLERS,
-        HPRcycle.VapourCompMVR.value,
+        HeatPumpAndRefrigerationCycle.VapourCompMVR.value,
         lambda args: HPRBackendResult(
             obj=0.1,
             utility_tot=1.0,
@@ -1479,7 +1482,7 @@ def test_vc_mvr_config_schema_and_dispatch(monkeypatch):
         T_vals=np.array([120.0, 80.0]),
         H_hot=np.array([0.0, -10.0]),
         H_cold=np.array([10.0, 0.0]),
-        config=Configuration({"HPR_TYPE": HPRcycle.VapourCompMVR.value}),
+        config=config,
         is_heat_pumping=True,
     )
 

@@ -3,11 +3,11 @@
 import pytest
 
 from OpenPinch.domain.configuration import Configuration
+from OpenPinch.domain.enums import ProblemTableLabel as ProblemTableLabel
 from OpenPinch.domain.enums import (
-    TT,
-    ZT,
+    TargetType,
+    ZoneType,
 )
-from OpenPinch.domain.enums import ProblemTableLabel as PT
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream import Stream
 from OpenPinch.domain.stream_collection import StreamCollection
@@ -17,7 +17,7 @@ from OpenPinch.presentation.reporting.results import serialize_target
 
 
 def _dummy_problem_table():
-    return ProblemTable({PT.T: [0.0]})
+    return ProblemTable({ProblemTableLabel.T: [0.0]})
 
 
 @pytest.fixture
@@ -44,8 +44,12 @@ def dummy_tar():
 def sample_streams():
     """Return sample streams data used by this test module."""
     return [
-        Stream(name="Hot1", t_supply=400, t_target=200, heat_flow=1),
-        Stream(name="Cold1", t_supply=100, t_target=300, heat_flow=1),
+        Stream(
+            name="Hot1", supply_temperature=400, target_temperature=200, heat_flow=1
+        ),
+        Stream(
+            name="Cold1", supply_temperature=100, target_temperature=300, heat_flow=1
+        ),
     ]
 
 
@@ -54,16 +58,16 @@ def sample_utilities():
     """Return sample utilities data used by this test module."""
     u1 = Stream(
         name="Steam",
-        t_supply=450,
-        t_target=250,
+        supply_temperature=450,
+        target_temperature=250,
         heat_flow=250,
         price=400,
         is_process_stream=False,
     )
     u2 = Stream(
         name="CoolingWater",
-        t_supply=25,
-        t_target=40,
+        supply_temperature=25,
+        target_temperature=40,
         heat_flow=125,
         price=400,
         is_process_stream=False,
@@ -157,15 +161,15 @@ def test_get_subzone_prefers_direct_child_when_child_matches_parent_name():
 
 def test_get_process_zones(dummy_zone: Zone):
     dummy_zone.add_zone(Zone(name="Area1"))
-    dummy_zone.add_zone(Zone(name=TT.DI.value), sub=False)  # site-level
+    dummy_zone.add_zone(Zone(name=TargetType.DI.value), sub=False)  # site-level
     assert "Area1" in dummy_zone.subzones
-    assert TT.DI.value not in dummy_zone.subzones
+    assert TargetType.DI.value not in dummy_zone.subzones
 
 
 def test_get_site_zones(dummy_zone: Zone):
     dummy_zone.add_zone(Zone(name="Area1"))
-    dummy_zone.add_zone(Zone(name=TT.DI.value), sub=False)
-    assert TT.DI.value in dummy_zone.targets
+    dummy_zone.add_zone(Zone(name=TargetType.DI.value), sub=False)
+    assert TargetType.DI.value in dummy_zone.targets
     assert "Area1" not in dummy_zone.targets
 
 
@@ -226,7 +230,11 @@ def test_zone_is_equal(dummy_zone):
     # Add a stream to one zone -> now not equal
     z1.hot_streams.add(
         Stream(
-            name="H1", t_supply=100, t_target=50, heat_flow=1, is_process_stream=False
+            name="H1",
+            supply_temperature=100,
+            target_temperature=50,
+            heat_flow=1,
+            is_process_stream=False,
         )
     )
     assert not dummy_zone._zone_is_equal(z1, z2)
@@ -249,9 +257,6 @@ def test_serialize_json_basic(dummy_tar):
 
 
 def test_serialize_json_with_area_and_exergy(dummy_tar):
-    dummy_tar.config.targeting.area_cost_enabled = True
-    dummy_tar.config.targeting.exergy_enabled = True
-
     dummy_tar.area = 120
     dummy_tar.num_units = 3
     dummy_tar.capital_cost = 2000
@@ -285,19 +290,25 @@ def test_zone_active_property_and_duplicate_suffix_increment():
 
     first = Zone("Child")
     first.hot_streams.add(
-        Stream(name="H1", t_supply=120.0, t_target=80.0, heat_flow=10.0)
+        Stream(
+            name="H1", supply_temperature=120.0, target_temperature=80.0, heat_flow=10.0
+        )
     )
     root.add_zone(first, sub=True)
 
     already_taken = Zone("Child_1")
     already_taken.hot_streams.add(
-        Stream(name="H9", t_supply=110.0, t_target=70.0, heat_flow=9.0)
+        Stream(
+            name="H9", supply_temperature=110.0, target_temperature=70.0, heat_flow=9.0
+        )
     )
     root.add_zone(already_taken, sub=True)
 
     duplicate = Zone("Child")
     duplicate.hot_streams.add(
-        Stream(name="H2", t_supply=130.0, t_target=90.0, heat_flow=8.0)
+        Stream(
+            name="H2", supply_temperature=130.0, target_temperature=90.0, heat_flow=8.0
+        )
     )
     root.add_zone(duplicate, sub=True)
 
@@ -309,11 +320,11 @@ def test_zone_property_setters_and_stream_container_type_guard():
     child = Zone("Child")
     config = Configuration({"THERMAL_DT_CONT": 8})
 
-    root.type = ZT.S.value
+    root.type = ZoneType.S.value
     root.config = config
     child.parent_zone = root
 
-    assert root.type == ZT.S.value
+    assert root.type == ZoneType.S.value
     assert root.config is config
     assert child.parent_zone is root
     with pytest.raises(TypeError, match="StreamCollection"):
@@ -364,10 +375,17 @@ def test_zone_imports_net_streams_and_locks_dt_multiplier():
     root = Zone("Root")
     area = Zone("Area", parent_zone=root)
     area.net_hot_streams.add(
-        Stream(name="NH", t_supply=200.0, t_target=120.0, heat_flow=10.0)
+        Stream(
+            name="NH",
+            supply_temperature=200.0,
+            target_temperature=120.0,
+            heat_flow=10.0,
+        )
     )
     area.net_cold_streams.add(
-        Stream(name="NC", t_supply=50.0, t_target=100.0, heat_flow=8.0)
+        Stream(
+            name="NC", supply_temperature=50.0, target_temperature=100.0, heat_flow=8.0
+        )
     )
     root.add_zone(area)
 

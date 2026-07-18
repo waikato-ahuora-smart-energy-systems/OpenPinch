@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from typing import Sequence
 
-from ....contracts.synthesis.common import SynthesisMethod
 from ....contracts.synthesis.task import HeatExchangerNetworkSynthesisTaskOutcome
 from ....contracts.synthesis.topology import HeatExchangerNetworkTopologyRestriction
-from ....domain.enums import HeatExchangerKind
+from ....domain.enums import HeatExchangerKind, HeatExchangerNetworkDesignMethod
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..errors import WorkflowContractError
 from .settings import SynthesisWorkflowSettings
@@ -15,7 +14,7 @@ from .settings import SynthesisWorkflowSettings
 
 def required_topology_restrictions_from_outcome(
     outcome: HeatExchangerNetworkSynthesisTaskOutcome,
-    downstream_method: SynthesisMethod,
+    downstream_method: HeatExchangerNetworkDesignMethod,
 ) -> tuple[HeatExchangerNetworkTopologyRestriction, ...]:
     """Return downstream topology restrictions or fail the workflow contract."""
     if outcome.network is None:
@@ -35,8 +34,8 @@ def required_topology_restrictions_from_outcome(
 def topology_restrictions_from_network(
     network: HeatExchangerNetwork,
     *,
-    downstream_method: SynthesisMethod,
-    source_method: SynthesisMethod | str = "seed_network",
+    downstream_method: HeatExchangerNetworkDesignMethod,
+    source_method: HeatExchangerNetworkDesignMethod | str = "seed_network",
     source_task_id: str | None = None,
 ) -> tuple[HeatExchangerNetworkTopologyRestriction, ...]:
     """Return topology restrictions from an existing network seed."""
@@ -69,7 +68,7 @@ def topology_restrictions_from_network(
 def stage_count_from_network(
     network: HeatExchangerNetwork,
     *,
-    downstream_method: SynthesisMethod,
+    downstream_method: HeatExchangerNetworkDesignMethod,
 ) -> int:
     """Return a stage count from network metadata or active recovery stages."""
     if network.stage_count is not None:
@@ -119,14 +118,14 @@ def derivative_threshold_from_network(network: HeatExchangerNetwork) -> float | 
 
 def _successful_method(
     outcome: HeatExchangerNetworkSynthesisTaskOutcome,
-    method: SynthesisMethod,
+    method: HeatExchangerNetworkDesignMethod,
 ) -> bool:
     return outcome.status == "success" and outcome.task.method == method
 
 
 def _required_stage_count(
     outcome: HeatExchangerNetworkSynthesisTaskOutcome,
-    downstream_method: SynthesisMethod,
+    downstream_method: HeatExchangerNetworkDesignMethod,
 ) -> int:
     stage_count = (
         outcome.network.stage_count

@@ -1,4 +1,4 @@
-"""Focused tests for shared HEN base-model helper methods."""
+"""Focused tests for shared HeatExchangerNetworkLabel base-model helper methods."""
 
 from __future__ import annotations
 

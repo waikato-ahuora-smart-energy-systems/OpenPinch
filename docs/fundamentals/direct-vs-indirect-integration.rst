@@ -71,7 +71,7 @@ Where The Methods Appear
 ------------------------
 
 In user workflows, direct and indirect integration are usually reached through
-``problem.target()`` for the default solve or through the explicit
+``problem.target.all_heat_integration()`` for the default solve or through the explicit
 ``problem.target.direct_heat_integration(...)`` and
 ``problem.target.indirect_heat_integration(...)`` accessors. The command-line
 surface does not run or graph these methods.

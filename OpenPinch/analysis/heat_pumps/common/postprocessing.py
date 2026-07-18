@@ -9,7 +9,7 @@ from ....analysis.targeting.grand_composite import (
     get_seperated_gcc_heat_load_profiles,
 )
 from ....analysis.targeting.utilities import target_utilities_for_load_profiles
-from ....domain.enums import PT
+from ....domain.enums import ProblemTableLabel
 from ....domain.problem_table import ProblemTable
 
 
@@ -27,7 +27,7 @@ def _get_hpr_residual_utility_summary(
         is_heat_pumping=is_heat_pumping,
     )
     utility_T_vals, utility_net = _get_hpr_residual_utility_net_profile(
-        T_vals=pt[PT.T],
+        T_vals=pt[ProblemTableLabel.T],
         residual_net=residual_net,
     )
     hot_profile, cold_profile = _get_hpr_residual_load_profiles(
@@ -68,10 +68,10 @@ def _get_hpr_residual_utility_summary(
     heat_recovery_limit = getattr(base_target, "heat_recovery_limit", None)
     hot_pinch, cold_pinch = ProblemTable(
         {
-            PT.T: utility_T_vals,
-            PT.H_NET: utility_net,
+            ProblemTableLabel.T: utility_T_vals,
+            ProblemTableLabel.H_NET: utility_net,
         }
-    ).pinch_temperatures(col_H=PT.H_NET)
+    ).pinch_temperatures(col_H=ProblemTableLabel.H_NET)
 
     return {
         "hot_utilities": hot_utilities,
@@ -99,8 +99,12 @@ def _get_hpr_residual_net_profile(
     is_direct: bool,
     is_heat_pumping: bool,
 ) -> np.ndarray:
-    base_col = PT.H_NET_W_AIR if is_direct else PT.H_NET_UT
-    hpr_col = PT.H_NET_HP if is_heat_pumping else PT.H_NET_RFRG
+    base_col = (
+        ProblemTableLabel.H_NET_W_AIR if is_direct else ProblemTableLabel.H_NET_UT
+    )
+    hpr_col = (
+        ProblemTableLabel.H_NET_HP if is_heat_pumping else ProblemTableLabel.H_NET_RFRG
+    )
     return np.asarray(pt[base_col] - pt[hpr_col], dtype=float)
 
 
@@ -109,11 +113,13 @@ def _get_hpr_residual_utility_net_profile(
     T_vals: np.ndarray,
     residual_net: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
-    residual_pt = ProblemTable({PT.T: T_vals, PT.H_NET: residual_net})
+    residual_pt = ProblemTable(
+        {ProblemTableLabel.T: T_vals, ProblemTableLabel.H_NET: residual_net}
+    )
     get_GCC_without_pockets(residual_pt)
     return (
-        np.asarray(residual_pt[PT.T], dtype=float),
-        np.asarray(residual_pt[PT.H_NET_NP], dtype=float),
+        np.asarray(residual_pt[ProblemTableLabel.T], dtype=float),
+        np.asarray(residual_pt[ProblemTableLabel.H_NET_NP], dtype=float),
     )
 
 
@@ -131,15 +137,23 @@ def _get_hpr_residual_load_profiles(
             H_net=residual_net,
             is_process_stream=True,
         )["updates"]
-        process_hot_profile = np.asarray(updates[PT.H_NET_HOT], dtype=float)
-        process_cold_profile = np.asarray(updates[PT.H_NET_COLD], dtype=float)
+        process_hot_profile = np.asarray(
+            updates[ProblemTableLabel.H_NET_HOT], dtype=float
+        )
+        process_cold_profile = np.asarray(
+            updates[ProblemTableLabel.H_NET_COLD], dtype=float
+        )
         hot_profile = process_cold_profile
         cold_profile = process_hot_profile
         hot_after_col = (
-            PT.H_NET_HOT_AFTR_HP if is_heat_pumping else PT.H_NET_HOT_AFTR_RFRG
+            ProblemTableLabel.H_NET_HOT_AFTR_HP
+            if is_heat_pumping
+            else ProblemTableLabel.H_NET_HOT_AFTR_RFRG
         )
         cold_after_col = (
-            PT.H_NET_COLD_AFTR_HP if is_heat_pumping else PT.H_NET_COLD_AFTR_RFRG
+            ProblemTableLabel.H_NET_COLD_AFTR_HP
+            if is_heat_pumping
+            else ProblemTableLabel.H_NET_COLD_AFTR_RFRG
         )
         stored_profiles = {
             hot_after_col: process_hot_profile,
@@ -147,10 +161,10 @@ def _get_hpr_residual_load_profiles(
         }
     else:
         rcp_net = (
-            np.asarray(pt[PT.RCP_UT_NET], dtype=float)
+            np.asarray(pt[ProblemTableLabel.RCP_UT_NET], dtype=float)
             if (
-                PT.RCP_UT_NET.value in pt.columns
-                and len(pt[PT.RCP_UT_NET]) == len(T_vals)
+                ProblemTableLabel.RCP_UT_NET.value in pt.columns
+                and len(pt[ProblemTableLabel.RCP_UT_NET]) == len(T_vals)
             )
             else np.zeros_like(residual_net)
         )
@@ -160,22 +174,28 @@ def _get_hpr_residual_load_profiles(
             rcp_net=rcp_net,
             is_process_stream=False,
         )["updates"]
-        hot_profile = np.asarray(updates[PT.H_HOT_UT], dtype=float)
-        cold_profile = np.asarray(updates[PT.H_COLD_UT], dtype=float)
+        hot_profile = np.asarray(updates[ProblemTableLabel.H_HOT_UT], dtype=float)
+        cold_profile = np.asarray(updates[ProblemTableLabel.H_COLD_UT], dtype=float)
         hot_after_col = (
-            PT.H_NET_HOT_UT_AFTR_HP if is_heat_pumping else PT.H_NET_HOT_UT_AFTR_RFRG
+            ProblemTableLabel.H_NET_HOT_UT_AFTR_HP
+            if is_heat_pumping
+            else ProblemTableLabel.H_NET_HOT_UT_AFTR_RFRG
         )
         cold_after_col = (
-            PT.H_NET_COLD_UT_AFTR_HP if is_heat_pumping else PT.H_NET_COLD_UT_AFTR_RFRG
+            ProblemTableLabel.H_NET_COLD_UT_AFTR_HP
+            if is_heat_pumping
+            else ProblemTableLabel.H_NET_COLD_UT_AFTR_RFRG
         )
         stored_profiles = {
             hot_after_col: hot_profile,
             cold_after_col: cold_profile,
         }
 
-    if len(T_vals) == len(pt[PT.T]) and np.allclose(T_vals, pt[PT.T]):
+    if len(T_vals) == len(pt[ProblemTableLabel.T]) and np.allclose(
+        T_vals, pt[ProblemTableLabel.T]
+    ):
         pt.update(
-            T_col=pt[PT.T],
+            T_col=pt[ProblemTableLabel.T],
             updates=stored_profiles,
         )
     return hot_profile, cold_profile
@@ -194,7 +214,9 @@ def _retarget_hpr_residual_utilities(
 ):
     hot_utilities.set_common_stream_attribute("heat_flow", 0.0, idx=period_idx)
     cold_utilities.set_common_stream_attribute("heat_flow", 0.0, idx=period_idx)
-    pinch_idx = ProblemTable({PT.T: T_vals, PT.H_NET: residual_net}).pinch_idx(PT.H_NET)
+    pinch_idx = ProblemTable(
+        {ProblemTableLabel.T: T_vals, ProblemTableLabel.H_NET: residual_net}
+    ).pinch_idx(ProblemTableLabel.H_NET)
     return target_utilities_for_load_profiles(
         hot_utilities=hot_utilities,
         cold_utilities=cold_utilities,

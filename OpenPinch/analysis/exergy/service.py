@@ -8,7 +8,7 @@ from typing import Any, Iterable
 import numpy as np
 
 from ...domain.configuration import C_to_K, tol
-from ...domain.enums import GT, PT, TT
+from ...domain.enums import GraphType, ProblemTableLabel, TargetType
 from ..targeting.context import (
     apply_zone_config_overrides,
     format_selected_period_suffix,
@@ -17,7 +17,6 @@ from ..targeting.context import (
 )
 
 __all__ = [
-    "apply_exergy_if_enabled",
     "apply_exergy_targeting",
     "build_exergy_gcc_curve",
     "build_exergy_nlp_curves",
@@ -26,10 +25,10 @@ __all__ = [
 ]
 
 _EXERGY_TARGET_ORDER = (
-    TT.TS.value,
-    TT.IHP.value,
-    TT.DHP.value,
-    TT.DI.value,
+    TargetType.TS.value,
+    TargetType.IHP.value,
+    TargetType.DHP.value,
+    TargetType.DI.value,
 )
 
 
@@ -132,8 +131,8 @@ def build_exergy_gcc_curve(
     shifted_x = _round_small_noise(np.asarray(x_vals, dtype=float) - min_x)
     shifted_t = _round_small_noise(np.asarray(t_ex_vals, dtype=float))
     return {
-        PT.T.value: shifted_t.tolist(),
-        PT.X_GCC.value: shifted_x.tolist(),
+        ProblemTableLabel.T.value: shifted_t.tolist(),
+        ProblemTableLabel.X_GCC.value: shifted_x.tolist(),
     }
 
 
@@ -153,9 +152,11 @@ def build_exergy_nlp_curves(
     if not branch_specs:
         zeros = np.zeros_like(t_vals, dtype=float)
         return {
-            PT.T.value: _build_exergy_temperature_grid(t_vals, t_env).tolist(),
-            PT.X_SUR.value: zeros.tolist(),
-            PT.X_DEF.value: zeros.tolist(),
+            ProblemTableLabel.T.value: _build_exergy_temperature_grid(
+                t_vals, t_env
+            ).tolist(),
+            ProblemTableLabel.X_SUR.value: zeros.tolist(),
+            ProblemTableLabel.X_DEF.value: zeros.tolist(),
             "source_total": 0.0,
             "sink_total": 0.0,
         }
@@ -219,9 +220,13 @@ def build_exergy_nlp_curves(
         deficit_profile.append(running_sink)
 
     return {
-        PT.T.value: _round_small_noise(tex_grid).tolist(),
-        PT.X_SUR.value: _round_small_noise(np.asarray(surplus_profile)).tolist(),
-        PT.X_DEF.value: _round_small_noise(np.asarray(deficit_profile)).tolist(),
+        ProblemTableLabel.T.value: _round_small_noise(tex_grid).tolist(),
+        ProblemTableLabel.X_SUR.value: _round_small_noise(
+            np.asarray(surplus_profile)
+        ).tolist(),
+        ProblemTableLabel.X_DEF.value: _round_small_noise(
+            np.asarray(deficit_profile)
+        ).tolist(),
         "source_total": float(source_total),
         "sink_total": float(sink_total),
     }
@@ -245,11 +250,11 @@ def apply_exergy_targeting(target: Any) -> Any:
         t_env=spec["t_env"],
     )
 
-    target.graphs[GT.GCC_X.value] = gcc_output
-    target.graphs[GT.NLP_X.value] = {
-        PT.T.value: nlp_output[PT.T.value],
-        PT.X_SUR.value: nlp_output[PT.X_SUR.value],
-        PT.X_DEF.value: nlp_output[PT.X_DEF.value],
+    target.graphs[GraphType.GCC_X.value] = gcc_output
+    target.graphs[GraphType.NLP_X.value] = {
+        ProblemTableLabel.T.value: nlp_output[ProblemTableLabel.T.value],
+        ProblemTableLabel.X_SUR.value: nlp_output[ProblemTableLabel.X_SUR.value],
+        ProblemTableLabel.X_DEF.value: nlp_output[ProblemTableLabel.X_DEF.value],
     }
     target.exergy_sources = float(nlp_output["source_total"])
     target.exergy_sinks = float(nlp_output["sink_total"])
@@ -258,21 +263,9 @@ def apply_exergy_targeting(target: Any) -> Any:
         if target.exergy_sources > tol
         else 0.0
     )
-    target.exergy_req_min = float(gcc_output[PT.X_GCC.value][0])
-    target.exergy_des_min = float(gcc_output[PT.X_GCC.value][-1])
+    target.exergy_req_min = float(gcc_output[ProblemTableLabel.X_GCC.value][0])
+    target.exergy_des_min = float(gcc_output[ProblemTableLabel.X_GCC.value][-1])
     return target
-
-
-def apply_exergy_if_enabled(
-    target: Any,
-    zone,
-    *,
-    apply_func=apply_exergy_targeting,
-) -> Any:
-    """Attach exergy outputs to one target when the feature is enabled."""
-    if target is None or not bool(zone.config.targeting.exergy_enabled):
-        return target
-    return apply_func(target)
 
 
 def run_exergy_targeting_service(
@@ -283,7 +276,6 @@ def run_exergy_targeting_service(
 ):
     """Enrich the first compatible existing target family with exergy outputs."""
     apply_zone_config_overrides(zone, args)
-    zone.config.targeting.exergy_enabled = True
     runtime_args = dict(args or {})
     explicit_target_type = _normalize_exergy_base_target_type(
         runtime_args.get("base_target_type")
@@ -311,7 +303,7 @@ def run_exergy_targeting_service(
                 )
             continue
 
-        zone.add_target(apply_exergy_if_enabled(target, zone, apply_func=apply_func))
+        zone.add_target(apply_func(target))
         zone._selected_exergy_target_type = target_type
         return zone
 
@@ -362,67 +354,78 @@ def _resolve_target_exergy_spec(target: Any) -> dict[str, Any] | None:
     t_env = float(getattr(environment, "temperature", 15.0))
     dt_cont_half = abs(float(getattr(thermal, "dt_cont", 0.0))) / 2
 
-    if target_type == TT.DI.value:
+    if target_type == TargetType.DI.value:
         pt = getattr(target, "pt", None)
         if pt is None:
             return None
         return _make_target_spec(
-            temperatures=pt[PT.T],
-            gcc_series=_first_available_column(pt, [PT.H_NET_A, PT.H_NET, PT.H_NET_UT]),
+            temperatures=pt[ProblemTableLabel.T],
+            gcc_series=_first_available_column(
+                pt,
+                [
+                    ProblemTableLabel.H_NET_A,
+                    ProblemTableLabel.H_NET,
+                    ProblemTableLabel.H_NET_UT,
+                ],
+            ),
             branches=[
-                ("hot", _optional_column(pt, PT.H_NET_HOT)),
-                ("cold", _optional_column(pt, PT.H_NET_COLD)),
+                ("hot", _optional_column(pt, ProblemTableLabel.H_NET_HOT)),
+                ("cold", _optional_column(pt, ProblemTableLabel.H_NET_COLD)),
             ],
             t_env=t_env,
             dt_cont_half=dt_cont_half,
         )
 
-    if target_type == TT.TS.value:
+    if target_type == TargetType.TS.value:
         pt = getattr(target, "pt", None)
         if pt is None:
             return None
         return _make_target_spec(
-            temperatures=pt[PT.T],
-            gcc_series=_first_available_column(pt, [PT.H_NET_UT]),
+            temperatures=pt[ProblemTableLabel.T],
+            gcc_series=_first_available_column(pt, [ProblemTableLabel.H_NET_UT]),
             branches=[
-                ("hot", _optional_column(pt, PT.H_HOT_UT)),
-                ("cold", _optional_column(pt, PT.H_COLD_UT)),
+                ("hot", _optional_column(pt, ProblemTableLabel.H_HOT_UT)),
+                ("cold", _optional_column(pt, ProblemTableLabel.H_COLD_UT)),
             ],
             t_env=t_env,
             dt_cont_half=dt_cont_half,
         )
 
-    if target_type == TT.DHP.value:
+    if target_type == TargetType.DHP.value:
         pt = getattr(target, "pt", None)
         if pt is None:
             return None
         return _make_target_spec(
-            temperatures=pt[PT.T],
-            gcc_series=_first_available_column(pt, [PT.H_NET_W_AIR, PT.H_NET_A]),
+            temperatures=pt[ProblemTableLabel.T],
+            gcc_series=_first_available_column(
+                pt, [ProblemTableLabel.H_NET_W_AIR, ProblemTableLabel.H_NET_A]
+            ),
             branches=[
-                ("hot", _optional_column(pt, PT.H_NET_HOT)),
-                ("cold", _optional_column(pt, PT.H_NET_COLD)),
-                ("hot", _optional_column(pt, PT.H_HOT_UT)),
-                ("cold", _optional_column(pt, PT.H_COLD_UT)),
-                ("hot", _optional_column(pt, PT.H_HOT_HP)),
-                ("cold", _optional_column(pt, PT.H_COLD_HP)),
+                ("hot", _optional_column(pt, ProblemTableLabel.H_NET_HOT)),
+                ("cold", _optional_column(pt, ProblemTableLabel.H_NET_COLD)),
+                ("hot", _optional_column(pt, ProblemTableLabel.H_HOT_UT)),
+                ("cold", _optional_column(pt, ProblemTableLabel.H_COLD_UT)),
+                ("hot", _optional_column(pt, ProblemTableLabel.H_HOT_HP)),
+                ("cold", _optional_column(pt, ProblemTableLabel.H_COLD_HP)),
             ],
             t_env=t_env,
             dt_cont_half=dt_cont_half,
         )
 
-    if target_type == TT.IHP.value:
+    if target_type == TargetType.IHP.value:
         pt = getattr(target, "pt", None)
         if pt is None:
             return None
         return _make_target_spec(
-            temperatures=pt[PT.T],
-            gcc_series=_first_available_column(pt, [PT.H_NET_UT, PT.H_NET_HP]),
+            temperatures=pt[ProblemTableLabel.T],
+            gcc_series=_first_available_column(
+                pt, [ProblemTableLabel.H_NET_UT, ProblemTableLabel.H_NET_HP]
+            ),
             branches=[
-                ("hot", _optional_column(pt, PT.H_HOT_UT)),
-                ("cold", _optional_column(pt, PT.H_COLD_UT)),
-                ("hot", _optional_column(pt, PT.H_HOT_HP)),
-                ("cold", _optional_column(pt, PT.H_COLD_HP)),
+                ("hot", _optional_column(pt, ProblemTableLabel.H_HOT_UT)),
+                ("cold", _optional_column(pt, ProblemTableLabel.H_COLD_UT)),
+                ("hot", _optional_column(pt, ProblemTableLabel.H_HOT_HP)),
+                ("cold", _optional_column(pt, ProblemTableLabel.H_COLD_HP)),
             ],
             t_env=t_env,
             dt_cont_half=dt_cont_half,

@@ -10,7 +10,7 @@ import pytest
 import OpenPinch.analysis.power.service as pca
 import OpenPinch.analysis.power.steam_turbine as turbine_mod
 from OpenPinch.domain.configuration import Configuration
-from OpenPinch.domain.enums import PT, TT
+from OpenPinch.domain.enums import ProblemTableLabel, TargetType
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream import Stream
 from OpenPinch.domain.stream_collection import StreamCollection
@@ -24,18 +24,20 @@ def _make_zone_config(
     mech_eff: float = 0.9,
     is_high_p_cond_flash: bool = False,
 ):
-    return Configuration(
+    config = Configuration(
         options={
             "POWER_TURB_P_IN": 20.0,
             "POWER_TURB_T_IN": 300.0,
             "POWER_MIN_EFF": 0.5,
-            "POWER_TURB_MODEL": model,
             "POWER_LOAD_FRACTION": load,
             "POWER_ETA_MECH": mech_eff,
             "POWER_HIGH_P_COND_FLASH_ENABLED": is_high_p_cond_flash,
             "ENV_TEMPERATURE": 15.0,
         }
     )
+    config._values["POWER_TURB_MODEL"] = model
+    config._build_groups(config._values)
+    return config
 
 
 def _make_zone(config: Configuration, utilities: StreamCollection | None = None):
@@ -57,10 +59,10 @@ def _steam_utility(
 ):
     return Stream(
         name=name,
-        t_supply=t_supply,
-        t_target=t_target,
+        supply_temperature=t_supply,
+        target_temperature=t_target,
         heat_flow=q,
-        dt_cont=dt_cont,
+        delta_t_contribution=dt_cont,
         is_process_stream=False,
     )
 
@@ -179,10 +181,10 @@ def test_get_power_cogeneration_above_pinch_accepts_heat_pump_targets(monkeypatc
     hot_utilities.add(_steam_utility("HU1", t_supply=180.0, t_target=140.0, q=120.0))
     target = DirectHeatPumpTarget(
         zone_name="Plant",
-        type=TT.DHP.value,
+        type=TargetType.DHP.value,
         parent_zone=None,
         config=cfg,
-        pt=ProblemTable({PT.T: [180.0, 140.0]}),
+        pt=ProblemTable({ProblemTableLabel.T: [180.0, 140.0]}),
         hot_utilities=hot_utilities,
         cold_utilities=StreamCollection(),
         hot_utility_target=120.0,
@@ -249,7 +251,7 @@ def test_cogeneration_service_and_target_refresh_edge_paths():
     assert (
         pca._ensure_cogeneration_target(
             zone,
-            target_type=TT.TS.value,
+            target_type=TargetType.TS.value,
             refresh_args={},
             compare_args={},
             refresh_services={},

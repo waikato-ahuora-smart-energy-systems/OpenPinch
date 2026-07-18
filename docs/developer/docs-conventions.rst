@@ -1,7 +1,7 @@
 Documentation Conventions
 =========================
 
-The documentation site is both a user manual for the one protected contract
+The documentation site is both a user manual for the package-root workflows
 and a contributor reference for unsupported owners. That distinction only
 works if documentation changes follow consistent conventions.
 

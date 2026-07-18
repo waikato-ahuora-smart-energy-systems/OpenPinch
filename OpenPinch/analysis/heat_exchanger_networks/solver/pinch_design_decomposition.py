@@ -48,7 +48,7 @@ class PinchDesignTarget(BaseModel):
         default=(
             "OpenPinch direct_heat_integration on copied Zone",
             "Zone.process_streams",
-            "Stream.dt_cont clamped to dTmin / 2 minimum",
+            "Stream.delta_t_contribution clamped to dTmin / 2 minimum",
         )
     )
 
@@ -279,7 +279,7 @@ def _apply_hen_dt_cont_convention(zone: Zone, *, dTmin: float) -> None:
                 minimum_dt_cont=minimum_dt_cont,
             )
         else:
-            stream.dt_cont = _stream_dt_cont_with_minimum(
+            stream.delta_t_contribution = _stream_dt_cont_with_minimum(
                 stream,
                 minimum_dt_cont=minimum_dt_cont,
             )
@@ -295,7 +295,7 @@ def _apply_segment_dt_cont_minimum(
     stream.update_segments(
         {
             segment_index: {
-                "dt_cont": _stream_dt_cont_with_minimum(
+                "delta_t_contribution": _stream_dt_cont_with_minimum(
                     segment,
                     minimum_dt_cont=minimum_dt_cont,
                 )

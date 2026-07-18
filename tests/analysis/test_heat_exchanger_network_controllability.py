@@ -21,7 +21,7 @@ from OpenPinch.contracts.controllability import (
 from OpenPinch.domain._heat_exchanger.period_state import HeatExchangerPeriodState
 from OpenPinch.domain.enums import (
     HeatExchangerKind,
-    HeatExchangerStreamRole,
+    StreamID,
 )
 from OpenPinch.domain.heat_exchanger import HeatExchanger
 from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
@@ -41,8 +41,8 @@ def _recovery_exchanger(
         kind=HeatExchangerKind.RECOVERY,
         source_stream=source,
         sink_stream=sink,
-        source_stream_role=HeatExchangerStreamRole.PROCESS,
-        sink_stream_role=HeatExchangerStreamRole.PROCESS,
+        source_stream_role=StreamID.Process,
+        sink_stream_role=StreamID.Process,
         stage=stage,
         period_states=(
             HeatExchangerPeriodState(
@@ -66,8 +66,8 @@ def _hot_utility_exchanger(
         kind=HeatExchangerKind.HOT_UTILITY,
         source_stream="Steam",
         sink_stream=sink,
-        source_stream_role=HeatExchangerStreamRole.UTILITY,
-        sink_stream_role=HeatExchangerStreamRole.PROCESS,
+        source_stream_role=StreamID.Utility,
+        sink_stream_role=StreamID.Process,
         period_states=(
             HeatExchangerPeriodState(
                 period_id="0",
@@ -90,8 +90,8 @@ def _cold_utility_exchanger(
         kind=HeatExchangerKind.COLD_UTILITY,
         source_stream=source,
         sink_stream="CoolingWater",
-        source_stream_role=HeatExchangerStreamRole.PROCESS,
-        sink_stream_role=HeatExchangerStreamRole.UTILITY,
+        source_stream_role=StreamID.Process,
+        sink_stream_role=StreamID.Utility,
         period_states=(
             HeatExchangerPeriodState(
                 period_id="0",

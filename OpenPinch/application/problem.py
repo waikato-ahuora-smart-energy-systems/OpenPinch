@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import warnings
 from copy import deepcopy
+from types import MappingProxyType
 from typing import Any, Callable, Dict, Optional
 
 import pandas as pd
@@ -28,7 +29,6 @@ from ._problem.input.loading import (
     PathLike,
     _LoadedProblemSource,
     load_problem_source,
-    prepare_in_memory_problem_source,
 )
 from ._problem.input.validation import (
     build_validation_report,
@@ -40,6 +40,7 @@ from ._problem.input.validation import (
     validate_problem_semantics as _validate_problem_semantics,
 )
 from ._problem.output.reporting import (
+    _build_numeric_summary_frame,
     build_graph_data,
     build_problem_report,
     build_problem_summary_frame,
@@ -48,19 +49,31 @@ from ._problem.output.reporting import (
 )
 from ._problem.output.result_extraction import extract_results
 from ._problem.periods import aggregation as _period_aggregation
-from ._problem.periods import execution as _period_execution
+from ._problem.periods.aggregation import _TargetRunSpec
 from ._problem.targeting import execution as _target_execution
 from ._problem.targeting.dispatch import run_targeting_for_zone_and_subzones
-from ._problem.targeting.plan import _TargetRunSpec
 from .targeting import data_preprocessing_service
 
 ZoneService = Callable[["Zone", Optional[dict[str, Any]]], "Zone"]
 
 
+def _period_mode(*, include_periods: bool, include_weighted_average: bool) -> str:
+    if not isinstance(include_periods, bool) or not isinstance(
+        include_weighted_average, bool
+    ):
+        raise TypeError("period aggregation flags must be bool values.")
+    if include_periods and include_weighted_average:
+        return "all_with_weighted_average"
+    if include_periods:
+        return "all"
+    if include_weighted_average:
+        return "weighted_average"
+    return "selected"
+
+
 class PinchProblem:
     """Typed orchestrator for loading input data and running targeting."""
 
-    results_dir: Any | None
     _problem_filepath: Any | None
     _problem_data: Optional[JsonDict | TargetInput]
     _project_name: str
@@ -72,7 +85,8 @@ class PinchProblem:
     _validation_context: Optional[dict[str, list[dict[str, Any]]]]
     _last_target_run_spec: Optional[_TargetRunSpec]
     _suspend_target_run_recording: bool
-    add_component = _ComponentAccessorDescriptor()
+    _period_results: dict[str, TargetOutput]
+    components = _ComponentAccessorDescriptor()
     design = _DesignAccessorDescriptor()
     plot = _PlotAccessorDescriptor()
     target = _TargetAccessorDescriptor()
@@ -96,7 +110,7 @@ class PinchProblem:
         self._process_components = {}
         self._last_target_run_spec = None
         self._suspend_target_run_recording = False
-        self.results_dir = None
+        self._period_results = {}
 
         if source is not None:
             self.load(source=source)
@@ -110,7 +124,9 @@ class PinchProblem:
         """Load problem inputs from JSON, Excel, CSV, or an in-memory object."""
         if source is None:
             if self.problem_filepath is None:
-                return None
+                raise RuntimeError(
+                    "No source was supplied and this problem has no reloadable path."
+                )
             source = self.problem_filepath
 
         loaded_source = load_problem_source(
@@ -262,35 +278,20 @@ class PinchProblem:
         master_zone = self._require_prepared_root_zone()
         return master_zone.period_ids
 
-    def target_all_periods(
-        self,
-        *,
-        parallel: bool | str = False,
-        max_workers: int | None = None,
-        preserve_cached_results: bool = True,
-    ) -> dict[str, TargetOutput]:
-        """Run default targeting once per canonical period id.
+    @property
+    def config(self):
+        """Read-only snapshot of stored flat numerical configuration values."""
+        from ..domain.configuration_fields import USER_CONFIG_FIELD_SPECS
 
-        Parameters
-        ----------
-        parallel:
-            ``False`` runs serially. ``True`` and ``"process"`` use a process pool,
-            while ``"thread"`` uses a thread pool which is suitable for no-GIL
-            Python builds.
-        max_workers:
-            Optional executor worker limit for parallel runs.
-        preserve_cached_results:
-            Restore the original ``results`` cache after the batch run when ``True``.
-        """
-        return _period_execution.target_all_periods(
-            self,
-            parallel=parallel,
-            max_workers=max_workers,
-            preserve_cached_results=preserve_cached_results,
+        config = self._require_prepared_root_zone().config
+        return MappingProxyType(
+            {name: deepcopy(config._values[name]) for name in USER_CONFIG_FIELD_SPECS}
         )
 
-    def _solve_target_for_period(self, period_id: str) -> TargetOutput:
-        return _period_execution.solve_target_for_period(self, period_id)
+    @property
+    def period_results(self):
+        """Ordered detached outputs from the latest all-period target workflow."""
+        return MappingProxyType(deepcopy(self._period_results))
 
     def _record_target_run(
         self,
@@ -344,12 +345,10 @@ class PinchProblem:
         self,
         *,
         periods: str,
-        solve: bool = True,
-    ) -> TargetOutput | None:
+    ) -> TargetOutput:
         return _period_aggregation.summary_results(
             self,
             periods=periods,
-            solve=solve,
         )
 
     def _resolve_runtime_period_options(
@@ -361,42 +360,6 @@ class PinchProblem:
         return _target_execution.resolve_runtime_period_options(
             options,
             zone=zone,
-        )
-
-    def _period_result_key(
-        self,
-        result: TargetOutput,
-        *,
-        requested_period_id: str,
-    ) -> str:
-        return _period_execution.period_result_key(
-            result,
-            requested_period_id=requested_period_id,
-        )
-
-    def _order_period_results(
-        self,
-        *,
-        period_ids: list[str],
-        results_by_requested_period: dict[str, TargetOutput],
-    ) -> dict[str, TargetOutput]:
-        return _period_execution.order_period_results(
-            period_ids=period_ids,
-            results_by_requested_period=results_by_requested_period,
-        )
-
-    def _target_all_periods_parallel(
-        self,
-        *,
-        period_ids: list[str],
-        backend: str,
-        max_workers: int | None,
-    ) -> dict[str, TargetOutput]:
-        return _period_execution.target_all_periods_parallel(
-            self,
-            period_ids=period_ids,
-            backend=backend,
-            max_workers=max_workers,
         )
 
     def validate(self) -> TargetInput:
@@ -434,42 +397,47 @@ class PinchProblem:
         self,
         *,
         detailed: bool = False,
-        format: str | None = None,
-        periods: str = "selected",
+        include_periods: bool = False,
+        include_weighted_average: bool = False,
     ) -> pd.DataFrame:
         """Return the solved target summary as a pandas DataFrame."""
-        results = self._summary_results(periods=periods)
-        if format is None:
-            format = "detailed" if detailed else "compact"
-        elif detailed and format != "detailed":
-            raise ValueError("Use either detailed=True or format=..., not both.")
-        if detailed:
-            from ..presentation.reporting.workbook import build_summary_dataframe
-
-            return build_summary_dataframe(results.targets)
-        return build_problem_summary_frame(results, format=format)
+        results = self._summary_results(
+            periods=_period_mode(
+                include_periods=include_periods,
+                include_weighted_average=include_weighted_average,
+            )
+        )
+        return build_problem_summary_frame(results, detailed=detailed)
 
     def metrics(
         self,
         *,
-        solve: bool = True,
-        periods: str = "selected",
+        include_periods: bool = False,
+        include_weighted_average: bool = False,
     ) -> list[ReportMetric]:
         """Return typed summary metrics for the current solved result."""
-        results = self._summary_results(periods=periods, solve=solve)
-        if results is None:
-            return []
+        results = self._summary_results(
+            periods=_period_mode(
+                include_periods=include_periods,
+                include_weighted_average=include_weighted_average,
+            )
+        )
         return build_report_metrics(results)
 
     def report(
         self,
         *,
-        solve: bool = True,
-        periods: str = "selected",
+        include_periods: bool = False,
+        include_weighted_average: bool = False,
     ) -> ProblemReport:
         """Return a typed report without writing any files."""
-        results = self._summary_results(periods=periods, solve=solve)
-        graph_data = build_graph_data(results) if results is not None else None
+        results = self._summary_results(
+            periods=_period_mode(
+                include_periods=include_periods,
+                include_weighted_average=include_weighted_average,
+            )
+        )
+        graph_data = build_graph_data(results)
         return build_problem_report(
             project_name=self.project_name,
             validation=self.validation_report(),
@@ -479,25 +447,29 @@ class PinchProblem:
 
     def export_excel(
         self,
-        results_dir: Optional[PathLike] = None,
+        destination: PathLike,
         *,
-        periods: str = "selected",
+        include_periods: bool = False,
+        include_weighted_average: bool = False,
     ) -> Any:
         """Export the solved target summary and problem tables to an Excel file."""
+        if destination is None:
+            raise ValueError("destination is required for Excel export.")
         from ..presentation.reporting.workbook import (
             export_target_summary_to_excel_with_units,
         )
 
-        if results_dir is not None:
-            self.results_dir = results_dir
-        if self.results_dir is None:
-            raise ValueError("No results_dir set. Provide a path to export results.")
-        results = self._summary_results(periods=periods)
+        results = self._summary_results(
+            periods=_period_mode(
+                include_periods=include_periods,
+                include_weighted_average=include_weighted_average,
+            )
+        )
 
         return export_target_summary_to_excel_with_units(
             target_response=results,
             master_zone=self._master_zone,
-            out_dir=self.results_dir,
+            out_dir=destination,
         )
 
     def compare_to(
@@ -510,8 +482,10 @@ class PinchProblem:
     ) -> pd.DataFrame:
         """Compare numeric summary metrics of two solved problems."""
         return compare_problem_summaries(
-            self.summary_frame(format="plain"),
-            other_problem.summary_frame(format="plain"),
+            _build_numeric_summary_frame(self._summary_results(periods="selected")),
+            _build_numeric_summary_frame(
+                other_problem._summary_results(periods="selected")
+            ),
             target_name=target_name,
             base_label=base_label,
             other_label=other_label,
@@ -584,28 +558,11 @@ class PinchProblem:
         if isinstance(self._master_zone, Zone):
             self._master_zone.name = value
 
-    @classmethod
-    def from_json(cls, data: JsonDict) -> "PinchProblem":
-        """Build from an in-memory mapping and apply the normal input cleaners."""
-        obj = cls()
-        obj._apply_loaded_source(
-            prepare_in_memory_problem_source(data, source_kind="in_memory")
-        )
-        return obj
-
-    def to_problem_json(self, *, canonical: bool = False) -> JsonDict:
-        """Return the currently loaded problem inputs."""
+    def to_problem_json(self) -> JsonDict:
+        """Return canonical JSON-compatible problem inputs."""
         if self._problem_data is None:
-            raise RuntimeError(
-                "No problem_data available. Did you call load(...) or from_json(...)?"
-            )
-        if canonical:
-            return self._canonical_problem_inputs()
-        return self._problem_data
-
-    def canonical_problem_json(self) -> JsonDict:
-        """Return canonical mutable problem inputs with an explicit zone tree."""
-        return self.to_problem_json(canonical=True)
+            raise RuntimeError("No problem data is available. Call load(...) first.")
+        return self._canonical_problem_inputs()
 
     def set_dt_cont_multiplier(
         self,
@@ -625,6 +582,7 @@ class PinchProblem:
         self._master_zone.get_subzone(zone_name).dt_cont_multiplier = resolved_value
         self._results = None  # Clear cached results since multipliers have changed
         self._last_target_run_spec = None
+        self._period_results = {}
         return self._master_zone
 
     def update_options(
@@ -637,7 +595,7 @@ class PinchProblem:
         if not isinstance(options, dict):
             raise TypeError("options must be provided as a dict.")
 
-        problem_inputs = self.canonical_problem_json()
+        problem_inputs = self.to_problem_json()
         current_options = problem_inputs.get("options") or {}
         problem_inputs["options"] = (
             deepcopy(options)
@@ -659,9 +617,8 @@ class PinchProblem:
             if self._problem_filepath is not None
             else "<in-memory or CSV tuple>"
         )
-        export = str(self.results_dir) if self.results_dir is not None else "<unset>"
         has_results = "yes" if self._results is not None else "no"
-        return f"PinchProblem(source={src}, export={export}, results={has_results})"
+        return f"PinchProblem(source={src}, results={has_results})"
 
     def show_dashboard(
         self,
@@ -672,11 +629,12 @@ class PinchProblem:
         value_rounding: int = 2,
     ) -> None:
         """Launch the Streamlit dashboard for the analysed problem."""
-        active_zone = zone or self._master_zone
-        if active_zone is None:
+        if self._results is None:
             raise RuntimeError(
-                "No analysed zone is available. Run target() before rendering."
+                "No target analysis is available. Run a problem.target.<method>() "
+                "workflow before rendering the dashboard."
             )
+        active_zone = zone or self._master_zone
 
         dashboard_graph_data = graph_data
         if dashboard_graph_data is None and self._results is not None:

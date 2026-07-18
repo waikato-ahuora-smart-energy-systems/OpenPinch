@@ -1,9 +1,9 @@
 API Reference
 =============
 
-Start with the external contract page. The remaining pages document
-unsupported internal owners for contributors and advanced experiments; they
-are not compatibility promises.
+Start with the external contract page and the two public workflow class pages.
+The remaining pages document concrete owners for contributors and advanced
+experiments; they are not broad compatibility promises.
 
 .. toctree::
    :maxdepth: 1

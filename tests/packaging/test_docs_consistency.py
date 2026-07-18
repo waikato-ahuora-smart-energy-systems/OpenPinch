@@ -17,37 +17,6 @@ GUIDES_ROOT = DOCS_ROOT / "guides"
 API_ROOT = DOCS_ROOT / "api"
 EXAMPLES_ROOT = DOCS_ROOT / "examples"
 
-LEGACY_PAGE_TARGETS = {
-    DOCS_ROOT / "user-guide" / "quickstart.rst": (
-        "../guides/first-solve-python",
-        "../guides/notebooks-and-sample-cases",
-    ),
-    DOCS_ROOT / "user-guide" / "notebooks.rst": (
-        "../guides/notebooks-and-sample-cases",
-        "../examples/notebook-series",
-    ),
-    DOCS_ROOT / "user-guide" / "heat-pump-targeting.rst": (
-        "../guides/heat-pump-workflows",
-        "../fundamentals/heat-pump-and-refrigeration-methods",
-    ),
-    DOCS_ROOT / "user-guide" / "interpreting-results.rst": (
-        "../guides/graphing-and-interpretation",
-        "../fundamentals/graphs-and-interpretation",
-    ),
-    DOCS_ROOT / "reference" / "api.rst": (
-        "../api/package-root",
-        "../api/generated-index",
-    ),
-    DOCS_ROOT / "reference" / "architecture.rst": (
-        "../overview/workflow-map",
-        "../fundamentals/pinch-analysis",
-    ),
-    DOCS_ROOT / "reference" / "index.rst": (
-        "../api/index",
-        "../developer/index",
-    ),
-}
-
 STALE_DOC_STRINGS = (
     "openpinch run",
     "openpinch graph",
@@ -94,7 +63,7 @@ def test_top_level_navigation_uses_user_first_information_architecture():
     for phrase in (
         "I want to solve a case",
         "I need to understand the method",
-        "I am integrating or extending OpenPinch",
+        "I am building a reusable study",
         "getting-started",
         "overview/index",
         "fundamentals/index",
@@ -112,16 +81,13 @@ def test_getting_started_is_canonical_first_run_page():
     page = _read(DOCS_ROOT / "getting-started.rst")
 
     assert ":orphan:" not in page
-    assert "python -m pip install openpinch" in page
-    assert "from OpenPinch.main import pinch_analysis_service" in page
-    assert "pinch_analysis_service(" in page
-    assert "PinchProblem(" not in page
-    assert "PinchWorkspace(" not in page
-    assert "openpinch notebook -o notebooks" in page
-    assert "Use the CLI Only for Notebook Assets" in page
+    assert "from OpenPinch import PinchProblem" in page
+    assert "problem.target.all_heat_integration()" in page
+    assert "PinchWorkspace" in page
+    assert "Observation" in page or "observe" in page
 
 
-def test_guides_follow_the_standard_task_structure():
+def test_guides_use_the_public_root_workflow_and_current_vocabulary():
     guide_pages = sorted(
         path for path in GUIDES_ROOT.glob("*.rst") if path.name != "index.rst"
     )
@@ -129,11 +95,10 @@ def test_guides_follow_the_standard_task_structure():
     assert guide_pages
     for path in guide_pages:
         text = _read(path)
-        for heading in GUIDE_REQUIRED_HEADINGS:
-            assert heading in text, f"{path} is missing {heading!r}"
-        assert (
-            "Sample Case" in text or "Sample Asset" in text or "Sample Cases" in text
-        ), f"{path} is missing a sample section"
+        assert "from OpenPinch.application" not in text
+        assert "pinch_analysis_service" not in text
+        assert "problem.target()" not in text
+        assert "problem.add_component" not in text
 
 
 def test_packaged_assets_are_documented_in_examples_and_guides():
@@ -153,46 +118,40 @@ def test_packaged_assets_are_documented_in_examples_and_guides():
         assert sample_case_name in combined
 
 
-def test_notebook_docs_keep_user_paths_and_numbered_order():
-    pages = [
-        GUIDES_ROOT / "notebooks-and-sample-cases.rst",
-        EXAMPLES_ROOT / "notebook-series.rst",
-    ]
+def test_notebook_docs_keep_numbered_order_and_coverage_link():
+    text = _read(EXAMPLES_ROOT / "notebook-series.rst")
 
-    for path in pages:
-        text = _read(path)
-        for phrase in (
-            "I want to solve a case with advanced methods",
-            "I need to understand the method",
-            "I am integrating or extending OpenPinch",
-        ):
-            assert phrase in text, f"{path} missing user path {phrase!r}"
-
-        last_position = -1
-        for notebook_name in list_notebooks():
-            position = text.index(notebook_name)
-            assert position > last_position, f"{path} has notebooks out of order"
-            last_position = position
+    last_position = -1
+    for notebook_name in list_notebooks():
+        position = text.index(notebook_name)
+        assert position > last_position, (
+            f"notebook series has {notebook_name} out of order"
+        )
+        last_position = position
+    assert "tutorial-coverage-map" in text
 
 
-def test_main_contract_is_covered_by_curated_api_docs():
+def test_public_python_surface_is_covered_by_curated_api_docs():
     combined_api = _docs_text(sorted(API_ROOT.glob("*.rst")))
     contract_page = _read(API_ROOT / "package-root.rst")
 
-    assert not hasattr(OpenPinch, "__all__")
-    assert "OpenPinch.main.pinch_analysis_service" in combined_api
-    assert "exactly one Python import" in contract_page
-    assert "package root is an import-free marker" in contract_page
-    assert "No deep import, root alias, package barrel" in contract_page
+    assert OpenPinch.__all__ == ["PinchProblem", "PinchWorkspace"]
+    assert "pinch_analysis_service" not in combined_api
+    assert "from OpenPinch import PinchProblem, PinchWorkspace" in contract_page
+    assert "process-engineer workflows begin" in contract_page.lower()
+    assert "tutorial-coverage-map" in contract_page
 
 
-def test_advanced_owner_guides_are_explicitly_unsupported():
-    for path in sorted(GUIDES_ROOT.glob("*.rst")):
-        text = _read(path)
-        if "from OpenPinch.application" not in text:
-            continue
-        assert "unsupported" in text.lower(), path
-        assert "OpenPinch.main.pinch_analysis_service" in text, path
+def test_legacy_library_transition_page_is_absent_from_docs_and_navigation():
+    assert not (DOCS_ROOT / "reference" / "api-lib.rst").exists()
+    assert "../reference/api-lib" not in _read(API_ROOT / "generated-index.rst")
+
+
+def test_workflow_guides_do_not_recommend_concrete_application_imports():
+    combined_guides = _docs_text(sorted(GUIDES_ROOT.glob("*.rst")))
+
+    assert "from OpenPinch.application.problem import" not in combined_guides
+    assert "from OpenPinch.application.workspace import" not in combined_guides
 
 
 def test_architecture_docs_define_owner_directions_and_shared_optimisation():
@@ -236,15 +195,6 @@ def test_docs_define_stability_and_optional_dependency_boundaries():
         assert phrase in combined
 
 
-def test_old_url_pages_remain_orphan_transition_stubs():
-    for path, targets in LEGACY_PAGE_TARGETS.items():
-        text = _read(path)
-        assert ":orphan:" in text
-        assert "Use these pages instead" in text or "Use these sections instead" in text
-        for target in targets:
-            assert target in text, f"{path} missing transition target {target}"
-
-
 def test_docs_do_not_present_removed_cli_surfaces():
     combined = _docs_text()
 
@@ -262,12 +212,12 @@ def test_hen_synthesis_docs_keep_internal_cutover_and_dependency_notes():
     for phrase in (
         'python -m pip install "openpinch[synthesis]"',
         "idaes get-extensions",
-        "problem.design.enhanced_synthesis_method(quality_tier=2)",
-        "problem.design.open_hens_method()",
-        "problem.design.network_evolution_method(initial_networks=",
+        "problem.design.enhanced_heat_exchanger_network(quality_tier=2)",
+        "problem.design.open_hens()",
+        "problem.design.network_evolution(",
         "TargetOutput.design",
-        "old import paths",
-        "OpenHENS field aliases",
+        'design.result.model_dump(mode="json")',
+        "design.selected_network",
         "pytest -m synthesis",
         "pytest -m solver",
     ):
@@ -315,14 +265,14 @@ def test_heat_pump_docs_keep_advanced_workflow_boundaries():
     )
 
     for phrase in (
-        "problem.target.direct_heat_pump",
-        "problem.target.indirect_heat_pump",
-        "problem.add_component.process_mvr",
+        "problem.target.carnot_heat_pump",
+        "problem.target.vapour_compression_heat_pump",
+        "process.components.add_process_mvr",
         "Cascade Carnot cycles",
         "Parallel vapour compression cycles",
         "Vapour compression with MVR cascade",
-        "04_carnot_heat_pump_screening.ipynb",
-        "05_direct_gas_stream_mvr_scenarios.ipynb",
+        "08_carnot_heat_pump_and_refrigeration.ipynb",
+        "11_process_mvr_and_cascade.ipynb",
     ):
         assert phrase in guide
 

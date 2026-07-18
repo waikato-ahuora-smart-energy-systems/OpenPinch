@@ -11,8 +11,8 @@ from pydantic import ValidationError
 import OpenPinch.contracts.input as io
 import OpenPinch.contracts.reporting as reporting
 import OpenPinch.domain.targets as targets
-from OpenPinch.domain.enums import ST, TT, FluidPhase
-from OpenPinch.domain.enums import ProblemTableLabel as PT
+from OpenPinch.domain.enums import FluidPhase, StreamType, TargetType
+from OpenPinch.domain.enums import ProblemTableLabel as ProblemTableLabel
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream import Stream
 from OpenPinch.domain.stream_collection import StreamCollection
@@ -30,8 +30,8 @@ def _fixture() -> dict:
 def _utility_stream(spec: dict) -> Stream:
     return Stream(
         name=spec["name"],
-        t_supply=spec["t_supply"],
-        t_target=spec["t_target"],
+        supply_temperature=spec["t_supply"],
+        target_temperature=spec["t_target"],
         heat_flow=spec["heat_flow"],
         price=spec["price"],
         is_process_stream=False,
@@ -46,7 +46,13 @@ def _utility_collection(*specs: dict) -> StreamCollection:
 
 
 def _problem_table() -> ProblemTable:
-    return ProblemTable({PT.T: [100.0], PT.H_HOT: [1.0], PT.H_COLD: [0.0]})
+    return ProblemTable(
+        {
+            ProblemTableLabel.T: [100.0],
+            ProblemTableLabel.H_HOT: [1.0],
+            ProblemTableLabel.H_COLD: [0.0],
+        }
+    )
 
 
 def test_io_schemas_normalise_fluid_fields_and_reject_edges():
@@ -76,7 +82,7 @@ def test_io_schemas_normalise_fluid_fields_and_reject_edges():
 
     utility = io.UtilitySchema(
         name="Steam",
-        type=ST.Hot.value,
+        type=StreamType.Hot.value,
         t_supply=200.0,
         fluid_name=" ",
         fluid_phase=FluidPhase.liq,
@@ -85,7 +91,7 @@ def test_io_schemas_normalise_fluid_fields_and_reject_edges():
     assert utility.fluid_phase == FluidPhase.liq.value
     default_utility = io.UtilitySchema(
         name="Default utility",
-        type=ST.Cold.value,
+        type=StreamType.Cold.value,
         t_supply=30.0,
         fluid_name=None,
         fluid_phase=None,
@@ -137,16 +143,18 @@ def test_target_name_validation_and_base_graph_helpers():
     with pytest.raises(ValueError, match="type is required"):
         targets._normalise_target_name(zone_name="Zone", target_type=None, name=None)
     with pytest.raises(ValueError, match="zone_name is required"):
-        targets._normalise_target_name(zone_name="", target_type=TT.DI.value, name=None)
+        targets._normalise_target_name(
+            zone_name="", target_type=TargetType.DI.value, name=None
+        )
     with pytest.raises(ValueError, match="zone_name or name"):
         targets._normalise_target_name(
-            zone_name=None, target_type=TT.DI.value, name=None
+            zone_name=None, target_type=TargetType.DI.value, name=None
         )
 
     assert (
         targets._normalise_target_name(
             zone_name="Zone/Direct Integration",
-            target_type=TT.DI.value,
+            target_type=TargetType.DI.value,
             name=None,
         )
         == "Zone/Direct Integration"
@@ -154,18 +162,18 @@ def test_target_name_validation_and_base_graph_helpers():
     assert (
         targets._normalise_target_name(
             zone_name="Zone",
-            target_type=TT.DI.value,
+            target_type=TargetType.DI.value,
             name="Custom",
         )
         == "Custom"
     )
     assert targets.BaseTargetModel._set_name("raw") == "raw"
 
-    base = targets.BaseTargetModel(zone_name="Zone", type=TT.DI.value)
+    base = targets.BaseTargetModel(zone_name="Zone", type=TargetType.DI.value)
     with pytest.raises(NotImplementedError):
         target_to_result(base)
 
-    graph_target = targets.GraphBackedTarget(zone_name="Zone", type=TT.ET.value)
+    graph_target = targets.GraphBackedTarget(zone_name="Zone", type=TargetType.ET.value)
     graph_target.add_graph("gcc", {"points": []})
     assert graph_target.graphs == {"gcc": {"points": []}}
 
@@ -177,7 +185,7 @@ def test_utility_summary_and_direct_target_reporting_round_trip():
     target_data = fixture["direct_target"]
     target = targets.DirectIntegrationTarget(
         zone_name="Zone",
-        type=TT.DI.value,
+        type=TargetType.DI.value,
         pt=_problem_table(),
         pt_real=_problem_table(),
         hot_utilities=hot_utilities,
@@ -203,7 +211,7 @@ def test_utility_summary_and_direct_target_reporting_round_trip():
 
     total_process = targets.TotalProcessTarget(
         zone_name="Zone",
-        type=TT.TZ.value,
+        type=TargetType.TZ.value,
         hot_utility_target=1.0,
         cold_utility_target=2.0,
         heat_recovery_target=3.0,
@@ -215,7 +223,7 @@ def test_total_site_and_heat_pump_target_reporting_include_special_fields():
     fixture = _fixture()
     total_site = targets.TotalSiteTarget(
         zone_name="Zone",
-        type=TT.TS.value,
+        type=TargetType.TS.value,
         pt=_problem_table(),
         hot_utility_target=10.0,
         cold_utility_target=5.0,
@@ -229,7 +237,7 @@ def test_total_site_and_heat_pump_target_reporting_include_special_fields():
 
     hpr = targets.DirectHeatPumpTarget(
         zone_name="Zone",
-        type=TT.DHP.value,
+        type=TargetType.DHP.value,
         pt=_problem_table(),
         hpr_hot_streams=StreamCollection(),
         hpr_cold_streams=StreamCollection(),

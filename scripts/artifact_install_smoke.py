@@ -28,7 +28,7 @@ def main(argv: list[str] | None = None) -> int:
     repo_root = args.repo_root.resolve()
 
     import OpenPinch
-    from OpenPinch.main import pinch_analysis_service
+    from OpenPinch import PinchProblem, PinchWorkspace
     from OpenPinch.resources import list_notebooks, list_sample_cases, read_sample_case
 
     package_path = Path(OpenPinch.__file__).resolve()
@@ -42,22 +42,25 @@ def main(argv: list[str] | None = None) -> int:
     sample = read_sample_case("basic_pinch.json")
     if not sample:
         raise AssertionError("Installed wheel could not read basic_pinch.json.")
+    if "process_mvr.json" not in sample_cases:
+        raise AssertionError("Installed wheel is missing process_mvr.json.")
+    if "11_process_mvr_and_cascade.ipynb" not in notebooks:
+        raise AssertionError("Installed wheel is missing the Process MVR tutorial.")
 
-    result = pinch_analysis_service(json.loads(sample), project_name="Wheel contract")
-    if result.name != "Wheel contract" or not result.targets:
-        raise AssertionError("Installed wheel failed the protected main contract.")
-    if pinch_analysis_service.__module__ != "OpenPinch.main":
-        raise AssertionError("Main contract resolved through an unexpected facade.")
+    problem = PinchProblem(json.loads(sample), project_name="Wheel contract")
+    problem.target.direct_heat_integration()
+    if problem.results.name != "Wheel contract" or not problem.results.targets:
+        raise AssertionError("Installed wheel failed the PinchProblem workflow.")
+    workspace = PinchWorkspace(json.loads(sample), project_name="Wheel contract")
+    if workspace.list_cases() != ["baseline"]:
+        raise AssertionError("Installed wheel failed the PinchWorkspace workflow.")
 
-    forbidden_root_exports = {
-        "PinchProblem",
-        "PinchWorkspace",
-        "TargetInput",
-        "pinch_analysis_service",
-    }
+    if OpenPinch.__all__ != ["PinchProblem", "PinchWorkspace"]:
+        raise AssertionError(f"Unexpected root exports: {OpenPinch.__all__}")
+    forbidden_root_exports = {"TargetInput", "TargetOutput"}
     leaked = sorted(name for name in forbidden_root_exports if hasattr(OpenPinch, name))
     if leaked:
-        raise AssertionError(f"Root package exposes unsupported aliases: {leaked}")
+        raise AssertionError(f"Root package exposes unexpected aliases: {leaked}")
 
     retired_packages = (
         "OpenPinch.classes",

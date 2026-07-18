@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import numpy as np
 
 import OpenPinch.analysis.heat_pumps.service as hp
-from OpenPinch.domain.enums import PT, HPRcycle
+from OpenPinch.domain.enums import HeatPumpAndRefrigerationCycle, ProblemTableLabel
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream import Stream
 from OpenPinch.domain.stream_collection import StreamCollection
@@ -49,18 +49,18 @@ def _stream(
 ):
     return Stream(
         name=name,
-        t_supply=t_supply,
-        t_target=t_target,
+        supply_temperature=t_supply,
+        target_temperature=t_target,
         heat_flow=heat_flow,
-        dt_cont=0.0,
-        htc=1.0,
+        delta_t_contribution=0.0,
+        heat_transfer_coefficient=1.0,
         is_process_stream=is_process_stream,
     )
 
 
 def _base_args(**overrides):
     args = {
-        "hpr_type": HPRcycle.CascadeCarnot.value,
+        "hpr_type": HeatPumpAndRefrigerationCycle.CascadeCarnot.value,
         "Q_hpr_target": 200.0,
         "dt_range_max": 110.0,
         "T_hot": np.array([140.0, 90.0, 40.0]),
@@ -100,12 +100,22 @@ def _base_args(**overrides):
         "initialise_simulated_cycle": True,
         "allow_integrated_expander": True,
         "bckgrd_hot_streams": _sc(
-            Stream(name="H", t_supply=120.0, t_target=80.0, heat_flow=50.0)
+            Stream(
+                name="H",
+                supply_temperature=120.0,
+                target_temperature=80.0,
+                heat_flow=50.0,
+            )
         ),
         "bckgrd_cold_streams": _sc(
-            Stream(name="C", t_supply=30.0, t_target=60.0, heat_flow=40.0)
+            Stream(
+                name="C",
+                supply_temperature=30.0,
+                target_temperature=60.0,
+                heat_flow=40.0,
+            )
         ),
-        "bb_minimiser": "rbf",
+        "bb_minimiser": "rbf_surrogate",
         "eta_penalty": 0.001,
         "rho_penalty": 10.0,
         "debug": False,
@@ -120,10 +130,10 @@ def _base_args(**overrides):
 def _pt_with_hnet(h0, h1, *, h_hot=None, h_cold=None):
     return ProblemTable(
         {
-            PT.T: [120.0, 60.0],
-            PT.H_NET: [h0, h1],
-            PT.H_NET_HOT: [0.0, 0.0] if h_hot is None else h_hot,
-            PT.H_NET_COLD: [0.0, 0.0] if h_cold is None else h_cold,
+            ProblemTableLabel.T: [120.0, 60.0],
+            ProblemTableLabel.H_NET: [h0, h1],
+            ProblemTableLabel.H_NET_HOT: [0.0, 0.0] if h_hot is None else h_hot,
+            ProblemTableLabel.H_NET_COLD: [0.0, 0.0] if h_cold is None else h_cold,
         }
     )
 

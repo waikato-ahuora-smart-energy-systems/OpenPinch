@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ....domain.enums import HeatExchangerKind, HeatExchangerStreamRole
+from ....domain.enums import HeatExchangerKind, StreamID
 from ....domain.heat_exchanger import HeatExchanger
 from ..solver.arrays import PreparedSolverArrays
 from .metadata import _allowed, _index, _optional_float, _optional_int, _third_dimension
@@ -72,8 +72,8 @@ def _recovery_exchangers(
                         kind=HeatExchangerKind.RECOVERY,
                         source_stream=hot_stream,
                         sink_stream=cold_stream,
-                        source_stream_role=HeatExchangerStreamRole.PROCESS,
-                        sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                        source_stream_role=StreamID.Process,
+                        sink_stream_role=StreamID.Process,
                         stage=stage,
                         period_states=states,
                         area=aggregate_area,

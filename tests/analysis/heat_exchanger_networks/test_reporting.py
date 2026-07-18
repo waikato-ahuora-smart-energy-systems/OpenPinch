@@ -33,7 +33,7 @@ from OpenPinch.contracts.synthesis.task import (
 from OpenPinch.domain._heat_exchanger.period_state import HeatExchangerPeriodState
 from OpenPinch.domain.enums import (
     HeatExchangerKind,
-    HeatExchangerStreamRole,
+    StreamID,
 )
 from OpenPinch.domain.heat_exchanger import HeatExchanger
 from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
@@ -415,8 +415,8 @@ def test_network_feasibility_reports_summary_and_temperature_failures() -> None:
                 kind=HeatExchangerKind.RECOVERY,
                 source_stream="H1",
                 sink_stream="C1",
-                source_stream_role=HeatExchangerStreamRole.PROCESS,
-                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Process,
                 stage=1,
                 period_states=(
                     _period_state(
@@ -434,8 +434,8 @@ def test_network_feasibility_reports_summary_and_temperature_failures() -> None:
                 kind=HeatExchangerKind.RECOVERY,
                 source_stream="H2",
                 sink_stream="C2",
-                source_stream_role=HeatExchangerStreamRole.PROCESS,
-                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Process,
                 stage=1,
                 period_states=(
                     _period_state(
@@ -458,8 +458,8 @@ def test_network_feasibility_reports_summary_and_temperature_failures() -> None:
                 kind=HeatExchangerKind.RECOVERY,
                 source_stream="H1",
                 sink_stream="C1",
-                source_stream_role=HeatExchangerStreamRole.PROCESS,
-                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Process,
                 stage=1,
                 period_states=(
                     _period_state(
@@ -547,8 +547,8 @@ def test_network_feasibility_checks_area_presence_and_utility_area_branches() ->
                 kind=HeatExchangerKind.RECOVERY,
                 source_stream="H1",
                 sink_stream="C1",
-                source_stream_role=HeatExchangerStreamRole.PROCESS,
-                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Process,
                 stage=1,
                 period_states=(
                     _period_state(
@@ -571,8 +571,8 @@ def test_network_feasibility_checks_area_presence_and_utility_area_branches() ->
                 kind=HeatExchangerKind.HOT_UTILITY,
                 source_stream="HU1",
                 sink_stream="C1",
-                source_stream_role=HeatExchangerStreamRole.UTILITY,
-                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                source_stream_role=StreamID.Utility,
+                sink_stream_role=StreamID.Process,
                 period_states=(
                     _period_state(
                         duty=200.0,
@@ -604,8 +604,8 @@ def test_network_feasibility_checks_area_presence_and_utility_area_branches() ->
                 kind=HeatExchangerKind.COLD_UTILITY,
                 source_stream="H1",
                 sink_stream="CU1",
-                source_stream_role=HeatExchangerStreamRole.PROCESS,
-                sink_stream_role=HeatExchangerStreamRole.UTILITY,
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Utility,
                 period_states=(
                     _period_state(
                         duty=200.0,
@@ -655,8 +655,8 @@ def test_network_feasibility_skips_match_level_checks_for_isothermal_stage_model
                 kind=HeatExchangerKind.RECOVERY,
                 source_stream="H1",
                 sink_stream="C1",
-                source_stream_role=HeatExchangerStreamRole.PROCESS,
-                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Process,
                 stage=1,
                 period_states=(
                     _period_state(
@@ -710,8 +710,8 @@ def test_network_feasibility_reports_cold_stream_balance_and_handles_missing_tem
                     kind=HeatExchangerKind.HOT_UTILITY,
                     source_stream="HU1",
                     sink_stream="C1",
-                    source_stream_role=HeatExchangerStreamRole.UTILITY,
-                    sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                    source_stream_role=StreamID.Utility,
+                    sink_stream_role=StreamID.Process,
                     period_states=(
                         _period_state(
                             duty=50.0,
@@ -731,8 +731,8 @@ def test_network_feasibility_reports_cold_stream_balance_and_handles_missing_tem
                 kind=HeatExchangerKind.RECOVERY,
                 source_stream="H1",
                 sink_stream="C1",
-                source_stream_role=HeatExchangerStreamRole.PROCESS,
-                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Process,
                 stage=1,
                 period_states=(
                     _period_state(
@@ -782,8 +782,8 @@ def test_verification_numeric_helpers_cover_invalid_inputs_and_defensive_branche
         kind=HeatExchangerKind.RECOVERY,
         source_stream="H1",
         sink_stream="C1",
-        source_stream_role=HeatExchangerStreamRole.PROCESS,
-        sink_stream_role=HeatExchangerStreamRole.PROCESS,
+        source_stream_role=StreamID.Process,
+        sink_stream_role=StreamID.Process,
         stage=1,
         period_states=(
             _period_state(
@@ -799,8 +799,8 @@ def test_verification_numeric_helpers_cover_invalid_inputs_and_defensive_branche
         kind=HeatExchangerKind.RECOVERY,
         source_stream="H1",
         sink_stream="C1",
-        source_stream_role=HeatExchangerStreamRole.PROCESS,
-        sink_stream_role=HeatExchangerStreamRole.PROCESS,
+        source_stream_role=StreamID.Process,
+        sink_stream_role=StreamID.Process,
         stage=1,
         period_states=(
             _period_state(
@@ -818,8 +818,8 @@ def test_verification_numeric_helpers_cover_invalid_inputs_and_defensive_branche
         kind="custom-kind",
         source_stream="H1",
         sink_stream="C1",
-        source_stream_role=HeatExchangerStreamRole.PROCESS,
-        sink_stream_role=HeatExchangerStreamRole.PROCESS,
+        source_stream_role=StreamID.Process,
+        sink_stream_role=StreamID.Process,
         stage=1,
         period_states=(_period_state(duty=10.0),),
         area=1.0,
@@ -1515,8 +1515,8 @@ def _feasible_balance_network(
                 kind=HeatExchangerKind.RECOVERY,
                 source_stream="H1",
                 sink_stream="C1",
-                source_stream_role=HeatExchangerStreamRole.PROCESS,
-                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Process,
                 stage=1,
                 period_states=(
                     _period_state(
@@ -1534,8 +1534,8 @@ def _feasible_balance_network(
                 kind=HeatExchangerKind.COLD_UTILITY,
                 source_stream="H1",
                 sink_stream="CU",
-                source_stream_role=HeatExchangerStreamRole.PROCESS,
-                sink_stream_role=HeatExchangerStreamRole.UTILITY,
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Utility,
                 period_states=(
                     _period_state(
                         duty=cold_utility_duty,
@@ -1744,8 +1744,8 @@ def _supply_side_hot_utility_network() -> HeatExchangerNetwork:
                 kind=HeatExchangerKind.RECOVERY,
                 source_stream="H1",
                 sink_stream="C1",
-                source_stream_role=HeatExchangerStreamRole.PROCESS,
-                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Process,
                 stage=1,
                 period_states=(
                     _period_state(
@@ -1762,8 +1762,8 @@ def _supply_side_hot_utility_network() -> HeatExchangerNetwork:
                 kind=HeatExchangerKind.HOT_UTILITY,
                 source_stream="HU1",
                 sink_stream="C1",
-                source_stream_role=HeatExchangerStreamRole.UTILITY,
-                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                source_stream_role=StreamID.Utility,
+                sink_stream_role=StreamID.Process,
                 period_states=(
                     _period_state(
                         duty=350.0,
@@ -1787,8 +1787,8 @@ def _out_of_order_midpoint_network() -> HeatExchangerNetwork:
                 kind=HeatExchangerKind.RECOVERY,
                 source_stream="H1",
                 sink_stream="C1",
-                source_stream_role=HeatExchangerStreamRole.PROCESS,
-                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Process,
                 stage=1,
                 period_states=(
                     _period_state(
@@ -1805,8 +1805,8 @@ def _out_of_order_midpoint_network() -> HeatExchangerNetwork:
                 kind=HeatExchangerKind.RECOVERY,
                 source_stream="H2",
                 sink_stream="C2",
-                source_stream_role=HeatExchangerStreamRole.PROCESS,
-                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Process,
                 stage=1,
                 period_states=(
                     _period_state(
@@ -1823,8 +1823,8 @@ def _out_of_order_midpoint_network() -> HeatExchangerNetwork:
                 kind=HeatExchangerKind.RECOVERY,
                 source_stream="H3",
                 sink_stream="C3",
-                source_stream_role=HeatExchangerStreamRole.PROCESS,
-                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Process,
                 stage=1,
                 period_states=(
                     _period_state(
@@ -1851,8 +1851,8 @@ def _temperature_scaled_network() -> HeatExchangerNetwork:
                 kind=HeatExchangerKind.RECOVERY,
                 source_stream="H1",
                 sink_stream="C1",
-                source_stream_role=HeatExchangerStreamRole.PROCESS,
-                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Process,
                 stage=1,
                 period_states=(
                     _period_state(
@@ -1869,8 +1869,8 @@ def _temperature_scaled_network() -> HeatExchangerNetwork:
                 kind=HeatExchangerKind.HOT_UTILITY,
                 source_stream="HU1",
                 sink_stream="C1",
-                source_stream_role=HeatExchangerStreamRole.UTILITY,
-                sink_stream_role=HeatExchangerStreamRole.PROCESS,
+                source_stream_role=StreamID.Utility,
+                sink_stream_role=StreamID.Process,
                 period_states=(
                     _period_state(
                         duty=200.0,
@@ -1884,8 +1884,8 @@ def _temperature_scaled_network() -> HeatExchangerNetwork:
                 kind=HeatExchangerKind.COLD_UTILITY,
                 source_stream="H1",
                 sink_stream="CU1",
-                source_stream_role=HeatExchangerStreamRole.PROCESS,
-                sink_stream_role=HeatExchangerStreamRole.UTILITY,
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Utility,
                 period_states=(
                     _period_state(
                         duty=250.0,
@@ -1914,8 +1914,8 @@ def _recovery(
         kind=HeatExchangerKind.RECOVERY,
         source_stream=hot_stream,
         sink_stream=cold_stream,
-        source_stream_role=HeatExchangerStreamRole.PROCESS,
-        sink_stream_role=HeatExchangerStreamRole.PROCESS,
+        source_stream_role=StreamID.Process,
+        sink_stream_role=StreamID.Process,
         stage=stage,
         period_states=(
             _period_state(
@@ -1940,8 +1940,8 @@ def _hot_utility(
         kind=HeatExchangerKind.HOT_UTILITY,
         source_stream=hot_utility,
         sink_stream=cold_stream,
-        source_stream_role=HeatExchangerStreamRole.UTILITY,
-        sink_stream_role=HeatExchangerStreamRole.PROCESS,
+        source_stream_role=StreamID.Utility,
+        sink_stream_role=StreamID.Process,
         period_states=(
             _period_state(
                 duty=duty,
@@ -1963,8 +1963,8 @@ def _cold_utility(
         kind=HeatExchangerKind.COLD_UTILITY,
         source_stream=hot_stream,
         sink_stream=cold_utility,
-        source_stream_role=HeatExchangerStreamRole.PROCESS,
-        sink_stream_role=HeatExchangerStreamRole.UTILITY,
+        source_stream_role=StreamID.Process,
+        sink_stream_role=StreamID.Utility,
         period_states=(
             _period_state(
                 duty=duty,

@@ -5,8 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from time import perf_counter
 
-from ....domain.enums import HENDesignMethod
-from ..errors import WorkflowContractError
+from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ..execution.executor import LocalSynthesisExecutor, SynthesisExecutor
 from ..execution.fallbacks import (
     _can_skip_derivative_stage_for_missing_couenne,
@@ -24,12 +23,6 @@ from .network_evolution_method import (
 from .pinch_design_method import execute_pinch_design_method_stage
 from .thermal_derivative_method import execute_thermal_derivative_method_stage
 
-_METHOD_SEQUENCE = (
-    "pinch_design_method",
-    "thermal_derivative_method",
-    "network_evolution_method",
-)
-
 
 def execute_open_hens_method(
     problem,
@@ -38,14 +31,9 @@ def execute_open_hens_method(
     executor: SynthesisExecutor | None = None,
 ) -> SynthesisWorkflowResult:
     """Generate, execute, and collect the PDM -> TDM -> EVM task graph."""
-    settings = replace(settings, design_method=HENDesignMethod.OpenHENS)
-    if settings.method_sequence != _METHOD_SEQUENCE:
-        raise WorkflowContractError(
-            "HENS_METHOD_SEQUENCE must preserve pinch_design_method -> "
-            "thermal_derivative_method -> network_evolution_method for "
-            "this migration slice."
-        )
-
+    settings = replace(
+        settings, design_method=HeatExchangerNetworkDesignMethod.OpenHENS
+    )
     if executor is None:
         executor = LocalSynthesisExecutor()
     start = perf_counter()

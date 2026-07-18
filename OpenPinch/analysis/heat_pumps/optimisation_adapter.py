@@ -14,6 +14,7 @@ from ...contracts.hpr import (
     HPRBackendResult,
     MultiPeriodHPRTargetInputs,
 )
+from ...domain.enums import PenaltyForm
 from ...domain.value import Value
 from ...optimisation.errors import NoOptimisationCandidatesError
 from ...optimisation.models import (
@@ -32,27 +33,6 @@ HPRCandidateSearch = Callable[..., tuple[OptimisationCandidate, ...]]
 OptimisationRunner = Callable[..., OptimisationResult]
 
 _FAILED_CANDIDATE_OBJECTIVE = 1e30
-_METHOD_ALIASES = {
-    "da": OptimisationMethod.DUAL_ANNEALING,
-    "dualannealing": OptimisationMethod.DUAL_ANNEALING,
-    "dual-annealing": OptimisationMethod.DUAL_ANNEALING,
-    "dual_annealing": OptimisationMethod.DUAL_ANNEALING,
-    "dual_annealing_multiminima": OptimisationMethod.DUAL_ANNEALING,
-    "cma": OptimisationMethod.CMA_ES,
-    "cma-es": OptimisationMethod.CMA_ES,
-    "cma_es": OptimisationMethod.CMA_ES,
-    "cmaes": OptimisationMethod.CMA_ES,
-    "cmaes_multiminima": OptimisationMethod.CMA_ES,
-    "bayes": OptimisationMethod.BAYESIAN,
-    "bayesian_optimization": OptimisationMethod.BAYESIAN,
-    "bayesian_optimisation": OptimisationMethod.BAYESIAN,
-    "bo": OptimisationMethod.BAYESIAN,
-    "bo_multiminima": OptimisationMethod.BAYESIAN,
-    "rbf": OptimisationMethod.RBF,
-    "rbf-surrogate": OptimisationMethod.RBF,
-    "rbf_surrogate": OptimisationMethod.RBF,
-    "rbf_surrogate_multiminima": OptimisationMethod.RBF,
-}
 
 
 def solve_hpr_placement(
@@ -112,7 +92,7 @@ def run_hpr_candidate_search(
     try:
         result = optimiser(
             problem,
-            method=normalise_hpr_method(args.bb_minimiser),
+            method=_resolve_hpr_optimisation_method(args.bb_minimiser),
             options=options,
         )
         backend_candidates = result.candidates
@@ -147,8 +127,8 @@ def normalise_initial_points(
     return tuple(tuple(float(value) for value in row) for row in block)
 
 
-def normalise_hpr_method(method: Any) -> OptimisationMethod:
-    """Resolve configured legacy spellings to one package-level method."""
+def _resolve_hpr_optimisation_method(method: Any) -> OptimisationMethod:
+    """Resolve one exact configured optimiser identifier or enum value."""
     if isinstance(method, OptimisationMethod):
         return method
     if method is None:
@@ -159,14 +139,14 @@ def normalise_hpr_method(method: Any) -> OptimisationMethod:
             "Optimizer handle must be a string or enum value; "
             f"got {type(method).__name__}."
         )
-    normalised = raw_value.strip().lower().replace(" ", "_")
-    resolved = _METHOD_ALIASES.get(normalised)
-    if resolved is None:
+    try:
+        return OptimisationMethod(raw_value)
+    except ValueError:
         supported = ", ".join(item.value for item in OptimisationMethod)
         raise ValueError(
-            f"Unsupported optimiser handle {method!r}. Supported handles: {supported}."
-        )
-    return resolved
+            f"Unsupported optimiser identifier {method!r}. "
+            f"Supported identifiers: {supported}."
+        ) from None
 
 
 def evaluate_hpr_candidate(
@@ -315,7 +295,7 @@ def build_hpr_accounting(
                 positive_penalty_terms,
                 eta=args.eta_penalty,
                 rho=args.rho_penalty,
-                form="square",
+                form=PenaltyForm.SQUARE,
             )
         )
         if positive_penalty_terms.size
@@ -327,7 +307,11 @@ def build_hpr_accounting(
         True,
     ):
         penalty += float(
-            g_ineq_penalty(g=Q_ext_cold, rho=args.rho_penalty, form="square")
+            g_ineq_penalty(
+                g=Q_ext_cold,
+                rho=args.rho_penalty,
+                form=PenaltyForm.SQUARE,
+            )
         )
     objective = calc_hpr_obj(
         work=work,
@@ -504,7 +488,6 @@ __all__ = [
     "build_hpr_accounting",
     "calc_hpr_obj",
     "evaluate_hpr_candidate",
-    "normalise_hpr_method",
     "normalise_initial_points",
     "run_hpr_candidate_search",
     "solve_hpr_placement",

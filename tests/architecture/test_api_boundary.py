@@ -1,8 +1,7 @@
-"""API-surface tests for the marker root and concrete owner modules."""
+"""API-surface tests for root workflow exports and concrete owner modules."""
 
 from __future__ import annotations
 
-import ast
 import importlib.util
 import subprocess
 import sys
@@ -13,7 +12,15 @@ import pytest
 import OpenPinch
 import OpenPinch.domain.heat_exchanger as heat_exchanger
 import OpenPinch.domain.stream as stream
-from OpenPinch.contracts.input import StreamSegmentSchema, TargetInput
+from OpenPinch.contracts.hpr import HPRBackendResult, HPRParsedState
+from OpenPinch.contracts.input import (
+    HeatExchangerAreaSliceSchema,
+    HeatExchangerNetworkSchema,
+    HeatExchangerPeriodStateSchema,
+    HeatExchangerSchema,
+    StreamSegmentSchema,
+    TargetInput,
+)
 
 PACKAGE_DIR = Path(OpenPinch.__file__).parent
 RETIRED_PACKAGES = (
@@ -25,14 +32,15 @@ RETIRED_PACKAGES = (
 )
 
 
-def test_root_package_is_an_import_free_marker() -> None:
-    tree = ast.parse(Path(OpenPinch.__file__).read_text(encoding="utf-8"))
+def test_root_package_exports_only_the_workflow_entrypoints() -> None:
+    from OpenPinch.application.problem import PinchProblem
+    from OpenPinch.application.workspace import PinchWorkspace
 
-    assert not hasattr(OpenPinch, "__all__")
-    assert not any(isinstance(node, ast.Import | ast.ImportFrom) for node in tree.body)
-    assert not hasattr(OpenPinch, "PinchProblem")
-    assert not hasattr(OpenPinch, "PinchWorkspace")
+    assert OpenPinch.__all__ == ["PinchProblem", "PinchWorkspace"]
+    assert OpenPinch.PinchProblem is PinchProblem
+    assert OpenPinch.PinchWorkspace is PinchWorkspace
     assert not hasattr(OpenPinch, "TargetInput")
+    assert not hasattr(OpenPinch, "PenaltyForm")
     assert not hasattr(OpenPinch, "pinch_analysis_service")
 
 
@@ -67,6 +75,19 @@ def test_stream_segment_schema_remains_on_the_main_input_contract() -> None:
     assert "StreamSegmentSchema" in schema["$defs"]
 
 
+def test_serialized_hen_schemas_are_owned_by_the_main_input_contract() -> None:
+    schemas = (
+        HeatExchangerAreaSliceSchema,
+        HeatExchangerPeriodStateSchema,
+        HeatExchangerSchema,
+        HeatExchangerNetworkSchema,
+    )
+    assert all(schema.__module__ == "OpenPinch.contracts.input" for schema in schemas)
+    definitions = TargetInput.model_json_schema()["$defs"]
+    assert {schema.__name__ for schema in schemas} <= definitions.keys()
+    assert not hasattr(OpenPinch, "HeatExchangerNetworkSchema")
+
+
 def test_service_runtime_records_and_graph_specs_are_private() -> None:
     import OpenPinch.analysis.heat_pumps._multiperiod.state as multiperiod_state
     import OpenPinch.analysis.heat_pumps.process_mvr as process_mvr
@@ -78,6 +99,11 @@ def test_service_runtime_records_and_graph_specs_are_private() -> None:
     assert not hasattr(metadata, "GraphSeriesMeta")
     assert not hasattr(multiperiod_state, "PreparedHPRPeriodCase")
     assert not hasattr(rendering, "StreamlitGraphSet")
+
+
+def test_typed_hpr_records_do_not_emulate_dictionaries() -> None:
+    assert {"__getitem__", "get"}.isdisjoint(HPRParsedState.__dict__)
+    assert {"__getitem__", "get", "__contains__"}.isdisjoint(HPRBackendResult.__dict__)
 
 
 def test_hen_model_package_is_a_marker_without_runtime_exports() -> None:

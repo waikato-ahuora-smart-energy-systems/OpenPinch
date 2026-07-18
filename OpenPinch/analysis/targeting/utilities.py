@@ -7,7 +7,7 @@ from typing import Tuple
 import numpy as np
 
 from ...domain.configuration import tol
-from ...domain.enums import PT
+from ...domain.enums import ProblemTableLabel
 from ...domain.problem_table import ProblemTable
 from ...domain.stream_collection import StreamCollection
 from .cascade import get_utility_heat_cascade
@@ -54,17 +54,17 @@ def get_utility_targets(
         hot_utilities, cold_utilities = target_utilities_for_load_profiles(
             hot_utilities=hot_utilities,
             cold_utilities=cold_utilities,
-            T_vals=pt[PT.T],
-            H_net_cold=pt[PT.H_NET_COLD],
-            H_net_hot=pt[PT.H_NET_HOT],
-            pinch_idx=pt.pinch_idx(PT.H_NET_A),
+            T_vals=pt[ProblemTableLabel.T],
+            H_net_cold=pt[ProblemTableLabel.H_NET_COLD],
+            H_net_hot=pt[ProblemTableLabel.H_NET_HOT],
+            pinch_idx=pt.pinch_idx(ProblemTableLabel.H_NET_A),
             is_real_temperatures=False,
             idx=idx,
         )
 
     pt.update(
         **get_utility_heat_cascade(
-            T_int_vals=pt[PT.T],
+            T_int_vals=pt[ProblemTableLabel.T],
             hot_utilities=hot_utilities,
             cold_utilities=cold_utilities,
             is_shifted=True,
@@ -73,16 +73,16 @@ def get_utility_targets(
     )
     pt.update(
         **get_seperated_gcc_heat_load_profiles(
-            T_col=pt[PT.T],
-            H_net=pt[PT.H_NET_UT],
-            rcp_net=pt[PT.RCP_UT_NET],
+            T_col=pt[ProblemTableLabel.T],
+            H_net=pt[ProblemTableLabel.H_NET_UT],
+            rcp_net=pt[ProblemTableLabel.RCP_UT_NET],
             is_process_stream=False,
         )
     )
     if isinstance(pt_real, ProblemTable):
         pt_real.update(
             **get_utility_heat_cascade(
-                T_int_vals=pt_real[PT.T],
+                T_int_vals=pt_real[ProblemTableLabel.T],
                 hot_utilities=hot_utilities,
                 cold_utilities=cold_utilities,
                 is_shifted=False,
@@ -91,9 +91,9 @@ def get_utility_targets(
         )
         pt_real.update(
             **get_seperated_gcc_heat_load_profiles(
-                T_col=pt_real[PT.T],
-                H_net=pt_real[PT.H_NET_UT],
-                rcp_net=pt_real[PT.RCP_UT_NET],
+                T_col=pt_real[ProblemTableLabel.T],
+                H_net=pt_real[ProblemTableLabel.H_NET_UT],
+                rcp_net=pt_real[ProblemTableLabel.RCP_UT_NET],
                 is_process_stream=False,
             )
         )
@@ -178,9 +178,9 @@ def _assign_utility(
     Q_assigned = 0.0
     for u in reversed(u_ls) if is_hot_ut else u_ls:
         if is_real_temperatures:
-            t_lo, t_hi = u.t_min, u.t_max
+            t_lo, t_hi = u.minimum_temperature, u.maximum_temperature
         else:
-            t_lo, t_hi = u.t_min_star, u.t_max_star
+            t_lo, t_hi = u.shifted_minimum_temperature, u.shifted_maximum_temperature
         if is_hot_ut:
             Ts, Tt = float(t_hi[idx]), float(t_lo[idx])
         else:

@@ -16,7 +16,7 @@ from ...contracts.controllability import (
     HeatExchangerNetworkControllabilityPairing,
     HeatExchangerNetworkControllabilityResult,
 )
-from ...domain.enums import HeatExchangerKind, HeatExchangerStreamRole
+from ...domain.enums import HeatExchangerKind, StreamID
 from ...domain.heat_exchanger import HeatExchanger
 
 if TYPE_CHECKING:
@@ -44,7 +44,7 @@ def quantify_heat_exchanger_network_controllability(
     rank_tolerance: float | None = None,
     condition_warning_threshold: float = 25.0,
 ) -> HeatExchangerNetworkControllabilityResult:
-    """Return a 0-1 controllability assessment for a solved HEN.
+    """Return a 0-1 controllability assessment for a solved HeatExchangerNetworkLabel.
 
     The service builds a steady-state interaction matrix from available network
     data. Rows are process-stream outlet temperatures, columns are practical
@@ -494,9 +494,9 @@ def _matrix_to_tuple(matrix: np.ndarray) -> tuple[tuple[float, ...], ...]:
 
 def _process_endpoints(exchanger: HeatExchanger) -> tuple[tuple[str, str], ...]:
     endpoints = []
-    if exchanger.source_stream_role is HeatExchangerStreamRole.PROCESS:
+    if exchanger.source_stream_role is StreamID.Process:
         endpoints.append(("source", exchanger.source_stream))
-    if exchanger.sink_stream_role is HeatExchangerStreamRole.PROCESS:
+    if exchanger.sink_stream_role is StreamID.Process:
         endpoints.append(("sink", exchanger.sink_stream))
     return tuple(endpoints)
 

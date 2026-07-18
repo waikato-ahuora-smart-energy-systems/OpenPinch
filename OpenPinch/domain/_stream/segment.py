@@ -38,28 +38,28 @@ class StreamSegment(Stream):
         return f"{self._owner.name}.S{self._segment_index + 1}"
 
     @property
-    def dt_cont_multiplier(self) -> float:
+    def delta_t_contribution_multiplier(self) -> float:
         """Return the zone shift multiplier inherited from the parent."""
         return self._dt_cont_multiplier
 
-    @dt_cont_multiplier.setter
-    def dt_cont_multiplier(self, value: float) -> None:
+    @delta_t_contribution_multiplier.setter
+    def delta_t_contribution_multiplier(self, value: float) -> None:
         if self._owner is not None:
             raise ValueError(
                 "Segment zone shift multiplier is controlled by its parent stream."
             )
-        Stream.dt_cont_multiplier.fset(self, value)
+        Stream.delta_t_contribution_multiplier.fset(self, value)
 
     @property
-    def active(self) -> bool:
+    def is_active(self) -> bool:
         """Return the activity inherited from the parent when attached."""
         return self._active
 
-    @active.setter
-    def active(self, value: bool) -> None:
+    @is_active.setter
+    def is_active(self, value: bool) -> None:
         if self._owner is not None:
             raise ValueError("Segment activity is controlled by its parent stream.")
-        Stream.active.fset(self, value)
+        Stream.is_active.fset(self, value)
 
     @property
     def is_process_stream(self) -> bool:

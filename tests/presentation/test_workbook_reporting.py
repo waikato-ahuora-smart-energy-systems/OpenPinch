@@ -11,7 +11,7 @@ from openpyxl import Workbook
 
 import OpenPinch.presentation.reporting.workbook as export_mod
 from OpenPinch.contracts.common import PeriodValueWithUnit
-from OpenPinch.domain.enums import ProblemTableLabel as PT
+from OpenPinch.domain.enums import ProblemTableLabel as ProblemTableLabel
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.targets import DirectIntegrationTarget
 from OpenPinch.domain.zone import Zone
@@ -97,9 +97,9 @@ def _make_problem_table(values):
     """Small ProblemTable with a few populated numeric columns."""
     return ProblemTable(
         {
-            PT.T: values,
-            PT.H_HOT: [v * 1.1 for v in values],
-            PT.H_COLD: [v * 2.2 for v in values],
+            ProblemTableLabel.T: values,
+            ProblemTableLabel.H_HOT: [v * 1.1 for v in values],
+            ProblemTableLabel.H_COLD: [v * 2.2 for v in values],
         }
     )
 
@@ -314,8 +314,8 @@ def test_export_writes_problem_tables_for_all_zones(tmp_path: Path):
         usecols=lambda c: not str(c).startswith("Unnamed"),
         header=2,
     )
-    assert pytest.approx(master_df.iloc[0][PT.T.value]) == 10.0
-    assert pytest.approx(master_df.iloc[0][PT.H_HOT.value]) == 11.0
+    assert pytest.approx(master_df.iloc[0][ProblemTableLabel.T.value]) == 10.0
+    assert pytest.approx(master_df.iloc[0][ProblemTableLabel.H_HOT.value]) == 11.0
 
     sub_df = pd.read_excel(
         out,
@@ -323,7 +323,7 @@ def test_export_writes_problem_tables_for_all_zones(tmp_path: Path):
         usecols=lambda c: not str(c).startswith("Unnamed"),
         header=2,
     )
-    assert pytest.approx(sub_df.iloc[0][PT.T.value]) == 40.0
+    assert pytest.approx(sub_df.iloc[0][ProblemTableLabel.T.value]) == 40.0
 
 
 def test_build_summary_dataframe_resolves_period_values_using_period_idx():

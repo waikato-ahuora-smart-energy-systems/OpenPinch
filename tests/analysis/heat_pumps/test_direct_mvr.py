@@ -27,12 +27,12 @@ DIRECT_MVR_STAGE_CASES = FIXTURES_ROOT / "process_mvr_edge_cases.json"
 def _gas_stream(name="Gas", *, fluid="Air", p=101.325, heat_flow=100.0):
     return Stream(
         name=name,
-        t_supply=120.0,
-        t_target=80.0,
-        p_supply=p,
+        supply_temperature=120.0,
+        target_temperature=80.0,
+        supply_pressure=p,
         heat_flow=heat_flow,
-        dt_cont=0.0,
-        htc=1.0,
+        delta_t_contribution=0.0,
+        heat_transfer_coefficient=1.0,
         fluid_name=fluid,
         fluid_phase="gas",
     )
@@ -45,12 +45,12 @@ def _water_vapour_stream(name="Water vapour", *, heat_flow=100.0):
     ).to("kPa")
     return Stream(
         name=name,
-        t_supply=100.0,
-        t_target=99.5,
-        p_supply=p_sat_kpa,
+        supply_temperature=100.0,
+        target_temperature=99.5,
+        supply_pressure=p_sat_kpa,
         heat_flow=heat_flow,
-        dt_cont=0.0,
-        htc=1.0,
+        delta_t_contribution=0.0,
+        heat_transfer_coefficient=1.0,
         fluid_name="Water",
         fluid_phase="vapour",
     )
@@ -100,15 +100,15 @@ def test_direct_mvr_solver_builds_multistage_replacement_streams():
     assert sum(stage.heat_flow for stage in solved.stage_results) > 0.0
     for replacement in solved.replacement_streams:
         assert replacement.fluid_phase == "gas"
-        assert replacement.t_supply.unit == "degC"
-        assert replacement.t_target.unit == "degC"
-        assert replacement.p_supply.unit == "kPa"
-        assert replacement.p_target.unit == "kPa"
+        assert replacement.supply_temperature.unit == "degC"
+        assert replacement.target_temperature.unit == "degC"
+        assert replacement.supply_pressure.unit == "kPa"
+        assert replacement.target_pressure.unit == "kPa"
         assert replacement.heat_flow.unit == "kW"
-        assert float(replacement.p_supply) > float(source.p_supply)
-    assert min(float(stream.t_target) for stream in solved.replacement_streams) == (
-        pytest.approx(float(source.t_target), abs=0.05)
-    )
+        assert float(replacement.supply_pressure) > float(source.supply_pressure)
+    assert min(
+        float(stream.target_temperature) for stream in solved.replacement_streams
+    ) == (pytest.approx(float(source.target_temperature), abs=0.05))
     assert sum(float(stream.heat_flow) for stream in solved.replacement_streams) == (
         pytest.approx(sum(stage.heat_flow for stage in solved.stage_results))
     )
@@ -147,7 +147,9 @@ def test_direct_mvr_solver_can_use_pressure_ratio_target():
 
     stage = solved.stage_results[0]
     assert stage.p_out / stage.p_in == pytest.approx(1.25)
-    assert float(solved.replacement_streams[0].p_supply) == pytest.approx(stage.p_out)
+    assert float(solved.replacement_streams[0].supply_pressure) == pytest.approx(
+        stage.p_out
+    )
 
 
 def test_direct_mvr_stage_result_enthalpies_use_stream_input_units():
@@ -170,14 +172,14 @@ def test_direct_mvr_stage_result_units_follow_source_stream_units():
     pytest.importorskip("CoolProp")
     source = CustomUnitStream(
         name="Custom units",
-        t_supply=Value(393.15, "K"),
-        t_target=Value(353.15, "K"),
-        p_supply=Value(1.01325, "bar"),
-        h_supply=Value(420000.0, "J/kg"),
-        h_target=Value(380000.0, "J/kg"),
+        supply_temperature=Value(393.15, "K"),
+        target_temperature=Value(353.15, "K"),
+        supply_pressure=Value(1.01325, "bar"),
+        supply_enthalpy=Value(420000.0, "J/kg"),
+        target_enthalpy=Value(380000.0, "J/kg"),
         heat_flow=Value(0.1, "MW"),
-        dt_cont=0.0,
-        htc=1.0,
+        delta_t_contribution=0.0,
+        heat_transfer_coefficient=1.0,
         fluid_name="Air",
         fluid_phase="gas",
     )
@@ -211,11 +213,11 @@ def test_direct_mvr_solver_normalises_source_enthalpy_units():
         liquid_injection=False,
     )
     kj_source = _gas_stream()
-    kj_source.h_supply = Value(420.0, "kJ/kg")
-    kj_source.h_target = Value(380.0, "kJ/kg")
+    kj_source.supply_enthalpy = Value(420.0, "kJ/kg")
+    kj_source.target_enthalpy = Value(380.0, "kJ/kg")
     j_source = _gas_stream()
-    j_source.h_supply = Value(420000.0, "J/kg")
-    j_source.h_target = Value(380000.0, "J/kg")
+    j_source.supply_enthalpy = Value(420000.0, "J/kg")
+    j_source.target_enthalpy = Value(380000.0, "J/kg")
 
     kj_solved = solve_direct_gas_mvr_stream(kj_source, settings=settings)
     j_solved = solve_direct_gas_mvr_stream(j_source, settings=settings)
@@ -254,9 +256,9 @@ def test_direct_mvr_solver_rejects_conflicting_compression_targets():
         (
             Stream(
                 name="NoCooling",
-                t_supply=80.0,
-                t_target=120.0,
-                p_supply=101.325,
+                supply_temperature=80.0,
+                target_temperature=120.0,
+                supply_pressure=101.325,
                 heat_flow=100.0,
                 fluid_name="Air",
                 fluid_phase="gas",
@@ -359,11 +361,11 @@ def test_direct_mvr_liquid_injection_mixer_conserves_enthalpy():
 def test_direct_mvr_solver_rejects_enthalpy_and_mass_flow_edge_cases():
     pytest.importorskip("CoolProp")
     no_drop = _gas_stream()
-    no_drop.h_supply = Value(100.0, "kJ/kg")
-    no_drop.h_target = Value(100.0, "kJ/kg")
+    no_drop.supply_enthalpy = Value(100.0, "kJ/kg")
+    no_drop.target_enthalpy = Value(100.0, "kJ/kg")
     tiny_mass_flow = _gas_stream(heat_flow=1e-5)
-    tiny_mass_flow.h_supply = Value(1e12, "kJ/kg")
-    tiny_mass_flow.h_target = Value(0.0, "kJ/kg")
+    tiny_mass_flow.supply_enthalpy = Value(1e12, "kJ/kg")
+    tiny_mass_flow.target_enthalpy = Value(0.0, "kJ/kg")
 
     with pytest.raises(ValueError, match="no positive enthalpy drop"):
         solve_direct_gas_mvr_stream(no_drop, settings=DirectGasMVRSettings())

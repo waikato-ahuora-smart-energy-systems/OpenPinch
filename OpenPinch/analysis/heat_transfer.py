@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from numbers import Integral
 
 import numpy as np
 
@@ -242,6 +243,9 @@ def CrossflowUnmixedEff1(Ntu, c):
 
 def CrossflowUnmixedEff2(Ntu, c, Rows, Cmin_fluid):
     """Lookup-derived correlations for cross-flow exchangers with finite rows."""
+    if isinstance(Rows, bool) or not isinstance(Rows, Integral) or Rows < 1:
+        raise ValueError("Rows must be a positive integer.")
+
     # ESDU 86018
     if Cmin_fluid == "Air":
         if Rows == 1:
@@ -276,7 +280,7 @@ def CrossflowUnmixedEff2(Ntu, c, Rows, Cmin_fluid):
                     )
                 )
             )
-        elif Rows > 4:
+        else:
             eff = CrossflowUnmixedEff1(Ntu, c)
     else:
         if Rows == 1:
@@ -297,7 +301,7 @@ def CrossflowUnmixedEff2(Ntu, c, Rows, Cmin_fluid):
                 + 4 * k**4 * (2 - k) / c**2
                 + (8 * k**6) / (3 * c**3)
             )
-        elif Rows > 4:
+        else:
             eff = CrossflowUnmixedEff1(Ntu, c)
 
     return eff

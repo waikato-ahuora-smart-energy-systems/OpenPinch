@@ -15,10 +15,10 @@ Where To Start
 Repository developers can begin with the parent-owned internal surfaces
 documented in :doc:`api-core`:
 
-- ``problem.target.direct_heat_pump(...)``
-- ``problem.target.indirect_heat_pump(...)``
-- ``problem.target.direct_refrigeration(...)``
-- ``problem.target.indirect_refrigeration(...)``
+- ``problem.target.carnot_heat_pump(...)``
+- ``problem.target.carnot_heat_pump(...)``
+- ``problem.target.carnot_refrigeration(...)``
+- ``problem.target.carnot_refrigeration(...)``
 
 The modules on this page are the lower-level implementation layers behind
 those helpers.
@@ -50,6 +50,9 @@ points provide residual external utilities for operating-cost accounting;
 cycle penalties remain separate feasibility terms. HPR objective and failure
 semantics are translated to the reusable optimiser only by
 ``optimisation_adapter``; the generic optimiser has no heat-pump dependency.
+Optimiser identifiers are exact: ``dual_annealing``, ``cmaes``, ``bo``, and
+``rbf_surrogate``. Case changes, surrounding whitespace, and abbreviated or
+historical spellings are rejected.
 
 .. automodule:: OpenPinch.analysis.heat_pumps.common
    :no-members:
@@ -68,6 +71,14 @@ semantics are translated to the reusable optimiser only by
 
 HPR Schemas
 -----------
+
+``HPRParsedState`` and ``HPRBackendResult`` are internal typed records with
+attribute-only access. Use their named attributes while processing results and
+``model_dump()`` when a mapping is required; they do not emulate dictionaries.
+
+.. autoclass:: OpenPinch.contracts.hpr.HPRParsedState
+   :members:
+   :no-index:
 
 .. autoclass:: OpenPinch.contracts.hpr.HeatPumpTargetInputs
    :members:

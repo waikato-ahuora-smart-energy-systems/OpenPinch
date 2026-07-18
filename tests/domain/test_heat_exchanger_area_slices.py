@@ -5,7 +5,7 @@ from hypothesis import given, seed, settings
 
 from OpenPinch.domain._heat_exchanger.area import HeatExchangerAreaSlice
 from OpenPinch.domain._heat_exchanger.period_state import HeatExchangerPeriodState
-from OpenPinch.domain.enums import HeatExchangerKind, HeatExchangerStreamRole
+from OpenPinch.domain.enums import HeatExchangerKind, StreamID
 from OpenPinch.domain.heat_exchanger import HeatExchanger
 from tests.strategies.heat_exchangers import heat_exchangers_with_area_slices
 
@@ -34,8 +34,8 @@ def _exchanger(*, slices=(), area=None) -> HeatExchanger:
         kind=HeatExchangerKind.RECOVERY,
         source_stream="hot",
         sink_stream="cold",
-        source_stream_role=HeatExchangerStreamRole.PROCESS,
-        sink_stream_role=HeatExchangerStreamRole.PROCESS,
+        source_stream_role=StreamID.Process,
+        sink_stream_role=StreamID.Process,
         stage=1,
         period_states=(
             HeatExchangerPeriodState(period_id="0", period_idx=0, duty=10.0),

@@ -46,14 +46,13 @@ idaes get-extensions
 
 ## First Solve
 
-OpenPinch currently compatibility-protects one Python entry point:
-`OpenPinch.main.pinch_analysis_service`. Pass it a mapping and receive the
-validated target-output model.
+OpenPinch exposes two package-root workflow classes. Use `PinchProblem` for one
+case and `PinchWorkspace` for named cases and scenarios.
 
 ```python
-from OpenPinch.main import pinch_analysis_service
+from OpenPinch import PinchProblem
 
-result = pinch_analysis_service(
+problem = PinchProblem(
     {
         "streams": [
             {
@@ -73,17 +72,16 @@ result = pinch_analysis_service(
         ],
         "utilities": [],
     },
-    project_name="first-solve",
+    project_name="First solve",
 )
+problem.validate()
+problem.target.all_heat_integration()
 
-print(result.model_dump(mode="json"))
+print(problem.summary_frame())
 ```
 
-Concrete modules under `OpenPinch.application`, `OpenPinch.analysis`,
-`OpenPinch.domain`, `OpenPinch.contracts`, `OpenPinch.adapters`,
-`OpenPinch.optimisation`, and `OpenPinch.presentation` are available for
-repository development and advanced experiments, but they are not currently
-compatibility-protected external APIs.
+Analysis is explicit: named methods execute work, while summaries, reports,
+plots, and exports consume prepared or cached state.
 
 ## Packaged Resources
 
@@ -102,7 +100,7 @@ from OpenPinch.resources import (
 print(list_sample_cases())
 print(sample_case_metadata("basic_pinch.json").description)
 print(list_notebooks())
-print(notebook_metadata("01_first_solve_summary_graphs.ipynb").title)
+print(notebook_metadata("01_first_solve_and_core_curves.ipynb").title)
 ```
 
 Copy the notebook series from the CLI:
@@ -111,9 +109,8 @@ Copy the notebook series from the CLI:
 openpinch notebook -o notebooks
 ```
 
-The series is ordered for three paths: solve cases with advanced methods,
-understand the targeting methods, and integrate or extend OpenPinch through
-typed service and export workflows.
+The eighteen-notebook series progresses from first solve through multiperiod
+HPR, cogeneration, HEN synthesis, and publication workflows.
 
 The CLI intentionally copies notebooks only. Solves, validation, graph export,
 Excel export, dashboards, and advanced targeting happen through Python.

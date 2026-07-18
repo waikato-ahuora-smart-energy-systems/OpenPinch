@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from ....contracts.synthesis.common import SynthesisMethod
 from ....contracts.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
 from ....domain._heat_exchanger.period_state import HeatExchangerPeriodState
-from ....domain.enums import HeatExchangerKind, HeatExchangerStreamRole
+from ....domain.enums import (
+    HeatExchangerKind,
+    HeatExchangerNetworkDesignMethod,
+    StreamID,
+)
 from ....domain.heat_exchanger import HeatExchanger
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..errors import WorkflowContractError
@@ -21,7 +24,7 @@ class FakeSynthesisExecutor:
 
     def __init__(self, failures: set[str] | None = None) -> None:
         self.failures = set(failures or ())
-        self.stage_order: list[SynthesisMethod] = []
+        self.stage_order: list[HeatExchangerNetworkDesignMethod] = []
         self.executed_tasks: list[HeatExchangerNetworkSynthesisTask] = []
 
     def execute(
@@ -97,8 +100,8 @@ def _fake_network(
     total_annual_cost = round(utility_cost + capital_cost, 6)
     approach_temperature = max(float(task.approach_temperature), 1.0)
     temperatures = _fake_temperatures(
-        hot_supply=_temperature(hot_stream.t_supply, "K"),
-        cold_supply=_temperature(cold_stream.t_supply, "K"),
+        hot_supply=_temperature(hot_stream.supply_temperature, "K"),
+        cold_supply=_temperature(cold_stream.supply_temperature, "K"),
         approach_temperature=approach_temperature,
     )
     hot_utility_duty = round(duty * 0.1, 6)
@@ -111,8 +114,8 @@ def _fake_network(
             kind=HeatExchangerKind.RECOVERY,
             source_stream=hot_key,
             sink_stream=cold_key,
-            source_stream_role=HeatExchangerStreamRole.PROCESS,
-            sink_stream_role=HeatExchangerStreamRole.PROCESS,
+            source_stream_role=StreamID.Process,
+            sink_stream_role=StreamID.Process,
             stage=stage_count,
             period_states=(
                 HeatExchangerPeriodState(
@@ -137,8 +140,8 @@ def _fake_network(
             kind=HeatExchangerKind.HOT_UTILITY,
             source_stream=hot_utility_key,
             sink_stream=cold_key,
-            source_stream_role=HeatExchangerStreamRole.UTILITY,
-            sink_stream_role=HeatExchangerStreamRole.PROCESS,
+            source_stream_role=StreamID.Utility,
+            sink_stream_role=StreamID.Process,
             period_states=(
                 HeatExchangerPeriodState(
                     period_id=period_id,
@@ -157,8 +160,8 @@ def _fake_network(
             kind=HeatExchangerKind.COLD_UTILITY,
             source_stream=hot_key,
             sink_stream=cold_utility_key,
-            source_stream_role=HeatExchangerStreamRole.PROCESS,
-            sink_stream_role=HeatExchangerStreamRole.UTILITY,
+            source_stream_role=StreamID.Process,
+            sink_stream_role=StreamID.Utility,
             period_states=(
                 HeatExchangerPeriodState(
                     period_id=period_id,

@@ -12,7 +12,7 @@ from .....analysis.targeting.cascade import (
     create_problem_table_with_t_int,
     get_utility_heat_cascade,
 )
-from .....domain.enums import PT
+from .....domain.enums import ProblemTableLabel
 from .....domain.stream_collection import StreamCollection
 
 
@@ -122,11 +122,15 @@ def _get_hpr_cascade(
     )
     pt.update(
         **get_utility_heat_cascade(
-            pt[PT.T],
+            pt[ProblemTableLabel.T],
             hot_streams,
             cold_streams,
             is_shifted=False,
             period_idx=period_idx,
         )
     )
-    return pt[PT.T], pt[PT.H_HOT_UT], pt[PT.H_COLD_UT]
+    return (
+        pt[ProblemTableLabel.T],
+        pt[ProblemTableLabel.H_HOT_UT],
+        pt[ProblemTableLabel.H_COLD_UT],
+    )

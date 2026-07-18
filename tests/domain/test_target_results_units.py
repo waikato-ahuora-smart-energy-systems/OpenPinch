@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 from OpenPinch.domain.configuration import Configuration
-from OpenPinch.domain.enums import PT, TT
+from OpenPinch.domain.enums import ProblemTableLabel, TargetType
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream_collection import StreamCollection
 from OpenPinch.domain.targets import (
@@ -19,7 +20,7 @@ from OpenPinch.presentation.reporting.results import target_to_result
 
 
 def _problem_table() -> ProblemTable:
-    return ProblemTable({PT.T: [120.0, 60.0]})
+    return ProblemTable({ProblemTableLabel.T: [120.0, 60.0]})
 
 
 def _config() -> Configuration:
@@ -29,7 +30,7 @@ def _config() -> Configuration:
 def _make_di_target() -> DirectIntegrationTarget:
     return DirectIntegrationTarget(
         zone_name="Plant",
-        type=TT.DI.value,
+        type=TargetType.DI.value,
         config=_config(),
         pt=_problem_table(),
         pt_real=_problem_table(),
@@ -42,7 +43,7 @@ def _make_di_target() -> DirectIntegrationTarget:
 def _make_ts_target() -> TotalSiteTarget:
     return TotalSiteTarget(
         zone_name="Plant",
-        type=TT.TS.value,
+        type=TargetType.TS.value,
         config=_config(),
         pt=_problem_table(),
         hot_utility_target=10.0,
@@ -54,7 +55,7 @@ def _make_ts_target() -> TotalSiteTarget:
 def _make_dhp_target() -> DirectHeatPumpTarget:
     return DirectHeatPumpTarget(
         zone_name="Plant",
-        type=TT.DHP.value,
+        type=TargetType.DHP.value,
         config=_config(),
         pt=_problem_table(),
         hot_utilities=StreamCollection(),
@@ -80,7 +81,7 @@ def _make_dhp_target() -> DirectHeatPumpTarget:
 def _make_ihp_target() -> IndirectHeatPumpTarget:
     return IndirectHeatPumpTarget(
         zone_name="Plant",
-        type=TT.IHP.value,
+        type=TargetType.IHP.value,
         config=_config(),
         pt=_problem_table(),
         hot_utilities=StreamCollection(),
@@ -189,10 +190,10 @@ def test_heat_pump_results_include_unit_aware_hpr_metrics(factory):
     _assert_scalar_payload(results.work_target, 8.0, "kW")
     _assert_scalar_payload(results.turbine_efficiency_target, 42.0, "%")
     assert isinstance(results.hpr_utility_total, Value)
-    assert results.hpr_utility_total.values == [10.0, 12.0]
+    np.testing.assert_allclose(results.hpr_utility_total.period_values, [10.0, 12.0])
     assert results.hpr_utility_total.unit == "kW"
     assert isinstance(results.hpr_work, Value)
-    assert results.hpr_work.values == [1.0, 2.0]
+    np.testing.assert_allclose(results.hpr_work.period_values, [1.0, 2.0])
     assert results.hpr_work.unit == "kW"
     _assert_scalar_payload(results.hpr_external_utility, 3.0, "kW")
     _assert_scalar_payload(results.hpr_ambient_hot, 4.0, "kW")
@@ -210,7 +211,7 @@ def test_heat_pump_results_include_unit_aware_hpr_metrics(factory):
 def test_target_results_apply_configured_output_unit_overrides():
     target = DirectIntegrationTarget(
         zone_name="Plant",
-        type=TT.DI.value,
+        type=TargetType.DI.value,
         config=Configuration(
             options={
                 "OUTPUT_UNIT_HEAT_FLOW": "MW",

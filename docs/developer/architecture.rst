@@ -1,10 +1,9 @@
 Package Architecture
 ====================
 
-This page documents the internal architecture used to implement the sole
-external call, :func:`OpenPinch.main.pinch_analysis_service`. Internal modules
-are not compatibility-protected, but their ownership and dependency direction
-are enforced by tests.
+This page documents the internal architecture used to implement
+:class:`OpenPinch.PinchProblem` and :class:`OpenPinch.PinchWorkspace`. Module
+ownership and dependency direction are enforced by tests.
 
 Owner Responsibilities
 ----------------------
@@ -57,12 +56,12 @@ Execution Flow
 
 The supported request follows this sequence:
 
-1. ``OpenPinch.main`` validates the external request through ``contracts``.
+1. ``PinchProblem`` validates input through ``contracts``.
 2. ``application`` constructs and coordinates the problem use case.
 3. ``analysis`` performs deterministic targeting using ``domain`` state.
 4. ``presentation`` and ``adapters`` shape outputs only when requested by an
    internal advanced workflow.
-5. ``OpenPinch.main`` returns the validated output contract.
+5. ``PinchProblem`` caches the validated output contract for observation.
 
 Optimisation Boundary
 ---------------------

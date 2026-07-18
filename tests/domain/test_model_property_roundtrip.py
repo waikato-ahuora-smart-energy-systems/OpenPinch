@@ -9,7 +9,7 @@ from pydantic import ValidationError
 
 import OpenPinch.domain.stream_collection as sc_mod
 from OpenPinch.domain.configuration import Configuration
-from OpenPinch.domain.enums import ProblemTableLabel as PT
+from OpenPinch.domain.enums import ProblemTableLabel as ProblemTableLabel
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream import Stream
 from OpenPinch.domain.stream_collection import StreamCollection
@@ -22,17 +22,17 @@ from OpenPinch.presentation.reporting.stream_collection import (
 
 
 def _dummy_problem_table():
-    return ProblemTable({PT.T: [0.0]})
+    return ProblemTable({ProblemTableLabel.T: [0.0]})
 
 
 def test_stream_property_roundtrip_and_mutation_paths():
     s = Stream(
         name="S1",
-        t_supply=150.0,
-        t_target=90.0,
+        supply_temperature=150.0,
+        target_temperature=90.0,
         heat_flow=120.0,
-        dt_cont=5.0,
-        htc=2.0,
+        delta_t_contribution=5.0,
+        heat_transfer_coefficient=2.0,
         price=10.0,
     )
 
@@ -40,38 +40,46 @@ def test_stream_property_roundtrip_and_mutation_paths():
     s.is_process_stream = False
     assert s.is_process_stream is False
 
-    s.t_supply = 160.0
-    s.t_target = 95.0
-    s.p_supply = 200.0
-    s.p_target = 180.0
-    s.h_supply = 2_500.0
-    s.h_target = 2_000.0
-    s.dt_cont = 4.0
-    s.dt_cont_multiplier = 1.5
+    s.supply_temperature = 160.0
+    s.target_temperature = 95.0
+    s.supply_pressure = 200.0
+    s.target_pressure = 180.0
+    s.supply_enthalpy = 2_500.0
+    s.target_enthalpy = 2_000.0
+    s.delta_t_contribution = 4.0
+    s.delta_t_contribution_multiplier = 1.5
     s.heat_flow = 100.0
-    s.htc = 3.0
+    s.heat_transfer_coefficient = 3.0
     s.price = 12.0
-    s.active = False
+    s.is_active = False
 
-    assert s.type == "Hot"
-    assert float(s.htr) == pytest.approx(1.0 / 3.0)
+    assert s.stream_type == "Hot"
+    assert float(s.heat_transfer_resistance) == pytest.approx(1.0 / 3.0)
     assert float(s.price) == pytest.approx(12.0)
-    assert float(s.ut_cost) == pytest.approx(1.2)
-    assert float(s.CP) == pytest.approx(100.0 / (160.0 - 95.0))
-    assert float(s.rCP) == pytest.approx((100.0 / (160.0 - 95.0)) / 3.0)
-    assert s.active is False
-    assert float(s.dt_cont) == pytest.approx(4.0)
-    assert float(s.dt_cont_act) == pytest.approx(6.0)
-    assert float(s.t_min) == pytest.approx(95.0)
-    assert float(s.t_max) == pytest.approx(160.0)
-    assert float(s.t_min_star) == pytest.approx(89.0)
-    assert float(s.t_max_star) == pytest.approx(154.0)
+    assert float(s.utility_cost) == pytest.approx(1.2)
+    assert float(s.heat_capacity_flowrate) == pytest.approx(100.0 / (160.0 - 95.0))
+    assert float(s.resistance_capacity_product) == pytest.approx(
+        (100.0 / (160.0 - 95.0)) / 3.0
+    )
+    assert s.is_active is False
+    assert float(s.delta_t_contribution) == pytest.approx(4.0)
+    assert float(s.effective_delta_t_contribution) == pytest.approx(6.0)
+    assert float(s.minimum_temperature) == pytest.approx(95.0)
+    assert float(s.maximum_temperature) == pytest.approx(160.0)
+    assert float(s.shifted_minimum_temperature) == pytest.approx(89.0)
+    assert float(s.shifted_maximum_temperature) == pytest.approx(154.0)
 
 
-def test_stream_collection_edge_paths_and_pickle_state(tmp_path):
-    st1 = Stream(name="A", t_supply=120.0, t_target=80.0, heat_flow=20.0)
-    st2 = Stream(name="B", t_supply=110.0, t_target=70.0, heat_flow=10.0)
-    st3 = Stream(name="C", t_supply=60.0, t_target=90.0, heat_flow=5.0)
+def test_stream_collection_edge_paths():
+    st1 = Stream(
+        name="A", supply_temperature=120.0, target_temperature=80.0, heat_flow=20.0
+    )
+    st2 = Stream(
+        name="B", supply_temperature=110.0, target_temperature=70.0, heat_flow=10.0
+    )
+    st3 = Stream(
+        name="C", supply_temperature=60.0, target_temperature=90.0, heat_flow=5.0
+    )
 
     sc = StreamCollection()
     sc.add(st1)
@@ -83,7 +91,7 @@ def test_stream_collection_edge_paths_and_pickle_state(tmp_path):
     with pytest.raises(ValueError, match="Length of streams and keys must match"):
         sc.add_many([st1], keys=["x", "y"])
 
-    sc.set_sort_key(["t_supply", "name"])
+    sc.set_sort_key(["supply_temperature", "name"])
     _ = list(sc)
     sc.set_sort_key(lambda stream: stream.name, reverse=True)
     _ = list(sc)
@@ -97,11 +105,6 @@ def test_stream_collection_edge_paths_and_pickle_state(tmp_path):
         _ = sc[1.2]
     with pytest.warns(Warning):
         sc.remove("unknown")
-
-    state = sc.__getstate__()
-    assert state["_sort_spec"] == ("attr", "t_supply")
-    sc2 = StreamCollection()
-    sc2.__setstate__(state)
 
     sc3 = StreamCollection()
     sc3.add_many([st1, st2], keys=["A", "B"])
@@ -139,16 +142,16 @@ def test_target_model_and_zone_property_branches():
     cold = StreamCollection()
     hu = Stream(
         name="HU",
-        t_supply=180.0,
-        t_target=170.0,
+        supply_temperature=180.0,
+        target_temperature=170.0,
         heat_flow=20.0,
         price=400.0,
         is_process_stream=False,
     )
     cu = Stream(
         name="CU",
-        t_supply=20.0,
-        t_target=30.0,
+        supply_temperature=20.0,
+        target_temperature=30.0,
         heat_flow=15.0,
         price=400.0,
         is_process_stream=False,
@@ -196,9 +199,6 @@ def test_target_model_and_zone_property_branches():
     payload_hot = serialize_target(t, isTotal=False)
     assert payload_hot["pinch_temp"]["hot_temp"] == {"value": 135.0, "unit": "degC"}
 
-    t.config.power.turbine_work_enabled = True
-    t.config.targeting.area_cost_enabled = True
-    t.config.targeting.exergy_enabled = True
     payload_all = serialize_target(t)
     assert payload_all["work_target"] == {"value": 5.0, "unit": "kW"}
     assert payload_all["area"] == {"value": 1.0, "unit": "m^2"}
@@ -227,7 +227,9 @@ def test_target_model_and_zone_property_branches():
     child2 = Zone(name="Child")
     child2.hot_streams = StreamCollection()
     child2.hot_streams.add(
-        Stream(name="x", t_supply=120.0, t_target=100.0, heat_flow=5.0)
+        Stream(
+            name="x", supply_temperature=120.0, target_temperature=100.0, heat_flow=5.0
+        )
     )
     z.add_zone(child1)
     z.add_zone(child2)
@@ -260,10 +262,14 @@ def test_target_model_and_zone_property_branches():
     parent = Zone(name="Parent")
     child = Zone(name="Child")
     child.hot_streams.add(
-        Stream(name="H1", t_supply=120.0, t_target=80.0, heat_flow=10.0)
+        Stream(
+            name="H1", supply_temperature=120.0, target_temperature=80.0, heat_flow=10.0
+        )
     )
     child.cold_streams.add(
-        Stream(name="C1", t_supply=30.0, t_target=60.0, heat_flow=8.0)
+        Stream(
+            name="C1", supply_temperature=30.0, target_temperature=60.0, heat_flow=8.0
+        )
     )
     parent.add_zone(child)
     parent.import_hot_and_cold_streams_from_sub_zones(

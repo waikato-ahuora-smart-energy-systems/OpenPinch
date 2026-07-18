@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from OpenPinch.domain._stream.value_state import resolve_period_weights
-from OpenPinch.domain.enums import ST, FluidPhase
+from OpenPinch.domain.enums import FluidPhase, StreamType
 from OpenPinch.domain.stream import Stream
 from OpenPinch.domain.value import Value
 from tests.support.paths import FIXTURES_ROOT
@@ -16,34 +16,48 @@ FIXTURE_PATH = FIXTURES_ROOT / "value_and_stream_edge_cases.json"
 
 def _stream_fixture(name: str) -> dict:
     fixture = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
-    return fixture["stream_cases"][name]
+    wire_to_runtime = {
+        "t_supply": "supply_temperature",
+        "t_target": "target_temperature",
+        "p_supply": "supply_pressure",
+        "p_target": "target_pressure",
+        "h_supply": "supply_enthalpy",
+        "h_target": "target_enthalpy",
+        "dt_cont": "delta_t_contribution",
+        "dt_cont_multiplier": "delta_t_contribution_multiplier",
+        "htc": "heat_transfer_coefficient",
+    }
+    return {
+        wire_to_runtime.get(key, key): value
+        for key, value in fixture["stream_cases"][name].items()
+    }
 
 
 def test_scalar_stream_initialisation_computes_derived_fields():
     stream = Stream(
         name="Hot1",
-        t_supply=300.0,
-        t_target=200.0,
+        supply_temperature=300.0,
+        target_temperature=200.0,
         heat_flow=5000.0,
-        dt_cont=10.0,
-        htc=2.0,
+        delta_t_contribution=10.0,
+        heat_transfer_coefficient=2.0,
         price=50.0,
     )
 
-    assert stream.type == ST.Hot.value
-    assert float(stream.t_min) == pytest.approx(200.0)
-    assert float(stream.t_max) == pytest.approx(300.0)
-    assert float(stream.t_min_star) == pytest.approx(190.0)
-    assert float(stream.t_max_star) == pytest.approx(290.0)
-    assert float(stream.CP) == pytest.approx(50.0)
-    assert float(stream.rCP) == pytest.approx(25.0)
+    assert stream.stream_type == StreamType.Hot.value
+    assert float(stream.minimum_temperature) == pytest.approx(200.0)
+    assert float(stream.maximum_temperature) == pytest.approx(300.0)
+    assert float(stream.shifted_minimum_temperature) == pytest.approx(190.0)
+    assert float(stream.shifted_maximum_temperature) == pytest.approx(290.0)
+    assert float(stream.heat_capacity_flowrate) == pytest.approx(50.0)
+    assert float(stream.resistance_capacity_product) == pytest.approx(25.0)
 
 
 def test_stream_accepts_optional_fluid_metadata():
     stream = Stream(
         name="Refrigerant",
-        t_supply=30.0,
-        t_target=80.0,
+        supply_temperature=30.0,
+        target_temperature=80.0,
         heat_flow=100.0,
         fluid_name="HEOS::R32[0.697615]&R125[0.302385]",
         fluid_phase="VLE",
@@ -66,8 +80,8 @@ def test_stream_rejects_invalid_fluid_phase():
     with pytest.raises(ValueError, match="fluid_phase must be one of"):
         Stream(
             name="Invalid",
-            t_supply=30.0,
-            t_target=80.0,
+            supply_temperature=30.0,
+            target_temperature=80.0,
             heat_flow=100.0,
             fluid_phase="plasma",
         )
@@ -77,8 +91,8 @@ def test_stream_rejects_invalid_coolprop_fluid_name():
     with pytest.raises(ValueError, match="Invalid CoolProp fluid_name"):
         Stream(
             name="InvalidFluid",
-            t_supply=30.0,
-            t_target=80.0,
+            supply_temperature=30.0,
+            target_temperature=80.0,
             heat_flow=100.0,
             fluid_name="NotARealCoolPropFluid",
         )
@@ -87,26 +101,26 @@ def test_stream_rejects_invalid_coolprop_fluid_name():
 def test_derived_stream_fields_are_read_only():
     stream = Stream(
         name="Hot1",
-        t_supply=300.0,
-        t_target=200.0,
+        supply_temperature=300.0,
+        target_temperature=200.0,
         heat_flow=5000.0,
-        dt_cont=10.0,
-        htc=2.0,
+        delta_t_contribution=10.0,
+        heat_transfer_coefficient=2.0,
         price=50.0,
     )
 
     with pytest.raises(AttributeError):
-        stream.CP = 10.0
+        stream.heat_capacity_flowrate = 10.0
 
     with pytest.raises(AttributeError):
-        stream.t_min = 150.0
+        stream.minimum_temperature = 150.0
 
     with pytest.raises(TypeError, match="Stream-owned Value is read-only"):
-        stream.t_min["0"] = 150.0
+        stream.minimum_temperature["0"] = 150.0
     with pytest.raises(TypeError, match="Stream-owned Value is read-only"):
-        stream.CP["0"] = 10.0
-    assert float(stream.t_min) == pytest.approx(200.0)
-    assert float(stream.CP) == pytest.approx(50.0)
+        stream.heat_capacity_flowrate["0"] = 10.0
+    assert float(stream.minimum_temperature) == pytest.approx(200.0)
+    assert float(stream.heat_capacity_flowrate) == pytest.approx(50.0)
 
 
 def test_period_weight_resolution_pads_missing_values_and_rejects_invalid_shapes():
@@ -128,13 +142,13 @@ def test_period_weight_resolution_pads_missing_values_and_rejects_invalid_shapes
 def test_period_stream_resolves_named_periods_from_context():
     stream = Stream(
         name="Period-valued",
-        t_supply={
+        supply_temperature={
             "values": [300.0, 280.0],
             "period_ids": ["base", "peak"],
             "weights": [0.25, 0.75],
             "unit": "degC",
         },
-        t_target={
+        target_temperature={
             "values": [200.0, 180.0],
             "period_ids": ["base", "peak"],
             "weights": [0.25, 0.75],
@@ -146,8 +160,8 @@ def test_period_stream_resolves_named_periods_from_context():
             "weights": [0.25, 0.75],
             "unit": "kW",
         },
-        dt_cont=10.0,
-        htc=2.0,
+        delta_t_contribution=10.0,
+        heat_transfer_coefficient=2.0,
     )
     stream.set_period_context(
         period_ids={"base": "0", "peak": "1"},
@@ -155,22 +169,32 @@ def test_period_stream_resolves_named_periods_from_context():
         num_periods=2,
     )
 
-    assert stream.resolve_attr("t_supply", period_id="peak") == pytest.approx(280.0)
-    assert stream.t_supply[1].value == pytest.approx(280.0)
-    np.testing.assert_allclose(stream.t_supply[None].value, [300.0, 280.0])
+    assert stream.resolve_attr("supply_temperature", period_id="peak") == pytest.approx(
+        280.0
+    )
+    assert stream.supply_temperature[1].value == pytest.approx(280.0)
+    np.testing.assert_allclose(stream.supply_temperature[None].value, [300.0, 280.0])
     with pytest.raises(TypeError):
-        float(stream.t_supply)
-    assert stream.t_supply > 250.0
+        float(stream.supply_temperature)
+    assert stream.supply_temperature > 250.0
 
 
 def test_stream_broadcasts_scalar_updates_over_existing_state_context():
     stream = Stream(
         name="Period-valued",
-        t_supply={"values": [300.0, 280.0], "period_ids": ["0", "1"], "unit": "degC"},
-        t_target={"values": [200.0, 180.0], "period_ids": ["0", "1"], "unit": "degC"},
+        supply_temperature={
+            "values": [300.0, 280.0],
+            "period_ids": ["0", "1"],
+            "unit": "degC",
+        },
+        target_temperature={
+            "values": [200.0, 180.0],
+            "period_ids": ["0", "1"],
+            "unit": "degC",
+        },
         heat_flow={"values": [5000.0, 4000.0], "period_ids": ["0", "1"], "unit": "kW"},
-        dt_cont=10.0,
-        htc=2.0,
+        delta_t_contribution=10.0,
+        heat_transfer_coefficient=2.0,
     )
 
     stream.heat_flow = 1000.0
@@ -184,11 +208,19 @@ def test_stream_broadcasts_scalar_updates_over_existing_state_context():
 def test_stream_set_attr_for_state_updates_selected_position():
     stream = Stream(
         name="Period-valued",
-        t_supply={"values": [300.0, 280.0], "period_ids": ["0", "1"], "unit": "degC"},
-        t_target={"values": [200.0, 180.0], "period_ids": ["0", "1"], "unit": "degC"},
+        supply_temperature={
+            "values": [300.0, 280.0],
+            "period_ids": ["0", "1"],
+            "unit": "degC",
+        },
+        target_temperature={
+            "values": [200.0, 180.0],
+            "period_ids": ["0", "1"],
+            "unit": "degC",
+        },
         heat_flow={"values": [5000.0, 4000.0], "period_ids": ["0", "1"], "unit": "kW"},
-        dt_cont=10.0,
-        htc=2.0,
+        delta_t_contribution=10.0,
+        heat_transfer_coefficient=2.0,
     )
 
     stream.set_attr_for_period("heat_flow", 3500.0, period_id="1")
@@ -201,11 +233,19 @@ def test_stream_set_attr_for_state_updates_selected_position():
 def test_stream_accessor_assignment_updates_selected_position():
     stream = Stream(
         name="Period-valued",
-        t_supply={"values": [300.0, 280.0], "period_ids": ["0", "1"], "unit": "degC"},
-        t_target={"values": [200.0, 180.0], "period_ids": ["0", "1"], "unit": "degC"},
+        supply_temperature={
+            "values": [300.0, 280.0],
+            "period_ids": ["0", "1"],
+            "unit": "degC",
+        },
+        target_temperature={
+            "values": [200.0, 180.0],
+            "period_ids": ["0", "1"],
+            "unit": "degC",
+        },
         heat_flow={"values": [5000.0, 4000.0], "period_ids": ["0", "1"], "unit": "kW"},
-        dt_cont=10.0,
-        htc=2.0,
+        delta_t_contribution=10.0,
+        heat_transfer_coefficient=2.0,
     )
 
     with pytest.raises(TypeError, match="Stream-owned Value is read-only"):
@@ -220,11 +260,19 @@ def test_stream_accessor_assignment_updates_selected_position():
 def test_stream_accessor_assignment_with_none_updates_default_period():
     stream = Stream(
         name="Period-valued",
-        t_supply={"values": [300.0, 280.0], "period_ids": ["0", "1"], "unit": "degC"},
-        t_target={"values": [200.0, 180.0], "period_ids": ["0", "1"], "unit": "degC"},
+        supply_temperature={
+            "values": [300.0, 280.0],
+            "period_ids": ["0", "1"],
+            "unit": "degC",
+        },
+        target_temperature={
+            "values": [200.0, 180.0],
+            "period_ids": ["0", "1"],
+            "unit": "degC",
+        },
         heat_flow={"values": [5000.0, 4000.0], "period_ids": ["0", "1"], "unit": "kW"},
-        dt_cont=10.0,
-        htc=2.0,
+        delta_t_contribution=10.0,
+        heat_transfer_coefficient=2.0,
     )
 
     with pytest.raises(TypeError, match="Stream-owned Value is read-only"):
@@ -239,11 +287,11 @@ def test_stream_accessor_assignment_with_none_updates_default_period():
 def test_scalar_stream_accessor_assignment_with_none_updates_value():
     stream = Stream(
         name="Scalar",
-        t_supply=300.0,
-        t_target=200.0,
+        supply_temperature=300.0,
+        target_temperature=200.0,
         heat_flow=5000.0,
-        dt_cont=10.0,
-        htc=2.0,
+        delta_t_contribution=10.0,
+        heat_transfer_coefficient=2.0,
     )
 
     with pytest.raises(TypeError, match="Stream-owned Value is read-only"):
@@ -258,34 +306,34 @@ def test_stream_equal_temperature_fixtures_resolve_hot_cold_and_neutral_states()
     hot = Stream(**_stream_fixture("hot"))
     neutral = Stream(**_stream_fixture("neutral"))
 
-    assert cold.type == ST.Cold.value
-    assert cold.t_target.value == pytest.approx(40.01)
-    assert cold.t_min_star.value == pytest.approx(45.0)
-    assert cold.htr.value == pytest.approx(0.0)
+    assert cold.stream_type == StreamType.Cold.value
+    assert cold.target_temperature.value == pytest.approx(40.01)
+    assert cold.shifted_minimum_temperature.value == pytest.approx(45.0)
+    assert cold.heat_transfer_resistance.value == pytest.approx(0.0)
 
-    assert hot.type == ST.Hot.value
-    assert hot.t_target.value == pytest.approx(89.99)
-    assert hot.t_max_star.value == pytest.approx(86.0)
+    assert hot.stream_type == StreamType.Hot.value
+    assert hot.target_temperature.value == pytest.approx(89.99)
+    assert hot.shifted_maximum_temperature.value == pytest.approx(86.0)
 
-    assert neutral.type == ST.Neutral.value
-    assert neutral.CP.value == pytest.approx(0.0)
-    assert neutral.rCP.value == pytest.approx(0.0)
+    assert neutral.stream_type == StreamType.Neutral.value
+    assert neutral.heat_capacity_flowrate.value == pytest.approx(0.0)
+    assert neutral.resistance_capacity_product.value == pytest.approx(0.0)
 
 
-def test_stream_readable_aliases_and_basic_setters_cover_public_surface():
+def test_stream_descriptive_properties_and_setters_cover_public_surface():
     stream = Stream(**_stream_fixture("utility"))
 
     stream.name = "Renamed"
     stream.is_process_stream = False
     stream.is_active = False
-    stream.dt_cont_multiplier = 2.0
+    stream.delta_t_contribution_multiplier = 2.0
 
     assert stream.name == "Renamed"
     assert stream.is_process_stream is False
     assert stream.num_periods == 1
     assert stream.period_ids == {"0": 0}
     np.testing.assert_allclose(stream.weights, np.array([1.0]))
-    assert stream.stream_type == ST.Cold.value
+    assert stream.stream_type == StreamType.Cold.value
     assert stream.is_active is False
     assert stream.supply_temperature.value == pytest.approx(20.0)
     assert stream.target_temperature.value == pytest.approx(70.0)
@@ -294,7 +342,7 @@ def test_stream_readable_aliases_and_basic_setters_cover_public_surface():
     assert stream.shifted_minimum_temperature.value == pytest.approx(26.0)
     assert stream.shifted_maximum_temperature.value == pytest.approx(76.0)
     assert stream.entropic_mean_temperature.value == pytest.approx(
-        stream.t_entr_mean.value
+        stream.entropic_mean_temperature.value
     )
     assert stream.supply_pressure.value == pytest.approx(120.0)
     assert stream.target_pressure.value == pytest.approx(100.0)
@@ -308,53 +356,70 @@ def test_stream_readable_aliases_and_basic_setters_cover_public_surface():
     assert stream.utility_cost.value == pytest.approx(0.25)
     assert stream.resistance_capacity_product.value == pytest.approx(0.5)
 
-    stream.t_supply = 25.0
-    stream.t_target = 75.0
-    stream.p_supply = 130.0
-    stream.p_target = 110.0
-    stream.h_supply = 11.0
-    stream.h_target = 21.0
-    stream.dt_cont = 1.5
+    stream.supply_temperature = 25.0
+    stream.target_temperature = 75.0
+    stream.supply_pressure = 130.0
+    stream.target_pressure = 110.0
+    stream.supply_enthalpy = 11.0
+    stream.target_enthalpy = 21.0
+    stream.delta_t_contribution = 1.5
     stream.heat_flow = 80.0
-    stream.htc = 4.0
+    stream.heat_transfer_coefficient = 4.0
     stream.price = 6.0
 
-    assert stream.t_supply.value == pytest.approx(25.0)
-    assert stream.t_target.value == pytest.approx(75.0)
-    assert stream.p_supply.value == pytest.approx(130.0)
-    assert stream.p_target.value == pytest.approx(110.0)
-    assert stream.h_supply.value == pytest.approx(11.0)
-    assert stream.h_target.value == pytest.approx(21.0)
-    assert stream.dt_cont.value == pytest.approx(1.5)
+    assert stream.supply_temperature.value == pytest.approx(25.0)
+    assert stream.target_temperature.value == pytest.approx(75.0)
+    assert stream.supply_pressure.value == pytest.approx(130.0)
+    assert stream.target_pressure.value == pytest.approx(110.0)
+    assert stream.supply_enthalpy.value == pytest.approx(11.0)
+    assert stream.target_enthalpy.value == pytest.approx(21.0)
+    assert stream.delta_t_contribution.value == pytest.approx(1.5)
     assert stream.heat_flow.value == pytest.approx(80.0)
-    assert stream.htc.value == pytest.approx(4.0)
+    assert stream.heat_transfer_coefficient.value == pytest.approx(4.0)
     assert stream.price.value == pytest.approx(6.0)
+
+
+def test_stream_rejects_retired_compact_runtime_names():
+    stream = Stream(**_stream_fixture("hot"))
+    retired = Stream._RETIRED_PUBLIC_ATTRS
+
+    for name in retired:
+        assert not hasattr(stream, name)
+        with pytest.raises(AttributeError, match="descriptive runtime name"):
+            setattr(stream, name, 1.0)
+        with pytest.raises(AttributeError, match="has no attribute"):
+            stream.set_value_attr(name, 1.0)
+
+    with pytest.raises(TypeError, match="unexpected keyword argument 't_supply'"):
+        Stream(t_supply=150.0)
 
 
 def test_stream_multiplier_lock_warns_and_preserves_derived_state():
     stream = Stream(**_stream_fixture("cold"))
-    original_shifted_minimum = stream.t_min_star.value
+    original_shifted_minimum = stream.shifted_minimum_temperature.value
 
-    stream.dt_cont_multiplier_locked = True
-    assert stream.dt_cont_multiplier_locked is True
+    stream.delta_t_contribution_multiplier_locked = True
+    assert stream.delta_t_contribution_multiplier_locked is True
     with pytest.warns(UserWarning, match="Attempted to change"):
-        stream.dt_cont_multiplier = 10.0
+        stream.delta_t_contribution_multiplier = 10.0
 
-    assert stream.dt_cont_multiplier == pytest.approx(1.0)
-    assert stream.t_min_star.value == pytest.approx(original_shifted_minimum)
+    assert stream.delta_t_contribution_multiplier == pytest.approx(1.0)
+    assert stream.shifted_minimum_temperature.value == pytest.approx(
+        original_shifted_minimum
+    )
 
 
 def test_stream_can_infer_missing_supply_temperature_from_target():
-    stream = Stream(t_target=80.0, heat_flow=0.0)
+    stream = Stream(target_temperature=80.0, heat_flow=0.0)
 
-    assert stream.t_supply.value == pytest.approx(80.0)
-    assert stream.type == ST.Neutral.value
+    assert stream.supply_temperature.value == pytest.approx(80.0)
+    assert stream.stream_type == StreamType.Neutral.value
 
     default_stream = Stream()
-    assert default_stream.t_supply.value == pytest.approx(15.0)
-    assert default_stream.t_target.value == pytest.approx(15.0)
+    assert default_stream.supply_temperature.value == pytest.approx(15.0)
+    assert default_stream.target_temperature.value == pytest.approx(15.0)
     assert default_stream.heat_flow.value == pytest.approx(0.0)
-    assert default_stream.htc.value == pytest.approx(1.0)
+    assert default_stream.heat_transfer_coefficient.value == pytest.approx(1.0)
     assert default_stream.price.value == pytest.approx(0.0)
 
     default_stream._dt_cont = None
@@ -363,50 +428,63 @@ def test_stream_can_infer_missing_supply_temperature_from_target():
     default_stream._price = None
     default_stream._calculate_missing_properties()
 
-    assert default_stream.dt_cont.value == pytest.approx(0.0)
+    assert default_stream.delta_t_contribution.value == pytest.approx(0.0)
     assert default_stream.heat_flow.value == pytest.approx(0.0)
-    assert default_stream.htc.value == pytest.approx(1.0)
+    assert default_stream.heat_transfer_coefficient.value == pytest.approx(1.0)
     assert default_stream.price.value == pytest.approx(0.0)
 
 
 def test_stream_value_setters_validate_mutability_and_period_lengths():
     stream = Stream(
         name="Period-valued",
-        t_supply={"values": [300.0, 280.0], "period_ids": ["0", "1"], "unit": "degC"},
-        t_target={"values": [200.0, 180.0], "period_ids": ["0", "1"], "unit": "degC"},
+        supply_temperature={
+            "values": [300.0, 280.0],
+            "period_ids": ["0", "1"],
+            "unit": "degC",
+        },
+        target_temperature={
+            "values": [200.0, 180.0],
+            "period_ids": ["0", "1"],
+            "unit": "degC",
+        },
         heat_flow={"values": [5000.0, 4000.0], "period_ids": ["0", "1"], "unit": "kW"},
-        dt_cont=10.0,
-        htc=2.0,
+        delta_t_contribution=10.0,
+        heat_transfer_coefficient=2.0,
     )
 
     with pytest.raises(ValueError, match="not a mutable state property"):
-        stream.set_value_attr_at_idx("CP", 1.0)
+        stream.set_value_attr_at_idx("heat_capacity_flowrate", 1.0)
     with pytest.raises(ValueError, match="Weights length"):
-        stream.htc = {"values": [1.0, 2.0, 3.0], "unit": "kW/m^2/delta_degC"}
+        stream.heat_transfer_coefficient = {
+            "values": [1.0, 2.0, 3.0],
+            "unit": "kW/m^2/delta_degC",
+        }
     stream._t_target = Value([200.0, 180.0, 160.0], unit="degC")
     with pytest.raises(ValueError, match="unequal period counts"):
         stream._validate_num_periods()
     stream._t_target = Value([200.0, 180.0], unit="degC")
     stream._validate_num_periods()
 
-    stream.set_value_attr("p_supply", None)
-    assert stream.p_supply is None
+    stream.set_value_attr("supply_pressure", None)
+    assert stream.supply_pressure is None
 
     class DumpableValue:
         def model_dump(self, *, mode: str):
             assert mode == "python"
             return {"value": 115.0, "unit": "kPa"}
 
-    stream.p_supply = DumpableValue()
-    assert stream.p_supply.value == pytest.approx(115.0)
-    stream.set_value_attr("p_supply", None)
+    stream.supply_pressure = DumpableValue()
+    assert stream.supply_pressure.value == pytest.approx(115.0)
+    stream.set_value_attr("supply_pressure", None)
 
-    stream.set_value_attr_at_idx("p_supply", 101.0, idx=1)
-    np.testing.assert_allclose(stream.p_supply.period_values, np.array([0.0, 101.0]))
+    stream.set_value_attr_at_idx("supply_pressure", 101.0, idx=1)
+    np.testing.assert_allclose(
+        stream.supply_pressure.period_values, np.array([0.0, 101.0])
+    )
 
 
 def test_stream_fluid_metadata_empty_values_normalise_to_none():
-    stream = Stream(t_supply=30.0, t_target=60.0, heat_flow=10.0)
+    stream = Stream(supply_temperature=30.0, target_temperature=60.0, heat_flow=10.0)
 
     stream.fluid_name = " "
     stream.fluid_phase = ""
@@ -425,22 +503,30 @@ def test_stream_invert_rejects_process_streams_and_flips_utility_streams():
     utility.invert()
 
     assert utility.is_process_stream is True
-    assert utility.t_supply.value == pytest.approx(70.0)
-    assert utility.t_target.value == pytest.approx(20.0)
-    assert utility.p_supply.value == pytest.approx(100.0)
-    assert utility.p_target.value == pytest.approx(120.0)
-    assert utility.h_supply.value == pytest.approx(20.0)
-    assert utility.h_target.value == pytest.approx(10.0)
+    assert utility.supply_temperature.value == pytest.approx(70.0)
+    assert utility.target_temperature.value == pytest.approx(20.0)
+    assert utility.supply_pressure.value == pytest.approx(100.0)
+    assert utility.target_pressure.value == pytest.approx(120.0)
+    assert utility.supply_enthalpy.value == pytest.approx(20.0)
+    assert utility.target_enthalpy.value == pytest.approx(10.0)
 
 
 def test_stream_period_context_helpers_validate_ids_and_lengths():
     stream = Stream(
         name="Period-valued",
-        t_supply={"values": [300.0, 280.0], "period_ids": ["0", "1"], "unit": "degC"},
-        t_target={"values": [200.0, 180.0], "period_ids": ["0", "1"], "unit": "degC"},
+        supply_temperature={
+            "values": [300.0, 280.0],
+            "period_ids": ["0", "1"],
+            "unit": "degC",
+        },
+        target_temperature={
+            "values": [200.0, 180.0],
+            "period_ids": ["0", "1"],
+            "unit": "degC",
+        },
         heat_flow={"values": [5000.0, 4000.0], "period_ids": ["0", "1"], "unit": "kW"},
-        dt_cont=10.0,
-        htc=2.0,
+        delta_t_contribution=10.0,
+        heat_transfer_coefficient=2.0,
     )
 
     period_ids, weights = stream._get_period_context()
@@ -459,14 +545,14 @@ def test_stream_period_context_helpers_validate_ids_and_lengths():
 def test_multiperiod_pressure_preserves_all_core_field_derived_broadcasting():
     stream = Stream(
         name="Pressure periods",
-        t_supply=200.0,
-        t_target=100.0,
-        p_supply=[200.0, 180.0],
-        p_target=[150.0, 140.0],
+        supply_temperature=200.0,
+        target_temperature=100.0,
+        supply_pressure=[200.0, 180.0],
+        target_pressure=[150.0, 140.0],
         heat_flow=50.0,
     )
 
     assert stream.num_periods == 2
-    assert stream.CP.num_periods == 2
-    np.testing.assert_allclose(stream.CP.period_values, [0.5, 0.5])
-    np.testing.assert_allclose(stream.t_min.period_values, [100.0, 100.0])
+    assert stream.heat_capacity_flowrate.num_periods == 2
+    np.testing.assert_allclose(stream.heat_capacity_flowrate.period_values, [0.5, 0.5])
+    np.testing.assert_allclose(stream.minimum_temperature.period_values, [100.0, 100.0])

@@ -3,7 +3,7 @@ Analysis Package
 
 This is an unsupported contributor reference. Analysis modules may move or
 change without a compatibility facade; external callers should use
-:func:`OpenPinch.main.pinch_analysis_service`.
+:class:`OpenPinch.PinchProblem`.
 
 The analysis package contains the numerical workflow that turns validated
 inputs into pinch targets, utility allocations, and graph-ready composite
@@ -106,7 +106,7 @@ Process Component Services
 --------------------------
 
 Process components mutate a prepared in-memory model before a target is
-rerun. They sit below ``PinchProblem.add_component`` and are most useful for
+rerun. They sit below ``PinchProblem.components`` and are most useful for
 workspace before/after studies where the active stream set changes between
 cases.
 

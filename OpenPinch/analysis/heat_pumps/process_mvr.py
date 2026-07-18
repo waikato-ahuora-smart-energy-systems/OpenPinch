@@ -42,17 +42,17 @@ class ProcessMVRComponent(ProcessComponent):
     def activate(self):
         """Use the MVR replacement streams in subsequent targeting."""
         for record in self.stream_records:
-            record.original_stream.active = False
+            record.original_stream.is_active = False
             for stream in record.replacement_streams:
-                stream.active = True
+                stream.is_active = True
         return super().activate()
 
     def deactivate(self):
         """Restore the original source streams for subsequent targeting."""
         for record in self.stream_records:
             for stream in record.replacement_streams:
-                stream.active = False
-            record.original_stream.active = True
+                stream.is_active = False
+            record.original_stream.is_active = True
         return super().deactivate()
 
     @property

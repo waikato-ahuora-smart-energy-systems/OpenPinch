@@ -24,7 +24,7 @@ from ._stream_collection.sorting import (
     _sort_by_attrs,
     _stream_attr_value,
 )
-from .enums import ST
+from .enums import StreamType
 from .stream import Stream
 
 
@@ -45,8 +45,8 @@ class StreamCollection:
         self._streams: dict[str, object] = {}
         self._period_ids: dict[str, int] | None = {"0": 0}
         self._weights: np.ndarray | None = np.array([1.0])
-        self._sort_spec: Tuple[str, Any] = ("attr", "t_supply")
-        self._sort_key: Callable = partial(_sort_by_attr, "t_supply")
+        self._sort_spec: Tuple[str, Any] = ("attr", "supply_temperature")
+        self._sort_key: Callable = partial(_sort_by_attr, "supply_temperature")
         self._sort_reverse: bool = True
         self._sorted_cache: List[object] = []
         self._needs_sort: bool = True
@@ -420,16 +420,16 @@ class StreamCollection:
 
     def __getstate__(self):
         state = self.__dict__.copy()
-        mode, sort_detail = state.get("_sort_spec", ("attr", "t_supply"))
+        mode, sort_detail = state["_sort_spec"]
         if mode == "callable" and not _is_picklable(sort_detail):
-            state["_sort_spec"] = ("attr", "t_supply")
+            state["_sort_spec"] = ("attr", "supply_temperature")
+            state["_sorted_cache"] = []
+            state["_needs_sort"] = True
         state["_sort_key"] = None
         return state
 
     def __setstate__(self, state):
         self.__dict__.update(state)
-        if "_numeric_cache" not in self.__dict__:
-            self._numeric_cache = {}
         self._rebuild_sort_key()
 
     def to_dict(
@@ -453,13 +453,13 @@ class StreamCollection:
 
     @classmethod
     def _dict_category(cls, stream: "Stream") -> str:
-        if stream.is_process_stream and stream.type == ST.Hot.value:
+        if stream.is_process_stream and stream.stream_type == StreamType.Hot.value:
             return "hot_stream"
-        if stream.is_process_stream and stream.type == ST.Cold.value:
+        if stream.is_process_stream and stream.stream_type == StreamType.Cold.value:
             return "cold_stream"
-        if not stream.is_process_stream and stream.type == ST.Hot.value:
+        if not stream.is_process_stream and stream.stream_type == StreamType.Hot.value:
             return "hot_utility"
-        if not stream.is_process_stream and stream.type == ST.Cold.value:
+        if not stream.is_process_stream and stream.stream_type == StreamType.Cold.value:
             return "cold_utility"
         return "other"
 
@@ -506,7 +506,7 @@ class StreamCollection:
     ):
         """Return a new collection containing only hot streams."""
         return self._build_stream_subset(
-            target_type=ST.Hot.value,
+            target_type=StreamType.Hot.value,
             include_process_streams=include_process_streams,
             include_utility_streams=include_utility_streams,
             invert_utility=invert_utility,
@@ -522,7 +522,7 @@ class StreamCollection:
     ):
         """Return a new collection containing only cold streams."""
         return self._build_stream_subset(
-            target_type=ST.Cold.value,
+            target_type=StreamType.Cold.value,
             include_process_streams=include_process_streams,
             include_utility_streams=include_utility_streams,
             invert_utility=invert_utility,
@@ -542,7 +542,7 @@ class StreamCollection:
     def get_hot_process_streams(self, sort_attr: str | None = None):
         """Return a new collection containing only hot process streams."""
         return self._build_stream_subset(
-            target_type=ST.Hot.value,
+            target_type=StreamType.Hot.value,
             include_process_streams=True,
             include_utility_streams=False,
             invert_utility=False,
@@ -552,7 +552,7 @@ class StreamCollection:
     def get_cold_process_streams(self, sort_attr: str | None = None):
         """Return a new collection containing only cold process streams."""
         return self._build_stream_subset(
-            target_type=ST.Cold.value,
+            target_type=StreamType.Cold.value,
             include_process_streams=True,
             include_utility_streams=False,
             invert_utility=False,
@@ -572,7 +572,7 @@ class StreamCollection:
     def get_hot_utility_streams(self, sort_attr: str | None = None):
         """Return a new collection containing only hot utility streams."""
         return self._build_stream_subset(
-            target_type=ST.Hot.value,
+            target_type=StreamType.Hot.value,
             include_process_streams=False,
             include_utility_streams=True,
             invert_utility=False,
@@ -582,7 +582,7 @@ class StreamCollection:
     def get_cold_utility_streams(self, sort_attr: str | None = None):
         """Return a new collection containing only cold utility streams."""
         return self._build_stream_subset(
-            target_type=ST.Cold.value,
+            target_type=StreamType.Cold.value,
             include_process_streams=False,
             include_utility_streams=True,
             invert_utility=False,
@@ -592,7 +592,7 @@ class StreamCollection:
     def get_inverted_hot_utility_streams(self, sort_attr: str | None = None):
         """Return a new collection containing only inverted hot utility streams."""
         return self._build_stream_subset(
-            target_type=ST.Hot.value,
+            target_type=StreamType.Hot.value,
             include_process_streams=False,
             include_utility_streams=True,
             invert_utility=True,
@@ -602,7 +602,7 @@ class StreamCollection:
     def get_inverted_cold_utility_streams(self, sort_attr: str | None = None):
         """Return a new collection containing only inverted cold utility streams."""
         return self._build_stream_subset(
-            target_type=ST.Cold.value,
+            target_type=StreamType.Cold.value,
             include_process_streams=False,
             include_utility_streams=True,
             invert_utility=True,

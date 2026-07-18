@@ -1,55 +1,44 @@
 # Build Instructions
 
-## Environment
+## Prerequisites
 
-Use Python 3.14.2 or newer and the locked development environment from the repository root.
+- Python 3.11 or newer.
+- `uv` with the repository lock file available.
+- Network access only when locked dependencies are not already installed.
+- Chrome or Chromium plus Kaleido for static Plotly image tests.
+- External HEN solvers only when running the separately marked solver profile.
 
-```bash
-uv sync --group dev
-```
+No application environment variables or external services are required for the
+base package build.
 
-## Distribution Build
+## Build Steps
 
-```bash
-uv run python scripts/build_dist.py
-```
-
-The verified acceptance build produced both the OpenPinch 0.4.5 wheel and source distribution. A temporary output directory may be selected with `--output-dir` to avoid replacing local release artifacts.
-
-## Documentation Build
+Install the locked development environment:
 
 ```bash
-uv run sphinx-build -W -b html docs docs/_build/html
+uv sync --all-extras --dev
 ```
 
-The segmented-stream API and input guide build warning-free.
-
-## Segment Batch Update and Pricing Acceptance Build
+Build the wheel and source distribution:
 
 ```bash
-uv run python scripts/build_dist.py \
-  --output-dir /private/tmp/openpinch-segment-pricing-20260716
+uv run python scripts/build_dist.py --output-dir dist
 ```
 
-Verified result: OpenPinch 0.4.6 wheel and source distribution built
-successfully without modifying tracked release artifacts.
-
-## GitHub CI Heat-Pump Zero-Duty Follow-Up
-
-### Verified Environment
-
-- Python 3.14.2
-- NumPy 2.4.6
-- CoolProp 7.2.0
-- pytest 9.1.1
-- Hypothesis 6.156.6
-
-### Isolated Distribution Build
+Build warning-free HTML documentation:
 
 ```bash
-uv run python scripts/build_dist.py \
-  --output-dir /private/tmp/openpinch-ci-build-20260715T2024
+uv run sphinx-build -W --keep-going -b html docs docs/_build/html
 ```
 
-Verified result: OpenPinch 0.4.5 wheel and source distribution built
-successfully without replacing workspace release artifacts.
+Successful distribution output contains one `openpinch-*.whl` and one
+`openpinch-*.tar.gz`. Successful documentation output is under
+`docs/_build/html` with zero warnings.
+
+## Troubleshooting
+
+- The Sphinx tree is self-contained and must build without network access.
+- Kaleido browser failures indicate that Chrome cannot start in the current
+  sandbox; verify image export in an environment allowed to launch it.
+- HEN solver failures belong to the explicit `solver` test profile and require
+  the corresponding solver installation.

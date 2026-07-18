@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any, Mapping, Optional
 
 if TYPE_CHECKING:
     from ....analysis.heat_pumps.process_mvr import ProcessMVRComponent
@@ -13,7 +14,12 @@ class _ComponentAccessor:
     def __init__(self, problem: "PinchProblem") -> None:
         self._problem = problem
 
-    def process_mvr(
+    @property
+    def inventory(self) -> Mapping[str, "ProcessMVRComponent"]:
+        """Return the current process components without exposing mutable storage."""
+        return MappingProxyType(dict(self._problem._process_components))
+
+    def add_process_mvr(
         self,
         source_streams,
         *,
@@ -22,6 +28,8 @@ class _ComponentAccessor:
         liquid_injection: bool = True,
         mvr_stage_t_lift: Optional[float] = None,
         mvr_stage_pressure_ratio: Optional[float] = None,
+        compressor_efficiency: Optional[float] = None,
+        motor_efficiency: Optional[float] = None,
         options: Optional[dict[str, Any]] = None,
         period_id: Optional[str] = None,
     ) -> "ProcessMVRComponent":
@@ -38,6 +46,8 @@ class _ComponentAccessor:
             liquid_injection=liquid_injection,
             mvr_stage_t_lift=mvr_stage_t_lift,
             mvr_stage_pressure_ratio=mvr_stage_pressure_ratio,
+            eta_mvr_comp=compressor_efficiency,
+            eta_motor=motor_efficiency,
             options=options,
             period_id=period_id,
         )

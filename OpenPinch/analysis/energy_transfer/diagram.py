@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 
 from ...domain.configuration import tol
-from ...domain.enums import GT, PT, TT
+from ...domain.enums import GraphType, ProblemTableLabel, TargetType
 from ...domain.problem_table import ProblemTable
 from ...domain.targets import EnergyTransferTarget, UtilitySummaryTarget
 from .cascade import (
@@ -39,7 +39,7 @@ def compute_energy_transfer_target(
     return EnergyTransferTarget.model_validate(
         {
             "zone_name": getattr(base_target, "zone_name", None),
-            "type": TT.ET.value,
+            "type": TargetType.ET.value,
             "parent_zone": base_target.parent_zone,
             "config": base_target.config,
             "pt": get_base_problem_table(base_target),
@@ -257,11 +257,11 @@ def get_base_problem_table(
 def get_source_problem_table(target: UtilitySummaryTarget) -> ProblemTable:
     graphs = getattr(target, "graphs", None)
     if isinstance(graphs, dict):
-        gcc = graphs.get(GT.GCC.value)
+        gcc = graphs.get(GraphType.GCC.value)
         if (
             isinstance(gcc, ProblemTable)
-            and has_problem_table_values(gcc, PT.T)
-            and has_problem_table_values(gcc, PT.H_NET)
+            and has_problem_table_values(gcc, ProblemTableLabel.T)
+            and has_problem_table_values(gcc, ProblemTableLabel.H_NET)
         ):
             return gcc
     return get_base_problem_table(target)

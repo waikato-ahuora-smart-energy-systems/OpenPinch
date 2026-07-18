@@ -43,7 +43,12 @@ def apply_zone_config_overrides(zone: Zone, args: dict | None) -> None:
     if not isinstance(args, dict):
         return
 
-    allowed_runtime_keys = {"period_idx", "period_id", "base_target_type"}
+    allowed_runtime_keys = {
+        "period_idx",
+        "period_id",
+        "base_target_type",
+        "_calculate_area_cost",
+    }
     invalid_keys = sorted(
         str(key) for key in args if str(key) not in allowed_runtime_keys
     )

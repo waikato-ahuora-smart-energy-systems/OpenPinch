@@ -7,12 +7,13 @@ Unreleased
 0.5.0 architecture clean break
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- ``OpenPinch.main.pinch_analysis_service`` is the sole current
-  compatibility-protected Python contract. Its signature, validation order,
-  return structure, serialization, ordering, exceptions, and numerical
-  behaviour are unchanged.
-- The package root is now an import-free marker. It no longer exports workflow
-  classes, schemas, enums, resource helpers, or the main service.
+- ``PinchProblem`` remains the strict
+  mapping-in/result-out contract. Its signature, validation order, return
+  structure, serialization, ordering, exceptions, and numerical behaviour are
+  unchanged.
+- The package root exports exactly ``PinchProblem`` and ``PinchWorkspace`` as
+  the high-level workflow entry points. Schemas, enums, resource helpers, and
+  the main service remain with their concrete owners.
 - Business state, wire contracts, reusable optimisation, orchestration,
   engineering analysis, infrastructure adapters, and presentation now have
   explicit ``domain``, ``contracts``, ``optimisation``, ``application``,
@@ -29,6 +30,16 @@ Unreleased
 - Optimisation is a reusable package-level capability. Heat-pump targeting
   crosses one explicit adapter; new services can reuse optimisation without
   importing heat-pump code.
+- HPR internal records are attribute-only, and HPR optimiser identifiers must
+  exactly match ``dual_annealing``, ``cmaes``, ``bo``, or ``rbf_surrogate``.
+  Obsolete helper-signature retries and historical optimiser spellings are not
+  accepted.
+- ``StreamCollection`` supports current-version pickle round trips, including
+  deterministic fallback for an unpicklable callable sort key. It does not
+  repair state dictionaries produced by older package versions.
+- Internal type-only imports now resolve to the concrete configuration owner,
+  total-site utility profiles forward the canonical period keyword, and invalid
+  crossflow row counts raise an explicit validation error.
 - Tests now mirror observable owner layers. The external main contract is
   authoritative, architecture directions are AST-enforced, and CI measures
   seeded statement and branch coverage with Hypothesis seed ``20260715``.
@@ -52,6 +63,15 @@ This pre-release changes the following contracts without compatibility shims:
   unknown versions, and the retired ``payload`` field are rejected.
 - Segmented process streams and utilities share the same semantic validation in
   reports and preparation, including parent aggregate consistency.
+- ``TargetInput.network`` accepts the exact mapping produced by
+  ``HeatExchangerNetwork.model_dump(mode="json")`` and preserves it through a
+  complete input JSON round trip. The transport contract rejects private
+  solver and source metadata and does not automatically seed HEN synthesis.
+- HEN endpoint classifications now use ``StreamID`` values ``Process`` and
+  ``Utility``. The retired lowercase endpoint-role enum and ``Unassigned``
+  endpoint values are not accepted.
+- ``StreamID`` is string-backed, keeping Python-mode HEN and canonical input
+  mappings safe for direct JSON and workspace-bundle persistence.
 
 Private helper ownership
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -62,7 +82,7 @@ Private helper ownership
 - Runtime stream-segment, exchanger-period, and exchanger-area-slice record
   classes are parent-owned implementation details. Construct them through
   ``Stream`` and ``HeatExchanger`` mappings. The equivalent segment wire shape
-  remains accepted through ``pinch_analysis_service(...)``; direct schema
+  remains accepted through ``PinchProblem(...)``; direct schema
   imports are not compatibility-protected.
 - The former public record imports and their Python pickle paths are removed
   without aliases or compatibility shims.
@@ -70,8 +90,9 @@ Private helper ownership
   owners. The compatibility-only ``methods``, ``tasks``, and ``results`` modules
   and the synthesis package re-export barrel are removed. Import concrete owner
   modules instead; old barrel-qualified pickle paths are unsupported.
-- The package root and owner package ``__init__`` files are import-free markers.
-  The retired ``classes``, ``lib``, ``services``, ``utils``, and
+- Owner package ``__init__`` files remain import-free markers. The package root
+  is the deliberate two-class workflow surface. The retired ``classes``,
+  ``lib``, ``services``, ``utils``, and
   ``streamlit_webviewer`` package paths have no compatibility facades; advanced
   callers import concrete owner modules.
 - Process-MVR records, multiperiod HPR period cases, dashboard graph state,

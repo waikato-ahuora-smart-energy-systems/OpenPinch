@@ -7,22 +7,22 @@ from typing import Sequence
 
 from ....contracts.synthesis.common import (
     HeatExchangerNetworkSynthesisManifest,
-    SynthesisMethod,
 )
 from ....contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
 from ....contracts.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
+from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ..errors import WorkflowContractError
 from ..execution.pathways import pathways_from_metadata
 from ..execution.settings import SynthesisWorkflowSettings
 from ..reporting.verification import verify_network_feasibility
 
-_METHOD_SEQUENCE: tuple[SynthesisMethod, ...] = (
-    "pinch_design_method",
-    "thermal_derivative_method",
-    "network_evolution_method",
+_METHOD_SEQUENCE: tuple[HeatExchangerNetworkDesignMethod, ...] = (
+    HeatExchangerNetworkDesignMethod.PinchDesign,
+    HeatExchangerNetworkDesignMethod.ThermalDerivative,
+    HeatExchangerNetworkDesignMethod.NetworkEvolution,
 )
 
 
