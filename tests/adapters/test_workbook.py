@@ -516,7 +516,7 @@ def test_write_targets_to_dict_and_list_empty_paths():
     )
 
 
-def test_validate_utilities_data_alias_executes():
+def test_validate_utility_data_accepts_canonical_records():
     out = validate_utility_data(
         [
             {"name": "HP Steam", "type": "Hot"},

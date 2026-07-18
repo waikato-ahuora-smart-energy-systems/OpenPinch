@@ -119,6 +119,13 @@ class HeatFlowUnits(Enum):
     GW = "GW"
 
 
+class PenaltyForm(Enum):
+    """Canonical inequality-constraint penalty algorithms."""
+
+    SQUARE = "square"
+    SQUARE_ROOT_SMOOTHING = "square_root_smoothing"
+
+
 class StreamType(Enum):
     """Steam type"""
 
@@ -352,6 +359,7 @@ __all__ = [
     "HeatPumpAndRefrigerationCycle",
     "LegendSeries",
     "LineColour",
+    "PenaltyForm",
     "ProblemTableLabel",
     "StreamID",
     "StreamDataLabel",

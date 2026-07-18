@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: CONSTRUCTION - Compatibility Shim Canonicalization complete; Operations N/A
+- **Current Stage**: COMPLETE - Residual Compatibility Shim Cleanup
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -208,6 +208,63 @@
   `aidlc-docs/construction/compatibility-shim-canonicalization/code/code-generation-summary.md`.
 - **Build and Test summary**:
   `aidlc-docs/construction/compatibility-shim-canonicalization/build-and-test/build-and-test-summary.md`.
+
+## Residual Compatibility Shim Cleanup Progress
+
+- [x] INCEPTION - Workspace Detection and continuity reused
+- [x] INCEPTION - Reverse Engineering reused with focused repository scan
+- [x] INCEPTION - Requirements clarification complete
+- [x] INCEPTION - Requirements Analysis artifact complete
+- [x] INCEPTION - Requirements approval
+- [x] INCEPTION - User Stories assessment (skipped: internal refactor)
+- [x] INCEPTION - Workflow Planning artifact complete
+- [x] INCEPTION - Workflow plan approval
+- [x] INCEPTION - Application Design assessment (skipped: existing boundaries)
+- [x] INCEPTION - Units Generation assessment (skipped: one coupled unit)
+- [x] CONSTRUCTION - Functional Design assessment (skipped: requirements are sufficient)
+- [x] CONSTRUCTION - NFR Requirements and Design assessment (skipped: no new NFRs)
+- [x] CONSTRUCTION - Infrastructure Design assessment (skipped: no infrastructure)
+- [x] CONSTRUCTION - Code Generation Part 1 planning
+- [x] CONSTRUCTION - Code Generation Part 2 implementation
+- [x] CONSTRUCTION - Build and Test
+- [x] OPERATIONS - N/A; no deployment work requested
+- **Compatibility policy**: Repository-wide clean break. Remove genuine aliases,
+  dependency-version retries, upstream monkeypatches, and transition pages while
+  retaining canonical engineering normalization, algorithmic resilience, wire
+  contracts, optional-dependency guards, and solver-shape invariants.
+- **Requirements**:
+  `aidlc-docs/inception/requirements/residual-compatibility-shim-cleanup-requirements.md`.
+- **Approval file**:
+  `aidlc-docs/inception/requirements/residual-compatibility-shim-cleanup-approval.md`.
+- **Workflow plan**:
+  `aidlc-docs/inception/plans/residual-compatibility-shim-cleanup-execution-plan.md`.
+- **Workflow approval file**:
+  `aidlc-docs/inception/plans/residual-compatibility-shim-cleanup-plan-approval.md`.
+- **Code Generation plan**:
+  `aidlc-docs/construction/plans/residual-compatibility-shim-cleanup-code-generation-plan.md`.
+- **Approval mode**: The user explicitly approved the workflow through task completion;
+  the approval covers the detailed dependency-ordered Code Generation plan and all
+  remaining standardized gates.
+- **Extension configuration**: Security and Resiliency disabled. Partial PBT applies
+  to penalty and unit-group invariants with Hypothesis seed `20260715`.
+- **Current stage**: Complete. Enum-only penalty selection, canonical unit-group
+  terminology, current Pyomo availability, an unmodified OpenHENS prerequisite,
+  removal of the final transition page, and static retirement guards are in place.
+- **Verification evidence**: The affected suite passed 275 tests; the complete
+  fixed-seed non-solver suite passed 2,108 tests with 3 intentional opt-in skips
+  and 4 solver deselections; the real HEN solver profile passed 3 tests with 1
+  intentional nine-stream skip. Ruff checked all 460 Python files, Sphinx built
+  53 sources warning-free, both distributions built, the isolated wheel smoke
+  passed, and stale-symbol and patch-hygiene checks are clean.
+- **Solver regression correction**: Live four-stream runs retained the exact
+  checked-in objective and design while producing 99 and 97 conditionally
+  generated ESM branches. The regression now enforces a 95-to-100 branch bound,
+  matching the existing bounded live-solver policy without weakening design,
+  topology, or cost assertions.
+- **Code Generation summary**:
+  `aidlc-docs/construction/residual-compatibility-shim-cleanup/code/implementation-summary.md`.
+- **Build and Test summary**:
+  `aidlc-docs/construction/residual-compatibility-shim-cleanup/build-and-test/build-and-test-summary.md`.
 
 ## Private Helper Reorganization Progress
 
@@ -661,3 +718,44 @@
   execution counts and outputs; those local results were preserved. Root
   identity/cold imports, curated docs/notebooks, Ruff, warning-as-error Sphinx,
   notebook JSON parsing, stale-contract search, and patch hygiene pass.
+
+## GitHub CI HEN Solver-Isolation Progress
+
+- [x] INCEPTION - Workspace Detection resumed from the current brownfield
+  repository.
+- [x] INCEPTION - Reverse Engineering reused current repository artifacts.
+- [x] INCEPTION - Minimal Requirements Analysis completed.
+- [x] INCEPTION - Requirements approval.
+- [x] INCEPTION - User Stories assessment (skipped: isolated internal test fix).
+- [x] INCEPTION - Workflow Planning artifact completed.
+- [x] INCEPTION - Workflow plan approval.
+- [x] CONSTRUCTION - Code Generation Part 1 planning.
+- [x] CONSTRUCTION - Code Generation plan approval.
+- [x] CONSTRUCTION - Code Generation Part 2 implementation.
+- [x] CONSTRUCTION - Generated-code approval.
+- [x] CONSTRUCTION - Build and Test.
+- [x] CONSTRUCTION - Build and Test approval.
+- [x] OPERATIONS - N/A; no deployment work requested.
+- **Diagnosed cause**: One unmarked owner-boundary test invokes live HEN
+  synthesis. Local IDAES binaries mask the dependency, while GitHub's non-solver
+  job has neither Couenne nor IPOPT.
+- **Recommended repair**: Use the existing fake-executor monkeypatch helper in
+  the affected test; do not install solvers or change production behavior.
+- **Requirements**:
+  `aidlc-docs/inception/requirements/github-ci-hen-solver-isolation-requirements.md`.
+- **User Stories assessment**:
+  `aidlc-docs/inception/plans/github-ci-hen-solver-isolation-user-stories-assessment.md`.
+- **Workflow plan**:
+  `aidlc-docs/inception/plans/github-ci-hen-solver-isolation-execution-plan.md`.
+- **Code Generation plan**:
+  `aidlc-docs/construction/plans/github-ci-hen-solver-isolation-code-generation-plan.md`.
+- **Code Generation summary**:
+  `aidlc-docs/construction/github-ci-hen-solver-isolation/code/code-generation-summary.md`.
+- **Build and Test summary**:
+  `aidlc-docs/construction/github-ci-hen-solver-isolation/build-and-test/build-and-test-summary.md`.
+- **Current stage**: Complete. Build and Test results are approved; Operations
+  is N/A. The exact
+  regression passed 1 test, the containing CI-selected module passed 22 tests,
+  and Ruff plus patch-hygiene checks passed.
+- **Extensions**: Security and Resiliency disabled. Partial PBT is N/A for the
+  isolated example repair except existing fixed-seed and framework compliance.

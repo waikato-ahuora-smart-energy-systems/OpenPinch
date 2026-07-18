@@ -107,7 +107,8 @@ def test_internal_service_requires_live_problem(raw_input: object) -> None:
         heat_exchanger_network_synthesis_service(raw_input)  # type: ignore[arg-type]
 
 
-def test_design_options_are_validated_at_their_owner_boundary() -> None:
+def test_design_options_are_validated_at_their_owner_boundary(monkeypatch) -> None:
+    _use_fake_default_executor(monkeypatch)
     problem = _public_example_problem()
 
     with pytest.raises(TypeError, match="runtime options.*dict"):

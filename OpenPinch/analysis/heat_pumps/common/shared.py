@@ -23,7 +23,7 @@ from ....contracts.hpr import (
     SimulatedHPRAnnualizedCostAccounting,
 )
 from ....domain.configuration import tol as _tol
-from ....domain.enums import ProblemTableLabel
+from ....domain.enums import PenaltyForm, ProblemTableLabel
 from ....domain.stream_collection import StreamCollection
 from ..optimisation_adapter import build_hpr_accounting as _build_hpr_accounting
 from ._shared import plotting as _plotting
@@ -59,7 +59,7 @@ def _cycle_penalty(
             cycle_terms,
             eta=float(getattr(args, "eta_penalty", 0.01)),
             rho=float(getattr(args, "rho_penalty", 10.0)),
-            form="square",
+            form=PenaltyForm.SQUARE,
         )
     )
 

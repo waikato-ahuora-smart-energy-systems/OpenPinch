@@ -142,6 +142,11 @@ def test_public_python_surface_is_covered_by_curated_api_docs():
     assert "tutorial-coverage-map" in contract_page
 
 
+def test_legacy_library_transition_page_is_absent_from_docs_and_navigation():
+    assert not (DOCS_ROOT / "reference" / "api-lib.rst").exists()
+    assert "../reference/api-lib" not in _read(API_ROOT / "generated-index.rst")
+
+
 def test_workflow_guides_do_not_recommend_concrete_application_imports():
     combined_guides = _docs_text(sorted(GUIDES_ROOT.glob("*.rst")))
 

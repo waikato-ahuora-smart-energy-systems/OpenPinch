@@ -156,10 +156,7 @@ def configure_gekko_solver(
             purpose=f"{solver_name} solver factory availability checks",
         )
         solver_factory = pyomo.SolverFactory(model.options.SOLVER)
-        try:
-            available = solver_factory.available(exception_flag=False)
-        except TypeError:
-            available = solver_factory.available(False)
+        available = solver_factory.available(exception_flag=False)
         if not available:
             raise MissingSynthesisSolverError(
                 f"The {model.options.SOLVER!r} Pyomo solver is not available. "

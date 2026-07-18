@@ -4,6 +4,8 @@ import math
 
 import numpy as np
 import pytest
+from hypothesis import given, seed
+from hypothesis import strategies as st
 
 from OpenPinch.analysis.economics import compute_capital_recovery_factor
 from OpenPinch.analysis.numerics import (
@@ -11,6 +13,7 @@ from OpenPinch.analysis.numerics import (
     interp_with_plateaus,
     make_monotonic,
 )
+from OpenPinch.domain.enums import PenaltyForm
 
 """Test cases for the compute_capital_recovery_factor function."""
 
@@ -66,20 +69,80 @@ def test_g_ineq_penalty_square_default():
 
 
 def test_g_ineq_penalty_square_custom_rho():
-    assert g_ineq_penalty(-3.0, rho=2.0, form="square") == pytest.approx(18.0)
+    assert g_ineq_penalty(-3.0, rho=2.0, form=PenaltyForm.SQUARE) == pytest.approx(18.0)
 
 
 def test_g_ineq_penalty_square_root_smoothing():
     g, eta, rho = -0.2, 0.5, 4.0
     expected = 0.5 * rho * (g + (g**2 + eta**2) ** 0.5)
     assert g_ineq_penalty(
-        g, eta=eta, rho=rho, form="square_root_smoothing"
+        g, eta=eta, rho=rho, form=PenaltyForm.SQUARE_ROOT_SMOOTHING
     ) == pytest.approx(expected)
 
 
-def test_g_ineq_penalty_invalid_form():
-    with pytest.raises(ValueError, match="Unrecognised penalty function"):
-        g_ineq_penalty(1.0, form="invalid")
+@pytest.mark.parametrize(
+    "form",
+    [
+        "square",
+        "SQUARE",
+        "square_root_smoothing",
+        "square root smoothing",
+        object(),
+    ],
+)
+def test_g_ineq_penalty_rejects_non_enum_forms(form):
+    with pytest.raises(TypeError, match="PenaltyForm"):
+        g_ineq_penalty(1.0, form=form)
+
+
+@seed(20260715)
+@given(
+    residuals=st.lists(
+        st.floats(
+            min_value=-1e4,
+            max_value=1e4,
+            allow_nan=False,
+            allow_infinity=False,
+        ),
+        min_size=1,
+        max_size=20,
+    ),
+    eta=st.floats(
+        min_value=0.0,
+        max_value=100.0,
+        allow_nan=False,
+        allow_infinity=False,
+    ),
+    rho=st.floats(
+        min_value=0.0,
+        max_value=100.0,
+        allow_nan=False,
+        allow_infinity=False,
+    ),
+    form=st.sampled_from(list(PenaltyForm)),
+)
+def test_g_ineq_penalty_vector_matches_scalar_sum(residuals, eta, rho, form):
+    result = g_ineq_penalty(residuals, eta=eta, rho=rho, form=form)
+    scalar_sum = sum(
+        float(g_ineq_penalty(value, eta=eta, rho=rho, form=form)) for value in residuals
+    )
+
+    assert np.isfinite(result)
+    assert result == pytest.approx(scalar_sum)
+
+
+@seed(20260715)
+@given(
+    residual=st.floats(
+        min_value=0.0,
+        max_value=1e4,
+        allow_nan=False,
+        allow_infinity=False,
+    ),
+    form=st.sampled_from(list(PenaltyForm)),
+)
+def test_g_ineq_penalty_is_non_negative_for_non_negative_residuals(residual, form):
+    assert g_ineq_penalty(residual, form=form) >= 0.0
 
 
 def test_interp_with_plateaus_invalid_side():

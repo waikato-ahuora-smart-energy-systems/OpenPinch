@@ -7,6 +7,7 @@ from typing import Tuple
 import numpy as np
 
 from ..domain.configuration import tol
+from ..domain.enums import PenaltyForm
 
 __all__ = [
     "delta_vals",
@@ -142,19 +143,17 @@ def g_ineq_penalty(
     *,
     eta: float = 0.01,
     rho: float = 10,
-    form: str = "square",
+    form: PenaltyForm = PenaltyForm.SQUARE,
 ) -> np.float64:
     """Return a penalty value for an inequality-constraint residual."""
+    if not isinstance(form, PenaltyForm):
+        raise TypeError("form must be a PenaltyForm value.")
+
     g = np.asarray(g, dtype=float)
-    if (
-        form.lower() == "square_root_smoothing"
-        or form.lower() == "square root smoothing"
-    ):
+    if form is PenaltyForm.SQUARE_ROOT_SMOOTHING:
         p = 0.5 * rho * (g + ((g) ** 2 + (eta) ** 2) ** 0.5)
-    elif form.lower() == "square":
-        p = rho * (g**2)
     else:
-        raise ValueError("Unrecognised penalty function form selection.")
+        p = rho * (g**2)
 
     if isinstance(p, float):
         return np.float64(p)

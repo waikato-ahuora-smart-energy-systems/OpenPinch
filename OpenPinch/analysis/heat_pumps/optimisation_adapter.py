@@ -14,6 +14,7 @@ from ...contracts.hpr import (
     HPRBackendResult,
     MultiPeriodHPRTargetInputs,
 )
+from ...domain.enums import PenaltyForm
 from ...domain.value import Value
 from ...optimisation.errors import NoOptimisationCandidatesError
 from ...optimisation.models import (
@@ -294,7 +295,7 @@ def build_hpr_accounting(
                 positive_penalty_terms,
                 eta=args.eta_penalty,
                 rho=args.rho_penalty,
-                form="square",
+                form=PenaltyForm.SQUARE,
             )
         )
         if positive_penalty_terms.size
@@ -306,7 +307,11 @@ def build_hpr_accounting(
         True,
     ):
         penalty += float(
-            g_ineq_penalty(g=Q_ext_cold, rho=args.rho_penalty, form="square")
+            g_ineq_penalty(
+                g=Q_ext_cold,
+                rho=args.rho_penalty,
+                form=PenaltyForm.SQUARE,
+            )
         )
     objective = calc_hpr_obj(
         work=work,

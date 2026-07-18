@@ -40,6 +40,7 @@ def test_root_package_exports_only_the_workflow_entrypoints() -> None:
     assert OpenPinch.PinchProblem is PinchProblem
     assert OpenPinch.PinchWorkspace is PinchWorkspace
     assert not hasattr(OpenPinch, "TargetInput")
+    assert not hasattr(OpenPinch, "PenaltyForm")
     assert not hasattr(OpenPinch, "pinch_analysis_service")
 
 

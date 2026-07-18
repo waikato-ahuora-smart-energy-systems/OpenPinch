@@ -53,7 +53,7 @@ def test_unit_system_config_override_resolution_paths():
     assert (
         unit_system._resolve_override(
             key="t_supply",
-            aliases=("temperature",),
+            unit_groups=("temperature",),
             overrides={"t_supply": None, "temperature": " K "},
         )
         == "K"
@@ -61,7 +61,7 @@ def test_unit_system_config_override_resolution_paths():
     assert (
         unit_system._resolve_override(
             key="t_supply",
-            aliases=("temperature",),
+            unit_groups=("temperature",),
             overrides={"temperature": " "},
         )
         is None
@@ -141,6 +141,30 @@ def test_standardise_input_value_uses_canonical_and_override_units():
     assert delta_temperature.unit == "delta_degC"
 
 
+@pytest.mark.parametrize("field_name", ["t_supply", "t_target"])
+def test_temperature_unit_group_override_applies_to_each_input_field(field_name):
+    value = unit_system.standardise_input_value(
+        298.15,
+        field_name=field_name,
+        config={"input_unit_overrides": {"temperature": "K"}},
+    )
+
+    assert value.value == pytest.approx(25.0)
+    assert value.unit == "degC"
+
+
+@pytest.mark.parametrize("metric_name", ["Qh", "Qc", "Qr", "utility_heat_flow"])
+def test_heat_flow_unit_group_override_applies_to_each_output_metric(metric_name):
+    value = unit_system.coerce_output_value(
+        Value(1000.0, "kW"),
+        metric_name=metric_name,
+        config={"output_unit_overrides": {"heat_flow": "MW"}},
+    )
+
+    assert value.value == pytest.approx(1.0)
+    assert value.unit == "MW"
+
+
 def test_coerce_output_value_uses_default_and_configured_display_units():
     fixture = _unit_fixture()
 
@@ -165,7 +189,7 @@ def test_coerce_output_value_uses_default_and_configured_display_units():
     temporary_rule = unit_system.OutputUnitRule(
         "dimensionless",
         None,
-        aliases=("raw_fraction",),
+        unit_groups=("raw_fraction",),
     )
     unit_system.OUTPUT_UNIT_RULES["raw_fraction"] = temporary_rule
     try:
