@@ -28,6 +28,67 @@
 | Property-Based Testing | Partial | Notebook Improvement Requirements Analysis |
 | Resiliency Baseline | No | Notebook Improvement Requirements Analysis |
 
+## Total Site Profiles Diagnostic
+
+- [x] Reproduced Notebook 2 with `pulp_mill.json` and captured the Total Site
+  process-profile and utility-profile duties.
+- [x] Traced direct GCC segment conversion, child-first multi-scale targeting,
+  net-stream import, Total Process utility aggregation, and Total Site graph
+  serialization.
+- [x] Confirmed the cause with a controlled replay that restored immediate
+  Process Zone direct-GCC profiles before the Site Total Site solve.
+- **Finding**: Process Zone indirect targeting overwrites each zone's
+  direct-GCC-derived `net_hot_streams` and `net_cold_streams` with Unit Operation
+  child profiles. Site targeting then combines those child-level profiles with
+  Process Zone direct utility targets, mixing two hierarchy levels.
+- **Observed residual**: Both duty identities were overstated by 59,168.043 kW.
+- **Controlled replay residual**: 0.103 kW for Hot Utility versus Cold CC and
+  0.0623 kW for Cold Utility versus Hot CC after restoring immediate direct
+  profiles; the remaining difference is graph-table rounding/reconstruction.
+- **Status**: Root cause diagnosed. No production-code change was authorized or
+  made in this investigation.
+
+## Total Site Profile Hierarchy Fix Progress
+
+- [x] INCEPTION - Workspace Detection reused the current brownfield assessment.
+- [x] INCEPTION - Reverse Engineering reused current targeting artifacts.
+- [x] INCEPTION - Minimal Requirements Analysis completed and approved by the
+  user's decision-complete implementation plan.
+- [x] INCEPTION - User Stories skipped for this bounded internal defect fix.
+- [x] INCEPTION - Workflow Planning completed and approved by the user's
+  implementation request.
+- [x] INCEPTION - Application Design and Units Generation skipped; one existing
+  targeting component is corrected without a new public contract.
+- [x] CONSTRUCTION - Functional, NFR, and Infrastructure Design skipped under
+  the approved workflow.
+- [x] CONSTRUCTION - Code Generation Part 1 plan created and approved by the
+  user's explicit request to implement the supplied plan.
+- [x] CONSTRUCTION - Code Generation Part 2 complete.
+- [x] CONSTRUCTION - Build and Test complete.
+- [x] OPERATIONS - N/A; no deployment or operational change was requested.
+- [x] CONSTRUCTION - Explicit second per-zone net-profile pair added and
+  verified at user request.
+- [x] CONSTRUCTION - Notebook 2 rounded SUGCC LPS ledge restored and verified.
+- **Requirements**:
+  `aidlc-docs/inception/requirements/total-site-profile-hierarchy-fix-requirements.md`.
+- **Workflow plan**:
+  `aidlc-docs/inception/plans/total-site-profile-hierarchy-fix-execution-plan.md`.
+- **Code Generation plan**:
+  `aidlc-docs/construction/plans/total-site-profile-hierarchy-fix-code-generation-plan.md`.
+- **Implementation summary**:
+  `aidlc-docs/construction/total-site-profile-hierarchy-fix/code/code-generation-summary.md`.
+- **Build and Test summary**:
+  `aidlc-docs/construction/total-site-profile-hierarchy-fix/build-and-test/build-and-test-summary.md`.
+- **Current stage**: Complete. Consecutive identical graph coordinates are
+  removed before collinearity cleanup, preserving the HPS-to-LPS vertical
+  connection and approximately 138.5 degC LPS ledge. The expanded focused suite
+  passed 145 tests; Notebook 2 passed; the complete fixed-seed non-solver suite
+  passed 2,191 tests with 3 optional-profile skips and 4 solver deselections;
+  84 packaging tests, repository Ruff, fresh distributions, direct built-wheel
+  corner smoke, and patch hygiene passed.
+- **Extension decisions**: Security and Resiliency disabled; partial PBT applies
+  to the deterministic reconstruction invariant.
+
 ## Notebook Improvement Progress
 
 - [x] INCEPTION - Workspace Detection completed by reusing the current

@@ -49,6 +49,11 @@ def clean_composite_curve(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Remove collinear and repeated points from one composite curve."""
     y_vals, x_vals = clean_composite_curve_ends(y_array, x_array)
+    if len(x_vals) > 1:
+        duplicate = (x_vals[1:] == x_vals[:-1]) & (y_vals[1:] == y_vals[:-1])
+        keep = np.concatenate(([True], ~duplicate))
+        x_vals = x_vals[keep]
+        y_vals = y_vals[keep]
     if len(x_vals) <= 2:
         return y_vals, x_vals
 

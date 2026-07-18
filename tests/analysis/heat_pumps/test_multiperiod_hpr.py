@@ -400,6 +400,45 @@ def test_build_multiperiod_cases_aligns_period_temperature_grids(monkeypatch):
     )
 
 
+def test_indirect_period_base_target_does_not_replace_zone_direct_profiles(
+    monkeypatch,
+):
+    zone = Zone(name="Site", config=Configuration())
+    total_process = SimpleNamespace(type=TargetType.TZ.value)
+    expected_target = SimpleNamespace(type=TargetType.TS.value)
+
+    monkeypatch.setattr(
+        hp_preparation,
+        "_refresh_direct_targets_for_subtree",
+        lambda target_zone, period_args: None,
+    )
+    monkeypatch.setattr(
+        hp_preparation,
+        "compute_total_subzone_utility_targets",
+        lambda target_zone, period_args: total_process,
+    )
+    monkeypatch.setattr(
+        hp_preparation,
+        "compute_indirect_integration_targets",
+        lambda target_zone, period_args: expected_target,
+    )
+    monkeypatch.setattr(
+        zone,
+        "import_hot_and_cold_streams_from_sub_zones",
+        lambda **_kwargs: pytest.fail(
+            "multi-period preparation must not overwrite direct profiles"
+        ),
+    )
+
+    result = hp_preparation._compute_hpr_base_target_for_period(
+        zone=zone,
+        period_args={"period_id": "0", "period_idx": 0},
+        is_direct=False,
+    )
+
+    assert result is expected_target
+
+
 @pytest.mark.parametrize(
     "cycle",
     [

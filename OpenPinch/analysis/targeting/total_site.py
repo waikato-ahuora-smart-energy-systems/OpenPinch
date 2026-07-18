@@ -20,11 +20,14 @@ from ...domain.targets import TotalProcessTarget, TotalSiteTarget
 from ...domain.zone import Zone
 from ..numerics import get_period_index
 from .cascade import get_process_heat_cascade
+from .direct import _create_net_hot_and_cold_stream_collections_for_site_analysis
 
 __all__ = [
     "compute_total_subzone_utility_targets",
     "compute_indirect_integration_targets",
 ]
+
+_DIRECT_TARGET_GRAPH_DECIMALS = 4
 
 
 ################################################################################
@@ -108,13 +111,17 @@ def compute_indirect_integration_targets(
     """
     idx, sid = get_period_index(period_ids=zone.period_ids, args=args)
     s_tzt = zone.targets[TargetType.TZ.value]
-    if len(zone.net_hot_streams) == 0 and len(zone.net_cold_streams) == 0:
+    net_hot_streams, net_cold_streams = _reconstruct_subzone_direct_profiles(
+        zone,
+        args,
+    )
+    if len(net_hot_streams) == 0 and len(net_cold_streams) == 0:
         return None
 
     # Total site profiles - process side
     pt = get_process_heat_cascade(
-        hot_streams=zone.net_hot_streams,
-        cold_streams=zone.net_cold_streams,
+        hot_streams=net_hot_streams,
+        cold_streams=net_cold_streams,
         is_shifted=True,  # Align a second shift with the real utility scale.
         period_idx=idx,
     )
@@ -183,6 +190,62 @@ def compute_indirect_integration_targets(
 ################################################################################
 # Helper Functions
 ################################################################################
+
+
+def _reconstruct_subzone_direct_profiles(
+    zone: Zone,
+    args: dict | None = None,
+) -> tuple[StreamCollection, StreamCollection]:
+    """Build one Total Site layer from immediate-child Direct targets.
+
+    A zone's ``net_hot_streams`` and ``net_cold_streams`` belong to its own
+    Direct Integration target. Indirect targeting therefore reconstructs fresh
+    child profiles from the child targets and stores them in the zone's
+    dedicated immediate-subzone collections. The zone's own Direct Integration
+    profiles remain independent.
+    """
+    if not zone.subzones:
+        zone.subzone_net_hot_streams = StreamCollection()
+        zone.subzone_net_cold_streams = StreamCollection()
+        return zone.net_hot_streams, zone.net_cold_streams
+
+    period_idx, _period_id = get_period_index(period_ids=zone.period_ids, args=args)
+    zone.subzone_net_hot_streams = StreamCollection()
+    zone.subzone_net_cold_streams = StreamCollection()
+    net_hot_streams = zone.subzone_net_hot_streams
+    net_cold_streams = zone.subzone_net_cold_streams
+
+    for subzone in zone.subzones.values():
+        direct_target = subzone.targets[TargetType.DI.value]
+        target_period_idx = (
+            direct_target.period_idx
+            if direct_target.period_idx is not None
+            else period_idx
+        )
+        child_hot_streams, child_cold_streams = (
+            _create_net_hot_and_cold_stream_collections_for_site_analysis(
+                T_vals=direct_target.pt[ProblemTableLabel.T],
+                H_vals=direct_target.pt[ProblemTableLabel.H_NET_A],
+                hot_utilities=direct_target.hot_utilities,
+                cold_utilities=direct_target.cold_utilities,
+                idx=target_period_idx,
+            )
+        )
+        for stream in child_hot_streams + child_cold_streams:
+            stream.supply_temperature = np.round(
+                np.asarray(stream.supply_temperature, dtype=float),
+                decimals=_DIRECT_TARGET_GRAPH_DECIMALS,
+            )
+            stream.target_temperature = np.round(
+                np.asarray(stream.target_temperature, dtype=float),
+                decimals=_DIRECT_TARGET_GRAPH_DECIMALS,
+            )
+        for key, stream in child_hot_streams.items():
+            net_hot_streams.add(stream, key=f"{subzone.name}.{key}")
+        for key, stream in child_cold_streams.items():
+            net_cold_streams.add(stream, key=f"{subzone.name}.{key}")
+
+    return net_hot_streams, net_cold_streams
 
 
 def _match_utility_gen_and_use_at_same_level(

@@ -213,6 +213,8 @@ def test_target_model_and_zone_property_branches():
     z.cold_streams = cold
     z.net_hot_streams = StreamCollection()
     z.net_cold_streams = StreamCollection()
+    z.subzone_net_hot_streams = StreamCollection()
+    z.subzone_net_cold_streams = StreamCollection()
     z.hot_utilities = hot
     z.cold_utilities = cold
     z.graphs = {}
@@ -220,6 +222,7 @@ def test_target_model_and_zone_property_branches():
     assert z.graphs["k"] == {"v": 1}
     assert z.process_streams is not None
     assert z.net_process_streams is not None
+    assert z.subzone_net_process_streams is not None
     assert z.utility_streams is not None
     assert z.all_streams is not None
 

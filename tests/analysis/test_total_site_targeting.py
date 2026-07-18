@@ -7,6 +7,8 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 import OpenPinch.analysis.targeting.total_site as indirect
 from OpenPinch.domain.configuration import Configuration
@@ -53,6 +55,101 @@ def _target_utilities(fixture: dict, target_spec: dict) -> tuple[StreamCollectio
         "heat_flow": target_spec["cold_utility_heat_flow"],
     }
     return _utility_collection([hot_spec]), _utility_collection([cold_spec])
+
+
+@st.composite
+def _direct_target_profile_specs(draw):
+    profile_count = draw(st.integers(min_value=1, max_value=5))
+    duties = st.floats(
+        min_value=1.0,
+        max_value=10000.0,
+        allow_nan=False,
+        allow_infinity=False,
+    )
+    return [(draw(duties), draw(duties)) for _index in range(profile_count)]
+
+
+@given(_direct_target_profile_specs())
+def test_reconstructed_subzone_direct_profiles_conserve_utility_duties(
+    profile_specs,
+):
+    zone = Zone(name="Site", type=ZoneType.S.value, config=Configuration())
+    expected_hot_utility = 0.0
+    expected_cold_utility = 0.0
+
+    for index, (hot_utility_duty, cold_utility_duty) in enumerate(profile_specs):
+        subzone = Zone(name=f"Process {index}", parent_zone=zone)
+        hot_utilities = StreamCollection(
+            [
+                Stream(
+                    name="HU",
+                    supply_temperature=250.0,
+                    target_temperature=300.0,
+                    heat_flow=hot_utility_duty,
+                    is_process_stream=False,
+                )
+            ]
+        )
+        cold_utilities = StreamCollection(
+            [
+                Stream(
+                    name="CU",
+                    supply_temperature=50.0,
+                    target_temperature=20.0,
+                    heat_flow=cold_utility_duty,
+                    is_process_stream=False,
+                )
+            ]
+        )
+        subzone.targets[TargetType.DI.value] = SimpleNamespace(
+            pt=ProblemTable(
+                {
+                    ProblemTableLabel.T: [300.0, 150.0, 20.0],
+                    ProblemTableLabel.H_NET_A: [
+                        hot_utility_duty,
+                        0.0,
+                        cold_utility_duty,
+                    ],
+                }
+            ),
+            hot_utilities=hot_utilities,
+            cold_utilities=cold_utilities,
+            period_idx=0,
+        )
+        subzone.net_hot_streams.add(
+            Stream("Poison hot", 200.0, 100.0, heat_flow=999999.0)
+        )
+        subzone.net_cold_streams.add(
+            Stream("Poison cold", 80.0, 180.0, heat_flow=888888.0)
+        )
+        zone.add_zone(subzone)
+        expected_hot_utility += hot_utility_duty
+        expected_cold_utility += cold_utility_duty
+
+    net_hot_streams, net_cold_streams = indirect._reconstruct_subzone_direct_profiles(
+        zone
+    )
+
+    assert net_hot_streams is zone.subzone_net_hot_streams
+    assert net_cold_streams is zone.subzone_net_cold_streams
+    assert sum(float(stream.heat_flow[0]) for stream in net_cold_streams) == (
+        pytest.approx(expected_hot_utility)
+    )
+    assert sum(float(stream.heat_flow[0]) for stream in net_hot_streams) == (
+        pytest.approx(expected_cold_utility)
+    )
+    assert all(float(stream.heat_flow[0]) < 999999.0 for stream in net_hot_streams)
+    assert all(float(stream.heat_flow[0]) < 888888.0 for stream in net_cold_streams)
+    assert all(
+        float(stream.heat_flow[0]) == 999999.0
+        for subzone in zone.subzones.values()
+        for stream in subzone.net_hot_streams
+    )
+    assert all(
+        float(stream.heat_flow[0]) == 888888.0
+        for subzone in zone.subzones.values()
+        for stream in subzone.net_cold_streams
+    )
 
 
 def test_compute_indirect_integration_targets_auto_aligns_utility_profile_grids(

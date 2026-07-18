@@ -82,6 +82,12 @@ def test_dummy_zone_instantiation(dummy_zone: Zone):
     assert dummy_zone.name == "Z1"
     assert isinstance(dummy_zone.hot_streams, StreamCollection)
     assert isinstance(dummy_zone.cold_streams, StreamCollection)
+    assert isinstance(dummy_zone.net_hot_streams, StreamCollection)
+    assert isinstance(dummy_zone.net_cold_streams, StreamCollection)
+    assert isinstance(dummy_zone.subzone_net_hot_streams, StreamCollection)
+    assert isinstance(dummy_zone.subzone_net_cold_streams, StreamCollection)
+    assert dummy_zone.net_hot_streams is not dummy_zone.subzone_net_hot_streams
+    assert dummy_zone.net_cold_streams is not dummy_zone.subzone_net_cold_streams
     assert dummy_zone.dt_cont_multiplier == 1.0
 
 
@@ -344,6 +350,10 @@ def test_zone_period_context_none_list_weights_and_target_defaults(dummy_tar):
     assert root.period_ids == {"base": 0, "peak": 1}
     assert root.weights.tolist() == [0.25, 0.75]
     assert child.period_ids == {"base": 0, "peak": 1}
+    assert root.subzone_net_hot_streams.period_ids == {"base": 0, "peak": 1}
+    assert root.subzone_net_cold_streams.period_ids == {"base": 0, "peak": 1}
+    assert child.subzone_net_hot_streams.period_ids == {"base": 0, "peak": 1}
+    assert child.subzone_net_cold_streams.period_ids == {"base": 0, "peak": 1}
 
     root.set_period_context(["base", "peak"], (0.4, 0.6), 2)
     assert root.weights.tolist() == [0.4, 0.6]
@@ -374,6 +384,22 @@ def test_zone_subzone_and_target_zone_resolution_edges():
 def test_zone_imports_net_streams_and_locks_dt_multiplier():
     root = Zone("Root")
     area = Zone("Area", parent_zone=root)
+    root.net_hot_streams.add(
+        Stream(
+            name="Root own NH",
+            supply_temperature=220.0,
+            target_temperature=140.0,
+            heat_flow=12.0,
+        )
+    )
+    root.net_cold_streams.add(
+        Stream(
+            name="Root own NC",
+            supply_temperature=40.0,
+            target_temperature=110.0,
+            heat_flow=9.0,
+        )
+    )
     area.net_hot_streams.add(
         Stream(
             name="NH",
@@ -391,7 +417,11 @@ def test_zone_imports_net_streams_and_locks_dt_multiplier():
 
     root.import_hot_and_cold_streams_from_sub_zones(get_net_streams=True)
 
-    assert "Area.NH" in root.net_hot_streams
-    assert "Area.NC" in root.net_cold_streams
+    assert "Root own NH" in root.net_hot_streams
+    assert "Root own NC" in root.net_cold_streams
+    assert "Area.NH" in root.subzone_net_hot_streams
+    assert "Area.NC" in root.subzone_net_cold_streams
+    assert "Area.NH" not in root.net_hot_streams
+    assert "Area.NC" not in root.net_cold_streams
     with pytest.warns(UserWarning, match="empty stream collection"):
         Zone("Empty").lock_dt_cont_multiplier()

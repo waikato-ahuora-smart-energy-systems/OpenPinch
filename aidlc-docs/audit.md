@@ -3448,3 +3448,210 @@ How do I resolve this failed test on Github that is fine locally."
 **Context**: CONSTRUCTION - Build and Test completion and OPERATIONS - N/A
 
 ---
+
+## Total Site Profiles Diagnostic Investigation
+**Timestamp**: 2026-07-18T10:42:42Z
+**User Input**: "Notebook #2 shows an underlying issue with the Hot CC and Cold CC on total site plot. The Hot Utility duty must equal the Cold CC duty (which is clearly wrong), and vice versa. The issue will likely be the construction of the Hot CC and Cold CC from the GCC segments coming from the subzones. Investigate to see if the issue can be found."
+**AI Response**: "Reproduced the Notebook 2 Total Site profile mismatch and traced it to hierarchical targeting state. A Process Zone indirect solve replaces that zone's direct-GCC-derived net streams with its Unit Operation child profiles. The subsequent Site solve reuses those overwritten child-level profiles while summing Process Zone direct utility targets. A controlled replay that restored each immediate Process Zone's direct profiles reduced the Hot Utility versus Cold CC and Cold Utility versus Hot CC duty residuals from 59,168.043 kW to rounding-level residuals of 0.103 kW and 0.0623 kW. No production-code fix was made because the request was diagnostic."
+**Context**: Diagnostic follow-up to Notebook Improvement; Total Site profile source-of-truth mismatch identified
+
+---
+
+## Total Site Profile Hierarchy Fix - Implementation Authorization
+**Timestamp**: 2026-07-18T10:59:46Z
+**User Input**: "PLEASE IMPLEMENT THIS PLAN:
+# Fix Total Site Profile Hierarchy-Level Duty Mismatch
+
+## Summary
+
+Correct Total Site profile construction so each aggregation level uses the same immediate subzone Direct Integration targets for both process composite curves and utility duties.
+
+The fix will eliminate mutable hierarchy-state leakage while preserving current user-facing APIs, graph labels, target values, and notebook workflows.
+
+## Implementation Changes
+
+- Add an analysis helper that reconstructs net hot/cold segments from each immediate subzone’s current Direct Integration target using its `H(net)-actual` GCC, targeted utilities, and selected period.
+- Namespace and combine those reconstructed segments into fresh `StreamCollection` objects. Do not read potentially overwritten `subzone.net_*` collections.
+- Make Total Site targeting use these fresh collections for the Hot CC and Cold CC while continuing to derive utility profiles from the same immediate subzone DI targets.
+- Retain the existing `zone.net_*` fallback for zones without children, preserving low-level callers and existing unit-test usage.
+- Remove mutating child-profile imports from normal indirect targeting and multi-period indirect HPR preparation.
+- Establish `zone.net_hot_streams` and `zone.net_cold_streams` as the zone’s own direct-GCC-derived profiles; indirect targeting must no longer overwrite them with child aggregates.
+- Leave graph serialization and presentation unchanged. No new public fields, schemas, notebook calls, or target methods are required.
+
+## Test Plan
+
+- Add a three-level Site → Process Zone → Unit Operation regression where Unit Operation utility totals differ from the integrated Process Zone targets.
+- Poison child `zone.net_*` state deliberately and verify Total Site curves are still reconstructed from the child DI targets.
+- Assert these invariants using `rtol=1e-6` and `abs=0.2 kW` to accommodate current stream reconstruction and graph rounding:
+  - Cold CC duty equals the summed immediate-subzone Hot Utility duty.
+  - Hot CC duty equals the summed immediate-subzone Cold Utility duty.
+- Add a `pulp_mill.json` regression confirming:
+  - Cold CC changes from 271,599.431 kW to approximately 212,431.388 kW.
+  - Hot CC changes from 174,484.194 kW to approximately 115,316.151 kW.
+  - The 59,168.043 kW overstatement disappears.
+  - Final Total Site targets remain approximately 180,094.613 kW hot utility and 82,979.376 kW cold utility.
+- Verify `all_heat_integration()` followed by focused `total_site_heat_integration()` is idempotent.
+- Verify each Process Zone retains its own direct net profiles after its indirect target is calculated.
+- Cover single-period and multi-period indirect/HPR preparation, empty-net-profile behavior, and zones without subzones.
+- Run focused targeting, graph, service-orchestration, multi-scale, multi-period, and Notebook 2 execution tests, followed by the non-solver suite and Ruff checks.
+
+## Workflow and Assumptions
+
+- Treat this as a bounded brownfield bug fix with minimal Requirements Analysis and one targeting-state implementation unit.
+- Skip User Stories, Application Design, NFR Design, Infrastructure Design, and Operations because there is no new capability, public contract, dependency, or deployment change.
+- Update the AI-DLC audit, state, code-generation plan, implementation summary, and build/test records with same-interaction checkbox tracking.
+- Preserve all existing notebook improvements and unrelated working-tree files, including the Excel lock file.
+- Do not solve the issue by always rerunning Direct Integration targets; reconstruction from the already-current DI target is the deterministic source-of-truth approach."
+**AI Response**: "Started the approved bounded bug-fix workflow, reused current brownfield and reverse-engineering context, completed minimal Requirements Analysis and Workflow Planning, created and approved the single-unit Code Generation plan, retained disabled Security and Resiliency extensions, and applied partial PBT to the reconstruction invariant."
+**Status**: Inception approved; Code Generation Part 1 approved; regression-first implementation started
+**Context**: Total Site Profile Hierarchy Fix
+
+---
+
+## Total Site Profile Hierarchy Fix - Regression-First Checkpoint
+**Timestamp**: 2026-07-18T10:59:46Z
+**User Input**: "No new user input; continued under the approved implementation plan."
+**AI Response**: "Ran the focused baseline with 96 passing tests. Added three-level `pulp_mill` regressions for exact Total Site process-profile duties, poisoned child state, idempotence, and Process Zone direct-profile ownership. Added a fixed-seed Hypothesis invariant for duty conservation and mutable-state independence. The checkpoint produced exactly the intended failures: the two example regressions exposed 59,168.043 kW and poisoned-state mismatches, while idempotence remained a passing control; Hypothesis shrank to one 1 kW hot/cold profile and failed because the planned reconstruction helper was absent."
+**Status**: Code Generation Step 1 complete; deterministic reconstruction implementation started
+**Context**: CONSTRUCTION - regression-first Total Site hierarchy checkpoint
+
+---
+
+## Total Site Profile Hierarchy Fix - Implementation and Focused Targeting
+**Timestamp**: 2026-07-18T10:59:46Z
+**User Input**: "No new user input; continued under the approved implementation plan."
+**AI Response**: "Implemented deterministic reconstruction of immediate-child net profiles from current Direct Integration targets, preserved period context and no-child fallback behavior, canonicalized reconstructed temperatures to the target table's four-decimal precision, and removed mutating child-profile imports from normal and multi-period indirect targeting. The focused targeting, graph, hierarchy, multi-period, HPR, example-based, and fixed-seed PBT set passed 114 tests."
+**Status**: Code Generation Steps 2 and 3 complete; Step 4 focused verification in progress
+**Context**: CONSTRUCTION - Total Site hierarchy implementation
+
+---
+
+## Total Site Profile Hierarchy Fix - Focused Verification
+**Timestamp**: 2026-07-18T11:13:24Z
+**User Input**: "No new user input; continued under the approved implementation plan."
+**AI Response**: "Completed Code Generation Step 4. The focused targeting, direct-targeting, graph, service-orchestration, multi-scale, multi-period, HPR preparation, hierarchy regression, and fixed-seed property suite passed 114 tests. Notebook 2 executed successfully with 1 passing notebook test and 9 deselected profiles. Ruff passed on every changed Python file."
+**Status**: Code Generation Step 4 complete; integrated Build and Test started
+**Context**: CONSTRUCTION - focused verification for Total Site hierarchy fix
+
+---
+
+## Total Site Profile Hierarchy Fix - Build and Test Completion
+**Timestamp**: 2026-07-18T11:22:41Z
+**User Input**: "No new user input; continued under the approved implementation plan."
+**AI Response**: "Completed Code Generation Step 5 and Build and Test. The first complete run passed the implementation tests but exposed transient execution state in the already-modified Notebook 4; cleared only execution counts and outputs, preserved notebook source and metadata improvements, and reran from a clean invocation. Final evidence: 2,189 fixed-seed non-solver tests passed with 3 optional-profile skips and 4 solver deselections; 84 packaging/resource tests passed with 3 optional-profile skips; Notebook 2 passed; repository Ruff lint and format passed across 461 Python files; OpenPinch 0.5.3 wheel and source distributions built; direct wheel API/resource smoke and patch hygiene passed. Generated implementation and all five Build and Test records, completed every remaining plan and state checkbox, and closed Operations as N/A."
+**Status**: Complete
+**Context**: CONSTRUCTION - Build and Test complete; OPERATIONS - N/A
+
+---
+
+## Total Site Profile State-Model Review
+**Timestamp**: 2026-07-18T11:25:14Z
+**User Input**: "There should be two net_* collections per zone.
+1) is a collection of the net segments derived from the gcc of the present zone
+2) is a collection of the net segments from the immediate subzones.
+
+Check this is explicit in the changes."
+**AI Response**: "Reviewed the Zone state model and all net-profile reads and writes. The distinction is not explicit in the current implementation: Zone owns only one hot/cold net-profile pair for its own Direct Integration GCC, while immediate-subzone profiles are reconstructed into transient local collections inside Total Site targeting. The prior mutating import was removed, but no second named per-zone pair was added. Reported the required model correction and affected tests without changing production code."
+**Status**: Review complete; explicit second per-zone net-profile pair is a confirmed follow-up gap
+**Context**: Total Site Profile Hierarchy Fix - state ownership review
+
+---
+
+## Total Site Profile State-Model Correction Reopened
+**Timestamp**: 2026-07-18T14:58:16Z
+**User Input**: "Add the second pair of net streams to Zone."
+**AI Response**: "Reopened the completed hierarchy-fix unit and its AI-DLC checklist. Updated the requirement to make both per-zone profile pairs explicit: the existing `net_hot_streams` / `net_cold_streams` remain the present zone's Direct Integration GCC profiles, while new `subzone_net_hot_streams` / `subzone_net_cold_streams` will persist profiles reconstructed from immediate subzone Direct Integration targets. Started regression-first domain, targeting, period-context, and state-ownership work."
+**Status**: Code Generation Step 6 reopened; regression-first implementation started
+**Context**: CONSTRUCTION - explicit second per-zone net-profile pair
+
+---
+
+## Total Site Second-Pair Regression-First Checkpoint
+**Timestamp**: 2026-07-18T14:58:16Z
+**User Input**: "No new user input; continued under the approved second-pair correction."
+**AI Response**: "Added domain regressions for four independent net-profile collections, period propagation, and immediate-child imports that preserve the own-zone pair. Added property, Total Site persistence, three-level duty, and poisoned-state assertions for the new second pair. The checkpoint failed in seven expected places because Zone does not yet expose or preserve the requested immediate-subzone pair; 30 controls passed."
+**Status**: Code Generation Step 6 regression-first items complete; Zone implementation started
+**Context**: CONSTRUCTION - explicit second per-zone net-profile pair
+
+---
+
+## Total Site Second-Pair Implementation Checkpoint
+**Timestamp**: 2026-07-18T14:58:16Z
+**User Input**: "No new user input; continued under the approved second-pair correction."
+**AI Response**: "Added persistent `subzone_net_hot_streams` and `subzone_net_cold_streams` collections and properties to every Zone, included their period propagation, and added the combined `subzone_net_process_streams` view. Net-profile imports now populate the immediate-subzone pair without replacing the zone's own Direct Integration pair. Total Site reconstruction refreshes and stores the second pair from immediate child DI targets while retaining the no-child own-profile fallback. The regression-first gate now passes 37 tests."
+**Status**: Code Generation Step 6 implementation complete; focused verification started
+**Context**: CONSTRUCTION - explicit second per-zone net-profile pair
+
+---
+
+## Total Site Second-Pair Focused Verification
+**Timestamp**: 2026-07-18T14:58:16Z
+**User Input**: "No new user input; continued under the approved second-pair correction."
+**AI Response**: "Passed 141 expanded domain, targeting, graph, service-orchestration, multi-scale, multi-period, HPR preparation, and hierarchy tests with fixed Hypothesis seed 20260715. Notebook 2 passed its base execution profile with nine unrelated profiles deselected. Focused Ruff lint and format checks passed for all six changed Python files."
+**Status**: Focused verification complete; complete Build and Test gate started
+**Context**: CONSTRUCTION - explicit second per-zone net-profile pair
+
+---
+
+## Total Site Second-Pair Build and Test Completion
+**Timestamp**: 2026-07-18T15:07:45Z
+**User Input**: "No new user input; continued under the approved second-pair correction."
+**AI Response**: "Completed the reopened Code Generation Step 6 and Build and Test. Every Zone now owns independent own-GCC and immediate-subzone hot/cold net-profile pairs with period propagation and explicit properties. The complete fixed-seed non-solver suite passed 2,189 tests with 3 optional-profile skips and 4 solver deselections in 171.65 seconds; the packaging/resource suite passed 84 tests with 3 optional-profile skips; repository Ruff lint and format passed across 461 Python files; Notebook 2 passed; patch hygiene passed; OpenPinch 0.5.3 wheel and source distributions built; and a direct wheel smoke verified the two pairs are independently exposed. Updated the implementation summary, Build and Test evidence, state, audit, and all reopened plan checkboxes."
+**Status**: Complete
+**Context**: CONSTRUCTION - explicit second per-zone net-profile pair complete; OPERATIONS - N/A
+
+---
+
+## Notebook 2 LPS Utility-GCC Ledge Diagnostic
+**Timestamp**: 2026-07-18T15:30:24Z
+**User Input**: "The utility gcc for the site is now slightly wrong in Notebook #2. The should be a visible ledge at ~138 degC representing LPS utility. Instead it is directly connected to the start of the HPS."
+**AI Response**: "Reproduced Notebook 2 and traced the utility cascade through graph rendering. The Total Process utility inputs are correct: LPS contributes 15,994.542 kW from 138.525358 degC to 138.425358 degC, and the raw utility cascade contains the ledge. Deterministic process-profile reconstruction contributes a 138.5254 degC grid row while the utility cascade contributes 138.525358 degC. Total Site graph serialization rounds both to 138.5254 degC, creating consecutive duplicate coordinates. `clean_composite_curve` does not remove the duplicate pair safely and drops the constant-enthalpy corner, so graph segmentation joins HPS directly to the end of LPS as a diagonal. A read-only simulation that removes consecutive duplicate coordinate pairs before collinearity cleanup restores the missing point at H=27,253.7105 kW, T=138.5254 degC and the visible LPS ledge without changing any target value. No production code was changed."
+**Status**: Root cause diagnosed; graph-cleanup correction requires implementation authorization
+**Context**: Notebook 2 Total Site SUGCC presentation regression
+
+---
+
+## Notebook 2 LPS Utility-GCC Ledge Fix Authorized
+**Timestamp**: 2026-07-18T15:32:02Z
+**User Input**: "Go and fix it."
+**AI Response**: "Reopened the hierarchy-fix Code Generation and Build and Test records for the authorized graph correction. Added requirements and a Step 7 regression-first checklist to preserve internal SUGCC corners after rounding, restore the HPS-to-LPS vertical connection and LPS ledge, retain target values, and repeat focused and complete verification."
+**Status**: Code Generation Step 7 reopened; regression-first implementation started
+**Context**: CONSTRUCTION - Notebook 2 rounded SUGCC utility ledge
+
+---
+
+## Notebook 2 LPS Ledge Regression-First Checkpoint
+**Timestamp**: 2026-07-18T15:32:02Z
+**User Input**: "No new user input; continued under the authorized graph correction."
+**AI Response**: "Added a generic graph-cleanup regression that requires the internal constant-enthalpy corner to survive a consecutive duplicate point, and a `pulp_mill.json` regression that requires separate HPS connector and LPS ledge segments. Both tests failed as intended because the current cleanup drops the 27,253.71 kW, 138.5254 degC corner."
+**Status**: Code Generation Step 7 regression-first items complete; graph cleanup implementation started
+**Context**: CONSTRUCTION - Notebook 2 rounded SUGCC utility ledge
+
+---
+
+## Notebook 2 LPS Ledge Implementation Checkpoint
+**Timestamp**: 2026-07-18T15:32:02Z
+**User Input**: "No new user input; continued under the authorized graph correction."
+**AI Response**: "Updated `clean_composite_curve` to remove only consecutive points whose enthalpy and temperature coordinates are both exactly identical before existing collinearity cleanup. This preserves the internal vertical corner while leaving edge trimming and utility-segment classification unchanged. All 39 graph and Total Site hierarchy tests pass, including both new regressions."
+**Status**: Code Generation Step 7 implementation complete; focused verification started
+**Context**: CONSTRUCTION - Notebook 2 rounded SUGCC utility ledge
+
+---
+
+## Notebook 2 LPS Ledge Focused Verification
+**Timestamp**: 2026-07-18T15:32:02Z
+**User Input**: "No new user input; continued under the authorized graph correction."
+**AI Response**: "Passed 145 expanded domain, targeting, graph, presentation, service-orchestration, multi-scale, multi-period, HPR preparation, and hierarchy tests. Notebook 2 passed its base execution profile with nine unrelated profiles deselected. Focused Ruff lint and format checks passed for the graph implementation and regression files."
+**Status**: Focused verification complete; complete Build and Test gate started
+**Context**: CONSTRUCTION - Notebook 2 rounded SUGCC utility ledge
+
+---
+
+## Notebook 2 LPS Ledge Build and Test Completion
+**Timestamp**: 2026-07-18T15:40:00Z
+**User Input**: "No new user input; continued under the authorized graph correction."
+**AI Response**: "Completed Code Generation Step 7 and Build and Test. Consecutive identical graph coordinates are now removed before collinearity cleanup, preserving the HPS-to-LPS constant-enthalpy connector and approximately 138.5 degC LPS ledge without changing utility duties or Total Site targets. The complete fixed-seed non-solver suite passed 2,191 tests with 3 optional-profile skips and 4 solver deselections in 172.73 seconds; 84 packaging/resource tests passed with 3 optional-profile skips; Notebook 2 passed; repository Ruff lint and format passed across 461 Python files; patch hygiene passed; OpenPinch 0.5.3 wheel and source distributions built; and direct wheel smoke retained the 27,253.7105 kW, 138.5254 degC corner. Updated all implementation, Build and Test, state, audit, and plan evidence."
+**Status**: Complete
+**Context**: CONSTRUCTION - Notebook 2 rounded SUGCC utility ledge complete; OPERATIONS - N/A
+
+---

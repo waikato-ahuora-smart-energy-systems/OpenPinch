@@ -85,11 +85,6 @@ def indirect_heat_integration_service(zone: Zone, args: dict | None = None) -> Z
             period_ids=subzone.period_ids,
         ):
             direct_heat_integration_service(subzone, args)
-    zone.import_hot_and_cold_streams_from_sub_zones(
-        get_net_streams=True,
-        is_n_zone_depth=False,
-        is_new_stream_collection=True,
-    )
     record_selected_period(zone, args)
     zone.add_target(compute_total_subzone_utility_targets(zone, args))
     target = compute_indirect_integration_targets(zone, args)

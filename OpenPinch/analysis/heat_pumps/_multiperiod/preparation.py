@@ -136,11 +136,6 @@ def _compute_hpr_base_target_for_period(
     if is_direct:
         return compute_direct_integration_targets(zone, period_args)
     _refresh_direct_targets_for_subtree(zone, period_args)
-    zone.import_hot_and_cold_streams_from_sub_zones(
-        get_net_streams=True,
-        is_n_zone_depth=False,
-        is_new_stream_collection=True,
-    )
     zone.add_target(compute_total_subzone_utility_targets(zone, period_args))
     return compute_indirect_integration_targets(zone, period_args)
 

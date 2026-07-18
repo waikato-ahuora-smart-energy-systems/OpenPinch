@@ -181,6 +181,13 @@ def test_indirect_heat_integration_service_records_total_process_and_site_target
     monkeypatch.setattr(
         svc, "compute_indirect_integration_targets", fake_compute_indirect
     )
+    monkeypatch.setattr(
+        zone,
+        "import_hot_and_cold_streams_from_sub_zones",
+        lambda **_kwargs: pytest.fail(
+            "indirect targeting must not overwrite the zone's direct profiles"
+        ),
+    )
     out = svc.indirect_heat_integration_service(zone, args={"period_idx": 0})
 
     assert out is zone

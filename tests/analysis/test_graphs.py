@@ -568,6 +568,38 @@ def test_clean_composite_keeps_non_linear_middle_point_when_x_values_repeat():
     assert np.allclose(y_clean, [100.0, 90.0, 80.0])
 
 
+def test_clean_composite_preserves_corner_after_consecutive_duplicate_point():
+    y_clean, x_clean = clean_composite_curve(
+        y_array=[
+            280.0,
+            279.2455,
+            279.0,
+            138.5254,
+            138.5254,
+            138.4254,
+            138.4254,
+            80.0,
+            70.0,
+        ],
+        x_array=[
+            180094.613,
+            64778.462,
+            27253.7105,
+            27253.7105,
+            27253.7105,
+            11265.8857,
+            11259.168,
+            11259.168,
+            0.0,
+        ],
+    )
+
+    assert any(
+        np.isclose(x, 27253.7105) and np.isclose(y, 138.5254)
+        for x, y in zip(x_clean, y_clean)
+    )
+
+
 def test_clean_composite_curve_ends_0():
     x_vals = [30, 50, 0, 30, 30, 30, 30]
     y_vals = [100, 80, 50, 40, 10, 5, 0]
