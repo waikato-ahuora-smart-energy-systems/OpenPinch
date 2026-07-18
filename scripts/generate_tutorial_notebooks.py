@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -191,8 +192,8 @@ NOTEBOOKS = {
                 'tight_dt = workspace.scenario("tight_dt", '
                 "dt_cont_multiplier=0.75)\n"
                 "tight_dt.target.direct_heat_integration()\n"
-                'workspace.compare_cases("baseline", "tight_dt")\n'
-                "baseline.compare_to(tight_dt)"
+                'case_comparison = workspace.compare_cases("baseline", "tight_dt")\n'
+                "baseline_comparison = baseline.compare_to(tight_dt)"
             ),
             code(
                 'batch = workspace.cases(["baseline", "tight_dt"])\n'
@@ -344,7 +345,7 @@ NOTEBOOKS = {
                 "    evaporators=1,\n"
                 "    maximum_restarts=1,\n"
                 ")\n"
-                "problem.summary_frame()"
+                "hpr_summary = problem.summary_frame()"
             ),
             code(
                 "refrigeration = problem.target.carnot_refrigeration(\n"
@@ -467,7 +468,7 @@ NOTEBOOKS = {
                 "target = problem.target.direct_heat_integration(\n"
                 '    zone="Evaporation Train"\n'
                 ")\n"
-                "problem.summary_frame()"
+                "mvr_summary = problem.summary_frame()"
             ),
             code(
                 "component_inventory = problem.components.inventory\n"
@@ -505,7 +506,7 @@ NOTEBOOKS = {
                 "problem.target.all_heat_integration()\n"
                 "base = problem.target.total_site_heat_integration()\n"
                 "default = problem.target.cogeneration(base_target=base)\n"
-                "problem.summary_frame()"
+                "cogeneration_summary = problem.summary_frame()"
             ),
             code(
                 "sun_smith = problem.target.sun_smith_cogeneration(base_target=base)\n"
@@ -554,7 +555,7 @@ NOTEBOOKS = {
                 "site.target.all_heat_integration()\n"
                 "base = site.target.total_site_heat_integration()\n"
                 "energy_transfer = site.target.energy_transfer(base_target=base)\n"
-                "site.summary_frame()"
+                "transfer_summary = site.summary_frame()"
             ),
             code(
                 "diagram = site.plot.energy_transfer_diagram()\n"
@@ -581,7 +582,7 @@ NOTEBOOKS = {
                 "design = problem.design.heat_exchanger_network(\n"
                 "    approach_temperatures=[14.0], stages=[1], best_solutions=1\n"
                 ")\n"
-                "design.top(1)"
+                "ranked_networks = design.top(1)"
             ),
             code(
                 "selected = design.network(rank=1)\n"
@@ -614,17 +615,21 @@ NOTEBOOKS = {
                 "enhanced = problem.design.enhanced_heat_exchanger_network(\n"
                 "    quality_tier=1\n"
                 ")\n"
-                "enhanced.top(1)"
+                "enhanced_ranking = enhanced.top(1)"
             ),
             code(
                 "open_hens = problem.design.open_hens()\n"
+                "open_hens_ranking = open_hens.top(1)\n"
                 "pinch_design = problem.design.pinch_design()\n"
+                "pinch_ranking = pinch_design.top(1)\n"
                 "thermal = problem.design.thermal_derivative(\n"
                 "    (pinch_design.selected_network,)\n"
                 ")\n"
+                "thermal_ranking = thermal.top(1)\n"
                 "evolution = problem.design.network_evolution(\n"
                 "    (thermal.selected_network,)\n"
-                ")"
+                ")\n"
+                "evolution_ranking = evolution.top(1)"
             ),
         ],
     ),
@@ -662,7 +667,7 @@ NOTEBOOKS = {
                 "design = problem.design.multiperiod_heat_exchanger_network(\n"
                 "    stages=[3], best_solutions=1\n"
                 ")\n"
-                "design.top(1)"
+                "ranked_networks = design.top(1)"
             ),
             code(
                 "shared_network = design.network(rank=1)\n"
@@ -861,8 +866,167 @@ GUIDANCE = {
 }
 
 
+PRESENTATIONS: dict[str, tuple[str, str]] = {
+    "01_first_solve_and_core_curves.ipynb": (
+        "Review the target table first, then use the composite and grand composite curves to connect the utility targets to the remaining heat surplus and deficit.",
+        "from IPython.display import display\n\n"
+        "display(summary)\n"
+        "display(composite)\n"
+        "display(grand)",
+    ),
+    "02_focused_direct_and_total_site.ipynb": (
+        "Compare the process summary with the Total Site profiles and utility grand composite curve; the site views reveal opportunities that are not visible within one process zone.",
+        "from IPython.display import display\n\n"
+        "display(summary)\n"
+        "display(total_site_profiles)\n"
+        "display(site_utility_curve)",
+    ),
+    "03_multisegment_streams.ipynb": (
+        "Inspect the prepared segment boundaries and duties beside the target summary before replacing the example with plant-specific variable-heat-capacity data.",
+        "from IPython.display import display\n\n"
+        "display(segment_table)\n"
+        "display(problem.summary_frame())",
+    ),
+    "04_workspace_cases_and_scenarios.ipynb": (
+        "Use the case comparison for the engineering change and the batch summaries for a consistent review across every selected scenario.",
+        "from IPython.display import display\n\n"
+        "display(case_comparison)\n"
+        "display(baseline_comparison)\n"
+        "display(batch_summaries)",
+    ),
+    "05_workspace_persistence.ipynb": (
+        "Compare the original summary with the restored validation and case payload to confirm that the saved workspace contains a reusable study rather than only a file reference.",
+        "from IPython.display import display\n\n"
+        "display(summary)\n"
+        "display(validation)\n"
+        "display(case_input)",
+    ),
+    "06_multiperiod_heat_integration.ipynb": (
+        "Review period results beside the weighted aggregate; the largest single-period target does not necessarily dominate the weighted study.",
+        "from IPython.display import display\n\n"
+        "display(all_periods)\n"
+        "display(weighted)\n"
+        "display(combined)",
+    ),
+    "07_area_cost_and_exergy.ipynb": (
+        "Read the area and cost summary together with the exergy views to avoid selecting a design from energy targets alone.",
+        "from IPython.display import display\n\n"
+        "display(area_cost_summary)\n"
+        "display(exergy_curve)\n"
+        "display(exergy_loads)",
+    ),
+    "08_carnot_heat_pump_and_refrigeration.ipynb": (
+        "Compare cycle performance with the modified load and grand composite profiles to see whether the selected lift and placement reduce the intended utility demand.",
+        "from IPython.display import display\n\n"
+        "display(hpr_summary)\n"
+        "display(load_plot)\n"
+        "display(gcc_plot)",
+    ),
+    "09_vapour_compression_and_brayton.ipynb": (
+        "Compare feasibility and returned cycle results on the same process basis before selecting a thermodynamic model.",
+        "from IPython.display import display\n\n"
+        "cycle_comparison = {\n"
+        '    "vapour compression heat pump": vapour_compression,\n'
+        '    "vapour compression refrigeration": vc_refrigeration,\n'
+        '    "Brayton heat pump": brayton,\n'
+        '    "Brayton refrigeration": brayton_refrigeration,\n'
+        "}\n"
+        "display(cycle_comparison)",
+    ),
+    "10_multiperiod_heat_pumps.ipynb": (
+        "Use the weighted summary and period-screen outcomes to identify which operating condition controls capacity, lift, and feasibility.",
+        "from IPython.display import display\n\n"
+        "period_screen = {\n"
+        '    "Carnot heat pump": period_heat_pumps,\n'
+        '    "Carnot refrigeration": period_refrigeration,\n'
+        '    "vapour compression heat pump": period_vc_heat_pumps,\n'
+        '    "vapour compression refrigeration": period_vc_refrigeration,\n'
+        '    "MVR": period_mvr,\n'
+        "}\n"
+        "display(weighted)\n"
+        "display(period_screen)",
+    ),
+    "11_process_mvr_and_cascade.ipynb": (
+        "Review the targeted study, component inventory, stage results, and cascade outcome together to check that compression work and replacement streams serve the intended process zone.",
+        "from IPython.display import display\n\n"
+        "display(mvr_summary)\n"
+        "display(component_inventory)\n"
+        "display(stage_results)\n"
+        "display(cascade)",
+    ),
+    "12_cogeneration.ipynb": (
+        "Compare the common process summary with the alternative cogeneration results to see how utility conditions and turbine assumptions change recoverable power.",
+        "from IPython.display import display\n\n"
+        "cogeneration_methods = {\n"
+        '    "default": default,\n'
+        '    "Sun-Smith": sun_smith,\n'
+        '    "Varbanov": varbanov,\n'
+        '    "isentropic": isentropic,\n'
+        "}\n"
+        "display(cogeneration_summary)\n"
+        "display(cogeneration_methods)",
+    ),
+    "13_multiperiod_cogeneration.ipynb": (
+        "Review the weighted table with all period method results to identify which operating conditions drive annual cogeneration value.",
+        "from IPython.display import display\n\n"
+        "period_cogeneration_methods = {\n"
+        '    "default": period_cogeneration,\n'
+        '    "Sun-Smith": sun_smith,\n'
+        '    "Varbanov": varbanov,\n'
+        '    "isentropic": isentropic,\n'
+        "}\n"
+        "display(weighted)\n"
+        "display(period_cogeneration_methods)",
+    ),
+    "14_energy_transfer.ipynb": (
+        "Use the transfer summary and diagram to screen magnitude and temperature, then use the focused comparison to challenge whether the connection is physically credible.",
+        "from IPython.display import display\n\n"
+        "display(transfer_summary)\n"
+        "display(diagram)\n"
+        "display(comparison)",
+    ),
+    "15_hen_synthesis_and_selection.ipynb": (
+        "Review ranked candidates, recovery and utility metrics, and the selected grid together; objective rank alone is not a complete network-selection basis.",
+        "from IPython.display import display\n\n"
+        "display(ranked_networks)\n"
+        "display(metrics)\n"
+        "display(grid)",
+    ),
+    "16_advanced_hen_methods.ipynb": (
+        "Compare the leading result from every method on the same stream and economic basis before attributing design differences to the search method.",
+        "from IPython.display import display\n\n"
+        "display(enhanced_ranking)\n"
+        "display(open_hens_ranking)\n"
+        "display(pinch_ranking)\n"
+        "display(thermal_ranking)\n"
+        "display(evolution_ranking)",
+    ),
+    "17_multiperiod_hen_synthesis.ipynb": (
+        "Review the shared network metrics and one period-specific grid with the ranking to identify the period that controls the common design.",
+        "from IPython.display import display\n\n"
+        "display(ranked_networks)\n"
+        "display(shared_network.summary_metrics)\n"
+        "display(shared_grid)",
+    ),
+    "18_results_plots_reports_exports.ipynb": (
+        "Inspect the cached summary and net-load view before reviewing publication outputs; verify method, scope, units, and case identity before sharing files.",
+        "from IPython.display import display\n\n"
+        "publication_outputs = {\n"
+        '    "plot paths": plot_paths,\n'
+        '    "gallery": gallery,\n'
+        '    "problem workbook": workbook,\n'
+        "}\n"
+        "display(summary)\n"
+        "display(net_loads)\n"
+        "display(catalog)\n"
+        "display(publication_outputs)",
+    ),
+}
+
+
 def enrich(name: str, notebook: dict) -> dict:
     question, interpretation, adaptation, step_titles = GUIDANCE[name]
+    review, presentation = PRESENTATIONS[name]
     original = notebook["cells"]
     code_cells = [cell for cell in original if cell["cell_type"] == "code"]
     if len(code_cells) != len(step_titles):
@@ -891,6 +1055,8 @@ def enrich(name: str, notebook: dict) -> dict:
         )
     cells.extend(
         [
+            markdown(f"## Review the result\n\n{review}"),
+            code(presentation),
             markdown(f"## Interpret the result\n\n{interpretation}"),
             markdown(
                 "## Adapt this template\n\n"
@@ -913,7 +1079,8 @@ def main() -> None:
     for name, notebook in NOTEBOOKS.items():
         destination = NOTEBOOK_DIR / name
         destination.write_text(
-            json.dumps(enrich(name, notebook), indent=1, ensure_ascii=False) + "\n",
+            json.dumps(enrich(name, deepcopy(notebook)), indent=1, ensure_ascii=False)
+            + "\n",
             encoding="utf-8",
         )
 

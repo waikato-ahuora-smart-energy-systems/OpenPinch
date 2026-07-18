@@ -3249,3 +3249,202 @@ How do I resolve this failed test on Github that is fine locally."
 **Context**: CONSTRUCTION - final contract correction and verification
 
 ---
+
+## Notebook Improvement - Initial Request and Workspace Detection Start
+**Timestamp**: 2026-07-18T05:31:03Z
+**User Input**: "Notebook improvement"
+**AI Response**: "Started a new adaptive workflow, displayed the required welcome message, loaded the common workflow rules and extension opt-in prompts, and began brownfield workspace detection and session-continuity review."
+**Context**: INCEPTION - Workspace Detection
+
+---
+
+## Notebook Improvement - Workspace Detection Complete
+**Timestamp**: 2026-07-18T05:32:39Z
+**User Input**: "Notebook improvement"
+**AI Response**: "Confirmed a brownfield Python library with 18 packaged tutorial notebooks, a generator script, current reverse-engineering artifacts, and a completed prior workflow. Reused the current reverse-engineering context and automatically proceeded to standard-depth Requirements Analysis. Preserved all existing uncommitted notebook changes and the untracked generated workspace file."
+**Status**: Workspace Detection complete; Reverse Engineering reused; Requirements Analysis started
+**Context**: INCEPTION - Workspace Detection and Requirements Analysis transition
+
+---
+
+## Notebook Improvement - Requirements Questions Prompt
+**Timestamp**: 2026-07-18T05:32:39Z
+**AI Prompt**: "Please complete all nine questions in aidlc-docs/inception/requirements/notebook-improvement-requirement-verification-questions.md by filling each [Answer]: tag, then confirm when finished."
+**Status**: Awaiting user answers
+**Context**: INCEPTION - Requirements Analysis Step 6 gate. Existing notebook edits remain untouched. Security, Resiliency, and Property-Based Testing configuration will be recorded after the opt-in answers are received.
+
+---
+
+## Notebook Improvement - Requirements Answers Received
+**Timestamp**: 2026-07-18T05:51:16Z
+**User Input**: "Done"
+**AI Response**: "Read and validated all nine requirements answers. Confirmed scope across all 18 packaged tutorials, generator authority, comprehensive unattended demonstrations, full execution-profile verification, Security and Resiliency opt-out, and partial Property-Based Testing. Verified that the previously observed notebook edits and generated workspace file are gone. Identified one material ambiguity between improving or retaining outputs and the repository's source-only notebook contract, plus a related choice between inline and exported demonstrations."
+**Status**: Initial answers valid; clarification required before requirements generation
+**Context**: INCEPTION - Requirements Analysis answer validation and ambiguity detection
+
+---
+
+## Notebook Improvement - Requirements Clarification Prompt
+**Timestamp**: 2026-07-18T05:51:16Z
+**AI Prompt**: "Please complete both questions in aidlc-docs/inception/requirements/notebook-improvement-requirements-clarification-questions.md by filling each [Answer]: tag, then confirm when finished."
+**Status**: Awaiting clarification answers
+**Context**: INCEPTION - Requirements Analysis Step 6 clarification gate. Partial PBT rules PBT-02, PBT-03, PBT-07, PBT-08, and PBT-09 are loaded; they are N/A for this clarification artifact.
+
+---
+
+## Notebook Improvement - Clarification Answers and Requirements Generation
+**Timestamp**: 2026-07-18T05:54:20Z
+**User Input**: "Done"
+**AI Response**: "Validated both clarification answers. Resolved the presentation contract in favor of source-only committed notebooks whose execution visibly renders a relevant inline plot or table followed by engineering interpretation. Generated standard-depth requirements covering all 18 generator-owned tutorials, unattended execution, all declared profiles, curriculum preservation, deterministic generation, validation, and partial PBT applicability."
+**Status**: Requirements artifact complete; explicit approval pending
+**Context**: INCEPTION - Requirements Analysis Steps 7 through 9
+
+---
+
+## Notebook Improvement - Requirements Approval Prompt
+**Timestamp**: 2026-07-18T05:54:20Z
+**AI Prompt**: "Please review aidlc-docs/inception/requirements/notebook-improvement-requirements.md. Choose Request Changes or Approve & Continue to User Stories."
+**Status**: Awaiting user response
+**Context**: INCEPTION - Requirements Analysis explicit approval gate
+
+---
+
+## Notebook Improvement - Requirements Approval
+**Timestamp**: 2026-07-18T05:58:41Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded explicit approval of the notebook improvement requirements. Performed the mandatory User Stories assessment and selected the stage because all 18 customer-facing tutorials change the learner workflow. Created the story-generation plan with five methodology questions, breakdown trade-offs, mandatory personas and stories artifacts, INVEST verification, traceability, and same-turn checkbox tracking."
+**Status**: Requirements approved; User Stories Part 1 awaiting planning answers
+**Context**: INCEPTION - Requirements Analysis approval and User Stories Planning
+
+---
+
+## Notebook Improvement - Story Planning Questions Prompt
+**Timestamp**: 2026-07-18T05:58:41Z
+**AI Prompt**: "Please complete all five questions in aidlc-docs/inception/plans/notebook-improvement-story-generation-plan.md by filling each [Answer]: tag, then confirm when finished."
+**Status**: Awaiting user answers
+**Context**: INCEPTION - User Stories Part 1 planning questions gate
+
+---
+
+## Notebook Improvement - Story Planning Answers Received
+**Timestamp**: 2026-07-18T06:06:28Z
+**User Input**: "Done"
+**AI Response**: "Validated all five story-planning answers. Resolved the methodology as two personas, one story per notebook, profile-based grouping, and Given/When/Then criteria with direct traceability. Confirmed that profile grouping and notebook granularity are complementary rather than contradictory. Marked the answer-validation checklist step complete in the same interaction."
+**Status**: Planning answers valid; explicit plan approval pending
+**Context**: INCEPTION - User Stories Part 1 answer analysis
+
+---
+
+## Notebook Improvement - Story Plan Approval Prompt
+**Timestamp**: 2026-07-18T06:06:28Z
+**AI Prompt**: "Please complete the approval choice in aidlc-docs/inception/plans/notebook-improvement-story-plan-approval-questions.md, then confirm when finished."
+**Status**: Awaiting explicit plan approval
+**Context**: INCEPTION - User Stories Part 1 approval gate
+
+---
+
+## Notebook Improvement - Story Plan Approval and Generation
+**Timestamp**: 2026-07-18T06:09:28Z
+**User Input**: "Go"
+**AI Response**: "Interpreted 'Go' as explicit approval option A, consistent with the completed approval artifact. Generated two personas and 18 notebook-level stories grouped by base, slow-HPR, solver, and interactive profiles. Added three Given/When/Then scenarios to every story, complete requirements traceability, persona mapping, INVEST verification, and extension compliance. Marked every story-generation plan checkbox complete in the same interaction."
+**Status**: User Stories Part 1 approved; Part 2 generation complete; generated artifacts awaiting approval
+**Context**: INCEPTION - User Stories generation and review gate
+
+---
+
+## Notebook Improvement - Generated User Stories Approval Prompt
+**Timestamp**: 2026-07-18T06:09:28Z
+**AI Prompt**: "Please review aidlc-docs/inception/user-stories/notebook-improvement/stories.md and personas.md. Choose Request Changes or Approve & Continue to Workflow Planning."
+**Status**: Awaiting explicit approval
+**Context**: INCEPTION - User Stories final approval gate
+
+---
+
+## Notebook Improvement - User Stories Approval and Completion Authorization
+**Timestamp**: 2026-07-18T06:16:45Z
+**User Input**: "Approve & Continue till completion. "
+**AI Response**: "Recorded explicit approval of the generated personas and 18 user stories, plus authorization to continue through all remaining approved-scope gates without pausing. Created and approved the Workflow Planning artifact. Selected one generator-owned Code Generation unit and Build and Test; skipped Application Design, Units Generation, Functional Design, NFR Requirements, NFR Design, and Infrastructure Design because no new component, model, business logic, technology, service, or infrastructure is required."
+**Status**: User Stories and Workflow Planning approved; Code Generation planning started
+**Context**: INCEPTION completion and transition to CONSTRUCTION
+
+---
+
+## Notebook Improvement - Workflow Plan Approval
+**Timestamp**: 2026-07-18T06:16:45Z
+**AI Prompt**: "Review the notebook improvement execution plan or continue under the user's explicit completion authorization."
+**User Response**: "Approve & Continue till completion. "
+**Status**: Approved under explicit completion authorization
+**Context**: Workflow plan executes Code Generation and Build and Test; all other remaining stages are skipped with documented rationale.
+
+---
+
+## Notebook Improvement - Code Generation Plan Authorization
+**Timestamp**: 2026-07-18T06:16:45Z
+**User Input**: "Approve & Continue till completion. "
+**AI Response**: "Created and approved a ten-step regression-first Code Generation plan for the single Notebook Presentation unit. The plan covers presentation contracts, canonical generator definitions, result retention, regeneration, all execution profiles, integrated packaging and documentation verification, partial PBT, patch review, and implementation summary."
+**Status**: Code Generation Part 1 approved; Part 2 started
+**Context**: CONSTRUCTION - Notebook Presentation Code Generation
+
+---
+
+## Notebook Improvement - Code Generation Step 1 Baseline
+**Timestamp**: 2026-07-18T06:16:45Z
+**User Input**: "No new user input; continued under the user's explicit completion authorization."
+**AI Response**: "Ran the focused notebook and tutorial coverage baseline with Hypothesis seed 20260715: 19 tests passed and 3 optional-profile tests skipped. Ran the canonical generator and confirmed no generator, packaged-notebook, or notebook-test diff. Marked both Step 1 checkboxes complete in the same interaction."
+**Status**: Code Generation Step 1 complete; Step 2 regression creation started
+**Context**: CONSTRUCTION - Notebook Presentation baseline
+
+---
+
+## Notebook Improvement - Code Generation Step 2 Regressions
+**Timestamp**: 2026-07-18T06:16:45Z
+**User Input**: "No new user input; continued under the user's explicit completion authorization."
+**AI Response**: "Added regression-first checks requiring one explicit review section and display cell per notebook, review placement before interpretation, in-process generator repeatability, and a domain-specific Hypothesis invariant over canonical tutorial names. The pre-change run produced exactly the two intended failures while 16 controls passed and 3 optional profiles skipped; Hypothesis shrank to notebook 01 under seed 20260715. Marked all Step 2 checkboxes complete."
+**Status**: Code Generation Step 2 complete; Steps 3 and 4 implementation in progress
+**Context**: CONSTRUCTION - Notebook Presentation regression-first checkpoint
+
+---
+
+## Notebook Improvement - Code Generation Steps 3 through 6
+**Timestamp**: 2026-07-18T06:16:45Z
+**User Input**: "No new user input; continued under the user's explicit completion authorization."
+**AI Response**: "Added 18 canonical subject-specific presentation definitions, inserted one review Markdown and display cell before interpretation in every notebook, retained required summaries/comparisons/rankings without duplicate analysis, and made in-process generation detached and repeatable. Generated exactly 18 source-only notebooks twice with identical SHA-256 output. The focused structural, Hypothesis, coverage, compilation, and ten-notebook base execution gate passed 22 tests with 3 optional-profile skips under seed 20260715. Ruff import validation and the focused generator repeatability check passed. Marked Steps 3 through 6 complete."
+**Status**: Code Generation Steps 3 through 6 complete; optional profiles in progress
+**Context**: CONSTRUCTION - Notebook Presentation implementation and base verification
+
+---
+
+## Notebook Improvement - Code Generation Step 7 Optional Profiles
+**Timestamp**: 2026-07-18T06:16:45Z
+**User Input**: "No new user input; continued under the user's explicit completion authorization."
+**AI Response**: "Executed every optional tutorial profile. The four slow-HPR notebooks passed their selected profile in 213.71 seconds, the three external-solver HEN notebooks passed in 164.50 seconds, and the interactive reporting/export notebook passed in 8.55 seconds. Each parametrized run reported one selected pass and two expected non-selected skips; no profile-specific correction was required. Marked all Step 7 checkboxes complete."
+**Status**: Code Generation Step 7 complete; integrated verification started
+**Context**: CONSTRUCTION - Notebook Presentation optional profiles
+
+---
+
+## Notebook Improvement - Code Generation Completion
+**Timestamp**: 2026-07-18T06:16:45Z
+**User Input**: "No new user input; continued under the user's explicit completion authorization."
+**AI Response**: "Completed integrated packaging verification with 84 passed and 3 optional-profile skips. Ruff lint and format, Markdown and JSON parsing, public-import, dependency-diff, duplicate-file, patch-hygiene, and source-only checks passed. Documented full PBT compliance, generated the implementation summary, marked all remaining Code Generation and story checkboxes complete, and applied the user's completion authorization to the generated-code approval gate."
+**Status**: Notebook Presentation Code Generation complete and approved; Build and Test started
+**Context**: CONSTRUCTION - Code Generation completion and transition to Build and Test
+
+---
+
+## Notebook Improvement - Build and Test Completion
+**Timestamp**: 2026-07-18T06:44:11Z
+**User Input**: "No new user input; completed under the user's explicit 'Approve & Continue till completion. ' authorization."
+**AI Response**: "Completed the required Build and Test stage. The complete fixed-seed non-solver suite passed 2,184 tests with 3 optional-profile skips and 4 solver deselections in 163.54 seconds. The focused notebook suite passed 22 tests; all slow-HPR, external-solver, and interactive profiles passed; the integrated packaging suite passed 84 tests. Repository Ruff passed across 460 Python files. Sphinx built 53 sources with warnings treated as errors. OpenPinch 0.5.3 wheel and source archives built with all 18 notebooks, and the installed wheel passed workflow, resource, root-API, retired-package, notebook, and CLI smoke outside the checkout. Generated all required build/test instructions and summary, completed every plan checkbox, and closed Operations as N/A."
+**Build Status**: Success
+**Test Status**: Pass
+**Files Generated**:
+- `aidlc-docs/construction/notebook-presentation/build-and-test/build-instructions.md`
+- `aidlc-docs/construction/notebook-presentation/build-and-test/unit-test-instructions.md`
+- `aidlc-docs/construction/notebook-presentation/build-and-test/integration-test-instructions.md`
+- `aidlc-docs/construction/notebook-presentation/build-and-test/performance-test-instructions.md`
+- `aidlc-docs/construction/notebook-presentation/build-and-test/build-and-test-summary.md`
+**Status**: Build and Test approved under completion authorization; Operations N/A; workflow complete
+**Context**: CONSTRUCTION - Build and Test completion and OPERATIONS - N/A
+
+---

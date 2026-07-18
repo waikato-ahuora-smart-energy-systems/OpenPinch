@@ -9,6 +9,8 @@ import os
 from pathlib import Path
 
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 from OpenPinch.resources import (
     copy_notebook,
@@ -18,6 +20,7 @@ from OpenPinch.resources import (
     read_sample_case,
     sample_case_metadata,
 )
+from scripts import generate_tutorial_notebooks as notebook_generator
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = ROOT / "docs" / "_data" / "tutorial-coverage.csv"
@@ -36,6 +39,7 @@ def _manifest_rows() -> list[dict[str, str]]:
 
 
 EXPECTED_NOTEBOOKS = sorted({row["primary_tutorial"] for row in _manifest_rows()})
+TUTORIAL_NAMES = st.sampled_from(EXPECTED_NOTEBOOKS)
 
 
 def _load_notebook(path: Path) -> dict:
@@ -108,6 +112,65 @@ def test_notebooks_are_valid_source_only_nbformat_documents(tmp_path: Path) -> N
             if cell["cell_type"] == "code":
                 assert cell["execution_count"] is None, name
                 assert cell["outputs"] == [], name
+
+
+def _assert_review_contract(name: str, notebook: dict) -> None:
+    cells = notebook["cells"]
+    review_indices = [
+        index
+        for index, cell in enumerate(cells)
+        if cell["cell_type"] == "markdown"
+        and "## Review the result" in "".join(cell.get("source", []))
+    ]
+    assert len(review_indices) == 1, name
+    review_index = review_indices[0]
+    assert cells[review_index + 1]["cell_type"] == "code", name
+    display_source = "".join(cells[review_index + 1].get("source", []))
+    assert "from IPython.display import display" in display_source, name
+    assert "display(" in display_source, name
+
+    interpretation_indices = [
+        index
+        for index, cell in enumerate(cells)
+        if cell["cell_type"] == "markdown"
+        and "## Interpret the result" in "".join(cell.get("source", []))
+    ]
+    assert len(interpretation_indices) == 1, name
+    assert review_index + 1 < interpretation_indices[0], name
+
+
+def test_every_notebook_has_one_explicit_result_review(tmp_path: Path) -> None:
+    for name in EXPECTED_NOTEBOOKS:
+        _assert_review_contract(name, _copied_notebook(tmp_path, name))
+
+
+@given(name=TUTORIAL_NAMES)
+def test_tutorial_review_preserves_notebook_invariants(name: str) -> None:
+    notebook = _load_notebook(ROOT / "OpenPinch" / "data" / "notebooks" / name)
+
+    _assert_review_contract(name, notebook)
+    assert [cell["id"] for cell in notebook["cells"]] == [
+        f"cell-{index:02d}" for index in range(1, len(notebook["cells"]) + 1)
+    ]
+    assert all(
+        cell["execution_count"] is None and cell["outputs"] == []
+        for cell in notebook["cells"]
+        if cell["cell_type"] == "code"
+    )
+
+
+def test_notebook_generator_is_repeatable_in_process(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(notebook_generator, "NOTEBOOK_DIR", tmp_path)
+
+    notebook_generator.main()
+    first = {path.name: path.read_bytes() for path in tmp_path.glob("*.ipynb")}
+    notebook_generator.main()
+    second = {path.name: path.read_bytes() for path in tmp_path.glob("*.ipynb")}
+
+    assert sorted(first) == EXPECTED_NOTEBOOKS
+    assert second == first
 
 
 def test_every_code_cell_compiles_and_uses_only_public_package_imports(
