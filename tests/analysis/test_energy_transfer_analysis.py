@@ -192,9 +192,9 @@ def test_energy_transfer_service_handles_period_context_and_error_paths():
     with pytest.raises(RuntimeError, match="could not produce base target"):
         run_energy_transfer_analysis_service(
             FakeZone(),
-            {"base_target_type": TargetType.TS.value},
+            {"base_target_type": TargetType.II.value},
             refresh_services={
-                TargetType.TS.value: lambda target_zone, args=None: target_zone
+                TargetType.II.value: lambda target_zone, args=None: target_zone
             },
             compute_func=lambda base_target, source_targets=None: result_target,
         )
@@ -229,10 +229,10 @@ def test_ensure_energy_transfer_base_target_reports_missing_and_stale_refreshes(
     assert (
         _ensure_energy_transfer_base_target(
             zone,
-            target_type=TargetType.TS.value,
+            target_type=TargetType.II.value,
             refresh_args={},
             compare_args={},
-            refresh_services={TargetType.TS.value: lambda target_zone, args=None: None},
+            refresh_services={TargetType.II.value: lambda target_zone, args=None: None},
         )
         is None
     )

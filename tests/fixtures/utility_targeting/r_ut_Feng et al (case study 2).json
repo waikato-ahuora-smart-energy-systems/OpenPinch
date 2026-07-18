@@ -1,7 +1,10 @@
 {
     "targets": [
         {
-            "name": "Aromatic hydrocarbon extraction unit/Direct Integration",
+            "scope": "Site/Aromatic hydrocarbon extraction unit",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 85.0,
@@ -48,7 +51,10 @@
             ]
         },
         {
-            "name": "Hydrocracking unit/Direct Integration",
+            "scope": "Site/Hydrocracking unit",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 228.3,
@@ -95,7 +101,10 @@
             ]
         },
         {
-            "name": "Isomerization unit/Direct Integration",
+            "scope": "Site/Isomerization unit",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 238.0,

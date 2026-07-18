@@ -45,7 +45,7 @@ Writing Style
 
 - Use the same terminology as the code and the result tables.
 - Write core OpenPinch concepts in spaced title case in prose, for example
-  ``Total Site``, ``Total Process``, ``Heat Pump``, ``Problem Table``, and
+  ``Total Site``, ``Indirect``, ``Heat Pump``, ``Problem Table``, and
   ``Composite Curve``. Reserve hyphenated forms for literal file names, page
   paths, CLI commands, graph IDs, and other API values.
 - Avoid marketing language and generic claims about optimization.

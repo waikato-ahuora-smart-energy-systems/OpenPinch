@@ -1,7 +1,10 @@
 {
     "targets": [
         {
-            "name": "Castillo/Direct Integration",
+            "scope": "Site/Castillo",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 835.0,

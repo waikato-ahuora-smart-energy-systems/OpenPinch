@@ -26,7 +26,7 @@ Indirect integration operates one level up:
 - utility-to-utility balancing is used to recover heat across zones through the
   wider utility system rather than only by direct process-to-process exchange
 
-This is the foundation for Total Process and Total Site workflows.
+At Site scope, this indirect result is the conventional Total Site target.
 
 Why The Answers Differ
 ----------------------
@@ -61,7 +61,8 @@ Practical Reading Rule
 
 When comparing direct and indirect answers:
 
-- compare like with like by target row name
+- compare like with like using Scope, Zone Type, Integration Type, and Target
+  Method
 - compare utility targets first
 - use graphs to explain why the change occurred
 - do not assume an indirect answer is always better; it is only better if the

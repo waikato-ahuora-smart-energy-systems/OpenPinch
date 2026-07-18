@@ -1,7 +1,10 @@
 {
     "targets": [
         {
-            "name": "Start of run/Direct Integration",
+            "scope": "Site/Start of run",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 244.0,

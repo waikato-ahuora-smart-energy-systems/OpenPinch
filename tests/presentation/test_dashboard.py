@@ -135,7 +135,7 @@ def _make_target(name: str) -> DirectIntegrationTarget:
     )
     return DirectIntegrationTarget(
         zone_name=name,
-        type="DI",
+        type="Direct Integration",
         cold_pinch=80.0,
         hot_pinch=120.0,
         hot_utility_target=100.0,
@@ -160,8 +160,8 @@ def test_collect_targets_and_problem_table_dataframe_helpers():
     child.add_target(child_target)
 
     targets = dashboard._collect_targets(parent)
-    assert "Parent/DI" in targets
-    assert "Child/DI" in targets
+    assert "Parent/Direct Integration" in targets
+    assert "Child/Direct Integration" in targets
 
     assert problem_table_frame(None).empty
     empty_table = SimpleNamespace(data=np.array([]), columns=[])
@@ -272,12 +272,12 @@ def test_apply_dashboard_theme_and_render_dashboard_branches(monkeypatch, tmp_pa
     monkeypatch.setitem(__import__("sys").modules, "streamlit", st_render)
 
     zone = Zone(name="Master")
-    target = _make_target("Master/DI")
+    target = _make_target("Master")
     zone.add_target(target)
 
     graph_data = {
-        "Master/DI": {
-            "name": "Master/DI",
+        "Master/Direct Integration": {
+            "name": "Master/Direct Integration",
             "graphs": [
                 {
                     "name": "GCC",
@@ -402,7 +402,7 @@ def test_render_streamlit_dashboard_empty_graph_and_problem_tables(monkeypatch):
     zone = Zone(name="Plant")
     target = DirectIntegrationTarget(
         zone_name="Plant",
-        type="DI",
+        type="Direct Integration",
         pt=ProblemTable({ProblemTableLabel.T: []}),
         pt_real=ProblemTable({ProblemTableLabel.T: []}),
         cold_pinch=80.0,

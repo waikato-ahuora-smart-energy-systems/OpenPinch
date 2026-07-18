@@ -1,7 +1,10 @@
 {
     "targets": [
         {
-            "name": "A/Direct Integration",
+            "scope": "Site/A",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 221.85000000000002,
@@ -83,7 +86,10 @@
             ]
         },
         {
-            "name": "B/Direct Integration",
+            "scope": "Site/B",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 221.85000000000002,
@@ -165,7 +171,10 @@
             ]
         },
         {
-            "name": "C/Direct Integration",
+            "scope": "Site/C",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 121.85000000000002,

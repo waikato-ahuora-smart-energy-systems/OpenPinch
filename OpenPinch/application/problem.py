@@ -476,7 +476,10 @@ class PinchProblem:
         self,
         other_problem: "PinchProblem",
         *,
-        target_name: Optional[str] = None,
+        scope: Optional[str] = None,
+        zone_type: Optional[str] = None,
+        integration_type: Optional[str] = None,
+        target_method: Optional[str] = None,
         base_label: str = "Base case",
         other_label: str = "Scenario",
     ) -> pd.DataFrame:
@@ -486,7 +489,10 @@ class PinchProblem:
             _build_numeric_summary_frame(
                 other_problem._summary_results(periods="selected")
             ),
-            target_name=target_name,
+            scope=scope,
+            zone_type=zone_type,
+            integration_type=integration_type,
+            target_method=target_method,
             base_label=base_label,
             other_label=other_label,
         )

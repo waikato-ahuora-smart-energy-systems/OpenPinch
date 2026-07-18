@@ -9,6 +9,7 @@ from OpenPinch import PinchProblem
 from OpenPinch.domain.enums import GraphType, ProblemTableLabel, TargetType
 from OpenPinch.domain.stream import Stream
 from OpenPinch.domain.stream_collection import StreamCollection
+from OpenPinch.domain.targets import IndirectIntegrationTarget, SubzoneAggregateTarget
 
 ABS_DUTY_TOL = 0.2
 REL_DUTY_TOL = 1e-6
@@ -25,8 +26,8 @@ def _stream_duty(streams: StreamCollection) -> float:
 
 def _assert_total_site_profile_duties(problem: PinchProblem) -> None:
     zone = problem.master_zone
-    total_process = zone.targets[TargetType.TZ.value]
-    total_site = zone.targets[TargetType.TS.value]
+    total_process = zone.targets[TargetType.SA.value]
+    total_site = zone.targets[TargetType.II.value]
 
     assert _curve_span(total_site, ProblemTableLabel.H_COLD) == pytest.approx(
         total_process.hot_utility_target,
@@ -55,7 +56,13 @@ def test_pulp_mill_total_site_profiles_use_immediate_subzone_direct_targets():
 
     problem.target.all_heat_integration()
 
-    total_site = problem.master_zone.targets[TargetType.TS.value]
+    total_site = problem.master_zone.targets[TargetType.II.value]
+    assert isinstance(total_site, IndirectIntegrationTarget)
+    assert total_site.name == "Site/Indirect"
+    assert isinstance(
+        problem.master_zone.targets[TargetType.SA.value],
+        SubzoneAggregateTarget,
+    )
     assert _curve_span(total_site, ProblemTableLabel.H_COLD) == pytest.approx(
         212431.388,
         rel=REL_DUTY_TOL,
@@ -69,6 +76,13 @@ def test_pulp_mill_total_site_profiles_use_immediate_subzone_direct_targets():
     assert total_site.hot_utility_target == pytest.approx(180094.613)
     assert total_site.cold_utility_target == pytest.approx(82979.376)
     _assert_total_site_profile_duties(problem)
+
+    results = problem.results
+    assert problem.master_zone.targets[TargetType.SA.value].reportable is False
+    assert len(results.targets) == 2 + sum(
+        2 + len(process_zone.subzones)
+        for process_zone in problem.master_zone.subzones.values()
+    )
 
     for process_zone in problem.master_zone.subzones.values():
         direct = process_zone.targets[TargetType.DI.value]
@@ -100,6 +114,47 @@ def test_pulp_mill_total_site_profiles_use_immediate_subzone_direct_targets():
             rel=REL_DUTY_TOL,
             abs=ABS_DUTY_TOL,
         )
+        assert isinstance(
+            process_zone.targets[TargetType.II.value],
+            IndirectIntegrationTarget,
+        )
+
+
+def test_total_site_convenience_is_site_only_and_matches_generic_indirect():
+    problem = PinchProblem("zonal_site.json", project_name="Site")
+
+    total_site = problem.target.total_site_heat_integration()
+    generic = problem.target.indirect_heat_integration()
+
+    assert isinstance(total_site, IndirectIntegrationTarget)
+    assert isinstance(generic, IndirectIntegrationTarget)
+    assert generic.name == total_site.name == "Site/Indirect"
+    assert generic.hot_utility_target == pytest.approx(total_site.hot_utility_target)
+    assert generic.cold_utility_target == pytest.approx(total_site.cold_utility_target)
+
+    process_zone = next(iter(problem.master_zone.subzones.values()))
+    with pytest.raises(ValueError, match="requires a Zone of type 'Site'"):
+        problem.target.total_site_heat_integration(zone=process_zone)
+
+    process_indirect = problem.target.indirect_heat_integration(zone=process_zone)
+    assert isinstance(process_indirect, IndirectIntegrationTarget)
+    assert process_indirect.zone_type == "Process Zone"
+
+
+@pytest.mark.parametrize("zone_type", ["Community", "Region"])
+def test_generic_indirect_uses_one_runtime_class_at_higher_scopes(zone_type):
+    seed = PinchProblem("zonal_site.json", project_name="Scope")
+    payload = seed.to_problem_json()
+    payload["zone_tree"]["name"] = "Scope"
+    payload["zone_tree"]["type"] = zone_type
+    problem = PinchProblem(payload, project_name="Scope")
+
+    target = problem.target.indirect_heat_integration()
+
+    assert isinstance(target, IndirectIntegrationTarget)
+    assert target.scope == "Scope"
+    assert target.zone_type == zone_type
+    assert target.name == "Scope/Indirect"
 
 
 def test_total_site_profiles_ignore_poisoned_child_zone_net_stream_state():
@@ -136,7 +191,7 @@ def test_total_site_profiles_ignore_poisoned_child_zone_net_stream_state():
 def test_total_site_profile_targeting_is_idempotent_after_all_heat_integration():
     problem = PinchProblem("pulp_mill.json", project_name="Site")
     problem.target.all_heat_integration()
-    original = problem.master_zone.targets[TargetType.TS.value]
+    original = problem.master_zone.targets[TargetType.II.value]
     original_spans = (
         _curve_span(original, ProblemTableLabel.H_COLD),
         _curve_span(original, ProblemTableLabel.H_HOT),

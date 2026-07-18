@@ -136,9 +136,10 @@ def test_workspace_returns_real_cases_and_delegates_to_pinchproblem():
     baseline = workspace.case("baseline")
     baseline.target.all_heat_integration()
     summary = workspace.summary_frame()
-    direct_target_name = summary.loc[
-        summary["Target"].str.endswith("/Direct Integration"),
-        "Target",
+    direct_scope = summary.loc[
+        (summary["Integration Type"] == "Process")
+        & (summary["Target Method"] == "Heat Exchange"),
+        "Scope",
     ].iloc[0]
 
     assert isinstance(baseline, PinchProblem)
@@ -155,7 +156,9 @@ def test_workspace_returns_real_cases_and_delegates_to_pinchproblem():
     comparison = workspace.compare_cases(
         "baseline",
         "wide_dt",
-        target_name=direct_target_name,
+        scope=direct_scope,
+        integration_type="Process",
+        target_method="Heat Exchange",
     )
 
     assert workspace.active_case_name == "wide_dt"
@@ -429,6 +432,38 @@ def test_workspace_batch_namespaces_expose_only_valid_workflows():
     assert "direct_heat_integration" not in design_methods
     assert "direct_heat_integration" in all_period_methods
     assert "brayton_heat_pump" not in all_period_methods
+
+
+def test_total_site_convenience_is_site_only_across_workspace_batch_and_periods():
+    workspace = PinchWorkspace("zonal_site.json", project_name="Site")
+    workspace.scenario("scenario")
+    process_scope = next(
+        iter(workspace.case("baseline").master_zone.subzones.values())
+    ).address
+
+    with pytest.raises(ValueError, match="requires a Zone of type 'Site'"):
+        workspace.case("baseline").target.total_site_heat_integration(
+            zone=process_scope
+        )
+    with pytest.raises(ValueError, match="requires a Zone of type 'Site'"):
+        workspace.case("baseline").target.all_periods.total_site_heat_integration(
+            zone=process_scope
+        )
+
+    batch = workspace.cases(["baseline", "scenario"])
+    selected = batch.target.total_site_heat_integration(zone=process_scope)
+    all_periods = batch.target.all_periods.total_site_heat_integration(
+        zone=process_scope
+    )
+
+    assert not selected.results
+    assert not all_periods.results
+    assert set(selected.errors) == {"baseline", "scenario"}
+    assert set(all_periods.errors) == {"baseline", "scenario"}
+    assert all(
+        "requires a Zone of type 'Site'" in str(error)
+        for error in [*selected.errors.values(), *all_periods.errors.values()]
+    )
 
 
 def test_workspace_batch_mirrors_observation_and_export_surfaces(

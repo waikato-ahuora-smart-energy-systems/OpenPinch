@@ -69,7 +69,10 @@ def _make_target(
         cold_utils = [SimpleNamespace(name="Cooling Water", heat_flow=VU(60.0, "kW"))]
 
     return SimpleNamespace(
-        name=name,
+        scope=name,
+        zone_type="Site",
+        integration_type="Process",
+        target_method="Heat Exchange",
         period_idx=period_idx,
         period_id=period_id,
         pinch_temp=SimpleNamespace(cold_temp=pinch_cold, hot_temp=pinch_hot),
@@ -159,7 +162,10 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
     df = pd.read_excel(out_path, sheet_name="Summary")
     # Expect at least our known columns
     expected_cols = {
-        "Target",
+        "Scope",
+        "Zone Type",
+        "Integration Type",
+        "Target Method",
         "Cold Pinch (value)",
         "Cold Pinch (unit)",
         "Hot Pinch (value)",
@@ -236,7 +242,7 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
     assert expected_cols.issubset(set(df.columns))
 
     # Row for "Base"
-    base = df.loc[df["Target"] == "Base"].iloc[0]
+    base = df.loc[df["Scope"] == "Base"].iloc[0]
     assert pytest.approx(base["Cold Pinch (value)"]) == 85.0
     assert base["Cold Pinch (unit)"] == "degC"
     assert pytest.approx(base["Qh (value)"]) == 100.0
@@ -252,7 +258,7 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
     assert base["ETE (unit)"] == "%"
 
     # Row for "Alt A"
-    alt = df.loc[df["Target"] == "Alt A"].iloc[0]
+    alt = df.loc[df["Scope"] == "Alt A"].iloc[0]
     assert pytest.approx(alt["MP Steam (value)"]) == 55.0
     assert alt["MP Steam (unit)"] == "kW"
     assert pytest.approx(alt["Chilled Water (value)"]) == 30.0
@@ -263,7 +269,7 @@ def test_export_writes_problem_tables_for_all_zones(tmp_path: Path):
     master_zone = Zone("Plant")
     master_target = DirectIntegrationTarget(
         zone_name="Master",
-        type="DI",
+        type="Direct Integration",
         pt=_make_problem_table([10.0]),
         pt_real=_make_problem_table([30.0]),
         hot_utility_target=0.0,
@@ -278,7 +284,7 @@ def test_export_writes_problem_tables_for_all_zones(tmp_path: Path):
     master_zone.add_zone(sub_zone, sub=True)
     sub_target = DirectIntegrationTarget(
         zone_name="Alt:Target",
-        type="DI",
+        type="Direct Integration",
         parent_zone=sub_zone,
         pt=_make_problem_table([40.0]),
         pt_real=_make_problem_table([50.0]),
@@ -307,8 +313,8 @@ def test_export_writes_problem_tables_for_all_zones(tmp_path: Path):
     assert sub_real in xls.sheet_names
 
     wb = openpyxl.load_workbook(out, data_only=True)
-    assert wb[master_shifted]["A1"].value == "Master/DI"
-    assert wb[sub_shifted]["A1"].value == "Alt:Target/DI"
+    assert wb[master_shifted]["A1"].value == "Master/Direct Integration"
+    assert wb[sub_shifted]["A1"].value == "Plant/Sub/Zone/Alt:Target/Direct Integration"
 
     master_df = pd.read_excel(
         out,
@@ -353,7 +359,7 @@ def test_build_summary_dataframe_resolves_period_values_using_period_idx():
 def test_target_results_include_period_idx():
     target = DirectIntegrationTarget(
         zone_name="Plant",
-        type="DI",
+        type="Direct Integration",
         pt=_make_problem_table([10.0]),
         pt_real=_make_problem_table([30.0]),
         hot_utility_target=10.0,
@@ -487,7 +493,7 @@ def test_write_problem_tables_skips_empty_dataframes(monkeypatch, tmp_path: Path
     zone = Zone("Plant")
     target = DirectIntegrationTarget(
         zone_name="Plant",
-        type="DI",
+        type="Direct Integration",
         pt=_make_problem_table([1.0]),
         pt_real=_make_problem_table([2.0]),
         hot_utility_target=0.0,

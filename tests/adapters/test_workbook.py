@@ -181,7 +181,13 @@ def test_get_results_from_excel_parses_summary(tmp_path: Path):
     assert isinstance(targets, list) and len(targets) == 2
 
     # Row derived from "Total Site Targets"
-    ts = next(t for t in targets if t["name"].startswith("Proj/Total Site Target"))
+    ts = next(
+        t
+        for t in targets
+        if t["scope"] == "Proj" and t["integration_type"] == "Utility"
+    )
+    assert ts["zone_type"] == "Site"
+    assert ts["target_method"] == "Heat Exchange"
     # degree_of_integration gets scaled by 100
     assert ts["degree_of_integration"]["value"] == pytest.approx(70.0)
     assert ts["degree_of_integration"]["unit"] == "%"
@@ -200,7 +206,9 @@ def test_get_results_from_excel_parses_summary(tmp_path: Path):
     assert "Chilled Water" in cu_names
 
     # Zone-level row
-    z = next(t for t in targets if t["name"] == "Zone A/Direct Integration")
+    z = next(t for t in targets if t["scope"] == "Proj/Zone A")
+    assert z["zone_type"] == "Process Zone"
+    assert z["integration_type"] == "Process"
     assert z["Qh"]["value"] == pytest.approx(90.0)
     # Utility cost present & wrapped with units
     assert z["utility_cost"]["value"] == pytest.approx(999.0)
@@ -486,9 +494,12 @@ def test_write_targets_to_dict_and_list_special_name_and_none_fields():
 
     out = wkbook_to_json._write_targets_to_dict_and_list(df, units, project_name="Proj")
 
-    assert out[0]["name"] == "Proj/Total Process Target"
-    assert out[0]["pinch_temp"]["cold_temp"]["value"] is None
-    assert out[0]["pinch_temp"]["hot_temp"]["value"] is None
+    assert out[0]["scope"] == "Proj"
+    assert out[0]["zone_type"] == "Site"
+    assert out[0]["integration_type"] == "Utility"
+    assert out[0]["target_method"] == "Heat Exchange"
+    assert out[0]["pinch_temp"]["cold_temp"]["value"] == pytest.approx(70.0)
+    assert out[0]["pinch_temp"]["hot_temp"]["value"] == pytest.approx(100.0)
     assert out[0]["degree_of_integration"]["value"] is None
 
 

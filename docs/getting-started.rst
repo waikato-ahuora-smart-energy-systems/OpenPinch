@@ -42,7 +42,8 @@ Use descriptive methods when only one analysis is required:
 
 ``all_heat_integration()`` is the dependency-aware convenience method. It
 cycles through the zone hierarchy, computes direct targets where needed, and
-then completes Total Process and Total Site targeting.
+then completes direct and utility-mediated indirect targeting across the Zone
+hierarchy.
 
 Named Scenarios
 ---------------

@@ -278,14 +278,16 @@ def _aligned_target_groups(
     first_targets = list(outputs[0].targets)
     first_keys = [_target_key(target) for target in first_targets]
     if len(set(first_keys)) != len(first_keys):
-        raise ValueError("Cannot aggregate duplicate target names and row types.")
+        raise ValueError("Cannot aggregate duplicate target metadata and row types.")
 
     groups: list[list[TargetResults]] = [[target] for target in first_targets]
     expected_key_set = set(first_keys)
     for output in outputs[1:]:
         target_by_key = {_target_key(target): target for target in output.targets}
         if len(target_by_key) != len(output.targets):
-            raise ValueError("Cannot aggregate duplicate target names and row types.")
+            raise ValueError(
+                "Cannot aggregate duplicate target metadata and row types."
+            )
         if set(target_by_key) != expected_key_set:
             missing = sorted(expected_key_set - set(target_by_key))
             extra = sorted(set(target_by_key) - expected_key_set)
@@ -303,8 +305,14 @@ def _aligned_target_groups(
     return groups
 
 
-def _target_key(target: TargetResults) -> tuple[str, str | None]:
-    return (str(target.name), getattr(target, "row_type", None))
+def _target_key(target: TargetResults) -> tuple[str, str, str, str, str | None]:
+    return (
+        target.scope,
+        target.zone_type,
+        target.integration_type,
+        target.target_method,
+        getattr(target, "row_type", None),
+    )
 
 
 def _weighted_average_target(

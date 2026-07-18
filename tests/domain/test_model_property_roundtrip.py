@@ -124,7 +124,7 @@ def test_stream_collection_edge_paths():
 def test_target_model_and_zone_property_branches():
     t = DirectIntegrationTarget(
         zone_name="T0",
-        type="DI",
+        type="Direct Integration",
         pt=_dummy_problem_table(),
         pt_real=_dummy_problem_table(),
         hot_utilities=StreamCollection(),
@@ -243,7 +243,7 @@ def test_target_model_and_zone_property_branches():
         [
             DirectIntegrationTarget(
                 zone_name="T2",
-                type="DI",
+                type="Direct Integration",
                 pt=_dummy_problem_table(),
                 pt_real=_dummy_problem_table(),
                 hot_utilities=StreamCollection(),
@@ -254,7 +254,7 @@ def test_target_model_and_zone_property_branches():
             )
         ]
     )
-    assert "DI" in z.targets
+    assert "Direct Integration" in z.targets
 
     assert z.get_subzone(next(iter(z.subzones.keys()))) is not None
     with pytest.warns(Warning):
@@ -290,15 +290,19 @@ def test_target_model_requires_zone_name_and_identifier():
         BaseTargetModel(zone_name="T")
 
     with pytest.raises(ValueError, match="zone_name is required"):
-        BaseTargetModel(zone_name="", type="DI")
+        BaseTargetModel(zone_name="", type="Direct Integration")
 
     with pytest.raises(ValueError, match="type is required"):
         BaseTargetModel(zone_name="T", type="")
 
 
 def test_target_model_identifier_parent_active_and_cost_properties():
-    target = BaseTargetModel(zone_name="T", type="id", parent_zone="Z")
-    assert target.type == "id"
+    target = BaseTargetModel(
+        zone_name="T",
+        type="Direct Integration",
+        parent_zone="Z",
+    )
+    assert target.type == "Direct Integration"
     assert target.parent_zone == "Z"
 
     target.active = True
@@ -306,7 +310,7 @@ def test_target_model_identifier_parent_active_and_cost_properties():
 
     direct_target = DirectIntegrationTarget(
         zone_name="T",
-        type="DI",
+        type="Direct Integration",
         parent_zone="Z",
         pt=_dummy_problem_table(),
         pt_real=_dummy_problem_table(),

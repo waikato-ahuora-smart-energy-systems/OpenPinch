@@ -8,6 +8,99 @@
 
 ---
 
+## Indirect Target Terminology Implementation Authorization
+**Timestamp**: 2026-07-18T16:15:53Z
+**User Input**: "PLEASE IMPLEMENT THIS PLAN:
+# Correct Indirect-Target Terminology and Summary Metadata
+
+## Summary
+
+Remove `TotalSiteTarget` entirely. A Total Site target is an `IndirectIntegrationTarget` whose scope is a Zone of type `Site`; it does not need a separate runtime class.
+
+Separate the internal immediate-subzone aggregate from the public indirect result, and replace record-name-based summaries with explicit scope and classification fields.
+
+## Target Model and API Changes
+
+- Rename `OpenPinch/analysis/targeting/total_site.py` to `indirect.py`; remove the old module without a compatibility shim.
+- Rename `TotalProcessTarget` to `SubzoneAggregateTarget`.
+  - Store it under `TargetType.SA = \"Subzone Aggregate\"`.
+  - Continue using it internally to sum the Direct Integration targets of immediate subzones.
+  - Mark it non-reportable.
+- Replace `TotalSiteTarget` with `IndirectIntegrationTarget` for every eligible Zone type.
+  - Store it under `TargetType.II = \"Indirect\"`.
+  - Its internal record name becomes `<scope>/Indirect`, such as `Site/Indirect` or `Site/Bleaching/Indirect`.
+- Remove `TotalSiteTarget`, `TotalProcessTarget`, `TargetType.TS`, `TargetType.TZ`, and the unused `TargetType.RT` from the domain union, exports, imports, selectors, and tests.
+- Rename `compute_total_subzone_utility_targets` to `compute_subzone_aggregate_target`.
+- Keep `compute_indirect_integration_targets` as the generic indirect calculation, returning `IndirectIntegrationTarget`.
+- Update HPR, refrigeration, power, exergy, energy-transfer, graph, and service-orchestration code to use `TargetType.II`.
+- Preserve `indirect_heat_integration(...)` for Process, Site, Community, and Region scopes supported by the current traversal.
+- Preserve `total_site_heat_integration(...)` as a convenience workflow, but require its selected Zone to be type `Site`; return the same `IndirectIntegrationTarget` produced by `indirect_heat_integration(...)`.
+- Apply the same Site-only validation to all-period and workspace/batch Total Site convenience methods.
+- Keep `all_heat_integration()` child-first, producing an `IndirectIntegrationTarget` at every eligible aggregation level.
+- Use a clean break for Python imports, enum members, class names, and selectors. Historical workbook labels may still be normalized at the input-adapter boundary.
+
+## Summary and Reporting Contract
+
+- Add explicit public metadata to reportable targets:
+  - `scope`: canonical `Zone.address`, so the root is `Site` and nested repeated names remain unique.
+  - `zone_type`: `Site`, `Process Zone`, `Unit Operation`, and so forth.
+  - `integration_type`: `Process` or `Utility`.
+  - `target_method`: `Heat Exchange`, `Heat Pump`, `Refrigeration`, or `Energy Transfer`.
+- Populate classifications consistently:
+  - Direct Integration → `Process` / `Heat Exchange`
+  - Indirect Integration → `Utility` / `Heat Exchange`
+  - Direct Heat Pump → `Process` / `Heat Pump`
+  - Indirect Heat Pump → `Utility` / `Heat Pump`
+  - Direct Refrigeration → `Process` / `Refrigeration`
+  - Indirect Refrigeration → `Utility` / `Refrigeration`
+  - Energy Transfer → selected base route / `Energy Transfer`
+- Keep runtime record names private to target dictionaries and graph joins.
+- Remove record names from `TargetResults`, report metrics, and summary tables.
+- Exclude `SubzoneAggregateTarget` from `TargetOutput.targets`, reports, metrics, summaries, dashboards, and Excel summary sheets.
+- Replace the `Target` column in compact, detailed, comparison, workspace, batch, and Excel summaries with:
+  - `Scope`
+  - `Zone Type`
+  - `Integration Type`
+  - `Target Method`
+- Replace `ReportMetric.target_name` with the same metadata fields.
+- Align multi-period rows using `(scope, zone_type, integration_type, target_method, row_type)` rather than internal record names.
+- Replace comparison APIs’ `target_name` selector with explicit scope, Zone type, integration type, and target method selectors.
+- Default summary comparison to the root `Process` / `Heat Exchange` row when selectors are omitted.
+- Leave graph schemas and scientific plot names unchanged; update graph titles and target metadata from `Total Site Target` to `Indirect`.
+- Update notebooks and documentation that reference the old module, classes, enum values, target names, or `Target` summary column.
+
+## Test Plan
+
+- Assert `IndirectIntegrationTarget` is the only indirect-integration runtime class at Process, Site, Community, and Region levels.
+- Assert `TotalSiteTarget`, `TotalProcessTarget`, `TargetType.TS`, and `TargetType.TZ` are unavailable.
+- Assert Site indirect records are internally named `Site/Indirect`.
+- Verify `total_site_heat_integration()` and `indirect_heat_integration()` produce equivalent `IndirectIntegrationTarget` results for a Site.
+- Verify `total_site_heat_integration(zone=<non-Site>)` raises a clear scope error while generic indirect targeting succeeds.
+- Verify `SubzoneAggregateTarget` remains available internally on applicable Zones but never appears in public outputs.
+- Verify summaries contain the four new metadata columns, omit `Target`, and uniquely identify repeated nested Zone names.
+- Verify heat-exchange rows use `Target Method = \"Heat Exchange\"`.
+- Cover direct and indirect heat exchange, HPR, refrigeration, energy transfer, exergy, cogeneration, power, graphs, comparison helpers, workspaces, batches, Excel exports, JSON round trips, and weighted multi-period summaries.
+- Verify legacy workbook labels normalize into the new target representation.
+- Re-run the existing hierarchy regression:
+  - Total Site duties remain approximately 180,094.613 kW hot and 82,979.376 kW cold.
+  - Hot and Cold CC duties retain the corrected hierarchy-level identities.
+  - The Notebook 2 SUGCC retains the LPS ledge near 138.5 °C.
+- Run focused targeting/reporting tests, Notebook 2 execution, the complete non-solver suite, Ruff checks, documentation build, package build, and installed-wheel smoke test.
+
+## Workflow and Assumptions
+
+- Treat this as one bounded brownfield targeting/reporting contract unit.
+- Reuse current reverse-engineering artifacts and perform standard Requirements Analysis because the change intentionally breaks public target/reporting symbols.
+- Skip User Stories, NFR Design, Infrastructure Design, and Operations.
+- Update all AI-DLC audit, state, planning, implementation, and build/test records with same-interaction checkbox tracking.
+- Preserve targeting mathematics, graph coordinates, and both pairs of per-Zone net-stream collections.
+- “Total Site target” remains valid domain terminology for an indirect result at Site scope, but is not represented by a distinct Python class or target type."
+**AI Response**: "Accepted the approved plan as standard Requirements Analysis, Workflow Planning, and Code Generation Part 1 authorization. Created checkbox-tracked requirements, execution, and code-generation artifacts and began the domain and indirect-analysis rename."
+**Status**: Code Generation Part 2 started
+**Context**: INCEPTION complete; CONSTRUCTION - indirect-target terminology unit
+
+---
+
 ## Serialized HEN TargetInput Implementation Approval
 **Timestamp**: 2026-07-17T04:19:28Z
 **User Input**: """PLEASE IMPLEMENT THIS PLAN:
@@ -3653,5 +3746,14 @@ Check this is explicit in the changes."
 **AI Response**: "Completed Code Generation Step 7 and Build and Test. Consecutive identical graph coordinates are now removed before collinearity cleanup, preserving the HPS-to-LPS constant-enthalpy connector and approximately 138.5 degC LPS ledge without changing utility duties or Total Site targets. The complete fixed-seed non-solver suite passed 2,191 tests with 3 optional-profile skips and 4 solver deselections in 172.73 seconds; 84 packaging/resource tests passed with 3 optional-profile skips; Notebook 2 passed; repository Ruff lint and format passed across 461 Python files; patch hygiene passed; OpenPinch 0.5.3 wheel and source distributions built; and direct wheel smoke retained the 27,253.7105 kW, 138.5254 degC corner. Updated all implementation, Build and Test, state, audit, and plan evidence."
 **Status**: Complete
 **Context**: CONSTRUCTION - Notebook 2 rounded SUGCC utility ledge complete; OPERATIONS - N/A
+
+---
+
+## Indirect Target Terminology Implementation Completion
+**Timestamp**: 2026-07-18T16:54:40Z
+**User Input**: "No new user input; continued under the approved indirect-target terminology implementation plan."
+**AI Response**: "Removed the old Total Site module, classes, and TS/TZ/RT enum members; implemented IndirectIntegrationTarget and non-reportable SubzoneAggregateTarget; migrated targeting, advanced analysis, reporting, comparison, multi-period, workspace, batch, graph, adapter, notebook, documentation, and expected-output contracts to explicit Scope, Zone Type, Integration Type, and Target Method metadata. Added Site-only validation across focused, all-period, workspace, and batch Total Site conveniences while retaining generic indirect targeting at Process Zone, Site, Community, and Region scopes. Notebook 2 retained 180,094.613 kW hot and 82,979.376 kW cold targets and the 138.5 degC LPS ledge. Final evidence: 2,195 fixed-seed non-solver tests passed with 3 optional-profile skips and 4 solver deselections; 84 packaging tests passed with 3 skips; warning-free Sphinx, Ruff, formatting, stale-symbol, patch-hygiene, distribution, and isolated-wheel gates passed. Generated implementation and Build and Test records and completed all plan and state checkboxes."
+**Status**: Complete
+**Context**: CONSTRUCTION - indirect-target terminology and reporting contract complete; OPERATIONS - N/A
 
 ---

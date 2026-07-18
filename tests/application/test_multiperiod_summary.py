@@ -24,7 +24,7 @@ from OpenPinch.domain.zone import Zone
 
 def _target(
     *,
-    name: str = "Site/Direct Integration",
+    scope: str = "Site",
     period_id: str = "base",
     qh: float = 10.0,
     qc: float = 5.0,
@@ -34,7 +34,10 @@ def _target(
     hot_utilities: list[HeatUtility] | None = None,
 ) -> TargetResults:
     return TargetResults(
-        name=name,
+        scope=scope,
+        zone_type="Site",
+        integration_type="Process",
+        target_method="Heat Exchange",
         period_id=period_id,
         Qh=Value(qh, "kW"),
         Qc=Value(qc, "kW"),
@@ -400,8 +403,8 @@ def test_weighted_summary_matches_sample_period_weights(source):
     )
     period_outputs = list(period_results.values())
     weights = list(problem.master_zone.weights)
-    target_name = period_outputs[0].targets[0].name
-    row = frame.loc[frame["Target"] == target_name].iloc[0]
+    scope = period_outputs[0].targets[0].scope
+    row = frame.loc[frame["Scope"] == scope].iloc[0]
 
     for column, attr_name in [
         ("Hot Utility Target", "Qh"),

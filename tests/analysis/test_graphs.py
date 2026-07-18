@@ -412,7 +412,7 @@ def test_create_graph_set_includes_remaining_graph_families_from_static_fixture(
     table = _graph_fixture("base_table")
     target = SimpleNamespace(
         name="Site/Total Site",
-        type=TargetType.TS.value,
+        type=TargetType.II.value,
         period_id="annual",
         zone_name="TargetZone",
         graphs={

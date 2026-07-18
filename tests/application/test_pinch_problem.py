@@ -597,14 +597,14 @@ def test_target_accessor_cogeneration_uses_dedicated_execution_path(monkeypatch)
     obj._master_zone = Zone("Site")
     out = obj.target.cogeneration(
         zone="Plant/TS",
-        options={"base_target_type": "Total Site Target"},
+        options={"base_target_type": "Indirect"},
         period_id="peak",
     )
 
     assert out == {"target": "ts"}
     assert called["application_zone"] == "Plant/TS"
     assert called["options"] == {
-        "base_target_type": "Total Site Target",
+        "base_target_type": "Indirect",
         "period_id": "peak",
     }
     assert called["include_subzones"] is False
@@ -700,13 +700,13 @@ def test_execute_cogeneration_targeting_returns_selected_target_family():
     from OpenPinch.domain.problem_table import ProblemTable
     from OpenPinch.domain.targets import (
         DirectIntegrationTarget,
-        TotalSiteTarget,
+        IndirectIntegrationTarget,
     )
 
     zone = Zone(name="Plant", type=ZoneType.S.value, config=Configuration())
-    ts_target = TotalSiteTarget(
+    ts_target = IndirectIntegrationTarget(
         zone_name=zone.name,
-        type=TargetType.TS.value,
+        type=TargetType.II.value,
         parent_zone=zone.parent_zone,
         config=zone.config,
         pt=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]}),
@@ -732,7 +732,7 @@ def test_execute_cogeneration_targeting_returns_selected_target_family():
     problem._master_zone = zone
 
     def fake_cogeneration_service(target_zone: Zone, args=None) -> Zone:
-        target_zone._selected_cogeneration_target_type = TargetType.TS.value
+        target_zone._selected_cogeneration_target_type = TargetType.II.value
         return target_zone
 
     out = problem._execute_cogeneration_targeting(
@@ -752,13 +752,13 @@ def test_execute_exergy_targeting_returns_selected_target_family():
     from OpenPinch.domain.problem_table import ProblemTable
     from OpenPinch.domain.targets import (
         DirectIntegrationTarget,
-        TotalSiteTarget,
+        IndirectIntegrationTarget,
     )
 
     zone = Zone(name="Plant", type=ZoneType.S.value, config=Configuration())
-    ts_target = TotalSiteTarget(
+    ts_target = IndirectIntegrationTarget(
         zone_name=zone.name,
-        type=TargetType.TS.value,
+        type=TargetType.II.value,
         parent_zone=zone.parent_zone,
         config=zone.config,
         pt=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]}),
@@ -784,7 +784,7 @@ def test_execute_exergy_targeting_returns_selected_target_family():
     problem._master_zone = zone
 
     def fake_exergy_service(target_zone: Zone, args=None) -> Zone:
-        target_zone._selected_exergy_target_type = TargetType.TS.value
+        target_zone._selected_exergy_target_type = TargetType.II.value
         return target_zone
 
     out = problem._execute_exergy_targeting(
@@ -802,14 +802,14 @@ def test_execute_exergy_targeting_does_not_walk_children_without_include_subzone
     from OpenPinch.domain.enums import ProblemTableLabel as ProblemTableLabel
     from OpenPinch.domain.enums import TargetType, ZoneType
     from OpenPinch.domain.problem_table import ProblemTable
-    from OpenPinch.domain.targets import TotalSiteTarget
+    from OpenPinch.domain.targets import IndirectIntegrationTarget
 
     root = Zone(name="Root", type=ZoneType.S.value, config=Configuration())
     child = Zone(name="Child", parent_zone=root)
     root._subzones = {"Child": child}
-    ts_target = TotalSiteTarget(
+    ts_target = IndirectIntegrationTarget(
         zone_name=root.name,
-        type=TargetType.TS.value,
+        type=TargetType.II.value,
         parent_zone=root.parent_zone,
         config=root.config,
         pt=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]}),
@@ -825,7 +825,7 @@ def test_execute_exergy_targeting_does_not_walk_children_without_include_subzone
 
     def fake_exergy_service(target_zone: Zone, args=None) -> Zone:
         calls.append(target_zone.name)
-        target_zone._selected_exergy_target_type = TargetType.TS.value
+        target_zone._selected_exergy_target_type = TargetType.II.value
         return target_zone
 
     out = problem._execute_exergy_targeting(
@@ -867,13 +867,13 @@ def test_run_exergy_targeting_for_zone_and_subzones_drops_base_target_type_for_c
         service_func=lambda zone, args=None: calls.append(
             (zone.name, dict(args or {}))
         ),
-        options={"base_target_type": "Total Site Target", "period_id": "peak"},
+        options={"base_target_type": "Indirect", "period_id": "peak"},
     )
 
     assert calls[0] == ("Child", {"period_id": "peak"})
     assert calls[1] == (
         "Root",
-        {"base_target_type": "Total Site Target", "period_id": "peak"},
+        {"base_target_type": "Indirect", "period_id": "peak"},
     )
 
 
@@ -949,7 +949,10 @@ def test_summary_frame_compact_and_detailed(monkeypatch):
         "Target",
         (),
         {
-            "name": "Plant/DI",
+            "scope": "Plant",
+            "zone_type": "Site",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "Qh": _Value(10.0),
             "Qc": _Value(20.0),
             "Qr": _Value(30.0),
@@ -967,7 +970,7 @@ def test_summary_frame_compact_and_detailed(monkeypatch):
     monkeypatch.setattr(
         sys.modules[build_problem_summary_frame.__module__],
         "build_summary_dataframe",
-        lambda targets: __import__("pandas").DataFrame([{"Target": targets[0].name}]),
+        lambda targets: __import__("pandas").DataFrame([{"Scope": targets[0].scope}]),
         raising=True,
     )
 
@@ -977,8 +980,11 @@ def test_summary_frame_compact_and_detailed(monkeypatch):
     numeric = _build_numeric_summary_frame(results)
     detailed = obj.summary_frame(detailed=True)
 
-    assert list(compact.columns[:7]) == [
-        "Target",
+    assert list(compact.columns[:10]) == [
+        "Scope",
+        "Zone Type",
+        "Integration Type",
+        "Target Method",
         "Period ID",
         "Hot Utility Target",
         "Cold Utility Target",
@@ -989,7 +995,7 @@ def test_summary_frame_compact_and_detailed(monkeypatch):
     assert compact.iloc[0]["Hot Utilities"] == "Steam: 10.00 kW"
     assert numeric.iloc[0]["Hot Utility Target"] == 10.0
     assert numeric.iloc[0]["Hot Utility Target (unit)"] == "kW"
-    assert detailed.iloc[0]["Target"] == "Plant/DI"
+    assert detailed.iloc[0]["Scope"] == "Plant"
 
 
 def test_validation_report_returns_structured_errors_without_raising():
@@ -1038,7 +1044,10 @@ def test_summary_frame_preserves_equal_hot_and_cold_pinch_values():
         "Target",
         (),
         {
-            "name": "Plant/DI",
+            "scope": "Plant",
+            "zone_type": "Site",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "Qh": _Value(10.0),
             "Qc": _Value(20.0),
             "Qr": _Value(30.0),
@@ -1074,7 +1083,10 @@ def test_summary_frame_uses_selected_period_for_period_results():
         "Target",
         (),
         {
-            "name": "Plant/DI",
+            "scope": "Plant",
+            "zone_type": "Site",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "period_idx": 1,
             "period_id": "peak",
             "Qh": {"values": [10.0, 25.0], "period_ids": ["0", "peak"], "unit": "kW"},
@@ -1581,7 +1593,10 @@ def test_compare_to_builds_delta_table(monkeypatch):
     base_frame = __import__("pandas").DataFrame(
         [
             {
-                "Target": "Plant/Direct Integration",
+                "Scope": "Plant",
+                "Zone Type": "Site",
+                "Integration Type": "Process",
+                "Target Method": "Heat Exchange",
                 "Hot Utility Target": 750.0,
                 "Hot Utility Target (unit)": "kW",
                 "Cold Utility Target": 1000.0,
@@ -1598,7 +1613,10 @@ def test_compare_to_builds_delta_table(monkeypatch):
     other_frame = __import__("pandas").DataFrame(
         [
             {
-                "Target": "Plant/Direct Integration",
+                "Scope": "Plant",
+                "Zone Type": "Site",
+                "Integration Type": "Process",
+                "Target Method": "Heat Exchange",
                 "Hot Utility Target": 500.0,
                 "Hot Utility Target (unit)": "kW",
                 "Cold Utility Target": 850.0,
@@ -1643,7 +1661,10 @@ def test_compare_to_suppresses_delta_when_units_do_not_match(monkeypatch):
     base_frame = __import__("pandas").DataFrame(
         [
             {
-                "Target": "Plant/Direct Integration",
+                "Scope": "Plant",
+                "Zone Type": "Site",
+                "Integration Type": "Process",
+                "Target Method": "Heat Exchange",
                 "Hot Utility Target": 750.0,
                 "Hot Utility Target (unit)": "kW",
                 "Cold Utility Target": 1000.0,
@@ -1660,7 +1681,10 @@ def test_compare_to_suppresses_delta_when_units_do_not_match(monkeypatch):
     other_frame = __import__("pandas").DataFrame(
         [
             {
-                "Target": "Plant/Direct Integration",
+                "Scope": "Plant",
+                "Zone Type": "Site",
+                "Integration Type": "Process",
+                "Target Method": "Heat Exchange",
                 "Hot Utility Target": 500.0,
                 "Hot Utility Target (unit)": "MW",
                 "Cold Utility Target": 850.0,
@@ -1913,7 +1937,9 @@ def test_set_dt_cont_multiplier_rebuilds_targets_and_stream_state(tmp_path: Path
     problem.target.direct_heat_integration()
     baseline = problem.summary_frame()
     baseline_row = baseline.loc[
-        baseline["Target"] == f"{case_path.stem}/Direct Integration"
+        (baseline["Scope"] == case_path.stem)
+        & (baseline["Integration Type"] == "Process")
+        & (baseline["Target Method"] == "Heat Exchange")
     ].iloc[0]
     unit = problem.master_zone.get_subzone("Crude Unit")
     hot_stream = next(iter(unit.hot_streams))
@@ -1936,7 +1962,9 @@ def test_set_dt_cont_multiplier_rebuilds_targets_and_stream_state(tmp_path: Path
     problem.target.direct_heat_integration()
     updated = problem.summary_frame()
     updated_row = updated.loc[
-        updated["Target"] == f"{case_path.stem}/Direct Integration"
+        (updated["Scope"] == case_path.stem)
+        & (updated["Integration Type"] == "Process")
+        & (updated["Target Method"] == "Heat Exchange")
     ].iloc[0]
 
     assert updated_row["Hot Utility Target"] != baseline_row["Hot Utility Target"]
@@ -2204,7 +2232,10 @@ def test_indirect_heat_pump_accepts_period_id_and_returns_period_specific_result
     from OpenPinch.domain.enums import ProblemTableLabel, TargetType
     from OpenPinch.domain.problem_table import ProblemTable
     from OpenPinch.domain.stream_collection import StreamCollection
-    from OpenPinch.domain.targets import IndirectHeatPumpTarget, TotalSiteTarget
+    from OpenPinch.domain.targets import (
+        IndirectHeatPumpTarget,
+        IndirectIntegrationTarget,
+    )
 
     payload = {
         "streams": [
@@ -2270,11 +2301,11 @@ def test_indirect_heat_pump_accepts_period_id_and_returns_period_specific_result
         "indirect_heat_integration_service",
         lambda target_zone, args=None: (
             target_zone.add_target(
-                TotalSiteTarget(
+                IndirectIntegrationTarget(
                     zone_name=target_zone.name,
                     period_id=args.get("period_id"),
                     period_idx=args["period_idx"],
-                    type=TargetType.TS.value,
+                    type=TargetType.II.value,
                     parent_zone=target_zone.parent_zone,
                     config=target_zone.config,
                     pt=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]}),
@@ -2297,7 +2328,7 @@ def test_indirect_heat_pump_accepts_period_id_and_returns_period_specific_result
     assert offpeak.period_id == "0"
     assert peak.period_id == "peak"
     assert peak.hpr_utility_total != offpeak.hpr_utility_total
-    assert problem.master_zone.targets[TargetType.TS.value].period_idx == 1
+    assert problem.master_zone.targets[TargetType.II.value].period_idx == 1
 
 
 def test_direct_heat_integration_rejects_unknown_period_id():
@@ -2657,7 +2688,7 @@ def test_cogeneration_and_exergy_selection_error_paths(monkeypatch):
             include_subzones=False,
         )
 
-    zone._selected_cogeneration_target_type = "Total Site Target"
+    zone._selected_cogeneration_target_type = "Indirect"
     with pytest.raises(RuntimeError, match="target was not available"):
         problem._execute_cogeneration_targeting(
             application_zone=None,
@@ -2816,9 +2847,9 @@ def test_cogeneration_and_exergy_include_subzones_execution_paths(monkeypatch):
     mod = sys.modules[PinchProblem.__module__]
     problem = PinchProblem()
     zone = Zone("Site")
-    zone.targets["Total Site Target"] = "cogen"
+    zone.targets["Indirect"] = "cogen"
     zone.targets["Exergy Target"] = "exergy"
-    zone._selected_cogeneration_target_type = "Total Site Target"
+    zone._selected_cogeneration_target_type = "Indirect"
     zone._selected_exergy_target_type = "Exergy Target"
     problem._master_zone = zone
     called = {}
@@ -2897,7 +2928,10 @@ def test_metrics_uses_cached_results_and_compare_handles_non_numeric_units(
     frame = pd.DataFrame(
         [
             {
-                "Target": "Site/Direct Integration",
+                "Scope": "Site",
+                "Zone Type": "Site",
+                "Integration Type": "Process",
+                "Target Method": "Heat Exchange",
                 "Hot Utility Target": "not numeric",
                 "Hot Utility Target (unit)": "kW",
                 "Cold Utility Target": 1.0,
@@ -3075,7 +3109,10 @@ def test_loading_zone_tree_and_packaged_sample_edges(monkeypatch, tmp_path: Path
 
 def test_output_helpers_cover_report_summary_and_formatting_edges():
     target = SimpleNamespace(
-        name="Plant/Direct Integration",
+        scope="Plant",
+        zone_type="Site",
+        integration_type="Process",
+        target_method="Heat Exchange",
         period_id="peak",
         period_idx=0,
         Qh={"values": [100.0], "unit": "kW"},
@@ -3109,20 +3146,44 @@ def test_output_helpers_cover_report_summary_and_formatting_edges():
 
     frame = pd.DataFrame(
         [
-            {"Target": "Other Target", "Value": 1},
-            {"Target": "Plant/Direct Integration", "Value": 2},
+            {
+                "Scope": "Other",
+                "Zone Type": "Process Zone",
+                "Integration Type": "Utility",
+                "Target Method": "Heat Exchange",
+                "Value": 1,
+            },
+            {
+                "Scope": "Plant",
+                "Zone Type": "Site",
+                "Integration Type": "Process",
+                "Target Method": "Heat Exchange",
+                "Value": 2,
+            },
         ]
     )
     assert locate_summary_row(frame)["Value"] == 2
-    assert locate_summary_row(frame, target_name="Direct Integration")["Value"] == 2
+    assert locate_summary_row(frame, scope="Plant")["Value"] == 2
     assert (
-        locate_summary_row(pd.DataFrame([{"Target": "Other", "Value": 3}]))["Value"]
+        locate_summary_row(
+            pd.DataFrame(
+                [
+                    {
+                        "Scope": "Other",
+                        "Zone Type": "Site",
+                        "Integration Type": "Process",
+                        "Target Method": "Heat Exchange",
+                        "Value": 3,
+                    }
+                ]
+            )
+        )["Value"]
         == 3
     )
     with pytest.raises(ValueError, match="Summary frame"):
         locate_summary_row(pd.DataFrame())
     with pytest.raises(KeyError, match="not found"):
-        locate_summary_row(frame, target_name="Missing")
+        locate_summary_row(frame, scope="Missing")
     assert _target_attr(SimpleNamespace(), "pinch_temp.hot_temp") is None
 
     graph_catalog = build_graph_availability(

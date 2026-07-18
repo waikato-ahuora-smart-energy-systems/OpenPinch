@@ -1,7 +1,10 @@
 {
     "targets": [
         {
-            "name": "Ahmad/Direct Integration",
+            "scope": "Site/Ahmad",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 150.0,

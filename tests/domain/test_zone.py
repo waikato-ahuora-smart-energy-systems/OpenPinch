@@ -31,7 +31,7 @@ def dummy_tar():
     """Return dummy tar data used by this test module."""
     return DirectIntegrationTarget(
         zone_name="Z1",
-        type="DI",
+        type="Direct Integration",
         pt=_dummy_problem_table(),
         pt_real=_dummy_problem_table(),
         hot_utility_target=0.0,
@@ -254,7 +254,11 @@ def test_serialize_json_basic(dummy_tar):
 
     json_data = serialize_target(dummy_tar)
 
-    assert json_data["name"] == "Z1/DI"
+    assert json_data["scope"] == "Z1"
+    assert json_data["zone_type"] == "Process Zone"
+    assert json_data["integration_type"] == "Process"
+    assert json_data["target_method"] == "Heat Exchange"
+    assert "name" not in json_data
     assert json_data["Qh"] == {"value": 100.0, "unit": "kW"}
     assert json_data["Qc"] == {"value": 50.0, "unit": "kW"}
     assert json_data["Qr"] == {"value": 30.0, "unit": "kW"}

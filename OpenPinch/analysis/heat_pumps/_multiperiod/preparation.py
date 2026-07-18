@@ -7,9 +7,9 @@ from copy import deepcopy
 import numpy as np
 
 from ....analysis.targeting.direct import compute_direct_integration_targets
-from ....analysis.targeting.total_site import (
+from ....analysis.targeting.indirect import (
     compute_indirect_integration_targets,
-    compute_total_subzone_utility_targets,
+    compute_subzone_aggregate_target,
 )
 from ....contracts.hpr import HPRPeriodCase
 from ....domain._stream.value_state import resolve_period_weights
@@ -136,7 +136,7 @@ def _compute_hpr_base_target_for_period(
     if is_direct:
         return compute_direct_integration_targets(zone, period_args)
     _refresh_direct_targets_for_subtree(zone, period_args)
-    zone.add_target(compute_total_subzone_utility_targets(zone, period_args))
+    zone.add_target(compute_subzone_aggregate_target(zone, period_args))
     return compute_indirect_integration_targets(zone, period_args)
 
 

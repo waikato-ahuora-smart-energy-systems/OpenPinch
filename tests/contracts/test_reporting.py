@@ -140,6 +140,11 @@ def test_reporting_value_coercion_accepts_value_mapping_and_dumpable_objects():
 
 
 def test_target_name_validation_and_base_graph_helpers():
+    assert not hasattr(TargetType, "TS")
+    assert not hasattr(TargetType, "TZ")
+    assert not hasattr(TargetType, "RT")
+    assert not hasattr(targets, "TotalSiteTarget")
+    assert not hasattr(targets, "TotalProcessTarget")
     with pytest.raises(ValueError, match="type is required"):
         targets._normalise_target_name(zone_name="Zone", target_type=None, name=None)
     with pytest.raises(ValueError, match="zone_name is required"):
@@ -206,24 +211,30 @@ def test_utility_summary_and_direct_target_reporting_round_trip():
     assert result.capital_cost.value == pytest.approx(10000.0)
 
     serialised = serialize_target(target, isTotal=True)
+    assert serialised["scope"] == "Zone"
+    assert serialised["zone_type"] == "Process Zone"
+    assert serialised["integration_type"] == "Process"
+    assert serialised["target_method"] == "Heat Exchange"
+    assert "name" not in serialised
     assert serialised["Qh"] == {"value": 1000.0, "unit": "kW"}
     assert serialised["hot_utilities"][0]["heat_flow"]["unit"] == "kW"
 
-    total_process = targets.TotalProcessTarget(
+    total_process = targets.SubzoneAggregateTarget(
         zone_name="Zone",
-        type=TargetType.TZ.value,
+        type=TargetType.SA.value,
         hot_utility_target=1.0,
         cold_utility_target=2.0,
         heat_recovery_target=3.0,
     )
-    assert target_to_result(total_process).Qh.value == pytest.approx(1.0)
+    with pytest.raises(NotImplementedError, match="SubzoneAggregateTarget"):
+        target_to_result(total_process)
 
 
 def test_total_site_and_heat_pump_target_reporting_include_special_fields():
     fixture = _fixture()
-    total_site = targets.TotalSiteTarget(
+    total_site = targets.IndirectIntegrationTarget(
         zone_name="Zone",
-        type=TargetType.TS.value,
+        type=TargetType.II.value,
         pt=_problem_table(),
         hot_utility_target=10.0,
         cold_utility_target=5.0,

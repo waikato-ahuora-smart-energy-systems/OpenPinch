@@ -22,7 +22,6 @@ from OpenPinch.domain._value.resolution import get_scalar_value
 from OpenPinch.domain.enums import (
     ProblemTableLabel,
     StreamLoc,
-    TargetType,
 )
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream_collection import StreamCollection
@@ -135,7 +134,7 @@ def test_target_utility(filename):
         t = None
         i = 0
         for t in wkb_res.targets:
-            if plant_name == t.name.replace("/" + TargetType.DI.value, ""):
+            if f"Site/{plant_name}" == t.scope:
                 break
             i += 1
         assert i < len(wkb_res.targets)

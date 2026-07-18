@@ -1,7 +1,10 @@
 {
     "targets": [
         {
-            "name": "Distillery/Direct Integration",
+            "scope": "Site/Distillery",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 132.70000000000002,

@@ -30,7 +30,7 @@ __all__ = [
 ]
 
 _COGENERATION_TARGET_ORDER = (
-    TargetType.TS.value,
+    TargetType.II.value,
     TargetType.IHP.value,
     TargetType.IR.value,
     TargetType.DHP.value,

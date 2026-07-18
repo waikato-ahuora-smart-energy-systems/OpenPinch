@@ -6,7 +6,8 @@ Purpose
 
 Use zonal workflows when a study needs more than one process boundary. Zones
 let OpenPinch solve local direct targets and then aggregate solved subzones
-into Total Process or Total Site utility-system views.
+into indirect utility-system views. An indirect result at Site scope is the
+conventional Total Site target.
 
 Prerequisites
 -------------
@@ -35,21 +36,33 @@ Runnable Workflow
    total_site = case.target.total_site_heat_integration()
    summary = case.summary_frame()
 
-   print(summary[["Target", "Zone", "Hot Utility Target", "Cold Utility Target"]])
+   print(
+       summary[
+           [
+               "Scope",
+               "Zone Type",
+               "Integration Type",
+               "Target Method",
+               "Hot Utility Target",
+               "Cold Utility Target",
+           ]
+       ]
+   )
 
 Expected Output
 ---------------
 
-The summary contains target rows for different scopes and target families.
-Direct rows describe local recovery inside a zone. Indirect or Total Site rows
-describe utility-mediated recovery across solved subzones.
+The summary contains target rows classified by canonical scope, Zone type,
+integration route, and target method. Process / Heat Exchange rows describe
+local recovery. Utility / Heat Exchange rows describe indirect recovery across
+solved subzones.
 
 Interpretation
 --------------
 
 Compare zonal results by scope before comparing numbers:
 
-- Check the target family: Direct Integration, Total Process, or Total Site.
+- Check Integration Type (Process or Utility) and Target Method.
 - Check the zone name and hierarchy level.
 - Compare hot and cold utility targets first.
 - Use Grand Composite Curves, Total Site profiles, and SUGCC views to explain

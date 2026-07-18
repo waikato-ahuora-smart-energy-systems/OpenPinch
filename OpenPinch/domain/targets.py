@@ -7,6 +7,7 @@ from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .configuration import Configuration
+from .enums import IntegrationType, TargetMethod, TargetType, ZoneType
 from .problem_table import ProblemTable
 from .stream_collection import StreamCollection
 
@@ -30,6 +31,49 @@ def _normalise_target_name(
     return zone_name if str(zone_name).endswith(suffix) else f"{zone_name}{suffix}"
 
 
+def _target_classification(
+    target_type: str,
+    *,
+    base_target_type: str | None = None,
+) -> tuple[str, str]:
+    """Return the public integration route and analysis method."""
+    process_types = {
+        TargetType.DI.value,
+        TargetType.DHP.value,
+        TargetType.DR.value,
+        TargetType.TL.value,
+    }
+    utility_types = {
+        TargetType.II.value,
+        TargetType.IHP.value,
+        TargetType.IR.value,
+        TargetType.SA.value,
+    }
+    if target_type == TargetType.ET.value:
+        route = (
+            IntegrationType.Utility.value
+            if base_target_type
+            in {TargetType.II.value, TargetType.IHP.value, TargetType.IR.value}
+            else IntegrationType.Process.value
+        )
+        return route, TargetMethod.EnergyTransfer.value
+    if target_type in process_types:
+        route = IntegrationType.Process.value
+    elif target_type in utility_types:
+        route = IntegrationType.Utility.value
+    else:
+        raise ValueError(
+            f"No reporting classification for target type {target_type!r}."
+        )
+    if target_type in {TargetType.DHP.value, TargetType.IHP.value}:
+        method = TargetMethod.HeatPump.value
+    elif target_type in {TargetType.DR.value, TargetType.IR.value}:
+        method = TargetMethod.Refrigeration.value
+    else:
+        method = TargetMethod.HeatExchange.value
+    return route, method
+
+
 class BaseTargetModel(BaseModel):
     """Shared metadata for all solved target objects."""
 
@@ -40,6 +84,10 @@ class BaseTargetModel(BaseModel):
     )
 
     zone_name: Optional[str] = Field(default=None, exclude=True, repr=False)
+    scope: str
+    zone_type: str = ZoneType.P.value
+    integration_type: str
+    target_method: str
     period_id: Optional[str] = None
     period_idx: Optional[int] = Field(default=None, exclude=True, repr=False)
     name: str
@@ -47,14 +95,38 @@ class BaseTargetModel(BaseModel):
     parent_zone: Any = None
     config: Configuration = Field(default_factory=Configuration)
     active: bool = True
+    reportable: bool = Field(default=True, exclude=True, repr=False)
 
     @model_validator(mode="before")
     @classmethod
     def _set_name(cls, data: Any) -> Any:
         if not isinstance(data, dict):
             return data
+        zone_name = data.get("zone_name")
+        parent_zone = data.get("parent_zone")
+        scope = data.get("scope")
+        if not scope:
+            if (
+                parent_zone is not None
+                and hasattr(parent_zone, "address")
+                and zone_name
+            ):
+                scope = f"{parent_zone.address}/{zone_name}"
+            else:
+                scope = zone_name
+        if not scope:
+            raise ValueError("scope or zone_name is required.")
+        data["scope"] = str(scope)
+        if not data.get("type"):
+            raise ValueError("type is required.")
+        integration_type, target_method = _target_classification(
+            str(data.get("type") or ""),
+            base_target_type=data.get("base_target_type"),
+        )
+        data["integration_type"] = integration_type
+        data["target_method"] = target_method
         data["name"] = _normalise_target_name(
-            zone_name=data.get("zone_name"),
+            zone_name=data["scope"],
             target_type=data.get("type"),
             name=data.get("name"),
         )
@@ -116,12 +188,14 @@ class DirectIntegrationTarget(GraphBackedTarget, UtilitySummaryTarget):
     turbine_efficiency_target: Optional[float] = None
 
 
-class TotalProcessTarget(UtilitySummaryTarget):
-    """Aggregated process-level utility summary built from solved subzones."""
+class SubzoneAggregateTarget(UtilitySummaryTarget):
+    """Internal utility summary built from immediate solved subzones."""
+
+    reportable: bool = Field(default=False, exclude=True, repr=False)
 
 
-class TotalSiteTarget(GraphBackedTarget, UtilitySummaryTarget):
-    """Total Site / indirect integration target with site Problem Tables and graphs."""
+class IndirectIntegrationTarget(GraphBackedTarget, UtilitySummaryTarget):
+    """Utility-mediated integration target for an aggregate Zone scope."""
 
     pt: ProblemTable
     work_target: Optional[float] = None
@@ -192,8 +266,8 @@ class IndirectRefrigerationTarget(HeatPumpTargetBase):
 
 AnyTargetModel = (
     DirectIntegrationTarget
-    | TotalProcessTarget
-    | TotalSiteTarget
+    | SubzoneAggregateTarget
+    | IndirectIntegrationTarget
     | EnergyTransferTarget
     | DirectHeatPumpTarget
     | IndirectHeatPumpTarget
@@ -211,8 +285,8 @@ __all__ = [
     "EnergyTransferTarget",
     "HeatPumpTargetBase",
     "IndirectHeatPumpTarget",
+    "IndirectIntegrationTarget",
     "IndirectRefrigerationTarget",
-    "TotalProcessTarget",
-    "TotalSiteTarget",
+    "SubzoneAggregateTarget",
     "UtilitySummaryTarget",
 ]

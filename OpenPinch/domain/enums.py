@@ -43,9 +43,8 @@ class TargetType(Enum):
 
     TL = "Thermodynamic Limit Target"
     DI = "Direct Integration"
-    TZ = "Total Process Target"
-    TS = "Total Site Target"  # Also indirect integration
-    RT = "Regional Target"  # Currently the same as TS
+    SA = "Subzone Aggregate"
+    II = "Indirect"
     ET = "Energy Transfer Analysis"
     DHP = "Direct Heat Pump"
     IHP = "Indirect Heat Pump"
@@ -54,6 +53,22 @@ class TargetType(Enum):
 
     def __str__(self):
         return self.value
+
+
+class IntegrationType(str, Enum):
+    """Heat-exchange route represented by a reportable target."""
+
+    Process = "Process"
+    Utility = "Utility"
+
+
+class TargetMethod(str, Enum):
+    """Analysis method represented by a reportable target."""
+
+    HeatExchange = "Heat Exchange"
+    HeatPump = "Heat Pump"
+    Refrigeration = "Refrigeration"
+    EnergyTransfer = "Energy Transfer"
 
 
 class HeatExchangerTypes(Enum):

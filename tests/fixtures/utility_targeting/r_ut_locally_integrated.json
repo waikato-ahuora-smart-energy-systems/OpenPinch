@@ -1,7 +1,10 @@
 {
     "targets": [
         {
-            "name": "Chemical Plant[S]/Direct Integration",
+            "scope": "Site/Chemical Plant[S]",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 140.0,
@@ -104,7 +107,10 @@
             ]
         },
         {
-            "name": "Food Plant[S]/Direct Integration",
+            "scope": "Site/Food Plant[S]",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 197.5,
@@ -207,7 +213,10 @@
             ]
         },
         {
-            "name": "Hospital[S]/Direct Integration",
+            "scope": "Site/Hospital[S]",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 23.0,
@@ -310,7 +319,10 @@
             ]
         },
         {
-            "name": "Residential[S]/Direct Integration",
+            "scope": "Site/Residential[S]",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 21.0,

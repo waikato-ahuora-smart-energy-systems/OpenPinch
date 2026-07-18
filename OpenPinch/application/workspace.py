@@ -605,7 +605,10 @@ class PinchWorkspace:
         *,
         case_name: Optional[str] = None,
         other_case_name: Optional[str] = None,
-        target_name: Optional[str] = None,
+        scope: Optional[str] = None,
+        zone_type: Optional[str] = None,
+        integration_type: Optional[str] = None,
+        target_method: Optional[str] = None,
         base_label: str = "Base case",
         other_label: str = "Scenario",
     ) -> pd.DataFrame:
@@ -617,7 +620,10 @@ class PinchWorkspace:
             comparison_problem = other_problem
         return base_problem.compare_to(
             comparison_problem,
-            target_name=target_name,
+            scope=scope,
+            zone_type=zone_type,
+            integration_type=integration_type,
+            target_method=target_method,
             base_label=base_label,
             other_label=other_label,
         )
@@ -627,14 +633,20 @@ class PinchWorkspace:
         base_case: str,
         other_case: str,
         *,
-        target_name: Optional[str] = None,
+        scope: Optional[str] = None,
+        zone_type: Optional[str] = None,
+        integration_type: Optional[str] = None,
+        target_method: Optional[str] = None,
         base_label: Optional[str] = None,
         other_label: Optional[str] = None,
     ) -> pd.DataFrame:
         """Compare two cases in the same workspace."""
         return self.case(base_case).compare_to(
             self.case(other_case),
-            target_name=target_name,
+            scope=scope,
+            zone_type=zone_type,
+            integration_type=integration_type,
+            target_method=target_method,
             base_label=base_label or base_case,
             other_label=other_label or other_case,
         )

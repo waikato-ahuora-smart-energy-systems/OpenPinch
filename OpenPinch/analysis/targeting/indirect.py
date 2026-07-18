@@ -16,14 +16,14 @@ from ...domain._problem_table.types import ProblemTableUpdateKwargs
 from ...domain.enums import GraphType, ProblemTableLabel, TargetType
 from ...domain.problem_table import ProblemTable
 from ...domain.stream_collection import StreamCollection
-from ...domain.targets import TotalProcessTarget, TotalSiteTarget
+from ...domain.targets import IndirectIntegrationTarget, SubzoneAggregateTarget
 from ...domain.zone import Zone
 from ..numerics import get_period_index
 from .cascade import get_process_heat_cascade
 from .direct import _create_net_hot_and_cold_stream_collections_for_site_analysis
 
 __all__ = [
-    "compute_total_subzone_utility_targets",
+    "compute_subzone_aggregate_target",
     "compute_indirect_integration_targets",
 ]
 
@@ -35,10 +35,10 @@ _DIRECT_TARGET_GRAPH_DECIMALS = 4
 ################################################################################
 
 
-def compute_total_subzone_utility_targets(
+def compute_subzone_aggregate_target(
     zone: Zone,
     args: dict | None = None,
-) -> TotalProcessTarget:
+) -> SubzoneAggregateTarget:
     """Sums and records zonal targets."""
     # Sum targets from subzones
     idx, sid = get_period_index(period_ids=zone.period_ids, args=args)
@@ -77,7 +77,9 @@ def compute_total_subzone_utility_targets(
     heat_recovery_limit = zone.targets[TargetType.DI.value].heat_recovery_limit
     output = {
         "zone_name": zone.name,
-        "type": TargetType.TZ.value,
+        "scope": zone.address,
+        "zone_type": zone.type,
+        "type": TargetType.SA.value,
         "parent_zone": zone.parent_zone,
         "config": zone.config,
         "hot_utilities": hot_utilities,
@@ -95,13 +97,13 @@ def compute_total_subzone_utility_targets(
         "period_id": sid,
         "period_idx": idx,
     }
-    return TotalProcessTarget.model_validate(output)
+    return SubzoneAggregateTarget.model_validate(output)
 
 
 def compute_indirect_integration_targets(
     zone: Zone,
     args: dict | None = None,
-) -> TotalSiteTarget | None:
+) -> IndirectIntegrationTarget | None:
     """Compute indirect integration targets for an aggregated zone.
 
     The routine assumes the relevant child zones have already been solved for
@@ -110,7 +112,7 @@ def compute_indirect_integration_targets(
     resulting Total Site target on ``zone`` before returning it.
     """
     idx, sid = get_period_index(period_ids=zone.period_ids, args=args)
-    s_tzt = zone.targets[TargetType.TZ.value]
+    s_tzt = zone.targets[TargetType.SA.value]
     net_hot_streams, net_cold_streams = _reconstruct_subzone_direct_profiles(
         zone,
         args,
@@ -159,7 +161,9 @@ def compute_indirect_integration_targets(
 
     output = {
         "zone_name": zone.name,
-        "type": TargetType.TS.value,
+        "scope": zone.address,
+        "zone_type": zone.type,
+        "type": TargetType.II.value,
         "parent_zone": zone.parent_zone,
         "config": zone.config,
         "pt": pt,
@@ -184,7 +188,7 @@ def compute_indirect_integration_targets(
         "period_id": sid,
         "period_idx": idx,
     }
-    return TotalSiteTarget.model_validate(output)
+    return IndirectIntegrationTarget.model_validate(output)
 
 
 ################################################################################

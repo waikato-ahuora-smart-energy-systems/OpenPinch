@@ -133,7 +133,10 @@ def _make_summary_row(t) -> dict:
     period_id = getattr(t, "period_id", None)
     period_idx = getattr(t, "period_idx", None)
     base_columns = {
-        "Target": t.name,
+        "Scope": t.scope,
+        "Zone Type": t.zone_type,
+        "Integration Type": t.integration_type,
+        "Target Method": t.target_method,
         "Period ID": period_id,
         **_value_unit_columns(
             "Cold Pinch",

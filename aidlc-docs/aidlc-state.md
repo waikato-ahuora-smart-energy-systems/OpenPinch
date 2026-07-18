@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: COMPLETE - Notebook Improvement; Operations N/A
+- **Current Stage**: COMPLETE - Indirect Target Terminology; Operations N/A
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -27,6 +27,41 @@
 | Security Baseline | No | Notebook Improvement Requirements Analysis |
 | Property-Based Testing | Partial | Notebook Improvement Requirements Analysis |
 | Resiliency Baseline | No | Notebook Improvement Requirements Analysis |
+
+## Indirect Target Terminology Progress
+
+- [x] INCEPTION - Workspace Detection reused the current brownfield assessment.
+- [x] INCEPTION - Reverse Engineering reused current target/report artifacts.
+- [x] INCEPTION - Standard Requirements Analysis completed and approved by the
+  supplied implementation plan.
+- [x] INCEPTION - User Stories skipped for this technical contract refactor.
+- [x] INCEPTION - Workflow Planning completed and approved.
+- [x] INCEPTION - Application Design and Units Generation skipped; existing
+  boundaries and one cohesive implementation unit are sufficient.
+- [x] CONSTRUCTION - Functional, NFR, and Infrastructure Design skipped under
+  the approved workflow.
+- [x] CONSTRUCTION - Code Generation Part 1 plan created and approved by the
+  explicit implementation request.
+- [x] CONSTRUCTION - Code Generation Part 2 complete.
+- [x] CONSTRUCTION - Build and Test complete.
+- [x] OPERATIONS - N/A; no deployment work requested.
+- **Requirements**:
+  `aidlc-docs/inception/requirements/indirect-target-terminology-requirements.md`.
+- **Workflow plan**:
+  `aidlc-docs/inception/plans/indirect-target-terminology-execution-plan.md`.
+- **Code Generation plan**:
+  `aidlc-docs/construction/plans/indirect-target-terminology-code-generation-plan.md`.
+- **Implementation summary**:
+  `aidlc-docs/construction/indirect-target-terminology/code/code-generation-summary.md`.
+- **Build and Test summary**:
+  `aidlc-docs/construction/indirect-target-terminology/build-and-test/build-and-test-summary.md`.
+- **Current stage**: Complete. The generic indirect model and explicit public
+  metadata contract are implemented. Notebook 2 retains the corrected duties
+  and LPS ledge. The complete fixed-seed non-solver suite passed 2,195 tests
+  with 3 optional-profile skips and 4 solver deselections; packaging, Ruff,
+  Sphinx, distribution, isolated-wheel, stale-symbol, and patch gates pass.
+- **Extensions**: Security and Resiliency disabled; partial PBT applies to
+  serialization and multi-period metadata alignment.
 
 ## Total Site Profiles Diagnostic
 

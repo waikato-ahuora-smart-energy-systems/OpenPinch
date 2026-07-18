@@ -137,7 +137,11 @@ def test_get_results_from_csv_writes_json(tmp_path: Path, capsys):
 
     assert output_json.exists()
     assert json.loads(output_json.read_text()) == out
-    assert out["targets"][0]["name"].startswith("Proj/")
+    assert out["targets"][0]["scope"] == "Proj"
+    assert out["targets"][0]["zone_type"] == "Site"
+    assert out["targets"][0]["integration_type"] == "Utility"
+    assert out["targets"][0]["target_method"] == "Heat Exchange"
+    assert "name" not in out["targets"][0]
     assert capsys.readouterr().out == ""
 
 

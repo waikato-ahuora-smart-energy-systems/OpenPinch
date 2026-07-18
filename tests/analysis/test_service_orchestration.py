@@ -17,8 +17,8 @@ from OpenPinch.domain.targets import (
     DirectRefrigerationTarget,
     EnergyTransferTarget,
     IndirectHeatPumpTarget,
+    IndirectIntegrationTarget,
     IndirectRefrigerationTarget,
-    TotalSiteTarget,
 )
 from OpenPinch.domain.zone import Zone
 
@@ -52,8 +52,8 @@ def _make_target(
             cold_utility_target=0.0,
             heat_recovery_target=0.0,
         )
-    if target_type == TargetType.TS.value:
-        return TotalSiteTarget(
+    if target_type == TargetType.II.value:
+        return IndirectIntegrationTarget(
             zone_name=zone.name,
             period_id=period_id,
             period_idx=period_idx,
@@ -169,15 +169,13 @@ def test_indirect_heat_integration_service_records_total_process_and_site_target
 
     def fake_compute_total(target_zone: Zone, args: dict | None = None):
         calls.append(("total_process", args))
-        return _make_target(target_zone, TargetType.TZ.value)
+        return _make_target(target_zone, TargetType.SA.value)
 
     def fake_compute_indirect(target_zone: Zone, args: dict | None = None):
         calls.append(("total_site", args))
-        return _make_target(target_zone, TargetType.TS.value)
+        return _make_target(target_zone, TargetType.II.value)
 
-    monkeypatch.setattr(
-        svc, "compute_total_subzone_utility_targets", fake_compute_total
-    )
+    monkeypatch.setattr(svc, "compute_subzone_aggregate_target", fake_compute_total)
     monkeypatch.setattr(
         svc, "compute_indirect_integration_targets", fake_compute_indirect
     )
@@ -195,8 +193,8 @@ def test_indirect_heat_integration_service_records_total_process_and_site_target
         ("total_process", {"period_idx": 0}),
         ("total_site", {"period_idx": 0}),
     ]
-    assert TargetType.TZ.value in zone.targets
-    assert TargetType.TS.value in zone.targets
+    assert TargetType.SA.value in zone.targets
+    assert TargetType.II.value in zone.targets
 
 
 @pytest.mark.parametrize(
@@ -217,7 +215,7 @@ def test_indirect_heat_integration_service_records_total_process_and_site_target
         (
             "indirect_heat_pump_service",
             TargetType.IHP.value,
-            TargetType.TS.value,
+            TargetType.II.value,
             "compute_indirect_heat_pump_or_refrigeration_target",
         ),
     ],
@@ -337,7 +335,7 @@ def test_indirect_hpr_services_enable_flags_and_bootstrap_total_site_targets(
     ) -> Zone:
         calls["indirect"] += 1
         assert args is None
-        target_zone.add_target(_make_target(target_zone, TargetType.TS.value))
+        target_zone.add_target(_make_target(target_zone, TargetType.II.value))
         return target_zone
 
     def fake_compute(
@@ -364,13 +362,13 @@ def test_indirect_hpr_services_enable_flags_and_bootstrap_total_site_targets(
 
     assert out is zone
     assert calls["indirect"] == 1
-    assert TargetType.TS.value in zone.targets
+    assert TargetType.II.value in zone.targets
     assert target_id in zone.targets
 
 
 def test_exergy_targeting_service_auto_selects_total_site_first(monkeypatch):
     zone = _make_zone()
-    zone.add_target(_make_target(zone, TargetType.TS.value))
+    zone.add_target(_make_target(zone, TargetType.II.value))
     zone.add_target(_make_target(zone, TargetType.DI.value))
     enriched = []
 
@@ -383,13 +381,13 @@ def test_exergy_targeting_service_auto_selects_total_site_first(monkeypatch):
     out = svc.exergy_targeting_service(zone)
 
     assert out is zone
-    assert enriched == [TargetType.TS.value]
-    assert zone._selected_exergy_target_type == TargetType.TS.value
+    assert enriched == [TargetType.II.value]
+    assert zone._selected_exergy_target_type == TargetType.II.value
 
 
 def test_exergy_targeting_service_honours_explicit_base_target_type(monkeypatch):
     zone = _make_zone()
-    zone.add_target(_make_target(zone, TargetType.TS.value))
+    zone.add_target(_make_target(zone, TargetType.II.value))
     zone.add_target(_make_target(zone, TargetType.DI.value))
     enriched = []
 
@@ -413,7 +411,7 @@ def test_exergy_targeting_service_uses_existing_matching_state_only(monkeypatch)
     zone = _make_zone()
     zone.set_period_context({"0": 0, "peak": 1}, [1.0, 1.0], 2)
     zone.add_target(
-        _make_target(zone, TargetType.TS.value, period_id="0", period_idx=0)
+        _make_target(zone, TargetType.II.value, period_id="0", period_idx=0)
     )
     zone.add_target(
         _make_target(zone, TargetType.DI.value, period_id="peak", period_idx=1)
@@ -438,7 +436,7 @@ def test_exergy_targeting_service_explicit_target_raises_when_unavailable():
     zone.add_target(_make_target(zone, TargetType.DI.value))
 
     with pytest.raises(RuntimeError, match="requires an existing target"):
-        svc.exergy_targeting_service(zone, {"base_target_type": TargetType.TS.value})
+        svc.exergy_targeting_service(zone, {"base_target_type": TargetType.II.value})
 
 
 def test_exergy_targeting_service_raises_when_no_existing_target():
@@ -493,7 +491,7 @@ def test_exergy_targeting_service_does_not_refresh_state_mismatched_target(
     zone = _make_zone()
     zone.set_period_context({"0": 0, "peak": 1}, [1.0, 1.0], 2)
     zone.add_target(
-        _make_target(zone, TargetType.TS.value, period_id="0", period_idx=0)
+        _make_target(zone, TargetType.II.value, period_id="0", period_idx=0)
     )
 
     monkeypatch.setattr(
@@ -505,7 +503,7 @@ def test_exergy_targeting_service_does_not_refresh_state_mismatched_target(
     with pytest.raises(RuntimeError, match="requires an existing target"):
         svc.exergy_targeting_service(
             zone,
-            {"base_target_type": TargetType.TS.value, "period_id": "peak"},
+            {"base_target_type": TargetType.II.value, "period_id": "peak"},
         )
 
 
@@ -516,7 +514,7 @@ def test_indirect_service_skips_none_targets(monkeypatch):
         svc,
         "indirect_heat_integration_service",
         lambda target_zone, args=None: (
-            target_zone.add_target(_make_target(target_zone, TargetType.TS.value))
+            target_zone.add_target(_make_target(target_zone, TargetType.II.value))
             or target_zone
         ),
     )
@@ -529,7 +527,7 @@ def test_indirect_service_skips_none_targets(monkeypatch):
     out = svc.indirect_refrigeration_service(zone)
 
     assert out is zone
-    assert TargetType.TS.value in zone.targets
+    assert TargetType.II.value in zone.targets
     assert TargetType.IR.value not in zone.targets
 
 
@@ -623,14 +621,14 @@ def test_energy_transfer_service_bootstraps_direct_target_on_leaf(monkeypatch):
 
 def test_energy_transfer_service_prefers_existing_total_site_target():
     zone = _make_zone()
-    zone.add_target(_make_target(zone, TargetType.TS.value))
+    zone.add_target(_make_target(zone, TargetType.II.value))
     zone.add_target(_make_target(zone, TargetType.DI.value))
 
     out = svc.energy_transfer_analysis_service(zone)
 
     assert out is zone
-    assert zone.targets[TargetType.ET.value].base_target_type == TargetType.TS.value
-    assert zone._selected_energy_transfer_base_target_type == TargetType.TS.value
+    assert zone.targets[TargetType.ET.value].base_target_type == TargetType.II.value
+    assert zone._selected_energy_transfer_base_target_type == TargetType.II.value
 
 
 def test_energy_transfer_total_site_bootstrap_solves_parent_and_child_di(
@@ -653,10 +651,10 @@ def test_energy_transfer_total_site_bootstrap_solves_parent_and_child_di(
         target_zone: Zone,
         args: dict | None = None,
     ) -> Zone:
-        calls.append((TargetType.TS.value, target_zone.name))
+        calls.append((TargetType.II.value, target_zone.name))
         assert TargetType.DI.value in target_zone.targets
         assert TargetType.DI.value in subzone.targets
-        target_zone.add_target(_make_target(target_zone, TargetType.TS.value))
+        target_zone.add_target(_make_target(target_zone, TargetType.II.value))
         return target_zone
 
     monkeypatch.setattr(
@@ -672,16 +670,16 @@ def test_energy_transfer_total_site_bootstrap_solves_parent_and_child_di(
 
     out = svc.energy_transfer_analysis_service(
         zone,
-        {"base_target_type": TargetType.TS.value},
+        {"base_target_type": TargetType.II.value},
     )
 
     assert out is zone
     assert calls == [
         (TargetType.DI.value, "Plant"),
         (TargetType.DI.value, "Bleaching"),
-        (TargetType.TS.value, "Plant"),
+        (TargetType.II.value, "Plant"),
     ]
-    assert zone.targets[TargetType.ET.value].base_target_type == TargetType.TS.value
+    assert zone.targets[TargetType.ET.value].base_target_type == TargetType.II.value
 
 
 def test_energy_transfer_total_site_uses_one_subzone_layer_of_gccs(monkeypatch):
@@ -705,11 +703,11 @@ def test_energy_transfer_total_site_uses_one_subzone_layer_of_gccs(monkeypatch):
         target_zone: Zone,
         args: dict | None = None,
     ) -> Zone:
-        calls.append((TargetType.TS.value, target_zone.name))
+        calls.append((TargetType.II.value, target_zone.name))
         assert TargetType.DI.value in target_zone.targets
         assert TargetType.DI.value in area.targets
         assert TargetType.DI.value not in unit.targets
-        target_zone.add_target(_make_target(target_zone, TargetType.TS.value))
+        target_zone.add_target(_make_target(target_zone, TargetType.II.value))
         return target_zone
 
     def fake_compute_energy_transfer_target(base_target, source_targets=None):
@@ -739,24 +737,24 @@ def test_energy_transfer_total_site_uses_one_subzone_layer_of_gccs(monkeypatch):
 
     out = svc.energy_transfer_analysis_service(
         zone,
-        {"base_target_type": TargetType.TS.value},
+        {"base_target_type": TargetType.II.value},
     )
 
     assert out is zone
     assert calls == [
         (TargetType.DI.value, "Plant"),
         (TargetType.DI.value, "Area"),
-        (TargetType.TS.value, "Plant"),
+        (TargetType.II.value, "Plant"),
     ]
     assert source_names == ["Plant/Area"]
-    assert zone.targets[TargetType.ET.value].base_target_type == TargetType.TS.value
+    assert zone.targets[TargetType.ET.value].base_target_type == TargetType.II.value
 
 
 def test_cogeneration_service_prefers_total_site_before_direct_integration(
     monkeypatch,
 ):
     zone = _make_zone()
-    zone.add_target(_make_target(zone, TargetType.TS.value))
+    zone.add_target(_make_target(zone, TargetType.II.value))
     zone.add_target(_make_target(zone, TargetType.DI.value))
     selected_targets: list[str] = []
 
@@ -774,10 +772,10 @@ def test_cogeneration_service_prefers_total_site_before_direct_integration(
     out = svc.power_cogeneration_service(zone)
 
     assert out is zone
-    assert selected_targets == [TargetType.TS.value]
-    assert zone.targets[TargetType.TS.value].work_target == 8.0
+    assert selected_targets == [TargetType.II.value]
+    assert zone.targets[TargetType.II.value].work_target == 8.0
     assert zone.targets[TargetType.DI.value].work_target is None
-    assert zone._selected_cogeneration_target_type == TargetType.TS.value
+    assert zone._selected_cogeneration_target_type == TargetType.II.value
 
 
 def test_cogeneration_service_falls_back_from_total_site_to_indirect_heat_pump(
@@ -788,7 +786,7 @@ def test_cogeneration_service_falls_back_from_total_site_to_indirect_heat_pump(
     selected_targets: list[str] = []
 
     def fake_indirect_heat_integration_service(target_zone: Zone, args=None) -> Zone:
-        refresh_order.append(TargetType.TS.value)
+        refresh_order.append(TargetType.II.value)
         return target_zone
 
     def fake_indirect_heat_pump_service(target_zone: Zone, args=None) -> Zone:
@@ -819,7 +817,7 @@ def test_cogeneration_service_falls_back_from_total_site_to_indirect_heat_pump(
     out = svc.power_cogeneration_service(zone)
 
     assert out is zone
-    assert refresh_order == [TargetType.TS.value, TargetType.IHP.value]
+    assert refresh_order == [TargetType.II.value, TargetType.IHP.value]
     assert selected_targets == [TargetType.IHP.value]
     assert zone._selected_cogeneration_target_type == TargetType.IHP.value
 
@@ -850,7 +848,7 @@ def test_cogeneration_service_falls_back_to_direct_integration_when_needed(
     monkeypatch.setattr(
         svc,
         "indirect_heat_integration_service",
-        _missing(TargetType.TS.value),
+        _missing(TargetType.II.value),
     )
     monkeypatch.setattr(
         svc,
@@ -887,7 +885,7 @@ def test_cogeneration_service_falls_back_to_direct_integration_when_needed(
 
     assert out is zone
     assert refresh_order == [
-        TargetType.TS.value,
+        TargetType.II.value,
         TargetType.IHP.value,
         TargetType.IR.value,
         TargetType.DHP.value,
@@ -900,7 +898,7 @@ def test_cogeneration_service_falls_back_to_direct_integration_when_needed(
 
 @pytest.mark.parametrize(
     "base_target_type",
-    [TargetType.TS.value, TargetType.IHP.value, TargetType.DI.value],
+    [TargetType.II.value, TargetType.IHP.value, TargetType.DI.value],
 )
 def test_cogeneration_service_explicit_override_targets_exact_family(
     monkeypatch,
@@ -908,7 +906,7 @@ def test_cogeneration_service_explicit_override_targets_exact_family(
 ):
     zone = _make_zone()
     for target_type in (
-        TargetType.TS.value,
+        TargetType.II.value,
         TargetType.IHP.value,
         TargetType.IR.value,
         TargetType.DHP.value,
@@ -943,7 +941,7 @@ def test_cogeneration_service_rejects_unsupported_explicit_override():
     zone = _make_zone()
 
     with pytest.raises(ValueError, match="Unsupported cogeneration base_target_type"):
-        svc.power_cogeneration_service(zone, {"base_target_type": TargetType.TZ.value})
+        svc.power_cogeneration_service(zone, {"base_target_type": TargetType.SA.value})
 
 
 def test_cogeneration_service_explicit_target_raises_when_unavailable(monkeypatch):
@@ -957,9 +955,9 @@ def test_cogeneration_service_explicit_target_raises_when_unavailable(monkeypatc
 
     with pytest.raises(
         RuntimeError,
-        match="could not produce target 'Total Site Target'",
+        match="could not produce target 'Indirect'",
     ):
-        svc.power_cogeneration_service(zone, {"base_target_type": TargetType.TS.value})
+        svc.power_cogeneration_service(zone, {"base_target_type": TargetType.II.value})
 
 
 def test_cogeneration_service_refreshes_state_mismatched_target(monkeypatch):
@@ -968,7 +966,7 @@ def test_cogeneration_service_refreshes_state_mismatched_target(monkeypatch):
     zone.add_target(
         _make_target(
             zone,
-            TargetType.TS.value,
+            TargetType.II.value,
             period_id="shoulder",
             period_idx=1,
         )
@@ -981,7 +979,7 @@ def test_cogeneration_service_refreshes_state_mismatched_target(monkeypatch):
         target_zone.add_target(
             _make_target(
                 target_zone,
-                TargetType.TS.value,
+                TargetType.II.value,
                 period_id="peak",
                 period_idx=0,
             )
@@ -1008,12 +1006,12 @@ def test_cogeneration_service_refreshes_state_mismatched_target(monkeypatch):
     assert out is zone
     assert refresh_calls["count"] == 1
     assert selected_periods == ["peak"]
-    assert zone._selected_cogeneration_target_type == TargetType.TS.value
+    assert zone._selected_cogeneration_target_type == TargetType.II.value
 
 
 def test_cogeneration_service_no_viable_stage_does_not_fall_back(monkeypatch):
     zone = _make_zone()
-    zone.add_target(_make_target(zone, TargetType.TS.value))
+    zone.add_target(_make_target(zone, TargetType.II.value))
     zone.add_target(_make_target(zone, TargetType.DI.value))
     selected_targets: list[str] = []
 
@@ -1030,10 +1028,10 @@ def test_cogeneration_service_no_viable_stage_does_not_fall_back(monkeypatch):
     out = svc.power_cogeneration_service(zone)
 
     assert out is zone
-    assert selected_targets == [TargetType.TS.value]
-    assert zone.targets[TargetType.TS.value].work_target is None
+    assert selected_targets == [TargetType.II.value]
+    assert zone.targets[TargetType.II.value].work_target is None
     assert zone.targets[TargetType.DI.value].work_target is None
-    assert zone._selected_cogeneration_target_type == TargetType.TS.value
+    assert zone._selected_cogeneration_target_type == TargetType.II.value
 
 
 def test_direct_service_records_selected_period_id_on_zone(monkeypatch):
@@ -1104,9 +1102,9 @@ def test_direct_heat_pump_service_refreshes_direct_integration_for_new_period(
 def test_indirect_heat_pump_service_refreshes_total_site_for_new_period(monkeypatch):
     zone = _make_zone()
     zone.set_period_context({"0": 0, "peak": 1}, [1.0, 1.0], 2)
-    zone.targets[TargetType.TS.value] = _make_target(
+    zone.targets[TargetType.II.value] = _make_target(
         zone,
-        TargetType.TS.value,
+        TargetType.II.value,
         period_id="0",
         period_idx=0,
     )
@@ -1119,7 +1117,7 @@ def test_indirect_heat_pump_service_refreshes_total_site_for_new_period(monkeypa
         calls["indirect"] += 1
         target_zone.add_target(
             _make_target(
-                target_zone, TargetType.TS.value, period_id="peak", period_idx=1
+                target_zone, TargetType.II.value, period_id="peak", period_idx=1
             )
         )
         return target_zone
@@ -1144,5 +1142,5 @@ def test_indirect_heat_pump_service_refreshes_total_site_for_new_period(monkeypa
 
     assert out is zone
     assert calls["indirect"] == 1
-    assert zone.targets[TargetType.TS.value].period_idx == 1
+    assert zone.targets[TargetType.II.value].period_idx == 1
     assert zone.targets[TargetType.IHP.value].period_idx == 1

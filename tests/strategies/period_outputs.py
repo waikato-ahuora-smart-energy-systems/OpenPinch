@@ -23,14 +23,17 @@ class AlignedPeriodOutputs:
 
 def _target(
     *,
-    name: str,
+    scope: str,
     period_id: str,
     hot_utility: float,
     cold_pinch_present: bool,
 ) -> TargetResults:
     cold_pinch = Value(90.0 + hot_utility / 100.0, "degC")
     return TargetResults(
-        name=name,
+        scope=scope,
+        zone_type="Site" if scope == "Site" else "Process Zone",
+        integration_type="Process",
+        target_method="Heat Exchange",
         period_id=period_id,
         Qh=Value(hot_utility, "kW"),
         Qc=Value(hot_utility / 2.0, "kW"),
@@ -76,13 +79,13 @@ def aligned_period_outputs(draw) -> AlignedPeriodOutputs:
                 period_id=period_id,
                 targets=[
                     _target(
-                        name="Site/Direct Heat Integration",
+                        scope="Site",
                         period_id=period_id,
                         hot_utility=hot_utility,
                         cold_pinch_present=has_cold_pinch,
                     ),
                     _target(
-                        name="Process/Direct Heat Integration",
+                        scope="Site/Process",
                         period_id=period_id,
                         hot_utility=hot_utility / 2.0,
                         cold_pinch_present=has_cold_pinch,

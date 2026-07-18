@@ -404,8 +404,8 @@ def test_indirect_period_base_target_does_not_replace_zone_direct_profiles(
     monkeypatch,
 ):
     zone = Zone(name="Site", config=Configuration())
-    total_process = SimpleNamespace(type=TargetType.TZ.value)
-    expected_target = SimpleNamespace(type=TargetType.TS.value)
+    total_process = SimpleNamespace(type=TargetType.SA.value)
+    expected_target = SimpleNamespace(type=TargetType.II.value)
 
     monkeypatch.setattr(
         hp_preparation,
@@ -414,7 +414,7 @@ def test_indirect_period_base_target_does_not_replace_zone_direct_profiles(
     )
     monkeypatch.setattr(
         hp_preparation,
-        "compute_total_subzone_utility_targets",
+        "compute_subzone_aggregate_target",
         lambda target_zone, period_args: total_process,
     )
     monkeypatch.setattr(

@@ -77,7 +77,10 @@ class PinchTemp(_ReportModel):
 class TargetResults(_ReportModel):
     """Summary metrics for a single zone/target returned by the analysis."""
 
-    name: str
+    scope: str
+    zone_type: str
+    integration_type: str
+    target_method: str
     period_idx: Optional[int] = None
     period_id: Optional[str] = None
     degree_of_integration: Value | None = None
@@ -159,7 +162,10 @@ class TargetResults(_ReportModel):
 class ReportMetric(BaseModel):
     """One numeric report metric resolved for a target and optional state."""
 
-    target_name: str
+    scope: str
+    zone_type: str
+    integration_type: str
+    target_method: str
     metric: str
     label: str
     value: Any = None

@@ -7,7 +7,7 @@ from typing import Any
 from ...domain.enums import TargetType
 from ..targeting.context import target_matches_requested_period
 
-ENERGY_TRANSFER_TARGET_ORDER = (TargetType.TS.value, TargetType.DI.value)
+ENERGY_TRANSFER_TARGET_ORDER = (TargetType.II.value, TargetType.DI.value)
 
 
 def normalize_base_target_type(base_target_type: object | None) -> str | None:
@@ -28,7 +28,7 @@ def candidate_order(zone, base_target_type: str | None) -> tuple[str, ...]:
     """Return the base-target search order for one zone."""
     if base_target_type is not None:
         return (base_target_type,)
-    if TargetType.TS.value in zone.targets or zone.subzones:
+    if TargetType.II.value in zone.targets or zone.subzones:
         return ENERGY_TRANSFER_TARGET_ORDER
     return (TargetType.DI.value,)
 
@@ -52,7 +52,7 @@ def ensure_base_target(
     refresh_service = refresh_services.get(target_type)
     if refresh_service is None:
         return None
-    if target_type == TargetType.TS.value:
+    if target_type == TargetType.II.value:
         if not zone.subzones:
             return None
         direct_target = zone.targets.get(TargetType.DI.value)
@@ -83,7 +83,7 @@ def ensure_base_target(
 
 def source_targets(zone, base_target_type: str) -> list:
     """Return operation-level targets contributing to one diagram."""
-    if base_target_type == TargetType.TS.value and zone.subzones:
+    if base_target_type == TargetType.II.value and zone.subzones:
         return [
             {"name": source_name, "target": source_zone.targets[TargetType.DI.value]}
             for source_name, source_zone in iter_source_zones(zone)

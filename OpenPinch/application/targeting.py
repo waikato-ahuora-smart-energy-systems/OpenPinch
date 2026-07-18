@@ -22,9 +22,9 @@ from ..analysis.targeting.context import (
     target_matches_requested_period,
 )
 from ..analysis.targeting.direct import compute_direct_integration_targets
-from ..analysis.targeting.total_site import (
+from ..analysis.targeting.indirect import (
     compute_indirect_integration_targets,
-    compute_total_subzone_utility_targets,
+    compute_subzone_aggregate_target,
 )
 from ..contracts.input import TargetInput
 from ..domain.enums import TargetType
@@ -86,7 +86,7 @@ def indirect_heat_integration_service(zone: Zone, args: dict | None = None) -> Z
         ):
             direct_heat_integration_service(subzone, args)
     record_selected_period(zone, args)
-    zone.add_target(compute_total_subzone_utility_targets(zone, args))
+    zone.add_target(compute_subzone_aggregate_target(zone, args))
     target = compute_indirect_integration_targets(zone, args)
     if target is not None:
         zone.add_target(target)
@@ -116,11 +116,11 @@ def direct_heat_pump_service(zone: Zone, args: dict | None = None) -> Zone:
 
 
 def indirect_heat_pump_service(zone: Zone, args: dict | None = None) -> Zone:
-    """Run indirect Heat Pump targeting after ensuring a base TS target exists."""
+    """Run indirect Heat Pump targeting after ensuring an indirect target exists."""
     apply_zone_config_overrides(zone, args)
     record_selected_period(zone, args)
     if not target_matches_requested_period(
-        zone.targets.get(TargetType.TS.value),
+        zone.targets.get(TargetType.II.value),
         args=args,
         period_ids=zone.period_ids,
     ):
@@ -160,11 +160,11 @@ def direct_refrigeration_service(zone: Zone, args: dict | None = None) -> Zone:
 
 
 def indirect_refrigeration_service(zone: Zone, args: dict | None = None) -> Zone:
-    """Run indirect refrigeration targeting after ensuring a base TS target exists."""
+    """Run indirect refrigeration after ensuring an indirect target exists."""
     apply_zone_config_overrides(zone, args)
     record_selected_period(zone, args)
     if not target_matches_requested_period(
-        zone.targets.get(TargetType.TS.value),
+        zone.targets.get(TargetType.II.value),
         args=args,
         period_ids=zone.period_ids,
     ):
@@ -183,13 +183,13 @@ def indirect_refrigeration_service(zone: Zone, args: dict | None = None) -> Zone
 
 def power_cogeneration_service(zone: Zone, args: dict | None = None) -> Zone:
     """Post-process one compatible target in
-    TS -> IHP -> IR -> DHP -> DR -> DI order."""
+    II -> IHP -> IR -> DHP -> DR -> DI order."""
     return run_power_cogeneration_service(
         zone,
         args,
         refresh_services={
             TargetType.DI.value: direct_heat_integration_service,
-            TargetType.TS.value: indirect_heat_integration_service,
+            TargetType.II.value: indirect_heat_integration_service,
             TargetType.DHP.value: direct_heat_pump_service,
             TargetType.DR.value: direct_refrigeration_service,
             TargetType.IHP.value: indirect_heat_pump_service,
@@ -222,7 +222,7 @@ def energy_transfer_analysis_service(zone: Zone, args: dict | None = None) -> Zo
         args,
         refresh_services={
             TargetType.DI.value: direct_heat_integration_service,
-            TargetType.TS.value: indirect_heat_integration_service,
+            TargetType.II.value: indirect_heat_integration_service,
         },
         compute_func=compute_energy_transfer_target,
     )

@@ -10,7 +10,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-import OpenPinch.analysis.targeting.total_site as indirect
+import OpenPinch.analysis.targeting.indirect as indirect
 from OpenPinch.domain.configuration import Configuration
 from OpenPinch.domain.enums import GraphType, TargetType, ZoneType
 from OpenPinch.domain.enums import ProblemTableLabel as ProblemTableLabel
@@ -156,7 +156,7 @@ def test_compute_indirect_integration_targets_auto_aligns_utility_profile_grids(
     monkeypatch,
 ):
     zone = Zone(name="Plant", type=ZoneType.S.value, config=Configuration())
-    zone.targets[TargetType.TZ.value] = SimpleNamespace(
+    zone.targets[TargetType.SA.value] = SimpleNamespace(
         hot_utilities=StreamCollection(),
         cold_utilities=StreamCollection(),
         heat_recovery_target=25.0,
@@ -234,7 +234,7 @@ def test_compute_indirect_integration_targets_auto_aligns_utility_profile_grids(
     assert np.allclose(target.pt[ProblemTableLabel.H_COLD_UT], expected_h_cold_ut)
 
 
-def test_compute_total_subzone_utility_targets_sums_static_fixture_targets():
+def test_compute_subzone_aggregate_target_sums_static_fixture_targets():
     fixture = _fixture()
     zone = Zone(name="Site", type=ZoneType.S.value, config=Configuration())
     zone.hot_utilities = _utility_collection(fixture["base_utilities"]["hot"])
@@ -254,7 +254,7 @@ def test_compute_total_subzone_utility_targets_sums_static_fixture_targets():
         )
         zone.add_zone(subzone)
 
-    target = indirect.compute_total_subzone_utility_targets(zone)
+    target = indirect.compute_subzone_aggregate_target(zone)
 
     assert target.hot_utility_target == pytest.approx(20.0)
     assert target.cold_utility_target == pytest.approx(10.0)
@@ -265,14 +265,14 @@ def test_compute_total_subzone_utility_targets_sums_static_fixture_targets():
     assert float(target.cold_utilities[0].heat_flow[0]) == pytest.approx(10.0)
 
 
-def test_compute_total_subzone_utility_targets_handles_zero_recovery_limit():
+def test_compute_subzone_aggregate_target_handles_zero_recovery_limit():
     fixture = _fixture()
     zone = Zone(name="Site", type=ZoneType.S.value, config=Configuration())
     zone.hot_utilities = _utility_collection(fixture["base_utilities"]["hot"])
     zone.cold_utilities = _utility_collection(fixture["base_utilities"]["cold"])
     zone.targets[TargetType.DI.value] = SimpleNamespace(heat_recovery_limit=0.0)
 
-    target = indirect.compute_total_subzone_utility_targets(zone)
+    target = indirect.compute_subzone_aggregate_target(zone)
 
     assert target.degree_of_int == pytest.approx(1.0)
     assert target.hot_utility_target == pytest.approx(0.0)
@@ -282,7 +282,7 @@ def test_compute_total_subzone_utility_targets_handles_zero_recovery_limit():
 def test_compute_indirect_integration_targets_returns_none_without_net_streams():
     fixture = _fixture()
     zone = Zone(name="Site", type=ZoneType.S.value, config=Configuration())
-    zone.targets[TargetType.TZ.value] = SimpleNamespace(
+    zone.targets[TargetType.SA.value] = SimpleNamespace(
         hot_utilities=_utility_collection(fixture["base_utilities"]["hot"]),
         cold_utilities=_utility_collection(fixture["base_utilities"]["cold"]),
         heat_recovery_target=0.0,

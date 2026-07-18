@@ -7,7 +7,12 @@ from copy import deepcopy
 from typing import TYPE_CHECKING, Any, Mapping
 
 from ....contracts.output import TargetOutput
-from ....domain.enums import HeatPumpAndRefrigerationCycle, TargetType, TurbineModel
+from ....domain.enums import (
+    HeatPumpAndRefrigerationCycle,
+    TargetType,
+    TurbineModel,
+    ZoneType,
+)
 from ....domain.targets import BaseTargetModel
 from ...targeting import (
     area_cost_targeting_service,
@@ -242,14 +247,24 @@ class _TargetAccessor:
         )
 
     def indirect_heat_integration(self, **kwargs) -> BaseTargetModel:
-        """Run focused indirect (Total Site) heat integration."""
-        return self._total_site("indirect_heat_integration", **kwargs)
+        """Run focused utility-mediated heat integration."""
+        return self._indirect("indirect_heat_integration", **kwargs)
 
     def total_site_heat_integration(self, **kwargs) -> BaseTargetModel:
-        """Run focused Total Site heat integration."""
-        return self._total_site("total_site_heat_integration", **kwargs)
+        """Run indirect heat integration for a Site Zone."""
+        root = self._problem._build_execution_master_zone()
+        selected = self._problem._resolve_target_zone(
+            kwargs.get("zone"),
+            master_zone=root,
+        )
+        if selected.type != ZoneType.S.value:
+            raise ValueError(
+                "total_site_heat_integration requires a Zone of type 'Site'; "
+                "use indirect_heat_integration for other aggregate Zone types."
+            )
+        return self._indirect("total_site_heat_integration", **kwargs)
 
-    def _total_site(
+    def _indirect(
         self,
         surface: str,
         *,
@@ -260,7 +275,7 @@ class _TargetAccessor:
     ) -> BaseTargetModel:
         return self._execute(
             surface=surface,
-            target_id=TargetType.TS.value,
+            target_id=TargetType.II.value,
             zone=zone,
             options=options,
             configuration=None,

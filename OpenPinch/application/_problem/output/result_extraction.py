@@ -29,6 +29,8 @@ def _get_report(zone: Zone, period_id: str | None = None) -> dict:
     targets: List[dict] = []
 
     for target in zone.targets.values():
+        if not target.reportable:
+            continue
         target_data = serialize_target(target)
         if period_id is not None:
             target_data["period_id"] = period_id

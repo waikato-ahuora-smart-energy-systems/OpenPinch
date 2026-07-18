@@ -1,7 +1,10 @@
 {
     "targets": [
         {
-            "name": "Medium/Direct Integration",
+            "scope": "Site/Medium",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 224.35000000000002,

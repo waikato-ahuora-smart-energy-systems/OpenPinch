@@ -25,7 +25,7 @@ __all__ = [
 ]
 
 _EXERGY_TARGET_ORDER = (
-    TargetType.TS.value,
+    TargetType.II.value,
     TargetType.IHP.value,
     TargetType.DHP.value,
     TargetType.DI.value,
@@ -376,7 +376,7 @@ def _resolve_target_exergy_spec(target: Any) -> dict[str, Any] | None:
             dt_cont_half=dt_cont_half,
         )
 
-    if target_type == TargetType.TS.value:
+    if target_type == TargetType.II.value:
         pt = getattr(target, "pt", None)
         if pt is None:
             return None

@@ -1,7 +1,10 @@
 {
     "targets": [
         {
-            "name": "Barbaro/Direct Integration",
+            "scope": "Site/Barbaro",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 45.0,
