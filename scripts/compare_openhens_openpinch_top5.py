@@ -13,10 +13,11 @@ import queue as queue_module
 import sys
 import tempfile
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
-from importlib import import_module
+from importlib import import_module, invalidate_caches
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from OpenPinch import PinchProblem
 from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
@@ -45,6 +46,12 @@ DUTY_TOLERANCE_KW = 1.0
 TAC_COMPARE_TOLERANCE = 1e-6
 _SOURCE_TIMEOUTS: list[dict[str, Any]] = []
 _NO_RESULT = object()
+_OPENHENS_MODULE_NAMES = (
+    "openhens",
+    "openhens.main",
+    "openhens.classes.pinch_classes.process",
+    "openhens.classes.pinch_classes.publicOperations",
+)
 _TIMEOUT_FIELDNAMES = (
     "case_id",
     "problem",
@@ -507,33 +514,77 @@ def _configure_solver_path() -> None:
 
 def _require_supported_openhens(openhens_root: Path) -> None:
     """Require the unmodified upstream capability surface used by this tool."""
+    with _supported_openhens_checkout(openhens_root):
+        pass
+
+
+@contextmanager
+def _supported_openhens_checkout(
+    openhens_root: Path,
+) -> Iterator[dict[str, Any]]:
+    """Load and verify OpenHENS from one checkout within a restored scope."""
     if not openhens_root.is_dir():
         raise RuntimeError(
             f"Unsupported OpenHENS checkout at {openhens_root}: directory not found."
         )
 
-    module_names = (
-        "openhens",
-        "openhens.main",
-        "openhens.classes.pinch_classes.process",
-        "openhens.classes.pinch_classes.publicOperations",
-    )
-    root_text = str(openhens_root)
-    inserted_path = root_text not in sys.path
-    if inserted_path:
-        sys.path.insert(0, root_text)
+    resolved_root = openhens_root.resolve()
+    root_text = str(resolved_root)
+    original_path = list(sys.path)
+    original_modules = {
+        name: module
+        for name, module in sys.modules.items()
+        if _is_openhens_module_name(name)
+    }
+    for name in original_modules:
+        sys.modules.pop(name, None)
+    sys.path[:] = [root_text, *(item for item in original_path if item != root_text)]
+    invalidate_caches()
     try:
-        modules = {name: import_module(name) for name in module_names}
-    except Exception as exc:
-        raise RuntimeError(
-            f"Unsupported OpenHENS checkout at {openhens_root}: could not import "
-            f"the required upstream modules ({type(exc).__name__}: {exc})."
-        ) from exc
-    finally:
-        if inserted_path:
-            sys.path.remove(root_text)
+        try:
+            modules = {name: import_module(name) for name in _OPENHENS_MODULE_NAMES}
+        except Exception as exc:
+            raise RuntimeError(
+                f"Unsupported OpenHENS checkout at {resolved_root}: could not "
+                "import the required upstream modules "
+                f"({type(exc).__name__}: {exc})."
+            ) from exc
 
-    _validate_openhens_capabilities(modules, openhens_root=openhens_root)
+        _validate_openhens_module_origins(modules, openhens_root=resolved_root)
+        _validate_openhens_capabilities(modules, openhens_root=resolved_root)
+        yield modules
+    finally:
+        for name in tuple(sys.modules):
+            if _is_openhens_module_name(name):
+                sys.modules.pop(name, None)
+        sys.modules.update(original_modules)
+        sys.path[:] = original_path
+        invalidate_caches()
+
+
+def _is_openhens_module_name(name: str) -> bool:
+    return name == "openhens" or name.startswith("openhens.")
+
+
+def _validate_openhens_module_origins(
+    modules: dict[str, Any],
+    *,
+    openhens_root: Path,
+) -> None:
+    for module_name in _OPENHENS_MODULE_NAMES:
+        module_path = getattr(modules[module_name], "__file__", None)
+        if module_path is None:
+            raise RuntimeError(
+                f"Unsupported OpenHENS checkout at {openhens_root}: required "
+                f"module {module_name} has no source origin."
+            )
+        resolved_module_path = Path(module_path).resolve()
+        if not resolved_module_path.is_relative_to(openhens_root):
+            raise RuntimeError(
+                f"Unsupported OpenHENS checkout at {openhens_root}: required "
+                f"module {module_name} loaded from {resolved_module_path}, "
+                "outside the requested checkout."
+            )
 
 
 def _validate_openhens_capabilities(
@@ -570,10 +621,32 @@ def _run_source_openhens(
     top_n: int,
     max_parallel: int,
 ) -> tuple[list[RankedNetwork], dict[str, int]]:
-    from openhens import OpenHENS
+    with _supported_openhens_checkout(openhens_root) as modules:
+        return _execute_source_openhens(
+            case_id,
+            openhens_root=openhens_root,
+            d_tmin_grid=d_tmin_grid,
+            dqda_grid=dqda_grid,
+            top_n=top_n,
+            max_parallel=max_parallel,
+            openhens_factory=modules["openhens"].OpenHENS,
+        )
+
+
+def _execute_source_openhens(
+    case_id: str,
+    *,
+    openhens_root: Path,
+    d_tmin_grid: tuple[float, ...],
+    dqda_grid: tuple[float, ...],
+    top_n: int,
+    max_parallel: int,
+    openhens_factory: Any,
+) -> tuple[list[RankedNetwork], dict[str, int]]:
+    """Run one source comparison through an already verified factory."""
 
     with tempfile.TemporaryDirectory(prefix=f"openhens-{case_id}-") as tmpdir:
-        model = OpenHENS(
+        model = openhens_factory(
             input_folder=str(openhens_root / "examples" / "cases" / f"{case_id}.csv"),
             output_folder=tmpdir,
             min_dT_list=list(d_tmin_grid),

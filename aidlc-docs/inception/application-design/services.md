@@ -35,3 +35,22 @@
 - Tutorial verification generates a live public inventory, compares it with the
   CSV manifest, executes notebooks by dependency profile, and supplies the same
   manifest to the RTD coverage page.
+
+## Repository Issue Remediation Orchestration
+
+- Workspace construction, `load`, `scenario`, internal case creation, and bundle
+  validation all invoke the same case-identifier contract before changing state.
+- Batch export resolves the destination root once, validates each case
+  directory independently, and preserves the established per-case error
+  isolation contract.
+- Problem input observation copies authoritative input at the property boundary;
+  targeting and serialization continue to use internal validated state.
+- Multiplier updates acquire the prepared root through the existing guard before
+  changing zone state and invalidating cached results.
+- Reporting reserves a unique workbook path before opening pandas/openpyxl and
+  removes the reservation if the write fails.
+- The OpenHENS comparison wraps prerequisite checking and source execution in
+  one exact-checkout import context and injects the verified factory into every
+  case run.
+- Documentation verification scans only active current-state and reverse-
+  engineering sources so historical audit evidence remains valid.

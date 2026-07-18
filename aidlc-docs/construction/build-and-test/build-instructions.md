@@ -2,43 +2,56 @@
 
 ## Prerequisites
 
-- Python 3.11 or newer.
-- `uv` with the repository lock file available.
-- Network access only when locked dependencies are not already installed.
-- Chrome or Chromium plus Kaleido for static Plotly image tests.
-- External HEN solvers only when running the separately marked solver profile.
+- Python version selected by `.python-version`.
+- uv with the committed `uv.lock` environment available.
+- Hatchling and `build` from the development dependency group.
+- Sphinx and the Read the Docs theme from the documentation/development groups.
+- No application environment variables, database, service, or network access
+  when the locked environment and package caches are already available.
 
-No application environment variables or external services are required for the
-base package build.
+External HEN solver binaries are required only for separately marked solver
+profiles and are not needed for this remediation build.
 
 ## Build Steps
 
-Install the locked development environment:
+Install or refresh the locked environment when needed:
 
 ```bash
 uv sync --all-extras --dev
 ```
 
-Build the wheel and source distribution:
+Create clean temporary destinations rather than reusing ignored build trees:
 
 ```bash
-uv run python scripts/build_dist.py --output-dir dist
+mktemp -d /private/tmp/openpinch-docs.XXXXXX
+mktemp -d /private/tmp/openpinch-dist.XXXXXX
 ```
 
-Build warning-free HTML documentation:
+Build warning-as-error HTML documentation:
 
 ```bash
-uv run sphinx-build -W --keep-going -b html docs docs/_build/html
+uv run python scripts/build_docs.py --output-dir /path/to/clean/docs-html
 ```
 
-Successful distribution output contains one `openpinch-*.whl` and one
-`openpinch-*.tar.gz`. Successful documentation output is under
-`docs/_build/html` with zero warnings.
+Build the wheel and source archive:
+
+```bash
+uv run python scripts/build_dist.py --output-dir /path/to/clean/dist
+```
+
+## Success Criteria
+
+- Sphinx completes with zero warnings and writes an HTML index.
+- Distribution output contains exactly one `openpinch-*.whl` and one
+  `openpinch-*.tar.gz` for the current version.
+- Build logs contain no missing-file, import, or package-content failures.
 
 ## Troubleshooting
 
-- The Sphinx tree is self-contained and must build without network access.
-- Kaleido browser failures indicate that Chrome cannot start in the current
-  sandbox; verify image export in an environment allowed to launch it.
-- HEN solver failures belong to the explicit `solver` test profile and require
-  the corresponding solver installation.
+- A uv cache permission error requires running the approved uv command with
+  access to the existing user cache; do not redirect or recreate the cache in
+  the repository.
+- A Sphinx warning is a build failure; correct the source/reference and rebuild
+  from a fresh destination.
+- A missing build backend means the locked development group was not installed.
+- Optional solver errors belong only to explicitly selected solver profiles.

@@ -508,8 +508,8 @@ class PinchProblem:
 
     @property
     def problem_data(self) -> Optional[TargetInput | JsonDict]:
-        """Return the raw problem definition that was loaded or supplied."""
-        return self._problem_data
+        """Return a detached snapshot of the loaded raw problem definition."""
+        return deepcopy(self._problem_data)
 
     @property
     def results(self) -> Optional[TargetOutput]:
@@ -579,11 +579,12 @@ class PinchProblem:
                 UserWarning,
             )
             resolved_value = 1.0
-        self._master_zone.get_subzone(zone_name).dt_cont_multiplier = resolved_value
+        root_zone = self._require_prepared_root_zone()
+        root_zone.get_subzone(zone_name).dt_cont_multiplier = resolved_value
         self._results = None  # Clear cached results since multipliers have changed
         self._last_target_run_spec = None
         self._period_results = {}
-        return self._master_zone
+        return root_zone
 
     def update_options(
         self,

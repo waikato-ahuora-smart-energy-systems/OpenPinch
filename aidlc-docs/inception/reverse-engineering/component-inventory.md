@@ -1,60 +1,50 @@
 # Component Inventory
 
-## Application Packages
+## Package Components
 
-- `OpenPinch.classes` - public orchestration and core domain objects.
-- `OpenPinch.services.direct_heat_integration` - direct pinch targeting.
-- `OpenPinch.services.indirect_heat_integration` - Total Site and indirect targeting.
-- `OpenPinch.services.energy_transfer_analysis` - energy-transfer diagrams and surplus/deficit analysis.
-- `OpenPinch.services.exergy_analysis` - exergy enrichment.
-- `OpenPinch.services.power_cogeneration` - turbine and cogeneration targeting.
-- `OpenPinch.services.components` - process-component and MVR transformations.
-- `OpenPinch.services.heat_pump_integration` - HPR targeting and unit models.
-- `OpenPinch.services.heat_exchanger_network_synthesis` - HEN task orchestration, models, execution, verification, and reporting.
-- `OpenPinch.services.heat_exchanger_network_controllability` - controllability models and assessment.
-- `OpenPinch.services.network_grid_diagram` - network diagram construction and rendering.
-- `OpenPinch.streamlit_webviewer` - interactive result presentation.
-- `OpenPinch.main` - typed service facade.
-- `OpenPinch.__main__` - notebook-copying CLI.
+| Component | Current responsibility |
+|---|---|
+| `OpenPinch.application` | `PinchProblem`, `PinchWorkspace`, accessors, case batches, lifecycle, and workflow coordination |
+| `OpenPinch.domain` | configuration, units-aware values, streams, zones, targets, problem tables, exchangers, and networks |
+| `OpenPinch.contracts` | strict input/output, reporting, graph, HPR, workspace, turbine, controllability, and synthesis schemas |
+| `OpenPinch.analysis.targeting` | direct, indirect, Total Site, area/cost, and shared targeting operations |
+| `OpenPinch.analysis.heat_pumps` | Carnot, vapour-compression, Brayton, MVR, refrigeration, and multiperiod HPR workflows |
+| `OpenPinch.analysis.power` | cogeneration and turbine analysis |
+| `OpenPinch.analysis.exergy` | exergy targeting and enrichment |
+| `OpenPinch.analysis.energy_transfer` | transfer opportunity analysis and diagrams |
+| `OpenPinch.analysis.heat_exchanger_networks` | HEN targeting, synthesis models, execution, verification, ranking, and results |
+| `OpenPinch.analysis.graphs` | graph metadata and calculation specifications |
+| `OpenPinch.analysis.thermodynamics` | fluid-property and cycle thermodynamics |
+| `OpenPinch.optimisation` | shared candidates, models, execution, services, errors, and backend adapters |
+| `OpenPinch.adapters.io` | JSON, CSV, Excel, workspace bundle, and legacy input boundaries |
+| `OpenPinch.adapters.optional_dependencies` | optional feature installation guards |
+| `OpenPinch.presentation.reporting` | summary/report frames and workbook/file reporting |
+| `OpenPinch.presentation.graphs` | graph construction, rendering, and gallery export |
+| `OpenPinch.presentation.dashboard` | optional Streamlit presentation |
+| `OpenPinch.presentation.network_grid` | HEN grid views and renderers |
+| `OpenPinch.resources` and `OpenPinch.data` | packaged sample cases and tutorial notebooks |
+| `OpenPinch.__main__` | notebook-copying command-line entry point |
 
-## Infrastructure Packages
+## Repository Components
 
-- None. No Terraform, CloudFormation, CDK, container, serverless, or database package is present.
+- `tests/architecture` enforces owner dependencies and the root API boundary.
+- `tests/application`, `tests/domain`, `tests/contracts`, `tests/analysis`, and
+  `tests/presentation` verify the corresponding owners.
+- `tests/packaging` verifies docs, tutorials, resources, release artifacts,
+  entry points, and distribution metadata.
+- `docs` contains user, API, example, and developer Sphinx sources.
+- `scripts` contains documentation/distribution builders and bounded comparison
+  or benchmark utilities.
+- `examples` contains study inputs retained for package and legacy workflows.
+- `.github/workflows` contains test and publishing automation.
 
-## Shared Packages
+## Infrastructure Components
 
-- `OpenPinch.lib` - configuration, enums, units, schemas, and shared types.
-- `OpenPinch.services.common` - reusable analysis operations and orchestration.
-- `OpenPinch.services.input_data_processing` - canonicalization and domain construction.
-- `OpenPinch.utils` - file adapters, exports, validation, costing, optimization utilities, and optional dependency checks.
-- `OpenPinch.resources` and `OpenPinch.data` - packaged notebooks and sample cases.
+None. The package has no application server, container, database, cloud
+resource definition, or infrastructure-as-code module.
 
-## Test Packages
+## Public Boundary
 
-- `tests.e2e` - end-to-end service workflows.
-- `tests.test_analysis` - targeting and service behavior.
-- `tests.test_classes` - domain and orchestration behavior.
-- `tests.heat_exchanger_network_synthesis` - HEN contracts, helpers, reporting, and sequence tests.
-- `tests.test_lib` and `tests.test_utils` - schema, configuration, unit, adapter, and utility tests.
-- Root-level test modules - packaging, CLI, docs, notebooks, optional boundaries, release, resource, and parity checks.
-- `tests.test_streamlit_webviewer` - dashboard graphing tests.
-
-## Repository Support Components
-
-- `docs` - Sphinx documentation, guides, API reference, and developer material.
-- `scripts` - docs/build/release helpers, performance benchmarks, fixture conversion, and OpenHENS comparisons.
-- `examples` - JSON and legacy Excel example studies.
-- `.github/workflows` - pull-request, develop-branch, and tag-publish automation.
-- `Excel_Version` - legacy workbook implementation retained alongside the Python package.
-
-## Total Count
-
-- **Tracked repository files**: 774 at analysis time.
-- **Tracked package files**: 213 under `OpenPinch`, including Python modules, notebooks, and sample cases.
-- **Tracked tests and fixtures**: 271 paths under `tests`.
-- **Python import packages**: 39 directories identified by `__init__.py`.
-- **Application/service package families**: 14.
-- **Shared package families**: 5.
-- **Infrastructure packages**: 0.
-- **Primary test areas**: 7 plus root-level repository contract tests.
-
+The package root intentionally exposes only `PinchProblem` and
+`PinchWorkspace`. The component inventory describes concrete internal owners;
+it does not imply root-level stability for every class or function within them.

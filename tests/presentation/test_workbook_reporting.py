@@ -1,5 +1,6 @@
 """Regression tests for export utility helpers."""
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -151,7 +152,8 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
     assert out_path.exists()
 
     # Filename pattern check
-    assert out_path.name == "Proj__Foo_Bar_20250102_030405.xlsx"
+    assert out_path.name.startswith("Proj__Foo_Bar_20250102_030405_000000")
+    assert out_path.suffix == ".xlsx"
 
     # Verify Summary sheet contents round-trip
     df = pd.read_excel(out_path, sheet_name="Summary")
@@ -383,6 +385,61 @@ def test_target_results_include_period_idx():
 )
 def test_safe_name_sanitization(raw, expected):
     assert _safe_name(raw) == expected
+
+
+def test_workbook_path_reservation_is_unique_with_frozen_time(
+    tmp_path: Path,
+    monkeypatch,
+):
+    class _FixedDT:
+        @staticmethod
+        def now():
+            return datetime(2025, 1, 2, 3, 4, 5)
+
+    monkeypatch.setattr(export_mod, "datetime", _FixedDT, raising=True)
+
+    first = export_mod._reserve_workbook_path("Site", tmp_path)
+    second = export_mod._reserve_workbook_path("Site", tmp_path)
+
+    assert first != second
+    assert first.exists()
+    assert second.exists()
+    assert first.name == "Site_20250102_030405_000000.xlsx"
+    assert second.name == "Site_20250102_030405_000000_2.xlsx"
+
+
+def test_workbook_path_reservation_is_unique_under_concurrency(tmp_path: Path):
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        paths = list(
+            executor.map(
+                lambda _index: export_mod._reserve_workbook_path("Site", tmp_path),
+                range(24),
+            )
+        )
+
+    assert len(paths) == len(set(paths)) == 24
+    assert all(path.exists() for path in paths)
+    assert all(
+        path.name.startswith("Site_") and path.suffix == ".xlsx" for path in paths
+    )
+
+
+def test_failed_workbook_write_removes_reserved_artifact(tmp_path: Path, monkeypatch):
+    target_response = SimpleNamespace(name="Project", targets=[])
+
+    def fail_summary(*_args, **_kwargs):
+        raise RuntimeError("writer failed")
+
+    monkeypatch.setattr(export_mod, "_write_summary_sheet", fail_summary)
+
+    with pytest.raises(RuntimeError, match="writer failed"):
+        export_target_summary_to_excel_with_units(
+            target_response,
+            master_zone=None,
+            out_dir=tmp_path,
+        )
+
+    assert list(tmp_path.glob("*.xlsx")) == []
 
 
 # --------------------------------------------------------------------------------------

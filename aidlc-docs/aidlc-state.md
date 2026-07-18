@@ -3,13 +3,15 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: COMPLETE - Residual Compatibility Shim Cleanup
+- **Current Stage**: COMPLETE - Operations N/A
 
 ## Workspace State
 - **Existing Code**: Yes
 - **Programming Languages**: Python, reStructuredText, Markdown, JSON, YAML, TOML
 - **Build System**: Hatchling with uv dependency and lockfile management
-- **Project Structure**: Python library with CLI, Streamlit dashboard, services, tests, documentation, scripts, notebooks, examples, and packaged data
+- **Project Structure**: Python library with application, domain, contracts,
+  analysis, optimisation, adapters, presentation, CLI, tests, documentation,
+  scripts, notebooks, examples, and packaged data
 - **Reverse Engineering Needed**: No, completed for the current repository state
 - **Reverse Engineering Artifacts**: Generated under aidlc-docs/inception/reverse-engineering/
 - **Workspace Root**: /Users/timothyw/Github_Local/OpenPinch
@@ -26,7 +28,83 @@
 | Property-Based Testing | Partial | Requirements Analysis |
 | Resiliency Baseline | No | Requirements Analysis |
 
-## Stage Progress
+## Repository Issue Remediation Progress
+
+- [x] INCEPTION - Workspace Detection reused the current brownfield assessment.
+- [x] INCEPTION - Reverse Engineering reused current artifacts; stale current-API
+  statements are included in remediation scope.
+- [x] INCEPTION - Standard Requirements Analysis completed from six reproduced
+  findings and the clean-break contract.
+- [x] INCEPTION - User Stories skipped because the work is bounded remediation
+  for the existing process-engineer persona.
+- [x] INCEPTION - Workflow Planning completed.
+- [x] INCEPTION - Workflow plan approved by the user.
+- [x] INCEPTION - Minimal Application Design approved by the user.
+- [x] INCEPTION - Units Generation Part 1 decomposition plan completed for
+  application/filesystem, exact OpenHENS loading, and current documentation;
+  generation approved by the user.
+- [x] INCEPTION - Units Generation Part 2 artifacts generated and validated;
+  final units approved by the user.
+- [x] CONSTRUCTION - Unit 1 Functional Design approved by the user.
+- [x] CONSTRUCTION - Unit 1 Code Generation Part 1 plan generated; approval is
+  approved by the user.
+- [x] CONSTRUCTION - Unit 1 Code Generation Part 2 implementation and focused
+  verification complete; generated code approved by the user.
+  - [x] Step 1 focused baseline: 128 passed.
+  - [x] Step 2 problem-state regressions: 5 expected pre-fix failures confirmed.
+  - [x] Step 3 identity/containment regressions: 51 expected failures, 7 controls passed.
+  - [x] Step 4 workbook-allocation regressions: 4 expected pre-fix failures confirmed.
+  - [x] Step 5 shared case-identifier validator: 30 focused tests passed.
+  - [x] Step 6 runtime validation/export containment: 58 focused tests passed.
+  - [x] Step 7 detached input/multiplier guard: 11 focused tests passed.
+  - [x] Step 8 workbook allocation/cleanup: 14 reporting tests passed.
+  - [x] Step 9 integrated verification: 203 tests and Ruff/patch gates passed.
+  - [x] Step 10 structural review: planned owners only; 34 contract tests passed.
+  - [x] Step 11 implementation summary and handoff complete.
+- [x] CONSTRUCTION - Unit 2 Functional Design completed under the user's
+  authorization to continue through completion.
+- [x] CONSTRUCTION - Unit 2 NFR Requirements, NFR Design, and Infrastructure
+  Design skipped as approved: no new NFR, stack, or infrastructure decision.
+- [x] CONSTRUCTION - Unit 2 Code Generation Part 1 plan completed and approved
+  under the user's authorization to continue through completion.
+- [x] CONSTRUCTION - Unit 2 Code Generation Part 2 implementation and focused
+  verification complete; approved under the user's completion authorization.
+  - [x] Focused baseline: 3 passed.
+  - [x] Regression-first checkpoint: 5 expected pre-fix failures confirmed.
+  - [x] Exact-checkout prerequisite suite: 8 passed.
+  - [x] Integrated Unit 1/Unit 2 architecture selection: 123 passed.
+  - [x] Ruff lint/format and patch-hygiene checks passed.
+- [x] CONSTRUCTION - Unit 3 Functional Design skipped as documentation-only;
+  no new data model or business logic is introduced.
+- [x] CONSTRUCTION - Unit 3 NFR Requirements, NFR Design, and Infrastructure
+  Design skipped under the approved workflow.
+- [x] CONSTRUCTION - Unit 3 Code Generation Part 1 plan completed and approved
+  under the user's authorization to continue through completion.
+- [x] CONSTRUCTION - Unit 3 Code Generation Part 2 documentation and drift
+  guards complete; approved under the user's completion authorization.
+  - [x] Existing focused baseline: 27 passed.
+  - [x] New scoped guard failed before refresh and passed after refresh.
+  - [x] Five Mermaid diagrams validated with text alternatives.
+  - [x] Documentation, architecture, and entrypoint selection: 70 passed.
+  - [x] Ruff lint/format, stale-symbol scan, and patch hygiene passed.
+- [x] CONSTRUCTION - Build and Test complete.
+  - [x] Complete post-correction non-solver suite: 2,181 passed, 3 skipped,
+    4 deselected.
+  - [x] Focused non-external OpenHENS/HEN profile: 458 passed, 4 deselected.
+  - [x] Repository Ruff lint and 460-file format check passed.
+  - [x] Clean 53-source warning-as-error Sphinx build passed.
+  - [x] OpenPinch 0.5.2 wheel/source build and installed-wheel smoke passed.
+  - [x] Patch hygiene and scoped current-contract scan passed.
+- [x] OPERATIONS - N/A; no deployment work requested.
+- **Requirements**:
+  `aidlc-docs/inception/requirements/repository-issue-remediation-requirements.md`.
+- **Workflow plan**:
+  `aidlc-docs/inception/plans/repository-issue-remediation-execution-plan.md`.
+- **Extensions**: Security and Resiliency remain disabled. Partial PBT applies to
+  generated case-name/path containment coverage with the repository seed and
+  shrinking retained.
+
+## Historical Stage Progress (Prior Workflows)
 - [x] INCEPTION - Workspace Detection
 - [x] INCEPTION - Reverse Engineering
 - [x] INCEPTION - Requirements Analysis
@@ -52,31 +130,33 @@
 - **Units**: Domain and Input; Targeting and Integration; Heat Exchanger Network
 
 ## Current Status
-- **Lifecycle Phase**: CONSTRUCTION
-- **Current Unit**: Package architecture modernization
-- **Current Stage**: Generated Code Review
-- **Status**: All ten dependency-ordered implementation steps and Build and Test
-  are complete. `OpenPinch.main.pinch_analysis_service` is the sole protected
-  Python contract; domain, contracts, optimisation, application, analysis,
-  adapters, and presentation have concrete owners; retired package trees and
-  compatibility facades are absent. The final seeded non-solver suite passed
-  2,039 tests with four solver tests deselected, supported solver tests passed
-  three with one explicit skip, statement coverage is 97.95%, and branch
-  coverage is 92.79%. Ruff, warning-free Sphinx, notebooks, isolated artifacts,
-  clean-wheel tests, stale-path scans, and patch hygiene pass. Overall quality
-  is 9.3/10 and Test Gates are 9.6/10. Generated code awaits explicit user
-  review before Code Generation is closed.
-- **Generated-code review finding**: The package/import facade cleanup is
-  structurally complete, but a package-wide audit found residual behavioural
-  compatibility machinery: three HPR `TypeError` retries for helpers that now
-  accept `period_idx`, mapping-style access on typed HPR state/result records,
-  non-canonical optimiser spellings, and legacy `StreamCollection` pickle-state
-  repair. Public and convenience naming aliases also remain and require a
-  separate canonical-name decision. These findings are open; no runtime code
-  was changed by the audit.
-- **Deferred Follow-up**: Exact logarithmic LMTD in the continuous NLP
-  formulation may be revisited later; it is not an immediate next step, and
-  the Chen surrogate remains the accepted baseline
+
+- **Lifecycle Phase**: COMPLETE
+- **Current workflow**: Repository Issue Remediation
+- **Current unit**: Repository Issue Remediation integration
+- **Current stage**: Operations N/A
+- **Status**: Repository Issue Remediation is complete. Application
+  state/filesystem contracts, exact OpenHENS checkout loading, and current
+  documentation/drift guards are implemented. The root exposes exactly
+  `PinchProblem` and `PinchWorkspace`; concrete application, domain, contracts,
+  analysis, optimisation, adapters, and presentation owners remain intact. All
+  focused, complete non-solver, Ruff, clean Sphinx, distribution, installed-
+  wheel, and patch gates pass.
+- **Post-gate correction**: generic mapping-shaped workspace bundles now receive
+  the same schema-version and case-key validation as concrete dictionaries. The
+  regression, corrected wheel, and installed-artifact guard pass.
+- **Compatibility policy**: immediate clean break; no aliases, migration paths,
+  deprecated forwarding, or legacy workflow selectors.
+- **Extensions**: Security Baseline and Resiliency Baseline are disabled for
+  this workflow. Partial Property-Based Testing is enabled for generated case
+  identifier and containment invariants with seed `20260715` and shrinking.
+
+## Historical Package Architecture Modernization Status
+
+The following sections record previously completed workflows. Their claims and
+test counts are historical evidence, not the active package contract. Current
+contract statements are maintained in the preceding status block and in the
+refreshed reverse-engineering artifacts.
 
 ## Experimental Discopt Removal Progress
 

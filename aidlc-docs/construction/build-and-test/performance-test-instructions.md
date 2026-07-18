@@ -2,18 +2,25 @@
 
 ## Applicability
 
-No new server, concurrency service, latency service-level objective, or load
-requirement was introduced. A standalone load or stress suite is therefore N/A
-for this package usability refactor.
+Dedicated load, stress, throughput, and response-time testing is N/A. OpenPinch
+is an in-process engineering package, and this remediation adds no server,
+concurrent service, latency objective, database query, network boundary, or
+numerical algorithm.
 
-The relevant execution-cost checks remain functional:
+## Proportional Cost Evidence
 
-- all-period methods preserve deterministic ordering for serial and threaded
-  workers;
-- notebook execution profiles separate base, optional, and solver-backed work;
-- external solver tests remain marked and are not hidden inside the ordinary
-  non-solver suite.
+- Case-name validation is linear in the short identifier and occurs only at
+  case boundaries.
+- Export containment performs a bounded number of local path operations per
+  selected case.
+- Workbook allocation normally succeeds on the first exclusive-create attempt
+  and retries only on a real collision.
+- OpenHENS module isolation is limited to the comparison utility and the fixed
+  required module set; solver execution dominates its cost.
+- Detached input observation intentionally copies one validated input graph per
+  property access.
 
-Any future performance baseline should record the exact case, operating-period
-count, solver/backend, worker count, hardware, and dependency versions before
-comparing elapsed time.
+The complete non-solver suite and focused concurrent workbook test provide
+proportional execution evidence. Future benchmarks should record hardware,
+Python/dependency versions, case size, period count, worker count, solver, and
+backend before comparing elapsed time.

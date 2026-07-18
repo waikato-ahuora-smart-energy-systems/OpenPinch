@@ -1,76 +1,82 @@
 # Business Overview
 
-## Business Context Diagram
+## Business Context
 
 ```mermaid
 flowchart LR
-    Analyst["Energy analyst or researcher"] --> Inputs["Process stream and utility data"]
-    Inputs --> OpenPinch["OpenPinch analysis toolkit"]
-    OpenPinch --> Targets["Energy, exergy, cost, and pinch targets"]
-    OpenPinch --> Designs["Heat-pump and exchanger-network designs"]
-    OpenPinch --> Reports["Tables, graphs, exports, and scenario comparisons"]
-    Solvers["Thermodynamic and optimization engines"] --> OpenPinch
+    Engineer["Process engineer"] --> Inputs["Streams, utilities, periods, and zones"]
+    Inputs --> Package["OpenPinch"]
+    Package --> Targets["Heat-integration and advanced targets"]
+    Package --> Designs["Heat-exchanger-network designs"]
+    Package --> Evidence["Tables, plots, reports, and files"]
+    Engines["Optional thermodynamic and optimisation engines"] --> Package
 ```
 
-Text alternative: an analyst supplies process and utility data to OpenPinch. OpenPinch uses local thermodynamic and optimization engines to produce targets, candidate designs, reports, visualizations, and scenario comparisons.
+Text alternative: a process engineer supplies stream, utility, operating-period,
+and zone data. OpenPinch uses its numerical core and optional local engines to
+produce targets, network designs, and presentation-ready evidence.
 
 ## Business Description
 
-- **Business Description**: OpenPinch is an open-source process-integration toolkit for reducing industrial energy use and cost. It turns process-stream, utility, operating-period, and equipment assumptions into pinch-analysis targets, Total Site targets, heat-pump and refrigeration opportunities, exergy and cogeneration results, and heat-exchanger-network designs.
-- **Primary users**: process-integration researchers, energy engineers, industrial decarbonization analysts, educators, and software teams embedding typed thermal-analysis services.
-- **Delivery surfaces**: Python API, typed service function, scenario workspace, packaged notebooks and samples, a narrow notebook-copying CLI, Excel/CSV/JSON adapters, and a Streamlit result viewer.
+OpenPinch is an in-process Python package for industrial process integration.
+It helps process engineers quantify direct and indirect heat recovery, Total
+Site opportunities, area and cost, heat pumps and refrigeration, exergy,
+cogeneration, energy transfer, and heat-exchanger-network designs.
+
+The supported study entry points are `PinchProblem` for one case and
+`PinchWorkspace` for named cases. Both are imported from the package root. Input
+and result contracts, domain models, and specialised services remain available
+from their concrete owner modules for advanced use; they are not package-root
+exports.
 
 ## Business Transactions
 
-1. **Load and validate a study**: read JSON, Excel, CSV, a Pydantic schema, or an in-memory mapping; normalize units and configuration; build streams, utilities, and a zone hierarchy; return structured validation issues when inputs are invalid.
-2. **Calculate direct heat-integration targets**: construct problem tables and composite-curve data, determine pinch temperatures, utility demands, heat-recovery opportunity, area, and cost metrics.
-3. **Calculate indirect or Total Site targets**: aggregate zone-level source and sink profiles, form Total Process and Total Site targets, and quantify indirect heat-transfer opportunities.
-4. **Screen heat pumps and refrigeration**: evaluate Carnot, vapour-compression, MVR, cascade, parallel, and Brayton configurations against direct or indirect targets, including multiperiod cases.
-5. **Evaluate exergy and cogeneration**: enrich compatible heat-integration targets with exergy demand, exergy destruction, turbine work, and efficiency information.
-6. **Add process components**: model direct gas or vapour mechanical-vapour-recompression components and convert component results back into streams and work targets.
-7. **Synthesize heat-exchanger networks**: convert a solved problem into optimization tasks, execute one or more synthesis methods, verify and rank candidates, and render grid diagrams.
-8. **Run scenario studies**: preserve a baseline, create named variants, solve workflows, compare metrics and problem tables, and save or restore workspace bundles.
-9. **Publish and inspect results**: return typed outputs, summary DataFrames, Plotly graph data, Streamlit views, Excel exports, HTML graph galleries, manifests, and packaged learning resources.
+1. **Load and validate a study** from a packaged sample, JSON, CSV, Excel,
+   Pydantic contract, or in-memory mapping.
+2. **Run heat integration** for direct recovery, indirect recovery, Total Site,
+   all zones, or every operating period.
+3. **Assess advanced opportunities** for area/cost, heat pumps, refrigeration,
+   MVR, exergy, cogeneration, and energy transfer.
+4. **Modify a process case** with an explicit process-MVR component and rerun
+   affected analyses.
+5. **Design a heat-exchanger network** with named single-period, enhanced,
+   multiperiod, OpenHENS, pinch, thermal-derivative, or evolution workflows.
+6. **Run scenario studies** by creating named workspace cases, executing chosen
+   problem methods, comparing results, and saving schema-version-3 bundles.
+7. **Publish evidence** through typed results, DataFrames, reports, plots,
+   dashboards, Excel workbooks, graph galleries, and JSON serialization.
 
 ## Business Dictionary
 
-- **Pinch**: the thermodynamic bottleneck separating above-pinch and below-pinch heat-recovery regions.
-- **Stream**: a process or utility flow with supply and target states and thermal duty information.
-- **Utility**: external heating or cooling service, optionally with cost and thermophysical properties.
-- **Zone**: a hierarchical analysis boundary such as process, plant, site, community, or region.
-- **Direct integration**: heat recovery between process streams without an intermediate utility system.
-- **Indirect integration**: heat recovery coordinated through utilities or Total Site source and sink profiles.
-- **Target**: a calculated thermodynamic, economic, exergy, cogeneration, or design result for a zone and period.
-- **HPR**: heat-pump or refrigeration targeting and simulation.
+- **Pinch**: the thermodynamic bottleneck separating above- and below-pinch
+  recovery regions.
+- **Stream**: a process or utility flow with supply and target states and a
+  thermal duty.
+- **Zone**: a hierarchical process, plant, site, community, or region boundary.
+- **Direct integration**: recovery between process streams in one targeting
+  boundary.
+- **Indirect integration**: recovery coordinated through utility or Total Site
+  source/sink profiles.
+- **Target**: a thermodynamic, economic, exergy, power, or transfer result.
+- **HPR**: heat-pump or refrigeration analysis.
 - **MVR**: mechanical vapour recompression.
 - **HEN**: heat-exchanger network.
-- **Period**: one operating condition in a multiperiod study, optionally associated with a weight.
-- **Scenario**: a named variant of a baseline input and workflow configuration.
+- **Period**: one operating condition with an optional study weight.
+- **Case**: a validated named input owned by a workspace.
 
-## Component-Level Business Descriptions
+## Capability Owners
 
-### Public orchestration
-
-- **Purpose**: provide stable study-level entry points through `PinchProblem`, `PinchWorkspace`, and `pinch_analysis_service`.
-- **Responsibilities**: load inputs, validate cases, select workflows, cache results, expose summaries and exports, and coordinate scenario comparison.
-
-### Domain model
-
-- **Purpose**: represent values, streams, utilities, zones, problem tables, targets, exchangers, and networks.
-- **Responsibilities**: preserve units and period semantics, enforce invariants, and carry calculated state between services.
-
-### Analysis services
-
-- **Purpose**: implement direct and indirect targeting, exergy, cogeneration, heat pumps, refrigeration, components, and energy-transfer analysis.
-- **Responsibilities**: transform a validated zone tree into domain-specific targets and graph data.
-
-### HEN synthesis
-
-- **Purpose**: convert thermal targets into candidate exchanger networks.
-- **Responsibilities**: build solver tasks and equations, execute optimization backends, verify feasibility, rank results, and generate design outputs.
-
-### Presentation and resources
-
-- **Purpose**: make analyses reproducible and interpretable.
-- **Responsibilities**: package samples and notebooks, expose CLI copying, render dashboards and grid diagrams, and export structured results.
-
+- **Application** owns `PinchProblem`, `PinchWorkspace`, lifecycle, named
+  workflows, state invalidation, and case coordination.
+- **Domain** owns values, streams, zones, configuration, problem tables,
+  targets, exchangers, and networks.
+- **Contracts** owns serialized input, output, reporting, workspace, HPR, and
+  synthesis records.
+- **Analysis** owns thermal, economic, targeting, HPR, power, exergy, transfer,
+  graph, and HEN calculations.
+- **Optimisation** owns reusable candidate, model, execution, backend, and error
+  abstractions.
+- **Adapters** owns file loading, bundle persistence, optional-dependency
+  boundaries, and external format conversion.
+- **Presentation** owns reports, graphs, dashboards, network grids, and file
+  exports.

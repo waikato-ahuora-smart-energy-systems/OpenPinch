@@ -1,19 +1,39 @@
-# Unit Test Execution
+# Unit and Property Test Instructions
 
-## Complete Non-Solver Suite
+## Complete Non-Solver Gate
+
+Run all ordinary, contract, architecture, packaging, documentation, tutorial,
+and non-external-solver tests with the repository property seed:
 
 ```bash
-uv run pytest -q -m "not solver"
+uv run pytest -q -m "not solver" --hypothesis-seed=20260715
 ```
 
-Expected result for this implementation: 2,079 passed and 4 solver tests
-deselected.
+Success requires zero failures. Skips are acceptable only when their reason is
+an explicitly guarded optional profile; solver-marked deselections are expected.
+
+## Focused Remediation Gates
+
+```bash
+uv run pytest -q \
+  tests/application/test_pinch_problem.py \
+  tests/application/test_pinch_workspace.py \
+  tests/presentation/test_workbook_reporting.py \
+  tests/packaging/test_openhens_comparison_prerequisite.py \
+  tests/packaging/test_docs_consistency.py \
+  tests/architecture \
+  --hypothesis-seed=20260715
+```
+
+This selection covers detached state, unloaded mutation, generated case names,
+resolved export containment, exclusive workbook allocation, exact checkout
+identity, current documentation, and owner dependency rules.
 
 ## Property-Based Contracts
 
-The normal suite includes fixed-seed Hypothesis coverage for effective argument
-precedence, ordered workspace case batches, and multiperiod aggregation. The
-canonical seed is `20260715`; shrinking and CI execution remain enabled.
+Generated case-identifier/path tests retain seed `20260715`, Hypothesis
+shrinking, and normal CI execution. No example database or one-off generated
+fixture is committed.
 
 ## Static Quality
 
@@ -23,5 +43,4 @@ uv run ruff format --check .
 git diff --check
 ```
 
-All commands must complete without findings. Pytest output is the test report;
-no persistent coverage or result artifact is required for this change.
+All commands must complete without findings.

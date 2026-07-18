@@ -3016,3 +3016,236 @@ How do I resolve this failed test on Github that is fine locally."
 **Context**: CONSTRUCTION complete; OPERATIONS N/A. The local CI-equivalent regression, module, Ruff, and patch-hygiene gates are approved. The actual GitHub Actions rerun remains an external post-push confirmation.
 
 ---
+
+## Repository Issue Scan - Workspace Detection
+**Timestamp**: 2026-07-18T01:45:28Z
+**User Input**: "Scan the repo for issues."
+**AI Response**: "Started a read-only repository review covering correctness, public contracts, tests, packaging, documentation, and maintainability. Loaded the mandatory AI-DLC common rules and welcome message, reused the current brownfield reverse-engineering context, and confirmed a clean develop worktree aligned with origin/develop at 9420bc79. No application-code mutation is authorized or planned for this scan."
+**Context**: INCEPTION - Workspace Detection complete. Existing reverse-engineering artifacts will be reused for focused analysis. Security and Resiliency remain disabled; partial PBT remains enabled. Requirements are exceptionally clear for a read-only audit, so no clarification file is required.
+
+---
+
+## Repository Issue Scan - Findings and Verification
+**Timestamp**: 2026-07-18T01:55:02Z
+**User Input**: "No new user input; completed the requested read-only scan."
+**AI Response**: "Identified six actionable issues: PinchProblem.problem_data exposes mutable cached input that can diverge from the prepared runtime model; the OpenHENS comparison prerequisite can import and accept modules from a different checkout; second-resolution workbook names collide; unsanitized workspace case names can escape the requested batch export directory; set_dt_cont_multiplier on an unloaded problem raises an internal AttributeError; and current AI-DLC state/reverse-engineering documents still describe the removed OpenPinch.main.pinch_analysis_service contract. Confirmed the first five behavioral findings with source inspection and isolated runtime probes. Ruff passed, 167 focused non-solver tests passed, and git diff hygiene passed. No application code was changed."
+**Test Status**: Pass for existing focused gates; the reported behaviors are uncovered contract gaps
+**Context**: Read-only repository audit complete. Security and Resiliency extensions were disabled and therefore skipped. Partial Property-Based Testing was not applicable because no generated behavioral domain or application change was made. The mandatory audit entry is the only worktree modification from this scan.
+
+---
+
+## Repository Issue Scan - Suggested Fixes
+**Timestamp**: 2026-07-18T01:58:59Z
+**User Input**: "Suggest fixes."
+**AI Response**: "Prepared implementation-ready recommendations for all six findings without changing application code: contain and encode batch export directories independently of case display names; return detached problem_data snapshots and require explicit rebuilding mutation paths; load OpenHENS through an exact-checkout context with module-origin verification; allocate collision-resistant workbook filenames; use the prepared-root-zone guard in set_dt_cont_multiplier; and refresh active AI-DLC state and reverse-engineering API documentation while preserving explicitly historical records. Each recommendation includes focused regression coverage and an implementation order."
+**Context**: Advisory follow-up to the completed read-only repository audit. No approval to implement was inferred. Security and Resiliency remain disabled; partial Property-Based Testing would apply only if implementation introduces a generated identifier or path domain worth property-testing.
+
+---
+
+## Repository Issue Remediation - Requirements and Workflow Planning
+**Timestamp**: 2026-07-18T02:10:26Z
+**User Input**: "Make a plan"
+**AI Response**: "Interpreted the direct planning request as approval to formalize the six reproduced findings and previously suggested clean-break fixes. Created standard-depth requirements and a dependency-ordered execution plan covering workspace identifier validation and export containment, detached problem input snapshots, consistent multiplier guards, atomic workbook allocation, exact OpenHENS checkout identity, current-documentation repair, regression tests, fixed-seed generated path coverage, and repository verification gates. No application code was changed."
+**Status**: Workflow plan complete; explicit plan approval pending
+**Context**: INCEPTION - Requirements Analysis and Workflow Planning complete. User Stories, broad Application Design, NFR Design, and Infrastructure Design are recommended to skip. Units Generation, focused Functional Design, Code Generation, and Build and Test are recommended to execute. Security and Resiliency remain disabled; partial PBT applies to generated case-name/path containment tests.
+
+---
+
+## Repository Issue Remediation - Workflow Plan Approval Prompt
+**Timestamp**: 2026-07-18T02:10:26Z
+**AI Prompt**: "Please review the repository issue remediation execution plan. Request changes, add a skipped stage, or approve and continue to Units Generation."
+**Status**: Awaiting user response
+**Context**: INCEPTION - Workflow Planning approval gate
+
+---
+
+## Repository Issue Remediation - Workflow Plan Approval
+**Timestamp**: 2026-07-18T02:17:59Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded explicit workflow-plan approval. On loading the mandatory Units Generation rules, identified that Application Design is a required prerequisite whenever Units Generation executes. Corrected the workflow without expanding remediation scope and generated a minimal existing-boundary Application Design for review before unit decomposition."
+**Status**: Workflow plan approved; Application Design review pending
+**Context**: INCEPTION - Workflow Planning approved. Application Design changed from SKIP to EXECUTE solely to satisfy the mandatory Units Generation prerequisite.
+
+---
+
+## Repository Issue Remediation - Application Design Approval Prompt
+**Timestamp**: 2026-07-18T02:18:50Z
+**AI Prompt**: "Please review the repository issue remediation Application Design artifacts. Request changes or approve and continue to Units Generation Part 1."
+**Status**: Awaiting user response
+**Context**: INCEPTION - Application Design approval gate. The design retains existing public boundaries and adds only internal validation, isolation, allocation, and drift-guard responsibilities.
+
+---
+
+## Repository Issue Remediation - Application Design Approval
+**Timestamp**: 2026-07-18T02:25:22Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded explicit Application Design approval and created Units Generation Part 1. The decomposition plan defines three non-deployable units inside the existing package, evaluates every mandatory grouping category, records dependencies and ownership, and provides the mandatory artifact-generation checklist."
+**Status**: Application Design approved; Units Generation Part 1 approval pending
+**Context**: INCEPTION - Application Design complete. Units Generation Part 1 planning complete; no unit artifacts have been generated yet.
+
+---
+
+## Repository Issue Remediation - Unit Plan Approval Prompt
+**Timestamp**: 2026-07-18T02:25:22Z
+**AI Prompt**: "Unit of work plan complete. Review the plan in aidlc-docs/inception/plans/unit-of-work-plan.md. Ready to proceed to generation?"
+**Status**: Awaiting user response
+**Context**: INCEPTION - Units Generation Part 1 approval gate
+
+---
+
+## Repository Issue Remediation - Unit Plan Approval and Generation
+**Timestamp**: 2026-07-18T02:38:53Z
+**User Input**: "Go"
+**AI Response**: "Interpreted 'Go' as approval option A from the unit plan and generated all three mandatory unit artifacts. Defined responsibilities, inputs, outputs, exclusions, dependencies, delivery order, testing checkpoints, and complete FR/NFR/acceptance traceability for Application State and Filesystem Contracts, Exact OpenHENS Checkout Loading, and Current Documentation and Drift Guards. Marked every generation-plan checkbox complete in the same interaction."
+**Status**: Units Generation artifacts complete; final unit approval pending
+**Context**: INCEPTION - Units Generation Part 2 complete. The dependency graph is acyclic, all requirements are assigned, and no unit creates a deployable service or root export.
+
+---
+
+## Repository Issue Remediation - Units Generation Approval Prompt
+**Timestamp**: 2026-07-18T02:38:53Z
+**AI Prompt**: "Please review the Units Generation artifacts in aidlc-docs/inception/application-design/. Request changes or approve and continue to the Construction phase."
+**Status**: Awaiting user response
+**Context**: INCEPTION - Units Generation final approval gate
+
+---
+
+## Repository Issue Remediation - Units Generation Approval
+**Timestamp**: 2026-07-18T02:47:13Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded explicit Units Generation approval and entered Construction with Unit 1 Functional Design. Generated the required business logic, business rules, and domain entity artifacts for workspace identity and path containment, detached problem input, prepared-root multiplier behavior, and exclusive workbook allocation. The approved requirements resolved all design choices, so no unanswered design questions remain."
+**Status**: Units Generation approved; Unit 1 Functional Design review pending
+**Context**: CONSTRUCTION - Unit 1 Application State and Filesystem Contracts. Security and Resiliency extensions remain disabled. Partial PBT applies to generated case-identifier/path invariants.
+
+---
+
+## Unit 1 Application State and Filesystem Contracts - Functional Design Approval Prompt
+**Timestamp**: 2026-07-18T02:47:13Z
+**AI Prompt**: "Please review the Unit 1 Functional Design artifacts. Choose Request Changes or Continue to Next Stage."
+**Status**: Awaiting user response
+**Context**: CONSTRUCTION - Functional Design standardized two-option approval gate
+
+---
+
+## Unit 1 Application State and Filesystem Contracts - Functional Design Approval
+**Timestamp**: 2026-07-18T02:51:36Z
+**User Input**: "Continue to Next Stage"
+**AI Response**: "Recorded explicit Unit 1 Functional Design approval. NFR Requirements, NFR Design, and Infrastructure Design remain skipped under the approved workflow. Created an eleven-step regression-first Code Generation plan with exact brownfield files, FR/NFR traceability, fixed-seed property coverage, focused verification, structural review, and same-turn checkbox enforcement. No production or test code was changed."
+**Status**: Functional Design approved; Code Generation Part 1 approval pending
+**Context**: CONSTRUCTION - Unit 1 Code Generation planning
+
+---
+
+## Unit 1 Application State and Filesystem Contracts - Code Generation Plan Approval Prompt
+**Timestamp**: 2026-07-18T02:51:36Z
+**AI Prompt**: "Please review the Unit 1 Code Generation plan at aidlc-docs/construction/plans/application-state-filesystem-contracts-code-generation-plan.md. Choose Request Changes or Continue to Next Stage to approve all eleven generation steps."
+**Status**: Awaiting user response
+**Context**: CONSTRUCTION - Code Generation Part 1 standardized two-option approval gate
+
+---
+
+## Unit 1 Application State and Filesystem Contracts - Code Generation Plan Approval
+**Timestamp**: 2026-07-18T02:57:14Z
+**User Input**: "Continue to Next Stage"
+**AI Response**: "Recorded explicit approval of all eleven Unit 1 Code Generation steps and started Part 2 with the required brownfield implementation/test reread and focused baseline."
+**Status**: Code Generation Part 1 approved; Part 2 in progress
+**Context**: CONSTRUCTION - Unit 1 Code Generation Step 1
+
+---
+
+## Unit 1 Application State and Filesystem Contracts - Code Generation Completion
+**Timestamp**: 2026-07-18T03:49:39Z
+**User Input**: "No new user input; completed the approved eleven-step Unit 1 generation plan."
+**AI Response**: "Implemented strict shared workspace case-name validation, resolved batch export containment, detached problem_data snapshots, prepared-root multiplier guards, and exclusive workbook reservation with failed-write cleanup. Added regression-first unit, property, concurrency, symlink, serialization, and contract coverage. The integrated Unit 1 suite passed 203 tests with Hypothesis seed 20260715; 34 HEN serialization/round-trip/root-boundary tests passed; Ruff lint/format and patch hygiene passed. Generated the implementation summary and marked every plan checkbox complete."
+**Status**: Unit 1 Code Generation complete; generated-code approval pending
+**Context**: CONSTRUCTION - Unit 1 Application State and Filesystem Contracts. Complete repository gates remain deferred until all units finish.
+
+---
+
+## Unit 1 Application State and Filesystem Contracts - Generated Code Approval Prompt
+**Timestamp**: 2026-07-18T03:49:39Z
+**AI Prompt**: "Please review the generated Unit 1 code and implementation summary. Choose Request Changes or Continue to Next Stage to approve Unit 1 and proceed to Unit 2 Functional Design."
+**Status**: Awaiting user response
+**Context**: CONSTRUCTION - Code Generation standardized two-option approval gate
+
+---
+
+## Unit 1 Approval and Remaining Workflow Authorization
+**Timestamp**: 2026-07-18T04:31:44Z
+**User Input**: "Continue to Completion"
+**AI Response**: "Recorded approval of Unit 1 generated code and explicit authorization to carry the remaining approved workflow through completion without pausing at each intermediate review gate. Began Unit 2 Exact OpenHENS Checkout Loading Functional Design and Code Generation planning."
+**Status**: Unit 1 approved; Unit 2 in progress; remaining approved gates authorized through completion
+**Context**: CONSTRUCTION - transition from Unit 1 to Unit 2
+
+---
+
+## Unit 2 Exact OpenHENS Checkout Loading - Functional Design and Code Plan Authorization
+**Timestamp**: 2026-07-18T04:31:44Z
+**User Input**: "Continue to Completion"
+**AI Response**: "Applied the user's completion authorization to the standardized Unit 2 review gates. Generated the exact-checkout functional design and a regression-first seven-step Code Generation plan. NFR Requirements, NFR Design, and Infrastructure Design remain skipped under the approved workflow because the unit introduces no dependency, stack, performance target, service, or infrastructure change."
+**Status**: Unit 2 Functional Design and Code Generation Part 1 approved; Part 2 started
+**Context**: CONSTRUCTION - Unit 2 Exact OpenHENS Checkout Loading
+
+---
+
+## Unit 2 Exact OpenHENS Checkout Loading - Code Generation Completion
+**Timestamp**: 2026-07-18T04:37:10Z
+**User Input**: "No new user input; continued under the user's explicit 'Continue to Completion' authorization."
+**AI Response**: "Implemented a scoped OpenHENS import transaction that removes ambient cached modules, prioritizes the requested checkout, validates every required module origin and callable, injects the verified OpenHENS factory into unchanged execution logic, and restores sys.path and sys.modules on all exits. Added five regression-first checks. Corrected a Unit 1 architecture violation found by the broader dependency gate by retaining export containment through standard path functions without importing pathlib in the application layer. Eight focused prerequisite tests and 123 integrated application/architecture/packaging tests passed with seed 20260715; Ruff and patch hygiene passed."
+**Status**: Unit 2 Code Generation complete and approved under completion authorization; Unit 3 started
+**Context**: CONSTRUCTION - Unit 2 Exact OpenHENS Checkout Loading
+
+---
+
+## Unit 3 Current Documentation and Drift Guards - Code Plan Authorization
+**Timestamp**: 2026-07-18T04:37:10Z
+**User Input**: "Continue to Completion"
+**AI Response**: "Applied the user's completion authorization to Unit 3. Confirmed Functional Design is not applicable because the unit changes documentation and repository assertions only, with no new business logic or data model. NFR and Infrastructure stages also remain skipped. Generated a six-step regression-first Code Generation plan covering active state, current reverse-engineering artifacts, scoped stale-symbol guards, content validation, and focused documentation checks."
+**Status**: Unit 3 Code Generation Part 1 approved; Part 2 started
+**Context**: CONSTRUCTION - Unit 3 Current Documentation and Drift Guards
+
+---
+
+## Unit 3 Current Documentation and Drift Guards - Code Generation Completion
+**Timestamp**: 2026-07-18T04:45:13Z
+**User Input**: "No new user input; continued under the user's explicit 'Continue to Completion' authorization."
+**AI Response**: "Refreshed the active AI-DLC status and six current reverse-engineering artifacts to document the canonical root-only workflow entry points and concrete application, domain, contracts, analysis, optimisation, adapters, and presentation owners. Removed retired package/service claims, selector workflows, and captured shell-error contamination while preserving historical state and audit records. Added a scoped drift guard. Validated five Mermaid diagrams with text alternatives; 70 documentation, architecture, and entrypoint tests passed; Ruff, stale-symbol, and patch checks passed."
+**Status**: Unit 3 complete and approved under completion authorization; Build and Test started
+**Context**: CONSTRUCTION - Unit 3 Current Documentation and Drift Guards
+
+---
+
+## Repository Issue Remediation - Build and Test Completion
+**Timestamp**: 2026-07-18T04:56:22Z
+**User Input**: "No new user input; completed under the user's explicit 'Continue to Completion' authorization."
+**AI Response**: "Completed the approved Build and Test stage. The fixed-seed non-solver suite passed 2,180 tests with 3 guarded skips and 4 solver deselections. The focused non-external OpenHENS/HEN profile passed 458 tests with 4 solver deselections. Ruff lint and format passed across 460 Python files; patch and current-contract scans had no findings. Sphinx 9.1.0 built 53 sources from a clean temporary destination with warnings treated as errors. OpenPinch 0.5.2 wheel and source archives built successfully, and the wheel passed workflow, resource, root-API, retired-package, and CLI smoke from a temporary Python 3.14 site-packages environment outside the checkout. Removed only the verified ignored docs/_build cache; it is reproducible. Updated all plan checkboxes, requirements traceability, state, summary, and audit records."
+**Build Status**: Success
+**Test Status**: Pass
+**Files Generated or Refreshed**:
+- `aidlc-docs/construction/build-and-test/build-instructions.md`
+- `aidlc-docs/construction/build-and-test/unit-test-instructions.md`
+- `aidlc-docs/construction/build-and-test/integration-test-instructions.md`
+- `aidlc-docs/construction/build-and-test/performance-test-instructions.md`
+- `aidlc-docs/construction/build-and-test/build-and-test-summary.md`
+**Status**: Build and Test approved under completion authorization; Operations N/A; workflow complete
+**Context**: CONSTRUCTION - Build and Test completion and OPERATIONS - N/A
+
+---
+
+## Repository Issue Remediation - Post-Gate Contract Finding
+**Timestamp**: 2026-07-18T04:56:22Z
+**User Input**: "No new user input; continued under the user's explicit 'Continue to Completion' authorization."
+**AI Response**: "A final read-only probe found that PinchWorkspaceBundle accepted generic Mapping inputs, while its pre-validator inspected only dict. MappingProxyType could therefore carry an unsafe case key past validation. Reopened completion, added a regression first, and began a bounded correction."
+**Status**: Completion temporarily reopened; post-gate contract correction in progress
+**Context**: CONSTRUCTION - workspace bundle validation edge case
+
+---
+
+## Repository Issue Remediation - Post-Gate Contract Closure
+**Timestamp**: 2026-07-18T05:03:07Z
+**User Input**: "No new user input; completed under the user's explicit 'Continue to Completion' authorization."
+**AI Response**: "Changed PinchWorkspaceBundle pre-validation from concrete dict checks to collections.abc.Mapping checks and added a MappingProxyType regression. The regression failed before the fix. Afterward, 158 focused workspace/contracts/API tests passed; repository Ruff and format checks passed; the corrected 0.5.2 wheel and source archive rebuilt; the reinstalled wheel passed its standard smoke and explicit unsafe generic-mapping rejection probe. The final complete fixed-seed non-solver suite passed 2,181 tests with 3 guarded skips and 4 solver deselections in 148.03 seconds. Updated all reopened checkboxes and final evidence."
+**Status**: Post-gate finding closed; Build and Test pass; Operations N/A; workflow complete
+**Context**: CONSTRUCTION - final contract correction and verification
+
+---

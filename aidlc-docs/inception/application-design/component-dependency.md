@@ -44,3 +44,33 @@ problem or workspace. Problem accessors and workspace case views coordinate
 internal numerical services. Services produce domain results consumed by
 observational outputs. Tutorials and RTD documentation depend only on the root
 facade and verified public inventory.
+
+## Repository Issue Remediation Dependencies
+
+| Component | Depends on | Consumed by | Forbidden dependency |
+|---|---|---|---|
+| Workspace identity contract | standard library, Pydantic validation | bundle schema, workspace application | reporting or solver services |
+| Workspace export boundary | identity contract, `pathlib.Path` | case batch export | raw unvalidated case paths |
+| Problem input observation | `deepcopy`, `TargetInput` | problem/workspace callers | prepared-zone mutation |
+| Workbook allocator | standard library filesystem APIs | reporting writer | timestamp uniqueness alone |
+| Exact OpenHENS loader | `importlib`, `sys`, `pathlib` | comparison runner | ambient cached OpenHENS identity |
+| Contract drift guard | canonical root exports, current docs | repository tests | historical audit rewriting |
+
+```mermaid
+flowchart LR
+    Bundle["Workspace bundle"] --> Identity["Case identity contract"]
+    Workspace["PinchWorkspace"] --> Identity
+    Identity --> Export["Contained batch export"]
+    Caller["Process engineer"] --> Problem["PinchProblem"]
+    Problem --> Snapshot["Detached problem-data snapshot"]
+    Export --> Allocator["Exclusive workbook allocator"]
+    Script["Comparison script"] --> Loader["Exact OpenHENS loader"]
+    Loader --> Checkout["Requested checkout"]
+    Docs["Current documentation"] --> Guard["Contract drift guard"]
+```
+
+Text alternative: bundle and runtime workspace inputs share one case-identity
+contract before batch export. Batch export uses the exclusive workbook
+allocator. Problem observation returns a detached snapshot. The comparison
+script reaches OpenHENS only through the exact-checkout loader. Current
+documentation is checked by a scoped contract drift guard.

@@ -69,3 +69,39 @@ Owns the eighteen-notebook process-engineer learning path and the canonical CSV
 manifest consumed by CI and Sphinx. Notebooks are executable study templates,
 while the manifest proves every supported operation and semantic mode has an
 owner.
+
+## Repository Issue Remediation Components
+
+### Workspace Identity Contract
+
+Owns one portable, clean-break case-identifier validator shared by workspace
+runtime entry points and persisted bundle validation. It rejects unsafe names;
+it never aliases or silently sanitizes them.
+
+### Workspace Export Boundary
+
+Owns `Path`-based per-case destination construction, resolved-root containment,
+and preservation of original case identifiers in `CaseBatchResult` mappings.
+
+### Problem Input Observation Boundary
+
+Keeps `_problem_data` authoritative and returns a detached deep snapshot through
+the public `problem_data` property. Existing mutation methods remain responsible
+for validation, runtime rebuilding, and cache invalidation.
+
+### Workbook Path Allocator
+
+Owns exclusive `.xlsx` path reservation, readable project/timestamp naming, and
+cleanup of incomplete reservations after writer failure.
+
+### Exact OpenHENS Checkout Loader
+
+Owns temporary interpreter import isolation, required-capability validation,
+module-origin containment, verified callable delivery, and restoration of the
+previous interpreter state.
+
+### Current Contract Drift Guard
+
+Owns scoped assertions that current-state and reverse-engineering documentation
+describe only the canonical `PinchProblem` and `PinchWorkspace` root API while
+leaving explicitly historical records untouched.

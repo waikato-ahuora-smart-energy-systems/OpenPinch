@@ -2,54 +2,58 @@
 
 ## Build Status
 
-- Build tool: `uv` and `scripts/build_dist.py`.
+- Build tool: Hatchling through uv and the repository build helper.
 - Status: success.
-- Artifacts: OpenPinch 0.5.2 wheel and source distribution.
-- Installed-artifact smoke: success outside the source checkout, including the
-  eighteen packaged notebooks and the packaged Process MVR study input.
-- Warning-as-error Sphinx HTML build: success.
+- Artifacts: `openpinch-0.5.2-py3-none-any.whl` and
+  `openpinch-0.5.2.tar.gz` from a clean temporary destination.
+- Installed artifact: passed from a temporary Python 3.14 environment outside
+  the source checkout.
+- Documentation: Sphinx 9.1.0 built 53 sources with warnings treated as errors.
 
-## Test Execution Summary
+## Planned Gates
 
-### Unit, Property, and Integration Tests
+| Gate | Result | Status |
+|---|---:|---|
+| Complete fixed-seed non-solver suite | 2,181 passed, 3 skipped, 4 deselected | Pass |
+| Repository Ruff lint/format | All checks; 460 files formatted | Pass |
+| Patch and current-contract scans | No findings | Pass |
+| Clean warning-as-error Sphinx build | 53 sources, zero warnings | Pass |
+| Wheel and source distribution build | 2 artifacts, version 0.5.2 | Pass |
+| Isolated installed-wheel smoke | Site-packages import and workflow/resource/CLI smoke | Pass |
 
-- Complete non-solver profile: 2,084 passed, 3 optional-profile tests skipped,
-  and 4 external-solver tests deselected.
-- Final usability, notebook, documentation, architecture, workspace, component,
-  and operation-manifest checkpoint: 108 passed and 3 opt-in profile selectors
-  skipped.
-- Notebook execution profiles: 10 base notebooks passed in routine pytest; all
-  4 slow-HPR notebooks passed in 204.74 seconds; all 3 HEN solver notebooks
-  passed in 160.68 seconds; the guarded interactive notebook passed in 7.78
-  seconds.
-- Internal method-selector contract checkpoint: 110 passed.
-- Failed tests after corrections: 0.
+## Focused and Integration Evidence
 
-### Static and Contract Gates
+- Unit 1 integrated application/filesystem selection: 203 passed.
+- HEN serialization and package-root boundary selection: 34 passed.
+- Unit 2 exact-checkout prerequisite suite: 8 passed.
+- Unit 1/Unit 2 architecture selection: 123 passed.
+- Unit 3 documentation/architecture/entrypoint selection: 70 passed.
+- Focused non-external OpenHENS/HEN profile: 458 passed, 4 solver tests
+  deselected.
+- Post-correction workspace/contracts selection: 158 passed.
+- Complete fixed-seed non-solver suite: 2,181 passed, 3 optional-profile skips,
+  4 solver deselections in 148.03 seconds.
 
-- Ruff lint: pass.
-- Ruff format: pass across 458 files.
-- Patch whitespace validation: pass.
-- RTD operation coverage: 186 of 186 live operations mapped, including
-  constructors, returned Process MVR behavior, and ordered case batches.
-- Packaged tutorials: 18 of 18 structurally valid and mapped.
-- Tutorial narrative: every notebook contains a study question, staged method
-  guidance, interpretation guidance, and an adaptation section; the minimum is
-  six Markdown cells per notebook.
-- Stale public symbols: absent except explicit negative assertions.
-- Offline warning-as-error Sphinx build: pass without network inventories.
-- Brayton runtime status: explicitly documented as unsupported pending solver
-  repair; tutorial 09 demonstrates the guarded comparison-study pattern.
+## Verification Notes
 
-### Performance and Security
+The initial temporary wheel environment contained only the wheel and therefore
+lacked its runtime dependencies. The environment was populated with the
+declared CI runtime dependencies, and the installed-artifact smoke then passed
+from site-packages. After the generic-mapping correction, the artifacts were
+rebuilt, the wheel was reinstalled, and both the standard smoke and installed
+mapping-key rejection probe passed. No source-checkout import was used.
 
-- Performance load/stress testing: N/A; no performance requirement or service
-  deployment changed.
-- Security testing: N/A; the security extension is disabled and no security
-  boundary changed.
-- External binary solver tests remain outside the non-solver acceptance gate.
-  The packaged HEN tutorial profile itself executed all three notebooks using
-  the installed synthesis environment.
+The ignored local `docs/_build` cache was removed after its target and ignore
+rule were verified. Documentation was built into a separate clean temporary
+destination, preventing stale pages from masking source state. It is recoverable
+by rerunning `scripts/build_docs.py`.
+
+## Extension Compliance
+
+- Security Baseline: disabled; N/A.
+- Resiliency Baseline: disabled; N/A.
+- Partial Property-Based Testing: enabled for generated case identifier and path
+  invariants with seed `20260715` and shrinking.
 
 ## Overall Status
 
@@ -57,5 +61,6 @@
 - Tests: pass.
 - Documentation: pass.
 - Distribution: pass.
-- Operations: N/A because no deployment work was requested.
-- Task status: complete and ready for review.
+- Operations: N/A; no deployment or production environment change was
+  requested.
+- Task: complete.

@@ -1,37 +1,61 @@
-# Integration Test Instructions
+# Integration, Contract, and End-to-End Test Instructions
 
-## Process-Engineer Workflow Scenarios
+## Unit Interaction Scenarios
 
-Run the architecture, package, documentation, notebook, and root workflow
-integration checks:
+### Workspace identity to presentation export
+
+- Create and load valid named cases through runtime and schema-version-3 bundle
+  boundaries.
+- Reject invalid names before storage and revalidate at batch export.
+- Resolve each valid case destination beneath the selected root.
+- Reserve a unique workbook and clean it on writer failure.
+- Expected: original result keys, per-case isolation, no path escape, and no
+  collision.
+
+### Problem state to analysis
+
+- Read and mutate returned `problem_data` snapshots.
+- Run an explicit targeting method and serialize canonical input/results.
+- Invoke multiplier mutation on unloaded and lazily prepared problems.
+- Expected: internal state is detached, loaded behavior is unchanged, and the
+  unloaded path raises the canonical actionable error.
+
+### Exact checkout comparison boundary
+
+- Seed foreign cached OpenHENS modules.
+- Enter the requested-checkout scope and validate module origins/capabilities.
+- Execute only through the verified injected factory.
+- Expected: foreign modules cannot satisfy imports and original interpreter
+  state is restored on success and failure.
+
+### Current contract and distribution
+
+- Confirm root exports exactly the two workflow classes.
+- Validate serialized HEN mappings through `TargetInput.network`.
+- Check current documentation and owner dependencies.
+- Build/install the wheel and run its workflow/resource/CLI smoke outside the
+  checkout.
+
+## Repository Integration Command
 
 ```bash
-uv run pytest -q tests/architecture tests/packaging tests/e2e/test_main.py
+uv run pytest -q -m "not solver" --hypothesis-seed=20260715
 ```
 
-These tests verify:
+No service startup, endpoint configuration, database fixture, or cleanup is
+required.
 
-- package-root `PinchProblem` and `PinchWorkspace` imports;
-- explicit target, design, component, plot, report, and workspace interactions;
-- exact operation-manifest parity with all eighteen tutorials;
-- `HeatExchangerNetwork.model_dump(mode="json")` transport through
-  `TargetInput.network`;
-- workspace schema version 3 case-input persistence;
-- warning-free RTD source consistency and packaged resource inventory;
-- wheel and source-distribution package boundaries.
+## Installed Artifact Smoke
 
-## Installed-Artifact Scenario
-
-Build a wheel, install it with declared dependencies into a clean temporary
-environment, then run:
+Create a temporary virtual environment with access to the already installed
+runtime dependencies, install only the newly built wheel, change outside the
+checkout, and run:
 
 ```bash
-python scripts/artifact_install_smoke.py --repo-root /path/to/OpenPinch
+/path/to/venv/bin/python /path/to/OpenPinch/scripts/artifact_install_smoke.py \
+  --repo-root /path/to/OpenPinch
 ```
 
-Run the script outside the checkout. It must import from site-packages, solve a
-direct target, construct a workspace, expose exactly the two root workflow
-classes, find all packaged assets, and execute CLI help.
-
-Temporary build environments can be removed after verification; no service or
-database cleanup is required.
+The smoke must import from site-packages, solve a direct target, construct a
+workspace, expose exactly two root names, find packaged tutorials/samples, and
+execute CLI help.

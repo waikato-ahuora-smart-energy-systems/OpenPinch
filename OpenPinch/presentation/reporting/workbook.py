@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import re
+from contextlib import suppress
 from datetime import datetime
+from itertools import count
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterable, Optional
 
@@ -54,14 +57,26 @@ def export_target_summary_to_excel_with_units(
     """
     df_summary = build_summary_dataframe(target_response.targets)
 
-    out_path = _compose_output_path(
+    out_path = _reserve_workbook_path(
         project_name=getattr(target_response, "name", "Project"),
         out_dir=out_dir,
     )
 
-    with pd.ExcelWriter(out_path, engine="openpyxl") as xw:
+    writer: pd.ExcelWriter | None = None
+    completed = False
+    try:
+        writer = pd.ExcelWriter(out_path, engine="openpyxl")
+        xw = writer
         _write_summary_sheet(df_summary, xw)
         _write_problem_tables(master_zone, xw)
+        writer.close()
+        completed = True
+    finally:
+        if not completed:
+            if writer is not None:
+                with suppress(Exception):
+                    writer._handles.close()
+            out_path.unlink(missing_ok=True)
 
     return out_path
 
@@ -260,13 +275,29 @@ def _utility_columns(
     return columns
 
 
-def _compose_output_path(project_name: str, out_dir: str) -> Path:
+def _reserve_workbook_path(project_name: str, out_dir: str | Path) -> Path:
+    """Atomically reserve a unique workbook path for one export invocation."""
     project = _safe_name(project_name)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{project}_{timestamp}.xlsx"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     output_dir = Path(out_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    return output_dir / filename
+    for attempt in count(1):
+        suffix = "" if attempt == 1 else f"_{attempt}"
+        candidate = output_dir / f"{project}_{timestamp}{suffix}.xlsx"
+        try:
+            descriptor = os.open(
+                candidate,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                0o666,
+            )
+        except FileExistsError:
+            continue
+        try:
+            os.close(descriptor)
+        except BaseException:
+            candidate.unlink(missing_ok=True)
+            raise
+        return candidate
 
 
 def _write_summary_sheet(df_summary: pd.DataFrame, writer: pd.ExcelWriter) -> None:

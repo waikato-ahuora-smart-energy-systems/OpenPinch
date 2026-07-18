@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import MappingProxyType
 
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 from pydantic import ValidationError
 
 from OpenPinch.application._workspace import case_inputs
@@ -56,6 +59,75 @@ def _network_payload() -> dict:
         )
     )
     return network.model_dump(mode="json")
+
+
+_INVALID_CASE_NAMES = (
+    "",
+    " baseline",
+    "baseline ",
+    ".",
+    "..",
+    "a/b",
+    "a\\b",
+    "bad\nname",
+    "a:b",
+    'a"b',
+    "a|b",
+    "a?b",
+    "a*b",
+    "a<b",
+    "a>b",
+    "trailing.",
+    "CON",
+    "con.txt",
+    "PRN",
+    "AUX",
+    "NUL",
+    "COM1",
+    "COM9.log",
+    "LPT1",
+)
+
+_VALID_CASE_NAMES = (
+    "baseline",
+    "Retrofit 2026",
+    "unité",
+    "case.v2",
+    "wide_dt",
+    "case-study",
+)
+
+_WINDOWS_DEVICE_NAMES = {
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
+    *(f"COM{index}" for index in range(1, 10)),
+    *(f"LPT{index}" for index in range(1, 10)),
+}
+
+
+def _is_generated_portable_case_name(value: str) -> bool:
+    return (
+        bool(value)
+        and value == value.strip()
+        and value not in {".", ".."}
+        and not value.endswith(".")
+        and value.split(".", 1)[0].upper() not in _WINDOWS_DEVICE_NAMES
+    )
+
+
+_GENERATED_VALID_CASE_NAMES = st.text(
+    alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 _.-é",
+    min_size=1,
+    max_size=24,
+).filter(_is_generated_portable_case_name)
+
+_GENERATED_INVALID_CASE_NAMES = st.one_of(
+    st.sampled_from(_INVALID_CASE_NAMES),
+    st.text(min_size=0, max_size=12).map(lambda value: f"{value}/case"),
+    st.text(min_size=0, max_size=12).map(lambda value: f"case\\{value}"),
+)
 
 
 def test_workspace_returns_real_cases_and_delegates_to_pinchproblem():
@@ -155,6 +227,19 @@ def test_workspace_bundle_rejects_old_payloads_and_unknown_versions():
                 "cases": {"baseline": {"payload": _basic_payload()}},
             }
         )
+
+
+def test_workspace_bundle_validates_generic_mapping_case_keys():
+    payload = MappingProxyType(
+        {
+            "schema_version": "3",
+            "baseline_name": "baseline",
+            "cases": MappingProxyType({"../escape": {"case_input": _basic_payload()}}),
+        }
+    )
+
+    with pytest.raises(ValidationError, match="case name"):
+        PinchWorkspaceBundle.model_validate(payload)
 
 
 def test_workspace_scenario_helper_and_report_delegates():
@@ -452,3 +537,135 @@ def test_workspace_sync_case_input_uses_canonical_problem_json():
         workspace.to_problem_json(case_name="baseline")["options"]["THERMAL_DT_CONT"]
         == 15
     )
+
+
+def test_workspace_problem_data_returns_detached_active_case_snapshot():
+    workspace = PinchWorkspace(_basic_payload(), project_name="Demo")
+    snapshot = workspace.problem_data
+
+    assert isinstance(snapshot, dict)
+    snapshot["streams"][0]["t_supply"]["value"] = 99.0
+
+    assert (
+        workspace.to_problem_json(case_name="baseline")["streams"][0]["t_supply"][
+            "value"
+        ]
+        == 20.0
+    )
+
+
+@pytest.mark.parametrize("case_name", _INVALID_CASE_NAMES)
+def test_workspace_rejects_invalid_case_names_at_runtime_boundaries(case_name):
+    with pytest.raises(ValueError, match="case name"):
+        PinchWorkspace(baseline_name=case_name)
+
+    workspace = PinchWorkspace(_basic_payload(), project_name="Demo")
+    with pytest.raises(ValueError, match="case name"):
+        workspace.load(_basic_payload(), case_name=case_name)
+    with pytest.raises(ValueError, match="case name"):
+        workspace.scenario(case_name)
+
+
+@pytest.mark.parametrize("case_name", _VALID_CASE_NAMES)
+def test_workspace_preserves_valid_case_names(case_name):
+    workspace = PinchWorkspace(
+        _basic_payload(),
+        project_name="Demo",
+        baseline_name=case_name,
+    )
+    bundle = PinchWorkspaceBundle.model_validate(
+        {
+            "schema_version": "3",
+            "baseline_name": case_name,
+            "cases": {case_name: {"case_input": _basic_payload()}},
+        }
+    )
+
+    assert workspace.list_cases() == [case_name]
+    assert bundle.baseline_name == case_name
+    assert list(bundle.cases) == [case_name]
+
+
+@pytest.mark.parametrize("case_name", _INVALID_CASE_NAMES)
+def test_workspace_bundle_rejects_invalid_case_names(case_name):
+    with pytest.raises(ValidationError, match="case name"):
+        PinchWorkspaceBundle.model_validate(
+            {
+                "schema_version": "3",
+                "baseline_name": case_name,
+                "cases": {"baseline": {"case_input": _basic_payload()}},
+            }
+        )
+
+    with pytest.raises(ValidationError, match="case name"):
+        PinchWorkspaceBundle.model_validate(
+            {
+                "schema_version": "3",
+                "baseline_name": "baseline",
+                "cases": {case_name: {"case_input": _basic_payload()}},
+            }
+        )
+
+
+@given(_GENERATED_VALID_CASE_NAMES)
+def test_generated_valid_case_names_remain_single_workspace_keys(case_name):
+    workspace = PinchWorkspace(baseline_name=case_name)
+
+    assert workspace.baseline_name == case_name
+    assert Path(case_name).name == case_name
+
+
+@given(_GENERATED_INVALID_CASE_NAMES)
+def test_generated_invalid_case_names_are_rejected(case_name):
+    with pytest.raises(ValueError, match="case name"):
+        PinchWorkspace(baseline_name=case_name)
+
+
+def test_batch_export_rejects_corrupted_unsafe_case_without_calling_exporter(
+    monkeypatch,
+    tmp_path: Path,
+):
+    workspace = PinchWorkspace(_basic_payload(), project_name="Demo")
+    workspace._case_inputs["../outside"] = _basic_payload()
+    called: list[Path] = []
+
+    def fake_export(_problem, destination, **_kwargs):
+        called.append(Path(destination))
+        return Path(destination)
+
+    monkeypatch.setattr(PinchProblem, "export_excel", fake_export)
+
+    exported = workspace.cases(["baseline", "../outside"]).export_excel(tmp_path)
+
+    assert list(exported.results) == ["baseline"]
+    assert list(exported.errors) == ["../outside"]
+    assert "case name" in str(exported.errors["../outside"])
+    assert called == [tmp_path.resolve() / "baseline"]
+    assert called[0].is_relative_to(tmp_path.resolve())
+
+
+def test_batch_export_rejects_existing_case_symlink_outside_root(
+    monkeypatch,
+    tmp_path: Path,
+):
+    workspace = PinchWorkspace(_basic_payload(), project_name="Demo")
+    export_root = tmp_path / "exports"
+    outside = tmp_path / "outside"
+    export_root.mkdir()
+    outside.mkdir()
+    (export_root / "baseline").symlink_to(outside, target_is_directory=True)
+    called = False
+
+    def fake_export(_problem, destination, **_kwargs):
+        nonlocal called
+        called = True
+        return Path(destination)
+
+    monkeypatch.setattr(PinchProblem, "export_excel", fake_export)
+
+    exported = workspace.cases(["baseline"]).export_excel(export_root)
+
+    assert exported.results == {}
+    assert list(exported.errors) == ["baseline"]
+    assert "outside the batch export destination" in str(exported.errors["baseline"])
+    assert called is False

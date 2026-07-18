@@ -12,3 +12,16 @@ The approved package-usability refactor is documented separately in
 adds descriptive target/design/workspace accessors, separates execution from
 observation, and makes the tutorial/RTD manifest an enforced public-contract
 consumer without overwriting the segmented-stream design above.
+
+## Repository Issue Remediation Design
+
+The remediation retains all existing public component boundaries. Workspace
+case identifiers gain one shared strict validator used by runtime and bundle
+entry points, with a second containment check at batch export. `problem_data`
+becomes a detached observation boundary; explicit application methods remain the
+only supported mutation paths. Reporting uses exclusive workbook reservation,
+and the comparison tool uses one scoped import context that verifies every
+OpenHENS module against the requested checkout before injecting its factory into
+execution. Current documentation is corrected through a scoped drift guard that
+does not rewrite historical records. No new runtime dependency or root export is
+introduced.

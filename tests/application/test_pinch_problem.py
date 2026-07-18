@@ -313,6 +313,48 @@ def test_problem_data_and_master_zone_properties():
     assert obj.master_zone == {"z": 1}
 
 
+def test_problem_data_returns_detached_mapping_snapshot():
+    problem = PinchProblem("basic_pinch.json")
+    runtime_temperature = problem.hot_streams[0].supply_temperature
+    snapshot = problem.problem_data
+
+    assert isinstance(snapshot, dict)
+    snapshot["streams"][0]["t_supply"]["value"] = 99.0
+
+    assert problem.hot_streams[0].supply_temperature == runtime_temperature
+    assert problem.to_problem_json()["streams"][0]["t_supply"]["value"] == 20.0
+
+
+def test_problem_data_returns_detached_target_input_snapshot():
+    input_data = TargetInput.model_validate(
+        PinchProblem("basic_pinch.json").to_problem_json()
+    )
+    problem = PinchProblem(input_data)
+    snapshot = problem.problem_data
+
+    assert isinstance(snapshot, TargetInput)
+    snapshot.options["THERMAL_DT_CONT"] = 77
+
+    assert problem.problem_data.options == {}
+    assert problem.to_problem_json()["options"] == {}
+
+
+def test_set_dt_cont_multiplier_requires_loaded_input():
+    with pytest.raises(RuntimeError, match="No input loaded"):
+        PinchProblem().set_dt_cont_multiplier(1.0)
+
+
+def test_set_dt_cont_multiplier_lazily_rebuilds_prepared_root():
+    problem = PinchProblem("basic_pinch.json")
+    problem._master_zone = None
+
+    root = problem.set_dt_cont_multiplier(2.0)
+
+    assert root is problem.master_zone
+    assert root.dt_cont_multiplier == 2.0
+    assert problem.results is None
+
+
 def test_root_stream_views_are_exposed_on_problem():
     payload = {
         "options": {"THERMAL_DT_CONT": 10},
