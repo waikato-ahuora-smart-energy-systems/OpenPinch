@@ -223,6 +223,13 @@ openhens_baseline_results/refactor/*/*/
 results/
 plans/
 
+# This active AI-DLC remediation plan is project documentation, not solver output.
+!aidlc-docs/inception/plans/
+aidlc-docs/inception/plans/*
+!aidlc-docs/inception/plans/application-design-plan.md
+!aidlc-docs/inception/plans/repository-issue-remediation-execution-plan.md
+!aidlc-docs/inception/plans/unit-of-work-plan.md
+
 # This is Python source, not generated solver output.
 !OpenPinch/analysis/heat_exchanger_networks/results/
 !OpenPinch/analysis/heat_exchanger_networks/results/*.py
@@ -232,3 +239,8 @@ plans/
 !aidlc-docs/construction/plans/package-architecture-modernization-code-generation-plan.md
 !aidlc-docs/construction/plans/residual-compatibility-shims-code-generation-plan.md
 !aidlc-docs/construction/plans/post-implementation-import-type-fixes-code-generation-plan.md
+!aidlc-docs/construction/plans/application-state-filesystem-contracts-functional-design-plan.md
+!aidlc-docs/construction/plans/application-state-filesystem-contracts-code-generation-plan.md
+!aidlc-docs/construction/plans/exact-openhens-checkout-loading-functional-design-plan.md
+!aidlc-docs/construction/plans/exact-openhens-checkout-loading-code-generation-plan.md
+!aidlc-docs/construction/plans/current-documentation-drift-guards-code-generation-plan.md

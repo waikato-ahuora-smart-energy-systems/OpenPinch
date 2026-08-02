@@ -10,6 +10,7 @@ from pint.errors import DimensionalityError
 from ....contracts.report_units import split_report_value
 from ....contracts.reporting import GraphAvailability, ProblemReport, ReportMetric
 from ....contracts.workspace import ValidationReport
+from ....domain.enums import IntegrationType, TargetMethod
 from ....domain.value import Value
 from ....presentation.reporting.workbook import build_summary_dataframe
 
@@ -47,7 +48,10 @@ def build_problem_summary_frame(
         )
         rows.append(
             {
-                "Target": target.name,
+                "Scope": target.scope,
+                "Zone Type": target.zone_type,
+                "Integration Type": target.integration_type,
+                "Target Method": target.target_method,
                 "Period ID": getattr(target, "period_id", None),
                 "Hot Utility Target": format_res(
                     value=qh_value,
@@ -95,7 +99,10 @@ def _build_numeric_summary_frame(results: Any) -> pd.DataFrame:
     rows = []
     for target in results.targets:
         row = {
-            "Target": target.name,
+            "Scope": target.scope,
+            "Zone Type": target.zone_type,
+            "Integration Type": target.integration_type,
+            "Target Method": target.target_method,
             "Period ID": getattr(target, "period_id", None),
         }
         for label, attr_path in _SUMMARY_METRICS.items():
@@ -137,7 +144,10 @@ def build_report_metrics(results: Any) -> list[ReportMetric]:
             )
             metrics.append(
                 ReportMetric(
-                    target_name=target.name,
+                    scope=target.scope,
+                    zone_type=target.zone_type,
+                    integration_type=target.integration_type,
+                    target_method=target.target_method,
                     metric=label,
                     label=label,
                     value=value,
@@ -199,48 +209,75 @@ def build_problem_report(
 def locate_summary_row(
     frame: pd.DataFrame,
     *,
-    target_name: Optional[str] = None,
+    scope: Optional[str] = None,
+    zone_type: Optional[str] = None,
+    integration_type: Optional[str] = None,
+    target_method: Optional[str] = None,
 ) -> pd.Series:
-    """Locate one summary row using explicit name or common defaults."""
-    if "Target" not in frame.columns or frame.empty:
-        raise ValueError("Summary frame is empty or missing the 'Target' column.")
+    """Locate one summary row using explicit public target metadata."""
+    identity_columns = {
+        "Scope": scope,
+        "Zone Type": zone_type,
+        "Integration Type": integration_type,
+        "Target Method": target_method,
+    }
+    missing = [column for column in identity_columns if column not in frame.columns]
+    if frame.empty or missing:
+        detail = f"; missing {missing}" if missing else ""
+        raise ValueError(f"Summary frame is empty or missing identity columns{detail}.")
 
-    targets = frame["Target"].astype(str)
-    if target_name is not None:
-        exact_match = frame.loc[targets == str(target_name)]
-        if not exact_match.empty:
-            return exact_match.iloc[0]
-
-        suffix = str(target_name).split("/", 1)[-1]
-        suffix_match = frame.loc[targets.str.endswith(suffix)]
-        if not suffix_match.empty:
-            return suffix_match.iloc[0]
-
-        raise KeyError(f"Target {target_name!r} was not found in the summary output.")
-
-    preferred_match = frame.loc[targets == "Plant/Direct Integration"]
-    if not preferred_match.empty:
-        return preferred_match.iloc[0]
-
-    direct_match = frame.loc[targets.str.endswith("/Direct Integration")]
-    if not direct_match.empty:
-        return direct_match.iloc[0]
-    return frame.iloc[0]
+    candidates = frame
+    explicit = any(value is not None for value in identity_columns.values())
+    defaults = {
+        "Integration Type": IntegrationType.Process.value,
+        "Target Method": TargetMethod.HeatExchange.value,
+    }
+    for column, value in identity_columns.items():
+        selected = value if value is not None else defaults.get(column)
+        if selected is not None:
+            candidates = candidates.loc[candidates[column].astype(str) == str(selected)]
+    if scope is None and not candidates.empty:
+        depth = candidates["Scope"].astype(str).str.count("/")
+        candidates = candidates.loc[depth == depth.min()]
+    if candidates.empty:
+        requested = {
+            column: value
+            for column, value in identity_columns.items()
+            if value is not None
+        }
+        if not explicit:
+            requested = defaults
+        raise KeyError(
+            f"Target metadata {requested!r} was not found in the summary output."
+        )
+    return candidates.iloc[0]
 
 
 def compare_problem_summaries(
     base_frame: pd.DataFrame,
     other_frame: pd.DataFrame,
     *,
-    target_name: str | None,
+    scope: str | None,
+    zone_type: str | None,
+    integration_type: str | None,
+    target_method: str | None,
     base_label: str,
     other_label: str,
 ) -> pd.DataFrame:
     """Compare unit-aware numeric metrics from two solved summary frames."""
-    base_row = locate_summary_row(base_frame, target_name=target_name)
+    selectors = {
+        "scope": scope,
+        "zone_type": zone_type,
+        "integration_type": integration_type,
+        "target_method": target_method,
+    }
+    base_row = locate_summary_row(base_frame, **selectors)
     other_row = locate_summary_row(
         other_frame,
-        target_name=target_name or str(base_row["Target"]),
+        scope=scope or str(base_row["Scope"]),
+        zone_type=zone_type or str(base_row["Zone Type"]),
+        integration_type=integration_type or str(base_row["Integration Type"]),
+        target_method=target_method or str(base_row["Target Method"]),
     )
     columns = [
         "Hot Utility Target",
@@ -251,15 +288,18 @@ def compare_problem_summaries(
     ]
     unit_columns = {column: f"{column} (unit)" for column in columns}
     row_columns = [*columns, *unit_columns.values()]
+    identity_columns = ["Scope", "Zone Type", "Integration Type", "Target Method"]
     base_row_data = {
-        "Target": str(base_row["Target"]),
+        **{column: base_row.get(column) for column in identity_columns},
         **{column: base_row.get(column) for column in row_columns},
     }
     other_row_data = {
-        "Target": str(other_row["Target"]),
+        **{column: other_row.get(column) for column in identity_columns},
         **{column: other_row.get(column) for column in row_columns},
     }
-    change_row: dict[str, object] = {"Target": str(base_row["Target"])}
+    change_row: dict[str, object] = {
+        column: base_row.get(column) for column in identity_columns
+    }
     for column in columns:
         unit_column = unit_columns[column]
         base_unit = base_row.get(unit_column)
@@ -280,7 +320,7 @@ def compare_problem_summaries(
             "Change": change_row,
         },
         orient="index",
-        columns=["Target", *row_columns],
+        columns=[*identity_columns, *row_columns],
     )
 
 

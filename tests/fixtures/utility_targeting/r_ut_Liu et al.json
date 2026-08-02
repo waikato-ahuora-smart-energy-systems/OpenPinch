@@ -1,7 +1,10 @@
 {
     "targets": [
         {
-            "name": "Acid gas removal/Direct Integration",
+            "scope": "Site/Acid gas removal",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 107.0,
@@ -97,7 +100,10 @@
             ]
         },
         {
-            "name": "Coal gas shift/Direct Integration",
+            "scope": "Site/Coal gas shift",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 220.0,
@@ -193,7 +199,10 @@
             ]
         },
         {
-            "name": "Methanation/Direct Integration",
+            "scope": "Site/Methanation",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 615.0,
@@ -289,7 +298,10 @@
             ]
         },
         {
-            "name": "Water gas shift/Direct Integration",
+            "scope": "Site/Water gas shift",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 315.0,

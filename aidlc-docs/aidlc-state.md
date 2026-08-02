@@ -3,13 +3,15 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: COMPLETE - Residual Compatibility Shim Cleanup
+- **Current Stage**: COMPLETE - Indirect Target Terminology; Operations N/A
 
 ## Workspace State
 - **Existing Code**: Yes
 - **Programming Languages**: Python, reStructuredText, Markdown, JSON, YAML, TOML
 - **Build System**: Hatchling with uv dependency and lockfile management
-- **Project Structure**: Python library with CLI, Streamlit dashboard, services, tests, documentation, scripts, notebooks, examples, and packaged data
+- **Project Structure**: Python library with application, domain, contracts,
+  analysis, optimisation, adapters, presentation, CLI, tests, documentation,
+  scripts, notebooks, examples, and packaged data
 - **Reverse Engineering Needed**: No, completed for the current repository state
 - **Reverse Engineering Artifacts**: Generated under aidlc-docs/inception/reverse-engineering/
 - **Workspace Root**: /Users/timothyw/Github_Local/OpenPinch
@@ -22,11 +24,261 @@
 ## Extension Configuration
 | Extension | Enabled | Decided At |
 |---|---|---|
-| Security Baseline | No | Requirements Analysis |
-| Property-Based Testing | Partial | Requirements Analysis |
-| Resiliency Baseline | No | Requirements Analysis |
+| Security Baseline | No | Notebook Improvement Requirements Analysis |
+| Property-Based Testing | Partial | Notebook Improvement Requirements Analysis |
+| Resiliency Baseline | No | Notebook Improvement Requirements Analysis |
 
-## Stage Progress
+## Indirect Target Terminology Progress
+
+- [x] INCEPTION - Workspace Detection reused the current brownfield assessment.
+- [x] INCEPTION - Reverse Engineering reused current target/report artifacts.
+- [x] INCEPTION - Standard Requirements Analysis completed and approved by the
+  supplied implementation plan.
+- [x] INCEPTION - User Stories skipped for this technical contract refactor.
+- [x] INCEPTION - Workflow Planning completed and approved.
+- [x] INCEPTION - Application Design and Units Generation skipped; existing
+  boundaries and one cohesive implementation unit are sufficient.
+- [x] CONSTRUCTION - Functional, NFR, and Infrastructure Design skipped under
+  the approved workflow.
+- [x] CONSTRUCTION - Code Generation Part 1 plan created and approved by the
+  explicit implementation request.
+- [x] CONSTRUCTION - Code Generation Part 2 complete.
+- [x] CONSTRUCTION - Build and Test complete.
+- [x] OPERATIONS - N/A; no deployment work requested.
+- **Requirements**:
+  `aidlc-docs/inception/requirements/indirect-target-terminology-requirements.md`.
+- **Workflow plan**:
+  `aidlc-docs/inception/plans/indirect-target-terminology-execution-plan.md`.
+- **Code Generation plan**:
+  `aidlc-docs/construction/plans/indirect-target-terminology-code-generation-plan.md`.
+- **Implementation summary**:
+  `aidlc-docs/construction/indirect-target-terminology/code/code-generation-summary.md`.
+- **Build and Test summary**:
+  `aidlc-docs/construction/indirect-target-terminology/build-and-test/build-and-test-summary.md`.
+- **Current stage**: Complete. The generic indirect model and explicit public
+  metadata contract are implemented. Notebook 2 retains the corrected duties
+  and LPS ledge. The complete fixed-seed non-solver suite passed 2,195 tests
+  with 3 optional-profile skips and 4 solver deselections; packaging, Ruff,
+  Sphinx, distribution, isolated-wheel, stale-symbol, and patch gates pass.
+- **Extensions**: Security and Resiliency disabled; partial PBT applies to
+  serialization and multi-period metadata alignment.
+
+## Total Site Profiles Diagnostic
+
+- [x] Reproduced Notebook 2 with `pulp_mill.json` and captured the Total Site
+  process-profile and utility-profile duties.
+- [x] Traced direct GCC segment conversion, child-first multi-scale targeting,
+  net-stream import, Total Process utility aggregation, and Total Site graph
+  serialization.
+- [x] Confirmed the cause with a controlled replay that restored immediate
+  Process Zone direct-GCC profiles before the Site Total Site solve.
+- **Finding**: Process Zone indirect targeting overwrites each zone's
+  direct-GCC-derived `net_hot_streams` and `net_cold_streams` with Unit Operation
+  child profiles. Site targeting then combines those child-level profiles with
+  Process Zone direct utility targets, mixing two hierarchy levels.
+- **Observed residual**: Both duty identities were overstated by 59,168.043 kW.
+- **Controlled replay residual**: 0.103 kW for Hot Utility versus Cold CC and
+  0.0623 kW for Cold Utility versus Hot CC after restoring immediate direct
+  profiles; the remaining difference is graph-table rounding/reconstruction.
+- **Status**: Root cause diagnosed. No production-code change was authorized or
+  made in this investigation.
+
+## Total Site Profile Hierarchy Fix Progress
+
+- [x] INCEPTION - Workspace Detection reused the current brownfield assessment.
+- [x] INCEPTION - Reverse Engineering reused current targeting artifacts.
+- [x] INCEPTION - Minimal Requirements Analysis completed and approved by the
+  user's decision-complete implementation plan.
+- [x] INCEPTION - User Stories skipped for this bounded internal defect fix.
+- [x] INCEPTION - Workflow Planning completed and approved by the user's
+  implementation request.
+- [x] INCEPTION - Application Design and Units Generation skipped; one existing
+  targeting component is corrected without a new public contract.
+- [x] CONSTRUCTION - Functional, NFR, and Infrastructure Design skipped under
+  the approved workflow.
+- [x] CONSTRUCTION - Code Generation Part 1 plan created and approved by the
+  user's explicit request to implement the supplied plan.
+- [x] CONSTRUCTION - Code Generation Part 2 complete.
+- [x] CONSTRUCTION - Build and Test complete.
+- [x] OPERATIONS - N/A; no deployment or operational change was requested.
+- [x] CONSTRUCTION - Explicit second per-zone net-profile pair added and
+  verified at user request.
+- [x] CONSTRUCTION - Notebook 2 rounded SUGCC LPS ledge restored and verified.
+- **Requirements**:
+  `aidlc-docs/inception/requirements/total-site-profile-hierarchy-fix-requirements.md`.
+- **Workflow plan**:
+  `aidlc-docs/inception/plans/total-site-profile-hierarchy-fix-execution-plan.md`.
+- **Code Generation plan**:
+  `aidlc-docs/construction/plans/total-site-profile-hierarchy-fix-code-generation-plan.md`.
+- **Implementation summary**:
+  `aidlc-docs/construction/total-site-profile-hierarchy-fix/code/code-generation-summary.md`.
+- **Build and Test summary**:
+  `aidlc-docs/construction/total-site-profile-hierarchy-fix/build-and-test/build-and-test-summary.md`.
+- **Current stage**: Complete. Consecutive identical graph coordinates are
+  removed before collinearity cleanup, preserving the HPS-to-LPS vertical
+  connection and approximately 138.5 degC LPS ledge. The expanded focused suite
+  passed 145 tests; Notebook 2 passed; the complete fixed-seed non-solver suite
+  passed 2,191 tests with 3 optional-profile skips and 4 solver deselections;
+  84 packaging tests, repository Ruff, fresh distributions, direct built-wheel
+  corner smoke, and patch hygiene passed.
+- **Extension decisions**: Security and Resiliency disabled; partial PBT applies
+  to the deterministic reconstruction invariant.
+
+## Notebook Improvement Progress
+
+- [x] INCEPTION - Workspace Detection completed by reusing the current
+  brownfield assessment.
+- [x] INCEPTION - Reverse Engineering reused because the current architecture,
+  component inventory, and technology stack cover the notebook subsystem.
+- [x] INCEPTION - Initial Requirements Analysis questions answered and
+  validated.
+- [x] INCEPTION - Presentation clarification answers received and validated.
+- [x] INCEPTION - Standard Requirements Analysis artifact generated.
+- [x] INCEPTION - Requirements approved by the user.
+- [x] INCEPTION - User Stories assessment completed; the stage is required for
+  the customer-facing learning workflow.
+- [x] INCEPTION - Story-generation plan and methodology questions created.
+- [x] INCEPTION - Story-generation answers validated; 18 notebook-level stories
+  will be grouped by execution profile.
+- [x] INCEPTION - Story-generation plan approved by the user's response "Go".
+- [x] INCEPTION - Two personas and 18 profile-grouped notebook stories generated
+  with Given/When/Then criteria, INVEST verification, and full traceability.
+- [x] INCEPTION - Generated User Stories approved by the user's instruction to
+  continue through completion.
+- [x] INCEPTION - Workflow Planning completed and approved under completion
+  authorization.
+- [x] INCEPTION - Application Design skipped; no new components or services.
+- [x] INCEPTION - Units Generation skipped; one cohesive generator-owned unit.
+- [x] CONSTRUCTION - Functional Design skipped; no domain model or complex logic.
+- [x] CONSTRUCTION - NFR Requirements and NFR Design skipped; approved NFRs use
+  the existing stack and patterns.
+- [x] CONSTRUCTION - Infrastructure Design skipped; no infrastructure change.
+- [x] CONSTRUCTION - Code Generation Part 1 plan created and approved under the
+  user's completion authorization.
+- [x] CONSTRUCTION - Code Generation Part 2 implementation and focused
+  verification complete; approved under completion authorization.
+- [x] CONSTRUCTION - Build and Test complete and approved under completion
+  authorization.
+- [x] OPERATIONS - N/A; no deployment or production runtime change requested.
+- **Request clarity**: Vague; the target notebooks, improvement goal, source of
+  truth, handling of generated outputs, and verification profile require user
+  decisions.
+- **Requirements depth**: Standard.
+- **Question artifact**:
+  `aidlc-docs/inception/requirements/notebook-improvement-requirement-verification-questions.md`.
+- **Clarification artifact**:
+  `aidlc-docs/inception/requirements/notebook-improvement-requirements-clarification-questions.md`.
+- **Requirements artifact**:
+  `aidlc-docs/inception/requirements/notebook-improvement-requirements.md`.
+- **Next stage after User Stories approval**: Workflow Planning.
+- **User Stories assessment**:
+  `aidlc-docs/inception/plans/notebook-improvement-user-stories-assessment.md`.
+- **Story-generation plan**:
+  `aidlc-docs/inception/plans/notebook-improvement-story-generation-plan.md`.
+- **Story-plan approval artifact**:
+  `aidlc-docs/inception/plans/notebook-improvement-story-plan-approval-questions.md`.
+- **Personas artifact**:
+  `aidlc-docs/inception/user-stories/notebook-improvement/personas.md`.
+- **Stories artifact**:
+  `aidlc-docs/inception/user-stories/notebook-improvement/stories.md`.
+- **Workflow plan**:
+  `aidlc-docs/inception/plans/notebook-improvement-execution-plan.md`.
+- **Code Generation plan**:
+  `aidlc-docs/construction/plans/notebook-presentation-code-generation-plan.md`.
+- **Code Generation summary**:
+  `aidlc-docs/construction/notebook-presentation/code/code-generation-summary.md`.
+- **Build and Test summary**:
+  `aidlc-docs/construction/notebook-presentation/build-and-test/build-and-test-summary.md`.
+- **Notebook Improvement status**: Complete. All 18 generator-owned tutorials
+  now present a subject-specific inline result before interpretation while
+  remaining source-only and unattended. All profile, complete-suite, Ruff,
+  Sphinx, distribution, installed-wheel, and patch gates pass.
+- **Approval mode**: The user explicitly authorized continuation through
+  completion for all remaining approved-scope review gates.
+- **Existing notebook state**: The previously observed generated notebook edits
+  and `OpenPinch/data/notebooks/openpinch-workspace.json` are gone. Only AI-DLC
+  documentation changes for this workflow remain in the working tree.
+- **Extension decisions for this workflow**: Security disabled; Resiliency
+  disabled; Property-Based Testing partially enabled for pure functions and
+  serialization round trips.
+
+## Repository Issue Remediation Progress
+
+- [x] INCEPTION - Workspace Detection reused the current brownfield assessment.
+- [x] INCEPTION - Reverse Engineering reused current artifacts; stale current-API
+  statements are included in remediation scope.
+- [x] INCEPTION - Standard Requirements Analysis completed from six reproduced
+  findings and the clean-break contract.
+- [x] INCEPTION - User Stories skipped because the work is bounded remediation
+  for the existing process-engineer persona.
+- [x] INCEPTION - Workflow Planning completed.
+- [x] INCEPTION - Workflow plan approved by the user.
+- [x] INCEPTION - Minimal Application Design approved by the user.
+- [x] INCEPTION - Units Generation Part 1 decomposition plan completed for
+  application/filesystem, exact OpenHENS loading, and current documentation;
+  generation approved by the user.
+- [x] INCEPTION - Units Generation Part 2 artifacts generated and validated;
+  final units approved by the user.
+- [x] CONSTRUCTION - Unit 1 Functional Design approved by the user.
+- [x] CONSTRUCTION - Unit 1 Code Generation Part 1 plan generated; approval is
+  approved by the user.
+- [x] CONSTRUCTION - Unit 1 Code Generation Part 2 implementation and focused
+  verification complete; generated code approved by the user.
+  - [x] Step 1 focused baseline: 128 passed.
+  - [x] Step 2 problem-state regressions: 5 expected pre-fix failures confirmed.
+  - [x] Step 3 identity/containment regressions: 51 expected failures, 7 controls passed.
+  - [x] Step 4 workbook-allocation regressions: 4 expected pre-fix failures confirmed.
+  - [x] Step 5 shared case-identifier validator: 30 focused tests passed.
+  - [x] Step 6 runtime validation/export containment: 58 focused tests passed.
+  - [x] Step 7 detached input/multiplier guard: 11 focused tests passed.
+  - [x] Step 8 workbook allocation/cleanup: 14 reporting tests passed.
+  - [x] Step 9 integrated verification: 203 tests and Ruff/patch gates passed.
+  - [x] Step 10 structural review: planned owners only; 34 contract tests passed.
+  - [x] Step 11 implementation summary and handoff complete.
+- [x] CONSTRUCTION - Unit 2 Functional Design completed under the user's
+  authorization to continue through completion.
+- [x] CONSTRUCTION - Unit 2 NFR Requirements, NFR Design, and Infrastructure
+  Design skipped as approved: no new NFR, stack, or infrastructure decision.
+- [x] CONSTRUCTION - Unit 2 Code Generation Part 1 plan completed and approved
+  under the user's authorization to continue through completion.
+- [x] CONSTRUCTION - Unit 2 Code Generation Part 2 implementation and focused
+  verification complete; approved under the user's completion authorization.
+  - [x] Focused baseline: 3 passed.
+  - [x] Regression-first checkpoint: 5 expected pre-fix failures confirmed.
+  - [x] Exact-checkout prerequisite suite: 8 passed.
+  - [x] Integrated Unit 1/Unit 2 architecture selection: 123 passed.
+  - [x] Ruff lint/format and patch-hygiene checks passed.
+- [x] CONSTRUCTION - Unit 3 Functional Design skipped as documentation-only;
+  no new data model or business logic is introduced.
+- [x] CONSTRUCTION - Unit 3 NFR Requirements, NFR Design, and Infrastructure
+  Design skipped under the approved workflow.
+- [x] CONSTRUCTION - Unit 3 Code Generation Part 1 plan completed and approved
+  under the user's authorization to continue through completion.
+- [x] CONSTRUCTION - Unit 3 Code Generation Part 2 documentation and drift
+  guards complete; approved under the user's completion authorization.
+  - [x] Existing focused baseline: 27 passed.
+  - [x] New scoped guard failed before refresh and passed after refresh.
+  - [x] Five Mermaid diagrams validated with text alternatives.
+  - [x] Documentation, architecture, and entrypoint selection: 70 passed.
+  - [x] Ruff lint/format, stale-symbol scan, and patch hygiene passed.
+- [x] CONSTRUCTION - Build and Test complete.
+  - [x] Complete post-correction non-solver suite: 2,181 passed, 3 skipped,
+    4 deselected.
+  - [x] Focused non-external OpenHENS/HEN profile: 458 passed, 4 deselected.
+  - [x] Repository Ruff lint and 460-file format check passed.
+  - [x] Clean 53-source warning-as-error Sphinx build passed.
+  - [x] OpenPinch 0.5.2 wheel/source build and installed-wheel smoke passed.
+  - [x] Patch hygiene and scoped current-contract scan passed.
+- [x] OPERATIONS - N/A; no deployment work requested.
+- **Requirements**:
+  `aidlc-docs/inception/requirements/repository-issue-remediation-requirements.md`.
+- **Workflow plan**:
+  `aidlc-docs/inception/plans/repository-issue-remediation-execution-plan.md`.
+- **Extensions**: Security and Resiliency remain disabled. Partial PBT applies to
+  generated case-name/path containment coverage with the repository seed and
+  shrinking retained.
+
+## Historical Stage Progress (Prior Workflows)
 - [x] INCEPTION - Workspace Detection
 - [x] INCEPTION - Reverse Engineering
 - [x] INCEPTION - Requirements Analysis
@@ -52,31 +304,33 @@
 - **Units**: Domain and Input; Targeting and Integration; Heat Exchanger Network
 
 ## Current Status
-- **Lifecycle Phase**: CONSTRUCTION
-- **Current Unit**: Package architecture modernization
-- **Current Stage**: Generated Code Review
-- **Status**: All ten dependency-ordered implementation steps and Build and Test
-  are complete. `OpenPinch.main.pinch_analysis_service` is the sole protected
-  Python contract; domain, contracts, optimisation, application, analysis,
-  adapters, and presentation have concrete owners; retired package trees and
-  compatibility facades are absent. The final seeded non-solver suite passed
-  2,039 tests with four solver tests deselected, supported solver tests passed
-  three with one explicit skip, statement coverage is 97.95%, and branch
-  coverage is 92.79%. Ruff, warning-free Sphinx, notebooks, isolated artifacts,
-  clean-wheel tests, stale-path scans, and patch hygiene pass. Overall quality
-  is 9.3/10 and Test Gates are 9.6/10. Generated code awaits explicit user
-  review before Code Generation is closed.
-- **Generated-code review finding**: The package/import facade cleanup is
-  structurally complete, but a package-wide audit found residual behavioural
-  compatibility machinery: three HPR `TypeError` retries for helpers that now
-  accept `period_idx`, mapping-style access on typed HPR state/result records,
-  non-canonical optimiser spellings, and legacy `StreamCollection` pickle-state
-  repair. Public and convenience naming aliases also remain and require a
-  separate canonical-name decision. These findings are open; no runtime code
-  was changed by the audit.
-- **Deferred Follow-up**: Exact logarithmic LMTD in the continuous NLP
-  formulation may be revisited later; it is not an immediate next step, and
-  the Chen surrogate remains the accepted baseline
+
+- **Lifecycle Phase**: COMPLETE
+- **Current workflow**: Repository Issue Remediation
+- **Current unit**: Repository Issue Remediation integration
+- **Current stage**: Operations N/A
+- **Status**: Repository Issue Remediation is complete. Application
+  state/filesystem contracts, exact OpenHENS checkout loading, and current
+  documentation/drift guards are implemented. The root exposes exactly
+  `PinchProblem` and `PinchWorkspace`; concrete application, domain, contracts,
+  analysis, optimisation, adapters, and presentation owners remain intact. All
+  focused, complete non-solver, Ruff, clean Sphinx, distribution, installed-
+  wheel, and patch gates pass.
+- **Post-gate correction**: generic mapping-shaped workspace bundles now receive
+  the same schema-version and case-key validation as concrete dictionaries. The
+  regression, corrected wheel, and installed-artifact guard pass.
+- **Compatibility policy**: immediate clean break; no aliases, migration paths,
+  deprecated forwarding, or legacy workflow selectors.
+- **Extensions**: Security Baseline and Resiliency Baseline are disabled for
+  this workflow. Partial Property-Based Testing is enabled for generated case
+  identifier and containment invariants with seed `20260715` and shrinking.
+
+## Historical Package Architecture Modernization Status
+
+The following sections record previously completed workflows. Their claims and
+test counts are historical evidence, not the active package contract. Current
+contract statements are maintained in the preceding status block and in the
+refreshed reverse-engineering artifacts.
 
 ## Experimental Discopt Removal Progress
 

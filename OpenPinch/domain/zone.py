@@ -76,6 +76,8 @@ class Zone:
         self._cold_streams: StreamCollection = self._new_stream_collection()
         self._net_hot_streams: StreamCollection = self._new_stream_collection()
         self._net_cold_streams: StreamCollection = self._new_stream_collection()
+        self._subzone_net_hot_streams: StreamCollection = self._new_stream_collection()
+        self._subzone_net_cold_streams: StreamCollection = self._new_stream_collection()
         self._hot_utilities: StreamCollection = self._new_stream_collection()
         self._cold_utilities: StreamCollection = self._new_stream_collection()
 
@@ -192,23 +194,43 @@ class Zone:
 
     @property
     def net_hot_streams(self):
-        """Net hot streams derived from zonal aggregation."""
+        """Net hot streams derived from this zone's Direct Integration GCC."""
         return self._net_hot_streams
 
     @net_hot_streams.setter
     def net_hot_streams(self, data):
-        """Replace the aggregated net hot-stream collection."""
+        """Replace this zone's Direct Integration net hot-stream collection."""
         self._net_hot_streams = self._attach_stream_collection(data)
 
     @property
     def net_cold_streams(self):
-        """Net cold streams derived from zonal aggregation."""
+        """Net cold streams derived from this zone's Direct Integration GCC."""
         return self._net_cold_streams
 
     @net_cold_streams.setter
     def net_cold_streams(self, data):
-        """Replace the aggregated net cold-stream collection."""
+        """Replace this zone's Direct Integration net cold-stream collection."""
         self._net_cold_streams = self._attach_stream_collection(data)
+
+    @property
+    def subzone_net_hot_streams(self):
+        """Net hot profiles reconstructed from immediate subzone DI targets."""
+        return self._subzone_net_hot_streams
+
+    @subzone_net_hot_streams.setter
+    def subzone_net_hot_streams(self, data):
+        """Replace the immediate-subzone net hot-profile collection."""
+        self._subzone_net_hot_streams = self._attach_stream_collection(data)
+
+    @property
+    def subzone_net_cold_streams(self):
+        """Net cold profiles reconstructed from immediate subzone DI targets."""
+        return self._subzone_net_cold_streams
+
+    @subzone_net_cold_streams.setter
+    def subzone_net_cold_streams(self, data):
+        """Replace the immediate-subzone net cold-profile collection."""
+        self._subzone_net_cold_streams = self._attach_stream_collection(data)
 
     @property
     def hot_utilities(self):
@@ -257,8 +279,13 @@ class Zone:
 
     @property
     def net_process_streams(self):
-        """Combined net hot and net cold process streams for the zone."""
+        """Combined net hot and cold profiles from this zone's own GCC."""
         return self._net_hot_streams + self._net_cold_streams
+
+    @property
+    def subzone_net_process_streams(self):
+        """Combined net profiles reconstructed from immediate subzones."""
+        return self._subzone_net_hot_streams + self._subzone_net_cold_streams
 
     @property
     def utility_streams(self):
@@ -297,6 +324,8 @@ class Zone:
             self._cold_streams,
             self._net_hot_streams,
             self._net_cold_streams,
+            self._subzone_net_hot_streams,
+            self._subzone_net_cold_streams,
             self._hot_utilities,
             self._cold_utilities,
         ):
@@ -443,10 +472,10 @@ class Zone:
             cs_dst = self._cold_streams
         else:
             if is_new_stream_collection:
-                self._net_hot_streams = self._new_stream_collection()
-                self._net_cold_streams = self._new_stream_collection()
-            hs_dst = self._net_hot_streams
-            cs_dst = self._net_cold_streams
+                self._subzone_net_hot_streams = self._new_stream_collection()
+                self._subzone_net_cold_streams = self._new_stream_collection()
+            hs_dst = self._subzone_net_hot_streams
+            cs_dst = self._subzone_net_cold_streams
 
         for z in self.subzones.values():
             if len(z.subzones) > 0 and is_n_zone_depth:

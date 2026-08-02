@@ -13,7 +13,7 @@ from OpenPinch.domain.targets import (
     DirectHeatPumpTarget,
     DirectIntegrationTarget,
     IndirectHeatPumpTarget,
-    TotalSiteTarget,
+    IndirectIntegrationTarget,
 )
 from OpenPinch.domain.value import Value
 from OpenPinch.presentation.reporting.results import target_to_result
@@ -40,10 +40,10 @@ def _make_di_target() -> DirectIntegrationTarget:
     )
 
 
-def _make_ts_target() -> TotalSiteTarget:
-    return TotalSiteTarget(
+def _make_ts_target() -> IndirectIntegrationTarget:
+    return IndirectIntegrationTarget(
         zone_name="Plant",
-        type=TargetType.TS.value,
+        type=TargetType.II.value,
         config=_config(),
         pt=_problem_table(),
         hot_utility_target=10.0,

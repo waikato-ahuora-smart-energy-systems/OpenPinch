@@ -343,7 +343,10 @@ def test_target_input_rejects_legacy_units_alias():
 
 def test_target_results_accept_unit_aware_hpr_scalar_and_array_metrics():
     results = TargetResults(
-        name="Plant/Direct Heat Pump",
+        scope="Plant",
+        zone_type="Site",
+        integration_type="Process",
+        target_method="Heat Pump",
         Qh=ValueWithUnit(value=100.0, unit="kW"),
         Qc=ValueWithUnit(value=50.0, unit="kW"),
         Qr=ValueWithUnit(value=25.0, unit="kW"),
@@ -369,7 +372,10 @@ def test_target_results_accept_unit_aware_hpr_scalar_and_array_metrics():
 
 def test_target_results_serialize_domain_values_without_legacy_encoders():
     results = TargetResults(
-        name="Plant/Direct Heat Pump",
+        scope="Plant",
+        zone_type="Site",
+        integration_type="Process",
+        target_method="Heat Pump",
         Qh=ValueWithUnit(value=100.0, unit="kW"),
         Qc=ValueWithUnit(value=50.0, unit="kW"),
         Qr=ValueWithUnit(value=25.0, unit="kW"),

@@ -1,5 +1,6 @@
 """Regression tests for export utility helpers."""
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -68,7 +69,10 @@ def _make_target(
         cold_utils = [SimpleNamespace(name="Cooling Water", heat_flow=VU(60.0, "kW"))]
 
     return SimpleNamespace(
-        name=name,
+        scope=name,
+        zone_type="Site",
+        integration_type="Process",
+        target_method="Heat Exchange",
         period_idx=period_idx,
         period_id=period_id,
         pinch_temp=SimpleNamespace(cold_temp=pinch_cold, hot_temp=pinch_hot),
@@ -151,13 +155,17 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
     assert out_path.exists()
 
     # Filename pattern check
-    assert out_path.name == "Proj__Foo_Bar_20250102_030405.xlsx"
+    assert out_path.name.startswith("Proj__Foo_Bar_20250102_030405_000000")
+    assert out_path.suffix == ".xlsx"
 
     # Verify Summary sheet contents round-trip
     df = pd.read_excel(out_path, sheet_name="Summary")
     # Expect at least our known columns
     expected_cols = {
-        "Target",
+        "Scope",
+        "Zone Type",
+        "Integration Type",
+        "Target Method",
         "Cold Pinch (value)",
         "Cold Pinch (unit)",
         "Hot Pinch (value)",
@@ -234,7 +242,7 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
     assert expected_cols.issubset(set(df.columns))
 
     # Row for "Base"
-    base = df.loc[df["Target"] == "Base"].iloc[0]
+    base = df.loc[df["Scope"] == "Base"].iloc[0]
     assert pytest.approx(base["Cold Pinch (value)"]) == 85.0
     assert base["Cold Pinch (unit)"] == "degC"
     assert pytest.approx(base["Qh (value)"]) == 100.0
@@ -250,7 +258,7 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
     assert base["ETE (unit)"] == "%"
 
     # Row for "Alt A"
-    alt = df.loc[df["Target"] == "Alt A"].iloc[0]
+    alt = df.loc[df["Scope"] == "Alt A"].iloc[0]
     assert pytest.approx(alt["MP Steam (value)"]) == 55.0
     assert alt["MP Steam (unit)"] == "kW"
     assert pytest.approx(alt["Chilled Water (value)"]) == 30.0
@@ -261,7 +269,7 @@ def test_export_writes_problem_tables_for_all_zones(tmp_path: Path):
     master_zone = Zone("Plant")
     master_target = DirectIntegrationTarget(
         zone_name="Master",
-        type="DI",
+        type="Direct Integration",
         pt=_make_problem_table([10.0]),
         pt_real=_make_problem_table([30.0]),
         hot_utility_target=0.0,
@@ -276,7 +284,7 @@ def test_export_writes_problem_tables_for_all_zones(tmp_path: Path):
     master_zone.add_zone(sub_zone, sub=True)
     sub_target = DirectIntegrationTarget(
         zone_name="Alt:Target",
-        type="DI",
+        type="Direct Integration",
         parent_zone=sub_zone,
         pt=_make_problem_table([40.0]),
         pt_real=_make_problem_table([50.0]),
@@ -305,8 +313,8 @@ def test_export_writes_problem_tables_for_all_zones(tmp_path: Path):
     assert sub_real in xls.sheet_names
 
     wb = openpyxl.load_workbook(out, data_only=True)
-    assert wb[master_shifted]["A1"].value == "Master/DI"
-    assert wb[sub_shifted]["A1"].value == "Alt:Target/DI"
+    assert wb[master_shifted]["A1"].value == "Master/Direct Integration"
+    assert wb[sub_shifted]["A1"].value == "Plant/Sub/Zone/Alt:Target/Direct Integration"
 
     master_df = pd.read_excel(
         out,
@@ -351,7 +359,7 @@ def test_build_summary_dataframe_resolves_period_values_using_period_idx():
 def test_target_results_include_period_idx():
     target = DirectIntegrationTarget(
         zone_name="Plant",
-        type="DI",
+        type="Direct Integration",
         pt=_make_problem_table([10.0]),
         pt_real=_make_problem_table([30.0]),
         hot_utility_target=10.0,
@@ -383,6 +391,61 @@ def test_target_results_include_period_idx():
 )
 def test_safe_name_sanitization(raw, expected):
     assert _safe_name(raw) == expected
+
+
+def test_workbook_path_reservation_is_unique_with_frozen_time(
+    tmp_path: Path,
+    monkeypatch,
+):
+    class _FixedDT:
+        @staticmethod
+        def now():
+            return datetime(2025, 1, 2, 3, 4, 5)
+
+    monkeypatch.setattr(export_mod, "datetime", _FixedDT, raising=True)
+
+    first = export_mod._reserve_workbook_path("Site", tmp_path)
+    second = export_mod._reserve_workbook_path("Site", tmp_path)
+
+    assert first != second
+    assert first.exists()
+    assert second.exists()
+    assert first.name == "Site_20250102_030405_000000.xlsx"
+    assert second.name == "Site_20250102_030405_000000_2.xlsx"
+
+
+def test_workbook_path_reservation_is_unique_under_concurrency(tmp_path: Path):
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        paths = list(
+            executor.map(
+                lambda _index: export_mod._reserve_workbook_path("Site", tmp_path),
+                range(24),
+            )
+        )
+
+    assert len(paths) == len(set(paths)) == 24
+    assert all(path.exists() for path in paths)
+    assert all(
+        path.name.startswith("Site_") and path.suffix == ".xlsx" for path in paths
+    )
+
+
+def test_failed_workbook_write_removes_reserved_artifact(tmp_path: Path, monkeypatch):
+    target_response = SimpleNamespace(name="Project", targets=[])
+
+    def fail_summary(*_args, **_kwargs):
+        raise RuntimeError("writer failed")
+
+    monkeypatch.setattr(export_mod, "_write_summary_sheet", fail_summary)
+
+    with pytest.raises(RuntimeError, match="writer failed"):
+        export_target_summary_to_excel_with_units(
+            target_response,
+            master_zone=None,
+            out_dir=tmp_path,
+        )
+
+    assert list(tmp_path.glob("*.xlsx")) == []
 
 
 # --------------------------------------------------------------------------------------
@@ -430,7 +493,7 @@ def test_write_problem_tables_skips_empty_dataframes(monkeypatch, tmp_path: Path
     zone = Zone("Plant")
     target = DirectIntegrationTarget(
         zone_name="Plant",
-        type="DI",
+        type="Direct Integration",
         pt=_make_problem_table([1.0]),
         pt_real=_make_problem_table([2.0]),
         hot_utility_target=0.0,

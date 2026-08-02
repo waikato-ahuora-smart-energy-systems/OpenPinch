@@ -251,7 +251,7 @@ def test_cogeneration_service_and_target_refresh_edge_paths():
     assert (
         pca._ensure_cogeneration_target(
             zone,
-            target_type=TargetType.TS.value,
+            target_type=TargetType.II.value,
             refresh_args={},
             compare_args={},
             refresh_services={},

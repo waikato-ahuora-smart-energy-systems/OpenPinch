@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from copy import deepcopy
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -17,6 +18,7 @@ from ..contracts.input import TargetInput
 from ..contracts.workspace import (
     PinchWorkspaceBundle,
     WorkspaceCaseBundleEntry,
+    validate_workspace_case_name,
 )
 from ._problem.input.validation import build_validation_report
 from ._workspace import state as _workspace_state
@@ -237,15 +239,23 @@ class _CaseBatch:
 
     def export_excel(self, destination: PathLike, **kwargs) -> CaseBatchResult:
         """Export each selected case into a distinct case subdirectory."""
-        output_dir = str(destination).rstrip("/\\")
+        output_dir = os.fspath(destination).rstrip("/\\")
         if not output_dir:
             raise ValueError("destination is required for batch Excel export.")
+        export_root = os.path.realpath(output_dir)
         results: dict[str, Any] = {}
         errors: dict[str, Exception] = {}
         for name in self.names:
             try:
+                validate_workspace_case_name(name)
+                case_directory = os.path.realpath(os.path.join(export_root, name))
+                if os.path.commonpath((export_root, case_directory)) != export_root:
+                    raise ValueError(
+                        f"case name {name!r} resolves outside the batch export "
+                        "destination"
+                    )
                 results[name] = self.workspace.case(name).export_excel(
-                    f"{output_dir}/{name}",
+                    case_directory,
                     **kwargs,
                 )
             except Exception as exc:  # batch isolation is the public contract
@@ -273,7 +283,7 @@ class PinchWorkspace:
         project_name: Optional[str] = "Site",
         baseline_name: str = "baseline",
     ) -> None:
-        self.baseline_name = baseline_name
+        self.baseline_name = validate_workspace_case_name(baseline_name)
         self.project_name = project_name
         self._case_inputs: dict[str, JsonDict] = {}
         self._case_cache: dict[str, PinchProblem] = {}
@@ -322,7 +332,12 @@ class PinchWorkspace:
         if source is None:
             return self.case(case_name)
 
-        name = case_name or self._active_case_name or self.baseline_name
+        name = (
+            validate_workspace_case_name(case_name)
+            if case_name is not None
+            else self._active_case_name or self.baseline_name
+        )
+        name = validate_workspace_case_name(name)
         case_input, resolved_project_name = canonical_case_input_from_source(
             source,
             project_name=project_name,
@@ -354,6 +369,7 @@ class PinchWorkspace:
         base: Optional[str] = None,
     ) -> JsonDict:
         """Create or replace one stored case input."""
+        name = validate_workspace_case_name(name)
         normalized = normalise_case_input(case_input)
         if base is not None:
             base_case_input = self._get_case_input(base)
@@ -589,7 +605,10 @@ class PinchWorkspace:
         *,
         case_name: Optional[str] = None,
         other_case_name: Optional[str] = None,
-        target_name: Optional[str] = None,
+        scope: Optional[str] = None,
+        zone_type: Optional[str] = None,
+        integration_type: Optional[str] = None,
+        target_method: Optional[str] = None,
         base_label: str = "Base case",
         other_label: str = "Scenario",
     ) -> pd.DataFrame:
@@ -601,7 +620,10 @@ class PinchWorkspace:
             comparison_problem = other_problem
         return base_problem.compare_to(
             comparison_problem,
-            target_name=target_name,
+            scope=scope,
+            zone_type=zone_type,
+            integration_type=integration_type,
+            target_method=target_method,
             base_label=base_label,
             other_label=other_label,
         )
@@ -611,14 +633,20 @@ class PinchWorkspace:
         base_case: str,
         other_case: str,
         *,
-        target_name: Optional[str] = None,
+        scope: Optional[str] = None,
+        zone_type: Optional[str] = None,
+        integration_type: Optional[str] = None,
+        target_method: Optional[str] = None,
         base_label: Optional[str] = None,
         other_label: Optional[str] = None,
     ) -> pd.DataFrame:
         """Compare two cases in the same workspace."""
         return self.case(base_case).compare_to(
             self.case(other_case),
-            target_name=target_name,
+            scope=scope,
+            zone_type=zone_type,
+            integration_type=integration_type,
+            target_method=target_method,
             base_label=base_label or base_case,
             other_label=other_label or other_case,
         )

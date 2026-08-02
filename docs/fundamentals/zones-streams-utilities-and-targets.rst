@@ -100,14 +100,14 @@ The main in-memory hierarchy can be sketched as:
    |  |- hot / cold utilities
    |  `- targets
    |     |- Direct Integration
-   |     |- Indirect / Total Site views
+   |     |- Indirect utility-system views
    |     |- HPR / refrigeration targets
    |     `- cogeneration / area-cost post-processing
    `- Subzones
       `- repeat the same pattern recursively
 
 This is why a result row is never just a number. It is always a number tied to
-both a zone scope and a target family.
+both a canonical Zone scope and explicit integration and method classifications.
 
 Useful Mental Model
 -------------------

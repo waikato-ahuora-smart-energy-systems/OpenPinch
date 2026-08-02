@@ -50,3 +50,41 @@ owns contract evidence, Units 2 and 3 own runtime behavior, Unit 4 owns teaching
 coverage, and Unit 5 owns public documentation and enforcement. There are no
 orphan stories and no story is assigned only to a downstream consumer without
 an implementation owner.
+
+## Repository Issue Remediation Requirement Map
+
+User Stories are intentionally skipped for these bounded correctness fixes.
+Functional requirements, NFRs, and acceptance criteria provide full assignment
+traceability instead.
+
+| Requirement | Primary unit | Supporting unit |
+|---|---|---|
+| FR-1 Workspace identifiers and export containment | 1 | 3 |
+| FR-2 Detached problem-input observation | 1 | 3 |
+| FR-3 Exact OpenHENS checkout identity | 2 | 3 |
+| FR-4 Collision-free workbook allocation | 1 | 3 |
+| FR-5 Consistent unloaded-problem error | 1 | 3 |
+| FR-6 Current contract documentation | 3 | 1 and 2 |
+| NFR Safety and filesystem containment | 1 | 3 |
+| NFR Reliability and concurrent allocation | 1 | 3 |
+| NFR State consistency | 1 | 3 |
+| NFR Deterministic checkout identity | 2 | 3 |
+| NFR Cross-platform portability | 1 | 3 |
+| NFR Maintainability and shared validation | 1 | 3 |
+| NFR No new runtime dependencies | 1 and 2 | 3 |
+| NFR Bounded performance overhead | 1 | 3 |
+
+| Acceptance criterion | Primary unit | Final verification |
+|---|---|---|
+| 1. Six reproductions have focused regressions | 1 and 2 | 3 |
+| 2. Unsafe identifiers rejected and exports contained | 1 | 3 |
+| 3. Snapshot mutation cannot affect internal state | 1 | 3 |
+| 4. OpenHENS modules originate from requested checkout | 2 | 3 |
+| 5. Repeated/concurrent exports never collide | 1 | 3 |
+| 6. Empty multiplier update raises canonical error | 1 | 3 |
+| 7. Current docs contain no retired API claims | 3 | 3 |
+| 8. Full quality and distribution gates pass | 3 | 3 |
+
+Every FR, NFR, and numbered acceptance criterion is assigned to an implementation
+owner and a final verification owner. Unit 3 cannot redefine Unit 1 or Unit 2
+behavior; it documents and enforces their completed contracts.

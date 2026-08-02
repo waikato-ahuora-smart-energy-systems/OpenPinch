@@ -16,6 +16,32 @@ RTD_CONFIG = REPO_ROOT / ".readthedocs.yaml"
 GUIDES_ROOT = DOCS_ROOT / "guides"
 API_ROOT = DOCS_ROOT / "api"
 EXAMPLES_ROOT = DOCS_ROOT / "examples"
+AI_DLC_STATE = REPO_ROOT / "aidlc-docs" / "aidlc-state.md"
+REVERSE_ENGINEERING_ROOT = (
+    REPO_ROOT / "aidlc-docs" / "inception" / "reverse-engineering"
+)
+CURRENT_REVERSE_ENGINEERING_FILES = (
+    "api-documentation.md",
+    "architecture.md",
+    "business-overview.md",
+    "code-structure.md",
+    "component-inventory.md",
+    "dependencies.md",
+)
+RETIRED_CURRENT_CONTRACT_STRINGS = (
+    "OpenPinch.main",
+    "OpenPinch.classes",
+    "OpenPinch.services",
+    "OpenPinch.lib",
+    "OpenPinch.utils",
+    "OpenPinch.streamlit_webviewer",
+    "pinch_analysis_service",
+    "/etc/zshenv",
+    "target()",
+    "add_component",
+    "set_variant_input",
+    "solve_variant",
+)
 
 STALE_DOC_STRINGS = (
     "openpinch run",
@@ -46,6 +72,21 @@ def _docs_text(paths: list[Path] | None = None) -> str:
     if paths is None:
         paths = [*DOCS_ROOT.rglob("*.rst"), README]
     return "\n".join(_read(path) for path in paths)
+
+
+def test_current_aidlc_contract_documents_reject_retired_api_claims():
+    current_documents = "\n".join(
+        _read(REVERSE_ENGINEERING_ROOT / name)
+        for name in CURRENT_REVERSE_ENGINEERING_FILES
+    )
+    state = _read(AI_DLC_STATE)
+    current_status = state.split("## Current Status", maxsplit=1)[1].split(
+        "\n## ", maxsplit=1
+    )[0]
+
+    for stale in RETIRED_CURRENT_CONTRACT_STRINGS:
+        assert stale not in current_documents
+        assert stale not in current_status
 
 
 def test_rtd_configuration_keeps_strict_python314_build():

@@ -2,130 +2,126 @@
 
 ## System Overview
 
-OpenPinch is a single distributable Python package with a layered internal architecture. Public orchestration objects sit above input adapters and Pydantic schemas. Those adapters create a mutable domain graph of zones, streams, utilities, problem tables, and targets. Service modules perform numerical analysis and optional optimization. Reporting and presentation modules convert the resulting graph into typed responses, tables, files, and interactive visualizations.
+OpenPinch is one distributable Python library with explicit owner layers. The
+package root exposes only `PinchProblem` and `PinchWorkspace`. Application
+objects coordinate contracts, adapters, analysis, and presentation while the
+domain remains independent of UI and concrete solver backends.
 
-The project is a library rather than a deployed network service. It has no REST server, database, cloud stack, or persistent daemon. Persistence is file-based, and solver-backed workflows execute locally through optional Python packages and external solver binaries.
+The package has no REST server, database, cloud runtime, or persistent daemon.
+Persistence is file-based. Optional solver-backed and thermodynamic workflows
+run locally and are guarded at their concrete integration boundaries.
 
 ## Architecture Diagram
 
 ```mermaid
 flowchart TD
-    User["Python, notebook, CLI, or Streamlit user"] --> Public["Public API and orchestration"]
-    Public --> Adapters["JSON, CSV, Excel, schema, and resource adapters"]
-    Adapters --> Schemas["Pydantic schemas and configuration validation"]
-    Schemas --> Domain["Values, streams, zones, problem tables, targets, and networks"]
-    Public --> Services["Analysis service orchestration"]
-    Domain --> Services
-    Services --> Thermo["CoolProp, Pint, SciPy, and TESPy"]
-    Services --> HEN["Heat-exchanger-network synthesis"]
-    HEN --> Solvers["Pyomo, GEKKO, IDAES, and external solvers"]
-    Services --> Output["Reports, DataFrames, graph data, and exports"]
-    HEN --> Output
-    Output --> Presentation["Plotly, Streamlit, Excel, HTML, and JSON"]
+    User["Process engineer"] --> Root["OpenPinch root workflow API"]
+    Root --> Application["application"]
+    Application --> Contracts["contracts"]
+    Application --> Adapters["adapters"]
+    Application --> Analysis["analysis"]
+    Application --> Presentation["presentation"]
+    Adapters --> Contracts
+    Analysis --> Domain["domain"]
+    Analysis --> Contracts
+    Analysis --> Optimisation["optimisation"]
+    Presentation --> Contracts
+    Presentation --> Domain
+    Optimisation --> Domain
+    Optimisation --> Contracts
+    Analysis --> Engines["Optional local engines and solver binaries"]
 ```
 
-Text alternative: users call public orchestration APIs. Input adapters and schemas create validated domain objects. Analysis services use thermodynamic libraries and optional HEN solvers. Reporting and presentation layers convert results into typed data, tables, graphs, dashboards, and files.
+Text alternative: process engineers enter through the root workflow API. The
+application layer coordinates contract and adapter boundaries, analysis, and
+presentation. Analysis and optimisation depend on domain and contracts;
+optional engines remain behind local integration boundaries.
 
 ## Component Descriptions
 
-### `OpenPinch.__init__`, `main`, and `__main__`
+### Package root and CLI
 
-- **Purpose**: curated package exports, typed service boundary, and CLI entry point.
-- **Responsibilities**: expose supported public names, map `TargetInput` to `TargetOutput`, and copy packaged notebooks.
-- **Dependencies**: classes, schemas, resources, and service facade.
-- **Type**: application facade.
+- `OpenPinch.__init__` imports only the two workflow entry points.
+- `OpenPinch.__main__` implements the narrow notebook-copying CLI.
+- Package resources expose sample-case and notebook discovery/copy helpers from
+  their concrete module.
 
-### `OpenPinch.classes`
+### `OpenPinch.application`
 
-- **Purpose**: domain objects and high-level orchestration.
-- **Responsibilities**: problem/workspace lifecycle, values and units, streams and collections, zone hierarchy, problem tables, exchangers, networks, accessors, validation, result extraction, and views.
-- **Dependencies**: schemas, configuration, input adapters, services, pandas, Pydantic, and Pint.
-- **Type**: application and domain model.
+- Owns problem/workspace lifecycle, effective runtime arguments, targeting,
+  component, design and plot accessors, multiperiod replay, summaries,
+  comparisons, case batches, and workspace bundle coordination.
+- Depends on abstractions and concrete feature owners; it does not own domain
+  equations, UI implementation, solver models, or filesystem presentation.
 
-### `OpenPinch.lib`
+### `OpenPinch.domain`
 
-- **Purpose**: configuration, enums, unit policy, schema contracts, and shared type definitions.
-- **Responsibilities**: validate flat options, define serializable request/response models, normalize output units, and centralize target and graph vocabulary.
-- **Dependencies**: Pydantic, Pint, and selected domain classes for runtime target schemas.
-- **Type**: shared models and policy.
+- Owns values with units, streams and collections, zones, configuration,
+  problem tables, targets, fluids, exchangers, and networks.
+- Enforces runtime invariants and remains free of presentation, application,
+  and concrete optimisation-backend dependencies.
 
-### `OpenPinch.services.common`
+### `OpenPinch.contracts`
 
-- **Purpose**: reusable thermal-analysis operations.
-- **Responsibilities**: utility targeting, problem-table analysis, graph construction, cost and area targeting, temperature driving force, and service orchestration.
-- **Dependencies**: domain model, NumPy, pandas, and SciPy.
-- **Type**: shared service layer.
+- Owns Pydantic input/output, HPR, reporting, graph, turbine, unit, workspace,
+  controllability, and synthesis contracts.
+- `TargetInput.network` is a transport schema for serialized HEN payloads, not a
+  runtime network object.
 
-### Integration and post-processing services
+### `OpenPinch.analysis`
 
-- **Purpose**: direct integration, indirect integration, energy-transfer analysis, exergy, cogeneration, process components, and controllability.
-- **Responsibilities**: execute specialized business transactions on zones and attach target results.
-- **Dependencies**: shared services, schemas, thermodynamic models, and configuration.
-- **Type**: application services.
+- Owns targeting, heat transfer, economics, numerics, thermodynamics, graphs,
+  energy transfer, exergy, power, HPR, and HEN synthesis/verification.
+- Solver-backed HEN execution remains under
+  `OpenPinch.analysis.heat_exchanger_networks` and uses shared optimisation
+  abstractions.
 
-### Heat-pump integration
+### `OpenPinch.optimisation`
 
-- **Purpose**: screen and simulate heat-pump, refrigeration, MVR, cascade, parallel, multiperiod, and Brayton configurations.
-- **Responsibilities**: preprocess targets, encode optimizer variables, solve thermodynamic unit models, select loads, and post-process cost and graph effects.
-- **Dependencies**: CoolProp, SciPy, NumPy, optional TESPy, and black-box optimizers.
-- **Type**: advanced numerical service.
+- Owns solver-neutral models, candidates, execution, services, errors, and
+  optional backend adapters reusable beyond HPR or HEN.
 
-### Heat-exchanger-network synthesis
+### `OpenPinch.adapters`
 
-- **Purpose**: produce, verify, rank, and report exchanger-network candidates.
-- **Responsibilities**: construct synthesis tasks, map data to solver arrays, implement stagewise and pinch-decomposition models, manage execution pathways and fallbacks, assemble results, and export manifests.
-- **Dependencies**: optional Pyomo, GEKKO, IDAES, external solvers, NumPy, pandas, and domain schemas.
-- **Type**: optional optimization subsystem.
+- Owns JSON/CSV/Excel loading, workspace bundles, legacy input conversion, and
+  optional dependency checks.
 
-### Network-grid diagram
+### `OpenPinch.presentation`
 
-- **Purpose**: render synthesized networks.
-- **Responsibilities**: build a renderable intermediate model and produce Plotly or Matplotlib-compatible grid diagrams.
-- **Dependencies**: HEN schemas and optional plotting libraries.
-- **Type**: presentation service.
+- Owns typed/tabular reporting, Excel export, plot construction and galleries,
+  Streamlit rendering, and network-grid views.
 
-### Utilities, resources, and data
-
-- **Purpose**: file conversion, validation helpers, optimization adapters, exports, packaged notebooks, and sample cases.
-- **Responsibilities**: bridge external file formats and learning assets to the core model.
-- **Dependencies**: optional Excel and plotting packages plus standard library resources APIs.
-- **Type**: adapters and shared utilities.
-
-## Data Flow
+## Primary Data Flow
 
 ```mermaid
 sequenceDiagram
-    participant Caller
-    participant Facade as PinchProblem or service facade
-    participant Adapter as Input adapter and schema validation
-    participant Domain as Zone and stream domain model
-    participant Analysis as Targeting service
-    participant Output as Reporting and export
-    Caller->>Facade: Submit source and workflow options
-    Facade->>Adapter: Load, normalize, and validate
-    Adapter->>Domain: Build zones, streams, utilities, and configuration
-    Facade->>Analysis: Execute selected target or design workflow
-    Analysis->>Domain: Attach problem tables, targets, and graphs
-    Facade->>Output: Extract typed and tabular views
-    Output-->>Caller: Return model, table, graph, or file
+    participant E as Process engineer
+    participant P as PinchProblem or PinchWorkspace
+    participant I as Adapter and contract boundary
+    participant D as Domain model
+    participant A as Analysis
+    participant R as Presentation
+    E->>P: Supply source and explicit method arguments
+    P->>I: Load, normalize, and validate
+    I->>D: Construct streams, utilities, zones, and configuration
+    P->>A: Execute one named workflow
+    A->>D: Attach calculated targets or designs
+    P->>R: Request report, plot, dashboard, or export
+    R-->>E: Return view, table, or file
 ```
 
-Text alternative: the caller submits a source and options; the facade loads and validates it; adapters build the domain model; a selected service attaches results; reporting extracts a typed, tabular, graphical, or file output.
+Text alternative: a workflow object loads and validates a source, constructs
+domain state, invokes one named analysis, then asks presentation owners to
+produce a view, table, graph, dashboard, or file.
 
-## Integration Points
+## Deployment and Integration
 
-- **External APIs**: none at runtime. Documentation builds fetch Python, NumPy, and pandas intersphinx inventories.
-- **Databases**: none.
-- **File formats**: JSON, CSV, XLSB/XLSX, HTML, JSON manifests, pickle artifacts produced by some external or experimental solver workflows, and workspace bundle JSON.
-- **Thermodynamic engines**: CoolProp by default; TESPy for optional Brayton-cycle functionality.
-- **Optimization engines**: SciPy and internal black-box minimizers; optional Pyomo, GEKKO, IDAES, and system-installed solver binaries for HEN synthesis.
-- **Presentation**: pandas, Plotly, Streamlit, openpyxl, and pyxlsb.
-
-## Infrastructure Components
-
-- **Infrastructure as code**: none found.
-- **Deployment model**: PyPI wheel and source distribution built by Hatchling; documentation hosted through Read the Docs; source and CI hosted on GitHub.
-- **CI/CD**: GitHub Actions for pull requests, the `develop` branch, and version tags; trusted publishing to TestPyPI and PyPI.
-- **Networking**: no application network or cloud networking configuration.
-- **Persistence**: local files only.
-
+- **Distribution**: Hatchling wheel and source archive, validated by repository
+  build scripts.
+- **Documentation**: Sphinx on Read the Docs.
+- **CI/CD**: GitHub Actions and trusted PyPI publishing.
+- **Persistence**: local JSON, CSV, Excel, HTML, manifests, and workspace bundle
+  files.
+- **Thermodynamics**: CoolProp and optional TESPy.
+- **Optimisation**: SciPy plus optional Pyomo, GEKKO, IDAES, and provisioned
+  external solvers.

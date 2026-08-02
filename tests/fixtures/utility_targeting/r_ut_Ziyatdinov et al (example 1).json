@@ -1,7 +1,10 @@
 {
     "targets": [
         {
-            "name": "Ziyatdinov et al/Direct Integration",
+            "scope": "Site/Ziyatdinov et al",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 139.35000000000002,

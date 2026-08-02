@@ -16,15 +16,18 @@ from ...domain._problem_table.types import ProblemTableUpdateKwargs
 from ...domain.enums import GraphType, ProblemTableLabel, TargetType
 from ...domain.problem_table import ProblemTable
 from ...domain.stream_collection import StreamCollection
-from ...domain.targets import TotalProcessTarget, TotalSiteTarget
+from ...domain.targets import IndirectIntegrationTarget, SubzoneAggregateTarget
 from ...domain.zone import Zone
 from ..numerics import get_period_index
 from .cascade import get_process_heat_cascade
+from .direct import _create_net_hot_and_cold_stream_collections_for_site_analysis
 
 __all__ = [
-    "compute_total_subzone_utility_targets",
+    "compute_subzone_aggregate_target",
     "compute_indirect_integration_targets",
 ]
+
+_DIRECT_TARGET_GRAPH_DECIMALS = 4
 
 
 ################################################################################
@@ -32,10 +35,10 @@ __all__ = [
 ################################################################################
 
 
-def compute_total_subzone_utility_targets(
+def compute_subzone_aggregate_target(
     zone: Zone,
     args: dict | None = None,
-) -> TotalProcessTarget:
+) -> SubzoneAggregateTarget:
     """Sums and records zonal targets."""
     # Sum targets from subzones
     idx, sid = get_period_index(period_ids=zone.period_ids, args=args)
@@ -74,7 +77,9 @@ def compute_total_subzone_utility_targets(
     heat_recovery_limit = zone.targets[TargetType.DI.value].heat_recovery_limit
     output = {
         "zone_name": zone.name,
-        "type": TargetType.TZ.value,
+        "scope": zone.address,
+        "zone_type": zone.type,
+        "type": TargetType.SA.value,
         "parent_zone": zone.parent_zone,
         "config": zone.config,
         "hot_utilities": hot_utilities,
@@ -92,13 +97,13 @@ def compute_total_subzone_utility_targets(
         "period_id": sid,
         "period_idx": idx,
     }
-    return TotalProcessTarget.model_validate(output)
+    return SubzoneAggregateTarget.model_validate(output)
 
 
 def compute_indirect_integration_targets(
     zone: Zone,
     args: dict | None = None,
-) -> TotalSiteTarget | None:
+) -> IndirectIntegrationTarget | None:
     """Compute indirect integration targets for an aggregated zone.
 
     The routine assumes the relevant child zones have already been solved for
@@ -107,14 +112,18 @@ def compute_indirect_integration_targets(
     resulting Total Site target on ``zone`` before returning it.
     """
     idx, sid = get_period_index(period_ids=zone.period_ids, args=args)
-    s_tzt = zone.targets[TargetType.TZ.value]
-    if len(zone.net_hot_streams) == 0 and len(zone.net_cold_streams) == 0:
+    s_tzt = zone.targets[TargetType.SA.value]
+    net_hot_streams, net_cold_streams = _reconstruct_subzone_direct_profiles(
+        zone,
+        args,
+    )
+    if len(net_hot_streams) == 0 and len(net_cold_streams) == 0:
         return None
 
     # Total site profiles - process side
     pt = get_process_heat_cascade(
-        hot_streams=zone.net_hot_streams,
-        cold_streams=zone.net_cold_streams,
+        hot_streams=net_hot_streams,
+        cold_streams=net_cold_streams,
         is_shifted=True,  # Align a second shift with the real utility scale.
         period_idx=idx,
     )
@@ -152,7 +161,9 @@ def compute_indirect_integration_targets(
 
     output = {
         "zone_name": zone.name,
-        "type": TargetType.TS.value,
+        "scope": zone.address,
+        "zone_type": zone.type,
+        "type": TargetType.II.value,
         "parent_zone": zone.parent_zone,
         "config": zone.config,
         "pt": pt,
@@ -177,12 +188,68 @@ def compute_indirect_integration_targets(
         "period_id": sid,
         "period_idx": idx,
     }
-    return TotalSiteTarget.model_validate(output)
+    return IndirectIntegrationTarget.model_validate(output)
 
 
 ################################################################################
 # Helper Functions
 ################################################################################
+
+
+def _reconstruct_subzone_direct_profiles(
+    zone: Zone,
+    args: dict | None = None,
+) -> tuple[StreamCollection, StreamCollection]:
+    """Build one Total Site layer from immediate-child Direct targets.
+
+    A zone's ``net_hot_streams`` and ``net_cold_streams`` belong to its own
+    Direct Integration target. Indirect targeting therefore reconstructs fresh
+    child profiles from the child targets and stores them in the zone's
+    dedicated immediate-subzone collections. The zone's own Direct Integration
+    profiles remain independent.
+    """
+    if not zone.subzones:
+        zone.subzone_net_hot_streams = StreamCollection()
+        zone.subzone_net_cold_streams = StreamCollection()
+        return zone.net_hot_streams, zone.net_cold_streams
+
+    period_idx, _period_id = get_period_index(period_ids=zone.period_ids, args=args)
+    zone.subzone_net_hot_streams = StreamCollection()
+    zone.subzone_net_cold_streams = StreamCollection()
+    net_hot_streams = zone.subzone_net_hot_streams
+    net_cold_streams = zone.subzone_net_cold_streams
+
+    for subzone in zone.subzones.values():
+        direct_target = subzone.targets[TargetType.DI.value]
+        target_period_idx = (
+            direct_target.period_idx
+            if direct_target.period_idx is not None
+            else period_idx
+        )
+        child_hot_streams, child_cold_streams = (
+            _create_net_hot_and_cold_stream_collections_for_site_analysis(
+                T_vals=direct_target.pt[ProblemTableLabel.T],
+                H_vals=direct_target.pt[ProblemTableLabel.H_NET_A],
+                hot_utilities=direct_target.hot_utilities,
+                cold_utilities=direct_target.cold_utilities,
+                idx=target_period_idx,
+            )
+        )
+        for stream in child_hot_streams + child_cold_streams:
+            stream.supply_temperature = np.round(
+                np.asarray(stream.supply_temperature, dtype=float),
+                decimals=_DIRECT_TARGET_GRAPH_DECIMALS,
+            )
+            stream.target_temperature = np.round(
+                np.asarray(stream.target_temperature, dtype=float),
+                decimals=_DIRECT_TARGET_GRAPH_DECIMALS,
+            )
+        for key, stream in child_hot_streams.items():
+            net_hot_streams.add(stream, key=f"{subzone.name}.{key}")
+        for key, stream in child_cold_streams.items():
+            net_cold_streams.add(stream, key=f"{subzone.name}.{key}")
+
+    return net_hot_streams, net_cold_streams
 
 
 def _match_utility_gen_and_use_at_same_level(

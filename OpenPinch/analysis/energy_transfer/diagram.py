@@ -39,6 +39,8 @@ def compute_energy_transfer_target(
     return EnergyTransferTarget.model_validate(
         {
             "zone_name": getattr(base_target, "zone_name", None),
+            "scope": base_target.scope,
+            "zone_type": base_target.zone_type,
             "type": TargetType.ET.value,
             "parent_zone": base_target.parent_zone,
             "config": base_target.config,

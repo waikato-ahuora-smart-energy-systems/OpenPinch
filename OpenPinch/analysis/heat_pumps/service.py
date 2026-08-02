@@ -117,6 +117,8 @@ def compute_direct_heat_pump_or_refrigeration_target(
     )
     general_results = {
         "zone_name": zone.name,
+        "scope": zone.address,
+        "zone_type": zone.type,
         "type": TargetType.DHP.value if is_heat_pumping else TargetType.DR.value,
         "parent_zone": zone.parent_zone,
         "config": zone.config,
@@ -157,7 +159,7 @@ def compute_indirect_heat_pump_or_refrigeration_target(
 
     idx, period_id = get_period_index(period_ids=zone.period_ids, args=args)
     is_refrigeration = not (is_heat_pumping)
-    base_target = zone.targets[TargetType.TS.value]
+    base_target = zone.targets[TargetType.II.value]
     pt = deepcopy(base_target.pt)
     # Create problem table based on inverted utility streams
     pt_ut_gen = get_process_heat_cascade(
@@ -198,6 +200,8 @@ def compute_indirect_heat_pump_or_refrigeration_target(
     )
     general_results = {
         "zone_name": zone.name,
+        "scope": zone.address,
+        "zone_type": zone.type,
         "type": TargetType.IHP.value if is_heat_pumping else TargetType.IR.value,
         "parent_zone": zone.parent_zone,
         "config": zone.config,
@@ -268,6 +272,8 @@ def _compute_multiperiod_heat_pump_or_refrigeration_target(
     )
     general_results = {
         "zone_name": zone.name,
+        "scope": zone.address,
+        "zone_type": zone.type,
         "type": _hpr_target_type(is_direct=is_direct, is_heat_pumping=is_heat_pumping),
         "parent_zone": zone.parent_zone,
         "config": zone.config,

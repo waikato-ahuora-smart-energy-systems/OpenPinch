@@ -1,115 +1,127 @@
 # API Documentation
 
-## REST APIs
+## Public Workflow Boundary
 
-No REST or HTTP API is implemented. OpenPinch is an in-process Python library. Applications that need a service boundary use the typed `pinch_analysis_service` function and can wrap it in their own transport.
+OpenPinch is an in-process Python library and has no REST or HTTP API. The
+package root exports exactly:
 
-## Curated Package API
+```python
+from OpenPinch import PinchProblem, PinchWorkspace
+```
 
-The package root exports the supported high-level surface:
+- `PinchProblem(source=None, project_name="Site")` owns one study.
+- `PinchWorkspace(source=None, project_name="Site", baseline_name="baseline")`
+  owns named cases and delegates the active case's problem surface.
 
-- `PinchProblem(source=None, project_name="Site")` - load, validate, target, inspect, plot, and export one study.
-- `PinchWorkspace(source=None, project_name="Site", baseline_name="baseline")` - manage named baseline and scenario cases.
-- `pinch_analysis_service(input_data, project_name="Site") -> TargetOutput` - typed, stateless request-to-response boundary.
-- `TargetInput`, `TargetOutput`, `StreamSchema`, `UtilitySchema`, and `ZoneTreeSchema` - typed I/O contracts.
-- `Configuration` and `config_options()` - runtime options and option metadata.
-- `list_sample_cases`, `read_sample_case`, `copy_sample_case`, and sample metadata functions - packaged case discovery.
-- `list_notebooks`, `copy_notebook`, and notebook metadata functions - packaged notebook discovery.
-- `get_piecewise_linearisation_for_streams` - nonlinear-stream preprocessing utility.
-- Public enums and report models, including `TargetType`, `GraphType`, `HeatPumpAndRefrigerationCycle`, `ProblemReport`, and `ValidationReport`.
+Contracts, domain classes, resources, and specialist services are imported from
+their concrete modules when advanced integrations need them; they are not added
+to the root namespace.
 
-## `PinchProblem` API Families
+## `PinchProblem` Families
 
-### Lifecycle and validation
+### Lifecycle and observation
 
-- `load(source) -> Zone | None` - load JSON, CSV, Excel, schema, mapping, tuple, or packaged sample input.
-- `validation_report() -> ValidationReport` - validate source semantics without requiring a successful solve.
-- `period_ids` and period-aware execution helpers - expose multiperiod study identifiers.
+- `load(source)`, `validate()`, and `validation_report()` load or inspect input.
+- `problem_data` returns a detached snapshot; `to_problem_json()` returns the
+  canonical serialized input.
+- `period_ids`, `config`, `master_zone`, `results`, stream/utility collections,
+  and `process_components` expose current state without choosing an analysis.
+- `update_options(...)` and `set_dt_cont_multiplier(...)` are explicit mutations
+  that invalidate dependent state.
 
 ### Targeting
 
-- `target()` - default direct heat-integration targeting.
-- `target.direct_heat_integration(...)`
-- `target.indirect_heat_integration(...)`
-- `target.direct_heat_pump(...)` and `target.indirect_heat_pump(...)`
-- `target.direct_refrigeration(...)` and `target.indirect_refrigeration(...)`
-- `target.cogeneration(...)`, `target.exergy(...)`, and related advanced target accessors.
-- `target_all_periods(...)` - replay a target workflow across operating periods, with serial, thread, or process execution backends.
+Core named methods include:
 
-### Components and design
+- `problem.target.direct_heat_integration(...)`
+- `problem.target.indirect_heat_integration(...)`
+- `problem.target.total_site_heat_integration(...)`
+- `problem.target.all_heat_integration(...)`
+- `problem.target.heat_exchanger_area_and_cost(...)`
 
-- `add_component.process_mvr(...)` - add direct gas or vapour MVR modifications.
-- `design.enhanced_synthesis_method(...)` - execute HEN synthesis and expose ranked candidates.
+Advanced named methods include Carnot and vapour-compression heat pumps and
+refrigeration, Brayton heat pump/refrigeration, MVR heat pump, cogeneration and
+its named methods, exergy, and energy transfer. The corresponding supported
+multiperiod operations are under `problem.target.all_periods` with an explicit
+`workers` argument.
+
+Arguments supplied directly to a method take precedence. When an argument is
+omitted, the method resolves the corresponding current configuration value.
+Configuration supplies defaults; it does not select which core analysis runs.
+
+### Components
+
+`problem.components.add_process_mvr(...)` adds a process MVR component and
+invalidates affected results. `problem.components.inventory` is a read-only
+mapping of current components.
+
+### HEN design
+
+Named methods under `problem.design` cover the base heat-exchanger-network
+workflow, enhanced and multiperiod variants, OpenHENS, pinch design,
+thermal-derivative design, and network evolution.
+
+They return an explicit `HeatExchangerNetworkDesignView` with `result`,
+`selected_network`, `top(n)`, `network(rank=...)`, `grid(...)`, heat/utility
+totals, and `utility(...)`. Serialize through
+`design.result.model_dump(mode="json")`.
 
 ### Reporting and presentation
 
-- `summary_frame(...)` - produce pandas summaries.
-- `report(...)` and graph-data helpers - expose serializable reporting views.
-- `plot.*` and `plot.export(...)` - build or export graph families.
-- Excel and HTML export methods - persist summaries and visualizations.
-- `show_dashboard()` - render the Streamlit result viewer.
+- `summary_frame(...)`, `metrics(...)`, `report(...)`, and `compare_to(...)`
+  observe current results without hidden execution.
+- `problem.plot` exposes named graph operations and exports.
+- `export_excel(...)` writes a report workbook.
+- `show_dashboard(...)` renders the optional interactive presentation.
 
-## `PinchWorkspace` API Families
+## `PinchWorkspace` Families
 
-- `load`, `set_variant_input`, `get_variant_input`, and `input_view` - manage normalized case inputs.
-- `list_variants`, `copy_case`, `scenario`, `case`, and active-case helpers - manage named variants.
-- `validate_variant` and `validation_report` - produce structured validation results.
-- `solve_variant(workflow=..., workflow_options=...)` - execute a configured case workflow and return a serializable view.
-- `compare_cases` and `compare_to` calculate metric and problem-table deltas.
-- `save_bundle` and `load_bundle` - persist scenario inputs, workflow metadata, and cached views as JSON.
+- `list_cases()`, `case(name)`, and `use_case(name)` select existing cases.
+- `scenario(name, ...)` creates an unsolved named case from a base case.
+- `cases(names)` returns an ordered batch surface mirroring supported target and
+  design operations plus summaries, metrics, reports, and Excel export.
+- `target`, `design`, `components`, `plot`, configuration, state, reporting, and
+  export members delegate to the active `PinchProblem`.
+- `compare_to(...)` and `compare_cases(...)` compare solved cases.
+- `save_bundle(path)` and `load_bundle(path)` persist explicit
+  `schema_version: "3"` case inputs without migrations.
 
-## Internal Service APIs
+Workspace case identifiers are non-empty, trimmed, portable path components.
+They are rejected rather than normalized, and batch exports enforce resolved
+destination containment.
 
-`OpenPinch.services.services_entry` exposes zone-oriented functions used by the public accessors:
+## Contract and Runtime Owners
 
-- `data_preprocessing_service(input_data, project_name)`
-- `direct_heat_integration_service(zone, args=None)`
-- `indirect_heat_integration_service(zone, args=None)`
-- `direct_heat_pump_service(zone, args=None)`
-- `indirect_heat_pump_service(zone, args=None)`
-- `direct_refrigeration_service(zone, args=None)`
-- `indirect_refrigeration_service(zone, args=None)`
-- `power_cogeneration_service(zone, args=None)`
-- `exergy_targeting_service(zone, args=None)`
-- `area_cost_targeting_service(zone, args=None)`
-- `energy_transfer_analysis_service(zone, args=None)`
+- `OpenPinch.contracts.input.TargetInput` owns stream, utility, zone, nonlinear
+  segment, and serialized HEN input contracts.
+- `OpenPinch.contracts.output.TargetOutput` owns primary serialized results.
+- `OpenPinch.contracts.workspace.PinchWorkspaceBundle` owns workspace bundle
+  schema version `3`.
+- `OpenPinch.domain` owns runtime `Value`, `Stream`, `Zone`, target,
+  `HeatExchanger`, and `HeatExchangerNetwork` behavior.
 
-These functions mutate or enrich a prepared `Zone` graph and return the zone. They are lower-level extension points rather than the preferred first-use API.
+The supported HEN transport bridge is a mapping, not a JSON string:
 
-## CLI API
+```python
+network_payload = network.model_dump(mode="json")
+input_data = TargetInput.model_validate({"streams": [], "network": network_payload})
+```
 
-`openpinch notebook [--name NAME] [-o OUTPUT]` copies one packaged notebook or the ordered notebook series. `--debug` preserves tracebacks. Solving and exporting are intentionally Python-only.
+Private solver and source metadata excluded by the runtime dump are rejected by
+the transport schemas.
 
-## Data Models
+## CLI Boundary
 
-### Input contracts
+`openpinch notebook [--name NAME] [-o OUTPUT]` copies one packaged notebook or
+the ordered notebook series. Analysis selection and export remain Python
+workflow operations.
 
-- `StreamSchema`: zone, name, supply and target states, heat flow, optional heat-capacity flow, contribution temperatures, heat-transfer coefficient, fluid metadata, and active flag.
-- `UtilitySchema`: utility type, thermal states, optional duty, cost, contribution temperature, heat-transfer coefficient, fluid metadata, and active flag.
-- `ZoneTreeSchema`: recursive name, type, optional contribution-temperature multiplier, and children.
-- `TargetInput`: streams, utilities, options, and optional zone tree. Flat options are validated against the configuration catalog.
+## Error Behavior
 
-### Output contracts
-
-- `TargetOutput`: study name, optional period identifier, target-result list, graph sets, and optional HEN design.
-- `TargetResults`, `ReportMetric`, `ProblemReport`, and graph schemas: reporting-oriented thermal, economic, and presentation data.
-- `HeatExchangerNetworkSynthesisResult` and related task, outcome, manifest, and export schemas: solver workflow inputs and design outputs.
-- HPR schemas: targeting inputs, period cases, parsed optimizer state, thermodynamic artifacts, backend outcomes, and cost accounting.
-- Workspace schemas: validation issues, tables, cards, graph catalogs, variant views, deltas, comparisons, and persisted bundles.
-
-### Runtime domain models
-
-- `Value`: numeric or period-valued data with Pint units.
-- `Stream` and `StreamCollection`: process and utility stream behavior plus cached numeric views.
-- `Zone`: hierarchical streams, utilities, targets, and subzones.
-- `ProblemTable`: shifted-temperature intervals and heat balances.
-- `HeatExchanger` and `HeatExchangerNetwork`: network structure and reporting models.
-- Runtime target subclasses: utility-summary, exergy, cogeneration, HPR, and other specialized target families.
-
-## Validation and Error Behavior
-
-- Pydantic validates structural request and response contracts.
-- Configuration metadata validates supported option keys and values.
-- `ValidationReport` preserves semantic input issues for application-facing workflows.
-- Optional dependency helpers raise targeted installation guidance when advanced surfaces are unavailable.
-- `PinchWorkspace.solve_variant` converts expected workflow errors and unexpected exceptions into structured error views; direct `PinchProblem` calls generally raise exceptions.
+- Pydantic rejects unknown and invalid wire fields.
+- Semantic validation is available through `ValidationReport`.
+- Unloaded operations raise actionable runtime errors.
+- Optional features raise targeted installation guidance.
+- Batch operations isolate per-case exceptions in `CaseBatchResult`.
+- Solver-backed design methods expose typed synthesis outcomes and do not hide
+  missing solver capabilities.

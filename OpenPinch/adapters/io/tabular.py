@@ -6,6 +6,8 @@ from typing import Any, Optional
 
 import pandas as pd
 
+from ...domain.enums import IntegrationType, TargetMethod, ZoneType
+
 
 def get_column_names_and_units(df_full, sheet_name, row_units=1):
     """Derive canonical column names and unit strings for a workbook sheet."""
@@ -124,8 +126,6 @@ def target_records_from_frame(
                 column_name,
                 value,
                 unit=unit,
-                project_name=project_name,
-                record_name=str(record.get("name") or ""),
             )
         items = list(entry.items())
         results.append(dict(items[2:] + items[:2]))
@@ -143,27 +143,33 @@ def _filtered_summary_frame(
 
     name_series = df_data["name"]
     mask_valid = name_series.map(lambda value: isinstance(value, str))
+    has_total_site = name_series.eq("Total Site Targets").any()
     mask_skip = name_series.eq("Individual Process Targets")
+    if has_total_site:
+        mask_skip |= name_series.eq("Total Process Targets")
     filtered = df_data.loc[mask_valid & ~mask_skip].reset_index(drop=True).copy()
     if filtered.empty:
         return filtered
 
     original_names = filtered["name"].copy()
-    filtered.loc[original_names == "Total Site Targets", "name"] = (
-        f"{project_name}/Total Site Target"
+    total_names = {
+        "Total Site Targets",
+        "Total Process Targets",
+        "Total Integrated Targets",
+    }
+    mask_total = original_names.isin(total_names)
+    mask_utility = original_names.isin(["Total Site Targets", "Total Process Targets"])
+    filtered["scope"] = original_names.astype(str)
+    filtered.loc[mask_total, "scope"] = project_name
+    filtered.loc[~mask_total, "scope"] = (
+        project_name + "/" + original_names[~mask_total].astype(str)
     )
-    filtered.loc[original_names == "Total Process Targets", "name"] = (
-        f"{project_name}/Total Process Target"
-    )
-    filtered.loc[original_names == "Total Integrated Targets", "name"] = (
-        f"{project_name}/Direct Integration"
-    )
-    mask_direct = ~original_names.isin(
-        ["Total Site Targets", "Total Process Targets", "Total Integrated Targets"]
-    )
-    filtered.loc[mask_direct, "name"] = (
-        original_names[mask_direct].astype(str) + "/Direct Integration"
-    )
+    filtered["zone_type"] = ZoneType.P.value
+    filtered.loc[mask_total, "zone_type"] = ZoneType.S.value
+    filtered["integration_type"] = IntegrationType.Process.value
+    filtered.loc[mask_utility, "integration_type"] = IntegrationType.Utility.value
+    filtered["target_method"] = TargetMethod.HeatExchange.value
+    filtered = filtered.drop(columns=["name"])
     return filtered
 
 
@@ -202,16 +208,12 @@ def _summary_field_data(
     value: Any,
     *,
     unit: Optional[str],
-    project_name: str,
-    record_name: str,
 ) -> Any:
     if column_name == "pinch_temp":
         return _temp_pinch_data(
             value,
             unit=unit,
-            is_total_process_target=(
-                record_name == f"{project_name}/Total Process Target"
-            ),
+            is_total_process_target=False,
         )
     if column_name == "degree_of_integration":
         if value is None or pd.isna(value):

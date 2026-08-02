@@ -8,6 +8,99 @@
 
 ---
 
+## Indirect Target Terminology Implementation Authorization
+**Timestamp**: 2026-07-18T16:15:53Z
+**User Input**: "PLEASE IMPLEMENT THIS PLAN:
+# Correct Indirect-Target Terminology and Summary Metadata
+
+## Summary
+
+Remove `TotalSiteTarget` entirely. A Total Site target is an `IndirectIntegrationTarget` whose scope is a Zone of type `Site`; it does not need a separate runtime class.
+
+Separate the internal immediate-subzone aggregate from the public indirect result, and replace record-name-based summaries with explicit scope and classification fields.
+
+## Target Model and API Changes
+
+- Rename `OpenPinch/analysis/targeting/total_site.py` to `indirect.py`; remove the old module without a compatibility shim.
+- Rename `TotalProcessTarget` to `SubzoneAggregateTarget`.
+  - Store it under `TargetType.SA = \"Subzone Aggregate\"`.
+  - Continue using it internally to sum the Direct Integration targets of immediate subzones.
+  - Mark it non-reportable.
+- Replace `TotalSiteTarget` with `IndirectIntegrationTarget` for every eligible Zone type.
+  - Store it under `TargetType.II = \"Indirect\"`.
+  - Its internal record name becomes `<scope>/Indirect`, such as `Site/Indirect` or `Site/Bleaching/Indirect`.
+- Remove `TotalSiteTarget`, `TotalProcessTarget`, `TargetType.TS`, `TargetType.TZ`, and the unused `TargetType.RT` from the domain union, exports, imports, selectors, and tests.
+- Rename `compute_total_subzone_utility_targets` to `compute_subzone_aggregate_target`.
+- Keep `compute_indirect_integration_targets` as the generic indirect calculation, returning `IndirectIntegrationTarget`.
+- Update HPR, refrigeration, power, exergy, energy-transfer, graph, and service-orchestration code to use `TargetType.II`.
+- Preserve `indirect_heat_integration(...)` for Process, Site, Community, and Region scopes supported by the current traversal.
+- Preserve `total_site_heat_integration(...)` as a convenience workflow, but require its selected Zone to be type `Site`; return the same `IndirectIntegrationTarget` produced by `indirect_heat_integration(...)`.
+- Apply the same Site-only validation to all-period and workspace/batch Total Site convenience methods.
+- Keep `all_heat_integration()` child-first, producing an `IndirectIntegrationTarget` at every eligible aggregation level.
+- Use a clean break for Python imports, enum members, class names, and selectors. Historical workbook labels may still be normalized at the input-adapter boundary.
+
+## Summary and Reporting Contract
+
+- Add explicit public metadata to reportable targets:
+  - `scope`: canonical `Zone.address`, so the root is `Site` and nested repeated names remain unique.
+  - `zone_type`: `Site`, `Process Zone`, `Unit Operation`, and so forth.
+  - `integration_type`: `Process` or `Utility`.
+  - `target_method`: `Heat Exchange`, `Heat Pump`, `Refrigeration`, or `Energy Transfer`.
+- Populate classifications consistently:
+  - Direct Integration → `Process` / `Heat Exchange`
+  - Indirect Integration → `Utility` / `Heat Exchange`
+  - Direct Heat Pump → `Process` / `Heat Pump`
+  - Indirect Heat Pump → `Utility` / `Heat Pump`
+  - Direct Refrigeration → `Process` / `Refrigeration`
+  - Indirect Refrigeration → `Utility` / `Refrigeration`
+  - Energy Transfer → selected base route / `Energy Transfer`
+- Keep runtime record names private to target dictionaries and graph joins.
+- Remove record names from `TargetResults`, report metrics, and summary tables.
+- Exclude `SubzoneAggregateTarget` from `TargetOutput.targets`, reports, metrics, summaries, dashboards, and Excel summary sheets.
+- Replace the `Target` column in compact, detailed, comparison, workspace, batch, and Excel summaries with:
+  - `Scope`
+  - `Zone Type`
+  - `Integration Type`
+  - `Target Method`
+- Replace `ReportMetric.target_name` with the same metadata fields.
+- Align multi-period rows using `(scope, zone_type, integration_type, target_method, row_type)` rather than internal record names.
+- Replace comparison APIs’ `target_name` selector with explicit scope, Zone type, integration type, and target method selectors.
+- Default summary comparison to the root `Process` / `Heat Exchange` row when selectors are omitted.
+- Leave graph schemas and scientific plot names unchanged; update graph titles and target metadata from `Total Site Target` to `Indirect`.
+- Update notebooks and documentation that reference the old module, classes, enum values, target names, or `Target` summary column.
+
+## Test Plan
+
+- Assert `IndirectIntegrationTarget` is the only indirect-integration runtime class at Process, Site, Community, and Region levels.
+- Assert `TotalSiteTarget`, `TotalProcessTarget`, `TargetType.TS`, and `TargetType.TZ` are unavailable.
+- Assert Site indirect records are internally named `Site/Indirect`.
+- Verify `total_site_heat_integration()` and `indirect_heat_integration()` produce equivalent `IndirectIntegrationTarget` results for a Site.
+- Verify `total_site_heat_integration(zone=<non-Site>)` raises a clear scope error while generic indirect targeting succeeds.
+- Verify `SubzoneAggregateTarget` remains available internally on applicable Zones but never appears in public outputs.
+- Verify summaries contain the four new metadata columns, omit `Target`, and uniquely identify repeated nested Zone names.
+- Verify heat-exchange rows use `Target Method = \"Heat Exchange\"`.
+- Cover direct and indirect heat exchange, HPR, refrigeration, energy transfer, exergy, cogeneration, power, graphs, comparison helpers, workspaces, batches, Excel exports, JSON round trips, and weighted multi-period summaries.
+- Verify legacy workbook labels normalize into the new target representation.
+- Re-run the existing hierarchy regression:
+  - Total Site duties remain approximately 180,094.613 kW hot and 82,979.376 kW cold.
+  - Hot and Cold CC duties retain the corrected hierarchy-level identities.
+  - The Notebook 2 SUGCC retains the LPS ledge near 138.5 °C.
+- Run focused targeting/reporting tests, Notebook 2 execution, the complete non-solver suite, Ruff checks, documentation build, package build, and installed-wheel smoke test.
+
+## Workflow and Assumptions
+
+- Treat this as one bounded brownfield targeting/reporting contract unit.
+- Reuse current reverse-engineering artifacts and perform standard Requirements Analysis because the change intentionally breaks public target/reporting symbols.
+- Skip User Stories, NFR Design, Infrastructure Design, and Operations.
+- Update all AI-DLC audit, state, planning, implementation, and build/test records with same-interaction checkbox tracking.
+- Preserve targeting mathematics, graph coordinates, and both pairs of per-Zone net-stream collections.
+- “Total Site target” remains valid domain terminology for an indirect result at Site scope, but is not represented by a distinct Python class or target type."
+**AI Response**: "Accepted the approved plan as standard Requirements Analysis, Workflow Planning, and Code Generation Part 1 authorization. Created checkbox-tracked requirements, execution, and code-generation artifacts and began the domain and indirect-analysis rename."
+**Status**: Code Generation Part 2 started
+**Context**: INCEPTION complete; CONSTRUCTION - indirect-target terminology unit
+
+---
+
 ## Serialized HEN TargetInput Implementation Approval
 **Timestamp**: 2026-07-17T04:19:28Z
 **User Input**: """PLEASE IMPLEMENT THIS PLAN:
@@ -3014,5 +3107,653 @@ How do I resolve this failed test on Github that is fine locally."
 **AI Response**: "Recorded explicit approval of the Build and Test results. Closed the focused AI-DLC workflow with Operations marked N/A because the repair changes only test isolation and requires no deployment, monitoring, or runtime operational work."
 **Status**: Workflow complete
 **Context**: CONSTRUCTION complete; OPERATIONS N/A. The local CI-equivalent regression, module, Ruff, and patch-hygiene gates are approved. The actual GitHub Actions rerun remains an external post-push confirmation.
+
+---
+
+## Repository Issue Scan - Workspace Detection
+**Timestamp**: 2026-07-18T01:45:28Z
+**User Input**: "Scan the repo for issues."
+**AI Response**: "Started a read-only repository review covering correctness, public contracts, tests, packaging, documentation, and maintainability. Loaded the mandatory AI-DLC common rules and welcome message, reused the current brownfield reverse-engineering context, and confirmed a clean develop worktree aligned with origin/develop at 9420bc79. No application-code mutation is authorized or planned for this scan."
+**Context**: INCEPTION - Workspace Detection complete. Existing reverse-engineering artifacts will be reused for focused analysis. Security and Resiliency remain disabled; partial PBT remains enabled. Requirements are exceptionally clear for a read-only audit, so no clarification file is required.
+
+---
+
+## Repository Issue Scan - Findings and Verification
+**Timestamp**: 2026-07-18T01:55:02Z
+**User Input**: "No new user input; completed the requested read-only scan."
+**AI Response**: "Identified six actionable issues: PinchProblem.problem_data exposes mutable cached input that can diverge from the prepared runtime model; the OpenHENS comparison prerequisite can import and accept modules from a different checkout; second-resolution workbook names collide; unsanitized workspace case names can escape the requested batch export directory; set_dt_cont_multiplier on an unloaded problem raises an internal AttributeError; and current AI-DLC state/reverse-engineering documents still describe the removed OpenPinch.main.pinch_analysis_service contract. Confirmed the first five behavioral findings with source inspection and isolated runtime probes. Ruff passed, 167 focused non-solver tests passed, and git diff hygiene passed. No application code was changed."
+**Test Status**: Pass for existing focused gates; the reported behaviors are uncovered contract gaps
+**Context**: Read-only repository audit complete. Security and Resiliency extensions were disabled and therefore skipped. Partial Property-Based Testing was not applicable because no generated behavioral domain or application change was made. The mandatory audit entry is the only worktree modification from this scan.
+
+---
+
+## Repository Issue Scan - Suggested Fixes
+**Timestamp**: 2026-07-18T01:58:59Z
+**User Input**: "Suggest fixes."
+**AI Response**: "Prepared implementation-ready recommendations for all six findings without changing application code: contain and encode batch export directories independently of case display names; return detached problem_data snapshots and require explicit rebuilding mutation paths; load OpenHENS through an exact-checkout context with module-origin verification; allocate collision-resistant workbook filenames; use the prepared-root-zone guard in set_dt_cont_multiplier; and refresh active AI-DLC state and reverse-engineering API documentation while preserving explicitly historical records. Each recommendation includes focused regression coverage and an implementation order."
+**Context**: Advisory follow-up to the completed read-only repository audit. No approval to implement was inferred. Security and Resiliency remain disabled; partial Property-Based Testing would apply only if implementation introduces a generated identifier or path domain worth property-testing.
+
+---
+
+## Repository Issue Remediation - Requirements and Workflow Planning
+**Timestamp**: 2026-07-18T02:10:26Z
+**User Input**: "Make a plan"
+**AI Response**: "Interpreted the direct planning request as approval to formalize the six reproduced findings and previously suggested clean-break fixes. Created standard-depth requirements and a dependency-ordered execution plan covering workspace identifier validation and export containment, detached problem input snapshots, consistent multiplier guards, atomic workbook allocation, exact OpenHENS checkout identity, current-documentation repair, regression tests, fixed-seed generated path coverage, and repository verification gates. No application code was changed."
+**Status**: Workflow plan complete; explicit plan approval pending
+**Context**: INCEPTION - Requirements Analysis and Workflow Planning complete. User Stories, broad Application Design, NFR Design, and Infrastructure Design are recommended to skip. Units Generation, focused Functional Design, Code Generation, and Build and Test are recommended to execute. Security and Resiliency remain disabled; partial PBT applies to generated case-name/path containment tests.
+
+---
+
+## Repository Issue Remediation - Workflow Plan Approval Prompt
+**Timestamp**: 2026-07-18T02:10:26Z
+**AI Prompt**: "Please review the repository issue remediation execution plan. Request changes, add a skipped stage, or approve and continue to Units Generation."
+**Status**: Awaiting user response
+**Context**: INCEPTION - Workflow Planning approval gate
+
+---
+
+## Repository Issue Remediation - Workflow Plan Approval
+**Timestamp**: 2026-07-18T02:17:59Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded explicit workflow-plan approval. On loading the mandatory Units Generation rules, identified that Application Design is a required prerequisite whenever Units Generation executes. Corrected the workflow without expanding remediation scope and generated a minimal existing-boundary Application Design for review before unit decomposition."
+**Status**: Workflow plan approved; Application Design review pending
+**Context**: INCEPTION - Workflow Planning approved. Application Design changed from SKIP to EXECUTE solely to satisfy the mandatory Units Generation prerequisite.
+
+---
+
+## Repository Issue Remediation - Application Design Approval Prompt
+**Timestamp**: 2026-07-18T02:18:50Z
+**AI Prompt**: "Please review the repository issue remediation Application Design artifacts. Request changes or approve and continue to Units Generation Part 1."
+**Status**: Awaiting user response
+**Context**: INCEPTION - Application Design approval gate. The design retains existing public boundaries and adds only internal validation, isolation, allocation, and drift-guard responsibilities.
+
+---
+
+## Repository Issue Remediation - Application Design Approval
+**Timestamp**: 2026-07-18T02:25:22Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded explicit Application Design approval and created Units Generation Part 1. The decomposition plan defines three non-deployable units inside the existing package, evaluates every mandatory grouping category, records dependencies and ownership, and provides the mandatory artifact-generation checklist."
+**Status**: Application Design approved; Units Generation Part 1 approval pending
+**Context**: INCEPTION - Application Design complete. Units Generation Part 1 planning complete; no unit artifacts have been generated yet.
+
+---
+
+## Repository Issue Remediation - Unit Plan Approval Prompt
+**Timestamp**: 2026-07-18T02:25:22Z
+**AI Prompt**: "Unit of work plan complete. Review the plan in aidlc-docs/inception/plans/unit-of-work-plan.md. Ready to proceed to generation?"
+**Status**: Awaiting user response
+**Context**: INCEPTION - Units Generation Part 1 approval gate
+
+---
+
+## Repository Issue Remediation - Unit Plan Approval and Generation
+**Timestamp**: 2026-07-18T02:38:53Z
+**User Input**: "Go"
+**AI Response**: "Interpreted 'Go' as approval option A from the unit plan and generated all three mandatory unit artifacts. Defined responsibilities, inputs, outputs, exclusions, dependencies, delivery order, testing checkpoints, and complete FR/NFR/acceptance traceability for Application State and Filesystem Contracts, Exact OpenHENS Checkout Loading, and Current Documentation and Drift Guards. Marked every generation-plan checkbox complete in the same interaction."
+**Status**: Units Generation artifacts complete; final unit approval pending
+**Context**: INCEPTION - Units Generation Part 2 complete. The dependency graph is acyclic, all requirements are assigned, and no unit creates a deployable service or root export.
+
+---
+
+## Repository Issue Remediation - Units Generation Approval Prompt
+**Timestamp**: 2026-07-18T02:38:53Z
+**AI Prompt**: "Please review the Units Generation artifacts in aidlc-docs/inception/application-design/. Request changes or approve and continue to the Construction phase."
+**Status**: Awaiting user response
+**Context**: INCEPTION - Units Generation final approval gate
+
+---
+
+## Repository Issue Remediation - Units Generation Approval
+**Timestamp**: 2026-07-18T02:47:13Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded explicit Units Generation approval and entered Construction with Unit 1 Functional Design. Generated the required business logic, business rules, and domain entity artifacts for workspace identity and path containment, detached problem input, prepared-root multiplier behavior, and exclusive workbook allocation. The approved requirements resolved all design choices, so no unanswered design questions remain."
+**Status**: Units Generation approved; Unit 1 Functional Design review pending
+**Context**: CONSTRUCTION - Unit 1 Application State and Filesystem Contracts. Security and Resiliency extensions remain disabled. Partial PBT applies to generated case-identifier/path invariants.
+
+---
+
+## Unit 1 Application State and Filesystem Contracts - Functional Design Approval Prompt
+**Timestamp**: 2026-07-18T02:47:13Z
+**AI Prompt**: "Please review the Unit 1 Functional Design artifacts. Choose Request Changes or Continue to Next Stage."
+**Status**: Awaiting user response
+**Context**: CONSTRUCTION - Functional Design standardized two-option approval gate
+
+---
+
+## Unit 1 Application State and Filesystem Contracts - Functional Design Approval
+**Timestamp**: 2026-07-18T02:51:36Z
+**User Input**: "Continue to Next Stage"
+**AI Response**: "Recorded explicit Unit 1 Functional Design approval. NFR Requirements, NFR Design, and Infrastructure Design remain skipped under the approved workflow. Created an eleven-step regression-first Code Generation plan with exact brownfield files, FR/NFR traceability, fixed-seed property coverage, focused verification, structural review, and same-turn checkbox enforcement. No production or test code was changed."
+**Status**: Functional Design approved; Code Generation Part 1 approval pending
+**Context**: CONSTRUCTION - Unit 1 Code Generation planning
+
+---
+
+## Unit 1 Application State and Filesystem Contracts - Code Generation Plan Approval Prompt
+**Timestamp**: 2026-07-18T02:51:36Z
+**AI Prompt**: "Please review the Unit 1 Code Generation plan at aidlc-docs/construction/plans/application-state-filesystem-contracts-code-generation-plan.md. Choose Request Changes or Continue to Next Stage to approve all eleven generation steps."
+**Status**: Awaiting user response
+**Context**: CONSTRUCTION - Code Generation Part 1 standardized two-option approval gate
+
+---
+
+## Unit 1 Application State and Filesystem Contracts - Code Generation Plan Approval
+**Timestamp**: 2026-07-18T02:57:14Z
+**User Input**: "Continue to Next Stage"
+**AI Response**: "Recorded explicit approval of all eleven Unit 1 Code Generation steps and started Part 2 with the required brownfield implementation/test reread and focused baseline."
+**Status**: Code Generation Part 1 approved; Part 2 in progress
+**Context**: CONSTRUCTION - Unit 1 Code Generation Step 1
+
+---
+
+## Unit 1 Application State and Filesystem Contracts - Code Generation Completion
+**Timestamp**: 2026-07-18T03:49:39Z
+**User Input**: "No new user input; completed the approved eleven-step Unit 1 generation plan."
+**AI Response**: "Implemented strict shared workspace case-name validation, resolved batch export containment, detached problem_data snapshots, prepared-root multiplier guards, and exclusive workbook reservation with failed-write cleanup. Added regression-first unit, property, concurrency, symlink, serialization, and contract coverage. The integrated Unit 1 suite passed 203 tests with Hypothesis seed 20260715; 34 HEN serialization/round-trip/root-boundary tests passed; Ruff lint/format and patch hygiene passed. Generated the implementation summary and marked every plan checkbox complete."
+**Status**: Unit 1 Code Generation complete; generated-code approval pending
+**Context**: CONSTRUCTION - Unit 1 Application State and Filesystem Contracts. Complete repository gates remain deferred until all units finish.
+
+---
+
+## Unit 1 Application State and Filesystem Contracts - Generated Code Approval Prompt
+**Timestamp**: 2026-07-18T03:49:39Z
+**AI Prompt**: "Please review the generated Unit 1 code and implementation summary. Choose Request Changes or Continue to Next Stage to approve Unit 1 and proceed to Unit 2 Functional Design."
+**Status**: Awaiting user response
+**Context**: CONSTRUCTION - Code Generation standardized two-option approval gate
+
+---
+
+## Unit 1 Approval and Remaining Workflow Authorization
+**Timestamp**: 2026-07-18T04:31:44Z
+**User Input**: "Continue to Completion"
+**AI Response**: "Recorded approval of Unit 1 generated code and explicit authorization to carry the remaining approved workflow through completion without pausing at each intermediate review gate. Began Unit 2 Exact OpenHENS Checkout Loading Functional Design and Code Generation planning."
+**Status**: Unit 1 approved; Unit 2 in progress; remaining approved gates authorized through completion
+**Context**: CONSTRUCTION - transition from Unit 1 to Unit 2
+
+---
+
+## Unit 2 Exact OpenHENS Checkout Loading - Functional Design and Code Plan Authorization
+**Timestamp**: 2026-07-18T04:31:44Z
+**User Input**: "Continue to Completion"
+**AI Response**: "Applied the user's completion authorization to the standardized Unit 2 review gates. Generated the exact-checkout functional design and a regression-first seven-step Code Generation plan. NFR Requirements, NFR Design, and Infrastructure Design remain skipped under the approved workflow because the unit introduces no dependency, stack, performance target, service, or infrastructure change."
+**Status**: Unit 2 Functional Design and Code Generation Part 1 approved; Part 2 started
+**Context**: CONSTRUCTION - Unit 2 Exact OpenHENS Checkout Loading
+
+---
+
+## Unit 2 Exact OpenHENS Checkout Loading - Code Generation Completion
+**Timestamp**: 2026-07-18T04:37:10Z
+**User Input**: "No new user input; continued under the user's explicit 'Continue to Completion' authorization."
+**AI Response**: "Implemented a scoped OpenHENS import transaction that removes ambient cached modules, prioritizes the requested checkout, validates every required module origin and callable, injects the verified OpenHENS factory into unchanged execution logic, and restores sys.path and sys.modules on all exits. Added five regression-first checks. Corrected a Unit 1 architecture violation found by the broader dependency gate by retaining export containment through standard path functions without importing pathlib in the application layer. Eight focused prerequisite tests and 123 integrated application/architecture/packaging tests passed with seed 20260715; Ruff and patch hygiene passed."
+**Status**: Unit 2 Code Generation complete and approved under completion authorization; Unit 3 started
+**Context**: CONSTRUCTION - Unit 2 Exact OpenHENS Checkout Loading
+
+---
+
+## Unit 3 Current Documentation and Drift Guards - Code Plan Authorization
+**Timestamp**: 2026-07-18T04:37:10Z
+**User Input**: "Continue to Completion"
+**AI Response**: "Applied the user's completion authorization to Unit 3. Confirmed Functional Design is not applicable because the unit changes documentation and repository assertions only, with no new business logic or data model. NFR and Infrastructure stages also remain skipped. Generated a six-step regression-first Code Generation plan covering active state, current reverse-engineering artifacts, scoped stale-symbol guards, content validation, and focused documentation checks."
+**Status**: Unit 3 Code Generation Part 1 approved; Part 2 started
+**Context**: CONSTRUCTION - Unit 3 Current Documentation and Drift Guards
+
+---
+
+## Unit 3 Current Documentation and Drift Guards - Code Generation Completion
+**Timestamp**: 2026-07-18T04:45:13Z
+**User Input**: "No new user input; continued under the user's explicit 'Continue to Completion' authorization."
+**AI Response**: "Refreshed the active AI-DLC status and six current reverse-engineering artifacts to document the canonical root-only workflow entry points and concrete application, domain, contracts, analysis, optimisation, adapters, and presentation owners. Removed retired package/service claims, selector workflows, and captured shell-error contamination while preserving historical state and audit records. Added a scoped drift guard. Validated five Mermaid diagrams with text alternatives; 70 documentation, architecture, and entrypoint tests passed; Ruff, stale-symbol, and patch checks passed."
+**Status**: Unit 3 complete and approved under completion authorization; Build and Test started
+**Context**: CONSTRUCTION - Unit 3 Current Documentation and Drift Guards
+
+---
+
+## Repository Issue Remediation - Build and Test Completion
+**Timestamp**: 2026-07-18T04:56:22Z
+**User Input**: "No new user input; completed under the user's explicit 'Continue to Completion' authorization."
+**AI Response**: "Completed the approved Build and Test stage. The fixed-seed non-solver suite passed 2,180 tests with 3 guarded skips and 4 solver deselections. The focused non-external OpenHENS/HEN profile passed 458 tests with 4 solver deselections. Ruff lint and format passed across 460 Python files; patch and current-contract scans had no findings. Sphinx 9.1.0 built 53 sources from a clean temporary destination with warnings treated as errors. OpenPinch 0.5.2 wheel and source archives built successfully, and the wheel passed workflow, resource, root-API, retired-package, and CLI smoke from a temporary Python 3.14 site-packages environment outside the checkout. Removed only the verified ignored docs/_build cache; it is reproducible. Updated all plan checkboxes, requirements traceability, state, summary, and audit records."
+**Build Status**: Success
+**Test Status**: Pass
+**Files Generated or Refreshed**:
+- `aidlc-docs/construction/build-and-test/build-instructions.md`
+- `aidlc-docs/construction/build-and-test/unit-test-instructions.md`
+- `aidlc-docs/construction/build-and-test/integration-test-instructions.md`
+- `aidlc-docs/construction/build-and-test/performance-test-instructions.md`
+- `aidlc-docs/construction/build-and-test/build-and-test-summary.md`
+**Status**: Build and Test approved under completion authorization; Operations N/A; workflow complete
+**Context**: CONSTRUCTION - Build and Test completion and OPERATIONS - N/A
+
+---
+
+## Repository Issue Remediation - Post-Gate Contract Finding
+**Timestamp**: 2026-07-18T04:56:22Z
+**User Input**: "No new user input; continued under the user's explicit 'Continue to Completion' authorization."
+**AI Response**: "A final read-only probe found that PinchWorkspaceBundle accepted generic Mapping inputs, while its pre-validator inspected only dict. MappingProxyType could therefore carry an unsafe case key past validation. Reopened completion, added a regression first, and began a bounded correction."
+**Status**: Completion temporarily reopened; post-gate contract correction in progress
+**Context**: CONSTRUCTION - workspace bundle validation edge case
+
+---
+
+## Repository Issue Remediation - Post-Gate Contract Closure
+**Timestamp**: 2026-07-18T05:03:07Z
+**User Input**: "No new user input; completed under the user's explicit 'Continue to Completion' authorization."
+**AI Response**: "Changed PinchWorkspaceBundle pre-validation from concrete dict checks to collections.abc.Mapping checks and added a MappingProxyType regression. The regression failed before the fix. Afterward, 158 focused workspace/contracts/API tests passed; repository Ruff and format checks passed; the corrected 0.5.2 wheel and source archive rebuilt; the reinstalled wheel passed its standard smoke and explicit unsafe generic-mapping rejection probe. The final complete fixed-seed non-solver suite passed 2,181 tests with 3 guarded skips and 4 solver deselections in 148.03 seconds. Updated all reopened checkboxes and final evidence."
+**Status**: Post-gate finding closed; Build and Test pass; Operations N/A; workflow complete
+**Context**: CONSTRUCTION - final contract correction and verification
+
+---
+
+## Notebook Improvement - Initial Request and Workspace Detection Start
+**Timestamp**: 2026-07-18T05:31:03Z
+**User Input**: "Notebook improvement"
+**AI Response**: "Started a new adaptive workflow, displayed the required welcome message, loaded the common workflow rules and extension opt-in prompts, and began brownfield workspace detection and session-continuity review."
+**Context**: INCEPTION - Workspace Detection
+
+---
+
+## Notebook Improvement - Workspace Detection Complete
+**Timestamp**: 2026-07-18T05:32:39Z
+**User Input**: "Notebook improvement"
+**AI Response**: "Confirmed a brownfield Python library with 18 packaged tutorial notebooks, a generator script, current reverse-engineering artifacts, and a completed prior workflow. Reused the current reverse-engineering context and automatically proceeded to standard-depth Requirements Analysis. Preserved all existing uncommitted notebook changes and the untracked generated workspace file."
+**Status**: Workspace Detection complete; Reverse Engineering reused; Requirements Analysis started
+**Context**: INCEPTION - Workspace Detection and Requirements Analysis transition
+
+---
+
+## Notebook Improvement - Requirements Questions Prompt
+**Timestamp**: 2026-07-18T05:32:39Z
+**AI Prompt**: "Please complete all nine questions in aidlc-docs/inception/requirements/notebook-improvement-requirement-verification-questions.md by filling each [Answer]: tag, then confirm when finished."
+**Status**: Awaiting user answers
+**Context**: INCEPTION - Requirements Analysis Step 6 gate. Existing notebook edits remain untouched. Security, Resiliency, and Property-Based Testing configuration will be recorded after the opt-in answers are received.
+
+---
+
+## Notebook Improvement - Requirements Answers Received
+**Timestamp**: 2026-07-18T05:51:16Z
+**User Input**: "Done"
+**AI Response**: "Read and validated all nine requirements answers. Confirmed scope across all 18 packaged tutorials, generator authority, comprehensive unattended demonstrations, full execution-profile verification, Security and Resiliency opt-out, and partial Property-Based Testing. Verified that the previously observed notebook edits and generated workspace file are gone. Identified one material ambiguity between improving or retaining outputs and the repository's source-only notebook contract, plus a related choice between inline and exported demonstrations."
+**Status**: Initial answers valid; clarification required before requirements generation
+**Context**: INCEPTION - Requirements Analysis answer validation and ambiguity detection
+
+---
+
+## Notebook Improvement - Requirements Clarification Prompt
+**Timestamp**: 2026-07-18T05:51:16Z
+**AI Prompt**: "Please complete both questions in aidlc-docs/inception/requirements/notebook-improvement-requirements-clarification-questions.md by filling each [Answer]: tag, then confirm when finished."
+**Status**: Awaiting clarification answers
+**Context**: INCEPTION - Requirements Analysis Step 6 clarification gate. Partial PBT rules PBT-02, PBT-03, PBT-07, PBT-08, and PBT-09 are loaded; they are N/A for this clarification artifact.
+
+---
+
+## Notebook Improvement - Clarification Answers and Requirements Generation
+**Timestamp**: 2026-07-18T05:54:20Z
+**User Input**: "Done"
+**AI Response**: "Validated both clarification answers. Resolved the presentation contract in favor of source-only committed notebooks whose execution visibly renders a relevant inline plot or table followed by engineering interpretation. Generated standard-depth requirements covering all 18 generator-owned tutorials, unattended execution, all declared profiles, curriculum preservation, deterministic generation, validation, and partial PBT applicability."
+**Status**: Requirements artifact complete; explicit approval pending
+**Context**: INCEPTION - Requirements Analysis Steps 7 through 9
+
+---
+
+## Notebook Improvement - Requirements Approval Prompt
+**Timestamp**: 2026-07-18T05:54:20Z
+**AI Prompt**: "Please review aidlc-docs/inception/requirements/notebook-improvement-requirements.md. Choose Request Changes or Approve & Continue to User Stories."
+**Status**: Awaiting user response
+**Context**: INCEPTION - Requirements Analysis explicit approval gate
+
+---
+
+## Notebook Improvement - Requirements Approval
+**Timestamp**: 2026-07-18T05:58:41Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded explicit approval of the notebook improvement requirements. Performed the mandatory User Stories assessment and selected the stage because all 18 customer-facing tutorials change the learner workflow. Created the story-generation plan with five methodology questions, breakdown trade-offs, mandatory personas and stories artifacts, INVEST verification, traceability, and same-turn checkbox tracking."
+**Status**: Requirements approved; User Stories Part 1 awaiting planning answers
+**Context**: INCEPTION - Requirements Analysis approval and User Stories Planning
+
+---
+
+## Notebook Improvement - Story Planning Questions Prompt
+**Timestamp**: 2026-07-18T05:58:41Z
+**AI Prompt**: "Please complete all five questions in aidlc-docs/inception/plans/notebook-improvement-story-generation-plan.md by filling each [Answer]: tag, then confirm when finished."
+**Status**: Awaiting user answers
+**Context**: INCEPTION - User Stories Part 1 planning questions gate
+
+---
+
+## Notebook Improvement - Story Planning Answers Received
+**Timestamp**: 2026-07-18T06:06:28Z
+**User Input**: "Done"
+**AI Response**: "Validated all five story-planning answers. Resolved the methodology as two personas, one story per notebook, profile-based grouping, and Given/When/Then criteria with direct traceability. Confirmed that profile grouping and notebook granularity are complementary rather than contradictory. Marked the answer-validation checklist step complete in the same interaction."
+**Status**: Planning answers valid; explicit plan approval pending
+**Context**: INCEPTION - User Stories Part 1 answer analysis
+
+---
+
+## Notebook Improvement - Story Plan Approval Prompt
+**Timestamp**: 2026-07-18T06:06:28Z
+**AI Prompt**: "Please complete the approval choice in aidlc-docs/inception/plans/notebook-improvement-story-plan-approval-questions.md, then confirm when finished."
+**Status**: Awaiting explicit plan approval
+**Context**: INCEPTION - User Stories Part 1 approval gate
+
+---
+
+## Notebook Improvement - Story Plan Approval and Generation
+**Timestamp**: 2026-07-18T06:09:28Z
+**User Input**: "Go"
+**AI Response**: "Interpreted 'Go' as explicit approval option A, consistent with the completed approval artifact. Generated two personas and 18 notebook-level stories grouped by base, slow-HPR, solver, and interactive profiles. Added three Given/When/Then scenarios to every story, complete requirements traceability, persona mapping, INVEST verification, and extension compliance. Marked every story-generation plan checkbox complete in the same interaction."
+**Status**: User Stories Part 1 approved; Part 2 generation complete; generated artifacts awaiting approval
+**Context**: INCEPTION - User Stories generation and review gate
+
+---
+
+## Notebook Improvement - Generated User Stories Approval Prompt
+**Timestamp**: 2026-07-18T06:09:28Z
+**AI Prompt**: "Please review aidlc-docs/inception/user-stories/notebook-improvement/stories.md and personas.md. Choose Request Changes or Approve & Continue to Workflow Planning."
+**Status**: Awaiting explicit approval
+**Context**: INCEPTION - User Stories final approval gate
+
+---
+
+## Notebook Improvement - User Stories Approval and Completion Authorization
+**Timestamp**: 2026-07-18T06:16:45Z
+**User Input**: "Approve & Continue till completion. "
+**AI Response**: "Recorded explicit approval of the generated personas and 18 user stories, plus authorization to continue through all remaining approved-scope gates without pausing. Created and approved the Workflow Planning artifact. Selected one generator-owned Code Generation unit and Build and Test; skipped Application Design, Units Generation, Functional Design, NFR Requirements, NFR Design, and Infrastructure Design because no new component, model, business logic, technology, service, or infrastructure is required."
+**Status**: User Stories and Workflow Planning approved; Code Generation planning started
+**Context**: INCEPTION completion and transition to CONSTRUCTION
+
+---
+
+## Notebook Improvement - Workflow Plan Approval
+**Timestamp**: 2026-07-18T06:16:45Z
+**AI Prompt**: "Review the notebook improvement execution plan or continue under the user's explicit completion authorization."
+**User Response**: "Approve & Continue till completion. "
+**Status**: Approved under explicit completion authorization
+**Context**: Workflow plan executes Code Generation and Build and Test; all other remaining stages are skipped with documented rationale.
+
+---
+
+## Notebook Improvement - Code Generation Plan Authorization
+**Timestamp**: 2026-07-18T06:16:45Z
+**User Input**: "Approve & Continue till completion. "
+**AI Response**: "Created and approved a ten-step regression-first Code Generation plan for the single Notebook Presentation unit. The plan covers presentation contracts, canonical generator definitions, result retention, regeneration, all execution profiles, integrated packaging and documentation verification, partial PBT, patch review, and implementation summary."
+**Status**: Code Generation Part 1 approved; Part 2 started
+**Context**: CONSTRUCTION - Notebook Presentation Code Generation
+
+---
+
+## Notebook Improvement - Code Generation Step 1 Baseline
+**Timestamp**: 2026-07-18T06:16:45Z
+**User Input**: "No new user input; continued under the user's explicit completion authorization."
+**AI Response**: "Ran the focused notebook and tutorial coverage baseline with Hypothesis seed 20260715: 19 tests passed and 3 optional-profile tests skipped. Ran the canonical generator and confirmed no generator, packaged-notebook, or notebook-test diff. Marked both Step 1 checkboxes complete in the same interaction."
+**Status**: Code Generation Step 1 complete; Step 2 regression creation started
+**Context**: CONSTRUCTION - Notebook Presentation baseline
+
+---
+
+## Notebook Improvement - Code Generation Step 2 Regressions
+**Timestamp**: 2026-07-18T06:16:45Z
+**User Input**: "No new user input; continued under the user's explicit completion authorization."
+**AI Response**: "Added regression-first checks requiring one explicit review section and display cell per notebook, review placement before interpretation, in-process generator repeatability, and a domain-specific Hypothesis invariant over canonical tutorial names. The pre-change run produced exactly the two intended failures while 16 controls passed and 3 optional profiles skipped; Hypothesis shrank to notebook 01 under seed 20260715. Marked all Step 2 checkboxes complete."
+**Status**: Code Generation Step 2 complete; Steps 3 and 4 implementation in progress
+**Context**: CONSTRUCTION - Notebook Presentation regression-first checkpoint
+
+---
+
+## Notebook Improvement - Code Generation Steps 3 through 6
+**Timestamp**: 2026-07-18T06:16:45Z
+**User Input**: "No new user input; continued under the user's explicit completion authorization."
+**AI Response**: "Added 18 canonical subject-specific presentation definitions, inserted one review Markdown and display cell before interpretation in every notebook, retained required summaries/comparisons/rankings without duplicate analysis, and made in-process generation detached and repeatable. Generated exactly 18 source-only notebooks twice with identical SHA-256 output. The focused structural, Hypothesis, coverage, compilation, and ten-notebook base execution gate passed 22 tests with 3 optional-profile skips under seed 20260715. Ruff import validation and the focused generator repeatability check passed. Marked Steps 3 through 6 complete."
+**Status**: Code Generation Steps 3 through 6 complete; optional profiles in progress
+**Context**: CONSTRUCTION - Notebook Presentation implementation and base verification
+
+---
+
+## Notebook Improvement - Code Generation Step 7 Optional Profiles
+**Timestamp**: 2026-07-18T06:16:45Z
+**User Input**: "No new user input; continued under the user's explicit completion authorization."
+**AI Response**: "Executed every optional tutorial profile. The four slow-HPR notebooks passed their selected profile in 213.71 seconds, the three external-solver HEN notebooks passed in 164.50 seconds, and the interactive reporting/export notebook passed in 8.55 seconds. Each parametrized run reported one selected pass and two expected non-selected skips; no profile-specific correction was required. Marked all Step 7 checkboxes complete."
+**Status**: Code Generation Step 7 complete; integrated verification started
+**Context**: CONSTRUCTION - Notebook Presentation optional profiles
+
+---
+
+## Notebook Improvement - Code Generation Completion
+**Timestamp**: 2026-07-18T06:16:45Z
+**User Input**: "No new user input; continued under the user's explicit completion authorization."
+**AI Response**: "Completed integrated packaging verification with 84 passed and 3 optional-profile skips. Ruff lint and format, Markdown and JSON parsing, public-import, dependency-diff, duplicate-file, patch-hygiene, and source-only checks passed. Documented full PBT compliance, generated the implementation summary, marked all remaining Code Generation and story checkboxes complete, and applied the user's completion authorization to the generated-code approval gate."
+**Status**: Notebook Presentation Code Generation complete and approved; Build and Test started
+**Context**: CONSTRUCTION - Code Generation completion and transition to Build and Test
+
+---
+
+## Notebook Improvement - Build and Test Completion
+**Timestamp**: 2026-07-18T06:44:11Z
+**User Input**: "No new user input; completed under the user's explicit 'Approve & Continue till completion. ' authorization."
+**AI Response**: "Completed the required Build and Test stage. The complete fixed-seed non-solver suite passed 2,184 tests with 3 optional-profile skips and 4 solver deselections in 163.54 seconds. The focused notebook suite passed 22 tests; all slow-HPR, external-solver, and interactive profiles passed; the integrated packaging suite passed 84 tests. Repository Ruff passed across 460 Python files. Sphinx built 53 sources with warnings treated as errors. OpenPinch 0.5.3 wheel and source archives built with all 18 notebooks, and the installed wheel passed workflow, resource, root-API, retired-package, notebook, and CLI smoke outside the checkout. Generated all required build/test instructions and summary, completed every plan checkbox, and closed Operations as N/A."
+**Build Status**: Success
+**Test Status**: Pass
+**Files Generated**:
+- `aidlc-docs/construction/notebook-presentation/build-and-test/build-instructions.md`
+- `aidlc-docs/construction/notebook-presentation/build-and-test/unit-test-instructions.md`
+- `aidlc-docs/construction/notebook-presentation/build-and-test/integration-test-instructions.md`
+- `aidlc-docs/construction/notebook-presentation/build-and-test/performance-test-instructions.md`
+- `aidlc-docs/construction/notebook-presentation/build-and-test/build-and-test-summary.md`
+**Status**: Build and Test approved under completion authorization; Operations N/A; workflow complete
+**Context**: CONSTRUCTION - Build and Test completion and OPERATIONS - N/A
+
+---
+
+## Total Site Profiles Diagnostic Investigation
+**Timestamp**: 2026-07-18T10:42:42Z
+**User Input**: "Notebook #2 shows an underlying issue with the Hot CC and Cold CC on total site plot. The Hot Utility duty must equal the Cold CC duty (which is clearly wrong), and vice versa. The issue will likely be the construction of the Hot CC and Cold CC from the GCC segments coming from the subzones. Investigate to see if the issue can be found."
+**AI Response**: "Reproduced the Notebook 2 Total Site profile mismatch and traced it to hierarchical targeting state. A Process Zone indirect solve replaces that zone's direct-GCC-derived net streams with its Unit Operation child profiles. The subsequent Site solve reuses those overwritten child-level profiles while summing Process Zone direct utility targets. A controlled replay that restored each immediate Process Zone's direct profiles reduced the Hot Utility versus Cold CC and Cold Utility versus Hot CC duty residuals from 59,168.043 kW to rounding-level residuals of 0.103 kW and 0.0623 kW. No production-code fix was made because the request was diagnostic."
+**Context**: Diagnostic follow-up to Notebook Improvement; Total Site profile source-of-truth mismatch identified
+
+---
+
+## Total Site Profile Hierarchy Fix - Implementation Authorization
+**Timestamp**: 2026-07-18T10:59:46Z
+**User Input**: "PLEASE IMPLEMENT THIS PLAN:
+# Fix Total Site Profile Hierarchy-Level Duty Mismatch
+
+## Summary
+
+Correct Total Site profile construction so each aggregation level uses the same immediate subzone Direct Integration targets for both process composite curves and utility duties.
+
+The fix will eliminate mutable hierarchy-state leakage while preserving current user-facing APIs, graph labels, target values, and notebook workflows.
+
+## Implementation Changes
+
+- Add an analysis helper that reconstructs net hot/cold segments from each immediate subzone’s current Direct Integration target using its `H(net)-actual` GCC, targeted utilities, and selected period.
+- Namespace and combine those reconstructed segments into fresh `StreamCollection` objects. Do not read potentially overwritten `subzone.net_*` collections.
+- Make Total Site targeting use these fresh collections for the Hot CC and Cold CC while continuing to derive utility profiles from the same immediate subzone DI targets.
+- Retain the existing `zone.net_*` fallback for zones without children, preserving low-level callers and existing unit-test usage.
+- Remove mutating child-profile imports from normal indirect targeting and multi-period indirect HPR preparation.
+- Establish `zone.net_hot_streams` and `zone.net_cold_streams` as the zone’s own direct-GCC-derived profiles; indirect targeting must no longer overwrite them with child aggregates.
+- Leave graph serialization and presentation unchanged. No new public fields, schemas, notebook calls, or target methods are required.
+
+## Test Plan
+
+- Add a three-level Site → Process Zone → Unit Operation regression where Unit Operation utility totals differ from the integrated Process Zone targets.
+- Poison child `zone.net_*` state deliberately and verify Total Site curves are still reconstructed from the child DI targets.
+- Assert these invariants using `rtol=1e-6` and `abs=0.2 kW` to accommodate current stream reconstruction and graph rounding:
+  - Cold CC duty equals the summed immediate-subzone Hot Utility duty.
+  - Hot CC duty equals the summed immediate-subzone Cold Utility duty.
+- Add a `pulp_mill.json` regression confirming:
+  - Cold CC changes from 271,599.431 kW to approximately 212,431.388 kW.
+  - Hot CC changes from 174,484.194 kW to approximately 115,316.151 kW.
+  - The 59,168.043 kW overstatement disappears.
+  - Final Total Site targets remain approximately 180,094.613 kW hot utility and 82,979.376 kW cold utility.
+- Verify `all_heat_integration()` followed by focused `total_site_heat_integration()` is idempotent.
+- Verify each Process Zone retains its own direct net profiles after its indirect target is calculated.
+- Cover single-period and multi-period indirect/HPR preparation, empty-net-profile behavior, and zones without subzones.
+- Run focused targeting, graph, service-orchestration, multi-scale, multi-period, and Notebook 2 execution tests, followed by the non-solver suite and Ruff checks.
+
+## Workflow and Assumptions
+
+- Treat this as a bounded brownfield bug fix with minimal Requirements Analysis and one targeting-state implementation unit.
+- Skip User Stories, Application Design, NFR Design, Infrastructure Design, and Operations because there is no new capability, public contract, dependency, or deployment change.
+- Update the AI-DLC audit, state, code-generation plan, implementation summary, and build/test records with same-interaction checkbox tracking.
+- Preserve all existing notebook improvements and unrelated working-tree files, including the Excel lock file.
+- Do not solve the issue by always rerunning Direct Integration targets; reconstruction from the already-current DI target is the deterministic source-of-truth approach."
+**AI Response**: "Started the approved bounded bug-fix workflow, reused current brownfield and reverse-engineering context, completed minimal Requirements Analysis and Workflow Planning, created and approved the single-unit Code Generation plan, retained disabled Security and Resiliency extensions, and applied partial PBT to the reconstruction invariant."
+**Status**: Inception approved; Code Generation Part 1 approved; regression-first implementation started
+**Context**: Total Site Profile Hierarchy Fix
+
+---
+
+## Total Site Profile Hierarchy Fix - Regression-First Checkpoint
+**Timestamp**: 2026-07-18T10:59:46Z
+**User Input**: "No new user input; continued under the approved implementation plan."
+**AI Response**: "Ran the focused baseline with 96 passing tests. Added three-level `pulp_mill` regressions for exact Total Site process-profile duties, poisoned child state, idempotence, and Process Zone direct-profile ownership. Added a fixed-seed Hypothesis invariant for duty conservation and mutable-state independence. The checkpoint produced exactly the intended failures: the two example regressions exposed 59,168.043 kW and poisoned-state mismatches, while idempotence remained a passing control; Hypothesis shrank to one 1 kW hot/cold profile and failed because the planned reconstruction helper was absent."
+**Status**: Code Generation Step 1 complete; deterministic reconstruction implementation started
+**Context**: CONSTRUCTION - regression-first Total Site hierarchy checkpoint
+
+---
+
+## Total Site Profile Hierarchy Fix - Implementation and Focused Targeting
+**Timestamp**: 2026-07-18T10:59:46Z
+**User Input**: "No new user input; continued under the approved implementation plan."
+**AI Response**: "Implemented deterministic reconstruction of immediate-child net profiles from current Direct Integration targets, preserved period context and no-child fallback behavior, canonicalized reconstructed temperatures to the target table's four-decimal precision, and removed mutating child-profile imports from normal and multi-period indirect targeting. The focused targeting, graph, hierarchy, multi-period, HPR, example-based, and fixed-seed PBT set passed 114 tests."
+**Status**: Code Generation Steps 2 and 3 complete; Step 4 focused verification in progress
+**Context**: CONSTRUCTION - Total Site hierarchy implementation
+
+---
+
+## Total Site Profile Hierarchy Fix - Focused Verification
+**Timestamp**: 2026-07-18T11:13:24Z
+**User Input**: "No new user input; continued under the approved implementation plan."
+**AI Response**: "Completed Code Generation Step 4. The focused targeting, direct-targeting, graph, service-orchestration, multi-scale, multi-period, HPR preparation, hierarchy regression, and fixed-seed property suite passed 114 tests. Notebook 2 executed successfully with 1 passing notebook test and 9 deselected profiles. Ruff passed on every changed Python file."
+**Status**: Code Generation Step 4 complete; integrated Build and Test started
+**Context**: CONSTRUCTION - focused verification for Total Site hierarchy fix
+
+---
+
+## Total Site Profile Hierarchy Fix - Build and Test Completion
+**Timestamp**: 2026-07-18T11:22:41Z
+**User Input**: "No new user input; continued under the approved implementation plan."
+**AI Response**: "Completed Code Generation Step 5 and Build and Test. The first complete run passed the implementation tests but exposed transient execution state in the already-modified Notebook 4; cleared only execution counts and outputs, preserved notebook source and metadata improvements, and reran from a clean invocation. Final evidence: 2,189 fixed-seed non-solver tests passed with 3 optional-profile skips and 4 solver deselections; 84 packaging/resource tests passed with 3 optional-profile skips; Notebook 2 passed; repository Ruff lint and format passed across 461 Python files; OpenPinch 0.5.3 wheel and source distributions built; direct wheel API/resource smoke and patch hygiene passed. Generated implementation and all five Build and Test records, completed every remaining plan and state checkbox, and closed Operations as N/A."
+**Status**: Complete
+**Context**: CONSTRUCTION - Build and Test complete; OPERATIONS - N/A
+
+---
+
+## Total Site Profile State-Model Review
+**Timestamp**: 2026-07-18T11:25:14Z
+**User Input**: "There should be two net_* collections per zone.
+1) is a collection of the net segments derived from the gcc of the present zone
+2) is a collection of the net segments from the immediate subzones.
+
+Check this is explicit in the changes."
+**AI Response**: "Reviewed the Zone state model and all net-profile reads and writes. The distinction is not explicit in the current implementation: Zone owns only one hot/cold net-profile pair for its own Direct Integration GCC, while immediate-subzone profiles are reconstructed into transient local collections inside Total Site targeting. The prior mutating import was removed, but no second named per-zone pair was added. Reported the required model correction and affected tests without changing production code."
+**Status**: Review complete; explicit second per-zone net-profile pair is a confirmed follow-up gap
+**Context**: Total Site Profile Hierarchy Fix - state ownership review
+
+---
+
+## Total Site Profile State-Model Correction Reopened
+**Timestamp**: 2026-07-18T14:58:16Z
+**User Input**: "Add the second pair of net streams to Zone."
+**AI Response**: "Reopened the completed hierarchy-fix unit and its AI-DLC checklist. Updated the requirement to make both per-zone profile pairs explicit: the existing `net_hot_streams` / `net_cold_streams` remain the present zone's Direct Integration GCC profiles, while new `subzone_net_hot_streams` / `subzone_net_cold_streams` will persist profiles reconstructed from immediate subzone Direct Integration targets. Started regression-first domain, targeting, period-context, and state-ownership work."
+**Status**: Code Generation Step 6 reopened; regression-first implementation started
+**Context**: CONSTRUCTION - explicit second per-zone net-profile pair
+
+---
+
+## Total Site Second-Pair Regression-First Checkpoint
+**Timestamp**: 2026-07-18T14:58:16Z
+**User Input**: "No new user input; continued under the approved second-pair correction."
+**AI Response**: "Added domain regressions for four independent net-profile collections, period propagation, and immediate-child imports that preserve the own-zone pair. Added property, Total Site persistence, three-level duty, and poisoned-state assertions for the new second pair. The checkpoint failed in seven expected places because Zone does not yet expose or preserve the requested immediate-subzone pair; 30 controls passed."
+**Status**: Code Generation Step 6 regression-first items complete; Zone implementation started
+**Context**: CONSTRUCTION - explicit second per-zone net-profile pair
+
+---
+
+## Total Site Second-Pair Implementation Checkpoint
+**Timestamp**: 2026-07-18T14:58:16Z
+**User Input**: "No new user input; continued under the approved second-pair correction."
+**AI Response**: "Added persistent `subzone_net_hot_streams` and `subzone_net_cold_streams` collections and properties to every Zone, included their period propagation, and added the combined `subzone_net_process_streams` view. Net-profile imports now populate the immediate-subzone pair without replacing the zone's own Direct Integration pair. Total Site reconstruction refreshes and stores the second pair from immediate child DI targets while retaining the no-child own-profile fallback. The regression-first gate now passes 37 tests."
+**Status**: Code Generation Step 6 implementation complete; focused verification started
+**Context**: CONSTRUCTION - explicit second per-zone net-profile pair
+
+---
+
+## Total Site Second-Pair Focused Verification
+**Timestamp**: 2026-07-18T14:58:16Z
+**User Input**: "No new user input; continued under the approved second-pair correction."
+**AI Response**: "Passed 141 expanded domain, targeting, graph, service-orchestration, multi-scale, multi-period, HPR preparation, and hierarchy tests with fixed Hypothesis seed 20260715. Notebook 2 passed its base execution profile with nine unrelated profiles deselected. Focused Ruff lint and format checks passed for all six changed Python files."
+**Status**: Focused verification complete; complete Build and Test gate started
+**Context**: CONSTRUCTION - explicit second per-zone net-profile pair
+
+---
+
+## Total Site Second-Pair Build and Test Completion
+**Timestamp**: 2026-07-18T15:07:45Z
+**User Input**: "No new user input; continued under the approved second-pair correction."
+**AI Response**: "Completed the reopened Code Generation Step 6 and Build and Test. Every Zone now owns independent own-GCC and immediate-subzone hot/cold net-profile pairs with period propagation and explicit properties. The complete fixed-seed non-solver suite passed 2,189 tests with 3 optional-profile skips and 4 solver deselections in 171.65 seconds; the packaging/resource suite passed 84 tests with 3 optional-profile skips; repository Ruff lint and format passed across 461 Python files; Notebook 2 passed; patch hygiene passed; OpenPinch 0.5.3 wheel and source distributions built; and a direct wheel smoke verified the two pairs are independently exposed. Updated the implementation summary, Build and Test evidence, state, audit, and all reopened plan checkboxes."
+**Status**: Complete
+**Context**: CONSTRUCTION - explicit second per-zone net-profile pair complete; OPERATIONS - N/A
+
+---
+
+## Notebook 2 LPS Utility-GCC Ledge Diagnostic
+**Timestamp**: 2026-07-18T15:30:24Z
+**User Input**: "The utility gcc for the site is now slightly wrong in Notebook #2. The should be a visible ledge at ~138 degC representing LPS utility. Instead it is directly connected to the start of the HPS."
+**AI Response**: "Reproduced Notebook 2 and traced the utility cascade through graph rendering. The Total Process utility inputs are correct: LPS contributes 15,994.542 kW from 138.525358 degC to 138.425358 degC, and the raw utility cascade contains the ledge. Deterministic process-profile reconstruction contributes a 138.5254 degC grid row while the utility cascade contributes 138.525358 degC. Total Site graph serialization rounds both to 138.5254 degC, creating consecutive duplicate coordinates. `clean_composite_curve` does not remove the duplicate pair safely and drops the constant-enthalpy corner, so graph segmentation joins HPS directly to the end of LPS as a diagonal. A read-only simulation that removes consecutive duplicate coordinate pairs before collinearity cleanup restores the missing point at H=27,253.7105 kW, T=138.5254 degC and the visible LPS ledge without changing any target value. No production code was changed."
+**Status**: Root cause diagnosed; graph-cleanup correction requires implementation authorization
+**Context**: Notebook 2 Total Site SUGCC presentation regression
+
+---
+
+## Notebook 2 LPS Utility-GCC Ledge Fix Authorized
+**Timestamp**: 2026-07-18T15:32:02Z
+**User Input**: "Go and fix it."
+**AI Response**: "Reopened the hierarchy-fix Code Generation and Build and Test records for the authorized graph correction. Added requirements and a Step 7 regression-first checklist to preserve internal SUGCC corners after rounding, restore the HPS-to-LPS vertical connection and LPS ledge, retain target values, and repeat focused and complete verification."
+**Status**: Code Generation Step 7 reopened; regression-first implementation started
+**Context**: CONSTRUCTION - Notebook 2 rounded SUGCC utility ledge
+
+---
+
+## Notebook 2 LPS Ledge Regression-First Checkpoint
+**Timestamp**: 2026-07-18T15:32:02Z
+**User Input**: "No new user input; continued under the authorized graph correction."
+**AI Response**: "Added a generic graph-cleanup regression that requires the internal constant-enthalpy corner to survive a consecutive duplicate point, and a `pulp_mill.json` regression that requires separate HPS connector and LPS ledge segments. Both tests failed as intended because the current cleanup drops the 27,253.71 kW, 138.5254 degC corner."
+**Status**: Code Generation Step 7 regression-first items complete; graph cleanup implementation started
+**Context**: CONSTRUCTION - Notebook 2 rounded SUGCC utility ledge
+
+---
+
+## Notebook 2 LPS Ledge Implementation Checkpoint
+**Timestamp**: 2026-07-18T15:32:02Z
+**User Input**: "No new user input; continued under the authorized graph correction."
+**AI Response**: "Updated `clean_composite_curve` to remove only consecutive points whose enthalpy and temperature coordinates are both exactly identical before existing collinearity cleanup. This preserves the internal vertical corner while leaving edge trimming and utility-segment classification unchanged. All 39 graph and Total Site hierarchy tests pass, including both new regressions."
+**Status**: Code Generation Step 7 implementation complete; focused verification started
+**Context**: CONSTRUCTION - Notebook 2 rounded SUGCC utility ledge
+
+---
+
+## Notebook 2 LPS Ledge Focused Verification
+**Timestamp**: 2026-07-18T15:32:02Z
+**User Input**: "No new user input; continued under the authorized graph correction."
+**AI Response**: "Passed 145 expanded domain, targeting, graph, presentation, service-orchestration, multi-scale, multi-period, HPR preparation, and hierarchy tests. Notebook 2 passed its base execution profile with nine unrelated profiles deselected. Focused Ruff lint and format checks passed for the graph implementation and regression files."
+**Status**: Focused verification complete; complete Build and Test gate started
+**Context**: CONSTRUCTION - Notebook 2 rounded SUGCC utility ledge
+
+---
+
+## Notebook 2 LPS Ledge Build and Test Completion
+**Timestamp**: 2026-07-18T15:40:00Z
+**User Input**: "No new user input; continued under the authorized graph correction."
+**AI Response**: "Completed Code Generation Step 7 and Build and Test. Consecutive identical graph coordinates are now removed before collinearity cleanup, preserving the HPS-to-LPS constant-enthalpy connector and approximately 138.5 degC LPS ledge without changing utility duties or Total Site targets. The complete fixed-seed non-solver suite passed 2,191 tests with 3 optional-profile skips and 4 solver deselections in 172.73 seconds; 84 packaging/resource tests passed with 3 optional-profile skips; Notebook 2 passed; repository Ruff lint and format passed across 461 Python files; patch hygiene passed; OpenPinch 0.5.3 wheel and source distributions built; and direct wheel smoke retained the 27,253.7105 kW, 138.5254 degC corner. Updated all implementation, Build and Test, state, audit, and plan evidence."
+**Status**: Complete
+**Context**: CONSTRUCTION - Notebook 2 rounded SUGCC utility ledge complete; OPERATIONS - N/A
+
+---
+
+## Indirect Target Terminology Implementation Completion
+**Timestamp**: 2026-07-18T16:54:40Z
+**User Input**: "No new user input; continued under the approved indirect-target terminology implementation plan."
+**AI Response**: "Removed the old Total Site module, classes, and TS/TZ/RT enum members; implemented IndirectIntegrationTarget and non-reportable SubzoneAggregateTarget; migrated targeting, advanced analysis, reporting, comparison, multi-period, workspace, batch, graph, adapter, notebook, documentation, and expected-output contracts to explicit Scope, Zone Type, Integration Type, and Target Method metadata. Added Site-only validation across focused, all-period, workspace, and batch Total Site conveniences while retaining generic indirect targeting at Process Zone, Site, Community, and Region scopes. Notebook 2 retained 180,094.613 kW hot and 82,979.376 kW cold targets and the 138.5 degC LPS ledge. Final evidence: 2,195 fixed-seed non-solver tests passed with 3 optional-profile skips and 4 solver deselections; 84 packaging tests passed with 3 skips; warning-free Sphinx, Ruff, formatting, stale-symbol, patch-hygiene, distribution, and isolated-wheel gates passed. Generated implementation and Build and Test records and completed all plan and state checkboxes."
+**Status**: Complete
+**Context**: CONSTRUCTION - indirect-target terminology and reporting contract complete; OPERATIONS - N/A
 
 ---

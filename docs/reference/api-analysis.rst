@@ -28,7 +28,7 @@ The analysis stack typically runs in this order:
    workflow.
 4. :mod:`OpenPinch.analysis.targeting.direct`
    computes direct integration targets for unit-operation and process zones.
-5. :mod:`OpenPinch.analysis.targeting.total_site`
+5. :mod:`OpenPinch.analysis.targeting.indirect`
    aggregates solved subzones into site-style indirect integration targets when
    the hierarchy requires it.
 6. :mod:`OpenPinch.analysis.graphs.service` converts solved tables and
@@ -71,7 +71,7 @@ constructed.
 .. automodule:: OpenPinch.analysis.targeting.direct
    :members:
 
-.. automodule:: OpenPinch.analysis.targeting.total_site
+.. automodule:: OpenPinch.analysis.targeting.indirect
    :members:
 
 Problem Tables, Utility Allocation, and Graph Data

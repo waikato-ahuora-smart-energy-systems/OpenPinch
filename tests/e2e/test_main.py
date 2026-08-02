@@ -39,7 +39,11 @@ def test_pinch_problem_returns_stable_target_output_structure() -> None:
     assert list(dumped) == ["name", "period_id", "targets", "graphs", "design"]
     assert dumped["name"] == "Contract"
     assert len(dumped["targets"]) == 1
-    assert dumped["targets"][0]["name"] == "Contract/Direct Integration"
+    assert dumped["targets"][0]["scope"] == "Contract"
+    assert dumped["targets"][0]["zone_type"] == "Site"
+    assert dumped["targets"][0]["integration_type"] == "Process"
+    assert dumped["targets"][0]["target_method"] == "Heat Exchange"
+    assert "name" not in dumped["targets"][0]
     assert _scalar_value(dumped["targets"][0]["Qh"]) == pytest.approx(749.9999950000001)
     assert _scalar_value(dumped["targets"][0]["Qc"]) == pytest.approx(1000.0)
     assert _scalar_value(dumped["targets"][0]["Qr"]) == pytest.approx(5150.000005)

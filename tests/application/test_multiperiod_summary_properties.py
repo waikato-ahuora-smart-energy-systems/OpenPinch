@@ -34,9 +34,9 @@ def test_weighted_summary_preserves_order_range_and_inputs(case):
 
     weighted = weighted_average_output(case.outputs, case.weights)
 
-    assert [target.name for target in weighted.targets] == [
-        "Site/Direct Heat Integration",
-        "Process/Direct Heat Integration",
+    assert [target.scope for target in weighted.targets] == [
+        "Site",
+        "Site/Process",
     ]
     hot_utility = weighted.targets[0].Qh.value
     tolerance = max(1.0, max(case.primary_hot_utility)) * 1e-12
@@ -64,8 +64,8 @@ def test_weighted_summary_is_invariant_to_weight_scale(case):
         tuple(weight * 7.0 for weight in case.weights),
     )
 
-    assert [target.name for target in scaled.targets] == [
-        target.name for target in baseline.targets
+    assert [target.scope for target in scaled.targets] == [
+        target.scope for target in baseline.targets
     ]
     for baseline_target, scaled_target in zip(
         baseline.targets,

@@ -1,7 +1,10 @@
 {
     "targets": [
         {
-            "name": "Dairy/Direct Integration",
+            "scope": "Site/Dairy",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 85.0,

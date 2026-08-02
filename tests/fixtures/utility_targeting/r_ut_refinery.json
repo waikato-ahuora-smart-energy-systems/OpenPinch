@@ -1,7 +1,10 @@
 {
     "targets": [
         {
-            "name": "Refinery/Direct Integration",
+            "scope": "Site/Refinery",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 261.0,

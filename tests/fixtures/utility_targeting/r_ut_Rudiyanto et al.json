@@ -1,7 +1,10 @@
 {
     "targets": [
         {
-            "name": "Plant/Direct Integration",
+            "scope": "Site/Plant",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 51.087500000000006,

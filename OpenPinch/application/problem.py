@@ -476,7 +476,10 @@ class PinchProblem:
         self,
         other_problem: "PinchProblem",
         *,
-        target_name: Optional[str] = None,
+        scope: Optional[str] = None,
+        zone_type: Optional[str] = None,
+        integration_type: Optional[str] = None,
+        target_method: Optional[str] = None,
         base_label: str = "Base case",
         other_label: str = "Scenario",
     ) -> pd.DataFrame:
@@ -486,7 +489,10 @@ class PinchProblem:
             _build_numeric_summary_frame(
                 other_problem._summary_results(periods="selected")
             ),
-            target_name=target_name,
+            scope=scope,
+            zone_type=zone_type,
+            integration_type=integration_type,
+            target_method=target_method,
             base_label=base_label,
             other_label=other_label,
         )
@@ -508,8 +514,8 @@ class PinchProblem:
 
     @property
     def problem_data(self) -> Optional[TargetInput | JsonDict]:
-        """Return the raw problem definition that was loaded or supplied."""
-        return self._problem_data
+        """Return a detached snapshot of the loaded raw problem definition."""
+        return deepcopy(self._problem_data)
 
     @property
     def results(self) -> Optional[TargetOutput]:
@@ -579,11 +585,12 @@ class PinchProblem:
                 UserWarning,
             )
             resolved_value = 1.0
-        self._master_zone.get_subzone(zone_name).dt_cont_multiplier = resolved_value
+        root_zone = self._require_prepared_root_zone()
+        root_zone.get_subzone(zone_name).dt_cont_multiplier = resolved_value
         self._results = None  # Clear cached results since multipliers have changed
         self._last_target_run_spec = None
         self._period_results = {}
-        return self._master_zone
+        return root_zone
 
     def update_options(
         self,

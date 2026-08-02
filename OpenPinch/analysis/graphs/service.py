@@ -20,6 +20,8 @@ def get_output_graph_data(
     """Return serialized graph sets for one zone hierarchy."""
     graph_sets = {} if graph_sets is None else graph_sets
     for target in zone.targets.values():
+        if not target.reportable:
+            continue
         graph_sets[target.name] = _create_graph_set(target, zone=zone)
     for subzone in zone.subzones.values():
         get_output_graph_data(subzone, graph_sets)

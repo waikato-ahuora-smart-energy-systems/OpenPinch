@@ -12,7 +12,7 @@ from ...domain.targets import (
     BaseTargetModel,
     DirectIntegrationTarget,
     HeatPumpTargetBase,
-    TotalSiteTarget,
+    IndirectIntegrationTarget,
     UtilitySummaryTarget,
 )
 from ...domain.value import Value
@@ -23,7 +23,7 @@ def target_to_result(
     isTotal: bool = False,
 ) -> TargetResults:
     """Return the external reporting model for one runtime target."""
-    if not isinstance(target, UtilitySummaryTarget):
+    if not target.reportable or not isinstance(target, UtilitySummaryTarget):
         raise NotImplementedError(
             f"Reporting is not defined for {type(target).__name__}."
         )
@@ -43,7 +43,7 @@ def target_to_result(
                 "total_cost": _metric(target, "total_cost"),
             }
         )
-    if isinstance(target, TotalSiteTarget):
+    if isinstance(target, IndirectIntegrationTarget):
         return result.model_copy(
             update={
                 "work_target": _metric(target, "work_target"),
@@ -118,7 +118,10 @@ def _utility_summary_result(
             metric_name="degree_of_integration",
         )
     return TargetResults(
-        name=target.name,
+        scope=target.scope,
+        zone_type=target.zone_type,
+        integration_type=target.integration_type,
+        target_method=target.target_method,
         period_idx=target.period_idx,
         period_id=target.period_id,
         degree_of_integration=degree_of_integration,

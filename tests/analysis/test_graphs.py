@@ -412,7 +412,7 @@ def test_create_graph_set_includes_remaining_graph_families_from_static_fixture(
     table = _graph_fixture("base_table")
     target = SimpleNamespace(
         name="Site/Total Site",
-        type=TargetType.TS.value,
+        type=TargetType.II.value,
         period_id="annual",
         zone_name="TargetZone",
         graphs={
@@ -566,6 +566,38 @@ def test_clean_composite_keeps_non_linear_middle_point_when_x_values_repeat():
 
     assert np.allclose(x_clean, [0.0, 5.0, 0.0])
     assert np.allclose(y_clean, [100.0, 90.0, 80.0])
+
+
+def test_clean_composite_preserves_corner_after_consecutive_duplicate_point():
+    y_clean, x_clean = clean_composite_curve(
+        y_array=[
+            280.0,
+            279.2455,
+            279.0,
+            138.5254,
+            138.5254,
+            138.4254,
+            138.4254,
+            80.0,
+            70.0,
+        ],
+        x_array=[
+            180094.613,
+            64778.462,
+            27253.7105,
+            27253.7105,
+            27253.7105,
+            11265.8857,
+            11259.168,
+            11259.168,
+            0.0,
+        ],
+    )
+
+    assert any(
+        np.isclose(x, 27253.7105) and np.isclose(y, 138.5254)
+        for x, y in zip(x_clean, y_clean)
+    )
 
 
 def test_clean_composite_curve_ends_0():

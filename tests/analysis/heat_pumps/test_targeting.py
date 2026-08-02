@@ -344,7 +344,7 @@ def test_get_hpr_targets_forwards_selected_idx_to_preprocessing(monkeypatch):
 def test_compute_indirect_hpr_uses_idx_not_period_id_for_utility_profile(monkeypatch):
     zone = Zone(name="Plant", type=ZoneType.S.value, config=Configuration())
     zone.set_period_context({"0": 0, "peak": 1}, [1.0, 1.0], 2)
-    zone.targets[TargetType.TS.value] = SimpleNamespace(
+    zone.targets[TargetType.II.value] = SimpleNamespace(
         pt=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]})
     )
     calls = {}
@@ -427,7 +427,7 @@ def test_indirect_hpr_load_uses_finite_utility_profile_when_base_target_has_nans
     monkeypatch,
 ):
     zone = Zone(name="Plant", type=ZoneType.S.value, config=Configuration())
-    zone.targets[TargetType.TS.value] = SimpleNamespace(
+    zone.targets[TargetType.II.value] = SimpleNamespace(
         pt=ProblemTable(
             {
                 ProblemTableLabel.T: [120.0, 60.0],
@@ -766,7 +766,7 @@ def test_compute_indirect_hpr_returns_none_when_utility_profile_has_no_load(
     monkeypatch,
 ):
     zone = Zone(name="Plant", type=ZoneType.S.value, config=Configuration())
-    zone.targets[TargetType.TS.value] = SimpleNamespace(
+    zone.targets[TargetType.II.value] = SimpleNamespace(
         pt=ProblemTable({ProblemTableLabel.T: [120.0, 60.0]})
     )
     monkeypatch.setattr(

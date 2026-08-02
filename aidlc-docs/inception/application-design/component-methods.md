@@ -105,3 +105,23 @@ attributes.
   ordered per-case outcomes with structured failures.
 - Active-case summary, metric, report, plot, export, configuration, and
   validation forwarding retains the corresponding `PinchProblem` signature.
+
+## Repository Issue Remediation Methods
+
+The names below are internal design signatures; they do not add root exports.
+
+- `validate_workspace_case_name(value: str) -> str` returns the original valid
+  identifier or raises `ValueError` for an unsafe/non-portable identifier.
+- `PinchProblem.problem_data -> TargetInput | JsonDict | None` returns a deep,
+  detached snapshot without changing the existing public type family.
+- `PinchProblem.set_dt_cont_multiplier(value, *, zone_name=None) -> Zone` first
+  resolves `_require_prepared_root_zone()` and retains its existing success
+  contract.
+- `_resolve_batch_export_directory(root: Path, case_name: str) -> Path` composes,
+  resolves, and verifies one contained case directory.
+- `_reserve_workbook_path(project_name: str, out_dir: str) -> Path` atomically
+  reserves a readable `.xlsx` path.
+- `_load_supported_openhens(openhens_root: Path) -> ContextManager[OpenHENSAPI]`
+  yields verified modules/callables and restores interpreter import state.
+- `_run_source_openhens(..., openhens_factory: Callable[..., Any])` consumes the
+  verified factory and performs no ambient `openhens` import.

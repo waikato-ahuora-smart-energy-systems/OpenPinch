@@ -30,7 +30,7 @@ from OpenPinch.domain.targets import (
     DirectHeatPumpTarget,
     DirectIntegrationTarget,
     IndirectHeatPumpTarget,
-    TotalSiteTarget,
+    IndirectIntegrationTarget,
 )
 from OpenPinch.presentation.reporting.results import serialize_target
 
@@ -111,11 +111,11 @@ def _make_direct_integration_target() -> DirectIntegrationTarget:
     )
 
 
-def _make_total_site_target() -> TotalSiteTarget:
+def _make_total_site_target() -> IndirectIntegrationTarget:
     config = _base_config()
-    return TotalSiteTarget(
+    return IndirectIntegrationTarget(
         zone_name="Plant",
-        type=TargetType.TS.value,
+        type=TargetType.II.value,
         config=config,
         pt=_ts_problem_table(),
         hot_utility_target=0.0,
@@ -298,7 +298,7 @@ def test_exergy_target_selection_and_column_helpers_cover_edge_cases():
 
     for target_type in (
         TargetType.DI.value,
-        TargetType.TS.value,
+        TargetType.II.value,
         TargetType.DHP.value,
         TargetType.IHP.value,
     ):

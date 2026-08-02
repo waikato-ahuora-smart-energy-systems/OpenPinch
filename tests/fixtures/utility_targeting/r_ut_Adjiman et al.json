@@ -1,7 +1,10 @@
 {
     "targets": [
         {
-            "name": "Adjiman/Direct Integration",
+            "scope": "Site/Adjiman",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 311.52000000000004,

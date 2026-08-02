@@ -130,6 +130,8 @@ def compute_direct_integration_targets(
         )
         | {
             "zone_name": zone.name,
+            "scope": zone.address,
+            "zone_type": zone.type,
             "type": TargetType.DI.value,
             "parent_zone": zone.parent_zone,
             "config": zone.config,

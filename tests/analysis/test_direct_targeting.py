@@ -15,7 +15,7 @@ from OpenPinch.analysis.targeting.direct import (
     should_update_balanced_composite_curves,
 )
 from OpenPinch.domain.configuration import tol
-from OpenPinch.domain.enums import ProblemTableLabel
+from OpenPinch.domain.enums import ProblemTableLabel, ZoneType
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream import Stream
 from OpenPinch.domain.stream_collection import StreamCollection
@@ -96,6 +96,8 @@ def test_compute_direct_integration_targets_uses_empty_area_payload_when_disable
     )
     zone = SimpleNamespace(
         name="Area",
+        address="Area",
+        type=ZoneType.P.value,
         parent_zone=None,
         period_ids=None,
         all_streams=StreamCollection(),

@@ -19,6 +19,8 @@ def _collect_targets(zone: Zone) -> dict[str, BaseTargetModel]:
 
     def _iter(current: Zone) -> Iterator[tuple[str, BaseTargetModel]]:
         for _, target in current.targets.items():
+            if not target.reportable:
+                continue
             yield target.name, target
         for subzone in current.subzones.values():
             yield from _iter(subzone)

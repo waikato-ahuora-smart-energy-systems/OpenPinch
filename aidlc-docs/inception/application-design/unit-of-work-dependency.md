@@ -21,3 +21,33 @@ are logical construction boundaries inside one distributable package, not
 independently deployable services. A later unit may reveal a defect in an
 earlier contract, but the correction is applied to the owning earlier unit and
 its regression tests before downstream work continues.
+
+## Repository Issue Remediation Dependencies
+
+| Unit | Direct dependencies | Downstream consumers | Delivery order |
+|---|---|---|---:|
+| 1. Application State and Filesystem Contracts | approved requirements and Application Design | Unit 3 documentation and repository gates | 1 |
+| 2. Exact OpenHENS Checkout Loading | approved requirements and Application Design | Unit 3 documentation and repository gates | 2 |
+| 3. Current Documentation and Drift Guards | final Unit 1 and Unit 2 contracts | final build/test evidence | 3 |
+
+### Update Strategy
+
+- **Approach**: logically parallel Unit 1 and Unit 2 ownership with sequential
+  implementation and review for diagnostic clarity.
+- **Critical path**: Unit 1, Unit 2, then Unit 3 and repository-wide gates.
+- **Coordination points**: architecture/stale-symbol tests and final package
+  verification consume both runtime units.
+- **Rollback**: each unit is independently revertible; Unit 3 documentation is
+  reverted with whichever runtime unit contract is reverted.
+- **Deployment**: one wheel/source distribution after all units; no independent
+  deployment or version skew is supported.
+
+### Testing Checkpoints
+
+1. Unit 1 focused application, contract, property, and reporting tests.
+2. Unit 2 isolated import/cache and comparison prerequisite tests.
+3. Unit 3 stale-symbol, architecture, documentation, packaging, and wheel tests.
+4. Complete fixed-seed non-solver and repository quality gates after all units.
+
+The graph is acyclic: Units 1 and 2 depend only on approved inception artifacts;
+Unit 3 depends on both runtime units; no edge returns to an earlier unit.

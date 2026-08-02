@@ -1,7 +1,10 @@
 {
     "targets": [
         {
-            "name": "Casein/Direct Integration",
+            "scope": "Site/Casein",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 78.5,
@@ -69,7 +72,10 @@
             ]
         },
         {
-            "name": "D4/Direct Integration",
+            "scope": "Site/D4",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 54.8,
@@ -137,7 +143,10 @@
             ]
         },
         {
-            "name": "D5/Direct Integration",
+            "scope": "Site/D5",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 53.0,

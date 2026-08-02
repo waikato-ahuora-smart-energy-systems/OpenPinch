@@ -1,7 +1,10 @@
 {
     "targets": [
         {
-            "name": "Aniline unit/Direct Integration",
+            "scope": "Site/Aniline unit",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 101.6,
@@ -55,7 +58,10 @@
             ]
         },
         {
-            "name": "Natural gas unit/Direct Integration",
+            "scope": "Site/Natural gas unit",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 840.4,
@@ -109,7 +115,10 @@
             ]
         },
         {
-            "name": "Nitrobenzene unit/Direct Integration",
+            "scope": "Site/Nitrobenzene unit",
+            "zone_type": "Process Zone",
+            "integration_type": "Process",
+            "target_method": "Heat Exchange",
             "pinch_temp": {
                 "cold_temp": {
                     "value": 101.0,
