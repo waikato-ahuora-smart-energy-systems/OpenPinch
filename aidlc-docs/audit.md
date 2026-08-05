@@ -3757,3 +3757,50 @@ Check this is explicit in the changes."
 **Context**: CONSTRUCTION - indirect-target terminology and reporting contract complete; OPERATIONS - N/A
 
 ---
+
+## Indirect Profile Precision Fix Authorization
+**Timestamp**: 2026-08-02T23:42:32Z
+**User Input**: "**Reconstruct indirect profiles from full-precision data**
+
+When a child cascade contains temperatures or enthalpies requiring more than four decimal places, this reconstructs the indirect profile from direct_target.pt, but direct._save_graph_data() has already rounded that table in place to four decimals. The previous path consumed the child zone's net streams, which were created before that rounding; the new path can therefore alter duties or collapse nearby temperature intervals, changing indirect targets for fine-resolution inputs. Preserve an unrounded cascade for reconstruction rather than consuming the graph-rounded table."
+**AI Response**: "Confirmed that direct graph extraction mutates both Problem Tables through in-place rounding and that indirect reconstruction applies a second temperature rounding step. Reused the current brownfield and extension decisions, documented minimal precision requirements and a regression-first code plan, and began implementation while preserving the unrelated Notebook 5 working-tree change."
+**Status**: Code Generation Part 2 started
+**Context**: INCEPTION complete; CONSTRUCTION - indirect profile precision fix
+
+---
+
+## Indirect Profile Precision Regression-First Checkpoint
+**Timestamp**: 2026-08-02T23:45:13Z
+**User Input**: "No new user input; continued under the approved precision correction."
+**AI Response**: "Added direct graph and indirect reconstruction regressions using temperatures 200.00004 and 200.00001 plus enthalpies requiring five decimal places. Both tests failed as intended: graph extraction mutated five full-precision cells and collapsed the nearby temperatures to 200.0, after which indirect reconstruction rejected the zero-width interval."
+**Status**: Code Generation Step 1 complete; implementation started
+**Context**: CONSTRUCTION - regression-first indirect profile precision fix
+
+---
+
+## Indirect Profile Precision Implementation Checkpoint
+**Timestamp**: 2026-08-02T23:46:07Z
+**User Input**: "No new user input; continued under the approved precision correction."
+**AI Response**: "Changed direct graph extraction to round deep-copied Problem Tables and removed reconstruction-time temperature rounding from immediate-subzone profiles. The two regression-first tests now pass, preserving exact source tables, a 0.00003 degC interval, and five-decimal duties while retaining four-decimal graph arrays. Focused Ruff lint and formatting pass."
+**Status**: Code Generation Step 2 complete; focused verification started
+**Context**: CONSTRUCTION - indirect profile precision implementation
+
+---
+
+## Indirect Profile Precision Focused Verification
+**Timestamp**: 2026-08-02T23:46:54Z
+**User Input**: "No new user input; continued under the approved precision correction."
+**AI Response**: "Completed Code Generation Step 3. The expanded direct, indirect, hierarchy, graph, service-orchestration, multi-scale, multi-period, HPR, and model round-trip matrix passed 158 tests with fixed Hypothesis seed 20260715. Focused Ruff lint and format checks passed, and the implementation summary was generated."
+**Status**: Code Generation Step 3 complete; integrated Build and Test started
+**Context**: CONSTRUCTION - focused verification for indirect profile precision
+
+---
+
+## Indirect Profile Precision Build and Test Completion
+**Timestamp**: 2026-08-02T23:52:09Z
+**User Input**: "No new user input; continued under the approved precision correction."
+**AI Response**: "Completed Code Generation Step 4 and Build and Test. Direct graph extraction now rounds copies while preserving full-precision runtime cascades, and indirect reconstruction no longer rounds child segment temperatures. Final evidence: 158 focused tests passed; the complete fixed-seed non-solver suite passed 2,197 tests with 3 optional-profile skips and 4 solver deselections; Notebook 2 passed with 9 unrelated profiles deselected; 84 packaging tests passed with 3 skips; repository Ruff lint and format, patch hygiene, OpenPinch 0.5.3 wheel and sdist build, and an isolated-wheel full-precision reconstruction smoke passed. The unrelated modified Notebook 5 was preserved untouched. Generated all implementation and Build and Test records and completed the workflow checkboxes."
+**Status**: Complete
+**Context**: CONSTRUCTION - indirect profile precision complete; OPERATIONS - N/A
+
+---

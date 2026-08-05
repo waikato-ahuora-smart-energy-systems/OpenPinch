@@ -27,9 +27,6 @@ __all__ = [
     "compute_indirect_integration_targets",
 ]
 
-_DIRECT_TARGET_GRAPH_DECIMALS = 4
-
-
 ################################################################################
 # Public API
 ################################################################################
@@ -235,15 +232,6 @@ def _reconstruct_subzone_direct_profiles(
                 idx=target_period_idx,
             )
         )
-        for stream in child_hot_streams + child_cold_streams:
-            stream.supply_temperature = np.round(
-                np.asarray(stream.supply_temperature, dtype=float),
-                decimals=_DIRECT_TARGET_GRAPH_DECIMALS,
-            )
-            stream.target_temperature = np.round(
-                np.asarray(stream.target_temperature, dtype=float),
-                decimals=_DIRECT_TARGET_GRAPH_DECIMALS,
-            )
         for key, stream in child_hot_streams.items():
             net_hot_streams.add(stream, key=f"{subzone.name}.{key}")
         for key, stream in child_cold_streams.items():

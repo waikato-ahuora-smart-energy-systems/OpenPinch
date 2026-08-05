@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import List, Tuple
 
 import numpy as np
@@ -374,23 +375,25 @@ def _find_next_available_utility(
 
 def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> dict:
     """Assemble the Problem Table slices required for composite/comparison plots."""
-    pt.round(decimals=4)
-    pt_real.round(decimals=4)
+    pt_graph = deepcopy(pt)
+    pt_real_graph = deepcopy(pt_real)
+    pt_graph.round(decimals=4)
+    pt_real_graph.round(decimals=4)
     return {
-        GraphType.CC.value: pt_real.slice(
+        GraphType.CC.value: pt_real_graph.slice(
             [ProblemTableLabel.T, ProblemTableLabel.H_HOT, ProblemTableLabel.H_COLD]
         ),
-        GraphType.SCC.value: pt.slice(
+        GraphType.SCC.value: pt_graph.slice(
             [ProblemTableLabel.T, ProblemTableLabel.H_HOT, ProblemTableLabel.H_COLD]
         ),
-        GraphType.BCC.value: pt_real.slice(
+        GraphType.BCC.value: pt_real_graph.slice(
             [
                 ProblemTableLabel.T,
                 ProblemTableLabel.H_HOT_BAL,
                 ProblemTableLabel.H_COLD_BAL,
             ]
         ),
-        GraphType.GCC.value: pt.slice(
+        GraphType.GCC.value: pt_graph.slice(
             [
                 ProblemTableLabel.T,
                 ProblemTableLabel.H_NET,
@@ -400,10 +403,10 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> dict:
                 ProblemTableLabel.H_NET_UT,
             ]
         ),
-        GraphType.GCC_R.value: pt_real.slice(
+        GraphType.GCC_R.value: pt_real_graph.slice(
             [ProblemTableLabel.T, ProblemTableLabel.H_NET, ProblemTableLabel.H_NET_UT]
         ),
-        GraphType.NLP.value: pt.slice(
+        GraphType.NLP.value: pt_graph.slice(
             [
                 ProblemTableLabel.T,
                 ProblemTableLabel.H_NET_HOT,
@@ -414,7 +417,7 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> dict:
                 ProblemTableLabel.H_COLD_HP,
             ]
         ),
-        GraphType.GCC_HP.value: pt.slice(
+        GraphType.GCC_HP.value: pt_graph.slice(
             [
                 ProblemTableLabel.T,
                 ProblemTableLabel.H_NET_W_AIR,

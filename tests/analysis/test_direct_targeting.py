@@ -15,7 +15,7 @@ from OpenPinch.analysis.targeting.direct import (
     should_update_balanced_composite_curves,
 )
 from OpenPinch.domain.configuration import tol
-from OpenPinch.domain.enums import ProblemTableLabel, ZoneType
+from OpenPinch.domain.enums import GraphType, ProblemTableLabel, ZoneType
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream import Stream
 from OpenPinch.domain.stream_collection import StreamCollection
@@ -145,6 +145,40 @@ def test_compute_direct_integration_targets_uses_empty_area_payload_when_disable
 
     assert "area" not in result
     assert result["zone_name"] == "Area"
+
+
+def test_save_graph_data_rounds_graph_copies_without_mutating_problem_tables():
+    temperatures = [200.00004, 200.00001, 100.00003]
+    enthalpies = [10.00006, 0.0, 5.00004]
+    pt = ProblemTable(
+        {
+            ProblemTableLabel.T: temperatures,
+            ProblemTableLabel.H_NET_A: enthalpies,
+        }
+    )
+    pt_real = ProblemTable(
+        {
+            ProblemTableLabel.T: temperatures,
+            ProblemTableLabel.H_NET: enthalpies,
+        }
+    )
+    pt_before = pt.data.copy()
+    pt_real_before = pt_real.data.copy()
+
+    graphs = direct._save_graph_data(pt, pt_real)
+
+    np.testing.assert_array_equal(pt.data, pt_before)
+    np.testing.assert_array_equal(pt_real.data, pt_real_before)
+    assert graphs[GraphType.GCC.value][ProblemTableLabel.T].tolist() == [
+        200.0,
+        200.0,
+        100.0,
+    ]
+    assert graphs[GraphType.GCC.value][ProblemTableLabel.H_NET_A].tolist() == [
+        10.0001,
+        0.0,
+        5.0,
+    ]
 
 
 def test_initialise_utility_index_returns_first_available():
