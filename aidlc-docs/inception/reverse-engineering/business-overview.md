@@ -46,6 +46,12 @@ exports.
 7. **Publish evidence** through typed results, DataFrames, reports, plots,
    dashboards, Excel workbooks, graph galleries, and JSON serialization.
 
+Utility allocation across user-selected temperature levels is supported only
+for utilities already present in the study. The current package does not choose
+an optimal number or placement of utility levels, nor does it expose a combined
+entropy/monetary/cogeneration placement objective. That is the capability gap
+for the proposed utility-placement analysis service.
+
 ## Business Dictionary
 
 - **Pinch**: the thermodynamic bottleneck separating above- and below-pinch
@@ -63,6 +69,9 @@ exports.
 - **HEN**: heat-exchanger network.
 - **Period**: one operating condition with an optional study weight.
 - **Case**: a validated named input owned by a workspace.
+- **Utility placement**: selection of utility temperature levels, and possibly
+  their duties or types, subject to heat-integration feasibility and an
+  objective such as entropy generation or net monetary cost.
 
 ## Capability Owners
 

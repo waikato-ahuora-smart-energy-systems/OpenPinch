@@ -125,3 +125,13 @@ workflow operations.
 - Batch operations isolate per-case exceptions in `CaseBatchResult`.
 - Solver-backed design methods expose typed synthesis outcomes and do not hide
   missing solver capabilities.
+
+## Utility-Placement API Gap
+
+There is currently no `problem.target.utility_placement(...)` workflow and no
+typed request/result contract for optimised utility levels. Existing callers
+must supply utility streams before targeting. Requirements must decide whether
+the new workflow returns temperatures only or a full placed-utility target,
+which utility families are candidates, how infeasible candidates are reported,
+and whether monetary/cogeneration inputs are explicit method arguments,
+configuration defaults, or both.

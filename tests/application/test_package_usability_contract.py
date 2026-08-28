@@ -28,6 +28,7 @@ EXPECTED_TARGET_METHODS = {
     "mvr_heat_pump",
     "sun_smith_cogeneration",
     "total_site_heat_integration",
+    "utility_placement",
     "vapour_compression_heat_pump",
     "vapour_compression_refrigeration",
     "varbanov_cogeneration",
@@ -52,6 +53,7 @@ EXPECTED_DESIGN_METHODS = {
     "thermal_derivative",
 }
 EXPECTED_WORKSPACE_METHODS = {
+    "add",
     "case",
     "cases",
     "compare_cases",
@@ -151,6 +153,23 @@ def test_workspace_class_matches_the_case_only_manifest():
         "configuration_field_metadata",
     ):
         assert not hasattr(PinchWorkspace, retired_name)
+
+
+def test_utility_placement_signature_uses_short_level_names() -> None:
+    parameters = inspect.signature(
+        PinchProblem().target.utility_placement
+    ).parameters
+
+    assert "isothermal" in parameters
+    assert "sensible" in parameters
+    assert parameters["isothermal"].default is None
+    assert parameters["sensible"].default is None
+    assert parameters["zone"].default is None
+    assert "isothermal_level_count" not in parameters
+    assert "sensible_level_count" not in parameters
+    assert "hot_templates" not in parameters
+    assert "cold_templates" not in parameters
+    assert "base_target" not in parameters
 
 
 def test_root_only_quickstart_import_compiles():

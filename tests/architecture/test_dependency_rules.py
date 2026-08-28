@@ -137,6 +137,16 @@ def test_layer_dependencies_follow_explicit_allowed_directions() -> None:
     assert observed_exceptions == LAYER_BOUNDARY_EXCEPTIONS
 
 
+def test_utility_placement_pure_model_has_no_application_dependency() -> None:
+    utility_placement_dir = PACKAGE_DIR / "analysis" / "utility_placement"
+    contract_path = PACKAGE_DIR / "contracts" / "utility_placement.py"
+
+    assert contract_path.is_file()
+    assert utility_placement_dir.is_dir()
+    for path in (contract_path, *sorted(utility_placement_dir.glob("*.py"))):
+        assert "application" not in _openpinch_import_roots(path)
+
+
 def test_source_imports_concrete_modules_instead_of_parent_barrels() -> None:
     offenders: list[str] = []
     for path in PACKAGE_DIR.rglob("*.py"):

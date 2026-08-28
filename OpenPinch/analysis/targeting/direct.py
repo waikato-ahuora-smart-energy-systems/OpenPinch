@@ -55,6 +55,18 @@ def compute_direct_integration_targets(
         is_shifted=True,
         period_idx=idx,
     )
+    # The real-temperature cascade has two distinct jobs.  The unshifted
+    # table defines the thermodynamic heat-recovery limit, while the shifted
+    # table is the presentation/utility-allocation table aligned to the
+    # shifted-temperature target.  Using the aligned table for both jobs
+    # collapses every direct-integration degree to 1.0.
+    pt_real_limit = get_process_heat_cascade(
+        hot_streams=zone.hot_streams,
+        cold_streams=zone.cold_streams,
+        all_streams=all_streams,
+        is_shifted=False,
+        period_idx=idx,
+    )
     pt_real = get_process_heat_cascade(
         hot_streams=zone.hot_streams,
         cold_streams=zone.cold_streams,
@@ -63,6 +75,7 @@ def compute_direct_integration_targets(
         known_heat_recovery=get_heat_recovery_target_from_pt(pt),
         period_idx=idx,
     )
+    zonal_targets = set_zonal_targets(pt=pt, pt_real=pt_real_limit)
     hot_pinch, cold_pinch = pt.pinch_temperatures()
     direct = zone.config.direct
     calculate_area_cost = bool((args or {}).get("_calculate_area_cost", False))
@@ -125,10 +138,7 @@ def compute_direct_integration_targets(
         area_data = {}
 
     target_data = (
-        set_zonal_targets(
-            pt=pt,
-            pt_real=pt_real,
-        )
+        zonal_targets
         | {
             "zone_name": zone.name,
             "scope": zone.address,

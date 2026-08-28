@@ -47,6 +47,10 @@ HEN Design and Publication
     (``solver``).
 18. ``18_results_plots_reports_exports.ipynb`` -- complete observation and
     explicit export/dashboard surfaces (``interactive``).
+19. ``19_utility_placement_optimisation.ipynb`` -- entropy-based placement with
+    two isothermal plus two sensible levels per side, replacement in a new
+    case, and standard GCC and Total Site Profile plots (``base`` with
+    ``plot``).
 
 Copy the Series
 ---------------

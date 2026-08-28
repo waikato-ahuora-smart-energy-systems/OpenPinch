@@ -65,6 +65,11 @@ Interaction Matrix
      - target output
      - targeted
      - base
+   * - ``target.utility_placement``
+     - Optimize or infer hot and cold utility levels at a selected hierarchy zone
+     - detached optimized problem
+     - source unchanged
+     - base
    * - ``target.all_periods.*``
      - Mirror supported targeting over ordered periods
      - period-to-output mapping

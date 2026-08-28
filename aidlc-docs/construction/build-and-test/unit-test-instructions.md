@@ -1,46 +1,38 @@
-# Unit and Property Test Instructions
+# Unit Test Execution
 
-## Complete Non-Solver Gate
+## Run Unit Tests
 
-Run all ordinary, contract, architecture, packaging, documentation, tutorial,
-and non-external-solver tests with the repository property seed:
-
-```bash
-uv run pytest -q -m "not solver" --hypothesis-seed=20260715
-```
-
-Success requires zero failures. Skips are acceptable only when their reason is
-an explicitly guarded optional profile; solver-marked deselections are expected.
-
-## Focused Remediation Gates
+### 1. Execute Utility-Placement Unit Tests
 
 ```bash
-uv run pytest -q \
-  tests/application/test_pinch_problem.py \
-  tests/application/test_pinch_workspace.py \
-  tests/presentation/test_workbook_reporting.py \
-  tests/packaging/test_openhens_comparison_prerequisite.py \
-  tests/packaging/test_docs_consistency.py \
-  tests/architecture \
-  --hypothesis-seed=20260715
+uv run pytest tests/analysis/utility_placement -q --hypothesis-seed=20260715
 ```
 
-This selection covers detached state, unloaded mutation, generated case names,
-resolved export containment, exclusive workbook allocation, exact checkout
-identity, current documentation, and owner dependency rules.
+This exercises contracts, normalization, bounds, vector encoding and decoding,
+allocation, thermodynamics, monetary accounting, cogeneration, penalties,
+evaluation, optimization, service orchestration, analytical oracles,
+properties, and performance thresholds.
 
-## Property-Based Contracts
+### 2. Review Test Results
 
-Generated case-identifier/path tests retain seed `20260715`, Hypothesis
-shrinking, and normal CI execution. No example database or one-off generated
-fixture is committed.
-
-## Static Quality
+- **Expected**: 149 utility-placement specialist tests pass with zero failures.
+- **Property testing**: Hypothesis uses reproducible seed `20260715` while
+  retaining shrinking.
+- **Coverage**: Unit 2-owned code plus the shared contract passed its 95 percent
+  branch gate at 96 percent. Unit 3-owned application/presentation modules
+  passed at 97 percent.
+- **Report location**: terminal output by default. Generate `.coverage` with
+  the following command when a persistent coverage database is required:
 
 ```bash
-uv run ruff check .
-uv run ruff format --check .
-git diff --check
+uv run coverage run --branch -m pytest tests/analysis/utility_placement -q --hypothesis-seed=20260715
+uv run coverage report --show-missing
 ```
 
-All commands must complete without findings.
+### 3. Fix Failing Tests
+
+1. Read the first failing example and its minimized Hypothesis input.
+2. Reproduce only that test with the same seed.
+3. Correct the owning contract or pure numerical module; do not move numerical
+   rules into application or presentation code.
+4. Rerun the focused file, then the entire specialist directory.

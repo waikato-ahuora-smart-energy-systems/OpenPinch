@@ -8,6 +8,300 @@
 
 ---
 
+## Excel v5 VBA Redesign Implementation Authorization
+**Timestamp**: 2026-08-21T02:01:37Z
+**User Input**: "PLEASE IMPLEMENT THIS PLAN:
+# OpenPinch Excel VBA Redesign Plan
+
+## Summary
+
+Rebuild OpenPinch as a standalone, embedded-VBA workbook for Microsoft 365 Excel on Windows and macOS. The workbook will not require Python at runtime. The current Python package will define the numerical and configuration behavior, while shared fixtures and differential tests will prevent future drift.
+
+The existing workbook remains an immutable baseline; implementation produces `OpenPinch-v5.00.xlsb`. Baseline: :codex-file-citation{path=\"/Users/timothyw/Github_Local/OpenPinch/Excel_Version/OpenPinch-v4.02.xlsb\" purpose=\"source\" artifact_kind=\"workbook\"}
+
+Success means:
+
+- Existing Excel workflows remain recognizable and functionally complete.
+- Current Python semantics win wherever VBA and Python disagree.
+- Calculations run entirely in memory before worksheet output.
+- Failures cannot leave Excel calculation, events, alerts, or screen updating in the wrong state.
+- VBA is maintained as exported, reviewable source rather than edited only inside the binary workbook.
+- One source build regenerates the main workbook and all bundled example workbooks.
+
+## Baseline and Compatibility Contract
+
+The current project contains 60 VBA modules—14 standard modules, 34 class/sheet modules, and 12 forms—with about 12,272 lines, 9,440 active lines, and 591 procedures. Only 11 active modules use `Option Explicit`; the project has only two error handlers, 37 `Select`/`Activate` uses, 71 unqualified worksheet references, mutable global state, and an unguarded application-state toggle. The workbook also contains 26 sheets, approximately 400 chart objects, five stale external workbook links, and an external query/connection.
+
+Freeze these public behaviors:
+
+- Preserve the visible sheet names, order, styling, and normal workflow: `Stream Data`, `Utility Data`, `License`, and `Options`.
+- Preserve hidden output sheet names and their externally consumed table layouts, especially `Summary`, `PT`, the composite-curve sheets, `ETD`, `HSDT`, `TSP`, `NLC`, `Multi-output`, `Input HEN`, and `Grid`.
+- Preserve existing form names, control names, captions, default states, navigation, and button positions.
+- Preserve assigned entry points including `ThisWorkbook.StartButton`, `Main`, `Target`, `Clear_All`, `Draw_HEN`, `Select_grid_diagram`, and `ExergyAnalysis`. They become thin compatibility wrappers.
+- Preserve the `Summary` row/column contract consumed by the Python workbook adapter.
+- Preserve input layouts for `Stream Data` A:G, `Utility Data` A:I, `Input HEN` A:V, and Grid settings.
+- Preserve named ranges and any worksheet UDF found by the initial formula/macro-reference scan.
+
+Controlled exceptions:
+
+- Update the `Options` sheet’s keys while retaining its two-column layout and style. Map obsolete names to canonical configuration names such as `PROBLEM_TOP_ZONE_NAME`, `THERMAL_DT_CONT`, `ENV_TEMPERATURE`, `REPORTING_DECIMAL_PLACES`, `DIRECT_BALANCED_CC_ENABLED`, and the current costing/power keys.
+- Remove old `DO_*_TARGETING` configuration selectors; analysis selection remains an action taken through the existing forms.
+- Do not expose Python-only HPR, multiperiod, scenario, or solver-backed HEN capabilities in v5.00.
+- Add only VeryHidden internal sheets for metadata, staging, and diagnostics; add no new visible sheet or mandatory UI step.
+- Remove all stale external links, connections, queries, local-path dependencies, and preallocated unused charts.
+
+## Target Architecture and Interfaces
+
+Use this dependency direction:
+
+`UserForms/buttons → application controller → workbook adapter → validation/model → calculation services → result model → worksheet/chart renderer`
+
+### Public shell
+
+- Event handlers and compatibility macros contain no calculations.
+- They create a request, invoke one application use case, and present the returned outcome.
+- Use `Option Private Module` for all non-public standard modules so internal procedures do not pollute Excel’s Macro dialog.
+
+### Application and transaction layer
+
+Introduce:
+
+- `cRunController`: coordinates Run, Clear, multirun, retrofit, and HEN drawing.
+- `cRunContext`: run ID, phase, timestamps, cancellation state, and diagnostics.
+- `cApplicationStateGuard`: captures and unconditionally restores calculation mode, events, alerts, screen updating, status bar, cursor, and cancel behavior.
+- `cOutputTransaction`: snapshots affected output ranges and visibility, stages writes, commits success atomically, and restores the prior successful state if commit fails.
+- A workbook-level reentrancy lock to reject double-clicked or nested runs.
+- `Application.EnableCancelKey = xlErrorHandler` plus bounded phase-level `DoEvents` so cancellation is safe without re-entrant calculations.
+
+Every top-level use case uses one `On Error GoTo Fail` boundary and raises enriched errors with stable OpenPinch error codes. `On Error Resume Next` is prohibited except for a one-statement platform/feature probe followed immediately by `Err` inspection and clearing.
+
+### Workbook boundary
+
+Create one `mWorkbookContract` owner for:
+
+- Sheet names/codenames, input/output ranges, units rows, named ranges, chart positions, and schema version.
+- Dynamic last-row discovery based on required key columns rather than `CurrentRegion`.
+- Bulk range reads/writes; no per-cell access in calculation loops.
+- Locale-safe typed values—no use of `Val` for worksheet numbers and no numbers serialized as formatted strings.
+- Exact mapping between visible option keys, form settings, and canonical configuration names.
+
+Add `cWorkbookRepository` to construct an immutable `cAnalysisRequest` from cells and to commit a complete `cAnalysisResult`. Algorithms must not reference worksheets, forms, active selections, or Excel chart objects.
+
+### Domain and calculation core
+
+Replace mutable global collections and loosely typed arrays with explicit models:
+
+- `cStream`, `cUtility`, `cZone`, `cConfiguration`, and `cTargetResult`.
+- `cValidationIssue` with severity, code, sheet, cell, and message.
+- Typed result families for problem tables, curves, Total Site profiles, exergy, economics, power, retrofit, and HEN geometry.
+- Zero-based core numerical arrays with explicit bounds; worksheet-originated one-based `Variant` arrays are converted once at the adapter boundary.
+- Explicit `ByVal`/`ByRef` declarations everywhere. `Variant` remains limited to worksheet marshaling and intentionally heterogeneous output tables.
+
+Split numerical ownership into pure services:
+
+1. Input normalization and zone preparation.
+2. Direct process targeting, problem table, CC/SCC/GCC/BCC, utility allocation, area, cost, and exergy.
+3. zonal aggregation and conventional/unified Total Site targeting.
+4. cogeneration and turbine calculations.
+5. energy-retrofit ETD/ACC and ART analysis.
+6. HEN grid geometry.
+7. shared numerical utilities and heat-exchanger equations.
+
+Retain `X_Steam_Tables` only as a quarantined, documented third-party IF97 implementation behind `cSteamProperties`. Do not let callers access its functions directly. Verify its outputs against Python thermodynamic fixtures and modify it only for demonstrated defects.
+
+### Presentation layer
+
+- Build `cSummaryWriter`, `cTableWriter`, `cChartRenderer`, and `cHenRenderer`.
+- Generate only the charts required by the selected workflows. Name all owned charts/shapes with an `OP_` prefix and delete only owned objects.
+- Preserve current chart positions, dimensions, labels, styles, and output-sheet visibility.
+- Separate HEN geometry calculation from shape creation; `Draw_HEN` computes shape specifications first and renders them without selecting cells or shapes.
+- Keep detailed diagnostics on a VeryHidden `_OP_Diagnostics` sheet. Users receive a short actionable message containing the error code and affected cell/phase.
+
+## Implementation Sequence
+
+1. **Contract capture and source control**
+   - Extract every `.bas`, `.cls`, `.frm`, and `.frx` into `Excel_Version/vba/`.
+   - Generate `Excel_Version/contracts/workbook_contract.json` containing sheets, visibility, codenames, names, controls, macro assignments, input/output ranges, formats, chart locations, and public procedure/UDF references.
+   - Capture v4.02 outputs, screenshots, timings, and Python results for the regression corpus.
+   - Keep v4.02 unchanged and establish automated import/export scripts for VBA source.
+
+2. **Build and test harness**
+   - Build v5.00 from one clean workbook template using Excel automation; never hand-maintain different macro copies in example workbooks.
+   - Add a separate test workbook that imports production modules plus VBA tests.
+   - Embed workbook schema version, VBA source hash, Python oracle version, and build commit on `_OP_Metadata`.
+   - Regenerate sample XLSB workbooks by combining the same template/code with each case’s data sheets.
+
+3. **Foundation and input vertical slice**
+   - Add the application-state guard, run transaction, diagnostics, typed models, validation collector, and workbook repository.
+   - Port input normalization first, matching Python behavior for inherited zones, generated stream names, blank/default values, `Both` utilities, units, duplicate identities, and invalid thermal records.
+   - Update the Options sheet and provide an explicit legacy-to-canonical option migration table.
+
+4. **Core targeting vertical slice**
+   - Port direct targeting and its table/curve outputs.
+   - Port area/cost and exergy enrichment.
+   - Replace each old path only after its VBA unit tests and Python differential fixtures pass.
+   - Remove replaced legacy procedures immediately rather than retaining a runtime legacy switch.
+
+5. **Site and advanced legacy workflows**
+   - Port zonal totals, direct/indirect Total Site profiles, cogeneration, retrofit ETD/ACC, ART, and multirun exergy.
+   - Resolve every legacy/Python difference in a checked-in divergence register. Reachable v5.00 features cannot ship with an unresolved entry.
+
+6. **Output, graph, and HEN rendering**
+   - Rebuild output writers against the frozen table contract.
+   - Replace the approximately 400 preallocated chart objects with deterministic on-demand chart construction.
+   - Rewrite HEN drawing as pure layout plus rendering and confirm that Clear removes only OpenPinch-owned shapes.
+
+7. **Migration and release hardening**
+   - Add a public but non-prominent `ImportLegacyCase` macro that reads v4 workbook inputs, HEN inputs, and Grid settings into v5.00 without importing old macros or cached results.
+   - Map recognized options, warn about nonblank retired keys, validate the imported case, and leave the source workbook untouched.
+   - Compile and test on 64-bit Microsoft 365 Excel for Windows and macOS.
+   - Sign the production VBA project during release; unsigned development builds remain clearly marked and cannot be promoted as the release artifact.
+
+## Verification and Acceptance
+
+### Static and build gates
+
+- Every production module has `Option Explicit`.
+- The VBA project compiles with only built-in Excel/Office/VBA references on both platforms.
+- No mutable public globals, unqualified `Range`/`Cells`, `ActiveSheet`, `ActiveWorkbook`, `Select`, `Activate`, `GoTo` outside error cleanup, external `Shell`, Windows-only declarations, external links, or data connections.
+- Every binary release has a matching exported-source hash.
+- Python can load and validate the generated workbook through the existing workbook adapter.
+
+### Numerical differential tests
+
+Use representative repository cases including the current pulp-mill workbook, `illustrative.xlsb`, `only_hot.xlsb`, `only_cold.xlsb`, `locally_integrated.xlsb`, `refinery_retrofit.xlsb`, and the HEN/ART example.
+
+Compare:
+
+- Labels, row ordering, utility ordering, option keys, flags, and error codes exactly.
+- Core temperatures, duties, area, costs, exergy, and Total Site results using `abs(error) ≤ max(1e-6 in the canonical unit, 1e-6 × abs(expected))`.
+- Steam-property and cogeneration values to `1e-5` relative tolerance.
+- Displayed cells exactly after applying the configured reporting precision.
+- Graph payloads at the Python presentation precision of four decimal places.
+
+Property tests cover conservation balances, monotonic cascades, nonnegative utility allocation, shifted/unshifted round-trips, cloning isolation, interpolation bounds, duplicate-temperature handling, and deterministic chart-table cleanup.
+
+### Failure and UI tests
+
+Force failures during input, calculation, output commit, chart creation, cancellation, and read-only/protected workbook operation. Each test must prove:
+
+- Excel application state is restored.
+- The reentrancy lock is released.
+- No mixture of old and new results remains.
+- The prior successful output is restored or the affected output is clearly marked invalid.
+- Diagnostics identify the run, phase, error code, and originating cell.
+
+Structural and visual regression checks compare:
+
+- Visible input sheets, forms, controls, tab order, named ranges, styles, widths, heights, number formats, merged cells, print areas, and macro assignments.
+- Every output family after a successful run.
+- Windows and macOS screenshots at normal zoom.
+
+Benchmark the 66-stream baseline and a synthetic 500-stream case over five warm runs. The redesigned median must not be slower than v4.02 for the same selected workflows, worksheet I/O must occur in block operations, and cancellation must be observed at the next declared calculation phase.
+
+## Release and Drift Prevention
+
+- Ship v5.00 beside v4.02; never overwrite or auto-modify legacy workbooks.
+- Publish one primary workbook plus regenerated example workbooks built from the same VBA source.
+- Maintain a Python-generated parity manifest containing canonical option metadata and expected fixture outputs.
+- Any Python change to configuration, input contracts, targeting semantics, or result schemas must update the parity manifest and pass the self-hosted Excel differential job before release.
+- Hosted CI performs source/static/manifest checks; Excel execution runs on licensed self-hosted Windows and macOS runners.
+- Retain no telemetry or network dependency. Diagnostics remain local and are exported only through an explicit user action.
+
+## Assumptions
+
+- Python is the behavioral authority, but it is a development and test dependency only.
+- v5.00 preserves every workflow currently reachable through the workbook UI; Python-only features remain out of scope until a later deliberate UI release.
+- The Options-sheet vocabulary update and internal VeryHidden sheets are the only planned user-surface exceptions.
+- Security and resiliency extensions remain disabled for this local desktop product; partial property-based testing applies to pure numerical kernels and serialization/parity contracts.
+"
+**AI Response**: "Resumed the approved brownfield construction workflow, exported and hashed all 60 readable VBA components, captured the workbook contract, corrected the Python workbook boundary, generated the pulp-mill parity oracle, and implemented the first 27-module v5 foundation/direct-targeting vertical slice with source/build/static tooling. The task remains in Code Generation because advanced workflows and the compiled binary are not complete."
+**Status**: Code Generation Part 2 in progress
+**Context**: CONSTRUCTION - Excel v5 VBA redesign
+
+---
+
+## Excel v5 VBA Redesign Construction Checkpoint
+**Timestamp**: 2026-08-21T04:10:00Z
+**User Input**: Continued authorization from "PLEASE IMPLEMENT THIS PLAN".
+**AI Response**: "Completed the source-controlled application foundation and the direct, Total Site, assisted-GCC, utility, area/cost, exergy, power, ETD, HEN-rendering, legacy-import, and multirun vertical slices; added Windows and macOS build drivers, executable VBA oracle tests, a seven-workbook Python fixture corpus, and a canonical parity manifest. Static and focused Python gates pass."
+**Status**: Code Generation Part 2 in progress; ACC/ART and licensed Excel binary verification remain open. macOS build execution is blocked until Accessibility and Excel VBA-project trust are enabled.
+**Context**: CONSTRUCTION - Excel v5 VBA redesign
+
+---
+
+## Excel v5 VBA Redesign Evidence Reconciliation
+**Timestamp**: 2026-08-21T05:08:18Z
+**User Input**: "No new user input; continued the approved Excel v5 implementation goal."
+**AI Response**: "Re-audited the repository and immutable v4.02 workbook. Confirmed the immutable baseline and cached output payloads, then replaced the remaining implicit direct-targeting zone buckets with an explicit typed `cZone` hierarchy while preserving target ordering. Added source and VBA unit-test coverage for the hierarchy, regenerated the 61-file source manifest at hash `0716a1314a4a96c912113f730bb5d6eb1eefd3ff73d39b59db918c41adae8f2f`, and passed the production/test VBA static gates plus the current 46-test workbook/asset/output/chart gate. Hardened the macOS driver to verify baseline/source hashes before copying and to reject an unsigned release before producing an output. Generated the required build, unit, integration, performance, and Build and Test records; corrected stale construction counts; and separated source-complete ACC/ART work from its still-open licensed Excel execution gates. The previously completed full Python suite remains 2,222 passed with 4 skips. The current host still lacks macOS Accessibility permission, so no v5 binary or spreadsheet artifact was created."
+**Status**: Source-side construction evidence reconciled; licensed Excel Build and Test remains blocked by host permission
+**Context**: CONSTRUCTION - Excel v5 VBA redesign
+
+---
+
+## Excel v5 Workbook Contract Expansion
+**Timestamp**: 2026-08-21T05:23:32Z
+**User Input**: "No new user input; continued the approved Excel v5 implementation goal."
+**AI Response**: "Expanded the immutable v4.02 contract with explicit input/output range roles, cached payload bounds, all 409 chart-to-sheet anchors and positions, and a reproducible 85-formula scan. Confirmed there are no worksheet UDF or external-formula references. Added deterministic contract regeneration coverage and made the licensed Excel structural verifier compare every captured formula in the v5 candidate. Updated build instructions and passed 47 focused contract, asset, verifier, and adapter tests plus Ruff and patch-hygiene checks. No workbook binary was modified or created."
+**Status**: Contract-capture and formula-preservation evidence complete; licensed Excel execution remains open
+**Context**: CONSTRUCTION - Excel v5 VBA redesign
+
+---
+
+## Excel v5 HEN Boundary Refactor
+**Timestamp**: 2026-08-21T05:29:58Z
+**User Input**: "No new user input; continued the approved Excel v5 implementation goal."
+**AI Response**: "The completion audit identified that HEN geometry still read `Input HEN` and `Grid` directly. Added a typed `cHenRequest`, moved both bulk range reads and grid-setting coercion into `cWorkbookRepository`, changed `cHenLayoutService` to consume only the in-memory request, and retained all Excel shape access in `cHenRenderer`. Updated the controller and VBA HEN test, added an executable source-boundary regression, regenerated the 62-file manifest at `6e26cc6d33b53df7c051759bdc10b75872af82d807084bc05e56d030348ce002`, and passed production/test VBA static gates plus 48 focused tests."
+**Status**: HEN workbook-boundary architecture gap closed at source level; licensed Excel compile and execution remain open
+**Context**: CONSTRUCTION - Excel v5 VBA redesign
+
+---
+
+## Excel v5 State-Guard Transactional Capture Fix
+**Timestamp**: 2026-08-21T05:32:15Z
+**User Input**: "No new user input; continued the approved Excel v5 implementation goal."
+**AI Response**: "Found that `cApplicationStateGuard.Capture` marked the guard captured only after mutating Excel settings, so a mid-capture setter failure could leave events, alerts, screen updating, or calculation changed with cleanup disabled. Moved the captured marker before the first mutation, added an error boundary that restores the snapshot before re-raising the original error, added a source regression, regenerated the source hash to `1a99df4c4dff9c80071451207cdb0086998e882ec9aee0280e6dd7751573f730`, and passed both VBA static gates and 49 focused tests."
+**Status**: Partial-capture application-state failure closed at source level; injected licensed Excel execution remains open
+**Context**: CONSTRUCTION - Excel v5 VBA redesign
+
+---
+
+## Excel v5 Output-Transaction Hardening
+**Timestamp**: 2026-08-21T05:35:03Z
+**User Input**: "No new user input; continued the approved Excel v5 implementation goal."
+**AI Response**: "Reviewed the two-phase worksheet/chart commit edge. Made output commit finalization non-throwing after the successful state is marked, so staging cleanup cannot create a mixed post-chart failure. Extended worksheet snapshots to capture and restore Summary header merge geometry, and expanded the VBA rollback test plus source regression. Regenerated the source hash to `92d3151d81a50fd58e3172e36221abca2069b5b530cbec1245614ec24545b996`; production/test VBA static gates and 50 focused tests pass."
+**Status**: Output commit-finalization and Summary merge-rollback gaps closed at source level; injected licensed Excel execution remains open
+**Context**: CONSTRUCTION - Excel v5 VBA redesign
+
+---
+
+## Excel v5 Current Full-Suite Verification
+**Timestamp**: 2026-08-21T05:41:32Z
+**User Input**: "No new user input; continued the approved Excel v5 implementation goal."
+**AI Response**: "Ran the complete current repository suite with Hypothesis seed 20260715 after the contract, HEN boundary, state-guard, and transaction changes. The run passed 2,229 tests with 4 expected skips in 306.89 seconds. The focused Excel source/contract/adapter gate remains 50 passed, both VBA static gates pass, and patch hygiene passes."
+**Status**: Current Python/source verification complete; licensed Excel binary Build and Test remains open
+**Context**: CONSTRUCTION - Excel v5 VBA redesign
+
+---
+
+## Excel v5 Visual Regression Harness
+**Timestamp**: 2026-08-21T05:47:15Z
+**User Input**: "No new user input; continued the approved Excel v5 implementation goal."
+**AI Response**: "Added a Windows Excel capture harness for every nonempty worksheet range, grouped worksheet shape collection, and chart at 100% zoom, including temporary hidden-sheet exposure with visibility restoration and deterministic stale-image cleanup. Added a bidirectional Pillow comparator that detects missing or unexpected images, dimension differences, mean absolute pixel error, and any changed RGB pixel. Integrated capture into every Windows build and made an approved same-platform visual baseline mandatory for release builds. Strengthened the VBA static gate to enforce explicit `ByVal`/`ByRef` semantics and reject locale-unsafe `Val` calls. Added source tests and documentation; the focused Excel asset/contract/output/chart/visual/adapter suite passes 56 tests, both VBA static gates pass, the source manifest remains `92d3151d81a50fd58e3172e36221abca2069b5b530cbec1245614ec24545b996`, and patch hygiene passes. Live baseline/candidate images, retained-UserForm capture, and equivalent macOS evidence remain open."
+**Status**: Visual regression source harness implemented; licensed cross-platform visual evidence remains open
+**Context**: CONSTRUCTION - Excel v5 VBA redesign
+
+---
+
+## Excel v5 Executable Output Layout Contract
+**Timestamp**: 2026-08-21T06:01:31Z
+**User Input**: "No new user input; continued the approved Excel v5 implementation goal."
+**AI Response**: "Added a licensed-Excel output-layout verifier that compares the immutable PT, Multi-output, Input HEN, and Grid header/settings ranges with v4.02 cell-by-cell, including values, formulas, styles, number formats, row/column dimensions, and merges. Core mode requires populated Summary/PT and every selected curve/TSP/NLC chart family; retrofit, exergy-sweep, and HEN modes require HSDT/ETD, Multi-output, and `OP_HEN_` shapes. Integrated core layout verification into every seven-case differential run and added a source contract test covering all frozen output families. The focused gate now passes 57 tests; licensed execution remains open."
+**Status**: Executable output-layout contract implemented; live cross-platform evidence remains open
+**Context**: CONSTRUCTION - Excel v5 VBA redesign
+
+---
+
 ## Indirect Target Terminology Implementation Authorization
 **Timestamp**: 2026-07-18T16:15:53Z
 **User Input**: "PLEASE IMPLEMENT THIS PLAN:
@@ -2121,6 +2415,22 @@ This is an intentional clean break for unsupported internal APIs. No deprecation
 
 ---
 
+## Post-Gate Thermodynamic Sanity Audit and Corrective RED
+**Timestamp**: 2026-08-24T08:13:00Z
+**User Input**: "Approve through to completion unless something unexpected happens."
+**AI Response**: "A final real-sample sanity probe found that direct-scope application contexts carried zero process entropy slices because the direct real-temperature problem table does not expose usable RCP intervals. The utility entropy and optimization were present, but the reported total omitted the constant physical process-stream contribution. Reopened the Unit 3 plan with Steps 19 through 22 and added failing tests requiring nonempty process entropy evidence for direct and Total Site contexts and nonzero process entropy through the public result. Corrective RED reproduced two failures. No user decision is required because the correction restores the already approved thermodynamic contract. Marked Step 19 complete."
+**Context**: CONSTRUCTION - Unit 3 corrective TDD; process entropy completeness
+
+---
+
+## Post-Gate Corrective GREEN
+**Timestamp**: 2026-08-24T08:25:00Z
+**User Input**: "Approve through to completion unless something unexpected happens."
+**AI Response**: "Completed corrective GREEN. Direct and Total Site contexts now extract period-resolved real supply/target temperatures and duties from isolated physical process streams and explicit segments; thermodynamic evaluation applies the stable entropy kernel to those duties, including the isothermal limit. A second real-sample regression exposed Total Site problem-table rounding and profile-basis mismatch: the adapter now separates the exact Total Site utility cascade and calibrates rounded load profiles to exact residual duties without relaxing coverage tolerance. Seven focused direct, Total Site, public-result, and thermodynamic tests pass. Marked Step 20 complete."
+**Context**: CONSTRUCTION - Unit 3 corrective TDD; physical process entropy and Total Site coverage
+
+---
+
 ## Post-Implementation Unresolved Import and Type Audit Request
 **Timestamp**: 2026-07-17T03:07:34Z
 **User Input**: "Check for unresolved imports including type errors, such as in OpenPinch/domain/enums.py"
@@ -3802,5 +4112,1247 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 **AI Response**: "Completed Code Generation Step 4 and Build and Test. Direct graph extraction now rounds copies while preserving full-precision runtime cascades, and indirect reconstruction no longer rounds child segment temperatures. Final evidence: 158 focused tests passed; the complete fixed-seed non-solver suite passed 2,197 tests with 3 optional-profile skips and 4 solver deselections; Notebook 2 passed with 9 unrelated profiles deselected; 84 packaging tests passed with 3 skips; repository Ruff lint and format, patch hygiene, OpenPinch 0.5.3 wheel and sdist build, and an isolated-wheel full-precision reconstruction smoke passed. The unrelated modified Notebook 5 was preserved untouched. Generated all implementation and Build and Test records and completed the workflow checkboxes."
 **Status**: Complete
 **Context**: CONSTRUCTION - indirect profile precision complete; OPERATIONS - N/A
+
+---
+
+## Excel v5 Workbook Location Follow-up
+**Timestamp**: 2026-08-21T09:01:07Z
+**User Input**: "Where in Excel?"
+**AI Response**: "Clarified that the verified v5 workbook did not yet exist and resumed the licensed macOS build. Proved a deterministic VBA-editor paste path with a harmless live macro, implemented a source-controlled temporary bootstrap and self-removal finalizer, moved the source payload into Excel's sandbox to eliminate the folder-access prompt, refreshed the production source manifest, and retained the immutable v4.02 hash. After a forced Excel restart, macOS focus protection prevented background automation from opening the VBA editor; prepared the build for a one-time foreground editor handoff."
+**Status**: Code Generation Part 2 remains in progress; binary build awaits one foreground Excel editor action
+**Context**: CONSTRUCTION - Excel v5 macOS build and executable verification
+
+---
+
+## Excel v5 Interactive Editor Wait Checkpoint
+**Timestamp**: 2026-08-21T10:08:00Z
+**User Input**: "No new user input; continued under the authorized Excel v5 implementation goal."
+**AI Response**: "Reconfirmed the immutable v4.02 SHA-256, reproduced the clean macOS build through workbook opening, and isolated the remaining failure to the absent foreground Visual Basic Editor. Added a validated `--editor-wait-seconds` build option, regression assertions, and corrected macOS build documentation so the driver can wait for the required foreground editor action. Python syntax, Ruff, and all 24 focused Excel asset tests pass in the authoritative repository."
+**Status**: Code Generation Part 2 remains in progress; clean binary build awaits the foreground editor handoff
+**Context**: CONSTRUCTION - Excel v5 macOS build and executable verification
+
+---
+
+## Excel v5 Hash-Guarded Resume Checkpoint
+**Timestamp**: 2026-08-21T10:18:00Z
+**User Input**: "No new user input; continued under the authorized Excel v5 implementation goal."
+**AI Response**: "Stopped the unattended editor wait cleanly, confirmed no build process remained, and proved the open candidate stayed saved and byte-for-byte identical to v4.02. Added an explicit `--reuse-open-workbook` path that requires exactly one matching workbook and rejects any on-disk candidate whose hash differs from the immutable baseline. Ruff, Python syntax, all 57 focused Excel tests, the production VBA static gate, and the source-manifest hash pass."
+**Status**: Code Generation Part 2 remains in progress; the foreground Visual Basic Editor action is the only immediate macOS build blocker
+**Context**: CONSTRUCTION - Excel v5 macOS build and executable verification
+
+---
+
+## Excel v5 Licensed VBA Differential Checkpoint
+**Timestamp**: 2026-08-21T12:09:26Z
+**User Input**: "No new user input; continued under the authorized Excel v5 implementation goal."
+**AI Response**: "Advanced licensed Excel for Mac through VBA import and the production test suite. Added a pure-VBA dictionary for macOS, corrected LF class import and continuation-limit failures, aligned saturation properties with the Python CoolProp oracle, fixed a non-short-circuit exergy array guard, removed a unit-token name collision, compacted blank HEN separator rows at the workbook boundary, and corrected the HEN row sort. The suite then reached the illustrative area oracle and exposed 554.1172562335 m^2 versus Python's 478.801493362318 m^2. Replaced the midpoint calculation with Python's rounded plateau/discontinuity/resistance algorithm; an independent Python mirror reproduces 478.801493362318 exactly. Static VBA checks, Ruff, 59 focused tests, and source hash verification pass. Licensed rerun is paused because macOS is at the locked login window; the build driver now reports that state explicitly."
+**Status**: Code Generation Part 2 in progress; licensed area/VBA rerun awaits an unlocked macOS desktop
+**Context**: CONSTRUCTION - Excel v5 macOS compilation and Python differential convergence
+
+---
+
+## Excel v5 Area Interval-Parity Checkpoint
+**Timestamp**: 2026-08-21T16:41:42Z
+**User Input**: "No new user input; continued under the authorized Excel v5 implementation goal."
+**AI Response**: "Ran two further licensed Excel builds. The Python-style area grid first produced 557.324389776149 m^2, exposing that projection-temperature insertion also controls the resistance intervals. Porting that split-row behavior produced 475.687649629807 m^2 and showed that utility endpoints must retain ordinary insertion semantics because Python includes them in the initial grid. Separated ordinary and projection insertion in VBA, added dedicated unit/static assertions, regenerated the 64-file source manifest at 5747bcc92084d1507fea83d5bc51e6455a8037d4b599a9435b2fa4e2d90e692f, and passed Ruff, 60 focused tests, and production VBA static gates. The third licensed run could not start because the desktop locked again."
+**Status**: Code Generation Part 2 in progress; final licensed area rerun awaits an unlocked macOS desktop
+**Context**: CONSTRUCTION - Excel v5 macOS compilation and Python differential convergence
+
+---
+
+## Excel v5 Utility Differential Fixture Correction
+**Timestamp**: 2026-08-22T10:41:08Z
+**User Input**: "Go"
+**AI Response**: "Traced the reported 2.930899 MW utility-allocation difference to an invalid workbook/oracle pairing rather than a VBA calculation defect. The v4.02-based oracle has four utilities with zero utility delta-temperature contributions; the separately bundled pulp_mill example has five utilities with contributions of 5, 10, 2, 3, and 0.5 degC. The generated primary v5 workbook matches the v4.02 oracle exactly, and all seven correctly paired numerical differential cases pass. Added an input identity gate to verify_excel_outputs.py so a wrong fixture pairing now fails before calculated outputs with the first differing input field, plus focused regressions. Forty-six packaging tests and Ruff pass. No VBA or workbook rebuild was required, preserving the corrected Degree of Integration and legacy graph formatting."
+**Status**: Utility allocation report resolved as a fixture-pairing false positive; verifier hardening complete
+**Context**: CONSTRUCTION - Excel v5 numerical differential integrity
+
+---
+
+## Excel v5 Full Python E2E Utility Parity
+**Timestamp**: 2026-08-22T18:33:19Z
+**User Input**: "Python has many e2e tests. Run all of those through Excel to confirm the same total utility targets and utility allocations are calculated."
+**AI Response**: "Discovered all 54 stream-data cases exercised by the Python E2E suite, generated and calculated a corresponding v5.00 workbook for each in licensed Excel for Mac, and compared fresh Excel Summary results with fresh Python direct-targeting results. Fixed stable utility ordering and blank utility delta-temperature semantics in VBA. All 54 cases pass: 162 total targets and 247 utility allocations match at configured reporting precision. The workbook also passed 185 embedded VBA assertions, exported-source parity for 89 modules, the 85-formula frozen contract, host-independent package checks, and unsigned-local checksum packaging."
+**Status**: E2E utility parity complete; unsigned local development build packaged
+**Context**: CONSTRUCTION - Excel v5 numerical differential verification
+
+---
+
+## Excel v5 ART Status-Bar Cleanup
+**Timestamp**: 2026-08-22T19:31:39Z
+**User Input**: "The bottom bar continuous has a message about ART."
+**AI Response**: "Traced the persistent status-bar text to the final direct ART unit test running outside the application-state guard. Updated the guard to discard only stale OpenPinch-owned status text and restore status-bar visibility, made the test harness release the status bar, and added a live retrofit regression. Licensed Excel passed 185 embedded VBA assertions; ACC and ART completed with identical before/after application-state snapshots and final status FALSE. Exported-source, formula, workbook-contract, package, and checksum gates pass, and a corrected unsigned-local workbook was produced."
+**Status**: Complete; corrected unsigned-local workbook packaged
+**Context**: CONSTRUCTION - Excel v5 application-state restoration
+
+---
+
+## Excel v5 Stream Data Opening Sheet
+**Timestamp**: 2026-08-22T19:37:13Z
+**User Input**: "Always open the workbook to Stream Data."
+**AI Response**: "Updated the workbook-open event to activate the contract-defined Stream Data sheet, with a narrowly scoped static-gate exception that leaves all other Select/Activate usage prohibited. Rebuilt and compiled the workbook in licensed Excel, passed 185 embedded assertions, and opened the generated binary with events enabled; Excel reported Stream Data as the active sheet. Exported-source, formula, frozen-contract, package, and checksum gates pass."
+**Status**: Complete; corrected unsigned-local workbook packaged
+**Context**: CONSTRUCTION - Excel v5 workbook opening behavior
+
+---
+
+## Excel v5 Preformatted Graph Lifecycle
+**Timestamp**: 2026-08-22T22:30:00Z
+**User Input**: "The formatting is now being applied every time graphs are created. The graphs should be pre-formatted, and the options menu have the option to reformat them as a one off."
+**AI Response**: "Superseded the earlier on-demand blank-chart policy with the user-directed legacy lifecycle. The clean workbook now retains 408 hidden, marker-free, preformatted graph templates and the preserved Multi-output chart. Normal calculation duplicates a template and changes only graph titles and series payload/semantics; it does not run the global formatter. The existing Format Settings Enter action now performs an explicit one-off resize/font/axis reformat on both templates and displayed graphs, so later calculations inherit the selected format. Fixed output snapshots so range copies cannot duplicate floating chart objects. Licensed Excel passed 185 embedded assertions, rendered marker-free default charts, and passed an end-to-end custom-format test in which eight regenerated charts inherited the one-off Calibri format."
+**Status**: Complete; corrected unsigned-local workbook packaged
+**Context**: CONSTRUCTION - Excel v5 graph lifecycle and user-controlled formatting
+
+---
+
+## Excel v5 Total Site Graph Crash Fix
+**Timestamp**: 2026-08-22T23:11:46Z
+**User Input**: "Excel now crashes whenever I run modules include total site and graphs"
+**AI Response**: "Reproduced the crash in licensed Excel on the 16-process-area main workbook. Replaced the graph-duplication lifecycle with in-place reuse of the 408 preformatted chart slots, assigned Total Site to fixed legacy TSP slot 1, added capacity validation and a two-run macOS regression. The final binary completed two consecutive full runs with 113 active graphs, application-state restoration and a constant 409 chart parts. Embedded VBA, source export, static, package, formula, visual and Stream Data opening gates pass; a corrected unsigned-local workbook was packaged."
+**Status**: Complete; corrected unsigned-local workbook packaged
+**Context**: CONSTRUCTION - Excel v5 Total Site graph stability
+
+---
+
+## Excel v5 Utility Cost Calculation Fix
+**Timestamp**: 2026-08-23T00:08:00Z
+**User Input**: "Utility cost is not being calculated."
+**AI Response**: "Found that VBA calculated utility cost correctly but discarded it by storing a literal zero on every direct target. Passed the allocated cost into the result model, added exact VBA assertions, and populated the equivalent direct target field in Python. The expanded 54-case Excel differential then exposed a separate Python normalization defect: blank utility prices were multiplied by 8,300 annual operating hours while still labeled $/h. Corrected blank prices to use the canonical $/MWh default directly, regenerated all oracle fixtures, and added utility cost as a mandatory E2E parity field. All 54 cases pass for 216 target values, 247 utility allocations, and 54 costs. The final workbook passes 187 VBA assertions, 151 focused tests, pulp-mill differential comparison, two consecutive Total Site + graph runs, source/formula/package gates, and Stream Data opening; an unsigned-local workbook was packaged."
+**Status**: Complete; utility costs are populated and Excel/Python hourly-cost parity is verified
+**Context**: CONSTRUCTION - Excel v5 direct utility costing and differential verification
+
+---
+
+## Excel v5 Summary Header Typography Fix
+**Timestamp**: 2026-08-23T00:33:00Z
+**User Input**: "The headings on the summary sheet are not formatted correctly with subscripts like before. Fix it."
+**AI Response**: "Restored the legacy character-level subscripts for the Summary sheet's pinch-temperature, utility-target, heat-recovery, power, efficiency, and exergy headings. Excel for Mac required the Summary sheet to be visible before rich-text formatting, and the legacy `Xsurp,max` call requested nine characters where only eight exist; the visible legacy result is retained with a valid eight-character run. Added a licensed-Excel regression for every heading and visually inspected an Excel-rendered Summary page. The final workbook passed 187 embedded VBA assertions, 46 packaging tests, production static gates, the typography test, two consecutive Total Site + graph runs with application-state restoration, exported-source parity, formula/package gates, and Stream Data opening. Packaged the verified build as unsigned-local because no production certificate is available."
+**Status**: Complete; corrected unsigned-local workbook packaged
+**Context**: CONSTRUCTION - Excel v5 Summary rich-text compatibility
+
+---
+
+## Excel v5 Summary Utility Group Labels
+**Timestamp**: 2026-08-23T09:04:00Z
+**User Input**: "Change \"Heat Supplier Utility\" and \"Heat Receiver Utility\" to \"Hot Utility\" and \"Cold Utility\""
+**AI Response**: "Changed the generated Summary group headings to `Hot Utility` and `Cold Utility` while preserving the existing merged blue-header formatting. Extended the licensed-Excel regression to require each new heading exactly once and reject both retired phrases. The rebuilt workbook passed 187 embedded VBA assertions, 47 packaging tests, the production static gate, live Summary heading and subscript checks, visual inspection of the Excel-rendered Summary sheet, exported-source parity, the frozen 85-formula contract, package integrity, and Stream Data opening. Packaged the verified workbook as unsigned-local because no production certificate is available."
+**Status**: Complete; corrected unsigned-local workbook packaged
+**Context**: CONSTRUCTION - Excel v5 Summary terminology
+
+---
+
+## Excel v5 Legacy Graph Colours and Endpoint Cleanup
+**Timestamp**: 2026-08-23T09:26:00Z
+**User Input**: "The colours of the graph series need to be restored. Also, the composite curves, including grand composite curve and total site profiles, show vertical segments at the extremes. These should be remove, as it use to be."
+**AI Response**: "Restored the legacy graph palette by series role, reinstated the separate Total Site process and utility profiles, and removed only leading/trailing repeated-enthalpy points before charting. Added exact payload checks for colours, directional segment formatting, Python-oracle values, and endpoint cleanup. The licensed workbook completed two consecutive full Total Site + graph runs with 113 active charts and restored application state; 196 contract series and 693 format segments passed the chart verifier. Production VBA static gates, 164 packaging tests with 3 skips, 90-module exported-source parity, the 85-formula contract, package integrity, rendered visual inspection, and Stream Data opening passed. Packaged the workbook as unsigned-local because no production certificate is available."
+**Status**: Complete; corrected unsigned-local workbook packaged
+**Context**: CONSTRUCTION - Excel v5 legacy graph colours and endpoint behavior
+
+---
+
+## Excel v5 Large-Case Graph Capacity and Completion Audit
+**Timestamp**: 2026-08-23T10:47:00Z
+**User Input**: "No new user input; continued under the active OpenPinch Excel VBA redesign goal."
+**AI Response**: "Audited the full redesign rather than treating the chart-colour fix as completion. Found that the latest package omitted source-consistent examples and that the 47-process-zone refinery retrofit crashed Excel because the preformatted lifecycle retained only 36 slots per process graph sheet. Added 48 build-time slots per process graph sheet without runtime duplication, rebuilt and compiled the workbook with 187 embedded assertions, and regenerated all 52 bundled examples from the same primary hash. Current evidence passes 90-module source export parity, 166 packaging tests with 3 platform skips, the 85-formula/package contract, 7 numerical/chart cases with 532 charts and 928 series, all 54 Python E2E cases with utility cost/allocation parity, two full graph runs, one-off reformat across 540 templates, HEN cleanup, ACC/ART execution, Summary layout/typography, visible-surface regression, Stream Data opening, and five-run macOS benchmarks. Packaged the primary workbook plus all 52 examples as checksum-verified unsigned-local artifacts. The goal remains incomplete because licensed Windows compile, failure-injection/rollback, Windows visuals, and controlled v4 performance evidence are still external; no production certificate is available by user instruction."
+**Status**: Substantial completion; verified unsigned-local package produced, external Windows release gates remain
+**Context**: CONSTRUCTION - final completion audit and large-case graph capacity
+
+---
+
+## Utility Placement Optimisation - Initial Request and Workspace Detection
+**Timestamp**: 2026-08-23T11:04:02Z
+**User Input**: "I want to develop a new analysis service: utility placement optimisation. The user should enter the number of utility levels (min 2). Then the objective is to minimise \"cost\". Cost can mean thermodynamic cost (entropy based) or monetary cost (likely including power cogeneration for a tradeoff). Thermodynamic cost can be the default. Ask questions to clarify intent and make a plan. Follow a TDD approach."
+**AI Response**: "Displayed the required AI-DLC welcome message, loaded the common workflow, continuity, validation, question-format, workspace-detection, and extension opt-in rules, and completed workspace detection. Classified OpenPinch as a brownfield Python library using Hatchling and uv. Identified reusable analysis, application, domain, contract, and solver-neutral optimisation boundaries. Determined that the 2026-07-12 reverse-engineering snapshot is stale because it predates significant package and test changes, so a focused reverse-engineering refresh is required before Requirements Analysis. Preserved the separate Excel v5 workflow state and recorded TDD as mandatory for construction."
+**Context**: INCEPTION - Utility Placement Optimisation Workspace Detection
+
+---
+
+## Utility Placement Optimisation - Reverse Engineering Refresh
+**Timestamp**: 2026-08-23T11:05:49Z
+**User Input**: "No new user input; continued the utility-placement inception workflow."
+**AI Response**: "Refreshed the brownfield reverse-engineering artifacts against the current package. Confirmed that direct/indirect utility targeting, exergy curves, cogeneration services, and reusable bounded scalar optimisation are available building blocks, but no component currently owns utility-level placement, objective composition, its typed result, or a public target accessor. Updated stale test and branch-coverage facts, recorded 2,291 collected tests with four solver-marked, and verified Ruff plus non-solver test collection. Requested explicit approval before Requirements Analysis as required by the workflow."
+**Context**: INCEPTION - Utility Placement Optimisation Reverse Engineering
+
+---
+
+## Utility Placement Optimisation - Reverse Engineering Approval Prompt
+**Timestamp**: 2026-08-23T11:05:49Z
+**User Input**: "No new user input; continued the utility-placement inception workflow."
+**AI Response**: "Created the required reverse-engineering approval checkpoint at aidlc-docs/inception/reverse-engineering/utility-placement-reverse-engineering-approval.md. Asked the user to approve the refreshed analysis or request changes before Requirements Analysis."
+**Context**: INCEPTION - Utility Placement Optimisation Reverse Engineering Approval
+
+---
+
+## Utility Placement Optimisation - Reverse Engineering Approval Response
+**Timestamp**: 2026-08-23T11:09:46Z
+**User Input**: "Done"
+**AI Response**: "Read and validated Question 1 as A, approving the refreshed reverse-engineering analysis and authorizing progression to Requirements Analysis. Classified the feature as a complex, multi-component numerical addition requiring comprehensive requirements depth."
+**Context**: INCEPTION - Utility Placement Optimisation Reverse Engineering Approval
+
+---
+
+## Utility Placement Optimisation - Requirements Questions
+**Timestamp**: 2026-08-23T11:09:46Z
+**User Input**: "No new user input; continued after the approved reverse-engineering checkpoint."
+**AI Response**: "Created 21 requirements questions covering level counts, utility physics, targeting scope, decision variables, bounds, separation, thermodynamic and monetary objectives, cogeneration, pricing, results, mutation, periods, infeasibility, public API, optimisation policy, TDD evidence, and the three extension opt-ins. Paused at the mandatory answer gate."
+**Context**: INCEPTION - Utility Placement Optimisation Requirements Analysis
+
+---
+
+## Utility Placement Optimisation - Initial Requirements Answers
+**Timestamp**: 2026-08-23T11:22:35Z
+**User Input**: "Proceed"
+**AI Response**: "Read all 21 recorded questionnaire answers. Validated each answer letter and recorded extension decisions: Property-Based Testing fully enabled; Security and Resiliency disabled. Loaded the complete Property-Based Testing rules. Detected an underdetermined interaction between sensible utility endpoints, temperature-only decision variables, utility pricing identity, the existing steam-turbine cogeneration model, and shared multiperiod feasibility. Created four targeted clarification questions and paused at the clarification gate."
+**Context**: INCEPTION - Utility Placement Optimisation Requirements Analysis
+
+---
+
+## Utility Placement Optimisation - Clarification Answers and Precedence Follow-Up
+**Timestamp**: 2026-08-23T20:19:28Z
+**User Input**: "Go"
+**AI Response**: "Validated the four clarification answers. Confirmed integrated constant-heat-capacity entropy accounting and period-by-period feasibility with weighted objectives. Detected one remaining contradiction: the custom endpoint answer makes supply temperature and utility delta temperature decision variables, while the selected fixed-template answer says the template contains the temperature span and only placement temperature is optimised. Added one targeted precedence question and paused before requirements generation."
+**Context**: INCEPTION - Utility Placement Optimisation Requirements Clarification
+
+---
+
+## Utility Placement Optimisation - Final Clarification and Requirements Generation
+**Timestamp**: 2026-08-23T20:46:25Z
+**User Input**: "Go"
+**AI Response**: "Validated the final precedence answer as A with a configurable near-zero isothermal delta-temperature default. Generated comprehensive utility-placement requirements covering fixed templates, sensible and near-isothermal decision variables, direct and Total Site scope, per-period feasibility, entropy and monetary objectives, cogeneration credit, deterministic optimisation, typed detached results, API/batch behavior, red-green-refactor sequencing, analytical examples, and full Hypothesis property obligations. Created the formal requirements approval checkpoint and selected User Stories as the next stage because this is a new public workflow with complex acceptance behavior."
+**Context**: INCEPTION - Utility Placement Optimisation Requirements Analysis
+
+---
+
+## Utility Placement Optimisation - Requirements Approval Prompt
+**Timestamp**: 2026-08-23T20:46:25Z
+**User Input**: "No new user input; continued after requirements generation."
+**AI Response**: "Requested review of utility-placement-requirements.md and an A, B, or X response in utility-placement-requirements-approval.md. PBT-08, PBT-09, and PBT-10 are compliant at Requirements Analysis; PBT-01 through PBT-07 are not yet applicable and are carried as blocking obligations into their designated design and construction stages. Security and Resiliency remain disabled."
+**Context**: INCEPTION - Utility Placement Optimisation Requirements Approval
+
+---
+
+## Utility Placement Optimisation - Requirements Change Request
+**Timestamp**: 2026-08-23T20:53:33Z
+**User Input**: "Update the requirements"
+**AI Response**: "Read approval answer B: 'The user should input seperate numbers for isothermal and non-isothermal utilities. The minimum is 2 isothermal utilities. A constraint is that the utility must cover all heating and cooling demands.' Updated the requirements to accept separate isothermal and sensible counts applied to both hot and cold sides, require at least two isothermal levels, allow zero or more sensible levels, validate exact template counts by kind, and enforce complete residual heating and cooling coverage as per-period equality constraints. Added TDD and Hypothesis coverage-conservation cases, reset the approval checkpoint, and requested reapproval."
+**Context**: INCEPTION - Utility Placement Optimisation Requirements Revision
+
+---
+
+## Utility Placement Optimisation - Revised Requirements Approval
+**Timestamp**: 2026-08-23T20:59:29Z
+**User Input**: "Go"
+**AI Response**: "Read and validated approval answer A, approving the revised requirements with separate isothermal and sensible counts and complete per-period demand coverage. Selected User Stories because the new public API has multiple user journeys, personas, objective modes, scopes, and acceptance risks."
+**Context**: INCEPTION - Utility Placement Optimisation Requirements Approval
+
+---
+
+## Utility Placement Optimisation - User Stories Assessment and Planning Questions
+**Timestamp**: 2026-08-23T20:59:29Z
+**User Input**: "No new user input; continued after revised requirements approval."
+**AI Response**: "Documented the mandatory User Stories assessment with an Execute decision. Created a story-generation plan containing six methodology questions, five breakdown options, plan-level checkboxes, mandatory personas/stories artifacts, INVEST verification, requirements traceability, and PBT traceability. Paused at the answer gate."
+**Context**: INCEPTION - Utility Placement Optimisation User Stories Planning
+
+---
+
+## Utility Placement Optimisation - Story Methodology Answers
+**Timestamp**: 2026-08-23T21:11:05Z
+**User Input**: "Go"
+**AI Response**: "Read and validated all six story-plan answers as A. Resolved the methodology to four personas, a hybrid journey/feature structure, approximately 10 to 12 stories, Given/When/Then acceptance criteria, a small number of explicit assurance enablers, and shared stories with distinct direct and Total Site scenarios. Marked answer validation and no-clarification-needed checklist steps complete in the story-generation plan."
+**Context**: INCEPTION - Utility Placement Optimisation User Stories Planning
+
+---
+
+## Utility Placement Optimisation - Story Plan Approval Prompt
+**Timestamp**: 2026-08-23T21:11:05Z
+**User Input**: "No new user input; continued after story methodology resolution."
+**AI Response**: "Story methodology is ready for explicit approval. Review aidlc-docs/inception/plans/story-generation-plan.md and record A to approve generation, B to request methodology changes, or X with a custom direction in aidlc-docs/inception/plans/utility-placement-story-plan-approval.md. Personas and stories will not be generated before approval."
+**Context**: INCEPTION - Utility Placement Optimisation Story Plan Approval
+
+---
+
+## Utility Placement Optimisation - Story Plan Approval and Generation
+**Timestamp**: 2026-08-23T21:12:30Z
+**User Input**: "Go"
+**AI Response**: "Read and validated story-plan approval answer A. Marked methodology approval complete, then generated four personas and 12 stories using the approved hybrid structure. Added Given/When/Then criteria, complete functional/non-functional/TDD/PBT traceability, persona mappings, direct and Total Site scenarios, demand-coverage and multiperiod outcomes, typed integration and batch stories, two bounded assurance enablers, and per-story INVEST verification. Marked every completed plan and mandatory-artifact checkbox in the same interaction."
+**Context**: INCEPTION - Utility Placement Optimisation User Stories Generation
+
+---
+
+## Utility Placement Optimisation - Generated Stories Approval Prompt
+**Timestamp**: 2026-08-23T21:12:30Z
+**User Input**: "No new user input; continued after story generation."
+**AI Response**: "User Stories are complete. Review aidlc-docs/inception/user-stories/utility-placement/stories.md and personas.md, then record A to approve and continue to Workflow Planning, B to request changes, or X with a custom direction in aidlc-docs/inception/user-stories/utility-placement/approval.md. PBT enforcement is N/A at User Stories, with all future PBT-01 through PBT-10 obligations traced and no blocking finding."
+**Context**: INCEPTION - Utility Placement Optimisation Generated Stories Approval
+
+---
+
+## Utility Placement Optimisation - Generated Stories Approval
+**Timestamp**: 2026-08-23T21:32:37Z
+**User Input**: "Go"
+**AI Response**: "Accepted the explicit chat response as approval of the four personas and 12 generated stories, recorded A in the approval artifact, marked User Stories approved, and proceeded to Workflow Planning."
+**Context**: INCEPTION - Utility Placement Optimisation User Stories Approval
+
+---
+
+## Utility Placement Optimisation - Workflow Planning and Approval Prompt
+**Timestamp**: 2026-08-23T21:32:37Z
+**User Input**: "No new user input; continued after generated stories approval."
+**AI Response**: "Generated a comprehensive execution plan after loading the approved architecture, requirements, personas, and stories. Classified the additive feature as high numerical risk with easy-to-moderate rollback. Recommended comprehensive Application Design, Units Generation, per-unit Functional Design, NFR Requirements, NFR Design, TDD Code Generation, and integrated Build and Test; skipped Infrastructure Design because no infrastructure changes exist. Proposed a three-unit logical shape and dependency-ordered package/test sequence. Validated the Mermaid flowchart before file creation and included a text alternative. Requested A to approve and continue to Application Design, B to request changes, or X with a custom override in utility-placement-workflow-plan-approval.md."
+**Context**: INCEPTION - Utility Placement Optimisation Workflow Planning
+
+---
+
+## Workflow Planning Approval
+**Timestamp**: 2026-08-23T21:40:32Z
+**User Input**: "Go"
+**AI Response**: "Validated option A in the workflow-plan approval artifact, marked Workflow Planning complete, and began comprehensive Application Design."
+**Context**: Utility Placement Optimisation - explicit workflow plan approval and transition to Application Design
+
+---
+
+## Application Design Completion and Approval Prompt
+**Timestamp**: 2026-08-23T21:45:12Z
+**User Input**: "No new user input; continued after workflow plan approval."
+**AI Response**: "Generated and validated the comprehensive Utility Placement sections in components.md, component-methods.md, services.md, component-dependency.md, and application-design.md. Defined specialist contracts, public and internal signatures, detached orchestration, dependency direction, alternatives, failure boundaries, and complete FR/NFR/story traceability. Validated Markdown fences and the Mermaid graph, included its text alternative, marked PBT rules N/A at this stage under the enabled extension applicability matrix, and requested A to approve and continue to Units Generation, B to request changes, or X with a custom direction in utility-placement-application-design-approval.md."
+**Context**: INCEPTION - Utility Placement Optimisation Application Design Approval
+
+---
+
+## Application Design Approval
+**Timestamp**: 2026-08-23T21:58:18Z
+**User Input**: "Go"
+**AI Response**: "Accepted the explicit chat response as option A, confirmed the approval artifact, completed the Application Design plan, marked Application Design approved, and began Units Generation Part 1."
+**Context**: INCEPTION - Utility Placement Optimisation Application Design Approval and Units Generation transition
+
+---
+
+## Units Generation Part 1 Questions
+**Timestamp**: 2026-08-23T21:58:18Z
+**User Input**: "No new user input; continued after Application Design approval."
+**AI Response**: "Created the Utility Placement section of aidlc-docs/inception/plans/unit-of-work-plan.md with the proposed three-unit decomposition, mandatory generation steps, explicit brownfield code-organization rationale, and five decision questions covering story grouping, dependencies, team alignment, technical deployment boundaries, and business-domain boundaries. Requested completion of every [Answer]: tag before plan approval and generation."
+**Context**: INCEPTION - Utility Placement Optimisation Units Generation Part 1 planning questions
+
+---
+
+## Units Generation Part 1 Approval Prompt
+**Timestamp**: 2026-08-23T21:58:18Z
+**User Input**: "No new user input; approval requested after creating the decomposition questions."
+**AI Response**: "Units Generation Part 1 is ready. Five decomposition questions are in aidlc-docs/inception/plans/unit-of-work-plan.md. All recommended answers are A. Reply Go to accept all five recommended answers and approve generation of the three unit artifacts."
+**Context**: INCEPTION - Utility Placement Optimisation Units Generation Part 1 plan approval prompt
+
+---
+
+## Units Generation Part 1 Approval
+**Timestamp**: 2026-08-23T22:01:09Z
+**User Input**: "Go"
+**AI Response**: "Applied option A to all five decomposition questions, confirmed that the answers are complete, consistent, and unambiguous, approved the dependency-ordered three-unit plan, marked Units Generation Part 1 complete, and began Part 2 generation."
+**Context**: INCEPTION - Utility Placement Optimisation Units Generation Part 1 approval and Part 2 transition
+
+---
+
+## Units Generation Part 2 Completion and Approval Prompt
+**Timestamp**: 2026-08-23T22:04:14Z
+**User Input**: "No new user input; continued after the approved unit plan."
+**AI Response**: "Generated the three mandatory Utility Placement unit artifacts: detailed unit definitions and readiness, a validated acyclic dependency matrix and Mermaid flow with text alternative, and complete story/FR/NFR/acceptance/TDD/PBT ownership maps. Validated balanced Markdown fences, four declared Mermaid nodes and four expected edges with no missing identifiers, all five unambiguous plan answers, and complete coverage. Requested A to approve and continue to Construction with Unit 1 Functional Design, B to request changes, or X with a custom direction in utility-placement-units-approval.md."
+**Context**: INCEPTION - Utility Placement Optimisation Units Generation Part 2 completion and approval
+
+---
+
+## Units Generation Approval
+**Timestamp**: 2026-08-23T22:05:17Z
+**User Input**: "go"
+**AI Response**: "Accepted the lowercase explicit chat response as option A, confirmed the units approval artifact, completed the final Units Generation checkbox, marked Inception complete for this feature, and entered Construction with Unit 1 Functional Design."
+**Context**: INCEPTION to CONSTRUCTION - Utility Placement Optimisation units approval
+
+---
+
+## Unit 1 Functional Design Planning Questions
+**Timestamp**: 2026-08-23T22:05:17Z
+**User Input**: "No new user input; continued after generated-units approval."
+**AI Response**: "Created the Unit 1 Functional Design plan with eight context-specific questions covering generated templates, unit representation, identity and coordinate order, frozen normalization, feasibility-envelope ownership, typed errors, boundary scenarios, and floating-point round trips. Included the required business-logic, business-rules, domain-entity, and PBT-01 artifact steps; marked frontend design N/A because no UI exists. Requested completion of every [Answer]: tag before design generation. Stated that replying Go accepts all eight recommended A answers and approves Functional Design generation."
+**Context**: CONSTRUCTION - Unit 1 Placement Contracts and Pure Model Functional Design planning
+
+---
+
+## Unit 1 Functional Design Plan Approval
+**Timestamp**: 2026-08-23T22:07:54Z
+**User Input**: "Go"
+**AI Response**: "Applied option A to all eight Unit 1 functional-design questions. Confirmed the answers are complete, consistent, and unambiguous; approved deterministic generated templates, established unit-aware boundaries, stable identity/vector ordering, frozen idempotent normalization, the detached feasibility-envelope contract, typed errors, strict boundary behavior, and tolerance-aware float round trips. Began Functional Design artifact generation."
+**Context**: CONSTRUCTION - Unit 1 Placement Contracts and Pure Model Functional Design plan approval
+
+---
+
+## Unit 1 Functional Design Completion and Approval Prompt
+**Timestamp**: 2026-08-23T22:14:38Z
+**User Input**: "No new user input; continued after the approved Functional Design plan."
+**AI Response**: "Generated business-logic-model.md, business-rules.md, and domain-entities.md for Unit 1. Defined the request/template/model flow, canonical units, deterministic envelope intersection/order propagation/start construction, 43 business rules, frozen entity relationships, result/error contracts, and complete requirement/story traceability. Validated balanced Markdown fences, permitted ASCII diagrams, unique rule numbering, answered plan questions, and PBT-01 property identification per component with Code Generation carry-forward. PBT-01 is compliant; PBT-02 through PBT-10 are N/A at Functional Design. Requested the standardized choice between Request Changes and Continue to Next Stage in functional-design/approval.md."
+**Context**: CONSTRUCTION - Unit 1 Placement Contracts and Pure Model Functional Design approval
+
+---
+
+## Unit 1 Functional Design Approval
+**Timestamp**: 2026-08-23T23:37:48Z
+**User Input**: "Proceed"
+**AI Response**: "Recorded option B, Continue to Next Stage, in the standardized approval artifact; marked Unit 1 Functional Design complete and approved; and began Unit 1 NFR Requirements."
+**Context**: CONSTRUCTION - Unit 1 Functional Design approval and NFR Requirements transition
+
+---
+
+## Unit 1 NFR Requirements Planning Questions
+**Timestamp**: 2026-08-23T23:37:48Z
+**User Input**: "No new user input; continued after Functional Design approval."
+**AI Response**: "Created the Unit 1 NFR Requirements plan with eight questions covering capacity, a measurable CI performance benchmark, exact tolerance defaults, availability N/A handling, disabled-security scope, Python/Pydantic/Pint/pytest/Hypothesis stack selection, reliability and maintainability gates, and specialist-contract usability/compatibility. Included mandatory NFR and tech-stack artifacts plus blocking PBT-09 verification. Stated that replying Go accepts all recommended A answers and approves NFR Requirements generation."
+**Context**: CONSTRUCTION - Unit 1 Placement Contracts and Pure Model NFR Requirements planning
+
+---
+
+## Unit 1 NFR Requirements Plan Approval
+**Timestamp**: 2026-08-23T23:40:08Z
+**User Input**: "Go"
+**AI Response**: "Applied option A to all eight Unit 1 NFR questions. Confirmed the answers are complete, consistent, and unambiguous; approved linear capacity behavior without an arbitrary public maximum, the 250 ms representative CI benchmark, explicit numerical defaults, availability N/A, disabled-security validation scope, the existing Python/Pydantic/Pint/pytest/Hypothesis stack and fixed seed, repository quality gates, and stable specialist contract usability. Began NFR artifact generation."
+**Context**: CONSTRUCTION - Unit 1 Placement Contracts and Pure Model NFR Requirements plan approval
+
+---
+
+## Unit 1 NFR Runtime Compatibility Correction
+**Timestamp**: 2026-08-23T23:40:08Z
+**User Input**: "No new user input; correction derived from local repository configuration during NFR generation."
+**AI Response**: "Inspected pyproject.toml and CI configuration and corrected the approved stack wording from Python 3.11+ to the repository's stricter existing Python >=3.14.2 contract. Preserved all other approved stack decisions and recorded the correction in the answered plan and tech-stack artifact."
+**Context**: CONSTRUCTION - Unit 1 NFR Requirements local compatibility validation
+
+---
+
+## Unit 1 NFR Requirements Completion and Approval Prompt
+**Timestamp**: 2026-08-23T23:43:07Z
+**User Input**: "No new user input; continued after the approved NFR Requirements plan."
+**AI Response**: "Generated nfr-requirements.md with 18 measurable Unit 1 NFRs and tech-stack-decisions.md with production/test ownership, alternatives, and compatibility gates. Validated unique NFR numbering, answered questions, balanced Markdown, Functional Design traceability, exact tolerance and performance requirements, and disabled extension handling. Verified PBT-09 against pyproject.toml, uv.lock, and all three main CI workflows: Hypothesis 6.156.6 is declared, shrinking remains enabled, pytest integration is active, and fixed seed 20260715 is configured. PBT-09 is compliant with no blocking finding. Requested the standardized choice between Request Changes and Continue to Next Stage in nfr-requirements/approval.md."
+**Context**: CONSTRUCTION - Unit 1 Placement Contracts and Pure Model NFR Requirements approval
+
+---
+
+## Unit 1 NFR Requirements Approval
+**Timestamp**: 2026-08-23T23:44:07Z
+**User Input**: "Go"
+**AI Response**: "Recorded option B, Continue to Next Stage, in the standardized approval artifact; marked Unit 1 NFR Requirements complete and approved; and began Unit 1 NFR Design."
+**Context**: CONSTRUCTION - Unit 1 NFR Requirements approval and NFR Design transition
+
+---
+
+## Unit 1 NFR Design Planning Questions
+**Timestamp**: 2026-08-23T23:44:07Z
+**User Input**: "No new user input; continued after NFR Requirements approval."
+**AI Response**: "Created the Unit 1 NFR Design plan with eight questions covering fail-fast resilience, linear data structures, performance patterns, disabled-security boundaries, logical component layout, pure diagnostics, a testable adapter over existing unit conversion, and compatibility enforcement. Confirmed no infrastructure component is applicable. Stated that replying Go accepts all recommended A answers and approves NFR Design generation."
+**Context**: CONSTRUCTION - Unit 1 Placement Contracts and Pure Model NFR Design planning
+
+---
+
+## Unit 1 NFR Design Plan Approval
+**Timestamp**: 2026-08-23T23:46:34Z
+**User Input**: "Go"
+**AI Response**: "Applied option A to all eight Unit 1 NFR Design questions. Confirmed the answers are complete, consistent, and unambiguous; approved fail-fast immutable resilience, linear tuple/index patterns, one-time conversion and schema construction, boundary-only security validation, specialist logical components with no infrastructure, caller-owned logging, a testable adapter over existing unit conversion, and dedicated compatibility gates. Began NFR Design generation."
+**Context**: CONSTRUCTION - Unit 1 Placement Contracts and Pure Model NFR Design plan approval
+
+---
+
+## Unit 1 NFR Design Completion and Approval Prompt
+**Timestamp**: 2026-08-23T23:49:33Z
+**User Input**: "No new user input; continued after the approved NFR Design plan."
+**AI Response**: "Generated nfr-design-patterns.md with 15 numbered patterns and logical-components.md with production/test ownership, interfaces, failure routing, performance allocation, infrastructure N/A decisions, and complete U1-NFR-001 through U1-NFR-018 traceability. Validated balanced Markdown fences, a 13-node/15-edge Mermaid graph with no missing identifiers and a text alternative, unique patterns, answered questions, dependency direction, the 250 ms evidence design, and disabled Security/Resiliency handling. PBT-01 and PBT-09 remain compliant carry-forwards; other PBT rules are N/A at NFR Design. Requested the standardized choice between Request Changes and Continue to Next Stage in nfr-design/approval.md."
+**Context**: CONSTRUCTION - Unit 1 Placement Contracts and Pure Model NFR Design approval
+
+---
+
+## Unit 1 NFR Design Approval
+**Timestamp**: 2026-08-23T23:54:20Z
+**User Input**: "Go"
+**AI Response**: "Recorded option B, Continue to Next Stage, in the standardized approval artifact; marked Unit 1 NFR Design complete and approved; confirmed Infrastructure Design remains skipped; and began Unit 1 Code Generation Part 1 planning."
+**Context**: CONSTRUCTION - Unit 1 NFR Design approval and Code Generation transition
+
+---
+
+## Unit 1 Code Generation Part 1 Approval Prompt
+**Timestamp**: 2026-08-23T23:56:23Z
+**User Input**: "No new user input; continued after NFR Design approval."
+**AI Response**: "Created the Unit 1 Code Generation plan as the single source of truth with 19 sequential steps, strict RED-GREEN-REFACTOR slices, exact production and test paths, protected compatibility surfaces, requirement/story traceability, artifact applicability decisions, performance and packaging gates, and a PBT-01 through PBT-10 compliance matrix with no blocking finding. Requested explicit approval of the entire plan before creating tests or production code."
+**Context**: CONSTRUCTION - Unit 1 Placement Contracts and Pure Model Code Generation Part 1 plan approval
+
+---
+
+## Unit 1 Code Generation Plan Approval
+**Timestamp**: 2026-08-24T01:09:49Z
+**User Input**: "Go"
+**AI Response**: "Recorded option B, Approve Entire Plan; marked Code Generation Step 3 complete; transitioned Unit 1 to Part 2 implementation; and began the approved strict TDD sequence at Step 4."
+**Context**: CONSTRUCTION - Unit 1 Placement Contracts and Pure Model Code Generation Part 2
+
+---
+
+## Unit 1 Code Generation Step 4 - Baseline
+**Timestamp**: 2026-08-24T01:11:20Z
+**User Input**: "No new user input; executing the approved Code Generation plan."
+**AI Response**: "Confirmed all six planned production modules and the focused utility-placement test package are absent; captured the existing root export and dependency boundaries; preserved all unrelated dirty-worktree changes; and ran the relevant architecture, API-boundary, and repository-entrypoint baseline with 35 tests passing. Marked Step 4 complete."
+**Context**: CONSTRUCTION - Unit 1 Code Generation Step 4
+
+---
+
+## Unit 1 Code Generation Steps 5-7 - Contract TDD Slice
+**Timestamp**: 2026-08-24T01:15:17Z
+**User Input**: "No new user input; executing the approved Code Generation plan."
+**AI Response**: "RED: added contract, error, specialist-import, architecture, package-entrypoint, and reusable strategy tests and confirmed collection failed because OpenPinch.analysis.utility_placement did not exist. GREEN: created the frozen extra-forbid public request/value/template vocabulary, strict count and finite-value guards, typed JSON-safe errors, and minimum specialist facade; 25 focused tests passed. REFACTOR: reviewed annotations/docstrings/export ownership, Ruff passed, and the expanded contract/architecture/API/packaging set passed 60 tests. Marked Steps 5, 6, and 7 complete."
+**Context**: CONSTRUCTION - Unit 1 Code Generation Steps 5 through 7
+
+---
+
+## Unit 1 Code Generation Step 8 - Normalization RED
+**Timestamp**: 2026-08-24T01:15:17Z
+**User Input**: "No new user input; executing the approved Code Generation plan."
+**AI Response**: "Added normalization examples and properties for idempotence, JSON round-trip, generated inventory symmetry and identity, interleaved caller order, complete inventory, global uniqueness, cogeneration restrictions, monetary inputs, and conversion equivalence to Value.to. Confirmed the focused suite failed at collection because prepare_template_blueprints and the normalization module did not yet exist. Marked Step 8 complete."
+**Context**: CONSTRUCTION - Unit 1 Code Generation Step 8 RED
+
+---
+
+## Unit 1 Code Generation Steps 9-10 - Normalization GREEN and Bounds RED
+**Timestamp**: 2026-08-24T01:20:41Z
+**User Input**: "No new user input; executing the approved Code Generation plan."
+**AI Response**: "GREEN: added canonical template blueprint contracts, the one-way adapter over Value.to, deterministic generated and explicit inventory normalization, economics/cogeneration validation, and the specialist exports; all 34 contract/normalization/property tests passed with fixed seed 20260715. RED: added bounds, envelope coverage, max/min intersection, caller narrowing, permutation, order propagation, infeasibility, deterministic start, representative p95, and scaling tests; confirmed collection failed because the bound/envelope contracts and bounds functions did not yet exist. Marked Steps 9 and 10 complete."
+**Context**: CONSTRUCTION - Unit 1 Code Generation Steps 9 and 10
+
+---
+
+## Unit 1 Code Generation Step 11 - Bounds GREEN
+**Timestamp**: 2026-08-24T01:23:28Z
+**User Input**: "No new user input; executing the approved Code Generation plan."
+**AI Response**: "Implemented detached envelope, period-bound, coordinate, effective-template, and template-set contracts; exact per-period coordinate validation; canonical max/min intersection; narrow-only caller bounds; positive-Kelvin and sensible-span checks; linear hot/cold order propagation; and deterministic supply/span starts. Corrected the permutation assertion to compare effective bounds while preserving ordered provenance as designed. All 14 bounds/property/performance tests passed with fixed seed 20260715. Marked Step 11 complete."
+**Context**: CONSTRUCTION - Unit 1 Code Generation Step 11 GREEN
+
+---
+
+## Unit 1 Code Generation Step 12 - Codec RED
+**Timestamp**: 2026-08-24T01:23:28Z
+**User Input**: "No new user input; executing the approved Code Generation plan."
+**AI Response**: "Added decision-schema, dimension, coordinate uniqueness/order, fixed-coordinate, encode/decode round-trip, target-direction, invalid point diagnostic, strict decode, and generated-start verification tests plus a cross-dimension property. Confirmed collection failed because build_utility_placement_model and codec exports did not yet exist. Marked Step 12 complete."
+**Context**: CONSTRUCTION - Unit 1 Code Generation Step 12 RED
+
+---
+
+## Unit 1 Code Generation Step 13 - Codec GREEN
+**Timestamp**: 2026-08-24T01:27:14Z
+**User Input**: "No new user input; executing the approved Code Generation plan."
+**AI Response**: "Implemented decision-coordinate, decoded-level/placement, candidate-diagnostic/verification, and immutable model contracts; the exact coordinate family sequence; complete model construction; one-pass strict encode/decode; structured non-throwing candidate verification; target-direction and absolute-temperature checks; and independent generated-start verification. All 16 codec and property tests passed with fixed seed 20260715. Marked Step 13 complete."
+**Context**: CONSTRUCTION - Unit 1 Code Generation Step 13 GREEN
+
+---
+
+## Unit 1 Code Generation Step 14 - Result Contracts RED
+**Timestamp**: 2026-08-24T01:27:14Z
+**User Input**: "No new user input; executing the approved Code Generation plan."
+**AI Response**: "Added nested thermodynamic/monetary period and aggregate result examples, optional monetary retention, finite-coordinate and feasible-best guards, stable top-level schema checks, diagnostic round-trip, error-context properties, and nested result JSON properties. Confirmed collection failed because the result contract family did not yet exist. Marked Step 14 complete."
+**Context**: CONSTRUCTION - Unit 1 Code Generation Step 14 RED
+
+---
+
+## Unit 1 Code Generation Step 15 - Result Contracts GREEN
+**Timestamp**: 2026-08-24T01:30:18Z
+**User Input**: "No new user input; executing the approved Code Generation plan."
+**AI Response**: "Implemented nested level, thermodynamic, monetary, period, candidate, termination, and top-level result contracts with frozen extra-forbid finite serialization, explicit optional values, resolved scope metadata, feasible-candidate enforcement, and finite JSON-safe error context. Corrected an import-list insertion defect without changing behavior. All 36 contract and property tests passed with fixed seed 20260715. Marked Step 15 complete."
+**Context**: CONSTRUCTION - Unit 1 Code Generation Step 15 GREEN
+
+---
+
+## Unit 1 Code Generation Step 16 - Complete Pure-Model Refactor
+**Timestamp**: 2026-08-24T01:31:53Z
+**User Input**: "No new user input; executing the approved Code Generation plan."
+**AI Response**: "Refactored only behind green tests: corrected precise interval typing, normalized long expressions, mechanically formatted imports and new files, and reviewed all Unit 1 owners for duplicate implementations and forbidden application/logging/I/O/retry/cache dependencies. Ruff passed and the complete focused contract/normalization/bounds/codec/property/performance plus architecture/API/packaging suite passed 99 tests. Marked Step 16 complete."
+**Context**: CONSTRUCTION - Unit 1 Code Generation Step 16 REFACTOR
+
+---
+
+## Unit 1 Code Generation Step 17 - Quality and PBT Gates
+**Timestamp**: 2026-08-24T01:37:16Z
+**User Input**: "No new user input; executing the approved Code Generation plan."
+**AI Response**: "Completed the formal Unit 1 gates. Fifty example tests passed; 11 separately identifiable properties passed with fixed seed 20260715 and shrinking enabled; three performance tests passed; the combined 10-isothermal/10-sensible-per-side, 100-period model/decode/verify p95 measured 11.377 ms against the 250 ms requirement; Ruff passed; 110 focused plus architecture/API/packaging tests passed; and isolated coverage passed the configured 95 percent threshold with 72 tests. The first coverage invocation exposed a Python 3.14 NumPy double-load interaction caused by coverage source pre-import discovery; rerunning without source pre-imports succeeded and did not mask a product failure. PBT-01 through PBT-05 and PBT-07 through PBT-10 are compliant; PBT-06 remains correctly N/A for frozen pure state. Marked Step 17 complete."
+**Context**: CONSTRUCTION - Unit 1 Code Generation Step 17 quality gates
+
+---
+
+## Unit 1 Code Generation Step 18 - Regression and Packaging
+**Timestamp**: 2026-08-24T01:42:00Z
+**User Input**: "No new user input; executing the approved Code Generation plan."
+**AI Response**: "Ran the broader non-solver analysis/contracts/architecture/packaging regression with 1,641 passing and 4 skipped tests. Built the 0.5.4 wheel and source distribution in an isolated temporary directory, verified all six Unit 1 production files are packaged, installed the wheel without dependencies into an isolated target, and successfully imported/executed request normalization and deterministic four-template generation. Confirmed root/shared surfaces remain unchanged and pre-existing pyproject.toml/uv.lock oletools changes were not touched. Marked Step 18 complete."
+**Context**: CONSTRUCTION - Unit 1 Code Generation Step 18
+
+---
+
+## Unit 1 Code Generation Step 19 Completion and Approval Prompt
+**Timestamp**: 2026-08-24T01:42:00Z
+**User Input**: "No new user input; executing the approved Code Generation plan."
+**AI Response**: "Generated and validated code-summary.md with production/test ownership, complete RED-GREEN-REFACTOR evidence, verification results, PBT-01 through PBT-10 compliance, compatibility, limitations, story delivery, and Unit 2 handoff. Marked the Unit 1 slices of UPO-01, UPO-08, UPO-09, and UPO-12 complete in the story map; marked all 19 Code Generation plan steps complete; and requested the standardized choice between Request Changes and Continue to Next Stage in code/approval.md."
+**Context**: CONSTRUCTION - Unit 1 Generated Code approval
+
+---
+
+## Unit 1 Generated Code Approval - Scope Clarification
+**Timestamp**: 2026-08-24T01:47:49Z
+**User Input**: "Is CLI integration planned? Is a notebook example planned?"
+**AI Response**: "Clarified that the approved Unit 3 scope explicitly includes the Python problem.target.utility_placement workflow, all-period and workspace batch methods, presentation/reporting adapters, and documentation/packaged examples. It does not explicitly include an OpenPinch CLI command. It also does not name or require an executable notebook artifact, so the current docs/examples commitment does not guarantee a notebook. Recommended adding an explicit CLI subcommand and one executable notebook to Unit 3 requirements if the user wants both guaranteed deliverables; made no scope change while Unit 1 generated-code approval remains pending."
+**Context**: CONSTRUCTION - Unit 1 Generated Code approval scope clarification
+
+---
+
+## Utility Placement Scope Amendment
+**Timestamp**: 2026-08-24T01:49:13Z
+**User Input**: "No CLI. Just add one executable notebook demonstrating thermodynamic and monetary/cogeneration workflows."
+**AI Response**: "Updated the approved requirements, story traceability, workflow plan, application design, unit boundaries, dependency gates, and state tracking to exclude CLI integration and require exactly one generator-owned executable notebook at OpenPinch/data/notebooks/19_utility_placement_optimisation.ipynb. The Unit 3 deliverable must use public Python APIs, execute the thermodynamic and monetary/cogeneration workflows, inspect their result decompositions, register in the tutorial manifest, and pass source/wheel package-data checks. Unit 1 implementation remains unchanged and its generated-code approval remains pending."
+**Context**: CONSTRUCTION - Unit 1 Generated Code approval; approved Unit 3 scope amendment
+
+---
+
+## Unit 1 Generated Code Approval Prompt After Scope Amendment
+**Timestamp**: 2026-08-24T01:53:05Z
+**User Input**: "No new user input; scope amendment validation completed."
+**AI Response**: "Confirmed the amendment is internally consistent: FR-017 and Acceptance 16 define exactly one executable generated notebook for Unit 3, CLI integration is explicitly excluded, every story/design/unit trace is updated, Markdown fences are balanced, and git diff validation passes. Unit 1 code is unchanged. Re-presented the standardized Request Changes or Continue to Next Stage approval choice."
+**Context**: CONSTRUCTION - Unit 1 Generated Code approval
+
+---
+
+## Unit 1 Generated Code Approval
+**Timestamp**: 2026-08-24T01:56:38Z
+**User Input**: "B"
+**AI Response**: "Recorded explicit approval of Unit 1 generated code, marked Unit 1 Code Generation complete, and advanced to Unit 2 Placement Evaluation and Optimisation Service Functional Design. Loaded the Functional Design and enabled Property-Based Testing rules, inspected Unit 2 boundaries and existing numerical services, and created the checkbox plan with nine decision questions. Identified an FR-011 contract gap: the implemented UtilityPlacementOptions lacks the optimizer method and backend override fields required by the approved Unit 1 design. Awaiting complete answers before generating Unit 2 functional-design artifacts."
+**Context**: CONSTRUCTION - Unit 1 Generated Code approved; Unit 2 Functional Design questions
+
+---
+
+## Unit 2 Functional Design Answers and Completion Prompt
+**Timestamp**: 2026-08-24T02:15:13Z
+**User Input**: "Gp"
+**AI Response**: "Interpreted the message as instruction to continue after checking the Functional Design plan. Confirmed all nine question-file answers were present and valid as A, with no contradiction or ambiguity. Generated and validated Unit 2 business-logic-model.md, business-rules.md, domain-entities.md, and approval.md. The design contains 58 numbered rules; resolves the FR-011 options-contract gap; defines detached targeting, interval-resolved entropy, monetary/cogeneration, aggregation, strict scalar feasibility separation, exact memoization, deterministic alternatives, structured-grid oracles, and typed failures; and is PBT-01 compliant with no blocking finding. Presented the standardized Request Changes or Continue to Next Stage approval choice."
+**Context**: CONSTRUCTION - Unit 2 Functional Design approval
+
+---
+
+## Unit 2 Functional Design Approval and NFR Requirements Start
+**Timestamp**: 2026-08-24T03:28:01Z
+**User Input**: "Proceed"
+**AI Response**: "Recorded explicit approval of Unit 2 Functional Design and advanced to Unit 2 NFR Requirements. Loaded the stage rules and current Unit 1 NFR baseline; inspected project dependencies, optimizer/CI behavior, fixed Hypothesis seed, and quality gates; and created a checkbox plan with seven NFR decision questions covering tiered performance, coverage tolerance, multi-process memoization, real-optimizer CI scope, entropy reference precision, bounded diagnostics, and dependency policy. Awaiting complete answers before generating the NFR requirements and technology decisions."
+**Context**: CONSTRUCTION - Unit 2 NFR Requirements questions
+
+---
+
+## Unit 2 NFR Requirements Answers and Completion Prompt
+**Timestamp**: 2026-08-24T04:12:31Z
+**User Input**: "Done"
+**AI Response**: "Read and validated all seven NFR question-file answers as A with no ambiguity or contradiction. Generated and validated nfr-requirements.md, tech-stack-decisions.md, and approval.md. The assessment defines 32 measurable requirements, 50 ms/1 second/1 ms tiered performance gates, combined absolute/relative coverage, binary64 production with a decimal oracle, process-local bounded memos with canonical parent re-evaluation, one routine real dual-annealing regression, at most ten diagnostic representatives, and no new dependency. Updated the approved Functional Design memo wording for the selected multiprocess policy. PBT-09 is compliant and no blocking finding remains. Presented the standardized Request Changes or Continue to Next Stage approval choice."
+**Context**: CONSTRUCTION - Unit 2 NFR Requirements approval
+
+---
+
+## Continuing Approval and Unit 2 NFR Design
+**Timestamp**: 2026-08-24T04:53:01Z
+**User Input**: "Approve through to completion unless something unexpected happens."
+**AI Response**: "Recorded continuing approval for remaining routine checkpoints, approved Unit 2 NFR Requirements, generated and validated the Unit 2 NFR Design plan and artifacts, and approved the NFR Design under that authorization. The design applies 19 local patterns and maps all 32 NFRs to production or verification owners. PBT-01 and PBT-09 remain compliant, later PBT rules are carried forward, disabled Security/Resiliency extensions remain skipped, Infrastructure Design remains unnecessary, and no unexpected issue requires user input. Advanced to Unit 2 Code Generation planning."
+**Context**: CONSTRUCTION - Unit 2 NFR Requirements approval through NFR Design completion
+
+---
+
+## Unit 2 Code Generation Plan and Approval
+**Timestamp**: 2026-08-24T04:53:01Z
+**User Input**: "Approve through to completion unless something unexpected happens."
+**AI Response**: "Generated and validated the 28-step Unit 2 Code Generation plan with exact production/test paths, strict RED-GREEN-REFACTOR slices, all story/NFR ownership, decimal and structured-grid oracles, process-local memo command testing, three performance gates, regression/distribution checks, and PBT-01 through PBT-10 compliance. Recorded whole-plan approval under the user's continuing authorization and advanced to Part 2 generation."
+**Context**: CONSTRUCTION - Unit 2 Code Generation Part 1 approved
+
+---
+
+## Unit 2 Code Generation Steps 4 through 8
+**Timestamp**: 2026-08-24T05:04:51Z
+**User Input**: "Approve through to completion unless something unexpected happens."
+**AI Response**: "Captured the 146-test Unit 2 baseline; completed RED-GREEN coverage for additive optimizer options and typed operational errors; then completed RED-GREEN coverage for the detached immutable context. Corrected the previously documented but omitted configurable minimum-separation, minimum-sensible-span, and default-isothermal-span option fields, routed them through canonical unit normalization, removed the generated-template span literal, and populated the Unit 1 feasibility envelope from validated direct or Total Site period snapshots. The context is frozen, source-preserving, pickle-safe, ordered, and rejects unresolved scope, period mismatch, invalid ambient temperature, and incomplete coordinates. Focused verification passed 53 tests. No user-facing design choice or other unexpected issue arose. Marked plan Steps 4 through 8 complete."
+**Context**: CONSTRUCTION - Unit 2 Code Generation Part 2; RED-GREEN context slice
+
+---
+
+## Unit 2 Code Generation Steps 9 and 10
+**Timestamp**: 2026-08-24T05:14:00Z
+**User Input**: "Approve through to completion unless something unexpected happens."
+**AI Response**: "Completed the allocation RED-GREEN slice. Added candidate-local replay through the existing target_utilities_for_load_profiles ownership boundary, fresh utility streams per evaluation, stable level and interval records, exact hot/cold duty sums, the approved combined absolute/relative coverage tolerance, preserved zero duties and unmodified raw allocations, candidate-correctable diagnostics, and typed adapter/shape failures. Focused verification passed 30 tests. Marked plan Steps 9 and 10 complete."
+**Context**: CONSTRUCTION - Unit 2 Code Generation Part 2; RED-GREEN allocation slice
+
+---
+
+## Unit 2 Code Generation Steps 11 through 22
+**Timestamp**: 2026-08-24T05:31:00Z
+**User Input**: "Approve through to completion unless something unexpected happens."
+**AI Response**: "Completed RED-GREEN slices for stable entropy/exergy kernels, monetary purchase and cogeneration-credit accounting, strict feasible/infeasible scalar mapping, process-local exact memoized evaluation, bounded diagnostics, one-call optimizer coordination, exact candidate deduplication, fresh parent replay, feasible-only physical ranking, typed exhaustion, and frozen result assembly. The service always reports thermodynamic evidence and adds monetary/cogeneration decomposition when selected. Focused checks are green, and plan Steps 11 through 22 are complete. No unexpected decision arose."
+**Context**: CONSTRUCTION - Unit 2 Code Generation Part 2; numerical service completion
+
+---
+
+## Unit 2 Code Generation Completion and Approval
+**Timestamp**: 2026-08-24T06:05:00Z
+**User Input**: "Approve through to completion unless something unexpected happens."
+**AI Response**: "Completed Unit 2 refactoring and all planned gates: 149 focused tests, fixed-seed Hypothesis properties, decimal and structured-grid oracles, one real dual-annealing regression, three performance thresholds, Ruff, 96 percent branch coverage over Unit 2-owned code plus shared contracts, proportional target/turbine/optimizer/architecture/packaging regressions, isolated no-network source/wheel build, archive-content verification, and installed-wheel specialist smoke. Generated code-summary.md, marked all 28 Code Generation steps complete, approved Unit 2 generated code under continuing authorization, and advanced to Unit 3. The initial isolated build attempted network dependency resolution and failed in the restricted environment; the supported no-isolation build succeeded using locked local tooling."
+**Context**: CONSTRUCTION - Unit 2 Code Generation complete and approved
+
+---
+
+## Unit 3 Design Stages Completion and Approval
+**Timestamp**: 2026-08-24T06:05:00Z
+**User Input**: "Approve through to completion unless something unexpected happens."
+**AI Response**: "Generated and validated Unit 3 Functional Design, NFR Requirements, and NFR Design plans and artifacts. The design fixes isolated base-target execution, shared-vector all-period delegation, detached observation, ordered batch isolation, pure presentation, specialist import containment, no CLI, and exactly one generator-owned executable notebook. PBT-01 is compliant; Security and Resiliency remain disabled; external infrastructure patterns are N/A. Approved all routine stage transitions and advanced to Unit 3 Code Generation planning."
+**Context**: CONSTRUCTION - Unit 3 design stages complete and approved
+
+---
+
+## Unit 3 Code Generation Plan and Approval
+**Timestamp**: 2026-08-24T06:08:00Z
+**User Input**: "Approve through to completion unless something unexpected happens."
+**AI Response**: "Generated and validated the 18-step Unit 3 Code Generation plan covering isolated context extraction, public problem and all-period accessors, detached observation, presentation, ordered workspace batches, exactly one executable two-objective notebook, documentation, properties, quality, regression, distribution, summary, and integrated handoff. Approved the complete plan under continuing authorization and advanced to Part 2 generation."
+**Context**: CONSTRUCTION - Unit 3 Code Generation Part 1 approved
+
+---
+
+## Unit 3 Code Generation Steps 4 through 9
+**Timestamp**: 2026-08-24T06:24:00Z
+**User Input**: "Approve through to completion unless something unexpected happens."
+**AI Response**: "Completed RED-GREEN integration for isolated direct and Total Site context extraction, the public problem and all-period utility-placement accessors, cache-safe detached observation, pure presentation adapters, and ordered workspace batch mirrors. The default thermodynamic and monetary/cogeneration workflows execute through the public API, reject invalid counts before target analysis, preserve source and legacy target state, and produce JSON-safe results. Focused application, normalization, presentation, and batch verification passed 22 tests. Marked plan Steps 4 through 9 complete."
+**Context**: CONSTRUCTION - Unit 3 Code Generation Part 2; public workflow and presentation integration
+
+---
+
+## Unit 3 Code Generation Steps 10 and 11
+**Timestamp**: 2026-08-24T06:38:00Z
+**User Input**: "Approve through to completion unless something unexpected happens."
+**AI Response**: "Completed the notebook RED-GREEN slice. Added a failing exact-one/two-objective/no-CLI contract, extended the canonical notebook generator and resource metadata, generated exactly `19_utility_placement_optimisation.ipynb`, and added all eight new public operations to the executable coverage manifest. The base-profile notebook runs thermodynamic and monetary/cogeneration workflows through package-root imports and pure result presentation. Twelve focused notebook, manifest, source-compilation, execution, resource, and coverage tests pass. The existing `14_energy_transfer.ipynb` execution test still fails independently because its focused comparison asks for a Site row from a Bleaching-only result; this is outside the utility-placement change and is retained for the final baseline report. Marked plan Steps 10 and 11 complete."
+**Context**: CONSTRUCTION - Unit 3 Code Generation Part 2; executable notebook integration
+
+---
+
+## Unit 3 Code Generation Step 12
+**Timestamp**: 2026-08-24T06:48:00Z
+**User Input**: "Approve through to completion unless something unexpected happens."
+**AI Response**: "Completed the documentation RED-GREEN slice. Added and navigated a task-oriented utility-placement guide covering the minimum two-level contract, default thermodynamic and monetary/cogeneration objectives, direct/Total Site and period scopes, ordered case batches, units, errors, cache-only observation, result interpretation, and the executable notebook, with no new CLI surface. Updated the problem/workspace API matrices, notebook series, tutorial count, and capability overview. Four focused documentation contracts pass. Marked plan Step 12 complete."
+**Context**: CONSTRUCTION - Unit 3 Code Generation Part 2; user documentation
+
+---
+
+## Unit 3 Code Generation Step 13
+**Timestamp**: 2026-08-24T07:03:00Z
+**User Input**: "Approve through to completion unless something unexpected happens."
+**AI Response**: "Completed the public integration property and refactor slice. Added fixed-seed repeat equality, successful-result JSON round-trip, source/legacy-result invariance on success and typed failure, generated canonical-period ordering, generated workspace-case ordering, active-case/source preservation, and input-change cache invalidation coverage. Added placement-cache invalidation to both full input rebuilds and temperature-approach multiplier changes. Simplified the presentation fixture and formatted all touched Python code. Twelve focused public/presentation tests and scoped Ruff pass. Marked plan Step 13 complete."
+**Context**: CONSTRUCTION - Unit 3 Code Generation Part 2; properties and refactor
+
+---
+
+## Unit 3 Code Generation Step 14
+**Timestamp**: 2026-08-24T07:21:00Z
+**User Input**: "Approve through to completion unless something unexpected happens."
+**AI Response**: "Completed the focused quality gate: 272 tests passed and 3 optional-profile tests skipped across all utility-placement units, public application/presentation integration, architecture, API inventory, notebooks, tutorial coverage, entrypoints, packaging metadata, and release artifacts. Unit 3-owned application and presentation code achieved 97 percent branch coverage; all utility-placement specialist code combined reports 94 percent while the previously gated Unit 2 ownership slice remains 96 percent. All repository Ruff checks pass. The earlier notebook 14 failure was traced to its already-present explicit focused comparison being absent from the canonical generator; the generator was synchronized to preserve that existing fix and both notebooks 14 and 19 now execute. Marked plan Step 14 complete."
+**Context**: CONSTRUCTION - Unit 3 Code Generation Part 2; focused and performance gates
+
+---
+
+## Unit 3 Code Generation Step 15
+**Timestamp**: 2026-08-24T07:40:00Z
+**User Input**: "Approve through to completion unless something unexpected happens."
+**AI Response**: "Completed regression and distribution verification. The non-solver suite produced 2,450 passes, 3 optional-profile skips, 4 solver deselections, and one sandbox-only Kaleido/Chrome launch failure; the exact image-export test passed when rerun with its required local-browser permission, leaving no product failure. Sphinx completed all 54 pages with warnings treated as errors. A no-network/no-isolation build produced the source and wheel distributions, both archives contain every utility-placement module and notebook 19, and an isolated installed-wheel smoke executed the specialist import plus both notebook objectives with positive cogenerated work and electricity credit. Marked plan Step 15 complete."
+**Context**: CONSTRUCTION - Unit 3 Code Generation Part 2; regression and distribution gates
+
+---
+
+## Unit 3 Code Generation Step 16
+**Timestamp**: 2026-08-24T07:45:00Z
+**User Input**: "Approve through to completion unless something unexpected happens."
+**AI Response**: "Generated and content-validated the Unit 3 code summary. It records production ownership, RED-GREEN evidence, all PBT-01 through PBT-10 findings, compatibility and cache guarantees, performance and coverage results, notebook/documentation delivery, distribution verification, the sandbox-only browser test condition, and known numerical/operational limitations. Marked plan Step 16 complete."
+**Context**: CONSTRUCTION - Unit 3 Code Generation Part 2; code summary
+
+---
+
+## Unit 3 Code Generation Completion and Approval
+**Timestamp**: 2026-08-24T07:49:00Z
+**User Input**: "Approve through to completion unless something unexpected happens."
+**AI Response**: "Validated the completed Unit 3 plan through Step 16, generated the standardized two-option Code Generation approval with answer B under continuing authorization, approved the generated code, and selected Continue to Next Stage. No unresolved product, extension, compatibility, test, documentation, or distribution finding remains. Marked plan Step 17 complete and advanced to integrated Build and Test."
+**Context**: CONSTRUCTION - Unit 3 Code Generation complete and approved
+
+---
+
+## Build and Test Stage
+**Timestamp**: 2026-08-24T08:02:00Z
+**User Input**: "Approve through to completion unless something unexpected happens."
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Generated and content-validated the five required Build and Test instruction and summary files; updated UPO-01 through UPO-12, FR-001 through FR-017, NFR-001 through NFR-007, acceptance 1 through 16, and PBT-01 through PBT-10 traceability; marked Unit 3 and integrated Build and Test complete; applied continuing approval; and recorded Operations as N/A because it is a placeholder and no deployment or publication was requested. Marked Unit 3 plan Step 18 complete."
+**Files Generated**:
+- build-instructions.md
+- unit-test-instructions.md
+- integration-test-instructions.md
+- performance-test-instructions.md
+- build-and-test-summary.md
+**Context**: CONSTRUCTION - Integrated Build and Test complete; Utility Placement workflow complete
+
+---
+
+## Utility Placement Corrective Regression and Distribution Gates
+**Timestamp**: 2026-08-24T08:40:00Z
+**User Input**: "Approve through to completion unless something unexpected happens."
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Closed corrective plan Step 21. Added five focused behavioral tests for non-finite profile recovery, zero/unrepresentable profile calibration, inactive/zero/missing physical process entropy input, and sensible coordinate bounds. The focused all-unit gate passed 278 tests with 3 guarded skips and application/presentation branch coverage reached 97 percent. Ruff and patch hygiene passed. The complete non-solver suite produced 2,456 passes, 3 skips, 4 solver deselections, and one sandbox-only Kaleido Chrome launch failure; that exact unchanged image-export test passed with local-browser permission. Sphinx built 54 sources with warnings as errors. Fresh wheel and source archives contain every utility-placement module and notebook 19. The notebook executed from an isolated wheel with process entropy -8.117342396540316 kW/K, cogenerated work 1.3270750299879892 kW, electricity credit 0.13270750299879894 USD/h, and net monetary objective 88.01115892266249 USD/h."
+**Context**: CONSTRUCTION - Unit 3 corrective Step 21; regression, coverage, documentation, distribution, and installed-wheel gates
+
+---
+
+## Utility Placement Corrective Completion Records
+**Timestamp**: 2026-08-24T08:44:00Z
+**User Input**: "Approve through to completion unless something unexpected happens."
+**AI Response**: "Refreshed the Unit 3 code summary and approval, integrated Build and Test summary and integration instructions, requirements construction verification, UPO story delivery status, and workflow state with the physical entropy correction and final gate evidence. Confirmed exactly one executable utility-placement notebook, no utility-placement CLI, all enabled PBT rules compliant, Security and Resiliency disabled, and Operations N/A. Marked corrective plan Step 22 complete under the user's continuing authorization."
+**Context**: CONSTRUCTION - Unit 3 corrective Step 22 and integrated Build and Test completion records
+
+---
+
+## Utility Placement Mixed-Level Graph Amendment Request
+**Timestamp**: 2026-08-24T09:00:00Z
+**User Input**: "2 isothermal utility levels are a trivial example. Use 2 isothermal + 2 non isothermal utility levels instead. After optimising the utility levels it would be print a standard GCC/TSP + utility graph."
+**AI Response**: "Resumed the completed Utility Placement workflow as a bounded Unit 3 enhancement. Interpreted non-isothermal levels as the existing sensible utility level kind. Updated FR-015, FR-017, acceptance 17, the Unit 3 TDD plan, and workflow state to require two isothermal plus two sensible levels on each hot/cold side in both notebook objectives and a public isolated plot path that renders the optimized utilities through the existing standard GCC for direct scope or Total Site Profile for Total Site scope. Security and Resiliency remain disabled; full PBT remains enabled. Approved routine requirements and planning gates under the user's continuing authorization and marked Step 23 complete."
+**Context**: INCEPTION requirements amendment, Workflow Planning amendment, and CONSTRUCTION Unit 3 Code Generation Part 1
+
+---
+
+## Utility Placement Mixed-Level Graph RED
+**Timestamp**: 2026-08-24T09:08:00Z
+**User Input**: "2 isothermal utility levels are a trivial example. Use 2 isothermal + 2 non isothermal utility levels instead. After optimising the utility levels it would be print a standard GCC/TSP + utility graph."
+**AI Response**: "Completed Step 24 RED. Added notebook contracts requiring two isothermal and two sensible levels on each utility side in both objective calls and a displayed placement graph. Added public graph contracts requiring direct results to produce a standard GCC, Total Site results to produce a standard TSP, unknown periods to fail clearly, repeated cached observation to be deterministic, and source plus legacy target state to remain unchanged. The focused RED run failed in all three expected places because the plot surface and mixed-level notebook source did not yet exist."
+**Context**: CONSTRUCTION - Unit 3 Code Generation; mixed-level notebook and graph RED
+
+---
+
+## Utility Placement Mixed-Level Graph GREEN
+**Timestamp**: 2026-08-24T09:20:00Z
+**User Input**: "2 isothermal utility levels are a trivial example. Use 2 isothermal + 2 non isothermal utility levels instead. After optimising the utility levels it would be print a standard GCC/TSP + utility graph."
+**AI Response**: "Completed Step 25 GREEN. Added `problem.plot.utility_placement(...)`, which selects an explicit or cached result period, constructs eight optimized utility definitions on an isolated problem copy, reruns the matching standard direct or Total Site target, and returns the existing GCC or TSP graph data/Plotly figure without changing source or legacy target state. Updated the canonical notebook generator and notebook 19 to run two isothermal plus two sensible levels per side in both objectives and display the optimized-utility GCC. The monetary templates use bounded condensing and superheated-steam levels so the active sensible steam service retains positive cogeneration. The three RED contracts and full notebook execution now pass."
+**Context**: CONSTRUCTION - Unit 3 Code Generation; mixed-level graph GREEN
+
+---
+
+## Utility Placement Mixed-Level Graph Documentation and Inventory
+**Timestamp**: 2026-08-24T09:28:00Z
+**User Input**: "2 isothermal utility levels are a trivial example. Use 2 isothermal + 2 non isothermal utility levels instead. After optimising the utility levels it would be print a standard GCC/TSP + utility graph."
+**AI Response**: "Completed Step 26. Updated the utility-placement guide with mixed isothermal/sensible calls, physically bounded monetary templates, plot usage, GCC/TSP scope behavior, deterministic raw graph data, and non-mutation. Added `problem.plot.utility_placement` to the PinchProblem API matrix and exact public tutorial inventory, raising the mapped denominator to 195/195. Updated notebook-series metadata to require the plot extra and regenerated the single canonical notebook. Seven focused documentation, inventory, and notebook contracts pass."
+**Context**: CONSTRUCTION - Unit 3 Code Generation; documentation and public inventory
+
+---
+
+## Utility Placement Mixed-Level Graph Properties and Refactor
+**Timestamp**: 2026-08-24T09:36:00Z
+**User Input**: "2 isothermal utility levels are a trivial example. Use 2 isothermal + 2 non isothermal utility levels instead. After optimising the utility levels it would be print a standard GCC/TSP + utility graph."
+**AI Response**: "Completed Step 27. Added a domain-constrained Hypothesis property over direct/Total Site scope and implicit/explicit period selection. It proves deterministic graph-data equality, correct GCC/TSP selection, and source plus legacy-target non-mutation under fixed seed while retaining shrinking and a realistic five-second deadline. Explicit examples cover utility-profile presence, invalid periods, cached result observation, mixed-level notebook structure, and positive cogeneration. Refactored graph helpers with typed placement result/period boundaries. Twenty-two focused application, notebook, documentation, and exact inventory tests pass. PBT-03, PBT-07, PBT-08, PBT-09, and PBT-10 are compliant; PBT-01, PBT-02, PBT-04 through PBT-06 remain satisfied by the approved Unit 3 design and existing suites or are N/A to this new pure presentation slice."
+**Context**: CONSTRUCTION - Unit 3 Code Generation; properties, refactor, and PBT compliance
+
+---
+
+## Utility Placement Mixed-Level Graph Regression and Distribution Gates
+**Timestamp**: 2026-08-24T10:05:00Z
+**User Input**: "2 isothermal utility levels are a trivial example. Use 2 isothermal + 2 non isothermal utility levels instead. After optimising the utility levels it would be print a standard GCC/TSP + utility graph."
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Completed Step 28. Ruff and patch hygiene pass. The fixed-seed focused gate passed 397 tests with 3 guarded skips; utility-placement application and presentation ownership remains at 97 percent branch coverage. The complete non-solver suite produced 2,458 passes, 3 skips, 4 solver deselections, and the known sandbox-only Kaleido Chrome launch failure; its exact unchanged test passed with local-browser permission. Sphinx built all 54 sources with warnings as errors. Fresh wheel and source distributions contain the application graph adapter, plot accessor, and regenerated notebook. The installed-wheel notebook executed both four-hot/four-cold mixed-level objectives, displayed three Utility GCC traces, and produced 7.623472082367709 kW cogenerated work with thermodynamic objective 7.636793267394781 kW/K and monetary objective 52.12397264716 USD/h."
+**Context**: CONSTRUCTION - Unit 3 mixed-level graph amendment; quality, regression, documentation, and distribution gates
+
+---
+
+## Utility Placement Mixed-Level Graph Amendment Completion
+**Timestamp**: 2026-08-24T10:14:00Z
+**User Input**: "2 isothermal utility levels are a trivial example. Use 2 isothermal + 2 non isothermal utility levels instead. After optimising the utility levels it would be print a standard GCC/TSP + utility graph."
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Completed Step 29 and the approved amendment. Refreshed Unit 3 ownership/TDD/PBT/notebook/distribution evidence, integrated Build and Test counts and scenarios, FR-015/FR-017 plus acceptance 17 traceability, UPO delivery status, workflow state, and generated-code approval. Confirmed the single executable notebook uses two isothermal plus two sensible levels per side for thermodynamic and monetary/cogeneration optimization and displays the optimized standard GCC; the public plot selects TSP for Total Site results. All utility-placement plan checkboxes are complete, no enabled extension finding is unresolved, no CLI was added, and Operations remains N/A."
+**Context**: CONSTRUCTION - Unit 3 mixed-level graph amendment and refreshed Build and Test complete
+
+---
+
+## Utility Placement Named-Case Plotting Correction
+**Timestamp**: 2026-08-24T13:43:27Z
+**User Input**: "problem.plot.utility_placement(...) should not be added. Show how the optimised utilities can replace the utility in a new case and then display standard plots that include the utilities showing."
+**AI Response**: "Corrected FR-015, FR-017, acceptance 17, the Unit 3 TDD plan, and workflow state. The dedicated placement plot API is now explicitly excluded. The bounded correction requires the executable notebook to create a new named case, replace only that case's utility input with the optimized period levels through public workspace APIs, retarget it normally, and display the existing standard GCC and Total Site Profile plots while preserving the source case. Approved routine requirements and planning gates under the user's continuing authorization and marked Step 30 complete."
+**Context**: INCEPTION requirements correction, Workflow Planning correction, and CONSTRUCTION Unit 3 Code Generation Part 1
+
+---
+
+## Utility Placement Named-Case Workflow RED
+**Timestamp**: 2026-08-24T13:46:25Z
+**User Input**: "problem.plot.utility_placement(...) should not be added. Show how the optimised utilities can replace the utility in a new case and then display standard plots that include the utilities showing."
+**AI Response**: "Completed Step 31 RED. Replaced placement-plot contracts with an executable public workspace sequence that writes eight optimized levels into a separate named case, targets it normally for direct and Total Site analysis, verifies standard GCC and TSP output, preserves the baseline, and requires the rejected accessor to be absent. Notebook and guide contracts now require the same public sequence. The focused RED gate failed in exactly three expected areas: the old accessor remains, notebook 19 still calls it, and the guide still documents it. The named-case replacement and existing standard plots already execute successfully."
+**Context**: CONSTRUCTION - Unit 3 Code Generation; named-case replacement RED
+
+---
+
+## Utility Placement Named-Case Workflow GREEN
+**Timestamp**: 2026-08-24T13:49:52Z
+**User Input**: "problem.plot.utility_placement(...) should not be added. Show how the optimised utilities can replace the utility in a new case and then display standard plots that include the utilities showing."
+**AI Response**: "Completed Step 32 GREEN. Removed the dedicated plot accessor and application graph-construction adapter. Updated the canonical notebook generator and regenerated notebook 19 so it serializes the optimized period's four hot and four cold levels, replaces utilities in a separate `optimized_utilities` workspace case through `workspace.load`, targets that case normally for direct and Total Site integration, and builds the existing GCC and TSP figures. The baseline case remains unchanged. All 51 focused application, notebook, and documentation tests pass with 3 guarded skips, including full base-profile notebook execution."
+**Context**: CONSTRUCTION - Unit 3 Code Generation; named-case replacement GREEN
+
+---
+
+## Utility Placement Named-Case Documentation and Inventory
+**Timestamp**: 2026-08-24T13:50:17Z
+**User Input**: "problem.plot.utility_placement(...) should not be added. Show how the optimised utilities can replace the utility in a new case and then display standard plots that include the utilities showing."
+**AI Response**: "Completed Step 33. Replaced the guide's dedicated plotting workflow with the public named-case replacement sequence, removed the rejected method from the PinchProblem matrix and tutorial manifest, restored the exact public denominator to 194/194, updated notebook-series wording, and regenerated the single canonical utility-placement notebook. Twenty-two focused documentation, resources, and exact-inventory tests pass."
+**Context**: CONSTRUCTION - Unit 3 Code Generation; documentation and public inventory correction
+
+---
+
+## Utility Placement Named-Case Properties and Refactor
+**Timestamp**: 2026-08-24T13:51:53Z
+**User Input**: "problem.plot.utility_placement(...) should not be added. Show how the optimised utilities can replace the utility in a new case and then display standard plots that include the utilities showing."
+**AI Response**: "Completed Step 34. Refactored the public-workflow test around one deterministic result-to-input projection and added a fixed-seed Hypothesis property over direct and Total Site scopes. It verifies repeat-equal replacement payloads, named-case isolation, unchanged baseline input and active case, and ordinary GCC/TSP graph selection. Fifteen focused application tests pass. Scoped Ruff, notebook JSON parsing, patch hygiene, and the rejection scan all pass; the rejected method is absent from production, documentation, and notebook 19. PBT-03, PBT-07, PBT-08, PBT-09, and PBT-10 are compliant, with other enabled PBT rules retained by the existing utility-placement suites or N/A to this presentation-only correction."
+**Context**: CONSTRUCTION - Unit 3 Code Generation; named-case properties, refactor, and PBT compliance
+
+---
+
+## Utility Placement Named-Case Regression and Distribution Gates
+**Timestamp**: 2026-08-24T13:59:28Z
+**User Input**: "problem.plot.utility_placement(...) should not be added. Show how the optimised utilities can replace the utility in a new case and then display standard plots that include the utilities showing."
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Completed Step 35. The fixed-seed focused utility-placement gate passed 169 tests and the application adapter retained 97 percent branch coverage. The complete non-solver suite passed 2,459 tests with 3 guarded skips and 4 solver deselections. Repository Ruff and patch hygiene pass. Sphinx built all 54 sources with warnings as errors. Fresh wheel and source distributions built successfully. A wheel-only temporary import target executed notebook 19 outside the source checkout, verified eight replaced utilities in the new case, ordinary GCC and TSP figures, unchanged baseline input, absence of the rejected accessor, thermodynamic objective 7.636793267394781 kW/K, monetary objective 52.12397264716 USD/h, and 7.623472082367709 kW cogenerated work."
+**Context**: CONSTRUCTION - Unit 3 named-case correction; quality, regression, documentation, and distribution gates
+
+---
+
+## Utility Placement Named-Case Correction Completion
+**Timestamp**: 2026-08-24T14:00:50Z
+**User Input**: "problem.plot.utility_placement(...) should not be added. Show how the optimised utilities can replace the utility in a new case and then display standard plots that include the utilities showing."
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Completed Step 36 and the approved correction. Refreshed Unit 3 ownership, TDD/PBT/notebook/distribution evidence, generated-code approval, integrated Build and Test summary and instructions, FR-015/FR-017 plus acceptance 17 traceability, and workflow state. Confirmed that no placement-specific plot API exists; the single executable notebook uses two isothermal plus two sensible levels per side, creates a new named case with eight optimized utilities, runs ordinary direct and Total Site targets, and displays the standard GCC and TSP while preserving the baseline. All plan checkboxes are complete, no enabled extension finding is unresolved, no CLI was added, and Operations remains N/A."
+**Context**: CONSTRUCTION - Unit 3 named-case correction and refreshed Build and Test complete
+
+---
+
+## Utility Placement Final Utility-Visibility Guard
+**Timestamp**: 2026-08-24T14:01:59Z
+**User Input**: "problem.plot.utility_placement(...) should not be added. Show how the optimised utilities can replace the utility in a new case and then display standard plots that include the utilities showing."
+**AI Response**: "Strengthened the corrected workflow's explicit test to require `Utility GCC` segments in the standard GCC and both `Hot Utility` and `Cold Utility` segments in the standard TSP. The exact regression and scoped Ruff gate pass. The installed-wheel figures independently exposed three Utility GCC traces and TSP traces named Hot Utility and Cold Utility. Patch hygiene and the production/documentation rejection scan remain clean."
+**Context**: CONSTRUCTION - Unit 3 final standard-plot utility visibility verification
+
+---
+
+## Utility Placement Profile-Gap Correctness Request
+**Timestamp**: 2026-08-24T20:12:41Z
+**User Input**: "The answer in the notebook is clearly wrong. The utility placement should minimise the gap between the utility and process profiles."
+**AI Response**: "Reopened the completed utility-placement workflow as a blocking correctness correction. Reproduced the wrong notebook answer: the default objective placed the active hot sensible utility at 275.01 to 250.005 degC and the active cold sensible utility at -94.01 to -69.005 degC, far from the process profile. Traced the cause to a thermodynamic objective based on whole-process stream entropy plus utility entropy rather than paired residual process/utility profile separation. Corrected the requirements, acceptance 18, Unit 2/3 TDD plan, and workflow state to minimize the entropy-weighted reciprocal-temperature area between the residual process and candidate utility profiles. Approved the correction under continuing authorization and marked Step 37 complete."
+**Context**: INCEPTION requirements correction and CONSTRUCTION Unit 2/3 Code Generation Part 1
+
+---
+
+## Utility Placement Profile-Gap RED
+**Timestamp**: 2026-08-24T20:18:43Z
+**User Input**: "The answer in the notebook is clearly wrong. The utility placement should minimise the gap between the utility and process profiles."
+**AI Response**: "Completed Step 38 RED. Added analytical contracts requiring zero cost for coincident profiles, an exact constant-gap reciprocal-temperature integral, strict closer-before-wider ranking, profile-based thermodynamic breakdown, and a public sample result with active hot utility below 200 degC and active cold target above 0 degC. RED failed as intended: the profile-gap kernel does not exist, and the current sample selects active hot supply 275.01 degC."
+**Context**: CONSTRUCTION - Unit 2/3 Code Generation; profile-gap thermodynamic RED
+
+---
+
+## Utility Placement Profile-Gap Kernel GREEN
+**Timestamp**: 2026-08-24T20:22:23Z
+**User Input**: "The answer in the notebook is clearly wrong. The utility placement should minimise the gap between the utility and process profiles."
+**AI Response**: "Completed Step 39 GREEN. Replaced the placement-dependent thermodynamic term with deterministic trapezoidal integration of the absolute horizontal separation between aligned residual-process and allocated-utility profiles over reciprocal absolute temperature. Candidate utility endpoints are included in the union grid, inactive utility coordinates cannot alter the integral, and the reported total remains in kW/K with ambient-temperature exergy conversion. Five analytical thermodynamic tests pass; an explicit near-profile feasible candidate scores 0.9893224741947764 kW/K versus 7.468225441851388 kW/K for the old extreme candidate."
+**Context**: CONSTRUCTION - Unit 2/3 Code Generation; profile-gap thermodynamic GREEN
+
+---
+
+## Utility Placement Optimizer and Notebook Correction
+**Timestamp**: 2026-08-24T20:25:52Z
+**User Input**: "The answer in the notebook is clearly wrong. The utility placement should minimise the gap between the utility and process profiles."
+**AI Response**: "Completed Step 40. Corrected the deterministic feasible optimizer start, which had placed hot levels at their upper extremes and cold levels at their lower extremes, to begin at the process-facing envelope while preserving level ordering. The public sample now selects an active hot sensible utility from 178.01 to 153.005 degC and an active cold sensible utility from 2.99 to 27.995 degC with a profile-gap objective of 0.9893224741947764 kW/K. Regenerated notebook 19 with an executable sample guard against extreme placement. Every notebook cell executes; the monetary workflow remains valid at 52.11335764539092 USD/h with 7.72962210005848 kW cogenerated work, and the new case's standard GCC/TSP display the optimized utilities. Thirty focused thermodynamic, bounds, and application tests plus scoped Ruff pass."
+**Context**: CONSTRUCTION - Unit 2/3 Code Generation; optimizer and notebook profile-gap correction
+
+---
+
+## Utility Placement Profile-Gap Properties and Documentation
+**Timestamp**: 2026-08-24T20:30:10Z
+**User Input**: "The answer in the notebook is clearly wrong. The utility placement should minimise the gap between the utility and process profiles."
+**AI Response**: "Completed Step 41. Added fixed-seed property and analytical coverage for zero identity, symmetry, non-negativity, monotonic constant-gap widening, collinear-breakpoint refinement, strict monotonic temperature grids, exact units, and public near-profile placement. Updated the user guide, Unit 2 functional rules/business logic/NFR identity, code summaries, and notebook interpretation to define thermodynamic cost as the entropy-weighted horizontal separation between residual process and allocated utility profiles. The complete 175-test specialist/application/presentation gate, 20 notebook tests with 3 guarded skips, 17 documentation-consistency tests, and scoped Ruff pass. PBT-03, PBT-05, PBT-08, and PBT-10 are directly strengthened; all enabled PBT rules remain compliant. Security and Resiliency remain disabled and N/A."
+**Context**: CONSTRUCTION - Unit 2/3 Code Generation; profile-gap properties, documentation, refactor, and extension compliance
+
+---
+
+## Utility Placement Profile-Gap Correction Completion
+**Timestamp**: 2026-08-24T20:43:40Z
+**User Input**: "The answer in the notebook is clearly wrong. The utility placement should minimise the gap between the utility and process profiles."
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Completed Step 42 and the blocking profile-gap correction through integrated Build and Test. The corrected kernel has 96 percent branch coverage and analytical/property tests for shape/finite/kelvin/monotonic validation, zero identity, symmetry, non-negativity, monotonic widening, and breakpoint refinement. The complete fixed-seed non-solver suite passed 2,469 tests with 3 guarded skips and 4 solver deselections. Repository Ruff and patch hygiene pass. Sphinx built 54 sources with warnings treated as errors. Fresh source and wheel archives contain the corrected kernel and notebook. The final wheel was installed outside the checkout and executed notebook 19: thermodynamic objective 0.9893224741947764 kW/K, monetary objective 52.11335764539092 USD/h, 7.72962210005848 kW cogenerated work, and eight utilities in the isolated named case. Refreshed requirements/story/design traceability, Unit 2/3 summaries, Build and Test summary, workflow state, and approval. All correction-plan checkboxes are complete, no CLI or dedicated plot API was added, enabled PBT rules are compliant, Security/Resiliency remain disabled, and Operations is N/A."
+**Context**: CONSTRUCTION - Utility Placement profile-gap correction, integrated Build and Test, and completion approval
+
+---
+
+## Utility Placement Structured-Start RED and GREEN
+**Timestamp**: 2026-08-24T20:47:31Z
+**User Input**: "The answer in the notebook is clearly wrong. The utility placement should minimise the gap between the utility and process profiles."
+**AI Response**: "A post-gate engineering sanity check found that increasing the annealing budget did not improve the single midpoint sensible-span seed: 25.005 K remained at 0.9893224741947764 kW/K, while an explicit 30 K span produced approximately 0.8765 kW/K. Added RED contracts requiring multiple independently feasible starts and a sample result below 0.9 kW/K; both failed against the midpoint-only model. GREEN now generates deterministic 20, 40, 50, 60, and 80 percent sensible-span starts and canonically ranks every start with backend candidates. The focused tests pass. The sample selects the 60 percent span at 0.8764152060442507 kW/K, with hot sensible utility 178.01 to 148.006 degC and cold sensible utility 2.99 to 32.994 degC."
+**Context**: CONSTRUCTION - Unit 2/3 Code Generation; structured sensible-span start correction RED and GREEN
+
+---
+
+## Utility Placement Profile-Gap Final Superseding Completion
+**Timestamp**: 2026-08-24T20:54:21Z
+**User Input**: "The answer in the notebook is clearly wrong. The utility placement should minimise the gap between the utility and process profiles."
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Completed Steps 45 and 46 and superseded the interim completion result. The final default objective minimizes aligned process/utility profile separation and canonically ranks five independently feasible sensible-span starts with optimizer candidates. Notebook 19 now returns 0.8764152060442507 kW/K, active hot sensible utility 178.01 to 148.006 degC, and active cold sensible utility 2.99 to 32.994 degC. Its monetary result remains 52.11335764539092 USD/h with 7.72962210005848 kW cogenerated work and eight utilities in the separate named case. The complete focused/notebook/documentation gate passed 216 tests with 3 guarded skips; the objective kernel has 100 percent branch coverage; the full fixed-seed non-solver suite passed 2,469 tests with 3 guarded skips and 4 solver deselections. Repository Ruff, patch hygiene, 54-source warnings-as-errors Sphinx, fresh source/wheel builds, and final installed-wheel notebook execution pass. Requirements FR-005, acceptance 18, stories/design, summaries, state, audit, and approval are refreshed. All Steps 37 through 46 are complete; PBT is compliant, Security/Resiliency remain disabled, no CLI or placement-specific plot API exists, and Operations is N/A."
+**Context**: CONSTRUCTION - Utility Placement structured-start profile-gap final Build and Test completion and superseding approval
+
+---
+
+## Utility Placement Balanced-Composite Entropy Correction
+**Timestamp**: 2026-08-24T21:12:03Z
+**User Input**: "Apply the thermodynamic entropy generation approach. Use the balanced composite curve to calculate entropy generation. Ensure there is a penalty function that avoids \"default\" utility being included as an option."
+**AI Response**: "Reopened the thermodynamic implementation as a blocking physical-correctness correction. Updated the requirements, acceptance 19, workflow plan, and state to replace the reciprocal-profile distance surrogate with physical entropy generation from candidate-local real-temperature balanced composite curves. Each matched heat-load interval must use CP*ln(Tout/Tin) or the signed Q/T isothermal limit. Added a mandatory deterministic infeasible penalty and diagnostic for any positive allocation to generated default HU/CU utilities. Approved the bounded correction under the user's continuing authorization and marked Step 47 complete."
+**Context**: INCEPTION requirements correction and CONSTRUCTION Unit 2/3 Code Generation planning
+
+---
+
+## Utility Placement Balanced-Composite and Default-Penalty RED
+**Timestamp**: 2026-08-24T21:15:11Z
+**User Input**: "Apply the thermodynamic entropy generation approach. Use the balanced composite curve to calculate entropy generation. Ensure there is a penalty function that avoids \"default\" utility being included as an option."
+**AI Response**: "Completed Step 48 RED. Added exact balanced-composite contracts for sensible CP*ln(Tout/Tin), isothermal Q/T, closer-versus-farther hot curves, unbalanced-duty rejection, period breakdown/decomposition/exergy, pure HU/CU duty penalty, and evaluation-session penalty wiring. RED failed as intended because balanced_composite_entropy_generation and default_utility_penalty do not exist and evaluation has no default-penalty boundary."
+**Context**: CONSTRUCTION - Unit 2/3 Code Generation; physical entropy/default-utility RED
+
+---
+
+## Utility Placement Balanced-Composite and Default-Penalty GREEN
+**Timestamp**: 2026-08-24T21:21:30Z
+**User Input**: "Apply the thermodynamic entropy generation approach. Use the balanced composite curve to calculate entropy generation. Ensure there is a penalty function that avoids \"default\" utility being included as an option."
+**AI Response**: "Completed Steps 49 and 50 GREEN. Extracted detached real hot/cold process composites, added candidate allocated utility streams, built candidate-local balanced composite curves, aligned their union heat-load intervals, and calculated physical entropy changes with CP*ln(Tout/Tin) or Q/T. Added narrowly bounded heat-balance closure for problem-table rounding drift while retaining rejection of material imbalance. Added the deterministic positive-duty HU/CU penalty before thermodynamic ranking with a typed default_utility_forbidden diagnostic. Eleven focused thermodynamic/direct/Total Site tests pass, and the broader specialist/application run is at 168 pass with only one superseded surrogate threshold plus the now-corrected Total Site rounding regression."
+**Context**: CONSTRUCTION - Unit 2/3 Code Generation; balanced-composite thermodynamic and default-utility GREEN
+
+---
+
+## Utility Placement Balanced-Composite Notebook, Properties, and Documentation
+**Timestamp**: 2026-08-24T21:27:03Z
+**User Input**: "Apply the thermodynamic entropy generation approach. Use the balanced composite curve to calculate entropy generation. Ensure there is a penalty function that avoids \"default\" utility being included as an option."
+**AI Response**: "Completed Step 51. Added heat-load scaling and HU/CU case/order-invariance properties, real-composite extraction assertions, the physical balanced-composite equation and Q/T limit to the engineering guide and executable notebook, and updated Unit 2 requirements/design/NFR/code documentation. Regenerated notebook 19, added its explicit HU/CU guard, and executed both thermodynamic and monetary/cogeneration workflows. The thermodynamic result is 1.0940185892615926 kW/K with process entropy -8.117342396540316 kW/K, utility entropy 9.211360985801909 kW/K, and exergy destruction 326.1816423883438 kW. The monetary result remains 52.11335764539092 USD/h with 7.72962210005848 kW cogenerated work. Focused properties, notebook execution, documentation consistency, and Ruff pass. Property-Based Testing is compliant; disabled Security and Resiliency extensions are N/A."
+**Context**: CONSTRUCTION - Unit 2/3 Code Generation; physical entropy notebook, properties, documentation, and extension compliance
+
+---
+
+## Utility Placement Balanced-Composite Correction Completion
+**Timestamp**: 2026-08-24T21:36:19Z
+**User Input**: "Apply the thermodynamic entropy generation approach. Use the balanced composite curve to calculate entropy generation. Ensure there is a penalty function that avoids \"default\" utility being included as an option."
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Completed Step 52 and the balanced-composite correction through integrated Build and Test. The physical thermodynamic and default-utility penalty kernels each have 100 percent statement and branch coverage. The final focused gate passed 224 tests with 3 guarded optional-profile skips; the complete fixed-seed non-solver suite passed 2,477 tests with 3 skips and 4 solver deselections. Repository Ruff, patch hygiene, and warning-clean Sphinx pass. Fresh source and wheel distributions each contain 18 utility-placement modules/assets. The isolated installed wheel executed notebook 19 with thermodynamic objective 1.0940185892615926 kW/K, entropy identity -8.117342396540316 + 9.211360985801909 = 1.0940185892615926 kW/K, exergy destruction 326.1816423883438 kW, monetary objective 52.11335764539092 USD/h, 7.72962210005848 kW cogenerated work, and eight utilities in the new named case. All Steps 47 through 52 and completion records are complete. PBT is compliant; Security and Resiliency remain disabled and N/A; no CLI or placement-specific plot API exists; Operations is N/A."
+**Context**: CONSTRUCTION - Utility Placement balanced-composite entropy and default-utility penalty final Build and Test completion
+
+---
+
+## Utility Placement Balanced-Composite Final Numerical Edge Closure
+**Timestamp**: 2026-08-24T21:42:13Z
+**User Input**: "Apply the thermodynamic entropy generation approach. Use the balanced composite curve to calculate entropy generation. Ensure there is a penalty function that avoids \"default\" utility being included as an option."
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Completed the final numerical review after Step 52. Preserved the physical sign for near-isothermal cooling, moved curve conversion and validation inside the typed thermodynamic boundary, and added empty, non-finite, and non-one-dimensional balanced-curve regressions. The corrected entropy and penalty kernels remain at 100 percent statement and branch coverage with 28 focused kernel tests. The definitive fixed-seed non-solver suite passed 2,480 tests with 3 skips and 4 solver deselections. Ruff, patch hygiene, and rebuilt source/wheel distributions pass. A fresh isolated install of the rebuilt wheel executed notebook 19 with thermodynamic objective and entropy identity 1.0940185892615926 kW/K, monetary objective 52.11335764539092 USD/h, 7.72962210005848 kW cogenerated work, eight replaced utilities, and the expected -0.2 kW/K near-isothermal cooling sign. The completion state and summaries now record 227 focused passes and 2,480 non-solver passes."
+**Context**: CONSTRUCTION - Utility Placement final numerical robustness, rebuild, and installed-wheel verification
+
+---
+
+## Utility Placement Multiperiod Objective Confirmation
+**Timestamp**: 2026-08-24T22:11:16Z
+**User Input**: "Confirm that obj also sums over all periods too."
+**AI Response**: "Confirmed from the implementation and tests that each candidate is evaluated for every selected period and the thermodynamic optimizer objective is the raw weighted sum J = sum_p(w_p * S_gen,p). Monetary mode analogously sums each period's net monetary objective. Omitted period_ids selects every available problem period; an explicit period_ids tuple limits the sum to that selection. A candidate is infeasible if any selected period fails, including a zero-weight period. The sum is not divided by total weight."
+**Context**: Utility Placement implementation verification; multiperiod aggregation semantics
+
+---
+
+## Excel v5.20 HPR, Scenario, and Multiperiod Completion
+**Timestamp**: 2026-08-25T19:26:08Z
+**User Input**: "Add access to HPR, Scenario (SaveScenario / RunScenarios), and Multiperiod (SavePeriod / RunMultiperiod) from the Module menu. Replicate ‘Cascade Carnot cycles’ and ‘Parallel Carnot cycles’ from Python. I assume this means a simple solver needs to be written."
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Implemented the five Module-menu actions, complete scenario and weighted-period snapshots, and embedded multi-stage Cascade/Parallel Carnot targeting. The VBA solver is a deterministic bounded structured/Halton multistart coordinate search and requires no Python runtime. Licensed Excel compiled the final workbook and passed 204 embedded assertions. Seventy-four focused Python tests, static VBA gates, and Ruff pass. Live Excel verified both HPR cycle families, scenarios, multiperiod weighting, application-state restoration, and Stream Data opening. The fixed-vector Parallel kernel matches Python at numerical tolerance; optimized utility totals differ by 0.042 percent for Parallel and 4.758 percent for Cascade against equivalent eight-restart Python runs. The resulting v5.20 development workbook has SHA-256 83991a0e1ab9727e766bee00ffd93af2be63fc1db49193196cd06f3ba1a5505d and remains unsigned because no production certificate is available."
+**Context**: CONSTRUCTION - Excel v5.20 extension workflows, deterministic Carnot solver, and licensed macOS Build and Test
+
+---
+
+## Excel v5.20 Cascade Solver Parity Improvement
+**Timestamp**: 2026-08-25T21:03:13Z
+**User Input**: "Improve the solver to reduce the difference in cascade results with Python."
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Diagnosed the Cascade gap as a missed narrow feasibility basin rather than a thermodynamic-kernel discrepancy. Added a topology-aware calibrated warm start and fine 0.005 local refinement for the default three-condenser/two-evaporator topology, while retaining generalized stage-count and Halton starts. The representative eight-start Excel utility total is now 27,577.62 versus Python's 27,553.039914571644, a 0.089 percent difference, down from 4.758 percent. Tightened the executable gates to 0.1 percent for Cascade and 0.05 percent for Parallel. Licensed Excel passes 204 embedded assertions and all HPR/scenario/multiperiod state-restoration runs; 75 focused Python tests, Ruff, JSON contracts, and production VBA static checks pass. The accepted unsigned development workbook SHA-256 is 59b68505e3323210e81489238c672c99e7e412b8e2f8a9ca98ee159e0f9c9940."
+**Context**: CONSTRUCTION - Cascade deterministic solver warm-start and parity hardening
+
+---
+
+## Excel v5.20 Generalized Cascade Topology Warm Start
+**Timestamp**: 2026-08-25T21:18:56Z
+**User Input**: "Generalise the topology-aware warm start for any combination of n-condenser/m-evaporator arrangements."
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Removed the default three-condenser/two-evaporator branch and replaced it with one stage-count-independent topology generator. Condenser coordinates use first/middle/final piecewise-linear interpolation, evaporator coordinates use endpoint interpolation, and heat-split variables preserve first/interior/final cascade roles for every positive n/m pair. A licensed-Excel matrix validates dimensions, bounds, anchors, split roles, and interpolation for all 64 combinations from 1x1 through 8x8. The build passes 990 embedded VBA assertions and 75 focused Python tests. Strict live parity remains unchanged: Cascade differs from Python by 0.089 percent and Parallel by 0.042 percent. Scenario, multiperiod, state restoration, and Stream Data opening remain successful. The accepted unsigned development workbook SHA-256 is 87dd8bbb755b1317fa5ab9509f09a61c94024f05d00d4af253a04e65af3020ea."
+**Context**: CONSTRUCTION - Generalized deterministic Cascade topology warm start and licensed macOS acceptance
+
+---
+
+## Excel v5 Workstream Removal Request
+**Timestamp**: 2026-08-26T18:59:47Z
+**User Input**: "Remove all the files and code changes related to OpenPinch Excel v5. I'll copy over the final v5 when its ready."
+**AI Response**: "Started a scoped cleanup of the uncommitted Excel v5 implementation. The cleanup preserves the tracked v4.02 workbook and input template, the separate Utility Placement workstream, prior targeting corrections, notebooks, and unrelated worktree changes."
+**Context**: CONSTRUCTION - User-directed cancellation and removal of the Excel v5 implementation workstream
+
+---
+
+## Excel v5 Workstream Removal Completion
+**Timestamp**: 2026-08-26T19:06:19Z
+**User Input**: "No new user input; completed the explicitly requested Excel v5 removal."
+**Build Status**: N/A - removal-only workstream cleanup
+**Test Status**: Pass
+**AI Response**: "Removed the untracked Excel v5 workflow, source, VBA, tools, fixtures, contracts, tests, and construction artifacts; reverted Excel-only hunks from shared workflow, workbook adapter, targeting/costing, tests, and dependency files; and removed Excel v5 progress from active AI-DLC state. Preserved the tracked v4.02 workbook and input template, Utility Placement, targeting precision changes, notebooks, and other unrelated worktree changes. Adapter/targeting regressions passed 112 tests, Utility Placement preservation passed 190 tests, Ruff passed, patch hygiene passed, and no Excel v5 references remain outside the immutable audit history. The removed untracked material is temporarily recoverable at `/private/tmp/OpenPinch-excel-v5-retired-20260827T065947Z`."
+**Context**: CONSTRUCTION - Excel v5 workstream removed and unrelated work verified
+
+---
+
+## Utility Placement Boiler-Turbine Monetary Correction Request
+**Timestamp**: 2026-08-28T19:35:20Z
+**User Input**: "The cost based utility placement is not right. One should not input costs to each utility. The utility supply system should assume a boiler with a turbine. Fuel to the boiler incurs an operating expense while the turbine generates power."
+**AI Response**: "Reopened Utility Placement Requirements Analysis for a material monetary-objective correction. Confirmed that the current implementation incorrectly requires a price on every utility level and subtracts turbine electricity credit. Inspected the existing shared multi-stage steam-turbine model, which already returns work, stage duties, and inlet steam-flow evidence, and found no existing boiler/fuel-cost owner. Created a focused seven-question requirements amendment covering boiler energy balance, turbine participation, required fuel/efficiency/price inputs, generator efficiency, cold-side cost treatment, public contract compatibility, and equipment capacity/capital scope. Existing full PBT enforcement remains enabled; Security and Resiliency remain disabled."
+**Context**: INCEPTION - Utility Placement boiler-turbine monetary Requirements Analysis amendment
+
+---
+
+## Utility Placement Boiler-Turbine Answer Checkpoint
+**Timestamp**: 2026-08-28T19:43:12Z
+**User Input**: "Record the answers and pause."
+**AI Response**: "Recorded and validated the current answer checkpoint without proceeding. Questions 1, 2, 3, 4, 6, and 7 select A: use a shared first-law boiler balance; route every positive-duty hot level through the shared turbine; require fuel price, boiler efficiency, electricity price, and existing turbine settings; apply generator efficiency; remove per-level utility price and cogeneration eligibility; and exclude capacity/capital cost. Question 5 is unresolved because its recorded response asks whether the complete utility-system structure should be specified rather than selecting a listed option. Requirements Analysis is paused at that decision; no clarification artifact, design, plan, tests, or production changes were created."
+**Context**: INCEPTION - Utility Placement boiler-turbine monetary Requirements Analysis paused after answer recording
+
+---
+
+## Utility Placement Thermodynamic-Only Correction Request
+**Timestamp**: 2026-08-28T19:47:17Z
+**User Input**: "Remove the money based utility optimisation for now. Run all tests and address any failures."
+**AI Response**: "Approved a bounded thermodynamic-only correction under the user's continuing authorization. Superseded the paused boiler/turbine monetary amendment; planned test-first removal of the objective selector, utility prices, cogeneration eligibility/settings, monetary contracts/evaluators/reporting, and monetary notebook path while preserving balanced-composite entropy, all-period weighted summation, default HU/CU exclusion, named-case replacement, standard plots, and general cogeneration features outside utility placement. Planned complete test execution including solver-marked tests."
+**Context**: REQUIREMENTS / WORKFLOW PLANNING / CONSTRUCTION - Utility Placement thermodynamic-only correction
+
+---
+
+## Utility Placement Thermodynamic-Only Correction Completion
+**Timestamp**: 2026-08-28T20:06:49Z
+**User Input**: "Remove the money based utility optimisation for now. Run all tests and address any failures."
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Removed monetary utility placement as a complete public capability: the objective selector, per-utility prices, cogeneration eligibility, electricity and turbine inputs, monetary contracts/results/reporting, placement-specific economics and cogeneration modules, and the monetary notebook workflow are absent. Preserved balanced-composite logarithmic entropy generation, raw all-period weighted summation, default HU/CU exclusion, named-case utility replacement, standard GCC/TSP plots, and general cogeneration analysis elsewhere. TDD RED failed on the intended retained surfaces before GREEN. Focused gates passed 177 feature tests and 75 notebook/documentation/packaging/architecture tests with 3 expected skips. The complete solver-enabled repository suite passed 2,384 tests with 4 expected skips in 262.20 seconds. Ruff, patch hygiene, warning-clean documentation, source/wheel builds, and isolated installed-wheel notebook execution pass; the notebook result is 1.0940185892615926 kW/K with eight optimized utilities and both standard plots."
+**Context**: CONSTRUCTION / BUILD AND TEST - Utility Placement thermodynamic-only correction complete
+
+---
+
+## Utility Placement Final Scope and Change Audit Request
+**Timestamp**: 2026-08-28T20:07:59Z
+**User Input**: "Once the tests pass, ensure the code no longer includes money based utility optimisation, the notbook example is up to date and the RTD documentation is also up to date. Review all changes and ensure any changes to files are needed and not cosmetic."
+**AI Response**: "Started a final scope audit covering executable monetary-placement absence, generator/notebook consistency and execution, Read the Docs accuracy and warnings-as-errors build, and necessity review of every utility-placement ownership group. Preserved unrelated pre-existing worktree changes for separate ownership."
+**Context**: CONSTRUCTION / BUILD AND TEST - Utility Placement final scope and non-cosmetic change audit
+
+---
+
+## Utility Placement Final Scope and Change Audit Completion
+**Timestamp**: 2026-08-28T20:21:51Z
+**User Input**: "No new user input; completed the requested final scope and non-cosmetic change audit."
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Confirmed that utility-placement executable code, public contracts, presentation, and the sole notebook contain no monetary optimizer, monetary result path, electricity/turbine inputs, per-level placement prices, or cogeneration eligibility. General OpenPinch costing and cogeneration remain outside this feature. Corrected stale RTD text to describe entropy-only placement and 194/194 tutorial coverage. Removed generator-induced cosmetic rewrites from notebooks 1-18, restored notebook 3's standard composite plot, and made the generator skip byte rewrites when Python tokens and notebook structure are equivalent while preserving environment-owned metadata. The focused post-review gate passed 262 tests with 3 expected skips; Ruff and patch hygiene passed. The complete solver-enabled suite passed 2,385 tests with 4 expected skips in 269.17 seconds. Fresh source and wheel distributions built, and notebook 19 executed from the isolated wheel at 1.0940185892615926 kW/K with eight optimized utilities and standard GCC/TSP figures. The unrelated pre-existing .gitignore change was preserved and not included in feature conclusions."
+**Context**: CONSTRUCTION / BUILD AND TEST - Utility Placement final scope and non-cosmetic change audit complete
+
+---
+
+## Utility Placement API Usability Feedback
+**Timestamp**: 2026-08-28T20:57:07Z
+**User Input**: "The api is not user friendly and intuitive."
+**AI Response**: "Reopened Requirements Analysis for the Utility Placement public workflow. Inspected the current target signature, result-observation methods, RTD example, application orchestration, and approved requirements. Identified that the primary usability burden is manual traversal of nested results and manual construction of replacement utility dictionaries. Created four focused questions covering concise level-count naming, workspace-owned named-case creation, result-owned inspection, and the boundary between case creation and hidden targeting/plotting. Existing thermodynamic behavior and extension configuration are unchanged."
+**Context**: INCEPTION - Utility Placement API usability Requirements Analysis
+
+---
+
+## Utility Placement API Usability Answer Review
+**Timestamp**: 2026-08-28T21:02:55Z
+**User Input**: "Done"
+**AI Response**: "Read all four API usability answers. Accepted Q1=A for short explicit `isothermal` and `sensible` counts and Q4=A for explicit targeting and plotting after case creation. Q2 selected C but described a separate best-utility return followed by `workspace.add(case)`, which contradicts option C's combined optimization/case creation. Q3 requested normal-case access without selecting a listed return/reporting option. Created three focused clarification questions to determine whether the optimizer returns a detached `PinchProblem`, whether `workspace.add(...)` becomes the registration method, and where detailed optimization evidence remains accessible."
+**Context**: INCEPTION - Utility Placement API usability Requirements Analysis answer validation
+
+---
+
+## Utility Placement API Usability Clarification Completion
+**Timestamp**: 2026-08-28T21:05:10Z
+**User Input**: "Done"
+**AI Response**: "Validated all three clarification answers as A. The approved usability contract uses `utility_placement(isothermal=2, sensible=2)`, returns a detached normal `PinchProblem` containing only the best optimized utility set, registers that case explicitly through `workspace.add(case, name=..., activate=False)`, retains detailed placement evidence on `optimized_case.utility_placement_result`, and leaves normal targeting and plotting explicit. Updated the comprehensive utility-placement requirements and acceptance criteria; no numerical behavior or extension configuration changed."
+**Context**: INCEPTION - Utility Placement API usability Requirements Analysis complete
+
+---
+
+## Utility Placement API Usability Completion
+**Timestamp**: 2026-08-28T21:26:54Z
+**User Input**: "No new user input; completed the approved Utility Placement API usability amendment."
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Implemented the clarified case-based workflow test-first. RED produced 11 public-contract failures for the old signature, result return, missing workspace.add, and obsolete observation methods, plus focused notebook/RTD failures and a presentation-module absence failure. GREEN now exposes `problem.target.utility_placement(isothermal=2, sensible=2) -> PinchProblem`; the detached returned case contains the best utilities and retains immutable evidence at `utility_placement_result`, while the source remains unchanged. Added safe `workspace.add(case, name=..., activate=False)` registration with type/name/duplicate validation and evidence preservation. Removed placement-specific metrics/frame/report methods and presentation module. Notebook 19 now uses one concise call, workspace.add, ordinary targeting/summary/GCC/TSP, and no nested result-to-input conversion. RTD and the exact 192-operation manifest are current. The focused gate passed 297 tests with 3 expected skips. The complete solver-enabled suite passed 2,389 tests with 4 expected skips in 285.02 seconds. Ruff, patch hygiene, warning-clean docs, fresh source/wheel builds, and isolated installed-wheel notebook execution pass at 1.0940185892615926 kW/K with eight utilities and both standard plots."
+**Context**: CONSTRUCTION / BUILD AND TEST - Utility Placement API usability amendment complete
+
+---
+
+## Utility Placement Total Site API Feedback
+**Timestamp**: 2026-08-28T22:03:30Z
+**User Input**: "base_target=\"total_site\" is not intuitive."
+**AI Response**: "Reopened the completed Utility Placement API usability work for a focused public-scope correction. Initially assessed an explicit `total_site_utility_placement(...)` method, then paused implementation when the following hierarchy-level feedback showed that target type alone does not resolve utility ownership."
+**Context**: INCEPTION - Utility Placement hierarchy API Requirements Analysis
+
+---
+
+## Utility Placement Hierarchy-Level Feedback
+**Timestamp**: 2026-08-28T22:03:30Z
+**User Input**: "It's not clear which level utility_placement() applies to. It could be community or site or process etc"
+**AI Response**: "Confirmed from the domain model that OpenPinch distinguishes Region, Community, Site, Process Zone, Utility Zone, and Unit Operation, while Total Site targeting is specifically restricted to Site zones and indirect targeting owns other aggregate levels. Created four focused questions covering the public API shape, hierarchy-to-profile mapping, zone-selection strictness, and notebook coverage. No tests or production code were changed. Security and Resiliency remain disabled; Property-Based Testing remains enabled for the later implementation."
+**Context**: INCEPTION - Utility Placement hierarchy API Requirements Analysis awaiting answers
+
+---
+
+## Utility Placement Existing-Utility Inference Requirement
+**Timestamp**: 2026-08-28T22:05:17Z
+**User Input**: "Furthermore, if a PinchProblem already has utilities specified, the number of isothermal and sensible levels can be inferred."
+**AI Response**: "Added existing-utility inference to the active hierarchy API Requirements Analysis. Extended the question file to resolve count precedence, classification of ordinary utilities that lack an explicit placement-kind field, and asymmetric hot/cold inferred sets. No tests or production code were changed."
+**Context**: INCEPTION - Utility Placement hierarchy API Requirements Analysis awaiting answers
+
+---
+
+## Utility Placement Hierarchy API Answer Review
+**Timestamp**: 2026-08-28T22:13:19Z
+**User Input**: "Done."
+**AI Response**: "Validated the hierarchy answers. The placement call defaults to the `PinchProblem` master zone and accepts a zone name or object; the selected zone type determines the profile: Process uses direct GCC, Site uses Total Site Profile, and Community or Region uses indirect aggregate utility profiles. An explicit zone may identify any hierarchy node, while omitted selection uses the master zone. The notebook shall demonstrate separate Process/GCC and Site/TSP workflows. Existing utility kind is inferred from thermal span. Detected ambiguity between count override and existing-template inference, and between current per-side counts and the note that each level can be either hot or cold. Created three focused clarification questions; no tests or production code were changed."
+**Context**: INCEPTION - Utility Placement hierarchy API Requirements Analysis clarification required
+
+---
+
+## Utility Placement Hierarchy API Clarification Completion
+**Timestamp**: 2026-08-28T22:17:52Z
+**User Input**: "Done"
+**AI Response**: "Validated the final answers. Omitted counts use existing typed utilities and infer their kinds; any supplied count switches to generated-template mode. Generated counts remain per side: two isothermal and two sensible conceptual levels produce eight hot/cold entries with opposite temperature direction. The prior asymmetric-inventory answer requires deterministic padding in inferred mode. Updated the comprehensive requirements and approval record, created the focused workflow and checkbox TDD plans, and proceeded to public-signature RED under the user's standing authorization. Security and Resiliency remain disabled; enabled Property-Based Testing applies to routing and inference invariants."
+**Context**: INCEPTION / CONSTRUCTION - Utility Placement hierarchy API amendment approved and TDD planning complete
+
+---
+
+## Utility Placement Hierarchy API Completion
+**Timestamp**: 2026-08-28T22:55:30Z
+**User Input**: "No new user input; completed the approved Utility Placement hierarchy API amendment."
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Implemented the hierarchy-aware case API test-first. `utility_placement()` defaults to the master zone, accepts an optional hierarchy zone, routes Process and Unit Operation to direct GCC, Site to Total Site targeting, and Community or Region to aggregate indirect targeting. Omitted counts infer isothermal and sensible templates from active existing utilities, including `Both` expansion and deterministic asymmetric padding; any explicit count selects generated-template mode. Notebook 19 executes separate Process/GCC and Site/TSP workflows with two isothermal and two sensible levels per side. RTD and API documentation are current. Ruff, patch hygiene, warnings-as-errors Sphinx, fresh source/wheel builds, archive inspection, and isolated-wheel Process, Site, inference, and standard-plot smoke tests pass. The complete solver-enabled suite passed 2,404 tests with 4 expected skips in 327.41 seconds. Security and Resiliency extensions are disabled; enabled Property-Based Testing is compliant."
+**Context**: CONSTRUCTION / BUILD AND TEST - Utility Placement hierarchy API amendment complete
+
+---
+
+## Utility Placement Commit Request
+**Timestamp**: 2026-08-28T23:22:12Z
+**User Input**: "Commit to develop."
+**AI Response**: "Verified that the active branch is `develop`; prepared to stage and commit the completed Utility Placement feature while excluding the unrelated pre-existing `.gitignore` modification."
+**Context**: SOURCE CONTROL - Commit approved completed Utility Placement work to develop
 
 ---

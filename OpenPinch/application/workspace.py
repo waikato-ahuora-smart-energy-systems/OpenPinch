@@ -123,6 +123,9 @@ class _CaseBatchTargetAccessor(_CaseBatchAccessor):
     def energy_transfer(self, **kwargs):
         return self._run("energy_transfer", **kwargs)
 
+    def utility_placement(self, **kwargs):
+        return self._run("utility_placement", **kwargs)
+
 
 class _CaseBatchAllPeriodsTargetAccessor(_CaseBatchAccessor):
     """Mirror supported all-period target workflows over selected cases."""
@@ -174,6 +177,9 @@ class _CaseBatchAllPeriodsTargetAccessor(_CaseBatchAccessor):
 
     def energy_transfer(self, **kwargs):
         return self._run("energy_transfer", **kwargs)
+
+    def utility_placement(self, **kwargs):
+        return self._run("utility_placement", **kwargs)
 
 
 class _CaseBatchDesignAccessor(_CaseBatchAccessor):
@@ -354,6 +360,25 @@ class PinchWorkspace:
         if build_validation_report(case_input).valid:
             return self.case(name)
         return None
+
+    def add(
+        self,
+        case: PinchProblem,
+        *,
+        name: str,
+        activate: bool = False,
+    ) -> PinchProblem:
+        """Register a detached normal case without copying analysis caches."""
+        if not isinstance(case, PinchProblem):
+            raise TypeError("case must be a PinchProblem")
+        resolved_name = validate_workspace_case_name(name)
+        if resolved_name in self._case_inputs:
+            raise ValueError(f"Case name already exists: {resolved_name!r}.")
+        added = self.load(case, case_name=resolved_name, activate=activate)
+        if added is None:  # pragma: no cover - a PinchProblem is already validated
+            raise ValueError("case input is invalid")
+        added._utility_placement_result = deepcopy(case.utility_placement_result)
+        return added
 
     def validation_report(self, case_name: Optional[str] = None):
         """Return a structured validation report for one case input."""

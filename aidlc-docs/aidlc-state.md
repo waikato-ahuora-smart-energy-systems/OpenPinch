@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: COMPLETE - Indirect Profile Precision; Operations N/A
+- **Current Stage**: Utility Placement hierarchy API amendment complete.
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -12,8 +12,8 @@
 - **Project Structure**: Python library with application, domain, contracts,
   analysis, optimisation, adapters, presentation, CLI, tests, documentation,
   scripts, notebooks, examples, and packaged data
-- **Reverse Engineering Needed**: No, completed for the current repository state
-- **Reverse Engineering Artifacts**: Generated under aidlc-docs/inception/reverse-engineering/
+- **Reverse Engineering Needed**: No, refreshed on 2026-08-23
+- **Reverse Engineering Artifacts**: Current under aidlc-docs/inception/reverse-engineering/
 - **Workspace Root**: /Users/timothyw/Github_Local/OpenPinch
 
 ## Code Location Rules
@@ -24,9 +24,217 @@
 ## Extension Configuration
 | Extension | Enabled | Decided At |
 |---|---|---|
-| Security Baseline | No | Notebook Improvement Requirements Analysis |
-| Property-Based Testing | Partial | Notebook Improvement Requirements Analysis |
-| Resiliency Baseline | No | Notebook Improvement Requirements Analysis |
+| Security Baseline | No | Utility Placement Requirements Analysis |
+| Property-Based Testing | Yes | Utility Placement Requirements Analysis |
+| Resiliency Baseline | No | Utility Placement Requirements Analysis |
+
+## Utility Placement Optimisation Progress
+
+- [x] REQUIREMENTS CORRECTION - Monetary utility placement and its paused
+  boiler/turbine amendment are deferred in full. The current feature is
+  thermodynamic-only and retains balanced-composite entropy generation,
+  all-period weighted summation, and generated-default-utility exclusion.
+- [x] CONSTRUCTION - Thermodynamic-only removal, non-cosmetic scope audit, and
+  case-based API usability amendment completed; 2,389 tests passed with 4
+  expected skips and solver markers enabled.
+- [x] API USABILITY AMENDMENT - The concise call uses `isothermal` and
+  `sensible`, returns a detached normal optimized case, retains evidence on
+  that case, and registers it explicitly through `workspace.add(...)`.
+- [x] HIERARCHY API AMENDMENT - Make Process, Site, Community, and Region
+  utility ownership explicit and remove the ambiguous public target selector;
+  infer typed levels from existing utilities when counts are omitted. TDD,
+  notebook/RTD, packaging, installed-wheel smoke, and full Build and Test are
+  complete under continuing authorization; 2,404 tests passed with 4 expected
+  skips.
+
+- [x] INCEPTION - Workspace Detection completed for the existing brownfield Python library.
+- [x] INCEPTION - Reverse Engineering refreshed and approved by the user.
+- [x] INCEPTION - Comprehensive Requirements Analysis updated and approved by the user.
+- [x] INCEPTION - User Stories assessment, approved plan, four personas, and 12 stories generated and approved.
+- [x] INCEPTION - Workflow Planning generated and approved by the user.
+- [x] INCEPTION - Application Design generated, validated, and approved by the user.
+- [x] INCEPTION - Units Generation Part 1 decomposition plan answered and approved by the user.
+- [x] INCEPTION - Units Generation Part 2 artifacts generated, validated, and approved by the user.
+- [x] CONSTRUCTION - Unit 1 Placement Contracts and Pure Model Functional Design generated, PBT-01 compliant, and approved by the user.
+- [x] CONSTRUCTION - Unit 1 NFR Requirements generated, validated, PBT-09 compliant, and approved by the user.
+- [x] CONSTRUCTION - Unit 1 NFR Design generated, validated, and approved by the user.
+- [x] CONSTRUCTION - Unit 1 Infrastructure Design skipped; no infrastructure boundary exists.
+- [x] CONSTRUCTION - Unit 1 Code Generation Part 1 plan generated and approved by the user.
+- [x] SCOPE AMENDMENT - CLI integration excluded; Unit 3 delivers exactly one
+  executable generated notebook demonstrating the thermodynamic workflow,
+  named-case utility replacement, and standard plots, with manifest,
+  execution, and package-data verification.
+- [x] CONSTRUCTION - Unit 1 Code Generation Part 2 implementation, focused verification, regression, packaging, summary, and generated-code approval complete.
+- [x] CONSTRUCTION - Unit 2 Placement Evaluation and Optimisation Service
+  Functional Design generated, validated, PBT-01 compliant, and approved.
+- [x] CONSTRUCTION - Unit 2 NFR Requirements generated, validated, PBT-09
+  compliant, and approved under continuing authorization.
+- [x] CONSTRUCTION - Unit 2 NFR Design generated, validated, and approved under
+  continuing authorization; Infrastructure Design remains skipped.
+- [x] CONSTRUCTION - Unit 2 Code Generation Part 1 plan generated, PBT-01
+  through PBT-10 compliant, and approved under continuing authorization.
+- [x] CONSTRUCTION - Unit 2 Code Generation Part 2 implementation, properties,
+  real optimizer regression, performance, coverage, compatibility,
+  distribution, summary, and generated-code approval complete.
+- [x] CONSTRUCTION - Unit 3 Functional Design, NFR Requirements, and NFR
+  Design generated, validated, and approved under continuing authorization;
+  Infrastructure Design skipped because no infrastructure boundary exists.
+- [x] CONSTRUCTION - Unit 3 Code Generation Part 1 plan generated and approved
+  under continuing authorization.
+- [x] CONSTRUCTION - Unit 3 Code Generation Part 2 implementation, public
+  integration, properties, notebook, docs, regression, distribution, summary,
+  and generated-code approval complete.
+- **Unit 3 Code Generation plan**:
+  `aidlc-docs/construction/plans/utility-placement-public-workflow-presentation-integration-code-generation-plan.md`.
+- **Unit 3 Code Generation summary**:
+  `aidlc-docs/construction/utility-placement-public-workflow-presentation-integration/code/code-summary.md`.
+- **Executable notebook**:
+  `OpenPinch/data/notebooks/19_utility_placement_optimisation.ipynb`.
+- **Unit 2 Functional Design plan**:
+  `aidlc-docs/construction/plans/utility-placement-evaluation-optimisation-service-functional-design-plan.md`.
+- **Unit 2 Functional Design artifacts**:
+  `aidlc-docs/construction/utility-placement-evaluation-optimisation-service/functional-design/`.
+- **Unit 2 NFR Requirements plan**:
+  `aidlc-docs/construction/plans/utility-placement-evaluation-optimisation-service-nfr-requirements-plan.md`.
+- **Unit 2 NFR Requirements artifacts**:
+  `aidlc-docs/construction/utility-placement-evaluation-optimisation-service/nfr-requirements/`.
+- **Unit 2 NFR Design plan**:
+  `aidlc-docs/construction/plans/utility-placement-evaluation-optimisation-service-nfr-design-plan.md`.
+- **Unit 2 NFR Design artifacts**:
+  `aidlc-docs/construction/utility-placement-evaluation-optimisation-service/nfr-design/`.
+- **Unit 2 Code Generation plan**:
+  `aidlc-docs/construction/plans/utility-placement-evaluation-optimisation-service-code-generation-plan.md`.
+- **Unit 1 Code Generation summary**: `aidlc-docs/construction/utility-placement-contracts-pure-model/code/code-summary.md`.
+- **Unit 1 Code Generation plan**: `aidlc-docs/construction/plans/utility-placement-contracts-pure-model-code-generation-plan.md`.
+- **Unit 1 NFR Design plan**: `aidlc-docs/construction/plans/utility-placement-contracts-pure-model-nfr-design-plan.md`.
+- **Unit 1 NFR Design artifacts**: `aidlc-docs/construction/utility-placement-contracts-pure-model/nfr-design/`.
+- **Unit 1 NFR Requirements plan**: `aidlc-docs/construction/plans/utility-placement-contracts-pure-model-nfr-requirements-plan.md`.
+- **Unit 1 NFR Requirements artifacts**: `aidlc-docs/construction/utility-placement-contracts-pure-model/nfr-requirements/`.
+- **Unit 1 Functional Design plan**: `aidlc-docs/construction/plans/utility-placement-contracts-pure-model-functional-design-plan.md`.
+- **Unit 1 Functional Design artifacts**: `aidlc-docs/construction/utility-placement-contracts-pure-model/functional-design/`.
+- [x] CONSTRUCTION - All unit Functional Design stages completed with blocking PBT-01.
+- [x] CONSTRUCTION - All applicable unit NFR Requirements and NFR Design stages completed.
+- [x] CONSTRUCTION - Infrastructure Design skipped; no infrastructure change.
+- [x] CONSTRUCTION - TDD Code Generation complete and approved for Units 1, 2, and 3.
+- [x] CONSTRUCTION - Integrated Build and Test complete; summary at
+  `aidlc-docs/construction/build-and-test/build-and-test-summary.md`.
+- [x] OPERATIONS - N/A for Utility Placement; the workflow stage is a
+  placeholder and no deployment or publication was requested.
+- **Current scope**: Utility placement accepts at least two isothermal levels
+  and optional sensible levels per side and minimizes physical entropy
+  generation from balanced composite curves. Monetary placement is deferred.
+- **Testing approach**: Test-driven development is mandatory for construction.
+- **Example delivery**: Unit 3 owns
+  `OpenPinch/data/notebooks/19_utility_placement_optimisation.ipynb`; no
+  utility-placement CLI is planned.
+- **Question artifact**: `aidlc-docs/inception/requirements/utility-placement-requirement-verification-questions.md`.
+- **Clarification artifact**: `aidlc-docs/inception/requirements/utility-placement-requirements-clarification-questions.md`.
+- **Requirements artifact**: `aidlc-docs/inception/requirements/utility-placement-requirements.md`.
+- **Requirements approval**: `aidlc-docs/inception/requirements/utility-placement-requirements-approval.md`.
+- **User Stories assessment**: `aidlc-docs/inception/plans/utility-placement-user-stories-assessment.md`.
+- **Story generation plan**: `aidlc-docs/inception/plans/story-generation-plan.md`.
+- **Story plan approval**: `aidlc-docs/inception/plans/utility-placement-story-plan-approval.md`.
+- **Personas**: `aidlc-docs/inception/user-stories/utility-placement/personas.md`.
+- **Stories**: `aidlc-docs/inception/user-stories/utility-placement/stories.md`.
+- **Generated stories approval**: `aidlc-docs/inception/user-stories/utility-placement/approval.md`.
+- **Execution plan**: `aidlc-docs/inception/plans/utility-placement-execution-plan.md`.
+- **Workflow plan approval**: `aidlc-docs/inception/plans/utility-placement-workflow-plan-approval.md`.
+- **Application Design plan**: `aidlc-docs/inception/plans/application-design-plan.md` (Utility Placement section).
+- **Application Design artifacts**: Utility Placement sections in `aidlc-docs/inception/application-design/components.md`, `component-methods.md`, `services.md`, `component-dependency.md`, and `application-design.md`.
+- **Application Design approval**: `aidlc-docs/inception/application-design/utility-placement-application-design-approval.md`.
+- **Unit plan**: `aidlc-docs/inception/plans/unit-of-work-plan.md` (Utility Placement section).
+- **Unit artifacts**: Utility Placement sections in `aidlc-docs/inception/application-design/unit-of-work.md`, `unit-of-work-dependency.md`, and `unit-of-work-story-map.md`.
+- **Units approval**: `aidlc-docs/inception/application-design/utility-placement-units-approval.md`.
+- **Extensions**: Full Property-Based Testing enforcement enabled; Security and Resiliency disabled.
+- **Corrective closure**: A final thermodynamic sanity audit replaced empty
+  problem-table-derived entropy evidence with period-resolved physical process
+  stream/segment slices at real temperatures and calibrated Total Site rounded
+  profiles to exact target residuals. The refreshed focused gate passed 278
+  tests with 3 skips at 97 percent application/presentation branch coverage;
+  the complete non-solver gate passed 2,456 tests with 3 skips and 4 solver
+  deselections, with the sandbox-only Chrome export passing under local-browser
+  permission.
+- [x] SCOPE AMENDMENT - The executable notebook requires two isothermal and two
+  sensible utility levels per side for the thermodynamic objective and standard
+  GCC or Total Site Profile output with the optimized utilities.
+- [x] CONSTRUCTION - Mixed-level graph amendment requirements and TDD plan
+  approved under the user's continuing authorization.
+- [x] CONSTRUCTION - Mixed-level graph amendment Code Generation complete.
+- [x] CONSTRUCTION - Mixed-level graph amendment Build and Test refresh complete.
+- **Mixed-level graph closure**: The canonical notebook executes two
+  isothermal plus two sensible levels per hot/cold side and displays the
+  optimized direct utility profile on a standard GCC. The public
+  detached plot selects a TSP for Total Site results. The refreshed focused
+  gate passed 397 tests with 3 skips at 97 percent utility-placement
+  application/presentation branch coverage; the complete non-solver gate
+  passed 2,458 tests with 3 skips and 4 solver deselections, with the unchanged
+  sandbox-only Chrome export passing under local-browser permission.
+- [x] REQUIREMENTS CORRECTION - `problem.plot.utility_placement(...)` is
+  explicitly excluded. The single notebook shall replace utilities in a new
+  named case and display that case with the existing standard GCC and Total
+  Site Profile plot methods.
+- [x] CONSTRUCTION - Named-case replacement correction complete through Unit 3
+  Code Generation and integrated Build and Test under the user's continuing
+  authorization.
+- **Named-case correction closure**: The dedicated placement plot accessor and
+  graph adapter were removed. Notebook 19 replaces eight optimized utilities
+  in a new case, runs ordinary direct and Total Site targets, and displays the
+  standard GCC and TSP while leaving the baseline unchanged. The focused gate
+  passed 169 tests at 97 percent application branch coverage; the complete
+  non-solver gate passed 2,459 tests with 3 skips and 4 solver deselections;
+  Ruff, 54-page warnings-as-errors documentation, exact 194/194 inventory,
+  fresh archives, and wheel-only notebook execution pass.
+- [x] REQUIREMENTS CORRECTION - Thermodynamic placement minimizes the entropy-
+  weighted area between the residual process profile and candidate utility
+  profile; whole-process entropy is not the placement objective.
+- [x] CONSTRUCTION - Profile-gap thermodynamic correction complete through Unit
+  2/3 Code Generation and refreshed integrated Build and Test under the user's
+  continuing authorization.
+- **Profile-gap correction closure**: The objective now integrates absolute
+  residual-process/utility horizontal separation over reciprocal absolute
+  temperature. The corrected notebook result uses active hot utility
+  178.01 to 148.006 degC and active cold utility 2.99 to 32.994 degC at
+  0.8764152060442507 kW/K. The focused ownership gate passed 179 tests and the
+  complete focused/notebook/documentation gate passed 216 tests with 3 guarded
+  skips; the kernel has 100 percent branch coverage; the fixed-seed non-solver
+  gate passed 2,469 tests with 3 guarded skips and 4 solver deselections. Ruff,
+  54-source warnings-as-errors documentation, fresh archives, and final
+  installed-wheel notebook execution pass.
+- [x] REQUIREMENTS CORRECTION - Physical thermodynamic cost uses logarithmic
+  entropy generation from candidate-local balanced composite curves; generated
+  default `HU`/`CU` utilities are excluded through a deterministic infeasible
+  penalty.
+- [x] CONSTRUCTION - Balanced-composite entropy and default-utility penalty
+  correction complete through refreshed integrated Build and Test under
+  continuing authorization.
+- **Balanced-composite correction closure**: Thermodynamic placement now builds
+  candidate-local real-temperature balanced composite curves and evaluates
+  physical `CP * ln(T_out / T_in)` sensible entropy plus signed `Q/T`
+  isothermal limits. Positive generated `HU`/`CU` duty is infeasible. The two
+  corrected kernels have 100 percent branch coverage; the full non-solver gate
+  passed 2,480 tests with 3 guarded skips and 4 solver deselections. Ruff,
+  patch hygiene, warning-clean Sphinx, fresh source/wheel archives, and the
+  installed-wheel notebook pass. The notebook thermodynamic objective is
+  1.0940185892615926 kW/K and its entropy decomposition closes exactly.
+- **Thermodynamic-only closure**: The monetary objective selector, price and
+  cogeneration template fields, electricity/turbine inputs, monetary result
+  types, placement-specific economics/cogeneration modules, reporting columns,
+  documentation path, and second notebook workflow were removed. General
+  cogeneration analysis remains unchanged. The final review removed cosmetic
+  rewrites of notebooks 1-18, made the canonical generator preserve equivalent
+  checked-in notebooks, and corrected stale RTD scope and coverage text. The
+  complete post-review suite passed 2,385 tests with 4 expected skips and
+  solver markers enabled; Ruff, patch hygiene, warning-clean documentation,
+  fresh archives, and installed-wheel notebook execution pass.
+- **API usability closure**: The target call now returns a normal unsolved
+  `PinchProblem` containing the best utility set; the source remains unchanged.
+  `workspace.add(case, name=..., activate=False)` registers it and preserves
+  placement evidence. The verbose count keywords, detailed-result return,
+  placement-specific presentation methods/module, notebook result traversal,
+  and manual utility-dictionary construction were removed. The focused gate
+  passed 297 tests with 3 expected skips; the full solver-enabled suite passed
+  2,389 tests with 4 expected skips. Ruff, patch hygiene, warning-clean RTD,
+  fresh archives, and isolated installed-wheel notebook execution pass.
 
 ## Indirect Profile Precision Progress
 

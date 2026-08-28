@@ -59,6 +59,7 @@ def rebuild_problem_state(
     problem._results = None
     problem._last_target_run_spec = None
     problem._period_results = {}
+    problem._utility_placement_result = None
     return problem._master_zone
 
 

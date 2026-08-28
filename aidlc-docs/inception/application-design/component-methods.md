@@ -125,3 +125,196 @@ The names below are internal design signatures; they do not add root exports.
   yields verified modules/callables and restores interpreter import state.
 - `_run_source_openhens(..., openhens_factory: Callable[..., Any])` consumes the
   verified factory and performs no ambient `openhens` import.
+
+## Utility Placement Optimisation Methods
+
+The signatures below define interface shape; detailed equations, tolerances,
+and validation algorithms remain for per-unit Functional Design.
+
+### Public application surfaces
+
+```python
+_TargetAccessor.utility_placement(
+    *,
+    isothermal: int | None = None,
+    sensible: int | None = None,
+    zone: str | Zone | None = None,
+    period_ids: Sequence[str] | None = None,
+    options: UtilityPlacementOptions | Mapping[str, object] | None = None,
+) -> PinchProblem
+
+_AllPeriodsTargetAccessor.utility_placement(
+    **same_keyword_arguments_except_period_ids,
+) -> PinchProblem
+
+_CaseBatchTargetAccessor.utility_placement(**kwargs) -> CaseBatchResult
+_CaseBatchAllPeriodsTargetAccessor.utility_placement(**kwargs) -> CaseBatchResult
+
+PinchWorkspace.add(
+    case: PinchProblem,
+    *,
+    name: str,
+    activate: bool = False,
+) -> PinchProblem
+```
+
+`period_ids=None` selects the problem's canonical ordered periods, or its
+single scalar context when no period axis exists. The all-period method is an
+explicit alias for that shared-placement behavior; it must not use the generic
+per-period `_run` loop because that would produce independent placements.
+Public keyword arguments are normalized immediately to an immutable
+`UtilityPlacementRequest` so that specialist callers can also construct and
+validate the request directly. Omitted counts infer templates from existing
+problem utilities; supplied counts generate paired hot/cold templates. Omitted
+zone uses the master zone, and the selected zone type resolves direct, Total
+Site, or aggregate indirect scope without a public target selector.
+
+### Contract construction and serialization
+
+```python
+UtilityPlacementRequest.from_public_arguments(...) -> UtilityPlacementRequest
+UtilityPlacementRequest.model_dump_json(...) -> str
+UtilityPlacementResult.model_validate_json(value: str) -> UtilityPlacementResult
+UtilityPlacementResult.best -> UtilityPlacementCandidate
+```
+
+The internal request owns counts, ordered templates, scope, selected periods,
+weights, named tolerances, and optimiser options. `UtilityLevelTemplate`
+separates side and kind from temperature/span bounds, fixed span, and optional
+fluid metadata. Nested evidence contracts
+carry only serializable values, units, enums, tuples/lists, mappings, and typed
+diagnostics.
+
+### Application context boundary
+
+```python
+build_utility_placement_context(
+    *,
+    execution_zone: Zone,
+    request: UtilityPlacementRequest,
+    direct_service: Callable[..., Zone],
+    total_site_service: Callable[..., Zone],
+) -> UtilityPlacementContext
+
+build_optimized_utility_case(
+    source: PinchProblem,
+    result: UtilityPlacementResult,
+) -> PinchProblem
+```
+
+The builder receives an isolated execution-zone copy and returns detached
+period profiles plus metadata. The case builder replaces utilities only on a
+new normal problem and stores detached evidence there; it never changes source
+inputs, configuration, canonical heat targets, workspace selection, or the
+legacy `TargetOutput` cache.
+
+### Template and vector model
+
+```python
+normalise_utility_templates(
+    request: UtilityPlacementRequest,
+    context: UtilityPlacementContext,
+) -> UtilityTemplateSet
+
+derive_placement_bounds(
+    templates: UtilityTemplateSet,
+    context: UtilityPlacementContext,
+) -> tuple[tuple[float, float], ...]
+
+build_initial_candidates(
+    templates: UtilityTemplateSet,
+    bounds: Sequence[tuple[float, float]],
+) -> tuple[tuple[float, ...], ...]
+
+encode_placement(candidate: DecodedPlacement) -> tuple[float, ...]
+decode_placement(
+    point: Sequence[float],
+    templates: UtilityTemplateSet,
+) -> DecodedPlacement
+```
+
+Encoding order is deterministic by side, template kind, and declared template
+order. Isothermal spans are fixed metadata and therefore do not consume a span
+coordinate; each sensible level consumes supply-temperature and span
+coordinates.
+
+### Candidate and objective evaluation
+
+```python
+evaluate_placement_candidate(
+    point: Sequence[float],
+    *,
+    model: UtilityPlacementModel,
+    context: UtilityPlacementContext,
+) -> CandidateEvaluation
+
+evaluate_period_coverage(
+    placement: DecodedPlacement,
+    period: PlacementPeriodContext,
+) -> PeriodCoverage
+
+evaluate_entropy_objective(
+    coverage: PeriodCoverage,
+    *,
+    ambient_temperature: float,
+    tolerances: UtilityPlacementTolerances,
+) -> ThermodynamicCostBreakdown
+
+```
+
+Candidate evaluation returns structured infeasibility rather than throwing for
+ordinary candidate rejection. Invalid requests, empty feasible bounds,
+targeting failures, non-finite objectives, and solve
+exhaustion use distinct placement exception subclasses.
+
+### Service and optimisation coordination
+
+```python
+run_utility_placement_service(
+    context: UtilityPlacementContext,
+    request: UtilityPlacementRequest,
+    *,
+    minimise: Callable[..., OptimisationResult] = run_multistart_minimisation,
+) -> UtilityPlacementResult
+
+build_optimisation_problem(
+    model: UtilityPlacementModel,
+    context: UtilityPlacementContext,
+) -> OptimisationProblem
+
+normalise_placement_candidates(
+    result: OptimisationResult,
+    evaluations: Mapping[tuple[float, ...], CandidateEvaluation],
+    *,
+    limit: int,
+) -> tuple[UtilityPlacementCandidate, ...]
+```
+
+The default callable dependencies remain injectable for focused tests. The
+coordinator delegates backend execution to the existing optimiser and sorts
+successful candidates by objective value followed by the decoded coordinate
+tuple.
+
+### Normal-case observation and registration
+
+```python
+optimized_case.utility_placement_result -> UtilityPlacementResult
+optimized_case.target.direct_heat_integration(...) -> BaseTargetModel
+optimized_case.summary_frame(...) -> DataFrame
+optimized_case.plot.grand_composite_curve(...) -> Figure
+workspace.add(optimized_case, name=..., activate=False) -> PinchProblem
+```
+
+The placement call returns the normal case. Targeting, summaries, reports, and
+plots remain explicit ordinary case operations. Registration preserves only
+placement evidence in addition to canonical case input.
+
+### Executable notebook contract
+
+`OpenPinch/data/notebooks/19_utility_placement_optimisation.ipynb` is generated
+by `scripts/generate_tutorial_notebooks.py`, registered by the canonical
+tutorial-coverage manifest, and executed under its declared notebook profile.
+Its code cells call the public target accessor once with concise counts, add the
+returned normal case to the workspace, then use ordinary target, summary, GCC,
+and Total Site Profile methods. It has no CLI invocation, nested result-to-input
+conversion, or placement-specific presentation method.

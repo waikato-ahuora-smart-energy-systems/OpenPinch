@@ -147,6 +147,94 @@ def test_compute_direct_integration_targets_uses_empty_area_payload_when_disable
     assert result["zone_name"] == "Area"
 
 
+def test_compute_direct_integration_targets_uses_unshifted_real_table_for_limit(
+    monkeypatch,
+):
+    shifted = ProblemTable(
+        {
+            ProblemTableLabel.T: [300.0, 200.0],
+            ProblemTableLabel.H_NET: [20.0, 50.0],
+            ProblemTableLabel.H_NET_A: [20.0, 50.0],
+            ProblemTableLabel.H_HOT: [100.0, 0.0],
+            ProblemTableLabel.H_COLD: [0.0, 50.0],
+            ProblemTableLabel.H_HOT_UT: [0.0, 0.0],
+            ProblemTableLabel.H_COLD_UT: [0.0, 0.0],
+        }
+    )
+    real_limit = ProblemTable(
+        {
+            ProblemTableLabel.T: [300.0, 200.0],
+            ProblemTableLabel.H_NET: [0.0, 0.0],
+            ProblemTableLabel.H_NET_A: [0.0, 0.0],
+            ProblemTableLabel.H_HOT: [100.0, 0.0],
+            ProblemTableLabel.H_COLD: [0.0, 100.0],
+            ProblemTableLabel.H_HOT_UT: [0.0, 0.0],
+            ProblemTableLabel.H_COLD_UT: [0.0, 0.0],
+        }
+    )
+    real_aligned = ProblemTable(
+        {
+            ProblemTableLabel.T: [300.0, 200.0],
+            ProblemTableLabel.H_NET: [50.0, 50.0],
+            ProblemTableLabel.H_NET_A: [50.0, 50.0],
+            ProblemTableLabel.H_HOT: [100.0, 0.0],
+            ProblemTableLabel.H_COLD: [50.0, 150.0],
+            ProblemTableLabel.H_HOT_UT: [0.0, 0.0],
+            ProblemTableLabel.H_COLD_UT: [0.0, 0.0],
+        }
+    )
+
+    def fake_cascade(**kwargs):
+        if kwargs["is_shifted"]:
+            return shifted
+        if "known_heat_recovery" in kwargs:
+            return real_aligned
+        return real_limit
+
+    zone = SimpleNamespace(
+        name="Area",
+        address="Area",
+        type=ZoneType.P.value,
+        parent_zone=None,
+        period_ids=None,
+        all_streams=StreamCollection(),
+        hot_streams=StreamCollection(),
+        cold_streams=StreamCollection(),
+        hot_utilities=StreamCollection(),
+        cold_utilities=StreamCollection(),
+        config=SimpleNamespace(
+            direct=SimpleNamespace(
+                vertical_gcc_enabled=False,
+                assisted_ht_enabled=False,
+                assisted_ht_dt=0.0,
+                balanced_cc_enabled=False,
+            ),
+            targeting=SimpleNamespace(area_cost_enabled=False),
+        ),
+    )
+    monkeypatch.setattr(direct, "get_process_heat_cascade", fake_cascade)
+    monkeypatch.setattr(direct, "get_additional_GCCs", lambda pt, **_kwargs: pt)
+    monkeypatch.setattr(direct, "get_utility_targets", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        direct,
+        "_create_net_hot_and_cold_stream_collections_for_site_analysis",
+        lambda **_kwargs: (StreamCollection(), StreamCollection()),
+    )
+    monkeypatch.setattr(direct, "_save_graph_data", lambda *_args: {})
+    monkeypatch.setattr(
+        direct.DirectIntegrationTarget,
+        "model_validate",
+        staticmethod(lambda data: data),
+    )
+
+    result = direct.compute_direct_integration_targets(zone)
+
+    assert result["heat_recovery_target"] == pytest.approx(50.0)
+    assert result["heat_recovery_limit"] == pytest.approx(100.0)
+    assert result["degree_of_int"] == pytest.approx(0.5)
+    assert result["pt_real"] is real_aligned
+
+
 def test_save_graph_data_rounds_graph_copies_without_mutating_problem_tables():
     temperatures = [200.00004, 200.00001, 100.00003]
     enthalpies = [10.00006, 0.0, 5.00004]

@@ -6,7 +6,9 @@
 from __future__ import annotations
 
 import json
+import tokenize
 from copy import deepcopy
+from io import StringIO
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -172,6 +174,7 @@ NOTEBOOKS = {
                 "        prepared_hot.segments, prepared_hot.segments[1:]\n"
                 "    )\n"
                 ")\n"
+                "composite = problem.plot.composite_curve()\n"
                 "segment_table"
             ),
         ],
@@ -562,7 +565,13 @@ NOTEBOOKS = {
                 "period_transfers = site.target.all_periods.energy_transfer()\n"
                 'bleaching = PinchProblem("pulp_mill.json", project_name="Site")\n'
                 'bleaching.target.direct_heat_integration(zone="Bleaching")\n'
-                "comparison = site.compare_to(bleaching)"
+                "comparison = site.compare_to(\n"
+                "    bleaching,\n"
+                '    scope="Site/Bleaching",\n'
+                '    zone_type="Process Zone",\n'
+                '    integration_type="Process",\n'
+                '    target_method="Heat Exchange",\n'
+                ")"
             ),
         ],
     ),
@@ -728,6 +737,78 @@ NOTEBOOKS = {
             ),
         ],
     ),
+    "19_utility_placement_optimisation.ipynb": tutorial(
+        "Utility Placement Optimisation",
+        level="Advanced",
+        profile="base",
+        runtime="under 2 minutes",
+        extras="plot",
+        cells=[
+            code(
+                "from OpenPinch import PinchWorkspace\n\n"
+                "workspace = PinchWorkspace(\n"
+                '    source="chocolate_factory.json", project_name="Site"\n'
+                ")\n"
+                'problem = workspace.use_case("baseline")\n'
+                "baseline_input = problem.to_problem_json()\n"
+                "search_options = {\n"
+                '    "iteration_limit": 1,\n'
+                '    "evaluation_limit": 100,\n'
+                '    "candidate_limit": 2,\n'
+                '    "run_count": 1,\n'
+                "}"
+            ),
+            code(
+                "process_case = problem.target.utility_placement(\n"
+                "    isothermal=2,\n"
+                "    sensible=2,\n"
+                '    zone="Almond",\n'
+                '    period_ids=("0",),\n'
+                "    options=search_options,\n"
+                ")\n"
+                "process_evidence = process_case.utility_placement_result\n"
+                "process_objective = process_evidence.best.aggregate_objective\n"
+                "process_utilities = process_case.to_problem_json()[\"utilities\"]\n"
+                "assert len(process_utilities) == 8\n"
+                "assert all(\n"
+                "    utility[\"name\"].strip().casefold() not in {\"hu\", \"cu\"}\n"
+                "    for utility in process_utilities\n"
+                ")\n"
+                "process_case = workspace.add(\n"
+                "    process_case,\n"
+                '    name="optimized_process_utilities",\n'
+                "    activate=False,\n"
+                ")\n"
+                "process_case.target.direct_heat_integration(\n"
+                '    zone="Almond", period_id="0"\n'
+                ")\n"
+                "process_summary = process_case.summary_frame()\n"
+                "process_gcc = process_case.plot.grand_composite_curve(\n"
+                '    zone_name="Almond"\n'
+                ")"
+            ),
+            code(
+                "site_case = problem.target.utility_placement(\n"
+                "    isothermal=2,\n"
+                "    sensible=2,\n"
+                '    period_ids=("0",),\n'
+                "    options=search_options,\n"
+                ")\n"
+                "site_evidence = site_case.utility_placement_result\n"
+                "site_objective = site_evidence.best.aggregate_objective\n"
+                "assert len(site_case.to_problem_json()[\"utilities\"]) == 8\n"
+                "site_case = workspace.add(\n"
+                "    site_case,\n"
+                '    name="optimized_site_utilities",\n'
+                "    activate=False,\n"
+                ")\n"
+                "assert workspace.use_case(\"baseline\").to_problem_json() == baseline_input\n"
+                "site_case.target.total_site_heat_integration(period_id=\"0\")\n"
+                "site_summary = site_case.summary_frame()\n"
+                "site_tsp = site_case.plot.total_site_profiles()"
+            ),
+        ],
+    ),
 }
 
 
@@ -863,6 +944,16 @@ GUIDANCE = {
             "Publish active-workspace outputs",
         ),
     ),
+    "19_utility_placement_optimisation.ipynb": (
+        "Where should two isothermal and two sensible hot and cold utility levels be placed at Process and Site hierarchy levels to minimize thermodynamic cost?",
+        "Compare the Process result against its direct GCC and the Site result against its Total Site Profile. Inspect physical entropy generation from the balanced composite curves: use CP * ln(T_out / T_in) in kelvin for sensible intervals and the signed Q / T limit for isothermal intervals. Confirm that no generated HU/CU fallback has positive duty.",
+        "Replace the sample with validated plant data, apply defensible temperature bounds, and increase the optimizer limits before making an engineering decision.",
+        (
+            "Prepare the placement study",
+            "Optimize a Process Zone and build its standard GCC",
+            "Optimize the Site and build its standard Total Site Profile",
+        ),
+    ),
 }
 
 
@@ -885,7 +976,8 @@ PRESENTATIONS: dict[str, tuple[str, str]] = {
         "Inspect the prepared segment boundaries and duties beside the target summary before replacing the example with plant-specific variable-heat-capacity data.",
         "from IPython.display import display\n\n"
         "display(segment_table)\n"
-        "display(problem.summary_frame())",
+        "display(problem.summary_frame())\n"
+        "display(composite)",
     ),
     "04_workspace_cases_and_scenarios.ipynb": (
         "Use the case comparison for the engineering change and the batch summaries for a consistent review across every selected scenario.",
@@ -1021,6 +1113,16 @@ PRESENTATIONS: dict[str, tuple[str, str]] = {
         "display(catalog)\n"
         "display(publication_outputs)",
     ),
+    "19_utility_placement_optimisation.ipynb": (
+        "Review both optimized cases exactly like normal cases: compare the Process utilities on the standard GCC with the Site utilities on the standard Total Site Profile, and retain each placement result for engineering review.",
+        "from IPython.display import display\n\n"
+        "display(process_objective)\n"
+        "display(process_summary)\n"
+        "display(process_gcc)\n"
+        "display(site_objective)\n"
+        "display(site_summary)\n"
+        "display(site_tsp)",
+    ),
 }
 
 
@@ -1072,15 +1174,59 @@ def enrich(name: str, notebook: dict) -> dict:
     return notebook
 
 
+def _code_tokens(cell: dict) -> list[tuple[int, str]]:
+    ignored = {tokenize.ENDMARKER, tokenize.NL, tokenize.NEWLINE}
+    source = "".join(cell.get("source", []))
+    return [
+        (token.type, token.string)
+        for token in tokenize.generate_tokens(StringIO(source).readline)
+        if token.type not in ignored
+    ]
+
+
+def _equivalent_notebooks(generated: dict, existing: dict) -> bool:
+    generated_without_cells = {k: v for k, v in generated.items() if k != "cells"}
+    existing_without_cells = {k: v for k, v in existing.items() if k != "cells"}
+    if generated_without_cells != existing_without_cells:
+        return False
+    if len(generated["cells"]) != len(existing["cells"]):
+        return False
+    for generated_cell, existing_cell in zip(
+        generated["cells"], existing["cells"], strict=True
+    ):
+        generated_without_source = {
+            k: v for k, v in generated_cell.items() if k != "source"
+        }
+        existing_without_source = {
+            k: v for k, v in existing_cell.items() if k != "source"
+        }
+        if generated_without_source != existing_without_source:
+            return False
+        if generated_cell["cell_type"] == "code":
+            if _code_tokens(generated_cell) != _code_tokens(existing_cell):
+                return False
+        elif generated_cell.get("source", []) != existing_cell.get("source", []):
+            return False
+    return True
+
+
 def main() -> None:
     NOTEBOOK_DIR.mkdir(parents=True, exist_ok=True)
     for path in NOTEBOOK_DIR.glob("*.ipynb"):
-        path.unlink()
+        if path.name not in NOTEBOOKS:
+            path.unlink()
     for name, notebook in NOTEBOOKS.items():
         destination = NOTEBOOK_DIR / name
+        generated = enrich(name, deepcopy(notebook))
+        if destination.exists():
+            existing = json.loads(destination.read_text(encoding="utf-8"))
+            for key in ("kernelspec", "language_info"):
+                if key in existing.get("metadata", {}):
+                    generated["metadata"][key] = existing["metadata"][key]
+            if _equivalent_notebooks(generated, existing):
+                continue
         destination.write_text(
-            json.dumps(enrich(name, deepcopy(notebook)), indent=1, ensure_ascii=False)
-            + "\n",
+            json.dumps(generated, indent=1, ensure_ascii=False) + "\n",
             encoding="utf-8",
         )
 

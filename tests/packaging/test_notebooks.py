@@ -6,6 +6,7 @@ import ast
 import csv
 import json
 import os
+import shutil
 from pathlib import Path
 
 import pytest
@@ -60,6 +61,63 @@ def _code_sources(notebook: dict) -> list[str]:
 
 def _combined_source(notebook: dict) -> str:
     return "\n".join(_code_sources(notebook))
+
+
+def test_utility_placement_has_one_executable_thermodynamic_notebook() -> None:
+    names = [
+        path.name
+        for path in (ROOT / "OpenPinch" / "data" / "notebooks").glob("*.ipynb")
+        if "utility_placement" in path.name
+    ]
+
+    assert names == ["19_utility_placement_optimisation.ipynb"]
+    notebook = _load_notebook(
+        ROOT
+        / "OpenPinch"
+        / "data"
+        / "notebooks"
+        / "19_utility_placement_optimisation.ipynb"
+    )
+    source = _combined_source(notebook)
+    assert source.count("target.utility_placement(") == 2
+    assert source.count("isothermal=2") == 2
+    assert source.count("sensible=2") == 2
+    assert 'zone="Almond"' in source
+    assert "base_target" not in source
+    assert "isothermal_level_count" not in source
+    assert "sensible_level_count" not in source
+    assert "monetary" not in source.lower()
+    assert "cogeneration_eligible" not in source
+    assert 'not in {"hu", "cu"}' in source
+    assert "process_case.utility_placement_result" in source
+    assert "site_case.utility_placement_result" in source
+    assert "process_case.summary_frame()" in source
+    assert "site_case.summary_frame()" in source
+    assert ".best.period_results" not in source
+    assert "problem.plot.utility_placement(" not in source
+    assert 'name="optimized_process_utilities"' in source
+    assert 'name="optimized_site_utilities"' in source
+    assert "replacement_input" not in source
+    assert "workspace.add(" in source
+    assert "process_case.target.direct_heat_integration(" in source
+    assert "site_case.target.total_site_heat_integration(" in source
+    assert "process_case.plot.grand_composite_curve(" in source
+    assert "site_case.plot.total_site_profiles(" in source
+    assert "display(process_gcc)" in source
+    assert "display(site_tsp)" in source
+    assert "display(process_summary)" in source
+    assert "display(site_summary)" in source
+    assert "argparse" not in source
+    assert "openpinch utility" not in source
+    markdown = "\n".join(
+        "".join(cell.get("source", []))
+        for cell in notebook["cells"]
+        if cell["cell_type"] == "markdown"
+    )
+    assert "balanced composite curves" in markdown
+    assert "CP * ln(T_out / T_in)" in markdown
+    assert "signed Q / T limit" in markdown
+    assert "monetary" not in markdown.lower()
 
 
 def test_manifest_and_packaged_inventory_are_identical() -> None:
@@ -171,6 +229,21 @@ def test_notebook_generator_is_repeatable_in_process(
 
     assert sorted(first) == EXPECTED_NOTEBOOKS
     assert second == first
+
+
+def test_notebook_generator_does_not_rewrite_current_notebooks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    notebook_dir = ROOT / "OpenPinch" / "data" / "notebooks"
+    for source in notebook_dir.glob("*.ipynb"):
+        shutil.copy2(source, tmp_path / source.name)
+    before = {path.name: path.read_bytes() for path in tmp_path.glob("*.ipynb")}
+    monkeypatch.setattr(notebook_generator, "NOTEBOOK_DIR", tmp_path)
+
+    notebook_generator.main()
+
+    after = {path.name: path.read_bytes() for path in tmp_path.glob("*.ipynb")}
+    assert after == before
 
 
 def test_every_code_cell_compiles_and_uses_only_public_package_imports(

@@ -142,6 +142,46 @@ def test_guides_use_the_public_root_workflow_and_current_vocabulary():
         assert "problem.add_component" not in text
 
 
+def test_utility_placement_guide_documents_the_complete_public_contract():
+    page = _read(GUIDES_ROOT / "utility-placement-optimisation.rst")
+
+    for heading in GUIDE_REQUIRED_HEADINGS:
+        assert heading in page
+    for phrase in (
+        "isothermal=2",
+        "sensible=2",
+        "master zone",
+        "Process Zone",
+        "Site",
+        "Community",
+        "Region",
+        "existing utilities",
+        "period_ids",
+        "workspace.cases",
+        "utility_placement_result",
+        "workspace.add",
+        "process_case.plot.grand_composite_curve",
+        "site_case.plot.total_site_profiles",
+        "standard GCC",
+        "Total Site Profile",
+        "kW/K",
+        "at least 2",
+        "19_utility_placement_optimisation.ipynb",
+    ):
+        assert phrase in page
+    assert "problem.plot.utility_placement" not in page
+    assert "base_target" not in page
+    assert "isothermal_level_count" not in page
+    assert "sensible_level_count" not in page
+    assert "replacement_input" not in page
+    assert "utility_placement_summary_frame" not in page
+    assert "objective=" not in page
+    assert "electricity_price" not in page
+    assert "cogeneration_eligible" not in page
+    assert "openpinch utility" not in page
+    assert "command-line" not in page.lower()
+
+
 def test_packaged_assets_are_documented_in_examples_and_guides():
     combined = _docs_text(
         [

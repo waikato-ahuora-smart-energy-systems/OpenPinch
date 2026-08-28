@@ -1,0 +1,64 @@
+# Unit 2 Code Generation Summary
+
+## Outcome
+
+Unit 2 provides a detached, immutable, solver-neutral, thermodynamic-only
+utility-placement service using balanced-composite entropy generation.
+
+## Production ownership
+
+- Extended the shared contracts with explicit optimizer and temperature-policy options.
+- Added immutable context, allocation, thermodynamic, penalty, evaluation,
+  optimisation, and service modules under
+  `OpenPinch/analysis/utility_placement/`.
+- Reused existing utility targeting, optimiser, unit conversion, and Unit 1
+  model owners without private backend imports.
+
+## TDD evidence
+
+- Integrated correction-focused suite: 227 passed with 3 guarded optional-profile skips.
+- PBT: fixed-seed generated numerical examples plus pickle/process-state,
+  logarithmic heat-load scaling, and default-penalty permutation properties.
+- Oracle gates: hand-calculable `CP * ln(T_out / T_in)` and `Q/T` entropy
+  cases plus closer-temperature ranking passed.
+- Real backend: one fixed-seed, bounded dual-annealing regression passed.
+- Performance: 40-level by 100-period entropy batch p95 below 50 ms; cold replay below 1 second; exact memo hit below 1 ms.
+- Branch coverage: the corrected thermodynamic and penalty kernels are both at
+  100 percent; the established Unit 2 ownership gate remains above threshold.
+- Ruff: passed.
+- Existing utility-targeting, turbine, optimisation, architecture, API-boundary, and package-entrypoint regressions passed.
+
+## Distribution evidence
+
+An isolated no-network build produced `openpinch-0.5.4.tar.gz` and
+`openpinch-0.5.4-py3-none-any.whl`. Both contain all 12 specialist package files
+and the placement contract. A target-installed wheel imported the specialist
+service and constructed the default thermodynamic request successfully.
+
+## Numerical and failure contracts
+
+- Every candidate replays every period and must cover hot and cold residual duty.
+- Thermodynamic placement minimizes physical entropy generation from
+  candidate-local real-temperature balanced composite curves. Sensible
+  intervals use `CP * ln(T_out / T_in)` and isothermal intervals use signed
+  `Q/T`; materially unbalanced curves are rejected.
+- Sensible placements use five deterministic structured span starts at 20, 40,
+  50, 60, and 80 percent of each effective span interval; all are independently
+  verified and canonically replayed with backend candidates.
+- Thermodynamic results retain utility and process terms, total physical
+  entropy generation, ambient temperature, and exergy destruction.
+- Positive allocated duty on generated fallback `HU` or `CU` utilities receives
+  a deterministic infeasible penalty before objective ranking.
+- Monetary and placement-specific cogeneration contracts and evaluators are
+  intentionally absent.
+- Feasible and infeasible solver scalars occupy disjoint intervals even at binary64 saturation.
+- Exact process-local memoization, bounded diagnostic representatives, parent canonical replay, deterministic physical ranking, and typed exhaustion are implemented.
+
+## Compatibility and handoff
+
+Root exports and legacy result schemas are unchanged; no dependency or CLI was
+added. Unit 3 can consume `optimise_utility_placement`, the frozen context, and
+the result contract through the specialist package.
+
+PBT-01 through PBT-10 are compliant. Security and Resiliency are disabled and
+N/A for this in-process numerical unit.

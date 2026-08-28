@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import runpy
+import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -62,6 +63,27 @@ def test_build_dist_script_help_executes(monkeypatch):
 
     with pytest.raises(SystemExit, match="0"):
         namespace["main"](["--help"])
+
+
+def test_utility_placement_specialist_entrypoint_imports_in_fresh_python() -> None:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from OpenPinch.analysis.utility_placement import "
+                "normalize_utility_placement_request; "
+                "r = normalize_utility_placement_request("
+                "isothermal_level_count=2); assert r.isothermal_level_count == 2"
+            ),
+        ],
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
 
 
 def test_build_dist_uses_isolation_when_backend_is_missing(monkeypatch):

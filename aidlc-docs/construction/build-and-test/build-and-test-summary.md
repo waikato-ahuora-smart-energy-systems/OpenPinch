@@ -2,65 +2,84 @@
 
 ## Build Status
 
-- Build tool: Hatchling through uv and the repository build helper.
-- Status: success.
-- Artifacts: `openpinch-0.5.2-py3-none-any.whl` and
-  `openpinch-0.5.2.tar.gz` from a clean temporary destination.
-- Installed artifact: passed from a temporary Python 3.14 environment outside
-  the source checkout.
-- Documentation: Sphinx 9.1.0 built 53 sources with warnings treated as errors.
+- **Build tool**: Hatchling through the locked uv environment.
+- **Build status**: Success.
+- **Artifacts**: `dist/openpinch-0.5.4.tar.gz` and
+  `dist/openpinch-0.5.4-py3-none-any.whl`.
+- **Package smoke**: The fresh wheel was installed into an isolated import
+  target and executed notebook 19 using the project's installed dependencies.
 
-## Planned Gates
+## Test Execution Summary
 
-| Gate | Result | Status |
-|---|---:|---|
-| Complete fixed-seed non-solver suite | 2,181 passed, 3 skipped, 4 deselected | Pass |
-| Repository Ruff lint/format | All checks; 460 files formatted | Pass |
-| Patch and current-contract scans | No findings | Pass |
-| Clean warning-as-error Sphinx build | 53 sources, zero warnings | Pass |
-| Wheel and source distribution build | 2 artifacts, version 0.5.2 | Pass |
-| Isolated installed-wheel smoke | Site-packages import and workflow/resource/CLI smoke | Pass |
+### Focused TDD Gates
 
-## Focused and Integration Evidence
+- Public-signature RED failed because hierarchy routing and indirect placement
+  scope did not yet exist; hierarchy GREEN passed the 12 focused routing and
+  context tests.
+- Existing-utility inference RED failed because no problem-to-template builder
+  existed; inference GREEN passed classification, `Both` expansion,
+  deterministic padding, explicit-count precedence, and declaration-order
+  properties.
+- Notebook and RTD RED failed on the former single-scope workflow; GREEN passed
+  with separate Process/GCC and Site/TSP examples and no public target-mode
+  selector.
+- The generator byte-stability regression proves that all 19 checked-in
+  notebooks are current without rewriting equivalent Python formatting or
+  environment-owned kernel metadata.
+- Ruff, `git diff --check`, and the warnings-as-errors Sphinx build: pass.
 
-- Unit 1 integrated application/filesystem selection: 203 passed.
-- HEN serialization and package-root boundary selection: 34 passed.
-- Unit 2 exact-checkout prerequisite suite: 8 passed.
-- Unit 1/Unit 2 architecture selection: 123 passed.
-- Unit 3 documentation/architecture/entrypoint selection: 70 passed.
-- Focused non-external OpenHENS/HEN profile: 458 passed, 4 solver tests
-  deselected.
-- Post-correction workspace/contracts selection: 158 passed.
-- Complete fixed-seed non-solver suite: 2,181 passed, 3 optional-profile skips,
-  4 solver deselections in 148.03 seconds.
+### Complete Repository Suite
 
-## Verification Notes
+- **Collected**: 2,408 tests.
+- **Passed**: 2,404.
+- **Skipped**: 4 expected environment/profile-specific tests.
+- **Failed**: 0.
+- **Solver coverage**: solver-marked tests were enabled with the configured
+  local solver executables.
+- **Duration**: 327.41 seconds.
+- **Documentation**: the warnings-as-errors documentation build passed within
+  the complete suite.
 
-The initial temporary wheel environment contained only the wheel and therefore
-lacked its runtime dependencies. The environment was populated with the
-declared CI runtime dependencies, and the installed-artifact smoke then passed
-from site-packages. After the generic-mapping correction, the artifacts were
-rebuilt, the wheel was reinstalled, and both the standard smoke and installed
-mapping-key rejection probe passed. No source-checkout import was used.
+### Installed-Wheel Notebook
 
-The ignored local `docs/_build` cache was removed after its target and ignore
-rule were verified. Documentation was built into a separate clean temporary
-destination, preventing stale pages from masking source state. It is recoverable
-by rerunning `scripts/build_docs.py`.
+The installed wheel executed the sole utility-placement notebook from top to
+bottom through the hierarchy-aware case API. The Process/GCC workflow selected
+`Almond`, produced `0.06990104239676753 kW/K`, and returned eight optimized
+utilities. The Site/TSP workflow defaulted to the Site master zone, produced
+`1.1080402046277644 kW/K`, and returned eight optimized utilities. Both cases
+registered through `workspace.add(...)`, preserved `baseline` as active, and
+created standard Plotly figures. A separate wheel smoke inferred two
+isothermal and two sensible levels per side from existing utilities without
+count arguments. The imported `OpenPinch` path resolved to the isolated wheel
+target.
 
-## Extension Compliance
+## Delivered Scope
 
-- Security Baseline: disabled; N/A.
-- Resiliency Baseline: disabled; N/A.
-- Partial Property-Based Testing: enabled for generated case identifier and path
-  invariants with seed `20260715` and shrinking.
+Utility placement is thermodynamic-only. Its public request, templates,
+results, accessor, documentation, and notebook contain no
+monetary selector, per-utility prices, cogeneration eligibility, electricity
+price, turbine settings, or monetary breakdown. The physical balanced-
+composite entropy objective, raw all-period weighted sum, default `HU`/`CU`
+exclusion, named-case replacement, standard plots, and general OpenPinch
+cogeneration analyses remain intact. No utility-placement CLI was added.
+The final ownership audit removed generator-created cosmetic changes from
+notebooks 1-18; only the required notebook 19 was added. RTD now describes the
+thermodynamic-only case workflow and the exact 192-operation tutorial coverage
+count. The public call accepts optional `isothermal`, `sensible`, and `zone`
+arguments. Omitted `zone` uses the master zone; Process/Unit Operation routes
+to direct GCC, Site routes to Total Site targeting, and Community/Region routes
+to aggregate indirect targeting. Omitted counts infer typed templates from
+existing utilities, while any explicit count selects generated-template mode.
+The call returns a detached normal `PinchProblem`; the obsolete public
+`base_target`, placement-specific presentation module, and observation methods
+are absent.
 
 ## Overall Status
 
-- Build: success.
-- Tests: pass.
-- Documentation: pass.
-- Distribution: pass.
-- Operations: N/A; no deployment or production environment change was
-  requested.
-- Task: complete.
+- **Build**: Success.
+- **All tests**: Pass.
+- **Enabled Property-Based Testing extension**: Compliant; analytical,
+  generated-invariant, fixed-seed, round-trip, ordering, feasibility, and
+  all-period properties remain green.
+- **Security and Resiliency extensions**: Disabled; N/A.
+- **Operations**: N/A; no deployment or publication was requested.
