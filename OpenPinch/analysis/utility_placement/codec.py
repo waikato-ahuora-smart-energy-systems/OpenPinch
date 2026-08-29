@@ -11,7 +11,6 @@ from OpenPinch.contracts.utility_placement import (
     CoordinateKey,
     DecisionCoordinate,
     DecisionField,
-    DecodedPeriodDispatch,
     DecodedPlacement,
     DecodedUtilityLevel,
     EffectiveUtilityTemplate,
@@ -81,20 +80,6 @@ def build_decision_coordinates(
                         template.span_bounds,
                     )
                 )
-    duty_bounds = QuantityInterval(lower=0.0, upper=1.0, unit="dimensionless")
-    for period in envelope.periods:
-        for side_templates in (templates.hot, templates.cold):
-            for template in side_templates[:-1]:
-                ordered.append(
-                    (
-                        CoordinateKey(
-                            template_key=template.key,
-                            field=DecisionField.DUTY_FRACTION,
-                            period_id=period.period_id,
-                        ),
-                        duty_bounds,
-                    )
-                )
     return tuple(
         DecisionCoordinate(index=index, coordinate=key, bounds=bounds)
         for index, (key, bounds) in enumerate(ordered)
@@ -129,56 +114,6 @@ def _span_for(
             field=DecisionField.TEMPERATURE_SPAN,
         )
     ]
-
-
-def decode_duty_splits(
-    fractions: Sequence[float],
-    total_duty: float,
-) -> tuple[float, ...]:
-    """Decode bounded stick-breaking fractions into a conserving duty vector."""
-    remaining = max(float(total_duty), 0.0)
-    duties: list[float] = []
-    for raw_fraction in fractions:
-        fraction = min(max(float(raw_fraction), 0.0), 1.0)
-        duty = fraction * remaining
-        duties.append(duty)
-        remaining -= duty
-    duties.append(max(remaining, 0.0))
-    return tuple(duties)
-
-
-def encode_duty_splits(
-    duties: Sequence[float],
-    total_duty: float,
-    *,
-    tolerance: float,
-) -> tuple[float, ...]:
-    """Encode a conserving non-negative duty vector as stick-breaking fractions."""
-    normalized = tuple(float(value) for value in duties)
-    total = float(total_duty)
-    if not normalized or any(
-        not math.isfinite(value) or value < 0.0 for value in normalized
-    ):
-        raise PlacementModelValidationError(
-            code="invalid_dispatch_duties",
-            message="Dispatch duties must be finite and non-negative.",
-            field_path="period_dispatches",
-        )
-    if not math.isclose(
-        math.fsum(normalized), total, rel_tol=tolerance, abs_tol=tolerance
-    ):
-        raise PlacementModelValidationError(
-            code="dispatch_coverage_mismatch",
-            message="Dispatch duties must sum to the period residual duty.",
-            field_path="period_dispatches",
-        )
-    remaining = max(total, 0.0)
-    fractions: list[float] = []
-    for duty in normalized[:-1]:
-        fraction = duty / remaining if remaining > tolerance else 0.0
-        fractions.append(min(max(fraction, 0.0), 1.0))
-        remaining = max(remaining - duty, 0.0)
-    return tuple(fractions)
 
 
 def _diagnostic(
@@ -490,40 +425,9 @@ def decode_placement(
         )
     else:
         cold = tuple(decode_level(template) for template in model.templates.cold)
-    period_dispatches = []
-    for period in model.envelope.periods:
-        side_duties = []
-        for side_templates, total_duty in (
-            (model.templates.hot, period.residual_hot_duty),
-            (model.templates.cold, period.residual_cold_duty),
-        ):
-            fractions = tuple(
-                values[
-                    CoordinateKey(
-                        template_key=template.key,
-                        field=DecisionField.DUTY_FRACTION,
-                        period_id=period.period_id,
-                    )
-                ]
-                for template in side_templates[:-1]
-            )
-            side_duties.append(
-                tuple(
-                    QuantityValue(value=value, unit=model.request.units.heat_flow)
-                    for value in decode_duty_splits(fractions, total_duty)
-                )
-            )
-        period_dispatches.append(
-            DecodedPeriodDispatch(
-                period_id=period.period_id,
-                hot_duties=side_duties[0],
-                cold_duties=side_duties[1],
-            )
-        )
     return DecodedPlacement(
         hot=hot,
         cold=cold,
-        period_dispatches=tuple(period_dispatches),
         coordinates=normalized_point,
     )
 
@@ -581,56 +485,14 @@ def encode_placement(
                     template_key=cold_template.key,
                     field_path="placement",
                 )
-    dispatch_by_period = {item.period_id: item for item in placement.period_dispatches}
-    if set(dispatch_by_period) != {
-        period.period_id for period in model.envelope.periods
-    }:
-        raise PlacementModelValidationError(
-            code="dispatch_period_mismatch",
-            message="Placement dispatch must contain every model period exactly once.",
-            field_path="period_dispatches",
-        )
-    fraction_values: dict[CoordinateKey, float] = {}
-    for period in model.envelope.periods:
-        dispatch = dispatch_by_period[period.period_id]
-        for side_templates, duties, total in (
-            (model.templates.hot, dispatch.hot_duties, period.residual_hot_duty),
-            (model.templates.cold, dispatch.cold_duties, period.residual_cold_duty),
-        ):
-            if len(duties) != len(side_templates):
-                raise PlacementModelValidationError(
-                    code="dispatch_dimension_mismatch",
-                    message="Dispatch duty count must match its utility family.",
-                    field_path="period_dispatches",
-                )
-            fractions = encode_duty_splits(
-                tuple(item.value for item in duties),
-                total,
-                tolerance=max(
-                    model.request.tolerances.coverage,
-                    model.request.tolerances.relative * max(total, 1.0),
-                ),
-            )
-            for template, fraction in zip(side_templates[:-1], fractions, strict=True):
-                fraction_values[
-                    CoordinateKey(
-                        template_key=template.key,
-                        field=DecisionField.DUTY_FRACTION,
-                        period_id=period.period_id,
-                    )
-                ] = fraction
-
     encoded: list[float] = []
     for coordinate in model.coordinates:
-        if coordinate.coordinate.field is DecisionField.DUTY_FRACTION:
-            value = fraction_values[coordinate.coordinate]
-        else:
-            level = by_key[coordinate.coordinate.template_key]
-            value = (
-                level.supply_temperature.value
-                if coordinate.coordinate.field is DecisionField.SUPPLY_TEMPERATURE
-                else level.temperature_span.value
-            )
+        level = by_key[coordinate.coordinate.template_key]
+        value = (
+            level.supply_temperature.value
+            if coordinate.coordinate.field is DecisionField.SUPPLY_TEMPERATURE
+            else level.temperature_span.value
+        )
         encoded.append(0.0 if value == 0.0 else value)
     point = tuple(encoded)
     verification = verify_candidate(model, point)
@@ -677,16 +539,6 @@ def build_utility_placement_model(
         envelope.minimum_separation.value,
     )
     start_limit = max(4, min(20, 20_000 // max(len(coordinates), 1)))
-    for period in envelope.periods:
-        for side_templates in (templates.hot, templates.cold):
-            for index, template in enumerate(side_templates[:-1]):
-                initial_values[
-                    CoordinateKey(
-                        template_key=template.key,
-                        field=DecisionField.DUTY_FRACTION,
-                        period_id=period.period_id,
-                    )
-                ] = 1.0 / (len(side_templates) - index)
     initial_points: list[tuple[float, ...]] = []
     if request.uses_generated_pairs:
         coordinates_by_key = {item.coordinate: item for item in coordinates}
@@ -897,70 +749,7 @@ def build_utility_placement_model(
             point = tuple(values[coordinate.coordinate] for coordinate in coordinates)
             if point not in initial_points:
                 initial_points.append(point)
-    level_count = len(templates.hot)
-    dispatch_patterns = tuple(
-        dict.fromkeys(
-            (
-                (0, level_count - 1),
-                (max(level_count - 2, 0), level_count - 1),
-                (level_count - 1, level_count - 1),
-            )
-        )
-    )
-    dispatch_starts: list[tuple[float, ...]] = []
-    for base_point in initial_points[:4]:
-        if len(dispatch_starts) >= start_limit:
-            break
-        base_values = {
-            coordinate.coordinate: base_point[coordinate.index]
-            for coordinate in coordinates
-        }
-        balanced_hot_values = dict(base_values)
-        for period in envelope.periods:
-            for index, template in enumerate(templates.hot[:-1]):
-                balanced_hot_values[
-                    CoordinateKey(
-                        template_key=template.key,
-                        field=DecisionField.DUTY_FRACTION,
-                        period_id=period.period_id,
-                    )
-                ] = 1.0 / (len(templates.hot) - index)
-            for template in templates.cold[:-1]:
-                balanced_hot_values[
-                    CoordinateKey(
-                        template_key=template.key,
-                        field=DecisionField.DUTY_FRACTION,
-                        period_id=period.period_id,
-                    )
-                ] = 0.0
-        dispatch_starts.append(
-            tuple(
-                balanced_hot_values[coordinate.coordinate] for coordinate in coordinates
-            )
-        )
-        for hot_selected, cold_selected in dispatch_patterns:
-            if len(dispatch_starts) >= start_limit:
-                break
-            values = dict(base_values)
-            for period in envelope.periods:
-                for side_templates, selected in (
-                    (templates.hot, hot_selected),
-                    (templates.cold, cold_selected),
-                ):
-                    for index, template in enumerate(side_templates[:-1]):
-                        values[
-                            CoordinateKey(
-                                template_key=template.key,
-                                field=DecisionField.DUTY_FRACTION,
-                                period_id=period.period_id,
-                            )
-                        ] = 1.0 if index == selected else 0.0
-            dispatch_starts.append(
-                tuple(values[coordinate.coordinate] for coordinate in coordinates)
-            )
-    initial_points = list(dict.fromkeys((*dispatch_starts, *initial_points)))[
-        :start_limit
-    ]
+    initial_points = list(dict.fromkeys(initial_points))[:start_limit]
     provisional = UtilityPlacementModel(
         request=request,
         envelope=envelope,
@@ -991,8 +780,6 @@ __all__ = [
     "build_decision_coordinates",
     "build_utility_placement_model",
     "decode_placement",
-    "decode_duty_splits",
-    "encode_duty_splits",
     "encode_placement",
     "verify_candidate",
     "verify_placement",

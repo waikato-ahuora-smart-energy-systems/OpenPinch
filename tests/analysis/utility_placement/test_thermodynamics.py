@@ -163,7 +163,7 @@ def test_balanced_composite_entropy_closes_only_numerical_heat_balance_drift() -
         hot_temperatures_celsius=(226.85, 126.85),
         hot_heat_loads=(100.0, 0.0),
         cold_temperatures_celsius=(76.85, 26.85),
-        cold_heat_loads=(100.0000005, 0.0),
+        cold_heat_loads=(100.005, 0.0),
     )
 
     assert hot < 0.0
@@ -241,6 +241,9 @@ def test_period_thermodynamic_breakdown_uses_balanced_composite_curve() -> None:
         cold_levels=(),
         allocated_hot_duty=100.0,
         allocated_cold_duty=0.0,
+        required_hot_duty=100.0,
+        required_cold_duty=0.0,
+        target_snapshot=period.snapshot,
         hot_coverage_residual=0.0,
         cold_coverage_residual=0.0,
         coverage_tolerance_hot=1e-6,

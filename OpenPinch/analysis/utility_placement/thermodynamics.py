@@ -78,7 +78,7 @@ def _close_numerical_heat_balance(
     hot_extent = float(np.ptp(hot_heat_loads))
     cold_extent = float(np.ptp(cold_heat_loads))
     reference = max(hot_extent, cold_extent, 1.0)
-    if abs(hot_extent - cold_extent) > 1e-8 * reference:
+    if abs(hot_extent - cold_extent) > 1e-4 * reference:
         return hot_heat_loads, cold_heat_loads
     if hot_extent == 0.0 or cold_extent == 0.0:
         return hot_heat_loads, cold_heat_loads

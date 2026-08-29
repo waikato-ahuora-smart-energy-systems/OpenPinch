@@ -163,9 +163,19 @@ def test_maximum_duties_round_trip_on_request_and_returned_case() -> None:
     assert limits["hot_iso_1"] == {"value": 1.0, "unit": "kW"}
     assert any(name in {"HU", "CU"} for name in limits)
 
-    case.target.direct_heat_integration(zone="Almond", period_id="0")
+    evidence = result.best.period_results[0]
+    target = case.target.direct_heat_integration(zone="Almond", period_id="0")
     almond = case.master_zone.get_subzone("Almond")
     hot = {utility.name: utility for utility in almond.hot_utilities}
     assert hot["hot_iso_1"].heat_flow.value <= 1.0 + 1e-9
     assert hot["hot_iso_1"].maximum_heat_flow.value == pytest.approx(1.0)
-    assert hot["HU"].heat_flow.value > 0.0
+    assert {
+        utility.name: float(utility.heat_flow.value)
+        for utility in target.hot_utilities
+    } == pytest.approx(
+        {
+            level.template_key.name: level.allocated_duty.value
+            for level in evidence.hot_levels
+        },
+        abs=1e-6,
+    )

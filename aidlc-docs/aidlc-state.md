@@ -3,9 +3,10 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Utility Placement profile-aware dispatch correctness
-  amendment complete; Code Generation and Build and Test passed. Operations is
-  N/A because no deployment change was requested.
+- **Current Stage**: Utility Placement exact-target replay correction completed
+  Code Generation and Build and Test. All eight plan steps are complete; 2,448
+  tests pass with 4 expected skips, and the correction is ready to commit to
+  `develop`.
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -31,6 +32,13 @@
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
 
 ## Utility Placement Optimisation Progress
+
+- [x] EXACT-TARGET REPLAY CORRECTION - Candidate temperatures are evaluated
+  through detached ordinary Process, Site, Community, or Region targeting;
+  target-owned duties, totals, fallbacks, and balanced-composite data feed the
+  optimizer and reproduce on the returned case. Notebook 19 is executable and
+  assertion-free. Ruff, Sphinx, packaging, and 2,448 tests pass with 4 expected
+  skips.
 
 - [x] PROFILE-AWARE DISPATCH CORRECTION - Replace temperature-only greedy duty
   selection with period-specific profile-aware duty decisions, align canonical

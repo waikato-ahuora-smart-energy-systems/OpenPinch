@@ -25,9 +25,9 @@
 1. Accept optional isothermal and sensible level counts, independently applying
    each supplied count to both hot and cold sides; otherwise infer templates and
    counts from existing problem utilities.
-2. Optimise the temperature placement and period-specific hot/cold duty split
-   of fixed utility-family templates, with detached targeting validating duty
-   available against each residual profile.
+2. Optimise the temperature placement of fixed utility-family templates while
+   the exact ordinary Process, Total Site, or aggregate target workflow owns
+   candidate duties and fallback allocation.
 3. Minimise thermodynamic cost from balanced composite curves.
 4. Infer direct, Total Site, or aggregate indirect targeting from the selected
    hierarchy zone instead of exposing a public base-target selector.
@@ -44,8 +44,8 @@
 
 ## Non-Goals
 
-- Residual heating and cooling demands are not optimisation variables; each
-  side's period-specific utility duties must conserve the corresponding target.
+- Utility duties are not independent optimizer coordinates; they are outputs
+  of the exact ordinary target replay for each candidate and period.
 - Utility technology and fluid identity are not chosen by the optimiser.
 - Hybrid weighted objectives and Pareto-frontier generation are excluded.
 - Monetary, boiler, turbine, fuel-cost, electricity-credit, and capital-cost
@@ -156,38 +156,39 @@ glide.
 
 ### Candidate duty allocation
 
-For every candidate placement and period, the optimisation model shall choose
-independent non-negative hot- and cold-side duty allocations in addition to the
-shared utility temperatures. Per-period duties shall use bounded base/split
-coordinates equivalent to the heat-pump targeting encoding. The decoded duties
-shall be replayed through detached targeting to establish how much duty is
-available at each selected temperature; targeting shall validate the requested
-dispatch rather than greedily determine the optimum dispatch.
+For every candidate placement and period, the service shall construct a
+detached ordinary case containing the candidate temperatures and the caller's
+utility capacity limits, then invoke the same public target workflow the
+returned case will run. A Process Zone or Unit Operation shall use direct
+targeting. A Site shall run its child direct targets and ordinary Total Site
+aggregation. A Community or Region shall run its ordinary indirect aggregate
+target. The resulting named and fallback duties are candidate outputs, not an
+independent stick-breaking decision vector.
 
-Temperature decisions remain shared across selected periods. Duty dispatch is
-period-specific because process and site profiles vary by period. Hot and cold
-members of a generated reversed-temperature pair retain independent duties.
-The split encoding shall conserve each side's residual duty structurally,
-remain within `[0, 1]`, and permit any individual requested level to receive
-zero duty.
+Temperature decisions remain shared across selected periods. Targeted duties
+remain period-specific because process and site profiles vary by period. Hot
+and cold members of a generated reversed-temperature pair retain independent
+duties. Any candidate level may receive zero duty; requesting a level makes it
+available but does not impose a lower duty bound.
 
-For every period `p`, let `Q_heat_required[p]` and `Q_cool_required[p]` be the
-non-negative residual demands after the selected heat-integration target. The
-coverage constraints shall require, within one named numerical tolerance:
+For every candidate `c` and period `p`, let `Q_heat_required[c,p]` and
+`Q_cool_required[c,p]` be the non-negative targets produced by that exact
+ordinary replay. This candidate dependence is required for Total Site cases,
+where matching utility generation and use can change net hot and cold utility
+targets. The coverage constraints shall require, within one named numerical
+tolerance:
 
-- `sum(Q_hot_utility[i,p]) = Q_heat_required[p]`; and
-- `sum(Q_cold_utility[i,p]) = Q_cool_required[p]`.
+- `sum(Q_hot_utility[i,c,p]) = Q_heat_required[c,p]`; and
+- `sum(Q_cold_utility[i,c,p]) = Q_cool_required[c,p]`.
 
 No feasible candidate may leave unmet heating or cooling demand, and no excess
 allocation beyond the same tolerance may be silently accepted. Individual
 levels may have zero duty when the complete side-level balance still holds.
 
-Each requested level duty shall be limited by both its caller-specified maximum
-duty, when present, and the process-profile duty available at its selected
-temperature interval. Targeting shall clip unavailable requested duty and
-record the resulting shortfall as residual fallback evidence. Residual `HU` or
-`CU` duty shall remain available as an explicit fallback for otherwise valid
-coordinates and shall receive the dimensionless squared fallback penalty.
+Each targeted level duty shall be limited by both its caller-specified maximum
+duty, when present, and the duty available through the exact target workflow at
+its selected temperature interval. Residual `HU` or `CU` duty shall remain an
+explicit fallback and shall receive the dimensionless squared fallback penalty.
 
 When capped named levels cannot cover a side's complete residual demand, the
 generated `HU` or `CU` default utility shall supply only the remaining
@@ -451,8 +452,9 @@ only public Python APIs, one coherent example shall demonstrate:
 - normal direct targeting and standard GCC plotting of the Process result, plus
   normal Total Site targeting and standard Total Site Profile plotting of the
   Site result, with utilities visible in both; and
-- deterministic bounded options and lightweight assertions that make stale or
-  misleading output fail execution; and
+- deterministic bounded options and inspectable comparison tables showing
+  optimizer-evidence and ordinary-retarget duties side by side, without test
+  assertions in the notebook; and
 - at least one concise `maximum_duties` example that verifies a named cap and
   shows residual default utility duty and `g_penalty()` evidence when required.
 
@@ -542,7 +544,7 @@ makes it pass, and refactor only with the focused tests green.
 15. Verify workspace batch ordering and failure isolation.
 16. Execute `19_utility_placement_optimisation.ipynb` from a clean generated
     artifact and verify the thermodynamic workflow, public-API-only imports,
-    manifest registration, and package inclusion.
+    manifest registration, package inclusion, and absence of test assertions.
 17. Verify that mixed two-isothermal plus two-sensible placement returns a
     normal case, `workspace.add(...)` registers it without changing the source
     or active case by default, and normal targeting renders its standard GCC
@@ -643,6 +645,7 @@ permanent example-based regression test.
 | Hierarchy API answers and clarifications | Goals 1, 4, and 8; FR-001; FR-003; FR-004; FR-007; FR-014; FR-017; Acceptance 21-23 |
 | Maximum-duty answers and fallback clarification | Utility duty upper bounds; FR-001; FR-004; FR-008; FR-009; FR-012 through FR-017; Acceptance 24-27 |
 | Profile-aware dispatch correctness approval | Goal 2; Candidate duty allocation; FR-008; FR-009; NFR-001 through NFR-003; Acceptance 18, 25-27; profile-aware dispatch amendment |
+| Result correctness answers and clarification | Exact ordinary-target replay; candidate-only levels; no minimum duty; FR-008 through FR-017; Acceptance 28-31 |
 
 ## Success Criteria
 
@@ -702,6 +705,9 @@ so their rules are skipped for this stage.
 - [x] The profile-aware dispatch correction adds conserving per-period duty
   decisions, scalar-consistent ranking, entropy-unit scaling, bounded ordered
   optimizer coordinates, and current Process/GCC and Site/TSP notebook evidence.
+- [x] The exact-target replay correction removes independent duty coordinates,
+  derives duties from ordinary hierarchy-aware targeting, and shows their
+  equality through assertion-free Process/GCC and Site/TSP notebook tables.
 
 ## Profile-aware dispatch correctness amendment
 
@@ -719,11 +725,37 @@ Optimizer termination evidence shall include canonical parent-process replay
 evaluations and shall not report zero evaluations after successful candidate
 replay.
 
-The executable Process and Total Site examples shall verify that increasing the
-search budget does not collapse a requested four-level family to a greedy
-single active level when a feasible multi-level dispatch has lower
-balanced-composite entropy. Standard GCC and Total Site plots remain the visual
-acceptance evidence.
+The exact-target replay amendment supersedes the independent duty-coordinate
+part of this section. Candidate levels may remain inactive. Standard GCC and
+Total Site plots remain the visual acceptance evidence, and their retargeted
+duties shall match optimizer evidence by utility name and fallback status.
+
+## Exact ordinary-target replay amendment
+
+The optimizer shall evaluate the exact hierarchy-aware public target workflow,
+not a simplified aggregate load-profile allocator. Candidate thermodynamic
+inputs, net utility targets, named duties, fallback duties, and Total Site
+utility-to-utility matching shall all come from that detached replay.
+
+The returned case shall retain only inputs that ordinary targeting can replay.
+Running the same scope and period on that case shall reproduce optimizer
+evidence for every named and fallback utility within the declared tolerance.
+The standard GCC or Total Site Profile shall therefore visualize the allocation
+that was actually ranked. Independent period duty coordinates that cannot be
+reproduced through the normal case workflow shall be removed.
+
+Additional acceptance requirements:
+
+28. Prove Process optimizer evidence and ordinary direct retargeting agree by
+    utility name, duty, fallback status, and target totals.
+29. Prove Total Site optimizer evidence and ordinary Total Site retargeting
+    agree after child direct targeting, utility aggregation, and same-level
+    utility generation/use matching.
+30. Prove candidate-specific Total Site targets and balanced-composite entropy
+    are calculated from the exact replay rather than baseline residual duties or
+    a simplified aggregate-profile allocation.
+31. Prove requested levels may have zero duty, no implicit minimum-duty bound is
+    introduced, and source cases remain unchanged during every replay.
 
 Final correction evidence:
-`aidlc-docs/construction/utility-placement-profile-aware-dispatch/build-and-test/build-and-test-summary.md`.
+`aidlc-docs/construction/utility-placement-exact-target-replay/build-and-test/build-and-test-summary.md`.

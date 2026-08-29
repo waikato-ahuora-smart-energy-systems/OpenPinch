@@ -17,6 +17,7 @@ from OpenPinch.contracts.utility_placement import (
     UtilityPlacementBaseTarget,
     UtilityPlacementRequest,
 )
+from OpenPinch.domain._value.resolution import get_scalar_value
 from OpenPinch.domain.enums import GraphType, ProblemTableLabel, ZoneType
 from OpenPinch.domain.zone import Zone
 from tests.strategies.utility_placement import residual_profile_envelopes
@@ -280,6 +281,21 @@ def _temperature_overlap_ratio(background_segments, utility_segments) -> float:
     background_span = max(background) - min(background)
     overlap = min(max(background), max(utility)) - max(min(background), min(utility))
     return max(0.0, overlap) / background_span
+
+
+def _allocated_duties(levels) -> dict[str, float]:
+    return {
+        level.template_key.name: level.allocated_duty.value for level in levels
+    }
+
+
+def _targeted_duties(utilities, *, period_idx: int | None = None) -> dict[str, float]:
+    return {
+        utility.name: float(
+            get_scalar_value(utility.heat_flow, period_idx=period_idx)
+        )
+        for utility in utilities
+    }
 
 
 def _problem_with_utilities(utilities) -> PinchProblem:
@@ -654,7 +670,7 @@ def test_default_thermodynamic_solution_follows_the_residual_process_profile() -
     )
 
 
-def test_total_site_four_level_dispatch_reduces_the_cold_profile_gap() -> None:
+def test_total_site_four_level_request_keeps_inactive_sensible_candidates() -> None:
     problem = PinchWorkspace(
         source="chocolate_factory.json", project_name="Site"
     ).use_case("baseline")
@@ -662,16 +678,133 @@ def test_total_site_four_level_dispatch_reduces_the_cold_profile_gap() -> None:
         isothermal=2,
         sensible=2,
         period_ids=("0",),
-        options=_tiny_options(),
+        options={
+            **_tiny_options(),
+            "minimum_sensible_span": {
+                "value": 10.0,
+                "unit": "delta_degC",
+            },
+        },
     )
     period = optimized_case.utility_placement_result.best.period_results[0]
 
-    active_cold = [
-        level for level in period.cold_levels if level.allocated_duty.value > 1e-9
+    sensible_cold = [
+        level
+        for level in period.cold_levels
+        if level.kind is UtilityLevelKind.SENSIBLE and not level.is_fallback
     ]
-    assert active_cold
-    assert max(level.temperature_span.value for level in active_cold) > 5.0
-    assert optimized_case.utility_placement_result.best.aggregate_objective.value < 0.65
+    assert len(sensible_cold) == 2
+    assert all(level.temperature_span.value > 5.0 for level in sensible_cold)
+    assert any(level.allocated_duty.value == 0.0 for level in sensible_cold)
+
+
+@pytest.mark.parametrize("zone", ["Almond", None])
+def test_optimizer_evidence_exactly_matches_ordinary_retargeted_utility_duties(
+    zone,
+) -> None:
+    problem = PinchWorkspace(
+        source="chocolate_factory.json",
+        project_name="Site",
+    ).use_case("baseline")
+    maximum_duties = None
+    if zone is not None:
+        maximum_duties = {
+            f"hot_{suffix}": 20.0
+            for suffix in ("iso_1", "iso_2", "sensible_1", "sensible_2")
+        }
+    optimized_case = problem.target.utility_placement(
+        isothermal=2,
+        sensible=2,
+        zone=zone,
+        period_ids=("0",),
+        maximum_duties=maximum_duties,
+        options=_tiny_options(),
+    )
+    evidence = optimized_case.utility_placement_result.best.period_results[0]
+
+    if zone is None:
+        target = optimized_case.target.total_site_heat_integration(period_id="0")
+        graph = optimized_case.plot.total_site_profiles(return_graph_data=True)
+        assert graph["type"] == GraphType.TSP.value
+    else:
+        target = optimized_case.target.direct_heat_integration(
+            zone=zone,
+            period_id="0",
+        )
+        graph = optimized_case.plot.grand_composite_curve(
+            zone_name=zone,
+            return_graph_data=True,
+        )
+        assert graph["type"] == GraphType.GCC.value
+
+    assert _allocated_duties(evidence.hot_levels) == pytest.approx(
+        _targeted_duties(target.hot_utilities), abs=1e-6
+    )
+    assert _allocated_duties(evidence.cold_levels) == pytest.approx(
+        _targeted_duties(target.cold_utilities), abs=1e-6
+    )
+    assert evidence.residual_hot_duty.value == pytest.approx(
+        float(target.hot_utility_target), abs=1e-6
+    )
+    assert evidence.residual_cold_duty.value == pytest.approx(
+        float(target.cold_utility_target), abs=1e-6
+    )
+
+
+def test_returned_case_retargets_exact_duties_in_every_selected_period() -> None:
+    source = {
+        "streams": [
+            {
+                "zone": "Site/AreaA",
+                "name": "HotA",
+                "t_supply": {"values": [200.0, 220.0], "unit": "degC"},
+                "t_target": {"values": [80.0, 100.0], "unit": "degC"},
+                "heat_flow": {"values": [120.0, 160.0], "unit": "kW"},
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            },
+            {
+                "zone": "Site/AreaA",
+                "name": "ColdA",
+                "t_supply": {"values": [20.0, 30.0], "unit": "degC"},
+                "t_target": {"values": [160.0, 180.0], "unit": "degC"},
+                "heat_flow": {"values": [180.0, 240.0], "unit": "kW"},
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            },
+        ],
+        "utilities": [],
+        "zone_tree": {
+            "name": "Site",
+            "type": "Site",
+            "children": [{"name": "AreaA", "type": "Process Zone"}],
+        },
+        "options": {"PROBLEM_PERIOD_IDS": ["base", "peak"]},
+    }
+    problem = PinchProblem(source, project_name="Site")
+    optimized_case = problem.target.utility_placement(
+        isothermal=2,
+        zone="AreaA",
+        maximum_duties={"hot_iso_1": 10.0, "hot_iso_2": 10.0},
+        options=_tiny_options(),
+    )
+    evidence_by_period = {
+        period.period_id: period
+        for period in optimized_case.utility_placement_result.best.period_results
+    }
+
+    for period_id, evidence in evidence_by_period.items():
+        period_idx = optimized_case.period_ids[period_id]
+        target = optimized_case.target.direct_heat_integration(
+            zone="AreaA",
+            period_id=period_id,
+        )
+        assert _allocated_duties(evidence.hot_levels) == pytest.approx(
+            _targeted_duties(target.hot_utilities, period_idx=period_idx), abs=1e-6
+        )
+        assert _allocated_duties(evidence.cold_levels) == pytest.approx(
+            _targeted_duties(target.cold_utilities, period_idx=period_idx), abs=1e-6
+        )
 
 
 def test_capped_process_dispatch_uses_available_levels_before_fallback() -> None:
@@ -690,15 +823,30 @@ def test_capped_process_dispatch_uses_available_levels_before_fallback() -> None
         options=_tiny_options(),
     )
     result = optimized_case.utility_placement_result
-    hot_levels = result.best.period_results[0].hot_levels
+    period = result.best.period_results[0]
+    hot_levels = period.hot_levels
     named_active = [
         level
         for level in hot_levels
         if not level.is_fallback and level.allocated_duty.value > 1e-9
     ]
+    hot_fallback = sum(
+        level.allocated_duty.value for level in hot_levels if level.is_fallback
+    )
+    cold_fallback = sum(
+        level.allocated_duty.value
+        for level in period.cold_levels
+        if level.is_fallback
+    )
+    expected_penalty = (
+        hot_fallback / period.residual_hot_duty.value
+    ) ** 2 + (cold_fallback / period.residual_cold_duty.value) ** 2
 
     assert len(named_active) >= 3
-    assert result.best.fallback_penalty.value < 0.5
+    assert period.fallback_penalty.value == pytest.approx(expected_penalty)
+    assert result.best.fallback_penalty.value == pytest.approx(
+        period.weight * expected_penalty
+    )
 
 
 @pytest.mark.parametrize("zone", ["Almond", None])
@@ -914,11 +1062,12 @@ def test_public_total_site_workflow_covers_the_total_site_residual() -> None:
     )
 
 
-def test_public_community_workflow_uses_indirect_aggregate_profile() -> None:
+@pytest.mark.parametrize("zone_type", [ZoneType.C, ZoneType.R])
+def test_public_aggregate_workflow_retargets_exact_indirect_duties(zone_type) -> None:
     seed = PinchProblem("zonal_site.json", project_name="Scope")
     source = seed.to_problem_json()
     source["zone_tree"]["name"] = "Scope"
-    source["zone_tree"]["type"] = ZoneType.C.value
+    source["zone_tree"]["type"] = zone_type.value
     problem = PinchProblem(source, project_name="Scope")
 
     optimized_case = problem.target.utility_placement(
@@ -928,11 +1077,17 @@ def test_public_community_workflow_uses_indirect_aggregate_profile() -> None:
         options=_tiny_options(),
     )
 
-    assert (
-        optimized_case.utility_placement_result.scope
-        is UtilityPlacementBaseTarget.INDIRECT
-    )
+    result = optimized_case.utility_placement_result
+    assert result.scope is UtilityPlacementBaseTarget.INDIRECT
     assert len(optimized_case.to_problem_json()["utilities"]) == 8
+    evidence = result.best.period_results[0]
+    target = optimized_case.target.indirect_heat_integration(period_id="0")
+    assert _allocated_duties(evidence.hot_levels) == pytest.approx(
+        _targeted_duties(target.hot_utilities), abs=1e-6
+    )
+    assert _allocated_duties(evidence.cold_levels) == pytest.approx(
+        _targeted_duties(target.cold_utilities), abs=1e-6
+    )
 
 
 def test_public_validation_fails_before_analysis_and_preserves_previous_cache() -> None:

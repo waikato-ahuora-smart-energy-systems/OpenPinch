@@ -227,14 +227,16 @@ class PlacementEvaluationSession:
                 fallback_penalty = g_penalty(
                     hot_fallback_duty=allocation.hot_fallback_duty,
                     cold_fallback_duty=allocation.cold_fallback_duty,
-                    required_hot_duty=period.residual_hot_duty,
-                    required_cold_duty=period.residual_cold_duty,
+                    required_hot_duty=allocation.required_hot_duty,
+                    required_cold_duty=allocation.required_cold_duty,
                 )
                 fallback_penalties.append(fallback_penalty)
 
                 thermo = evaluate_thermodynamic_cost(
                     request=self.request,
-                    period=period,
+                    period=period.model_copy(
+                        update={"snapshot": allocation.target_snapshot}
+                    ),
                     allocation=allocation,
                 )
                 thermo_value = thermo.total_entropy_generation.value
@@ -260,11 +262,11 @@ class PlacementEvaluationSession:
                             unit=self.request.units.heat_flow,
                         ),
                         residual_hot_duty=QuantityValue(
-                            value=period.residual_hot_duty,
+                            value=allocation.required_hot_duty,
                             unit=self.request.units.heat_flow,
                         ),
                         residual_cold_duty=QuantityValue(
-                            value=period.residual_cold_duty,
+                            value=allocation.required_cold_duty,
                             unit=self.request.units.heat_flow,
                         ),
                         hot_coverage_residual=QuantityValue(

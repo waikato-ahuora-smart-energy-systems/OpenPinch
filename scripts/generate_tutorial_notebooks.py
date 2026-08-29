@@ -745,25 +745,43 @@ NOTEBOOKS = {
         extras="plot",
         cells=[
             code(
+                "import pandas as pd\n\n"
                 "from OpenPinch import PinchWorkspace\n\n"
                 "workspace = PinchWorkspace(\n"
                 '    source="chocolate_factory.json", project_name="Site"\n'
                 ")\n"
                 'problem = workspace.use_case("baseline")\n'
                 "baseline_input = problem.to_problem_json()\n"
-                "def assert_reversed_utility_pairs(utilities):\n"
-                '    by_name = {utility["name"]: utility for utility in utilities}\n'
-                '    for suffix in ("iso_1", "iso_2", "sensible_1", "sensible_2"):\n'
-                '        hot = by_name[f"hot_{suffix}"]\n'
-                '        cold = by_name[f"cold_{suffix}"]\n'
-                '        assert abs(cold["t_supply"]["value"] - hot["t_target"]["value"]) < 1e-9\n'
-                '        assert abs(cold["t_target"]["value"] - hot["t_supply"]["value"]) < 1e-9\n'
+                "\n"
+                "def retarget_comparison(evidence, target):\n"
+                "    period = evidence.best.period_results[0]\n"
+                "    rows = []\n"
+                "    for side, levels, utilities in (\n"
+                '        ("hot", period.hot_levels, target.hot_utilities),\n'
+                '        ("cold", period.cold_levels, target.cold_utilities),\n'
+                "    ):\n"
+                "        retargeted = {utility.name: float(utility.heat_flow.value) for utility in utilities}\n"
+                "        for level in levels:\n"
+                "            name = level.template_key.name\n"
+                "            rows.append({\n"
+                '                "side": side,\n'
+                '                "utility": name,\n'
+                '                "kind": level.kind.value,\n'
+                '                "supply_degC": level.supply_temperature.value,\n'
+                '                "target_degC": level.target_temperature.value,\n'
+                '                "optimizer_duty_kW": level.allocated_duty.value,\n'
+                '                "retargeted_duty_kW": retargeted.get(name, 0.0),\n'
+                '                "difference_kW": retargeted.get(name, 0.0) - level.allocated_duty.value,\n'
+                '                "fallback": level.is_fallback,\n'
+                "            })\n"
+                "    return pd.DataFrame(rows)\n"
                 "\n"
                 "search_options = {\n"
                 '    "iteration_limit": 1,\n'
                 '    "evaluation_limit": 100,\n'
                 '    "candidate_limit": 2,\n'
                 '    "run_count": 1,\n'
+                '    "minimum_sensible_span": {"value": 10.0, "unit": "delta_degC"},\n'
                 "}\n"
                 "process_maximum_duties = {\n"
                 '    f"hot_{suffix}": 20.0\n'
@@ -783,55 +801,17 @@ NOTEBOOKS = {
                 "process_objective = process_evidence.best.aggregate_objective\n"
                 "process_fallback_penalty = process_evidence.best.fallback_penalty\n"
                 'process_utilities = process_case.to_problem_json()["utilities"]\n'
-                "process_named_utilities = [\n"
-                "    utility\n"
-                "    for utility in process_utilities\n"
-                '    if utility["name"] not in {"HU", "CU"}\n'
-                "]\n"
-                "assert len(process_named_utilities) == 8\n"
-                "assert_reversed_utility_pairs(process_utilities)\n"
-                "assert process_fallback_penalty.value > 0.0\n"
-                "assert process_fallback_penalty.value < 0.5\n"
-                'assert any(utility["name"] == "HU" for utility in process_utilities)\n'
-                "for utility in process_named_utilities:\n"
-                '    maximum = process_maximum_duties.get(utility["name"])\n'
-                "    if maximum is not None:\n"
-                '        assert utility["maximum_heat_flow"] == {\n'
-                '            "value": maximum, "unit": "kW"\n'
-                "        }\n"
-                "process_hot_targets = [\n"
-                '    utility["t_target"]["value"]\n'
-                "    for utility in process_utilities\n"
-                '    if utility["type"] == "Hot"\n'
-                "]\n"
-                "process_cold_supplies = [\n"
-                '    utility["t_supply"]["value"]\n'
-                "    for utility in process_utilities\n"
-                '    if utility["type"] == "Cold"\n'
-                "]\n"
-                "# Reject the former edge-clustered result before plotting it.\n"
-                "assert min(process_hot_targets) < 75.0\n"
-                "assert max(process_cold_supplies) > 15.0\n"
                 "process_case = workspace.add(\n"
                 "    process_case,\n"
                 '    name="optimized_process_utilities",\n'
                 "    activate=False,\n"
                 ")\n"
-                "process_case.target.direct_heat_integration(\n"
+                "process_target = process_case.target.direct_heat_integration(\n"
                 '    zone="Almond", period_id="0"\n'
                 ")\n"
-                'process_zone = process_case.master_zone.get_subzone("Almond")\n'
-                "assert all(\n"
-                "    utility.heat_flow.value <= process_maximum_duties[utility.name] + 1e-9\n"
-                "    for utility in process_zone.hot_utilities\n"
-                "    if utility.name in process_maximum_duties\n"
+                "process_retarget_comparison = retarget_comparison(\n"
+                "    process_evidence, process_target\n"
                 ")\n"
-                "assert sum(\n"
-                "    utility.heat_flow.value > 1e-9\n"
-                "    for utility in process_zone.hot_utilities\n"
-                "    if utility.name in process_maximum_duties\n"
-                ") >= 3\n"
-                'assert process_zone.hot_utilities.get_stream_by_name("HU").heat_flow.value > 0.0\n'
                 "process_summary = process_case.summary_frame()\n"
                 "process_gcc = process_case.plot.grand_composite_curve(\n"
                 '    zone_name="Almond"\n'
@@ -847,33 +827,14 @@ NOTEBOOKS = {
                 "site_evidence = site_case.utility_placement_result\n"
                 "site_objective = site_evidence.best.aggregate_objective\n"
                 'site_utilities = site_case.to_problem_json()["utilities"]\n'
-                "assert len(site_utilities) == 8\n"
-                "assert_reversed_utility_pairs(site_utilities)\n"
-                "site_hot_targets = [\n"
-                '    utility["t_target"]["value"]\n'
-                "    for utility in site_utilities\n"
-                '    if utility["type"] == "Hot"\n'
-                "]\n"
-                "site_cold_supplies = [\n"
-                '    utility["t_supply"]["value"]\n'
-                "    for utility in site_utilities\n"
-                '    if utility["type"] == "Cold"\n'
-                "]\n"
-                "assert min(site_hot_targets) < 80.0\n"
-                "assert max(site_cold_supplies) > 15.0\n"
-                "assert site_objective.value < 0.65\n"
-                "assert max(\n"
-                '    utility["t_target"]["value"] - utility["t_supply"]["value"]\n'
-                "    for utility in site_utilities\n"
-                '    if utility["type"] == "Cold"\n'
-                ") > 5.0\n"
                 "site_case = workspace.add(\n"
                 "    site_case,\n"
                 '    name="optimized_site_utilities",\n'
                 "    activate=False,\n"
                 ")\n"
-                'assert workspace.use_case("baseline").to_problem_json() == baseline_input\n'
-                'site_case.target.total_site_heat_integration(period_id="0")\n'
+                'baseline_unchanged = workspace.use_case("baseline").to_problem_json() == baseline_input\n'
+                'site_target = site_case.target.total_site_heat_integration(period_id="0")\n'
+                "site_retarget_comparison = retarget_comparison(site_evidence, site_target)\n"
                 "site_summary = site_case.summary_frame()\n"
                 "site_tsp = site_case.plot.total_site_profiles()"
             ),
@@ -1016,7 +977,7 @@ GUIDANCE = {
     ),
     "19_utility_placement_optimisation.ipynb": (
         "Where should two isothermal and two sensible hot and cold utility levels be placed at Process and Site hierarchy levels to minimize thermodynamic cost?",
-        "Compare the Process result against its direct GCC and the Site result against its Total Site Profile. Inspect physical entropy generation from the balanced composite curves: use CP * ln(T_out / T_in) in kelvin for sensible intervals and the signed Q / T limit for isothermal intervals. In the capped Process example, confirm that the optimizer dispatches across the feasible named levels before assigning only the remaining shortfall to HU.",
+        "Compare the Process result against its direct GCC and the Site result against its Total Site Profile. Candidate duties come from those exact ordinary target workflows; they are not independent optimizer decisions, and a requested level may be unused. Inspect physical entropy generation from the balanced composite curves: use CP * ln(T_out / T_in) in kelvin for sensible intervals and the signed Q / T limit for isothermal intervals. In the capped Process example, confirm that exact targeting uses feasible named levels before assigning only the remaining shortfall to HU.",
         "Replace the sample with validated plant data, apply defensible temperature bounds, and increase the optimizer limits before making an engineering decision.",
         (
             "Prepare the placement study",
@@ -1184,13 +1145,16 @@ PRESENTATIONS: dict[str, tuple[str, str]] = {
         "display(publication_outputs)",
     ),
     "19_utility_placement_optimisation.ipynb": (
-        "Review both optimized cases exactly like normal cases: compare the Process utilities on the standard GCC with the Site utilities on the standard Total Site Profile, and retain each placement result for engineering review.",
+        "Review both optimized cases exactly like normal cases: compare the Process utilities on the standard GCC with the Site utilities on the standard Total Site Profile. The comparison tables place optimizer-evidence and ordinary-retarget duties side by side; a zero difference shows exact replay.",
         "from IPython.display import display\n\n"
         "display(process_objective)\n"
         "display(process_fallback_penalty)\n"
+        "display(process_retarget_comparison)\n"
         "display(process_summary)\n"
         "display(process_gcc)\n"
         "display(site_objective)\n"
+        "display(site_retarget_comparison)\n"
+        'display({"baseline_unchanged": baseline_unchanged})\n'
         "display(site_summary)\n"
         "display(site_tsp)",
     ),

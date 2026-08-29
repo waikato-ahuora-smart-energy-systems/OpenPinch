@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from ..analysis.targeting.grand_composite import get_seperated_gcc_heat_load_profiles
+from ..analysis.utility_placement.allocation import AllocationAdapterResult
 from ..analysis.utility_placement.context import (
     PlacementPeriodInput,
     PlacementTargetSnapshot,
@@ -27,6 +28,7 @@ from ..contracts.units import standardise_input_value
 from ..contracts.utility_placement import (
     CoordinateKey,
     DecisionField,
+    DecodedPlacement,
     PhysicalCoordinateBound,
     QuantityInterval,
     QuantityValue,
@@ -606,6 +608,68 @@ def _process_entropy_slices(zone, period_idx: int) -> tuple[ProcessEntropySlice,
     return tuple(slices)
 
 
+def _snapshot_from_target(
+    isolated: "PinchProblem",
+    request: UtilityPlacementRequest,
+    scope: UtilityPlacementBaseTarget,
+    period_id: str,
+    target,
+) -> tuple[PlacementTargetSnapshot, float, float]:
+    """Extract the exact target arrays and candidate-local utility totals."""
+    analysis_zone = isolated.master_zone.get_subzone(request.zone)
+    if analysis_zone is None:
+        raise PlacementContextError(
+            code="unknown_zone",
+            message="Requested utility-placement zone is not available.",
+            details=(("zone", request.zone),),
+        )
+    shifted = target.pt
+    real = getattr(target, "pt_real", None) or shifted
+    shifted_temperatures = _finite_tuple(shifted[ProblemTableLabel.T])
+    real_temperatures = _finite_tuple(real[ProblemTableLabel.T])
+    pinch_label = ProblemTableLabel.H_NET_A
+    if not all(
+        math.isfinite(float(value)) for value in shifted[ProblemTableLabel.H_NET_A]
+    ):
+        pinch_label = ProblemTableLabel.H_NET
+    if scope is not UtilityPlacementBaseTarget.DIRECT:
+        pinch_label = ProblemTableLabel.H_NET_UT
+    hot_pinch, cold_pinch, *_ = shifted.pinch_idx(pinch_label)
+    residual_hot_duty = float(get_scalar_value(target.hot_utility_target))
+    residual_cold_duty = float(get_scalar_value(target.cold_utility_target))
+    hot_profile, cold_profile = _load_profiles(
+        shifted,
+        net_label=(
+            ProblemTableLabel.H_NET_UT
+            if scope is not UtilityPlacementBaseTarget.DIRECT
+            else None
+        ),
+    )
+    hot_profile = _calibrate_profile(
+        hot_profile,
+        residual_duty=residual_hot_duty,
+    )
+    cold_profile = _calibrate_profile(
+        cold_profile,
+        residual_duty=residual_cold_duty,
+    )
+    snapshot = PlacementTargetSnapshot(
+        shifted_temperatures=shifted_temperatures,
+        real_temperatures=real_temperatures,
+        hot_load_profile=hot_profile,
+        cold_load_profile=cold_profile,
+        real_hot_composite=_finite_tuple(real[ProblemTableLabel.H_HOT]),
+        real_cold_composite=_finite_tuple(real[ProblemTableLabel.H_COLD]),
+        hot_pinch_index=int(hot_pinch),
+        cold_pinch_index=int(cold_pinch),
+        entropy_slices=_process_entropy_slices(
+            analysis_zone,
+            isolated.period_ids[period_id],
+        ),
+    )
+    return snapshot, residual_hot_duty, residual_cold_duty
+
+
 def _coordinate_bounds(
     request: UtilityPlacementRequest,
     blueprints: TemplateBlueprintSet,
@@ -726,58 +790,17 @@ def _extract_period(
         target = isolated.target.total_site_heat_integration(**kwargs)
     else:
         target = isolated.target.indirect_heat_integration(**kwargs)
-    analysis_zone = isolated.master_zone.get_subzone(request.zone)
-    if analysis_zone is None:
-        raise PlacementContextError(
-            code="unknown_zone",
-            message="Requested utility-placement zone is not available.",
-            details=(("zone", request.zone),),
-        )
-    shifted = target.pt
-    real = getattr(target, "pt_real", None) or shifted
-    shifted_temperatures = _finite_tuple(shifted[ProblemTableLabel.T])
-    real_temperatures = _finite_tuple(real[ProblemTableLabel.T])
-    pinch_label = ProblemTableLabel.H_NET_A
-    if not all(
-        math.isfinite(float(value)) for value in shifted[ProblemTableLabel.H_NET_A]
-    ):
-        pinch_label = ProblemTableLabel.H_NET
-    hot_pinch, cold_pinch, *_ = shifted.pinch_idx(pinch_label)
-    residual_hot_duty = float(get_scalar_value(target.hot_utility_target))
-    residual_cold_duty = float(get_scalar_value(target.cold_utility_target))
-    hot_profile, cold_profile = _load_profiles(
-        shifted,
-        net_label=(
-            ProblemTableLabel.H_NET_UT
-            if scope is not UtilityPlacementBaseTarget.DIRECT
-            else None
-        ),
-    )
-    hot_profile = _calibrate_profile(
-        hot_profile,
-        residual_duty=residual_hot_duty,
-    )
-    cold_profile = _calibrate_profile(
-        cold_profile,
-        residual_duty=residual_cold_duty,
+    snapshot, residual_hot_duty, residual_cold_duty = _snapshot_from_target(
+        isolated,
+        request,
+        scope,
+        period_id,
+        target,
     )
     return PlacementPeriodInput(
         period_id=period_id,
         weight=_period_weight(problem, period_id),
-        snapshot=PlacementTargetSnapshot(
-            shifted_temperatures=shifted_temperatures,
-            real_temperatures=real_temperatures,
-            hot_load_profile=hot_profile,
-            cold_load_profile=cold_profile,
-            real_hot_composite=_finite_tuple(real[ProblemTableLabel.H_HOT]),
-            real_cold_composite=_finite_tuple(real[ProblemTableLabel.H_COLD]),
-            hot_pinch_index=int(hot_pinch),
-            cold_pinch_index=int(cold_pinch),
-            entropy_slices=_process_entropy_slices(
-                analysis_zone,
-                isolated.period_ids[period_id],
-            ),
-        ),
+        snapshot=snapshot,
         residual_hot_duty=residual_hot_duty,
         residual_cold_duty=residual_cold_duty,
         ambient_temperature_kelvin=298.15,
@@ -789,9 +812,9 @@ def _extract_period(
         coordinate_bounds=_coordinate_bounds(
             request,
             blueprints,
-            shifted_temperatures,
-            hot_profile=hot_profile,
-            cold_profile=cold_profile,
+            snapshot.shifted_temperatures,
+            hot_profile=snapshot.hot_load_profile,
+            cold_profile=snapshot.cold_load_profile,
         ),
     )
 
@@ -837,6 +860,155 @@ def build_problem_placement_context(
     return blueprints, context
 
 
+def _serialized_limit(request: UtilityPlacementRequest, name: str):
+    limit = next((item for item in request.maximum_duties if item.name == name), None)
+    if limit is None:
+        return None
+    values = tuple(value.value for value in limit.values)
+    if len(set(values)) == 1:
+        return {"value": values[0], "unit": request.units.heat_flow}
+    return {
+        "values": list(values),
+        "period_ids": list(limit.period_ids),
+        "unit": request.units.heat_flow,
+    }
+
+
+def _candidate_utility_input(
+    request: UtilityPlacementRequest,
+    placement: DecodedPlacement,
+) -> list[dict[str, object]]:
+    utilities: list[dict[str, object]] = []
+    for utility_type, levels in (("Hot", placement.hot), ("Cold", placement.cold)):
+        for level in levels:
+            limit = _serialized_limit(request, level.template_key.name)
+            utilities.append(
+                {
+                    "name": level.template_key.name,
+                    "type": utility_type,
+                    "t_supply": level.supply_temperature.model_dump(),
+                    "t_target": level.target_temperature.model_dump(),
+                    "heat_flow": {"value": 0.0, "unit": request.units.heat_flow},
+                    **({"maximum_heat_flow": limit} if limit is not None else {}),
+                    "dt_cont": {
+                        "value": 0.0,
+                        "unit": request.units.temperature_difference,
+                    },
+                    "htc": {"value": 1.0, "unit": "kW/m^2/delta_degC"},
+                }
+            )
+    return utilities
+
+
+class _ExactTargetReplayAdapter:
+    """Replay candidates through the same detached target used by public plots."""
+
+    def __init__(
+        self,
+        *,
+        source: dict,
+        project_name: str | None,
+        request: UtilityPlacementRequest,
+    ) -> None:
+        self.source = source
+        self.project_name = project_name
+        self.request = request
+
+    def allocate(
+        self,
+        period: PlacementPeriodInput,
+        placement: DecodedPlacement,
+    ) -> AllocationAdapterResult:
+        from .problem import PinchProblem
+
+        candidate_source = dict(self.source)
+        candidate_source["utilities"] = _candidate_utility_input(
+            self.request,
+            placement,
+        )
+        isolated = PinchProblem(candidate_source, project_name=self.project_name)
+        kwargs = {"period_id": period.period_id}
+        if self.request.zone is not None:
+            kwargs["zone"] = self.request.zone
+        if self.request.base_target is UtilityPlacementBaseTarget.DIRECT:
+            target = isolated.target.direct_heat_integration(**kwargs)
+        elif self.request.base_target is UtilityPlacementBaseTarget.TOTAL_SITE:
+            target = isolated.target.total_site_heat_integration(**kwargs)
+        else:
+            target = isolated.target.indirect_heat_integration(**kwargs)
+
+        snapshot, required_hot, required_cold = _snapshot_from_target(
+            isolated,
+            self.request,
+            self.request.base_target,
+            period.period_id,
+            target,
+        )
+        period_idx = isolated.period_ids[period.period_id]
+
+        def duty(utility) -> float:
+            return float(get_scalar_value(utility.heat_flow, period_idx=period_idx))
+
+        def temperature(utility, attribute: str) -> float:
+            return float(
+                get_scalar_value(getattr(utility, attribute), period_idx=period_idx)
+            )
+
+        hot_by_name = {utility.name: utility for utility in target.hot_utilities}
+        cold_by_name = {utility.name: utility for utility in target.cold_utilities}
+        hot_names = {level.template_key.name for level in placement.hot}
+        cold_names = {level.template_key.name for level in placement.cold}
+        hot_fallbacks = tuple(
+            utility
+            for utility in target.hot_utilities
+            if utility.name not in hot_names and duty(utility) > 0.0
+        )
+        cold_fallbacks = tuple(
+            utility
+            for utility in target.cold_utilities
+            if utility.name not in cold_names and duty(utility) > 0.0
+        )
+
+        def fallback_values(utilities, default_name: str):
+            if not utilities:
+                return default_name, 0.0, None, None
+            first = utilities[0]
+            return (
+                first.name,
+                math.fsum(duty(utility) for utility in utilities),
+                temperature(first, "supply_temperature"),
+                temperature(first, "target_temperature"),
+            )
+
+        hot_fallback = fallback_values(hot_fallbacks, "HU")
+        cold_fallback = fallback_values(cold_fallbacks, "CU")
+        return AllocationAdapterResult(
+            hot_duties=tuple(
+                duty(hot_by_name[level.template_key.name])
+                if level.template_key.name in hot_by_name
+                else 0.0
+                for level in placement.hot
+            ),
+            cold_duties=tuple(
+                duty(cold_by_name[level.template_key.name])
+                if level.template_key.name in cold_by_name
+                else 0.0
+                for level in placement.cold
+            ),
+            hot_fallback_name=hot_fallback[0],
+            hot_fallback_duty=hot_fallback[1],
+            hot_fallback_supply_temperature=hot_fallback[2],
+            hot_fallback_target_temperature=hot_fallback[3],
+            cold_fallback_name=cold_fallback[0],
+            cold_fallback_duty=cold_fallback[1],
+            cold_fallback_supply_temperature=cold_fallback[2],
+            cold_fallback_target_temperature=cold_fallback[3],
+            required_hot_duty=required_hot,
+            required_cold_duty=required_cold,
+            target_snapshot=snapshot,
+        )
+
+
 def run_problem_utility_placement(
     problem: "PinchProblem",
     *,
@@ -869,9 +1041,13 @@ def run_problem_utility_placement(
         request=resolved_request,
         blueprints=blueprints,
         context=context,
+        allocation_adapter=_ExactTargetReplayAdapter(
+            source=problem.to_problem_json(),
+            project_name=problem.project_name,
+            request=resolved_request,
+        ),
     )
     period = result.best.period_results[0]
-    limit_by_name = {limit.name: limit for limit in result.request.maximum_duties}
     levels_by_side = {
         "Hot": list(period.hot_levels),
         "Cold": list(period.cold_levels),
@@ -890,19 +1066,6 @@ def run_problem_utility_placement(
                 if level.is_fallback and level.template_key.name not in observed
             )
 
-    def serialized_limit(name: str):
-        limit = limit_by_name.get(name)
-        if limit is None:
-            return None
-        values = tuple(value.value for value in limit.values)
-        if len(set(values)) == 1:
-            return {"value": values[0], "unit": result.units.heat_flow}
-        return {
-            "values": list(values),
-            "period_ids": list(limit.period_ids),
-            "unit": result.units.heat_flow,
-        }
-
     optimized_input = problem.to_problem_json()
     optimized_input["utilities"] = [
         {
@@ -912,8 +1075,14 @@ def run_problem_utility_placement(
             "t_target": level.target_temperature.model_dump(),
             "heat_flow": {"value": 0.0, "unit": result.units.heat_flow},
             **(
-                {"maximum_heat_flow": serialized_limit(level.template_key.name)}
-                if serialized_limit(level.template_key.name) is not None
+                {
+                    "maximum_heat_flow": _serialized_limit(
+                        result.request,
+                        level.template_key.name,
+                    )
+                }
+                if _serialized_limit(result.request, level.template_key.name)
+                is not None
                 else {}
             ),
             "dt_cont": {"value": 0.0, "unit": result.units.temperature_difference},

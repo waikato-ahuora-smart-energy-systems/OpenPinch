@@ -5,10 +5,11 @@ Purpose
 -------
 
 Utility placement optimisation selects the temperatures of multiple hot and
-cold utility levels and their period-specific duties while preserving the
-process heat targets. It minimizes
-physical entropy generation calculated from candidate-local balanced hot and
-cold composite curves and reports the result in ``kW/K``.
+cold candidate utility levels while preserving the process heat targets. For
+each candidate, the ordinary hierarchy-aware target workflow determines the
+period-specific duties. The service minimizes physical entropy generation
+calculated from the resulting balanced hot and cold composite curves and
+reports the result in ``kW/K``.
 
 The workflow is available through the Python API only; no CLI surface is
 provided. Monetary utility-placement optimisation is deferred for now.
@@ -26,7 +27,8 @@ Count-generated levels are temperature-coupled by kind and ordinal. For
 example, ``hot_iso_1`` and ``cold_iso_1`` occupy the same interval with
 opposite direction: the cold supply equals the hot target, and the cold target
 equals the hot supply. The same rule applies to generated sensible pairs.
-Their temperatures are shared, but their targeted duties remain independent.
+Their temperatures are shared, but ordinary targeting determines each side's
+duty independently.
 Generated pairs are ordered together from hottest to coldest. Existing Hot and
 Cold utilities inferred when counts are omitted retain independent temperature
 coordinates.
@@ -93,11 +95,12 @@ are also accepted:
 Each hot and cold level has its own independent bound, including matching
 generated pairs. When named capacity cannot cover the target, residual-only
 ``HU`` or ``CU`` supplies the shortfall and is retained in the returned case.
-The optimizer decides each period's hot and cold duty split independently.
-Bounded stick-breaking coordinates make each side's requested duties
-non-negative and conserve its residual load exactly. Targeting then clips each
-request to temperature availability and any ``maximum_duties`` entry; only the
-remaining shortfall becomes fallback duty.
+The optimizer changes temperatures and sensible spans only. For every
+candidate and period, OpenPinch installs those utilities in a detached case and
+runs the same direct, Total Site, or indirect target method used after the
+optimization. That exact target determines named duties, same-level Total Site
+utility matching, target totals, and fallback duty. A requested candidate level
+may therefore have zero duty; there is no implicit minimum-duty constraint.
 
 The return value is already a normal detached :class:`OpenPinch.PinchProblem`
 containing the best utility set. Register it, then target and plot it with the
@@ -136,14 +139,14 @@ Run Site-level placement separately. Because the master zone is a Site, no
 
 The standard GCC and Total Site Profile figures include the utilities stored
 on their corresponding returned cases. Use ``return_graph_data=True`` on either
-plot method for a deterministic graph mapping.
+plot method for a deterministic graph mapping. Retargeted named and fallback
+duties match the optimizer evidence because both use the same ordinary target
+workflow.
 
 Generated temperature bounds cover the intervals where each residual profile
 changes, rather than forcing every hot level above the hottest process
 temperature or every cold level below the coldest. Deterministic starting
-points include profile-spanning paired intervals, balanced named-hot dispatch
-with a profile-following cold level, and distributed utility supplies and
-sensible spans across that support, so
+points distribute utility supplies and sensible spans across that support, so
 even a deliberately small tutorial search can compare utilities near different
 parts of the background profile. These starts improve coverage but do not turn
 the bounded search into a proof of the global optimum.
@@ -167,7 +170,7 @@ canonical period. An ordered case batch uses the same arguments:
 Expected Output
 ---------------
 
-Each returned object is a normal unsolved case with the best hot and cold
+Each returned object is a normal case with the best hot and cold candidate
 utilities already present. Use ordinary case targeting, ``summary_frame()``,
 ``metrics()``, ``report()``, and plotting methods. Detailed optimizer evidence
 remains available at ``process_case.utility_placement_result`` or
@@ -225,8 +228,8 @@ Next Steps
 
 Run ``19_utility_placement_optimisation.ipynb`` for the executable
 thermodynamic workflow, two isothermal plus two sensible levels per side,
-executable checks of their reversed hot/cold endpoints, named-case replacement,
-and standard GCC and Total Site Profile plots. Replace
+named-case replacement, inspectable optimizer-versus-retarget duty comparison
+tables, and standard GCC and Total Site Profile plots. Replace
 the sample with reviewed site data and defensible bounds, then increase
 ``iteration_limit`` and ``evaluation_limit`` beyond the tutorial's deliberately
 small values before using the result for engineering decisions.

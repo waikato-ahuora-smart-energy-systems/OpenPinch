@@ -52,7 +52,6 @@ class DecisionField(StrEnum):
 
     SUPPLY_TEMPERATURE = "supply_temperature"
     TEMPERATURE_SPAN = "temperature_span"
-    DUTY_FRACTION = "duty_fraction"
 
 
 def _finite_float(value: float) -> float:
@@ -377,16 +376,6 @@ class CoordinateKey(_FrozenContract):
 
     template_key: TemplateKey
     field: DecisionField
-    period_id: str | None = None
-
-    @model_validator(mode="after")
-    def _validate_period_scope(self) -> Self:
-        if self.field is DecisionField.DUTY_FRACTION:
-            if self.period_id is None or not self.period_id.strip():
-                raise ValueError("duty-fraction coordinates require a period_id")
-        elif self.period_id is not None:
-            raise ValueError("temperature coordinates must be shared across periods")
-        return self
 
 
 class PhysicalCoordinateBound(_FrozenContract):
@@ -510,34 +499,11 @@ class DecodedUtilityLevel(_FrozenContract):
     temperature_span: QuantityValue
 
 
-class DecodedPeriodDispatch(_FrozenContract):
-    """One period's independent hot/cold requested utility duties."""
-
-    period_id: str
-    hot_duties: tuple[QuantityValue, ...]
-    cold_duties: tuple[QuantityValue, ...]
-
-    @field_validator("period_id")
-    @classmethod
-    def _validate_period_id(cls, value: str) -> str:
-        normalized = value.strip()
-        if not normalized:
-            raise ValueError("period_id must not be empty")
-        return normalized
-
-    @model_validator(mode="after")
-    def _validate_duties(self) -> Self:
-        if any(item.value < 0.0 for item in self.hot_duties + self.cold_duties):
-            raise ValueError("dispatch duties must be non-negative")
-        return self
-
-
 class DecodedPlacement(_FrozenContract):
     """Decoded hot/cold levels plus the exact source coordinate tuple."""
 
     hot: tuple[DecodedUtilityLevel, ...]
     cold: tuple[DecodedUtilityLevel, ...]
-    period_dispatches: tuple[DecodedPeriodDispatch, ...] = ()
     coordinates: tuple[float, ...]
 
     @field_validator("coordinates")
@@ -602,10 +568,6 @@ class UtilityPlacementModel(_FrozenContract):
                 2 * self.request.isothermal_level_count
                 + 4 * self.request.sensible_level_count
             )
-        level_count = (
-            self.request.isothermal_level_count + self.request.sensible_level_count
-        )
-        expected_dimension += len(self.envelope.periods) * 2 * (level_count - 1)
         if len(self.coordinates) != expected_dimension:
             raise ValueError("coordinate dimension does not match request counts")
         if [coordinate.index for coordinate in self.coordinates] != list(

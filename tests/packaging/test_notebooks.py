@@ -90,23 +90,21 @@ def test_utility_placement_has_one_executable_thermodynamic_notebook() -> None:
     assert "cogeneration_eligible" not in source
     assert "process_maximum_duties = {" in source
     assert source.count("maximum_duties=process_maximum_duties") == 1
-    assert 'utility["maximum_heat_flow"]' in source
     assert "process_evidence.best.fallback_penalty" in source
     assert "display(process_fallback_penalty)" in source
-    assert 'utility["name"] == "HU"' in source
-    assert "min(process_hot_targets) < 75.0" in source
-    assert "max(process_cold_supplies) > 15.0" in source
-    assert "min(site_hot_targets) < 80.0" in source
-    assert "max(site_cold_supplies) > 15.0" in source
-    assert "def assert_reversed_utility_pairs(utilities):" in source
-    assert source.count("assert_reversed_utility_pairs(") == 3
-    assert 'cold["t_supply"]["value"] - hot["t_target"]["value"]' in source
-    assert 'cold["t_target"]["value"] - hot["t_supply"]["value"]' in source
+    assert "def retarget_comparison(evidence, target):" in source
+    assert source.count("retarget_comparison(") == 3
+    assert "period = evidence.best.period_results[0]" in source
+    assert '"optimizer_duty_kW"' in source
+    assert '"retargeted_duty_kW"' in source
+    assert '"difference_kW"' in source
+    assert "display(process_retarget_comparison)" in source
+    assert "display(site_retarget_comparison)" in source
+    assert "assert " not in source
     assert "process_case.utility_placement_result" in source
     assert "site_case.utility_placement_result" in source
     assert "process_case.summary_frame()" in source
     assert "site_case.summary_frame()" in source
-    assert ".best.period_results" not in source
     assert "problem.plot.utility_placement(" not in source
     assert 'name="optimized_process_utilities"' in source
     assert 'name="optimized_site_utilities"' in source

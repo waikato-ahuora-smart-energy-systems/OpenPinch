@@ -5574,3 +5574,115 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 - build-and-test-summary.md
 
 ---
+
+## Utility Placement Post-Commit Correctness Reopening
+**Timestamp**: 2026-08-29T10:03:32Z
+**User Input**: "The result still appears wrong."
+**AI Response**: "Reopened a read-only correctness diagnosis. Began comparing optimizer evidence, returned-case utility definitions, and ordinary Process GCC and Total Site retargeting. Preserved the user's post-commit notebook output changes and unrelated .gitignore edit."
+**Context**: DIAGNOSIS - Utility Placement optimizer-to-standard-target consistency
+
+---
+
+## Utility Placement Post-Commit Correctness Findings
+**Timestamp**: 2026-08-29T10:03:32Z
+**User Input**: "The result still appears wrong."
+**AI Response**: "Confirmed the result is inconsistent. Process optimizer evidence requests 20.000, 18.515, and 20.000 kW from three named hot levels plus 80.701 kW HU, but ordinary retargeting uses 20.000, 20.000, and 20.000 kW plus 79.216 kW HU. Total Site optimizer evidence assigns 1,331.437 kW to hot_sensible_1 and 3,650.593 kW to cold_sensible_2 with no fallback, while ordinary Total Site retargeting assigns only 1,082.538 kW to hot_sensible_1, zero to cold_sensible_2, and generates 3,401.694 kW CU. The returned case serializes every utility heat_flow as zero and does not preserve the optimized period dispatch. Root cause: the optimizer replays a simplified aggregate profile allocator, whereas the public Total Site workflow targets child processes first and aggregates their utilities. Created three focused requirements questions covering exact public-target equivalence and whether requested levels must be active."
+**Context**: DIAGNOSIS / REQUIREMENTS REOPENING - Confirmed optimizer, returned case, and standard plot use different duty models
+
+---
+
+## Utility Placement Result Correctness Answers
+**Timestamp**: 2026-08-29T10:07:41Z
+**User Input**: "Done"
+**AI Response**: "Validated Question 1 as A (the optimizer must use the exact ordinary Process or Total Site target workflow) and Question 2 as C (requested levels are candidate levels and may remain unused). Question 3 contains `N/A`, which is not a listed letter answer, although it appears semantically equivalent to C. Created one focused clarification question rather than changing requirements from an invalid answer."
+**Context**: REQUIREMENTS ANALYSIS - Utility Placement result correctness clarification required
+
+---
+
+## Utility Placement Result Correctness Clarification Resolved
+**Timestamp**: 2026-08-29T10:08:50Z
+**User Input**: "Done"
+**AI Response**: "Validated clarification answer A. Recorded exact ordinary-target replay as the source of feasibility, candidate duties, target totals, entropy, returned-case evidence, and standard plots. Recorded candidate-only level semantics with no minimum-duty bound. Updated the comprehensive requirements, created the hierarchy-aware eight-step TDD execution plan, and opened the combined requirements/workflow approval checkpoint."
+**Context**: REQUIREMENTS ANALYSIS / WORKFLOW PLANNING - Utility Placement exact-target replay correction ready for approval
+
+---
+
+## Utility Placement Exact-Target Replay Plan Approval
+**Timestamp**: 2026-08-29T10:47:01Z
+**User Input**: "Done"
+**AI Response**: "Validated approval answer B. Approved the exact ordinary-target replay requirements and eight-step TDD execution plan. Began Code Generation Step 1 with Process and Total Site optimizer-versus-retarget RED regressions. Continuing authorization applies through completion unless a new unexpected product decision or external blocker appears."
+**Context**: REQUIREMENTS / WORKFLOW PLANNING / CODE GENERATION PLAN APPROVAL - Utility Placement exact-target replay
+
+---
+
+## Utility Placement Exact-Target Replay TDD Step 1
+**Timestamp**: 2026-08-29T10:55:00Z
+**User Input**: "Done"
+**AI Response**: "Added public Process and Total Site regressions that retarget the returned case through the ordinary direct or total-site workflow, build the standard GCC or TSP graph data, and compare every named/fallback duty plus both utility target totals with optimizer evidence. The focused test is RED for both scopes: Process differs by 1.4848 kW between hot_iso_2 and HU, and Total Site redistributes hundreds of kW across named levels."
+**Context**: CODE GENERATION STEP 1 COMPLETE - Exact optimizer-versus-retarget regressions are RED
+
+---
+
+## Utility Placement Exact-Target Replay TDD Step 2
+**Timestamp**: 2026-08-29T11:04:00Z
+**User Input**: "Done"
+**AI Response**: "Removed duty-fraction coordinates, period-scoped coordinate identity, decoded period dispatches, stick-breaking codec functions, and dispatch-specific starts. Candidate vectors now contain only structurally ordered temperatures and sensible spans. Updated the focused contract, codec, allocation, and property tests; all 60 pass."
+**Context**: CODE GENERATION STEP 2 COMPLETE - Temperature-only optimizer schema
+
+---
+
+## Utility Placement Exact-Target Replay TDD Step 3
+**Timestamp**: 2026-08-29T11:18:00Z
+**User Input**: "Done"
+**AI Response**: "Added an application-owned, picklable exact-target replay adapter. Every candidate is installed in a detached PinchProblem and evaluated through the ordinary direct, total-site, or indirect target method. The public Process and Total Site optimizer-versus-retarget regression now passes."
+**Context**: CODE GENERATION STEP 3 COMPLETE - Detached exact ordinary-target replay
+
+---
+
+## Utility Placement Exact-Target Replay TDD Step 4
+**Timestamp**: 2026-08-29T11:28:00Z
+**User Input**: "Done"
+**AI Response**: "Extended the injected allocation result and period allocation to carry candidate-local hot/cold targets, the exact target snapshot, named/fallback duties, and exact fallback temperatures. Coverage, residual evidence, fallback penalty, and balanced-composite entropy now consume those candidate-local values. Added a focused allocation contract test; the 28-test allocation/evaluation/thermodynamics gate and the complete focused utility-placement suite pass."
+**Context**: CODE GENERATION STEP 4 COMPLETE - Candidate-local target and entropy ownership
+
+---
+
+## Utility Placement Exact-Target Replay TDD Step 5
+**Timestamp**: 2026-08-29T11:38:00Z
+**User Input**: "Done"
+**AI Response**: "Expanded returned-case equivalence coverage to Community and Region indirect targeting and to a capped two-period Process case. Ordinary retargeting reproduces every optimizer-evidence named/fallback duty for Process, Site, Community, Region, and both selected periods."
+**Context**: CODE GENERATION STEP 5 COMPLETE - Returned-case hierarchy and period equivalence
+
+---
+
+## Utility Placement Exact-Target Replay TDD Step 6
+**Timestamp**: 2026-08-29T11:55:00Z
+**User Input**: "Done"
+**AI Response**: "Ran the complete utility-placement analysis, property, performance, application, and architecture gate successfully and made focused Ruff clean. Measured the exact Process replay at 25.101 seconds for 115 accounted backend-plus-canonical evaluations under the tutorial's 100-evaluation backend bound. Expanded numerical-drift coverage so reconstructed 0.005 kW tabular drift is normalized while materially unbalanced composites remain rejected."
+**Context**: CODE GENERATION STEP 6 COMPLETE - Focused quality and bounded runtime evidence
+
+---
+
+## Utility Placement Notebook Presentation Correction
+**Timestamp**: 2026-08-29T11:12:15Z
+**User Input**: "The notebook should not contain tests / assert."
+**AI Response**: "Accepted the presentation correction during Code Generation Step 7. Replacing executable assertions with inspectable optimizer-versus-ordinary-retarget comparison tables and retaining the standard GCC and Total Site Profile outputs."
+**Context**: CODE GENERATION STEP 7 - Notebook 19 must demonstrate, not test
+
+---
+
+## Utility Placement Exact-Target Replay TDD Step 7
+**Timestamp**: 2026-08-29T11:20:15Z
+**User Input**: "(No additional user input; continued under standing authorization.)"
+**AI Response**: "Completed the assertion-free executable notebook and synchronized its generator. Notebook 19 contains two isothermal plus two non-isothermal sensible levels, ordinary Process and Site retargeting, standard GCC and Total Site Profile outputs, and inspectable optimizer-versus-retarget tables whose stored duties agree. Updated RTD, requirements, packaging tests, and the implementation summary; the notebook and documentation consistency gate passes."
+**Context**: CODE GENERATION STEP 7 COMPLETE - Assertion-free notebook and documentation evidence
+
+---
+
+## Utility Placement Exact-Target Replay Build and Test
+**Timestamp**: 2026-08-29T11:46:39Z
+**User Input**: "(No additional user input; continued under standing authorization.)"
+**AI Response**: "Completed Build and Test. Ruff and patch hygiene pass, Sphinx builds cleanly with warnings as errors, source and wheel artifacts build successfully, the wheel contains assertion-free notebook 19, the focused analytical/property suite passes 181 tests, and the complete solver-enabled suite passes 2,448 tests with 4 expected skips. Reviewed the changed files and retained only exact-replay implementation, required regressions, notebook/generator, RTD, and AI-DLC evidence; the unrelated .gitignore modification remains excluded."
+**Context**: BUILD AND TEST COMPLETE - Utility Placement exact-target replay
+
+---

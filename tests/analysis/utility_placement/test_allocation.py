@@ -16,7 +16,6 @@ from OpenPinch.analysis.utility_placement.context import (
 )
 from OpenPinch.contracts.utility_placement import (
     CandidateDiagnostic,
-    DecodedPeriodDispatch,
     DecodedPlacement,
     DecodedUtilityLevel,
     QuantityValue,
@@ -104,6 +103,39 @@ def test_allocation_uses_fresh_adapter_result_and_preserves_stable_keys() -> Non
     assert result.cold_levels[0].allocated_duty == 0.0
     assert result.hot_coverage_residual == pytest.approx(0.0)
     assert result.cold_coverage_residual == pytest.approx(0.0)
+
+
+def test_allocation_uses_candidate_local_targets_snapshot_and_exact_fallback() -> None:
+    period = _period()
+    exact_snapshot = period.snapshot.model_copy(
+        update={"shifted_temperatures": (230.0, 120.0, 5.0)}
+    )
+    adapter = _RecordingAdapter(hot=(), cold=())
+    adapter.allocate = lambda period, placement: AllocationAdapterResult(
+        hot_duties=(70.0, 0.0),
+        cold_duties=(60.0, 0.0),
+        hot_fallback_duty=10.0,
+        required_hot_duty=80.0,
+        required_cold_duty=60.0,
+        target_snapshot=exact_snapshot,
+        hot_fallback_name="exact_HU",
+        hot_fallback_supply_temperature=260.0,
+        hot_fallback_target_temperature=259.99,
+    )
+
+    result = allocate_placement_period(
+        request=UtilityPlacementRequest(isothermal_level_count=2),
+        period=period,
+        placement=_placement(),
+        adapter=adapter,
+    )
+
+    assert result.feasible
+    assert result.required_hot_duty == pytest.approx(80.0)
+    assert result.required_cold_duty == pytest.approx(60.0)
+    assert result.target_snapshot == exact_snapshot
+    assert result.hot_levels[-1].template_key.name == "exact_HU"
+    assert result.hot_levels[-1].supply_temperature == pytest.approx(260.0)
 
 
 def test_allocation_uses_combined_tolerance_without_clipping() -> None:
@@ -199,44 +231,6 @@ def test_existing_targeting_caps_named_levels_then_allocates_fallback() -> None:
     assert result.cold_levels[-1].is_fallback
     assert result.allocated_hot_duty == pytest.approx(period.residual_hot_duty)
     assert result.allocated_cold_duty == pytest.approx(period.residual_cold_duty)
-
-
-def test_existing_targeting_replays_requested_period_dispatch_with_fallback() -> None:
-    placement = _placement().model_copy(
-        update={
-            "period_dispatches": (
-                DecodedPeriodDispatch(
-                    period_id="p1",
-                    hot_duties=(
-                        QuantityValue(value=25.0, unit="kW"),
-                        QuantityValue(value=75.0, unit="kW"),
-                    ),
-                    cold_duties=(
-                        QuantityValue(value=30.0, unit="kW"),
-                        QuantityValue(value=50.0, unit="kW"),
-                    ),
-                ),
-            )
-        }
-    )
-
-    result = allocate_placement_period(
-        request=UtilityPlacementRequest(isothermal_level_count=2),
-        period=_period(),
-        placement=placement,
-    )
-
-    assert result.feasible
-    assert all(
-        level.allocated_duty <= requested + 1e-9
-        for level, requested in zip(result.hot_levels[:2], (25.0, 75.0), strict=True)
-    )
-    assert all(
-        level.allocated_duty <= requested + 1e-9
-        for level, requested in zip(result.cold_levels[:2], (30.0, 50.0), strict=True)
-    )
-    assert result.allocated_hot_duty == pytest.approx(100.0)
-    assert result.allocated_cold_duty == pytest.approx(80.0)
 
 
 def test_zero_maximum_disables_only_its_named_utility() -> None:
