@@ -128,6 +128,7 @@ def test_utility_placement_has_one_executable_thermodynamic_notebook() -> None:
     assert "balanced composite curves" in markdown
     assert "CP * ln(T_out / T_in)" in markdown
     assert "signed Q / T limit" in markdown
+    assert "Utility GCC must not cross the Process GCC" in markdown
     assert "monetary" not in markdown.lower()
 
 

@@ -736,6 +736,14 @@ def test_optimizer_evidence_exactly_matches_ordinary_retargeted_utility_duties(
             return_graph_data=True,
         )
         assert graph["type"] == GraphType.GCC.value
+        assert all(
+            float(utility) <= float(process) + 1e-6
+            for process, utility in zip(
+                target.pt[ProblemTableLabel.H_NET_A],
+                target.pt[ProblemTableLabel.H_NET_UT],
+                strict=True,
+            )
+        )
 
     assert _allocated_duties(evidence.hot_levels) == pytest.approx(
         _targeted_duties(target.hot_utilities), abs=1e-6

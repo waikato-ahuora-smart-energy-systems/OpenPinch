@@ -5,6 +5,8 @@ import os
 
 import numpy as np
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 from OpenPinch.analysis.numerics import *
 from OpenPinch.analysis.targeting.grand_composite import (
@@ -24,6 +26,7 @@ from OpenPinch.domain.enums import (
     StreamLoc,
 )
 from OpenPinch.domain.problem_table import ProblemTable
+from OpenPinch.domain.stream import Stream
 from OpenPinch.domain.stream_collection import StreamCollection
 from tests.support.paths import FIXTURES_ROOT
 
@@ -79,6 +82,74 @@ def test_maximise_utility_duty_returns_zero_for_single_point_segment():
         )
         == 0.0
     )
+
+
+def test_sensible_hot_utility_duty_is_limited_by_interior_gcc_breakpoint():
+    """Regression for the Process crossing observed in tutorial notebook 19."""
+    temperatures = np.asarray([173.0, 168.0, 158.0, 97.0, 69.57, 62.96, 33.0])
+    process_gcc = np.asarray(
+        [139.22, 135.2, 124.17, 38.52, 22.01, 18.03, 0.0]
+    )
+    supply = 174.01
+    target = 62.9556
+
+    duty = _maximise_utility_duty(
+        T_segment=temperatures,
+        H_segment=process_gcc,
+        Ts=supply,
+        Tt=target,
+        is_hot_ut=True,
+        Q_assigned=0.0,
+    )
+
+    utility_profile = duty * np.clip(
+        (temperatures - target) / (supply - target), 0.0, 1.0
+    )
+    assert duty == pytest.approx(125.65401322978228)
+    assert np.all(utility_profile <= process_gcc + 1e-9)
+
+
+@given(
+    is_hot=st.booleans(),
+    total=st.floats(min_value=10.0, max_value=200.0),
+    interior_fraction=st.floats(min_value=0.05, max_value=0.4),
+)
+def test_sensible_utility_profile_never_crosses_gcc_breakpoints(
+    is_hot: bool,
+    total: float,
+    interior_fraction: float,
+) -> None:
+    temperatures = np.asarray([100.0, 50.0, 0.0])
+    interior = total * interior_fraction
+    process_gcc = np.asarray(
+        [total, interior, 0.0] if is_hot else [0.0, interior, total]
+    )
+    supply, target = ((110.0, 0.0) if is_hot else (-10.0, 100.0))
+    utility = Stream(
+        "Sensible utility",
+        supply,
+        target,
+        heat_flow=0.0,
+        is_process_stream=False,
+    )
+
+    targeted = _assign_utility(
+        T_vals=temperatures,
+        H_vals=process_gcc,
+        u_ls=StreamCollection([utility]),
+        pinch_row=2 if is_hot else 0,
+        is_hot_ut=is_hot,
+        is_real_temperatures=True,
+        idx=None,
+    )
+    duty = float(targeted.get_stream_by_name("Sensible utility").heat_flow.value)
+    fractions = (
+        np.clip((temperatures - target) / (supply - target), 0.0, 1.0)
+        if is_hot
+        else np.clip((target - temperatures) / (target - supply), 0.0, 1.0)
+    )
+
+    assert np.all(duty * fractions <= process_gcc + 1e-9)
 
 
 def get_test_filenames():

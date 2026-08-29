@@ -143,6 +143,13 @@ plot method for a deterministic graph mapping. Retargeted named and fallback
 duties match the optimizer evidence because both use the same ordinary target
 workflow.
 
+For a Process target, ordinary utility targeting limits each sensible duty at
+the tightest endpoint or interior GCC breakpoint. The cumulative hot and cold
+utility profiles therefore remain on the feasible side of the residual Process
+GCC over their complete temperature spans; a sensible Utility GCC must not
+cross the Process GCC. This same check applies during every detached optimizer
+replay and when the returned case is targeted again.
+
 Generated temperature bounds cover the intervals where each residual profile
 changes, rather than forcing every hot level above the hottest process
 temperature or every cold level below the coldest. Deterministic starting

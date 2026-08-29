@@ -977,7 +977,7 @@ GUIDANCE = {
     ),
     "19_utility_placement_optimisation.ipynb": (
         "Where should two isothermal and two sensible hot and cold utility levels be placed at Process and Site hierarchy levels to minimize thermodynamic cost?",
-        "Compare the Process result against its direct GCC and the Site result against its Total Site Profile. Candidate duties come from those exact ordinary target workflows; they are not independent optimizer decisions, and a requested level may be unused. Inspect physical entropy generation from the balanced composite curves: use CP * ln(T_out / T_in) in kelvin for sensible intervals and the signed Q / T limit for isothermal intervals. In the capped Process example, confirm that exact targeting uses feasible named levels before assigning only the remaining shortfall to HU.",
+        "Compare the Process result against its direct GCC and the Site result against its Total Site Profile. Candidate duties come from those exact ordinary target workflows; they are not independent optimizer decisions, and a requested level may be unused. Inspect physical entropy generation from the balanced composite curves: use CP * ln(T_out / T_in) in kelvin for sensible intervals and the signed Q / T limit for isothermal intervals. In the capped Process example, confirm that exact targeting limits sensible duty at every GCC breakpoint, so the Utility GCC cannot cross the Process GCC, before assigning only the remaining shortfall to HU.",
         "Replace the sample with validated plant data, apply defensible temperature bounds, and increase the optimizer limits before making an engineering decision.",
         (
             "Prepare the placement study",
@@ -1145,7 +1145,7 @@ PRESENTATIONS: dict[str, tuple[str, str]] = {
         "display(publication_outputs)",
     ),
     "19_utility_placement_optimisation.ipynb": (
-        "Review both optimized cases exactly like normal cases: compare the Process utilities on the standard GCC with the Site utilities on the standard Total Site Profile. The comparison tables place optimizer-evidence and ordinary-retarget duties side by side; a zero difference shows exact replay.",
+        "Review both optimized cases exactly like normal cases: compare the Process utilities on the standard GCC with the Site utilities on the standard Total Site Profile. The Process Utility GCC must not cross the Process GCC. The comparison tables place optimizer-evidence and ordinary-retarget duties side by side; a zero difference shows exact replay.",
         "from IPython.display import display\n\n"
         "display(process_objective)\n"
         "display(process_fallback_penalty)\n"

@@ -262,9 +262,12 @@ def _maximise_utility_duty(
         q_tt_max = q_tt.min() if q_tt.size > 0 else np.inf
         return min(q_ts_max, q_tt_max), q_ts_max, q_tt_max
 
-    q_adj, q_ts_adj, q_tt_adj = _candidate_limit(Q_pot)
-    q_cur, _, _ = _candidate_limit(current_H - Q_assigned)
-
-    if np.isfinite(q_tt_adj) and q_tt_adj < q_ts_adj:
-        return min(q_adj, q_cur)
+    q_adj, _, _ = _candidate_limit(Q_pot)
+    _, _, q_tt_cur = _candidate_limit(current_H - Q_assigned)
+    # When the utility target lies inside the GCC range, both ends of every
+    # piecewise-linear interval constrain its profile. The former condition
+    # inspected the adjacent-end limit and could discard a tighter current-end
+    # limit, allowing the sensible utility profile to cross the GCC.
+    if np.isfinite(q_tt_cur):
+        return min(q_adj, q_tt_cur)
     return q_adj

@@ -91,3 +91,14 @@ APIs, dependencies, and infrastructure remain excluded.
 - **Build**: Success.
 - **All required tests**: Pass.
 - **Operations**: N/A; no deployment or publication was requested.
+
+## Utility Targeting Profile Non-Crossing Refresh
+
+The shared sensible-duty maximizer now retains the tightest interior Process
+GCC breakpoint limit. RED captured the notebook-derived 97 degC crossing and a
+shrunk hot/cold property counterexample. The final focused gates pass 67 shared
+targeting tests, 248 analytical/placement tests, 7 application exact-replay
+workflows, and 20 notebook/documentation checks. The complete solver-enabled
+suite passes 2,450 tests with 4 expected skips in 526.67 seconds. Detailed
+evidence is recorded in
+`aidlc-docs/construction/utility-targeting-profile-non-crossing/build-and-test/build-and-test-summary.md`.

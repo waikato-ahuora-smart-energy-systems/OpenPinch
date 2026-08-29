@@ -5686,3 +5686,59 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 **Context**: BUILD AND TEST COMPLETE - Utility Placement exact-target replay
 
 ---
+
+## Utility Placement Default-Ledger Correctness Reopening
+**Timestamp**: 2026-08-29T17:22:53Z
+**User Input**: "It still fails to optimise utility placement. Default utility is appearing on both sides of the ledger."
+**AI Response**: "Reopened correctness diagnosis. Reproducing Process and Total Site ledgers and tracing default HU/CU participation through ordinary targeting, optimizer evidence, fallback penalty, and balanced-composite entropy before adding a failing regression."
+**Context**: DIAGNOSIS / TDD REOPENING - Default utility appears on both sides of the utility ledger
+
+---
+
+## Utility Placement Decision-Variable Clarification
+**Timestamp**: 2026-08-29T17:30:10Z
+**User Input**: "what variables are being optimised? Is duty an optimisation variable? Is it a maximum duty?"
+**AI Response**: "Clarified that count-generated placement currently optimizes four shared pair temperatures plus two sensible spans for the two-isothermal/two-sensible example. Cold endpoints are exact reversals, isothermal spans are fixed, and duties are not optimizer coordinates. Ordinary hierarchy targeting calculates actual period duties; optional maximum_duties are caller-supplied upper bounds, not optimized values."
+**Context**: REQUIREMENTS / MODEL CLARIFICATION - Temperature variables versus target-owned duties and caller capacity limits
+
+---
+
+## Utility Placement Test Runtime Status
+**Timestamp**: 2026-08-29T17:35:08Z
+**User Input**: "I'm running test. It is taking a long time."
+**AI Response**: "Checked the shared task environment. No active pytest, uv-run test, Python test, or Jupyter process was visible and no app terminal was attached, so the user's external test could not be inspected directly. Reported the last measured full-suite runtime and the expected utility-placement optimization cost."
+**Context**: DIAGNOSIS - Test runtime observation
+
+---
+
+## Modified Notebook 19 Runtime Diagnosis
+**Timestamp**: 2026-08-29T17:36:14Z
+**User Input**: "I'm running a modified #19 notebook"
+**AI Response**: "Inspected the modified notebook and found that the Process utility-placement call comments out options=search_options, selecting the defaults of up to 500 iterations and 5,000 exact-target evaluations. The Site call remains limited to one iteration and 100 evaluations. Identified the uncapped Process call as the cause of the long runtime."
+**Context**: DIAGNOSIS - Notebook 19 Process optimization runtime
+
+---
+
+## Utility Placement Sensible-Profile Feasibility Correction
+**Timestamp**: 2026-08-29T17:39:18Z
+**User Input**: "The results for the single process were slow but it reveals a clear issue with utility targeting. The sensible utility profile crosses the process gcc which is a violation. This should not be possible."
+**AI Response**: "Accepted the crossing as a thermodynamic-feasibility defect. Reopened the approved TDD correction workflow to reproduce the crossing numerically, add a failing example regression and a generated feasibility invariant, prevent infeasible sensible utility profiles from being ranked or returned, and rerun focused verification while preserving the user's modified notebook."
+**Context**: REQUIREMENTS / TDD REOPENING - Sensible utility profile must not cross the Process GCC
+
+---
+
+## Shared Utility Targeting Call-Path Confirmation
+**Timestamp**: 2026-08-29T17:42:39Z
+**User Input**: "Is this method imported and used: target_utilities_for_load_profiles?"
+**AI Response**: "Confirmed that target_utilities_for_load_profiles is called directly by ordinary get_utility_targets and by ExistingTargetingAllocationAdapter. Notebook 19's exact replay reaches it indirectly through direct_heat_integration, so the observed crossing is in the live shared targeting path."
+**Context**: DIAGNOSIS - Utility targeting call path
+
+---
+
+## Utility Targeting Profile Non-Crossing Build and Test Completion
+**Timestamp**: 2026-08-29T18:07:44Z
+**User Input**: "(No additional user input; continued under standing authorization.)"
+**AI Response**: "Completed the six-step TDD correction. The shared duty maximizer now enforces the finite current-end temperature limit and preserves out-of-range isothermal fallback behavior. RED captured the notebook-derived and shrunk hot/cold crossings; 67 shared targeting tests, 248 analytical/placement tests, 7 application exact-replay workflows, and 20 notebook/documentation checks pass. The executable assertion-free notebook and RTD are synchronized. The complete solver-enabled suite passes 2,450 tests with 4 expected skips in 526.67 seconds, Ruff and patch hygiene pass, and the final diff contains only the targeting correction, required regressions, notebook/generator, documentation, and AI-DLC evidence. The unrelated .gitignore modification remains excluded."
+**Context**: CODE GENERATION AND BUILD AND TEST COMPLETE - Utility GCC profile non-crossing correction
+
+---

@@ -3,10 +3,10 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Utility Placement exact-target replay correction completed
-  Code Generation and Build and Test. All eight plan steps are complete; 2,448
-  tests pass with 4 expected skips, and the correction is ready to commit to
-  `develop`.
+- **Current Stage**: Utility targeting profile non-crossing correction complete
+  through Code Generation and Build and Test. All six TDD plan steps are
+  complete; 2,450 tests pass with 4 expected skips, and the correction is ready
+  to commit to `develop`.
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -32,6 +32,11 @@
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
 
 ## Utility Placement Optimisation Progress
+
+- [x] PROFILE NON-CROSSING CORRECTION - Shared ordinary targeting retains the
+  tightest interior breakpoint limit, so sensible Utility GCC profiles cannot
+  cross the residual Process GCC. All six TDD steps, executable notebook/RTD,
+  and the 2,450-pass solver-enabled suite are complete.
 
 - [x] EXACT-TARGET REPLAY CORRECTION - Candidate temperatures are evaluated
   through detached ordinary Process, Site, Community, or Region targeting;

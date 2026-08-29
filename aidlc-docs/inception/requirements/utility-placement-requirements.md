@@ -759,3 +759,29 @@ Additional acceptance requirements:
 
 Final correction evidence:
 `aidlc-docs/construction/utility-placement-exact-target-replay/build-and-test/build-and-test-summary.md`.
+
+## Utility-profile non-crossing amendment
+
+Every ordinary Process utility target and every utility-placement candidate
+replayed through that target shall be thermodynamically feasible over the whole
+temperature range, not only at its endpoints. At every Process GCC breakpoint,
+the cumulative sensible utility profile shall remain on the feasible side of
+the residual Process GCC within the targeting tolerance. A hot utility profile
+shall not exceed the hot residual envelope and a cold utility profile shall not
+exceed the cold residual envelope.
+
+The duty maximizer shall enforce the tightest endpoint or interior breakpoint
+limit. It shall not discard a tighter interior limit. Multiple levels and
+maximum-duty limits shall preserve the same cumulative profile invariant.
+
+Additional acceptance requirements:
+
+32. Preserve the notebook-derived Process counterexample as a regression: a
+    hot sensible utility spanning approximately 174.01 to 62.96 degC must not
+    exceed the Process GCC around 97 degC.
+33. Prove with generated monotone residual profiles that assigned hot and cold
+    sensible utility profiles do not cross their respective GCC envelopes at
+    any breakpoint.
+34. Prove normal direct targeting and utility-placement exact replay use the
+    same corrected shared targeting behavior and continue to respect optional
+    per-utility maximum duties.
