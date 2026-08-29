@@ -5742,3 +5742,19 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 **Context**: CODE GENERATION AND BUILD AND TEST COMPLETE - Utility GCC profile non-crossing correction
 
 ---
+
+## Utility Placement Notebook Uncapped Example Amendment
+**Timestamp**: 2026-08-29T19:51:26Z
+**User Input**: "Remove the duty upper bounds from the notebook example."
+**AI Response**: "Reopened the bounded notebook presentation workflow. The canonical Process and Site examples will omit maximum_duties while retaining bounded optimizer runtime options; maximum-duty API support remains available outside the notebook. The notebook contract will be changed in RED, then the generator, RTD, executable outputs, and focused/full verification will be synchronized."
+**Context**: REQUIREMENTS / TDD REOPENING - Notebook 19 must demonstrate uncapped utility placement
+
+---
+
+## Utility Placement Uncapped Notebook Build and Test Completion
+**Timestamp**: 2026-08-29T20:04:05Z
+**User Input**: "(No additional user input; continued under standing authorization.)"
+**AI Response**: "Completed the four-step TDD amendment. RED rejected duty-cap setup and arguments in notebook 19; the generator, executable notebook, and RTD now demonstrate uncapped Process and Site placement while retaining bounded runtime search options. The optional maximum_duties API and specialist tests remain unchanged. The regenerated notebook executes with zero Process fallback penalty, exact optimizer-to-retarget replay, and a non-crossing standard Utility GCC. Ruff plus 21 focused notebook/documentation tests pass, and the complete solver-enabled suite passes 2,450 tests with 4 expected skips in 501.53 seconds. Final review retained only required presentation, contract, documentation, and AI-DLC evidence changes; the unrelated .gitignore modification remains excluded."
+**Context**: CODE GENERATION AND BUILD AND TEST COMPLETE - Uncapped utility-placement notebook amendment
+
+---

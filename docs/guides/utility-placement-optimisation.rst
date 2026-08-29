@@ -67,19 +67,14 @@ isothermal and two sensible levels on each side:
        sensible=2,
        zone="Almond",
        period_ids=("0",),
-       maximum_duties={
-           "hot_iso_1": 20.0,
-           "hot_iso_2": 20.0,
-           "hot_sensible_1": 20.0,
-           "hot_sensible_2": 20.0,
-       },
    )
    process_evidence = process_case.utility_placement_result
 
-``maximum_duties`` is optional and keyed by the final globally unique utility
-name. Omitted names are unbounded and zero disables only that named level. A
-scalar applies to every selected period. Explicit units and period identities
-are also accepted:
+Notebook 19 uses this uncapped form. The optional ``maximum_duties`` API remains
+available outside that tutorial and is keyed by the final globally unique
+utility name. Omitted names are unbounded and zero disables only that named
+level. A scalar applies to every selected period. Explicit units and period
+identities are also accepted:
 
 .. code-block:: python
 

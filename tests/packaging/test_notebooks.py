@@ -88,8 +88,8 @@ def test_utility_placement_has_one_executable_thermodynamic_notebook() -> None:
     assert "sensible_level_count" not in source
     assert "monetary" not in source.lower()
     assert "cogeneration_eligible" not in source
-    assert "process_maximum_duties = {" in source
-    assert source.count("maximum_duties=process_maximum_duties") == 1
+    assert "process_maximum_duties" not in source
+    assert "maximum_duties=" not in source
     assert "process_evidence.best.fallback_penalty" in source
     assert "display(process_fallback_penalty)" in source
     assert "def retarget_comparison(evidence, target):" in source

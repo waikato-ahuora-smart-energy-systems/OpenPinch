@@ -102,3 +102,18 @@ workflows, and 20 notebook/documentation checks. The complete solver-enabled
 suite passes 2,450 tests with 4 expected skips in 526.67 seconds. Detailed
 evidence is recorded in
 `aidlc-docs/construction/utility-targeting-profile-non-crossing/build-and-test/build-and-test-summary.md`.
+
+## Utility Placement Uncapped Notebook Refresh
+
+Notebook 19 and its generator no longer pass `maximum_duties` to the Process or
+Site utility-placement workflows. The deliberately small `search_options`
+remain so the tutorial is executable, while the optional maximum-duty API and
+its specialist tests remain available outside the notebook. RTD presents the
+uncapped workflow first and documents capacity limits separately.
+
+The regenerated notebook executes successfully. Its Process result has zero
+fallback penalty, exact optimizer-to-retarget duty replay, and a feasible
+standard Utility GCC that does not cross the Process GCC. The focused Ruff,
+notebook contract/execution, documentation consistency, and warnings-as-errors
+RTD gate passes 21 tests. The complete solver-enabled repository suite passes
+2,450 tests with 4 expected skips in 501.53 seconds.

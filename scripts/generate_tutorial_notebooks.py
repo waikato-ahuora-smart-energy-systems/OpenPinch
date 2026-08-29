@@ -782,10 +782,6 @@ NOTEBOOKS = {
                 '    "candidate_limit": 2,\n'
                 '    "run_count": 1,\n'
                 '    "minimum_sensible_span": {"value": 10.0, "unit": "delta_degC"},\n'
-                "}\n"
-                "process_maximum_duties = {\n"
-                '    f"hot_{suffix}": 20.0\n'
-                '    for suffix in ("iso_1", "iso_2", "sensible_1", "sensible_2")\n'
                 "}"
             ),
             code(
@@ -794,7 +790,6 @@ NOTEBOOKS = {
                 "    sensible=2,\n"
                 '    zone="Almond",\n'
                 '    period_ids=("0",),\n'
-                "    maximum_duties=process_maximum_duties,\n"
                 "    options=search_options,\n"
                 ")\n"
                 "process_evidence = process_case.utility_placement_result\n"
@@ -977,7 +972,7 @@ GUIDANCE = {
     ),
     "19_utility_placement_optimisation.ipynb": (
         "Where should two isothermal and two sensible hot and cold utility levels be placed at Process and Site hierarchy levels to minimize thermodynamic cost?",
-        "Compare the Process result against its direct GCC and the Site result against its Total Site Profile. Candidate duties come from those exact ordinary target workflows; they are not independent optimizer decisions, and a requested level may be unused. Inspect physical entropy generation from the balanced composite curves: use CP * ln(T_out / T_in) in kelvin for sensible intervals and the signed Q / T limit for isothermal intervals. In the capped Process example, confirm that exact targeting limits sensible duty at every GCC breakpoint, so the Utility GCC cannot cross the Process GCC, before assigning only the remaining shortfall to HU.",
+        "Compare the Process result against its direct GCC and the Site result against its Total Site Profile. Candidate duties come from those exact ordinary target workflows; they are not independent optimizer decisions, and a requested level may be unused. Inspect physical entropy generation from the balanced composite curves: use CP * ln(T_out / T_in) in kelvin for sensible intervals and the signed Q / T limit for isothermal intervals. In the uncapped Process example, confirm that exact targeting limits sensible duty at every GCC breakpoint, so the Utility GCC cannot cross the Process GCC while the selected levels cover the complete target.",
         "Replace the sample with validated plant data, apply defensible temperature bounds, and increase the optimizer limits before making an engineering decision.",
         (
             "Prepare the placement study",

@@ -3,10 +3,10 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Utility targeting profile non-crossing correction complete
-  through Code Generation and Build and Test. All six TDD plan steps are
-  complete; 2,450 tests pass with 4 expected skips, and the correction is ready
-  to commit to `develop`.
+- **Current Stage**: Utility placement uncapped notebook amendment complete
+  through Code Generation and Build and Test. All four TDD steps are complete;
+  2,450 tests pass with 4 expected skips, and the amendment is ready to commit
+  to `develop`.
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -32,6 +32,11 @@
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
 
 ## Utility Placement Optimisation Progress
+
+- [x] UNCAPPED NOTEBOOK AMENDMENT - Removed `maximum_duties` from notebook 19's
+  Process example while retaining bounded search options and the optional API.
+  All four TDD steps are complete; the uncapped Process result uses no fallback,
+  exact retarget replay holds, and all focused and complete gates pass.
 
 - [x] PROFILE NON-CROSSING CORRECTION - Shared ordinary targeting retains the
   tightest interior breakpoint limit, so sensible Utility GCC profiles cannot
