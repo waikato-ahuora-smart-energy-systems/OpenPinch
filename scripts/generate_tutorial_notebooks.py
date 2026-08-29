@@ -764,6 +764,10 @@ NOTEBOOKS = {
                 '    "evaluation_limit": 100,\n'
                 '    "candidate_limit": 2,\n'
                 '    "run_count": 1,\n'
+                "}\n"
+                "process_maximum_duties = {\n"
+                '    f"hot_{suffix}": 20.0\n'
+                '    for suffix in ("iso_1", "iso_2", "sensible_1", "sensible_2")\n'
                 "}"
             ),
             code(
@@ -772,17 +776,28 @@ NOTEBOOKS = {
                 "    sensible=2,\n"
                 '    zone="Almond",\n'
                 '    period_ids=("0",),\n'
+                "    maximum_duties=process_maximum_duties,\n"
                 "    options=search_options,\n"
                 ")\n"
                 "process_evidence = process_case.utility_placement_result\n"
                 "process_objective = process_evidence.best.aggregate_objective\n"
+                "process_fallback_penalty = process_evidence.best.fallback_penalty\n"
                 'process_utilities = process_case.to_problem_json()["utilities"]\n'
-                "assert len(process_utilities) == 8\n"
-                "assert_reversed_utility_pairs(process_utilities)\n"
-                "assert all(\n"
-                '    utility["name"].strip().casefold() not in {"hu", "cu"}\n'
+                "process_named_utilities = [\n"
+                "    utility\n"
                 "    for utility in process_utilities\n"
-                ")\n"
+                '    if utility["name"] not in {"HU", "CU"}\n'
+                "]\n"
+                "assert len(process_named_utilities) == 8\n"
+                "assert_reversed_utility_pairs(process_utilities)\n"
+                "assert process_fallback_penalty.value > 0.0\n"
+                "assert any(utility[\"name\"] == \"HU\" for utility in process_utilities)\n"
+                "for utility in process_named_utilities:\n"
+                "    maximum = process_maximum_duties.get(utility[\"name\"])\n"
+                "    if maximum is not None:\n"
+                "        assert utility[\"maximum_heat_flow\"] == {\n"
+                '            "value": maximum, "unit": "kW"\n'
+                "        }\n"
                 "process_hot_targets = [\n"
                 '    utility["t_target"]["value"]\n'
                 "    for utility in process_utilities\n"
@@ -804,6 +819,13 @@ NOTEBOOKS = {
                 "process_case.target.direct_heat_integration(\n"
                 '    zone="Almond", period_id="0"\n'
                 ")\n"
+                'process_zone = process_case.master_zone.get_subzone("Almond")\n'
+                "assert all(\n"
+                "    utility.heat_flow.value <= process_maximum_duties[utility.name] + 1e-9\n"
+                "    for utility in process_zone.hot_utilities\n"
+                "    if utility.name in process_maximum_duties\n"
+                ")\n"
+                "assert process_zone.hot_utilities.get_stream_by_name(\"HU\").heat_flow.value > 0.0\n"
                 "process_summary = process_case.summary_frame()\n"
                 "process_gcc = process_case.plot.grand_composite_curve(\n"
                 '    zone_name="Almond"\n'
@@ -1153,6 +1175,7 @@ PRESENTATIONS: dict[str, tuple[str, str]] = {
         "Review both optimized cases exactly like normal cases: compare the Process utilities on the standard GCC with the Site utilities on the standard Total Site Profile, and retain each placement result for engineering review.",
         "from IPython.display import display\n\n"
         "display(process_objective)\n"
+        "display(process_fallback_penalty)\n"
         "display(process_summary)\n"
         "display(process_gcc)\n"
         "display(site_objective)\n"
@@ -1236,6 +1259,15 @@ def _equivalent_notebooks(generated: dict, existing: dict) -> bool:
         existing_without_source = {
             k: v for k, v in existing_cell.items() if k != "source"
         }
+        if generated_cell["cell_type"] == "code":
+            for cell in (generated_without_source, existing_without_source):
+                cell.pop("execution_count", None)
+                cell.pop("outputs", None)
+                cell["metadata"] = {
+                    key: value
+                    for key, value in cell.get("metadata", {}).items()
+                    if key != "execution"
+                }
         if generated_without_source != existing_without_source:
             return False
         if generated_cell["cell_type"] == "code":

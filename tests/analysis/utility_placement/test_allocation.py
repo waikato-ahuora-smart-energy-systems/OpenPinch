@@ -166,3 +166,98 @@ def test_candidate_correctable_adapter_diagnostic_is_ordinary_infeasibility() ->
 
     assert not result.feasible
     assert result.diagnostics[0] == diagnostic
+
+
+def test_existing_targeting_caps_named_levels_then_allocates_fallback() -> None:
+    period = _period().model_copy(
+        update={
+            "maximum_duties": (
+                ("steam_high", 20.0),
+                ("steam_low", 10.0),
+                ("cw_low", 15.0),
+                ("cw_high", 5.0),
+            )
+        }
+    )
+    result = allocate_placement_period(
+        request=UtilityPlacementRequest(isothermal_level_count=2),
+        period=period,
+        placement=_placement(),
+    )
+
+    assert result.feasible
+    named_hot = [level for level in result.hot_levels if not level.is_fallback]
+    named_cold = [level for level in result.cold_levels if not level.is_fallback]
+    assert all(
+        level.allocated_duty <= level.maximum_duty + 1e-9 for level in named_hot
+    )
+    assert all(
+        level.allocated_duty <= level.maximum_duty + 1e-9 for level in named_cold
+    )
+    assert result.hot_levels[-1].template_key.name == "HU"
+    assert result.cold_levels[-1].template_key.name == "CU"
+    assert result.hot_levels[-1].is_fallback
+    assert result.cold_levels[-1].is_fallback
+    assert result.allocated_hot_duty == pytest.approx(period.residual_hot_duty)
+    assert result.allocated_cold_duty == pytest.approx(period.residual_cold_duty)
+
+
+def test_zero_maximum_disables_only_its_named_utility() -> None:
+    period = _period().model_copy(
+        update={"maximum_duties": (("steam_high", 0.0), ("cw_low", 0.0))}
+    )
+
+    result = allocate_placement_period(
+        request=UtilityPlacementRequest(isothermal_level_count=2),
+        period=period,
+        placement=_placement(),
+    )
+
+    by_name = {
+        level.template_key.name: level for level in result.hot_levels + result.cold_levels
+    }
+    assert by_name["steam_high"].allocated_duty == 0.0
+    assert by_name["cw_low"].allocated_duty == 0.0
+    assert by_name["steam_low"].maximum_duty is None
+    assert by_name["cw_high"].maximum_duty is None
+    assert result.feasible
+
+
+def test_fallback_uses_context_wide_temperature_support() -> None:
+    period = _period().model_copy(
+        update={
+            "maximum_duties": (("steam_high", 0.0), ("cw_low", 0.0)),
+            "fallback_hot_target_temperature": 500.0,
+            "fallback_cold_target_temperature": -100.0,
+        }
+    )
+
+    result = allocate_placement_period(
+        request=UtilityPlacementRequest(isothermal_level_count=2),
+        period=period,
+        placement=_placement(),
+    )
+
+    fallback_hot = next(level for level in result.hot_levels if level.is_fallback)
+    fallback_cold = next(level for level in result.cold_levels if level.is_fallback)
+    assert fallback_hot.target_temperature == 500.0
+    assert fallback_hot.supply_temperature == pytest.approx(500.01)
+    assert fallback_cold.target_temperature == -100.0
+    assert fallback_cold.supply_temperature == pytest.approx(-100.01)
+
+
+def test_adapter_duty_above_maximum_is_infeasible() -> None:
+    period = _period().model_copy(
+        update={"maximum_duties": (("steam_high", 10.0),)}
+    )
+    adapter = _RecordingAdapter(hot=(20.0, 80.0), cold=(100.0, 0.0))
+
+    result = allocate_placement_period(
+        request=UtilityPlacementRequest(isothermal_level_count=2),
+        period=period,
+        placement=_placement(),
+        adapter=adapter,
+    )
+
+    assert not result.feasible
+    assert any(item.code == "maximum_duty_exceeded" for item in result.diagnostics)

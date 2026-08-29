@@ -194,6 +194,11 @@ def _assign_utility(
             is_hot_ut,
             Q_assigned,
         )
+        if u.maximum_heat_flow is not None:
+            Q_ut_max = min(
+                Q_ut_max,
+                StreamCollection._value_at_idx(u._maximum_heat_flow, idx),
+            )
         if Q_ut_max > tol:
             u.set_value_attr_at_idx(
                 attr_name="heat_flow",

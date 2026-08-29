@@ -5438,3 +5438,75 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 **Context**: Coupled generated-pair correction complete; PBT compliant, Security and Resiliency disabled/N/A.
 
 ---
+
+## Utility Placement Maximum-Duty Requirements Amendment
+**Timestamp**: 2026-08-29T03:24:37Z
+**User Input**: "Allow a user to be able to specify an upper bound duty for each utility."
+**AI Response**: "Opened a requirements amendment and traced the current public API, globally unique generated and inferred utility identities, period-aware value model, targeting-owned duty allocation, coverage constraints, and returned-case writeback. Created three focused questions covering the public input shape, multiperiod semantics, and omitted or zero limits."
+**Context**: REQUIREMENTS ANALYSIS - Utility Placement per-utility maximum-duty amendment awaiting answers
+
+---
+
+## Utility Placement Maximum-Duty Answers
+**Timestamp**: 2026-08-29T03:39:00Z
+**User Input**: "Done"
+**AI Response**: "Validated the recorded choices: a public `maximum_duties` mapping keyed by globally unique utility names; scalar or period-resolved bounds enforced independently per period; omitted named utilities unbounded; zero disables a named utility; and independent hot/cold pair caps. Identified one material conflict requiring clarification: the appended request for a default utility to cover shortfall conflicts with the earlier approved rule that any positive default utility duty makes a candidate infeasible. Created focused questions for fallback participation and penalty ranking before changing requirements or code."
+**Context**: REQUIREMENTS ANALYSIS - Utility Placement default-utility fallback clarification required
+
+---
+
+## Utility Placement Maximum-Duty Clarification Approval
+**Timestamp**: 2026-08-29T03:50:07Z
+**User Input**: "Done"
+**AI Response**: "Accepted residual-only default utility fallback that is retained in the returned case and standard plots. Accepted the custom squared `g_penalty()` answer and specified it as the raw period-weighted sum of squared hot and cold fallback-duty fractions, added only to the dimensionless optimizer ranking while reported physical entropy remains unchanged. Updated requirements and acceptance criteria, completed the amendment workflow and functional design, created the ten-step TDD Code Generation plan, and approved continuation under the user's standing authorization."
+**Context**: REQUIREMENTS / WORKFLOW PLANNING / FUNCTIONAL DESIGN / CODE GENERATION PLANNING - Utility Placement maximum-duty amendment approved
+
+---
+
+## Utility Placement Maximum-Duty RED Baseline
+**Timestamp**: 2026-08-29T04:05:00Z
+**User Input**: "Done"
+**AI Response**: "Completed Code Generation Steps 2 and 3. Added public/API validation, returned-case persistence, runtime capacity, cap-priority allocation, exact squared-penalty examples, and a scale-invariance Hypothesis property. The focused RED run produced 12 expected failures because `maximum_duties`, `maximum_heat_flow`, cap-aware targeting, and `g_penalty()` do not yet exist; 21 unaffected tests passed."
+**Context**: CODE GENERATION - Utility Placement maximum-duty TDD RED complete
+
+---
+
+## Utility Placement Maximum-Duty GREEN
+**Timestamp**: 2026-08-29T04:13:09Z
+**User Input**: "Done"
+**AI Response**: "Continued under the standing approval and completed Code Generation Steps 4 through 7. Added typed per-period capacity contracts and runtime metadata, cap-aware shared targeting, residual-only HU/CU fallback on common cross-period temperature support, squared fallback-penalty evidence and ranking, public mapping normalization, batch forwarding, and detached-case persistence. Corrected the end-to-end assertion to inspect the targeted Almond zone rather than the zeroed Site owner. The expanded focused regression set is green; proceeded to refactoring, notebook, and RTD updates."
+**Context**: CODE GENERATION - Utility Placement maximum-duty TDD GREEN through public integration
+
+---
+
+## Utility Placement Maximum-Duty Code Generation Complete
+**Timestamp**: 2026-08-29T04:24:43Z
+**User Input**: "Done"
+**AI Response**: "Completed Code Generation Step 8. Removed the superseded default-utility exclusion scalar, excluded reserved HU/CU names from inferred placement templates, documented the optional scalar/unit/period maximum_duties mapping and all-period squared fallback equation, updated the canonical generator, and executed notebook 19 with refreshed Process GCC and Site TSP outputs. The broad utility-placement, targeting, input-contract, and notebook gate passed 290 tests with 3 guarded skips; Ruff passed. Proceeded to complete Build and Test under standing authorization."
+**Context**: CODE GENERATION - Utility Placement maximum-duty implementation, notebook, RTD, and summaries complete
+
+---
+
+## Build and Test Stage - Utility Placement Maximum Duties
+**Timestamp**: 2026-08-29T04:33:44Z
+**User Input**: "Done"
+**AI Response**: "Build and Test completed successfully under standing approval. The focused feature gate passed 290 tests with 3 guarded skips; 5 performance tests, Ruff, patch hygiene, a 54-page warnings-as-errors Sphinx build, canonical notebook generation, project-kernel notebook execution, fresh source/wheel builds, archive-content checks, and an isolated installed-wheel notebook smoke passed. The complete solver-enabled suite passed 2,430 tests with 4 expected skips in 290.81 seconds. Standalone coverage instrumentation was incompatible with NumPy on Python 3.14, but the same 17 numerical penalty tests, including Hypothesis branch cases, passed normally; the empty data file was removed."
+**Context**: BUILD AND TEST - Utility Placement maximum-duty amendment complete; final review authorized
+**Build Status**: Success
+**Test Status**: Pass
+**Files Generated**:
+- build-instructions.md
+- unit-test-instructions.md
+- integration-test-instructions.md
+- performance-test-instructions.md
+- build-and-test-summary.md
+
+---
+
+## Utility Placement Maximum-Duty Final Review
+**Timestamp**: 2026-08-29T04:41:15Z
+**User Input**: "Done"
+**AI Response**: "Completed the ten-step amendment under standing authorization. Reviewed every changed production, contract, test, notebook, RTD, generator, and AI-DLC file for feature ownership; retained the executed notebook output because it is the required current engineering result; excluded the unrelated .gitignore change. Added final invalid-input branches and reran the exact solver-enabled tree: 2,438 tests passed, 4 expected skips, 0 failures in 276.71 seconds. Ruff, patch hygiene, documentation, performance, build archives, installed-wheel notebook smoke, and Property-Based Testing compliance remain green. Scoped the maximum-duty amendment for commit to develop."
+**Context**: FINAL REVIEW - Utility Placement maximum-duty amendment complete and ready for scoped commit
+
+---

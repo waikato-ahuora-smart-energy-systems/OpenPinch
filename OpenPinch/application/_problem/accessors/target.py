@@ -861,6 +861,7 @@ class _TargetAccessor:
         sensible: int | None = None,
         zone=None,
         period_ids=None,
+        maximum_duties=None,
         options=None,
     ):
         """Return a detached normal case containing the best utility set."""
@@ -872,6 +873,7 @@ class _TargetAccessor:
             sensible=sensible,
             zone=zone,
             period_ids=period_ids,
+            maximum_duties=maximum_duties,
             options=options,
         )
 

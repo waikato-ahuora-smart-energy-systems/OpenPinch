@@ -155,6 +155,10 @@ class PlacementPeriodInput(_FrozenContext):
     residual_cold_duty: float
     ambient_temperature_kelvin: float
     coordinate_bounds: tuple[PhysicalCoordinateBound, ...]
+    maximum_duties: tuple[tuple[str, float], ...] = ()
+    fallback_temperature_span: float = 0.01
+    fallback_hot_target_temperature: float | None = None
+    fallback_cold_target_temperature: float | None = None
 
     @field_validator("period_id")
     @classmethod
@@ -169,6 +173,7 @@ class PlacementPeriodInput(_FrozenContext):
         "residual_hot_duty",
         "residual_cold_duty",
         "ambient_temperature_kelvin",
+        "fallback_temperature_span",
         mode="before",
     )
     @classmethod
@@ -183,6 +188,22 @@ class PlacementPeriodInput(_FrozenContext):
             raise ValueError("residual duties must be non-negative")
         if self.ambient_temperature_kelvin <= 0.0:
             raise ValueError("ambient temperature must be positive kelvin")
+        names = tuple(name for name, _ in self.maximum_duties)
+        if len(set(names)) != len(names):
+            raise ValueError("maximum-duty utility names must be unique")
+        if any(
+            not name.strip() or not math.isfinite(value) or value < 0.0
+            for name, value in self.maximum_duties
+        ):
+            raise ValueError("maximum duties must be named, finite, and non-negative")
+        if self.fallback_temperature_span <= 0.0:
+            raise ValueError("fallback temperature span must be positive")
+        for temperature in (
+            self.fallback_hot_target_temperature,
+            self.fallback_cold_target_temperature,
+        ):
+            if temperature is not None and not math.isfinite(temperature):
+                raise ValueError("fallback temperatures must be finite")
         return self
 
 

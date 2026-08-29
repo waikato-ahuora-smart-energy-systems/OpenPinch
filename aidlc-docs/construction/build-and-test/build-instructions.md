@@ -56,6 +56,8 @@ uv run python -m build --no-isolation --outdir dist
   `OpenPinch/analysis/utility_placement/` modules,
   `OpenPinch/application/utility_placement.py`,
   `OpenPinch/application/_problem/accessors/target.py`, and
+  `OpenPinch/analysis/targeting/utilities.py`,
+  `OpenPinch/domain/stream.py`, and
   `OpenPinch/data/notebooks/19_utility_placement_optimisation.ipynb`.
 - **Common warnings**: none are accepted from the build itself. Shell startup
   warnings about a restricted process list are environment noise, not build

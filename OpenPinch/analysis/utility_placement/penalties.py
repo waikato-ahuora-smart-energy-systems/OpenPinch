@@ -4,32 +4,37 @@ from __future__ import annotations
 
 import math
 
-_DEFAULT_UTILITY_NAMES = frozenset({"hu", "cu"})
 
-
-def default_utility_penalty(
+def g_penalty(
     *,
-    names: tuple[str, ...],
-    duties: tuple[float, ...],
-    reference_duty: float,
+    hot_fallback_duty: float,
+    cold_fallback_duty: float,
+    required_hot_duty: float,
+    required_cold_duty: float,
 ) -> float:
-    """Return normalized positive duty assigned to generated default utilities."""
-    if len(names) != len(duties):
-        raise ValueError("default utility names and duties must align")
-    if (
-        not math.isfinite(reference_duty)
-        or reference_duty < 0.0
-        or any(not math.isfinite(duty) or duty < 0.0 for duty in duties)
-    ):
-        raise ValueError(
-            "default utility penalty inputs must be finite and non-negative"
-        )
-    default_duty = math.fsum(
-        duty
-        for name, duty in zip(names, duties, strict=True)
-        if name.strip().casefold() in _DEFAULT_UTILITY_NAMES
+    """Return the squared dimensionless default-utility duty penalty."""
+    values = (
+        hot_fallback_duty,
+        cold_fallback_duty,
+        required_hot_duty,
+        required_cold_duty,
     )
-    return default_duty / max(reference_duty, 1.0)
+    if any(not math.isfinite(value) or value < 0.0 for value in values):
+        raise ValueError("g_penalty duties must be finite and non-negative")
+
+    def term(fallback: float, required: float) -> float:
+        if required == 0.0:
+            if fallback != 0.0:
+                raise ValueError("fallback duty requires positive residual duty")
+            return 0.0
+        return (fallback / required) ** 2
+
+    return math.fsum(
+        (
+            term(hot_fallback_duty, required_hot_duty),
+            term(cold_fallback_duty, required_cold_duty),
+        )
+    )
 
 
 def aggregate_weighted_objective(
@@ -56,6 +61,20 @@ def feasible_objective_scalar(cost: float, *, scale: float) -> float:
     return min(max(mapped, math.nextafter(0.0, 1.0)), math.nextafter(1.0, 0.0))
 
 
+def penalized_feasible_objective_scalar(base: float, penalty: float) -> float:
+    """Combine a feasible scalar and penalty while retaining the (0, 1) partition."""
+    if (
+        not math.isfinite(base)
+        or not 0.0 < base < 1.0
+        or not math.isfinite(penalty)
+        or penalty < 0.0
+    ):
+        raise ValueError("feasible scalar and penalty must be finite and valid")
+    mapped_penalty = penalty / (1.0 + penalty)
+    result = base + (1.0 - base) * mapped_penalty
+    return min(result, math.nextafter(1.0, 0.0))
+
+
 def infeasible_objective_scalar(normalized_violation: float) -> float:
     """Map a non-negative violation monotonically into [1, 2)."""
     if not math.isfinite(normalized_violation) or normalized_violation < 0.0:
@@ -66,7 +85,8 @@ def infeasible_objective_scalar(normalized_violation: float) -> float:
 
 __all__ = [
     "aggregate_weighted_objective",
-    "default_utility_penalty",
     "feasible_objective_scalar",
+    "g_penalty",
     "infeasible_objective_scalar",
+    "penalized_feasible_objective_scalar",
 ]

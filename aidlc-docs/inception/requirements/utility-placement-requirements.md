@@ -115,6 +115,25 @@ Each level template shall have a stable identity and define:
 The template fixes identity and non-temperature attributes. It does not fix a
 sensible utility's solved temperatures unless explicit fixed bounds are used.
 
+### Utility duty upper bounds
+
+The public workflow shall accept an optional `maximum_duties` mapping keyed by
+the globally unique generated or inferred utility name. A scalar limit applies
+to every selected period; existing scalar-with-unit and period-resolved value
+forms are accepted and normalized to the configured heat-flow unit. Limits
+shall be finite and non-negative. An omitted name is unbounded and a zero
+limit disables duty on that named level. Unknown names, duplicate normalized
+names, missing period values, incompatible units, and negative or non-finite
+limits shall fail before optimizer execution.
+
+For each named level `i` and selected period `p`, allocation shall enforce
+`0 <= Q_utility[i,p] <= Q_max[i,p]`.
+
+Hot and cold members of a generated temperature pair retain independent duty
+limits. The limit is capacity metadata, not the allocated `heat_flow`, and the
+returned normal case shall retain it so subsequent ordinary targeting and
+standard plots respect the same capacity constraint.
+
 ### Temperature decision variables
 
 For each sensible level `i`, the optimiser shall choose:
@@ -153,6 +172,12 @@ No feasible candidate may leave unmet heating or cooling demand, and no excess
 allocation beyond the same tolerance may be silently accepted. Individual
 levels may have zero duty when the complete side-level balance still holds.
 
+When capped named levels cannot cover a side's complete residual demand, the
+generated `HU` or `CU` default utility shall supply only the remaining
+shortfall. A default is not a requested or inferred placement level and shall
+never displace available named capacity. It shall be retained in the returned
+case and standard plots when its duty is positive in any selected period.
+
 ### Thermodynamic cost
 
 Thermodynamic cost shall be physical entropy generation calculated from the
@@ -185,12 +210,28 @@ period. For objective `C_p` and existing non-negative period weight `w_p`, the
 aggregate objective shall be `sum(w_p * C_p)`. At least one period weight must
 be positive. Per-period values and the aggregate shall both be returned.
 
+Default fallback use shall be discouraged by a squared, dimensionless penalty.
+For period `p`:
+
+`g_penalty[p] = (Q_HU[p] / Q_heat_required[p])^2 + (Q_CU[p] / Q_cool_required[p])^2`.
+
+Each side term is defined as zero when both its required and fallback duties
+are zero; positive fallback duty against zero required duty is invalid.
+
+The aggregate fallback penalty shall be `sum(w_p * g_penalty[p])` and shall be
+combined monotonically with the existing dimensionless optimizer scalar while
+preserving the feasible/infeasible ranking partition. The reported
+physical objective remains the period-weighted entropy generation in `kW/K`;
+fallback penalties shall be reported separately and shall not be presented as
+physical entropy.
+
 ## Functional Requirements
 
 ### FR-001: Public workflow
 
 The primary workflow shall be
-`problem.target.utility_placement(isothermal=..., sensible=..., zone=...)`.
+`problem.target.utility_placement(isothermal=..., sensible=..., zone=...,
+maximum_duties=...)`.
 All three arguments are optional when existing utilities permit inference. It shall
 return a detached `PinchProblem` whose utility input contains only the best
 optimized utility set. It shall be mirrored by supported workspace case-batch
@@ -231,6 +272,9 @@ finite and dimensionally valid. Hot and cold roles shall agree with their
 temperature direction.
 Matching generated templates shall share one supply/span decision and decode
 to exact endpoint reversals without duplicate optimizer coordinates.
+Maximum-duty names shall resolve against this final generated or inferred
+inventory and shall be independently validated and normalized per selected
+period.
 
 ### FR-005: Bounds and starting candidates
 
@@ -275,7 +319,9 @@ feasibility. In every period, allocated hot utilities shall cover the complete
 residual heating demand and allocated cold utilities shall cover the complete
 residual cooling demand within the named coverage tolerance. A coverage failure
 on either side in any period makes the candidate infeasible before objective
-ranking.
+ranking unless the residual-only default `HU` or `CU` fallback covers that
+shortfall. Every named duty shall satisfy its period-specific maximum within
+the same numerical tolerance.
 
 ### FR-009: Thermodynamic evaluation
 
@@ -309,9 +355,12 @@ duty, and useful constraint diagnostics. It shall not return a least-infeasible
 placement as success.
 
 Automatically generated default utilities (`HU` and `CU`) are balancing
-fallbacks, not placement options. Any positive allocation to a default utility
-shall receive a deterministic infeasible penalty and diagnostic before
-objective ranking; it cannot be returned as a successful candidate.
+fallbacks, not placement options. They shall be considered only after capped
+named utilities have exhausted their available duty. Positive fallback duty
+remains feasible, contributes to the balanced-composite entropy calculation,
+and receives the deterministic squared `g_penalty()` ranking term specified
+above. Fallback duty and penalty evidence shall be explicit rather than hidden
+as a coverage residual.
 
 ### FR-013: Detached optimized case
 
@@ -321,7 +370,9 @@ candidate objects shall be detached. The public return shall be a new
 `PinchProblem` built from the source input with its utility collection replaced
 by the best optimized hot and cold utility levels. It shall behave like a
 normal unsolved case: callers explicitly run ordinary targeting and plotting.
-The source problem remains unchanged.
+Per-utility maximum-duty metadata and any required default fallback definitions
+shall survive this replacement so ordinary retargeting reproduces capped
+allocation behavior. The source problem remains unchanged.
 
 ### FR-014: Placement evidence on the returned case
 
@@ -334,9 +385,10 @@ The returned optimized case shall retain a detached
 - one best feasible solution;
 - deterministically ordered alternative feasible candidates;
 - hot and cold utility templates with solved supply/target temperatures and
-  allocated duties;
+  allocated duties and optional maximum duties;
 - per-period and aggregate objective decomposition;
 - entropy generation and exergy destruction;
+- per-period default utility duties and squared fallback penalties;
 - feasibility status and non-fatal diagnostics.
 
 The evidence and nested candidates shall round-trip through the supported JSON
@@ -383,7 +435,9 @@ only public Python APIs, one coherent example shall demonstrate:
   normal Total Site targeting and standard Total Site Profile plotting of the
   Site result, with utilities visible in both; and
 - deterministic bounded options and lightweight assertions that make stale or
-  misleading output fail execution.
+  misleading output fail execution; and
+- at least one concise `maximum_duties` example that verifies a named cap and
+  shows residual default utility duty and `g_penalty()` evidence when required.
 
 No CLI command or CLI invocation shall be added for utility placement.
 
@@ -484,9 +538,8 @@ makes it pass, and refactor only with the focused tests green.
     utility temperatures visually separated from the residual process GCC.
 19. Reproduce hand-calculable balanced-composite sensible and isothermal
     entropy-generation cases containing the expected logarithmic and `Q/T`
-    terms. Prove that a positive-duty `HU` or `CU` fallback receives a
-    deterministic infeasible penalty and cannot rank with feasible declared
-    utility levels.
+    terms. Prove that residual-only `HU` or `CU` duty contributes physical
+    entropy and a separate squared `g_penalty()` term.
 20. Prove the public signature uses only `isothermal` and `sensible`, the call
     returns only the optimized `PinchProblem`, placement evidence remains on
     that case, and the notebook contains no nested best-period traversal or
@@ -502,6 +555,20 @@ makes it pass, and refactor only with the focused tests green.
     verify Process/Unit Operation direct, Site Total Site, and Community/Region
     indirect routing plus typed ambiguous, foreign, missing, and Utility Zone
     errors.
+24. Prove `maximum_duties` accepts scalar, explicit-unit, and period-resolved
+    values, broadcasts scalars, and rejects unknown names, invalid units,
+    negative/non-finite limits, and incomplete selected-period data before the
+    optimizer runs.
+25. Prove each named allocation stays at or below its own cap in every selected
+    period, omitted names remain unbounded, zero disables the named level, and
+    generated hot/cold pair caps remain independent.
+26. Prove the targeting allocator exhausts available named utility capacity
+    before allocating residual `HU` or `CU` duty, and that squared fallback
+    penalties aggregate with raw period weights without altering reported
+    physical entropy units.
+27. Prove the returned detached case retains maximum-duty metadata and any
+    required fallback so ordinary Process GCC and Site TSP targeting and plots
+    reproduce capped allocation without source mutation.
 
 ### Property-based acceptance tests
 
@@ -529,6 +596,10 @@ small cascades. Required properties include:
 - serialization never introduces backend-private or mutable runtime state.
 - inferred utility classification, `Both` expansion, side padding, and zone
   routing are deterministic under detached input copies and declaration order.
+- every named allocation is bounded by its scalar or period-resolved maximum;
+- squared fallback penalty is non-negative, zero exactly at zero fallback,
+  monotone with fallback magnitude, scale invariant when fallback and required
+  duties are scaled together, and equals the explicit weighted-period sum.
 
 Shrinking shall remain enabled. The repository's fixed Hypothesis seed shall be
 used in CI, and any newly discovered minimal counterexample shall become a
@@ -553,6 +624,7 @@ permanent example-based regression test.
 | Balanced-composite entropy correction | FR-009; FR-012; Acceptance 18-19; logarithmic/`Q/T` entropy and generated `HU`/`CU` exclusion |
 | Thermodynamic-only scope correction | Goal 3; Goal 8; FR-002; FR-004; FR-010; FR-014; FR-017; Acceptance 6 and 16 |
 | Hierarchy API answers and clarifications | Goals 1, 4, and 8; FR-001; FR-003; FR-004; FR-007; FR-014; FR-017; Acceptance 21-23 |
+| Maximum-duty answers and fallback clarification | Utility duty upper bounds; FR-001; FR-004; FR-008; FR-009; FR-012 through FR-017; Acceptance 24-27 |
 
 ## Success Criteria
 
@@ -607,5 +679,7 @@ so their rules are skipped for this stage.
 - [x] The packaged direct and Total Site samples use period-resolved physical
   process streams at real temperatures for process entropy; the direct result
   has nonzero process entropy and both scopes meet exact residual coverage.
+- [ ] The maximum-duty amendment is pending TDD implementation and integrated
+  Build and Test for Acceptance 24 through 27.
 
 Final evidence: `aidlc-docs/construction/build-and-test/build-and-test-summary.md`.

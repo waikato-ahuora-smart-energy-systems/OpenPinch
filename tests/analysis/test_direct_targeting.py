@@ -4,6 +4,8 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 import OpenPinch.analysis.targeting.direct as direct
 from OpenPinch.analysis.targeting.direct import (
@@ -14,6 +16,7 @@ from OpenPinch.analysis.targeting.direct import (
     build_area_cost_target_data,
     should_update_balanced_composite_curves,
 )
+from OpenPinch.analysis.targeting.utilities import _assign_utility
 from OpenPinch.domain.configuration import tol
 from OpenPinch.domain.enums import GraphType, ProblemTableLabel, ZoneType
 from OpenPinch.domain.problem_table import ProblemTable
@@ -274,6 +277,71 @@ def test_initialise_utility_index_returns_first_available():
     u2 = Stream("U2", 200, 250, heat_flow=75.0)
     idx = _initialise_utility_index([u1, u2], [u1.heat_flow, u2.heat_flow])
     assert idx == 1
+
+
+def test_utility_targeting_respects_maximum_heat_flow_before_fallback() -> None:
+    capped_hot = Stream(
+        "Capped steam",
+        250.0,
+        200.0,
+        heat_flow=0.0,
+        maximum_heat_flow=30.0,
+        is_process_stream=False,
+    )
+    fallback_hot = Stream(
+        "HU",
+        300.0,
+        299.99,
+        heat_flow=0.0,
+        is_process_stream=False,
+    )
+    hot = _assign_utility(
+        T_vals=np.asarray([250.0, 150.0, 50.0]),
+        H_vals=np.asarray([100.0, 50.0, 0.0]),
+        u_ls=StreamCollection([fallback_hot, capped_hot]),
+        pinch_row=2,
+        is_hot_ut=True,
+        is_real_temperatures=False,
+        idx=None,
+    )
+
+    assert hot.get_stream_by_name("Capped steam").heat_flow.value == pytest.approx(
+        30.0
+    )
+    assert hot.get_stream_by_name("HU").heat_flow.value == pytest.approx(70.0)
+
+
+@given(cap=st.floats(min_value=0.0, max_value=100.0))
+def test_utility_targeting_capacity_property(cap) -> None:
+    named = Stream(
+        "Named",
+        300.0,
+        299.99,
+        heat_flow=0.0,
+        maximum_heat_flow=cap,
+        is_process_stream=False,
+    )
+    fallback = Stream(
+        "HU",
+        310.0,
+        309.99,
+        heat_flow=0.0,
+        is_process_stream=False,
+    )
+    result = _assign_utility(
+        T_vals=np.asarray([250.0, 150.0, 50.0]),
+        H_vals=np.asarray([100.0, 50.0, 0.0]),
+        u_ls=StreamCollection([fallback, named]),
+        pinch_row=2,
+        is_hot_ut=True,
+        is_real_temperatures=False,
+        idx=None,
+    )
+
+    named_duty = float(result.get_stream_by_name("Named").heat_flow.value)
+    fallback_duty = float(result.get_stream_by_name("HU").heat_flow.value)
+    assert named_duty <= cap + 1e-9
+    assert named_duty + fallback_duty == pytest.approx(100.0)
 
 
 def test_add_net_segment_period_consumes_residuals():

@@ -54,6 +54,37 @@ def test_workspace_batch_all_periods_uses_shared_placement_surface(monkeypatch) 
     assert seen[0]["period_ids"] == ("0",)
 
 
+def test_workspace_batch_forwards_maximum_duties_unchanged(monkeypatch) -> None:
+    workspace = PinchWorkspace(source="chocolate_factory.json")
+    maximum_duties = {
+        "hot_iso_1": {
+            "values": [10.0],
+            "period_ids": ["0"],
+            "unit": "kW",
+        }
+    }
+    seen = []
+
+    def fake(self, **kwargs):
+        seen.append(kwargs)
+        return self._problem.project_name
+
+    monkeypatch.setattr(_TargetAccessor, "utility_placement", fake)
+    batch = workspace.cases(("baseline",)).target.all_periods.utility_placement(
+        isothermal=2,
+        maximum_duties=maximum_duties,
+    )
+
+    assert tuple(batch.results) == ("baseline",)
+    assert seen == [
+        {
+            "isothermal": 2,
+            "maximum_duties": maximum_duties,
+            "period_ids": ("0",),
+        }
+    ]
+
+
 @given(order=st.permutations(("baseline", "scenario", "third")))
 @settings(deadline=None, max_examples=6)
 def test_workspace_batch_preserves_generated_case_order(order) -> None:

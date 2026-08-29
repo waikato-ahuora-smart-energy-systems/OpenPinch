@@ -5,98 +5,89 @@
 - **Build tool**: Hatchling through the locked uv environment.
 - **Build status**: Success.
 - **Artifacts**: Fresh `openpinch-0.5.4.tar.gz` and
-  `openpinch-0.5.4-py3-none-any.whl` built in an isolated temporary directory.
-- **Package smoke**: The fresh wheel was installed into an isolated import
-  target and executed notebook 19 using the project's installed dependencies.
+  `openpinch-0.5.4-py3-none-any.whl` in an isolated temporary directory.
+- **Archive contents**: Both archives contain the cap-aware targeting,
+  placement contracts/service, public integration, runtime stream metadata,
+  and executed notebook 19.
+- **Installed-wheel smoke**: Success from an isolated import target outside
+  the source checkout.
 
 ## Test Execution Summary
 
-### Focused TDD Gates
+### Maximum-Duty TDD and Integration
 
-- Public-signature RED failed because hierarchy routing and indirect placement
-  scope did not yet exist; hierarchy GREEN passed the 12 focused routing and
-  context tests.
-- Existing-utility inference RED failed because no problem-to-template builder
-  existed; inference GREEN passed classification, `Both` expansion,
-  deterministic padding, explicit-count precedence, and declaration-order
-  properties.
-- Notebook and RTD RED failed on the former single-scope workflow; GREEN passed
-  with separate Process/GCC and Site/TSP examples and no public target-mode
-  selector.
-- Coupled-pair RED proved that two generated isothermal pairs still exposed
-  four independent coordinates. GREEN reduced generated dimensions to one
-  coordinate family per pair, derives every cold endpoint by exact reversal,
-  verifies pair ordering and bounds, and preserves explicit/inferred
-  independent coordinates.
-- The generator byte-stability regression proves that all 19 checked-in
-  notebooks are current without rewriting equivalent Python formatting or
-  environment-owned kernel metadata.
-- Ruff, `git diff --check`, and the warnings-as-errors Sphinx build: pass.
+- RED produced 12 expected failures and 21 unaffected passes before the API,
+  runtime metadata, targeting cap, and penalty kernel existed.
+- The expanded focused GREEN gate passed 81 tests covering generated and
+  inferred names, scalar/unit/period inputs, zero and omitted limits,
+  independent side caps, batch forwarding, named-before-fallback allocation,
+  common cross-period fallback temperatures, typed evidence, and detached-case
+  replay.
+- The broad utility-placement, direct-targeting, input-contract, and notebook
+  gate passed 298 tests with 3 guarded skips.
+- The numerical property suite proves squared-penalty identities, scale
+  invariance, monotonic bounded ranking, raw period-weight aggregation, cap
+  compliance, and exact duty coverage.
 
 ### Complete Repository Suite
 
-- **Collected**: 2,414 tests.
-- **Passed**: 2,410.
+- **Collected**: 2,442 tests.
+- **Passed**: 2,438.
 - **Skipped**: 4 expected environment/profile-specific tests.
 - **Failed**: 0.
-- **Solver coverage**: solver-marked tests were enabled with the configured
-  local solver executables.
-- **Duration**: 275.46 seconds.
-- **Documentation**: the warnings-as-errors documentation build passed within
-  the complete suite.
+- **Solver coverage**: solver-marked tests used the configured local IPOPT,
+  CBC, Bonmin, Couenne, APOPT, MojoPSE, and AMPL function libraries.
+- **Duration**: 276.71 seconds for the final reviewed-tree run.
 
-### Installed-Wheel Notebook
+### Quality, Documentation, and Performance
 
-The installed wheel executed the sole utility-placement notebook from top to
-bottom through the hierarchy-aware case API. The Process/GCC workflow selected
-`Almond`, produced `0.040191585277772335 kW/K`, and returned eight optimized
-utilities. The Site/TSP workflow defaulted to the Site master zone, produced
-`0.6863313374698734 kW/K`, and returned eight optimized utilities. Every
-generated isothermal and sensible cold member exactly reverses its matching hot
-member; the broad Process and Site sensible pairs span 174.01 to 50.394 degC
-and 181.01 to 50.194 degC, respectively. Both cases
-registered through `workspace.add(...)`, preserved `baseline` as active, and
-created standard Plotly figures. A separate wheel smoke inferred two
-isothermal and two sensible levels per side from existing utilities without
-count arguments. The imported `OpenPinch` path resolved to the isolated wheel
-target.
+- Ruff: pass.
+- `git diff --check`: pass.
+- Sphinx warnings-as-errors build: 54 source pages, pass.
+- Representative performance gates: 5 tests, pass.
+- Notebook generator/source contract: pass.
+- Notebook 19 project-kernel execution: pass with refreshed outputs.
+- A standalone Python 3.14 `coverage run` attempt was unavailable because
+  NumPy raised its duplicate-module import guard under instrumentation. The
+  same 25 penalty tests pass normally, including Hypothesis and every explicit
+  valid/invalid branch; the empty coverage file was removed.
+
+## Installed-Wheel Notebook Evidence
+
+The isolated wheel imported from the temporary target and executed notebook
+19's setup, capped Process/GCC workflow, and uncapped Site/TSP workflow. The
+Process result reports `0.05984815679388933 kW/K` entropy and
+`0.33603087814600113` dimensionless fallback penalty. Four named hot utilities
+carry independent 20 kW caps, residual `HU` remains visible, and ordinary
+direct targeting respects the stored limits. The uncapped Site result remains
+`0.6863313374698734 kW/K`. Both standard figures are constructed and the
+baseline case remains unchanged.
 
 ## Delivered Scope
 
-Utility placement is thermodynamic-only. Its public request, templates,
-results, accessor, documentation, and notebook contain no
-monetary selector, per-utility prices, cogeneration eligibility, electricity
-price, turbine settings, or monetary breakdown. The physical balanced-
-composite entropy objective, raw all-period weighted sum, default `HU`/`CU`
-exclusion, named-case replacement, standard plots, and general OpenPinch
-cogeneration analyses remain intact. No utility-placement CLI was added.
-The final ownership audit removed generator-created cosmetic changes from
-notebooks 1-18; only the required notebook 19 was added. RTD now describes the
-thermodynamic-only case workflow and the exact 192-operation tutorial coverage
-count. The public call accepts optional `isothermal`, `sensible`, and `zone`
-arguments. Omitted `zone` uses the master zone; Process/Unit Operation routes
-to direct GCC, Site routes to Total Site targeting, and Community/Region routes
-to aggregate indirect targeting. Omitted counts infer typed templates from
-existing utilities, while any explicit count selects generated-template mode.
-The call returns a detached normal `PinchProblem`; the obsolete public
-`base_target`, placement-specific presentation module, and observation methods
-are absent.
+Utility placement remains thermodynamic-only and Python-API-only. The optional
+`maximum_duties` mapping is keyed by final generated or inferred names and
+accepts scalar, explicit-unit, or period-resolved values. Omitted entries are
+unbounded and zero disables one named utility. Reserved `HU` and `CU` are not
+placement options; they cover only residual duty after capped named utilities
+are exhausted. Their balanced-composite entropy remains physical, while
+`g[p] = (Q_HU[p]/Q_heat[p])^2 + (Q_CU[p]/Q_cool[p])^2` is reported and
+raw-weighted across all periods as a separate dimensionless ranking term.
 
-The profile-envelope and coupled-pair corrections are deliberately narrow.
-Generated supply
-bounds now follow changing residual-profile support, sensible span bounds
-cover the target temperature range, and verified deterministic starts
-distribute supplies and spans across those bounds. Matching count-generated
-hot/cold utilities now share one interval with reversed endpoints and
-independent duties. No public API, objective, monetary behavior, CLI, or
-plotting method changed.
+The returned detached case retains caps and required fallback definitions, so
+normal Process GCC and Site TSP targeting/plots show the constrained utility
+system. Monetary placement, cogeneration economics, CLI integration, new plot
+APIs, dependencies, and infrastructure remain excluded.
+
+## Extension Compliance
+
+- **Property-Based Testing**: compliant; all applicable example, generated,
+  scaling, ordering, determinism, and conservation properties pass.
+- **Security Baseline**: disabled; N/A.
+- **Resiliency Baseline**: disabled; N/A.
 
 ## Overall Status
 
 - **Build**: Success.
-- **All tests**: Pass.
-- **Enabled Property-Based Testing extension**: Compliant; analytical,
-  generated-invariant, fixed-seed, round-trip, ordering, feasibility, and
-  all-period properties remain green.
-- **Security and Resiliency extensions**: Disabled; N/A.
+- **All required tests**: Pass.
 - **Operations**: N/A; no deployment or publication was requested.

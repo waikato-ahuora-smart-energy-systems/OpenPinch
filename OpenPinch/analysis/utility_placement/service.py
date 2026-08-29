@@ -43,6 +43,10 @@ def _candidate(
             if evaluation.thermodynamic_total is not None
             else None
         ),
+        fallback_penalty=QuantityValue(
+            value=evaluation.fallback_penalty,
+            unit="dimensionless",
+        ),
         diagnostics=evaluation.diagnostics,
     )
 

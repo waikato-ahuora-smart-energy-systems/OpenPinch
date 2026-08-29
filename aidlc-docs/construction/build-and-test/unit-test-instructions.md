@@ -9,18 +9,19 @@ uv run pytest tests/analysis/utility_placement -q --hypothesis-seed=20260715
 ```
 
 This exercises contracts, normalization, bounds, vector encoding and decoding,
-allocation, thermodynamics, monetary accounting, cogeneration, penalties,
-evaluation, optimization, service orchestration, analytical oracles,
-properties, and performance thresholds.
+cap-aware allocation, thermodynamics, residual fallback penalties, evaluation,
+optimization, service orchestration, analytical oracles, properties, and
+performance thresholds.
 
 ### 2. Review Test Results
 
-- **Expected**: 149 utility-placement specialist tests pass with zero failures.
+- **Expected**: 177 utility-placement specialist tests pass with zero failures.
 - **Property testing**: Hypothesis uses reproducible seed `20260715` while
   retaining shrinking.
-- **Coverage**: Unit 2-owned code plus the shared contract passed its 95 percent
-  branch gate at 96 percent. Unit 3-owned application/presentation modules
-  passed at 97 percent.
+- **Coverage**: Example and Hypothesis tests exercise zero, positive, invalid,
+  scaling, monotonicity, and raw-weight aggregation branches in the new
+  numerical penalty kernel. On Python 3.14, standalone `coverage run` may hit
+  NumPy's duplicate-module guard even though ordinary pytest is green.
 - **Report location**: terminal output by default. Generate `.coverage` with
   the following command when a persistent coverage database is required:
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from ..analysis.targeting.grand_composite import get_seperated_gcc_heat_load_profiles
@@ -28,7 +29,9 @@ from ..contracts.utility_placement import (
     DecisionField,
     PhysicalCoordinateBound,
     QuantityInterval,
+    QuantityValue,
     TemplateBlueprintSet,
+    UtilityDutyLimit,
     UtilityLevelKind,
     UtilityLevelTemplate,
     UtilityPlacementBaseTarget,
@@ -211,14 +214,17 @@ def _infer_problem_utility_templates(
     tuple[UtilityLevelTemplate, ...],
 ]:
     utilities = tuple(
-        utility for utility in problem.validate().utilities if utility.active
+        utility
+        for utility in problem.validate().utilities
+        if utility.active and utility.name.strip().casefold() not in {"hu", "cu"}
     )
     if not utilities:
         raise PlacementRequestValidationError(
             code="missing_existing_utilities",
             message=(
-                "Omitted counts require existing utilities on the PinchProblem; "
-                "supply isothermal and optional sensible counts instead."
+                "Omitted counts require existing utilities other than HU/CU "
+                "defaults on the PinchProblem; supply isothermal and optional "
+                "sensible counts instead."
             ),
             field_path="utilities",
         )
@@ -303,7 +309,8 @@ def _build_problem_placement_request(
     isothermal: int | None,
     sensible: int | None,
     period_ids,
-    options,
+    maximum_duties=None,
+    options=None,
 ) -> UtilityPlacementRequest:
     placement_options = (
         options
@@ -329,16 +336,151 @@ def _build_problem_placement_request(
             options=placement_options,
         )
     iso_count, sensible_count, hot_templates, cold_templates = inferred
-    return normalize_utility_placement_request(
+    request = normalize_utility_placement_request(
         isothermal_level_count=iso_count,
         sensible_level_count=sensible_count,
         hot_templates=hot_templates,
         cold_templates=cold_templates,
         base_target=scope,
         zone=selected_zone.address,
-        period_ids=None if period_ids is None else tuple(period_ids),
+        period_ids=(
+            tuple(problem.period_ids) if period_ids is None else tuple(period_ids)
+        ),
         options=placement_options,
     )
+    selected_period_ids = _period_selection(problem, request)
+    blueprints = prepare_template_blueprints(request)
+    known_names = {blueprint.key.name for blueprint in blueprints.all}
+    limits = _normalize_maximum_duties(
+        maximum_duties,
+        known_names=known_names,
+        selected_period_ids=selected_period_ids,
+        available_period_ids=tuple(problem.period_ids),
+        config=selected_zone.config,
+        heat_flow_unit=request.units.heat_flow,
+    )
+    return request.model_copy(update={"maximum_duties": limits})
+
+
+def _normalize_maximum_duties(
+    maximum_duties,
+    *,
+    known_names: set[str],
+    selected_period_ids: tuple[str, ...],
+    available_period_ids: tuple[str, ...],
+    config,
+    heat_flow_unit: str,
+) -> tuple[UtilityDutyLimit, ...]:
+    """Normalize one public name/value mapping after template resolution."""
+    if maximum_duties is None:
+        return ()
+    if not isinstance(maximum_duties, Mapping):
+        raise PlacementRequestValidationError(
+            code="invalid_maximum_duties",
+            message="maximum_duties must map utility names to duty limits.",
+            field_path="maximum_duties",
+        )
+
+    normalized: list[UtilityDutyLimit] = []
+    observed: set[str] = set()
+    for raw_name, raw_value in maximum_duties.items():
+        if not isinstance(raw_name, str) or not raw_name.strip():
+            raise PlacementRequestValidationError(
+                code="invalid_maximum_duty_name",
+                message="Maximum-duty utility names must be non-empty strings.",
+                field_path="maximum_duties",
+            )
+        name = raw_name.strip()
+        if name in observed:
+            raise PlacementRequestValidationError(
+                code="duplicate_maximum_duty",
+                message="Maximum-duty utility names must be unique.",
+                field_path=f"maximum_duties.{name}",
+            )
+        observed.add(name)
+        if name not in known_names:
+            raise PlacementRequestValidationError(
+                code="unknown_maximum_duty_utility",
+                message=f"maximum_duties contains unknown utility '{name}'.",
+                field_path=f"maximum_duties.{name}",
+            )
+        try:
+            value = standardise_input_value(
+                raw_value,
+                field_name="heat_flow",
+                config=config,
+            )
+        except Exception as exc:
+            raise PlacementRequestValidationError(
+                code="invalid_maximum_duty_unit",
+                message=f"Maximum duty for '{name}' has an incompatible unit.",
+                field_path=f"maximum_duties.{name}",
+            ) from exc
+        if value is None:
+            raise PlacementRequestValidationError(
+                code="missing_maximum_duty",
+                message=f"Maximum duty for '{name}' requires a value.",
+                field_path=f"maximum_duties.{name}",
+            )
+
+        magnitudes = tuple(float(item) for item in value.period_values)
+        explicit_period_ids = None
+        if isinstance(raw_value, Mapping) and raw_value.get("period_ids") is not None:
+            explicit_period_ids = tuple(str(item) for item in raw_value["period_ids"])
+            if len(explicit_period_ids) != len(magnitudes) or len(
+                set(explicit_period_ids)
+            ) != len(explicit_period_ids):
+                raise PlacementRequestValidationError(
+                    code="invalid_maximum_duty_periods",
+                    message=(
+                        f"Maximum-duty periods for '{name}' must align and be unique."
+                    ),
+                    field_path=f"maximum_duties.{name}.period_ids",
+                )
+            by_period = dict(zip(explicit_period_ids, magnitudes, strict=True))
+            if any(period_id not in by_period for period_id in selected_period_ids):
+                raise PlacementRequestValidationError(
+                    code="missing_maximum_duty_period",
+                    message=f"Maximum duty for '{name}' is missing a selected period.",
+                    field_path=f"maximum_duties.{name}",
+                )
+            selected_values = tuple(
+                by_period[period_id] for period_id in selected_period_ids
+            )
+        elif len(magnitudes) == 1:
+            selected_values = magnitudes * len(selected_period_ids)
+        elif len(magnitudes) == len(available_period_ids):
+            by_period = dict(zip(available_period_ids, magnitudes, strict=True))
+            selected_values = tuple(
+                by_period[period_id] for period_id in selected_period_ids
+            )
+        elif len(magnitudes) == len(selected_period_ids):
+            selected_values = magnitudes
+        else:
+            raise PlacementRequestValidationError(
+                code="maximum_duty_period_mismatch",
+                message=(
+                    f"Maximum duty for '{name}' does not align with selected periods."
+                ),
+                field_path=f"maximum_duties.{name}",
+            )
+        if any(not math.isfinite(item) or item < 0.0 for item in selected_values):
+            raise PlacementRequestValidationError(
+                code="invalid_maximum_duty",
+                message=f"Maximum duty for '{name}' must be finite and non-negative.",
+                field_path=f"maximum_duties.{name}",
+            )
+        normalized.append(
+            UtilityDutyLimit(
+                name=name,
+                period_ids=selected_period_ids,
+                values=tuple(
+                    QuantityValue(value=item, unit=heat_flow_unit)
+                    for item in selected_values
+                ),
+            )
+        )
+    return tuple(sorted(normalized, key=lambda item: item.name.casefold()))
 
 
 def _period_selection(
@@ -639,6 +781,11 @@ def _extract_period(
         residual_hot_duty=residual_hot_duty,
         residual_cold_duty=residual_cold_duty,
         ambient_temperature_kelvin=298.15,
+        maximum_duties=tuple(
+            (limit.name, limit.for_period(period_id).value)
+            for limit in request.maximum_duties
+        ),
+        fallback_temperature_span=request.options.default_isothermal_span.value,
         coordinate_bounds=_coordinate_bounds(
             request,
             blueprints,
@@ -664,6 +811,21 @@ def build_problem_placement_context(
         _extract_period(problem, normalized, blueprints, scope, period_id)
         for period_id in period_ids
     )
+    fallback_hot_target = max(
+        max(period.snapshot.shifted_temperatures) for period in periods
+    )
+    fallback_cold_target = min(
+        min(period.snapshot.shifted_temperatures) for period in periods
+    )
+    periods = tuple(
+        period.model_copy(
+            update={
+                "fallback_hot_target_temperature": fallback_hot_target,
+                "fallback_cold_target_temperature": fallback_cold_target,
+            }
+        )
+        for period in periods
+    )
     zone_name = normalized.zone or problem.project_name or "Site"
     context = build_utility_placement_context(
         request=normalized,
@@ -682,6 +844,7 @@ def run_problem_utility_placement(
     sensible: int | None = None,
     zone=None,
     period_ids=None,
+    maximum_duties=None,
     options=None,
 ) -> "PinchProblem":
     """Optimize one placement and return its best utilities as a normal case."""
@@ -692,6 +855,7 @@ def run_problem_utility_placement(
         isothermal=isothermal,
         sensible=sensible,
         period_ids=period_ids,
+        maximum_duties=maximum_duties,
         options=options,
     )
     blueprints, context = build_problem_placement_context(problem, request)
@@ -707,6 +871,38 @@ def run_problem_utility_placement(
         context=context,
     )
     period = result.best.period_results[0]
+    limit_by_name = {limit.name: limit for limit in result.request.maximum_duties}
+    levels_by_side = {
+        "Hot": list(period.hot_levels),
+        "Cold": list(period.cold_levels),
+    }
+    for period_result in result.best.period_results:
+        for utility_type, levels in (
+            ("Hot", period_result.hot_levels),
+            ("Cold", period_result.cold_levels),
+        ):
+            observed = {
+                level.template_key.name for level in levels_by_side[utility_type]
+            }
+            levels_by_side[utility_type].extend(
+                level
+                for level in levels
+                if level.is_fallback and level.template_key.name not in observed
+            )
+
+    def serialized_limit(name: str):
+        limit = limit_by_name.get(name)
+        if limit is None:
+            return None
+        values = tuple(value.value for value in limit.values)
+        if len(set(values)) == 1:
+            return {"value": values[0], "unit": result.units.heat_flow}
+        return {
+            "values": list(values),
+            "period_ids": list(limit.period_ids),
+            "unit": result.units.heat_flow,
+        }
+
     optimized_input = problem.to_problem_json()
     optimized_input["utilities"] = [
         {
@@ -715,13 +911,15 @@ def run_problem_utility_placement(
             "t_supply": level.supply_temperature.model_dump(),
             "t_target": level.target_temperature.model_dump(),
             "heat_flow": {"value": 0.0, "unit": result.units.heat_flow},
+            **(
+                {"maximum_heat_flow": serialized_limit(level.template_key.name)}
+                if serialized_limit(level.template_key.name) is not None
+                else {}
+            ),
             "dt_cont": {"value": 0.0, "unit": result.units.temperature_difference},
             "htc": {"value": 1.0, "unit": "kW/m^2/delta_degC"},
         }
-        for utility_type, levels in (
-            ("Hot", period.hot_levels),
-            ("Cold", period.cold_levels),
-        )
+        for utility_type, levels in levels_by_side.items()
         for level in levels
     ]
     from .problem import PinchProblem

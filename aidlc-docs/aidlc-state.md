@@ -3,8 +3,8 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Utility Placement coupled generated-pair correction and
-  Build and Test complete.
+- **Current Stage**: Utility Placement per-utility maximum-duty amendment
+  complete; Operations is N/A.
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -31,6 +31,15 @@
 
 ## Utility Placement Optimisation Progress
 
+- [x] REQUIREMENTS AMENDMENT - Define per-utility maximum-duty inputs,
+  multiperiod semantics, omitted-limit behavior, and infeasibility handling.
+  Name-mapped inputs, period-resolved bounds, residual default fallback, and
+  squared `g_penalty()` are approved and documented. Functional design and the
+  TDD Code Generation plan are complete under standing authorization.
+- [x] MAXIMUM-DUTY CONSTRUCTION - Execute the approved ten-step TDD plan,
+  notebook/RTD integration, full Build and Test, review, and commit. Code
+  Generation Steps 1 through 10 are complete. The final solver-enabled tree
+  passed 2,438 tests with 4 expected skips.
 - [x] REQUIREMENTS CORRECTION - Monetary utility placement and its paused
   boiler/turbine amendment are deferred in full. The current feature is
   thermodynamic-only and retains balanced-composite entropy generation,

@@ -25,9 +25,10 @@ from .allocation import PlacementAllocationAdapter, allocate_placement_period
 from .context import UtilityPlacementContext
 from .penalties import (
     aggregate_weighted_objective,
-    default_utility_penalty,
     feasible_objective_scalar,
+    g_penalty,
     infeasible_objective_scalar,
+    penalized_feasible_objective_scalar,
 )
 from .thermodynamics import evaluate_thermodynamic_cost
 
@@ -43,6 +44,7 @@ class PlacementEvaluation(BaseModel):
     physical_objective: float | None = None
     period_results: tuple[PlacementPeriodResult, ...] = ()
     thermodynamic_total: float | None = None
+    fallback_penalty: float = 0.0
     diagnostics: tuple[CandidateDiagnostic, ...] = ()
 
     @field_validator("coordinates", mode="before")
@@ -68,6 +70,12 @@ def _public_level(level, request: UtilityPlacementRequest) -> UtilityLevelPeriod
             unit=units.temperature_difference,
         ),
         allocated_duty=QuantityValue(value=level.allocated_duty, unit=units.heat_flow),
+        maximum_duty=(
+            QuantityValue(value=level.maximum_duty, unit=units.heat_flow)
+            if level.maximum_duty is not None
+            else None
+        ),
+        is_fallback=level.is_fallback,
     )
 
 
@@ -186,6 +194,7 @@ class PlacementEvaluationSession:
             placement = decode_placement(self.model, key)
             period_results: list[PlacementPeriodResult] = []
             thermo_values: list[float] = []
+            fallback_penalties: list[float] = []
             failure_diagnostics: list[CandidateDiagnostic] = []
             violation = 0.0
             for period in self.context.periods:
@@ -205,43 +214,13 @@ class PlacementEvaluationSession:
                     )
                     continue
 
-                allocated_levels = allocation.hot_levels + allocation.cold_levels
-                fallback_penalty = default_utility_penalty(
-                    names=tuple(
-                        level.template_key.name for level in allocated_levels
-                    ),
-                    duties=tuple(level.allocated_duty for level in allocated_levels),
-                    reference_duty=(
-                        period.residual_hot_duty + period.residual_cold_duty
-                    ),
+                fallback_penalty = g_penalty(
+                    hot_fallback_duty=allocation.hot_fallback_duty,
+                    cold_fallback_duty=allocation.cold_fallback_duty,
+                    required_hot_duty=period.residual_hot_duty,
+                    required_cold_duty=period.residual_cold_duty,
                 )
-                if fallback_penalty > 0.0:
-                    failure_diagnostics.append(
-                        CandidateDiagnostic(
-                            code="default_utility_forbidden",
-                            constraint="declared_utility_levels",
-                            message=(
-                                "Generated default HU/CU utility duty is excluded "
-                                "from placement optimization."
-                            ),
-                            period_id=period.period_id,
-                            measured=QuantityValue(
-                                value=math.fsum(
-                                    level.allocated_duty
-                                    for level in allocated_levels
-                                    if level.template_key.name.strip().casefold()
-                                    in {"hu", "cu"}
-                                ),
-                                unit=self.request.units.heat_flow,
-                            ),
-                            limit=QuantityValue(
-                                value=0.0,
-                                unit=self.request.units.heat_flow,
-                            ),
-                        )
-                    )
-                    violation += fallback_penalty
-                    continue
+                fallback_penalties.append(fallback_penalty)
 
                 thermo = evaluate_thermodynamic_cost(
                     request=self.request,
@@ -295,6 +274,10 @@ class PlacementEvaluationSession:
                         ),
                         feasible=True,
                         thermodynamic=thermo,
+                        fallback_penalty=QuantityValue(
+                            value=fallback_penalty,
+                            unit="dimensionless",
+                        ),
                         selected_objective=QuantityValue(
                             value=thermo_value, unit=self.request.units.entropy
                         ),
@@ -310,15 +293,23 @@ class PlacementEvaluationSession:
                 thermo_total = aggregate_weighted_objective(
                     tuple(thermo_values), weights
                 )
+                fallback_total = aggregate_weighted_objective(
+                    tuple(fallback_penalties), weights
+                )
+                entropy_scalar = feasible_objective_scalar(
+                    thermo_total, scale=self._objective_scale()
+                )
                 result = PlacementEvaluation(
                     coordinates=key,
                     feasible=True,
-                    scalar_objective=feasible_objective_scalar(
-                        thermo_total, scale=self._objective_scale()
+                    scalar_objective=penalized_feasible_objective_scalar(
+                        entropy_scalar,
+                        fallback_total,
                     ),
                     physical_objective=thermo_total,
                     period_results=tuple(period_results),
                     thermodynamic_total=thermo_total,
+                    fallback_penalty=fallback_total,
                 )
 
         with self._lock:

@@ -41,7 +41,8 @@ If both counts are omitted, OpenPinch infers templates from the existing utiliti
 A missing or near-equal target temperature is isothermal; a larger
 span, segmented utility, or multi-point profile is sensible. ``Both`` utilities
 form paired hot and cold templates. Supplying either count explicitly replaces
-the existing templates with generated levels.
+the existing templates with generated levels. ``HU`` and ``CU`` are reserved
+balancing fallbacks and are never inferred as placement options.
 
 Runnable Workflow
 -----------------
@@ -63,8 +64,34 @@ isothermal and two sensible levels on each side:
        sensible=2,
        zone="Almond",
        period_ids=("0",),
+       maximum_duties={
+           "hot_iso_1": 20.0,
+           "hot_iso_2": 20.0,
+           "hot_sensible_1": 20.0,
+           "hot_sensible_2": 20.0,
+       },
    )
    process_evidence = process_case.utility_placement_result
+
+``maximum_duties`` is optional and keyed by the final globally unique utility
+name. Omitted names are unbounded and zero disables only that named level. A
+scalar applies to every selected period. Explicit units and period identities
+are also accepted:
+
+.. code-block:: python
+
+   maximum_duties = {
+       "hot_iso_1": {"value": 0.02, "unit": "MW"},
+       "cold_iso_1": {
+           "values": [10.0, 15.0],
+           "period_ids": ["summer", "winter"],
+           "unit": "kW",
+       },
+   }
+
+Each hot and cold level has its own independent bound, including matching
+generated pairs. When named capacity cannot cover the target, residual-only
+``HU`` or ``CU`` supplies the shortfall and is retained in the returned case.
 
 The return value is already a normal detached :class:`OpenPinch.PinchProblem`
 containing the best utility set. Register it, then target and plot it with the
@@ -161,8 +188,18 @@ gives exergy destruction.
 For multiple selected periods, the objective is the raw weighted sum
 ``sum(w_p * S_gen,p)``. It is not divided by total weight, and a candidate must
 be feasible in every selected period. Generated fallback utilities named
-``HU`` and ``CU`` are not placement options: any positive duty assigned to
-either receives a deterministic infeasible penalty.
+``HU`` and ``CU`` are not placement options. They are residual-only balancing
+utilities and positive fallback duty remains feasible. Its separate
+dimensionless penalty in period ``p`` is
+
+.. math::
+
+   g_p = \left(\frac{Q_{HU,p}}{Q_{heat,required,p}}\right)^2
+       + \left(\frac{Q_{CU,p}}{Q_{cool,required,p}}\right)^2.
+
+The optimizer uses ``sum(w_p * g_p)`` together with its entropy ranking. The
+reported physical entropy remains the balanced-composite result in ``kW/K``;
+the dimensionless penalty is exposed separately as ``fallback_penalty``.
 
 Temperatures and duties retain explicit units. Default canonical units are
 ``degC``, ``delta_degC``, ``kW``, and ``kW/K``. Invalid input is rejected before

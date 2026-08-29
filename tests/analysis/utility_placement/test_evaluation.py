@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import pytest
+
 from OpenPinch.analysis.utility_placement.allocation import AllocationAdapterResult
 from OpenPinch.analysis.utility_placement.codec import build_utility_placement_model
 from OpenPinch.analysis.utility_placement.context import (
@@ -21,8 +23,6 @@ from OpenPinch.contracts.utility_placement import (
     DecisionField,
     PhysicalCoordinateBound,
     QuantityInterval,
-    UtilityLevelKind,
-    UtilityLevelTemplate,
     UtilityPlacementBaseTarget,
     UtilityPlacementRequest,
     UtilitySide,
@@ -141,46 +141,31 @@ def test_evaluation_session_replays_once_for_exact_coordinate_memo() -> None:
     assert session.memo_hit_count == 1
 
 
-def test_evaluation_session_penalizes_default_utility_allocation() -> None:
-    request = UtilityPlacementRequest(
-        isothermal_level_count=2,
-        hot_templates=(
-            UtilityLevelTemplate(
-                name="HU",
-                side=UtilitySide.HOT,
-                kind=UtilityLevelKind.ISOTHERMAL,
-            ),
-            UtilityLevelTemplate(
-                name="declared_hot",
-                side=UtilitySide.HOT,
-                kind=UtilityLevelKind.ISOTHERMAL,
-            ),
-        ),
-        cold_templates=(
-            UtilityLevelTemplate(
-                name="declared_cold_1",
-                side=UtilitySide.COLD,
-                kind=UtilityLevelKind.ISOTHERMAL,
-            ),
-            UtilityLevelTemplate(
-                name="declared_cold_2",
-                side=UtilitySide.COLD,
-                kind=UtilityLevelKind.ISOTHERMAL,
-            ),
-        ),
-    )
-    request, context, model = _case(request)
+def test_evaluation_session_applies_squared_fallback_penalty() -> None:
+    request, context, model = _case()
+
+    class FallbackAdapter:
+        def allocate(self, period, placement):
+            return AllocationAdapterResult(
+                hot_duties=(80.0, 0.0),
+                cold_duties=(80.0, 0.0),
+                hot_fallback_duty=20.0,
+            )
+
     session = PlacementEvaluationSession(
         request=request,
         context=context,
         model=model,
-        allocation_adapter=_Adapter(),
+        allocation_adapter=FallbackAdapter(),
     )
     result = session.evaluate(model.initial_points[0])
 
-    assert not result.feasible
-    assert result.diagnostics[0].code == "default_utility_forbidden"
-    assert 1.0 <= result.scalar_objective < 2.0
+    assert result.feasible
+    assert 0.0 < result.scalar_objective < 1.0
+    assert result.fallback_penalty == pytest.approx(0.08)
+    assert result.period_results[0].fallback_penalty.value == pytest.approx(0.04)
+    assert result.period_results[0].hot_levels[-1].template_key.name == "HU"
+    assert result.period_results[0].hot_levels[-1].is_fallback
 
 
 def test_evaluation_session_returns_graded_infeasibility_for_bad_candidate() -> None:

@@ -88,7 +88,12 @@ def test_utility_placement_has_one_executable_thermodynamic_notebook() -> None:
     assert "sensible_level_count" not in source
     assert "monetary" not in source.lower()
     assert "cogeneration_eligible" not in source
-    assert 'not in {"hu", "cu"}' in source
+    assert "process_maximum_duties = {" in source
+    assert source.count("maximum_duties=process_maximum_duties") == 1
+    assert 'utility["maximum_heat_flow"]' in source
+    assert "process_evidence.best.fallback_penalty" in source
+    assert "display(process_fallback_penalty)" in source
+    assert 'utility["name"] == "HU"' in source
     assert "min(process_hot_targets) < 75.0" in source
     assert "max(process_cold_supplies) > 15.0" in source
     assert "min(site_hot_targets) < 80.0" in source
@@ -143,7 +148,7 @@ def test_manifest_and_packaged_inventory_are_identical() -> None:
     assert all(row["operation"] for row in rows)
 
 
-def test_notebooks_are_valid_source_only_nbformat_documents(tmp_path: Path) -> None:
+def test_notebooks_are_valid_nbformat_documents(tmp_path: Path) -> None:
     for name in EXPECTED_NOTEBOOKS:
         notebook = _copied_notebook(tmp_path, name)
 
@@ -176,8 +181,11 @@ def test_notebooks_are_valid_source_only_nbformat_documents(tmp_path: Path) -> N
             assert heading in markdown_text, (name, heading)
         for cell in notebook["cells"]:
             if cell["cell_type"] == "code":
-                assert cell["execution_count"] is None, name
-                assert cell["outputs"] == [], name
+                if name == "19_utility_placement_optimisation.ipynb":
+                    assert isinstance(cell["execution_count"], int), name
+                else:
+                    assert cell["execution_count"] is None, name
+                    assert cell["outputs"] == [], name
 
 
 def _assert_review_contract(name: str, notebook: dict) -> None:
@@ -218,11 +226,17 @@ def test_tutorial_review_preserves_notebook_invariants(name: str) -> None:
     assert [cell["id"] for cell in notebook["cells"]] == [
         f"cell-{index:02d}" for index in range(1, len(notebook["cells"]) + 1)
     ]
-    assert all(
-        cell["execution_count"] is None and cell["outputs"] == []
-        for cell in notebook["cells"]
-        if cell["cell_type"] == "code"
-    )
+    code_cells = [
+        cell for cell in notebook["cells"] if cell["cell_type"] == "code"
+    ]
+    if name == "19_utility_placement_optimisation.ipynb":
+        assert all(isinstance(cell["execution_count"], int) for cell in code_cells)
+        assert code_cells[-1]["outputs"]
+    else:
+        assert all(
+            cell["execution_count"] is None and cell["outputs"] == []
+            for cell in code_cells
+        )
 
 
 def test_notebook_generator_is_repeatable_in_process(

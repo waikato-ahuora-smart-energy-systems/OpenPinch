@@ -290,6 +290,50 @@ class TemplateKey(_FrozenContract):
         return name
 
 
+class UtilityDutyLimit(_FrozenContract):
+    """Canonical period-aware upper bounds for one named utility level."""
+
+    name: str
+    period_ids: tuple[str, ...]
+    values: tuple[QuantityValue, ...]
+
+    @field_validator("name")
+    @classmethod
+    def _validate_name(cls, value: str) -> str:
+        name = value.strip()
+        if not name:
+            raise ValueError("name must not be empty")
+        return name
+
+    @field_validator("period_ids")
+    @classmethod
+    def _validate_period_ids(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        normalized = tuple(period_id.strip() for period_id in value)
+        if not normalized or any(not period_id for period_id in normalized):
+            raise ValueError("period_ids must be non-empty")
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("period_ids must be unique")
+        return normalized
+
+    @model_validator(mode="after")
+    def _validate_values(self) -> Self:
+        if len(self.period_ids) != len(self.values):
+            raise ValueError("maximum-duty periods and values must align")
+        if any(value.value < 0.0 for value in self.values):
+            raise ValueError("maximum duties must be non-negative")
+        if len({value.unit for value in self.values}) != 1:
+            raise ValueError("maximum duties must use one canonical unit")
+        return self
+
+    def for_period(self, period_id: str) -> QuantityValue:
+        """Return the limit for one selected period identity."""
+        try:
+            index = self.period_ids.index(period_id)
+        except ValueError as exc:
+            raise KeyError(period_id) from exc
+        return self.values[index]
+
+
 class UtilityTemplateBlueprint(_FrozenContract):
     """Canonical, identity-stable template before physical bounds exist."""
 
@@ -549,6 +593,8 @@ class UtilityLevelPeriodResult(_FrozenContract):
     target_temperature: QuantityValue
     temperature_span: QuantityValue
     allocated_duty: QuantityValue
+    maximum_duty: QuantityValue | None = None
+    is_fallback: bool = False
     diagnostics: tuple[CandidateDiagnostic, ...] = ()
 
 
@@ -578,6 +624,9 @@ class PlacementPeriodResult(_FrozenContract):
     coverage_tolerance: QuantityValue
     feasible: bool
     thermodynamic: ThermodynamicCostBreakdown | None = None
+    fallback_penalty: QuantityValue = Field(
+        default_factory=lambda: QuantityValue(value=0.0, unit="dimensionless")
+    )
     selected_objective: QuantityValue
     diagnostics: tuple[CandidateDiagnostic, ...] = ()
 
@@ -607,6 +656,9 @@ class UtilityPlacementCandidate(_FrozenContract):
     period_results: tuple[PlacementPeriodResult, ...]
     aggregate_objective: QuantityValue
     thermodynamic_total: QuantityValue | None = None
+    fallback_penalty: QuantityValue = Field(
+        default_factory=lambda: QuantityValue(value=0.0, unit="dimensionless")
+    )
     feasible: Literal[True] = True
     diagnostics: tuple[CandidateDiagnostic, ...] = ()
 
@@ -736,6 +788,7 @@ class UtilityPlacementRequest(_FrozenContract):
     base_target: UtilityPlacementBaseTarget = UtilityPlacementBaseTarget.AUTO
     zone: str | None = None
     period_ids: tuple[str, ...] | None = None
+    maximum_duties: tuple[UtilityDutyLimit, ...] = ()
     tolerances: PlacementTolerances = Field(default_factory=PlacementTolerances)
     options: UtilityPlacementOptions = Field(default_factory=UtilityPlacementOptions)
     units: PlacementUnitSystem = Field(default_factory=PlacementUnitSystem)
@@ -782,6 +835,17 @@ class UtilityPlacementRequest(_FrozenContract):
             raise ValueError("period_ids must be unique")
         return normalized
 
+    @model_validator(mode="after")
+    def _validate_maximum_duties(self) -> Self:
+        names = tuple(limit.name for limit in self.maximum_duties)
+        if len(set(names)) != len(names):
+            raise ValueError("maximum-duty utility names must be unique")
+        if self.period_ids is not None and any(
+            limit.period_ids != self.period_ids for limit in self.maximum_duties
+        ):
+            raise ValueError("maximum-duty periods must match request periods")
+        return self
+
 
 __all__ = [
     "CandidateDiagnostic",
@@ -807,6 +871,7 @@ __all__ = [
     "UtilityLevelKind",
     "UtilityLevelPeriodResult",
     "UtilityLevelTemplate",
+    "UtilityDutyLimit",
     "UtilityPlacementBaseTarget",
     "UtilityPlacementCandidate",
     "UtilityPlacementOptimisationMethod",
