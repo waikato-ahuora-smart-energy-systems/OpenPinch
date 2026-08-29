@@ -128,9 +128,9 @@ algorithm.
 
 ### BR2-019: Level order
 
-Hot and cold utilities enter targeting in the deterministic physical order
-required by Unit 1. Targeting output is remapped to stable template keys rather
-than positional guesses.
+Hot and cold utilities enter targeting in deterministic supply-temperature
+order, including cross-kind interleaving allowed by Unit 1. Targeting output is
+remapped to stable template keys rather than positional guesses.
 
 ### BR2-020: Non-negative duty
 
@@ -225,11 +225,14 @@ Any non-finite branch or aggregate is never passed to the optimizer as a
 feasible objective. Coordinate-dependent cases are infeasible; invariant
 calculation defects raise a typed thermodynamic error.
 
-### BR2-036A: Generated default utilities excluded
+### BR2-036A: Residual default utilities
 
-A positive allocation to a generated fallback named `HU` or `CU` receives a
-bounded deterministic infeasible penalty and a `default_utility_forbidden`
-diagnostic before objective ranking. Zero fallback duty adds no penalty.
+Generated fallback `HU` and `CU` are not placement coordinates. Their supply
+temperatures are respectively 50 K above the context-wide maximum process
+temperature and 50 K below the context-wide minimum. They enter ordinary
+targeting after named utilities, supply residual shortfall only, contribute to
+physical entropy, and receive the squared fallback-duty ranking penalty. Zero
+fallback duty adds no penalty.
 
 ## Monetary and Cogeneration Rules
 

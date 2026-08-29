@@ -5782,3 +5782,51 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 **Context**: CODE GENERATION AND BUILD AND TEST COMPLETE - Utility-placement CMA-ES default
 
 ---
+
+## Utility Placement Supply-Order Interleaving Correction
+**Timestamp**: 2026-08-29T21:50:15Z
+**User Input**: "The result is improving, however, its still obvious that an improvement is possible. The top isothermal utility could be a lower temperature with lower entropy generation.\n\nFile: /Users/timothyw/Downloads/newplot.png"
+**AI Response**: "Reproduced the modified notebook result and opened a TDD correction. Direct exact-target replay proves that lowering the active isothermal supply from 175.01 degrees C to 174.50 degrees C reduces entropy generation from approximately 0.0359349 to 0.0359064 kW/K with zero fallback, but the current declaration-order constraint excludes that point."
+**Context**: REQUIREMENTS / TDD REOPENING - Generated utility kinds must be free to interleave
+
+---
+
+## Utility Placement Physical Ordering Clarification
+**Timestamp**: 2026-08-29T21:53:10Z
+**User Input**: "Order by supply temperature"
+**AI Response**: "Clarified the amendment: targeting, reporting, and plotting order levels by optimized supply temperature rather than utility kind or declaration order. Cross-kind levels may interleave, while stable ordinal constraints remain only for equivalent same-kind levels."
+**Context**: REQUIREMENTS CLARIFICATION - Supply-temperature order governs physical utility sequence
+
+---
+
+## Utility Placement Separation Default Clarification
+**Timestamp**: 2026-08-29T21:54:22Z
+**User Input**: "The separation between utilities should be the same as the default isothermal dT."
+**AI Response**: "Amended FR-006 so all physically adjacent utilities are ordered by optimized supply temperature and use a default minimum separation equal to the default isothermal temperature difference."
+**Context**: REQUIREMENTS CLARIFICATION - Utility separation default
+
+---
+
+## Utility Placement Separation Default Confirmation
+**Timestamp**: 2026-08-29T21:54:22Z
+**User Input**: "The minimum separation between utilities should be the same as the default isothermal dT."
+**AI Response**: "Confirmed the default coupling requirement and incorporated it into the active RED tests and implementation plan."
+**Context**: REQUIREMENTS CONFIRMATION - Minimum separation equals default isothermal temperature difference
+
+---
+
+## Utility Placement Fallback Temperature Margin
+**Timestamp**: 2026-08-29T22:03:58Z
+**User Input**: "Default utility should by 50 K above/below the extreme process temperatures to ensure they are last to be targeted and provide a substantial penalty."
+**AI Response**: "Added the 50 K context-wide fallback-temperature margin to the active requirements and TDD scope. Generated optimization utilities retain the 0.01 K physical separation; residual HU and CU will be placed beyond the process-temperature extremes and verified through exact ordinary targeting."
+**Context**: REQUIREMENTS AMENDMENT - Default fallback utility temperature placement
+
+---
+
+## Utility Placement Supply-Order Interleaving Build and Test Completion
+**Timestamp**: 2026-08-29T22:35:03Z
+**User Input**: "(No additional user input; continued under standing authorization.)"
+**AI Response**: "Completed the TDD correction. Generated isothermal and sensible levels can interleave by optimized supply temperature, the default adjacent gap equals the 0.01 K isothermal temperature difference, residual HU/CU supplies are 50 K beyond real process extremes, and the close-profile deterministic seed prevents CMA-ES from retaining the former large-gap result. The canonical notebook Process workflow returns 0.03524514018747493 kW/K with zero fallback and a Utility GCC beginning at 173.03 degrees C against the 173.00 degrees C Process GCC. Focused suites, Ruff, RTD, temporary canonical notebook execution, and all 2,451 applicable broad tests pass; 4 expected skips and 4 user-notebook deselections remain. The user's .gitignore and notebook edits were preserved."
+**Context**: CODE GENERATION AND BUILD AND TEST COMPLETE - Supply-temperature ordering and fallback margin correction
+
+---

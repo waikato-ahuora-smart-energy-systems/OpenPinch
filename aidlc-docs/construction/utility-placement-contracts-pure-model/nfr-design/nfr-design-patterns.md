@@ -69,12 +69,15 @@ There is no period-pair comparison.
 
 ### NFRP-07: Monotone Adjacent Constraint Propagation
 
-Hot/cold ordering constraints use forward/backward passes over adjacent ranks.
-Each update only tightens a lower or upper bound. A pass stops when no value
-changes beyond bound tolerance. For a simple chain, the implementation shall
-prefer the bounded fixed number of directional passes proven sufficient by
-Functional Design; any defensive repeat loop has an explicit maximum derived
-from level count and raises an invariant error if exceeded.
+Independent hot/cold ordering constraints and generated same-kind identity
+constraints use forward/backward passes over adjacent ranks. Each update only
+tightens a lower or upper bound. Generated cross-kind adjacency is checked on a
+transient supply-temperature sort, allowing isothermal and sensible levels to
+interleave without changing stable vector identities. A pass stops when no
+value changes beyond bound tolerance. For a simple chain, the implementation
+shall prefer the bounded fixed number of directional passes proven sufficient
+by Functional Design; any defensive repeat loop has an explicit maximum
+derived from level count and raises an invariant error if exceeded.
 
 **Implements**: U1-NFR-002 through U1-NFR-004, U1-NFR-007.
 

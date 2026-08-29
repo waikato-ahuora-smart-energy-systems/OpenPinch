@@ -211,14 +211,18 @@ declaration.
 
 Generated hot/cold members of one ordinal are a coupled pair. For each pair,
 `cold_supply = hot_target` and `cold_target = hot_supply`. Generated pairs are
-ordered hottest-to-coldest using their shared interval; paired hot and cold
-duties remain independent.
+physically ordered by optimized supply temperature, so isothermal and sensible
+pairs may interleave. Equivalent hot-side identities remain ordered within
+each kind. After physical sorting, every adjacent supply gap is at least the
+named positive separation; its default equals the default isothermal span.
+Paired hot and cold duties remain independent.
 
 ### BR-030: No implicit repair
 
-Normalization and candidate validation never reorder, merge, deduplicate, or
-rename levels to satisfy BR-029. A failing candidate remains associated with
-its original identities.
+Normalization and candidate validation never mutate, merge, deduplicate, or
+rename levels to satisfy BR-029. Validation sorts an ephemeral supply view to
+check physical adjacency while retaining original identities and vector
+positions. A failing candidate remains associated with its original identities.
 
 ### BR-031: Coordinate sequence
 

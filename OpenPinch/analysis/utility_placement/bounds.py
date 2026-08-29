@@ -282,6 +282,30 @@ def _propagate_order(
     return tuple(updated)
 
 
+def _propagate_generated_kind_order(
+    templates: tuple[EffectiveUtilityTemplate, ...],
+    *,
+    separation: float,
+    tolerance: float,
+) -> tuple[EffectiveUtilityTemplate, ...]:
+    """Tighten generated identity families without fixing cross-kind order."""
+    by_key: dict[object, EffectiveUtilityTemplate] = {}
+    for kind in UtilityLevelKind:
+        family = tuple(template for template in templates if template.kind is kind)
+        by_key.update(
+            {
+                template.key: template
+                for template in _propagate_order(
+                    family,
+                    side=UtilitySide.HOT,
+                    separation=separation,
+                    tolerance=tolerance,
+                )
+            }
+        )
+    return tuple(by_key[template.key] for template in templates)
+
+
 def _couple_generated_pair_bounds(
     hot: tuple[EffectiveUtilityTemplate, ...],
     cold: tuple[EffectiveUtilityTemplate, ...],
@@ -407,9 +431,8 @@ def derive_effective_templates(
     if request.uses_generated_pairs:
         hot, cold = _couple_generated_pair_bounds(hot, cold, request)
         return UtilityTemplateSet(
-            hot=_propagate_order(
+            hot=_propagate_generated_kind_order(
                 hot,
-                side=UtilitySide.HOT,
                 separation=separation,
                 tolerance=request.tolerances.ordering,
             ),

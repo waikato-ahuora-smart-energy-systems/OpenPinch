@@ -48,6 +48,8 @@ from ..domain.zone import Zone
 if TYPE_CHECKING:
     from .problem import PinchProblem
 
+_FALLBACK_TEMPERATURE_MARGIN = 50.0
+
 
 def _resolved_scope(request: UtilityPlacementRequest) -> UtilityPlacementBaseTarget:
     if request.base_target is UtilityPlacementBaseTarget.AUTO:
@@ -834,11 +836,16 @@ def build_problem_placement_context(
         _extract_period(problem, normalized, blueprints, scope, period_id)
         for period_id in period_ids
     )
-    fallback_hot_target = max(
-        max(period.snapshot.shifted_temperatures) for period in periods
+    fallback_span = normalized.options.default_isothermal_span.value
+    fallback_hot_target = (
+        max(max(period.snapshot.real_temperatures) for period in periods)
+        + _FALLBACK_TEMPERATURE_MARGIN
+        - fallback_span
     )
-    fallback_cold_target = min(
-        min(period.snapshot.shifted_temperatures) for period in periods
+    fallback_cold_target = (
+        min(min(period.snapshot.real_temperatures) for period in periods)
+        - _FALLBACK_TEMPERATURE_MARGIN
+        + fallback_span
     )
     periods = tuple(
         period.model_copy(
@@ -877,6 +884,7 @@ def _serialized_limit(request: UtilityPlacementRequest, name: str):
 def _candidate_utility_input(
     request: UtilityPlacementRequest,
     placement: DecodedPlacement,
+    period: PlacementPeriodInput,
 ) -> list[dict[str, object]]:
     utilities: list[dict[str, object]] = []
     for utility_type, levels in (("Hot", placement.hot), ("Cold", placement.cold)):
@@ -897,6 +905,48 @@ def _candidate_utility_input(
                     "htc": {"value": 1.0, "unit": "kW/m^2/delta_degC"},
                 }
             )
+    fallback_targets = (
+        (
+            "HU",
+            "Hot",
+            period.fallback_hot_target_temperature,
+            1.0,
+        ),
+        (
+            "CU",
+            "Cold",
+            period.fallback_cold_target_temperature,
+            -1.0,
+        ),
+    )
+    for name, utility_type, target, direction in fallback_targets:
+        if target is None:
+            raise PlacementContextError(
+                code="missing_fallback_temperature",
+                message="Exact targeting requires context-wide fallback temperatures.",
+                period_id=period.period_id,
+            )
+        supply = target + direction * period.fallback_temperature_span
+        utilities.append(
+            {
+                "name": name,
+                "type": utility_type,
+                "t_supply": {
+                    "value": supply,
+                    "unit": request.units.absolute_temperature,
+                },
+                "t_target": {
+                    "value": target,
+                    "unit": request.units.absolute_temperature,
+                },
+                "heat_flow": {"value": 0.0, "unit": request.units.heat_flow},
+                "dt_cont": {
+                    "value": 0.0,
+                    "unit": request.units.temperature_difference,
+                },
+                "htc": {"value": 1.0, "unit": "kW/m^2/delta_degC"},
+            }
+        )
     return utilities
 
 
@@ -925,6 +975,7 @@ class _ExactTargetReplayAdapter:
         candidate_source["utilities"] = _candidate_utility_input(
             self.request,
             placement,
+            period,
         )
         isolated = PinchProblem(candidate_source, project_name=self.project_name)
         kwargs = {"period_id": period.period_id}

@@ -157,7 +157,7 @@ class UtilityPlacementOptions(_FrozenContract):
     local_method: str = "SLSQP"
     backend_options: tuple[tuple[str, str | int | float | bool | None], ...] = ()
     minimum_separation: QuantityValue = Field(
-        default_factory=lambda: QuantityValue(value=1.0, unit="delta_degC")
+        default_factory=lambda: QuantityValue(value=0.01, unit="delta_degC")
     )
     minimum_sensible_span: QuantityValue = Field(
         default_factory=lambda: QuantityValue(value=0.01, unit="delta_degC")

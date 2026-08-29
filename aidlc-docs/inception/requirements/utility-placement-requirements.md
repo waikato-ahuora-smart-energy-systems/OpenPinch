@@ -98,9 +98,11 @@ temperature level. Their endpoints shall be exact reversals:
 `cold_supply = hot_target` and `cold_target = hot_supply`. This applies to
 isothermal and sensible generated levels. The pair shares temperature decision
 coordinates, while hot and cold duties remain independent and may separately
-be zero. Generated pairs are ordered together from hottest to coldest; the
-independent ascending-cold ordering rule does not apply within generated pairs.
-Unrelated inferred Hot and Cold utilities remain independent.
+be zero. A generated level's physical position is determined by its optimized
+supply temperature, not its kind or declaration position. Isothermal and
+sensible levels may therefore interleave. Equivalent generated levels of the
+same kind retain stable ordinal identities and the configured separation;
+unrelated inferred Hot and Cold utilities remain independent.
 
 ### Utility templates
 
@@ -194,7 +196,11 @@ When capped named levels cannot cover a side's complete residual demand, the
 generated `HU` or `CU` default utility shall supply only the remaining
 shortfall. A default is not a requested or inferred placement level and shall
 never displace available named capacity. It shall be retained in the returned
-case and standard plots when its duty is positive in any selected period.
+case and standard plots when its duty is positive in any selected period. Its
+temperature interval shall lie 50 K beyond the context-wide extreme process
+temperature: Hot `HU` above the maximum and Cold `CU` below the minimum. This
+keeps fallback utilities last in ordinary targeting and gives fallback use a
+substantial physical entropy cost in addition to `g_penalty()`.
 
 ### Thermodynamic cost
 
@@ -310,12 +316,16 @@ cannot mask a closer profile fit.
 
 ### FR-006: Ordering and separation
 
-The combined isothermal and sensible levels shall be strictly descending on the
-hot side and strictly ascending on the cold side by supply temperature.
-Adjacent supply temperatures shall satisfy a configurable positive minimum
-separation regardless of template kind. Defaults and overrides shall use
-OpenPinch's temperature-difference unit handling. Coincident levels shall not
-be merged after optimisation.
+Utility targeting, reporting, and plotting shall order optimized levels by
+their actual supply temperature rather than by template kind or declaration
+position. Generated isothermal and sensible levels may interleave. Within each
+side and utility kind, ordinal identities remain stable to eliminate equivalent
+label permutations. After ordering all levels by supply temperature, every
+physically adjacent pair shall satisfy the configurable positive minimum
+separation. The default minimum separation shall equal the default isothermal
+temperature difference. Defaults and overrides shall use OpenPinch's
+temperature-difference unit handling. Levels shall not be merged after
+optimisation.
 
 ### FR-007: Direct and indirect scope
 
@@ -600,7 +610,10 @@ small cascades. Required properties include:
 
 - vector encode/decode round-trip;
 - result JSON round-trip within declared floating-point tolerances;
-- hot-descending and cold-ascending ordering;
+- supply-temperature ordering in targeting/reporting, including generated
+  isothermal/sensible interleaving, same-kind ordinal stability, and adjacent
+  physical separation equal by default to the isothermal temperature
+  difference;
 - target-temperature direction and bound preservation;
 - fixed near-isothermal span preservation;
 - non-negative feasible entropy generation within tolerance;

@@ -35,6 +35,7 @@ def _optimizer_point_to_physical(
     separation = model.envelope.minimum_separation.value
     values: dict[object, float] = {}
     previous_supply: dict[object, float] = {}
+    kinds = {template.key: template.kind for template in model.templates.all}
     for coordinate, raw_value in zip(model.coordinates, point, strict=True):
         fraction = min(max(float(raw_value), 0.0), 1.0)
         key = coordinate.coordinate
@@ -42,14 +43,19 @@ def _optimizer_point_to_physical(
         upper = coordinate.bounds.upper
         if key.field.value == "supply_temperature":
             side = key.template_key.side
-            previous = previous_supply.get(side)
+            family = (
+                (side, kinds[key.template_key])
+                if model.request.uses_generated_pairs
+                else side
+            )
+            previous = previous_supply.get(family)
             if previous is not None:
                 if side.value == "hot":
                     upper = min(upper, previous - separation)
                 elif not model.request.uses_generated_pairs:
                     lower = max(lower, previous + separation)
-            previous_supply[side] = lower + fraction * max(upper - lower, 0.0)
-            value = previous_supply[side]
+            previous_supply[family] = lower + fraction * max(upper - lower, 0.0)
+            value = previous_supply[family]
         else:
             value = lower + fraction * (upper - lower)
         values[key] = value
@@ -64,6 +70,7 @@ def _physical_point_to_optimizer(
     model = session.model
     separation = model.envelope.minimum_separation.value
     previous_supply: dict[object, float] = {}
+    kinds = {template.key: template.kind for template in model.templates.all}
     result: list[float] = []
     for coordinate, raw_value in zip(model.coordinates, point, strict=True):
         value = float(raw_value)
@@ -72,13 +79,18 @@ def _physical_point_to_optimizer(
         upper = coordinate.bounds.upper
         if key.field.value == "supply_temperature":
             side = key.template_key.side
-            previous = previous_supply.get(side)
+            family = (
+                (side, kinds[key.template_key])
+                if model.request.uses_generated_pairs
+                else side
+            )
+            previous = previous_supply.get(family)
             if previous is not None:
                 if side.value == "hot":
                     upper = min(upper, previous - separation)
                 elif not model.request.uses_generated_pairs:
                     lower = max(lower, previous + separation)
-            previous_supply[side] = value
+            previous_supply[family] = value
         width = upper - lower
         fraction = (value - lower) / width if width > 0.0 else 0.0
         result.append(min(max(fraction, 0.0), 1.0))

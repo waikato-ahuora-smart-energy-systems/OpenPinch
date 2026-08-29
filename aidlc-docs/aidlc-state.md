@@ -3,9 +3,9 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Utility placement CMA-ES default amendment complete through
-  Code Generation and Build and Test. All four TDD steps are complete; 2,446
-  broad tests pass with 4 expected skips and 4 local-notebook deselections, and
+- **Current Stage**: Utility placement supply-temperature ordering correction
+  complete through Code Generation and Build and Test. All four TDD steps are
+  complete; 2,451 applicable tests and the warning-as-error RTD build pass, and
   the amendment is ready to commit to `develop`.
 
 ## Workspace State
@@ -32,6 +32,11 @@
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
 
 ## Utility Placement Optimisation Progress
+
+- [x] SUPPLY-ORDER INTERLEAVING CORRECTION - Order physical utility use by
+  optimized supply temperature, permit isothermal and sensible generated
+  levels to interleave, retain same-kind ordinal separation, and prove the
+  notebook-derived entropy improvement without rewriting the user's notebook.
 
 - [x] CMA-ES DEFAULT AMENDMENT - Changed the utility-placement black-box default
   from dual annealing to CMA-ES while retaining per-call backend selection and

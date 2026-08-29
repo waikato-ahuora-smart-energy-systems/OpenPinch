@@ -150,8 +150,11 @@ and sum to total balanced-composite entropy generation. Values within numerical
 noise may normalize to zero. Exergy destruction is ambient absolute
 temperature times physical entropy generation.
 
-Before thermodynamic ranking, positive duty assigned to generated fallback
-`HU` or `CU` levels produces a deterministic infeasible penalty and diagnostic.
+Fallback `HU` and `CU` supplies lie 50 K beyond the context-wide process
+temperature extremes. They are not placement coordinates and ordinary
+targeting uses them only for residual shortfall. Positive fallback duty remains
+feasible, contributes to physical entropy, and receives the squared
+dimensionless fallback-duty ranking penalty.
 
 Thermodynamic evidence is computed for every feasible period in both objective
 modes.

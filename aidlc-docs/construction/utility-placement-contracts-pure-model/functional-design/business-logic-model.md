@@ -81,16 +81,17 @@ For each side independently:
 - generated templates default `cogeneration_eligible` to false and contain no
   utility price.
 
-Template identity never changes after normalization. Candidate validation uses
-`placement_rank` for physical ordering and never sorts, merges, or renames a
-template to repair a candidate.
+Template identity never changes after normalization. Candidate validation
+retains `placement_rank` for stable identity and uses a transient
+supply-temperature sort for physical adjacency without merging, renaming, or
+repairing a candidate.
 
 In generated mode, matching hot/cold templates of the same kind and ordinal
 form a coupled pair. Only the hot member owns optimizer coordinates. Decoding
 derives the cold member by exact endpoint reversal; encoding rejects a cold
-member that is not the exact inverse. Pair temperatures are ordered together
-from hottest to coldest. Explicit or inferred one-sided templates retain the
-independent side behavior.
+member that is not the exact inverse. Generated isothermal and sensible pairs
+may interleave by supply temperature. Explicit or inferred one-sided templates
+retain the independent side behavior.
 
 This identity pass produces a `TemplateBlueprintSet` before Unit 2 constructs
 the feasibility envelope. The later model-building pass combines those same
@@ -169,9 +170,14 @@ temperatures and minimum separation `d > 0`:
 - hot side: `S_i >= S_(i+1) + d`;
 - cold side: `S_(i+1) >= S_i + d`.
 
-Constraint propagation tightens the interval chain in both directions until no
-bound changes beyond the named bound tolerance. Any `lower > upper` outcome is
-an empty feasible region. The algorithm never swaps template identities.
+For generated pairs, these monotone constraints are propagated separately
+within the isothermal and sensible hot-side identity families, so vector family
+order cannot force one kind above the other. Candidate verification sorts the
+resulting hot supplies and derived cold supplies by temperature and requires
+every adjacent gap to be at least `d`. The default `d` equals the default
+isothermal span. Independent inferred templates retain their declared side
+chains. Any `lower > upper` outcome is an empty feasible region. The algorithm
+never swaps template identities.
 
 Hot-chain propagation raises upstream lower bounds from downstream requirements
 and lowers downstream upper bounds from upstream limits. Cold-chain propagation
@@ -188,8 +194,8 @@ Independent explicit or inferred templates use this fixed family sequence:
 3. cold isothermal supply temperatures in their relative declaration order;
 4. each cold sensible template's supply then span.
 
-`DecisionCoordinate` retains `TemplateKey` and `placement_rank`, so vector order
-and physical order are related explicitly rather than inferred by sorting.
+`DecisionCoordinate` retains `TemplateKey` and `placement_rank`; vector order is
+stable while generated physical order is derived from supply temperature.
 Generated pairs use only the first two hot-side families; cold endpoints are
 decoded by exact reversal. Encoding requires every declared coordinate exactly
 once and rejects a generated placement whose cold endpoints do not reverse its
@@ -224,7 +230,8 @@ Verification is deliberately cheaper than finding a placement. It checks:
 - coordinate dimension, finiteness, and effective bounds;
 - fixed isothermal spans and sensible span bounds;
 - hot/cold target direction and positive absolute temperatures;
-- placement-rank ordering and adjacent separation;
+- stable same-kind generated identity order, supply-sorted physical adjacency,
+  and minimum separation;
 - exact generated hot/cold endpoint reversal and derived cold endpoint bounds;
 - immutable source/template identity preservation.
 

@@ -135,3 +135,26 @@ cells and differs from the generator. A temporary canonical notebook 19 was
 generated and executed successfully under the CMA-ES default without modifying
 the user's file; its Process result retained zero fallback penalty and exact
 optimizer-to-retarget duty replay.
+
+## Utility Placement Supply-Order Interleaving Refresh
+
+Generated isothermal and sensible levels may now interleave by optimized supply
+temperature. Stable same-kind hot identities remain structurally ordered, while
+independent verification sorts physical hot and derived cold supplies and uses
+the `0.01 delta_degC` default isothermal temperature difference as the adjacent
+minimum gap. Residual `HU` and `CU` are explicit exact-target utilities with
+supplies 50 K beyond the context-wide real process-temperature extremes.
+
+The final sensible structured seed reaches the close-profile, zero-fallback
+branch before CMA-ES. The executed canonical notebook Process workflow returns
+`0.03524514018747493 kW/K`, zero fallback, an active `173.03 -> 173.02 degC`
+isothermal level, and a sensible level beginning at `173.02 degC`. The standard
+GCC ends at `173.00 degC`; exact optimizer-to-retarget duty replay holds. The
+Site TSP workflow also executes and the baseline remains unchanged.
+
+All focused placement, property, application, RTD, generator, and canonical
+notebook gates pass. The broad solver-enabled gate records 2,449 immediate
+passes, 4 expected skips, and 4 deliberate local-notebook deselections. Its two
+sandbox-denied Chrome/process-pool checks pass on their permitted rerun, giving
+2,451 passing tests for the complete applicable gate. The user's `.gitignore`
+and locally modified notebook 19 remain outside this amendment.

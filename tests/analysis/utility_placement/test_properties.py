@@ -326,6 +326,28 @@ def test_vector_codec_round_trips_across_valid_dimensions(request) -> None:
         assert cold.temperature_span == hot.temperature_span
 
 
+@given(
+    st.floats(
+        min_value=200.0,
+        max_value=400.0,
+        allow_nan=False,
+        allow_infinity=False,
+    )
+)
+def test_generated_cross_kind_physical_order_is_independent_of_vector_order(
+    sensible_supply,
+) -> None:
+    model = _model(isothermal_count=2, sensible_count=1)
+    point = (500.0, 50.0, sensible_supply, 50.0)
+
+    verification = verify_candidate(model, point)
+    placement = decode_placement(model, point)
+
+    assert verification.feasible
+    assert placement.hot[0].supply_temperature.value > sensible_supply
+    assert sensible_supply > placement.hot[1].supply_temperature.value
+
+
 @given(st.text(min_size=1), st.text(min_size=1))
 def test_error_context_always_has_stable_code_and_message(code, message) -> None:
     normalized_code = code.strip() or "fallback_code"

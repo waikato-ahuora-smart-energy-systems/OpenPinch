@@ -10,6 +10,11 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from OpenPinch import PinchProblem, PinchWorkspace
+from OpenPinch.analysis.utility_placement.codec import (
+    build_utility_placement_model,
+    decode_placement,
+)
+from OpenPinch.analysis.utility_placement.evaluation import PlacementEvaluationSession
 from OpenPinch.application import utility_placement as placement_application
 from OpenPinch.application.utility_placement import build_problem_placement_context
 from OpenPinch.contracts.utility_placement import (
@@ -54,6 +59,17 @@ def test_application_context_uses_isolated_target_and_complete_coordinates(
         context.periods[0].snapshot.real_temperatures
     )
     assert context.periods[0].snapshot.entropy_slices
+    period = context.periods[0]
+    assert (
+        period.fallback_hot_target_temperature + period.fallback_temperature_span
+    ) == pytest.approx(
+        max(period.snapshot.real_temperatures) + 50.0
+    )
+    assert (
+        period.fallback_cold_target_temperature - period.fallback_temperature_span
+    ) == pytest.approx(
+        min(period.snapshot.real_temperatures) - 50.0
+    )
     assert context.periods[0].residual_hot_duty >= 0.0
     assert context.periods[0].residual_cold_duty >= 0.0
     assert len(context.periods[0].coordinate_bounds) == len(blueprints.all)
@@ -78,6 +94,34 @@ def test_application_context_resolves_auto_and_rejects_unknown_period_first() ->
                 period_ids=("missing",),
             ),
         )
+
+
+def test_exact_replay_input_places_fallback_supplies_fifty_kelvin_beyond_process() -> (
+    None
+):
+    problem = PinchWorkspace(source="chocolate_factory.json").use_case("baseline")
+    request = UtilityPlacementRequest(
+        isothermal_level_count=2,
+        period_ids=("0",),
+    )
+    blueprints, context = build_problem_placement_context(problem, request)
+    model = build_utility_placement_model(request, blueprints, context.envelope)
+    placement = decode_placement(model, model.initial_points[0])
+    period = context.periods[0]
+
+    utilities = placement_application._candidate_utility_input(
+        request,
+        placement,
+        period,
+    )
+    by_name = {utility["name"]: utility for utility in utilities}
+
+    assert by_name["HU"]["t_supply"]["value"] == pytest.approx(
+        max(period.snapshot.real_temperatures) + 50.0
+    )
+    assert by_name["CU"]["t_supply"]["value"] == pytest.approx(
+        min(period.snapshot.real_temperatures) - 50.0
+    )
 
 
 def test_profile_extraction_recovers_from_non_finite_separated_columns(
@@ -685,6 +729,82 @@ def test_default_thermodynamic_solution_follows_the_residual_process_profile() -
     ].thermodynamic.total_entropy_generation.value == pytest.approx(
         result.best.thermodynamic_total.value
     )
+
+
+def test_process_isothermal_level_can_approach_sensible_supply_to_reduce_entropy() -> (
+    None
+):
+    problem = PinchWorkspace(
+        source="chocolate_factory.json", project_name="Site"
+    ).use_case("baseline")
+    zone = placement_application._resolve_placement_zone(problem, "Almond")
+    request = placement_application._build_problem_placement_request(
+        problem,
+        selected_zone=zone,
+        isothermal=2,
+        sensible=2,
+        period_ids=("0",),
+        options={
+            "minimum_sensible_span": {
+                "value": 10.0,
+                "unit": "delta_degC",
+            }
+        },
+    )
+    blueprints, context = build_problem_placement_context(problem, request)
+    request = request.model_copy(
+        update={
+            "base_target": context.scope,
+            "period_ids": tuple(period.period_id for period in context.periods),
+        }
+    )
+    model = build_utility_placement_model(request, blueprints, context.envelope)
+    session = PlacementEvaluationSession(
+        request=request,
+        context=context,
+        model=model,
+        allocation_adapter=placement_application._ExactTargetReplayAdapter(
+            source=problem.to_problem_json(),
+            project_name=problem.project_name,
+            request=request,
+        ),
+    )
+    sensible_supply = 172.50
+    sensible_span = sensible_supply - 63.857003
+    notebook_point = (
+        173.04,
+        173.03,
+        sensible_supply,
+        sensible_span,
+        31.96,
+        10.0,
+    )
+    lower_isothermal = (
+        173.04,
+        172.75,
+        sensible_supply,
+        sensible_span,
+        31.96,
+        10.0,
+    )
+
+    baseline = session.evaluate(notebook_point)
+    improved = session.evaluate(lower_isothermal)
+
+    assert baseline.feasible
+    assert improved.feasible
+    assert improved.fallback_penalty == pytest.approx(0.0)
+    assert improved.physical_objective < baseline.physical_objective
+    feasible_starts = [
+        evaluation
+        for point in model.initial_points
+        if (evaluation := session.evaluate(point)).feasible
+        and evaluation.fallback_penalty == pytest.approx(0.0)
+    ]
+    assert feasible_starts
+    assert min(
+        evaluation.physical_objective for evaluation in feasible_starts
+    ) <= improved.physical_objective
 
 
 def test_total_site_four_level_request_keeps_inactive_sensible_candidates() -> None:

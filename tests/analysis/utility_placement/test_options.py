@@ -34,7 +34,7 @@ def test_options_use_cmaes_optimizer_defaults() -> None:
     assert options.backend_options == ()
     assert options.candidate_limit == 5
     assert options.seed == 20260715
-    assert options.minimum_separation == QuantityValue(value=1.0, unit="delta_degC")
+    assert options.minimum_separation == options.default_isothermal_span
     assert options.minimum_sensible_span == QuantityValue(value=0.01, unit="delta_degC")
     assert options.default_isothermal_span == QuantityValue(
         value=0.01, unit="delta_degC"

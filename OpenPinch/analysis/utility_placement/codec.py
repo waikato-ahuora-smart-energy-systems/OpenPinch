@@ -224,15 +224,22 @@ def verify_candidate(
                         "Adjacent utility supplies violate physical ordering.",
                         coordinate=_coordinate_for(
                             model,
-                            model.templates.hot[index + 1]
-                            if model.request.uses_generated_pairs
-                            else templates[index + 1],
+                            templates[index + 1],
                             DecisionField.SUPPLY_TEMPERATURE,
                         ),
                         measured=actual,
                         limit=separation,
                     )
                 )
+
+    def check_physical_separation(
+        entries: list[tuple[float, EffectiveUtilityTemplate]],
+    ) -> None:
+        ordered = sorted(entries, key=lambda item: item[0], reverse=True)
+        check_descending(
+            [supply for supply, _ in ordered],
+            tuple(template for _, template in ordered),
+        )
 
     if model.request.uses_generated_pairs:
         hot_supplies: list[float] = []
@@ -294,8 +301,25 @@ def verify_candidate(
                         limit=ABSOLUTE_ZERO_C,
                     )
                 )
-        check_descending(hot_supplies, model.templates.hot)
-        check_descending(cold_supplies, model.templates.cold)
+        for kind in UtilityLevelKind:
+            family_indices = [
+                index
+                for index, template in enumerate(model.templates.hot)
+                if template.kind is kind
+            ]
+            family = tuple(
+                model.templates.hot[index] for index in family_indices
+            )
+            check_descending(
+                [hot_supplies[index] for index in family_indices],
+                family,
+            )
+        check_physical_separation(
+            list(zip(hot_supplies, model.templates.hot, strict=True))
+        )
+        check_physical_separation(
+            list(zip(cold_supplies, model.templates.hot, strict=True))
+        )
     else:
         for side, templates in (
             (UtilitySide.HOT, model.templates.hot),
@@ -563,9 +587,7 @@ def build_utility_placement_model(
                     )
                 ]
                 if rank == len(sensible_templates) - 1:
-                    supply = supply_coordinate.bounds.lower + 0.07 * (
-                        supply_coordinate.bounds.upper - supply_coordinate.bounds.lower
-                    )
+                    supply = supply_coordinate.bounds.lower
                     desired_cold_supply = final_cold_lower
                 else:
                     supply = profile_values[supply_key]
@@ -636,6 +658,48 @@ def build_utility_placement_model(
             initial_points.append(
                 tuple(coverage_values[item.coordinate] for item in coordinates)
             )
+
+            interleaved_values = dict(initial_values)
+            isothermal_templates = tuple(
+                item
+                for item in templates.hot
+                if item.kind is UtilityLevelKind.ISOTHERMAL
+            )
+            interleaved_order = tuple(
+                template
+                for rank in range(
+                    max(len(isothermal_templates), len(sensible_templates))
+                )
+                for template in (
+                    isothermal_templates[rank : rank + 1]
+                    + sensible_templates[rank : rank + 1]
+                )
+            )
+            previous_supply: float | None = None
+            interleaved_feasible = True
+            for template in interleaved_order:
+                key = CoordinateKey(
+                    template_key=template.key,
+                    field=DecisionField.SUPPLY_TEMPERATURE,
+                )
+                bounds = coordinates_by_key[key].bounds
+                supply = bounds.upper
+                if previous_supply is not None:
+                    supply = min(
+                        supply,
+                        previous_supply - envelope.minimum_separation.value,
+                    )
+                if supply < bounds.lower:
+                    interleaved_feasible = False
+                    break
+                interleaved_values[key] = supply
+                previous_supply = supply
+            if interleaved_feasible:
+                initial_points.append(
+                    tuple(
+                        interleaved_values[item.coordinate] for item in coordinates
+                    )
+                )
 
         spread_values = dict(initial_values)
         denominator = max(len(templates.hot) - 1, 1)

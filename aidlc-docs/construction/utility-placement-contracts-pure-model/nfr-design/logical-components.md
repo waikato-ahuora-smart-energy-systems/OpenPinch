@@ -136,7 +136,8 @@ package dependency still points from Unit 2 to Unit 1, never the reverse.
 - Reduce each period-coordinate interval once and retain active-limit
   provenance.
 - Apply caller narrowing and positive-Kelvin checks.
-- Propagate adjacent ordering constraints without sorting identities.
+- Propagate independent chains and generated same-kind identity constraints;
+  verify generated cross-kind adjacency on a transient supply-temperature sort.
 - Create and independently verify at least one deterministic start.
 
 ### Decision schema, codec, and verifier

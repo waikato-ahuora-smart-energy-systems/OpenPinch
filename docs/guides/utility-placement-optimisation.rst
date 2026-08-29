@@ -29,7 +29,8 @@ opposite direction: the cold supply equals the hot target, and the cold target
 equals the hot supply. The same rule applies to generated sensible pairs.
 Their temperatures are shared, but ordinary targeting determines each side's
 duty independently.
-Generated pairs are ordered together from hottest to coldest. Existing Hot and
+Generated isothermal and sensible pairs may interleave, and their physical
+sequence is determined from optimized supply temperatures. Existing Hot and
 Cold utilities inferred when counts are omitted retain independent temperature
 coordinates.
 
@@ -95,6 +96,9 @@ identities are also accepted:
 Each hot and cold level has its own independent bound, including matching
 generated pairs. When named capacity cannot cover the target, residual-only
 ``HU`` or ``CU`` supplies the shortfall and is retained in the returned case.
+Its supply temperature is fixed 50 K above the context-wide maximum process
+temperature for ``HU`` or 50 K below the context-wide minimum for ``CU``. This
+keeps fallback last in ordinary utility targeting.
 The optimizer changes temperatures and sensible spans only. For every
 candidate and period, OpenPinch installs those utilities in a detached case and
 runs the same direct, Total Site, or indirect target method used after the
@@ -159,8 +163,12 @@ parts of the background profile. These starts improve coverage but do not turn
 the bounded search into a proof of the global optimum.
 
 Internally, all optimizer-facing coordinates are normalized to ``[0, 1]``.
-Temperature decoding preserves the minimum ordering separation structurally,
-while the returned utility temperatures remain ordinary physical values.
+Generated isothermal and sensible levels may interleave; targeting orders them
+by their optimized supply temperatures. Temperature decoding retains stable
+same-kind identities, and independent verification enforces the minimum gap
+between physically adjacent supplies. By default that gap is
+``0.01 delta_degC``, the same as the default isothermal temperature difference.
+Returned utility temperatures remain ordinary physical values.
 
 Use ``problem.target.all_periods.utility_placement(...)`` to select every
 canonical period. An ordered case batch uses the same arguments:
@@ -210,7 +218,8 @@ For multiple selected periods, the objective is the raw weighted sum
 ``sum(w_p * S_gen,p)``. It is not divided by total weight, and a candidate must
 be feasible in every selected period. Generated fallback utilities named
 ``HU`` and ``CU`` are not placement options. They are residual-only balancing
-utilities and positive fallback duty remains feasible. Its separate
+utilities positioned 50 K beyond the process-temperature extremes; positive
+fallback duty remains feasible. Its separate
 dimensionless penalty in period ``p`` is
 
 .. math::

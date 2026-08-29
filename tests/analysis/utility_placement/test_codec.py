@@ -251,6 +251,22 @@ def test_every_generated_start_passes_independent_candidate_verifier() -> None:
     )
 
 
+def test_generated_utility_kinds_may_interleave_by_supply_temperature() -> None:
+    model = _model(isothermal_count=2, sensible_count=1)
+    # Physical hot order: iso 1, sensible 1, iso 2. The vector remains stable
+    # by identity and must not impose its iso-then-sensible schema as physics.
+    interleaved = (500.0, 300.0, 350.0, 1.0)
+
+    assert verify_candidate(model, interleaved).feasible
+
+    too_close = (500.0, 300.0, 300.0, 1.0)
+    verification = verify_candidate(model, too_close)
+    assert not verification.feasible
+    assert {item.code for item in verification.diagnostics} == {
+        "ordering_violation"
+    }
+
+
 def test_fixed_coordinates_remain_in_vector_schema() -> None:
     model = _model()
     coordinate = model.coordinates[0]

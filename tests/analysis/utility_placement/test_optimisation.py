@@ -20,6 +20,7 @@ from OpenPinch.optimisation.models import (
     OptimisationMethod,
     OptimisationResult,
 )
+from tests.analysis.utility_placement.test_codec import _model
 from tests.analysis.utility_placement.test_evaluation import _Adapter, _case
 
 
@@ -77,6 +78,22 @@ def test_optimizer_coordinates_are_bounded_and_preserve_physical_starts() -> Non
         bounded = _physical_point_to_optimizer(session, physical)
         assert all(0.0 <= value <= 1.0 for value in bounded)
         assert _optimizer_point_to_physical(session, bounded) == pytest.approx(physical)
+
+
+def test_optimizer_transform_preserves_cross_kind_supply_interleaving() -> None:
+    _, context, _ = _case()
+    model = _model(isothermal_count=2, sensible_count=1)
+    session = PlacementEvaluationSession(
+        request=model.request,
+        context=context,
+        model=model,
+        allocation_adapter=_Adapter(),
+    )
+    physical = (500.0, 300.0, 350.0, 1.0)
+
+    bounded = _physical_point_to_optimizer(session, physical)
+
+    assert _optimizer_point_to_physical(session, bounded) == pytest.approx(physical)
 
 
 def test_coordinator_ranks_by_the_same_penalized_scalar_as_the_backend(
