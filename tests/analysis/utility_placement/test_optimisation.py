@@ -60,7 +60,7 @@ def test_coordinator_calls_optimizer_once_deduplicates_and_replays_parent() -> N
     assert all(evaluation.feasible for evaluation in outcome.evaluations)
     assert outcome.termination.candidate_count == len(set(model.initial_points))
     assert outcome.termination.feasible_candidate_count == len(outcome.evaluations)
-    assert outcome.termination.method == "dual_annealing"
+    assert outcome.termination.method == "cmaes"
     assert outcome.termination.evaluations >= outcome.termination.candidate_count
 
 

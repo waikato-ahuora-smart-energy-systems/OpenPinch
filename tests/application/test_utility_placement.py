@@ -15,6 +15,7 @@ from OpenPinch.application.utility_placement import build_problem_placement_cont
 from OpenPinch.contracts.utility_placement import (
     UtilityLevelKind,
     UtilityPlacementBaseTarget,
+    UtilityPlacementOptimisationMethod,
     UtilityPlacementRequest,
 )
 from OpenPinch.domain._value.resolution import get_scalar_value
@@ -606,7 +607,23 @@ def test_public_accessor_returns_a_detached_normal_case_with_retained_evidence()
     assert result is not None
     assert result.best.thermodynamic_total is not None
     assert result.best.period_results[0].thermodynamic.process_entropy.value != 0.0
-    assert len(optimized_case.to_problem_json()["utilities"]) == 4
+    utilities = optimized_case.to_problem_json()["utilities"]
+    utility_names = {utility["name"] for utility in utilities}
+    assert {
+        "hot_iso_1",
+        "hot_iso_2",
+        "cold_iso_1",
+        "cold_iso_2",
+    } <= utility_names
+    assert utility_names <= {
+        "hot_iso_1",
+        "hot_iso_2",
+        "cold_iso_1",
+        "cold_iso_2",
+        "HU",
+        "CU",
+    }
+    assert result.request.options.method is UtilityPlacementOptimisationMethod.CMA_ES
     assert problem.utility_placement_result is None
     assert problem.results is legacy_results
     assert problem.to_problem_json() == before

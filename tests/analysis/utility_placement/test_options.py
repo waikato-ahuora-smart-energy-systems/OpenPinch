@@ -24,10 +24,10 @@ from OpenPinch.contracts.utility_placement import (
 from OpenPinch.optimisation.models import OptimisationMethod
 
 
-def test_options_add_backward_compatible_optimizer_defaults() -> None:
+def test_options_use_cmaes_optimizer_defaults() -> None:
     options = UtilityPlacementOptions()
 
-    assert options.method is UtilityPlacementOptimisationMethod.DUAL_ANNEALING
+    assert options.method is UtilityPlacementOptimisationMethod.CMA_ES
     assert options.run_count == 1
     assert options.cluster_tolerance == pytest.approx(0.01)
     assert options.local_method == "SLSQP"

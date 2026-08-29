@@ -3,10 +3,10 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Utility placement uncapped notebook amendment complete
-  through Code Generation and Build and Test. All four TDD steps are complete;
-  2,450 tests pass with 4 expected skips, and the amendment is ready to commit
-  to `develop`.
+- **Current Stage**: Utility placement CMA-ES default amendment complete through
+  Code Generation and Build and Test. All four TDD steps are complete; 2,446
+  broad tests pass with 4 expected skips and 4 local-notebook deselections, and
+  the amendment is ready to commit to `develop`.
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -32,6 +32,11 @@
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
 
 ## Utility Placement Optimisation Progress
+
+- [x] CMA-ES DEFAULT AMENDMENT - Changed the utility-placement black-box default
+  from dual annealing to CMA-ES while retaining per-call backend selection and
+  preserving the user's locally modified notebook 19. Focused and broad gates
+  pass, including an executed temporary canonical notebook under CMA-ES.
 
 - [x] UNCAPPED NOTEBOOK AMENDMENT - Removed `maximum_duties` from notebook 19's
   Process example while retaining bounded search options and the optional API.

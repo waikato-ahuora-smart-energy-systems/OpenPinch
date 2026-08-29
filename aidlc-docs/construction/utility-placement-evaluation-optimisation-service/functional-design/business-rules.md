@@ -30,8 +30,9 @@ backend overrides in addition to existing limits and seed.
 
 ### BR2-002: Default method and mapping
 
-The default method is the existing `dual_annealing`. Specialist options map to
+The default method is `cmaes`. Specialist options map to
 the existing `OptimisationOptions`; no Unit 2-specific backend dispatch exists.
+Callers may still select any supported method explicitly per placement call.
 
 ### BR2-003: Method-specific validation
 

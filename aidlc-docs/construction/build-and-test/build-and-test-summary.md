@@ -117,3 +117,21 @@ standard Utility GCC that does not cross the Process GCC. The focused Ruff,
 notebook contract/execution, documentation consistency, and warnings-as-errors
 RTD gate passes 21 tests. The complete solver-enabled repository suite passes
 2,450 tests with 4 expected skips in 501.53 seconds.
+
+## Utility Placement CMA-ES Default Refresh
+
+`UtilityPlacementOptions.method` now defaults to `cmaes`; exact per-call
+selection of `dual_annealing`, `cmaes`, `bo`, and `rbf_surrogate` remains
+unchanged. HPR selection and the reusable optimizer service's generic default
+are unchanged. Requirements, functional design, RTD, default-contract tests,
+coordinator evidence, and the public detached-case integration test are aligned.
+
+RED produced the two expected default-selection failures. GREEN passes 27
+focused contract/coordinator/application tests, 19 RTD and notebook-source
+checks, and the broader solver-enabled suite with 2,446 passed, 4 expected
+skips, and 4 deliberate notebook deselections in 622.87 seconds. The deselected
+checks depend on the user's locally modified notebook 19, which has unexecuted
+cells and differs from the generator. A temporary canonical notebook 19 was
+generated and executed successfully under the CMA-ES default without modifying
+the user's file; its Process result retained zero fallback penalty and exact
+optimizer-to-retarget duty replay.

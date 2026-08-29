@@ -358,8 +358,10 @@ analysis shall remain unchanged.
 ### FR-011: Deterministic optimisation
 
 The service shall use the existing solver-neutral bounded minimisation service.
-The default seed, method, tolerances, maximum evaluations, and candidate limit
-shall be deterministic and overridable through typed or validated options. The
+The default method shall be `cmaes`. The default seed, tolerances, maximum
+evaluations, and candidate limit shall be deterministic, and every setting
+shall be overridable through typed or validated options. Exact per-call method
+choices shall remain `dual_annealing`, `cmaes`, `bo`, and `rbf_surrogate`. The
 same request, environment, and options shall produce equivalent ordered results
 within documented numerical tolerances.
 

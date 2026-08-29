@@ -5758,3 +5758,27 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 **Context**: CODE GENERATION AND BUILD AND TEST COMPLETE - Uncapped utility-placement notebook amendment
 
 ---
+
+## Utility Placement Black-Box Solver Clarification
+**Timestamp**: 2026-08-29T20:28:59Z
+**User Input**: "what bb solver is being used? isit selectable like hpr?"
+**AI Response**: "Confirmed that utility placement defaults to SciPy dual annealing with local SLSQP candidate polishing. The method is selectable per utility-placement call through options.method; supported backends are dual_annealing, cmaes, bo, and rbf_surrogate. HPR uses the same reusable optimizer service but selects its backend through HPR_BB_MINIMISER and defaults to cmaes. Notebook 19 omits method, so it uses dual_annealing with deliberately tutorial-limited iteration/evaluation settings."
+**Context**: API / OPTIMIZER CONFIGURATION CLARIFICATION - Utility placement versus HPR black-box selection
+
+---
+
+## Utility Placement CMA-ES Default Amendment
+**Timestamp**: 2026-08-29T20:31:43Z
+**User Input**: "make cmaes the default."
+**AI Response**: "Opened a minimal TDD amendment to default utility placement to CMA-ES while retaining every explicit optimizer choice. Detected and preserved the user's overlapping local notebook 19 edit; canonical notebook verification will use a temporary generated copy rather than overwrite that file."
+**Context**: REQUIREMENTS / CODE GENERATION REOPENING - CMA-ES becomes the utility-placement default
+
+---
+
+## Utility Placement CMA-ES Default Build and Test Completion
+**Timestamp**: 2026-08-29T20:54:59Z
+**User Input**: "(No additional user input; continued under standing authorization.)"
+**AI Response**: "Completed the four-step TDD amendment. UtilityPlacementOptions now defaults to cmaes while all four exact per-call methods remain selectable and HPR behavior remains unchanged. RED proved the old dual-annealing default through the options and coordinator contracts. GREEN passes 27 focused tests, 19 RTD/notebook-source checks, and a broad solver-enabled gate with 2,446 passed, 4 expected skips, and 4 deliberate local-notebook deselections in 622.87 seconds. Generated and executed canonical notebook 19 in a temporary directory under CMA-ES; Process fallback remained zero and exact retarget replay held. Preserved and excluded the user's locally modified notebook 19 and unrelated .gitignore change from the implementation scope."
+**Context**: CODE GENERATION AND BUILD AND TEST COMPLETE - Utility-placement CMA-ES default
+
+---

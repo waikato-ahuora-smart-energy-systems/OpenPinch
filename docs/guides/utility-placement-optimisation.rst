@@ -47,6 +47,11 @@ form paired hot and cold templates. Supplying either count explicitly replaces
 the existing templates with generated levels. ``HU`` and ``CU`` are reserved
 balancing fallbacks and are never inferred as placement options.
 
+Utility placement uses ``cmaes`` as its default black-box optimizer. Select a
+different supported backend per call with ``options={"method": ...}``; the
+exact alternatives are ``dual_annealing``, ``bo``, and ``rbf_surrogate``.
+Backend selection is independent of the HPR ``HPR_BB_MINIMISER`` setting.
+
 Runnable Workflow
 -----------------
 

@@ -150,7 +150,7 @@ class UtilityPlacementOptions(_FrozenContract):
     evaluation_limit: int = 5_000
     seed: int = 20260715
     method: UtilityPlacementOptimisationMethod = (
-        UtilityPlacementOptimisationMethod.DUAL_ANNEALING
+        UtilityPlacementOptimisationMethod.CMA_ES
     )
     run_count: int = 1
     cluster_tolerance: float = 0.01

@@ -32,11 +32,9 @@ All nine Functional Design decisions select option A. The design therefore:
 ## Contract Reconciliation Before Numerical Work
 
 The approved Unit 1 design and FR-011 require an overridable method plus
-validated backend options, but the implemented frozen options currently expose
-only candidate, iteration, evaluation, and seed controls. The first Unit 2 TDD
-slice must extend the Unit 1-owned contract without changing existing defaults:
+validated backend options. The Unit 2 contract exposes:
 
-- `method`, defaulting to `dual_annealing` and limited to the existing
+- `method`, defaulting to `cmaes` and limited to the existing
   `OptimisationMethod` values;
 - `run_count`, a positive integer;
 - `cluster_tolerance`, finite and non-negative;
