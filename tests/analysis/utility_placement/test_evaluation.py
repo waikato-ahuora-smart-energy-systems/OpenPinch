@@ -42,7 +42,19 @@ class _Adapter:
 
 
 def _case(request=None):
-    request = request or UtilityPlacementRequest(isothermal_level_count=2)
+    if request is None:
+        generated_request = UtilityPlacementRequest(isothermal_level_count=2)
+        generated_blueprints = prepare_template_blueprints(generated_request)
+        request = generated_request.model_copy(
+            update={
+                "hot_templates": tuple(
+                    item.as_template() for item in generated_blueprints.hot
+                ),
+                "cold_templates": tuple(
+                    item.as_template() for item in generated_blueprints.cold
+                ),
+            }
+        )
     blueprints = prepare_template_blueprints(request)
     coordinate_bounds = tuple(
         PhysicalCoordinateBound(

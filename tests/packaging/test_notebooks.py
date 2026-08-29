@@ -89,6 +89,14 @@ def test_utility_placement_has_one_executable_thermodynamic_notebook() -> None:
     assert "monetary" not in source.lower()
     assert "cogeneration_eligible" not in source
     assert 'not in {"hu", "cu"}' in source
+    assert "min(process_hot_targets) < 75.0" in source
+    assert "max(process_cold_supplies) > 15.0" in source
+    assert "min(site_hot_targets) < 80.0" in source
+    assert "max(site_cold_supplies) > 15.0" in source
+    assert "def assert_reversed_utility_pairs(utilities):" in source
+    assert source.count("assert_reversed_utility_pairs(") == 3
+    assert 'cold["t_supply"]["value"] - hot["t_target"]["value"]' in source
+    assert 'cold["t_target"]["value"] - hot["t_supply"]["value"]' in source
     assert "process_case.utility_placement_result" in source
     assert "site_case.utility_placement_result" in source
     assert "process_case.summary_frame()" in source

@@ -25,5 +25,8 @@ def test_service_returns_detached_default_thermodynamic_result() -> None:
     assert result.period_weights == (2.0,)
     assert result.best.feasible
     assert result.best.thermodynamic_total is not None
-    assert result.alternatives == ()
+    assert len(result.alternatives) == request.options.candidate_limit - 1
+    assert all(candidate.feasible for candidate in result.alternatives)
+    candidates = (result.best, *result.alternatives)
+    assert len({candidate.coordinates for candidate in candidates}) == len(candidates)
     assert result == result.model_validate_json(result.model_dump_json())

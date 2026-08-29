@@ -10,6 +10,12 @@ starting candidates, stable vector encoding/decoding, independent candidate
 verification, typed failures, and the detached nested result vocabulary that
 Units 2 and 3 will populate and expose.
 
+For count-generated utilities, matching hot/cold members share one temperature
+interval and the cold endpoints exactly reverse the hot endpoints. The paired
+schema has `N_iso + 2*N_sens` coordinates and independent hot/cold duties.
+Explicit or inferred Hot/Cold inventories retain the independent
+`2*N_iso + 4*N_sens` schema and existing side ordering.
+
 It intentionally does not perform process targeting, duty allocation,
 thermodynamic objective calculation,
 numerical optimization, result ranking, workspace caching, presentation, or
@@ -66,7 +72,7 @@ precision-correct oracle assertions were completed behind green behavior.
 | Focused example tests | 50 passed |
 | Fixed-seed property tests | 11 passed with seed `20260715`; default shrinking enabled |
 | Performance tests | 3 passed |
-| Combined representative p95 | 11.377 ms for 10 isothermal plus 10 sensible levels per side, 100 periods, 60 coordinates, and 6,000 intervals; requirement is at most 250 ms |
+| Coupled representative performance | 5 tests passed for 10 isothermal plus 10 sensible pairs over 100 periods; the generated model has 30 decision coordinates and remains below the 250 ms requirement |
 | Focused plus architecture/API/packaging gate | 110 passed |
 | New-module statement coverage | 95 percent threshold passed; 72 focused tests in the coverage run |
 | Ruff | Passed on every touched Unit 1 Python path |

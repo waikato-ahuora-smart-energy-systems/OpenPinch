@@ -512,10 +512,16 @@ class UtilityPlacementModel(_FrozenContract):
 
     @model_validator(mode="after")
     def _validate_schema(self) -> Self:
-        expected_dimension = (
-            2 * self.request.isothermal_level_count
-            + 4 * self.request.sensible_level_count
-        )
+        if self.request.uses_generated_pairs:
+            expected_dimension = (
+                self.request.isothermal_level_count
+                + 2 * self.request.sensible_level_count
+            )
+        else:
+            expected_dimension = (
+                2 * self.request.isothermal_level_count
+                + 4 * self.request.sensible_level_count
+            )
         if len(self.coordinates) != expected_dimension:
             raise ValueError("coordinate dimension does not match request counts")
         if [coordinate.index for coordinate in self.coordinates] != list(
@@ -733,6 +739,11 @@ class UtilityPlacementRequest(_FrozenContract):
     tolerances: PlacementTolerances = Field(default_factory=PlacementTolerances)
     options: UtilityPlacementOptions = Field(default_factory=UtilityPlacementOptions)
     units: PlacementUnitSystem = Field(default_factory=PlacementUnitSystem)
+
+    @property
+    def uses_generated_pairs(self) -> bool:
+        """Return whether count-generated hot/cold levels share coordinates."""
+        return self.hot_templates is None and self.cold_templates is None
 
     @field_validator(
         "isothermal_level_count",

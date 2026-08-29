@@ -89,21 +89,26 @@ extension finding is unresolved.
 ## Notebook and Documentation
 
 `OpenPinch/data/notebooks/19_utility_placement_optimisation.ipynb` is a
-generator-owned base-profile notebook. It calls the public target surface once
-with `isothermal=2` and `sensible=2` for physical balanced-composite entropy
-generation. The call directly returns a normal case with eight optimized
-utilities; `workspace.add(...)` registers it as `optimized_utilities`. The
-notebook then runs ordinary direct and Total Site targets, displays a normal
-summary, and uses the existing standard GCC and TSP methods. Its installed-
-wheel smoke produced the retained entropy evidence and both figures. The user
-guide documents concise counts, the thermodynamic objective, direct and
-Total Site scope, periods, batches, units, errors, result interpretation, and
-the absence of a new CLI.
+generator-owned base-profile notebook. It calls the public target surface for
+separate Process and Site cases with `isothermal=2` and `sensible=2`. Each call
+returns a normal case with eight optimized utilities; `workspace.add(...)`
+registers the two named cases. It executes exact endpoint-reversal checks for
+all four generated hot/cold pairs in both cases. The notebook rejects the
+former edge-clustered
+temperature ranges before running ordinary direct and Total Site targets,
+displaying normal summaries, and using the existing standard GCC and TSP
+methods. Source execution after the coupled-pair correction produced
+0.040191585277772335 kW/K for Process and 0.6863313374698734 kW/K for Site,
+with the endpoint-reversal and profile-support guards
+and figures completing. The user guide documents concise counts, the
+thermodynamic objective, support-aware bounds, direct and Total Site scope,
+periods, batches, units, errors, result interpretation, and the absence of a
+new CLI.
 
 ## Distribution and Regression Evidence
 
-- Complete case-based all-test run: 2,389 passed and 4 expected tests skipped; solver
-  markers were enabled.
+- Complete solver-enabled regression after the profile-envelope correction:
+  2,408 passed and 4 expected tests skipped.
 - Sphinx built 54 source pages with warnings treated as errors.
 - No-isolation source and wheel builds completed without dependency download.
 - Both archives contain all specialist, application, contract, presentation,

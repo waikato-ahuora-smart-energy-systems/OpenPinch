@@ -282,6 +282,106 @@ def _propagate_order(
     return tuple(updated)
 
 
+def _couple_generated_pair_bounds(
+    hot: tuple[EffectiveUtilityTemplate, ...],
+    cold: tuple[EffectiveUtilityTemplate, ...],
+    request: UtilityPlacementRequest,
+) -> tuple[
+    tuple[EffectiveUtilityTemplate, ...],
+    tuple[EffectiveUtilityTemplate, ...],
+]:
+    """Reduce generated pairs to bounds supporting exact endpoint reversal."""
+    if len(hot) != len(cold):
+        raise PlacementModelValidationError(
+            code="generated_pair_inventory_mismatch",
+            message="Generated hot and cold utility inventories must align.",
+            field_path="templates",
+        )
+    paired_hot: list[EffectiveUtilityTemplate] = []
+    paired_cold: list[EffectiveUtilityTemplate] = []
+    tolerance = request.tolerances.bounds
+    for hot_template, cold_template in zip(hot, cold, strict=True):
+        if hot_template.kind is not cold_template.kind:
+            raise PlacementModelValidationError(
+                code="generated_pair_kind_mismatch",
+                message="Generated utility partners must have the same kind.",
+                template_key=hot_template.key,
+            )
+        if hot_template.kind is UtilityLevelKind.ISOTHERMAL:
+            if hot_template.fixed_span is None or cold_template.fixed_span is None:
+                raise PlacementModelValidationError(
+                    code="missing_fixed_span",
+                    message="Generated isothermal partners require fixed spans.",
+                    template_key=hot_template.key,
+                )
+            if (
+                abs(hot_template.fixed_span.value - cold_template.fixed_span.value)
+                > tolerance
+            ):
+                raise EmptyPlacementFeasibleRegionError(
+                    code="generated_pair_span_mismatch",
+                    message="Generated isothermal partners must share one span.",
+                    template_key=hot_template.key,
+                )
+            span_lower = span_upper = hot_template.fixed_span.value
+            hot_update: dict[str, object] = {}
+            cold_update: dict[str, object] = {
+                "fixed_span": hot_template.fixed_span,
+            }
+        else:
+            if hot_template.span_bounds is None or cold_template.span_bounds is None:
+                raise PlacementModelValidationError(
+                    code="missing_sensible_span_bounds",
+                    message="Generated sensible partners require span bounds.",
+                    template_key=hot_template.key,
+                )
+            span_lower = max(
+                hot_template.span_bounds.lower,
+                cold_template.span_bounds.lower,
+            )
+            span_upper = min(
+                hot_template.span_bounds.upper,
+                cold_template.span_bounds.upper,
+            )
+            if span_lower > span_upper + tolerance:
+                raise EmptyPlacementFeasibleRegionError(
+                    code="empty_generated_pair_span",
+                    message="Generated partner span bounds do not intersect.",
+                    template_key=hot_template.key,
+                )
+            shared_span = QuantityInterval(
+                lower=span_lower,
+                upper=span_upper,
+                unit=hot_template.span_bounds.unit,
+            )
+            hot_update = {"span_bounds": shared_span}
+            cold_update = {"span_bounds": shared_span}
+
+        supply_lower = max(
+            hot_template.supply_bounds.lower,
+            cold_template.supply_bounds.lower + span_lower,
+        )
+        supply_upper = min(
+            hot_template.supply_bounds.upper,
+            cold_template.supply_bounds.upper + span_upper,
+        )
+        if supply_lower > supply_upper + tolerance:
+            raise EmptyPlacementFeasibleRegionError(
+                code="empty_generated_pair_supply",
+                message="Generated partner bounds cannot support endpoint reversal.",
+                template_key=hot_template.key,
+                field_path=DecisionField.SUPPLY_TEMPERATURE.value,
+            )
+        hot_update["supply_bounds"] = QuantityInterval(
+            lower=supply_lower,
+            upper=supply_upper,
+            unit=hot_template.supply_bounds.unit,
+        )
+        paired_hot.append(hot_template.model_copy(update=hot_update))
+        paired_cold.append(cold_template.model_copy(update=cold_update))
+    return tuple(paired_hot), tuple(paired_cold)
+
+
 def derive_effective_templates(
     request: UtilityPlacementRequest,
     blueprints: TemplateBlueprintSet,
@@ -304,6 +404,17 @@ def derive_effective_templates(
         for blueprint in blueprints.cold
     )
     separation = envelope.minimum_separation.value
+    if request.uses_generated_pairs:
+        hot, cold = _couple_generated_pair_bounds(hot, cold, request)
+        return UtilityTemplateSet(
+            hot=_propagate_order(
+                hot,
+                side=UtilitySide.HOT,
+                separation=separation,
+                tolerance=request.tolerances.ordering,
+            ),
+            cold=cold,
+        )
     return UtilityTemplateSet(
         hot=_propagate_order(
             hot,
@@ -329,14 +440,14 @@ def _side_supply_values(
     ordered_templates = tuple(templates)
     result: dict[CoordinateKey, float] = {}
     adjacent: float | None = None
-    for template in reversed(ordered_templates):
+    for template in ordered_templates:
         bounds = template.supply_bounds
         if adjacent is None:
-            value = bounds.lower if side is UtilitySide.HOT else bounds.upper
+            value = bounds.upper if side is UtilitySide.HOT else bounds.lower
         elif side is UtilitySide.HOT:
-            value = max(bounds.lower, adjacent + separation)
-        else:
             value = min(bounds.upper, adjacent - separation)
+        else:
+            value = max(bounds.lower, adjacent + separation)
         if value < bounds.lower or value > bounds.upper:
             raise PlacementModelValidationError(
                 code="invalid_initial_supply",

@@ -91,6 +91,15 @@ conceptual generated level produces one hot and one cold utility entry. Hot
 utility target temperature is below supply temperature, while cold utility
 target temperature is above supply temperature.
 
+The two generated entries of the same kind and ordinal are one coupled
+temperature level. Their endpoints shall be exact reversals:
+`cold_supply = hot_target` and `cold_target = hot_supply`. This applies to
+isothermal and sensible generated levels. The pair shares temperature decision
+coordinates, while hot and cold duties remain independent and may separately
+be zero. Generated pairs are ordered together from hottest to coldest; the
+independent ascending-cold ordering rule does not apply within generated pairs.
+Unrelated inferred Hot and Cold utilities remain independent.
+
 ### Utility templates
 
 Each level template shall have a stable identity and define:
@@ -220,16 +229,22 @@ explicit and shall agree with fixed or variable `delta_temperature` behavior.
 Bounds, spans, approach metadata, and optional fluid data shall be
 finite and dimensionally valid. Hot and cold roles shall agree with their
 temperature direction.
+Matching generated templates shall share one supply/span decision and decode
+to exact endpoint reversals without duplicate optimizer coordinates.
 
 ### FR-005: Bounds and starting candidates
 
-Default temperature bounds shall be derived from the shifted direct or site
-profiles, minimum approach temperatures, and the intersection of feasible
+Default supply-temperature bounds shall cover the intervals where the selected
+shifted residual hot and cold profiles change; generated levels shall not all
+be forced outside the global process-temperature extremes. Sensible span
+bounds shall cover the complete target temperature range. The effective model
+shall retain minimum approach constraints and the intersection of feasible
 bounds across all selected periods. Callers may provide narrower overrides but
-may not expand beyond physical feasibility. The service shall produce at least
-one deterministic valid initial candidate when the feasible region is nonempty.
-For sensible levels, deterministic structured starts shall sample the effective
-span interval so a midpoint-only seed cannot mask a closer profile fit.
+may not expand beyond physical feasibility. The service shall produce
+deterministic valid initial candidates when the feasible region is nonempty.
+Structured starts shall distribute both supply temperatures and sensible spans
+across their effective intervals so edge clustering or a midpoint-only seed
+cannot mask a closer profile fit.
 
 ### FR-006: Ordering and separation
 
@@ -480,8 +495,9 @@ makes it pass, and refactor only with the focused tests green.
     expand `Both` with reversed temperature direction, pad asymmetric inferred
     sides deterministically, and preserve source input unchanged.
 22. Prove explicit counts override existing utilities and produce paired hot
-    and cold entries, while a partially specified generated request without
-    `isothermal` fails before analysis.
+    and cold entries whose temperatures are exact endpoint reversals and whose
+    duties remain independent, while a partially specified generated request
+    without `isothermal` fails before analysis.
 23. Prove master-zone defaulting and explicit name, path, and object selection;
     verify Process/Unit Operation direct, Site Total Site, and Community/Region
     indirect routing plus typed ambiguous, foreign, missing, and Utility Zone

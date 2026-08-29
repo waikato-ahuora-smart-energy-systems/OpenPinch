@@ -468,21 +468,60 @@ def _coordinate_bounds(
     request: UtilityPlacementRequest,
     blueprints: TemplateBlueprintSet,
     temperatures: tuple[float, ...],
+    *,
+    hot_profile: tuple[float, ...] | None = None,
+    cold_profile: tuple[float, ...] | None = None,
 ) -> tuple[PhysicalCoordinateBound, ...]:
+    def support(profile: tuple[float, ...] | None) -> tuple[float, ...]:
+        if profile is None:
+            return temperatures
+        if len(profile) != len(temperatures):
+            raise PlacementContextError(
+                code="profile_temperature_mismatch",
+                message="Residual profile and temperature coordinates must align.",
+            )
+        active = tuple(
+            temperature
+            for index, temperature in enumerate(temperatures)
+            if (index > 0 and abs(profile[index] - profile[index - 1]) > 1e-12)
+            or (
+                index < len(profile) - 1
+                and abs(profile[index] - profile[index + 1]) > 1e-12
+            )
+        )
+        return active or temperatures
+
     separation = request.options.minimum_separation.value
     level_count = request.isothermal_level_count + request.sensible_level_count
-    width = max(100.0, separation * (level_count + 1))
     hottest = max(temperatures)
     coldest = min(temperatures)
-    hot_lower = hottest + request.options.default_isothermal_span.value
-    cold_upper = coldest - request.options.default_isothermal_span.value
-    cold_lower = max(-273.14, cold_upper - width)
+    outward_margin = request.options.default_isothermal_span.value + separation * max(
+        level_count - 1, 0
+    )
+    hot_support = support(hot_profile)
+    cold_support = support(cold_profile)
+    hot_lower = min(hot_support)
+    hot_upper = max(hot_support) + outward_margin
+    cold_lower = max(-273.14, min(cold_support) - outward_margin)
+    cold_upper = max(cold_support)
+    paired_lower = min(hot_lower, cold_lower)
+    paired_upper = max(hot_upper, cold_upper)
+    maximum_span = max(
+        request.options.minimum_sensible_span.value,
+        hottest - coldest + outward_margin,
+    )
     bounds: list[PhysicalCoordinateBound] = []
     for blueprint in blueprints.all:
-        if blueprint.key.side is UtilitySide.HOT:
+        if request.uses_generated_pairs:
+            supply = QuantityInterval(
+                lower=paired_lower,
+                upper=paired_upper,
+                unit=request.units.absolute_temperature,
+            )
+        elif blueprint.key.side is UtilitySide.HOT:
             supply = QuantityInterval(
                 lower=hot_lower,
-                upper=hot_lower + width,
+                upper=hot_upper,
                 unit=request.units.absolute_temperature,
             )
         else:
@@ -498,7 +537,7 @@ def _coordinate_bounds(
                     field=DecisionField.SUPPLY_TEMPERATURE,
                 ),
                 bounds=supply,
-                reason="isolated base-target temperature envelope",
+                reason="residual-profile temperature support",
             )
         )
         if blueprint.kind is UtilityLevelKind.SENSIBLE:
@@ -510,13 +549,10 @@ def _coordinate_bounds(
                     ),
                     bounds=QuantityInterval(
                         lower=request.options.minimum_sensible_span.value,
-                        upper=max(
-                            request.options.minimum_sensible_span.value,
-                            width / 2.0,
-                        ),
+                        upper=maximum_span,
                         unit=request.units.temperature_difference,
                     ),
-                    reason="isolated base-target sensible-span envelope",
+                    reason="residual-profile sensible-span support",
                 )
             )
     return tuple(bounds)
@@ -603,7 +639,13 @@ def _extract_period(
         residual_hot_duty=residual_hot_duty,
         residual_cold_duty=residual_cold_duty,
         ambient_temperature_kelvin=298.15,
-        coordinate_bounds=_coordinate_bounds(request, blueprints, shifted_temperatures),
+        coordinate_bounds=_coordinate_bounds(
+            request,
+            blueprints,
+            shifted_temperatures,
+            hot_profile=hot_profile,
+            cold_profile=cold_profile,
+        ),
     )
 
 

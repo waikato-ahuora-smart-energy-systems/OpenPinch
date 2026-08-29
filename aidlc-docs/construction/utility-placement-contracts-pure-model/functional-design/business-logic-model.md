@@ -85,6 +85,13 @@ Template identity never changes after normalization. Candidate validation uses
 `placement_rank` for physical ordering and never sorts, merges, or renames a
 template to repair a candidate.
 
+In generated mode, matching hot/cold templates of the same kind and ordinal
+form a coupled pair. Only the hot member owns optimizer coordinates. Decoding
+derives the cold member by exact endpoint reversal; encoding rejects a cold
+member that is not the exact inverse. Pair temperatures are ordered together
+from hottest to coldest. Explicit or inferred one-sided templates retain the
+independent side behavior.
+
 This identity pass produces a `TemplateBlueprintSet` before Unit 2 constructs
 the feasibility envelope. The later model-building pass combines those same
 blueprints with envelope intervals to produce complete effective templates,
@@ -107,12 +114,14 @@ Every level has a supply-temperature coordinate.
 - Supply and derived target temperatures must both be strictly above absolute
   zero after conversion.
 
-Thus the first-release decision-vector dimension is:
+Thus the generated-pair decision-vector dimension is:
 
-`2 * N_iso + 4 * N_sens`.
+`N_iso + 2 * N_sens`.
 
-The first term is one supply coordinate for every hot/cold isothermal level;
-the second is supply plus span for every hot/cold sensible level.
+The first term is one shared endpoint coordinate for every isothermal pair;
+the second is one shared supply plus span for every sensible pair. Explicit or
+inferred independent templates retain one supply per level and one additional
+span per sensible level.
 
 ### 4. Validate the detached feasibility envelope
 
@@ -172,7 +181,7 @@ terminates without a numerical optimiser.
 
 ### 7. Build the vector schema
 
-Coordinates use this fixed family sequence:
+Independent explicit or inferred templates use this fixed family sequence:
 
 1. hot isothermal supply temperatures in their relative declaration order;
 2. each hot sensible template's supply then span;
@@ -181,9 +190,12 @@ Coordinates use this fixed family sequence:
 
 `DecisionCoordinate` retains `TemplateKey` and `placement_rank`, so vector order
 and physical order are related explicitly rather than inferred by sorting.
-Encoding requires every declared coordinate exactly once. Decoding requires the
-exact vector length, finite values, and in-bound coordinates, then reconstructs
-templates in original side declaration order with derived target temperatures.
+Generated pairs use only the first two hot-side families; cold endpoints are
+decoded by exact reversal. Encoding requires every declared coordinate exactly
+once and rejects a generated placement whose cold endpoints do not reverse its
+hot partners. Decoding requires the exact vector length, finite values, and
+in-bound coordinates, then reconstructs every template in original side
+declaration order.
 
 ### 8. Construct deterministic starting candidates
 
@@ -193,16 +205,16 @@ and span bounds are nonempty.
 - For hot supply coordinates, choose the hottest valid first value, then each
   following value as the greatest value not exceeding the previous value minus
   separation and its own upper bound; verify every lower bound.
-- For cold supply coordinates, choose the coldest valid first value, then each
+- For independent cold supply coordinates, choose the coldest valid first value, then each
   following value as the least value not below the previous value plus
   separation and its own lower bound; verify every upper bound.
 - For sensible spans, choose the finite interval midpoint, normalized to
   signed-zero-neutral form.
 - Fixed isothermal spans are copied from template metadata.
 
-Optional additional starts may use deterministic midpoint projections, but the
-required primary start is always first and no random start is generated in
-Unit 1.
+Generated-pair starts additionally span the common physical support and include
+candidate intervals near the residual profile edges. Every retained start is
+independently verified; no random start is generated in Unit 1.
 
 ### 9. Verify a decoded placement
 
@@ -213,6 +225,7 @@ Verification is deliberately cheaper than finding a placement. It checks:
 - fixed isothermal spans and sensible span bounds;
 - hot/cold target direction and positive absolute temperatures;
 - placement-rank ordering and adjacent separation;
+- exact generated hot/cold endpoint reversal and derived cold endpoint bounds;
 - immutable source/template identity preservation.
 
 It returns a structured verification result for an ordinary candidate failure.
@@ -262,7 +275,7 @@ inherits from `RuntimeError` consistently with existing optimisation errors.
 | Envelope intersection | Oracle | Effective lower/upper bounds equal explicit max-lower/min-upper reference calculations. |
 | Order-bound propagation | Invariant | Every accepted bound chain admits the stated hot/cold separation inequalities and every rejected chain has a checkable contradiction. |
 | Vector codec | Round-trip | `decode(encode(valid_placement))` equals the normalized placement; `encode(decode(valid_point))` equals the signed-zero-normalized point. |
-| Vector schema | Invariant | Dimension always equals `2*N_iso + 4*N_sens`, with every expected coordinate exactly once. |
+| Vector schema | Invariant | Generated dimension equals `N_iso + 2*N_sens`; independent explicit/inferred dimension equals `2*N_iso + 4*N_sens`, with every expected coordinate exactly once. |
 | Candidate verifier | Easy verification | Every accepted decoded placement independently satisfies keys, bounds, spans, direction, Kelvin positivity, order, and separation. |
 | Initial-candidate builder | Easy verification | Every returned start passes the independent candidate verifier. |
 | Result contracts | Round-trip | Valid nested result -> JSON -> result preserves all public structure/order and floats within tolerance. |

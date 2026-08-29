@@ -189,7 +189,8 @@ not own independent mutable copies.
 | `coordinates` | tuple of `DecisionCoordinate` | Exact stable vector schema |
 | `initial_points` | tuple of float tuples | Non-empty; each independently valid |
 
-Derived dimension must equal `2*N_iso + 4*N_sens`.
+Generated-pair dimension must equal `N_iso + 2*N_sens`; independent explicit
+or inferred dimension must equal `2*N_iso + 4*N_sens`.
 
 ### `DecodedUtilityLevel`
 

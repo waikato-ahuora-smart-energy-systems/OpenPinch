@@ -19,6 +19,7 @@ from OpenPinch.contracts.utility_placement import (
 )
 from OpenPinch.domain.enums import GraphType, ProblemTableLabel, ZoneType
 from OpenPinch.domain.zone import Zone
+from tests.strategies.utility_placement import residual_profile_envelopes
 
 
 @pytest.mark.parametrize(
@@ -175,6 +176,89 @@ def test_coordinate_bounds_include_sensible_temperature_span() -> None:
     }
 
 
+def test_coordinate_bounds_cover_the_process_temperature_envelope() -> None:
+    request = UtilityPlacementRequest(
+        isothermal_level_count=2,
+        sensible_level_count=2,
+    )
+    blueprints = placement_application.prepare_template_blueprints(request)
+    temperatures = (180.0, 100.0, 20.0)
+
+    bounds = placement_application._coordinate_bounds(
+        request,
+        blueprints,
+        temperatures,
+    )
+
+    supply_bounds = [
+        bound
+        for bound in bounds
+        if bound.coordinate.field.value == "supply_temperature"
+    ]
+    for bound in supply_bounds:
+        assert bound.bounds.lower <= max(temperatures)
+        assert bound.bounds.upper >= min(temperatures)
+    sensible_span_bounds = [
+        bound.bounds
+        for bound in bounds
+        if bound.coordinate.field.value == "temperature_span"
+    ]
+    assert sensible_span_bounds
+    assert all(
+        bound.upper >= max(temperatures) - min(temperatures)
+        for bound in sensible_span_bounds
+    )
+
+
+@settings(max_examples=50, deadline=None)
+@given(envelope=residual_profile_envelopes())
+def test_coordinate_bounds_cover_generated_residual_profile_support(envelope) -> None:
+    temperatures, hot_profile, cold_profile = envelope
+    request = UtilityPlacementRequest(
+        isothermal_level_count=2,
+        sensible_level_count=2,
+    )
+    blueprints = placement_application.prepare_template_blueprints(request)
+
+    bounds = placement_application._coordinate_bounds(
+        request,
+        blueprints,
+        temperatures,
+        hot_profile=hot_profile,
+        cold_profile=cold_profile,
+    )
+
+    def changing_support(profile):
+        support = tuple(
+            temperature
+            for index, temperature in enumerate(temperatures)
+            if (index > 0 and abs(profile[index] - profile[index - 1]) > 1e-12)
+            or (
+                index < len(profile) - 1
+                and abs(profile[index] - profile[index + 1]) > 1e-12
+            )
+        )
+        return support or temperatures
+
+    supply_bounds = {
+        (bound.coordinate.template_key.side, bound.coordinate.template_key.name): (
+            bound.bounds.lower,
+            bound.bounds.upper,
+        )
+        for bound in bounds
+        if bound.coordinate.field.value == "supply_temperature"
+    }
+    for (side, _), (lower, upper) in supply_bounds.items():
+        support = changing_support(hot_profile if side.value == "hot" else cold_profile)
+        assert lower <= min(support)
+        assert upper >= max(support)
+    assert all(
+        bound.bounds.upper >= max(temperatures) - min(temperatures)
+        for bound in bounds
+        if bound.coordinate.field.value == "temperature_span"
+    )
+
+
 def _tiny_options():
     return {
         "iteration_limit": 1,
@@ -184,10 +268,26 @@ def _tiny_options():
     }
 
 
+def _temperature_overlap_ratio(background_segments, utility_segments) -> float:
+    background = [
+        point["y"]
+        for segment in background_segments
+        for point in segment["data_points"]
+    ]
+    utility = [
+        point["y"] for segment in utility_segments for point in segment["data_points"]
+    ]
+    background_span = max(background) - min(background)
+    overlap = min(max(background), max(utility)) - max(min(background), min(utility))
+    return max(0.0, overlap) / background_span
+
+
 def _problem_with_utilities(utilities) -> PinchProblem:
-    source = PinchWorkspace(source="chocolate_factory.json").case(
-        "baseline"
-    ).to_problem_json()
+    source = (
+        PinchWorkspace(source="chocolate_factory.json")
+        .case("baseline")
+        .to_problem_json()
+    )
     source["utilities"] = utilities
     return PinchProblem(source=source, project_name="Site")
 
@@ -331,7 +431,9 @@ def test_profiled_existing_utility_is_sensible_and_both_direction_is_paired() ->
         options=_tiny_options(),
     )
 
-    hot = next(template for template in request.hot_templates if "Profiled" in template.name)
+    hot = next(
+        template for template in request.hot_templates if "Profiled" in template.name
+    )
     cold = next(
         template for template in request.cold_templates if "Profiled" in template.name
     )
@@ -431,7 +533,9 @@ def test_zone_resolution_defaults_to_root_and_accepts_unique_name_path_and_objec
     problem = SimpleNamespace(_build_execution_master_zone=lambda: root)
 
     assert placement_application._resolve_placement_zone(problem, None) is root
-    assert placement_application._resolve_placement_zone(problem, "Process A") is process
+    assert (
+        placement_application._resolve_placement_zone(problem, "Process A") is process
+    )
     assert (
         placement_application._resolve_placement_zone(
             problem, "Community/Site A/Process A/Operation A"
@@ -529,7 +633,9 @@ def test_default_thermodynamic_solution_follows_the_residual_process_profile() -
     )
     result = optimized_case.utility_placement_result
     period = result.best.period_results[0]
-    active_hot = [level for level in period.hot_levels if level.allocated_duty.value > 0]
+    active_hot = [
+        level for level in period.hot_levels if level.allocated_duty.value > 0
+    ]
     active_cold = [
         level for level in period.cold_levels if level.allocated_duty.value > 0
     ]
@@ -541,10 +647,113 @@ def test_default_thermodynamic_solution_follows_the_residual_process_profile() -
     assert result.best.thermodynamic_total is not None
     assert result.best.thermodynamic_total.value >= 0.0
     assert result.best.period_results[0].thermodynamic is not None
-    assert (
-        result.best.period_results[0].thermodynamic.total_entropy_generation.value
-        == pytest.approx(result.best.thermodynamic_total.value)
+    assert result.best.period_results[
+        0
+    ].thermodynamic.total_entropy_generation.value == pytest.approx(
+        result.best.thermodynamic_total.value
     )
+
+
+@pytest.mark.parametrize("zone", ["Almond", None])
+def test_notebook_scopes_cover_residual_profile_temperature_support(zone) -> None:
+    problem = PinchWorkspace(
+        source="chocolate_factory.json",
+        project_name="Site",
+    ).use_case("baseline")
+    optimized_case = problem.target.utility_placement(
+        isothermal=2,
+        sensible=2,
+        zone=zone,
+        period_ids=("0",),
+        options=_tiny_options(),
+    )
+    result = optimized_case.utility_placement_result
+    _, context = build_problem_placement_context(problem, result.request)
+    source_period = context.periods[0]
+    result_period = result.best.period_results[0]
+    temperatures = source_period.snapshot.shifted_temperatures
+
+    def changing_support(profile):
+        return {
+            temperature
+            for index, temperature in enumerate(temperatures)
+            if (index > 0 and abs(profile[index] - profile[index - 1]) > 1e-9)
+            or (
+                index < len(profile) - 1
+                and abs(profile[index] - profile[index + 1]) > 1e-9
+            )
+        }
+
+    hot_support = changing_support(source_period.snapshot.hot_load_profile)
+    cold_support = changing_support(source_period.snapshot.cold_load_profile)
+    hot_support_floor = min(hot_support)
+    hot_support_ceiling = max(hot_support)
+    cold_support_floor = min(cold_support)
+    active_hot = [
+        level for level in result_period.hot_levels if level.allocated_duty.value > 0
+    ]
+    active_cold = [
+        level for level in result_period.cold_levels if level.allocated_duty.value > 0
+    ]
+
+    for hot, cold in zip(
+        result_period.hot_levels, result_period.cold_levels, strict=True
+    ):
+        assert cold.kind is hot.kind
+        assert cold.supply_temperature.value == pytest.approx(
+            hot.target_temperature.value
+        )
+        assert cold.target_temperature.value == pytest.approx(
+            hot.supply_temperature.value
+        )
+        assert cold.temperature_span == hot.temperature_span
+
+    assert (
+        min(level.target_temperature.value for level in active_hot)
+        <= hot_support_floor + 20.0
+    )
+    assert (
+        min(
+            abs(level.supply_temperature.value - hot_support_ceiling)
+            for level in active_hot
+        )
+        <= 5.0
+    )
+    assert (
+        min(
+            abs(level.supply_temperature.value - cold_support_floor)
+            for level in active_cold
+        )
+        <= 5.0
+    )
+
+    if zone is not None:
+        optimized_case.target.direct_heat_integration(zone=zone, period_id="0")
+        graph = optimized_case.plot.grand_composite_curve(
+            zone_name=zone,
+            return_graph_data=True,
+        )
+        background_segments = [
+            segment for segment in graph["segments"] if segment["title"] == "GCC 1"
+        ]
+        utility_segments = [
+            segment
+            for segment in graph["segments"]
+            if segment["title"].startswith("Utility GCC")
+        ]
+        assert _temperature_overlap_ratio(background_segments, utility_segments) > 0.75
+    else:
+        optimized_case.target.total_site_heat_integration(period_id="0")
+        graph = optimized_case.plot.total_site_profiles(return_graph_data=True)
+        by_title = {segment["title"]: segment for segment in graph["segments"]}
+        assert (
+            _temperature_overlap_ratio(
+                [by_title["Cold CC"]],
+                [by_title["Hot Utility"]],
+            )
+            > 0.75
+        )
+        assert by_title["Cold Utility"]["data_points"]
 
 
 def test_optimized_utilities_replace_a_new_case_for_standard_gcc_and_tsp() -> None:
@@ -562,7 +771,9 @@ def test_optimized_utilities_replace_a_new_case_for_standard_gcc_and_tsp() -> No
         name="optimized_utilities",
         activate=False,
     )
-    assert added_case.utility_placement_result == optimized_case.utility_placement_result
+    assert (
+        added_case.utility_placement_result == optimized_case.utility_placement_result
+    )
 
     added_case.target.direct_heat_integration(period_id="0")
     gcc = added_case.plot.grand_composite_curve(return_graph_data=True)

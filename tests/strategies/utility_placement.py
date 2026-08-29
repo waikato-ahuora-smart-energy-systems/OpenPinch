@@ -73,12 +73,38 @@ def count_only_requests(draw):
     )
 
 
+@st.composite
+def residual_profile_envelopes(draw):
+    """Generate aligned descending temperatures and finite residual profiles."""
+    temperatures = tuple(
+        float(value)
+        for value in sorted(
+            draw(
+                st.lists(
+                    st.integers(min_value=-100, max_value=400),
+                    min_size=3,
+                    max_size=10,
+                    unique=True,
+                )
+            ),
+            reverse=True,
+        )
+    )
+    profile_strategy = st.lists(
+        st.integers(min_value=0, max_value=10_000),
+        min_size=len(temperatures),
+        max_size=len(temperatures),
+    ).map(lambda values: tuple(float(value) for value in values))
+    return temperatures, draw(profile_strategy), draw(profile_strategy)
+
+
 __all__ = [
     "count_only_requests",
     "finite_magnitudes",
     "invalid_counts",
     "isothermal_templates",
     "quantity_intervals",
+    "residual_profile_envelopes",
     "valid_isothermal_counts",
     "valid_sensible_counts",
 ]

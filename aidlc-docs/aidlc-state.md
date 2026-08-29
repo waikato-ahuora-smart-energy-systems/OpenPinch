@@ -3,7 +3,8 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Utility Placement hierarchy API amendment complete.
+- **Current Stage**: Utility Placement coupled generated-pair correction and
+  Build and Test complete.
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -46,6 +47,16 @@
   notebook/RTD, packaging, installed-wheel smoke, and full Build and Test are
   complete under continuing authorization; 2,404 tests passed with 4 expected
   skips.
+- [x] PROFILE-ENVELOPE CORRECTION - The feasible temperature envelope and
+  deterministic starts follow residual Process and Site profile support so the
+  entropy optimizer can reduce the visible background/utility gap. Notebook 19,
+  RTD, properties, package artifacts, installed-wheel execution, and the full
+  solver-enabled suite pass; 2,408 tests passed with 4 expected skips.
+- [x] COUPLED GENERATED PAIRS - Matching generated hot/cold isothermal and
+  sensible entries share one temperature interval with exact reversed
+  endpoints and independent duties. Requirements, TDD, notebook/RTD,
+  distribution, installed-wheel execution, and complete Build and Test are
+  complete; 2,410 tests passed with 4 expected skips.
 
 - [x] INCEPTION - Workspace Detection completed for the existing brownfield Python library.
 - [x] INCEPTION - Reverse Engineering refreshed and approved by the user.

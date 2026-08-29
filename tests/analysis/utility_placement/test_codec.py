@@ -27,12 +27,25 @@ from OpenPinch.contracts.utility_placement import (
 )
 
 
-def _model(*, isothermal_count: int = 2, sensible_count: int = 0):
+def _model(
+    *,
+    isothermal_count: int = 2,
+    sensible_count: int = 0,
+    generated_pairs: bool = True,
+):
     request = normalize_utility_placement_request(
         isothermal_level_count=isothermal_count,
         sensible_level_count=sensible_count,
     )
     blueprints = prepare_template_blueprints(request)
+    if not generated_pairs:
+        request = request.model_copy(
+            update={
+                "hot_templates": tuple(item.as_template() for item in blueprints.hot),
+                "cold_templates": tuple(item.as_template() for item in blueprints.cold),
+            }
+        )
+        blueprints = prepare_template_blueprints(request)
     coordinate_bounds = []
     for blueprint in blueprints.all:
         coordinate_bounds.append(
@@ -85,7 +98,7 @@ def test_schema_dimension_and_coordinate_uniqueness(
         sensible_count=sensible_count,
     )
 
-    assert len(model.coordinates) == 2 * isothermal_count + 4 * sensible_count
+    assert len(model.coordinates) == isothermal_count + 2 * sensible_count
     assert [coordinate.index for coordinate in model.coordinates] == list(
         range(len(model.coordinates))
     )
@@ -110,11 +123,21 @@ def test_coordinate_family_order_is_stable() -> None:
         ("hot", "hot_iso_2", "supply_temperature"),
         ("hot", "hot_sensible_1", "supply_temperature"),
         ("hot", "hot_sensible_1", "temperature_span"),
-        ("cold", "cold_iso_1", "supply_temperature"),
-        ("cold", "cold_iso_2", "supply_temperature"),
-        ("cold", "cold_sensible_1", "supply_temperature"),
-        ("cold", "cold_sensible_1", "temperature_span"),
     ]
+
+
+def test_explicit_hot_and_cold_templates_keep_independent_schema() -> None:
+    model = _model(
+        isothermal_count=2,
+        sensible_count=1,
+        generated_pairs=False,
+    )
+
+    assert len(model.coordinates) == 2 * 2 + 4 * 1
+    assert {item.coordinate.template_key.side.value for item in model.coordinates} == {
+        "hot",
+        "cold",
+    }
 
 
 def test_both_codec_round_trips_preserve_identity_order_and_values() -> None:
@@ -135,6 +158,25 @@ def test_both_codec_round_trips_preserve_identity_order_and_values() -> None:
     ]
 
 
+def test_encoding_rejects_a_generated_cold_endpoint_that_is_not_reversed() -> None:
+    model = _model(isothermal_count=2, sensible_count=1)
+    placement = decode_placement(model, model.initial_points[0])
+    cold = placement.cold[0]
+    invalid_cold = cold.model_copy(
+        update={
+            "supply_temperature": cold.supply_temperature.model_copy(
+                update={"value": cold.supply_temperature.value + 1.0}
+            )
+        }
+    )
+    invalid = placement.model_copy(update={"cold": (invalid_cold, *placement.cold[1:])})
+
+    with pytest.raises(PlacementModelValidationError) as captured:
+        encode_placement(model, invalid)
+
+    assert captured.value.code == "paired_endpoint_mismatch"
+
+
 def test_decoding_derives_hot_and_cold_target_directions() -> None:
     model = _model(isothermal_count=2, sensible_count=1)
     placement = decode_placement(model, model.initial_points[0])
@@ -149,6 +191,15 @@ def test_decoding_derives_hot_and_cold_target_directions() -> None:
         == pytest.approx(level.supply_temperature.value + level.temperature_span.value)
         for level in placement.cold
     )
+    for hot, cold in zip(placement.hot, placement.cold, strict=True):
+        assert cold.kind is hot.kind
+        assert cold.supply_temperature.value == pytest.approx(
+            hot.target_temperature.value
+        )
+        assert cold.target_temperature.value == pytest.approx(
+            hot.supply_temperature.value
+        )
+        assert cold.temperature_span == hot.temperature_span
 
 
 def test_invalid_points_return_diagnostics_and_strict_decode_rejects() -> None:
@@ -175,7 +226,22 @@ def test_invalid_points_return_diagnostics_and_strict_decode_rejects() -> None:
 def test_every_generated_start_passes_independent_candidate_verifier() -> None:
     model = _model(isothermal_count=3, sensible_count=2)
 
-    assert len(model.initial_points) > 1
+    assert 1 < len(model.initial_points) <= 28
+    supply_coordinates = [
+        coordinate
+        for coordinate in model.coordinates
+        if coordinate.coordinate.field is DecisionField.SUPPLY_TEMPERATURE
+    ]
+    assert (
+        1
+        < len(
+            {
+                tuple(point[coordinate.index] for coordinate in supply_coordinates)
+                for point in model.initial_points
+            }
+        )
+        <= 8
+    )
     assert all(
         verify_candidate(model, point).feasible for point in model.initial_points
     )

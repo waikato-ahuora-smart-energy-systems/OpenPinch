@@ -141,7 +141,8 @@ package dependency still points from Unit 2 to Unit 1, never the reverse.
 
 ### Decision schema, codec, and verifier
 
-- Build the `2*N_iso + 4*N_sens` coordinate tuple once.
+- Build `N_iso + 2*N_sens` generated-pair coordinates, or the independent
+  `2*N_iso + 4*N_sens` tuple, once.
 - Preserve fixed coordinates with equal bounds.
 - Encode/decode in one pass and derive hot/cold target direction.
 - Verify key coverage, finiteness, bounds, spans, Kelvin positivity, ordering,

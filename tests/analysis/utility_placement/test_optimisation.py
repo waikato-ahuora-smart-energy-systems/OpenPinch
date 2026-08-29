@@ -44,10 +44,10 @@ def test_coordinator_calls_optimizer_once_deduplicates_and_replays_parent() -> N
     outcome = coordinate_optimisation(session=session, runner=runner)
 
     assert runner.calls == 1
-    assert len(outcome.evaluations) == 1
-    assert outcome.evaluations[0].feasible
-    assert outcome.termination.candidate_count == 1
-    assert outcome.termination.feasible_candidate_count == 1
+    assert len(outcome.evaluations) == len(set(model.initial_points))
+    assert all(evaluation.feasible for evaluation in outcome.evaluations)
+    assert outcome.termination.candidate_count == len(set(model.initial_points))
+    assert outcome.termination.feasible_candidate_count == len(set(model.initial_points))
     assert outcome.termination.method == "dual_annealing"
 
 
@@ -97,7 +97,7 @@ def test_coordinator_matches_explicit_structured_grid_oracle() -> None:
     alternative = list(start)
     alternative[1] = max(model.coordinates[1].bounds.lower, alternative[1] - 10.0)
     alternative[3] = min(model.coordinates[3].bounds.upper, alternative[3] + 10.0)
-    grid = (start, tuple(alternative))
+    grid = (*model.initial_points, tuple(alternative))
 
     class GridRunner:
         def __call__(self, problem, *, method, options):

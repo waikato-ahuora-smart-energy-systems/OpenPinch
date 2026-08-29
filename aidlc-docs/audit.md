@@ -5356,3 +5356,85 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 **Context**: SOURCE CONTROL - Commit approved completed Utility Placement work to develop
 
 ---
+
+## Utility Placement Profile-Gap Defect Report
+**Timestamp**: 2026-08-28T23:40:16Z
+**User Input**: "The results still don't look right. Notebook #19 for process and total site cases results in sets of utilities with a large gap between the background process and the utility profiles."
+**AI Response**: "Reopened the completed thermodynamic placement work as a numerical-correctness defect. Planned to reproduce both notebook scopes, compare optimized and background balanced profiles point-by-point, create a failing regression that measures the visible gap, and trace the objective, allocation, bounds, and candidate ranking before changing production code. The unrelated pre-existing `.gitignore` change remains out of scope."
+**Context**: REQUIREMENTS / CONSTRUCTION - Utility Placement profile-gap correctness correction started
+
+---
+
+## Utility Placement Profile Envelope Correction Plan
+**Timestamp**: 2026-08-28T23:40:16Z
+**User Input**: "No new user input; continued the reported profile-gap correction under standing authorization."
+**AI Response**: "Reproduced both notebook scopes and localized the defect to the physical search envelope: Process active hot utility stopped at 138.01 degC although the residual hot profile continued to 48 degC, while the active cold utility remained near 1 degC although the residual cold profile began near 32 degC; Site active hot utility stopped at 155.005 degC although its residual profile continued to 51 degC. Generated hot supplies were bounded above the global hottest temperature, cold supplies below the global coldest temperature, and sensible spans were capped at 50 degC. Created and approved an eight-step TDD correction plan under the user's standing authorization."
+**Context**: WORKFLOW PLANNING / CODE GENERATION - Utility Placement profile-envelope correction plan approved
+
+---
+
+## Utility Placement Profile Envelope Correction Completion
+**Timestamp**: 2026-08-29T00:15:41Z
+**User Input**: "No new user input; completed the reported Utility Placement profile-envelope correction under standing authorization."
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "Corrected generated physical bounds to cover the temperature intervals where residual hot and cold profiles change and expanded sensible spans across the complete target range. Added five deterministic supply-distribution starts crossed with the five sensible-span starts, all independently verified. Notebook 19 now rejects the former Process and Site edge-clustered temperature ranges before producing standard GCC and Total Site Profile figures. With the tutorial budget, Process entropy improved from 0.06990104239676753 to 0.03197946044055344 kW/K and Site entropy from 1.1080402046277644 to 0.5336030842286164 kW/K. Generated-envelope properties, focused tests, Ruff, patch hygiene, warnings-as-errors Sphinx, packaging and API gates, fresh archives, generic installed-wheel smoke, and packaged notebook execution pass. The complete solver-enabled suite passed 2,408 tests with 4 expected skips in 293.92 seconds. All correction changes are functional tests, numerical implementation, the single canonical notebook, RTD, or required AI-DLC records; the unrelated pre-existing .gitignore modification remains untouched."
+**Context**: CONSTRUCTION / BUILD AND TEST - Utility Placement profile-envelope correction complete
+
+---
+
+## Utility Placement Total Site Level-Count Investigation
+**Timestamp**: 2026-08-29T00:51:48Z
+**User Input**: "The total site looks like it has 5 utility levels. Investigate."
+**AI Response**: "Started a read-only trace of notebook 19 from the four requested hot and four requested cold utility definitions through placement allocation, ordinary Total Site targeting, and standard TSP graph construction. No production or test change is authorized by this diagnostic request."
+**Context**: DIAGNOSIS - Utility Placement Total Site apparent fifth utility level
+
+---
+
+## Utility Placement Total Site Level-Count Investigation Findings
+**Timestamp**: 2026-08-29T00:51:48Z
+**User Input**: "No new user input; completed the requested read-only investigation."
+**AI Response**: "Confirmed eight declared utility templates: four hot and four cold. The placement result assigns positive duty to exactly five templates because the approved requirements permit zero-duty levels. The standard Total Site Profile does not plot one trace per template; it aggregates all hot utilities and all cold utilities, with sensible levels split at the common site temperature grid. Found a genuine replay inconsistency: placement allocates duties once against the aggregate residual profiles, but the returned case writes every utility with zero input heat flow and ordinary Total Site targeting recomputes duties through direct child-zone targeting and site aggregation. Placement reports three active hot and two active cold levels, whereas standard retargeting activates four hot and two cold levels and changes every material duty distribution. Therefore the apparent fifth level is not an undeclared utility, but the notebook plot is not a faithful replay of the optimized allocation. No production or test files were changed during diagnosis."
+**Context**: DIAGNOSIS - Utility Placement Total Site apparent fifth utility level confirmed and replay mismatch localized
+
+---
+
+## Utility Placement Coupled-Pair Requirement
+**Timestamp**: 2026-08-29T02:01:53Z
+**User Input**: "hot iso 1 should be coupled with cold iso 1 -- opposite supply/target temperatures."
+**AI Response**: "Reopened Requirements Analysis for generated utility pairing. Confirmed the current model gives every hot and cold template independent supply coordinates and only guarantees opposite temperature direction. Exact same-ordinal endpoint reversal would require `cold_supply = hot_target` and `cold_target = hot_supply`, which conflicts with the current independent hot-descending and cold-ascending ordering contract and changes the decision-vector schema. Paused implementation to clarify whether the rule applies to all matching generated isothermal and sensible pairs and whether paired duties remain independent."
+**Context**: REQUIREMENTS ANALYSIS - Utility Placement exact hot/cold pair coupling clarification required
+
+---
+
+## Utility Placement Coupled-Pair Clarification Approval
+**Timestamp**: 2026-08-29T02:01:53Z
+**User Input**: "Yes"
+**AI Response**: "Accepted exact endpoint reversal for every matching generated isothermal and sensible pair, independent hot/cold duties, shared hottest-to-coldest pair ordering, independent unrelated inferred Hot/Cold templates, and retained existing Both pairing. Updated requirements and functional rules, created the eight-step TDD plan, and proceeded to RED under standing authorization."
+**Context**: REQUIREMENTS / CODE GENERATION - Utility Placement coupled generated-pair correction approved
+
+---
+
+## Code Generation - Coupled Generated Utility Pairs RED Baseline
+**Timestamp**: 2026-08-29T02:08:26Z
+**User Input**: "Yes"
+**AI Response**: "Added example and property-based regressions for the approved exact hot/cold endpoint reversal and reduced generated coordinate schema. The focused RED run failed at the expected schema assertion: two generated isothermal pairs still produced four coordinates instead of two."
+**Context**: Coupled generated-pair correction, TDD RED phase; no production behavior changed by this step.
+
+---
+
+## Code Generation - Coupled Generated Utility Pairs GREEN
+**Timestamp**: 2026-08-29T02:24:02Z
+**User Input**: "Yes"
+**AI Response**: "Implemented one coordinate family per count-generated hot/cold pair, common physical support, exact cold endpoint reversal, descending pair ordering, pair-aware feasible starts, strict encode/decode verification, and preserved the independent explicit/inferred schema. Focused analysis and application verification passed: 196 tests."
+**Context**: Coupled generated-pair correction, TDD GREEN through application and standard plot regression.
+
+---
+
+## Build and Test - Coupled Generated Utility Pairs Complete
+**Timestamp**: 2026-08-29T02:37:02Z
+**User Input**: "Yes"
+**AI Response**: "Completed the coupled generated-pair correction through verification. Focused analysis/application/notebook tests passed (218 with 3 expected skips), Ruff and patch hygiene passed, Sphinx built 54 pages with warnings as errors, all 5 representative performance tests passed, and the complete solver-enabled suite passed 2,410 tests with 4 expected skips in 275.46 seconds. Fresh source/wheel archives include the implementation and notebook; the isolated installed wheel executed notebook 19 with exact pair assertions and objectives of 0.040191585277772335 kW/K for Process and 0.6863313374698734 kW/K for Site."
+**Context**: Coupled generated-pair correction complete; PBT compliant, Security and Resiliency disabled/N/A.
+
+---

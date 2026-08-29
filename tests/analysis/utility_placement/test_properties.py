@@ -38,6 +38,22 @@ from tests.analysis.utility_placement.test_contracts import _nested_result
 from tests.strategies.utility_placement import count_only_requests
 
 
+def _explicit_request_and_blueprints():
+    generated_request = normalize_utility_placement_request(isothermal_level_count=2)
+    generated_blueprints = prepare_template_blueprints(generated_request)
+    request = generated_request.model_copy(
+        update={
+            "hot_templates": tuple(
+                item.as_template() for item in generated_blueprints.hot
+            ),
+            "cold_templates": tuple(
+                item.as_template() for item in generated_blueprints.cold
+            ),
+        }
+    )
+    return request, prepare_template_blueprints(request)
+
+
 @given(count_only_requests())
 def test_request_normalization_is_idempotent(request) -> None:
     once = normalize_utility_placement_request(request)
@@ -95,8 +111,7 @@ def test_blueprint_normalization_is_idempotent(request) -> None:
 
 @given(st.permutations(("a", "b", "c")))
 def test_envelope_intersection_is_commutative_under_period_permutation(order) -> None:
-    request = normalize_utility_placement_request(isothermal_level_count=2)
-    blueprints = prepare_template_blueprints(request)
+    request, blueprints = _explicit_request_and_blueprints()
     period_limits = {"a": (-50.0, 500.0), "b": (-25.0, 450.0), "c": (0.0, 400.0)}
     periods = tuple(
         PlacementPeriodEnvelope(
@@ -162,8 +177,7 @@ def test_envelope_intersection_is_commutative_under_period_permutation(order) ->
     )
 )
 def test_envelope_intersection_matches_explicit_max_min_oracle(period_limits) -> None:
-    request = normalize_utility_placement_request(isothermal_level_count=2)
-    blueprints = prepare_template_blueprints(request)
+    request, blueprints = _explicit_request_and_blueprints()
     base_by_name = {
         "hot_iso_1": 300.0,
         "hot_iso_2": 100.0,
@@ -238,8 +252,7 @@ def test_unit_conversion_matches_value_to_oracle(magnitude, source_unit) -> None
 
 @given(st.floats(min_value=0.01, max_value=50.0, allow_nan=False))
 def test_order_propagation_and_start_satisfy_separation(separation) -> None:
-    request = normalize_utility_placement_request(isothermal_level_count=2)
-    blueprints = prepare_template_blueprints(request)
+    request, blueprints = _explicit_request_and_blueprints()
     coordinate_bounds = tuple(
         PhysicalCoordinateBound(
             coordinate=CoordinateKey(
@@ -288,14 +301,10 @@ def test_order_propagation_and_start_satisfy_separation(separation) -> None:
             assert supplies[1] >= supplies[0] + separation - 1e-6
 
 
-@given(
-    st.integers(min_value=2, max_value=5),
-    st.integers(min_value=0, max_value=3),
-)
-def test_vector_codec_round_trips_across_valid_dimensions(
-    isothermal_count,
-    sensible_count,
-) -> None:
+@given(count_only_requests())
+def test_vector_codec_round_trips_across_valid_dimensions(request) -> None:
+    isothermal_count = request.isothermal_level_count
+    sensible_count = request.sensible_level_count
     model = _model(
         isothermal_count=isothermal_count,
         sensible_count=sensible_count,
@@ -303,10 +312,14 @@ def test_vector_codec_round_trips_across_valid_dimensions(
     point = model.initial_points[0]
     placement = decode_placement(model, point)
 
-    assert len(point) == 2 * isothermal_count + 4 * sensible_count
+    assert len(point) == isothermal_count + 2 * sensible_count
     assert encode_placement(model, placement) == point
     assert decode_placement(model, encode_placement(model, placement)) == placement
     assert verify_candidate(model, point).feasible
+    for hot, cold in zip(placement.hot, placement.cold, strict=True):
+        assert cold.supply_temperature.value == hot.target_temperature.value
+        assert cold.target_temperature.value == hot.supply_temperature.value
+        assert cold.temperature_span == hot.temperature_span
 
 
 @given(st.text(min_size=1), st.text(min_size=1))

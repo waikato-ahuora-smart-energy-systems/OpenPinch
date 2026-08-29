@@ -4,8 +4,8 @@
 
 - **Build tool**: Hatchling through the locked uv environment.
 - **Build status**: Success.
-- **Artifacts**: `dist/openpinch-0.5.4.tar.gz` and
-  `dist/openpinch-0.5.4-py3-none-any.whl`.
+- **Artifacts**: Fresh `openpinch-0.5.4.tar.gz` and
+  `openpinch-0.5.4-py3-none-any.whl` built in an isolated temporary directory.
 - **Package smoke**: The fresh wheel was installed into an isolated import
   target and executed notebook 19 using the project's installed dependencies.
 
@@ -23,6 +23,11 @@
 - Notebook and RTD RED failed on the former single-scope workflow; GREEN passed
   with separate Process/GCC and Site/TSP examples and no public target-mode
   selector.
+- Coupled-pair RED proved that two generated isothermal pairs still exposed
+  four independent coordinates. GREEN reduced generated dimensions to one
+  coordinate family per pair, derives every cold endpoint by exact reversal,
+  verifies pair ordering and bounds, and preserves explicit/inferred
+  independent coordinates.
 - The generator byte-stability regression proves that all 19 checked-in
   notebooks are current without rewriting equivalent Python formatting or
   environment-owned kernel metadata.
@@ -30,13 +35,13 @@
 
 ### Complete Repository Suite
 
-- **Collected**: 2,408 tests.
-- **Passed**: 2,404.
+- **Collected**: 2,414 tests.
+- **Passed**: 2,410.
 - **Skipped**: 4 expected environment/profile-specific tests.
 - **Failed**: 0.
 - **Solver coverage**: solver-marked tests were enabled with the configured
   local solver executables.
-- **Duration**: 327.41 seconds.
+- **Duration**: 275.46 seconds.
 - **Documentation**: the warnings-as-errors documentation build passed within
   the complete suite.
 
@@ -44,9 +49,12 @@
 
 The installed wheel executed the sole utility-placement notebook from top to
 bottom through the hierarchy-aware case API. The Process/GCC workflow selected
-`Almond`, produced `0.06990104239676753 kW/K`, and returned eight optimized
+`Almond`, produced `0.040191585277772335 kW/K`, and returned eight optimized
 utilities. The Site/TSP workflow defaulted to the Site master zone, produced
-`1.1080402046277644 kW/K`, and returned eight optimized utilities. Both cases
+`0.6863313374698734 kW/K`, and returned eight optimized utilities. Every
+generated isothermal and sensible cold member exactly reverses its matching hot
+member; the broad Process and Site sensible pairs span 174.01 to 50.394 degC
+and 181.01 to 50.194 degC, respectively. Both cases
 registered through `workspace.add(...)`, preserved `baseline` as active, and
 created standard Plotly figures. A separate wheel smoke inferred two
 isothermal and two sensible levels per side from existing utilities without
@@ -73,6 +81,15 @@ existing utilities, while any explicit count selects generated-template mode.
 The call returns a detached normal `PinchProblem`; the obsolete public
 `base_target`, placement-specific presentation module, and observation methods
 are absent.
+
+The profile-envelope and coupled-pair corrections are deliberately narrow.
+Generated supply
+bounds now follow changing residual-profile support, sensible span bounds
+cover the target temperature range, and verified deterministic starts
+distribute supplies and spans across those bounds. Matching count-generated
+hot/cold utilities now share one interval with reversed endpoints and
+independent duties. No public API, objective, monetary behavior, CLI, or
+plotting method changed.
 
 ## Overall Status
 

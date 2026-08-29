@@ -2,7 +2,7 @@
 
 The design defines the complete request/template/model lifecycle, 43 numbered
 business rules, frozen domain relationships, deterministic bound and start
-algorithms, a `2*N_iso + 4*N_sens` vector schema, typed error boundaries, and
+algorithms, the original independent `2*N_iso + 4*N_sens` vector schema, typed error boundaries, and
 PBT-01 properties for every applicable component.
 
 ## Question 1

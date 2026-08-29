@@ -23,7 +23,9 @@ sizes still fail before model construction.
 ### U1-NFR-002: Linear pure-model scaling
 
 Let `P` be selected periods, `L = 2*(N_iso + N_sens)` total hot/cold levels,
-and `D = 2*N_iso + 4*N_sens` decision coordinates. Request/template work shall
+and `D = N_iso + 2*N_sens` generated-pair decision coordinates (or
+`D = 2*N_iso + 4*N_sens` for independent explicit/inferred templates).
+Request/template work shall
 be `O(L)`, period-bound validation/intersection `O(P*D)`, order propagation
 `O(L)`, vector encode/decode `O(D)`, and result serialization `O(serialized
 result size)`. No transformation may compare every period with every other

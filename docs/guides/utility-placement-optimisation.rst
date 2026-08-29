@@ -21,6 +21,15 @@ Load a valid :class:`OpenPinch.PinchProblem` directly or select one from a
 must be at least 2 and creates that many levels on each utility side;
 ``sensible`` optionally adds sensible levels on each side.
 
+Count-generated levels are temperature-coupled by kind and ordinal. For
+example, ``hot_iso_1`` and ``cold_iso_1`` occupy the same interval with
+opposite direction: the cold supply equals the hot target, and the cold target
+equals the hot supply. The same rule applies to generated sensible pairs.
+Their temperatures are shared, but their targeted duties remain independent.
+Generated pairs are ordered together from hottest to coldest. Existing Hot and
+Cold utilities inferred when counts are omitted retain independent temperature
+coordinates.
+
 The selected hierarchy node determines the target profile. With no ``zone``,
 the optimizer uses the problem's master zone. A Process Zone or Unit Operation
 uses its direct GCC, a Site uses its Total Site Profile, and a Community or
@@ -96,6 +105,15 @@ The standard GCC and Total Site Profile figures include the utilities stored
 on their corresponding returned cases. Use ``return_graph_data=True`` on either
 plot method for a deterministic graph mapping.
 
+Generated temperature bounds cover the intervals where each residual profile
+changes, rather than forcing every hot level above the hottest process
+temperature or every cold level below the coldest. Deterministic starting
+points include profile-spanning paired intervals as well as distributed utility
+supplies and sensible spans across that support, so
+even a deliberately small tutorial search can compare utilities near different
+parts of the background profile. These starts improve coverage but do not turn
+the bounded search into a proof of the global optimum.
+
 Use ``problem.target.all_periods.utility_placement(...)`` to select every
 canonical period. An ordered case batch uses the same arguments:
 
@@ -156,7 +174,8 @@ Next Steps
 
 Run ``19_utility_placement_optimisation.ipynb`` for the executable
 thermodynamic workflow, two isothermal plus two sensible levels per side,
-named-case replacement, and standard GCC and Total Site Profile plots. Replace
+executable checks of their reversed hot/cold endpoints, named-case replacement,
+and standard GCC and Total Site Profile plots. Replace
 the sample with reviewed site data and defensible bounds, then increase
 ``iteration_limit`` and ``evaluation_limit`` beyond the tutorial's deliberately
 small values before using the result for engineering decisions.

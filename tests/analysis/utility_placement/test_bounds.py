@@ -26,7 +26,18 @@ from OpenPinch.contracts.utility_placement import (
 
 
 def _request_and_blueprints(*, fixed_high: bool = False):
-    request = normalize_utility_placement_request(isothermal_level_count=2)
+    generated_request = normalize_utility_placement_request(isothermal_level_count=2)
+    generated_blueprints = prepare_template_blueprints(generated_request)
+    request = generated_request.model_copy(
+        update={
+            "hot_templates": tuple(
+                item.as_template() for item in generated_blueprints.hot
+            ),
+            "cold_templates": tuple(
+                item.as_template() for item in generated_blueprints.cold
+            ),
+        }
+    )
     blueprints = prepare_template_blueprints(request)
     if fixed_high:
         first = blueprints.hot[0].model_copy(
@@ -209,8 +220,8 @@ def test_primary_start_is_deterministic_and_locally_feasible() -> None:
         ]
         for template in templates.cold
     ]
-    assert hot_supplies[-1] == templates.hot[-1].supply_bounds.lower
-    assert cold_supplies[-1] == templates.cold[-1].supply_bounds.upper
+    assert hot_supplies[0] == templates.hot[0].supply_bounds.upper
+    assert cold_supplies[0] == templates.cold[0].supply_bounds.lower
     for blueprint in templates.all:
         supply_key = CoordinateKey(
             template_key=blueprint.key,

@@ -204,9 +204,15 @@ tolerance normalizes to one fixed bound.
 
 ### BR-029: Physical order
 
-In `placement_rank`, adjacent hot supplies are strictly descending and adjacent
-cold supplies strictly ascending by at least the named positive separation.
-Kinds may be interleaved by explicit caller declaration.
+In an independent explicit or inferred model, adjacent hot supplies are
+strictly descending and adjacent cold supplies strictly ascending by at least
+the named positive separation. Kinds may be interleaved by explicit caller
+declaration.
+
+Generated hot/cold members of one ordinal are a coupled pair. For each pair,
+`cold_supply = hot_target` and `cold_target = hot_supply`. Generated pairs are
+ordered hottest-to-coldest using their shared interval; paired hot and cold
+duties remain independent.
 
 ### BR-030: No implicit repair
 
@@ -216,14 +222,17 @@ its original identities.
 
 ### BR-031: Coordinate sequence
 
-Vector coordinates are hot isothermal supplies, hot sensible supply/span pairs,
-cold isothermal supplies, then cold sensible supply/span pairs. Relative order
-within a family follows caller declaration order.
+Generated vector coordinates are hot isothermal supplies followed by hot
+sensible supply/span pairs; matching cold temperatures are derived by endpoint
+reversal. Independent explicit or inferred models additionally contain cold
+isothermal supplies and cold sensible supply/span pairs. Relative order within
+a family follows caller declaration order.
 
 ### BR-032: Vector dimension
 
-Dimension is exactly `2*N_iso + 4*N_sens`, including fixed supply or sensible
-span coordinates with equal bounds.
+Generated paired dimension is exactly `N_iso + 2*N_sens`. Independent explicit
+or inferred dimension is `2*N_iso + 4*N_sens`, including fixed supply or
+sensible span coordinates with equal bounds.
 
 ### BR-033: Encode completeness
 

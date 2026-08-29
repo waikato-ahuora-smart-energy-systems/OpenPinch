@@ -42,9 +42,14 @@ service and constructed the default thermodynamic request successfully.
   candidate-local real-temperature balanced composite curves. Sensible
   intervals use `CP * ln(T_out / T_in)` and isothermal intervals use signed
   `Q/T`; materially unbalanced curves are rejected.
-- Sensible placements use five deterministic structured span starts at 20, 40,
-  50, 60, and 80 percent of each effective span interval; all are independently
-  verified and canonically replayed with backend candidates.
+- Placement retains the deterministic cross-product of five supply-distribution
+  and five sensible-span starts. Count-generated paired models prepend
+  profile-spanning, low-gap, and endpoint starts, then retain only candidates
+  that pass independent pair, bound, Kelvin, and ordering verification.
+- Application-owned physical bounds cover the temperature intervals where the
+  residual hot and cold profiles change; sensible span bounds cover the full
+  target temperature range. Generated-envelope properties verify containment,
+  ordering, finiteness, and feasible deterministic starts.
 - Thermodynamic results retain utility and process terms, total physical
   entropy generation, ambient temperature, and exergy destruction.
 - Positive allocated duty on generated fallback `HU` or `CU` utilities receives
