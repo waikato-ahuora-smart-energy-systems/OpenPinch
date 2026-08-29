@@ -30,7 +30,7 @@ from .penalties import (
     infeasible_objective_scalar,
     penalized_feasible_objective_scalar,
 )
-from .thermodynamics import evaluate_thermodynamic_cost
+from .thermodynamics import evaluate_thermodynamic_cost, stream_entropy_change
 
 
 class PlacementEvaluation(BaseModel):
@@ -153,11 +153,21 @@ class PlacementEvaluationSession:
         )
 
     def _objective_scale(self) -> float:
-        required = math.fsum(
-            period.weight * (period.residual_hot_duty + period.residual_cold_duty)
+        entropy_reference = math.fsum(
+            period.weight
+            * math.fsum(
+                abs(
+                    stream_entropy_change(
+                        item.available_duty,
+                        item.temperature_in_kelvin,
+                        item.temperature_out_kelvin,
+                    )
+                )
+                for item in period.snapshot.entropy_slices
+            )
             for period in self.context.periods
         )
-        return max(abs(required), 1.0)
+        return max(entropy_reference, 1e-12)
 
     def evaluate(self, coordinates) -> PlacementEvaluation:
         key = tuple(

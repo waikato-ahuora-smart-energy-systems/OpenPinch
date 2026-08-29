@@ -79,6 +79,8 @@ def _model(
                 period_id="only",
                 weight=1.0,
                 coordinate_bounds=tuple(coordinate_bounds),
+                residual_hot_duty=100.0,
+                residual_cold_duty=80.0,
             ),
         ),
         minimum_separation=QuantityValue(value=10.0, unit="delta_degC"),
@@ -98,7 +100,10 @@ def test_schema_dimension_and_coordinate_uniqueness(
         sensible_count=sensible_count,
     )
 
-    assert len(model.coordinates) == isothermal_count + 2 * sensible_count
+    level_count = isothermal_count + sensible_count
+    temperature_dimension = isothermal_count + 2 * sensible_count
+    dispatch_dimension = 2 * (level_count - 1)
+    assert len(model.coordinates) == temperature_dimension + dispatch_dimension
     assert [coordinate.index for coordinate in model.coordinates] == list(
         range(len(model.coordinates))
     )
@@ -123,6 +128,10 @@ def test_coordinate_family_order_is_stable() -> None:
         ("hot", "hot_iso_2", "supply_temperature"),
         ("hot", "hot_sensible_1", "supply_temperature"),
         ("hot", "hot_sensible_1", "temperature_span"),
+        ("hot", "hot_iso_1", "duty_fraction"),
+        ("hot", "hot_iso_2", "duty_fraction"),
+        ("cold", "cold_iso_1", "duty_fraction"),
+        ("cold", "cold_iso_2", "duty_fraction"),
     ]
 
 
@@ -133,7 +142,7 @@ def test_explicit_hot_and_cold_templates_keep_independent_schema() -> None:
         generated_pairs=False,
     )
 
-    assert len(model.coordinates) == 2 * 2 + 4 * 1
+    assert len(model.coordinates) == 2 * 2 + 4 * 1 + 2 * (3 - 1)
     assert {item.coordinate.template_key.side.value for item in model.coordinates} == {
         "hot",
         "cold",
@@ -148,14 +157,35 @@ def test_both_codec_round_trips_preserve_identity_order_and_values() -> None:
     restored_point = encode_placement(model, placement)
     restored_placement = decode_placement(model, restored_point)
 
-    assert restored_point == point
-    assert restored_placement == placement
+    assert restored_point == pytest.approx(point)
+    assert restored_placement.hot == placement.hot
+    assert restored_placement.cold == placement.cold
+    for restored, original in zip(
+        restored_placement.period_dispatches,
+        placement.period_dispatches,
+        strict=True,
+    ):
+        assert tuple(item.value for item in restored.hot_duties) == pytest.approx(
+            tuple(item.value for item in original.hot_duties)
+        )
+        assert tuple(item.value for item in restored.cold_duties) == pytest.approx(
+            tuple(item.value for item in original.cold_duties)
+        )
     assert [level.template_key for level in placement.hot] == [
         item.key for item in model.templates.hot
     ]
     assert [level.template_key for level in placement.cold] == [
         item.key for item in model.templates.cold
     ]
+    dispatch = placement.period_dispatches[0]
+    assert sum(item.value for item in dispatch.hot_duties) == pytest.approx(
+        model.envelope.periods[0].residual_hot_duty
+    )
+    assert sum(item.value for item in dispatch.cold_duties) == pytest.approx(
+        model.envelope.periods[0].residual_cold_duty
+    )
+    assert all(item.value >= 0.0 for item in dispatch.hot_duties)
+    assert all(item.value >= 0.0 for item in dispatch.cold_duties)
 
 
 def test_encoding_rejects_a_generated_cold_endpoint_that_is_not_reversed() -> None:

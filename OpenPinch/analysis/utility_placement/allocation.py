@@ -156,21 +156,52 @@ class ExistingTargetingAllocationAdapter:
         self, period: PlacementPeriodInput, placement: DecodedPlacement
     ) -> AllocationAdapterResult:
         limits = dict(period.maximum_duties)
+        dispatch = next(
+            (
+                item
+                for item in placement.period_dispatches
+                if item.period_id == period.period_id
+            ),
+            None,
+        )
+
+        def effective_limit(level, requested: float | None) -> float | None:
+            caller_limit = limits.get(level.template_key.name)
+            if requested is None:
+                return caller_limit
+            if caller_limit is None:
+                return requested
+            return min(requested, caller_limit)
+
+        hot_requested = (
+            tuple(item.value for item in dispatch.hot_duties)
+            if dispatch is not None
+            else (None,) * len(placement.hot)
+        )
+        cold_requested = (
+            tuple(item.value for item in dispatch.cold_duties)
+            if dispatch is not None
+            else (None,) * len(placement.cold)
+        )
         hot = StreamCollection(
             [
-                _build_stream(level, maximum_duty=limits.get(level.template_key.name))
-                for level in placement.hot
+                _build_stream(
+                    level,
+                    maximum_duty=effective_limit(level, requested),
+                )
+                for level, requested in zip(placement.hot, hot_requested, strict=True)
             ]
         )
         cold = StreamCollection(
             [
-                _build_stream(level, maximum_duty=limits.get(level.template_key.name))
-                for level in placement.cold
+                _build_stream(
+                    level,
+                    maximum_duty=effective_limit(level, requested),
+                )
+                for level, requested in zip(placement.cold, cold_requested, strict=True)
             ]
         )
-        if period.maximum_duties:
-            hot.add(_fallback_stream(period, UtilitySide.HOT))
-            cold.add(_fallback_stream(period, UtilitySide.COLD))
+        uses_fallback = dispatch is not None or bool(period.maximum_duties)
         snapshot = period.snapshot
         try:
             targeted_hot, targeted_cold = target_utilities_for_load_profiles(
@@ -196,31 +227,37 @@ class ExistingTargetingAllocationAdapter:
                 ),
             )
 
+        hot_duties = tuple(
+            float(
+                targeted_hot.get_stream_by_name(level.template_key.name).heat_flow.value
+            )
+            for level in placement.hot
+        )
+        cold_duties = tuple(
+            float(
+                targeted_cold.get_stream_by_name(
+                    level.template_key.name
+                ).heat_flow.value
+            )
+            for level in placement.cold
+        )
+
+        def residual_fallback(required: float, duties: tuple[float, ...]) -> float:
+            residual = max(required - math.fsum(duties), 0.0)
+            tolerance = 1e-9 * max(required, 1.0)
+            return 0.0 if residual <= tolerance else residual
+
         return AllocationAdapterResult(
-            hot_duties=tuple(
-                float(
-                    targeted_hot.get_stream_by_name(
-                        level.template_key.name
-                    ).heat_flow.value
-                )
-                for level in placement.hot
-            ),
-            cold_duties=tuple(
-                float(
-                    targeted_cold.get_stream_by_name(
-                        level.template_key.name
-                    ).heat_flow.value
-                )
-                for level in placement.cold
-            ),
+            hot_duties=hot_duties,
+            cold_duties=cold_duties,
             hot_fallback_duty=(
-                float(targeted_hot.get_stream_by_name("HU").heat_flow.value)
-                if period.maximum_duties
+                residual_fallback(period.residual_hot_duty, hot_duties)
+                if uses_fallback
                 else 0.0
             ),
             cold_fallback_duty=(
-                float(targeted_cold.get_stream_by_name("CU").heat_flow.value)
-                if period.maximum_duties
+                residual_fallback(period.residual_cold_duty, cold_duties)
+                if uses_fallback
                 else 0.0
             ),
         )

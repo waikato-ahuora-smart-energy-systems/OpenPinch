@@ -308,6 +308,8 @@ def build_utility_placement_context(
                 period_id=period.period_id,
                 weight=period.weight,
                 coordinate_bounds=period.coordinate_bounds,
+                residual_hot_duty=period.residual_hot_duty,
+                residual_cold_duty=period.residual_cold_duty,
             )
         )
 

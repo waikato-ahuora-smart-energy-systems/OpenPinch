@@ -5,7 +5,8 @@ Purpose
 -------
 
 Utility placement optimisation selects the temperatures of multiple hot and
-cold utility levels while preserving the process heat targets. It minimizes
+cold utility levels and their period-specific duties while preserving the
+process heat targets. It minimizes
 physical entropy generation calculated from candidate-local balanced hot and
 cold composite curves and reports the result in ``kW/K``.
 
@@ -92,6 +93,11 @@ are also accepted:
 Each hot and cold level has its own independent bound, including matching
 generated pairs. When named capacity cannot cover the target, residual-only
 ``HU`` or ``CU`` supplies the shortfall and is retained in the returned case.
+The optimizer decides each period's hot and cold duty split independently.
+Bounded stick-breaking coordinates make each side's requested duties
+non-negative and conserve its residual load exactly. Targeting then clips each
+request to temperature availability and any ``maximum_duties`` entry; only the
+remaining shortfall becomes fallback duty.
 
 The return value is already a normal detached :class:`OpenPinch.PinchProblem`
 containing the best utility set. Register it, then target and plot it with the
@@ -135,11 +141,16 @@ plot method for a deterministic graph mapping.
 Generated temperature bounds cover the intervals where each residual profile
 changes, rather than forcing every hot level above the hottest process
 temperature or every cold level below the coldest. Deterministic starting
-points include profile-spanning paired intervals as well as distributed utility
-supplies and sensible spans across that support, so
+points include profile-spanning paired intervals, balanced named-hot dispatch
+with a profile-following cold level, and distributed utility supplies and
+sensible spans across that support, so
 even a deliberately small tutorial search can compare utilities near different
 parts of the background profile. These starts improve coverage but do not turn
 the bounded search into a proof of the global optimum.
+
+Internally, all optimizer-facing coordinates are normalized to ``[0, 1]``.
+Temperature decoding preserves the minimum ordering separation structurally,
+while the returned utility temperatures remain ordinary physical values.
 
 Use ``problem.target.all_periods.utility_placement(...)`` to select every
 canonical period. An ordered case batch uses the same arguments:
@@ -197,9 +208,12 @@ dimensionless penalty in period ``p`` is
    g_p = \left(\frac{Q_{HU,p}}{Q_{heat,required,p}}\right)^2
        + \left(\frac{Q_{CU,p}}{Q_{cool,required,p}}\right)^2.
 
-The optimizer uses ``sum(w_p * g_p)`` together with its entropy ranking. The
-reported physical entropy remains the balanced-composite result in ``kW/K``;
-the dimensionless penalty is exposed separately as ``fallback_penalty``.
+For ranking, OpenPinch maps the weighted physical entropy monotonically using
+an entropy-valued reference derived from the process slices, then combines it
+with ``sum(w_p * g_p)``. The optimizer backend, canonical replay, alternatives,
+and selected best result all use this same scalar ranking. The reported
+physical entropy remains the balanced-composite result in ``kW/K``; the
+dimensionless penalty is exposed separately as ``fallback_penalty``.
 
 Temperatures and duties retain explicit units. Default canonical units are
 ``degC``, ``delta_degC``, ``kW``, and ``kW/K``. Invalid input is rejected before

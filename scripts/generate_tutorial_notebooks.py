@@ -791,11 +791,12 @@ NOTEBOOKS = {
                 "assert len(process_named_utilities) == 8\n"
                 "assert_reversed_utility_pairs(process_utilities)\n"
                 "assert process_fallback_penalty.value > 0.0\n"
-                "assert any(utility[\"name\"] == \"HU\" for utility in process_utilities)\n"
+                "assert process_fallback_penalty.value < 0.5\n"
+                'assert any(utility["name"] == "HU" for utility in process_utilities)\n'
                 "for utility in process_named_utilities:\n"
-                "    maximum = process_maximum_duties.get(utility[\"name\"])\n"
+                '    maximum = process_maximum_duties.get(utility["name"])\n'
                 "    if maximum is not None:\n"
-                "        assert utility[\"maximum_heat_flow\"] == {\n"
+                '        assert utility["maximum_heat_flow"] == {\n'
                 '            "value": maximum, "unit": "kW"\n'
                 "        }\n"
                 "process_hot_targets = [\n"
@@ -825,7 +826,12 @@ NOTEBOOKS = {
                 "    for utility in process_zone.hot_utilities\n"
                 "    if utility.name in process_maximum_duties\n"
                 ")\n"
-                "assert process_zone.hot_utilities.get_stream_by_name(\"HU\").heat_flow.value > 0.0\n"
+                "assert sum(\n"
+                "    utility.heat_flow.value > 1e-9\n"
+                "    for utility in process_zone.hot_utilities\n"
+                "    if utility.name in process_maximum_duties\n"
+                ") >= 3\n"
+                'assert process_zone.hot_utilities.get_stream_by_name("HU").heat_flow.value > 0.0\n'
                 "process_summary = process_case.summary_frame()\n"
                 "process_gcc = process_case.plot.grand_composite_curve(\n"
                 '    zone_name="Almond"\n'
@@ -855,6 +861,12 @@ NOTEBOOKS = {
                 "]\n"
                 "assert min(site_hot_targets) < 80.0\n"
                 "assert max(site_cold_supplies) > 15.0\n"
+                "assert site_objective.value < 0.65\n"
+                "assert max(\n"
+                '    utility["t_target"]["value"] - utility["t_supply"]["value"]\n'
+                "    for utility in site_utilities\n"
+                '    if utility["type"] == "Cold"\n'
+                ") > 5.0\n"
                 "site_case = workspace.add(\n"
                 "    site_case,\n"
                 '    name="optimized_site_utilities",\n'
@@ -1004,7 +1016,7 @@ GUIDANCE = {
     ),
     "19_utility_placement_optimisation.ipynb": (
         "Where should two isothermal and two sensible hot and cold utility levels be placed at Process and Site hierarchy levels to minimize thermodynamic cost?",
-        "Compare the Process result against its direct GCC and the Site result against its Total Site Profile. Inspect physical entropy generation from the balanced composite curves: use CP * ln(T_out / T_in) in kelvin for sensible intervals and the signed Q / T limit for isothermal intervals. Confirm that no generated HU/CU fallback has positive duty.",
+        "Compare the Process result against its direct GCC and the Site result against its Total Site Profile. Inspect physical entropy generation from the balanced composite curves: use CP * ln(T_out / T_in) in kelvin for sensible intervals and the signed Q / T limit for isothermal intervals. In the capped Process example, confirm that the optimizer dispatches across the feasible named levels before assigning only the remaining shortfall to HU.",
         "Replace the sample with validated plant data, apply defensible temperature bounds, and increase the optimizer limits before making an engineering decision.",
         (
             "Prepare the placement study",

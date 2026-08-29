@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -13,6 +14,10 @@ from OpenPinch.analysis.utility_placement import (
     normalize_utility_placement_request,
     prepare_template_blueprints,
     verify_candidate,
+)
+from OpenPinch.analysis.utility_placement.codec import (
+    decode_duty_splits,
+    encode_duty_splits,
 )
 from OpenPinch.analysis.utility_placement.errors import (
     PlacementModelValidationError,
@@ -35,7 +40,7 @@ from OpenPinch.contracts.utility_placement import (
 from OpenPinch.domain.value import Value
 from tests.analysis.utility_placement.test_codec import _model
 from tests.analysis.utility_placement.test_contracts import _nested_result
-from tests.strategies.utility_placement import count_only_requests
+from tests.strategies.utility_placement import count_only_requests, duty_split_cases
 
 
 def _explicit_request_and_blueprints():
@@ -312,14 +317,46 @@ def test_vector_codec_round_trips_across_valid_dimensions(request) -> None:
     point = model.initial_points[0]
     placement = decode_placement(model, point)
 
-    assert len(point) == isothermal_count + 2 * sensible_count
-    assert encode_placement(model, placement) == point
-    assert decode_placement(model, encode_placement(model, placement)) == placement
+    level_count = isothermal_count + sensible_count
+    assert len(point) == (isothermal_count + 2 * sensible_count + 2 * (level_count - 1))
+    encoded = encode_placement(model, placement)
+    assert encoded == pytest.approx(point)
+    restored = decode_placement(model, encoded)
+    assert restored.hot == placement.hot
+    assert restored.cold == placement.cold
+    for dispatch in restored.period_dispatches:
+        period = model.envelope.periods[0]
+        assert sum(item.value for item in dispatch.hot_duties) == pytest.approx(
+            period.residual_hot_duty
+        )
+        assert sum(item.value for item in dispatch.cold_duties) == pytest.approx(
+            period.residual_cold_duty
+        )
     assert verify_candidate(model, point).feasible
     for hot, cold in zip(placement.hot, placement.cold, strict=True):
         assert cold.supply_temperature.value == hot.target_temperature.value
         assert cold.target_temperature.value == hot.supply_temperature.value
         assert cold.temperature_span == hot.temperature_span
+
+
+@given(duty_split_cases())
+def test_duty_split_codec_conserves_and_round_trips(case) -> None:
+    fractions, total_duty = case
+    duties = decode_duty_splits(fractions, total_duty)
+    tolerance = 1e-9 * max(total_duty, 1.0)
+
+    assert len(duties) == len(fractions) + 1
+    assert all(duty >= 0.0 for duty in duties)
+    assert sum(duties) == pytest.approx(total_duty)
+    encoded = encode_duty_splits(
+        duties,
+        total_duty,
+        tolerance=tolerance,
+    )
+    assert decode_duty_splits(encoded, total_duty) == pytest.approx(
+        duties,
+        abs=tolerance,
+    )
 
 
 @given(st.text(min_size=1), st.text(min_size=1))

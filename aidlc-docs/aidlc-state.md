@@ -3,8 +3,9 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Utility Placement per-utility maximum-duty amendment
-  complete; Operations is N/A.
+- **Current Stage**: Utility Placement profile-aware dispatch correctness
+  amendment complete; Code Generation and Build and Test passed. Operations is
+  N/A because no deployment change was requested.
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -30,6 +31,14 @@
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
 
 ## Utility Placement Optimisation Progress
+
+- [x] PROFILE-AWARE DISPATCH CORRECTION - Replace temperature-only greedy duty
+  selection with period-specific profile-aware duty decisions, align canonical
+  ranking with the backend objective, use an entropy-unit scale, correct replay
+  accounting, and refresh notebook 19 and RTD under the approved eight-step TDD
+  plan. All eight steps are complete. The focused gate passes 220 tests, the
+  refreshed notebook/RTD gate passes 41 tests with 3 guarded skips, and the
+  complete solver-enabled suite passes 2,445 tests with 4 expected skips.
 
 - [x] REQUIREMENTS AMENDMENT - Define per-utility maximum-duty inputs,
   multiperiod semantics, omitted-limit behavior, and infeasibility handling.

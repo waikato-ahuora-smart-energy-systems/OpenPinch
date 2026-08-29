@@ -16,6 +16,7 @@ from OpenPinch.analysis.utility_placement.context import (
 )
 from OpenPinch.contracts.utility_placement import (
     CandidateDiagnostic,
+    DecodedPeriodDispatch,
     DecodedPlacement,
     DecodedUtilityLevel,
     QuantityValue,
@@ -188,9 +189,7 @@ def test_existing_targeting_caps_named_levels_then_allocates_fallback() -> None:
     assert result.feasible
     named_hot = [level for level in result.hot_levels if not level.is_fallback]
     named_cold = [level for level in result.cold_levels if not level.is_fallback]
-    assert all(
-        level.allocated_duty <= level.maximum_duty + 1e-9 for level in named_hot
-    )
+    assert all(level.allocated_duty <= level.maximum_duty + 1e-9 for level in named_hot)
     assert all(
         level.allocated_duty <= level.maximum_duty + 1e-9 for level in named_cold
     )
@@ -200,6 +199,44 @@ def test_existing_targeting_caps_named_levels_then_allocates_fallback() -> None:
     assert result.cold_levels[-1].is_fallback
     assert result.allocated_hot_duty == pytest.approx(period.residual_hot_duty)
     assert result.allocated_cold_duty == pytest.approx(period.residual_cold_duty)
+
+
+def test_existing_targeting_replays_requested_period_dispatch_with_fallback() -> None:
+    placement = _placement().model_copy(
+        update={
+            "period_dispatches": (
+                DecodedPeriodDispatch(
+                    period_id="p1",
+                    hot_duties=(
+                        QuantityValue(value=25.0, unit="kW"),
+                        QuantityValue(value=75.0, unit="kW"),
+                    ),
+                    cold_duties=(
+                        QuantityValue(value=30.0, unit="kW"),
+                        QuantityValue(value=50.0, unit="kW"),
+                    ),
+                ),
+            )
+        }
+    )
+
+    result = allocate_placement_period(
+        request=UtilityPlacementRequest(isothermal_level_count=2),
+        period=_period(),
+        placement=placement,
+    )
+
+    assert result.feasible
+    assert all(
+        level.allocated_duty <= requested + 1e-9
+        for level, requested in zip(result.hot_levels[:2], (25.0, 75.0), strict=True)
+    )
+    assert all(
+        level.allocated_duty <= requested + 1e-9
+        for level, requested in zip(result.cold_levels[:2], (30.0, 50.0), strict=True)
+    )
+    assert result.allocated_hot_duty == pytest.approx(100.0)
+    assert result.allocated_cold_duty == pytest.approx(80.0)
 
 
 def test_zero_maximum_disables_only_its_named_utility() -> None:
@@ -214,7 +251,8 @@ def test_zero_maximum_disables_only_its_named_utility() -> None:
     )
 
     by_name = {
-        level.template_key.name: level for level in result.hot_levels + result.cold_levels
+        level.template_key.name: level
+        for level in result.hot_levels + result.cold_levels
     }
     assert by_name["steam_high"].allocated_duty == 0.0
     assert by_name["cw_low"].allocated_duty == 0.0
@@ -247,9 +285,7 @@ def test_fallback_uses_context_wide_temperature_support() -> None:
 
 
 def test_adapter_duty_above_maximum_is_infeasible() -> None:
-    period = _period().model_copy(
-        update={"maximum_duties": (("steam_high", 10.0),)}
-    )
+    period = _period().model_copy(update={"maximum_duties": (("steam_high", 10.0),)})
     adapter = _RecordingAdapter(hot=(20.0, 80.0), cold=(100.0, 0.0))
 
     result = allocate_placement_period(

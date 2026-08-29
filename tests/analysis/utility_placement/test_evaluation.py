@@ -18,6 +18,7 @@ from OpenPinch.analysis.utility_placement.evaluation import PlacementEvaluationS
 from OpenPinch.analysis.utility_placement.normalization import (
     prepare_template_blueprints,
 )
+from OpenPinch.analysis.utility_placement.thermodynamics import stream_entropy_change
 from OpenPinch.contracts.utility_placement import (
     CoordinateKey,
     DecisionField,
@@ -139,6 +140,29 @@ def test_evaluation_session_replays_once_for_exact_coordinate_memo() -> None:
     assert adapter.calls == 1
     assert session.evaluation_count == 1
     assert session.memo_hit_count == 1
+
+
+def test_entropy_objective_scale_uses_entropy_not_heat_duty() -> None:
+    request, context, model = _case()
+    session = PlacementEvaluationSession(
+        request=request,
+        context=context,
+        model=model,
+        allocation_adapter=_Adapter(),
+    )
+    expected = context.periods[0].weight * sum(
+        abs(
+            stream_entropy_change(
+                item.available_duty,
+                item.temperature_in_kelvin,
+                item.temperature_out_kelvin,
+            )
+        )
+        for item in context.periods[0].snapshot.entropy_slices
+    )
+
+    assert session._objective_scale() == pytest.approx(expected)
+    assert session._objective_scale() != pytest.approx(360.0)
 
 
 def test_evaluation_session_applies_squared_fallback_penalty() -> None:

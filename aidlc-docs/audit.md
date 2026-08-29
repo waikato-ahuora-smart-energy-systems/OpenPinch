@@ -5510,3 +5510,67 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 **Context**: FINAL REVIEW - Utility Placement maximum-duty amendment complete and ready for scoped commit
 
 ---
+
+## Utility Placement Optimisation Correctness Diagnosis
+**Timestamp**: 2026-08-29T05:13:24Z
+**User Input**: "The utility placement optimisation is still obviously wrong. Check the way heat pump optimisation works for ideas to improve utility placement."
+**AI Response**: "Opened a read-only correctness diagnosis. Resumed the completed utility-placement artifacts and began comparing the placement decision model, objective scaling, deterministic starts, optimizer boundary, candidate replay, and result selection with the established heat-pump optimization workflow. No production behavior was changed."
+**Context**: DIAGNOSIS / REQUIREMENTS REOPENING - Utility Placement physical and optimizer correctness
+
+---
+
+## Utility Placement Optimisation Correctness Diagnosis - Findings
+**Timestamp**: 2026-08-29T05:19:31Z
+**User Input**: "The utility placement optimisation is still obviously wrong. Check the way heat pump optimisation works for ideas to improve utility placement."
+**AI Response**: "Completed the read-only comparison and reproduced the defect numerically. The total-site tutorial and a 50-iteration, three-run search returned the identical solution: one hot sensible level carries 1,331.44 kW, one cold sensible level carries 3,650.59 kW, and the other six requested levels carry zero. The primary cause is the requirements-mandated temperature-only optimization followed by greedy maximize-in-order cascade allocation. Heat-pump targeting instead optimizes bounded temperature coordinates and explicit base/split duty decisions against profile availability. Also found a result-selection defect: canonical utility-placement candidates are optimized using the entropy-plus-fallback scalar but sorted for publication by entropy alone, and found dimensionally inconsistent entropy scaling plus inaccurate parent-process evaluation accounting. No production code was changed."
+**Context**: DIAGNOSIS / REQUIREMENTS REOPENING - Evidence and heat-pump-derived correction direction recorded
+
+---
+
+## Utility Placement Profile-Aware Dispatch Plan Approval
+**Timestamp**: 2026-08-29T05:22:00Z
+**User Input**: "Go"
+**AI Response**: "Recorded approval of the diagnosis-derived requirements amendment and eight-step TDD Code Generation plan. Began Step 1 by adding analytical and application regressions before production changes. Security and Resiliency extensions remain disabled; configured Property-Based Testing remains enabled for dispatch round trips and invariants."
+**Context**: REQUIREMENTS AMENDMENT / CODE GENERATION PLAN APPROVAL - Utility Placement profile-aware dispatch correction
+
+---
+
+## Utility Placement Profile-Aware Dispatch TDD RED
+**Timestamp**: 2026-08-29T05:25:00Z
+**User Input**: "Go"
+**AI Response**: "Completed Code Generation Step 1. Added focused analytical, optimizer, application, and contract regressions for explicit per-period dispatch, objective-consistent ranking, entropy-unit scaling, canonical replay accounting, and the Total Site collapse. The focused RED run failed at the first expected counterexample: a generated two-level model exposes two temperature coordinates but no hot/cold duty coordinates. Proceeded to the smallest contract and codec implementation."
+**Context**: CODE GENERATION Step 1 - Utility Placement profile-aware dispatch TDD RED
+
+---
+
+## Utility Placement Profile-Aware Dispatch Focused GREEN
+**Timestamp**: 2026-08-29T06:02:37Z
+**User Input**: "Go"
+**AI Response**: "Completed Code Generation Steps 2 through 6. Added period-specific conserving hot/cold duty coordinates, cap-aware requested-dispatch replay with residual fallback only, entropy-unit normalization, scalar-consistent candidate ranking, accurate canonical replay accounting, and bounded structurally ordered optimizer coordinates. Added profile-aware deterministic starts, including a balanced-hot/cold-profile start for capped cases, and adaptively bounded their count for large multiperiod models. Process placement now activates three feasible capped hot levels before fallback; Total Site placement uses sensible utilities spanning the residual profile rather than zero-span edge utilities. Corrected a property assertion to use the codec's documented duty tolerance. The complete focused utility-placement gate passed 220 tests. Proceeded to RTD and executable notebook refresh."
+**Context**: CODE GENERATION Steps 2-6 - Utility Placement profile-aware dispatch TDD GREEN and focused refactor gate
+
+---
+
+## Utility Placement Profile-Aware Dispatch Notebook and RTD
+**Timestamp**: 2026-08-29T06:20:00Z
+**User Input**: "Go"
+**AI Response**: "Completed Code Generation Step 7. Updated the requirements-owned RTD guide with explicit period-specific duty decisions, profile/cap clipping, entropy-valued normalization, scalar-consistent ranking, and normalized ordered optimizer coordinates. Updated the canonical generator and executed notebook 19 under the repository Python 3.14 kernel. The capped Process workflow asserts a fallback penalty below 0.5 and at least three active feasible named hot levels after standard targeting; the Site workflow asserts entropy below 0.65 and a non-isothermal cold placement span above 5 degC before rendering the standard TSP. Notebook, documentation-consistency, profile-overlap, and capped-dispatch verification passed 41 tests with 3 guarded skips. Proceeded to the complete verification and patch review gate."
+**Context**: CODE GENERATION Step 7 - Utility Placement notebook 19 and RTD refresh complete
+
+---
+
+## Build and Test Stage - Utility Placement Profile-Aware Dispatch
+**Timestamp**: 2026-08-29T06:19:58Z
+**User Input**: "Go"
+**AI Response**: "Completed Code Generation Step 8 and Build and Test under the user's standing authorization. The focused utility-placement gate passed 220 tests. The notebook/documentation/graph gate passed 41 tests with 3 guarded skips. Notebook 19 executed cleanly under the repository Python 3.14 kernel and records Process entropy 0.05984815679388933 kW/K, Process fallback penalty 0.33603087814600113, and Total Site entropy 0.5104970730530098 kW/K. Ruff and format checks, patch hygiene, the 54-page warnings-as-errors Sphinx build, fresh source/wheel builds, and archive-content checks passed. The complete solver-enabled suite passed 2,445 tests with 4 expected skips and 0 failures in 306.33 seconds. Reviewed the changed-file set for feature ownership and excluded the unrelated .gitignore modification from the intended commit."
+**Context**: CODE GENERATION Step 8 / BUILD AND TEST - Utility Placement profile-aware dispatch correction complete
+**Build Status**: Success
+**Test Status**: Pass
+**Files Generated**:
+- build-instructions.md
+- unit-test-instructions.md
+- integration-test-instructions.md
+- performance-test-instructions.md
+- build-and-test-summary.md
+
+---

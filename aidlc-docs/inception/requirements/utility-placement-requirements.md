@@ -25,8 +25,9 @@
 1. Accept optional isothermal and sensible level counts, independently applying
    each supplied count to both hot and cold sides; otherwise infer templates and
    counts from existing problem utilities.
-2. Optimise the temperature placement of fixed utility-family templates while
-   existing heat cascades determine feasible duties.
+2. Optimise the temperature placement and period-specific hot/cold duty split
+   of fixed utility-family templates, with detached targeting validating duty
+   available against each residual profile.
 3. Minimise thermodynamic cost from balanced composite curves.
 4. Infer direct, Total Site, or aggregate indirect targeting from the selected
    hierarchy zone instead of exposing a public base-target selector.
@@ -43,7 +44,8 @@
 
 ## Non-Goals
 
-- Utility duties are not independent optimisation variables.
+- Residual heating and cooling demands are not optimisation variables; each
+  side's period-specific utility duties must conserve the corresponding target.
 - Utility technology and fluid identity are not chosen by the optimiser.
 - Hybrid weighted objectives and Pareto-frontier generation are excluded.
 - Monetary, boiler, turbine, fuel-cost, electricity-credit, and capital-cost
@@ -154,12 +156,20 @@ glide.
 
 ### Candidate duty allocation
 
-For every candidate placement and period, the service shall build detached
-utility streams and run the existing targeting cascade. The cascade, rather
-than the optimisation vector, shall determine each utility duty. A candidate
-is feasible only if all required process or site heating and cooling loads are
-fully satisfied and all temperature, ordering, separation, template, and
-targeting constraints hold.
+For every candidate placement and period, the optimisation model shall choose
+independent non-negative hot- and cold-side duty allocations in addition to the
+shared utility temperatures. Per-period duties shall use bounded base/split
+coordinates equivalent to the heat-pump targeting encoding. The decoded duties
+shall be replayed through detached targeting to establish how much duty is
+available at each selected temperature; targeting shall validate the requested
+dispatch rather than greedily determine the optimum dispatch.
+
+Temperature decisions remain shared across selected periods. Duty dispatch is
+period-specific because process and site profiles vary by period. Hot and cold
+members of a generated reversed-temperature pair retain independent duties.
+The split encoding shall conserve each side's residual duty structurally,
+remain within `[0, 1]`, and permit any individual requested level to receive
+zero duty.
 
 For every period `p`, let `Q_heat_required[p]` and `Q_cool_required[p]` be the
 non-negative residual demands after the selected heat-integration target. The
@@ -171,6 +181,13 @@ coverage constraints shall require, within one named numerical tolerance:
 No feasible candidate may leave unmet heating or cooling demand, and no excess
 allocation beyond the same tolerance may be silently accepted. Individual
 levels may have zero duty when the complete side-level balance still holds.
+
+Each requested level duty shall be limited by both its caller-specified maximum
+duty, when present, and the process-profile duty available at its selected
+temperature interval. Targeting shall clip unavailable requested duty and
+record the resulting shortfall as residual fallback evidence. Residual `HU` or
+`CU` duty shall remain available as an explicit fallback for otherwise valid
+coordinates and shall receive the dimensionless squared fallback penalty.
 
 When capped named levels cannot cover a side's complete residual demand, the
 generated `HU` or `CU` default utility shall supply only the remaining
@@ -625,6 +642,7 @@ permanent example-based regression test.
 | Thermodynamic-only scope correction | Goal 3; Goal 8; FR-002; FR-004; FR-010; FR-014; FR-017; Acceptance 6 and 16 |
 | Hierarchy API answers and clarifications | Goals 1, 4, and 8; FR-001; FR-003; FR-004; FR-007; FR-014; FR-017; Acceptance 21-23 |
 | Maximum-duty answers and fallback clarification | Utility duty upper bounds; FR-001; FR-004; FR-008; FR-009; FR-012 through FR-017; Acceptance 24-27 |
+| Profile-aware dispatch correctness approval | Goal 2; Candidate duty allocation; FR-008; FR-009; NFR-001 through NFR-003; Acceptance 18, 25-27; profile-aware dispatch amendment |
 
 ## Success Criteria
 
@@ -679,7 +697,33 @@ so their rules are skipped for this stage.
 - [x] The packaged direct and Total Site samples use period-resolved physical
   process streams at real temperatures for process entropy; the direct result
   has nonzero process entropy and both scopes meet exact residual coverage.
-- [ ] The maximum-duty amendment is pending TDD implementation and integrated
+- [x] The maximum-duty amendment completed TDD implementation and integrated
   Build and Test for Acceptance 24 through 27.
+- [x] The profile-aware dispatch correction adds conserving per-period duty
+  decisions, scalar-consistent ranking, entropy-unit scaling, bounded ordered
+  optimizer coordinates, and current Process/GCC and Site/TSP notebook evidence.
 
-Final evidence: `aidlc-docs/construction/build-and-test/build-and-test-summary.md`.
+## Profile-aware dispatch correctness amendment
+
+The optimizer shall rank candidates using the same complete scalar objective
+used by its backend: normalized balanced-composite entropy plus the separately
+reported fallback penalty. Canonical replay shall not reorder candidates using
+unpenalized entropy alone.
+
+The entropy normalization scale shall have entropy units. It shall be derived
+from deterministic baseline placement entropy or another positive
+context-derived entropy reference, never directly from heat duty. Scaling must
+remain constant for every candidate in one optimization run.
+
+Optimizer termination evidence shall include canonical parent-process replay
+evaluations and shall not report zero evaluations after successful candidate
+replay.
+
+The executable Process and Total Site examples shall verify that increasing the
+search budget does not collapse a requested four-level family to a greedy
+single active level when a feasible multi-level dispatch has lower
+balanced-composite entropy. Standard GCC and Total Site plots remain the visual
+acceptance evidence.
+
+Final correction evidence:
+`aidlc-docs/construction/utility-placement-profile-aware-dispatch/build-and-test/build-and-test-summary.md`.

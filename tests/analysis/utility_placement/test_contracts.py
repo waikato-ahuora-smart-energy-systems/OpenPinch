@@ -92,6 +92,7 @@ def test_stable_enum_values_are_lowercase_contract_vocabulary() -> None:
     assert [member.value for member in DecisionField] == [
         "supply_temperature",
         "temperature_span",
+        "duty_fraction",
     ]
 
 

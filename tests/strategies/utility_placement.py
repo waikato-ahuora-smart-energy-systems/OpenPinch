@@ -98,8 +98,36 @@ def residual_profile_envelopes(draw):
     return temperatures, draw(profile_strategy), draw(profile_strategy)
 
 
+@st.composite
+def duty_split_cases(draw):
+    """Generate one bounded utility-family dispatch case."""
+    level_count = draw(st.integers(min_value=2, max_value=8))
+    fractions = draw(
+        st.lists(
+            st.floats(
+                min_value=0.0,
+                max_value=1.0,
+                allow_nan=False,
+                allow_infinity=False,
+            ),
+            min_size=level_count - 1,
+            max_size=level_count - 1,
+        )
+    )
+    total_duty = draw(
+        st.floats(
+            min_value=0.001,
+            max_value=100_000.0,
+            allow_nan=False,
+            allow_infinity=False,
+        )
+    )
+    return tuple(fractions), total_duty
+
+
 __all__ = [
     "count_only_requests",
+    "duty_split_cases",
     "finite_magnitudes",
     "invalid_counts",
     "isothermal_templates",

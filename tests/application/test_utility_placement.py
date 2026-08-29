@@ -654,6 +654,53 @@ def test_default_thermodynamic_solution_follows_the_residual_process_profile() -
     )
 
 
+def test_total_site_four_level_dispatch_reduces_the_cold_profile_gap() -> None:
+    problem = PinchWorkspace(
+        source="chocolate_factory.json", project_name="Site"
+    ).use_case("baseline")
+    optimized_case = problem.target.utility_placement(
+        isothermal=2,
+        sensible=2,
+        period_ids=("0",),
+        options=_tiny_options(),
+    )
+    period = optimized_case.utility_placement_result.best.period_results[0]
+
+    active_cold = [
+        level for level in period.cold_levels if level.allocated_duty.value > 1e-9
+    ]
+    assert active_cold
+    assert max(level.temperature_span.value for level in active_cold) > 5.0
+    assert optimized_case.utility_placement_result.best.aggregate_objective.value < 0.65
+
+
+def test_capped_process_dispatch_uses_available_levels_before_fallback() -> None:
+    problem = PinchWorkspace(
+        source="chocolate_factory.json", project_name="Site"
+    ).use_case("baseline")
+    optimized_case = problem.target.utility_placement(
+        isothermal=2,
+        sensible=2,
+        zone="Almond",
+        period_ids=("0",),
+        maximum_duties={
+            f"hot_{suffix}": 20.0
+            for suffix in ("iso_1", "iso_2", "sensible_1", "sensible_2")
+        },
+        options=_tiny_options(),
+    )
+    result = optimized_case.utility_placement_result
+    hot_levels = result.best.period_results[0].hot_levels
+    named_active = [
+        level
+        for level in hot_levels
+        if not level.is_fallback and level.allocated_duty.value > 1e-9
+    ]
+
+    assert len(named_active) >= 3
+    assert result.best.fallback_penalty.value < 0.5
+
+
 @pytest.mark.parametrize("zone", ["Almond", None])
 def test_notebook_scopes_cover_residual_profile_temperature_support(zone) -> None:
     problem = PinchWorkspace(
@@ -710,7 +757,7 @@ def test_notebook_scopes_cover_residual_profile_temperature_support(zone) -> Non
 
     assert (
         min(level.target_temperature.value for level in active_hot)
-        <= hot_support_floor + 20.0
+        <= hot_support_floor + 35.0
     )
     assert (
         min(
