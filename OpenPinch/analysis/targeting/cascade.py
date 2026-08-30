@@ -7,11 +7,11 @@ deriving zonal targets and plotting data for composite curves.
 
 from __future__ import annotations
 
-import math
 from typing import List
 
 import numpy as np
 
+from ...domain._problem_table.intervals import canonical_temperature_values
 from ...domain._problem_table.types import ProblemTableUpdateKwargs
 from ...domain.configuration import tol
 from ...domain.enums import ProblemTableLabel
@@ -180,9 +180,7 @@ def create_problem_table_with_t_int(
     if T_vals.size == 0:
         return ProblemTable({ProblemTableLabel.T: []})
 
-    dp = int(-math.log10(tol))
-    T_vals = np.round(T_vals[np.isfinite(T_vals)], dp)
-    return ProblemTable({ProblemTableLabel.T: np.unique(T_vals)[::-1]})
+    return ProblemTable({ProblemTableLabel.T: canonical_temperature_values(T_vals)})
 
 
 def problem_table_algorithm(

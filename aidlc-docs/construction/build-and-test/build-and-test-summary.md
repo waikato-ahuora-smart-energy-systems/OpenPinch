@@ -214,3 +214,23 @@ deselections tied only to the user's locally modified, long-running notebook
 19. Ruff, formatting, patch hygiene, and the warnings-as-errors Sphinx build
 pass. The notebook and `.gitignore` are unchanged by and excluded from this
 refresh.
+
+## Utility Placement Total Site Uniform-Tolerance Refresh
+
+Temperature-grid construction, interval insertion, interpolation safeguards,
+grid comparison, and Total Site profile assignment now use one canonical
+absolute `1e-6 K` tolerance. The comparison normalizes machine-level
+subtraction noise six decimal places below the domain resolution and no longer
+uses the former scale-dependent relative tolerance.
+
+The fixed 70/71-row failure, generated adjacent-utility profiles, a negative-
+temperature boundary case, and a high-temperature absolute-only guard pass.
+All 50 problem-table tests and the 296-test targeting and utility-placement
+gate pass. A deterministic four-isothermal Total Site placement solves and its
+detached case completes ordinary Total Site retargeting with 71 rows.
+
+The complete applicable configured-solver gate passes 2,462 tests with 4
+expected skips and 5 deliberate deselections tied only to the user's locally
+modified notebook 19. Ruff, formatting, patch hygiene, and the warnings-as-
+errors Sphinx build pass. The notebook and `.gitignore` remain unchanged by and
+excluded from this correction.

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from collections.abc import Sequence
 from typing import List, Tuple
@@ -11,6 +12,41 @@ import numpy as np
 from ..configuration import tol
 from ..enums import ProblemTableLabel
 from .constants import HEAT_CAPACITY_PAIRS, INTERPOLATION_KEYS
+
+_TEMPERATURE_DECIMAL_PLACES = int(-math.log10(tol))
+_TEMPERATURE_COMPARISON_DECIMAL_PLACES = _TEMPERATURE_DECIMAL_PLACES + 6
+
+
+def _temperature_gap_exceeds_tolerance(gap) -> np.ndarray | bool:
+    """Compare absolute gaps after removing machine-level subtraction noise."""
+    normalized_gap = np.round(
+        np.abs(gap),
+        _TEMPERATURE_COMPARISON_DECIMAL_PLACES,
+    )
+    return normalized_gap > tol
+
+
+def canonical_temperature_values(temperatures) -> np.ndarray:
+    """Return one descending temperature grid using the domain tolerance."""
+    values = np.atleast_1d(np.asarray(temperatures, dtype=float))
+    values = np.round(values[np.isfinite(values)], _TEMPERATURE_DECIMAL_PLACES)
+    if values.size == 0:
+        return values
+    ordered = np.unique(values)[::-1]
+    kept = [ordered[0]]
+    for value in ordered[1:]:
+        if _temperature_gap_exceeds_tolerance(kept[-1] - value):
+            kept.append(value)
+    return np.asarray(kept, dtype=float)
+
+
+def temperature_grids_match(left, right) -> bool:
+    """Return whether two grids match under the canonical temperature tolerance."""
+    left_values = np.asarray(left, dtype=float)
+    right_values = np.asarray(right, dtype=float)
+    return left_values.shape == right_values.shape and bool(
+        np.all(~_temperature_gap_exceeds_tolerance(left_values - right_values))
+    )
 
 
 class TemperatureIntervalEngine:
@@ -28,7 +64,7 @@ class TemperatureIntervalEngine:
             return T_vals
         T_col = self.data[:, self._column_index_for(ProblemTableLabel.T)]
         gaps = np.abs(T_col[:, None] - T_vals[None, :])
-        mask = np.nanmin(gaps, axis=0) > tol
+        mask = _temperature_gap_exceeds_tolerance(np.nanmin(gaps, axis=0))
         return T_vals[mask]
 
     def _categorise_insertion_targets(
@@ -52,7 +88,9 @@ class TemperatureIntervalEngine:
             idx = np.searchsorted(-T_col, -mid_temps, side="left")
             upper = T_col[idx - 1]
             lower = T_col[idx]
-            inside = (upper - tol > mid_temps) & (mid_temps > lower + tol)
+            inside = _temperature_gap_exceeds_tolerance(
+                upper - mid_temps
+            ) & _temperature_gap_exceeds_tolerance(mid_temps - lower)
             mid_temps = mid_temps[inside]
             mid_idx = idx[inside].astype(int)
         interval_map = self._group_middle_inserts(mid_idx, mid_temps)
@@ -64,7 +102,7 @@ class TemperatureIntervalEngine:
             return values
         kept = [values[0]]
         for val in values[1:]:
-            if abs(kept[-1] - val) > tol:
+            if _temperature_gap_exceeds_tolerance(kept[-1] - val):
                 kept.append(val)
         return np.asarray(kept, dtype=float)
 
@@ -79,7 +117,9 @@ class TemperatureIntervalEngine:
         for i in order:
             key = int(idx[i])
             bucket = grouped.setdefault(key, [])
-            if bucket and abs(bucket[-1] - T_vals[i]) <= tol:
+            if bucket and not _temperature_gap_exceeds_tolerance(
+                bucket[-1] - T_vals[i]
+            ):
                 continue
             bucket.append(float(T_vals[i]))
         return grouped
@@ -405,7 +445,7 @@ class TemperatureIntervalEngine:
 
         temps = rows[:, t_idx]
         denom = row_top[t_idx] - row_bot[t_idx]
-        if abs(denom) <= tol:
+        if not _temperature_gap_exceeds_tolerance(denom):
             for key in INTERPOLATION_KEYS:
                 col_idx = self.col_index[key]
                 rows[:, col_idx] = row_bot[col_idx]
@@ -466,7 +506,7 @@ def insert_temperature_intervals(table, temperatures) -> int:
     if table.data is None or table.data.shape[0] < 2 == 0:
         return 0
     engine = TemperatureIntervalEngine(table)
-    values = np.atleast_1d(np.asarray(temperatures, dtype=float))
+    values = canonical_temperature_values(temperatures)
     missing = engine._Ts_needing_insertion(values)
     top_temps, interval_map, bottom_temps = engine._categorise_insertion_targets(
         missing

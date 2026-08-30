@@ -5978,3 +5978,91 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 **Context**: WORKFLOW COMPLETE - Prepared utility target replay
 
 ---
+
+## Utility Placement Total Site Solve Failure
+**Timestamp**: 2026-08-30T15:39:12Z
+**User Input**: "TS utility placement failed to solve."
+**AI Response**: "Opened a read-only diagnosis against the saved notebook traceback and committed prepared-replay path. The immediate failure is not optimizer exhaustion: a Total Site candidate reaches indirect targeting, where a 70-row site utility profile is assigned to a 71-row problem table. The investigation will reproduce and isolate the temperature-grid divergence without rewriting the user's notebook."
+**Context**: BUG DIAGNOSIS - Prepared Total Site target replay
+
+---
+
+## Utility Placement Total Site Exact-Grid TDD Plan
+**Timestamp**: 2026-08-30T15:39:12Z
+**User Input**: "No new user input; continued under the user's standing approval through completion unless unexpected."
+**AI Response**: "Confirmed that fixed-seed 50- and 100-generation Total Site runs solve, so the notebook failure is a late-convergence grid-alignment edge case. Shrunk the generic failure to a three-row target and four-row source whose extra distinct breakpoint is 0.6 microkelvin from an existing row. Opened a five-step TDD plan to preserve the exact union only during existing-table alignment, while retaining tolerant ordinary interval insertion."
+**Context**: REQUIREMENTS AND CODE GENERATION PLAN - Total Site exact-grid alignment
+
+---
+
+## Utility Placement Total Site Exact-Grid RED
+**Timestamp**: 2026-08-30T15:39:12Z
+**User Input**: "No new user input; continued under the authorized Total Site correction."
+**AI Response**: "Added the shrunk 200/100.0000006/100/0 degree source-grid regression and a 25-example Hypothesis property over constrained near-isothermal clusters and finite cumulative heat profiles. Both tests fail at the expected three-row/four-value broadcast. Hypothesis shrank to a one-nanokelvin separation, retaining deterministic reproduction."
+**Context**: TDD RED - Total Site exact-grid alignment
+
+---
+
+## Utility Placement Total Site Exact-Grid GREEN
+**Timestamp**: 2026-08-30T15:39:12Z
+**User Input**: "No new user input; continued under the authorized Total Site correction."
+**AI Response**: "Added an internal interval-engine tolerance and made ProblemTable.update align two existing tables on their exact temperature union. The ordinary public insertion method retains the 1e-6 temperature-noise tolerance. The shrunk example, 25-example domain property, tolerance guard, and all 49 problem-table tests pass; Ruff, formatting, and patch hygiene pass."
+**Context**: TDD GREEN - Total Site exact-grid alignment
+
+---
+
+## Utility Placement Uniform Tolerance Requirement
+**Timestamp**: 2026-08-30T15:39:12Z
+**User Input**: "tolerences need to be applied uniformly to avoid this issue"
+**AI Response**: "Stopped the long-running verification because the provisional zero-tolerance alignment path conflicted with the clarified requirement. Reopened GREEN implementation to use one canonical domain tolerance for temperature-grid construction, deduplication, interval detection, grid comparison, interpolation, and Total Site alignment. The former exact-union requirement and completion checkbox were withdrawn."
+**Context**: REQUIREMENTS CORRECTION - Uniform temperature tolerance
+
+---
+
+## Utility Placement Uniform Tolerance GREEN
+**Timestamp**: 2026-08-30T15:39:12Z
+**User Input**: "No new user input; continued under the corrected uniform-tolerance requirement."
+**AI Response**: "Removed the provisional zero-tolerance path. Added one canonical temperature-grid function and one rounded absolute-gap comparator based on the domain 1e-6 tolerance. Grid construction, near-duplicate removal, insertion, missing-row detection, grid comparison, interpolation safeguards, and Total Site alignment now share them. The saved-shape example, domain-valid 25-example utility-profile property, and ordinary insertion guard pass."
+**Context**: TDD GREEN - Uniform temperature tolerance
+
+---
+
+## Utility Placement Uniform Tolerance Refinement
+**Timestamp**: 2026-08-30T16:42:11Z
+**User Input**: "No new user input; continued under the corrected uniform-tolerance requirement."
+**AI Response**: "Refined the shared comparator to apply the canonical 1e-6 absolute tolerance directly after temperature-grid canonicalisation; this supersedes the prior audit entry's rounded-gap wording. All 49 problem-table tests pass, including the fixed shrunk case and 25 generated near-boundary utility profiles."
+**Context**: TDD GREEN - Canonical absolute temperature tolerance
+
+---
+
+## Utility Placement Total Site Workflow Regression
+**Timestamp**: 2026-08-30T16:42:11Z
+**User Input**: "No new user input; continued under the user's standing approval through completion unless unexpected."
+**AI Response**: "The full default four-isothermal Total Site optimization returned without the prior 70/71-row broadcast failure. A captured deterministic 50-generation follow-up solved at 0.48952830566434535 kW/K with fallback penalty 0.00012913992555333532 and then completed ordinary Total Site retargeting with hot target 1253.830750792924 kW, cold target 3572.9866931851 kW, and 71 problem-table rows."
+**Context**: WORKFLOW REGRESSION PASS - Uniform temperature tolerance
+
+---
+
+## Utility Placement Uniform Tolerance Boundary RED
+**Timestamp**: 2026-08-30T16:42:11Z
+**User Input**: "No new user input; continued under the corrected uniform-tolerance requirement."
+**AI Response**: "An expanded fixed-seed property run shrank a negative-temperature case where canonical rounding created a mathematical 1e-6 K gap represented marginally above 1e-6 in binary floating point. The source retained a fourth row, reproducing the same class of inconsistent boundary decision."
+**Context**: TDD RED - Absolute tolerance floating-point boundary
+
+---
+
+## Utility Placement Uniform Tolerance Boundary GREEN
+**Timestamp**: 2026-08-30T16:42:11Z
+**User Input**: "No new user input; continued under the corrected uniform-tolerance requirement."
+**AI Response**: "Normalized temperature gaps at a precision six decimal places finer than the 1e-6 domain resolution before applying the unchanged absolute tolerance. This removes only machine-level subtraction noise, retains absolute rather than scale-dependent relative comparison, and makes all 50 problem-table tests pass, including the generated negative-temperature case and an explicit high-temperature absolute-only guard. The broader targeting and utility-placement gate passes 296 tests."
+**Context**: TDD GREEN - Uniform absolute tolerance boundary
+
+---
+
+## Utility Placement Uniform Tolerance Build and Test
+**Timestamp**: 2026-08-30T17:05:56Z
+**User Input**: "No new user input; continued under the user's standing approval through completion unless unexpected."
+**AI Response**: "All 50 problem-table tests and the 296-test targeting and utility-placement gate pass. The initial complete run recorded 2,462 passes, 4 expected skips, 3 deliberate notebook-19 deselections, and two failures caused solely by the preserved user-modified notebook's unexecuted cells. The complete applicable rerun excludes those two notebook-wide checks as well and passes 2,462 tests with 4 expected skips and 5 deliberate notebook-19 deselections in 556.30 seconds. Ruff, formatting, patch hygiene, and the warnings-as-errors Sphinx build pass."
+**Context**: BUILD AND TEST COMPLETE - Uniform temperature tolerance
+
+---

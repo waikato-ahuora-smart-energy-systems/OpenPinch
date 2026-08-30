@@ -272,6 +272,14 @@ remain candidate-specific. Every replay shall use detached mutable tables,
 utilities, zones, and results so neither the source problem nor another
 candidate can be mutated.
 
+One canonical absolute temperature tolerance shall govern temperature-grid
+rounding, near-duplicate removal, missing-interval detection, table-grid
+comparison, interpolation safeguards, and Total Site process/utility profile
+alignment. Equivalent breakpoints shall therefore be represented consistently
+before cumulative columns are calculated or assigned. Alignment shall never
+fail with a row-count broadcast mismatch, and no private exact-tolerance path
+shall override the shared domain tolerance.
+
 Fresh full `PinchProblem` targeting is the correctness oracle. Process, Total
 Site, and multiperiod shortcut results shall reproduce ordinary targeting
 within existing numerical tolerances, including utility identities and duties,
