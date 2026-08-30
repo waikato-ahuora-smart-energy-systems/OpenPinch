@@ -13,6 +13,11 @@ utility-placement service using balanced-composite entropy generation.
   `OpenPinch/analysis/utility_placement/`.
 - Reused existing utility targeting, optimiser, unit conversion, and Unit 1
   model owners without private backend imports.
+- Prepared each utility-independent process load profile once per period and
+  target zone. Candidate replay deep-copies the prepared problem tables,
+  inserts shifted and real utility endpoints with the existing interval engine,
+  and continues through the existing utility-target and balanced-composite
+  methods.
 
 ## TDD evidence
 
@@ -27,6 +32,9 @@ utility-placement service using balanced-composite entropy generation.
   100 percent; the established Unit 2 ownership gate remains above threshold.
 - Ruff: passed.
 - Existing utility-targeting, turbine, optimisation, architecture, API-boundary, and package-entrypoint regressions passed.
+- Prepared-versus-fresh oracle coverage compares complete shifted and real
+  problem tables, utility duties, target totals, Process snapshots, and Total
+  Site snapshots across explicit and generated utility temperature sets.
 
 ## Distribution evidence
 

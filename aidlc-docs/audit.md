@@ -5870,3 +5870,103 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 **Context**: CODE GENERATION AND BUILD AND TEST COMPLETE - Balanced-composite duty-conservation root fix
 
 ---
+
+## Utility Placement Canonical Fallback Penalty Request
+**Timestamp**: 2026-08-30T08:16:00Z
+**User Input**: "Use g_ineq_penalty squared version to penalise fallback utility during utility placement optimisation."
+**AI Response**: "Opened a bounded Utility Placement correction to route normalized hot/cold fallback-duty residuals through the canonical `g_ineq_penalty(..., form=PenaltyForm.SQUARE)` implementation. The correction preserves validation, dimensionless reporting, raw period weighting, and the feasible/infeasible scalar partition. The user's imperative is treated as direct implementation authorization for this exact change."
+**Context**: REQUIREMENTS ANALYSIS AND CODE GENERATION AUTHORIZATION - Canonical squared fallback penalty
+
+---
+
+## Utility Placement Canonical Fallback Penalty RED
+**Timestamp**: 2026-08-30T08:16:00Z
+**User Input**: "No new user input; continued under the authorized canonical fallback-penalty correction."
+**AI Response**: "Updated the hand-calculable penalty, evaluation integration, public capped-dispatch regression, and Hypothesis oracle property to require the canonical squared penalty with default `rho=10`. The focused RED gate produced eight expected failures: the current local Utility Placement formula returned coefficient-free values exactly one tenth of the canonical oracle. Nineteen unaffected focused checks passed."
+**Context**: TDD RED - Canonical squared fallback penalty
+
+---
+
+## Utility Placement Canonical Fallback Penalty GREEN
+**Timestamp**: 2026-08-30T08:16:00Z
+**User Input**: "No new user input; continued under the authorized canonical fallback-penalty correction."
+**AI Response**: "Changed the Utility Placement penalty adapter to normalize hot and cold fallback duties and delegate the residual vector to `g_ineq_penalty(..., form=PenaltyForm.SQUARE)`. Validation and zero-duty behavior remain local; the canonical helper supplies the default `rho=10` weighting and vector aggregation. All 27 RED example, integration, and Hypothesis oracle/invariance checks now pass with the fixed seed."
+**Context**: TDD GREEN - Canonical squared fallback penalty
+
+---
+
+## Utility Placement Canonical Fallback Penalty Completion
+**Timestamp**: 2026-08-30T08:47:41Z
+**User Input**: "No new user input; completed the authorized canonical fallback-penalty correction."
+**Build Status**: Success for the bounded pure-Python correction
+**Test Status**: Pass for all applicable scientific and application gates
+**AI Response**: "Completed the canonical fallback-penalty correction. Utility Placement now normalizes hot/cold fallback duties and calls `g_ineq_penalty(..., form=PenaltyForm.SQUARE)`, inheriting the canonical default `rho=10`; validation, raw period weighting, dimensionless reporting, and the feasible/infeasible scalar partition are unchanged. The RED gate produced eight expected failures; GREEN passed 27 focused tests. The broad run completed 283 passes before the user-modified Notebook 19 base-profile execution was manually stopped after 26 minutes; its two existing inventory/generator assertions failed because the notebook differs from generated source. The remaining scoped notebook contract gate passed eight tests with three optional-profile skips. Ruff, patch hygiene, and full PBT compliance pass. Notebook 19 and `.gitignore` were preserved."
+**Context**: CODE GENERATION AND BUILD AND TEST COMPLETE - Canonical squared fallback penalty
+
+---
+
+## Utility Placement Iteration Profiling
+**Timestamp**: 2026-08-30T08:23:20Z
+**User Input**: "The utility optimisation is slow to fully complete.  Profile iterations to figure out which part is slowest."
+**AI Response**: "Profiled fixed three-generation Process and Total Site CMA-ES runs and a deeper 25-generation Process trace. Exact target replay consumed 97.6 to 99.0 percent of runtime, while thermodynamic cost evaluation consumed approximately 0.1 percent. In the lightweight runs, post-CMA SLSQP polishing consumed 67.4 percent of Process time and 59.7 percent of Total Site time. The deeper trace located the dominant replay cost in constructing and preprocessing a fresh PinchProblem for every feasible candidate. No application or notebook files were changed by profiling."
+**Context**: PERFORMANCE DIAGNOSIS - Utility placement candidate evaluation and post-CMA polishing
+
+---
+
+## Utility Placement Prepared Target Replay Request
+**Timestamp**: 2026-08-30T08:23:20Z
+**User Input**: "Do a deep dive into PinchProblem to identify a short cut method for targeting different sets of utility for different underlying utility sets.\n\nIn theory, the net load profiles should only be calculated once. Deepcopy it. Add in temperature intervals for the shifted utility temperatures. Then perform utility target. \n\nRe-use existing target methods as much as possible. Test that the end result is the same."
+**AI Response**: "Opened a TDD performance correction under continuing authorization. The deep dive confirmed that ordinary direct targeting calculates process-only cascades before utility targeting and that existing ProblemTable interval insertion can add candidate utility endpoints to copied profiles. The plan retains candidate-specific utility allocation, balanced composites, and Total Site aggregation while comparing every shortcut result against fresh PinchProblem targeting."
+**Context**: REQUIREMENTS AND CODE GENERATION AUTHORIZATION - Prepared utility target replay
+
+---
+
+## Utility Placement Prepared Direct Profile RED
+**Timestamp**: 2026-08-30T08:23:20Z
+**User Input**: "No new user input; continued under the authorized prepared target replay correction."
+**AI Response**: "Added an explicit edge-interval oracle and a constrained Hypothesis utility-temperature oracle comparing prepared direct replay with fresh ordinary targeting. Both tests failed at the missing prepared-profile boundary as expected; Hypothesis shrinking remained active."
+**Context**: TDD RED - Prepared direct load-profile replay
+
+---
+
+## Utility Placement Prepared Direct Profile GREEN
+**Timestamp**: 2026-08-30T08:23:20Z
+**User Input**: "No new user input; continued under the authorized prepared target replay correction."
+**AI Response**: "Added a reusable process-only direct profile containing raw shifted and real problem tables. Candidate replay deep-copies the profile, inserts shifted and real utility endpoints with the existing ProblemTable engine, restores derived interval columns, then follows the existing constant-heat interval, GCC, utility-targeting, net-stream, balanced-composite, and graph methods. The explicit and generated fresh-target oracles pass, as do all 58 direct-target and problem-table regressions."
+**Context**: TDD GREEN - Reusable direct load-profile replay
+
+---
+
+## Utility Placement Prepared Application Replay RED
+**Timestamp**: 2026-08-30T08:23:20Z
+**User Input**: "No new user input; continued under the authorized prepared target replay correction."
+**AI Response**: "Added Process and Total Site replay regressions requiring one PinchProblem preparation per adapter, no new construction for repeated or pickled candidate replay, exact equivalence to a fresh ordinary target, and source immutability. Both scopes failed at the expected construction-count assertion because the existing adapter still constructs only inside every allocation."
+**Context**: TDD RED - Prepared application utility replay
+
+---
+
+## Utility Placement Prepared Application Replay GREEN
+**Timestamp**: 2026-08-30T08:23:20Z
+**User Input**: "No new user input; continued under the authorized prepared target replay correction."
+**AI Response**: "The exact replay adapter now prepares one detached PinchProblem and process-profile cache per selected zone and period. Each candidate receives a lightweight zone-tree clone that shares read-only process collections, owns fresh target/net/utility state, reconstructs only validated utilities, and invokes the existing direct or indirect target execution services with copied profiles. Process, Total Site, pickle, multiperiod, and source-isolation regressions pass; the 282-test focused gate also passes."
+**Context**: TDD GREEN - Prepared PinchProblem utility replay
+
+---
+
+## Utility Placement Prepared Replay Performance Verification
+**Timestamp**: 2026-08-30T08:23:20Z
+**User Input**: "No new user input; continued under the authorized prepared target replay correction."
+**AI Response**: "Using three warm-ups and ten measurements, median Process candidate replay improved from 0.256325 seconds to 0.028981 seconds (8.84x), and Total Site improved from 0.537118 seconds to 0.324896 seconds (1.65x). The identical three-generation end-to-end benchmark improved Process from 27.861657 seconds to 3.258408 seconds and Total Site from 49.468948 seconds to 30.589541 seconds. Remaining Total Site time is candidate-specific child utility aggregation and post-CMA SLSQP work."
+**Context**: PERFORMANCE VERIFICATION - Prepared utility target replay
+
+---
+
+## Utility Placement Prepared Replay Build and Test
+**Timestamp**: 2026-08-30T10:01:52Z
+**User Input**: "No new user input; continued under the authorized prepared target replay correction."
+**Build Status**: Success
+**Test Status**: Pass
+**AI Response**: "The final fixed-seed focused gate passes 328 tests. The complete configured-solver repository gate passes 2,460 tests with 4 expected optional-profile skips and 3 deliberate deselections tied only to the user's locally modified, long-running notebook 19. Ruff, formatting, patch hygiene, and the warnings-as-errors Sphinx build pass. Process and Total Site prepared replay remain equivalent to fresh ordinary PinchProblem targeting, including complete problem tables, duties, snapshots, pickle replay, and source isolation. The notebook and .gitignore remain untouched by this correction."
+**Context**: BUILD AND TEST COMPLETE - Prepared utility target replay
+
+---

@@ -16,8 +16,10 @@
    coordinates and never displace available named capacity.
 9. Positive fallback duty remains feasible, participates in the physical
    balanced-composite entropy calculation, and is visible in result evidence.
-10. `g_penalty()` is the squared normalized fallback fraction and aggregates
-    with raw period weights; it is never labelled as entropy.
+10. `g_penalty()` normalizes the hot/cold fallback fractions and delegates them
+    to canonical `g_ineq_penalty(..., form=PenaltyForm.SQUARE)` with its default
+    `rho=10`; it aggregates with raw period weights and is never labelled as
+    entropy.
 11. Returned cases retain limit metadata and any used fallback so normal
     retargeting and standard plots reproduce capacity-constrained allocation.
 12. The source problem, source utilities, cached targets, and active workspace

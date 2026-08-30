@@ -3,10 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Utility placement supply-temperature ordering correction
-  complete through Code Generation and Build and Test. All four TDD steps are
-  complete; 2,451 applicable tests and the warning-as-error RTD build pass, and
-  the amendment is ready to commit to `develop`.
+- **Current Stage**: Utility Placement prepared target replay performance correction complete through Build and Test; Operations N/A.
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -32,6 +29,17 @@
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
 
 ## Utility Placement Optimisation Progress
+
+- [x] PREPARED TARGET REPLAY PERFORMANCE CORRECTION - Cache process-only direct
+  load profiles per zone and period, copy and augment them with candidate
+  utility intervals, retain candidate-specific utility and Total Site
+  targeting, and prove equivalence to fresh `PinchProblem` replay under TDD.
+  Process candidate replay is 8.84 times faster and Total Site replay is 1.65
+  times faster at the measured median. The final focused gate passes 328 tests;
+  the complete applicable gate passes 2,460 tests with 4 expected skips and 3
+  deliberate user-notebook deselections. Ruff, Sphinx, and patch hygiene pass.
+- **Prepared replay plan**:
+  `aidlc-docs/construction/plans/utility-placement-prepared-target-replay-code-generation-plan.md`.
 
 - [x] SUPPLY-ORDER INTERLEAVING CORRECTION - Order physical utility use by
   optimized supply temperature, permit isothermal and sensible generated
@@ -304,6 +312,23 @@
   diagnostic, and an unchanged baseline. The broad solver-enabled gate passes
   2,456 tests with 4 expected skips and 3 local-notebook metadata/generator
   deselections. The user's notebook and `.gitignore` remain unmodified.
+
+## Utility Placement Canonical Fallback Penalty Progress
+
+- [x] INCEPTION - Reused the current brownfield workspace and reverse-engineering artifacts.
+- [x] INCEPTION - Minimal Requirements Analysis completed from the explicit correction request.
+- [x] INCEPTION - User Stories, Application Design, Units Generation, and NFR stages skipped.
+- [x] INCEPTION - Bounded workflow and Code Generation plan approved by the user's direct instruction.
+- [x] CONSTRUCTION - RED example, integration, and canonical-oracle property coverage complete with eight expected failures.
+- [x] CONSTRUCTION - GREEN canonical squared-penalty delegation and oracle property complete.
+- [x] CONSTRUCTION - Focused Build and Test complete.
+- [x] OPERATIONS - N/A; no deployment change requested.
+- **Requirements**: `aidlc-docs/inception/requirements/utility-placement-canonical-fallback-penalty-requirements.md`.
+- **Plan**: `aidlc-docs/construction/plans/utility-placement-canonical-fallback-penalty-code-generation-plan.md`.
+- **Implementation summary**: `aidlc-docs/construction/utility-placement-canonical-fallback-penalty/code/implementation-summary.md`.
+- **Build and Test summary**: `aidlc-docs/construction/utility-placement-canonical-fallback-penalty/build-and-test/build-and-test-summary.md`.
+- **Outcome**: normalized hot/cold fallback residuals now delegate to canonical `g_ineq_penalty` with `PenaltyForm.SQUARE` and default `rho=10`. Twenty-seven focused checks and the 283 completed broad checks pass; the user-modified Notebook 19 remains untouched.
+- **Extensions**: Full Property-Based Testing enabled; Security and Resiliency disabled.
 
 ## Indirect Profile Precision Progress
 

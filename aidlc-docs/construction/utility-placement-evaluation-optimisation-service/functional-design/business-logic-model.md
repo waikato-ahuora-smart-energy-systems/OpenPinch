@@ -65,10 +65,15 @@ copy, then extracts immutable data:
 - period identity and raw non-negative weight; and
 - resolved target identity and units.
 
-Mutable problem tables, streams, targets, and zones are discarded at the
-boundary. Candidate replay reconstructs fresh local problem tables and utility
-streams from the snapshots, so repeated evaluation cannot accumulate duty or
-target state.
+Mutable context-builder problem tables, streams, targets, and zones are
+discarded at the boundary. The exact-target adapter separately prepares the
+utility-independent process load profile once for every period and direct
+target zone. Candidate replay deep-copies those prepared tables, inserts the
+candidate shifted and real utility endpoints through the existing problem-table
+interval method, and then invokes the existing utility-target and balanced-
+composite methods. Utility streams, targets, graphs, derived net streams, and
+component state remain candidate-local, so repeated evaluation cannot
+accumulate duty or target state.
 
 ### 2. Build the Unit 1 placement model
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import dataclass
 from typing import List, Tuple
 
 import numpy as np
@@ -14,7 +15,7 @@ from ...domain.stream import Stream
 from ...domain.stream_collection import StreamCollection
 from ...domain.targets import DirectIntegrationTarget
 from ...domain.zone import Zone
-from ..numerics import delta_vals, get_period_index
+from ..numerics import delta_vals, delta_with_zero_at_start, get_period_index
 from .area_cost import (
     get_area_targets,
     get_balanced_CC,
@@ -22,6 +23,8 @@ from .area_cost import (
     get_min_number_hx,
 )
 from .cascade import (
+    _insert_temperature_interval_into_pt_at_constant_h,
+    create_problem_table_with_t_int,
     get_heat_recovery_target_from_pt,
     get_process_heat_cascade,
     set_zonal_targets,
@@ -31,6 +34,18 @@ from .utilities import get_utility_targets
 
 __all__ = ["compute_direct_integration_targets"]
 
+
+@dataclass(frozen=True)
+class _PreparedDirectIntegrationProfile:
+    """Process-only direct target state copied for candidate utility replay."""
+
+    pt: ProblemTable
+    pt_real: ProblemTable
+    zonal_targets: dict
+    hot_pinch: float | None
+    cold_pinch: float | None
+
+
 ################################################################################
 # Public API
 ################################################################################
@@ -39,6 +54,8 @@ __all__ = ["compute_direct_integration_targets"]
 def compute_direct_integration_targets(
     zone: Zone,
     args: dict | None = None,
+    *,
+    prepared_profile: _PreparedDirectIntegrationProfile | None = None,
 ) -> DirectIntegrationTarget:
     """Populate a ``Zone`` with detailed direct heat integration pinch targets.
 
@@ -47,36 +64,38 @@ def compute_direct_integration_targets(
     the provided ``zone`` and used later by site and regional aggregation routines.
     """
     idx, sid = get_period_index(period_ids=zone.period_ids, args=args)
-    all_streams = zone.all_streams
-    pt = get_process_heat_cascade(
-        hot_streams=zone.hot_streams,
-        cold_streams=zone.cold_streams,
-        all_streams=all_streams,
-        is_shifted=True,
-        period_idx=idx,
-    )
-    # The real-temperature cascade has two distinct jobs.  The unshifted
-    # table defines the thermodynamic heat-recovery limit, while the shifted
-    # table is the presentation/utility-allocation table aligned to the
-    # shifted-temperature target.  Using the aligned table for both jobs
-    # collapses every direct-integration degree to 1.0.
-    pt_real_limit = get_process_heat_cascade(
-        hot_streams=zone.hot_streams,
-        cold_streams=zone.cold_streams,
-        all_streams=all_streams,
-        is_shifted=False,
-        period_idx=idx,
-    )
-    pt_real = get_process_heat_cascade(
-        hot_streams=zone.hot_streams,
-        cold_streams=zone.cold_streams,
-        all_streams=all_streams,
-        is_shifted=False,
-        known_heat_recovery=get_heat_recovery_target_from_pt(pt),
-        period_idx=idx,
-    )
-    zonal_targets = set_zonal_targets(pt=pt, pt_real=pt_real_limit)
-    hot_pinch, cold_pinch = pt.pinch_temperatures()
+    if prepared_profile is None:
+        profile = _build_direct_integration_profile(
+            zone,
+            idx=idx,
+            temperature_streams=zone.all_streams,
+            insert_constant_heat_intervals=True,
+        )
+        pt = profile.pt
+        pt_real = profile.pt_real
+    else:
+        profile = prepared_profile
+        pt = deepcopy(profile.pt)
+        pt_real = deepcopy(profile.pt_real)
+    zonal_targets = dict(profile.zonal_targets)
+    hot_pinch = profile.hot_pinch
+    cold_pinch = profile.cold_pinch
+    if prepared_profile is not None:
+        _insert_utility_temperature_intervals(
+            pt,
+            zone.hot_utilities + zone.cold_utilities,
+            is_shifted=True,
+            period_idx=idx,
+        )
+        _insert_utility_temperature_intervals(
+            pt_real,
+            zone.hot_utilities + zone.cold_utilities,
+            is_shifted=False,
+            period_idx=idx,
+        )
+        _insert_temperature_interval_into_pt_at_constant_h(pt)
+        _insert_temperature_interval_into_pt_at_constant_h(pt_real)
+
     direct = zone.config.direct
     calculate_area_cost = bool((args or {}).get("_calculate_area_cost", False))
     pt = get_additional_GCCs(
@@ -159,6 +178,100 @@ def compute_direct_integration_targets(
         | area_data
     )
     return DirectIntegrationTarget.model_validate(target_data)
+
+
+def _prepare_direct_integration_profile(
+    zone: Zone,
+    args: dict | None = None,
+) -> _PreparedDirectIntegrationProfile:
+    """Prepare one utility-independent direct load profile for repeated replay."""
+    idx, _sid = get_period_index(period_ids=zone.period_ids, args=args)
+    process_streams = zone.hot_streams + zone.cold_streams
+    return _build_direct_integration_profile(
+        zone,
+        idx=idx,
+        temperature_streams=process_streams,
+        insert_constant_heat_intervals=False,
+    )
+
+
+def _build_direct_integration_profile(
+    zone: Zone,
+    *,
+    idx: int | None,
+    temperature_streams: StreamCollection,
+    insert_constant_heat_intervals: bool,
+) -> _PreparedDirectIntegrationProfile:
+    """Build process cascades on a caller-selected temperature grid."""
+    pt = get_process_heat_cascade(
+        hot_streams=zone.hot_streams,
+        cold_streams=zone.cold_streams,
+        all_streams=temperature_streams,
+        is_shifted=True,
+        period_idx=idx,
+        insert_constant_heat_intervals=insert_constant_heat_intervals,
+    )
+    # The real-temperature cascade has two distinct jobs. The unshifted table
+    # defines the thermodynamic heat-recovery limit, while the aligned table is
+    # used for presentation and utility allocation.
+    pt_real_limit = get_process_heat_cascade(
+        hot_streams=zone.hot_streams,
+        cold_streams=zone.cold_streams,
+        all_streams=temperature_streams,
+        is_shifted=False,
+        period_idx=idx,
+        insert_constant_heat_intervals=insert_constant_heat_intervals,
+    )
+    pt_real = get_process_heat_cascade(
+        hot_streams=zone.hot_streams,
+        cold_streams=zone.cold_streams,
+        all_streams=temperature_streams,
+        is_shifted=False,
+        known_heat_recovery=get_heat_recovery_target_from_pt(pt),
+        period_idx=idx,
+        insert_constant_heat_intervals=insert_constant_heat_intervals,
+    )
+    zonal_targets = set_zonal_targets(pt=pt, pt_real=pt_real_limit)
+    hot_pinch, cold_pinch = pt.pinch_temperatures()
+    return _PreparedDirectIntegrationProfile(
+        pt=pt,
+        pt_real=pt_real,
+        zonal_targets=zonal_targets,
+        hot_pinch=hot_pinch,
+        cold_pinch=cold_pinch,
+    )
+
+
+def _insert_utility_temperature_intervals(
+    pt: ProblemTable,
+    utilities: StreamCollection,
+    *,
+    is_shifted: bool,
+    period_idx: int | None,
+) -> None:
+    """Add candidate utility endpoints to a copied process profile."""
+    if not utilities:
+        return
+    utility_grid = create_problem_table_with_t_int(
+        streams=utilities,
+        is_shifted=is_shifted,
+        period_idx=period_idx,
+    )
+    if len(utility_grid):
+        pt.insert_temperature_interval(utility_grid[ProblemTableLabel.T].tolist())
+        _refresh_interval_derived_columns(pt)
+
+
+def _refresh_interval_derived_columns(pt: ProblemTable) -> None:
+    """Rebuild interval widths and heat increments after grid augmentation."""
+    delta_t = delta_with_zero_at_start(pt[ProblemTableLabel.T])
+    pt[ProblemTableLabel.DELTA_T] = delta_t
+    for cp_label, delta_h_label in (
+        (ProblemTableLabel.CP_HOT, ProblemTableLabel.DELTA_H_HOT),
+        (ProblemTableLabel.CP_COLD, ProblemTableLabel.DELTA_H_COLD),
+        (ProblemTableLabel.CP_NET, ProblemTableLabel.DELTA_H_NET),
+    ):
+        pt[delta_h_label] = delta_t * pt[cp_label]
 
 
 ################################################################################

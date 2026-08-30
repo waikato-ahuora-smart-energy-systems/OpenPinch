@@ -14,9 +14,10 @@
   options. They are added only as residual balancing fallbacks after named
   utility capacity is exhausted.
 - Fallback duties participate in the balanced-composite entropy calculation.
-  Their separate dimensionless ranking term is
-  `g[p] = (Q_HU[p] / Q_heat[p])^2 + (Q_CU[p] / Q_cool[p])^2`, aggregated as
-  `sum(w[p] * g[p])` across all selected periods.
+  Their separate dimensionless ranking term delegates the normalized hot/cold
+  residual vector to canonical
+  `g_ineq_penalty(..., form=PenaltyForm.SQUARE)` with default `rho=10`, then
+  aggregates as `sum(w[p] * g[p])` across all selected periods.
 - The detached returned case retains maximum-duty metadata and any positive
   fallback definition. Ordinary direct or Total Site targeting therefore
   enforces the caps and standard GCC or TSP plots show the resulting utilities.

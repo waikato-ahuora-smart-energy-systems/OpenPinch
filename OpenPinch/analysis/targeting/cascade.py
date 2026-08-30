@@ -47,6 +47,7 @@ def get_process_heat_cascade(
     extra_T_intervals: list = None,
     is_full_analysis: bool = False,
     period_idx: int | None = None,
+    insert_constant_heat_intervals: bool = True,
 ) -> ProblemTable:
     """Prepare, calculate, and analyse the problem table for given streams."""
     if hot_streams is None:
@@ -87,7 +88,7 @@ def get_process_heat_cascade(
         )
 
     heat_recovery_target = get_heat_recovery_target_from_pt(pt)
-    if heat_recovery_target > tol:
+    if insert_constant_heat_intervals and heat_recovery_target > tol:
         # Add additional temperature intervals for ease in targeting utility etc
         _insert_temperature_interval_into_pt_at_constant_h(pt)
 

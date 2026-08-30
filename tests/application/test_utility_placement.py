@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import pickle
 from types import SimpleNamespace
 
 import pytest
@@ -62,14 +63,10 @@ def test_application_context_uses_isolated_target_and_complete_coordinates(
     period = context.periods[0]
     assert (
         period.fallback_hot_target_temperature + period.fallback_temperature_span
-    ) == pytest.approx(
-        max(period.snapshot.real_temperatures) + 50.0
-    )
+    ) == pytest.approx(max(period.snapshot.real_temperatures) + 50.0)
     assert (
         period.fallback_cold_target_temperature - period.fallback_temperature_span
-    ) == pytest.approx(
-        min(period.snapshot.real_temperatures) - 50.0
-    )
+    ) == pytest.approx(min(period.snapshot.real_temperatures) - 50.0)
     assert context.periods[0].residual_hot_duty >= 0.0
     assert context.periods[0].residual_cold_duty >= 0.0
     assert len(context.periods[0].coordinate_bounds) == len(blueprints.all)
@@ -122,6 +119,122 @@ def test_exact_replay_input_places_fallback_supplies_fifty_kelvin_beyond_process
     assert by_name["CU"]["t_supply"]["value"] == pytest.approx(
         min(period.snapshot.real_temperatures) - 50.0
     )
+
+
+@pytest.mark.parametrize("zone_name", ["Almond", None])
+def test_exact_replay_prepares_problem_once_and_matches_fresh_target(
+    monkeypatch,
+    zone_name,
+) -> None:
+    problem = PinchWorkspace(
+        source="chocolate_factory.json",
+        project_name="Site",
+    ).use_case("baseline")
+    selected_zone = placement_application._resolve_placement_zone(problem, zone_name)
+    request = placement_application._build_problem_placement_request(
+        problem,
+        selected_zone=selected_zone,
+        isothermal=2,
+        sensible=2,
+        period_ids=("0",),
+        options={
+            "iteration_limit": 1,
+            "evaluation_limit": 20,
+            "candidate_limit": 1,
+        },
+    )
+    blueprints, context = build_problem_placement_context(problem, request)
+    request = request.model_copy(
+        update={
+            "base_target": context.scope,
+            "period_ids": tuple(period.period_id for period in context.periods),
+        }
+    )
+    model = build_utility_placement_model(request, blueprints, context.envelope)
+    placement = decode_placement(model, model.initial_points[0])
+    period = context.periods[0]
+    source = problem.to_problem_json()
+    init_count = 0
+    original_init = PinchProblem.__init__
+
+    def counted_init(self, *args, **kwargs):
+        nonlocal init_count
+        init_count += 1
+        original_init(self, *args, **kwargs)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(PinchProblem, "__init__", counted_init)
+        adapter = placement_application._ExactTargetReplayAdapter(
+            source=source,
+            project_name=problem.project_name,
+            request=request,
+        )
+        assert init_count == 1
+
+        replay = adapter.allocate(period, placement)
+        replay_again = pickle.loads(pickle.dumps(adapter)).allocate(period, placement)
+
+        assert init_count == 1
+        assert replay_again == replay
+
+    candidate_source = dict(source)
+    candidate_source["utilities"] = placement_application._candidate_utility_input(
+        request,
+        placement,
+        period,
+    )
+    fresh_problem = PinchProblem(candidate_source, project_name=problem.project_name)
+    kwargs = {"period_id": period.period_id}
+    if request.zone is not None:
+        kwargs["zone"] = request.zone
+    if request.base_target is UtilityPlacementBaseTarget.DIRECT:
+        fresh_target = fresh_problem.target.direct_heat_integration(**kwargs)
+    else:
+        fresh_target = fresh_problem.target.total_site_heat_integration(**kwargs)
+    fresh_snapshot, required_hot, required_cold = (
+        placement_application._snapshot_from_target(
+            fresh_problem,
+            request,
+            request.base_target,
+            period.period_id,
+            fresh_target,
+        )
+    )
+    period_idx = fresh_problem.period_ids[period.period_id]
+    fresh_hot = {utility.name: utility for utility in fresh_target.hot_utilities}
+    fresh_cold = {utility.name: utility for utility in fresh_target.cold_utilities}
+
+    assert replay.hot_duties == pytest.approx(
+        tuple(
+            float(fresh_hot[level.template_key.name].heat_flow[period_idx])
+            for level in placement.hot
+        ),
+        abs=1e-8,
+    )
+    assert replay.cold_duties == pytest.approx(
+        tuple(
+            float(fresh_cold[level.template_key.name].heat_flow[period_idx])
+            for level in placement.cold
+        ),
+        abs=1e-8,
+    )
+    assert replay.required_hot_duty == pytest.approx(required_hot, abs=1e-8)
+    assert replay.required_cold_duty == pytest.approx(required_cold, abs=1e-8)
+    for attribute in (
+        "shifted_temperatures",
+        "real_temperatures",
+        "hot_load_profile",
+        "cold_load_profile",
+        "real_hot_composite",
+        "real_cold_composite",
+    ):
+        assert getattr(replay.target_snapshot, attribute) == pytest.approx(
+            getattr(fresh_snapshot, attribute), abs=1e-10
+        )
+    assert replay.target_snapshot.hot_pinch_index == fresh_snapshot.hot_pinch_index
+    assert replay.target_snapshot.cold_pinch_index == fresh_snapshot.cold_pinch_index
+    assert replay.target_snapshot.entropy_slices == fresh_snapshot.entropy_slices
+    assert problem.to_problem_json() == source
 
 
 def test_profile_extraction_recovers_from_non_finite_separated_columns(
@@ -329,16 +442,12 @@ def _temperature_overlap_ratio(background_segments, utility_segments) -> float:
 
 
 def _allocated_duties(levels) -> dict[str, float]:
-    return {
-        level.template_key.name: level.allocated_duty.value for level in levels
-    }
+    return {level.template_key.name: level.allocated_duty.value for level in levels}
 
 
 def _targeted_duties(utilities, *, period_idx: int | None = None) -> dict[str, float]:
     return {
-        utility.name: float(
-            get_scalar_value(utility.heat_flow, period_idx=period_idx)
-        )
+        utility.name: float(get_scalar_value(utility.heat_flow, period_idx=period_idx))
         for utility in utilities
     }
 
@@ -802,9 +911,10 @@ def test_process_isothermal_level_can_approach_sensible_supply_to_reduce_entropy
         and evaluation.fallback_penalty == pytest.approx(0.0)
     ]
     assert feasible_starts
-    assert min(
-        evaluation.physical_objective for evaluation in feasible_starts
-    ) <= improved.physical_objective
+    assert (
+        min(evaluation.physical_objective for evaluation in feasible_starts)
+        <= improved.physical_objective
+    )
 
 
 def test_total_site_four_level_request_keeps_inactive_sensible_candidates() -> None:
@@ -979,13 +1089,12 @@ def test_capped_process_dispatch_uses_available_levels_before_fallback() -> None
         level.allocated_duty.value for level in hot_levels if level.is_fallback
     )
     cold_fallback = sum(
-        level.allocated_duty.value
-        for level in period.cold_levels
-        if level.is_fallback
+        level.allocated_duty.value for level in period.cold_levels if level.is_fallback
     )
-    expected_penalty = (
-        hot_fallback / period.residual_hot_duty.value
-    ) ** 2 + (cold_fallback / period.residual_cold_duty.value) ** 2
+    expected_penalty = 10.0 * (
+        (hot_fallback / period.residual_hot_duty.value) ** 2
+        + (cold_fallback / period.residual_cold_duty.value) ** 2
+    )
 
     assert len(named_active) >= 3
     assert period.fallback_penalty.value == pytest.approx(expected_penalty)

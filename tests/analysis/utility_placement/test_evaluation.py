@@ -187,8 +187,8 @@ def test_evaluation_session_applies_squared_fallback_penalty() -> None:
 
     assert result.feasible
     assert 0.0 < result.scalar_objective < 1.0
-    assert result.fallback_penalty == pytest.approx(0.08)
-    assert result.period_results[0].fallback_penalty.value == pytest.approx(0.04)
+    assert result.fallback_penalty == pytest.approx(0.8)
+    assert result.period_results[0].fallback_penalty.value == pytest.approx(0.4)
     assert result.period_results[0].hot_levels[-1].template_key.name == "HU"
     assert result.period_results[0].hot_levels[-1].is_fallback
 

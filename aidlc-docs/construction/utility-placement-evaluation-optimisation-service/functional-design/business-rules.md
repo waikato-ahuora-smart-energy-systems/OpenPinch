@@ -116,9 +116,11 @@ target temperatures, spans, and coordinate tuple.
 
 ### BR2-017: Fresh targeting state
 
-Every period replay reconstructs fresh candidate-local problem tables and
-utility streams. No duty, target, or turbine state survives into another
-period or candidate.
+Every adapter prepares each period/target-zone process-only load profile once.
+Every period replay deep-copies those tables, inserts the candidate utility
+temperature intervals, and reconstructs fresh utility streams, targets, and
+derived net streams. No duty, target, graph, component, or turbine state
+survives into another period or candidate.
 
 ### BR2-018: Existing allocation owner
 

@@ -234,12 +234,18 @@ period. For objective `C_p` and existing non-negative period weight `w_p`, the
 aggregate objective shall be `sum(w_p * C_p)`. At least one period weight must
 be positive. Per-period values and the aggregate shall both be returned.
 
-Default fallback use shall be discouraged by a squared, dimensionless penalty.
-For period `p`:
+Default fallback use shall be discouraged by the canonical squared,
+dimensionless inequality penalty. For period `p`, define the residual vector:
 
-`g_penalty[p] = (Q_HU[p] / Q_heat_required[p])^2 + (Q_CU[p] / Q_cool_required[p])^2`.
+`g[p] = [Q_HU[p] / Q_heat_required[p], Q_CU[p] / Q_cool_required[p]]`.
 
-Each side term is defined as zero when both its required and fallback duties
+Then calculate `g_penalty[p]` with
+`g_ineq_penalty(g[p], form=PenaltyForm.SQUARE)`, using its canonical default
+`rho=10`. Equivalently:
+
+`g_penalty[p] = 10 * ((Q_HU[p] / Q_heat_required[p])^2 + (Q_CU[p] / Q_cool_required[p])^2)`.
+
+Each residual is defined as zero when both its required and fallback duties
 are zero; positive fallback duty against zero required duty is invalid.
 
 The aggregate fallback penalty shall be `sum(w_p * g_penalty[p])` and shall be
@@ -250,6 +256,29 @@ fallback penalties shall be reported separately and shall not be presented as
 physical entropy.
 
 ## Functional Requirements
+
+### Performance amendment: prepared target replay
+
+Utility-placement candidate evaluation shall prepare each selected period's
+process-only direct load profile once. Subsequent candidates shall receive a
+deep copy of that prepared profile, insert the candidate utility shifted and
+real-temperature endpoints through the existing problem-table interval
+insertion machinery, and run the existing utility-targeting and hierarchy
+aggregation services.
+
+The shortcut shall not cache candidate duties, utility heat cascades, balanced
+composite curves, net Total Site aggregation, or target outputs. Those values
+remain candidate-specific. Every replay shall use detached mutable tables,
+utilities, zones, and results so neither the source problem nor another
+candidate can be mutated.
+
+Fresh full `PinchProblem` targeting is the correctness oracle. Process, Total
+Site, and multiperiod shortcut results shall reproduce ordinary targeting
+within existing numerical tolerances, including utility identities and duties,
+fallback duties, target totals, problem-table profiles, and the resulting
+thermodynamic objective. The shortcut remains private to application
+coordination and shall not add a public `PinchProblem` method or change normal
+target APIs.
 
 ### FR-001: Public workflow
 

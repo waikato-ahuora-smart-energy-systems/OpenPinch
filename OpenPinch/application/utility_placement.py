@@ -4,8 +4,13 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping
+from copy import copy
 from typing import TYPE_CHECKING
 
+from ..analysis.targeting.direct import (
+    _prepare_direct_integration_profile,
+    _PreparedDirectIntegrationProfile,
+)
 from ..analysis.targeting.grand_composite import get_seperated_gcc_heat_load_profiles
 from ..analysis.utility_placement.allocation import AllocationAdapterResult
 from ..analysis.utility_placement.context import (
@@ -24,6 +29,7 @@ from ..analysis.utility_placement.normalization import (
     prepare_template_blueprints,
 )
 from ..analysis.utility_placement.service import optimise_utility_placement
+from ..contracts.input import UtilitySchema
 from ..contracts.units import standardise_input_value
 from ..contracts.utility_placement import (
     CoordinateKey,
@@ -42,13 +48,44 @@ from ..contracts.utility_placement import (
     UtilitySide,
 )
 from ..domain._value.resolution import get_scalar_value
-from ..domain.enums import ProblemTableLabel, StreamType, ZoneType
+from ..domain.enums import ProblemTableLabel, StreamType, TargetType, ZoneType
 from ..domain.zone import Zone
+from ._problem.input.construction import _find_extreme_process_temperatures
+from ._problem.input.utilities import (
+    _get_hot_and_cold_utilities,
+)
+from .targeting import (
+    direct_heat_integration_service,
+    indirect_heat_integration_service,
+)
 
 if TYPE_CHECKING:
     from .problem import PinchProblem
 
 _FALLBACK_TEMPERATURE_MARGIN = 50.0
+
+
+def _clone_zone_tree_for_target_replay(
+    source: Zone,
+    *,
+    parent: Zone | None = None,
+) -> Zone:
+    """Clone mutable target state while sharing read-only process collections."""
+    cloned = copy(source)
+    cloned._parent_zone = parent
+    cloned._subzones = {
+        name: _clone_zone_tree_for_target_replay(child, parent=cloned)
+        for name, child in source.subzones.items()
+    }
+    cloned._targets = {}
+    cloned._graphs = {}
+    cloned._net_hot_streams = cloned._new_stream_collection()
+    cloned._net_cold_streams = cloned._new_stream_collection()
+    cloned._subzone_net_hot_streams = cloned._new_stream_collection()
+    cloned._subzone_net_cold_streams = cloned._new_stream_collection()
+    cloned._hot_utilities = cloned._new_stream_collection()
+    cloned._cold_utilities = cloned._new_stream_collection()
+    return cloned
 
 
 def _resolved_scope(request: UtilityPlacementRequest) -> UtilityPlacementBaseTarget:
@@ -963,30 +1000,116 @@ class _ExactTargetReplayAdapter:
         self.source = source
         self.project_name = project_name
         self.request = request
+        from .problem import PinchProblem
+
+        self._prepared_problem = PinchProblem(
+            source=self.source,
+            project_name=self.project_name,
+        )
+        self._target_zone_addresses = tuple(
+            zone.address for zone in self._target_zones()
+        )
+        self._prepared_profiles = self._prepare_direct_profiles()
+
+    def _target_zones(self) -> tuple[Zone, ...]:
+        selected = _resolve_placement_zone(
+            self._prepared_problem,
+            self.request.zone,
+        )
+        if self.request.base_target is UtilityPlacementBaseTarget.DIRECT:
+            return (selected,)
+        return (selected, *selected.subzones.values())
+
+    def _prepare_direct_profiles(
+        self,
+    ) -> dict[tuple[str, str], _PreparedDirectIntegrationProfile]:
+        profiles = {}
+        for period_id in self.request.period_ids:
+            args = {"period_id": period_id}
+            for address in self._target_zone_addresses:
+                zone = self._prepared_problem._master_zone.get_subzone(address)
+                profiles[(period_id, zone.address)] = (
+                    _prepare_direct_integration_profile(zone, args)
+                )
+        return profiles
+
+    def _candidate_problem(
+        self,
+        utilities: list[dict[str, object]],
+    ) -> "PinchProblem":
+        candidate = copy(self._prepared_problem)
+        candidate._master_zone = _clone_zone_tree_for_target_replay(
+            self._prepared_problem._master_zone
+        )
+        candidate._results = None
+        candidate._last_target_run_spec = None
+        candidate._period_results = {}
+        candidate._utility_placement_result = None
+        candidate._process_components = {}
+
+        master = candidate._master_zone
+        utility_schemas = [UtilitySchema.model_validate(item) for item in utilities]
+        hu_t_min, cu_t_max = _find_extreme_process_temperatures(
+            hot_streams=master.hot_streams,
+            cold_streams=master.cold_streams,
+        )
+        prepared = _get_hot_and_cold_utilities(
+            utilities=utility_schemas,
+            hu_t_min=hu_t_min,
+            cu_t_max=cu_t_max,
+            config=master.config,
+            dt_cont_multiplier=master.dt_cont_multiplier,
+        )
+        hot_utilities = prepared.get_hot_utility_streams()
+        cold_utilities = prepared.get_cold_utility_streams()
+        for address in self._target_zone_addresses:
+            zone = master.get_subzone(address)
+            zone.hot_utilities = hot_utilities.copy(deep=True)
+            zone.cold_utilities = cold_utilities.copy(deep=True)
+        return candidate
+
+    def _target_candidate(
+        self,
+        isolated: "PinchProblem",
+        period_id: str,
+    ):
+        prepared_profiles = {
+            address: profile
+            for (profile_period, address), profile in self._prepared_profiles.items()
+            if profile_period == period_id
+        }
+        options = {
+            "period_id": period_id,
+            "_prepared_direct_profiles": prepared_profiles,
+        }
+        if self.request.base_target is UtilityPlacementBaseTarget.DIRECT:
+            return isolated._execute_targeting(
+                target_id=TargetType.DI.value,
+                application_zone=self.request.zone,
+                options=options,
+                include_subzones=False,
+                direct_service_func=direct_heat_integration_service,
+            )
+        return isolated._execute_targeting(
+            target_id=TargetType.II.value,
+            application_zone=self.request.zone,
+            options=options,
+            include_subzones=False,
+            indirect_service_func=indirect_heat_integration_service,
+        )
 
     def allocate(
         self,
         period: PlacementPeriodInput,
         placement: DecodedPlacement,
     ) -> AllocationAdapterResult:
-        from .problem import PinchProblem
-
-        candidate_source = dict(self.source)
-        candidate_source["utilities"] = _candidate_utility_input(
+        candidate_utilities = _candidate_utility_input(
             self.request,
             placement,
             period,
         )
-        isolated = PinchProblem(candidate_source, project_name=self.project_name)
-        kwargs = {"period_id": period.period_id}
-        if self.request.zone is not None:
-            kwargs["zone"] = self.request.zone
-        if self.request.base_target is UtilityPlacementBaseTarget.DIRECT:
-            target = isolated.target.direct_heat_integration(**kwargs)
-        elif self.request.base_target is UtilityPlacementBaseTarget.TOTAL_SITE:
-            target = isolated.target.total_site_heat_integration(**kwargs)
-        else:
-            target = isolated.target.indirect_heat_integration(**kwargs)
+        isolated = self._candidate_problem(candidate_utilities)
+        target = self._target_candidate(isolated, period.period_id)
 
         snapshot, required_hot, required_cold = _snapshot_from_target(
             isolated,

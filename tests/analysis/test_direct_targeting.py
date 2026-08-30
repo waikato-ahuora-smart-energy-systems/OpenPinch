@@ -1,13 +1,15 @@
 """Regression tests for direct integration entry analysis routines."""
 
+from copy import deepcopy
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
-from hypothesis import given
+from hypothesis import given, settings
 from hypothesis import strategies as st
 
 import OpenPinch.analysis.targeting.direct as direct
+from OpenPinch import PinchProblem
 from OpenPinch.analysis.targeting.direct import (
     _add_net_segment_period,
     _create_net_hot_and_cold_stream_collections_for_site_analysis,
@@ -22,6 +24,163 @@ from OpenPinch.domain.enums import GraphType, ProblemTableLabel, ZoneType
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream import Stream
 from OpenPinch.domain.stream_collection import StreamCollection
+
+
+def _prepared_profile_source(
+    *,
+    hot_supply: float,
+    hot_span: float,
+    cold_supply: float,
+    cold_span: float,
+) -> dict:
+    return {
+        "streams": [
+            {
+                "zone": "Site/Area",
+                "name": "Hot process",
+                "t_supply": 180.0,
+                "t_target": 60.0,
+                "heat_flow": 120.0,
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            },
+            {
+                "zone": "Site/Area",
+                "name": "Cold process",
+                "t_supply": 20.0,
+                "t_target": 150.0,
+                "heat_flow": 169.0,
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            },
+        ],
+        "utilities": [
+            {
+                "name": "Candidate hot",
+                "type": "Hot",
+                "t_supply": hot_supply,
+                "t_target": hot_supply - hot_span,
+                "heat_flow": 0.0,
+                "dt_cont": 0.0,
+                "htc": 1.0,
+            },
+            {
+                "name": "Candidate cold",
+                "type": "Cold",
+                "t_supply": cold_supply,
+                "t_target": cold_supply + cold_span,
+                "heat_flow": 0.0,
+                "dt_cont": 0.0,
+                "htc": 1.0,
+            },
+        ],
+        "zone_tree": {
+            "name": "Site",
+            "type": "Site",
+            "children": [{"name": "Area", "type": "Process Zone"}],
+        },
+    }
+
+
+def _direct_target_with_prepared_profile(source: dict):
+    problem = PinchProblem(source, project_name="Site")
+    zone = problem.master_zone.get_subzone("Area")
+    profile = direct._prepare_direct_integration_profile(zone, {"period_id": "0"})
+    fresh = direct.compute_direct_integration_targets(
+        deepcopy(zone),
+        {"period_id": "0"},
+    )
+    replay = direct.compute_direct_integration_targets(
+        deepcopy(zone),
+        {"period_id": "0"},
+        prepared_profile=profile,
+    )
+    return fresh, replay
+
+
+def _assert_direct_targets_equivalent(fresh, replay) -> None:
+    for attribute in (
+        "hot_utility_target",
+        "cold_utility_target",
+        "heat_recovery_target",
+        "heat_recovery_limit",
+        "degree_of_int",
+    ):
+        assert getattr(replay, attribute) == pytest.approx(
+            getattr(fresh, attribute), abs=1e-8
+        )
+    assert [utility.name for utility in replay.hot_utilities] == [
+        utility.name for utility in fresh.hot_utilities
+    ]
+    assert [utility.name for utility in replay.cold_utilities] == [
+        utility.name for utility in fresh.cold_utilities
+    ]
+    assert [float(utility.heat_flow[0]) for utility in replay.hot_utilities] == (
+        pytest.approx(
+            [float(utility.heat_flow[0]) for utility in fresh.hot_utilities],
+            abs=1e-8,
+        )
+    )
+    assert [float(utility.heat_flow[0]) for utility in replay.cold_utilities] == (
+        pytest.approx(
+            [float(utility.heat_flow[0]) for utility in fresh.cold_utilities],
+            abs=1e-8,
+        )
+    )
+    assert replay.pt.columns == fresh.pt.columns
+    assert replay.pt_real.columns == fresh.pt_real.columns
+    np.testing.assert_allclose(
+        replay.pt.data,
+        fresh.pt.data,
+        atol=1e-8,
+        rtol=0.0,
+        equal_nan=True,
+    )
+    np.testing.assert_allclose(
+        replay.pt_real.data,
+        fresh.pt_real.data,
+        atol=1e-8,
+        rtol=0.0,
+        equal_nan=True,
+    )
+
+
+@st.composite
+def _utility_temperature_sets(draw):
+    """Generate physically oriented utility intervals around process support."""
+    return {
+        "hot_supply": draw(st.floats(min_value=70.0, max_value=240.0, allow_nan=False)),
+        "hot_span": draw(st.floats(min_value=0.01, max_value=40.0, allow_nan=False)),
+        "cold_supply": draw(
+            st.floats(min_value=-30.0, max_value=130.0, allow_nan=False)
+        ),
+        "cold_span": draw(st.floats(min_value=0.01, max_value=40.0, allow_nan=False)),
+    }
+
+
+def test_prepared_direct_profile_matches_fresh_target_with_edge_intervals() -> None:
+    fresh, replay = _direct_target_with_prepared_profile(
+        _prepared_profile_source(
+            hot_supply=230.0,
+            hot_span=30.0,
+            cold_supply=-20.0,
+            cold_span=25.0,
+        )
+    )
+
+    _assert_direct_targets_equivalent(fresh, replay)
+
+
+@settings(max_examples=8, deadline=None)
+@given(temperatures=_utility_temperature_sets())
+def test_prepared_direct_profile_matches_fresh_target_for_generated_utilities(
+    temperatures,
+) -> None:
+    fresh, replay = _direct_target_with_prepared_profile(
+        _prepared_profile_source(**temperatures)
+    )
+
+    _assert_direct_targets_equivalent(fresh, replay)
 
 
 def _balanced_problem_table():
@@ -305,9 +464,7 @@ def test_utility_targeting_respects_maximum_heat_flow_before_fallback() -> None:
         idx=None,
     )
 
-    assert hot.get_stream_by_name("Capped steam").heat_flow.value == pytest.approx(
-        30.0
-    )
+    assert hot.get_stream_by_name("Capped steam").heat_flow.value == pytest.approx(30.0)
     assert hot.get_stream_by_name("HU").heat_flow.value == pytest.approx(70.0)
 
 

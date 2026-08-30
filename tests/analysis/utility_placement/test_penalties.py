@@ -8,12 +8,14 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
+from OpenPinch.analysis.numerics import g_ineq_penalty
 from OpenPinch.analysis.utility_placement import penalties
 from OpenPinch.analysis.utility_placement.penalties import (
     aggregate_weighted_objective,
     feasible_objective_scalar,
     infeasible_objective_scalar,
 )
+from OpenPinch.domain.enums import PenaltyForm
 
 
 def test_g_penalty_is_squared_and_dimensionless() -> None:
@@ -22,7 +24,7 @@ def test_g_penalty_is_squared_and_dimensionless() -> None:
         cold_fallback_duty=10.0,
         required_hot_duty=100.0,
         required_cold_duty=50.0,
-    ) == pytest.approx(0.08)
+    ) == pytest.approx(0.8)
     assert penalties.g_penalty(
         hot_fallback_duty=0.0,
         cold_fallback_duty=0.0,
@@ -39,7 +41,7 @@ def test_g_penalty_is_invariant_under_common_duty_scaling(scale) -> None:
         required_hot_duty=100.0 * scale,
         required_cold_duty=50.0 * scale,
     )
-    assert observed == pytest.approx(0.08)
+    assert observed == pytest.approx(0.8)
 
 
 @pytest.mark.parametrize(
@@ -90,7 +92,11 @@ def test_g_penalty_scale_invariance_property(
         required_cold_duty=cold_required * scale,
     )
 
-    assert baseline == pytest.approx(hot_fraction**2 + cold_fraction**2)
+    canonical = g_ineq_penalty(
+        [hot_fraction, cold_fraction],
+        form=PenaltyForm.SQUARE,
+    )
+    assert baseline == pytest.approx(canonical)
     assert scaled == pytest.approx(baseline)
 
 

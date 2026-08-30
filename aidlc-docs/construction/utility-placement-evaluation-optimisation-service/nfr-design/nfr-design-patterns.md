@@ -16,16 +16,19 @@ method-specific validation to the public optimizer service.
 Convert an isolated direct or Total Site target source into frozen period
 snapshots containing only finite tuples and metadata. Mutable zones, problem
 tables, streams, targets, arrays, and configuration objects stop at the
-builder. Candidate replay reconstructs fresh local objects from the snapshot.
+builder. The exact-target adapter prepares a separate process-only profile and
+copies it into fresh candidate-local state for physical replay.
 
 **Implements**: U2-NFR-002, U2-NFR-013, U2-NFR-018, U2-NFR-028.
 
-### U2-NFRP-03: Fresh Replay Sandbox
+### U2-NFRP-03: Prepared-Profile Replay Sandbox
 
-Each candidate/period replay receives newly reconstructed tables and utilities.
-No target, duty, or turbine state survives a replay. The same adapter path is
-used on success and failure, enabling repeatability and source non-mutation
-properties.
+Each adapter computes the process-only shifted and real load profiles once per
+period and target zone. Each candidate deep-copies those profiles, inserts its
+utility endpoints, and receives newly reconstructed utilities, targets,
+graphs, derived net streams, and component state. No target, duty, or turbine
+state survives a replay. The same adapter path is used on success and failure,
+enabling repeatability and source non-mutation properties.
 
 **Implements**: U2-NFR-014, U2-NFR-018 through U2-NFR-020.
 

@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import math
 
+from ...domain.enums import PenaltyForm
+from ..numerics import g_ineq_penalty
+
 
 def g_penalty(
     *,
@@ -12,7 +15,7 @@ def g_penalty(
     required_hot_duty: float,
     required_cold_duty: float,
 ) -> float:
-    """Return the squared dimensionless default-utility duty penalty."""
+    """Return the canonical squared default-utility duty penalty."""
     values = (
         hot_fallback_duty,
         cold_fallback_duty,
@@ -22,17 +25,20 @@ def g_penalty(
     if any(not math.isfinite(value) or value < 0.0 for value in values):
         raise ValueError("g_penalty duties must be finite and non-negative")
 
-    def term(fallback: float, required: float) -> float:
+    def residual(fallback: float, required: float) -> float:
         if required == 0.0:
             if fallback != 0.0:
                 raise ValueError("fallback duty requires positive residual duty")
             return 0.0
-        return (fallback / required) ** 2
+        return fallback / required
 
-    return math.fsum(
-        (
-            term(hot_fallback_duty, required_hot_duty),
-            term(cold_fallback_duty, required_cold_duty),
+    return float(
+        g_ineq_penalty(
+            (
+                residual(hot_fallback_duty, required_hot_duty),
+                residual(cold_fallback_duty, required_cold_duty),
+            ),
+            form=PenaltyForm.SQUARE,
         )
     )
 

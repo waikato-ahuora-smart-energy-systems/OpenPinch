@@ -71,8 +71,10 @@ accepts scalar, explicit-unit, or period-resolved values. Omitted entries are
 unbounded and zero disables one named utility. Reserved `HU` and `CU` are not
 placement options; they cover only residual duty after capped named utilities
 are exhausted. Their balanced-composite entropy remains physical, while
-`g[p] = (Q_HU[p]/Q_heat[p])^2 + (Q_CU[p]/Q_cool[p])^2` is reported and
-raw-weighted across all periods as a separate dimensionless ranking term.
+the normalized hot/cold fallback residual vector is passed to canonical
+`g_ineq_penalty(..., form=PenaltyForm.SQUARE)` with default `rho=10`; its result
+is reported and raw-weighted across all periods as a separate dimensionless
+ranking term.
 
 The returned detached case retains caps and required fallback definitions, so
 normal Process GCC and Site TSP targeting/plots show the constrained utility
@@ -184,3 +186,31 @@ tests, including deterministic and property duty-conservation coverage. The
 solver-enabled broad gate passes 2,456 tests with 4 expected skips and 3
 deliberate deselections for execution-count/generator assertions affected only
 by the user's locally modified notebook. Ruff and patch hygiene pass.
+
+## Utility Placement Prepared Target Replay Refresh
+
+The exact-target adapter now constructs and preprocesses one detached
+`PinchProblem`, then caches its utility-independent shifted and real direct load
+profiles once per period and target zone. Each candidate receives deep-copied
+problem tables with candidate utility temperature endpoints inserted through
+the existing interval engine. Existing utility targeting, balanced-composite,
+direct targeting, and Total Site aggregation remain the calculation owners.
+
+The fresh ordinary target is the independent oracle. Explicit edge cases and
+fixed-seed generated utility sets match complete shifted/real problem tables,
+utility names and duties, target totals, Process snapshots, and Total Site
+snapshots. Construction-count, repeated-replay, multiperiod, pickle, and source-
+isolation regressions pass.
+
+With three warmups and ten measurements, median Process candidate replay
+improves from 0.256325 to 0.028981 seconds (8.84 times), and Total Site improves
+from 0.537118 to 0.324896 seconds (1.65 times). The equivalent three-generation
+end-to-end runs improve from 27.861657 to 3.258408 seconds for Process and from
+49.468948 to 30.589541 seconds for Total Site.
+
+The final focused gate passes 328 tests. The complete configured-solver gate
+passes 2,460 tests with 4 expected optional-profile skips and 3 deliberate
+deselections tied only to the user's locally modified, long-running notebook
+19. Ruff, formatting, patch hygiene, and the warnings-as-errors Sphinx build
+pass. The notebook and `.gitignore` are unchanged by and excluded from this
+refresh.

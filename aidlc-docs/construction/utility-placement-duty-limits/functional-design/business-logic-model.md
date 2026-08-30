@@ -24,7 +24,10 @@ without becoming placement decision coordinates.
 
 For each period:
 
-`g_penalty[p] = (Q_HU[p] / Q_heat_required[p])^2 + (Q_CU[p] / Q_cool_required[p])^2`.
+`g_penalty[p] = g_ineq_penalty([Q_HU[p] / Q_heat_required[p], Q_CU[p] / Q_cool_required[p]], form=PenaltyForm.SQUARE)`.
+
+The canonical default `rho=10` therefore multiplies the sum of the two squared
+normalized residuals.
 
 A side contributes zero when required and fallback duties are both zero;
 positive fallback against zero required duty is invalid.
@@ -49,8 +52,9 @@ The source problem remains unchanged.
 - zero caps disable and omitted caps do not constrain;
 - hot/cold generated pair caps remain independent;
 - named duty is assigned before fallback duty;
-- `g_penalty()` is non-negative, zero iff fallback is zero, monotone, and
-  invariant under common scaling of fallback and required duties;
+- the canonical squared `g_ineq_penalty` adapter is non-negative, zero iff
+  fallback is zero, monotone, and invariant under common scaling of fallback
+  and required duties;
 - weighted aggregation equals a direct period sum;
 - request/result JSON and returned-case JSON round trips preserve limits;
 - repeated fixed-seed execution is deterministic and source-state invariant.
