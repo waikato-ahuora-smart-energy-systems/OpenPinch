@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Total Site utility-profile uniform-temperature-tolerance correction in Code Generation under TDD.
+- **Current Stage**: Total Site utility-profile uniform-temperature-tolerance correction complete through Build and Test; Operations N/A.
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -30,7 +30,7 @@
 
 ## Utility Placement Optimisation Progress
 
-- [ ] TOTAL SITE UNIFORM-TEMPERATURE-TOLERANCE CORRECTION - Canonicalise
+- [x] TOTAL SITE UNIFORM-TEMPERATURE-TOLERANCE CORRECTION - Canonicalise
   tolerance-equivalent source rows consistently while aligning Total Site
   process and utility problem tables, eliminate the 70/71-row broadcast
   failure, and verify the four-isothermal Total Site placement workflow.

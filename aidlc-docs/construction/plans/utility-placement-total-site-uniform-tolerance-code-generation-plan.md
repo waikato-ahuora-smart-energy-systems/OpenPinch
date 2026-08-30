@@ -20,7 +20,7 @@ an unexpected scope change occurs.
 - [x] **Step 4 - Total Site workflow regression.** Run the fixed-seed four-
   isothermal Total Site utility-placement workflow through the generation count
   that exposed the saved failure and verify it returns a feasible detached case.
-- [ ] **Step 5 - Build, review, and completion.** Run focused targeting and
+- [x] **Step 5 - Build, review, and completion.** Run focused targeting and
   utility-placement tests, fixed-seed properties, Ruff, patch hygiene, the
   applicable broad suite, documentation validation, review scope, preserve the
   user's notebook and `.gitignore`, update records, and commit to `develop`.
