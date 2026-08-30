@@ -36,7 +36,7 @@ authorize the complete TDD sequence.
 - [x] **Step 8 - Focused and broad Build and Test.** Run fixed-seed properties,
   direct/indirect targeting, utility placement, Ruff, patch hygiene,
   documentation, and the complete applicable test suite.
-- [ ] **Step 9 - Records, review, and completion.** Update requirements, design,
+- [x] **Step 9 - Records, review, and completion.** Update requirements, design,
   state, audit, code summary, and Build and Test evidence; review the diff for
   necessity; preserve unrelated notebook and `.gitignore` edits; commit the
   approved correction to `develop`.
