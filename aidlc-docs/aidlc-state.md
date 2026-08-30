@@ -292,15 +292,18 @@
   passed 297 tests with 3 expected skips; the full solver-enabled suite passed
   2,389 tests with 4 expected skips. Ruff, patch hygiene, warning-clean RTD,
   fresh archives, and isolated installed-wheel notebook execution pass.
-- **Candidate thermodynamic containment closure**: A sampled CMA-ES coordinate
-  with genuinely unbalanced composite extents now becomes a typed infeasible
-  candidate instead of aborting notebook 19. Invariant thermodynamic failures
-  still propagate. The exact locally modified Process and Site cells complete
-  in 329.71 seconds with objectives `0.03524514018747493 kW/K` and
-  `0.34520118924505105 kW/K`; the source baseline remains unchanged. The broad
-  solver-enabled gate passes 2,454 tests with 4 expected skips and 3 local-
-  notebook metadata/generator deselections. The user's notebook and
-  `.gitignore` remain unmodified by this correction.
+- **Balanced-composite duty-conservation closure**: The imbalance was caused
+  by thermodynamic reconstruction, not by an unbalanced targeting allocation.
+  A process breakpoint approximately `0.00000795 K` inside a near-isothermal
+  utility span was removed by the problem-table temperature tolerance, losing
+  about `2.625 kW` because that utility had a large heat-capacity flow. Utility
+  entropy profiles now use exact allocated duty and analytical temperature
+  fractions, so every subdivided grid conserves endpoint duty. The exact local
+  Process and Site cells complete in 355.17 seconds with objectives
+  `0.03524514018747493 kW/K` and `0.3452285101943513 kW/K`, no invalid-composite
+  diagnostic, and an unchanged baseline. The broad solver-enabled gate passes
+  2,456 tests with 4 expected skips and 3 local-notebook metadata/generator
+  deselections. The user's notebook and `.gitignore` remain unmodified.
 
 ## Indirect Profile Precision Progress
 

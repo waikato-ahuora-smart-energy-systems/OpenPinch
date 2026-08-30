@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
@@ -18,6 +19,8 @@ from OpenPinch.analysis.utility_placement.context import (
     ProcessEntropySlice,
 )
 from OpenPinch.analysis.utility_placement.thermodynamics import (
+    _balanced_composite_curves,
+    _utility_composite_profile,
     balanced_composite_entropy_generation,
     evaluate_thermodynamic_cost,
     stream_entropy_change,
@@ -169,6 +172,95 @@ def test_balanced_composite_entropy_closes_only_numerical_heat_balance_drift() -
     assert hot < 0.0
     assert cold > 0.0
     assert total == pytest.approx(hot + cold)
+
+
+def test_balanced_composite_reconstruction_preserves_near_isothermal_duty() -> None:
+    snapshot = PlacementTargetSnapshot(
+        shifted_temperatures=(100.0, 22.8789, 0.0),
+        real_temperatures=(100.0, 22.8789, 0.0),
+        hot_load_profile=(0.0, 0.0, 0.0),
+        cold_load_profile=(0.0, 0.0, 0.0),
+        real_hot_composite=(100.0, 50.0, 0.0),
+        real_cold_composite=(90.0, 45.0, 0.0),
+        hot_pinch_index=0,
+        cold_pinch_index=0,
+        entropy_slices=(),
+    )
+    period = PlacementPeriodInput(
+        period_id="p1",
+        weight=1.0,
+        snapshot=snapshot,
+        residual_hot_duty=0.0,
+        residual_cold_duty=10.0,
+        ambient_temperature_kelvin=298.15,
+        coordinate_bounds=(),
+    )
+    allocation = PlacementPeriodAllocation(
+        period_id="p1",
+        hot_levels=(),
+        cold_levels=(
+            _level(
+                UtilitySide.COLD,
+                22.878892049207573,
+                22.888892049207572,
+                10.0,
+            ),
+        ),
+        allocated_hot_duty=0.0,
+        allocated_cold_duty=10.0,
+        required_hot_duty=0.0,
+        required_cold_duty=10.0,
+        target_snapshot=snapshot,
+        hot_coverage_residual=0.0,
+        cold_coverage_residual=0.0,
+        coverage_tolerance_hot=1e-6,
+        coverage_tolerance_cold=1e-6,
+        feasible=True,
+    )
+
+    _, hot_heat, _, cold_heat = _balanced_composite_curves(period, allocation)
+
+    assert np.ptp(hot_heat) == pytest.approx(100.0, abs=1e-9)
+    assert np.ptp(cold_heat) == pytest.approx(100.0, abs=1e-9)
+
+
+@given(
+    duty=st.floats(min_value=1.0, max_value=1_000.0, allow_nan=False),
+    low=st.floats(min_value=-100.0, max_value=100.0, allow_nan=False),
+    span=st.floats(min_value=0.001, max_value=100.0, allow_nan=False),
+    fraction=st.floats(min_value=0.0, max_value=1.0, allow_nan=False),
+)
+def test_utility_composite_profiles_conserve_exact_endpoint_duty(
+    duty,
+    low,
+    span,
+    fraction,
+) -> None:
+    high = low + span
+    temperatures = (
+        high + 1.0,
+        high,
+        low + fraction * span,
+        low,
+        low - 1.0,
+    )
+    hot = _utility_composite_profile(
+        temperatures,
+        (_level(UtilitySide.HOT, high, low, duty),),
+        is_hot=True,
+    )
+    cold = _utility_composite_profile(
+        temperatures,
+        (_level(UtilitySide.COLD, low, high, duty),),
+        is_hot=False,
+    )
+
+    assert hot[0] == pytest.approx(duty)
+    assert hot[-1] == pytest.approx(0.0)
+    assert cold[0] == pytest.approx(0.0)
+    assert cold[-1] == pytest.approx(-duty)
+    assert np.ptp(hot) == pytest.approx(duty)
+    assert np.ptp(cold) == pytest.approx(duty)
 
 
 def test_balanced_composite_entropy_handles_zero_duty_curves() -> None:

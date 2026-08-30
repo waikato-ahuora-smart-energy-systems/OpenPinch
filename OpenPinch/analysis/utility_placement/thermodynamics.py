@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable
 
 import numpy as np
 
 from OpenPinch.analysis.graphs.composite import clean_composite_curve_ends
-from OpenPinch.analysis.targeting.area_cost import get_balanced_CC
-from OpenPinch.analysis.targeting.cascade import get_utility_heat_cascade
 from OpenPinch.analysis.targeting.temperature_driving_force import (
     get_temperature_driving_forces,
 )
@@ -17,11 +16,8 @@ from OpenPinch.contracts.utility_placement import (
     ThermodynamicCostBreakdown,
     UtilityPlacementRequest,
 )
-from OpenPinch.domain.enums import ProblemTableLabel
-from OpenPinch.domain.stream import Stream
-from OpenPinch.domain.stream_collection import StreamCollection
 
-from .allocation import PlacementPeriodAllocation
+from .allocation import AllocatedUtilityLevel, PlacementPeriodAllocation
 from .context import PlacementPeriodInput
 from .errors import PlacementThermodynamicError
 
@@ -162,16 +158,6 @@ def balanced_composite_entropy_generation(
     return hot_entropy, cold_entropy, max(generation, 0.0)
 
 
-def _level_stream(level) -> Stream:
-    return Stream(
-        name=level.template_key.name,
-        supply_temperature=level.supply_temperature,
-        target_temperature=level.target_temperature,
-        heat_flow=level.allocated_duty,
-        is_process_stream=False,
-    )
-
-
 def _interpolate_profile(
     source_temperatures: tuple[float, ...],
     source_profile: tuple[float, ...],
@@ -184,6 +170,38 @@ def _interpolate_profile(
         float(value)
         for value in np.interp(target_t[::-1], source_t[::-1], source_h[::-1])[::-1]
     )
+
+
+def _utility_composite_profile(
+    temperatures: tuple[float, ...],
+    levels: Iterable[AllocatedUtilityLevel],
+    *,
+    is_hot: bool,
+) -> np.ndarray:
+    """Return an exact cumulative utility profile on any temperature grid."""
+    grid = np.asarray(temperatures, dtype=float)
+    profile = np.zeros_like(grid)
+    for level in levels:
+        duty = float(level.allocated_duty)
+        if duty == 0.0:
+            continue
+        low, high = sorted(
+            (float(level.supply_temperature), float(level.target_temperature))
+        )
+        span = high - low
+        if span <= 0.0:
+            raise PlacementThermodynamicError(
+                code="zero_utility_temperature_span",
+                message="An allocated utility requires a positive temperature span.",
+                template_key=level.template_key,
+            )
+        if is_hot:
+            fraction = np.clip((grid - low) / span, 0.0, 1.0)
+            profile += duty * fraction
+        else:
+            fraction = np.clip((high - grid) / span, 0.0, 1.0)
+            profile -= duty * fraction
+    return profile
 
 
 def _balanced_composite_curves(period, allocation):
@@ -213,32 +231,25 @@ def _balanced_composite_curves(period, allocation):
         period.snapshot.real_cold_composite,
         temperatures,
     )
-    hot_streams = StreamCollection(
-        [_level_stream(level) for level in allocation.hot_levels]
+    hot_utility = _utility_composite_profile(
+        temperatures,
+        allocation.hot_levels,
+        is_hot=True,
     )
-    cold_streams = StreamCollection(
-        [_level_stream(level) for level in allocation.cold_levels]
+    cold_utility = _utility_composite_profile(
+        temperatures,
+        allocation.cold_levels,
+        is_hot=False,
     )
-    utility_updates = get_utility_heat_cascade(
-        np.asarray(temperatures, dtype=float),
-        hot_streams,
-        cold_streams,
-        is_shifted=False,
-    )["updates"]
-    balanced = get_balanced_CC(
-        T_col=np.asarray(temperatures, dtype=float),
-        H_hot=np.asarray(process_hot, dtype=float),
-        H_cold=np.asarray(process_cold, dtype=float),
-        H_hot_ut=utility_updates[ProblemTableLabel.H_HOT_UT],
-        H_cold_ut=utility_updates[ProblemTableLabel.H_COLD_UT],
-    )["updates"]
+    hot_balanced = np.asarray(process_hot, dtype=float) + hot_utility
+    cold_balanced = np.asarray(process_cold, dtype=float) + cold_utility
     hot_temperature, hot_heat = clean_composite_curve_ends(
         np.asarray(temperatures, dtype=float),
-        np.asarray(balanced[ProblemTableLabel.H_HOT_BAL], dtype=float),
+        hot_balanced,
     )
     cold_temperature, cold_heat = clean_composite_curve_ends(
         np.asarray(temperatures, dtype=float),
-        np.asarray(balanced[ProblemTableLabel.H_COLD_BAL], dtype=float),
+        cold_balanced,
     )
     return hot_temperature, hot_heat, cold_temperature, cold_heat
 

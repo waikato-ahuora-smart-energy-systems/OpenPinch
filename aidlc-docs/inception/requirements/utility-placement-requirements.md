@@ -804,3 +804,7 @@ Additional acceptance requirements:
     generation shall make only that candidate infeasible. It shall emit a
     typed period diagnostic and shall not abort the remaining optimizer search;
     invariant thermodynamic data defects shall continue to raise typed errors.
+36. Balanced-composite reconstruction shall conserve every allocated utility's
+    full duty even when a utility endpoint lies within the targeting tolerance
+    of a rounded process-table breakpoint. Temperature-grid subdivision shall
+    not remove or create utility heat.

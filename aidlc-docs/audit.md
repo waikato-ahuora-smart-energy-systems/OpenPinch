@@ -5854,3 +5854,19 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 **Context**: CODE GENERATION AND BUILD AND TEST COMPLETE - Candidate thermodynamic failure containment
 
 ---
+
+## Utility Placement Unbalanced Composite Root Cause
+**Timestamp**: 2026-08-30T03:33:21Z
+**User Input**: "How did an unbalanced composite curve occur? The root cause needs to be addressed."
+**AI Response**: "Reopened the correction at root cause. Exact Total Site replay conserved aggregate hot and cold duties, but balanced-composite reconstruction passed a near-isothermal utility through the shared problem-table interval filter. A rounded process breakpoint lay 0.00000795 K inside the utility span; the filter discarded that sub-interval as temperature noise even though the utility's large heat-capacity flow made it carry approximately 2.625 kW. Opened RED duty-conservation coverage and an analytical utility-profile correction."
+**Context**: TDD ROOT-CAUSE CORRECTION - Near-isothermal utility duty loss in balanced-composite reconstruction
+
+---
+
+## Utility Placement Balanced-Composite Root-Cause Completion
+**Timestamp**: 2026-08-30T04:09:12Z
+**User Input**: "(No additional user input; continued under standing authorization.)"
+**AI Response**: "Corrected the root cause rather than relying on candidate containment. Balanced-composite entropy reconstruction now builds utility heat profiles analytically from exact allocated duty and clipped temperature fractions, so the problem-table interval tolerance cannot discard material heat from a near-isothermal utility. The deterministic regression closes the former 10 kW example exactly and property coverage proves endpoint-duty conservation. Exact notebook Process and Site workflows complete in 355.17 seconds with objectives 0.03524514018747493 and 0.3452285101943513 kW/K, no invalid-balanced-composite diagnostic, and an unchanged baseline. The full suite passes 2,456 tests with 4 expected skips and 3 deliberate local-notebook metadata/generator deselections."
+**Context**: CODE GENERATION AND BUILD AND TEST COMPLETE - Balanced-composite duty-conservation root fix
+
+---

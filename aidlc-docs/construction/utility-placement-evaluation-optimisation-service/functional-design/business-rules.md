@@ -231,6 +231,13 @@ evaluation session converts them to infeasible scalar results with typed period
 diagnostics so one sampled point cannot abort a solver run. Other typed
 thermodynamic failures remain run-level defects and propagate.
 
+Balanced-composite thermodynamics constructs utility profiles analytically
+from each allocated duty and its exact temperature fraction. It does not use
+the problem-table interval activity tolerance, because a discarded sub-interval
+can carry material heat for a near-isothermal utility with a large heat-
+capacity flow. Each hot profile shall fall from full duty to zero and each cold
+profile from zero to negative full duty over its complete temperature span.
+
 ### BR2-036A: Residual default utilities
 
 Generated fallback `HU` and `CU` are not placement coordinates. Their supply

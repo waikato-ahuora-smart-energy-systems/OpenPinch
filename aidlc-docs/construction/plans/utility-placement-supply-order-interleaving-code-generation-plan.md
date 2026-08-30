@@ -20,3 +20,12 @@
 - [x] Step 7: Run focused and broad regression gates, update only the necessary
   requirements, design, state, audit, and build evidence, review the diff, and
   commit the correction to `develop`.
+- [x] Step 8: Trace the unbalanced candidate to its first non-conserving
+  operation and add a RED regression using a near-isothermal utility endpoint
+  adjacent to a process-table breakpoint.
+- [x] Step 9: Reconstruct utility composite profiles from exact allocated duty
+  and temperature fractions, independent of problem-table interval filtering,
+  and prove endpoint duty conservation with deterministic and property tests.
+- [x] Step 10: Rerun the exact uncapped notebook workflows and broad gates,
+  replace containment-only evidence with the root-cause result, review only
+  necessary changes, and commit the correction to `develop`.

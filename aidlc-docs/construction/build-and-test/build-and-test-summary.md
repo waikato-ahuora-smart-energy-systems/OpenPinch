@@ -159,21 +159,28 @@ sandbox-denied Chrome/process-pool checks pass on their permitted rerun, giving
 2,451 passing tests for the complete applicable gate. The user's `.gitignore`
 and locally modified notebook 19 remain outside this amendment.
 
-## Utility Placement Candidate Thermodynamic Containment Refresh
+## Utility Placement Balanced-Composite Duty-Conservation Refresh
 
-The uncapped notebook 19 Site workflow exposed a sampled CMA-ES coordinate
-whose balanced-composite hot and cold heat extents differed by approximately
-`2.625 kW`. That is a genuine candidate feasibility failure, not numerical
-rounding drift. The evaluation session now converts
-`invalid_balanced_composite` and `negative_entropy_generation` failures into
-typed, period-specific infeasible candidate results so the remaining search
-continues. Other thermodynamic errors still propagate as invariant defects.
+The uncapped notebook 19 Site workflow exposed a balanced allocation whose
+thermodynamic reconstruction lost approximately `2.625 kW`. The active cold
+isothermal utility spanned `22.878892` to `22.888892 degC`; a rounded process
+breakpoint lay about `0.00000795 K` inside that span. The shared problem-table
+kernel treats intervals narrower than `0.00001 K` as inactive. That temperature
+noise rule is normally harmless, but the near-isothermal utility's very large
+heat-capacity flow made the discarded interval carry material duty.
+
+Balanced-composite thermodynamics now constructs hot and cold utility profiles
+analytically from exact allocated duty and clipped temperature fractions. Every
+profile therefore reaches its complete endpoint duty on any subdivided grid.
+The candidate-failure containment remains as defense, but the formerly failing
+candidate is now balanced and evaluated normally rather than rejected.
 
 The exact current notebook cells execute without rewriting the user's file.
-Process and Site finish in 329.71 seconds with objectives
-`0.03524514018747493 kW/K` and `0.34520118924505105 kW/K`; Process fallback is
-zero and the baseline remains unchanged. The targeted thermodynamics,
-evaluation, and optimisation gate passes 28 tests. The solver-enabled broad
-gate passes 2,454 tests with 4 expected skips and 3 deliberate deselections for
-execution-count/generator assertions affected only by the user's locally
-modified notebook. Ruff and patch hygiene pass.
+Process and Site finish in 355.17 seconds with objectives
+`0.03524514018747493 kW/K` and `0.3452285101943513 kW/K`; Process fallback is
+zero, no invalid-balanced-composite diagnostic occurs, and the baseline remains
+unchanged. The focused utility-placement and shared numerical gate passes 240
+tests, including deterministic and property duty-conservation coverage. The
+solver-enabled broad gate passes 2,456 tests with 4 expected skips and 3
+deliberate deselections for execution-count/generator assertions affected only
+by the user's locally modified notebook. Ruff and patch hygiene pass.
