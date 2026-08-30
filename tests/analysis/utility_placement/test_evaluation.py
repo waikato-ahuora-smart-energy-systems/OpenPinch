@@ -14,6 +14,7 @@ from OpenPinch.analysis.utility_placement.context import (
     ProcessEntropySlice,
     build_utility_placement_context,
 )
+from OpenPinch.analysis.utility_placement.errors import PlacementThermodynamicError
 from OpenPinch.analysis.utility_placement.evaluation import PlacementEvaluationSession
 from OpenPinch.analysis.utility_placement.normalization import (
     prepare_template_blueprints,
@@ -209,3 +210,60 @@ def test_evaluation_session_returns_graded_infeasibility_for_bad_candidate() -> 
     assert result.physical_objective is None
     assert result.diagnostics
     assert len(session.diagnostic_representatives) <= 10
+
+
+def test_evaluation_session_contains_candidate_balanced_composite_failure(
+    monkeypatch,
+) -> None:
+    request, context, model = _case()
+    session = PlacementEvaluationSession(
+        request=request,
+        context=context,
+        model=model,
+        allocation_adapter=_Adapter(),
+    )
+
+    def fail_candidate_thermodynamics(**_kwargs):
+        raise PlacementThermodynamicError(
+            code="invalid_balanced_composite",
+            message="Candidate composites are not balanced.",
+        )
+
+    monkeypatch.setattr(
+        "OpenPinch.analysis.utility_placement.evaluation.evaluate_thermodynamic_cost",
+        fail_candidate_thermodynamics,
+    )
+
+    result = session.evaluate(model.initial_points[0])
+
+    assert not result.feasible
+    assert 1.0 <= result.scalar_objective < 2.0
+    assert result.diagnostics[0].code == "invalid_balanced_composite"
+    assert result.diagnostics[0].constraint == "thermodynamic_feasibility"
+    assert result.diagnostics[0].period_id == "p1"
+
+
+def test_evaluation_session_does_not_hide_invariant_thermodynamic_failure(
+    monkeypatch,
+) -> None:
+    request, context, model = _case()
+    session = PlacementEvaluationSession(
+        request=request,
+        context=context,
+        model=model,
+        allocation_adapter=_Adapter(),
+    )
+
+    def fail_invariant_thermodynamics(**_kwargs):
+        raise PlacementThermodynamicError(
+            code="nonfinite_entropy_input",
+            message="Invariant entropy data are invalid.",
+        )
+
+    monkeypatch.setattr(
+        "OpenPinch.analysis.utility_placement.evaluation.evaluate_thermodynamic_cost",
+        fail_invariant_thermodynamics,
+    )
+
+    with pytest.raises(PlacementThermodynamicError, match="Invariant entropy"):
+        session.evaluate(model.initial_points[0])

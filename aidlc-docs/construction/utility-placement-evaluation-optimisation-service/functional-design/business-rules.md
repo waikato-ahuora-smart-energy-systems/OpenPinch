@@ -225,6 +225,12 @@ Any non-finite branch or aggregate is never passed to the optimizer as a
 feasible objective. Coordinate-dependent cases are infeasible; invariant
 calculation defects raise a typed thermodynamic error.
 
+Candidate-specific `invalid_balanced_composite` and
+`negative_entropy_generation` failures are coordinate-dependent. The
+evaluation session converts them to infeasible scalar results with typed period
+diagnostics so one sampled point cannot abort a solver run. Other typed
+thermodynamic failures remain run-level defects and propagate.
+
 ### BR2-036A: Residual default utilities
 
 Generated fallback `HU` and `CU` are not placement coordinates. Their supply

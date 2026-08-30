@@ -23,6 +23,7 @@ from OpenPinch.contracts.utility_placement import (
 
 from .allocation import PlacementAllocationAdapter, allocate_placement_period
 from .context import UtilityPlacementContext
+from .errors import PlacementThermodynamicError
 from .penalties import (
     aggregate_weighted_objective,
     feasible_objective_scalar,
@@ -232,13 +233,31 @@ class PlacementEvaluationSession:
                 )
                 fallback_penalties.append(fallback_penalty)
 
-                thermo = evaluate_thermodynamic_cost(
-                    request=self.request,
-                    period=period.model_copy(
-                        update={"snapshot": allocation.target_snapshot}
-                    ),
-                    allocation=allocation,
-                )
+                try:
+                    thermo = evaluate_thermodynamic_cost(
+                        request=self.request,
+                        period=period.model_copy(
+                            update={"snapshot": allocation.target_snapshot}
+                        ),
+                        allocation=allocation,
+                    )
+                except PlacementThermodynamicError as exc:
+                    if exc.code not in {
+                        "invalid_balanced_composite",
+                        "negative_entropy_generation",
+                    }:
+                        raise
+                    failure_diagnostics.append(
+                        CandidateDiagnostic(
+                            code=exc.code,
+                            constraint="thermodynamic_feasibility",
+                            message=str(exc),
+                            period_id=period.period_id,
+                            details=(("thermodynamic_error", exc.code),),
+                        )
+                    )
+                    violation += 1.0
+                    continue
                 thermo_value = thermo.total_entropy_generation.value
                 thermo_values.append(thermo_value)
                 period_results.append(

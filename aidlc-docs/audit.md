@@ -5830,3 +5830,27 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 **Context**: CODE GENERATION AND BUILD AND TEST COMPLETE - Supply-temperature ordering and fallback margin correction
 
 ---
+
+## Utility Placement Objective Unit Scaling Clarification
+**Timestamp**: 2026-08-29T22:39:21Z
+**User Input**: "Should the obj use W/K to be scaled better?"
+**AI Response**: "Confirmed that the reported physical objective should remain in kW/K. The optimizer already receives a dimensionless scalar formed from the ratio of the weighted entropy-generation objective to a weighted process-entropy reference, so consistently converting both quantities to W/K leaves the optimizer input unchanged."
+**Context**: NUMERICAL SCALING CLARIFICATION - Physical reporting units versus optimizer-facing normalization
+
+---
+
+## Utility Placement Notebook Completion Failure
+**Timestamp**: 2026-08-29T23:25:20Z
+**User Input**: "#19 notebook fails to complete."
+**AI Response**: "Reproduced the saved Site traceback without rewriting the user's notebook. A CMA-ES candidate produced genuinely unbalanced hot and cold composite extents; the candidate-specific thermodynamic error escaped the evaluation boundary and aborted the complete optimization. Opened a TDD correction requiring recoverable balanced-composite and negative-generation failures to become typed infeasible candidate results while invariant thermodynamic defects still propagate."
+**Context**: TDD BUG FIX - Candidate thermodynamic failure containment
+
+---
+
+## Utility Placement Notebook Completion Fix Verification
+**Timestamp**: 2026-08-30T00:04:45Z
+**User Input**: "(No additional user input; continued under standing authorization.)"
+**AI Response**: "Completed the TDD correction. Recoverable candidate balanced-composite and negative-generation failures are now typed infeasible results rather than run-aborting exceptions, while invariant thermodynamic defects still propagate. The exact current notebook cells complete Process and Site in 329.71 seconds with objectives 0.03524514018747493 and 0.34520118924505105 kW/K, zero Process fallback, and an unchanged baseline. The broad suite passes 2,454 tests with 4 expected skips and 3 deliberate local-notebook metadata/generator deselections. The user's notebook and .gitignore were not rewritten or staged."
+**Context**: CODE GENERATION AND BUILD AND TEST COMPLETE - Candidate thermodynamic failure containment
+
+---

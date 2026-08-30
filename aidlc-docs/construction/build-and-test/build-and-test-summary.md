@@ -158,3 +158,22 @@ passes, 4 expected skips, and 4 deliberate local-notebook deselections. Its two
 sandbox-denied Chrome/process-pool checks pass on their permitted rerun, giving
 2,451 passing tests for the complete applicable gate. The user's `.gitignore`
 and locally modified notebook 19 remain outside this amendment.
+
+## Utility Placement Candidate Thermodynamic Containment Refresh
+
+The uncapped notebook 19 Site workflow exposed a sampled CMA-ES coordinate
+whose balanced-composite hot and cold heat extents differed by approximately
+`2.625 kW`. That is a genuine candidate feasibility failure, not numerical
+rounding drift. The evaluation session now converts
+`invalid_balanced_composite` and `negative_entropy_generation` failures into
+typed, period-specific infeasible candidate results so the remaining search
+continues. Other thermodynamic errors still propagate as invariant defects.
+
+The exact current notebook cells execute without rewriting the user's file.
+Process and Site finish in 329.71 seconds with objectives
+`0.03524514018747493 kW/K` and `0.34520118924505105 kW/K`; Process fallback is
+zero and the baseline remains unchanged. The targeted thermodynamics,
+evaluation, and optimisation gate passes 28 tests. The solver-enabled broad
+gate passes 2,454 tests with 4 expected skips and 3 deliberate deselections for
+execution-count/generator assertions affected only by the user's locally
+modified notebook. Ruff and patch hygiene pass.

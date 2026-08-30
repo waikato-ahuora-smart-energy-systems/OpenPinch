@@ -800,3 +800,7 @@ Additional acceptance requirements:
 34. Prove normal direct targeting and utility-placement exact replay use the
     same corrected shared targeting behavior and continue to respect optional
     per-utility maximum duties.
+35. A candidate-specific balanced-composite mismatch or negative entropy
+    generation shall make only that candidate infeasible. It shall emit a
+    typed period diagnostic and shall not abort the remaining optimizer search;
+    invariant thermodynamic data defects shall continue to raise typed errors.

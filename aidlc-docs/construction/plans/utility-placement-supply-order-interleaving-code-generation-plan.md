@@ -11,3 +11,12 @@
   reproduce the modified notebook case without rewriting the user's notebook.
 - [x] Step 4: Run broad regression and quality gates, review the final diff for
   necessary changes only, update evidence and state, and commit to `develop`.
+- [x] Step 5: Reproduce the saved notebook failure and add RED tests requiring
+  candidate-specific balanced-composite failures to be scored as infeasible
+  without hiding invariant thermodynamic defects.
+- [x] Step 6: Contain recoverable candidate thermodynamic failures at the
+  evaluation boundary with typed diagnostics, then rerun the exact uncapped
+  Process and Site notebook workflows without rewriting the user's notebook.
+- [x] Step 7: Run focused and broad regression gates, update only the necessary
+  requirements, design, state, audit, and build evidence, review the diff, and
+  commit the correction to `develop`.
