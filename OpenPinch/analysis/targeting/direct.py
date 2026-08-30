@@ -29,8 +29,15 @@ from .cascade import (
     get_process_heat_cascade,
     set_zonal_targets,
 )
-from .grand_composite import get_additional_GCCs
-from .utilities import get_utility_targets
+from .grand_composite import (
+    get_additional_GCCs,
+    get_seperated_gcc_heat_load_profiles,
+)
+from .utilities import (
+    _calculate_utility_duties_for_load_profiles,
+    get_utility_targets,
+    target_utilities_for_load_profiles,
+)
 
 __all__ = ["compute_direct_integration_targets"]
 
@@ -44,6 +51,15 @@ class _PreparedDirectIntegrationProfile:
     zonal_targets: dict
     hot_pinch: float | None
     cold_pinch: float | None
+
+
+@dataclass(frozen=True)
+class _PreparedUtilityLoadProfile:
+    """Completed utility-independent load profile for repeated targeting."""
+
+    pt: ProblemTable
+    hot_utility_target: float
+    cold_utility_target: float
 
 
 ################################################################################
@@ -192,6 +208,99 @@ def _prepare_direct_integration_profile(
         idx=idx,
         temperature_streams=process_streams,
         insert_constant_heat_intervals=False,
+    )
+
+
+def _prepare_utility_load_profile(
+    zone: Zone,
+    prepared_profile: _PreparedDirectIntegrationProfile,
+) -> _PreparedUtilityLoadProfile:
+    """Complete derived process load profiles once before candidate replay."""
+    pt = deepcopy(prepared_profile.pt)
+    _insert_temperature_interval_into_pt_at_constant_h(pt)
+    direct = zone.config.direct
+    get_additional_GCCs(
+        pt,
+        do_vert_cc_calc=direct.vertical_gcc_enabled,
+        do_assisted_ht_calc=direct.assisted_ht_enabled,
+        assisted_ht_dt_cut=direct.assisted_ht_dt,
+    )
+    return _PreparedUtilityLoadProfile(
+        pt=pt,
+        hot_utility_target=float(prepared_profile.zonal_targets["hot_utility_target"]),
+        cold_utility_target=float(
+            prepared_profile.zonal_targets["cold_utility_target"]
+        ),
+    )
+
+
+def _target_prepared_utility_load_profile(
+    prepared_profile: _PreparedUtilityLoadProfile,
+    *,
+    hot_utilities: StreamCollection,
+    cold_utilities: StreamCollection,
+    period_idx: int | None,
+) -> tuple[StreamCollection, StreamCollection]:
+    """Target fresh utilities after interpolating their candidate endpoints."""
+    pt = deepcopy(prepared_profile.pt)
+    _insert_utility_temperature_intervals(
+        pt,
+        hot_utilities + cold_utilities,
+        is_shifted=True,
+        period_idx=period_idx,
+    )
+    pt.update(
+        **get_seperated_gcc_heat_load_profiles(
+            T_col=pt[ProblemTableLabel.T],
+            H_net=pt[ProblemTableLabel.H_NET_A],
+            is_process_stream=True,
+        )
+    )
+    hot_pinch, cold_pinch, *_ = pt.pinch_idx(ProblemTableLabel.H_NET_A)
+    return target_utilities_for_load_profiles(
+        hot_utilities=hot_utilities,
+        cold_utilities=cold_utilities,
+        T_vals=pt[ProblemTableLabel.T],
+        H_net_cold=pt[ProblemTableLabel.H_NET_COLD],
+        H_net_hot=pt[ProblemTableLabel.H_NET_HOT],
+        pinch_idx=(hot_pinch, cold_pinch),
+        is_real_temperatures=False,
+        idx=period_idx,
+    )
+
+
+def _target_prepared_utility_load_profile_duties(
+    prepared_profile: _PreparedUtilityLoadProfile,
+    *,
+    hot_utilities: StreamCollection,
+    cold_utilities: StreamCollection,
+    period_idx: int | None,
+) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    """Calculate candidate duties from a cached profile without stream mutation."""
+    pt = deepcopy(prepared_profile.pt)
+    _insert_utility_temperature_intervals(
+        pt,
+        hot_utilities + cold_utilities,
+        is_shifted=True,
+        period_idx=period_idx,
+    )
+    pt.update(
+        **get_seperated_gcc_heat_load_profiles(
+            T_col=pt[ProblemTableLabel.T],
+            H_net=pt[ProblemTableLabel.H_NET_A],
+            is_process_stream=True,
+        )
+    )
+    hot_pinch, cold_pinch, *_ = pt.pinch_idx(ProblemTableLabel.H_NET_A)
+    return _calculate_utility_duties_for_load_profiles(
+        hot_utilities=hot_utilities,
+        cold_utilities=cold_utilities,
+        T_vals=pt[ProblemTableLabel.T],
+        H_net_cold=pt[ProblemTableLabel.H_NET_COLD],
+        H_net_hot=pt[ProblemTableLabel.H_NET_HOT],
+        pinch_idx=(hot_pinch, cold_pinch),
+        is_real_temperatures=False,
+        idx=period_idx,
     )
 
 

@@ -6,16 +6,21 @@ import inspect
 import pickle
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from OpenPinch import PinchProblem, PinchWorkspace
+from OpenPinch.analysis.utility_placement.allocation import allocate_placement_period
 from OpenPinch.analysis.utility_placement.codec import (
     build_utility_placement_model,
     decode_placement,
 )
 from OpenPinch.analysis.utility_placement.evaluation import PlacementEvaluationSession
+from OpenPinch.analysis.utility_placement.thermodynamics import (
+    evaluate_thermodynamic_cost,
+)
 from OpenPinch.application import utility_placement as placement_application
 from OpenPinch.application.utility_placement import build_problem_placement_context
 from OpenPinch.contracts.utility_placement import (
@@ -190,6 +195,30 @@ def test_exact_replay_prepares_problem_once_and_matches_fresh_target(
     if request.base_target is UtilityPlacementBaseTarget.DIRECT:
         fresh_target = fresh_problem.target.direct_heat_integration(**kwargs)
     else:
+
+        def assert_same_curve(
+            first_temperatures,
+            first_values,
+            second_temperatures,
+            second_values,
+            *,
+            tolerance,
+        ):
+            temperatures = sorted(
+                set(first_temperatures) | set(second_temperatures),
+            )
+            first = np.interp(
+                temperatures,
+                tuple(reversed(first_temperatures)),
+                tuple(reversed(first_values)),
+            )
+            second = np.interp(
+                temperatures,
+                tuple(reversed(second_temperatures)),
+                tuple(reversed(second_values)),
+            )
+            assert first == pytest.approx(second, abs=tolerance)
+
         fresh_target = fresh_problem.target.total_site_heat_integration(**kwargs)
     fresh_snapshot, required_hot, required_cold = (
         placement_application._snapshot_from_target(
@@ -220,21 +249,223 @@ def test_exact_replay_prepares_problem_once_and_matches_fresh_target(
     )
     assert replay.required_hot_duty == pytest.approx(required_hot, abs=1e-8)
     assert replay.required_cold_duty == pytest.approx(required_cold, abs=1e-8)
-    for attribute in (
-        "shifted_temperatures",
-        "real_temperatures",
-        "hot_load_profile",
-        "cold_load_profile",
-        "real_hot_composite",
-        "real_cold_composite",
-    ):
-        assert getattr(replay.target_snapshot, attribute) == pytest.approx(
-            getattr(fresh_snapshot, attribute), abs=1e-10
+    if request.base_target is UtilityPlacementBaseTarget.DIRECT:
+        for attribute in (
+            "shifted_temperatures",
+            "real_temperatures",
+            "hot_load_profile",
+            "cold_load_profile",
+            "real_hot_composite",
+            "real_cold_composite",
+        ):
+            assert getattr(replay.target_snapshot, attribute) == pytest.approx(
+                getattr(fresh_snapshot, attribute), abs=1e-10
+            )
+        assert replay.target_snapshot.hot_pinch_index == fresh_snapshot.hot_pinch_index
+        assert (
+            replay.target_snapshot.cold_pinch_index == fresh_snapshot.cold_pinch_index
         )
-    assert replay.target_snapshot.hot_pinch_index == fresh_snapshot.hot_pinch_index
-    assert replay.target_snapshot.cold_pinch_index == fresh_snapshot.cold_pinch_index
+    else:
+        assert max(replay.target_snapshot.hot_load_profile) == pytest.approx(
+            required_hot,
+            abs=1e-8,
+        )
+        assert max(replay.target_snapshot.cold_load_profile) == pytest.approx(
+            required_cold,
+            abs=1e-8,
+        )
+        assert_same_curve(
+            replay.target_snapshot.real_temperatures,
+            replay.target_snapshot.real_hot_composite,
+            fresh_snapshot.real_temperatures,
+            fresh_snapshot.real_hot_composite,
+            tolerance=2e-2,
+        )
+        assert_same_curve(
+            replay.target_snapshot.real_temperatures,
+            replay.target_snapshot.real_cold_composite,
+            fresh_snapshot.real_temperatures,
+            fresh_snapshot.real_cold_composite,
+            tolerance=2e-2,
+        )
     assert replay.target_snapshot.entropy_slices == fresh_snapshot.entropy_slices
     assert problem.to_problem_json() == source
+
+
+def test_total_site_candidate_allocation_bypasses_problem_tree_and_indirect_target(
+    monkeypatch,
+) -> None:
+    problem = PinchWorkspace(
+        source="chocolate_factory.json",
+        project_name="Site",
+    ).use_case("baseline")
+    request = placement_application._build_problem_placement_request(
+        problem,
+        selected_zone=placement_application._resolve_placement_zone(problem, None),
+        isothermal=2,
+        sensible=2,
+        period_ids=("0",),
+        options=_tiny_options(),
+    )
+    blueprints, context = build_problem_placement_context(problem, request)
+    request = request.model_copy(
+        update={"base_target": context.scope, "period_ids": ("0",)}
+    )
+    model = build_utility_placement_model(request, blueprints, context.envelope)
+    placement = decode_placement(model, model.initial_points[0])
+    adapter = placement_application._ExactTargetReplayAdapter(
+        source=problem.to_problem_json(),
+        project_name=problem.project_name,
+        request=request,
+    )
+
+    def unexpected_call(*_args, **_kwargs):
+        raise AssertionError("aggregate candidate replay must not build a target tree")
+
+    monkeypatch.setattr(adapter, "_candidate_problem", unexpected_call)
+    monkeypatch.setattr(adapter, "_target_candidate", unexpected_call)
+
+    result = adapter.allocate(context.periods[0], placement)
+
+    assert not result.diagnostics
+    assert result.required_hot_duty is not None
+    assert result.required_cold_duty is not None
+
+
+def test_total_site_completed_process_profiles_are_prepared_once(monkeypatch) -> None:
+    problem = PinchWorkspace(
+        source="chocolate_factory.json",
+        project_name="Site",
+    ).use_case("baseline")
+    request = placement_application._build_problem_placement_request(
+        problem,
+        selected_zone=placement_application._resolve_placement_zone(problem, None),
+        isothermal=2,
+        sensible=2,
+        period_ids=("0",),
+        options=_tiny_options(),
+    )
+    blueprints, context = build_problem_placement_context(problem, request)
+    request = request.model_copy(
+        update={"base_target": context.scope, "period_ids": ("0",)}
+    )
+    model = build_utility_placement_model(request, blueprints, context.envelope)
+    placement = decode_placement(model, model.initial_points[0])
+    calls = []
+    original = placement_application._prepare_utility_load_profile
+
+    def counted(*args, **kwargs):
+        calls.append(args[0].address)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(
+        placement_application,
+        "_prepare_utility_load_profile",
+        counted,
+    )
+    adapter = placement_application._ExactTargetReplayAdapter(
+        source=problem.to_problem_json(),
+        project_name=problem.project_name,
+        request=request,
+    )
+    expected = tuple(
+        zone.address
+        for zone in adapter._prepared_problem._master_zone.subzones.values()
+    )
+
+    assert tuple(calls) == expected
+    adapter.allocate(context.periods[0], placement)
+    adapter.allocate(context.periods[0], placement)
+    assert tuple(calls) == expected
+
+
+def test_total_site_cached_allocation_matches_exact_replay_for_structured_starts() -> (
+    None
+):
+    problem = PinchWorkspace(
+        source="chocolate_factory.json",
+        project_name="Site",
+    ).use_case("baseline")
+    request = placement_application._build_problem_placement_request(
+        problem,
+        selected_zone=placement_application._resolve_placement_zone(problem, None),
+        isothermal=2,
+        sensible=2,
+        period_ids=("0",),
+        options=_tiny_options(),
+    )
+    blueprints, context = build_problem_placement_context(problem, request)
+    request = request.model_copy(
+        update={"base_target": context.scope, "period_ids": ("0",)}
+    )
+    model = build_utility_placement_model(request, blueprints, context.envelope)
+    adapter = placement_application._ExactTargetReplayAdapter(
+        source=problem.to_problem_json(),
+        project_name=problem.project_name,
+        request=request,
+    )
+    period = context.periods[0]
+
+    class RawAdapter:
+        def __init__(self, result):
+            self.result = result
+
+        def allocate(self, _period, _placement):
+            return self.result
+
+    for point in model.initial_points[:5]:
+        placement = decode_placement(model, point)
+        cached = adapter.allocate(period, placement)
+        exact = adapter._allocate_exact_target_replay(period, placement)
+
+        assert cached.hot_duties == pytest.approx(exact.hot_duties, abs=1e-8)
+        assert cached.cold_duties == pytest.approx(exact.cold_duties, abs=1e-8)
+        assert cached.hot_fallback_duty == pytest.approx(
+            exact.hot_fallback_duty,
+            abs=1e-8,
+        )
+        assert cached.cold_fallback_duty == pytest.approx(
+            exact.cold_fallback_duty,
+            abs=1e-8,
+        )
+        assert cached.required_hot_duty == pytest.approx(
+            exact.required_hot_duty,
+            abs=1e-8,
+        )
+        assert cached.required_cold_duty == pytest.approx(
+            exact.required_cold_duty,
+            abs=1e-8,
+        )
+        cached_allocation = allocate_placement_period(
+            request=request,
+            period=period,
+            placement=placement,
+            adapter=RawAdapter(cached),
+        )
+        exact_allocation = allocate_placement_period(
+            request=request,
+            period=period,
+            placement=placement,
+            adapter=RawAdapter(exact),
+        )
+        cached_cost = evaluate_thermodynamic_cost(
+            request=request,
+            period=period.model_copy(
+                update={"snapshot": cached_allocation.target_snapshot}
+            ),
+            allocation=cached_allocation,
+        )
+        exact_cost = evaluate_thermodynamic_cost(
+            request=request,
+            period=period.model_copy(
+                update={"snapshot": exact_allocation.target_snapshot}
+            ),
+            allocation=exact_allocation,
+        )
+        assert cached_cost.total_entropy_generation.value == pytest.approx(
+            exact_cost.total_entropy_generation.value,
+            abs=1e-4,
+        )
 
 
 def test_profile_extraction_recovers_from_non_finite_separated_columns(

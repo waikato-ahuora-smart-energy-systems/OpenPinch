@@ -234,3 +234,30 @@ expected skips and 5 deliberate deselections tied only to the user's locally
 modified notebook 19. Ruff, formatting, patch hygiene, and the warnings-as-
 errors Sphinx build pass. The notebook and `.gitignore` remain unchanged by and
 excluded from this correction.
+
+## Utility Placement Cached Process-Profile and SUGCC Refresh
+
+Aggregate candidate evaluation now completes every immediate process net-load
+profile once per period, then targets each utility set by endpoint interpolation
+against those cached profiles. Numeric duties are accumulated by utility level,
+one candidate SUGCC is built, and the existing same-temperature cancellation
+returns net site utility use. No aggregate candidate constructs a problem tree,
+reruns child Direct targeting, reruns Indirect targeting, or regenerates graph
+and report data.
+
+Fresh hierarchy replay remains the independent oracle. Five structured
+candidates match every named and fallback duty and both target totals exactly;
+their balanced-composite entropy objectives agree within `1e-4 kW/K`. Fixed and
+generated child-profile oracles, lifecycle counts, Process, Site, Community,
+Region, multiperiod, pickle, and source-isolation regressions pass.
+
+Ten representative Total Site candidates improve from `3.263975833 s` through
+full hierarchy replay to `0.294159917 s` through cached targeting, an
+`11.0959` times speed-up with identical duties and required targets. The focused
+gate passes 372 tests. The complete configured-solver gate passes 2,467 tests
+with 4 expected skips and 4 deliberate deselections tied only to the user's
+modified notebook 19. Repository-wide Ruff lint, changed-file Ruff formatting,
+patch hygiene, and the warnings-as-errors 54-source Sphinx build pass. Ten
+untouched files remain outside the current repository-wide formatter baseline;
+they were not cosmetically changed. The notebook and `.gitignore` remain
+unchanged by and excluded from this refresh.

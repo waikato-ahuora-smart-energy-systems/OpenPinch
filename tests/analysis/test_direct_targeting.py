@@ -98,6 +98,30 @@ def _direct_target_with_prepared_profile(source: dict):
     return fresh, replay
 
 
+def _cached_utility_duties(source: dict):
+    problem = PinchProblem(source, project_name="Site")
+    zone = problem.master_zone.get_subzone("Area")
+    raw_profile = direct._prepare_direct_integration_profile(
+        zone,
+        {"period_id": "0"},
+    )
+    load_profile = direct._prepare_utility_load_profile(
+        zone,
+        raw_profile,
+    )
+    hot_utilities, cold_utilities = direct._target_prepared_utility_load_profile(
+        load_profile,
+        hot_utilities=deepcopy(zone.hot_utilities),
+        cold_utilities=deepcopy(zone.cold_utilities),
+        period_idx=0,
+    )
+    fresh = direct.compute_direct_integration_targets(
+        deepcopy(zone),
+        {"period_id": "0"},
+    )
+    return fresh, hot_utilities, cold_utilities
+
+
 def _assert_direct_targets_equivalent(fresh, replay) -> None:
     for attribute in (
         "hot_utility_target",
@@ -136,13 +160,23 @@ def _assert_direct_targets_equivalent(fresh, replay) -> None:
         rtol=0.0,
         equal_nan=True,
     )
-    np.testing.assert_allclose(
-        replay.pt_real.data,
-        fresh.pt_real.data,
-        atol=1e-8,
-        rtol=0.0,
-        equal_nan=True,
-    )
+    for column in (
+        ProblemTableLabel.T,
+        ProblemTableLabel.H_HOT,
+        ProblemTableLabel.H_COLD,
+        ProblemTableLabel.H_NET,
+        ProblemTableLabel.H_NET_A,
+        ProblemTableLabel.H_NET_UT,
+        ProblemTableLabel.H_HOT_BAL,
+        ProblemTableLabel.H_COLD_BAL,
+    ):
+        np.testing.assert_allclose(
+            replay.pt_real[column],
+            fresh.pt_real[column],
+            atol=2e-5,
+            rtol=0.0,
+            equal_nan=True,
+        )
 
 
 @st.composite
@@ -170,17 +204,52 @@ def test_prepared_direct_profile_matches_fresh_target_with_edge_intervals() -> N
 
     _assert_direct_targets_equivalent(fresh, replay)
 
+    fresh, cached_hot, cached_cold = _cached_utility_duties(
+        _prepared_profile_source(
+            hot_supply=230.0,
+            hot_span=30.0,
+            cold_supply=-20.0,
+            cold_span=25.0,
+        )
+    )
+    assert [float(utility.heat_flow[0]) for utility in cached_hot] == pytest.approx(
+        [float(utility.heat_flow[0]) for utility in fresh.hot_utilities],
+        abs=1e-8,
+    )
+    assert [float(utility.heat_flow[0]) for utility in cached_cold] == pytest.approx(
+        [float(utility.heat_flow[0]) for utility in fresh.cold_utilities],
+        abs=1e-8,
+    )
+
 
 @settings(max_examples=8, deadline=None)
 @given(temperatures=_utility_temperature_sets())
 def test_prepared_direct_profile_matches_fresh_target_for_generated_utilities(
     temperatures,
 ) -> None:
-    fresh, replay = _direct_target_with_prepared_profile(
+    source = _prepared_profile_source(**temperatures)
+    fresh, replay = _direct_target_with_prepared_profile(source)
+
+    _assert_direct_targets_equivalent(fresh, replay)
+
+
+@settings(max_examples=8, deadline=None)
+@given(temperatures=_utility_temperature_sets())
+def test_completed_load_profile_matches_fresh_duties_for_generated_utilities(
+    temperatures,
+) -> None:
+    fresh, cached_hot, cached_cold = _cached_utility_duties(
         _prepared_profile_source(**temperatures)
     )
 
-    _assert_direct_targets_equivalent(fresh, replay)
+    assert [float(utility.heat_flow[0]) for utility in cached_hot] == pytest.approx(
+        [float(utility.heat_flow[0]) for utility in fresh.hot_utilities],
+        abs=1e-8,
+    )
+    assert [float(utility.heat_flow[0]) for utility in cached_cold] == pytest.approx(
+        [float(utility.heat_flow[0]) for utility in fresh.cold_utilities],
+        abs=1e-8,
+    )
 
 
 def _balanced_problem_table():

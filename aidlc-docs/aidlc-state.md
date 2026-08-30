@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Total Site utility-profile uniform-temperature-tolerance correction complete through Build and Test; Operations N/A.
+- **Current Stage**: Utility Placement cached process-profile and SUGCC targeting complete through Build and Test; Operations N/A.
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -29,6 +29,26 @@
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
 
 ## Utility Placement Optimisation Progress
+
+- [x] TOTAL SITE CACHED PROCESS-PROFILE AND SUGCC TARGETING - Complete each
+  immediate process profile once per period, target candidate endpoints against
+  detached copies, accumulate duties, and construct only one candidate SUGCC.
+  Five structured candidates reproduce full hierarchy replay and ten
+  representative Total Site candidates are 11.0959 times faster. The focused
+  gate passes 372 tests and the complete applicable gate passes 2,467 tests
+  with 4 expected skips and 4 user-notebook deselections. Plan:
+  `aidlc-docs/construction/plans/utility-placement-cached-sugcc-code-generation-plan.md`.
+
+- [x] TOTAL SITE UTILITY-SET PERFORMANCE INVESTIGATION - Profile exact replay
+  across distinct utility sets, isolate candidate-specific work, prototype
+  semantics-preserving shortcuts, assess process-based candidate parallelism,
+  and rank acceleration opportunities without changing application code.
+  Follow-up validation confirmed that completed process net-load profiles can
+  be cached once per process and period, candidate utility temperatures can be
+  inserted by interpolation, and site net duties can then be obtained from the
+  aggregate SUGCC plus same-level cancellation. Ten structured candidate sets
+  reproduced every named exact-replay duty exactly while reducing comparison
+  time by 2.97 times before removing candidate problem-tree construction.
 
 - [x] TOTAL SITE UNIFORM-TEMPERATURE-TOLERANCE CORRECTION - Canonicalise
   tolerance-equivalent source rows consistently while aligning Total Site

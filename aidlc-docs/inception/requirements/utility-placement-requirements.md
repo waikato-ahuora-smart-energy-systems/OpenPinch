@@ -260,17 +260,28 @@ physical entropy.
 ### Performance amendment: prepared target replay
 
 Utility-placement candidate evaluation shall prepare each selected period's
-process-only direct load profile once. Subsequent candidates shall receive a
-deep copy of that prepared profile, insert the candidate utility shifted and
-real-temperature endpoints through the existing problem-table interval
-insertion machinery, and run the existing utility-targeting and hierarchy
-aggregation services.
+completed process-only direct net-load profile once per immediate process zone.
+Completion includes the process-owned pocket, assisted-GCC, constant-heat, and
+separated hot/cold load-profile transformations. Subsequent candidates shall
+receive a detached copy of that completed profile, insert only the candidate
+utility temperature endpoints through the existing problem-table interpolation
+machinery, and call the existing `target_utilities_for_load_profiles` owner.
 
-The shortcut shall not cache candidate duties, utility heat cascades, balanced
-composite curves, net Total Site aggregation, or target outputs. Those values
-remain candidate-specific. Every replay shall use detached mutable tables,
-utilities, zones, and results so neither the source problem nor another
-candidate can be mutated.
+For Total Site, Community, and Region placement, process profiles and the
+process-derived aggregate composite shall remain invariant across candidate
+utility sets. Candidate process utility duties shall be accumulated by level;
+the site calculation shall then construct only the candidate SUGCC and apply
+the existing same-temperature hot/cold generation-and-use cancellation to
+obtain net utility at every level. Candidate evaluation shall not rebuild the
+zone tree, child Direct targets, net process streams, Total Site process
+profile, report models, or graph data.
+
+The shortcut shall not cache candidate duties or candidate SUGCC values. Those
+values remain candidate-specific. Every evaluation shall use detached mutable
+tables and utility collections so neither the source problem nor another
+candidate can be mutated. The invariant aggregate process composite may be
+cached once per period and combined analytically with each allocated utility
+set for balanced-composite entropy generation.
 
 One canonical absolute temperature tolerance shall govern temperature-grid
 rounding, near-duplicate removal, missing-interval detection, table-grid
@@ -280,13 +291,15 @@ before cumulative columns are calculated or assigned. Alignment shall never
 fail with a row-count broadcast mismatch, and no private exact-tolerance path
 shall override the shared domain tolerance.
 
-Fresh full `PinchProblem` targeting is the correctness oracle. Process, Total
-Site, and multiperiod shortcut results shall reproduce ordinary targeting
-within existing numerical tolerances, including utility identities and duties,
-fallback duties, target totals, problem-table profiles, and the resulting
-thermodynamic objective. The shortcut remains private to application
-coordination and shall not add a public `PinchProblem` method or change normal
-target APIs.
+Fresh full `PinchProblem` targeting is the correctness oracle, not the
+per-candidate execution mechanism. Process, Total Site, higher aggregate, and
+multiperiod shortcut results shall reproduce ordinary targeting within existing
+numerical tolerances, including utility identities and duties, fallback duties,
+target totals, process-profile geometry, and the resulting thermodynamic
+objective. The winning returned case shall be retargeted once through the
+ordinary public workflow and shall reproduce optimizer evidence. The shortcut
+remains private to application coordination and shall not add a public
+`PinchProblem` method or change normal target APIs.
 
 ### FR-001: Public workflow
 
@@ -784,10 +797,12 @@ duties shall match optimizer evidence by utility name and fallback status.
 
 ## Exact ordinary-target replay amendment
 
-The optimizer shall evaluate the exact hierarchy-aware public target workflow,
-not a simplified aggregate load-profile allocator. Candidate thermodynamic
-inputs, net utility targets, named duties, fallback duties, and Total Site
-utility-to-utility matching shall all come from that detached replay.
+The cached-profile and SUGCC performance amendment supersedes the requirement
+to execute the hierarchy-aware public target workflow for every aggregate-scope
+candidate. Candidate thermodynamic inputs, net utility targets, named duties,
+fallback duties, and Total Site utility-to-utility matching shall come from the
+semantically equivalent cached process-profile and candidate-SUGCC path. Direct
+scope may continue through prepared ordinary replay.
 
 The returned case shall retain only inputs that ordinary targeting can replay.
 Running the same scope and period on that case shall reproduce optimizer
@@ -804,8 +819,9 @@ Additional acceptance requirements:
     agree after child direct targeting, utility aggregation, and same-level
     utility generation/use matching.
 30. Prove candidate-specific Total Site targets and balanced-composite entropy
-    are calculated from the exact replay rather than baseline residual duties or
-    a simplified aggregate-profile allocation.
+    are calculated from cached utility-independent process profiles plus the
+    candidate SUGCC, never from a baseline-utility `H_NET_UT` profile, baseline
+    residual duties, or a single simplified aggregate-profile allocation.
 31. Prove requested levels may have zero duty, no implicit minimum-duty bound is
     introduced, and source cases remain unchanged during every replay.
 
@@ -845,3 +861,9 @@ Additional acceptance requirements:
     full duty even when a utility endpoint lies within the targeting tolerance
     of a rounded process-table breakpoint. Temperature-grid subdivision shall
     not remove or create utility heat.
+37. Prove each process net-load profile is completed once per selected period,
+    candidate evaluation does not invoke aggregate target execution, and only
+    the winning returned case requires ordinary aggregate retargeting.
+38. Prove generated candidate endpoint insertion into cached process profiles
+    reproduces ordinary child utility duties and the aggregate candidate SUGCC
+    across fixed examples and generated valid utility sets.

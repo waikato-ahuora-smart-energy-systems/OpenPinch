@@ -6074,3 +6074,91 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 **Context**: WORKFLOW COMPLETE - Uniform temperature tolerance
 
 ---
+
+## Total Site Utility-Set Performance Investigation
+**Timestamp**: 2026-08-30T17:08:54Z
+**User Input**: "Investigate further ways to accelerate TS analysis with differnt utility sets."
+**AI Response**: "Resumed the completed brownfield utility-placement workflow on develop and opened a read-only performance investigation. The investigation will profile candidate-specific Total Site replay by phase, compare it with Process replay, identify reusable state across different utility sets, and rank safe acceleration options without implementing them. Existing reverse-engineering, requirements, prepared-replay, and uniform-tolerance artifacts are current. Property-Based Testing remains enabled; Security and Resiliency remain disabled and are N/A for this read-only investigation. The user's .gitignore and notebook changes remain outside scope."
+**Context**: WORKSPACE DETECTION AND DIAGNOSIS PLAN - Total Site performance
+
+---
+
+## Total Site Utility-Set Performance Findings
+**Timestamp**: 2026-08-30T17:22:09Z
+**User Input**: "No new user input; completed the requested read-only investigation."
+**AI Response**: "Exact Total Site candidate replay spends 90.3 percent in targeting, 9.5 percent constructing the candidate problem, and 0.15 percent extracting the snapshot. A ten-utility-set prototype that reuses child net streams, bypasses report serialization, omits optimizer-unused balanced and graph work, uses the cached parent heat-recovery limit, targets only children, and accumulates aggregate duties before one write per utility reduced median replay from 0.337633 to 0.155861 seconds (2.17 times) with identical AllocationAdapterResult values. Caching twelve normalized Pint Unit objects independently reduced baseline median replay from 0.339596 to 0.259450 seconds (1.31 times), also identically. Sixteen exact utility sets evaluated on four forked processes in 1.482179 seconds versus 5.691870 seconds sequentially (3.84 times), while four threads were slightly slower at 5.778513 versus 5.644911 seconds. The prepared adapter is 1,454,937 bytes when pickled and serializes plus restores in about 0.082 seconds, supporting a persistent worker pool. The existing profile-only adapter was about 49 times faster on the sixteen structured starts but only two candidates were feasible in both paths, so it is unsuitable as the authoritative objective and should be limited to optional proposal generation with exact acceptance. Property-Based Testing rules are N/A because no implementation or test change was made."
+**Context**: DIAGNOSIS COMPLETE - Total Site performance
+
+---
+
+## Total Site SUGCC Targeting Clarification
+**Timestamp**: 2026-08-30T17:27:50Z
+**User Input**: "In theory all process net load profiles should only be built once. At the site level, only the SUGCC is needed to calculate net utility at each level."
+**AI Response**: "Reopened the read-only Total Site performance investigation to validate the stated invariant against the current targeting implementation. The review will distinguish the utility-independent process-derived Total Site profile from candidate utility overlays, identify why the existing profile-only adapter diverges from full replay, and determine the exact cached SUGCC boundary required for authoritative candidate duty targeting."
+**Context**: DIAGNOSIS REFINEMENT - Total Site SUGCC targeting boundary
+
+---
+
+## Total Site Cached-Profile and SUGCC Findings
+**Timestamp**: 2026-08-30T17:33:37Z
+**User Input**: "No new user input; completed the refined SUGCC-boundary investigation."
+**AI Response**: "Confirmed the user's invariant. The correct cache boundary is each process's completed utility-independent net-load profile after pocket/assisted-GCC transformations and constant-heat breakpoints, not the baseline Total Site H_NET_UT curve. For each candidate, a copy of that fixed profile needs only candidate utility endpoint rows inserted by linear interpolation before calling target_utilities_for_load_profiles. Across ten structured four-level candidate sets, this reproduced every named duty from full hierarchy replay exactly. Aggregate child duties then reproduce the candidate SUGCC; _build_site_utility_profile depends only on aggregate utilities, and _match_utility_gen_and_use_at_same_level supplies the final net duty at each paired level. The Total Site process hot and cold profiles were invariant across those candidates apart from candidate-added rows and existing four-decimal target-table rounding; over 2,001 common temperatures the largest displayed-profile deviations were 0.000154 kW and 0.007806 kW. The cached-profile prototype reduced ten-candidate time from 3.425347 to 1.154104 seconds, a 2.97-times speed-up while still retaining avoidable candidate problem-tree construction. The earlier profile-only adapter diverged because it targeted once against a baseline-utility H_NET_UT snapshot instead of targeting each cached process net-load profile and aggregating the resulting candidate utilities into a new SUGCC. No application or test files were changed; Property-Based Testing is N/A for this read-only diagnosis."
+**Context**: DIAGNOSIS COMPLETE - Authoritative cached process-profile and SUGCC boundary
+
+---
+
+## Cached SUGCC Implementation Authorization
+**Timestamp**: 2026-08-30T17:33:37Z
+**User Input**: "proceed"
+**AI Response**: "Accepted the user's instruction together with the existing approval through completion. Amended the prepared-replay and exact-replay requirements so completed process profiles are cached once, aggregate candidates construct only a new SUGCC, and ordinary hierarchy replay remains the independent oracle and final-winner acceptance gate. Created and approved the seven-step TDD Code Generation plan covering exact examples, generated oracle properties, lifecycle counters, cached-profile implementation, SUGCC-only allocation, performance verification, broad Build and Test, documentation, and scope review. Full Property-Based Testing is enabled; Security and Resiliency remain disabled and are N/A."
+**Context**: REQUIREMENTS AMENDMENT / CODE GENERATION PART 1 APPROVAL - Cached SUGCC targeting
+
+---
+
+## Cached SUGCC TDD RED
+**Timestamp**: 2026-08-30T17:33:37Z
+**User Input**: "No new user input; continued under the approved cached-SUGCC plan."
+**AI Response**: "Added fixed Total Site lifecycle and five-structured-start exact-oracle regressions plus generated completed-process-profile oracle coverage. RED was confirmed: aggregate candidate allocation still called _candidate_problem/_target_candidate, the completed process load-profile helper was absent, and the adapter lacked a separate exact-oracle method. The tests failed for precisely those missing ownership boundaries. Hypothesis also shrank a pre-existing prepared-replay real-table presentation discrepancy to a cold utility supply of approximately 9.25e-6 degC; named duties and shifted targets remain exact, while only a near-zero-width real-temperature interval's intensive columns differ. This related finding remains open for the refactor gate."
+**Context**: CODE GENERATION Steps 1-2 - Cached SUGCC TDD RED
+
+---
+
+## Cached SUGCC TDD GREEN
+**Timestamp**: 2026-08-30T17:33:37Z
+**User Input**: "No new user input; continued under the approved cached-SUGCC plan."
+**AI Response**: "Added a completed utility-independent process load-profile owner that performs constant-heat, pocket/assisted-GCC, and separated-profile work once, then interpolates only candidate endpoints before calling target_utilities_for_load_profiles. Aggregate placement now creates fresh utilities without a candidate problem tree, targets each cached immediate-child profile, accumulates duties, constructs one candidate SUGCC, and applies the existing same-temperature cancellation. A one-time zero-dT coverage reconstruction supplies the invariant aggregate process composite for entropy; it avoids incorrectly reusing the source utility-dependent baseline TSP. Five structured candidates match exact replay for every named and fallback duty, target total, and entropy generation within 1e-4 kW/K. Lifecycle, pickle, fresh-target, fixed example, and generated profile-oracle tests pass."
+**Context**: CODE GENERATION Steps 3-4 - Cached process profiles and SUGCC-only allocation GREEN
+
+---
+
+## Cached SUGCC Refactor and Performance Gate
+**Timestamp**: 2026-08-30T20:23:44Z
+**User Input**: "No new user input; continued under the approved cached-SUGCC plan."
+**AI Response**: "Separated canonical utility-duty calculation from Stream mutation so aggregate candidates can reuse their utility definitions across every cached child profile, accumulate numeric duties, and write each aggregate duty once. Direct placement retains prepared exact replay; the full hierarchy path remains the independent test oracle. The 372-test focused targeting, hierarchy, multiperiod, and utility-placement gate passes. Ten representative Total Site candidates take 0.294159917 seconds through the cached path versus 3.263975833 seconds through full hierarchy replay, an 11.0959-times speed-up, with identical named duties and required targets. Ruff lint and formatting pass for all six changed Python files."
+**Context**: CODE GENERATION Steps 5-6 - Refactor, exact replay, and performance verification
+
+---
+
+## Cached SUGCC Build and Test
+**Timestamp**: 2026-08-30T20:38:07Z
+**User Input**: "No new user input; continued under the approved cached-SUGCC plan."
+**AI Response**: "The final focused gate passes 372 tests. The complete configured-solver repository gate passes 2,467 tests with 4 expected skips and 4 deliberate deselections tied only to the preserved user-modified notebook 19; an isolated notebook gate confirmed those four failures are source, execution-count, output, and generator-equivalence differences in that file. Repository-wide Ruff lint, changed-file Ruff formatting, git diff whitespace validation, and the warnings-as-errors 54-source Sphinx build pass. Repository-wide format checking reports ten untouched pre-existing files outside the current formatter baseline; they were reviewed as unrelated cosmetic work and left unchanged. The user's notebook 19 and .gitignore edits remain preserved and outside the implementation."
+**Context**: BUILD AND TEST COMPLETE - Cached process-profile and SUGCC targeting
+
+---
+
+## Cached SUGCC Completion
+**Timestamp**: 2026-08-30T20:38:07Z
+**User Input**: "No new user input; completed under the user's standing approval through completion unless unexpected."
+**AI Response**: "Completed all seven approved TDD steps. Aggregate candidates now reuse completed process net-load profiles, calculate child duties without mutating reusable candidate Streams, accumulate duties numerically, build one SUGCC, and apply existing same-temperature cancellation. Direct placement and the winning-case public acceptance workflow remain unchanged. Updated requirements, implementation summary, Build and Test evidence, state, audit, and plan checkboxes. Property-Based Testing requirements are compliant; Security and Resiliency remain disabled and N/A; Operations is N/A. No public API, notebook, RTD user workflow, CLI, or plot API changed."
+**Context**: WORKFLOW COMPLETE - Cached process-profile and SUGCC targeting
+
+---
+
+## Cached SUGCC Commit Authorization
+**Timestamp**: 2026-08-30T21:44:31Z
+**User Input**: "Commit"
+**AI Response**: "Accepted authorization to commit the completed cached process-profile and SUGCC implementation to develop. The commit includes only the verified implementation, tests, requirements, plan, state, audit, technical summary, and Build and Test evidence; the user's .gitignore and notebook 19 changes remain unstaged and excluded."
+**Context**: GIT COMMIT - Cached process-profile and SUGCC targeting
+
+---

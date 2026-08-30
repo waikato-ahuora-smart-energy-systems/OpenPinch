@@ -14,6 +14,7 @@ from OpenPinch.analysis.targeting.grand_composite import (
 )
 from OpenPinch.analysis.targeting.utilities import (
     _assign_utility,
+    _calculate_assigned_utility_duties,
     _maximise_utility_duty,
     target_utilities_for_load_profiles,
 )
@@ -87,9 +88,7 @@ def test_maximise_utility_duty_returns_zero_for_single_point_segment():
 def test_sensible_hot_utility_duty_is_limited_by_interior_gcc_breakpoint():
     """Regression for the Process crossing observed in tutorial notebook 19."""
     temperatures = np.asarray([173.0, 168.0, 158.0, 97.0, 69.57, 62.96, 33.0])
-    process_gcc = np.asarray(
-        [139.22, 135.2, 124.17, 38.52, 22.01, 18.03, 0.0]
-    )
+    process_gcc = np.asarray([139.22, 135.2, 124.17, 38.52, 22.01, 18.03, 0.0])
     supply = 174.01
     target = 62.9556
 
@@ -124,7 +123,7 @@ def test_sensible_utility_profile_never_crosses_gcc_breakpoints(
     process_gcc = np.asarray(
         [total, interior, 0.0] if is_hot else [0.0, interior, total]
     )
-    supply, target = ((110.0, 0.0) if is_hot else (-10.0, 100.0))
+    supply, target = (110.0, 0.0) if is_hot else (-10.0, 100.0)
     utility = Stream(
         "Sensible utility",
         supply,
@@ -132,6 +131,16 @@ def test_sensible_utility_profile_never_crosses_gcc_breakpoints(
         heat_flow=0.0,
         is_process_stream=False,
     )
+    pure_duties = _calculate_assigned_utility_duties(
+        T_vals=temperatures,
+        H_vals=process_gcc,
+        u_ls=StreamCollection([utility]),
+        pinch_row=2 if is_hot else 0,
+        is_hot_ut=is_hot,
+        is_real_temperatures=True,
+        idx=None,
+    )
+    assert float(utility.heat_flow.value) == 0.0
 
     targeted = _assign_utility(
         T_vals=temperatures,
@@ -143,6 +152,7 @@ def test_sensible_utility_profile_never_crosses_gcc_breakpoints(
         idx=None,
     )
     duty = float(targeted.get_stream_by_name("Sensible utility").heat_flow.value)
+    assert pure_duties == pytest.approx((duty,), abs=1e-12)
     fractions = (
         np.clip((temperatures - target) / (supply - target), 0.0, 1.0)
         if is_hot
