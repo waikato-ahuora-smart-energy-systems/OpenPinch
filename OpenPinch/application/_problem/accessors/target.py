@@ -167,6 +167,14 @@ class _AllPeriodsTargetAccessor:
     def energy_transfer(self, *, workers: int = 1, **kwargs):
         return self._run("energy_transfer", workers=workers, kwargs=kwargs)
 
+    def utility_placement(self, **kwargs):
+        """Optimize one shared placement over every canonical period."""
+        kwargs.pop("period_ids", None)
+        return self._target.utility_placement(
+            period_ids=tuple(self._target._problem.period_ids),
+            **kwargs,
+        )
+
 
 class _TargetAccessor:
     """Explicit, discoverable targeting workflows for one problem."""
@@ -844,6 +852,29 @@ class _TargetAccessor:
             include_subzones=include_subzones,
             period_id=period_id,
             direct_service=energy_transfer_analysis_service,
+        )
+
+    def utility_placement(
+        self,
+        *,
+        isothermal: int | None = None,
+        sensible: int | None = None,
+        zone=None,
+        period_ids=None,
+        maximum_duties=None,
+        options=None,
+    ):
+        """Return a detached normal case containing the best utility set."""
+        from ...utility_placement import run_problem_utility_placement
+
+        return run_problem_utility_placement(
+            self._problem,
+            isothermal=isothermal,
+            sensible=sensible,
+            zone=zone,
+            period_ids=period_ids,
+            maximum_duties=maximum_duties,
+            options=options,
         )
 
 

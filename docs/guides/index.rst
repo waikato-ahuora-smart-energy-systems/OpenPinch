@@ -19,6 +19,7 @@ from a shell.
    heat-pump-workflows
    heat-exchanger-network-synthesis
    cogeneration-workflows
+   utility-placement-optimisation
    exergy-workflows
    graphing-and-interpretation
    exporting-results

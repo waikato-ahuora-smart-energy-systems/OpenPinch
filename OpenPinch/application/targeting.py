@@ -64,7 +64,22 @@ def direct_heat_integration_service(zone: Zone, args: dict | None = None) -> Zon
     """Run direct heat integration targeting for a prepared zone."""
     apply_zone_config_overrides(zone, args)
     record_selected_period(zone, args)
-    target = compute_direct_integration_targets(zone, args)
+    prepared_profiles = (
+        args.get("_prepared_direct_profiles") if isinstance(args, dict) else None
+    )
+    prepared_profile = (
+        prepared_profiles.get(zone.address)
+        if isinstance(prepared_profiles, dict)
+        else None
+    )
+    if prepared_profile is None:
+        target = compute_direct_integration_targets(zone, args)
+    else:
+        target = compute_direct_integration_targets(
+            zone,
+            args,
+            prepared_profile=prepared_profile,
+        )
     zone.add_target(target)
     return zone
 

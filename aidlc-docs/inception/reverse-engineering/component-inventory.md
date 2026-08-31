@@ -48,3 +48,10 @@ resource definition, or infrastructure-as-code module.
 The package root intentionally exposes only `PinchProblem` and
 `PinchWorkspace`. The component inventory describes concrete internal owners;
 it does not imply root-level stability for every class or function within them.
+
+## Utility-Placement Component Finding
+
+The proposed feature fits the existing `analysis` plus `optimisation` owners
+and the `application` target accessor. No current component owns the placement
+problem end to end, so a cohesive analysis-service component and typed result
+surface will be needed; new infrastructure components are not indicated.

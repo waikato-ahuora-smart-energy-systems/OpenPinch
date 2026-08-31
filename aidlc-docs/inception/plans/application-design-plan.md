@@ -54,3 +54,38 @@ there are no blank `[Answer]:` tags.
 The approved remediation requirements determine all component boundaries and
 interfaces. No unresolved choice would change the design, so no blank
 `[Answer]:` tags are required.
+
+## Utility Placement Optimisation Application Design
+
+- [x] Reconcile the approved utility-placement requirements, personas, 12 user
+  stories, reverse-engineered architecture, and approved execution plan.
+- [x] Define components, responsibilities, ownership boundaries, and public or
+  specialist interfaces in `components.md`.
+- [x] Define public and internal method signatures, typed inputs and outputs,
+  and high-level method purposes in `component-methods.md`.
+- [x] Define application, analysis, targeting, optimisation, cogeneration,
+  reporting, all-period, and workspace-batch orchestration in `services.md`.
+- [x] Define dependency direction, communication patterns, a dependency matrix,
+  and a validated data-flow diagram with a text alternative in
+  `component-dependency.md`.
+- [x] Consolidate the design and considered alternatives in
+  `application-design.md`.
+- [x] Validate completeness and consistency against FR-001 through FR-017,
+  NFR-001 through NFR-007, UPO-01 through UPO-12, the TDD mandate, and enabled
+  Property-Based Testing constraints.
+- [x] Incorporate the approved scope amendment: no CLI integration and exactly
+  one generated executable notebook covering thermodynamic and
+  monetary/cogeneration workflows.
+- [x] Obtain explicit user approval before Units Generation.
+
+The approved artifacts settle the design categories that could otherwise need
+questions: component organization follows existing layer ownership; the public
+method uses explicit keyword inputs and normalizes an immutable request;
+application accessors resolve scopes and periods while analysis services own
+equations; existing targeting, optimisation, and cogeneration services are
+composed through their public boundaries; and detached placement results are
+returned and retained only in a dedicated observation cache for reporting.
+The existing notebook generator, tutorial manifest, execution profiles, and
+package-data gates own the single example artifact; no CLI owner is involved.
+Consequently, no unresolved design question would change a component boundary
+or interface and there are no blank `[Answer]:` tags.

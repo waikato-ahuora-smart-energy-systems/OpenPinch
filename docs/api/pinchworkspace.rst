@@ -42,11 +42,21 @@ Interaction Matrix
      - problem
      - add case
      - base
+   * - ``add``
+     - Register a detached normal case under a name
+     - problem
+     - add case; inactive by default
+     - base
    * - ``cases(names).target.*`` and ``cases(names).design.*``
      - Run one named workflow across an ordered case set
      - ordered case result
      - per-case
      - method-specific
+   * - ``cases(names).target.utility_placement``
+     - Optimize the same hierarchy-aware placement request for each selected case
+     - ordered case result
+     - source cases unchanged
+     - base
    * - ``cases(names).summary_frames()``, ``metrics()``, and ``reports()``
      - Observe every selected solved case and preserve per-case failures
      - result and error mappings

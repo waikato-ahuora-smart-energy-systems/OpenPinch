@@ -1,0 +1,532 @@
+"""Candidate-local duty allocation through the existing targeting owner."""
+
+from __future__ import annotations
+
+import math
+from typing import Protocol, Self
+
+import numpy as np
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+
+from OpenPinch.analysis.targeting.utilities import target_utilities_for_load_profiles
+from OpenPinch.contracts.utility_placement import (
+    CandidateDiagnostic,
+    DecodedPlacement,
+    DecodedUtilityLevel,
+    QuantityValue,
+    TemplateKey,
+    UtilityLevelKind,
+    UtilityPlacementRequest,
+    UtilitySide,
+)
+from OpenPinch.domain.stream import Stream
+from OpenPinch.domain.stream_collection import StreamCollection
+
+from .context import PlacementPeriodInput, PlacementTargetSnapshot
+from .errors import PlacementTargetingError
+
+
+class _FrozenAllocation(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
+
+
+class AllocationAdapterResult(_FrozenAllocation):
+    """Raw level duties returned by one detached allocation replay."""
+
+    hot_duties: tuple[float, ...]
+    cold_duties: tuple[float, ...]
+    hot_fallback_duty: float = 0.0
+    cold_fallback_duty: float = 0.0
+    required_hot_duty: float | None = None
+    required_cold_duty: float | None = None
+    target_snapshot: PlacementTargetSnapshot | None = None
+    hot_fallback_name: str = "HU"
+    cold_fallback_name: str = "CU"
+    hot_fallback_supply_temperature: float | None = None
+    hot_fallback_target_temperature: float | None = None
+    cold_fallback_supply_temperature: float | None = None
+    cold_fallback_target_temperature: float | None = None
+    diagnostics: tuple[CandidateDiagnostic, ...] = ()
+
+    @field_validator("hot_duties", "cold_duties", mode="before")
+    @classmethod
+    def _validate_duties(cls, value: object) -> tuple[float, ...]:
+        result = tuple(float(item) for item in value)  # type: ignore[arg-type]
+        if any(not math.isfinite(item) or item < 0.0 for item in result):
+            raise ValueError("allocation duties must be finite and non-negative")
+        return result
+
+    @field_validator("hot_fallback_duty", "cold_fallback_duty", mode="before")
+    @classmethod
+    def _validate_fallback_duty(cls, value: object) -> float:
+        result = float(value)
+        if not math.isfinite(result) or result < 0.0:
+            raise ValueError("fallback duties must be finite and non-negative")
+        return result
+
+    @field_validator("required_hot_duty", "required_cold_duty", mode="before")
+    @classmethod
+    def _validate_required_duty(cls, value: object) -> float | None:
+        if value is None:
+            return None
+        result = float(value)
+        if not math.isfinite(result) or result < 0.0:
+            raise ValueError("required duties must be finite and non-negative")
+        return result
+
+    @field_validator(
+        "hot_fallback_supply_temperature",
+        "hot_fallback_target_temperature",
+        "cold_fallback_supply_temperature",
+        "cold_fallback_target_temperature",
+        mode="before",
+    )
+    @classmethod
+    def _validate_fallback_temperature(cls, value: object) -> float | None:
+        if value is None:
+            return None
+        result = float(value)
+        if not math.isfinite(result):
+            raise ValueError("fallback temperatures must be finite")
+        return result
+
+
+class UtilityAllocationSlice(_FrozenAllocation):
+    """Stable assignment of one level's duty to one target interval."""
+
+    interval_index: int
+    duty: float
+
+
+class AllocatedUtilityLevel(_FrozenAllocation):
+    """Decoded utility level plus its candidate-local assigned duty."""
+
+    template_key: TemplateKey
+    kind: UtilityLevelKind
+    placement_rank: int
+    supply_temperature: float
+    target_temperature: float
+    allocated_duty: float
+    maximum_duty: float | None = None
+    is_fallback: bool = False
+    slices: tuple[UtilityAllocationSlice, ...] = ()
+
+
+class PlacementPeriodAllocation(_FrozenAllocation):
+    """Complete conservation result for one candidate and period."""
+
+    period_id: str
+    hot_levels: tuple[AllocatedUtilityLevel, ...]
+    cold_levels: tuple[AllocatedUtilityLevel, ...]
+    allocated_hot_duty: float
+    allocated_cold_duty: float
+    required_hot_duty: float
+    required_cold_duty: float
+    target_snapshot: PlacementTargetSnapshot
+    hot_fallback_duty: float = 0.0
+    cold_fallback_duty: float = 0.0
+    hot_coverage_residual: float
+    cold_coverage_residual: float
+    coverage_tolerance_hot: float
+    coverage_tolerance_cold: float
+    feasible: bool
+    diagnostics: tuple[CandidateDiagnostic, ...] = ()
+
+    @model_validator(mode="after")
+    def _validate_feasibility(self) -> Self:
+        if self.feasible and self.diagnostics:
+            raise ValueError("feasible allocation cannot contain diagnostics")
+        if not self.feasible and not self.diagnostics:
+            raise ValueError("infeasible allocation requires diagnostics")
+        return self
+
+
+class PlacementAllocationAdapter(Protocol):
+    """Injection boundary for an existing or test allocation owner."""
+
+    def allocate(
+        self, period: PlacementPeriodInput, placement: DecodedPlacement
+    ) -> AllocationAdapterResult: ...
+
+
+def _build_stream(
+    level: DecodedUtilityLevel,
+    *,
+    maximum_duty: float | None = None,
+) -> Stream:
+    return Stream(
+        name=level.template_key.name,
+        supply_temperature=level.supply_temperature.value,
+        target_temperature=level.target_temperature.value,
+        heat_flow=0.0,
+        maximum_heat_flow=maximum_duty,
+        is_process_stream=False,
+    )
+
+
+def _fallback_stream(period: PlacementPeriodInput, side: UtilitySide) -> Stream:
+    span = period.fallback_temperature_span
+    if side is UtilitySide.HOT:
+        target = period.fallback_hot_target_temperature
+        if target is None:
+            target = max(period.snapshot.shifted_temperatures)
+        supply = target + span
+        name = "HU"
+    else:
+        target = period.fallback_cold_target_temperature
+        if target is None:
+            target = min(period.snapshot.shifted_temperatures)
+        supply = target - span
+        name = "CU"
+    return Stream(
+        name=name,
+        supply_temperature=supply,
+        target_temperature=target,
+        heat_flow=0.0,
+        is_process_stream=False,
+    )
+
+
+class ExistingTargetingAllocationAdapter:
+    """Fresh-stream adapter over ``target_utilities_for_load_profiles``."""
+
+    def allocate(
+        self, period: PlacementPeriodInput, placement: DecodedPlacement
+    ) -> AllocationAdapterResult:
+        limits = dict(period.maximum_duties)
+        hot = StreamCollection(
+            [
+                _build_stream(
+                    level,
+                    maximum_duty=limits.get(level.template_key.name),
+                )
+                for level in placement.hot
+            ]
+        )
+        cold = StreamCollection(
+            [
+                _build_stream(
+                    level,
+                    maximum_duty=limits.get(level.template_key.name),
+                )
+                for level in placement.cold
+            ]
+        )
+        uses_fallback = bool(period.maximum_duties)
+        snapshot = period.snapshot
+        try:
+            targeted_hot, targeted_cold = target_utilities_for_load_profiles(
+                hot_utilities=hot,
+                cold_utilities=cold,
+                T_vals=np.asarray(snapshot.shifted_temperatures, dtype=float),
+                H_net_cold=np.asarray(snapshot.hot_load_profile, dtype=float),
+                H_net_hot=np.asarray(snapshot.cold_load_profile, dtype=float),
+                pinch_idx=(snapshot.hot_pinch_index, snapshot.cold_pinch_index),
+                is_real_temperatures=False,
+            )
+        except (ArithmeticError, ValueError) as exc:
+            return AllocationAdapterResult(
+                hot_duties=(0.0,) * len(placement.hot),
+                cold_duties=(0.0,) * len(placement.cold),
+                diagnostics=(
+                    CandidateDiagnostic(
+                        code="targeting_infeasible",
+                        constraint="utility_allocation",
+                        message=str(exc) or "Utility allocation is infeasible.",
+                        period_id=period.period_id,
+                    ),
+                ),
+            )
+
+        hot_duties = tuple(
+            float(
+                targeted_hot.get_stream_by_name(level.template_key.name).heat_flow.value
+            )
+            for level in placement.hot
+        )
+        cold_duties = tuple(
+            float(
+                targeted_cold.get_stream_by_name(
+                    level.template_key.name
+                ).heat_flow.value
+            )
+            for level in placement.cold
+        )
+
+        def residual_fallback(required: float, duties: tuple[float, ...]) -> float:
+            residual = max(required - math.fsum(duties), 0.0)
+            tolerance = 1e-9 * max(required, 1.0)
+            return 0.0 if residual <= tolerance else residual
+
+        return AllocationAdapterResult(
+            hot_duties=hot_duties,
+            cold_duties=cold_duties,
+            hot_fallback_duty=(
+                residual_fallback(period.residual_hot_duty, hot_duties)
+                if uses_fallback
+                else 0.0
+            ),
+            cold_fallback_duty=(
+                residual_fallback(period.residual_cold_duty, cold_duties)
+                if uses_fallback
+                else 0.0
+            ),
+        )
+
+
+def _interval_index(period: PlacementPeriodInput, temperature: float) -> int:
+    temperatures = period.snapshot.shifted_temperatures
+    for index, (first, second) in enumerate(zip(temperatures, temperatures[1:])):
+        lower, upper = sorted((first, second))
+        if lower <= temperature <= upper:
+            return index
+    return min(
+        range(len(temperatures) - 1),
+        key=lambda index: abs(
+            temperature - (temperatures[index] + temperatures[index + 1]) / 2.0
+        ),
+    )
+
+
+def _allocated_levels(
+    period: PlacementPeriodInput,
+    levels: tuple[DecodedUtilityLevel, ...],
+    duties: tuple[float, ...],
+    maximum_duties: dict[str, float],
+) -> tuple[AllocatedUtilityLevel, ...]:
+    result = []
+    for level, duty in zip(levels, duties, strict=True):
+        slices = ()
+        if duty > 0.0:
+            interval = _interval_index(
+                period,
+                (level.supply_temperature.value + level.target_temperature.value) / 2.0,
+            )
+            slices = (UtilityAllocationSlice(interval_index=interval, duty=duty),)
+        result.append(
+            AllocatedUtilityLevel(
+                template_key=level.template_key,
+                kind=level.kind,
+                placement_rank=level.placement_rank,
+                supply_temperature=level.supply_temperature.value,
+                target_temperature=level.target_temperature.value,
+                allocated_duty=duty,
+                maximum_duty=maximum_duties.get(level.template_key.name),
+                slices=slices,
+            )
+        )
+    return tuple(result)
+
+
+def _allocated_fallback(
+    period: PlacementPeriodInput,
+    side: UtilitySide,
+    duty: float,
+    placement_rank: int,
+    name: str,
+    supply_temperature: float | None,
+    target_temperature: float | None,
+) -> AllocatedUtilityLevel | None:
+    if duty <= 0.0:
+        return None
+    stream = _fallback_stream(period, side)
+    supply = (
+        float(stream.supply_temperature.value)
+        if supply_temperature is None
+        else supply_temperature
+    )
+    target = (
+        float(stream.target_temperature.value)
+        if target_temperature is None
+        else target_temperature
+    )
+    interval = _interval_index(period, (supply + target) / 2.0)
+    return AllocatedUtilityLevel(
+        template_key=TemplateKey(side=side, name=name),
+        kind=UtilityLevelKind.ISOTHERMAL,
+        placement_rank=placement_rank,
+        supply_temperature=supply,
+        target_temperature=target,
+        allocated_duty=duty,
+        is_fallback=True,
+        slices=(UtilityAllocationSlice(interval_index=interval, duty=duty),),
+    )
+
+
+def _coverage_diagnostic(
+    *,
+    side: UtilitySide,
+    period: PlacementPeriodInput,
+    residual: float,
+    tolerance: float,
+    heat_flow_unit: str,
+) -> CandidateDiagnostic:
+    return CandidateDiagnostic(
+        code=f"{side.value}_coverage_shortfall",
+        constraint="utility_coverage",
+        message=(
+            f"Allocated {side.value} utility duty does not cover the residual demand."
+        ),
+        side=side,
+        period_id=period.period_id,
+        measured=QuantityValue(value=residual, unit=heat_flow_unit),
+        limit=QuantityValue(value=tolerance, unit=heat_flow_unit),
+    )
+
+
+def allocate_placement_period(
+    *,
+    request: UtilityPlacementRequest,
+    period: PlacementPeriodInput,
+    placement: DecodedPlacement,
+    adapter: PlacementAllocationAdapter | None = None,
+) -> PlacementPeriodAllocation:
+    """Replay one candidate and enforce exact hot/cold coverage within tolerance."""
+    owner = adapter or ExistingTargetingAllocationAdapter()
+    try:
+        raw = owner.allocate(period, placement)
+    except PlacementTargetingError:
+        raise
+    except Exception as exc:
+        raise PlacementTargetingError(
+            code="allocation_adapter_failure",
+            message="Utility allocation adapter failed.",
+            period_id=period.period_id,
+            details=(("reason", str(exc)),),
+        ) from exc
+
+    if len(raw.hot_duties) != len(placement.hot) or len(raw.cold_duties) != len(
+        placement.cold
+    ):
+        raise PlacementTargetingError(
+            code="allocation_shape_mismatch",
+            message="Allocation adapter duty count does not match utility levels.",
+            period_id=period.period_id,
+        )
+
+    required_hot = (
+        period.residual_hot_duty
+        if raw.required_hot_duty is None
+        else raw.required_hot_duty
+    )
+    required_cold = (
+        period.residual_cold_duty
+        if raw.required_cold_duty is None
+        else raw.required_cold_duty
+    )
+    allocated_hot = math.fsum((*raw.hot_duties, raw.hot_fallback_duty))
+    allocated_cold = math.fsum((*raw.cold_duties, raw.cold_fallback_duty))
+    hot_residual = abs(required_hot - allocated_hot)
+    cold_residual = abs(required_cold - allocated_cold)
+    hot_tolerance = request.tolerances.coverage + request.tolerances.relative * max(
+        required_hot, 1.0
+    )
+    cold_tolerance = request.tolerances.coverage + request.tolerances.relative * max(
+        required_cold, 1.0
+    )
+    diagnostics = list(raw.diagnostics)
+    maximum_duties = dict(period.maximum_duties)
+    for side, levels, duties, tolerance in (
+        (UtilitySide.HOT, placement.hot, raw.hot_duties, hot_tolerance),
+        (UtilitySide.COLD, placement.cold, raw.cold_duties, cold_tolerance),
+    ):
+        for level, duty in zip(levels, duties, strict=True):
+            limit = maximum_duties.get(level.template_key.name)
+            if limit is not None and duty > limit + tolerance:
+                diagnostics.append(
+                    CandidateDiagnostic(
+                        code="maximum_duty_exceeded",
+                        constraint="utility_capacity",
+                        message="Allocated utility duty exceeds its upper bound.",
+                        side=side,
+                        template_key=level.template_key,
+                        period_id=period.period_id,
+                        measured=QuantityValue(
+                            value=duty,
+                            unit=request.units.heat_flow,
+                        ),
+                        limit=QuantityValue(
+                            value=limit,
+                            unit=request.units.heat_flow,
+                        ),
+                    )
+                )
+    if not diagnostics and hot_residual > hot_tolerance:
+        diagnostics.append(
+            _coverage_diagnostic(
+                side=UtilitySide.HOT,
+                period=period,
+                residual=hot_residual,
+                tolerance=hot_tolerance,
+                heat_flow_unit=request.units.heat_flow,
+            )
+        )
+    if not diagnostics and cold_residual > cold_tolerance:
+        diagnostics.append(
+            _coverage_diagnostic(
+                side=UtilitySide.COLD,
+                period=period,
+                residual=cold_residual,
+                tolerance=cold_tolerance,
+                heat_flow_unit=request.units.heat_flow,
+            )
+        )
+
+    hot_levels = list(
+        _allocated_levels(period, placement.hot, raw.hot_duties, maximum_duties)
+    )
+    cold_levels = list(
+        _allocated_levels(period, placement.cold, raw.cold_duties, maximum_duties)
+    )
+    hot_fallback = _allocated_fallback(
+        period,
+        UtilitySide.HOT,
+        raw.hot_fallback_duty,
+        len(hot_levels),
+        raw.hot_fallback_name,
+        raw.hot_fallback_supply_temperature,
+        raw.hot_fallback_target_temperature,
+    )
+    cold_fallback = _allocated_fallback(
+        period,
+        UtilitySide.COLD,
+        raw.cold_fallback_duty,
+        len(cold_levels),
+        raw.cold_fallback_name,
+        raw.cold_fallback_supply_temperature,
+        raw.cold_fallback_target_temperature,
+    )
+    if hot_fallback is not None:
+        hot_levels.append(hot_fallback)
+    if cold_fallback is not None:
+        cold_levels.append(cold_fallback)
+
+    return PlacementPeriodAllocation(
+        period_id=period.period_id,
+        hot_levels=tuple(hot_levels),
+        cold_levels=tuple(cold_levels),
+        allocated_hot_duty=allocated_hot,
+        allocated_cold_duty=allocated_cold,
+        required_hot_duty=required_hot,
+        required_cold_duty=required_cold,
+        target_snapshot=raw.target_snapshot or period.snapshot,
+        hot_fallback_duty=raw.hot_fallback_duty,
+        cold_fallback_duty=raw.cold_fallback_duty,
+        hot_coverage_residual=hot_residual,
+        cold_coverage_residual=cold_residual,
+        coverage_tolerance_hot=hot_tolerance,
+        coverage_tolerance_cold=cold_tolerance,
+        feasible=not diagnostics,
+        diagnostics=tuple(diagnostics),
+    )
+
+
+__all__ = [
+    "AllocatedUtilityLevel",
+    "AllocationAdapterResult",
+    "ExistingTargetingAllocationAdapter",
+    "PlacementAllocationAdapter",
+    "PlacementPeriodAllocation",
+    "UtilityAllocationSlice",
+    "allocate_placement_period",
+]

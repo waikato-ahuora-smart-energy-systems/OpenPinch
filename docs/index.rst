@@ -46,6 +46,7 @@ What OpenPinch Covers
 - Heat Pump and refrigeration screening, including simulated-cycle backends
 - direct gas/vapour MVR process-component studies
 - exergy and cogeneration post-processing on solved thermal targets
+- balanced-composite thermodynamic utility placement optimisation
 - heat exchanger network synthesis through the ``problem.design`` accessor
 
 The documentation is organized as a manual first and an internal reference second:

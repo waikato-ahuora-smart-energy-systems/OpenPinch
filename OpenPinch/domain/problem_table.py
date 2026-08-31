@@ -12,7 +12,10 @@ import numpy as np
 from ._problem_table.equality import (
     problem_tables_equal,
 )
-from ._problem_table.intervals import insert_temperature_intervals
+from ._problem_table.intervals import (
+    insert_temperature_intervals,
+    temperature_grids_match,
+)
 from ._problem_table.types import ProblemTableColumnUpdates
 from .configuration import tol
 from .enums import ProblemTableLabel
@@ -480,12 +483,7 @@ class ProblemTable:
         updates = self._validate_updates(updates, T_col)
         target_temperatures = np.asarray(self[ProblemTableLabel.T], dtype=float)
 
-        if target_temperatures.shape != T_col.shape or not np.allclose(
-            a=target_temperatures,
-            b=T_col,
-            atol=tol,
-            rtol=tol,
-        ):
+        if not temperature_grids_match(target_temperatures, T_col):
             source_pt = ProblemTable({ProblemTableLabel.T: T_col, **updates})
             self.share_temperature_intervals(source_pt)
             for col_name in updates:

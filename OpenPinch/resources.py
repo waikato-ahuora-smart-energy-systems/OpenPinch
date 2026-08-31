@@ -173,6 +173,11 @@ _NOTEBOOK_CATALOG = (
         "Results, Plots, Reports, and Exports",
         ("results", "exports"),
     ),
+    (
+        "19_utility_placement_optimisation.ipynb",
+        "Utility Placement Optimisation",
+        ("utility placement", "thermodynamic cost"),
+    ),
 )
 
 _NOTEBOOK_METADATA: dict[str, NotebookMetadata] = {

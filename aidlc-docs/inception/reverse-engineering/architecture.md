@@ -81,6 +81,27 @@ optional engines remain behind local integration boundaries.
 - Owns solver-neutral models, candidates, execution, services, errors, and
   optional backend adapters reusable beyond HPR or HEN.
 
+## Utility-Placement Readiness and Gap
+
+- Direct and indirect targeting already calculate utility feasibility,
+  allocation, load profiles, and hourly utility cost for supplied utilities.
+- Exergy services already derive exergetic-temperature and exergy curves that
+  can support an entropy- or lost-work-based thermodynamic objective once the
+  exact definition is selected.
+- Power services already evaluate multi-stage steam-turbine cogeneration for a
+  compatible target and can supply work and efficiency terms to a monetary
+  trade-off.
+- `OpenPinch.optimisation` already validates bounded scalar problems and offers
+  deterministic multi-start result normalization across several backends.
+- No current owner coordinates candidate utility-level generation, minimum
+  level-count validation, feasibility evaluation, objective composition,
+  result contracts, or a `problem.target` utility-placement entry point.
+
+The existing dependency direction therefore supports a new analysis-owned
+placement service coordinated by the application target accessor, with typed
+contracts/domain results and the reusable optimisation layer. It does not
+require a server, database, adapter, or deployment architecture.
+
 ### `OpenPinch.adapters`
 
 - Owns JSON/CSV/Excel loading, workspace bundles, legacy input conversion, and

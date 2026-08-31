@@ -2,28 +2,39 @@
 
 ## Executive Assessment
 
-OpenPinch has unusually strong automated correctness signals for a scientific Python library: 1,901 non-solver tests passed locally, statement coverage measured 99%, Ruff passed, the documentation and distributions built, and package/lock versions matched. The dominant weaknesses are therefore not broad test absence or lint failure. They are concentrated complexity, incomplete validation of real solver paths, narrow platform support, repository and CI maintenance cost, and error-handling patterns that can conceal degraded numerical behavior.
+OpenPinch has unusually strong automated correctness signals for a scientific
+Python library. At the 2026-08-23 refresh, Ruff passes and pytest collects
+2,291 tests, of which 2,287 belong to the non-solver selection and four are
+solver-marked. CI now enables branch coverage and enforces a 95% threshold.
+The dominant weaknesses are concentrated numerical complexity, incomplete
+continuous validation of real solver paths, a narrow Python support range, and
+error-handling patterns that can conceal degraded numerical behavior.
 
 This is a reverse-engineering quality assessment, not a dedicated security audit. Security, property-based testing, and resiliency extensions remain pending user selection for Requirements Analysis.
 
 ## Verification Performed
 
-- `ruff check .` - passed.
-- `coverage run --source=OpenPinch -m pytest -m "not solver"` - 1,901 passed, 4 deselected in 115.68 seconds.
-- `coverage report --show-missing` - 21,150 statements, 154 missed, 99% total statement coverage.
-- `scripts/build_dist.py` - wheel and source distribution built successfully.
-- `scripts/check_lockfile_version.py` - `uv.lock` and `pyproject.toml` both report version 0.4.5.
-- `scripts/build_docs.py` - initially failed because warnings are fatal and external intersphinx inventories were unreachable in the sandbox; succeeded once network access was available.
-- Static repository scans - package inventory, AST size and annotation metrics, exception patterns, optional-dependency imports, TODOs, tracked-file size, CI configuration, and support documentation.
+- `uv run ruff check OpenPinch tests` - passed on 2026-08-23.
+- `uv run pytest --collect-only -q -m "not solver"` - 2,287 selected,
+  four deselected, completed successfully on 2026-08-23.
+- CI workflow inspection - all primary Python CI workflows run Coverage.py with
+  `--branch`, a fixed Hypothesis seed, and `--fail-under=95`.
+- Static repository scans - 653 package/test/script files, 466 Python files,
+  current owner packages, dependency direction, optional integrations, and
+  public workflow surfaces.
+- Full test execution, coverage measurement, docs, distribution, and real
+  solver runs were not repeated for this architecture refresh.
 
 ## Test Coverage
 
-- **Overall**: excellent statement coverage at 99%, comfortably above the 95% CI threshold.
+- **Overall**: CI enforces at least 95% branch-aware coverage; this refresh did
+  not claim a new measured percentage.
 - **Unit and integration tests**: extensive coverage across domain classes, schemas, targeting services, exports, packaging, docs, optional dependencies, and HEN helpers.
 - **End-to-end tests**: present for primary in-process workflows.
 - **Cross-platform artifact smoke tests**: present for Ubuntu, Windows, and macOS wheels.
 - **Weak point**: the four solver-marked tests are excluded from automated CI and require a manually provisioned solver environment. This leaves the highest-complexity optimization path without continuous real-backend validation.
-- **Weak point**: Coverage.py is run without branch coverage, so a 99% statement result does not establish that all decision outcomes, exception paths, or numerical fallback branches are exercised.
+- **Strength**: branch coverage and a fixed Hypothesis seed are enforced by
+  repository tests that also verify the CI policy itself.
 
 ## Code Quality Indicators
 
@@ -65,12 +76,6 @@ This is a reverse-engineering quality assessment, not a dedicated security audit
 - **Why it matters**: orchestration and numerical code passes heterogeneous dictionaries, optional values, arrays, Pydantic models, and mutable domain objects across many layers.
 - **Risk**: interface drift and invalid optional or array assumptions are caught only at runtime or through existing examples.
 
-### Medium: Coverage quality is overstated by statement-only measurement
-
-- **Evidence**: coverage is reported at 99%, but branch coverage is not enabled. The 154 uncovered statements cluster in multiperiod problem execution, HPR shared logic, HPR multiperiod targeting, and stagewise synthesis.
-- **Why it matters**: those modules contain the densest conditional and failure behavior.
-- **Risk**: rare combinations and negative paths can remain untested despite the impressive headline percentage.
-
 ### Medium: Documentation builds are network-sensitive
 
 - **Evidence**: documentation treats warnings as errors and dynamically retrieves Python, pandas, and NumPy inventories. The build failed offline solely because all three inventories were unreachable, then passed online without source changes.
@@ -109,11 +114,13 @@ This is a reverse-engineering quality assessment, not a dedicated security audit
 
 ## Technical Debt Hotspots
 
-- `OpenPinch/services/heat_exchanger_network_synthesis/unit_models/stagewise.py` - very large stateful solver model, long methods, multiperiod equation construction, and backend-shape compatibility logic.
-- `OpenPinch/services/heat_exchanger_network_synthesis/unit_models/pinch_design.py` and `base.py` - long equation builders and post-processing methods.
-- `OpenPinch/services/network_grid_diagram/renderer.py` - large presentation class with layout and rendering responsibilities.
-- `OpenPinch/classes/problem_table.py`, `stream.py`, `value.py`, and `stream_collection.py` - foundational mutable domain types with broad responsibility.
-- `OpenPinch/classes/pinch_problem.py` - central orchestration dependency hub despite accessor extraction.
+- `OpenPinch/analysis/heat_exchanger_networks/models/` - large stateful solver
+  models, multiperiod equation construction, and backend-shape compatibility.
+- `OpenPinch/presentation/network_grid/` - coupled layout and rendering logic.
+- `OpenPinch/domain/_problem_table/`, `_stream/`, `_value/`, and
+  `_stream_collection/` - foundational numerical domain behavior.
+- `OpenPinch/application/_problem/` - central orchestration split across accessors
+  but still coordinating many analysis families.
 - HPR unit models - repeated solve patterns, optimizer integration, broad fallback handling, and external thermodynamic state behavior.
 - Three GitHub Actions workflows - duplicated pipelines and dependency installation.
 - Binary Excel examples and tracked `coverage.json` - repository maintenance burden.
@@ -136,7 +143,7 @@ This is a reverse-engineering quality assessment, not a dedicated security audit
 2. Define which solver backends and Python versions are intended to be genuinely supported.
 3. Prioritize decomposition of stagewise synthesis and other oversized stateful models around explicit intermediate data structures and invariants.
 4. Replace broad numerical fallbacks with narrow exception types, structured warnings, and diagnostic metadata where behavior can change.
-5. Add branch coverage and a type-checking baseline before treating 99% statement coverage as comprehensive assurance.
+5. Preserve branch-coverage enforcement and consider a static type-checking
+   baseline for the heterogeneous numerical and orchestration interfaces.
 6. Consolidate CI through reusable workflows or composite actions and establish an offline-tolerant docs policy.
 7. Establish a fixture/artifact retention policy for XLSB files, generated coverage data, solver outputs, and historical workbooks.
-

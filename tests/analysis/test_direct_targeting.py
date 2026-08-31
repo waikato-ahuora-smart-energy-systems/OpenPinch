@@ -1,11 +1,15 @@
 """Regression tests for direct integration entry analysis routines."""
 
+from copy import deepcopy
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 import OpenPinch.analysis.targeting.direct as direct
+from OpenPinch import PinchProblem
 from OpenPinch.analysis.targeting.direct import (
     _add_net_segment_period,
     _create_net_hot_and_cold_stream_collections_for_site_analysis,
@@ -14,11 +18,238 @@ from OpenPinch.analysis.targeting.direct import (
     build_area_cost_target_data,
     should_update_balanced_composite_curves,
 )
+from OpenPinch.analysis.targeting.utilities import _assign_utility
 from OpenPinch.domain.configuration import tol
-from OpenPinch.domain.enums import ProblemTableLabel, ZoneType
+from OpenPinch.domain.enums import GraphType, ProblemTableLabel, ZoneType
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream import Stream
 from OpenPinch.domain.stream_collection import StreamCollection
+
+
+def _prepared_profile_source(
+    *,
+    hot_supply: float,
+    hot_span: float,
+    cold_supply: float,
+    cold_span: float,
+) -> dict:
+    return {
+        "streams": [
+            {
+                "zone": "Site/Area",
+                "name": "Hot process",
+                "t_supply": 180.0,
+                "t_target": 60.0,
+                "heat_flow": 120.0,
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            },
+            {
+                "zone": "Site/Area",
+                "name": "Cold process",
+                "t_supply": 20.0,
+                "t_target": 150.0,
+                "heat_flow": 169.0,
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            },
+        ],
+        "utilities": [
+            {
+                "name": "Candidate hot",
+                "type": "Hot",
+                "t_supply": hot_supply,
+                "t_target": hot_supply - hot_span,
+                "heat_flow": 0.0,
+                "dt_cont": 0.0,
+                "htc": 1.0,
+            },
+            {
+                "name": "Candidate cold",
+                "type": "Cold",
+                "t_supply": cold_supply,
+                "t_target": cold_supply + cold_span,
+                "heat_flow": 0.0,
+                "dt_cont": 0.0,
+                "htc": 1.0,
+            },
+        ],
+        "zone_tree": {
+            "name": "Site",
+            "type": "Site",
+            "children": [{"name": "Area", "type": "Process Zone"}],
+        },
+    }
+
+
+def _direct_target_with_prepared_profile(source: dict):
+    problem = PinchProblem(source, project_name="Site")
+    zone = problem.master_zone.get_subzone("Area")
+    profile = direct._prepare_direct_integration_profile(zone, {"period_id": "0"})
+    fresh = direct.compute_direct_integration_targets(
+        deepcopy(zone),
+        {"period_id": "0"},
+    )
+    replay = direct.compute_direct_integration_targets(
+        deepcopy(zone),
+        {"period_id": "0"},
+        prepared_profile=profile,
+    )
+    return fresh, replay
+
+
+def _cached_utility_duties(source: dict):
+    problem = PinchProblem(source, project_name="Site")
+    zone = problem.master_zone.get_subzone("Area")
+    raw_profile = direct._prepare_direct_integration_profile(
+        zone,
+        {"period_id": "0"},
+    )
+    load_profile = direct._prepare_utility_load_profile(
+        zone,
+        raw_profile,
+    )
+    hot_utilities, cold_utilities = direct._target_prepared_utility_load_profile(
+        load_profile,
+        hot_utilities=deepcopy(zone.hot_utilities),
+        cold_utilities=deepcopy(zone.cold_utilities),
+        period_idx=0,
+    )
+    fresh = direct.compute_direct_integration_targets(
+        deepcopy(zone),
+        {"period_id": "0"},
+    )
+    return fresh, hot_utilities, cold_utilities
+
+
+def _assert_direct_targets_equivalent(fresh, replay) -> None:
+    for attribute in (
+        "hot_utility_target",
+        "cold_utility_target",
+        "heat_recovery_target",
+        "heat_recovery_limit",
+        "degree_of_int",
+    ):
+        assert getattr(replay, attribute) == pytest.approx(
+            getattr(fresh, attribute), abs=1e-8
+        )
+    assert [utility.name for utility in replay.hot_utilities] == [
+        utility.name for utility in fresh.hot_utilities
+    ]
+    assert [utility.name for utility in replay.cold_utilities] == [
+        utility.name for utility in fresh.cold_utilities
+    ]
+    assert [float(utility.heat_flow[0]) for utility in replay.hot_utilities] == (
+        pytest.approx(
+            [float(utility.heat_flow[0]) for utility in fresh.hot_utilities],
+            abs=1e-8,
+        )
+    )
+    assert [float(utility.heat_flow[0]) for utility in replay.cold_utilities] == (
+        pytest.approx(
+            [float(utility.heat_flow[0]) for utility in fresh.cold_utilities],
+            abs=1e-8,
+        )
+    )
+    assert replay.pt.columns == fresh.pt.columns
+    assert replay.pt_real.columns == fresh.pt_real.columns
+    np.testing.assert_allclose(
+        replay.pt.data,
+        fresh.pt.data,
+        atol=1e-8,
+        rtol=0.0,
+        equal_nan=True,
+    )
+    for column in (
+        ProblemTableLabel.T,
+        ProblemTableLabel.H_HOT,
+        ProblemTableLabel.H_COLD,
+        ProblemTableLabel.H_NET,
+        ProblemTableLabel.H_NET_A,
+        ProblemTableLabel.H_NET_UT,
+        ProblemTableLabel.H_HOT_BAL,
+        ProblemTableLabel.H_COLD_BAL,
+    ):
+        np.testing.assert_allclose(
+            replay.pt_real[column],
+            fresh.pt_real[column],
+            atol=2e-5,
+            rtol=0.0,
+            equal_nan=True,
+        )
+
+
+@st.composite
+def _utility_temperature_sets(draw):
+    """Generate physically oriented utility intervals around process support."""
+    return {
+        "hot_supply": draw(st.floats(min_value=70.0, max_value=240.0, allow_nan=False)),
+        "hot_span": draw(st.floats(min_value=0.01, max_value=40.0, allow_nan=False)),
+        "cold_supply": draw(
+            st.floats(min_value=-30.0, max_value=130.0, allow_nan=False)
+        ),
+        "cold_span": draw(st.floats(min_value=0.01, max_value=40.0, allow_nan=False)),
+    }
+
+
+def test_prepared_direct_profile_matches_fresh_target_with_edge_intervals() -> None:
+    fresh, replay = _direct_target_with_prepared_profile(
+        _prepared_profile_source(
+            hot_supply=230.0,
+            hot_span=30.0,
+            cold_supply=-20.0,
+            cold_span=25.0,
+        )
+    )
+
+    _assert_direct_targets_equivalent(fresh, replay)
+
+    fresh, cached_hot, cached_cold = _cached_utility_duties(
+        _prepared_profile_source(
+            hot_supply=230.0,
+            hot_span=30.0,
+            cold_supply=-20.0,
+            cold_span=25.0,
+        )
+    )
+    assert [float(utility.heat_flow[0]) for utility in cached_hot] == pytest.approx(
+        [float(utility.heat_flow[0]) for utility in fresh.hot_utilities],
+        abs=1e-8,
+    )
+    assert [float(utility.heat_flow[0]) for utility in cached_cold] == pytest.approx(
+        [float(utility.heat_flow[0]) for utility in fresh.cold_utilities],
+        abs=1e-8,
+    )
+
+
+@settings(max_examples=8, deadline=None)
+@given(temperatures=_utility_temperature_sets())
+def test_prepared_direct_profile_matches_fresh_target_for_generated_utilities(
+    temperatures,
+) -> None:
+    source = _prepared_profile_source(**temperatures)
+    fresh, replay = _direct_target_with_prepared_profile(source)
+
+    _assert_direct_targets_equivalent(fresh, replay)
+
+
+@settings(max_examples=8, deadline=None)
+@given(temperatures=_utility_temperature_sets())
+def test_completed_load_profile_matches_fresh_duties_for_generated_utilities(
+    temperatures,
+) -> None:
+    fresh, cached_hot, cached_cold = _cached_utility_duties(
+        _prepared_profile_source(**temperatures)
+    )
+
+    assert [float(utility.heat_flow[0]) for utility in cached_hot] == pytest.approx(
+        [float(utility.heat_flow[0]) for utility in fresh.hot_utilities],
+        abs=1e-8,
+    )
+    assert [float(utility.heat_flow[0]) for utility in cached_cold] == pytest.approx(
+        [float(utility.heat_flow[0]) for utility in fresh.cold_utilities],
+        abs=1e-8,
+    )
 
 
 def _balanced_problem_table():
@@ -147,11 +378,196 @@ def test_compute_direct_integration_targets_uses_empty_area_payload_when_disable
     assert result["zone_name"] == "Area"
 
 
+def test_compute_direct_integration_targets_uses_unshifted_real_table_for_limit(
+    monkeypatch,
+):
+    shifted = ProblemTable(
+        {
+            ProblemTableLabel.T: [300.0, 200.0],
+            ProblemTableLabel.H_NET: [20.0, 50.0],
+            ProblemTableLabel.H_NET_A: [20.0, 50.0],
+            ProblemTableLabel.H_HOT: [100.0, 0.0],
+            ProblemTableLabel.H_COLD: [0.0, 50.0],
+            ProblemTableLabel.H_HOT_UT: [0.0, 0.0],
+            ProblemTableLabel.H_COLD_UT: [0.0, 0.0],
+        }
+    )
+    real_limit = ProblemTable(
+        {
+            ProblemTableLabel.T: [300.0, 200.0],
+            ProblemTableLabel.H_NET: [0.0, 0.0],
+            ProblemTableLabel.H_NET_A: [0.0, 0.0],
+            ProblemTableLabel.H_HOT: [100.0, 0.0],
+            ProblemTableLabel.H_COLD: [0.0, 100.0],
+            ProblemTableLabel.H_HOT_UT: [0.0, 0.0],
+            ProblemTableLabel.H_COLD_UT: [0.0, 0.0],
+        }
+    )
+    real_aligned = ProblemTable(
+        {
+            ProblemTableLabel.T: [300.0, 200.0],
+            ProblemTableLabel.H_NET: [50.0, 50.0],
+            ProblemTableLabel.H_NET_A: [50.0, 50.0],
+            ProblemTableLabel.H_HOT: [100.0, 0.0],
+            ProblemTableLabel.H_COLD: [50.0, 150.0],
+            ProblemTableLabel.H_HOT_UT: [0.0, 0.0],
+            ProblemTableLabel.H_COLD_UT: [0.0, 0.0],
+        }
+    )
+
+    def fake_cascade(**kwargs):
+        if kwargs["is_shifted"]:
+            return shifted
+        if "known_heat_recovery" in kwargs:
+            return real_aligned
+        return real_limit
+
+    zone = SimpleNamespace(
+        name="Area",
+        address="Area",
+        type=ZoneType.P.value,
+        parent_zone=None,
+        period_ids=None,
+        all_streams=StreamCollection(),
+        hot_streams=StreamCollection(),
+        cold_streams=StreamCollection(),
+        hot_utilities=StreamCollection(),
+        cold_utilities=StreamCollection(),
+        config=SimpleNamespace(
+            direct=SimpleNamespace(
+                vertical_gcc_enabled=False,
+                assisted_ht_enabled=False,
+                assisted_ht_dt=0.0,
+                balanced_cc_enabled=False,
+            ),
+            targeting=SimpleNamespace(area_cost_enabled=False),
+        ),
+    )
+    monkeypatch.setattr(direct, "get_process_heat_cascade", fake_cascade)
+    monkeypatch.setattr(direct, "get_additional_GCCs", lambda pt, **_kwargs: pt)
+    monkeypatch.setattr(direct, "get_utility_targets", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        direct,
+        "_create_net_hot_and_cold_stream_collections_for_site_analysis",
+        lambda **_kwargs: (StreamCollection(), StreamCollection()),
+    )
+    monkeypatch.setattr(direct, "_save_graph_data", lambda *_args: {})
+    monkeypatch.setattr(
+        direct.DirectIntegrationTarget,
+        "model_validate",
+        staticmethod(lambda data: data),
+    )
+
+    result = direct.compute_direct_integration_targets(zone)
+
+    assert result["heat_recovery_target"] == pytest.approx(50.0)
+    assert result["heat_recovery_limit"] == pytest.approx(100.0)
+    assert result["degree_of_int"] == pytest.approx(0.5)
+    assert result["pt_real"] is real_aligned
+
+
+def test_save_graph_data_rounds_graph_copies_without_mutating_problem_tables():
+    temperatures = [200.00004, 200.00001, 100.00003]
+    enthalpies = [10.00006, 0.0, 5.00004]
+    pt = ProblemTable(
+        {
+            ProblemTableLabel.T: temperatures,
+            ProblemTableLabel.H_NET_A: enthalpies,
+        }
+    )
+    pt_real = ProblemTable(
+        {
+            ProblemTableLabel.T: temperatures,
+            ProblemTableLabel.H_NET: enthalpies,
+        }
+    )
+    pt_before = pt.data.copy()
+    pt_real_before = pt_real.data.copy()
+
+    graphs = direct._save_graph_data(pt, pt_real)
+
+    np.testing.assert_array_equal(pt.data, pt_before)
+    np.testing.assert_array_equal(pt_real.data, pt_real_before)
+    assert graphs[GraphType.GCC.value][ProblemTableLabel.T].tolist() == [
+        200.0,
+        200.0,
+        100.0,
+    ]
+    assert graphs[GraphType.GCC.value][ProblemTableLabel.H_NET_A].tolist() == [
+        10.0001,
+        0.0,
+        5.0,
+    ]
+
+
 def test_initialise_utility_index_returns_first_available():
     u1 = Stream("U1", 200, 250, heat_flow=0.0)
     u2 = Stream("U2", 200, 250, heat_flow=75.0)
     idx = _initialise_utility_index([u1, u2], [u1.heat_flow, u2.heat_flow])
     assert idx == 1
+
+
+def test_utility_targeting_respects_maximum_heat_flow_before_fallback() -> None:
+    capped_hot = Stream(
+        "Capped steam",
+        250.0,
+        200.0,
+        heat_flow=0.0,
+        maximum_heat_flow=30.0,
+        is_process_stream=False,
+    )
+    fallback_hot = Stream(
+        "HU",
+        300.0,
+        299.99,
+        heat_flow=0.0,
+        is_process_stream=False,
+    )
+    hot = _assign_utility(
+        T_vals=np.asarray([250.0, 150.0, 50.0]),
+        H_vals=np.asarray([100.0, 50.0, 0.0]),
+        u_ls=StreamCollection([fallback_hot, capped_hot]),
+        pinch_row=2,
+        is_hot_ut=True,
+        is_real_temperatures=False,
+        idx=None,
+    )
+
+    assert hot.get_stream_by_name("Capped steam").heat_flow.value == pytest.approx(30.0)
+    assert hot.get_stream_by_name("HU").heat_flow.value == pytest.approx(70.0)
+
+
+@given(cap=st.floats(min_value=0.0, max_value=100.0))
+def test_utility_targeting_capacity_property(cap) -> None:
+    named = Stream(
+        "Named",
+        300.0,
+        299.99,
+        heat_flow=0.0,
+        maximum_heat_flow=cap,
+        is_process_stream=False,
+    )
+    fallback = Stream(
+        "HU",
+        310.0,
+        309.99,
+        heat_flow=0.0,
+        is_process_stream=False,
+    )
+    result = _assign_utility(
+        T_vals=np.asarray([250.0, 150.0, 50.0]),
+        H_vals=np.asarray([100.0, 50.0, 0.0]),
+        u_ls=StreamCollection([fallback, named]),
+        pinch_row=2,
+        is_hot_ut=True,
+        is_real_temperatures=False,
+        idx=None,
+    )
+
+    named_duty = float(result.get_stream_by_name("Named").heat_flow.value)
+    fallback_duty = float(result.get_stream_by_name("HU").heat_flow.value)
+    assert named_duty <= cap + 1e-9
+    assert named_duty + fallback_duty == pytest.approx(100.0)
 
 
 def test_add_net_segment_period_consumes_residuals():

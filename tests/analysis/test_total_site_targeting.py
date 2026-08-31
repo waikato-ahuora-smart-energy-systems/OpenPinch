@@ -10,6 +10,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
+import OpenPinch.analysis.targeting.direct as direct
 import OpenPinch.analysis.targeting.indirect as indirect
 from OpenPinch.domain.configuration import Configuration
 from OpenPinch.domain.enums import GraphType, TargetType, ZoneType
@@ -150,6 +151,67 @@ def test_reconstructed_subzone_direct_profiles_conserve_utility_duties(
         for subzone in zone.subzones.values()
         for stream in subzone.net_cold_streams
     )
+
+
+def test_reconstructed_profiles_retain_sub_four_decimal_cascade_precision():
+    zone = Zone(name="Site", type=ZoneType.S.value, config=Configuration())
+    subzone = Zone(name="Fine Process", parent_zone=zone)
+    temperatures = [200.00004, 200.00001, 100.00003]
+    enthalpies = [10.00006, 0.0, 5.00004]
+    pt = ProblemTable(
+        {
+            ProblemTableLabel.T: temperatures,
+            ProblemTableLabel.H_NET_A: enthalpies,
+        }
+    )
+    pt_real = ProblemTable(
+        {
+            ProblemTableLabel.T: temperatures,
+            ProblemTableLabel.H_NET: enthalpies,
+        }
+    )
+    hot_utilities = StreamCollection(
+        [
+            Stream(
+                name="HU",
+                supply_temperature=300.0,
+                target_temperature=250.0,
+                heat_flow=10.00006,
+                is_process_stream=False,
+            )
+        ]
+    )
+    cold_utilities = StreamCollection(
+        [
+            Stream(
+                name="CU",
+                supply_temperature=20.0,
+                target_temperature=50.0,
+                heat_flow=5.00004,
+                is_process_stream=False,
+            )
+        ]
+    )
+    direct._save_graph_data(pt, pt_real)
+    subzone.targets[TargetType.DI.value] = SimpleNamespace(
+        pt=pt,
+        hot_utilities=hot_utilities,
+        cold_utilities=cold_utilities,
+        period_idx=0,
+    )
+    zone.add_zone(subzone)
+
+    net_hot_streams, net_cold_streams = indirect._reconstruct_subzone_direct_profiles(
+        zone
+    )
+
+    assert len(net_hot_streams) == len(net_cold_streams) == 1
+    assert float(net_cold_streams[0].heat_flow[0]) == pytest.approx(10.00006)
+    assert float(net_cold_streams[0].supply_temperature[0]) == pytest.approx(200.00001)
+    assert float(net_cold_streams[0].target_temperature[0]) == pytest.approx(200.00004)
+    assert float(net_hot_streams[0].heat_flow[0]) == pytest.approx(5.00004)
+    assert float(net_hot_streams[0].supply_temperature[0]) == pytest.approx(200.00001)
+    assert float(net_hot_streams[0].target_temperature[0]) == pytest.approx(100.00003)
 
 
 def test_compute_indirect_integration_targets_auto_aligns_utility_profile_grids(

@@ -44,6 +44,19 @@ def test_root_package_exports_only_the_workflow_entrypoints() -> None:
     assert not hasattr(OpenPinch, "pinch_analysis_service")
 
 
+def test_utility_placement_uses_a_specialist_api_without_root_exports() -> None:
+    from OpenPinch.analysis.utility_placement import (
+        normalize_utility_placement_request,
+    )
+    from OpenPinch.contracts.utility_placement import UtilityPlacementRequest
+
+    request = normalize_utility_placement_request(isothermal_level_count=2)
+
+    assert isinstance(request, UtilityPlacementRequest)
+    assert not hasattr(OpenPinch, "UtilityPlacementRequest")
+    assert not hasattr(OpenPinch, "normalize_utility_placement_request")
+
+
 @pytest.mark.parametrize("package_name", RETIRED_PACKAGES)
 def test_retired_package_imports_fail(package_name: str) -> None:
     qualified_name = f"OpenPinch.{package_name}"

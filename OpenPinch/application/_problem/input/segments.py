@@ -335,7 +335,17 @@ def _create_segmented_utility_stream(
             {**common, "price": parent_price},
         )
 
-    parent = Stream(name=utility.name, segments=segments, price=None, **common)
+    parent = Stream(
+        name=utility.name,
+        segments=segments,
+        price=None,
+        maximum_heat_flow=standardise_input_value(
+            utility.maximum_heat_flow,
+            field_name="heat_flow",
+            config=config,
+        ),
+        **common,
+    )
     parent.is_active = utility.active
     _validate_supplied_parent_aggregates(utility, parent, config)
     if parent.stream_type != utility_type:

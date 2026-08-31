@@ -86,6 +86,7 @@ class PinchProblem:
     _last_target_run_spec: Optional[_TargetRunSpec]
     _suspend_target_run_recording: bool
     _period_results: dict[str, TargetOutput]
+    _utility_placement_result: Any | None
     components = _ComponentAccessorDescriptor()
     design = _DesignAccessorDescriptor()
     plot = _PlotAccessorDescriptor()
@@ -111,6 +112,7 @@ class PinchProblem:
         self._last_target_run_spec = None
         self._suspend_target_run_recording = False
         self._period_results = {}
+        self._utility_placement_result = None
 
         if source is not None:
             self.load(source=source)
@@ -292,6 +294,11 @@ class PinchProblem:
     def period_results(self):
         """Ordered detached outputs from the latest all-period target workflow."""
         return MappingProxyType(deepcopy(self._period_results))
+
+    @property
+    def utility_placement_result(self):
+        """Return the last detached placement result without running analysis."""
+        return self._utility_placement_result
 
     def _record_target_run(
         self,
@@ -590,6 +597,7 @@ class PinchProblem:
         self._results = None  # Clear cached results since multipliers have changed
         self._last_target_run_spec = None
         self._period_results = {}
+        self._utility_placement_result = None
         return root_zone
 
     def update_options(

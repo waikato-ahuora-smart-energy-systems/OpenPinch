@@ -105,3 +105,92 @@ previous interpreter state.
 Owns scoped assertions that current-state and reverse-engineering documentation
 describe only the canonical `PinchProblem` and `PinchWorkspace` root API while
 leaving explicitly historical records untouched.
+
+## Utility Placement Optimisation Components
+
+### Utility Placement Contract Family
+
+Owns the specialist Pydantic request, template, option, candidate, period,
+aggregate-result, diagnostic, and error-context schemas in
+`OpenPinch.contracts.utility_placement`. The contracts normalize public values,
+preserve units and stable identities, forbid backend-private objects, and
+support detached JSON round-trips. Objective, level-kind, utility-side, and
+base-target enums live with this specialist contract unless an existing domain
+enum is already the canonical owner.
+
+### Target Placement Accessors
+
+The existing problem target accessor exposes hierarchy-aware
+`utility_placement(...)`; its
+all-period counterpart selects every canonical period for one shared placement.
+The workspace case-batch accessors mirror both surfaces and reuse
+`CaseBatchResult` ordering and failure isolation. The problem accessor delegates
+once, converts the best result to a detached normal case, and retains placement
+evidence on that returned case. `workspace.add(...)` registers a returned case
+without activating it by default or copying unrelated analysis caches.
+
+### Placement Context Builder
+
+Owns unique hierarchy resolution plus read-only extraction of shifted direct,
+Total Site, or aggregate indirect profiles, residual
+heating and cooling demands, canonical periods and weights, configuration,
+ambient temperature, approach temperatures, and units. It may invoke existing
+targeting services against an isolated execution-zone copy, but the resulting
+`PlacementContext` contains only immutable numerical data and stable metadata.
+
+### Utility Template Model
+
+Owns template normalization, generated defaults, existing-utility inference,
+`Both` expansion, deterministic side padding, count-to-template agreement,
+unique identities, hot/cold direction, fixed near-isothermal span, sensible
+span bounds, feasible bound intersection, and
+deterministic starting candidates. It also owns reversible decision-vector
+encoding and decoding. These are pure operations with no optimiser or
+application dependency.
+
+### Candidate Evaluation Engine
+
+Replays one decoded placement independently against every selected period.
+It obtains duty allocation from detached copies of existing direct or Total
+Site targeting inputs, verifies complete hot and cold coverage, evaluates the
+selected objective, and returns a typed feasible or infeasible evaluation with
+diagnostics. It never ranks or caches candidates.
+
+### Thermodynamic Objective Evaluator
+
+Owns stable sensible and near-isothermal entropy calculations in absolute
+temperature, utility-side and process-side decomposition, finite-value checks,
+noise tolerance, and exergy-destruction conversion. It is a pure numerical
+kernel and does not know about accessors or optimiser backends.
+
+### Placement Optimisation Coordinator
+
+Builds one existing solver-neutral `OptimisationProblem`, evaluates bounded
+candidates, normalizes feasible alternatives, applies deterministic objective
+and coordinate ordering, and converts optimiser exhaustion into placement-
+specific typed diagnostics. It does not implement backend algorithms.
+
+### Utility Placement Analysis Service
+
+Orchestrates request normalization, context preparation, template-model
+construction, optimisation, candidate re-evaluation, result assembly, and
+typed failure translation. This is the specialist service entry point under
+`OpenPinch.analysis.utility_placement`; all numerical behavior remains below
+the application layer.
+
+### Optimized-Case Application Adapter
+
+Builds a normal detached `PinchProblem` from source input plus the best solved
+utility temperatures. It stores detailed evidence at
+`utility_placement_result`; all ordinary target, summary, report, and plot
+operations remain owned by the normal case APIs.
+
+### Utility Placement Notebook Example
+
+The existing tutorial generator owns exactly one new artifact,
+`19_utility_placement_optimisation.ipynb`. The notebook consumes only public
+problem-target and workspace APIs, demonstrates thermodynamic placement, adds
+the returned normal case, and contains lightweight executable assertions over
+standard summaries and plots. Existing
+tutorial-manifest, execution-profile, and package-data owners register and
+verify it. This component adds no CLI surface.

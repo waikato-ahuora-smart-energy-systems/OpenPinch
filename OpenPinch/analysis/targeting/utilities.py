@@ -150,6 +150,53 @@ def target_utilities_for_load_profiles(
     return hot_utilities, cold_utilities
 
 
+def _calculate_utility_duties_for_load_profiles(
+    *,
+    hot_utilities: StreamCollection,
+    cold_utilities: StreamCollection,
+    T_vals: np.ndarray,
+    H_net_cold: np.ndarray,
+    H_net_hot: np.ndarray,
+    pinch_idx: Tuple[int, int],
+    is_real_temperatures: bool = False,
+    idx: int | None = None,
+) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    """Calculate duties without mutating reusable candidate utility streams."""
+    hot_duties = (0.0,) * len(hot_utilities)
+    cold_duties = (0.0,) * len(cold_utilities)
+    if abs(H_net_cold[0]) > tol:
+        if len(hot_utilities) == 0:
+            raise ValueError(
+                "Hot utility targeting failed. No hot utilities provided but "
+                "heat load profile indicates utility use is required."
+            )
+        hot_duties = _calculate_assigned_utility_duties(
+            T_vals=T_vals,
+            H_vals=np.abs(H_net_cold),
+            u_ls=hot_utilities,
+            pinch_row=pinch_idx[0],
+            is_hot_ut=True,
+            is_real_temperatures=is_real_temperatures,
+            idx=idx,
+        )
+    if abs(H_net_hot[-1]) > tol:
+        if len(cold_utilities) == 0:
+            raise ValueError(
+                "Cold utility targeting failed. No cold utilities provided but "
+                "heat load profile indicates utility use is required."
+            )
+        cold_duties = _calculate_assigned_utility_duties(
+            T_vals=T_vals,
+            H_vals=np.abs(H_net_hot),
+            u_ls=cold_utilities,
+            pinch_row=pinch_idx[1],
+            is_hot_ut=False,
+            is_real_temperatures=is_real_temperatures,
+            idx=idx,
+        )
+    return hot_duties, cold_duties
+
+
 def _assign_utility(
     T_vals: np.ndarray,
     H_vals: np.ndarray,
@@ -160,6 +207,35 @@ def _assign_utility(
     idx: int | None,
 ) -> StreamCollection:
     """Assigns utility heat duties based on vertical heat transfer across a pinch."""
+    duties = _calculate_assigned_utility_duties(
+        T_vals=T_vals,
+        H_vals=H_vals,
+        u_ls=u_ls,
+        pinch_row=pinch_row,
+        is_hot_ut=is_hot_ut,
+        is_real_temperatures=is_real_temperatures,
+        idx=idx,
+    )
+    for utility, duty in zip(u_ls, duties, strict=True):
+        if duty > tol:
+            utility.set_value_attr_at_idx(
+                attr_name="heat_flow",
+                value=duty,
+                idx=idx,
+            )
+    return u_ls
+
+
+def _calculate_assigned_utility_duties(
+    T_vals: np.ndarray,
+    H_vals: np.ndarray,
+    u_ls: StreamCollection,
+    pinch_row: int,
+    is_hot_ut: bool,
+    is_real_temperatures: bool,
+    idx: int | None,
+) -> tuple[float, ...]:
+    """Return ordered utility duties using the canonical targeting algorithm."""
     if is_hot_ut:
         T_segment = T_vals[: pinch_row + 1]
         H_segment = H_vals[: pinch_row + 1]
@@ -175,8 +251,12 @@ def _assign_utility(
             "this error."
         )
 
+    utilities = tuple(u_ls)
+    duties = [0.0] * len(utilities)
+    indices = range(len(utilities) - 1, -1, -1) if is_hot_ut else range(len(utilities))
     Q_assigned = 0.0
-    for u in reversed(u_ls) if is_hot_ut else u_ls:
+    for utility_index in indices:
+        u = utilities[utility_index]
         if is_real_temperatures:
             t_lo, t_hi = u.minimum_temperature, u.maximum_temperature
         else:
@@ -194,18 +274,19 @@ def _assign_utility(
             is_hot_ut,
             Q_assigned,
         )
-        if Q_ut_max > tol:
-            u.set_value_attr_at_idx(
-                attr_name="heat_flow",
-                value=Q_ut_max,
-                idx=idx,
+        if u.maximum_heat_flow is not None:
+            Q_ut_max = min(
+                Q_ut_max,
+                StreamCollection._value_at_idx(u._maximum_heat_flow, idx),
             )
+        if Q_ut_max > tol:
+            duties[utility_index] = float(Q_ut_max)
             Q_assigned += Q_ut_max
 
         if abs(segment_limit - Q_assigned) < tol:
             break
 
-    return u_ls
+    return tuple(duties)
 
 
 def _maximise_utility_duty(
@@ -257,9 +338,12 @@ def _maximise_utility_duty(
         q_tt_max = q_tt.min() if q_tt.size > 0 else np.inf
         return min(q_ts_max, q_tt_max), q_ts_max, q_tt_max
 
-    q_adj, q_ts_adj, q_tt_adj = _candidate_limit(Q_pot)
-    q_cur, _, _ = _candidate_limit(current_H - Q_assigned)
-
-    if np.isfinite(q_tt_adj) and q_tt_adj < q_ts_adj:
-        return min(q_adj, q_cur)
+    q_adj, _, _ = _candidate_limit(Q_pot)
+    _, _, q_tt_cur = _candidate_limit(current_H - Q_assigned)
+    # When the utility target lies inside the GCC range, both ends of every
+    # piecewise-linear interval constrain its profile. The former condition
+    # inspected the adjacent-end limit and could discard a tighter current-end
+    # limit, allowing the sensible utility profile to cross the GCC.
+    if np.isfinite(q_tt_cur):
+        return min(q_adj, q_tt_cur)
     return q_adj

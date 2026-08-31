@@ -95,3 +95,20 @@ domain dependencies.
 
 Counts are intentionally omitted because the live file tree and test collection
 are the authoritative inventory and change frequently.
+
+## Utility-Placement Relevant Sources
+
+- `OpenPinch/analysis/targeting/utilities.py` allocates supplied utility levels
+  against heat-load profiles and enforces missing-utility feasibility errors.
+- `OpenPinch/analysis/targeting/direct.py` produces utility duties, profiles,
+  and hourly utility cost for a direct target.
+- `OpenPinch/analysis/exergy/service.py` produces exergy-oriented temperature
+  and load curves but does not define a utility-placement objective.
+- `OpenPinch/analysis/power/service.py` calculates cogeneration work for
+  compatible target families.
+- `OpenPinch/optimisation/models.py` and `service.py` own bounded scalar
+  minimisation inputs, options, validation, and normalized candidates.
+- `OpenPinch/application/_problem/accessors/target.py` is the established
+  workflow entry-point owner for a future utility-placement method.
+- `tests/analysis`, `tests/optimisation`, `tests/application`, `tests/contracts`,
+  and `tests/strategies` provide the corresponding TDD test boundaries.

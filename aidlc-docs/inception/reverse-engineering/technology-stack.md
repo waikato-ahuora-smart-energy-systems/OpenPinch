@@ -40,8 +40,9 @@
 
 ## Testing and Quality
 
-- pytest - 1,905 collected tests at analysis time, with synthesis and solver markers.
-- Coverage.py - branch-independent statement coverage, enforced at 95% in CI; observed 99% locally.
+- pytest - 2,291 collected tests at refresh time; 2,287 are in the non-solver
+  selection and four are solver-marked.
+- Coverage.py - branch coverage is enabled and enforced at 95% in CI.
 - Ruff - linting, import ordering, bugbear mutable-default checks, and formatting support.
 - Black - configured as an additional developer formatter.
 - Pylint - installed in the development group but not configured or invoked in CI.
@@ -53,4 +54,3 @@
 - Read the Docs - hosted documentation.
 - PyPI - package distribution.
 - No runtime cloud infrastructure, database, web framework, or container image.
-

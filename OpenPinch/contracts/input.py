@@ -161,6 +161,7 @@ class UtilitySchema(BaseModel):
     h_supply: Optional[ScalarOrVU] = None
     h_target: Optional[ScalarOrVU] = None
     heat_flow: Optional[ScalarOrVU] = None
+    maximum_heat_flow: Optional[ScalarOrVU] = None
     dt_cont: Optional[ScalarOrVU] = 0.0
     htc: Optional[ScalarOrVU] = 1.0
     price: Optional[ScalarOrVU] = 1.0

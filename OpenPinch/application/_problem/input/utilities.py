@@ -443,6 +443,11 @@ def _create_utilities_list(
                     field_name="htc",
                     config=config,
                 ),
+                maximum_heat_flow=standardise_input_value(
+                    selected.maximum_heat_flow,
+                    field_name="heat_flow",
+                    config=config,
+                ),
                 price=standardise_input_value(
                     selected.price,
                     field_name="price",

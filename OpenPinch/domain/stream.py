@@ -41,6 +41,7 @@ class Stream:
         "_dt_cont": "delta_degC",
         "_dt_cont_act": "delta_degC",
         "_heat_flow": "kW",
+        "_maximum_heat_flow": "kW",
         "_htc": "kW/m^2/delta_degC",
         "_htr": "m^2*delta_degC/kW",
         "_price": "$/MW/h",
@@ -61,6 +62,7 @@ class Stream:
         "_h_target",
         "_dt_cont",
         "_heat_flow",
+        "_maximum_heat_flow",
         "_htc",
         "_price",
     )
@@ -85,6 +87,7 @@ class Stream:
         "target_enthalpy": "_h_target",
         "delta_t_contribution": "_dt_cont",
         "heat_flow": "_heat_flow",
+        "maximum_heat_flow": "_maximum_heat_flow",
         "heat_transfer_coefficient": "_htc",
         "price": "_price",
         "effective_delta_t_contribution": "_dt_cont_act",
@@ -156,6 +159,7 @@ class Stream:
         delta_t_contribution: MaybeVU = 0.0,
         delta_t_contribution_multiplier: float = 1.0,
         heat_flow: MaybeVU = 0.0,
+        maximum_heat_flow: Optional[MaybeVU] = None,
         heat_transfer_coefficient: MaybeVU = 1.0,
         price: Optional[MaybeVU] = None,
         is_process_stream: bool = True,
@@ -189,6 +193,7 @@ class Stream:
         self._h_target: Value | None = None
         self._dt_cont: Value | None = None
         self._heat_flow: Value | None = None
+        self._maximum_heat_flow: Value | None = None
         self._htc: Value | None = None
         self._price: Value | None = None
 
@@ -216,6 +221,9 @@ class Stream:
             "delta_t_contribution", delta_t_contribution, update_derived=False
         )
         self.set_value_attr("heat_flow", heat_flow, update_derived=False)
+        self.set_value_attr(
+            "maximum_heat_flow", maximum_heat_flow, update_derived=False
+        )
         self.set_value_attr(
             "heat_transfer_coefficient",
             heat_transfer_coefficient,
@@ -417,6 +425,15 @@ class Stream:
     @heat_flow.setter
     def heat_flow(self, value):
         self.set_value_attr("heat_flow", value)
+
+    @property
+    def maximum_heat_flow(self) -> Value | None:
+        """Optional scalar or period-aware upper bound on utility duty."""
+        return self._copy_value(self._maximum_heat_flow)
+
+    @maximum_heat_flow.setter
+    def maximum_heat_flow(self, value):
+        self.set_value_attr("maximum_heat_flow", value)
 
     @property
     def heat_transfer_coefficient(self) -> Value:

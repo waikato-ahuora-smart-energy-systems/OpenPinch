@@ -212,6 +212,9 @@ __marimo__/
 results/*
 commands.txt
 
+# Locally generated research manuscript and analysis artifacts
+/paper/heat-pump-targeting/
+
 # Generated solver artifacts
 *.pkl
 *.pickle

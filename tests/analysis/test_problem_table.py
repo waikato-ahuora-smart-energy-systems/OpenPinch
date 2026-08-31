@@ -6,6 +6,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from OpenPinch.analysis.targeting.cascade import (
     _get_T_start_on_opposite_cc,
@@ -18,7 +20,9 @@ from OpenPinch.analysis.targeting.cascade import (
     problem_table_algorithm,
     set_zonal_targets,
 )
-from OpenPinch.domain.configuration import Configuration
+from OpenPinch.analysis.targeting.indirect import _build_site_utility_profile
+from OpenPinch.domain._problem_table.intervals import temperature_grids_match
+from OpenPinch.domain.configuration import Configuration, tol
 from OpenPinch.domain.enums import ProblemTableLabel
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream import Stream
@@ -524,6 +528,98 @@ def test_update_interpolates_cumulative_columns_and_splits_interval_properties()
     assert pt[ProblemTableLabel.T].tolist() == [300.0, 200.0, 100.0]
     assert np.allclose(pt[ProblemTableLabel.H_NET_UT], np.array([0.0, 50.0, 100.0]))
     assert np.allclose(pt[ProblemTableLabel.RCP_HOT_UT], np.array([0.0, 5.0, 5.0]))
+
+
+def test_uniform_temperature_tolerance_aligns_total_site_utility_profile() -> None:
+    hot_utilities = StreamCollection(
+        [
+            make_stream("Upper utility", 200.0, 100.0000006, 0.0, cp=1.0),
+            make_stream("Lower utility", 100.0, 0.0, 0.0, cp=1.0),
+        ]
+    )
+    profile = _build_site_utility_profile(
+        hot_utilities=hot_utilities,
+        cold_utilities=StreamCollection(),
+        is_shifted=False,
+    )
+    target = ProblemTable({ProblemTableLabel.T: [200.0, 100.0, 0.0]})
+
+    target.update(**profile)
+
+    assert len(profile["T_col"]) == len(target) == 3
+    assert temperature_grids_match(target[ProblemTableLabel.T], profile["T_col"])
+    assert np.isfinite(target[ProblemTableLabel.H_NET_UT]).all()
+    expected_duty = sum(float(utility.heat_flow.value) for utility in hot_utilities)
+    observed_duty = float(np.ptp(target[ProblemTableLabel.H_HOT_UT]))
+    assert observed_duty == pytest.approx(expected_duty, abs=tol)
+
+
+def test_ordinary_interval_insertion_keeps_temperature_noise_tolerance() -> None:
+    table = ProblemTable({ProblemTableLabel.T: [200.0, 100.0, 0.0]})
+
+    inserted = table.insert_temperature_interval(100.0000006)
+
+    assert inserted == 0
+    np.testing.assert_array_equal(
+        table[ProblemTableLabel.T],
+        np.array([200.0, 100.0, 0.0]),
+    )
+
+
+def test_temperature_grid_comparison_uses_absolute_tolerance_only() -> None:
+    assert temperature_grids_match([1_000_000.0], [1_000_000.0 + (0.5 * tol)])
+    assert not temperature_grids_match(
+        [1_000_000.0],
+        [1_000_000.0 + (2.0 * tol)],
+    )
+
+
+@settings(max_examples=25, deadline=None)
+@given(
+    center=st.integers(min_value=-100, max_value=300),
+    upper_span=st.integers(min_value=10, max_value=200),
+    lower_span=st.integers(min_value=10, max_value=200),
+    gap_nanokelvin=st.integers(min_value=1, max_value=900),
+    upper_cp=st.floats(min_value=0.01, max_value=100.0, allow_nan=False),
+    lower_cp=st.floats(min_value=0.01, max_value=100.0, allow_nan=False),
+)
+def test_total_site_grid_property_applies_one_temperature_tolerance(
+    center,
+    upper_span,
+    lower_span,
+    gap_nanokelvin,
+    upper_cp,
+    lower_cp,
+) -> None:
+    gap = gap_nanokelvin * 1e-9
+    top = float(center + upper_span)
+    middle = float(center)
+    bottom = float(center - lower_span)
+    hot_utilities = StreamCollection(
+        [
+            make_stream("Upper utility", top, middle + gap, 0.0, cp=upper_cp),
+            make_stream("Lower utility", middle, bottom, 0.0, cp=lower_cp),
+        ]
+    )
+    profile = _build_site_utility_profile(
+        hot_utilities=hot_utilities,
+        cold_utilities=StreamCollection(),
+        is_shifted=False,
+    )
+    target = ProblemTable({ProblemTableLabel.T: [top, middle, bottom]})
+
+    target.update(**profile)
+
+    assert len(profile["T_col"]) == len(target) == 3
+    assert temperature_grids_match(target[ProblemTableLabel.T], profile["T_col"])
+    assert np.all(np.diff(profile["T_col"]) < 0.0)
+    assert np.isfinite(target[ProblemTableLabel.H_NET_UT]).all()
+    expected_duty = sum(float(utility.heat_flow.value) for utility in hot_utilities)
+    observed_duty = float(np.ptp(target[ProblemTableLabel.H_HOT_UT]))
+    assert observed_duty == pytest.approx(
+        expected_duty,
+        abs=tol * max(upper_cp, lower_cp),
+    )
 
 
 @pytest.mark.parametrize(

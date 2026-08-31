@@ -233,3 +233,191 @@ canonical root API and prevent current-contract regression.
 
 **Exit evidence**: scoped scans find no retired active contract, Sphinx passes
 with warnings as errors, and root/wheel smoke confirms only canonical imports.
+
+## Utility Placement Optimisation Units
+
+These are logical units inside one OpenPinch package and distribution. They are
+not independently deployed services and do not create team or runtime silos.
+Construction follows Unit 1 -> Unit 2 -> Unit 3, with red-green-refactor
+evidence recorded for every production slice.
+
+### Unit 1: Placement Contracts and Pure Model
+
+**Purpose**: establish the stable specialist vocabulary and deterministic pure
+model consumed by every later numerical and public workflow.
+
+**Responsibilities**:
+
+- define objective, base-target, level-kind, and utility-side enums;
+- define immutable/Pydantic template, request, options, tolerances, diagnostic,
+  candidate, per-period, aggregate, termination, and result contracts;
+- define typed placement exceptions and structured candidate-infeasibility data;
+- validate separate isothermal and sensible counts and matching hot/cold
+  template inventories;
+- normalize supplied or generated templates, units, identities, direction,
+  fixed near-isothermal span, prices, eligibility, and temperature/span bounds;
+- derive the all-period feasible-bound intersection and deterministic valid
+  starting points;
+- encode and decode decision vectors with stable coordinate ordering;
+- guarantee detached JSON serialization and equality within named tolerances;
+- provide domain-valid Hypothesis strategies and pure-model reference helpers.
+
+**Primary inputs**: approved placement public arguments, utility-template
+metadata, units/configuration conventions, and detached period feasibility
+limits supplied by Unit 2 through a stable context value object.
+
+**Outputs**: `UtilityPlacementRequest`, `UtilityTemplateSet`,
+`UtilityPlacementModel`, result/diagnostic contracts, exception taxonomy,
+bounded vector schema, and reusable test strategies.
+
+**Owned requirements and stories**: FR-002 through FR-006, FR-012 contract
+shape, FR-014 contract shape, NFR-001, NFR-002 ordering, NFR-004, NFR-005 pure
+boundaries, NFR-006 error vocabulary; UPO-01, UPO-08 contract behavior, UPO-09,
+and UPO-12 foundations.
+
+**Exclusions**:
+
+- no process-profile targeting or duty allocation;
+- no entropy, monetary, turbine, or aggregate objective calculation;
+- no optimiser backend execution;
+- no application accessor, cache, workspace batch, or presentation changes;
+- no package-root export or new runtime dependency.
+
+**Construction readiness**: comprehensive Functional Design, standard NFR
+Requirements and Design, then approved TDD Code Generation. PBT-01 must assign
+round-trip, ordering, bound, vector, serialization, and generator properties
+before code planning.
+
+**Exit evidence**: focused contract validation and serialization examples;
+encode/decode, ordering, fixed-span, bounds, copying, and JSON properties;
+fixed-seed reproducibility; Ruff and architecture/import checks for the unit.
+
+### Unit 2: Placement Evaluation and Optimisation Service
+
+**Purpose**: implement the detached numerical capability that evaluates and
+optimises one utility placement across direct or Total Site periods.
+
+**Responsibilities**:
+
+- build immutable placement context from isolated direct or Total Site target
+  snapshots and preserve canonical period order and weights;
+- replay one decoded placement independently for every selected period;
+- allocate all residual heating and cooling demand with existing targeting
+  calculations and verify both conservation equalities within tolerance;
+- integrate utility-side and process-side entropy in absolute temperature,
+  including stable near-isothermal limits, and compute exergy destruction;
+- compute thermal purchase cost, detached eligible-level cogeneration,
+  electricity credit, and net monetary objective;
+- form the explicit weighted sum of period objectives without surrogate profiles;
+- build and run the existing bounded solver-neutral optimisation contract;
+- reject or penalize infeasible candidates deterministically, ensure feasible
+  candidates always rank first, and normalize bounded alternatives;
+- translate context, targeting, thermodynamic, turbine, non-finite, and
+  optimiser failures into Unit 1's typed diagnostics;
+- compare bounded analytical cases with brute-force or structured-grid oracles.
+
+**Primary inputs**: Unit 1 request/model/contracts; isolated domain target
+inputs; existing direct and Total Site targeting services; existing
+solver-neutral minimisation; existing steam-turbine calculation.
+
+**Outputs**: a complete detached `UtilityPlacementResult`, including best and
+alternative candidates, period and aggregate coverage/objective evidence,
+termination metadata, and diagnostics.
+
+**Owned requirements and stories**: FR-005 bounds consumption; FR-007 through
+FR-012; FR-014 numerical result content; NFR-001 through NFR-003, NFR-005, and
+NFR-006; UPO-02 numerical workflow, UPO-03 through UPO-08, UPO-11, and UPO-12.
+
+**Exclusions**:
+
+- no public problem/workspace method ownership;
+- no canonical `Zone`, utility, target, result, or workspace mutation;
+- no private optimisation-backend import or new optimiser implementation;
+- no reimplementation of target-profile or steam-turbine physics;
+- no implicit reporting or hidden reruns.
+
+**Construction readiness**: comprehensive Functional Design must specify
+equations, intervals, feasibility, penalties, aggregation, and oracles before
+standard NFR stages and approved TDD Code Generation. PBT-01 must identify
+coverage, thermodynamic, objective, feasibility, oracle, copying, and
+reproducibility properties.
+
+**Exit evidence**: hand-calculable hot/cold entropy and monetary/cogeneration
+examples; direct and Total Site examples; per-period coverage and weighted-sum
+properties; feasible-vs-penalty invariant; small-grid oracle comparison;
+fixed-seed bounded solve and typed-exhaustion tests.
+
+### Unit 3: Public Workflow and Presentation Integration
+
+**Purpose**: expose the completed specialist service through stable OpenPinch
+workflows and observation paths without changing existing study behavior.
+
+**Responsibilities**:
+
+- add explicit `problem.target.utility_placement(...)` keyword arguments and
+  immediate request normalization;
+- add the special shared-placement all-period method without using the generic
+  independent-period loop;
+- add ordered workspace case-batch and batch-all-period mirrors using existing
+  `CaseBatchResult` failure isolation;
+- resolve zones, scopes, canonical periods, weights, and isolated execution
+  copies in the application layer and delegate once to Unit 2;
+- retain only the detached result in a dedicated placement observation slot;
+- expose already-computed placement metrics, summaries, comparisons, and
+  reports without changing legacy `TargetOutput` schemas or triggering reruns;
+- document specialist imports, both objectives, units, options, errors,
+  direct/Total Site usage, multiperiod semantics, batches, and result
+  interpretation;
+- generate exactly one executable notebook,
+  `19_utility_placement_optimisation.ipynb`, that uses public Python APIs to
+  demonstrate the default thermodynamic and monetary/cogeneration workflows;
+  register it in the tutorial manifest and notebook execution profile;
+- verify root facade, optional dependencies, wheel/source distribution,
+  backward compatibility, non-mutation, and repository-wide quality gates.
+
+**Primary inputs**: Unit 1 public contracts and Unit 2 service; existing
+application target and workspace accessors; presentation/reporting owners;
+approved documentation and packaging conventions.
+
+**Outputs**: public problem/all-period/batch workflows, explicit observation
+and reporting behavior, the one required generated executable notebook, user
+documentation, and end-to-end evidence.
+
+**Owned requirements and stories**: FR-001, FR-007 public scope, FR-008 public
+period selection, FR-013, FR-015, FR-016, FR-017, and final integration of
+FR-002 and FR-014; NFR-002, NFR-004 through NFR-007; UPO-02, UPO-05 notebook
+delivery, UPO-06, UPO-07, UPO-09, UPO-10, and UPO-12.
+
+**Exclusions**:
+
+- no utility-placement equations in application or presentation modules;
+- no root-level export beyond `PinchProblem` and `PinchWorkspace`;
+- no utility-placement CLI command or CLI integration;
+- no additional utility-placement notebook beyond the single FR-017 artifact;
+- no implicit application of the chosen placement to source utilities;
+- no network, persistence, credential, deployment, or infrastructure service;
+- no hidden target or optimisation execution during observation.
+
+**Construction readiness**: comprehensive Functional Design defines accessor,
+cache, batch, and reporting behavior; standard NFR stages capture compatibility
+and observability; approved TDD Code Generation then integrates one public
+surface at a time. PBT-01 must identify batch-order/state, copy invariance,
+serialization-through-public-workflow, and repeatability properties.
+
+**Exit evidence**: focused accessor/all-period/batch/report tests; success and
+failure non-mutation properties; ordered batch isolation; installed-package
+specialist import and root-facade tests; clean execution of the generated
+thermodynamic and monetary/cogeneration notebook; tutorial-manifest and
+wheel/source package-data checks; full fixed-seed non-solver, architecture,
+Ruff, packaging, and distribution gates.
+
+### Unit Boundary Validation
+
+- Unit 1 owns stable values and pure transformations; Unit 2 consumes them and
+  owns numerical orchestration; Unit 3 consumes both and owns user integration.
+- No dependency points from Unit 1 to Unit 2/3 or from Unit 2 to Unit 3.
+- Thermodynamic and monetary objectives share Unit 2 orchestration but retain
+  independent pure evaluators.
+- Every unit remains inside the existing package and preserves established
+  component ownership.
+- Infrastructure Design remains skipped for every unit.

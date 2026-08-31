@@ -2,56 +2,80 @@
 
 ## Prerequisites
 
-- Python version selected by `.python-version`.
-- uv with the committed `uv.lock` environment available.
-- Hatchling and `build` from the development dependency group.
-- Sphinx and the Read the Docs theme from the documentation/development groups.
-- No application environment variables, database, service, or network access
-  when the locked environment and package caches are already available.
-
-External HEN solver binaries are required only for separately marked solver
-profiles and are not needed for this remediation build.
+- **Build tool**: `uv`, Python build frontend, and Hatchling.
+- **Python**: CPython 3.14.2 or later, as declared by `pyproject.toml`.
+- **Core dependencies**: NumPy, Pint, pandas, CoolProp, Pydantic, and SciPy.
+- **Development dependencies**: pytest, Hypothesis, coverage, Ruff, Sphinx,
+  `build`, and Hatchling from the locked development group.
+- **Optional dependencies**: notebook extras for an interactive Jupyter
+  session; solver extras only for solver-marked HEN tests.
+- **Environment variables**: none for the utility-placement core, build, or
+  base-profile notebook. External solver executable variables are required
+  only for the separately marked solver suite.
+- **System requirements**: any supported operating system with a Python 3.14
+  environment; temporary disk space for one source archive and wheel.
 
 ## Build Steps
 
-Install or refresh the locked environment when needed:
+### 1. Install Dependencies
+
+From the repository root:
 
 ```bash
-uv sync --all-extras --dev
+uv sync --all-extras --group dev
 ```
 
-Create clean temporary destinations rather than reusing ignored build trees:
+For the core feature and base notebook only, the locked default and development
+dependencies are sufficient; solver executables are not needed.
+
+### 2. Configure Environment
+
+No runtime configuration is needed for utility placement. Confirm the selected
+interpreter and import source:
 
 ```bash
-mktemp -d /private/tmp/openpinch-docs.XXXXXX
-mktemp -d /private/tmp/openpinch-dist.XXXXXX
+uv run python --version
+uv run python -c "import OpenPinch; print(OpenPinch.__file__)"
 ```
 
-Build warning-as-error HTML documentation:
+### 3. Build All Units
+
+Use installed locked build tooling without dependency download:
 
 ```bash
-uv run python scripts/build_docs.py --output-dir /path/to/clean/docs-html
+uv run python -m build --no-isolation --outdir dist
 ```
 
-Build the wheel and source archive:
+### 4. Verify Build Success
 
-```bash
-uv run python scripts/build_dist.py --output-dir /path/to/clean/dist
-```
-
-## Success Criteria
-
-- Sphinx completes with zero warnings and writes an HTML index.
-- Distribution output contains exactly one `openpinch-*.whl` and one
-  `openpinch-*.tar.gz` for the current version.
-- Build logs contain no missing-file, import, or package-content failures.
+- **Expected output**: `Successfully built openpinch-0.5.4.tar.gz and
+  openpinch-0.5.4-py3-none-any.whl` for the current project version.
+- **Build artifacts**: `dist/openpinch-*.tar.gz` and
+  `dist/openpinch-*-py3-none-any.whl`.
+- **Required archive content**: `OpenPinch/contracts/utility_placement.py`, all
+  `OpenPinch/analysis/utility_placement/` modules,
+  `OpenPinch/application/utility_placement.py`,
+  `OpenPinch/application/_problem/accessors/target.py`, and
+  `OpenPinch/analysis/targeting/utilities.py`,
+  `OpenPinch/domain/stream.py`, and
+  `OpenPinch/data/notebooks/19_utility_placement_optimisation.ipynb`.
+- **Common warnings**: none are accepted from the build itself. Shell startup
+  warnings about a restricted process list are environment noise, not build
+  output.
 
 ## Troubleshooting
 
-- A uv cache permission error requires running the approved uv command with
-  access to the existing user cache; do not redirect or recreate the cache in
-  the repository.
-- A Sphinx warning is a build failure; correct the source/reference and rebuild
-  from a fresh destination.
-- A missing build backend means the locked development group was not installed.
-- Optional solver errors belong only to explicitly selected solver profiles.
+### Build Fails with Dependency Errors
+
+- **Cause**: isolated build mode tries to download Hatchling in a network-
+  restricted environment, or the lock is not synchronized.
+- **Solution**: run `uv sync --all-extras --group dev`, then use
+  `python -m build --no-isolation` through the synchronized environment.
+
+### Build Fails with Compilation or Package-Data Errors
+
+- **Cause**: invalid Python syntax, stale generated notebook output, or missing
+  Hatchling package-data discovery.
+- **Solution**: run Ruff and the focused packaging/notebook tests, regenerate
+  notebooks with `uv run python scripts/generate_tutorial_notebooks.py`, and
+  rebuild. Do not hand-edit the generated notebook.

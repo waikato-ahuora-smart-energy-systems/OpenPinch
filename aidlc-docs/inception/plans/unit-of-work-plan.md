@@ -58,6 +58,144 @@ X) Other (please describe after the `[Answer]:` tag below)
 
 [Answer]: A
 
+## Utility Placement Optimisation Unit Plan
+
+### Decomposition Assessment
+
+- **Story grouping**: The approved execution plan proposes three cohesive
+  units: placement contracts and pure model; placement evaluation and
+  optimisation; and public workflow integration. This groups high-affinity
+  stories without splitting the two objective modes into duplicated pipelines.
+- **Dependencies**: The default critical path is Unit 1 -> Unit 2 -> Unit 3.
+  Public integration consumes stable contracts and the completed specialist
+  service. Test fixtures and documentation can develop alongside later slices
+  after their consumed interfaces stabilize.
+- **Team alignment**: OpenPinch is one in-process Python package. In the absence
+  of a separate team topology, units are implementation, TDD, and review
+  boundaries rather than ownership silos.
+- **Technical considerations**: All units ship in the same wheel and source
+  distribution, reuse existing optional solver profiles, add no runtime
+  dependency, and introduce no separately deployable process or service.
+- **Business domain**: One utility-placement capability owns both objective
+  modes. The split follows stable contracts, core numerical capability, and
+  user-facing integration while preserving one domain vocabulary.
+- **Code organization**: N/A as a question because this is brownfield. Existing
+  `contracts`, `domain`, `analysis`, `optimisation`, `application`,
+  `presentation`, `tests`, and documentation owners remain authoritative.
+
+### Proposed Units
+
+1. **Unit 1 - Placement Contracts and Pure Model**
+   - Specialist enums, request/template/options/results, diagnostics, and error
+     contracts.
+   - Template normalization, count validation, bound derivation, deterministic
+     starting points, and vector encoding/decoding.
+   - Serialization, units, ordering, and pure-model invariants.
+2. **Unit 2 - Placement Evaluation and Optimisation Service**
+   - Detached direct and Total Site period contexts and duty allocation.
+   - Per-period coverage, entropy/exergy, monetary/cogeneration evaluation,
+     aggregation, feasibility, optimiser coordination, and alternatives.
+   - Typed numerical failures, deterministic bounded solve, and analytical or
+     structured-grid oracle tests.
+3. **Unit 3 - Public Workflow and Presentation Integration**
+   - Problem target, explicit all-period, and ordered workspace-batch surfaces.
+   - Dedicated detached result observation, metrics, summaries, comparisons,
+     reports, public docs, exactly one executable generated notebook covering
+     thermodynamic and monetary/cogeneration workflows, compatibility, and
+     end-to-end gates. CLI integration is excluded.
+
+### Generation Steps
+
+- [x] Reconcile the approved requirements, 12 stories, Application Design, and
+  three-unit execution-plan hypothesis.
+- [x] Collect and analyze every decomposition answer below; add follow-up
+  questions for any ambiguity.
+- [x] Obtain explicit approval of the completed unit plan before generation.
+- [x] Generate the Utility Placement section of
+  `aidlc-docs/inception/application-design/unit-of-work.md` with unit
+  definitions, responsibilities, inputs, outputs, exclusions, and readiness.
+- [x] Generate the Utility Placement section of
+  `aidlc-docs/inception/application-design/unit-of-work-dependency.md` with the
+  dependency matrix, critical path, coordination points, and test checkpoints.
+- [x] Generate the Utility Placement section of
+  `aidlc-docs/inception/application-design/unit-of-work-story-map.md` mapping
+  every UPO story, FR, NFR, and enabled PBT obligation to one or more units.
+- [x] Validate that dependencies are acyclic, existing package ownership is
+  preserved, and no later unit defines a contract required by an earlier unit.
+- [x] Validate that all UPO-01 through UPO-12, FR-001 through FR-017, NFR-001
+  through NFR-007, TDD acceptance work, and PBT obligations are assigned.
+- [x] Assign the approved no-CLI and single executable notebook scope amendment
+  to Unit 3 with manifest, execution-profile, and package-data verification.
+- [x] Obtain explicit approval of generated units before Construction.
+
+### Question 1 - Story Grouping
+
+Which story-grouping strategy should define the units?
+
+A) Use the proposed three-unit split: contracts/pure model, evaluation/service,
+then public integration
+
+B) Use a different grouping and describe the desired unit boundaries after the
+`[Answer]:` tag
+
+X) Other (please describe after the `[Answer]:` tag below)
+
+[Answer]: A (accepted by explicit chat response `Go`)
+
+### Question 2 - Dependencies
+
+How should inter-unit delivery be sequenced?
+
+A) Use the dependency-ordered critical path Unit 1 -> Unit 2 -> Unit 3, with
+only non-blocking fixtures and documentation prepared in parallel
+
+B) Optimize for broader parallel delivery even if temporary interfaces or
+integration rework are required
+
+X) Other (please describe after the `[Answer]:` tag below)
+
+[Answer]: A (accepted by explicit chat response `Go`)
+
+### Question 3 - Team Alignment
+
+What ownership model should the decomposition assume?
+
+A) Treat units as sequential TDD and review boundaries for one package team
+
+B) Align units to separate teams or maintainers and describe the ownership
+split after the `[Answer]:` tag
+
+X) Other (please describe after the `[Answer]:` tag below)
+
+[Answer]: A (accepted by explicit chat response `Go`)
+
+### Question 4 - Technical Deployment Boundary
+
+What does "analysis service" mean for deployment and packaging?
+
+A) Keep it as an in-process OpenPinch analysis service shipped in the existing
+package, with no network or independent deployment boundary
+
+B) Introduce a separately deployable or remotely callable service boundary
+
+X) Other (please describe after the `[Answer]:` tag below)
+
+[Answer]: A (accepted by explicit chat response `Go`)
+
+### Question 5 - Business Domain Boundary
+
+How should the two cost objectives affect unit boundaries?
+
+A) Keep thermodynamic and monetary objectives in one evaluation/service unit
+with separate pure evaluators and a shared placement pipeline
+
+B) Split thermodynamic and monetary placement into separate implementation
+units despite their shared templates, constraints, and orchestration
+
+X) Other (please describe after the `[Answer]:` tag below)
+
+[Answer]: A (accepted by explicit chat response `Go`)
+
 ## Repository Issue Remediation Unit Plan
 
 ### Decomposition Assessment

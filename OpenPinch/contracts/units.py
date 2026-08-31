@@ -39,6 +39,7 @@ INPUT_UNIT_RULES: dict[str, InputUnitRule] = {
     "h_supply": InputUnitRule("kJ/kg", unit_groups=("enthalpy",)),
     "h_target": InputUnitRule("kJ/kg", unit_groups=("enthalpy",)),
     "heat_flow": InputUnitRule("kW", unit_groups=("heat_flow",)),
+    "maximum_heat_flow": InputUnitRule("kW", unit_groups=("heat_flow",)),
     "dt_cont": InputUnitRule(
         "delta_degC",
         unit_groups=("delta_temperature", "temperature_difference"),

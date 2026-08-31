@@ -4,11 +4,11 @@ Tutorial Coverage Map
 Coverage Result
 ---------------
 
-The released public denominator contains **186 operations** across
+The released public denominator contains **192 operations** across
 ``PinchProblem``, ``PinchWorkspace``, targeting, all-period targeting,
 components and returned component results, ordered case batches, HEN
-design/result views, and plotting. The canonical manifest maps all 186 live
-operations to tutorial code cells: **186/186, or 100 percent mapping
+design/result views, and plotting. The canonical manifest maps all 192 live
+operations to tutorial code cells: **192/192, or 100 percent mapping
 coverage**.
 
 Operation coverage and notebook execution coverage are different. The ``base``

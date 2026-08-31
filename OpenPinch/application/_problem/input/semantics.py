@@ -40,6 +40,7 @@ _UTILITY_VALUE_FIELDS = (
     "h_supply",
     "h_target",
     "heat_flow",
+    "maximum_heat_flow",
     "dt_cont",
     "htc",
     "price",
@@ -51,6 +52,7 @@ _UTILITY_OPTIONAL_VALUE_FIELDS = (
     "h_supply",
     "h_target",
     "heat_flow",
+    "maximum_heat_flow",
     "dt_cont",
     "htc",
     "price",
@@ -821,7 +823,7 @@ def _validate_utility_record_states(
             )
         )
 
-    for field_name in ("dt_cont", "price", "heat_flow"):
+    for field_name in ("dt_cont", "price", "heat_flow", "maximum_heat_flow"):
         issues.extend(
             _validate_non_negative_states(
                 values.get(field_name),
