@@ -6401,3 +6401,35 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 **Context**: GIT COMMIT - Repository critical corrections
 
 ---
+
+## GitHub Workflows Audit
+**Timestamp**: 2026-08-31T20:20:36Z
+**User Input**: "Audit the Github workflows."
+**AI Response**: "Started a read-only audit of all repository GitHub Actions workflows, covering triggers, permissions, action pinning, secret and fork safety, concurrency, release controls, caching, test coverage, and maintainability. Workflow files will not be changed."
+**Context**: CODE REVIEW - GitHub Actions workflows
+
+---
+
+## GitHub Workflows Audit Completion
+**Timestamp**: 2026-08-31T20:34:14Z
+**User Input**: "Audit the Github workflows."
+**AI Response**: "Completed the read-only audit. Critical findings cover missing pre-merge CI for pull requests targeting develop, execution of PR-controlled bump configuration in a contents-write job, shell interpolation of a PR branch name, bot-authored version bumps leaving the new PR head in action_required state, and mutable PyPI publishing action references. Moderate findings cover incomplete version-bump dependencies, missing explicit default token permissions, non-frozen dependency installation, unenforced solver tests, and release-tag provenance checks. All three workflow files parse as YAML; recent CI and v0.6.0 publication runs succeeded."
+**Context**: CODE REVIEW - GitHub Actions workflows completed; no workflow files changed
+
+---
+
+## GitHub Actions and Codex Review Corrections Authorization
+**Timestamp**: 2026-08-31T20:37:16Z
+**User Input**: "- Address the GitHub Actions workflow issues. Automate the tag/release process as well as the publish to Pypi.  \n- Address the Github Codex review issues. \n- Commit the improvements. "
+**AI Response**: "Accepted explicit authorization to implement and commit the audited workflow corrections, automated tag/GitHub-release/PyPI delivery, and all current PR 92 Codex review findings. Created the TDD and property-based execution plan and began by retrieving the live review comments and reconciling the bot-created remote version commit."
+**Context**: CODE GENERATION AUTHORIZATION - GitHub Actions release automation and Codex review corrections
+
+---
+
+## GitHub Actions and Codex Review Corrections Completion
+**Timestamp**: 2026-08-31T21:15:54Z
+**User Input**: "No new user input; completed under the approved GitHub Actions release and Codex review corrections plan."
+**AI Response**: "Replaced pull-request mutation with read-only validation for main and develop, pinned every action to an immutable commit, installed from the frozen uv lock, and added a guarded main-only release workflow that validates the forward version, runs solver and artifact gates, creates an annotated tag and draft GitHub release, publishes the same distributions to TestPyPI and protected PyPI, then finalizes the GitHub release. Resolved all three PR 92 Codex findings with a configurable 1e-6 optimizer feasibility tolerance, generated nested-zone multiplier round trips, and generated stateful load/target/failure sequences. The focused gate passes 186 tests. The complete configured-solver suite passes 2,515 tests with 4 expected skips in 336.65 seconds. Repository-wide Ruff, workflow YAML parsing, patch hygiene, the warning-strict 54-source RTD build, and OpenPinch 0.6.1 wheel/source builds pass. Property-Based Testing rules PBT-02, PBT-03, PBT-06, PBT-07, PBT-08, and PBT-10 are compliant; PBT-04 and PBT-05 are N/A. Security and Resiliency extensions remain disabled and were not enforced. The unrelated untracked Excel workbook was preserved and excluded."
+**Context**: BUILD AND TEST COMPLETE - GitHub Actions release automation and Codex review corrections
+
+---

@@ -276,6 +276,24 @@ def test_docs_define_stability_and_optional_dependency_boundaries():
         assert phrase in combined
 
 
+def test_release_docs_match_automated_main_branch_publication() -> None:
+    readme = _read(REPO_ROOT / "README.md")
+    developer_guide = _read(DOCS_ROOT / "developer" / "build-and-coverage.rst")
+    combined = f"{readme}\n{developer_guide}"
+
+    for phrase in (
+        "creates the annotated version tag",
+        "draft GitHub release",
+        "TestPyPI",
+        "protected ``pypi`` environment",
+        "publishes the GitHub release",
+    ):
+        assert phrase in combined
+
+    assert "maintainers always create release tags explicitly" not in readme
+    assert "Production publication is tag-driven" not in developer_guide
+
+
 def test_docs_do_not_present_removed_cli_surfaces():
     combined = _docs_text()
 

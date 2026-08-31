@@ -37,17 +37,22 @@ provide core-runtime and wheel-install compatibility coverage.
 Release Process
 ---------------
 
-Production publication is tag-driven:
+Production publication is automated from the ``main`` branch:
 
-1. merge only after the required CI jobs pass
-2. verify that ``pyproject.toml`` and ``uv.lock`` carry the intended version
-3. run ``pytest -m solver`` in an environment with the required external solvers
-4. create a signed or annotated ``vX.Y.Z`` tag at the intended commit
-5. push the tag and approve the protected ``pypi`` environment after TestPyPI
-   publication succeeds
+1. set a strict, forward ``X.Y.Z`` version in ``pyproject.toml`` and keep the
+   OpenPinch entry in ``uv.lock`` synchronized in the pull request
+2. merge only after the required read-only validation jobs pass
+3. let the main-branch workflow repeat the test, documentation, solver, build,
+   and cross-platform artifact gates
+4. after validation, the workflow creates the annotated version tag and a
+   draft GitHub release, then publishes the same distributions to TestPyPI
+5. approve the protected ``pypi`` environment for production publication
+6. after PyPI succeeds, the workflow publishes the GitHub release
 
-The tag must exactly equal ``v{project.version}``. PR automation deliberately
-uses ``--no-tag`` so maintainers retain explicit control of releases.
+Version bumping does not create a local tag. The release workflow owns the
+``v{project.version}`` tag and rejects malformed versions, lock mismatches, or
+an existing tag that points to a different commit. Its draft release keeps a
+failed publication visible without presenting it as a completed release.
 
 Alternative Direct Sphinx Build
 -------------------------------

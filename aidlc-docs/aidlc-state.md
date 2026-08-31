@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Repository critical corrections completed through Build and Test.
+- **Current Stage**: GitHub Actions release automation and Codex review corrections complete.
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -29,6 +29,14 @@
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
 
 ## Utility Placement Optimisation Progress
+
+- [x] GITHUB ACTIONS RELEASE AND CODEX REVIEW CORRECTIONS - Hardened PR CI,
+  automated trusted tag/GitHub-release/TestPyPI/PyPI delivery, and resolved the
+  three current GitHub Codex review findings. The complete configured-solver
+  suite passes 2,515 tests with 4 expected skips; Ruff, YAML parsing, warning-
+  strict RTD documentation, OpenPinch 0.6.1 distributions, and patch hygiene
+  pass. Plan:
+  `aidlc-docs/construction/plans/github-actions-release-and-codex-review-corrections-plan.md`.
 
 - [x] REPOSITORY CRITICAL CORRECTIONS - Correct transactional problem loading,
   utility-profile validation, segmented utility assignment, period-cap

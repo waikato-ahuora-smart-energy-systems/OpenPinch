@@ -55,6 +55,7 @@ class OptimisationOptions:
     cluster_tol: float = 0.01
     max_minima: int | None = 4
     local_method: str = "SLSQP"
+    feasibility_tolerance: float = 1.0e-6
     backend_options: tuple[tuple[str, Any], ...] = ()
 
     @classmethod
@@ -74,6 +75,7 @@ class OptimisationOptions:
             "cluster_tol",
             "max_minima",
             "local_method",
+            "feasibility_tolerance",
         }
         generic = {
             name: values.pop(name) for name in tuple(values) if name in generic_names

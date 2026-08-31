@@ -291,6 +291,67 @@ def test_all_infeasible_backend_candidates_fail_explicitly(monkeypatch) -> None:
         run_multistart_minimisation(problem)
 
 
+def test_default_feasibility_tolerance_accepts_slsqp_scale_residual(
+    monkeypatch,
+) -> None:
+    point = np.asarray([[0.5000005]])
+    monkeypatch.setattr(
+        optimisation_service,
+        "_resolve_backend",
+        lambda _method: lambda **_kwargs: (point, np.asarray([0.0])),
+    )
+    problem = OptimisationProblem(
+        objective=lambda x: float((x[0] - 0.5) ** 2),
+        bounds=((0.0, 1.0),),
+        constraints={"type": "eq", "fun": lambda x: x[0] - 0.5},
+    )
+
+    result = run_multistart_minimisation(problem)
+
+    assert result.best.point == pytest.approx((0.5000005,))
+
+
+def test_feasibility_tolerance_can_be_tightened_without_reaching_backend(
+    monkeypatch,
+) -> None:
+    backend_options = None
+
+    def backend(**kwargs):
+        nonlocal backend_options
+        backend_options = kwargs
+        return np.asarray([[0.5000005]]), np.asarray([0.0])
+
+    monkeypatch.setattr(optimisation_service, "_resolve_backend", lambda _method: backend)
+    problem = OptimisationProblem(
+        objective=lambda x: float((x[0] - 0.5) ** 2),
+        bounds=((0.0, 1.0),),
+        constraints={"type": "eq", "fun": lambda x: x[0] - 0.5},
+    )
+
+    with pytest.raises(NoOptimisationCandidatesError, match="feasible candidate"):
+        run_multistart_minimisation(
+            problem,
+            options={"feasibility_tolerance": 1.0e-8},
+        )
+
+    assert backend_options is not None
+    assert "feasibility_tolerance" not in backend_options
+
+
+@pytest.mark.parametrize("tolerance", [-1.0, float("nan"), float("inf")])
+def test_invalid_feasibility_tolerances_are_rejected(tolerance: float) -> None:
+    problem = OptimisationProblem(
+        objective=lambda x: float(x[0] ** 2),
+        bounds=((0.0, 1.0),),
+    )
+
+    with pytest.raises(InvalidOptimisationProblemError, match="feasibility_tolerance"):
+        run_multistart_minimisation(
+            problem,
+            options={"feasibility_tolerance": tolerance},
+        )
+
+
 @pytest.mark.parametrize(
     "constraint",
     (

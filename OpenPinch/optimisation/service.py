@@ -73,9 +73,6 @@ _METHOD_OPTION_NAMES = {
         }
     ),
 }
-_FEASIBILITY_TOLERANCE = 1.0e-8
-
-
 def run_multistart_minimisation(
     problem: OptimisationProblem,
     *,
@@ -85,6 +82,9 @@ def run_multistart_minimisation(
     """Run one backend and return finite, bounded, feasible candidates in order."""
     method = _normalise_method(method)
     options = _normalise_options(options)
+    feasibility_tolerance = _validate_feasibility_tolerance(
+        options.feasibility_tolerance
+    )
     bounds, initial_points = _validate_problem(problem)
     backend_kwargs = options.to_backend_kwargs()
     _validate_options(method, backend_kwargs)
@@ -105,6 +105,7 @@ def run_multistart_minimisation(
             np.asarray(candidate.point, dtype=float),
             bounds=bounds,
             constraints=problem.constraints,
+            tolerance=feasibility_tolerance,
         )
     )
     if not candidates:
@@ -198,6 +199,21 @@ def _validate_options(
         raise InvalidOptimisationProblemError("max_minima must be positive or None.")
 
 
+def _validate_feasibility_tolerance(value: object) -> float:
+    """Return a finite, non-negative post-solve feasibility tolerance."""
+    try:
+        tolerance = float(value)
+    except (TypeError, ValueError) as exc:
+        raise InvalidOptimisationProblemError(
+            "feasibility_tolerance must be a finite non-negative number."
+        ) from exc
+    if not math.isfinite(tolerance) or tolerance < 0.0:
+        raise InvalidOptimisationProblemError(
+            "feasibility_tolerance must be a finite non-negative number."
+        )
+    return tolerance
+
+
 def _resolve_backend(method: OptimisationMethod) -> OptimisationBackend:
     if method is OptimisationMethod.DUAL_ANNEALING:
         return _get_da_multiminima_in_parallel
@@ -249,9 +265,9 @@ def _is_feasible_candidate(
     *,
     bounds: np.ndarray,
     constraints,
+    tolerance: float,
 ) -> bool:
     """Return whether one finite point satisfies bounds and supplied constraints."""
-    tolerance = _FEASIBILITY_TOLERANCE
     if np.any(point < bounds[:, 0] - tolerance) or np.any(
         point > bounds[:, 1] + tolerance
     ):

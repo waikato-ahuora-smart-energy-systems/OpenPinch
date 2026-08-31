@@ -127,31 +127,35 @@ Excel export, dashboards, and advanced targeting happen through Python.
 Run the test suite locally:
 
 ```bash
-python -m pip install -e .
-python -m pip install --group dev
-ruff check .
-coverage run --branch --source=OpenPinch -m pytest --hypothesis-seed=20260715 -m "not solver"
-coverage report --fail-under=95
-python scripts/build_docs.py
-python scripts/build_dist.py
+uv sync --frozen --group dev
+uv run --no-sync ruff check .
+uv run --no-sync coverage run --branch --source=OpenPinch -m pytest --hypothesis-seed=20260715 -m "not solver"
+uv run --no-sync coverage report --fail-under=95
+uv run --no-sync python scripts/build_docs.py
+uv run --no-sync python scripts/build_dist.py
 ```
 
 Ubuntu runs the complete CI suite. Windows and macOS install the generated
 wheel and verify the core import, CLI, and packaged resources. Tests marked
-`solver` require external solver binaries and remain a manual pre-release
-check in a solver-enabled environment: `pytest -m solver`.
+`solver` require external solver binaries; the release workflow installs the
+IDAES extensions and runs this gate automatically. Run it locally with
+`uv run pytest -m solver` when the required binaries are available.
 
 ## Release Process
 
-1. Merge a change only after the required CI checks pass.
-2. Confirm `pyproject.toml` and `uv.lock` contain the intended release version.
-3. Run the solver-marked tests in a solver-enabled environment.
-4. Create a signed or annotated `vX.Y.Z` tag at the intended commit and push it.
-5. Approve the protected `pypi` environment after TestPyPI publication succeeds.
+1. In the pull request targeting `main`, set a strict, forward `X.Y.Z` version
+   in `pyproject.toml` and keep the OpenPinch entry in `uv.lock` synchronized.
+2. Merge only after the required read-only validation checks pass.
+3. The main-branch workflow repeats the test, documentation, solver, build, and
+   cross-platform artifact gates.
+4. After those gates pass, it creates the annotated version tag and a draft
+   GitHub release, then publishes the same artifacts to TestPyPI.
+5. Approve the protected `pypi` environment to publish to production PyPI.
+6. After PyPI succeeds, the workflow publishes the GitHub release.
 
-The publish workflow rejects malformed tags and tags that do not exactly match
-the project version. Pull-request automation updates versions with `--no-tag`;
-maintainers always create release tags explicitly.
+Version bumping does not create a tag locally. The release workflow owns tags
+and rejects malformed versions, mismatched lock metadata, or an existing tag
+that points anywhere other than the main-branch release commit.
 
 Build the documentation locally:
 
