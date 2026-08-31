@@ -7,6 +7,8 @@ import math
 from ...domain.enums import PenaltyForm
 from ..numerics import g_ineq_penalty
 
+_DEFAULT_UTILITY_PENALTY_RHO = 1000.0
+
 
 def g_penalty(
     *,
@@ -38,6 +40,7 @@ def g_penalty(
                 residual(hot_fallback_duty, required_hot_duty),
                 residual(cold_fallback_duty, required_cold_duty),
             ),
+            rho=_DEFAULT_UTILITY_PENALTY_RHO,
             form=PenaltyForm.SQUARE,
         )
     )

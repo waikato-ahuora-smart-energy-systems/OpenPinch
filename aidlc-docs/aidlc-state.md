@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Utility Placement cached process-profile and SUGCC targeting complete through Build and Test; Operations N/A.
+- **Current Stage**: Utility Placement default-utility penalty coefficient 1000 amendment complete through Build and Test; Operations N/A.
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -29,6 +29,25 @@
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
 
 ## Utility Placement Optimisation Progress
+
+- [x] DEFAULT-UTILITY PENALTY COEFFICIENT 1000 - Increase the private
+  Utility Placement squared fallback coefficient from 100 to 1000 while
+  retaining physical entropy, feasibility, units, and period weighting. The
+  complete no-deselection suite passes 2,471 tests with 4 expected skips. Plan:
+  `aidlc-docs/construction/plans/utility-placement-default-penalty-1000-plan.md`.
+
+- [x] DEFAULT-UTILITY PENALTY TENFOLD AMENDMENT - Increase the private
+  utility-placement squared fallback coefficient from 10 to 100 while retaining
+  physical entropy, feasibility, units, and weighted-period semantics. The
+  focused gate passes 289 tests and the complete no-deselection suite passes
+  2,471 tests with 4 expected skips. Plan:
+  `aidlc-docs/construction/plans/utility-placement-default-penalty-tenfold-plan.md`.
+
+- [x] FOUR-ISOTHERMAL NOTEBOOK CONTRACT - Align notebook 19, its canonical
+  generator, fixed packaging contract, requirements, and RTD with four
+  isothermal and zero sensible levels for both Process and Site examples. The
+  complete no-deselection suite passes 2,471 tests with 4 expected skips.
+  Plan: `aidlc-docs/construction/plans/utility-placement-four-isothermal-notebook-contract-plan.md`.
 
 - [x] TOTAL SITE CACHED PROCESS-PROFILE AND SUGCC TARGETING - Complete each
   immediate process profile once per period, target candidate endpoints against

@@ -261,3 +261,56 @@ patch hygiene, and the warnings-as-errors 54-source Sphinx build pass. Ten
 untouched files remain outside the current repository-wide formatter baseline;
 they were not cosmetically changed. The notebook and `.gitignore` remain
 unchanged by and excluded from this refresh.
+
+## Utility Placement Four-Isothermal Notebook Contract Refresh
+
+Notebook 19, its canonical generator, packaging assertions, requirements, and
+RTD now use four isothermal and zero sensible levels for both the Process and
+Site examples. The notebook's current result outputs are preserved; only its
+study question and the missing first-cell execution count were aligned. The
+generator recognizes the checked-in notebook as equivalent without rewriting
+its execution results.
+
+The focused notebook and documentation gate passes 38 tests with 3 expected
+optional-profile skips. Generator repeatability and no-rewrite checks pass,
+repository Ruff lint is clean for the changed Python files, and the 54-source
+Sphinx build succeeds with warnings treated as errors. The complete configured-
+solver suite passes all 2,471 tests with 4 expected skips and no deselections in
+371.25 seconds. Patch whitespace validation passes. The unrelated `.gitignore`
+change remains outside this amendment.
+
+## Utility Placement Default-Utility Penalty Tenfold Refresh
+
+The private Utility Placement `HU`/`CU` squared fallback coefficient is now 100,
+ten times its previous value of 10. The generic inequality-penalty default is
+unchanged for other analyses. Physical entropy, target-owned duties,
+dimensionless reporting, raw period weighting, and the feasible/infeasible
+ranking partition retain their existing semantics.
+
+The fixed, common-scaling, generated oracle, evaluation-integration, and public
+capped-workflow RED gate produced eight exact factor-of-ten failures; GREEN
+passes all 27 checks. The expanded utility-placement, notebook, and
+documentation gate passes 289 tests with 3 expected optional-profile skips.
+Changed-file Ruff lint, patch hygiene, and the warnings-as-errors 54-source
+Sphinx build pass. The complete configured-solver suite passes 2,471 tests with
+4 expected skips and no deselections in 359.65 seconds. Live notebook execution
+passes under coefficient 100; the user's stored notebook result outputs were
+not overwritten. The unrelated `.gitignore` change remains outside this
+amendment.
+
+## Utility Placement Default-Utility Penalty 1000 Refresh
+
+The private Utility Placement `HU`/`CU` squared fallback coefficient is now
+1000, ten times the preceding coefficient of 100 and one hundred times the
+original coefficient of 10. The generic inequality-penalty default remains
+unchanged. Physical entropy, target-owned duties, dimensionless reporting, raw
+period weighting, and the feasible/infeasible partition retain their existing
+semantics.
+
+All 27 coefficient-1000 fixed, scaling, generated-oracle, evaluation, and
+public capped-workflow checks pass. The final focused coefficient/notebook gate
+passes 47 tests. Notebook execution metadata is treated as transient; live
+execution remains authoritative. Changed-file Ruff lint, patch hygiene, and the
+warnings-as-errors 54-source Sphinx build pass. The complete configured-solver
+suite passes 2,471 tests with 4 expected skips and no deselections in 371.75
+seconds. The unrelated `.gitignore` change remains outside this amendment.

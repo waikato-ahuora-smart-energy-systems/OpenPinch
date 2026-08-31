@@ -24,7 +24,7 @@ def test_g_penalty_is_squared_and_dimensionless() -> None:
         cold_fallback_duty=10.0,
         required_hot_duty=100.0,
         required_cold_duty=50.0,
-    ) == pytest.approx(0.8)
+    ) == pytest.approx(80.0)
     assert penalties.g_penalty(
         hot_fallback_duty=0.0,
         cold_fallback_duty=0.0,
@@ -41,7 +41,7 @@ def test_g_penalty_is_invariant_under_common_duty_scaling(scale) -> None:
         required_hot_duty=100.0 * scale,
         required_cold_duty=50.0 * scale,
     )
-    assert observed == pytest.approx(0.8)
+    assert observed == pytest.approx(80.0)
 
 
 @pytest.mark.parametrize(
@@ -94,6 +94,7 @@ def test_g_penalty_scale_invariance_property(
 
     canonical = g_ineq_penalty(
         [hot_fraction, cold_fraction],
+        rho=1000.0,
         form=PenaltyForm.SQUARE,
     )
     assert baseline == pytest.approx(canonical)

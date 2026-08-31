@@ -1322,7 +1322,7 @@ def test_capped_process_dispatch_uses_available_levels_before_fallback() -> None
     cold_fallback = sum(
         level.allocated_duty.value for level in period.cold_levels if level.is_fallback
     )
-    expected_penalty = 10.0 * (
+    expected_penalty = 1000.0 * (
         (hot_fallback / period.residual_hot_duty.value) ** 2
         + (cold_fallback / period.residual_cold_duty.value) ** 2
     )

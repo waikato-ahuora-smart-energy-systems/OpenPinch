@@ -56,8 +56,8 @@ Backend selection is independent of the HPR ``HPR_BB_MINIMISER`` setting.
 Runnable Workflow
 -----------------
 
-Run Process-level placement against the ``Almond`` direct GCC with two
-isothermal and two sensible levels on each side:
+Run Process-level placement against the ``Almond`` direct GCC with four
+isothermal and zero sensible levels on each side:
 
 .. code-block:: python
 
@@ -69,8 +69,8 @@ isothermal and two sensible levels on each side:
    problem = workspace.use_case("baseline")
 
    process_case = problem.target.utility_placement(
-       isothermal=2,
-       sensible=2,
+       isothermal=4,
+       sensible=0,
        zone="Almond",
        period_ids=("0",),
    )
@@ -128,8 +128,8 @@ Run Site-level placement separately. Because the master zone is a Site, no
 .. code-block:: python
 
    site_case = problem.target.utility_placement(
-       isothermal=2,
-       sensible=2,
+       isothermal=4,
+       sensible=0,
        period_ids=("0",),
    )
    site_case = workspace.add(
@@ -224,8 +224,8 @@ dimensionless penalty in period ``p`` is
 
 .. math::
 
-   g_p = \left(\frac{Q_{HU,p}}{Q_{heat,required,p}}\right)^2
-       + \left(\frac{Q_{CU,p}}{Q_{cool,required,p}}\right)^2.
+   g_p = 1000 \left[\left(\frac{Q_{HU,p}}{Q_{heat,required,p}}\right)^2
+       + \left(\frac{Q_{CU,p}}{Q_{cool,required,p}}\right)^2\right].
 
 For ranking, OpenPinch maps the weighted physical entropy monotonically using
 an entropy-valued reference derived from the process slices, then combines it
@@ -243,7 +243,7 @@ Next Steps
 ----------
 
 Run ``19_utility_placement_optimisation.ipynb`` for the executable
-thermodynamic workflow, two isothermal plus two sensible levels per side,
+thermodynamic workflow, four isothermal and zero sensible levels per side,
 named-case replacement, inspectable optimizer-versus-retarget duty comparison
 tables, and standard GCC and Total Site Profile plots. Replace
 the sample with reviewed site data and defensible bounds, then increase

@@ -781,13 +781,12 @@ NOTEBOOKS = {
                 '    "evaluation_limit": 100,\n'
                 '    "candidate_limit": 2,\n'
                 '    "run_count": 1,\n'
-                '    "minimum_sensible_span": {"value": 10.0, "unit": "delta_degC"},\n'
                 "}"
             ),
             code(
                 "process_case = problem.target.utility_placement(\n"
-                "    isothermal=2,\n"
-                "    sensible=2,\n"
+                "    isothermal=4,\n"
+                "    sensible=0,\n"
                 '    zone="Almond",\n'
                 '    period_ids=("0",),\n'
                 "    options=search_options,\n"
@@ -814,8 +813,8 @@ NOTEBOOKS = {
             ),
             code(
                 "site_case = problem.target.utility_placement(\n"
-                "    isothermal=2,\n"
-                "    sensible=2,\n"
+                "    isothermal=4,\n"
+                "    sensible=0,\n"
                 '    period_ids=("0",),\n'
                 "    options=search_options,\n"
                 ")\n"
@@ -971,8 +970,8 @@ GUIDANCE = {
         ),
     ),
     "19_utility_placement_optimisation.ipynb": (
-        "Where should two isothermal and two sensible hot and cold utility levels be placed at Process and Site hierarchy levels to minimize thermodynamic cost?",
-        "Compare the Process result against its direct GCC and the Site result against its Total Site Profile. Candidate duties come from those exact ordinary target workflows; they are not independent optimizer decisions, and a requested level may be unused. Inspect physical entropy generation from the balanced composite curves: use CP * ln(T_out / T_in) in kelvin for sensible intervals and the signed Q / T limit for isothermal intervals. In the uncapped Process example, confirm that exact targeting limits sensible duty at every GCC breakpoint, so the Utility GCC cannot cross the Process GCC while the selected levels cover the complete target.",
+        "Where should four isothermal hot and cold utility levels be placed at Process and Site hierarchy levels to minimize thermodynamic cost?",
+        "Compare the Process result against its direct GCC and the Site result against its Total Site Profile. Candidate duties come from those exact ordinary target workflows; they are not independent optimizer decisions, and a requested level may be unused. Inspect physical entropy generation from the balanced composite curves using the signed Q / T limit for the isothermal intervals; CP * ln(T_out / T_in) in kelvin applies when adapting the workflow to sensible utilities. Confirm that ordinary retargeting reproduces every selected duty and that the Utility GCC does not cross the Process GCC.",
         "Replace the sample with validated plant data, apply defensible temperature bounds, and increase the optimizer limits before making an engineering decision.",
         (
             "Prepare the placement study",

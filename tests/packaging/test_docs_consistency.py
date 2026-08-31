@@ -148,8 +148,8 @@ def test_utility_placement_guide_documents_the_complete_public_contract():
     for heading in GUIDE_REQUIRED_HEADINGS:
         assert heading in page
     for phrase in (
-        "isothermal=2",
-        "sensible=2",
+        "isothermal=4",
+        "sensible=0",
         "master zone",
         "Process Zone",
         "Site",

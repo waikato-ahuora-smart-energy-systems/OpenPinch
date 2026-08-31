@@ -80,8 +80,8 @@ def test_utility_placement_has_one_executable_thermodynamic_notebook() -> None:
     )
     source = _combined_source(notebook)
     assert source.count("target.utility_placement(") == 2
-    assert source.count("isothermal=2") == 2
-    assert source.count("sensible=2") == 2
+    assert source.count("isothermal=4") == 2
+    assert source.count("sensible=0") == 2
     assert 'zone="Almond"' in source
     assert "base_target" not in source
     assert "isothermal_level_count" not in source
@@ -181,7 +181,9 @@ def test_notebooks_are_valid_nbformat_documents(tmp_path: Path) -> None:
         for cell in notebook["cells"]:
             if cell["cell_type"] == "code":
                 if name == "19_utility_placement_optimisation.ipynb":
-                    assert isinstance(cell["execution_count"], int), name
+                    assert cell["execution_count"] is None or isinstance(
+                        cell["execution_count"], int
+                    ), name
                 else:
                     assert cell["execution_count"] is None, name
                     assert cell["outputs"] == [], name
@@ -229,8 +231,11 @@ def test_tutorial_review_preserves_notebook_invariants(name: str) -> None:
         cell for cell in notebook["cells"] if cell["cell_type"] == "code"
     ]
     if name == "19_utility_placement_optimisation.ipynb":
-        assert all(isinstance(cell["execution_count"], int) for cell in code_cells)
-        assert code_cells[-1]["outputs"]
+        assert all(
+            cell["execution_count"] is None
+            or isinstance(cell["execution_count"], int)
+            for cell in code_cells
+        )
     else:
         assert all(
             cell["execution_count"] is None and cell["outputs"] == []

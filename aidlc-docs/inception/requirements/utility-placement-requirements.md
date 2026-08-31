@@ -39,7 +39,7 @@
 7. Deliver the feature test-first with analytical, regression, and full
    property-based evidence.
 8. Deliver one executable notebook that separately demonstrates Process/GCC and
-   Site/TSP placement using two isothermal and two sensible levels per side,
+   Site/TSP placement using four isothermal and zero sensible levels per side,
    then renders each returned case with the corresponding standard plot.
 
 ## Non-Goals
@@ -240,10 +240,11 @@ dimensionless inequality penalty. For period `p`, define the residual vector:
 `g[p] = [Q_HU[p] / Q_heat_required[p], Q_CU[p] / Q_cool_required[p]]`.
 
 Then calculate `g_penalty[p]` with
-`g_ineq_penalty(g[p], form=PenaltyForm.SQUARE)`, using its canonical default
-`rho=10`. Equivalently:
+`g_ineq_penalty(g[p], rho=1000, form=PenaltyForm.SQUARE)`. This private
+Utility Placement coefficient is one hundred times the generic kernel default.
+Equivalently:
 
-`g_penalty[p] = 10 * ((Q_HU[p] / Q_heat_required[p])^2 + (Q_CU[p] / Q_cool_required[p])^2)`.
+`g_penalty[p] = 1000 * ((Q_HU[p] / Q_heat_required[p])^2 + (Q_CU[p] / Q_cool_required[p])^2)`.
 
 Each residual is defined as zero when both its required and fallback duties
 are zero; positive fallback duty against zero required duty is invalid.
@@ -504,8 +505,8 @@ tutorial manifest, included in source and wheel distributions, and executable
 from top to bottom under the appropriate notebook dependency profile. Using
 only public Python APIs, one coherent example shall demonstrate:
 
-- one Process placement and one Site placement, each with two isothermal and
-  two sensible hot utility levels plus their two isothermal and two sensible
+- one Process placement and one Site placement, each with four isothermal and
+  zero sensible hot utility levels plus their four isothermal and zero sensible
   cold counterparts;
 - the default thermodynamic or entropy-based placement workflow;
 - inspection of entropy-generation and exergy-destruction result breakdowns;
