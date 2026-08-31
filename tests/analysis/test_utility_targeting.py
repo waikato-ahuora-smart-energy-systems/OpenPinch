@@ -5,7 +5,7 @@ import os
 
 import numpy as np
 import pytest
-from hypothesis import given
+from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from OpenPinch.analysis.numerics import *
@@ -13,15 +13,18 @@ from OpenPinch.analysis.targeting.grand_composite import (
     get_seperated_gcc_heat_load_profiles,
 )
 from OpenPinch.analysis.targeting.utilities import (
+    _apply_utility_duties,
     _assign_utility,
     _calculate_assigned_utility_duties,
     _maximise_utility_duty,
     target_utilities_for_load_profiles,
 )
 from OpenPinch.application._problem.input.construction import prepare_problem
+from OpenPinch.application.problem import PinchProblem
 from OpenPinch.contracts.input import TargetInput
 from OpenPinch.contracts.output import TargetOutput
 from OpenPinch.domain._value.resolution import get_scalar_value
+from OpenPinch.domain.configuration import tol
 from OpenPinch.domain.enums import (
     ProblemTableLabel,
     StreamLoc,
@@ -69,6 +72,165 @@ def test_assign_utility_rejects_non_vector_heat_segment():
             is_real_temperatures=False,
             idx=None,
         )
+
+
+@pytest.mark.parametrize(
+    "heat_segment",
+    (
+        np.array([100.0, 0.0, -5.0]),
+        np.array([100.0, np.nan, 0.0]),
+    ),
+)
+def test_assign_utility_requires_finite_nonnegative_heat(heat_segment) -> None:
+    with pytest.raises(ValueError, match="Error in utility targeting"):
+        _assign_utility(
+            T_vals=np.linspace(200.0, 100.0, len(heat_segment)),
+            H_vals=heat_segment,
+            u_ls=StreamCollection(),
+            pinch_row=len(heat_segment) - 1,
+            is_hot_ut=True,
+            is_real_temperatures=False,
+            idx=None,
+        )
+
+
+def test_segmented_utility_assignment_scales_authoritative_children() -> None:
+    utility = Stream(
+        "Segmented steam",
+        is_process_stream=False,
+        segments=[
+            {
+                "name": "Condensing",
+                "supply_temperature": 300.0,
+                "target_temperature": 200.0,
+                "heat_flow": 30.0,
+            },
+            {
+                "name": "Cooling",
+                "supply_temperature": 200.0,
+                "target_temperature": 100.0,
+                "heat_flow": 70.0,
+            },
+        ],
+    )
+    utilities = StreamCollection([utility])
+
+    _apply_utility_duties(utilities, (50.0,), idx=None)
+    assigned = utilities.get_stream_by_name("Segmented steam")
+
+    assert float(assigned.heat_flow.value) == pytest.approx(50.0)
+    assert [float(segment.heat_flow.value) for segment in assigned.segments] == (
+        pytest.approx([15.0, 35.0])
+    )
+
+
+def test_segmented_utility_recovers_profile_after_zero_assignment() -> None:
+    utility = Stream(
+        "Segmented steam",
+        is_process_stream=False,
+        segments=[
+            {
+                "supply_temperature": 300.0,
+                "target_temperature": 200.0,
+                "heat_flow": 25.0,
+            },
+            {
+                "supply_temperature": 200.0,
+                "target_temperature": 100.0,
+                "heat_flow": 75.0,
+            },
+        ],
+    )
+    utilities = StreamCollection([utility])
+
+    _apply_utility_duties(utilities, (0.0,), idx=None)
+    _apply_utility_duties(utilities, (40.0,), idx=None)
+
+    assert [float(segment.heat_flow.value) for segment in utility.segments] == (
+        pytest.approx([10.0, 30.0])
+    )
+
+
+@given(target=st.floats(min_value=0.0, max_value=1.0e4))
+@settings(max_examples=30)
+def test_segmented_utility_assignment_conserves_total_and_profile(
+    target: float,
+) -> None:
+    utility = Stream(
+        "Segmented steam",
+        is_process_stream=False,
+        segments=[
+            {
+                "supply_temperature": 300.0,
+                "target_temperature": 200.0,
+                "heat_flow": 20.0,
+            },
+            {
+                "supply_temperature": 200.0,
+                "target_temperature": 100.0,
+                "heat_flow": 80.0,
+            },
+        ],
+    )
+    utilities = StreamCollection([utility])
+    expected = target if target > tol else 0.0
+
+    _apply_utility_duties(utilities, (target,), idx=None)
+    _apply_utility_duties(utilities, (target,), idx=None)
+
+    duties = np.asarray(
+        [float(segment.heat_flow.value) for segment in utility.segments]
+    )
+    assert float(utility.heat_flow.value) == pytest.approx(expected)
+    assert duties.sum() == pytest.approx(expected)
+    if expected > 0.0:
+        assert duties / expected == pytest.approx([0.2, 0.8])
+
+
+def test_problem_targeting_supports_documented_segmented_utility() -> None:
+    problem = PinchProblem(
+        {
+            "streams": [
+                {
+                    "zone": "Site",
+                    "name": "Cold",
+                    "t_supply": 20.0,
+                    "t_target": 150.0,
+                    "heat_flow": 100.0,
+                    "dt_cont": 10.0,
+                }
+            ],
+            "utilities": [
+                {
+                    "name": "Steam profile",
+                    "type": "Hot",
+                    "segments": [
+                        {
+                            "t_supply": 250.0,
+                            "t_target": 200.0,
+                            "heat_flow": 30.0,
+                        },
+                        {
+                            "t_supply": 200.0,
+                            "t_target": 160.0,
+                            "heat_flow": 70.0,
+                        },
+                    ],
+                },
+                {"name": "CU", "type": "Cold", "t_supply": 0.0},
+            ],
+            "options": {},
+        },
+        project_name="Site",
+    )
+
+    problem.target.direct_heat_integration()
+    utility = problem.hot_utilities.get_stream_by_name("Steam profile")
+
+    assert float(utility.heat_flow.value) == pytest.approx(100.0)
+    assert [float(segment.heat_flow.value) for segment in utility.segments] == (
+        pytest.approx([30.0, 70.0])
+    )
 
 
 def test_assign_utility_replaces_stale_duty_when_cap_is_zero() -> None:

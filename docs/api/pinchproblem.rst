@@ -9,7 +9,9 @@ Lifecycle
 
 ``prepared``
    Construction or ``load(...)`` validates and prepares streams, utilities,
-   zones, periods, and configuration.
+   zones, periods, and configuration. Input replacement is atomic: if loading,
+   validation, or preparation fails, the prior prepared problem and cached
+   results remain available together with their original input.
 
 ``targeted``
    A descriptive ``target`` method stores the latest result. All-period methods

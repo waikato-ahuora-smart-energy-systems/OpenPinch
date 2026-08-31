@@ -183,6 +183,65 @@ def test_candidate_replay_serializes_only_the_selected_period_limit() -> None:
     ) == {"value": 200.0, "unit": "kW"}
 
 
+def test_equal_selected_period_limits_retain_period_identity() -> None:
+    request = UtilityPlacementRequest(
+        isothermal_level_count=2,
+        period_ids=("winter", "summer"),
+        maximum_duties=(
+            UtilityDutyLimit(
+                name="hot_iso_1",
+                period_ids=("winter", "summer"),
+                values=(
+                    QuantityValue(value=100.0, unit="kW"),
+                    QuantityValue(value=100.0, unit="kW"),
+                ),
+            ),
+        ),
+    )
+
+    assert placement_application._serialized_limit(request, "hot_iso_1") == {
+        "values": [100.0, 100.0],
+        "period_ids": ["winter", "summer"],
+        "unit": "kW",
+    }
+
+
+@given(
+    period_ids=st.lists(
+        st.sampled_from(("summer", "shoulder", "winter", "maintenance")),
+        min_size=1,
+        max_size=4,
+        unique=True,
+    ),
+    value=st.floats(
+        min_value=0.0,
+        max_value=1.0e6,
+        allow_nan=False,
+        allow_infinity=False,
+    ),
+)
+def test_uniform_limits_always_serialize_with_selected_period_ids(
+    period_ids,
+    value: float,
+) -> None:
+    request = UtilityPlacementRequest(
+        isothermal_level_count=2,
+        period_ids=tuple(period_ids),
+        maximum_duties=(
+            UtilityDutyLimit(
+                name="hot_iso_1",
+                period_ids=tuple(period_ids),
+                values=tuple(QuantityValue(value=value, unit="kW") for _ in period_ids),
+            ),
+        ),
+    )
+
+    serialized = placement_application._serialized_limit(request, "hot_iso_1")
+
+    assert serialized["period_ids"] == period_ids
+    assert serialized["values"] == pytest.approx([value] * len(period_ids))
+
+
 def test_period_identity_limit_is_accepted_by_returned_case_schema() -> None:
     request = _period_resolved_request()
     maximum_heat_flow = placement_application._serialized_limit(
@@ -309,7 +368,11 @@ def test_maximum_duties_round_trip_on_request_and_returned_case() -> None:
         utility["name"]: utility.get("maximum_heat_flow")
         for utility in case.to_problem_json()["utilities"]
     }
-    assert limits["hot_iso_1"] == {"value": 1.0, "unit": "kW"}
+    assert limits["hot_iso_1"] == {
+        "values": [1.0],
+        "period_ids": ["0"],
+        "unit": "kW",
+    }
     assert any(name in {"HU", "CU"} for name in limits)
 
     evidence = result.best.period_results[0]

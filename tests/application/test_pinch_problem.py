@@ -4,6 +4,7 @@ import json
 
 # import types
 import sys
+from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -75,6 +76,35 @@ def test_load_json(tmp_path: Path, sample_problem):
     assert obj.results is None
     assert obj.to_problem_json() == obj._canonical_problem_inputs()
     assert obj.to_problem_json()["streams"][0]["name"] == "H1"
+
+
+@pytest.mark.parametrize("replacement_method", ("load", "_replace_problem_inputs"))
+def test_failed_problem_input_replacement_is_atomic(replacement_method: str) -> None:
+    problem = PinchProblem(source="basic_pinch.json", project_name="Atomic")
+    problem.target.direct_heat_integration()
+    canonical_before = problem.to_problem_json()
+    problem_data_before = problem._problem_data
+    master_zone_before = problem.master_zone
+    results_before = problem._results
+    target_spec_before = problem._last_target_run_spec
+    period_results_before = problem._period_results
+    source_kind_before = problem._input_source_kind
+    filepath_before = problem.problem_filepath
+
+    invalid = deepcopy(canonical_before)
+    invalid["streams"][0]["t_target"] = deepcopy(invalid["streams"][0]["t_supply"])
+
+    with pytest.raises(ValueError):
+        getattr(problem, replacement_method)(invalid)
+
+    assert problem.to_problem_json() == canonical_before
+    assert problem._problem_data is problem_data_before
+    assert problem.master_zone is master_zone_before
+    assert problem._results is results_before
+    assert problem._last_target_run_spec is target_spec_before
+    assert problem._period_results is period_results_before
+    assert problem._input_source_kind == source_kind_before
+    assert problem.problem_filepath == filepath_before
 
 
 def test_load_excel_calls_reader_and_sets_path(
@@ -353,6 +383,40 @@ def test_set_dt_cont_multiplier_lazily_rebuilds_prepared_root():
     assert root is problem.master_zone
     assert root.dt_cont_multiplier == 2.0
     assert problem.results is None
+
+
+def test_dt_cont_multiplier_round_trips_through_canonical_problem_input() -> None:
+    payload = {
+        "streams": [
+            {
+                "zone": "AreaA",
+                "name": "Cold",
+                "t_supply": 20.0,
+                "t_target": 100.0,
+                "heat_flow": 80.0,
+                "dt_cont": 10.0,
+            }
+        ],
+        "utilities": [],
+        "zone_tree": {
+            "name": "Site",
+            "type": "Site",
+            "children": [{"name": "AreaA", "type": "Process Zone"}],
+        },
+        "options": {},
+    }
+    problem = PinchProblem(source=payload, project_name="Site")
+
+    problem.set_dt_cont_multiplier(2.5, zone_name="AreaA")
+    serialized = problem.to_problem_json()
+    restored = PinchProblem(source=serialized, project_name="Site")
+
+    assert find_zone_tree_node(serialized["zone_tree"], "AreaA")[
+        "dt_cont_multiplier"
+    ] == pytest.approx(2.5)
+    assert restored.master_zone.get_subzone(
+        "AreaA"
+    ).dt_cont_multiplier == pytest.approx(2.5)
 
 
 def test_root_stream_views_are_exposed_on_problem():

@@ -947,8 +947,6 @@ def _serialized_limit(
         selected = limit.for_period(period_id)
         return {"value": selected.value, "unit": selected.unit}
     values = tuple(value.value for value in limit.values)
-    if len(set(values)) == 1:
-        return {"value": values[0], "unit": request.units.heat_flow}
     return {
         "values": list(values),
         "period_ids": list(limit.period_ids),

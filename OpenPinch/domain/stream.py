@@ -169,6 +169,8 @@ class Stream:
     ):
         """Initialise a stream and infer hot/cold classification."""
         self._segments: tuple[_StreamSegment, ...] = ()
+        self._segment_targeting_fractions: dict[int, tuple[float, ...]] = {}
+        self._allow_targeting_segment_duties = False
         self._syncing_segments = False
         self._name = name
         self._is_process_stream = bool(is_process_stream)
@@ -817,6 +819,15 @@ class Stream:
     ) -> None:
         """Delegate sparse child updates to the transaction owner."""
         _stream_segments.update_transaction(self, updates, idx=idx)
+
+    def _set_segmented_total_heat_flow_at_idx(
+        self,
+        value: float,
+        *,
+        idx: int | None,
+    ) -> None:
+        """Scale child duties so their aggregate equals one targeting duty."""
+        _stream_segments.set_total_heat_flow_at_idx(self, value, idx=idx)
 
     def replace_segments(self, segments) -> None:
         """Normalize and atomically replace the piecewise profile."""

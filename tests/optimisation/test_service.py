@@ -11,6 +11,8 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 from hypothesis import given, seed, settings
+from hypothesis import strategies as st
+from scipy.optimize import LinearConstraint, NonlinearConstraint
 
 import OpenPinch.optimisation
 import OpenPinch.optimisation.service as optimisation_service
@@ -242,6 +244,111 @@ def test_invalid_backend_results_are_explicit(
 
     with pytest.raises(error):
         run_multistart_minimisation(problem)
+
+
+def test_infeasible_backend_candidates_are_removed_before_ranking(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        optimisation_service,
+        "_resolve_backend",
+        lambda _method: (
+            lambda **_kwargs: (
+                np.asarray([[-0.1], [0.5], [0.8], [1.1]]),
+                np.asarray([0.01, 0.25, 0.64, 1.21]),
+            )
+        ),
+    )
+    problem = OptimisationProblem(
+        objective=lambda x: float(x[0] ** 2),
+        bounds=((0.0, 1.0),),
+        constraints={"type": "ineq", "fun": lambda x: x[0] - 0.75},
+    )
+
+    result = run_multistart_minimisation(problem)
+
+    assert tuple(candidate.point for candidate in result.candidates) == ((0.8,),)
+
+
+def test_all_infeasible_backend_candidates_fail_explicitly(monkeypatch) -> None:
+    monkeypatch.setattr(
+        optimisation_service,
+        "_resolve_backend",
+        lambda _method: (
+            lambda **_kwargs: (
+                np.asarray([[0.0], [0.5]]),
+                np.asarray([0.0, 0.25]),
+            )
+        ),
+    )
+    problem = OptimisationProblem(
+        objective=lambda x: float(x[0] ** 2),
+        bounds=((0.0, 1.0),),
+        constraints={"type": "ineq", "fun": lambda x: x[0] - 0.8},
+    )
+
+    with pytest.raises(NoOptimisationCandidatesError, match="feasible candidate"):
+        run_multistart_minimisation(problem)
+
+
+@pytest.mark.parametrize(
+    "constraint",
+    (
+        LinearConstraint([[1.0]], [0.75], [np.inf]),
+        NonlinearConstraint(lambda x: x[0], 0.75, np.inf),
+    ),
+)
+def test_scipy_constraint_objects_are_enforced(constraint, monkeypatch) -> None:
+    monkeypatch.setattr(
+        optimisation_service,
+        "_resolve_backend",
+        lambda _method: (
+            lambda **_kwargs: (
+                np.asarray([[0.5], [0.8]]),
+                np.asarray([0.25, 0.64]),
+            )
+        ),
+    )
+    problem = OptimisationProblem(
+        objective=lambda x: float(x[0] ** 2),
+        bounds=((0.0, 1.0),),
+        constraints=constraint,
+    )
+
+    result = run_multistart_minimisation(problem)
+
+    assert tuple(candidate.point for candidate in result.candidates) == ((0.8,),)
+
+
+@given(threshold=st.floats(min_value=0.1, max_value=0.9))
+@settings(max_examples=30)
+def test_returned_candidates_satisfy_generated_inequality_constraints(
+    threshold: float,
+) -> None:
+    points = np.asarray(
+        [[threshold - 0.05], [threshold], [threshold + 0.05]],
+        dtype=float,
+    )
+    problem = OptimisationProblem(
+        objective=lambda x: float(x[0] ** 2),
+        bounds=((0.0, 1.0),),
+        constraints={"type": "ineq", "fun": lambda x: x[0] - threshold},
+    )
+
+    with patch.object(
+        optimisation_service,
+        "_resolve_backend",
+        return_value=lambda **_kwargs: (
+            points,
+            np.square(points[:, 0]),
+        ),
+    ):
+        result = run_multistart_minimisation(problem)
+
+    assert result.candidates
+    assert all(
+        candidate.point[0] >= threshold - 1.0e-8 for candidate in result.candidates
+    )
 
 
 def test_optimisation_package_has_no_outward_openpinch_dependencies() -> None:

@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Utility Placement GitHub Codex review corrections complete through Build and Test; Operations N/A.
+- **Current Stage**: Repository critical corrections completed through Build and Test.
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -29,6 +29,13 @@
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
 
 ## Utility Placement Optimisation Progress
+
+- [x] REPOSITORY CRITICAL CORRECTIONS - Correct transactional problem loading,
+  utility-profile validation, segmented utility assignment, period-cap
+  identity, multiplier persistence, and optimizer constraint feasibility. The
+  complete configured-solver suite passes 2,497 tests with 4 expected skips;
+  Ruff, Sphinx, package build, and patch hygiene pass.
+  Plan: `aidlc-docs/construction/plans/repository-critical-corrections-plan.md`.
 
 - [x] GITHUB CODEX REVIEW CORRECTIONS - Correct period-aware maximum-duty
   replay serialization and make shared utility targeting replace every duty,

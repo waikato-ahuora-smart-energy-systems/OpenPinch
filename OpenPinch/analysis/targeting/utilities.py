@@ -209,11 +209,15 @@ def _apply_utility_duties(
 ) -> StreamCollection:
     """Replace the selected-period duty of every utility."""
     for utility, duty in zip(utilities, duties, strict=True):
-        utility.set_value_attr_at_idx(
-            attr_name="heat_flow",
-            value=float(duty) if duty > tol else 0.0,
-            idx=idx,
-        )
+        assigned_duty = float(duty) if duty > tol else 0.0
+        if utility.has_segments:
+            utility._set_segmented_total_heat_flow_at_idx(assigned_duty, idx=idx)
+        else:
+            utility.set_value_attr_at_idx(
+                attr_name="heat_flow",
+                value=assigned_duty,
+                idx=idx,
+            )
     return utilities
 
 
@@ -236,7 +240,13 @@ def _calculate_assigned_utility_duties(
         H_segment = H_vals[pinch_row:]
         segment_limit = H_segment[-1]
 
-    if len(np.where(H_segment < tol)) != 1:
+    if (
+        T_segment.ndim != 1
+        or H_segment.ndim != 1
+        or len(T_segment) != len(H_segment)
+        or not np.isfinite(H_segment).all()
+        or np.any(H_segment < -tol)
+    ):
         raise ValueError(
             "Error in utility targeting. Please report the data that produced "
             "this error."

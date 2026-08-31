@@ -22,6 +22,21 @@ if TYPE_CHECKING:
 
 JsonDict = Dict[str, Any]
 
+_PROBLEM_STATE_FIELDS = (
+    "_problem_data",
+    "_input_source_kind",
+    "_validation_context",
+    "_problem_filepath",
+    "_project_name",
+    "_validated_data",
+    "_master_zone",
+    "_process_components",
+    "_results",
+    "_last_target_run_spec",
+    "_period_results",
+    "_utility_placement_result",
+)
+
 
 @dataclass(frozen=True)
 class _LoadedProblemSource:
@@ -63,19 +78,41 @@ def rebuild_problem_state(
     return problem._master_zone
 
 
+def replace_loaded_source(
+    problem: "PinchProblem",
+    loaded_source: _LoadedProblemSource,
+    *,
+    rebuild: Callable[[], "Zone"],
+    preserve_filepath: bool = False,
+) -> "Zone":
+    """Apply and rebuild one source atomically, restoring prior state on failure."""
+    previous = {name: getattr(problem, name) for name in _PROBLEM_STATE_FIELDS}
+    try:
+        apply_loaded_source(problem, loaded_source)
+        if preserve_filepath:
+            problem._problem_filepath = previous["_problem_filepath"]
+        return rebuild()
+    except Exception:
+        for name, value in previous.items():
+            setattr(problem, name, value)
+        raise
+
+
 def replace_problem_inputs(
     problem: "PinchProblem",
     problem_inputs: JsonDict,
 ) -> "Zone":
     """Replace canonical inputs while preserving external source identity."""
-    current_filepath = problem._problem_filepath
     loaded_source = prepare_in_memory_problem_source(
         problem_inputs,
         source_kind=problem._input_source_kind or "target_input",
     )
-    apply_loaded_source(problem, loaded_source)
-    problem._problem_filepath = current_filepath
-    return problem._rebuild_problem_state()
+    return replace_loaded_source(
+        problem,
+        loaded_source,
+        rebuild=problem._rebuild_problem_state,
+        preserve_filepath=True,
+    )
 
 
 def normalize_problem_mapping(input_data: JsonDict) -> JsonDict:

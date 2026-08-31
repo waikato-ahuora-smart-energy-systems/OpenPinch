@@ -109,6 +109,7 @@ def validate_segments(
     *,
     parent_num_periods: int | None,
     tolerance: float,
+    allow_targeting_duties: bool = False,
 ) -> None:
     """Validate an ordered segment profile across every operating period."""
     if not segments:
@@ -119,18 +120,28 @@ def validate_segments(
         raise ValueError(
             "All segment values must use one shared operating-period count."
         )
+    duty_profiles = np.asarray(
+        [
+            segment._value_array(segment._heat_flow, size=state_size)
+            for segment in segments
+        ],
+        dtype=float,
+    )
+    all_positive = np.all(duty_profiles > tolerance, axis=0)
+    targeting_nonnegative = np.all(duty_profiles >= -tolerance, axis=0)
+    valid_duties = targeting_nonnegative if allow_targeting_duties else all_positive
+    if not np.isfinite(duty_profiles).all() or not np.all(valid_duties):
+        raise ValueError(
+            "Segment heat flows must be finite and positive within each operating "
+            "period."
+        )
     direction: int | None = None
     for index, segment in enumerate(segments):
         supply = segment._value_array(segment._t_supply, size=state_size)
         target = segment._value_array(segment._t_target, size=state_size)
-        duty = segment._value_array(segment._heat_flow, size=state_size)
         htc = segment._value_array(segment._htc, size=state_size)
         if not np.isfinite(supply).all() or not np.isfinite(target).all():
             raise ValueError(f"Segment {index + 1} temperatures must be finite.")
-        if not np.isfinite(duty).all() or np.any(duty <= tolerance):
-            raise ValueError(
-                f"Segment {index + 1} heat flow must be positive and finite."
-            )
         if not np.isfinite(htc).all() or np.any(htc <= tolerance):
             raise ValueError(f"Segment {index + 1} HTC must be positive and finite.")
         delta = target - supply

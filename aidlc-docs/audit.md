@@ -6338,3 +6338,66 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 **Context**: BUILD AND TEST COMPLETE - PR #91 P1 and P2 corrections
 
 ---
+
+## Repository Critical-Issue Code Review
+**Timestamp**: 2026-08-31T09:40:28Z
+**User Input**: "Do a thorough code review for the repo and identify critical issues."
+**AI Response**: "Started a read-only, risk-prioritized review of the committed repository, covering calculation and state mutation, multiperiod value handling, serialization, solver execution, and file/process boundaries. Application code will not be changed; findings will be ranked and supported by exact locations and reproductions where possible."
+**Context**: CODE REVIEW - Repository-wide critical issue assessment
+
+---
+
+## Previous Utility-Placement Corrections Commit
+**Timestamp**: 2026-08-31T09:49:02Z
+**User Input**: "Commit the previous changes and then continue."
+**AI Response**: "Committed the completed and verified utility-placement review corrections on develop as e06f8a2d (Fix utility cap replay and stale targeting duties), then resumed the repository critical-issue review from that clean code boundary."
+**Context**: GIT COMMIT / CODE REVIEW CONTINUATION
+
+---
+
+## Repository Critical-Issue Code Review Findings
+**Timestamp**: 2026-08-31T09:58:09Z
+**User Input**: "No new user input; continued the requested repository code review after committing the previous changes."
+**AI Response**: "Completed the risk-prioritized repository review and reproduced six actionable correctness defects: documented segmented utilities crash during duty assignment; the one-dimensional load-profile validity guard counts ndarray dimensions rather than qualifying rows; failed PinchProblem loads leave new raw input paired with the old prepared runtime; equal selected-period caps collapse to a scalar and constrain unselected periods; set_dt_cont_multiplier is lost on serialization and restoration; and the reusable optimizer can return candidates that violate supplied constraints. The existing 2,480-pass suite has no direct regression covering these scenarios. No application code was changed during the review."
+**Context**: CODE REVIEW COMPLETE - Six reproduced critical/high-priority findings
+
+---
+
+## Repository Critical Corrections Authorization
+**Timestamp**: 2026-08-31T11:49:03Z
+**User Input**: "go"
+**AI Response**: "Accepted authorization to correct all six reproduced findings through an eight-step TDD plan: problem-state transaction RED, targeting RED, persistence RED, optimizer-feasibility RED, state/persistence GREEN, targeting/optimizer GREEN, focused/property verification, and the complete configured-solver suite. Public workflow names, unrelated numerical methods, notebook content, and plotting remain unchanged."
+**Context**: CODE GENERATION AUTHORIZATION - Repository critical corrections
+
+---
+## Repository Critical Corrections - RED Verification
+**Timestamp**: 2026-08-31T11:58:41Z
+**User Input**: "go"
+**AI Response**: "Added focused regression tests for all six reproduced review findings. The RED run produced eleven expected failures covering atomic input replacement, multiplier persistence, period-identity cap serialization, malformed utility profiles, segmented utility assignment, and optimizer feasibility filtering."
+**Context**: Code Generation; completed correction-plan Steps 1 through 4 before production changes.
+
+---
+
+## Repository Critical Corrections - GREEN and Focused Verification
+**Timestamp**: 2026-08-31T12:20:53Z
+**User Input**: "No new user input; continued under the approved repository critical-corrections plan."
+**AI Response**: "Implemented atomic source replacement, canonical zone-multiplier persistence, identity-aware selected-period caps, finite non-negative utility-profile validation, proportional segmented-utility child targeting with zero-duty recovery, and optimizer bound/constraint filtering. The affected application, targeting, segmented-stream, utility-placement, and optimisation gate passes 374 tests. Repository Ruff, patch whitespace, generated constraint/cap/segment properties, and the warnings-as-errors 54-source Sphinx build pass."
+**Context**: Code Generation and focused verification; completed correction-plan Steps 5 through 7.
+
+---
+
+## Repository Critical Corrections - Build and Test Complete
+**Timestamp**: 2026-08-31T12:38:48Z
+**User Input**: "No new user input; completed under the approved repository critical-corrections plan."
+**AI Response**: "The first complete run exposed one generated segmented-duty boundary at 4.8 μW; the targeting transaction was corrected to accept finite tolerance-non-negative child duties without weakening ordinary segment mutation. The 113-test boundary gate then passed. The final configured-solver suite passes 2,497 tests with 4 expected skips and no deselections in 356.52 seconds. Ruff, patch hygiene, warning-free Sphinx documentation, and OpenPinch 0.6.0 wheel/source builds pass. Final scope review retained only production, regression, RTD, and mandatory workflow evidence required by the six corrections."
+**Context**: BUILD AND TEST COMPLETE - Repository critical corrections
+
+---
+
+## Repository Critical Corrections Commit Authorization
+**Timestamp**: 2026-08-31T16:32:38Z
+**User Input**: "commit"
+**AI Response**: "Accepted authorization to commit the completed repository critical-corrections implementation, tests, RTD documentation, and AI-DLC evidence on develop."
+**Context**: GIT COMMIT - Repository critical corrections
+
+---
