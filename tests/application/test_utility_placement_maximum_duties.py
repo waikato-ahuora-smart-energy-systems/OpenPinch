@@ -5,10 +5,20 @@ from __future__ import annotations
 import inspect
 
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
-from OpenPinch import PinchWorkspace
+from OpenPinch import PinchProblem, PinchWorkspace
 from OpenPinch.application import utility_placement as placement_application
 from OpenPinch.application._problem.accessors.target import _TargetAccessor
+from OpenPinch.application._problem.input.utilities import _get_hot_and_cold_utilities
+from OpenPinch.contracts.input import UtilitySchema
+from OpenPinch.contracts.utility_placement import (
+    QuantityValue,
+    UtilityDutyLimit,
+    UtilityPlacementRequest,
+)
+from OpenPinch.domain.configuration import Configuration
 
 
 def _problem_and_zone():
@@ -112,6 +122,145 @@ def test_period_resolved_maximum_duties_follow_selected_period_identity() -> Non
     )
 
 
+def _period_resolved_request() -> UtilityPlacementRequest:
+    return UtilityPlacementRequest(
+        isothermal_level_count=2,
+        period_ids=("winter", "summer"),
+        maximum_duties=(
+            UtilityDutyLimit(
+                name="hot_iso_1",
+                period_ids=("winter", "summer"),
+                values=(
+                    QuantityValue(value=200.0, unit="kW"),
+                    QuantityValue(value=100.0, unit="kW"),
+                ),
+            ),
+        ),
+    )
+
+
+@st.composite
+def _identity_aware_maximum_heat_flows(draw):
+    period_ids = draw(
+        st.lists(
+            st.sampled_from(("summer", "shoulder", "winter", "maintenance")),
+            min_size=1,
+            max_size=4,
+            unique=True,
+        )
+    )
+    values = draw(
+        st.lists(
+            st.floats(
+                min_value=0.0,
+                max_value=1.0e6,
+                allow_nan=False,
+                allow_infinity=False,
+            ),
+            min_size=len(period_ids),
+            max_size=len(period_ids),
+        )
+    )
+    return {
+        "values": values,
+        "period_ids": period_ids,
+        "unit": "kW",
+    }
+
+
+def test_candidate_replay_serializes_only_the_selected_period_limit() -> None:
+    request = _period_resolved_request()
+
+    assert placement_application._serialized_limit(
+        request,
+        "hot_iso_1",
+        period_id="summer",
+    ) == {"value": 100.0, "unit": "kW"}
+    assert placement_application._serialized_limit(
+        request,
+        "hot_iso_1",
+        period_id="winter",
+    ) == {"value": 200.0, "unit": "kW"}
+
+
+def test_period_identity_limit_is_accepted_by_returned_case_schema() -> None:
+    request = _period_resolved_request()
+    maximum_heat_flow = placement_application._serialized_limit(
+        request,
+        "hot_iso_1",
+    )
+
+    utility = UtilitySchema.model_validate(
+        {
+            "name": "hot_iso_1",
+            "type": "Hot",
+            "t_supply": {"value": 200.0, "unit": "degC"},
+            "t_target": {"value": 199.99, "unit": "degC"},
+            "heat_flow": {"value": 0.0, "unit": "kW"},
+            "maximum_heat_flow": maximum_heat_flow,
+        }
+    )
+
+    assert utility.maximum_heat_flow.model_dump(mode="python") == {
+        "values": [200.0, 100.0],
+        "period_ids": ["winter", "summer"],
+        "unit": "kW",
+    }
+
+
+@given(maximum_heat_flow=_identity_aware_maximum_heat_flows())
+def test_identity_aware_maximum_heat_flow_schema_round_trip(
+    maximum_heat_flow,
+) -> None:
+    utility = UtilitySchema.model_validate(
+        {
+            "name": "HPS",
+            "type": "Hot",
+            "t_supply": 200.0,
+            "t_target": 199.99,
+            "maximum_heat_flow": maximum_heat_flow,
+        }
+    )
+
+    assert UtilitySchema.model_validate_json(utility.model_dump_json()) == utility
+
+
+def test_period_identity_limit_canonicalizes_and_leaves_unselected_unbounded() -> None:
+    config = Configuration(
+        options={
+            "PROBLEM_PERIOD_IDS": ["summer", "shoulder", "winter"],
+            "PROBLEM_PERIOD_WEIGHTS": [1.0, 1.0, 1.0],
+        }
+    )
+    utility = UtilitySchema.model_validate(
+        {
+            "name": "HPS",
+            "type": "Hot",
+            "t_supply": {"value": 200.0, "unit": "degC"},
+            "t_target": {"value": 199.99, "unit": "degC"},
+            "heat_flow": {"value": 0.0, "unit": "kW"},
+            "maximum_heat_flow": {
+                "values": [200.0, 100.0],
+                "period_ids": ["winter", "summer"],
+                "unit": "kW",
+            },
+        }
+    )
+
+    prepared = _get_hot_and_cold_utilities(
+        utilities=[utility],
+        hu_t_min=250.0,
+        cu_t_max=10.0,
+        config=config,
+    )
+    maximum = prepared.get_hot_utility_streams().get_stream_by_name(
+        "HPS"
+    ).maximum_heat_flow
+
+    assert maximum.period_values[[0, 2]] == pytest.approx([100.0, 200.0])
+    assert maximum.period_values[1] != maximum.period_values[1]
+
+
 @pytest.mark.parametrize(
     ("maximum_duties", "message"),
     [
@@ -179,3 +328,54 @@ def test_maximum_duties_round_trip_on_request_and_returned_case() -> None:
         },
         abs=1e-6,
     )
+
+
+def test_unequal_multiperiod_caps_complete_and_retarget_by_identity() -> None:
+    baseline = PinchWorkspace(source="chocolate_factory.json").use_case("baseline")
+    source = baseline.to_problem_json()
+    source["options"]["PROBLEM_PERIOD_IDS"] = ["summer", "winter"]
+    source["options"]["PROBLEM_PERIOD_WEIGHTS"] = [1.0, 1.0]
+    problem = PinchProblem(source=source, project_name="Site")
+
+    case = problem.target.utility_placement(
+        isothermal=2,
+        zone="Almond",
+        period_ids=("winter", "summer"),
+        maximum_duties={
+            "hot_iso_1": {
+                "values": [2.0, 1.0],
+                "period_ids": ["winter", "summer"],
+                "unit": "kW",
+            }
+        },
+        options={
+            "iteration_limit": 1,
+            "evaluation_limit": 100,
+            "candidate_limit": 2,
+            "run_count": 1,
+        },
+    )
+
+    serialized = {
+        utility["name"]: utility.get("maximum_heat_flow")
+        for utility in case.to_problem_json()["utilities"]
+    }
+    assert serialized["hot_iso_1"] == {
+        "values": [2.0, 1.0],
+        "period_ids": ["winter", "summer"],
+        "unit": "kW",
+    }
+    optimized = case.master_zone.get_subzone("Almond")
+    maximum = optimized.hot_utilities.get_stream_by_name(
+        "hot_iso_1"
+    ).maximum_heat_flow
+    assert maximum.period_values == pytest.approx([1.0, 2.0])
+
+    for period_id, expected_limit in (("summer", 1.0), ("winter", 2.0)):
+        target = case.target.direct_heat_integration(
+            zone="Almond",
+            period_id=period_id,
+        )
+        period_idx = case.period_ids[period_id]
+        hot = {utility.name: utility for utility in target.hot_utilities}
+        assert hot["hot_iso_1"].heat_flow[period_idx] <= expected_limit + 1e-9

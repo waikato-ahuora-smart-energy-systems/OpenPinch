@@ -136,7 +136,10 @@ For each named level `i` and selected period `p`, allocation shall enforce
 Hot and cold members of a generated temperature pair retain independent duty
 limits. The limit is capacity metadata, not the allocated `heat_flow`, and the
 returned normal case shall retain it so subsequent ordinary targeting and
-standard plots respect the same capacity constraint.
+standard plots respect the same capacity constraint. Explicit period identities
+shall be preserved and resolved against the problem's canonical period order.
+When only a subset is selected, unselected periods in the returned case remain
+unbounded for that utility.
 
 ### Temperature decision variables
 

@@ -71,6 +71,131 @@ def test_assign_utility_rejects_non_vector_heat_segment():
         )
 
 
+def test_assign_utility_replaces_stale_duty_when_cap_is_zero() -> None:
+    fallback = Stream(
+        "HU",
+        310.0,
+        309.99,
+        heat_flow=0.0,
+        is_process_stream=False,
+    )
+    disabled = Stream(
+        "Disabled",
+        300.0,
+        299.99,
+        heat_flow=25.0,
+        maximum_heat_flow=0.0,
+        is_process_stream=False,
+    )
+
+    targeted = _assign_utility(
+        T_vals=np.asarray([250.0, 150.0, 50.0]),
+        H_vals=np.asarray([100.0, 50.0, 0.0]),
+        u_ls=StreamCollection([fallback, disabled]),
+        pinch_row=2,
+        is_hot_ut=True,
+        is_real_temperatures=False,
+        idx=None,
+    )
+
+    assert targeted.get_stream_by_name("Disabled").heat_flow.value == 0.0
+    assert targeted.get_stream_by_name("HU").heat_flow.value == pytest.approx(100.0)
+
+
+def test_target_utilities_replaces_stale_duties_on_zero_load_sides() -> None:
+    hot = StreamCollection(
+        [Stream("HU", 300.0, 299.99, heat_flow=25.0, is_process_stream=False)]
+    )
+    cold = StreamCollection(
+        [Stream("CU", 10.0, 10.01, heat_flow=30.0, is_process_stream=False)]
+    )
+
+    targeted_hot, targeted_cold = target_utilities_for_load_profiles(
+        hot_utilities=hot,
+        cold_utilities=cold,
+        T_vals=np.asarray([250.0, 150.0, 50.0]),
+        H_net_cold=np.zeros(3),
+        H_net_hot=np.zeros(3),
+        pinch_idx=(2, 0),
+        idx=None,
+    )
+
+    assert targeted_hot.get_stream_by_name("HU").heat_flow.value == 0.0
+    assert targeted_cold.get_stream_by_name("CU").heat_flow.value == 0.0
+
+
+def test_zero_assignment_updates_only_the_selected_period() -> None:
+    utility = Stream(
+        "Named",
+        300.0,
+        299.99,
+        heat_flow={"values": [11.0, 22.0], "unit": "kW"},
+        maximum_heat_flow={"values": [100.0, 0.0], "unit": "kW"},
+        is_process_stream=False,
+    )
+
+    targeted = _assign_utility(
+        T_vals=np.asarray([250.0, 150.0, 50.0]),
+        H_vals=np.asarray([100.0, 50.0, 0.0]),
+        u_ls=StreamCollection([utility]),
+        pinch_row=2,
+        is_hot_ut=True,
+        is_real_temperatures=False,
+        idx=1,
+    )
+
+    assert targeted.get_stream_by_name("Named").heat_flow.period_values == pytest.approx(
+        [11.0, 0.0]
+    )
+
+
+@given(
+    cap=st.floats(min_value=0.0, max_value=100.0, allow_nan=False),
+    initial=st.floats(min_value=0.0, max_value=100.0, allow_nan=False),
+)
+def test_assignment_matches_pure_duty_oracle_and_is_idempotent(
+    cap: float,
+    initial: float,
+) -> None:
+    utilities = StreamCollection(
+        [
+            Stream(
+                "HU",
+                310.0,
+                309.99,
+                heat_flow=initial,
+                is_process_stream=False,
+            ),
+            Stream(
+                "Named",
+                300.0,
+                299.99,
+                heat_flow=initial,
+                maximum_heat_flow=cap,
+                is_process_stream=False,
+            ),
+        ]
+    )
+    kwargs = {
+        "T_vals": np.asarray([250.0, 150.0, 50.0]),
+        "H_vals": np.asarray([100.0, 50.0, 0.0]),
+        "u_ls": utilities,
+        "pinch_row": 2,
+        "is_hot_ut": True,
+        "is_real_temperatures": False,
+        "idx": None,
+    }
+    expected = _calculate_assigned_utility_duties(**kwargs)
+
+    once = _assign_utility(**kwargs)
+    observed_once = tuple(float(utility.heat_flow.value) for utility in once)
+    twice = _assign_utility(**{**kwargs, "u_ls": once})
+    observed_twice = tuple(float(utility.heat_flow.value) for utility in twice)
+
+    assert observed_once == pytest.approx(expected)
+    assert observed_twice == pytest.approx(expected)
+
+
 def test_maximise_utility_duty_returns_zero_for_single_point_segment():
     assert (
         _maximise_utility_duty(

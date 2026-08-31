@@ -314,3 +314,24 @@ execution remains authoritative. Changed-file Ruff lint, patch hygiene, and the
 warnings-as-errors 54-source Sphinx build pass. The complete configured-solver
 suite passes 2,471 tests with 4 expected skips and no deselections in 371.75
 seconds. The unrelated `.gitignore` change remains outside this amendment.
+
+## Utility Placement GitHub Codex Review Corrections
+
+Candidate exact replay now supplies only the selected period's scalar maximum
+duty, while detached returned cases retain identity-aware period metadata and
+resolve it into canonical problem-period order. Shared utility targeting first
+calculates both hot- and cold-side duty vectors, then replaces every selected-
+period duty, including exact zero, so capped, unused, and zero-load utilities
+cannot retain stale input duty.
+
+The focused GREEN gate passes 75 example and property checks, and the expanded
+contracts, domain, targeting, and placement gate passes 480 tests. Packaging
+and notebook contracts pass 38 tests with 3 expected optional-profile skips.
+Repository-wide Ruff, patch whitespace validation, and the warnings-as-errors
+54-source Sphinx build pass. The complete configured-solver suite passes 2,480
+tests with 4 expected skips and no deselections in 348.28 seconds.
+
+The changed-file review found only the six production modules required for the
+two corrections, their two regression modules, requirements/design/RTD
+alignment, and mandatory workflow records. Notebook 19, plotting, optimizer
+coordinates, and unrelated files are unchanged.

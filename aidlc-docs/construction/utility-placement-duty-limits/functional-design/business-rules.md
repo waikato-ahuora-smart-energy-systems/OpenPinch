@@ -5,7 +5,9 @@
 2. Limits accept existing scalar, scalar-with-unit, and period-resolved value
    forms and normalize to the configured heat-flow unit.
 3. Limits are finite and non-negative; unknown names, invalid units, and
-   incomplete selected periods fail before optimizer execution.
+   incomplete selected periods fail before optimizer execution. Explicit
+   identities map to canonical problem periods; unselected periods remain
+   unbounded in the returned case.
 4. Omitted names are unbounded and zero limits disable only that named level.
 5. Every named duty satisfies `Q <= Q_max` independently in every period.
 6. Generated hot/cold temperature pairs share temperatures but never share a
@@ -22,5 +24,7 @@
     entropy.
 11. Returned cases retain limit metadata and any used fallback so normal
     retargeting and standard plots reproduce capacity-constrained allocation.
-12. The source problem, source utilities, cached targets, and active workspace
+12. Targeting replaces every calculated duty, including zero, rather than
+    retaining a previous stream duty for capped, unused, or zero-load levels.
+13. The source problem, source utilities, cached targets, and active workspace
     case remain unchanged.

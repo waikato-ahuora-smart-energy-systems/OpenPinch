@@ -6274,3 +6274,67 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 **Context**: GIT COMMIT - Four-isothermal notebook and default-utility penalty 1000
 
 ---
+
+## GitHub Codex Review Inspection
+**Timestamp**: 2026-08-31T07:28:44Z
+**User Input**: "See the Codex reviews from Github"
+**AI Response**: "Attempted to locate the current pull request and its Codex review through the local GitHub CLI and public web search. The CLI was unavailable and the public search result was inconclusive, so no repository files were changed during that attempt."
+**Context**: CODE REVIEW - External GitHub review lookup
+
+---
+
+## GitHub Codex Review Inspection Retry
+**Timestamp**: 2026-08-31T07:28:44Z
+**User Input**: "Try again"
+**AI Response**: "Used the signed-in GitHub browser session to inspect merged PR #91 and expand both resolved Codex review threads. Confirmed that the reviewed commit bf3794a2 is the current develop HEAD and that both reported defects remain present: invalid period_ids serialization for multiperiod maximum duties and stale nonzero utility heat flow when a recalculated capped assignment is zero. No application code was changed."
+**Context**: CODE REVIEW - PR #91 Codex findings verified against current develop
+
+---
+
+## GitHub Codex Review Solution Assessment
+**Timestamp**: 2026-08-31T08:57:49Z
+**User Input**: "Suggest solutions"
+**AI Response**: "Recommended separating single-period replay serialization from returned-case persistence: exact replay should pass only the current period's scalar maximum duty, while period-aware persistence should canonicalize identities at the input boundary rather than widening the generic positional value contract. Recommended making utility targeting a full replacement operation by calculating both sides first and then writing every assigned duty, including explicit zeros, so capped, unused, and zero-load utilities cannot retain stale heat flow. Defined focused unit, multiperiod identity, returned-case, cap, zero-load, and idempotence regression tests. No application code was changed."
+**Context**: CODE REVIEW DESIGN - Proposed TDD corrections for PR #91 findings
+
+---
+
+## GitHub Codex Review Corrections Authorization
+**Timestamp**: 2026-08-31T08:57:49Z
+**User Input**: "Go"
+**AI Response**: "Accepted the instruction as approval to implement both verified review corrections through a five-step TDD plan: period-aware cap replay RED, complete duty replacement RED, GREEN corrections, property and focused verification, then the complete configured-solver suite and scope review. Public API, objective, optimizer, notebook, and plotting behavior remain unchanged."
+**Context**: CODE GENERATION AUTHORIZATION - PR #91 review corrections
+
+---
+
+## GitHub Codex Review Corrections RED
+**Timestamp**: 2026-08-31T09:13:20Z
+**User Input**: "No new user input; continued under the approved PR #91 review-correction plan."
+**AI Response**: "Added example regressions for current-period cap serialization, identity-aware returned-case schema validation, canonical selected/subset period mapping, zero-cap stale-duty clearing, zero-load-side clearing, and selected-index isolation. Added a Hypothesis pure-calculator oracle and idempotence property. The RED gate produced exactly seven failures and 66 unaffected passes; Hypothesis shrank the stale-duty defect to cap=0 and initial duty=1."
+**Context**: TDD RED - PR #91 P1 and P2 corrections
+
+---
+
+## GitHub Codex Review Corrections GREEN
+**Timestamp**: 2026-08-31T09:24:03Z
+**User Input**: "No new user input; continued under the approved PR #91 review-correction plan."
+**AI Response**: "Candidate replay now serializes only the current period's scalar cap. Returned utilities accept an identity-aware maximum-heat-flow contract, canonicalize selected IDs into the problem period vector, and represent unselected periods as internally unbounded. Shared targeting calculates both sides before mutation and replaces every selected-period duty, including exact zeros; non-finite internal cap sentinels are treated as unbounded. The focused GREEN gate passes 75 tests, including an actual reversed-order unequal-cap two-period optimization and retarget plus schema round-trip, oracle, period-isolation, and idempotence properties. The expanded contracts/domain/targeting/placement gate passes 480 tests; Ruff passes."
+**Context**: TDD GREEN - PR #91 P1 and P2 corrections
+
+---
+
+## GitHub Codex Review Corrections Focused Verification
+**Timestamp**: 2026-08-31T09:31:02Z
+**User Input**: "No new user input; continued under the approved PR #91 review-correction plan."
+**AI Response**: "Property and example regressions pass alongside the 480-test expanded contracts/domain/targeting/placement gate. Packaging and notebook contracts pass 38 tests with 3 expected skips. Repository-wide Ruff, patch whitespace validation, and the warnings-as-errors 54-source Sphinx build pass. Property-Based Testing rules are compliant; Security and Resiliency remain disabled and N/A."
+**Context**: FOCUSED VERIFICATION - PR #91 P1 and P2 corrections
+
+---
+
+## GitHub Codex Review Corrections Build and Test
+**Timestamp**: 2026-08-31T09:38:17Z
+**User Input**: "No new user input; completed under the approved PR #91 review-correction plan."
+**AI Response**: "The complete configured-solver repository suite passes 2,480 tests with 4 expected skips, no failures, and no deselections in 348.28 seconds. Final scope review retained only six production modules required for period-aware replay and complete duty replacement, two regression modules, requirements/design/RTD alignment, and mandatory workflow records. Notebook 19, plotting, optimizer coordinates, and unrelated files are unchanged. All five TDD steps are complete. Property-Based Testing is compliant; Security and Resiliency remain disabled and N/A; Operations is N/A."
+**Context**: BUILD AND TEST COMPLETE - PR #91 P1 and P2 corrections
+
+---

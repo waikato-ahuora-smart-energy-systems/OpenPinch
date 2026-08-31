@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ValueWithUnit(BaseModel):
@@ -45,6 +45,30 @@ class PeriodValueWithUnitAndWeights(BaseModel):
     )
 
 
+class PeriodValueWithUnitAndIds(BaseModel):
+    """Container storing magnitudes keyed to explicit operating-period identities."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    values: list[float] = Field(..., description="Per-period magnitudes.")
+    period_ids: list[str] = Field(..., description="Ordered operating-period IDs.")
+    unit: Optional[str] = Field(
+        default=None, description="Shared unit string, e.g. 'degC' or 'kW'."
+    )
+
+    @model_validator(mode="after")
+    def _validate_period_identity(self):
+        if len(self.values) != len(self.period_ids):
+            raise ValueError("period_ids must align with values")
+        if not self.period_ids or any(
+            not period_id.strip() for period_id in self.period_ids
+        ):
+            raise ValueError("period_ids must be non-empty")
+        if len(set(self.period_ids)) != len(self.period_ids):
+            raise ValueError("period_ids must be unique")
+        return self
+
+
 ScalarOrVU = Union[
     float, ValueWithUnit, PeriodValueWithUnit, PeriodValueWithUnitAndWeights
 ]
@@ -59,6 +83,7 @@ __all__ = [
     "MaybeVU",
     "ScalarOrVU",
     "PeriodValueWithUnit",
+    "PeriodValueWithUnitAndIds",
     "PeriodValueWithUnitAndWeights",
     "ValueWithUnit",
 ]

@@ -117,36 +117,18 @@ def target_utilities_for_load_profiles(
     idx: int | None = None,
 ) -> Tuple[StreamCollection, StreamCollection]:
     """Targets multiple utilities for precomputed hot- and cold-side load profiles."""
-    if abs(H_net_cold[0]) > tol:
-        if len(hot_utilities) == 0:
-            raise ValueError(
-                "Hot utility targeting failed. No hot utilities provided but "
-                "heat load profile indicates utility use is required."
-            )
-        hot_utilities = _assign_utility(
-            T_vals=T_vals,
-            H_vals=np.abs(H_net_cold),
-            u_ls=hot_utilities,
-            pinch_row=pinch_idx[0],
-            is_hot_ut=True,
-            is_real_temperatures=is_real_temperatures,
-            idx=idx,
-        )
-    if abs(H_net_hot[-1]) > tol:
-        if len(cold_utilities) == 0:
-            raise ValueError(
-                "Cold utility targeting failed. No cold utilities provided but "
-                "heat load profile indicates utility use is required."
-            )
-        cold_utilities = _assign_utility(
-            T_vals=T_vals,
-            H_vals=np.abs(H_net_hot),
-            u_ls=cold_utilities,
-            pinch_row=pinch_idx[1],
-            is_hot_ut=False,
-            is_real_temperatures=is_real_temperatures,
-            idx=idx,
-        )
+    hot_duties, cold_duties = _calculate_utility_duties_for_load_profiles(
+        hot_utilities=hot_utilities,
+        cold_utilities=cold_utilities,
+        T_vals=T_vals,
+        H_net_cold=H_net_cold,
+        H_net_hot=H_net_hot,
+        pinch_idx=pinch_idx,
+        is_real_temperatures=is_real_temperatures,
+        idx=idx,
+    )
+    hot_utilities = _apply_utility_duties(hot_utilities, hot_duties, idx=idx)
+    cold_utilities = _apply_utility_duties(cold_utilities, cold_duties, idx=idx)
     return hot_utilities, cold_utilities
 
 
@@ -216,14 +198,23 @@ def _assign_utility(
         is_real_temperatures=is_real_temperatures,
         idx=idx,
     )
-    for utility, duty in zip(u_ls, duties, strict=True):
-        if duty > tol:
-            utility.set_value_attr_at_idx(
-                attr_name="heat_flow",
-                value=duty,
-                idx=idx,
-            )
-    return u_ls
+    return _apply_utility_duties(u_ls, duties, idx=idx)
+
+
+def _apply_utility_duties(
+    utilities: StreamCollection,
+    duties: tuple[float, ...],
+    *,
+    idx: int | None,
+) -> StreamCollection:
+    """Replace the selected-period duty of every utility."""
+    for utility, duty in zip(utilities, duties, strict=True):
+        utility.set_value_attr_at_idx(
+            attr_name="heat_flow",
+            value=float(duty) if duty > tol else 0.0,
+            idx=idx,
+        )
+    return utilities
 
 
 def _calculate_assigned_utility_duties(
@@ -275,10 +266,9 @@ def _calculate_assigned_utility_duties(
             Q_assigned,
         )
         if u.maximum_heat_flow is not None:
-            Q_ut_max = min(
-                Q_ut_max,
-                StreamCollection._value_at_idx(u._maximum_heat_flow, idx),
-            )
+            maximum_duty = StreamCollection._value_at_idx(u._maximum_heat_flow, idx)
+            if np.isfinite(maximum_duty):
+                Q_ut_max = min(Q_ut_max, maximum_duty)
         if Q_ut_max > tol:
             duties[utility_index] = float(Q_ut_max)
             Q_assigned += Q_ut_max

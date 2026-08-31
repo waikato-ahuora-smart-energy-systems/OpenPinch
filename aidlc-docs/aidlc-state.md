@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Utility Placement default-utility penalty coefficient 1000 amendment complete through Build and Test; Operations N/A.
+- **Current Stage**: Utility Placement GitHub Codex review corrections complete through Build and Test; Operations N/A.
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -29,6 +29,12 @@
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
 
 ## Utility Placement Optimisation Progress
+
+- [x] GITHUB CODEX REVIEW CORRECTIONS - Correct period-aware maximum-duty
+  replay serialization and make shared utility targeting replace every duty,
+  including zeros. The complete no-deselection suite passes 2,480 tests with 4
+  expected skips. Plan:
+  `aidlc-docs/construction/plans/utility-placement-codex-review-corrections-plan.md`.
 
 - [x] DEFAULT-UTILITY PENALTY COEFFICIENT 1000 - Increase the private
   Utility Placement squared fallback coefficient from 100 to 1000 while

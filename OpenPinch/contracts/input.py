@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import List, Optional, Self
+from typing import List, Optional, Self, Union
 
 from pydantic import (
     BaseModel,
@@ -16,7 +16,9 @@ from pydantic import (
 
 from ..domain.configuration_fields import validate_configuration_options
 from ..domain.enums import FluidPhase, HeatExchangerKind, StreamID, StreamType
-from .common import ScalarOrVU
+from .common import PeriodValueWithUnitAndIds, ScalarOrVU
+
+MaximumHeatFlowValue = Union[ScalarOrVU, PeriodValueWithUnitAndIds]
 
 
 class StreamSegmentSchema(BaseModel):
@@ -161,7 +163,7 @@ class UtilitySchema(BaseModel):
     h_supply: Optional[ScalarOrVU] = None
     h_target: Optional[ScalarOrVU] = None
     heat_flow: Optional[ScalarOrVU] = None
-    maximum_heat_flow: Optional[ScalarOrVU] = None
+    maximum_heat_flow: Optional[MaximumHeatFlowValue] = None
     dt_cont: Optional[ScalarOrVU] = 0.0
     htc: Optional[ScalarOrVU] = 1.0
     price: Optional[ScalarOrVU] = 1.0

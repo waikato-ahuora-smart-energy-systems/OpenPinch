@@ -242,6 +242,7 @@ def _create_segmented_utility_stream(
     utility_type: str,
     config,
     dt_cont_multiplier: float,
+    maximum_heat_flow: Value | None = None,
 ) -> Stream:
     """Create one ordered segmented utility, preserving local segment prices."""
     _validate_nested_record_semantics(utility, config=config, section="utilities")
@@ -339,11 +340,7 @@ def _create_segmented_utility_stream(
         name=utility.name,
         segments=segments,
         price=None,
-        maximum_heat_flow=standardise_input_value(
-            utility.maximum_heat_flow,
-            field_name="heat_flow",
-            config=config,
-        ),
+        maximum_heat_flow=maximum_heat_flow,
         **common,
     )
     parent.is_active = utility.active
