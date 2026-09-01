@@ -149,13 +149,22 @@ IDAES extensions and runs this gate automatically. Run it locally with
 3. The main-branch workflow repeats the test, documentation, solver, build, and
    cross-platform artifact gates.
 4. After those gates pass, it creates the annotated version tag and a draft
-   GitHub release, then publishes the same artifacts to TestPyPI.
-5. Approve the protected `pypi` environment to publish to production PyPI.
-6. After PyPI succeeds, the workflow publishes the GitHub release.
+   GitHub release with checksummed release artifacts, then publishes the same
+   distributions to TestPyPI.
+5. After TestPyPI succeeds:
+   - it publishes the GitHub release before production PyPI
+   - it dispatches the same workflow at the version tag
+6. The tag-ref run downloads and verifies the published artifacts without
+   rebuilding them, then waits at the protected `pypi` environment.
+7. Approve that deployment to use PyPI Trusted Publishing; the workflow uploads
+   the verified distributions and confirms the version through the PyPI API.
 
 Version bumping does not create a tag locally. The release workflow owns tags
 and rejects malformed versions, mismatched lock metadata, or an existing tag
-that points anywhere other than the main-branch release commit.
+that points anywhere other than the main-branch release commit. If production
+publication fails after the GitHub Release becomes public, rerun the workflow
+at that version tag with the matching `release_tag`; it reuses the published
+artifacts and never rebuilds the release.
 
 Build the documentation locally:
 

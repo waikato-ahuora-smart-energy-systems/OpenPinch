@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Release version 0.6.2 complete.
+- **Current Stage**: GitHub Actions tag-context PyPI publication complete.
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -29,6 +29,16 @@
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
 
 ## Utility Placement Optimisation Progress
+
+- [x] GITHUB ACTIONS TAG-CONTEXT PYPI PUBLICATION - Publish the GitHub Release
+  after TestPyPI validation, dispatch the existing trusted workflow at the
+  immutable version tag, validate and reuse the published artifacts, retain the
+  protected `pypi` environment, and verify production publication. The focused
+  packaging gate passes 106 tests with 3 expected skips; all workflows parse;
+  release metadata, documentation, distributions, Ruff, formatting, and patch
+  hygiene pass; and the complete configured-solver suite passes 2,520 tests
+  with 4 expected skips. Plan:
+  `aidlc-docs/construction/plans/github-actions-tag-context-pypi-publication-plan.md`.
 
 - [x] RELEASE VERSION 0.6.2 - Advanced all canonical version records and
   satisfied the forward-version gate against main at 0.6.1. The focused gate

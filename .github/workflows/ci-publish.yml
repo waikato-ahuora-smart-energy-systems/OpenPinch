@@ -4,12 +4,17 @@ on:
   push:
     branches: ["main"]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Version tag for the production PyPI phase
+        required: false
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-main
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 env:
@@ -240,10 +245,12 @@ jobs:
             git push origin "refs/tags/${TAG_NAME}"
           fi
 
+          (cd dist && sha256sum *) > SHA256SUMS
+
           if gh release view "${TAG_NAME}" >/dev/null 2>&1; then
-            gh release upload "${TAG_NAME}" dist/* --clobber
+            gh release upload "${TAG_NAME}" dist/* SHA256SUMS --clobber
           else
-            gh release create "${TAG_NAME}" dist/* --draft --generate-notes --title "OpenPinch ${TAG_NAME}"
+            gh release create "${TAG_NAME}" dist/* SHA256SUMS --draft --generate-notes --title "OpenPinch ${TAG_NAME}"
           fi
 
   publish-testpypi:
@@ -262,8 +269,106 @@ jobs:
         with:
           repository-url: https://test.pypi.org/legacy/
 
-  publish-pypi:
+  publish-release:
     needs: [release-check, publish-testpypi]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Publish the GitHub release after TestPyPI succeeds
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG_NAME: ${{ needs.release-check.outputs.tag }}
+        run: gh release edit "${TAG_NAME}" --draft=false --latest
+
+  dispatch-pypi:
+    needs: [release-check, publish-release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Dispatch production publication at the release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG_NAME: ${{ needs.release-check.outputs.tag }}
+        run: gh workflow run ci-publish.yml --ref "${TAG_NAME}" -f release_tag="${TAG_NAME}"
+
+  validate-published-release:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Validate the tag-bound public release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG_NAME: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_REF_TYPE}" != "tag" ]; then
+            echo "Production publication requires a tag ref, not ${GITHUB_REF}." >&2
+            exit 1
+          fi
+          if [ "${TAG_NAME}" != "${GITHUB_REF_NAME}" ]; then
+            echo "Release input ${TAG_NAME} does not match ref ${GITHUB_REF_NAME}." >&2
+            exit 1
+          fi
+          if [[ ! "${TAG_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag ${TAG_NAME} is not a stable semantic version." >&2
+            exit 1
+          fi
+
+          RELEASE_IS_DRAFT="$(gh release view "${TAG_NAME}" --json isDraft --jq .isDraft)"
+          RELEASE_IS_PRERELEASE="$(gh release view "${TAG_NAME}" --json isPrerelease --jq .isPrerelease)"
+          if [ "${RELEASE_IS_DRAFT}" != "false" ]; then
+            echo "GitHub Release ${TAG_NAME} is still a draft." >&2
+            exit 1
+          fi
+          if [ "${RELEASE_IS_PRERELEASE}" != "false" ]; then
+            echo "GitHub Release ${TAG_NAME} is a prerelease." >&2
+            exit 1
+          fi
+
+          mkdir dist
+          gh release download "${TAG_NAME}" --pattern "*.whl" --pattern "*.tar.gz" --dir dist
+          gh release download "${TAG_NAME}" --pattern SHA256SUMS --dir .
+
+          version="${TAG_NAME#v}"
+          expected_wheel="openpinch-${version}-py3-none-any.whl"
+          expected_sdist="openpinch-${version}.tar.gz"
+          test -f "dist/${expected_wheel}"
+          test -f "dist/${expected_sdist}"
+
+          artifact_count="$(find dist -maxdepth 1 -type f | wc -l | tr -d ' ')"
+          if [ "${artifact_count}" != "2" ]; then
+            echo "Expected exactly one wheel and one source distribution." >&2
+            exit 1
+          fi
+
+          expected_names="$(printf '%s\n%s\n' "${expected_sdist}" "${expected_wheel}" | sort)"
+          checksum_names="$(awk '{print $2}' SHA256SUMS | sort)"
+          if [ "${checksum_names}" != "${expected_names}" ]; then
+            echo "SHA256SUMS does not describe the expected release artifacts." >&2
+            exit 1
+          fi
+          (cd dist && sha256sum --check ../SHA256SUMS)
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: openpinch-release-dist
+          path: dist/*
+          if-no-files-found: error
+
+  publish-pypi:
+    needs: validate-published-release
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
@@ -275,19 +380,14 @@ jobs:
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: openpinch-dist
+          name: openpinch-release-dist
           path: dist
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
-
-  finalize-release:
-    needs: [release-check, publish-pypi]
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    steps:
-      - name: Publish the GitHub release after PyPI succeeds
+      - name: Verify the published version on PyPI
         env:
-          GH_TOKEN: ${{ github.token }}
-          TAG_NAME: ${{ needs.release-check.outputs.tag }}
-        run: gh release edit "${TAG_NAME}" --draft=false --latest
+          TAG_NAME: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          version="${TAG_NAME#v}"
+          curl --fail --silent --show-error --retry 5 --retry-delay 10 --retry-all-errors \
+            "https://pypi.org/pypi/OpenPinch/${version}/json" >/dev/null

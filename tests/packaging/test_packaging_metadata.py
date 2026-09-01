@@ -295,11 +295,17 @@ def test_workflows_use_current_node24_artifact_actions():
         assert download_ref in workflow
 
 
-def test_testpypi_and_pypi_publish_the_same_validated_artifact_without_skips():
+def test_testpypi_and_pypi_publish_the_same_release_artifacts_without_skips():
     workflow = (REPO_ROOT / ".github" / "workflows" / "ci-publish.yml").read_text(
         encoding="utf-8"
     )
     testpypi_block = workflow.split("publish-testpypi:", 1)[1].split(
+        "publish-release:", 1
+    )[0]
+    release_block = workflow.split("create-draft-release:", 1)[1].split(
+        "publish-testpypi:", 1
+    )[0]
+    validation_block = workflow.split("validate-published-release:", 1)[1].split(
         "publish-pypi:", 1
     )[0]
     pypi_block = workflow.split("publish-pypi:", 1)[1]
@@ -307,10 +313,17 @@ def test_testpypi_and_pypi_publish_the_same_validated_artifact_without_skips():
     assert "skip-existing: true" not in testpypi_block
     assert "skip-existing: true" not in pypi_block
     assert testpypi_block.count("name: openpinch-dist") == 1
-    assert pypi_block.count("name: openpinch-dist") == 1
+    assert "(cd dist && sha256sum *) > SHA256SUMS" in release_block
+    assert "dist/* SHA256SUMS --draft" in release_block
+    assert 'gh release download "${TAG_NAME}"' in validation_block
+    assert "sha256sum --check ../SHA256SUMS" in validation_block
+    assert "name: openpinch-release-dist" in validation_block
+    assert pypi_block.count("name: openpinch-release-dist") == 1
+    assert "build_dist.py" not in validation_block
+    assert "build_dist.py" not in pypi_block
 
 
-def test_publish_workflow_automates_tag_draft_release_pypi_and_final_release():
+def test_publish_workflow_hands_off_from_public_release_to_tag_ref_pypi():
     workflow = (REPO_ROOT / ".github" / "workflows" / "ci-publish.yml").read_text(
         encoding="utf-8"
     )
@@ -319,6 +332,7 @@ def test_publish_workflow_automates_tag_draft_release_pypi_and_final_release():
     assert "github.ref == 'refs/heads/main'" in workflow
     assert "tags:" not in workflow
     assert "workflow_dispatch:" in workflow
+    assert "release_tag:" in workflow
     assert "python scripts/check_release_version.py" in workflow
     assert "solver-tests:" in workflow
     assert 'pytest --hypothesis-seed=20260715 -m "solver"' in workflow
@@ -327,9 +341,22 @@ def test_publish_workflow_automates_tag_draft_release_pypi_and_final_release():
     assert 'gh release create "${TAG_NAME}"' in workflow
     assert "--draft" in workflow
     assert "publish-testpypi:" in workflow
-    assert "publish-pypi:" in workflow
-    assert "finalize-release:" in workflow
+    assert "publish-release:" in workflow
+    assert "needs: [release-check, publish-testpypi]" in workflow
     assert 'gh release edit "${TAG_NAME}" --draft=false --latest' in workflow
+    assert "dispatch-pypi:" in workflow
+    assert "needs: [release-check, publish-release]" in workflow
+    assert (
+        'gh workflow run ci-publish.yml --ref "${TAG_NAME}" '
+        '-f release_tag="${TAG_NAME}"'
+    ) in workflow
+    assert "validate-published-release:" in workflow
+    assert "github.ref_type == 'tag'" in workflow
+    assert "TAG_NAME: ${{ inputs.release_tag }}" in workflow
+    assert '"${TAG_NAME}" != "${GITHUB_REF_NAME}"' in workflow
+    assert "publish-pypi:" in workflow
+    assert "needs: validate-published-release" in workflow
+    assert "finalize-release:" not in workflow
     assert "coverage report --fail-under=95" in workflow
     assert "surface: [core, dashboard, notebook, brayton_cycle, synthesis]" in workflow
     assert "os: [ubuntu-latest, windows-latest, macos-latest]" in workflow
@@ -372,13 +399,46 @@ def test_release_jobs_are_privilege_separated_from_project_code_execution():
     create_block = workflow.split("  create-draft-release:", 1)[1].split(
         "  publish-testpypi:", 1
     )[0]
-    finalize_block = workflow.split("  finalize-release:", 1)[1]
+    publish_block = workflow.split("  publish-release:", 1)[1].split(
+        "  dispatch-pypi:", 1
+    )[0]
+    dispatch_block = workflow.split("  dispatch-pypi:", 1)[1].split(
+        "  validate-published-release:", 1
+    )[0]
     assert "contents: write" in create_block
-    assert "contents: write" in finalize_block
+    assert "contents: write" in publish_block
+    assert "actions: write" in dispatch_block
+    assert "contents: write" not in dispatch_block
+    assert "GH_REPO: ${{ github.repository }}" in publish_block
+    assert "GH_REPO: ${{ github.repository }}" in dispatch_block
     assert "uv run" not in create_block
     assert "python scripts/" not in create_block
-    assert "uv run" not in finalize_block
-    assert "python scripts/" not in finalize_block
+    assert "uv run" not in publish_block
+    assert "python scripts/" not in publish_block
+    assert "uv run" not in dispatch_block
+    assert "python scripts/" not in dispatch_block
+
+
+def test_pypi_environment_is_reached_only_from_a_verified_public_tag_release():
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci-publish.yml").read_text(
+        encoding="utf-8"
+    )
+    validation_block = workflow.split("  validate-published-release:", 1)[1].split(
+        "  publish-pypi:", 1
+    )[0]
+    pypi_block = workflow.split("  publish-pypi:", 1)[1]
+
+    assert "github.event_name == 'workflow_dispatch'" in validation_block
+    assert "github.ref_type == 'tag'" in validation_block
+    assert "TAG_NAME: ${{ inputs.release_tag }}" in validation_block
+    assert '"${GITHUB_REF_TYPE}" != "tag"' in validation_block
+    assert '"${TAG_NAME}" != "${GITHUB_REF_NAME}"' in validation_block
+    assert '"${RELEASE_IS_DRAFT}" != "false"' in validation_block
+    assert '"${RELEASE_IS_PRERELEASE}" != "false"' in validation_block
+    assert "environment:" not in validation_block
+    assert "needs: validate-published-release" in pypi_block
+    assert "name: pypi" in pypi_block
+    assert "id-token: write" in pypi_block
 
 
 def test_installed_wheel_smoke_uses_only_the_root_workflow_contract():

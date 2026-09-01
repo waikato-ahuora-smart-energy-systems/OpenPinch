@@ -285,13 +285,17 @@ def test_release_docs_match_automated_main_branch_publication() -> None:
         "creates the annotated version tag",
         "draft GitHub release",
         "TestPyPI",
+        "publishes the GitHub release before production PyPI",
+        "dispatches the same workflow at the version tag",
+        "checksummed release artifacts",
         "protected ``pypi`` environment",
-        "publishes the GitHub release",
     ):
         assert phrase in combined
 
     assert "maintainers always create release tags explicitly" not in readme
-    assert "Production publication is tag-driven" not in developer_guide
+    assert "after PyPI succeeds, the workflow publishes the GitHub release" not in (
+        combined
+    )
 
 
 def test_docs_do_not_present_removed_cli_surfaces():

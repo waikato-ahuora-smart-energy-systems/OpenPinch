@@ -45,14 +45,24 @@ Production publication is automated from the ``main`` branch:
 3. let the main-branch workflow repeat the test, documentation, solver, build,
    and cross-platform artifact gates
 4. after validation, the workflow creates the annotated version tag and a
-   draft GitHub release, then publishes the same distributions to TestPyPI
-5. approve the protected ``pypi`` environment for production publication
-6. after PyPI succeeds, the workflow publishes the GitHub release
+   draft GitHub release containing checksummed release artifacts, then
+   publishes the same distributions to TestPyPI
+5. after TestPyPI succeeds:
+
+   * it publishes the GitHub release before production PyPI
+   * it dispatches the same workflow at the version tag
+6. the tag-ref run downloads the public release artifacts, verifies their
+   names and SHA-256 digests without rebuilding, and then waits at the
+   protected ``pypi`` environment
+7. after approval, PyPI Trusted Publishing uploads the verified distributions
+   and the workflow confirms the version through the PyPI API
 
 Version bumping does not create a local tag. The release workflow owns the
 ``v{project.version}`` tag and rejects malformed versions, lock mismatches, or
-an existing tag that points to a different commit. Its draft release keeps a
-failed publication visible without presenting it as a completed release.
+an existing tag that points to a different commit. A production failure can
+therefore leave a public GitHub Release while PyPI is pending. Rerun
+``ci-publish.yml`` at that version tag with the matching ``release_tag`` input;
+the tag phase reuses the published artifacts and does not rebuild the release.
 
 Alternative Direct Sphinx Build
 -------------------------------

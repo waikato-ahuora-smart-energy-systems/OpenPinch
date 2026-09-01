@@ -6505,3 +6505,35 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 **Context**: BUILD AND TEST COMPLETE - Release version 0.6.2
 
 ---
+
+## PyPI Deployment Stop Investigation
+**Timestamp**: 2026-09-01T16:36:19Z
+**User Input**: "The workflow has encounter a stop. The package needs the published release before Pypi deployment. What do you suggest?"
+**AI Response**: "Inspected Validate, Release & Publish run 33528423337 and the pypi environment configuration. All validation, build, artifact smoke, draft-release, and TestPyPI jobs passed. Production PyPI was rejected before execution because the workflow runs on main while the pypi environment allows only v*.*.* tags; publishing the draft release would not change that run's ref. Recommended a tag-context production-publish workflow dispatched only after the GitHub Release is published, preserving the tag-only environment gate and manual approval while downloading and publishing the already validated release assets."
+**Context**: DIAGNOSIS AND WORKFLOW DESIGN RECOMMENDATION - PyPI deployment source restriction
+
+---
+
+## PyPI Release Workflow Flowchart
+**Timestamp**: 2026-09-01T16:41:13Z
+**User Input**: "Show a flowchart."
+**AI Response**: "Presented a Mermaid flowchart of the recommended two-workflow release process: main-context validation and GitHub Release publication followed by an explicitly dispatched tag-context PyPI deployment using the same validated artifacts, protected environment approval, Trusted Publishing, verification, and safe retry behavior."
+**Context**: WORKFLOW VISUALIZATION - Tag-context PyPI release hand-off
+
+---
+
+## Tag-Context PyPI Publication Authorization
+**Timestamp**: 2026-09-01T16:45:30Z
+**User Input**: "Implement and commit."
+**AI Response**: "Accepted authorization to implement and commit the tag-context production publication design under TDD. Created an eight-step plan covering failing workflow contracts, main/tag phase separation within the existing trusted workflow identity, release checksum verification, documentation, the required fresh 0.6.3 version identity, focused and complete validation, scope review, and commit."
+**Context**: CODE GENERATION AUTHORIZATION - GitHub Actions tag-context PyPI publication
+
+---
+
+## Tag-Context PyPI Publication Completion
+**Timestamp**: 2026-09-01T17:01:39Z
+**User Input**: "Implement and commit."
+**AI Response**: "Refactored ci-publish.yml so main validation creates checksummed artifacts, validates them on TestPyPI, publishes the GitHub Release, and dispatches the same workflow at the immutable release tag. The tag-ref phase rejects mismatched or non-public releases, verifies exact artifact names and SHA-256 digests, preserves the protected pypi reviewer gate and existing Trusted Publisher workflow identity, publishes without rebuilding, and verifies the PyPI API. Updated maintainer documentation and advanced canonical release metadata to 0.6.3 because v0.6.2 cannot contain the corrected workflow. The focused packaging gate passes 106 tests with 3 expected skips; all workflows parse; release and lock checks, warning-strict documentation, fresh distributions, Ruff, formatting, and patch hygiene pass; and the complete configured-solver suite passes 2,520 tests with 4 expected skips. PBT-02 through PBT-07 and PBT-10 are N/A for the fixed declarative workflow contract; PBT-08 and PBT-09 remain compliant. Security and Resiliency extensions remain disabled and N/A."
+**Context**: BUILD AND TEST COMPLETE - GitHub Actions tag-context PyPI publication
+
+---
