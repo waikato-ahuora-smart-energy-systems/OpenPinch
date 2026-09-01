@@ -335,6 +335,18 @@ def test_publish_workflow_automates_tag_draft_release_pypi_and_final_release():
     assert "os: [ubuntu-latest, windows-latest, macos-latest]" in workflow
 
 
+def test_publish_solver_gate_uses_supported_runner_and_probes_binaries():
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci-publish.yml").read_text(
+        encoding="utf-8"
+    )
+    solver_block = workflow.split("solver-tests:", 1)[1].split("\n  build:", 1)[0]
+
+    assert "runs-on: ubuntu-22.04" in solver_block
+    assert "Verify IDAES solver binaries" in solver_block
+    assert "SolverFactory(name).available(exception_flag=False)" in solver_block
+    assert "('couenne', 'ipopt')" in solver_block
+
+
 def test_pr_workflow_validates_main_and_develop_without_mutating_pr_heads():
     workflow = (REPO_ROOT / ".github" / "workflows" / "ci-pull-request.yml").read_text(
         encoding="utf-8"

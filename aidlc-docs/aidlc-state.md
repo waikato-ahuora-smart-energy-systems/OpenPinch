@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: GitHub Actions artifact smoke correction complete.
+- **Current Stage**: Release version 0.6.2 complete.
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -29,6 +29,20 @@
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
 
 ## Utility Placement Optimisation Progress
+
+- [x] RELEASE VERSION 0.6.2 - Advanced all canonical version records and
+  satisfied the forward-version gate against main at 0.6.1. The focused gate
+  passes 33 tests; the complete configured-solver suite passes 2,519 tests with
+  4 expected skips; Ruff, lockfile consistency, fresh 0.6.2 archives, and patch
+  hygiene pass. Plan:
+  `aidlc-docs/construction/plans/release-version-0.6.2-plan.md`.
+
+- [x] GITHUB ACTIONS COUENNE RUNNER CORRECTION - Pinned the release solver gate
+  to Ubuntu 22.04 and added a fail-fast Couenne/IPOPT runtime probe. The focused
+  gate passes 25 tests; all workflows parse; the exact probe passes; and the
+  complete configured-solver suite passes 2,519 tests with 4 expected skips.
+  Ruff, changed-file formatting, and patch hygiene pass. Plan:
+  `aidlc-docs/construction/plans/github-actions-couenne-runner-correction-plan.md`.
 
 - [x] GITHUB ACTIONS ARTIFACT SMOKE CORRECTION - Corrected checkout-local virtual
   environment classification, updated artifact actions to their supported Node
