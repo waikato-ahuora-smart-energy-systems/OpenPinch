@@ -6457,3 +6457,27 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 **Context**: BUILD AND TEST COMPLETE - GitHub Actions artifact smoke correction
 
 ---
+
+## GitHub Actions Solver-Test Failure Investigation
+**Timestamp**: 2026-09-01T03:37:18Z
+**User Input**: "solver-test fails due to the unavailability of couenne in Github venv. See github action workflow."
+**AI Response**: "Inspected live Validate, Release & Publish run 33466355219 and the local publish workflow. The solver-tests job runs on ubuntu-latest, which resolved to Ubuntu 24.04.4, while idaes get-extensions installed the v3.4.2 ubuntu2204-x86_64 solver bundle. Couenne then failed Pyomo's executable/version availability check, causing all three marked solver tests to fail. IDAES stable documentation lists Couenne in its solver bundle but supports Ubuntu only through 22.04, and the upstream project records Ubuntu 24.04 as unsupported by get-extensions. Recommended pinning only solver-tests to ubuntu-22.04 and adding an explicit post-install Couenne/IPOPT availability assertion. No workflow or application implementation was changed during diagnosis."
+**Context**: DIAGNOSIS COMPLETE - GitHub Actions Couenne runner compatibility failure
+
+---
+
+## GitHub Actions Couenne Runner Correction Authorization
+**Timestamp**: 2026-09-01T04:54:10Z
+**User Input**: "Go fix and commit."
+**AI Response**: "Accepted authorization to correct and commit the release solver gate under TDD. Created a five-step plan covering a failing workflow contract, the Ubuntu 22.04 runner pin, an explicit Couenne/IPOPT runtime probe, focused and complete verification, scope review, and commit to develop."
+**Context**: CODE GENERATION AUTHORIZATION - GitHub Actions Couenne runner correction
+
+---
+
+## GitHub Actions Couenne Runner Correction Completion
+**Timestamp**: 2026-09-01T05:02:09Z
+**User Input**: "Go fix and commit."
+**AI Response**: "Pinned only the release solver-tests job to Ubuntu 22.04, matching the IDAES v3.4.2 ubuntu2204 solver bundle, and added an explicit Pyomo availability probe for Couenne and IPOPT immediately after installation. Added a static workflow regression covering both requirements. All 25 packaging/workflow tests pass; every workflow parses; the exact runtime probe reports both solvers available locally; and the complete configured-solver suite passes 2,519 tests with 4 expected skips in 349.41 seconds. Repository Ruff, changed-file formatting, and patch hygiene pass. Property-Based Testing is N/A for the fixed runner-image contract; Security and Resiliency remain disabled and N/A."
+**Context**: BUILD AND TEST COMPLETE - GitHub Actions Couenne runner correction
+
+---

@@ -127,7 +127,7 @@ jobs:
 
   solver-tests:
     needs: release-check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
@@ -143,6 +143,15 @@ jobs:
       - run: uv sync --frozen --group dev
       - name: Install IDAES solver binaries
         run: uv run --no-sync idaes get-extensions
+      - name: Verify IDAES solver binaries
+        run: >-
+          uv run --no-sync python -c
+          "import idaes;
+          from pyomo.environ import SolverFactory;
+          required = ('couenne', 'ipopt');
+          unavailable = [name for name in required if not
+          SolverFactory(name).available(exception_flag=False)];
+          assert not unavailable, f'Unavailable solver binaries: {unavailable}'"
       - run: uv run --no-sync pytest --hypothesis-seed=20260715 -m "solver"
 
   build:
