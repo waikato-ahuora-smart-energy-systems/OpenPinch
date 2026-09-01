@@ -6433,3 +6433,27 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 **Context**: BUILD AND TEST COMPLETE - GitHub Actions release automation and Codex review corrections
 
 ---
+
+## GitHub Actions Failure Investigation
+**Timestamp**: 2026-08-31T22:22:59Z
+**User Input**: "Github actions now fail. Investigate."
+**AI Response**: "Investigated the live CI Develop run 33441220938 and PR Validation run 33441224711 for commit 7136b7c7. Tests, coverage, documentation, optional installs, lock validation, and artifact builds pass. All six failures are the three operating-system variants of artifact-install-smoke in both workflows. The wheel is successfully installed into the checkout-local .venv, but artifact_install_smoke.py rejects every package path beneath the repository root and therefore misclassifies .venv site-packages as a source-checkout import. The same defect is present in the unpublished release workflow. GitHub also reports a non-blocking Node.js 20 deprecation warning for the pinned download-artifact action. No production or workflow files were changed during diagnosis."
+**Context**: DIAGNOSIS COMPLETE - GitHub Actions installed-wheel smoke failure
+
+---
+
+## GitHub Actions Artifact Smoke Correction Authorization
+**Timestamp**: 2026-08-31T22:22:59Z
+**User Input**: "Fix. commit."
+**AI Response**: "Accepted authorization to correct the checkout-local virtual-environment false positive under TDD, update the deprecated artifact action pins, run focused and complete verification, and commit the correction to develop. Created the seven-step correction plan and resumed Code Generation."
+**Context**: CODE GENERATION AUTHORIZATION - GitHub Actions artifact smoke correction
+
+---
+
+## GitHub Actions Artifact Smoke Correction Completion
+**Timestamp**: 2026-09-01T00:02:01Z
+**User Input**: "Fix. commit."
+**AI Response**: "Narrowed artifact smoke classification from the entire repository to the actual OpenPinch source package, preserving source-import rejection while permitting wheel imports from checkout-local virtual environments. Added the exact GitHub regression and a fixed-seed generated path invariant. Updated upload-artifact to v7.0.1 commit 043fb46d1a93c77aae656e7c1c64a875d1fc6a0a and download-artifact to v8.0.1 commit 3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c in develop, pull-request, and publish workflows. The focused gate passes 27 tests; an isolated checkout-local wheel smoke passes; the complete configured-solver suite passes 2,518 tests with 4 expected skips in 337.87 seconds. Ruff, formatting, workflow YAML parsing, patch hygiene, the warning-strict 54-source RTD build, and fresh wheel/source builds pass. PBT-03, PBT-07, PBT-08, and PBT-10 are compliant; the remaining property rules are N/A for this pure path classifier. Security and Resiliency remain disabled and N/A."
+**Context**: BUILD AND TEST COMPLETE - GitHub Actions artifact smoke correction
+
+---

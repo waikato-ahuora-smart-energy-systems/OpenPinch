@@ -22,6 +22,12 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def is_checkout_source_import(package_path: Path, repo_root: Path) -> bool:
+    """Return whether ``package_path`` resolves from the checkout source package."""
+    source_package = repo_root.resolve() / "OpenPinch"
+    return package_path.resolve().is_relative_to(source_package)
+
+
 def main(argv: list[str] | None = None) -> int:
     """Exercise the installed package, CLI, and packaged resources."""
     args = build_parser().parse_args(argv)
@@ -32,7 +38,7 @@ def main(argv: list[str] | None = None) -> int:
     from OpenPinch.resources import list_notebooks, list_sample_cases, read_sample_case
 
     package_path = Path(OpenPinch.__file__).resolve()
-    if package_path.is_relative_to(repo_root):
+    if is_checkout_source_import(package_path, repo_root):
         raise AssertionError(f"Imported OpenPinch from checkout: {package_path}")
 
     notebooks = list_notebooks()

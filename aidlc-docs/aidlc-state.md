@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: GitHub Actions release automation and Codex review corrections complete.
+- **Current Stage**: GitHub Actions artifact smoke correction complete.
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -29,6 +29,14 @@
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
 
 ## Utility Placement Optimisation Progress
+
+- [x] GITHUB ACTIONS ARTIFACT SMOKE CORRECTION - Corrected checkout-local virtual
+  environment classification, updated artifact actions to their supported Node
+  runtime releases, and verified all affected workflow gates. The complete
+  configured-solver suite passes 2,518 tests with 4 expected skips; the focused
+  gate passes 27 tests; Ruff, YAML parsing, warning-strict RTD documentation,
+  fresh distributions, installed-wheel smoke, and patch hygiene pass. Plan:
+  `aidlc-docs/construction/plans/github-actions-artifact-smoke-correction-plan.md`.
 
 - [x] GITHUB ACTIONS RELEASE AND CODEX REVIEW CORRECTIONS - Hardened PR CI,
   automated trusted tag/GitHub-release/TestPyPI/PyPI delivery, and resolved the

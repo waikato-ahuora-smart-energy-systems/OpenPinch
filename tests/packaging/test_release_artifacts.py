@@ -8,6 +8,10 @@ import tarfile
 from pathlib import Path
 from zipfile import ZipFile
 
+from hypothesis import given, seed
+
+from scripts.artifact_install_smoke import is_checkout_source_import
+from tests.strategies.artifact_paths import artifact_import_path_cases
 from tests.support.paths import REPOSITORY_ROOT
 
 
@@ -123,3 +127,29 @@ def test_release_artifacts_exclude_repo_only_assets(tmp_path: Path):
 
     sdist_root = next(name.split("/", 1)[0] for name in sdist_names if "/" in name)
     _assert_common_release_boundary(sdist_names, root_prefix=sdist_root)
+
+
+def test_checkout_local_virtual_environment_is_not_source_import(tmp_path: Path):
+    repo_root = tmp_path / "OpenPinch"
+    source_path = repo_root / "OpenPinch" / "__init__.py"
+    installed_path = (
+        repo_root
+        / ".venv"
+        / "lib"
+        / "python3.14"
+        / "site-packages"
+        / "OpenPinch"
+        / "__init__.py"
+    )
+
+    assert is_checkout_source_import(source_path, repo_root)
+    assert not is_checkout_source_import(installed_path, repo_root)
+
+
+@seed(20260715)
+@given(case=artifact_import_path_cases())
+def test_only_source_package_imports_are_classified_as_checkout_source(case):
+    assert (
+        is_checkout_source_import(case.package_path, case.repo_root)
+        is case.source_import
+    )

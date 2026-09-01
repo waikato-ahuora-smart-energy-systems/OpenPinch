@@ -21,6 +21,8 @@ WORKFLOWS = [
     REPO_ROOT / ".github" / "workflows" / "ci-pull-request.yml",
     REPO_ROOT / ".github" / "workflows" / "ci-publish.yml",
 ]
+UPLOAD_ARTIFACT_SHA = "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+DOWNLOAD_ARTIFACT_SHA = "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"
 
 
 def _read_pyproject() -> dict:
@@ -281,6 +283,16 @@ def test_every_external_action_is_pinned_to_an_immutable_commit():
                 workflow_path,
                 reference,
             )
+
+
+def test_workflows_use_current_node24_artifact_actions():
+    upload_ref = f"actions/upload-artifact@{UPLOAD_ARTIFACT_SHA}"
+    download_ref = f"actions/download-artifact@{DOWNLOAD_ARTIFACT_SHA}"
+
+    for workflow_path in WORKFLOWS:
+        workflow = workflow_path.read_text(encoding="utf-8")
+        assert upload_ref in workflow
+        assert download_ref in workflow
 
 
 def test_testpypi_and_pypi_publish_the_same_validated_artifact_without_skips():
