@@ -43,13 +43,18 @@ Write every optimized named utility with its optional period-aware maximum-duty
 metadata. Write `HU` or `CU` when fallback is positive in any selected period.
 Ordinary targeting reads the runtime maximum duty, respects it in the same
 temperature-priority cascade, and allocates the explicit fallback residual.
+Explicit identities are canonicalized to the problem period order; unselected
+periods are internally unbounded. Targeting writes all recalculated duties,
+including zero, so old input duties cannot survive a cap or zero-load result.
 The source problem remains unchanged.
 
 ## Property inventory
 
 - allocation never exceeds a finite cap;
 - scalar limits broadcast and period values select by identity;
+- unselected returned-case periods remain unbounded;
 - zero caps disable and omitted caps do not constrain;
+- mutating assignment equals the pure duty calculation and is idempotent;
 - hot/cold generated pair caps remain independent;
 - named duty is assigned before fallback duty;
 - the canonical squared `g_ineq_penalty` adapter is non-negative, zero iff

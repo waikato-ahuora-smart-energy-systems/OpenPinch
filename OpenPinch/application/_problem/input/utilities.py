@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from typing import List, Tuple
 
@@ -24,6 +25,36 @@ __all__ = [
 ]
 
 _TEMPERATURE_EQUAL_TOL = 1e-12
+
+
+def _standardise_maximum_heat_flow(value, config: Configuration) -> Value | None:
+    """Resolve identity-aware caps to the problem's canonical period vector."""
+    if value is None:
+        return None
+    raw = value.model_dump(mode="python") if hasattr(value, "model_dump") else value
+    if not isinstance(raw, Mapping) or raw.get("period_ids") is None:
+        return standardise_input_value(value, field_name="heat_flow", config=config)
+
+    period_ids = tuple(str(period_id) for period_id in raw["period_ids"])
+    values = tuple(float(item) for item in raw["values"])
+    by_period = dict(zip(period_ids, values, strict=True))
+    canonical_period_ids = tuple(str(item) for item in config.problem.period_ids)
+    unknown = tuple(
+        period_id
+        for period_id in period_ids
+        if period_id not in canonical_period_ids
+    )
+    if unknown:
+        raise ValueError(
+            f"Unknown maximum_heat_flow period id(s): {', '.join(unknown)}."
+        )
+
+    canonical = [by_period.get(period_id, np.nan) for period_id in canonical_period_ids]
+    return standardise_input_value(
+        {"values": canonical, "unit": raw.get("unit")},
+        field_name="heat_flow",
+        config=config,
+    )
 
 
 def _get_hot_and_cold_utilities(
@@ -401,12 +432,17 @@ def _create_utilities_list(
         p_target = selected.p_supply if endpoints_swapped else selected.p_target
         h_supply = selected.h_target if endpoints_swapped else selected.h_supply
         h_target = selected.h_supply if endpoints_swapped else selected.h_target
+        maximum_heat_flow = _standardise_maximum_heat_flow(
+            selected.maximum_heat_flow,
+            config,
+        )
         if selected.segments is not None or selected.profile is not None:
             created = _create_segmented_utility_stream(
                 selected,
                 utility_type=utility_type,
                 config=config,
                 dt_cont_multiplier=dt_cont_multiplier,
+                maximum_heat_flow=maximum_heat_flow,
             )
         else:
             created = Stream(
@@ -443,11 +479,7 @@ def _create_utilities_list(
                     field_name="htc",
                     config=config,
                 ),
-                maximum_heat_flow=standardise_input_value(
-                    selected.maximum_heat_flow,
-                    field_name="heat_flow",
-                    config=config,
-                ),
+                maximum_heat_flow=maximum_heat_flow,
                 price=standardise_input_value(
                     selected.price,
                     field_name="price",

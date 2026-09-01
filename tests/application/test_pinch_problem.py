@@ -4,11 +4,13 @@ import json
 
 # import types
 import sys
+from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
 
 import pandas as pd
 import pytest
+from hypothesis import given, seed, settings
 
 from OpenPinch.adapters.io import problem_sources as source_adapter
 from OpenPinch.adapters.io.problem_sources import (
@@ -40,6 +42,10 @@ from OpenPinch.presentation.graphs.problem import (
     _slugify,
 )
 from OpenPinch.resources import copy_sample_case
+from tests.strategies.problem_inputs import (
+    nested_zone_multiplier_cases,
+    transactional_problem_scenarios,
+)
 
 
 @pytest.fixture
@@ -75,6 +81,35 @@ def test_load_json(tmp_path: Path, sample_problem):
     assert obj.results is None
     assert obj.to_problem_json() == obj._canonical_problem_inputs()
     assert obj.to_problem_json()["streams"][0]["name"] == "H1"
+
+
+@pytest.mark.parametrize("replacement_method", ("load", "_replace_problem_inputs"))
+def test_failed_problem_input_replacement_is_atomic(replacement_method: str) -> None:
+    problem = PinchProblem(source="basic_pinch.json", project_name="Atomic")
+    problem.target.direct_heat_integration()
+    canonical_before = problem.to_problem_json()
+    problem_data_before = problem._problem_data
+    master_zone_before = problem.master_zone
+    results_before = problem._results
+    target_spec_before = problem._last_target_run_spec
+    period_results_before = problem._period_results
+    source_kind_before = problem._input_source_kind
+    filepath_before = problem.problem_filepath
+
+    invalid = deepcopy(canonical_before)
+    invalid["streams"][0]["t_target"] = deepcopy(invalid["streams"][0]["t_supply"])
+
+    with pytest.raises(ValueError):
+        getattr(problem, replacement_method)(invalid)
+
+    assert problem.to_problem_json() == canonical_before
+    assert problem._problem_data is problem_data_before
+    assert problem.master_zone is master_zone_before
+    assert problem._results is results_before
+    assert problem._last_target_run_spec is target_spec_before
+    assert problem._period_results is period_results_before
+    assert problem._input_source_kind == source_kind_before
+    assert problem.problem_filepath == filepath_before
 
 
 def test_load_excel_calls_reader_and_sets_path(
@@ -353,6 +388,83 @@ def test_set_dt_cont_multiplier_lazily_rebuilds_prepared_root():
     assert root is problem.master_zone
     assert root.dt_cont_multiplier == 2.0
     assert problem.results is None
+
+
+@seed(20260715)
+@given(case=nested_zone_multiplier_cases())
+@settings(max_examples=40)
+def test_dt_cont_multiplier_round_trips_through_canonical_problem_input(
+    case,
+) -> None:
+    payload, zone_path, multiplier = case
+    problem = PinchProblem(source=payload, project_name="Site")
+
+    problem.set_dt_cont_multiplier(multiplier, zone_name=zone_path)
+    serialized = problem.to_problem_json()
+    restored = PinchProblem(source=serialized, project_name="Site")
+
+    assert find_zone_tree_node(serialized["zone_tree"], zone_path)[
+        "dt_cont_multiplier"
+    ] == pytest.approx(multiplier)
+    assert restored.master_zone.get_subzone(zone_path).dt_cont_multiplier == pytest.approx(
+        multiplier
+    )
+
+
+@seed(20260715)
+@given(scenario=transactional_problem_scenarios())
+@settings(max_examples=30, deadline=None)
+def test_transactional_loading_matches_generated_command_model(scenario) -> None:
+    payloads, commands = scenario
+    canonical_payloads = tuple(
+        PinchProblem(source=payload, project_name="Stateful").to_problem_json()
+        for payload in payloads
+    )
+    problem = PinchProblem(source=payloads[0], project_name="Stateful")
+    expected_canonical = canonical_payloads[0]
+    expected_has_results = False
+
+    def assert_model() -> None:
+        assert problem.to_problem_json() == expected_canonical
+        assert (problem.results is not None) is expected_has_results
+
+    assert_model()
+    for command in commands:
+        if command == "load_primary":
+            problem.load(deepcopy(payloads[0]))
+            expected_canonical = canonical_payloads[0]
+            expected_has_results = False
+        elif command == "load_secondary":
+            problem.load(deepcopy(payloads[1]))
+            expected_canonical = canonical_payloads[1]
+            expected_has_results = False
+        elif command == "target":
+            problem.target.direct_heat_integration()
+            expected_has_results = True
+        else:
+            state_before = {
+                name: getattr(problem, name)
+                for name in (
+                    "_problem_data",
+                    "_validated_data",
+                    "_master_zone",
+                    "_results",
+                    "_last_target_run_spec",
+                    "_period_results",
+                    "_utility_placement_result",
+                )
+            }
+            invalid = deepcopy(expected_canonical)
+            invalid["streams"][0]["t_target"] = deepcopy(
+                invalid["streams"][0]["t_supply"]
+            )
+            with pytest.raises(ValueError):
+                problem.load(invalid)
+            assert all(
+                getattr(problem, name) is value
+                for name, value in state_before.items()
+            )
+        assert_model()
 
 
 def test_root_stream_views_are_exposed_on_problem():

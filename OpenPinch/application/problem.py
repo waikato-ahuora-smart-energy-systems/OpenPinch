@@ -135,8 +135,11 @@ class PinchProblem:
             source,
             current_project_name=self._project_name,
         )
-        self._apply_loaded_source(loaded_source)
-        return self._rebuild_problem_state()
+        return _input_loading.replace_loaded_source(
+            self,
+            loaded_source,
+            rebuild=self._rebuild_problem_state,
+        )
 
     def _run_targeting_for_zone_and_subzones(
         self,
@@ -592,13 +595,16 @@ class PinchProblem:
                 UserWarning,
             )
             resolved_value = 1.0
-        root_zone = self._require_prepared_root_zone()
-        root_zone.get_subzone(zone_name).dt_cont_multiplier = resolved_value
-        self._results = None  # Clear cached results since multipliers have changed
-        self._last_target_run_spec = None
-        self._period_results = {}
-        self._utility_placement_result = None
-        return root_zone
+        self._require_prepared_root_zone()
+        problem_inputs = self.to_problem_json()
+        zone_tree = problem_inputs["zone_tree"]
+        selected_zone_name = zone_name or str(zone_tree["name"])
+        zone_node = _input_loading.find_zone_tree_node(
+            zone_tree,
+            selected_zone_name,
+        )
+        zone_node["dt_cont_multiplier"] = resolved_value
+        return self._replace_problem_inputs(problem_inputs)
 
     def update_options(
         self,

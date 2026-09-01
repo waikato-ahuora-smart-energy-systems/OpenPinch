@@ -73,17 +73,18 @@ _METHOD_OPTION_NAMES = {
         }
     ),
 }
-
-
 def run_multistart_minimisation(
     problem: OptimisationProblem,
     *,
     method: OptimisationMethod | str = OptimisationMethod.DUAL_ANNEALING,
     options: OptimisationOptions | Mapping[str, object] | None = None,
 ) -> OptimisationResult:
-    """Run one reusable backend and return finite candidates in stable order."""
+    """Run one backend and return finite, bounded, feasible candidates in order."""
     method = _normalise_method(method)
     options = _normalise_options(options)
+    feasibility_tolerance = _validate_feasibility_tolerance(
+        options.feasibility_tolerance
+    )
     bounds, initial_points = _validate_problem(problem)
     backend_kwargs = options.to_backend_kwargs()
     _validate_options(method, backend_kwargs)
@@ -97,10 +98,19 @@ def run_multistart_minimisation(
         constraints=problem.constraints,
         **backend_kwargs,
     )
-    candidates = _normalise_candidates(points, objectives, len(bounds))
+    candidates = tuple(
+        candidate
+        for candidate in _normalise_candidates(points, objectives, len(bounds))
+        if _is_feasible_candidate(
+            np.asarray(candidate.point, dtype=float),
+            bounds=bounds,
+            constraints=problem.constraints,
+            tolerance=feasibility_tolerance,
+        )
+    )
     if not candidates:
         raise NoOptimisationCandidatesError(
-            f"{method.value} completed without a finite candidate."
+            f"{method.value} completed without a finite feasible candidate."
         )
     return OptimisationResult(method=method, candidates=candidates)
 
@@ -189,6 +199,21 @@ def _validate_options(
         raise InvalidOptimisationProblemError("max_minima must be positive or None.")
 
 
+def _validate_feasibility_tolerance(value: object) -> float:
+    """Return a finite, non-negative post-solve feasibility tolerance."""
+    try:
+        tolerance = float(value)
+    except (TypeError, ValueError) as exc:
+        raise InvalidOptimisationProblemError(
+            "feasibility_tolerance must be a finite non-negative number."
+        ) from exc
+    if not math.isfinite(tolerance) or tolerance < 0.0:
+        raise InvalidOptimisationProblemError(
+            "feasibility_tolerance must be a finite non-negative number."
+        )
+    return tolerance
+
+
 def _resolve_backend(method: OptimisationMethod) -> OptimisationBackend:
     if method is OptimisationMethod.DUAL_ANNEALING:
         return _get_da_multiminima_in_parallel
@@ -233,6 +258,71 @@ def _normalise_candidates(
             )
         )
     return tuple(sorted(candidates))
+
+
+def _is_feasible_candidate(
+    point: np.ndarray,
+    *,
+    bounds: np.ndarray,
+    constraints,
+    tolerance: float,
+) -> bool:
+    """Return whether one finite point satisfies bounds and supplied constraints."""
+    if np.any(point < bounds[:, 0] - tolerance) or np.any(
+        point > bounds[:, 1] + tolerance
+    ):
+        return False
+    if constraints is None or (
+        isinstance(constraints, (tuple, list)) and not constraints
+    ):
+        return True
+    constraint_items = (
+        (constraints,)
+        if isinstance(constraints, Mapping) or hasattr(constraints, "lb")
+        else tuple(constraints)
+    )
+    for constraint in constraint_items:
+        if isinstance(constraint, Mapping):
+            constraint_type = str(constraint.get("type", "")).lower()
+            function = constraint.get("fun")
+            if constraint_type not in {"eq", "ineq"} or not callable(function):
+                raise InvalidOptimisationProblemError(
+                    "constraints must use scipy-compatible 'eq' or 'ineq' mappings."
+                )
+            values = np.asarray(
+                function(point, *tuple(constraint.get("args", ()))),
+                dtype=float,
+            )
+            if not np.isfinite(values).all():
+                return False
+            if constraint_type == "eq" and np.any(np.abs(values) > tolerance):
+                return False
+            if constraint_type == "ineq" and np.any(values < -tolerance):
+                return False
+            continue
+
+        lower = getattr(constraint, "lb", None)
+        upper = getattr(constraint, "ub", None)
+        if lower is None or upper is None:
+            raise InvalidOptimisationProblemError(
+                "constraints must be scipy-compatible constraint objects or mappings."
+            )
+        if hasattr(constraint, "A"):
+            values = np.asarray(constraint.A @ point, dtype=float)
+        else:
+            function = getattr(constraint, "fun", None)
+            if not callable(function):
+                raise InvalidOptimisationProblemError(
+                    "constraint objects must provide a callable fun or a matrix A."
+                )
+            values = np.asarray(function(point), dtype=float)
+        if not np.isfinite(values).all():
+            return False
+        if np.any(values < np.asarray(lower, dtype=float) - tolerance) or np.any(
+            values > np.asarray(upper, dtype=float) + tolerance
+        ):
+            return False
+    return True
 
 
 __all__ = ["run_multistart_minimisation"]

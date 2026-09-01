@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Utility Placement default-utility penalty coefficient 1000 amendment complete through Build and Test; Operations N/A.
+- **Current Stage**: GitHub Actions artifact smoke correction complete.
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -29,6 +29,35 @@
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
 
 ## Utility Placement Optimisation Progress
+
+- [x] GITHUB ACTIONS ARTIFACT SMOKE CORRECTION - Corrected checkout-local virtual
+  environment classification, updated artifact actions to their supported Node
+  runtime releases, and verified all affected workflow gates. The complete
+  configured-solver suite passes 2,518 tests with 4 expected skips; the focused
+  gate passes 27 tests; Ruff, YAML parsing, warning-strict RTD documentation,
+  fresh distributions, installed-wheel smoke, and patch hygiene pass. Plan:
+  `aidlc-docs/construction/plans/github-actions-artifact-smoke-correction-plan.md`.
+
+- [x] GITHUB ACTIONS RELEASE AND CODEX REVIEW CORRECTIONS - Hardened PR CI,
+  automated trusted tag/GitHub-release/TestPyPI/PyPI delivery, and resolved the
+  three current GitHub Codex review findings. The complete configured-solver
+  suite passes 2,515 tests with 4 expected skips; Ruff, YAML parsing, warning-
+  strict RTD documentation, OpenPinch 0.6.1 distributions, and patch hygiene
+  pass. Plan:
+  `aidlc-docs/construction/plans/github-actions-release-and-codex-review-corrections-plan.md`.
+
+- [x] REPOSITORY CRITICAL CORRECTIONS - Correct transactional problem loading,
+  utility-profile validation, segmented utility assignment, period-cap
+  identity, multiplier persistence, and optimizer constraint feasibility. The
+  complete configured-solver suite passes 2,497 tests with 4 expected skips;
+  Ruff, Sphinx, package build, and patch hygiene pass.
+  Plan: `aidlc-docs/construction/plans/repository-critical-corrections-plan.md`.
+
+- [x] GITHUB CODEX REVIEW CORRECTIONS - Correct period-aware maximum-duty
+  replay serialization and make shared utility targeting replace every duty,
+  including zeros. The complete no-deselection suite passes 2,480 tests with 4
+  expected skips. Plan:
+  `aidlc-docs/construction/plans/utility-placement-codex-review-corrections-plan.md`.
 
 - [x] DEFAULT-UTILITY PENALTY COEFFICIENT 1000 - Increase the private
   Utility Placement squared fallback coefficient from 100 to 1000 while

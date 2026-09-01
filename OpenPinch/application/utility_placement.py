@@ -934,13 +934,19 @@ def build_problem_placement_context(
     return blueprints, context
 
 
-def _serialized_limit(request: UtilityPlacementRequest, name: str):
+def _serialized_limit(
+    request: UtilityPlacementRequest,
+    name: str,
+    *,
+    period_id: str | None = None,
+):
     limit = next((item for item in request.maximum_duties if item.name == name), None)
     if limit is None:
         return None
+    if period_id is not None:
+        selected = limit.for_period(period_id)
+        return {"value": selected.value, "unit": selected.unit}
     values = tuple(value.value for value in limit.values)
-    if len(set(values)) == 1:
-        return {"value": values[0], "unit": request.units.heat_flow}
     return {
         "values": list(values),
         "period_ids": list(limit.period_ids),
@@ -956,7 +962,11 @@ def _candidate_utility_input(
     utilities: list[dict[str, object]] = []
     for utility_type, levels in (("Hot", placement.hot), ("Cold", placement.cold)):
         for level in levels:
-            limit = _serialized_limit(request, level.template_key.name)
+            limit = _serialized_limit(
+                request,
+                level.template_key.name,
+                period_id=period.period_id,
+            )
             utilities.append(
                 {
                     "name": level.template_key.name,

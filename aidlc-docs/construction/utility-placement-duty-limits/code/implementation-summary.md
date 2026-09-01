@@ -7,6 +7,9 @@
   name.
 - Scalar, explicit-unit, and period-resolved limits normalize to the request's
   heat-flow unit. Scalars broadcast to every selected period.
+- Exact candidate replay passes the current period's scalar cap. Returned-case
+  metadata retains explicit period identities, maps them to canonical problem
+  order, and leaves unselected periods internally unbounded.
 - Each named limit is enforced independently in the shared utility targeting
   allocator. An omitted utility remains unbounded and a zero limit disables
   only that utility.
@@ -21,6 +24,9 @@
 - The detached returned case retains maximum-duty metadata and any positive
   fallback definition. Ordinary direct or Total Site targeting therefore
   enforces the caps and standard GCC or TSP plots show the resulting utilities.
+- Shared utility targeting calculates both sides before mutation and replaces
+  every selected-period duty, including zero, preventing stale input duty from
+  surviving a cap, unused level, or zero-load side.
 
 ## Public and Runtime Integration
 

@@ -6274,3 +6274,186 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 **Context**: GIT COMMIT - Four-isothermal notebook and default-utility penalty 1000
 
 ---
+
+## GitHub Codex Review Inspection
+**Timestamp**: 2026-08-31T07:28:44Z
+**User Input**: "See the Codex reviews from Github"
+**AI Response**: "Attempted to locate the current pull request and its Codex review through the local GitHub CLI and public web search. The CLI was unavailable and the public search result was inconclusive, so no repository files were changed during that attempt."
+**Context**: CODE REVIEW - External GitHub review lookup
+
+---
+
+## GitHub Codex Review Inspection Retry
+**Timestamp**: 2026-08-31T07:28:44Z
+**User Input**: "Try again"
+**AI Response**: "Used the signed-in GitHub browser session to inspect merged PR #91 and expand both resolved Codex review threads. Confirmed that the reviewed commit bf3794a2 is the current develop HEAD and that both reported defects remain present: invalid period_ids serialization for multiperiod maximum duties and stale nonzero utility heat flow when a recalculated capped assignment is zero. No application code was changed."
+**Context**: CODE REVIEW - PR #91 Codex findings verified against current develop
+
+---
+
+## GitHub Codex Review Solution Assessment
+**Timestamp**: 2026-08-31T08:57:49Z
+**User Input**: "Suggest solutions"
+**AI Response**: "Recommended separating single-period replay serialization from returned-case persistence: exact replay should pass only the current period's scalar maximum duty, while period-aware persistence should canonicalize identities at the input boundary rather than widening the generic positional value contract. Recommended making utility targeting a full replacement operation by calculating both sides first and then writing every assigned duty, including explicit zeros, so capped, unused, and zero-load utilities cannot retain stale heat flow. Defined focused unit, multiperiod identity, returned-case, cap, zero-load, and idempotence regression tests. No application code was changed."
+**Context**: CODE REVIEW DESIGN - Proposed TDD corrections for PR #91 findings
+
+---
+
+## GitHub Codex Review Corrections Authorization
+**Timestamp**: 2026-08-31T08:57:49Z
+**User Input**: "Go"
+**AI Response**: "Accepted the instruction as approval to implement both verified review corrections through a five-step TDD plan: period-aware cap replay RED, complete duty replacement RED, GREEN corrections, property and focused verification, then the complete configured-solver suite and scope review. Public API, objective, optimizer, notebook, and plotting behavior remain unchanged."
+**Context**: CODE GENERATION AUTHORIZATION - PR #91 review corrections
+
+---
+
+## GitHub Codex Review Corrections RED
+**Timestamp**: 2026-08-31T09:13:20Z
+**User Input**: "No new user input; continued under the approved PR #91 review-correction plan."
+**AI Response**: "Added example regressions for current-period cap serialization, identity-aware returned-case schema validation, canonical selected/subset period mapping, zero-cap stale-duty clearing, zero-load-side clearing, and selected-index isolation. Added a Hypothesis pure-calculator oracle and idempotence property. The RED gate produced exactly seven failures and 66 unaffected passes; Hypothesis shrank the stale-duty defect to cap=0 and initial duty=1."
+**Context**: TDD RED - PR #91 P1 and P2 corrections
+
+---
+
+## GitHub Codex Review Corrections GREEN
+**Timestamp**: 2026-08-31T09:24:03Z
+**User Input**: "No new user input; continued under the approved PR #91 review-correction plan."
+**AI Response**: "Candidate replay now serializes only the current period's scalar cap. Returned utilities accept an identity-aware maximum-heat-flow contract, canonicalize selected IDs into the problem period vector, and represent unselected periods as internally unbounded. Shared targeting calculates both sides before mutation and replaces every selected-period duty, including exact zeros; non-finite internal cap sentinels are treated as unbounded. The focused GREEN gate passes 75 tests, including an actual reversed-order unequal-cap two-period optimization and retarget plus schema round-trip, oracle, period-isolation, and idempotence properties. The expanded contracts/domain/targeting/placement gate passes 480 tests; Ruff passes."
+**Context**: TDD GREEN - PR #91 P1 and P2 corrections
+
+---
+
+## GitHub Codex Review Corrections Focused Verification
+**Timestamp**: 2026-08-31T09:31:02Z
+**User Input**: "No new user input; continued under the approved PR #91 review-correction plan."
+**AI Response**: "Property and example regressions pass alongside the 480-test expanded contracts/domain/targeting/placement gate. Packaging and notebook contracts pass 38 tests with 3 expected skips. Repository-wide Ruff, patch whitespace validation, and the warnings-as-errors 54-source Sphinx build pass. Property-Based Testing rules are compliant; Security and Resiliency remain disabled and N/A."
+**Context**: FOCUSED VERIFICATION - PR #91 P1 and P2 corrections
+
+---
+
+## GitHub Codex Review Corrections Build and Test
+**Timestamp**: 2026-08-31T09:38:17Z
+**User Input**: "No new user input; completed under the approved PR #91 review-correction plan."
+**AI Response**: "The complete configured-solver repository suite passes 2,480 tests with 4 expected skips, no failures, and no deselections in 348.28 seconds. Final scope review retained only six production modules required for period-aware replay and complete duty replacement, two regression modules, requirements/design/RTD alignment, and mandatory workflow records. Notebook 19, plotting, optimizer coordinates, and unrelated files are unchanged. All five TDD steps are complete. Property-Based Testing is compliant; Security and Resiliency remain disabled and N/A; Operations is N/A."
+**Context**: BUILD AND TEST COMPLETE - PR #91 P1 and P2 corrections
+
+---
+
+## Repository Critical-Issue Code Review
+**Timestamp**: 2026-08-31T09:40:28Z
+**User Input**: "Do a thorough code review for the repo and identify critical issues."
+**AI Response**: "Started a read-only, risk-prioritized review of the committed repository, covering calculation and state mutation, multiperiod value handling, serialization, solver execution, and file/process boundaries. Application code will not be changed; findings will be ranked and supported by exact locations and reproductions where possible."
+**Context**: CODE REVIEW - Repository-wide critical issue assessment
+
+---
+
+## Previous Utility-Placement Corrections Commit
+**Timestamp**: 2026-08-31T09:49:02Z
+**User Input**: "Commit the previous changes and then continue."
+**AI Response**: "Committed the completed and verified utility-placement review corrections on develop as e06f8a2d (Fix utility cap replay and stale targeting duties), then resumed the repository critical-issue review from that clean code boundary."
+**Context**: GIT COMMIT / CODE REVIEW CONTINUATION
+
+---
+
+## Repository Critical-Issue Code Review Findings
+**Timestamp**: 2026-08-31T09:58:09Z
+**User Input**: "No new user input; continued the requested repository code review after committing the previous changes."
+**AI Response**: "Completed the risk-prioritized repository review and reproduced six actionable correctness defects: documented segmented utilities crash during duty assignment; the one-dimensional load-profile validity guard counts ndarray dimensions rather than qualifying rows; failed PinchProblem loads leave new raw input paired with the old prepared runtime; equal selected-period caps collapse to a scalar and constrain unselected periods; set_dt_cont_multiplier is lost on serialization and restoration; and the reusable optimizer can return candidates that violate supplied constraints. The existing 2,480-pass suite has no direct regression covering these scenarios. No application code was changed during the review."
+**Context**: CODE REVIEW COMPLETE - Six reproduced critical/high-priority findings
+
+---
+
+## Repository Critical Corrections Authorization
+**Timestamp**: 2026-08-31T11:49:03Z
+**User Input**: "go"
+**AI Response**: "Accepted authorization to correct all six reproduced findings through an eight-step TDD plan: problem-state transaction RED, targeting RED, persistence RED, optimizer-feasibility RED, state/persistence GREEN, targeting/optimizer GREEN, focused/property verification, and the complete configured-solver suite. Public workflow names, unrelated numerical methods, notebook content, and plotting remain unchanged."
+**Context**: CODE GENERATION AUTHORIZATION - Repository critical corrections
+
+---
+## Repository Critical Corrections - RED Verification
+**Timestamp**: 2026-08-31T11:58:41Z
+**User Input**: "go"
+**AI Response**: "Added focused regression tests for all six reproduced review findings. The RED run produced eleven expected failures covering atomic input replacement, multiplier persistence, period-identity cap serialization, malformed utility profiles, segmented utility assignment, and optimizer feasibility filtering."
+**Context**: Code Generation; completed correction-plan Steps 1 through 4 before production changes.
+
+---
+
+## Repository Critical Corrections - GREEN and Focused Verification
+**Timestamp**: 2026-08-31T12:20:53Z
+**User Input**: "No new user input; continued under the approved repository critical-corrections plan."
+**AI Response**: "Implemented atomic source replacement, canonical zone-multiplier persistence, identity-aware selected-period caps, finite non-negative utility-profile validation, proportional segmented-utility child targeting with zero-duty recovery, and optimizer bound/constraint filtering. The affected application, targeting, segmented-stream, utility-placement, and optimisation gate passes 374 tests. Repository Ruff, patch whitespace, generated constraint/cap/segment properties, and the warnings-as-errors 54-source Sphinx build pass."
+**Context**: Code Generation and focused verification; completed correction-plan Steps 5 through 7.
+
+---
+
+## Repository Critical Corrections - Build and Test Complete
+**Timestamp**: 2026-08-31T12:38:48Z
+**User Input**: "No new user input; completed under the approved repository critical-corrections plan."
+**AI Response**: "The first complete run exposed one generated segmented-duty boundary at 4.8 μW; the targeting transaction was corrected to accept finite tolerance-non-negative child duties without weakening ordinary segment mutation. The 113-test boundary gate then passed. The final configured-solver suite passes 2,497 tests with 4 expected skips and no deselections in 356.52 seconds. Ruff, patch hygiene, warning-free Sphinx documentation, and OpenPinch 0.6.0 wheel/source builds pass. Final scope review retained only production, regression, RTD, and mandatory workflow evidence required by the six corrections."
+**Context**: BUILD AND TEST COMPLETE - Repository critical corrections
+
+---
+
+## Repository Critical Corrections Commit Authorization
+**Timestamp**: 2026-08-31T16:32:38Z
+**User Input**: "commit"
+**AI Response**: "Accepted authorization to commit the completed repository critical-corrections implementation, tests, RTD documentation, and AI-DLC evidence on develop."
+**Context**: GIT COMMIT - Repository critical corrections
+
+---
+
+## GitHub Workflows Audit
+**Timestamp**: 2026-08-31T20:20:36Z
+**User Input**: "Audit the Github workflows."
+**AI Response**: "Started a read-only audit of all repository GitHub Actions workflows, covering triggers, permissions, action pinning, secret and fork safety, concurrency, release controls, caching, test coverage, and maintainability. Workflow files will not be changed."
+**Context**: CODE REVIEW - GitHub Actions workflows
+
+---
+
+## GitHub Workflows Audit Completion
+**Timestamp**: 2026-08-31T20:34:14Z
+**User Input**: "Audit the Github workflows."
+**AI Response**: "Completed the read-only audit. Critical findings cover missing pre-merge CI for pull requests targeting develop, execution of PR-controlled bump configuration in a contents-write job, shell interpolation of a PR branch name, bot-authored version bumps leaving the new PR head in action_required state, and mutable PyPI publishing action references. Moderate findings cover incomplete version-bump dependencies, missing explicit default token permissions, non-frozen dependency installation, unenforced solver tests, and release-tag provenance checks. All three workflow files parse as YAML; recent CI and v0.6.0 publication runs succeeded."
+**Context**: CODE REVIEW - GitHub Actions workflows completed; no workflow files changed
+
+---
+
+## GitHub Actions and Codex Review Corrections Authorization
+**Timestamp**: 2026-08-31T20:37:16Z
+**User Input**: "- Address the GitHub Actions workflow issues. Automate the tag/release process as well as the publish to Pypi.  \n- Address the Github Codex review issues. \n- Commit the improvements. "
+**AI Response**: "Accepted explicit authorization to implement and commit the audited workflow corrections, automated tag/GitHub-release/PyPI delivery, and all current PR 92 Codex review findings. Created the TDD and property-based execution plan and began by retrieving the live review comments and reconciling the bot-created remote version commit."
+**Context**: CODE GENERATION AUTHORIZATION - GitHub Actions release automation and Codex review corrections
+
+---
+
+## GitHub Actions and Codex Review Corrections Completion
+**Timestamp**: 2026-08-31T21:15:54Z
+**User Input**: "No new user input; completed under the approved GitHub Actions release and Codex review corrections plan."
+**AI Response**: "Replaced pull-request mutation with read-only validation for main and develop, pinned every action to an immutable commit, installed from the frozen uv lock, and added a guarded main-only release workflow that validates the forward version, runs solver and artifact gates, creates an annotated tag and draft GitHub release, publishes the same distributions to TestPyPI and protected PyPI, then finalizes the GitHub release. Resolved all three PR 92 Codex findings with a configurable 1e-6 optimizer feasibility tolerance, generated nested-zone multiplier round trips, and generated stateful load/target/failure sequences. The focused gate passes 186 tests. The complete configured-solver suite passes 2,515 tests with 4 expected skips in 336.65 seconds. Repository-wide Ruff, workflow YAML parsing, patch hygiene, the warning-strict 54-source RTD build, and OpenPinch 0.6.1 wheel/source builds pass. Property-Based Testing rules PBT-02, PBT-03, PBT-06, PBT-07, PBT-08, and PBT-10 are compliant; PBT-04 and PBT-05 are N/A. Security and Resiliency extensions remain disabled and were not enforced. The unrelated untracked Excel workbook was preserved and excluded."
+**Context**: BUILD AND TEST COMPLETE - GitHub Actions release automation and Codex review corrections
+
+---
+
+## GitHub Actions Failure Investigation
+**Timestamp**: 2026-08-31T22:22:59Z
+**User Input**: "Github actions now fail. Investigate."
+**AI Response**: "Investigated the live CI Develop run 33441220938 and PR Validation run 33441224711 for commit 7136b7c7. Tests, coverage, documentation, optional installs, lock validation, and artifact builds pass. All six failures are the three operating-system variants of artifact-install-smoke in both workflows. The wheel is successfully installed into the checkout-local .venv, but artifact_install_smoke.py rejects every package path beneath the repository root and therefore misclassifies .venv site-packages as a source-checkout import. The same defect is present in the unpublished release workflow. GitHub also reports a non-blocking Node.js 20 deprecation warning for the pinned download-artifact action. No production or workflow files were changed during diagnosis."
+**Context**: DIAGNOSIS COMPLETE - GitHub Actions installed-wheel smoke failure
+
+---
+
+## GitHub Actions Artifact Smoke Correction Authorization
+**Timestamp**: 2026-08-31T22:22:59Z
+**User Input**: "Fix. commit."
+**AI Response**: "Accepted authorization to correct the checkout-local virtual-environment false positive under TDD, update the deprecated artifact action pins, run focused and complete verification, and commit the correction to develop. Created the seven-step correction plan and resumed Code Generation."
+**Context**: CODE GENERATION AUTHORIZATION - GitHub Actions artifact smoke correction
+
+---
+
+## GitHub Actions Artifact Smoke Correction Completion
+**Timestamp**: 2026-09-01T00:02:01Z
+**User Input**: "Fix. commit."
+**AI Response**: "Narrowed artifact smoke classification from the entire repository to the actual OpenPinch source package, preserving source-import rejection while permitting wheel imports from checkout-local virtual environments. Added the exact GitHub regression and a fixed-seed generated path invariant. Updated upload-artifact to v7.0.1 commit 043fb46d1a93c77aae656e7c1c64a875d1fc6a0a and download-artifact to v8.0.1 commit 3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c in develop, pull-request, and publish workflows. The focused gate passes 27 tests; an isolated checkout-local wheel smoke passes; the complete configured-solver suite passes 2,518 tests with 4 expected skips in 337.87 seconds. Ruff, formatting, workflow YAML parsing, patch hygiene, the warning-strict 54-source RTD build, and fresh wheel/source builds pass. PBT-03, PBT-07, PBT-08, and PBT-10 are compliant; the remaining property rules are N/A for this pure path classifier. Security and Resiliency remain disabled and N/A."
+**Context**: BUILD AND TEST COMPLETE - GitHub Actions artifact smoke correction
+
+---

@@ -1,307 +1,163 @@
-name: PR & Version Bump
+name: PR Validation
 
 on:
   pull_request:
-    branches: [ "main" ]
-    types: [ opened, synchronize, reopened, ready_for_review ]
+    branches: ["main", "develop"]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
 
 concurrency:
-  group: pr-bump-${{ github.event.pull_request.number }}
-  cancel-in-progress: false
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 env:
   PYTHON_VERSION: "3.14.2"
+  UV_VERSION: "0.11.29"
 
 jobs:
   test:
-    if: ${{ github.event.pull_request.draft == false }}
+    if: ${{ github.event.action != 'closed' && github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
-      - name: Checkout (merge commit is fine for tests)
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-      - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-      - name: Check uv.lock project version
-        run: python scripts/check_lockfile_version.py
-      - name: Install deps
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --frozen --group dev
+      - run: uv run --no-sync python scripts/check_lockfile_version.py
+      - run: uv run --no-sync ruff check .
+      - run: uv run --no-sync coverage run --branch --source=OpenPinch -m pytest --hypothesis-seed=20260715 -m "not solver"
+      - run: uv run --no-sync coverage report --fail-under=95
+
+  release-version:
+    if: ${{ github.event.action != 'closed' && github.event.pull_request.draft == false && github.event.pull_request.base.ref == 'main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --frozen --no-default-groups
+      - run: uv run --no-sync python scripts/check_lockfile_version.py
+      - name: Require a forward release version
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
-          python -m pip install --upgrade pip
-          pip install -e .
-          pip install --group dev
-      - name: Run Ruff
-        run: ruff check .
-      - name: Run tests
-        run: coverage run --branch --source=OpenPinch -m pytest --hypothesis-seed=20260715 -m "not solver"
-      - name: Enforce coverage
-        run: coverage report --fail-under=95
+          set -euo pipefail
+          git fetch --no-tags origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          git show "refs/remotes/origin/${BASE_REF}:pyproject.toml" > "${RUNNER_TEMP}/base-pyproject.toml"
+          uv run --no-sync python scripts/check_release_version.py --base-pyproject "${RUNNER_TEMP}/base-pyproject.toml"
 
   docs:
-    if: ${{ github.event.pull_request.draft == false }}
+    if: ${{ github.event.action != 'closed' && github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-      - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-      - name: Install deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .
-          pip install --group dev
-      - name: Build docs
-        run: python scripts/build_docs.py
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --frozen --group dev
+      - run: uv run --no-sync python scripts/build_docs.py
 
   optional-install-smoke:
-    if: ${{ github.event.pull_request.draft == false }}
+    if: ${{ github.event.action != 'closed' && github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         surface: [core, dashboard, notebook, brayton_cycle, synthesis]
     steps:
-      - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-      - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-      - name: Install package surface
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install locked package surface
+        env:
+          SURFACE: ${{ matrix.surface }}
         run: |
-          python -m pip install --upgrade pip
-          case "${{ matrix.surface }}" in
-            core) pip install . ;;
-            *) pip install ".[${{ matrix.surface }}]" ;;
+          case "${SURFACE}" in
+            core) uv sync --frozen --no-default-groups ;;
+            *) uv sync --frozen --no-default-groups --extra "${SURFACE}" ;;
           esac
-      - name: Run optional install smoke
-        run: python scripts/optional_install_smoke.py ${{ matrix.surface }}
+      - run: uv run --no-sync python scripts/optional_install_smoke.py ${{ matrix.surface }}
 
   artifact-build:
-    if: ${{ github.event.pull_request.draft == false }}
+    if: ${{ github.event.action != 'closed' && github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-      - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-      - name: Build distributions
-        run: |
-          python -m pip install --upgrade pip
-          pip install build
-          python scripts/build_dist.py
-      - name: Upload distributions
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --frozen --group dev
+      - run: uv run --no-sync python scripts/build_dist.py
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: openpinch-dist
           path: dist/*
+          if-no-files-found: error
 
   artifact-install-smoke:
     needs: artifact-build
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-      - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - name: Download distributions
-        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: openpinch-dist
           path: dist
-      - name: Install runtime dependencies
-        run: python -m pip install "numpy<3" "pint<1" "pandas<3" "coolprop<8" "pydantic<3" "scipy<2"
-      - name: Install wheel without package index
-        run: python -m pip install --no-index --find-links dist OpenPinch
-      - name: Smoke installed artifact
-        run: python scripts/artifact_install_smoke.py
-
-  bump-version:
-    name: Bump version on PR head branch (no tags)
-    needs: [test, optional-install-smoke]
-    if: ${{ github.event.pull_request.draft == false && !github.event.pull_request.head.repo.fork }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-    steps:
-      # 1) Checkout the PR HEAD branch (pushable), not refs/pull/*/merge
-      - name: Checkout PR head branch
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
-          persist-credentials: true
-
-      - name: Debug ref
-        run: |
-          echo "HEAD ref: $(git rev-parse --abbrev-ref --symbolic-full-name HEAD)"
-          git remote -v
-
-      - name: Set git identity
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-      - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install bump-my-version
-        run: pip install "bump-my-version==1.2.3"
-
-      - name: Resolve bump part from PR labels/title
-        id: bump-part
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
-        with:
-          script: |
-            const labels = (context.payload.pull_request.labels || []).map(l => l.name.toLowerCase());
-            const title = (context.payload.pull_request.title || "").toLowerCase();
-            const titleMatch = title.match(/\[(major|minor|patch)\]/);
-            let part = "patch";
-            if (labels.includes("major")) {
-              part = "major";
-            } else if (labels.includes("minor")) {
-              part = "minor";
-            } else if (labels.includes("patch")) {
-              part = "patch";
-            } else if (titleMatch) {
-              part = titleMatch[1];
-            }
-            core.setOutput("part", part);
-
-      - name: Check whether selected bump already exists on branch
-        id: bump-policy
-        env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-          BUMP_PART: ${{ steps.bump-part.outputs.part }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-        run: |
-          set -euo pipefail
-
-          git fetch origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}"
-
-          current="$(bump-my-version show current_version)"
-          base="$(
-            git show "refs/remotes/origin/${BASE_REF}:.bumpversion.toml" \
-              | python -c 'import sys, tomllib; print(tomllib.loads(sys.stdin.read())["tool"]["bumpversion"]["current_version"])'
-          )"
-
-          echo "base-version=${base}" >> "$GITHUB_OUTPUT"
-          echo "current-version=${current}" >> "$GITHUB_OUTPUT"
-
-          if [ "${HEAD_REF}" = "main" ] || [ "${HEAD_REF}" = "develop" ]; then
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "reason=protected branch bump policy is unchanged" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          BASE_VERSION="${base}" CURRENT_VERSION="${current}" python - <<'PY'
-          import os
-
-          def parse(version: str) -> tuple[int, int, int]:
-              parts = version.split(".")
-              if len(parts) != 3:
-                  raise SystemExit(f"Unsupported version format: {version}")
-              return tuple(int(part) for part in parts)
-
-          base = parse(os.environ["BASE_VERSION"])
-          current = parse(os.environ["CURRENT_VERSION"])
-          part = os.environ["BUMP_PART"]
-
-          skip = False
-          if part == "major":
-              skip = current[0] > base[0]
-          elif part == "minor":
-              skip = current[0] == base[0] and current[1] > base[1]
-          elif part == "patch":
-              skip = (
-                  current[0] == base[0]
-                  and current[1] == base[1]
-                  and current[2] > base[2]
-              )
-          else:
-              raise SystemExit(f"Unsupported bump part: {part}")
-
-          reason = (
-              f"{part} version already bumped from {os.environ['BASE_VERSION']}"
-              f" to {os.environ['CURRENT_VERSION']}"
-              if skip
-              else f"{part} version has not been bumped on this branch"
-          )
-
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
-              handle.write(f"skip={str(skip).lower()}\n")
-              handle.write(f"reason={reason}\n")
-          PY
-
-      # 2) Run the bump locally (no tag), capture versions
-      - name: Bump version (selected part, no tag)
-        id: bump
-        if: steps.bump-policy.outputs.skip != 'true'
-        env:
-          BUMP_PART: ${{ steps.bump-part.outputs.part }}
-        run: |
-          set -euo pipefail
-          prev="$(bump-my-version show current_version)"
-          echo "previous-version=${prev}" >> "$GITHUB_OUTPUT"
-
-          bump-my-version bump "${BUMP_PART}" --no-tag
-
-          curr="$(bump-my-version show current_version)"
-          echo "current-version=${curr}" >> "$GITHUB_OUTPUT"
-          echo "bump-part=${BUMP_PART}" >> "$GITHUB_OUTPUT"
-
-          if [ "$prev" != "$curr" ]; then
-            echo "bumped=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "bumped=false" >> "$GITHUB_OUTPUT"
-          fi
-
-          # If the tool didn't auto-commit, commit changes ourselves
-          if ! git diff --quiet --staged || ! git diff --quiet; then
-            git add -A
-            git commit -m "chore: bump version: ${prev} → ${curr} [ci bump]"
-          fi
-
-      - name: Check bumped uv.lock project version
-        if: steps.bump.outputs.bumped == 'true'
-        run: python scripts/check_lockfile_version.py
-
-      # 3) Push to the PR head branch explicitly (never to refs/pull/*/merge)
-      - name: Push bump commit to PR head
-        if: steps.bump.outputs.bumped == 'true'
-        run: |
-          git push origin "HEAD:refs/heads/${{ github.event.pull_request.head.ref }}"
-
-      - name: Comment on PR with new version
-        if: steps.bump.outputs.bumped == 'true'
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
-        env:
-          PREV: ${{ steps.bump.outputs.previous-version }}
-          CURR: ${{ steps.bump.outputs.current-version }}
-          PART: ${{ steps.bump.outputs.bump-part }}
-        with:
-          script: |
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-              body: `✅ Version bumped (${process.env.PART}) from \`${process.env.PREV}\` to \`${process.env.CURR}\` on this PR branch.`
-            });
+      - run: uv sync --frozen --no-default-groups
+      - run: uv pip install --python .venv --no-deps --reinstall --no-index --find-links dist OpenPinch
+      - run: uv run --no-sync python scripts/artifact_install_smoke.py

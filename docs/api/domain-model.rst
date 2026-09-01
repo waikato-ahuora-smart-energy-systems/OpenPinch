@@ -34,6 +34,11 @@ cost equals the sum of the child costs. Assigning ``parent.price`` is an
 explicit broadcast to every child; updating one child afterwards may make the
 prices differ again.
 
+Utility targeting assigns a segmented utility through its authoritative child
+profile. Child duties are scaled proportionally to the required aggregate
+duty. An unused utility may be set to zero, and later retargeting restores the
+last non-zero segment proportions instead of mutating the derived parent duty.
+
 ``StreamCollection``
    Ordered container with hot/cold filtering and utility inversion helpers.
    Ordinary iteration and reports remain parent-based; explicit expanded

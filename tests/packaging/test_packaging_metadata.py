@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import runpy
 import subprocess
 import tomllib
@@ -20,6 +21,8 @@ WORKFLOWS = [
     REPO_ROOT / ".github" / "workflows" / "ci-pull-request.yml",
     REPO_ROOT / ".github" / "workflows" / "ci-publish.yml",
 ]
+UPLOAD_ARTIFACT_SHA = "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+DOWNLOAD_ARTIFACT_SHA = "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"
 
 
 def _read_pyproject() -> dict:
@@ -216,6 +219,7 @@ def test_lockfile_project_version_matches_pyproject():
 
 def test_bumpversion_updates_lockfile_project_version():
     config = _read_bumpversion()["tool"]["bumpversion"]
+    assert config["tag"] is False
     uv_lock_entries = [
         entry
         for entry in config["files"]
@@ -257,7 +261,41 @@ def test_ci_measures_branch_coverage_with_the_documented_hypothesis_seed():
         assert "coverage report --fail-under=95" in text
 
 
-def test_testpypi_publish_skips_existing_files_but_pypi_publish_does_not():
+def test_workflows_use_frozen_uv_environment_and_read_only_default_permissions():
+    setup_uv_ref = re.compile(r"astral-sh/setup-uv@[0-9a-f]{40}")
+
+    for workflow_path in WORKFLOWS:
+        workflow = workflow_path.read_text(encoding="utf-8")
+        assert "permissions:\n  contents: read" in workflow
+        assert setup_uv_ref.search(workflow)
+        assert "uv sync --frozen" in workflow
+        assert "pip install --group dev" not in workflow
+        assert "python -m pip install --upgrade pip" not in workflow
+
+
+def test_every_external_action_is_pinned_to_an_immutable_commit():
+    action_ref = re.compile(r"^\s*- uses: ([^\s]+)$", re.MULTILINE)
+
+    for workflow_path in WORKFLOWS:
+        workflow = workflow_path.read_text(encoding="utf-8")
+        for reference in action_ref.findall(workflow):
+            assert re.fullmatch(r"[^@]+@[0-9a-f]{40}", reference), (
+                workflow_path,
+                reference,
+            )
+
+
+def test_workflows_use_current_node24_artifact_actions():
+    upload_ref = f"actions/upload-artifact@{UPLOAD_ARTIFACT_SHA}"
+    download_ref = f"actions/download-artifact@{DOWNLOAD_ARTIFACT_SHA}"
+
+    for workflow_path in WORKFLOWS:
+        workflow = workflow_path.read_text(encoding="utf-8")
+        assert upload_ref in workflow
+        assert download_ref in workflow
+
+
+def test_testpypi_and_pypi_publish_the_same_validated_artifact_without_skips():
     workflow = (REPO_ROOT / ".github" / "workflows" / "ci-publish.yml").read_text(
         encoding="utf-8"
     )
@@ -266,34 +304,69 @@ def test_testpypi_publish_skips_existing_files_but_pypi_publish_does_not():
     )[0]
     pypi_block = workflow.split("publish-pypi:", 1)[1]
 
-    assert "skip-existing: true" in testpypi_block
+    assert "skip-existing: true" not in testpypi_block
     assert "skip-existing: true" not in pypi_block
+    assert testpypi_block.count("name: openpinch-dist") == 1
+    assert pypi_block.count("name: openpinch-dist") == 1
 
 
-def test_publish_workflow_is_tag_only_and_validation_gated():
+def test_publish_workflow_automates_tag_draft_release_pypi_and_final_release():
     workflow = (REPO_ROOT / ".github" / "workflows" / "ci-publish.yml").read_text(
         encoding="utf-8"
     )
 
-    assert 'tags: ["v*.*.*"]' in workflow
-    assert "branches:" not in workflow
-    assert "workflow_dispatch:" not in workflow
-    assert 'python scripts/check_release_tag.py "${{ github.ref_name }}"' in workflow
-    assert "needs: [test, docs, optional-install-smoke]" in workflow
+    assert 'branches: ["main"]' in workflow
+    assert "github.ref == 'refs/heads/main'" in workflow
+    assert "tags:" not in workflow
+    assert "workflow_dispatch:" in workflow
+    assert "python scripts/check_release_version.py" in workflow
+    assert "solver-tests:" in workflow
+    assert 'pytest --hypothesis-seed=20260715 -m "solver"' in workflow
+    assert "create-draft-release:" in workflow
+    assert 'git tag -a "${TAG_NAME}"' in workflow
+    assert 'gh release create "${TAG_NAME}"' in workflow
+    assert "--draft" in workflow
+    assert "publish-testpypi:" in workflow
+    assert "publish-pypi:" in workflow
+    assert "finalize-release:" in workflow
+    assert 'gh release edit "${TAG_NAME}" --draft=false --latest' in workflow
     assert "coverage report --fail-under=95" in workflow
     assert "surface: [core, dashboard, notebook, brayton_cycle, synthesis]" in workflow
     assert "os: [ubuntu-latest, windows-latest, macos-latest]" in workflow
 
 
-def test_pr_version_bump_waits_for_validation():
+def test_pr_workflow_validates_main_and_develop_without_mutating_pr_heads():
     workflow = (REPO_ROOT / ".github" / "workflows" / "ci-pull-request.yml").read_text(
         encoding="utf-8"
     )
-    bump_block = workflow.split("  bump-version:", 1)[1]
 
-    assert "needs: [test, optional-install-smoke]" in bump_block
+    assert 'branches: ["main", "develop"]' in workflow
+    assert "bump-version:" not in workflow
+    assert "contents: write" not in workflow
+    assert "pull-requests: write" not in workflow
+    assert "persist-credentials: true" not in workflow
+    assert "git push" not in workflow
+    assert "release-version:" in workflow
+    assert "github.event.pull_request.base.ref == 'main'" in workflow
     assert "coverage report --fail-under=95" in workflow
     assert "surface: [core, dashboard, notebook, brayton_cycle, synthesis]" in workflow
+
+
+def test_release_jobs_are_privilege_separated_from_project_code_execution():
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci-publish.yml").read_text(
+        encoding="utf-8"
+    )
+
+    create_block = workflow.split("  create-draft-release:", 1)[1].split(
+        "  publish-testpypi:", 1
+    )[0]
+    finalize_block = workflow.split("  finalize-release:", 1)[1]
+    assert "contents: write" in create_block
+    assert "contents: write" in finalize_block
+    assert "uv run" not in create_block
+    assert "python scripts/" not in create_block
+    assert "uv run" not in finalize_block
+    assert "python scripts/" not in finalize_block
 
 
 def test_installed_wheel_smoke_uses_only_the_root_workflow_contract():

@@ -188,6 +188,20 @@ def test_workspace_updates_case_options_and_roundtrips_bundles(tmp_path: Path):
     )
 
 
+def test_workspace_round_trips_dt_cont_multiplier(tmp_path: Path) -> None:
+    workspace = PinchWorkspace(_basic_payload(), project_name="Demo")
+    workspace.set_dt_cont_multiplier(2.25)
+
+    bundle_path = workspace.save_bundle(tmp_path / "multiplier_workspace.json")
+    reloaded = PinchWorkspace.load_bundle(bundle_path)
+
+    serialized = reloaded.to_problem_json(case_name="baseline")
+    assert serialized["zone_tree"]["dt_cont_multiplier"] == pytest.approx(2.25)
+    assert reloaded.case("baseline").master_zone.dt_cont_multiplier == pytest.approx(
+        2.25
+    )
+
+
 def test_workspace_roundtrips_a_serialized_heat_exchanger_network(
     tmp_path: Path,
 ) -> None:

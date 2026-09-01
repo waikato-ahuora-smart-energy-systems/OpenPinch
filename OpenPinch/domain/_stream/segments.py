@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+import numpy as np
+
 _WIRE_TO_RUNTIME = {
     "t_supply": "supply_temperature",
     "t_target": "target_temperature",
@@ -124,6 +126,59 @@ def update_transaction(
     parent.replace_segments(candidates)
 
 
+def set_total_heat_flow_at_idx(parent, value: float, *, idx: int | None) -> None:
+    """Scale authoritative child duties to one aggregate targeting duty."""
+    from ...domain.configuration import tol
+
+    if not parent.has_segments:
+        raise ValueError(f"Stream {parent.name!r} has no explicit segments.")
+    target = float(value)
+    if not np.isfinite(target) or target < -tol:
+        raise ValueError(
+            "Segmented stream targeting duty must be finite and non-negative."
+        )
+    target = max(target, 0.0)
+    period_idx = 0 if idx is None else int(idx)
+    duties = np.asarray(
+        [float(segment.heat_flow[period_idx]) for segment in parent._segments],
+        dtype=float,
+    )
+    total = float(np.sum(duties))
+    fractions_by_period = parent._segment_targeting_fractions
+    previous_fractions = dict(fractions_by_period)
+    if total > tol:
+        fractions = duties / total
+        fractions_by_period[period_idx] = tuple(float(item) for item in fractions)
+    else:
+        cached = fractions_by_period.get(period_idx)
+        if cached is None or len(cached) != parent.segment_count:
+            if target > tol:
+                raise ValueError(
+                    f"Segmented stream {parent.name!r} has no non-zero duty profile "
+                    "that can be scaled for targeting."
+                )
+            fractions = np.zeros(parent.segment_count, dtype=float)
+        else:
+            fractions = np.asarray(cached, dtype=float)
+
+    previous_allow_targeting = parent._allow_targeting_segment_duties
+    parent._allow_targeting_segment_duties = True
+    try:
+        update_transaction(
+            parent,
+            {
+                segment_index: {"heat_flow": target * float(fraction)}
+                for segment_index, fraction in enumerate(fractions)
+            },
+            idx=period_idx,
+        )
+    except Exception:
+        parent._segment_targeting_fractions = previous_fractions
+        raise
+    finally:
+        parent._allow_targeting_segment_duties = previous_allow_targeting
+
+
 def replace(parent, segments, *, segment_type: type) -> None:
     """Normalize, validate, attach, and atomically replace child records."""
     candidates = normalise_segment_inputs(segments, segment_type=segment_type)
@@ -174,6 +229,7 @@ def validate(parent, segments: tuple) -> None:
         segments,
         parent_num_periods=parent._num_periods,
         tolerance=tol,
+        allow_targeting_duties=parent._allow_targeting_segment_duties,
     )
 
 

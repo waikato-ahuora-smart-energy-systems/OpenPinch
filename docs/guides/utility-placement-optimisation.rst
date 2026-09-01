@@ -94,7 +94,10 @@ identities are also accepted:
    }
 
 Each hot and cold level has its own independent bound, including matching
-generated pairs. When named capacity cannot cover the target, residual-only
+generated pairs. Explicit identities are resolved against the problem's
+canonical period order. If only a subset is selected, the returned case leaves
+that utility unbounded in unselected periods. When named capacity cannot cover
+the target, residual-only
 ``HU`` or ``CU`` supplies the shortfall and is retained in the returned case.
 Its supply temperature is fixed 50 K above the context-wide maximum process
 temperature for ``HU`` or 50 K below the context-wide minimum for ``CU``. This
@@ -105,6 +108,8 @@ runs the same direct, Total Site, or indirect target method used after the
 optimization. That exact target determines named duties, same-level Total Site
 utility matching, target totals, and fallback duty. A requested candidate level
 may therefore have zero duty; there is no implicit minimum-duty constraint.
+Retargeting replaces prior utility duties, including writing exact zero for
+capped, unused, and zero-load levels.
 
 The return value is already a normal detached :class:`OpenPinch.PinchProblem`
 containing the best utility set. Register it, then target and plot it with the
