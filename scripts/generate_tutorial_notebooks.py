@@ -118,10 +118,11 @@ NOTEBOOKS = {
                 "direct = problem.target.direct_heat_integration(\n"
                 '    zone="Bleaching", period_id="0"\n'
                 ")\n"
-                "requested_recovery_kw = float(direct.heat_recovery_target)\n"
+                "direct_recovery_kw = float(direct.heat_recovery_target)\n"
+                "requested_recovery_kw = direct_recovery_kw\n"
                 "cached_results_before_inverse = problem.results\n"
-                "recovery_approach = "
-                "problem.target.heat_recovery_approach_temperature(\n"
+                "recovery_dt_min = "
+                "problem.target.heat_recovery_dt_min(\n"
                 '    heat_recovery={"value": requested_recovery_kw, "unit": "kW"},\n'
                 '    zone="Bleaching",\n'
                 '    period_id="0",\n'
@@ -129,9 +130,16 @@ NOTEBOOKS = {
                 "ordinary_target_preserved = (\n"
                 "    problem.results is cached_results_before_inverse\n"
                 ")\n"
-                'recovery_approach_summary = recovery_approach.model_dump(mode="json")\n'
-                'recovery_approach_summary["ordinary_target_preserved"] = (\n'
+                'recovery_dt_min_summary = recovery_dt_min.model_dump(mode="json")\n'
+                "thermodynamic_limit_matches_direct = abs(\n"
+                "    recovery_dt_min.thermodynamic_limit.value\n"
+                "    - direct_recovery_kw\n"
+                ") <= 1e-6\n"
+                'recovery_dt_min_summary["ordinary_target_preserved"] = (\n'
                 "    ordinary_target_preserved\n"
+                ")\n"
+                'recovery_dt_min_summary["direct_recovery_is_limit"] = (\n'
+                "    thermodynamic_limit_matches_direct\n"
                 ")\n"
                 "indirect = problem.target.indirect_heat_integration()\n"
                 "total_site = problem.target.total_site_heat_integration()\n"
@@ -303,16 +311,16 @@ NOTEBOOKS = {
                 "period_outputs = problem.target.all_periods.all_heat_integration()\n"
                 "direct_periods = "
                 "problem.target.all_periods.direct_heat_integration()\n"
-                "zero_recovery_approaches = "
-                "problem.target.all_periods.heat_recovery_approach_temperature(\n"
+                "zero_recovery_dt_mins = "
+                "problem.target.all_periods.heat_recovery_dt_min(\n"
                 "    heat_recovery=0.0\n"
                 ")\n"
                 "recovery_requests = {\n"
                 "    period_id: result.thermodynamic_limit.value * 0.8\n"
-                "    for period_id, result in zero_recovery_approaches.items()\n"
+                "    for period_id, result in zero_recovery_dt_mins.items()\n"
                 "}\n"
-                "mapped_recovery_approaches = "
-                "problem.target.all_periods.heat_recovery_approach_temperature(\n"
+                "mapped_recovery_dt_mins = "
+                "problem.target.all_periods.heat_recovery_dt_min(\n"
                 "    heat_recovery=recovery_requests, workers=2\n"
                 ")\n"
                 "indirect_periods = "
@@ -878,12 +886,12 @@ GUIDANCE = {
         ),
     ),
     "02_focused_direct_and_total_site.ipynb": (
-        "How do local process targets and their equivalent global HRAT differ from indirect and Total Site opportunities?",
-        "Compare like-for-like duties and retain the zone and period with every focused result. For an interior request, the inverse service returns the greatest feasible global HRAT whose calculated recovery still meets the request. It is a process-level composite-curve spacing, not an exchanger EMAT; Total Site curves describe utility-system opportunities, not individual exchanger matches.",
+        "How does a threshold problem's equivalent global dt_min differ from ordinary direct, indirect, and Total Site targets?",
+        "Bleaching is a threshold problem: its ordinary direct recovery equals the thermodynamic limit over a positive global-approach plateau. The inverse therefore returns the greatest feasible approach on that plateau, about 58.34505 delta_degC, with `at_thermodynamic_limit`; it does not force the limit boundary to zero. This is process-level composite-curve spacing, not an exchanger EMAT. Total Site curves describe utility-system opportunities, not individual exchanger matches.",
         'Change `zone="Bleaching"` to a path from your zone tree and compare the same scope across scenarios.',
         (
             "Establish the site-wide reference",
-            "Run explicit integration scopes and inspect the equivalent HRAT",
+            "Run explicit integration scopes and inspect the equivalent dt_min",
         ),
     ),
     "03_multisegment_streams.ipynb": (
@@ -905,7 +913,7 @@ GUIDANCE = {
         ("Inspect the active case", "Persist and restore the workspace"),
     ),
     "06_multiperiod_heat_integration.ipynb": (
-        "How do heat-integration targets and equivalent global HRAT values change by operating period, and what is the weighted annual view?",
+        "How do heat-integration targets and equivalent global dt_min values change by operating period, and what is the weighted annual view?",
         "Review every period before the weighted average; use a scalar recovery only when broadcasting the same requirement is intentional, and use an exact period mapping otherwise.",
         "Replace the sample with period-tagged plant data and verify period order and weights before comparing annual totals.",
         (
@@ -1026,10 +1034,10 @@ PRESENTATIONS: dict[str, tuple[str, str]] = {
         "display(grand)",
     ),
     "02_focused_direct_and_total_site.ipynb": (
-        "Inspect the requested and achieved recovery, approach temperature, thermodynamic limit, residual, status, and iteration count together. The ordinary target identity demonstrates that the inverse call is non-mutating. Then compare the process summary with the Total Site profiles and utility grand composite curve; the site views reveal opportunities that are not visible within one process zone.",
+        "Inspect the requested and achieved recovery, positive threshold approach, thermodynamic limit, residual, status, and iteration count together. The direct-recovery comparison confirms that the requested value is the maximum-recovery boundary, while the ordinary target identity demonstrates that the inverse call is non-mutating. Then compare the process summary with the Total Site profiles and utility grand composite curve; the site views reveal opportunities that are not visible within one process zone.",
         "from IPython.display import display\n\n"
         "display(summary)\n"
-        "display(recovery_approach_summary)\n"
+        "display(recovery_dt_min_summary)\n"
         "display(total_site_profiles)\n"
         "display(site_utility_curve)",
     ),
@@ -1058,8 +1066,8 @@ PRESENTATIONS: dict[str, tuple[str, str]] = {
         "Review period results beside the weighted aggregate; the largest single-period target does not necessarily dominate the weighted study.",
         "from IPython.display import display\n\n"
         "display(all_periods)\n"
-        "display(zero_recovery_approaches)\n"
-        "display(mapped_recovery_approaches)\n"
+        "display(zero_recovery_dt_mins)\n"
+        "display(mapped_recovery_dt_mins)\n"
         "display(weighted)\n"
         "display(combined)",
     ),

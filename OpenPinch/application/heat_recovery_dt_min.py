@@ -1,4 +1,4 @@
-"""Problem orchestration for inverse heat-recovery approach targeting."""
+"""Problem orchestration for inverse heat-recovery dt_min targeting."""
 
 from __future__ import annotations
 
@@ -7,13 +7,13 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any
 
 from ..analysis.numerics import get_period_index
-from ..analysis.targeting.approach_temperature import (
-    HeatRecoveryApproachSolution,
+from ..analysis.targeting.heat_recovery_dt_min import (
+    HeatRecoveryDtMinSolution,
     HeatRecoveryLimitError,
-    solve_heat_recovery_approach,
+    solve_heat_recovery_dt_min,
 )
-from ..contracts.heat_recovery import (
-    HeatRecoveryApproachResult,
+from ..contracts.heat_recovery_dt_min import (
+    HeatRecoveryDtMinResult,
     HeatRecoveryQuantity,
 )
 from ..contracts.units import coerce_output_value, standardise_input_value
@@ -42,7 +42,7 @@ def _resolve_zone_and_period(
         raise ValueError(f"Target zone {zone!r} was not found.")
     if selected.type not in _SUPPORTED_ZONE_TYPES:
         raise ValueError(
-            "Heat-recovery approach targeting requires a Site, Process Zone, "
+            "Heat-recovery dt_min targeting requires a Site, Process Zone, "
             "or Unit Operation scope. Select a direct process-targeting zone "
             "instead of a Community or Region."
         )
@@ -94,23 +94,23 @@ def _quantity(
 
 
 def _result_contract(
-    solution: HeatRecoveryApproachSolution,
+    solution: HeatRecoveryDtMinSolution,
     *,
     zone: "Zone",
     period_id: str,
-) -> HeatRecoveryApproachResult:
+) -> HeatRecoveryDtMinResult:
     heat = {
         "source_unit": "kW",
         "metric_name": "Qr",
         "config": zone.config,
     }
-    return HeatRecoveryApproachResult(
+    return HeatRecoveryDtMinResult(
         scope=zone.address,
         period_id=period_id,
-        approach_temperature=_quantity(
-            solution.approach_temperature,
+        dt_min=_quantity(
+            solution.dt_min,
             source_unit="delta_degC",
-            metric_name="heat_recovery_approach_temperature",
+            metric_name="heat_recovery_dt_min",
             config=zone.config,
         ),
         requested_heat_recovery=_quantity(
@@ -128,14 +128,14 @@ def _result_contract(
     )
 
 
-def calculate_heat_recovery_approach(
+def calculate_heat_recovery_dt_min(
     problem: "PinchProblem",
     *,
     heat_recovery,
     zone=None,
     period_id=None,
-) -> HeatRecoveryApproachResult:
-    """Calculate one selected-period global HRAT without changing the problem."""
+) -> HeatRecoveryDtMinResult:
+    """Calculate one selected-period global dt_min without changing the problem."""
     selected, idx, canonical_id = _resolve_zone_and_period(
         problem,
         zone=zone,
@@ -143,7 +143,7 @@ def calculate_heat_recovery_approach(
     )
     requested = _canonical_recovery(heat_recovery, config=selected.config)
     try:
-        solution = solve_heat_recovery_approach(
+        solution = solve_heat_recovery_dt_min(
             selected.hot_streams,
             selected.cold_streams,
             requested_heat_recovery=requested,
@@ -180,21 +180,21 @@ def _period_requests(
     return {period_id: heat_recovery[period_id] for period_id in period_ids}
 
 
-def calculate_all_period_heat_recovery_approach(
+def calculate_all_period_heat_recovery_dt_min(
     problem: "PinchProblem",
     *,
     heat_recovery,
     zone=None,
     workers=1,
-) -> dict[str, HeatRecoveryApproachResult]:
+) -> dict[str, HeatRecoveryDtMinResult]:
     """Calculate isolated inverse targets for every canonical period."""
     if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
         raise ValueError("workers must be a positive integer.")
     period_ids = tuple(problem.period_ids)
     requests = _period_requests(heat_recovery, period_ids=period_ids)
 
-    def solve(period_id: str) -> HeatRecoveryApproachResult:
-        return calculate_heat_recovery_approach(
+    def solve(period_id: str) -> HeatRecoveryDtMinResult:
+        return calculate_heat_recovery_dt_min(
             problem,
             heat_recovery=requests[period_id],
             zone=zone,
@@ -209,6 +209,6 @@ def calculate_all_period_heat_recovery_approach(
 
 
 __all__ = [
-    "calculate_all_period_heat_recovery_approach",
-    "calculate_heat_recovery_approach",
+    "calculate_all_period_heat_recovery_dt_min",
+    "calculate_heat_recovery_dt_min",
 ]

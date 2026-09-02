@@ -14,8 +14,12 @@ class _FrozenContract(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
 
 
-class HeatRecoveryApproachStatus(StrEnum):
-    """Termination states for an inverse heat-recovery calculation."""
+class HeatRecoveryDtMinStatus(StrEnum):
+    """Termination states for an inverse heat-recovery calculation.
+
+    ``AT_THERMODYNAMIC_LIMIT`` identifies a maximum-recovery request; its
+    dt_min can be positive when a threshold problem has a recovery plateau.
+    """
 
     SOLVED = "solved"
     AT_THERMODYNAMIC_LIMIT = "at_thermodynamic_limit"
@@ -47,17 +51,17 @@ class HeatRecoveryQuantity(_FrozenContract):
         return unit
 
 
-class HeatRecoveryApproachResult(_FrozenContract):
-    """Diagnostic result from process-level global HRAT inversion."""
+class HeatRecoveryDtMinResult(_FrozenContract):
+    """Diagnostic result from process-level global dt_min inversion."""
 
     scope: str
     period_id: str
-    approach_temperature: HeatRecoveryQuantity
+    dt_min: HeatRecoveryQuantity
     requested_heat_recovery: HeatRecoveryQuantity
     achieved_heat_recovery: HeatRecoveryQuantity
     thermodynamic_limit: HeatRecoveryQuantity
     heat_recovery_residual: HeatRecoveryQuantity
-    status: HeatRecoveryApproachStatus
+    status: HeatRecoveryDtMinStatus
     iterations: int
 
     @field_validator("scope", "period_id")
@@ -84,7 +88,7 @@ class HeatRecoveryApproachResult(_FrozenContract):
 
 
 __all__ = [
-    "HeatRecoveryApproachResult",
-    "HeatRecoveryApproachStatus",
+    "HeatRecoveryDtMinResult",
+    "HeatRecoveryDtMinStatus",
     "HeatRecoveryQuantity",
 ]

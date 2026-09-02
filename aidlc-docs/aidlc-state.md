@@ -1465,14 +1465,43 @@ refreshed reverse-engineering artifacts.
 - **Extensions**: Security and Resiliency disabled. Partial PBT is N/A for the
   isolated example repair except existing fixed-seed and framework compliance.
 
-## Heat-Recovery Approach Temperature Progress
+## Heat-Recovery `dt_min` Progress
+
+- [x] DT_MIN TERMINOLOGY CORRECTION - Replaced the new inverse service's
+  `approach_temperature` naming family with `dt_min` across its public API,
+  contracts, implementation, tests, notebooks, RTD, and workflow artifacts.
+  Pre-existing exchanger-network approach-temperature contracts remain out of
+  scope. The focused behavioral suite passed 47 tests; notebook and RTD tests
+  passed 52 tests with 3 expected skips; warning-strict Sphinx passed; the full
+  configured suite passed 2,584 tests with 4 skips; the exact non-solver
+  coverage selection passed 2,581 tests with 3 skips and 4 deselections at 96
+  percent branch coverage. Distributions built and the isolated Python 3.14
+  installed-wheel smoke passed. Ruff, formatting, and patch hygiene passed.
+  Plan:
+  `aidlc-docs/construction/plans/heat-recovery-dt-min-terminology-code-generation-plan.md`.
+
+- [x] THRESHOLD-LIMIT CORRECTION - Return the greatest positive global `dt_min`
+  that retains maximum recovery for threshold problems, then use that boundary
+  directly in notebook 02. The Bleaching regression returns approximately
+  58.34505 delta_degC at 14,121.972 kW. The inverse feature suite passed 46
+  tests; notebook and RTD checks passed 47 tests with 3 expected skips; the
+  configured full suite passed 2,583 tests with 4 expected skips; the exact
+  non-solver coverage job passed 2,580 tests with 3 expected skips and 4
+  deselections at 96 percent branch coverage. Ruff, formatting, and patch
+  hygiene passed. Plan:
+  `aidlc-docs/construction/plans/heat-recovery-threshold-limit-correction-plan.md`.
+
+- [x] SUPERSEDED NOTEBOOK DT_MIN CORRECTION - A provisional 12,000 kW
+  notebook-only workaround was completed locally but superseded before commit
+  by the threshold-limit requirement correction. Plan:
+  `aidlc-docs/construction/plans/heat-recovery-notebook-dt-min-correction-plan.md`.
 
 - [x] DOCUMENTATION AMENDMENT - Expanded the generated selected-period notebook
-  example and comprehensively integrated the inverse HRAT workflow throughout
+  example and comprehensively integrated the inverse `dt_min` workflow throughout
   Read the Docs. The focused gate passes 46 tests with 3 expected skips,
   including notebook execution and warning-strict Sphinx; Ruff and patch
   hygiene also pass. Plan:
-  `aidlc-docs/construction/plans/heat-recovery-approach-documentation-amendment-code-generation-plan.md`.
+  `aidlc-docs/construction/plans/heat-recovery-dt-min-documentation-amendment-code-generation-plan.md`.
 
 - [x] INCEPTION - Workspace Detection resumed from the current brownfield
   repository.
@@ -1493,22 +1522,22 @@ refreshed reverse-engineering artifacts.
 - [x] CONSTRUCTION - Build and Test.
 - [x] OPERATIONS - N/A; no deployment work requested.
 - **Requirements**:
-  `aidlc-docs/inception/requirements/heat-recovery-approach-temperature-requirements.md`.
+  `aidlc-docs/inception/requirements/heat-recovery-dt-min-requirements.md`.
 - **Application design**:
-  `aidlc-docs/inception/application-design/heat-recovery-approach-temperature-application-design.md`.
+  `aidlc-docs/inception/application-design/heat-recovery-dt-min-application-design.md`.
 - **Functional design**:
-  `aidlc-docs/construction/heat-recovery-approach-temperature/functional-design/functional-design.md`.
+  `aidlc-docs/construction/heat-recovery-dt-min/functional-design/functional-design.md`.
 - **Workflow plan**:
-  `aidlc-docs/inception/plans/heat-recovery-approach-temperature-execution-plan.md`.
+  `aidlc-docs/inception/plans/heat-recovery-dt-min-execution-plan.md`.
 - **Code Generation plan**:
-  `aidlc-docs/construction/plans/heat-recovery-approach-temperature-code-generation-plan.md`.
+  `aidlc-docs/construction/plans/heat-recovery-dt-min-code-generation-plan.md`.
 - **Extensions**: Property-Based Testing enabled. Security and Resiliency are
   disabled. PBT-01 through PBT-05 and PBT-07 through PBT-10 apply; PBT-06 is
   N/A because the solver has no persistent mutable state.
 - **Code Generation summary**:
-  `aidlc-docs/construction/heat-recovery-approach-temperature/code/code-generation-summary.md`.
+  `aidlc-docs/construction/heat-recovery-dt-min/code/code-generation-summary.md`.
 - **Build and Test summary**:
-  `aidlc-docs/construction/heat-recovery-approach-temperature/build-and-test/build-and-test-summary.md`.
+  `aidlc-docs/construction/heat-recovery-dt-min/build-and-test/build-and-test-summary.md`.
 - **Current stage**: Complete. The service, contracts, orchestration,
   properties, documentation, generated tutorials, full coverage suite,
   distributions, and installed-wheel smoke are verified.

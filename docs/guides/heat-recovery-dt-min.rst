@@ -1,14 +1,14 @@
-Heat-Recovery Approach Temperature
-==================================
+Heat-Recovery ``dt_min``
+========================
 
 Purpose
 -------
 
 Use the inverse heat-recovery target when the process heat recovery is known
-but the corresponding global heat-recovery approach temperature is not. The
-service answers this question:
+but the corresponding global ``dt_min`` is not. The service answers this
+question:
 
-   What is the greatest global HRAT, or delta Tmin, at which the process can
+   What is the greatest global ``dt_min`` at which the process can
    still recover the requested heat?
 
 This is a process-targeting calculation over the hot and cold composite
@@ -40,8 +40,8 @@ Runnable Workflow
 Single period
 ~~~~~~~~~~~~~
 
-The packaged basic case has a zero-approach thermodynamic limit of about
-5,550 kW. Requesting 4,000 kW gives an equivalent global approach of about
+The packaged basic case has a zero-``dt_min`` thermodynamic limit of about
+5,550 kW. Requesting 4,000 kW gives an equivalent global ``dt_min`` of about
 38.75 ``delta_degC``:
 
 .. code-block:: python
@@ -52,13 +52,13 @@ The packaged basic case has a zero-approach thermodynamic limit of about
    ordinary = problem.target.direct_heat_integration(period_id="0")
    cached_results_before = problem.results
 
-   result = problem.target.heat_recovery_approach_temperature(
+   result = problem.target.heat_recovery_dt_min(
        heat_recovery={"value": 4_000.0, "unit": "kW"},
        zone="Site",
        period_id="0",
    )
 
-   result.approach_temperature
+   result.dt_min
    result.requested_heat_recovery
    result.achieved_heat_recovery
    result.thermodynamic_limit
@@ -67,28 +67,33 @@ The packaged basic case has a zero-approach thermodynamic limit of about
    assert problem.results is cached_results_before
    assert problem.period_results == {}
 
-The returned approach is the full hot-to-cold global spacing. OpenPinch applies
-half of each trial approach to every detached hot and cold stream and forces
+The returned ``dt_min`` is the full hot-to-cold global spacing. OpenPinch applies
+half of each trial ``dt_min`` to every detached hot and cold stream and forces
 the detached contribution multiplier to one. Existing heterogeneous
 ``delta_t_contribution`` values and utilities therefore do not define this
-equivalent HRAT.
+equivalent global ``dt_min``.
 
 Thermodynamic and zero-recovery boundaries
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Request the zero-approach thermodynamic limit itself to obtain an approach of
-zero and status ``at_thermodynamic_limit``. A request of zero instead returns
-the smallest approach that produces zero recovery, with status
-``zero_recovery_boundary``:
+The thermodynamic limit is measured at zero ``dt_min``, but its equivalent
+boundary is not necessarily zero. A threshold problem can retain maximum
+recovery over a positive global ``dt_min`` interval. Requesting the limit returns
+the greatest feasible ``dt_min`` on that plateau with status
+``at_thermodynamic_limit``. If recovery decreases immediately, the returned
+boundary is zero within the numerical ``dt_min`` tolerance.
+
+A request of zero returns the smallest ``dt_min`` that produces zero recovery,
+with status ``zero_recovery_boundary``:
 
 .. code-block:: python
 
-   zero_boundary = problem.target.heat_recovery_approach_temperature(
+   zero_boundary = problem.target.heat_recovery_dt_min(
        heat_recovery=0.0,
        period_id="0",
    )
 
-   maximum = problem.target.heat_recovery_approach_temperature(
+   maximum = problem.target.heat_recovery_dt_min(
        heat_recovery=zero_boundary.thermodynamic_limit.model_dump(),
        period_id="0",
    )
@@ -96,9 +101,29 @@ the smallest approach that produces zero recovery, with status
    assert zero_boundary.status == "zero_recovery_boundary"
    assert maximum.status == "at_thermodynamic_limit"
 
+The Bleaching process in the packaged pulp-mill case is a threshold example.
+Its direct target equals the thermodynamic limit, but the inverse returns a
+positive boundary of approximately 58.34505 ``delta_degC``:
+
+.. code-block:: python
+
+   threshold_problem = PinchProblem("pulp_mill.json", project_name="Site")
+   direct = threshold_problem.target.direct_heat_integration(
+       zone="Bleaching",
+       period_id="0",
+   )
+   threshold = threshold_problem.target.heat_recovery_dt_min(
+       heat_recovery=float(direct.heat_recovery_target),
+       zone="Bleaching",
+       period_id="0",
+   )
+
+   assert threshold.status == "at_thermodynamic_limit"
+   assert threshold.dt_min.value > 0.0
+
 If one process side is empty, or the hot and cold temperature ranges do not
 overlap, the thermodynamic limit can be zero. In that case a zero request is
-also at the thermodynamic limit and the approach is zero.
+also at the thermodynamic limit and the ``dt_min`` is zero.
 
 All periods
 ~~~~~~~~~~~
@@ -114,7 +139,7 @@ canonical period IDs, and the returned dictionary retains canonical order:
    )
 
    zero_boundaries = (
-       periods.target.all_periods.heat_recovery_approach_temperature(
+       periods.target.all_periods.heat_recovery_dt_min(
            heat_recovery=0.0,
        )
    )
@@ -123,7 +148,7 @@ canonical period IDs, and the returned dictionary retains canonical order:
        for period_id, boundary in zero_boundaries.items()
    }
    period_results = (
-       periods.target.all_periods.heat_recovery_approach_temperature(
+       periods.target.all_periods.heat_recovery_dt_min(
            heat_recovery=recovery_by_period,
            workers=2,
        )
@@ -148,17 +173,17 @@ contract:
    workspace = PinchWorkspace("basic_pinch.json", project_name="Site")
    workspace.scenario("tight", dt_cont_multiplier=0.8)
 
-   active = workspace.target.heat_recovery_approach_temperature(
+   active = workspace.target.heat_recovery_dt_min(
        heat_recovery=4_000.0,
        period_id="0",
    )
-   batch = workspace.cases(["baseline", "tight"]).target.heat_recovery_approach_temperature(
+   batch = workspace.cases(["baseline", "tight"]).target.heat_recovery_dt_min(
        heat_recovery=4_000.0,
        period_id="0",
    )
    batch_periods = (
        workspace.cases(["baseline", "tight"])
-       .target.all_periods.heat_recovery_approach_temperature(
+       .target.all_periods.heat_recovery_dt_min(
            heat_recovery=4_000.0,
            workers=2,
        )
@@ -174,7 +199,7 @@ successful case results.
 Expected Output
 ---------------
 
-The frozen :class:`OpenPinch.contracts.heat_recovery.HeatRecoveryApproachResult`
+The frozen :class:`OpenPinch.contracts.heat_recovery_dt_min.HeatRecoveryDtMinResult`
 contains only finite, JSON-serializable values:
 
 .. list-table:: Result fields
@@ -185,23 +210,25 @@ contains only finite, JSON-serializable values:
      - Meaning
    * - ``scope`` and ``period_id``
      - Resolved zone path and canonical operating-period ID.
-   * - ``approach_temperature``
-     - Equivalent full global HRAT with an explicit delta-temperature unit.
+   * - ``dt_min``
+     - Equivalent full global ``dt_min`` with an explicit delta-temperature unit.
    * - ``requested_heat_recovery``
      - Normalized user request with an explicit heat-flow unit.
    * - ``achieved_heat_recovery``
-     - Recovery at the returned approach. It meets an interior request within
+     - Recovery at the returned ``dt_min``. It meets an interior request within
        the documented numerical tolerance.
    * - ``thermodynamic_limit``
-     - Maximum process recovery at zero global approach.
+     - Maximum process recovery at zero global ``dt_min``.
    * - ``heat_recovery_residual``
      - Achieved recovery minus requested recovery.
    * - ``status``
      - ``solved``, ``at_thermodynamic_limit``, or
-       ``zero_recovery_boundary``.
+       ``zero_recovery_boundary``. A thermodynamic-limit result can carry a
+       positive threshold ``dt_min``.
    * - ``iterations``
-     - Number of deterministic bisection iterations; zero at the
-       thermodynamic-limit boundary.
+     - Number of deterministic bisection iterations. A positive threshold
+       boundary is solved by bisection; the degenerate zero-limit case returns
+       without iterating.
 
 Use the Pydantic serialization surface when recording a study:
 
@@ -210,7 +237,7 @@ Use the Pydantic serialization surface when recording a study:
    payload = result.model_dump(mode="json")
    json_text = result.model_dump_json()
 
-Heat-flow values honor ``OUTPUT_UNIT_HEAT_FLOW``. The approach honors
+Heat-flow values honor ``OUTPUT_UNIT_HEAT_FLOW``. The ``dt_min`` honors
 ``OUTPUT_UNIT_TEMPERATURE`` and is reported as a delta unit, for example
 ``delta_degC`` or ``delta_degF`` rather than an absolute temperature.
 
@@ -223,7 +250,7 @@ requested recovery, calculated limit, scope, period, and units. All-period
 mappings with missing or extra period IDs and non-positive ``workers`` values
 are also rejected.
 
-The numerical search uses a ``1e-6 delta_degC`` approach tolerance, a
+The numerical search uses a ``1e-6 delta_degC`` ``dt_min`` tolerance, a
 ``1e-6 kW`` absolute recovery tolerance, a ``1e-9`` relative recovery
 tolerance, and a hard 100-iteration limit. Non-finite cascade evaluations,
 invalid brackets, and non-convergence fail closed.
@@ -231,13 +258,18 @@ invalid brackets, and non-convergence fail closed.
 Interpretation
 --------------
 
-Recovery is non-increasing as the global approach grows. For an interior
-request, OpenPinch returns the greatest feasible approach whose calculated
+Recovery is non-increasing as the global ``dt_min`` grows. For an interior
+request, OpenPinch returns the greatest feasible ``dt_min`` whose calculated
 recovery remains at least the requested value. This makes flat recovery
 plateaus deterministic and gives the most conservative spacing that still
 meets the target.
 
-Use HRAT for process-level targeting and early sensitivity studies. Do not use
+The same greatest-feasible rule applies at maximum recovery. In a threshold
+problem it identifies the positive global ``dt_min`` at which external heating
+or cooling first becomes necessary. Zero ``dt_min`` describes how the limit is
+calculated, not an unconditional inverse answer for that limit.
+
+Use global ``dt_min`` for process-level targeting and early sensitivity studies. Do not use
 it as evidence that every proposed exchanger match satisfies EMAT, pressure
 drop, area, operability, or control constraints. Carry a promising process
 target into a heat-exchanger-network study for those checks.
@@ -250,7 +282,7 @@ broadcast and exact period-mapped recovery requests.
 Next Steps
 ----------
 
-- Read :doc:`../fundamentals/pinch-analysis` for HRAT and EMAT context.
+- Read :doc:`../fundamentals/pinch-analysis` for global ``dt_min`` and EMAT context.
 - Use :doc:`zonal-and-total-site-workflows` to choose an appropriate direct
   process scope.
 - See :doc:`../api/pinchproblem` and :doc:`../api/pinchworkspace` for the

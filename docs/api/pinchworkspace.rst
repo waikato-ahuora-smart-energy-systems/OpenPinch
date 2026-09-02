@@ -57,7 +57,7 @@ Interaction Matrix
      - ordered case result
      - source cases unchanged
      - base
-   * - active and batch ``target.heat_recovery_approach_temperature``
+   * - active and batch ``target.heat_recovery_dt_min``
      - Invert a requested process recovery for one or every canonical period
      - frozen result or ordered case result
      - source cases unchanged
@@ -121,11 +121,11 @@ requested order and isolates above-limit or validation failures:
 
 .. code-block:: python
 
-   active = workspace.target.heat_recovery_approach_temperature(
+   active = workspace.target.heat_recovery_dt_min(
        heat_recovery=4_000.0,
        period_id="0",
    )
-   outcome = workspace.cases(["baseline", "retrofit"]).target.heat_recovery_approach_temperature(
+   outcome = workspace.cases(["baseline", "retrofit"]).target.heat_recovery_dt_min(
        heat_recovery=4_000.0,
        period_id="0",
    )
@@ -140,7 +140,7 @@ period mapping per case call and forwards ``workers`` to each isolated case:
 
    period_outcome = (
        workspace.cases(["baseline", "retrofit"])
-       .target.all_periods.heat_recovery_approach_temperature(
+       .target.all_periods.heat_recovery_dt_min(
            heat_recovery=4_000.0,
            workers=2,
        )
@@ -148,7 +148,7 @@ period mapping per case call and forwards ``workers`` to each isolated case:
 
 Neither form changes the active case, the source cases' ordinary results, or
 their period caches. See
-:doc:`../guides/heat-recovery-approach-temperature` for the complete contract.
+:doc:`../guides/heat-recovery-dt-min` for the complete contract.
 
 Complete API
 ------------

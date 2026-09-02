@@ -1,15 +1,15 @@
-"""Numerical inverse targeting for a global heat-recovery approach."""
+"""Numerical inverse targeting for a global heat-recovery dt_min."""
 
 from __future__ import annotations
 
 import pytest
 
 from OpenPinch import PinchProblem
-from OpenPinch.analysis.targeting.approach_temperature import (
+from OpenPinch.analysis.targeting.heat_recovery_dt_min import (
     evaluate_process_heat_recovery,
-    solve_heat_recovery_approach,
+    solve_heat_recovery_dt_min,
 )
-from OpenPinch.contracts.heat_recovery import HeatRecoveryApproachStatus
+from OpenPinch.contracts.heat_recovery_dt_min import HeatRecoveryDtMinStatus
 from OpenPinch.domain.stream_collection import StreamCollection
 
 
@@ -54,70 +54,104 @@ def test_analytical_two_stream_interior_and_zero_boundary() -> None:
     assert evaluate_process_heat_recovery(
         zone.hot_streams,
         zone.cold_streams,
-        approach_temperature=0.0,
+        dt_min=0.0,
         period_idx=0,
     ) == pytest.approx(100.0)
     assert evaluate_process_heat_recovery(
         zone.hot_streams,
         zone.cold_streams,
-        approach_temperature=100.0,
+        dt_min=100.0,
         period_idx=0,
     ) == pytest.approx(50.0)
 
-    interior = solve_heat_recovery_approach(
+    interior = solve_heat_recovery_dt_min(
         zone.hot_streams,
         zone.cold_streams,
         requested_heat_recovery=50.0,
         period_idx=0,
     )
-    assert interior.status is HeatRecoveryApproachStatus.SOLVED
-    assert interior.approach_temperature == pytest.approx(100.0, abs=1e-6)
+    assert interior.status is HeatRecoveryDtMinStatus.SOLVED
+    assert interior.dt_min == pytest.approx(100.0, abs=1e-6)
     assert interior.achieved_heat_recovery >= 50.0 - 1e-6
 
-    zero = solve_heat_recovery_approach(
+    zero = solve_heat_recovery_dt_min(
         zone.hot_streams,
         zone.cold_streams,
         requested_heat_recovery=0.0,
         period_idx=0,
     )
-    assert zero.status is HeatRecoveryApproachStatus.ZERO_RECOVERY_BOUNDARY
+    assert zero.status is HeatRecoveryDtMinStatus.ZERO_RECOVERY_BOUNDARY
     # The existing cascade canonicalises temperature intervals within its own
     # 1e-5 thermal epsilon; bisection then locates that numerical zero boundary
     # to the stricter service tolerance.
-    assert zero.approach_temperature == pytest.approx(150.0, abs=2e-5)
+    assert zero.dt_min == pytest.approx(150.0, abs=2e-5)
     assert zero.achieved_heat_recovery == pytest.approx(0.0, abs=1e-6)
 
 
-def test_thermodynamic_limit_has_exact_zero_approach() -> None:
+def test_threshold_problem_limit_returns_greatest_feasible_dt_min() -> None:
     problem = _two_stream_problem()
     zone = problem._master_zone
 
-    result = solve_heat_recovery_approach(
+    result = solve_heat_recovery_dt_min(
         zone.hot_streams,
         zone.cold_streams,
         requested_heat_recovery=100.0,
         period_idx=0,
     )
 
-    assert result.status is HeatRecoveryApproachStatus.AT_THERMODYNAMIC_LIMIT
-    assert result.approach_temperature == 0.0
-    assert result.iterations == 0
+    assert result.status is HeatRecoveryDtMinStatus.AT_THERMODYNAMIC_LIMIT
+    # The cascade canonicalises interval boundaries with a 1e-5 temperature
+    # epsilon, so the greatest numerically feasible point sits just below the
+    # analytical 50 degree threshold.
+    assert result.dt_min == pytest.approx(50.0, abs=2e-5)
+    assert result.iterations > 0
+    assert (
+        evaluate_process_heat_recovery(
+            zone.hot_streams,
+            zone.cold_streams,
+            dt_min=result.dt_min + 2e-5,
+            period_idx=0,
+        )
+        < result.thermodynamic_limit
+    )
 
 
-def test_packaged_forward_target_round_trips_to_known_global_approach() -> None:
+def test_packaged_threshold_problem_returns_positive_limit_dt_min() -> None:
+    problem = PinchProblem("pulp_mill.json", project_name="Site")
+    forward = problem.target.direct_heat_integration(
+        zone="Bleaching",
+        period_id="0",
+    )
+    result = problem.target.heat_recovery_dt_min(
+        heat_recovery=float(forward.heat_recovery_target),
+        zone="Bleaching",
+        period_id="0",
+    )
+
+    assert result.status is HeatRecoveryDtMinStatus.AT_THERMODYNAMIC_LIMIT
+    assert result.thermodynamic_limit.value == pytest.approx(
+        float(forward.heat_recovery_target)
+    )
+    assert result.dt_min.value == pytest.approx(
+        58.34505097121001,
+        abs=2e-6,
+    )
+
+
+def test_packaged_forward_target_round_trips_to_known_global_dt_min() -> None:
     problem = PinchProblem("basic_pinch.json", project_name="Site")
     forward = problem.target.direct_heat_integration()
     zone = problem._master_zone
 
-    result = solve_heat_recovery_approach(
+    result = solve_heat_recovery_dt_min(
         zone.hot_streams,
         zone.cold_streams,
         requested_heat_recovery=float(forward.heat_recovery_target),
         period_idx=0,
     )
 
-    assert result.status is HeatRecoveryApproachStatus.SOLVED
-    assert result.approach_temperature == pytest.approx(10.0, abs=2e-6)
+    assert result.status is HeatRecoveryDtMinStatus.SOLVED
+    assert result.dt_min == pytest.approx(10.0, abs=2e-6)
     assert result.achieved_heat_recovery == pytest.approx(
         float(forward.heat_recovery_target),
         abs=1e-6,
@@ -125,14 +159,14 @@ def test_packaged_forward_target_round_trips_to_known_global_approach() -> None:
 
 
 def test_empty_or_nonoverlapping_sides_have_zero_limit() -> None:
-    empty = solve_heat_recovery_approach(
+    empty = solve_heat_recovery_dt_min(
         StreamCollection(),
         StreamCollection(),
         requested_heat_recovery=0.0,
         period_idx=0,
     )
-    assert empty.status is HeatRecoveryApproachStatus.AT_THERMODYNAMIC_LIMIT
-    assert empty.approach_temperature == 0.0
+    assert empty.status is HeatRecoveryDtMinStatus.AT_THERMODYNAMIC_LIMIT
+    assert empty.dt_min == 0.0
     assert empty.thermodynamic_limit == 0.0
 
     problem = PinchProblem(
@@ -167,14 +201,14 @@ def test_empty_or_nonoverlapping_sides_have_zero_limit() -> None:
         project_name="Site",
     )
     zone = problem._master_zone
-    no_overlap = solve_heat_recovery_approach(
+    no_overlap = solve_heat_recovery_dt_min(
         zone.hot_streams,
         zone.cold_streams,
         requested_heat_recovery=0.0,
         period_idx=0,
     )
     assert no_overlap.thermodynamic_limit == 0.0
-    assert no_overlap.approach_temperature == 0.0
+    assert no_overlap.dt_min == 0.0
 
 
 @pytest.mark.parametrize(
@@ -186,7 +220,7 @@ def test_solver_rejects_invalid_requested_recovery(requested) -> None:
     zone = problem._master_zone
 
     with pytest.raises((TypeError, ValueError)):
-        solve_heat_recovery_approach(
+        solve_heat_recovery_dt_min(
             zone.hot_streams,
             zone.cold_streams,
             requested_heat_recovery=requested,
@@ -199,7 +233,7 @@ def test_solver_rejects_recovery_above_thermodynamic_limit() -> None:
     zone = problem._master_zone
 
     with pytest.raises(ValueError, match="exceeds the thermodynamic limit"):
-        solve_heat_recovery_approach(
+        solve_heat_recovery_dt_min(
             zone.hot_streams,
             zone.cold_streams,
             requested_heat_recovery=100.1,
@@ -207,7 +241,7 @@ def test_solver_rejects_recovery_above_thermodynamic_limit() -> None:
         )
 
     with pytest.raises(ValueError, match="exceeds the thermodynamic limit"):
-        solve_heat_recovery_approach(
+        solve_heat_recovery_dt_min(
             zone.hot_streams,
             zone.cold_streams,
             requested_heat_recovery=100.0 + 5e-7,
@@ -219,26 +253,26 @@ def test_solver_clamps_only_tolerance_sized_recovery_excursions(monkeypatch) -> 
     problem = _two_stream_problem()
     zone = problem._master_zone
     module = __import__(
-        "OpenPinch.analysis.targeting.approach_temperature",
+        "OpenPinch.analysis.targeting.heat_recovery_dt_min",
         fromlist=["_evaluate_detached_process_heat_recovery"],
     )
     original = module._evaluate_detached_process_heat_recovery
 
-    def within_tolerance(hot, cold, *, approach_temperature, period_idx):
+    def within_tolerance(hot, cold, *, dt_min, period_idx):
         recovery = original(
             hot,
             cold,
-            approach_temperature=approach_temperature,
+            dt_min=dt_min,
             period_idx=period_idx,
         )
-        return 100.0 + 5e-7 if 0.0 < approach_temperature < 150.0 else recovery
+        return 100.0 + 5e-7 if 0.0 < dt_min < 150.0 else recovery
 
     monkeypatch.setattr(
         module,
         "_evaluate_detached_process_heat_recovery",
         within_tolerance,
     )
-    result = solve_heat_recovery_approach(
+    result = solve_heat_recovery_dt_min(
         zone.hot_streams,
         zone.cold_streams,
         requested_heat_recovery=50.0,
@@ -246,14 +280,14 @@ def test_solver_clamps_only_tolerance_sized_recovery_excursions(monkeypatch) -> 
     )
     assert result.achieved_heat_recovery <= result.thermodynamic_limit
 
-    def outside_tolerance(hot, cold, *, approach_temperature, period_idx):
+    def outside_tolerance(hot, cold, *, dt_min, period_idx):
         recovery = original(
             hot,
             cold,
-            approach_temperature=approach_temperature,
+            dt_min=dt_min,
             period_idx=period_idx,
         )
-        return 100.001 if 0.0 < approach_temperature < 150.0 else recovery
+        return 100.001 if 0.0 < dt_min < 150.0 else recovery
 
     monkeypatch.setattr(
         module,
@@ -261,7 +295,7 @@ def test_solver_clamps_only_tolerance_sized_recovery_excursions(monkeypatch) -> 
         outside_tolerance,
     )
     with pytest.raises(RuntimeError, match="thermodynamic bounds"):
-        solve_heat_recovery_approach(
+        solve_heat_recovery_dt_min(
             zone.hot_streams,
             zone.cold_streams,
             requested_heat_recovery=99.9995,
@@ -269,7 +303,7 @@ def test_solver_clamps_only_tolerance_sized_recovery_excursions(monkeypatch) -> 
         )
 
 
-def test_interior_plateau_returns_its_greatest_feasible_approach() -> None:
+def test_interior_plateau_returns_its_greatest_feasible_dt_min() -> None:
     streams = [
         ("H0", 182.0, 143.0, 121.0),
         ("H1", 266.0, 240.0, 38.0),
@@ -300,19 +334,19 @@ def test_interior_plateau_returns_its_greatest_feasible_approach() -> None:
         project_name="Site",
     )
     zone = problem._master_zone
-    result = solve_heat_recovery_approach(
+    result = solve_heat_recovery_dt_min(
         zone.hot_streams,
         zone.cold_streams,
         requested_heat_recovery=38.0,
         period_idx=0,
     )
 
-    assert result.approach_temperature == pytest.approx(103.0, abs=2e-6)
+    assert result.dt_min == pytest.approx(103.0, abs=2e-6)
     assert (
         evaluate_process_heat_recovery(
             zone.hot_streams,
             zone.cold_streams,
-            approach_temperature=result.approach_temperature + 2e-5,
+            dt_min=result.dt_min + 2e-5,
             period_idx=0,
         )
         < 38.0

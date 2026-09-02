@@ -72,7 +72,7 @@ class _CaseBatchTargetAccessor(_CaseBatchAccessor):
     def direct_heat_integration(self, **kwargs):
         return self._run("direct_heat_integration", **kwargs)
 
-    def heat_recovery_approach_temperature(
+    def heat_recovery_dt_min(
         self,
         *,
         heat_recovery,
@@ -80,7 +80,7 @@ class _CaseBatchTargetAccessor(_CaseBatchAccessor):
         period_id=None,
     ) -> CaseBatchResult:
         return self._run(
-            "heat_recovery_approach_temperature",
+            "heat_recovery_dt_min",
             heat_recovery=heat_recovery,
             zone=zone,
             period_id=period_id,
@@ -147,7 +147,7 @@ class _CaseBatchAllPeriodsTargetAccessor(_CaseBatchAccessor):
     def direct_heat_integration(self, **kwargs):
         return self._run("direct_heat_integration", **kwargs)
 
-    def heat_recovery_approach_temperature(
+    def heat_recovery_dt_min(
         self,
         *,
         heat_recovery,
@@ -155,7 +155,7 @@ class _CaseBatchAllPeriodsTargetAccessor(_CaseBatchAccessor):
         workers=1,
     ) -> CaseBatchResult:
         return self._run(
-            "heat_recovery_approach_temperature",
+            "heat_recovery_dt_min",
             heat_recovery=heat_recovery,
             zone=zone,
             workers=workers,

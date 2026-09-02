@@ -4,21 +4,25 @@ Pre-Release Notes
 Unreleased
 ----------
 
-Heat-recovery approach temperature service
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Heat-recovery ``dt_min`` service
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - Added non-mutating selected-period and all-period inverse pinch targeting
-  through ``target.heat_recovery_approach_temperature``. The service returns
-  the global HRAT/delta Tmin corresponding to requested process heat recovery,
-  validates the zero-approach thermodynamic limit, supports explicit units,
+  through ``target.heat_recovery_dt_min``. The service returns
+  the global ``dt_min`` corresponding to requested process heat recovery,
+  validates the zero-``dt_min`` thermodynamic limit, supports explicit units,
   and mirrors through active workspaces and isolated ordered case batches.
 - Added deterministic plateau and zero-recovery boundary handling, analytical,
   packaged-regression, immutability, and seeded property-based coverage.
-- Documented the distinction between process composite-curve HRAT and
-  exchanger-level EMAT, and extended tutorials 02 and 06 with selected-period
+- Corrected thermodynamic-limit inversion for threshold problems: maximum
+  recovery now returns the greatest positive global ``dt_min`` that retains the
+  limit, rather than forcing zero ``dt_min``.
+- Documented the distinction between process composite-curve global
+  ``dt_min`` and exchanger-level EMAT, and extended tutorials 02 and 06 with
+  selected-period
   and scalar/mapped all-period workflows.
-- Added a dedicated inverse-HRAT task guide and integrated the workflow through
-  RTD navigation, overview, fundamentals, public problem/workspace API,
+- Added a dedicated inverse-``dt_min`` task guide and integrated the workflow
+  through RTD navigation, overview, fundamentals, public problem/workspace API,
   contributor service reference, and notebook-series pages. Tutorial 02 now
   demonstrates explicit recovery units, every result field, and preservation
   of the ordinary cached target.

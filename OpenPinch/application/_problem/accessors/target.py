@@ -32,7 +32,7 @@ from ..arguments import (
 )
 
 if TYPE_CHECKING:
-    from ....contracts.heat_recovery import HeatRecoveryApproachResult
+    from ....contracts.heat_recovery_dt_min import HeatRecoveryDtMinResult
     from ....domain.zone import Zone
     from ...problem import PinchProblem
 
@@ -121,18 +121,18 @@ class _AllPeriodsTargetAccessor:
     def direct_heat_integration(self, *, workers: int = 1, **kwargs):
         return self._run("direct_heat_integration", workers=workers, kwargs=kwargs)
 
-    def heat_recovery_approach_temperature(
+    def heat_recovery_dt_min(
         self,
         *,
         heat_recovery,
         zone=None,
         workers=1,
-    ) -> dict[str, "HeatRecoveryApproachResult"]:
-        from ...heat_recovery_approach import (
-            calculate_all_period_heat_recovery_approach,
+    ) -> dict[str, "HeatRecoveryDtMinResult"]:
+        from ...heat_recovery_dt_min import (
+            calculate_all_period_heat_recovery_dt_min,
         )
 
-        return calculate_all_period_heat_recovery_approach(
+        return calculate_all_period_heat_recovery_dt_min(
             self._target._problem,
             heat_recovery=heat_recovery,
             zone=zone,
@@ -273,17 +273,17 @@ class _TargetAccessor:
             direct_service=direct_heat_integration_service,
         )
 
-    def heat_recovery_approach_temperature(
+    def heat_recovery_dt_min(
         self,
         *,
         heat_recovery,
         zone=None,
         period_id=None,
-    ) -> "HeatRecoveryApproachResult":
-        """Return the global HRAT corresponding to requested process recovery."""
-        from ...heat_recovery_approach import calculate_heat_recovery_approach
+    ) -> "HeatRecoveryDtMinResult":
+        """Return the global dt_min corresponding to requested process recovery."""
+        from ...heat_recovery_dt_min import calculate_heat_recovery_dt_min
 
-        return calculate_heat_recovery_approach(
+        return calculate_heat_recovery_dt_min(
             self._problem,
             heat_recovery=heat_recovery,
             zone=zone,

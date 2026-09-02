@@ -16,7 +16,7 @@ def _signature_names(callable_) -> tuple[str, ...]:
 
 
 def test_selected_period_signature_is_exact() -> None:
-    method = PinchProblem().target.heat_recovery_approach_temperature
+    method = PinchProblem().target.heat_recovery_dt_min
     parameters = inspect.signature(method).parameters
 
     assert _signature_names(method) == ("heat_recovery", "zone", "period_id")
@@ -29,7 +29,7 @@ def test_selected_period_signature_is_exact() -> None:
 
 
 def test_all_period_signature_is_exact() -> None:
-    method = PinchProblem().target.all_periods.heat_recovery_approach_temperature
+    method = PinchProblem().target.all_periods.heat_recovery_dt_min
     parameters = inspect.signature(method).parameters
 
     assert _signature_names(method) == ("heat_recovery", "zone", "workers")
@@ -45,21 +45,19 @@ def test_workspace_delegates_the_exact_active_case_signatures() -> None:
     workspace = PinchWorkspace("basic_pinch.json", project_name="Site")
 
     assert inspect.signature(
-        workspace.target.heat_recovery_approach_temperature
-    ) == inspect.signature(workspace.case().target.heat_recovery_approach_temperature)
+        workspace.target.heat_recovery_dt_min
+    ) == inspect.signature(workspace.case().target.heat_recovery_dt_min)
     assert inspect.signature(
-        workspace.target.all_periods.heat_recovery_approach_temperature
-    ) == inspect.signature(
-        workspace.case().target.all_periods.heat_recovery_approach_temperature
-    )
+        workspace.target.all_periods.heat_recovery_dt_min
+    ) == inspect.signature(workspace.case().target.all_periods.heat_recovery_dt_min)
 
 
 def test_batch_signatures_are_explicit() -> None:
     selected = inspect.signature(
-        _CaseBatchTargetAccessor.heat_recovery_approach_temperature
+        _CaseBatchTargetAccessor.heat_recovery_dt_min
     ).parameters
     all_periods = inspect.signature(
-        _CaseBatchAllPeriodsTargetAccessor.heat_recovery_approach_temperature
+        _CaseBatchAllPeriodsTargetAccessor.heat_recovery_dt_min
     ).parameters
 
     assert tuple(selected) == ("self", "heat_recovery", "zone", "period_id")
@@ -73,4 +71,14 @@ def test_batch_signatures_are_explicit() -> None:
         parameter.kind is inspect.Parameter.KEYWORD_ONLY
         for name, parameter in all_periods.items()
         if name != "self"
+    )
+
+
+def test_superseded_service_name_is_not_exposed() -> None:
+    problem = PinchProblem()
+
+    assert not hasattr(problem.target, "heat_recovery_approach_temperature")
+    assert not hasattr(
+        problem.target.all_periods,
+        "heat_recovery_approach_temperature",
     )

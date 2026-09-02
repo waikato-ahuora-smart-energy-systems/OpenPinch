@@ -6,7 +6,7 @@ from hypothesis import given, seed, settings
 from hypothesis import strategies as st
 
 from OpenPinch import PinchProblem
-from OpenPinch.analysis.targeting.approach_temperature import (
+from OpenPinch.analysis.targeting.heat_recovery_dt_min import (
     evaluate_process_heat_recovery,
 )
 from tests.strategies.heat_recovery import (
@@ -31,19 +31,19 @@ def test_generated_all_period_results_have_parallel_equivalence_and_no_state(
         period_id: evaluate_process_heat_recovery(
             zone.hot_streams,
             zone.cold_streams,
-            approach_temperature=0.0,
+            dt_min=0.0,
             period_idx=period_idx,
         )
         * fraction
         for period_id, period_idx in problem.period_ids.items()
     }
 
-    sequential = problem.target.all_periods.heat_recovery_approach_temperature(
+    sequential = problem.target.all_periods.heat_recovery_dt_min(
         heat_recovery=requests,
         zone="Site/Process",
         workers=1,
     )
-    parallel = problem.target.all_periods.heat_recovery_approach_temperature(
+    parallel = problem.target.all_periods.heat_recovery_dt_min(
         heat_recovery=requests,
         zone="Site/Process",
         workers=2,

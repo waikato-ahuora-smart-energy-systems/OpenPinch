@@ -1,4 +1,4 @@
-# Heat-Recovery Approach Temperature Code-Generation Plan
+# Heat-Recovery `dt_min` Code-Generation Plan
 
 ## Part 1: Approved plan
 

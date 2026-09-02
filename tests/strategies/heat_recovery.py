@@ -178,7 +178,49 @@ def multiperiod_heat_recovery_problem_payloads(draw):
     }
 
 
+@st.composite
+def threshold_problem_payloads(draw):
+    """Generate balanced two-stream threshold problems with a positive plateau."""
+    cold_supply = _value(draw, minimum=20, maximum=80)
+    temperature_span = _value(draw, minimum=50, maximum=100)
+    threshold_approach = _value(draw, minimum=10, maximum=80)
+    heat_recovery = _value(draw, minimum=50, maximum=500)
+    hot_target = cold_supply + threshold_approach
+    hot_supply = hot_target + temperature_span
+    cold_target = cold_supply + temperature_span
+    return {
+        "streams": [
+            {
+                "zone": "Site/Process",
+                "name": "Hot threshold stream",
+                "t_supply": hot_supply,
+                "t_target": hot_target,
+                "heat_flow": heat_recovery,
+                "dt_cont": _value(draw, minimum=0, maximum=30),
+                "htc": 1.0,
+            },
+            {
+                "zone": "Site/Process",
+                "name": "Cold threshold stream",
+                "t_supply": cold_supply,
+                "t_target": cold_target,
+                "heat_flow": heat_recovery,
+                "dt_cont": _value(draw, minimum=0, maximum=30),
+                "htc": 1.0,
+            },
+        ],
+        "utilities": [],
+        "zone_tree": {
+            "name": "Site",
+            "type": "Site",
+            "children": [{"name": "Process", "type": "Process Zone"}],
+        },
+        "options": {},
+    }
+
+
 __all__ = [
     "heat_recovery_problem_payloads",
     "multiperiod_heat_recovery_problem_payloads",
+    "threshold_problem_payloads",
 ]

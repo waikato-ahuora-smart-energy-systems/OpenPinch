@@ -12,7 +12,7 @@ the top-level index, getting started, capability and workflow maps,
 fundamentals, problem and workspace APIs, contributor service/reference pages,
 the notebook catalog, and release notes. The guide covers supported scopes,
 units, statuses, thermodynamic and zero-recovery boundaries, plateau selection,
-all-period and case-batch calls, validation failures, non-mutation, and the HRAT
+all-period and case-batch calls, validation failures, non-mutation, and the `dt_min`
 versus exchanger EMAT distinction.
 
 ## TDD and verification evidence

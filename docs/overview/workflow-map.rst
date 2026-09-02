@@ -27,7 +27,7 @@ Focused Total Site
    ``direct_heat_integration -> total_site_heat_integration -> site profiles``
 
 Specified process heat recovery
-   ``heat_recovery_approach_temperature -> equivalent global HRAT -> optional HEN study``
+   ``heat_recovery_dt_min -> equivalent global dt_min -> optional HEN study``
 
 Multiperiod
    ``problem.target.all_periods.<method> -> period_results -> weighted summary``

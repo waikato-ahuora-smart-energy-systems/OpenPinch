@@ -1,4 +1,4 @@
-"""Inverse process targeting for a global heat-recovery approach temperature."""
+"""Inverse process targeting for a global heat-recovery dt_min."""
 
 from __future__ import annotations
 
@@ -7,32 +7,32 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ...contracts.heat_recovery import HeatRecoveryApproachStatus
+from ...contracts.heat_recovery_dt_min import HeatRecoveryDtMinStatus
 from ...domain.stream_collection import StreamCollection
 from ...domain.value import Value
 from .cascade import get_heat_recovery_target_from_pt, get_process_heat_cascade
 
-TEMPERATURE_TOLERANCE = 1e-6
+DT_MIN_TOLERANCE = 1e-6
 RECOVERY_ABSOLUTE_TOLERANCE = 1e-6
 RECOVERY_RELATIVE_TOLERANCE = 1e-9
 MAXIMUM_ITERATIONS = 100
 
 
 @dataclass(frozen=True)
-class HeatRecoveryApproachSolution:
+class HeatRecoveryDtMinSolution:
     """Canonical numerical result before application-owned unit conversion."""
 
-    approach_temperature: float
+    dt_min: float
     requested_heat_recovery: float
     achieved_heat_recovery: float
     thermodynamic_limit: float
     heat_recovery_residual: float
-    status: HeatRecoveryApproachStatus
+    status: HeatRecoveryDtMinStatus
     iterations: int
 
 
 class HeatRecoveryLimitError(ValueError):
-    """Raised when requested recovery exceeds the zero-approach limit."""
+    """Raised when requested recovery exceeds the zero-dt_min limit."""
 
     def __init__(self, requested: float, limit: float) -> None:
         self.requested = requested
@@ -67,31 +67,31 @@ def _recovery_tolerance(*values: float) -> float:
     )
 
 
-def _set_global_approach(
+def _set_global_dt_min(
     hot_streams: StreamCollection,
     cold_streams: StreamCollection,
-    approach_temperature: float,
+    dt_min: float,
 ) -> None:
-    half_approach = Value(approach_temperature / 2.0, unit="delta_degC")
+    half_dt_min = Value(dt_min / 2.0, unit="delta_degC")
     for stream in (*hot_streams, *cold_streams):
         stream.delta_t_contribution_multiplier_locked = False
         stream.delta_t_contribution_multiplier = 1.0
-        stream.delta_t_contribution = half_approach
+        stream.delta_t_contribution = half_dt_min
 
 
 def _evaluate_detached_process_heat_recovery(
     hot_streams: StreamCollection,
     cold_streams: StreamCollection,
     *,
-    approach_temperature: float,
+    dt_min: float,
     period_idx: int,
 ) -> float:
-    if not math.isfinite(approach_temperature) or approach_temperature < 0.0:
-        raise ValueError("approach_temperature must be finite and non-negative")
+    if not math.isfinite(dt_min) or dt_min < 0.0:
+        raise ValueError("dt_min must be finite and non-negative")
     if len(hot_streams) == 0 or len(cold_streams) == 0:
         return 0.0
 
-    _set_global_approach(hot_streams, cold_streams, approach_temperature)
+    _set_global_dt_min(hot_streams, cold_streams, dt_min)
     table = get_process_heat_cascade(
         hot_streams=hot_streams,
         cold_streams=cold_streams,
@@ -104,7 +104,7 @@ def _evaluate_detached_process_heat_recovery(
     recovery = float(get_heat_recovery_target_from_pt(table))
     if not math.isfinite(recovery):
         raise RuntimeError(
-            "Heat-recovery approach evaluation produced a non-finite value."
+            "Heat-recovery dt_min evaluation produced a non-finite value."
         )
     return recovery
 
@@ -113,16 +113,16 @@ def evaluate_process_heat_recovery(
     hot_streams: StreamCollection,
     cold_streams: StreamCollection,
     *,
-    approach_temperature: float,
+    dt_min: float,
     period_idx: int = 0,
 ) -> float:
-    """Evaluate recovery on detached streams at one global approach."""
+    """Evaluate recovery on detached streams at one global dt_min."""
     detached_hot = hot_streams.copy(deep=True)
     detached_cold = cold_streams.copy(deep=True)
     recovery = _evaluate_detached_process_heat_recovery(
         detached_hot,
         detached_cold,
-        approach_temperature=float(approach_temperature),
+        dt_min=float(dt_min),
         period_idx=int(period_idx),
     )
     tolerance = _recovery_tolerance(recovery)
@@ -153,15 +153,15 @@ def _no_overlap_upper_bound(
 
 def _solution(
     *,
-    approach: float,
+    dt_min: float,
     requested: float,
     achieved: float,
     limit: float,
-    status: HeatRecoveryApproachStatus,
+    status: HeatRecoveryDtMinStatus,
     iterations: int,
-) -> HeatRecoveryApproachSolution:
-    return HeatRecoveryApproachSolution(
-        approach_temperature=0.0 if approach == 0.0 else approach,
+) -> HeatRecoveryDtMinSolution:
+    return HeatRecoveryDtMinSolution(
+        dt_min=0.0 if dt_min == 0.0 else dt_min,
         requested_heat_recovery=requested,
         achieved_heat_recovery=0.0 if achieved == 0.0 else achieved,
         thermodynamic_limit=0.0 if limit == 0.0 else limit,
@@ -171,23 +171,27 @@ def _solution(
     )
 
 
-def solve_heat_recovery_approach(
+def solve_heat_recovery_dt_min(
     hot_streams: StreamCollection,
     cold_streams: StreamCollection,
     *,
     requested_heat_recovery: float,
     period_idx: int = 0,
-) -> HeatRecoveryApproachSolution:
-    """Invert the process cascade for one requested recovery using bisection."""
+) -> HeatRecoveryDtMinSolution:
+    """Return the greatest feasible global dt_min for a requested recovery.
+
+    Thermodynamic-limit requests use the same plateau boundary rule, allowing
+    threshold problems to return a positive dt_min.
+    """
     requested = _validate_requested_recovery(requested_heat_recovery)
     detached_hot = hot_streams.copy(deep=True)
     detached_cold = cold_streams.copy(deep=True)
 
-    def evaluate(approach: float) -> float:
+    def evaluate(dt_min: float) -> float:
         return _evaluate_detached_process_heat_recovery(
             detached_hot,
             detached_cold,
-            approach_temperature=approach,
+            dt_min=dt_min,
             period_idx=int(period_idx),
         )
 
@@ -199,13 +203,14 @@ def solve_heat_recovery_approach(
         raise RuntimeError("Thermodynamic heat-recovery limit was negative.")
     if requested > limit:
         raise HeatRecoveryLimitError(requested, limit)
-    if abs(requested - limit) <= limit_tolerance:
+    at_thermodynamic_limit = abs(requested - limit) <= limit_tolerance
+    if at_thermodynamic_limit and limit <= limit_tolerance:
         return _solution(
-            approach=0.0,
+            dt_min=0.0,
             requested=requested,
             achieved=limit,
             limit=limit,
-            status=HeatRecoveryApproachStatus.AT_THERMODYNAMIC_LIMIT,
+            status=HeatRecoveryDtMinStatus.AT_THERMODYNAMIC_LIMIT,
             iterations=0,
         )
 
@@ -215,30 +220,28 @@ def solve_heat_recovery_approach(
         period_idx=int(period_idx),
     )
 
-    def bounded_recovery(approach: float) -> float:
-        recovery = evaluate(approach)
+    def bounded_recovery(dt_min: float) -> float:
+        recovery = evaluate(dt_min)
         tolerance = _recovery_tolerance(limit, requested, recovery)
         if recovery < -tolerance or recovery > limit + tolerance:
             raise RuntimeError(
-                "Heat-recovery approach evaluation left its thermodynamic bounds."
+                "Heat-recovery dt_min evaluation left its thermodynamic bounds."
             )
         return min(limit, max(0.0, recovery))
 
     upper_recovery = bounded_recovery(upper)
     if upper_recovery > limit_tolerance:
         raise RuntimeError(
-            "The no-overlap approach did not produce a valid zero-recovery bracket."
+            "The no-overlap dt_min did not produce a valid zero-recovery bracket."
         )
 
     low = 0.0
     high = upper
     iterations = 0
     if requested <= limit_tolerance:
-        while high - low > TEMPERATURE_TOLERANCE:
+        while high - low > DT_MIN_TOLERANCE:
             if iterations >= MAXIMUM_ITERATIONS:
-                raise RuntimeError(
-                    "Heat-recovery approach bisection failed to converge."
-                )
+                raise RuntimeError("Heat-recovery dt_min bisection failed to converge.")
             midpoint = (low + high) / 2.0
             midpoint_recovery = bounded_recovery(midpoint)
             iterations += 1
@@ -248,45 +251,50 @@ def solve_heat_recovery_approach(
             else:
                 low = midpoint
         return _solution(
-            approach=high,
+            dt_min=high,
             requested=requested,
             achieved=upper_recovery,
             limit=limit,
-            status=HeatRecoveryApproachStatus.ZERO_RECOVERY_BOUNDARY,
+            status=HeatRecoveryDtMinStatus.ZERO_RECOVERY_BOUNDARY,
             iterations=iterations,
         )
 
+    comparison_target = limit if at_thermodynamic_limit else requested
     feasible_recovery = limit
-    while high - low > TEMPERATURE_TOLERANCE:
+    while high - low > DT_MIN_TOLERANCE:
         if iterations >= MAXIMUM_ITERATIONS:
-            raise RuntimeError("Heat-recovery approach bisection failed to converge.")
+            raise RuntimeError("Heat-recovery dt_min bisection failed to converge.")
         midpoint = (low + high) / 2.0
         midpoint_recovery = bounded_recovery(midpoint)
         iterations += 1
         comparison_tolerance = _recovery_tolerance(
             limit,
-            requested,
+            comparison_target,
             midpoint_recovery,
         )
-        if midpoint_recovery + comparison_tolerance >= requested:
+        if midpoint_recovery + comparison_tolerance >= comparison_target:
             low = midpoint
             feasible_recovery = min(limit, max(0.0, midpoint_recovery))
         else:
             high = midpoint
 
     return _solution(
-        approach=low,
+        dt_min=low,
         requested=requested,
         achieved=feasible_recovery,
         limit=limit,
-        status=HeatRecoveryApproachStatus.SOLVED,
+        status=(
+            HeatRecoveryDtMinStatus.AT_THERMODYNAMIC_LIMIT
+            if at_thermodynamic_limit
+            else HeatRecoveryDtMinStatus.SOLVED
+        ),
         iterations=iterations,
     )
 
 
 __all__ = [
     "HeatRecoveryLimitError",
-    "HeatRecoveryApproachSolution",
+    "HeatRecoveryDtMinSolution",
     "evaluate_process_heat_recovery",
-    "solve_heat_recovery_approach",
+    "solve_heat_recovery_dt_min",
 ]

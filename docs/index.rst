@@ -1,7 +1,8 @@
 OpenPinch Guide
 ===============
 
-OpenPinch is a Python toolkit for Pinch Analysis, inverse heat-recovery approach
+OpenPinch is a Python toolkit for Pinch Analysis, inverse heat-recovery
+``dt_min``
 targeting, Total Site heat integration, graph interpretation, Heat Pump and
 refrigeration screening, exergy post-processing, cogeneration targeting, and
 heat exchanger network synthesis.
@@ -31,8 +32,8 @@ I need to understand the method
    :doc:`fundamentals/graphs-and-interpretation`.
 
 I know the required process heat recovery
-   Use :doc:`guides/heat-recovery-approach-temperature` to calculate its
-   equivalent global HRAT and understand the thermodynamic-limit checks.
+   Use :doc:`guides/heat-recovery-dt-min` to calculate its
+   equivalent global ``dt_min`` and understand the thermodynamic-limit checks.
 
 I am building a reusable study
    Start with :doc:`api/package-root` and :doc:`developer/architecture`.
@@ -43,7 +44,7 @@ What OpenPinch Covers
 ---------------------
 
 - direct process Pinch Analysis and indirect Total Site targeting
-- inverse global HRAT targeting from a specified process heat recovery
+- inverse global ``dt_min`` targeting from a specified process heat recovery
 - hierarchical zone modeling from unit operation to site scale
 - Composite Curve, Grand Composite Curve, Total Site profile, and SUGCC graphs
 - JSON, Excel, CSV-bundle, schema-first, and packaged sample-case inputs

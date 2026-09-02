@@ -16,7 +16,7 @@ from a shell.
    first-solve-cli
    input-formats-and-validation
    zonal-and-total-site-workflows
-   heat-recovery-approach-temperature
+   heat-recovery-dt-min
    heat-pump-workflows
    heat-exchanger-network-synthesis
    cogeneration-workflows

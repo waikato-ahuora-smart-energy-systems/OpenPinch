@@ -8,9 +8,9 @@ from copy import deepcopy
 import pytest
 
 from OpenPinch import PinchProblem, PinchWorkspace
-from OpenPinch.contracts.heat_recovery import (
-    HeatRecoveryApproachResult,
-    HeatRecoveryApproachStatus,
+from OpenPinch.contracts.heat_recovery_dt_min import (
+    HeatRecoveryDtMinResult,
+    HeatRecoveryDtMinStatus,
 )
 
 
@@ -68,20 +68,20 @@ def _stream_contributions(
     ]
 
 
-def test_selected_period_service_returns_units_scope_and_known_approach() -> None:
+def test_selected_period_service_returns_units_scope_and_known_dt_min() -> None:
     problem = PinchProblem("basic_pinch.json", project_name="Site")
-    result = problem.target.heat_recovery_approach_temperature(
+    result = problem.target.heat_recovery_dt_min(
         heat_recovery={"value": 5.150000005, "unit": "MW"},
         zone="Site/Plant",
         period_id="0",
     )
 
-    assert isinstance(result, HeatRecoveryApproachResult)
+    assert isinstance(result, HeatRecoveryDtMinResult)
     assert result.scope == "Site/Plant"
     assert result.period_id == "0"
-    assert result.status is HeatRecoveryApproachStatus.SOLVED
-    assert result.approach_temperature.value == pytest.approx(10.0, abs=2e-6)
-    assert result.approach_temperature.unit == "delta_degC"
+    assert result.status is HeatRecoveryDtMinStatus.SOLVED
+    assert result.dt_min.value == pytest.approx(10.0, abs=2e-6)
+    assert result.dt_min.unit == "delta_degC"
     assert result.requested_heat_recovery.value == pytest.approx(5_150.000005)
     assert result.requested_heat_recovery.unit == "kW"
 
@@ -93,15 +93,13 @@ def test_output_unit_overrides_apply_to_every_thermal_quantity() -> None:
         OUTPUT_UNIT_HEAT_FLOW="MW",
         OUTPUT_UNIT_TEMPERATURE="K",
     )
-    result = PinchProblem(
-        payload, project_name="Site"
-    ).target.heat_recovery_approach_temperature(
+    result = PinchProblem(payload, project_name="Site").target.heat_recovery_dt_min(
         heat_recovery=0.05,
         zone="Site/Process",
         period_id="0",
     )
 
-    assert result.approach_temperature.unit == "K"
+    assert result.dt_min.unit == "K"
     assert result.requested_heat_recovery.value == pytest.approx(0.05)
     assert result.requested_heat_recovery.unit == "MW"
     assert result.achieved_heat_recovery.unit == "MW"
@@ -113,14 +111,14 @@ def test_output_unit_overrides_apply_to_every_thermal_quantity() -> None:
 def test_invalid_recovery_values_are_rejected(value) -> None:
     problem = PinchProblem("basic_pinch.json", project_name="Site")
     with pytest.raises((TypeError, ValueError)):
-        problem.target.heat_recovery_approach_temperature(heat_recovery=value)
+        problem.target.heat_recovery_dt_min(heat_recovery=value)
 
 
 def test_above_limit_error_reports_complete_context() -> None:
     problem = PinchProblem(_multiperiod_payload(), project_name="Site")
 
     with pytest.raises(ValueError) as error:
-        problem.target.heat_recovery_approach_temperature(
+        problem.target.heat_recovery_dt_min(
             heat_recovery=101.0,
             zone="Site/Process",
             period_id="0",
@@ -158,7 +156,7 @@ def test_community_and_region_scopes_are_rejected_with_guidance() -> None:
     problem = PinchProblem(payload, project_name="Region")
 
     with pytest.raises(ValueError, match="Site, Process Zone, or Unit Operation"):
-        problem.target.heat_recovery_approach_temperature(
+        problem.target.heat_recovery_dt_min(
             heat_recovery=50.0,
             zone="Region/Community",
             period_id="0",
@@ -168,11 +166,11 @@ def test_community_and_region_scopes_are_rejected_with_guidance() -> None:
 def test_all_period_scalar_broadcast_mapping_order_and_parallel_parity() -> None:
     problem = PinchProblem(_multiperiod_payload(), project_name="Site")
 
-    sequential = problem.target.all_periods.heat_recovery_approach_temperature(
+    sequential = problem.target.all_periods.heat_recovery_dt_min(
         heat_recovery=50.0,
         zone="Site/Process",
     )
-    parallel = problem.target.all_periods.heat_recovery_approach_temperature(
+    parallel = problem.target.all_periods.heat_recovery_dt_min(
         heat_recovery={"0": 50.0, "peak": 50.0},
         zone="Site/Process",
         workers=2,
@@ -191,16 +189,14 @@ def test_all_period_scalar_broadcast_mapping_order_and_parallel_parity() -> None
 def test_all_period_mapping_requires_exact_canonical_ids(mapping) -> None:
     problem = PinchProblem(_multiperiod_payload(), project_name="Site")
     with pytest.raises(ValueError, match="exactly the canonical period IDs"):
-        problem.target.all_periods.heat_recovery_approach_temperature(
-            heat_recovery=mapping
-        )
+        problem.target.all_periods.heat_recovery_dt_min(heat_recovery=mapping)
 
 
 @pytest.mark.parametrize("workers", [0, -1, True, 1.5])
 def test_all_period_workers_must_be_a_positive_integer(workers) -> None:
     problem = PinchProblem(_multiperiod_payload(), project_name="Site")
     with pytest.raises((TypeError, ValueError), match="positive integer"):
-        problem.target.all_periods.heat_recovery_approach_temperature(
+        problem.target.all_periods.heat_recovery_dt_min(
             heat_recovery=50.0,
             workers=workers,
         )
@@ -225,11 +221,11 @@ def test_selected_and_all_period_calls_are_non_mutating() -> None:
         },
     }
 
-    problem.target.heat_recovery_approach_temperature(
+    problem.target.heat_recovery_dt_min(
         heat_recovery=50.0,
         period_id="0",
     )
-    problem.target.all_periods.heat_recovery_approach_temperature(
+    problem.target.all_periods.heat_recovery_dt_min(
         heat_recovery=50.0,
         workers=2,
     )
@@ -256,21 +252,19 @@ def test_workspace_active_case_and_batch_failure_isolation() -> None:
         activate=False,
     )
 
-    active = workspace.target.heat_recovery_approach_temperature(
+    active = workspace.target.heat_recovery_dt_min(
         heat_recovery=50.0,
         zone="Site/Process",
         period_id="0",
     )
-    batch = workspace.cases().target.heat_recovery_approach_temperature(
+    batch = workspace.cases().target.heat_recovery_dt_min(
         heat_recovery=50.0,
         zone="Site/Process",
         period_id="0",
     )
-    batch_periods = (
-        workspace.cases().target.all_periods.heat_recovery_approach_temperature(
-            heat_recovery=50.0,
-            zone="Site/Process",
-        )
+    batch_periods = workspace.cases().target.all_periods.heat_recovery_dt_min(
+        heat_recovery=50.0,
+        zone="Site/Process",
     )
 
     assert active.period_id == "0"

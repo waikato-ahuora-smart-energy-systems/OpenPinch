@@ -2,7 +2,7 @@
 
 ## Context and authorization
 
-This amendment continues the approved heat-recovery approach temperature
+This amendment continues the approved heat-recovery `dt_min`
 feature. The user explicitly requested a notebook example and a thorough Read
 the Docs review. The existing specialist contract, solver, and public service
 are dependencies and remain unchanged.

@@ -6813,3 +6813,77 @@ Thoroughly review and update RTD."
 **Context**: SOURCE CONTROL AUTHORIZATION - Heat-recovery approach documentation amendment
 
 ---
+
+## Heat-Recovery Notebook Approach Correction
+**Timestamp**: 2026-09-02T11:02:47Z
+**User Input**: "OpenPinch/data/notebooks/02_focused_direct_and_total_site.ipynb
+
+It is not giving the right approach temperature."
+**AI Response**: "Reproduced the notebook result and identified that its 14,121.972 kW request equals the Bleaching zone's zero-approach thermodynamic limit, so the documented boundary contract correctly returns 0 delta_degC with at_thermodynamic_limit. Began a TDD correction using an explicit 12,000 kW interior request with an expected approach of approximately 61.86735 delta_degC. Preserved the user's executed notebook copy in /tmp before regenerating the output-free package asset."
+**Context**: CODE GENERATION AUTHORIZATION - Heat-recovery notebook example correction
+
+---
+
+## Heat-Recovery Notebook Approach Correction Completion
+**Timestamp**: 2026-09-02T11:07:18Z
+**User Input**: "No new user input; continued under the authorized notebook approach correction."
+**AI Response**: "Corrected notebook 02 to use an explicit 12,000 kW interior recovery requirement, producing approximately 61.8673468 delta_degC with solved status. Retained and displayed the fact that the 14,121.972 kW ordinary direct target equals the thermodynamic limit and therefore maps to the zero-approach boundary. Added an executable numerical regression. The focused gate passed 47 tests with 3 expected skips; notebook execution, generator drift, warning-strict Sphinx, Ruff, and patch hygiene passed."
+**Context**: BUILD AND TEST COMPLETE - Heat-recovery notebook example correction
+
+---
+
+## Heat-Recovery Threshold-Limit Requirement Correction
+**Timestamp**: 2026-09-02T17:40:00Z
+**User Input**: "If a problem doesn't need heating or cooling, i.e. a threshold problem, the dtmin can be greater than zero at ther thermodynamic limit."
+**AI Response**: "Accepted the thermodynamic correction. Identified that maximum recovery can occupy a positive global-approach plateau in a threshold problem, so the inverse must return the greatest feasible approach on that plateau instead of forcing zero. Began a TDD solver, property, notebook, and documentation correction while preserving zero-limit and non-threshold behavior."
+**Context**: REQUIREMENTS AND CODE GENERATION AUTHORIZATION - Heat-recovery threshold-limit correction
+
+---
+
+## Heat-Recovery Threshold-Limit Correction Completion
+**Timestamp**: 2026-09-02T18:03:46Z
+**User Input**: "No new user input; continued under the authorized threshold-limit requirement correction."
+**AI Response**: "Corrected thermodynamic-limit inversion to return the greatest feasible global HRAT on a maximum-recovery plateau. The Bleaching notebook regression now returns approximately 58.34505 delta_degC for its 14,121.972 kW thermodynamic limit. Added analytical, packaged, and generated threshold regressions and corrected the requirements, functional design, API, guide, fundamentals, notebook catalog, and release notes. The inverse suite passed 46 tests; notebook and RTD checks passed 47 tests with 3 expected skips; the full configured suite passed 2,583 tests with 4 skips; the exact non-solver coverage selection passed 2,580 tests with 3 skips and 4 deselections at 96 percent branch coverage. Ruff, formatting, and patch hygiene passed."
+**Context**: BUILD AND TEST COMPLETE - Heat-recovery threshold-limit correction
+
+---
+
+## Heat-Recovery DT_MIN Terminology Change Request
+**Timestamp**: 2026-09-02T18:07:38Z
+**User Input**: "Use dt_min instead of approach_temperature and its derivatives."
+**AI Response**: "Inventoried the new inverse service's naming family and prepared a focused TDD rename plan. The proposed contract replaces heat_recovery_approach_temperature with heat_recovery_dt_min, HeatRecoveryApproachResult with HeatRecoveryDtMinResult, approach_temperature with dt_min, and matching internal symbols, modules, tests, notebooks, and RTD references. Existing HEN approach-temperature APIs are outside this feature and remain unchanged."
+**Context**: CODE GENERATION CHANGE REQUEST - Heat-recovery DT_MIN terminology
+
+---
+
+## Heat-Recovery DT_MIN Code-Generation Plan Approval Prompt
+**Timestamp**: 2026-09-02T18:08:47Z
+**User Input**: "No new user input; presenting the required code-generation plan for approval."
+**AI Response**: "Prepared the nine-step clean rename plan at aidlc-docs/construction/plans/heat-recovery-dt-min-terminology-code-generation-plan.md. Requested explicit approval to execute the mapping and verification sequence."
+**Context**: CODE GENERATION PLAN APPROVAL - Heat-recovery DT_MIN terminology
+
+---
+
+## Heat-Recovery DT_MIN Code-Generation Approval
+**Timestamp**: 2026-09-02T18:09:50Z
+**User Input**: "go"
+**AI Response**: "Accepted approval for the nine-step DT_MIN terminology plan. Updated contract and closed API tests first; the Red gate failed as expected because OpenPinch.contracts.heat_recovery_dt_min did not yet exist."
+**Context**: CODE GENERATION AUTHORIZATION AND RED TEST - Heat-recovery DT_MIN terminology
+
+---
+
+## Heat-Recovery DT_MIN Terminology Completion
+**Timestamp**: 2026-09-02T18:41:29Z
+**User Input**: "No new user input; continued under the approved DT_MIN terminology plan."
+**AI Response**: "Completed the clean rename of the inverse heat-recovery service to heat_recovery_dt_min, HeatRecoveryDtMinResult, HeatRecoveryDtMinStatus, and result.dt_min, including derived numerical/application symbols and module paths. Updated generated notebooks 02 and 06, tutorial inventories, installed-artifact smoke, RTD navigation and guide, API/service references, requirements, design, and workflow evidence. The superseded public names are explicitly absent. Focused behavior passed 47 tests; notebook and RTD tests passed 52 tests with 3 expected skips; warning-strict Sphinx passed; the full configured suite passed 2,584 tests with 4 skips; the exact non-solver selection passed 2,581 tests with 3 skips and 4 deselections at 96 percent branch coverage. Ruff, formatting, distribution builds, isolated Python 3.14 installed-wheel smoke, and patch hygiene passed."
+**Context**: BUILD AND TEST COMPLETE - Heat-recovery DT_MIN terminology
+
+---
+
+## Heat-Recovery DT_MIN Commit Authorization
+**Timestamp**: 2026-09-02T18:43:25Z
+**User Input**: "commit if tests are green"
+**AI Response**: "Confirmed all verification gates are green and accepted authorization to stage and commit the threshold-limit correction and complete dt_min terminology change as one cohesive commit."
+**Context**: SOURCE CONTROL AUTHORIZATION - Heat-recovery DT_MIN terminology
+
+---

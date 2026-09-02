@@ -2,7 +2,7 @@ What Is OpenPinch?
 ==================
 
 OpenPinch is a process-engineering package for Pinch Analysis, inverse global
-HRAT targeting from a required process heat recovery, Total Site heat
+``dt_min`` targeting from a required process heat recovery, Total Site heat
 integration, multiperiod analysis, HPR and cogeneration screening, exergy and
 energy-transfer analysis, and heat exchanger network synthesis.
 
@@ -27,4 +27,4 @@ configuration, and defaults without mutating persistent configuration.
 
 Start with :doc:`../getting-started` and the
 :doc:`../examples/notebook-series`. When recovery is the design input rather
-than delta Tmin, use :doc:`../guides/heat-recovery-approach-temperature`.
+than delta Tmin, use :doc:`../guides/heat-recovery-dt-min`.

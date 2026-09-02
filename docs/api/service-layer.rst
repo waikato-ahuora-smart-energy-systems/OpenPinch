@@ -38,39 +38,41 @@ Main Service Surface
    :members:
    :no-index:
 
-Inverse Heat-Recovery Approach Service
---------------------------------------
+Inverse Heat-Recovery ``dt_min`` Service
+----------------------------------------
 
-``OpenPinch.application.heat_recovery_approach`` orchestrates the non-mutating
+``OpenPinch.application.heat_recovery_dt_min`` orchestrates the non-mutating
 inverse target. It resolves direct-targeting zones and canonical periods,
 normalizes requested heat flow, delegates deterministic bisection to
-``OpenPinch.analysis.targeting.approach_temperature``, and converts the result
+``OpenPinch.analysis.targeting.heat_recovery_dt_min``, and converts the result
 to configured output units. The analysis module evaluates only detached
 process-stream copies through the existing vectorized cascade; it does not run
 utility allocation, graph construction, constant-enthalpy presentation work,
 or an optimizer.
 
 Application code should normally call
-``problem.target.heat_recovery_approach_temperature(...)`` or its
+``problem.target.heat_recovery_dt_min(...)`` or its
 ``all_periods`` mirror. The concrete specialist contract remains at
-``OpenPinch.contracts.heat_recovery`` and is intentionally absent from the
+``OpenPinch.contracts.heat_recovery_dt_min`` and is intentionally absent from the
 package root.
 
 The application functions below own public validation, scope and period
 resolution, all-period ordering, and output-unit conversion. The lower-level
-``solve_heat_recovery_approach(...)`` and
+``solve_heat_recovery_dt_min(...)`` and
 ``evaluate_process_heat_recovery(...)`` functions in
-``OpenPinch.analysis.targeting.approach_temperature`` operate in canonical kW
-and ``delta_degC`` and are contributor implementation details.
+``OpenPinch.analysis.targeting.heat_recovery_dt_min`` operate in canonical kW
+and ``delta_degC`` and are contributor implementation details. The solver uses
+the greatest-feasible plateau boundary for both interior and
+thermodynamic-limit requests, including positive threshold-problem results.
 
-.. autofunction:: OpenPinch.application.heat_recovery_approach.calculate_heat_recovery_approach
+.. autofunction:: OpenPinch.application.heat_recovery_dt_min.calculate_heat_recovery_dt_min
    :no-index:
 
-.. autofunction:: OpenPinch.application.heat_recovery_approach.calculate_all_period_heat_recovery_approach
+.. autofunction:: OpenPinch.application.heat_recovery_dt_min.calculate_all_period_heat_recovery_dt_min
    :no-index:
 
 Process-engineer examples and the full behavioral contract are in
-:doc:`../guides/heat-recovery-approach-temperature`.
+:doc:`../guides/heat-recovery-dt-min`.
 
 Preparation Entry Point
 -----------------------

@@ -4,9 +4,9 @@ Run the application, architecture, documentation, and tutorial slices:
 
 ```bash
 uv run pytest \
-  tests/application/test_heat_recovery_approach_api.py \
-  tests/application/test_heat_recovery_approach_temperature.py \
-  tests/application/test_heat_recovery_approach_properties.py \
+  tests/application/test_heat_recovery_dt_min_api.py \
+  tests/application/test_heat_recovery_dt_min.py \
+  tests/application/test_heat_recovery_dt_min_properties.py \
   tests/application/test_package_usability_contract.py \
   tests/architecture \
   tests/packaging/test_tutorial_coverage.py \

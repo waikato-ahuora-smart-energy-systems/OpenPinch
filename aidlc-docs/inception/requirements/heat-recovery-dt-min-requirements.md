@@ -1,9 +1,9 @@
-# Heat-Recovery Approach Temperature Requirements
+# Heat-Recovery `dt_min` Requirements
 
 ## Intent
 
 Provide a non-mutating inverse pinch-analysis service that returns the global
-heat-recovery approach temperature (HRAT/global delta Tmin) corresponding to a
+heat-recovery `dt_min` corresponding to a
 requested process heat recovery.
 
 ## Functional requirements
@@ -14,10 +14,14 @@ requested process heat recovery.
 - Accept finite, non-negative scalar heat recovery values, including the
   existing scalar value-with-unit representations.
 - Reject Boolean, negative, non-finite, and above-limit recovery requests.
-- Calculate the thermodynamic limit at zero global approach and report it in
+- Calculate the thermodynamic limit at zero global `dt_min` and report it in
   above-limit errors together with scope, period, and units.
+- For a request at the thermodynamic limit, return the greatest feasible
+  approach that retains maximum recovery. This boundary may be positive for a
+  threshold problem; return zero only when no positive maximum-recovery
+  plateau exists or the limit itself is zero.
 - Ignore utilities and configured stream-specific `dt_cont` values by applying
-  half the trial global approach to detached hot and cold process streams.
+  half the trial global `dt_min` to detached hot and cold process streams.
 - Return the greatest feasible approach for an interior recovery plateau and
   the smallest zero-recovery boundary for a zero request.
 - Preserve the canonical period order and isolate case-batch failures.
@@ -26,8 +30,8 @@ requested process heat recovery.
 
 ## Result contract
 
-`HeatRecoveryApproachResult` is frozen, strict, finite, and JSON serializable.
-It contains scope, canonical period ID, approach temperature, requested and
+`HeatRecoveryDtMinResult` is frozen, strict, finite, and JSON serializable.
+It contains scope, canonical period ID, `dt_min`, requested and
 achieved recovery, thermodynamic limit, recovery residual, status, and
 iteration count. Thermal values include explicit units and respect configured
 output-unit overrides.
@@ -46,7 +50,7 @@ output-unit overrides.
 
 The feature is additive. It does not alter `direct_heat_integration`,
 `DirectIntegrationTarget`, input schemas, persistence, configuration,
-infrastructure, or package-root exports. HRAT is a process composite-curve
+infrastructure, or package-root exports. Global `dt_min` is a process composite-curve
 spacing and is explicitly distinct from exchanger-level EMAT.
 
 ## Verification requirements

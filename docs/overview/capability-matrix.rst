@@ -18,10 +18,10 @@ Capability Matrix
      - ``problem.target.all_periods.*``
      - ordered period outputs and weighted summaries
      - base
-   * - Inverse heat-recovery approach targeting
-     - ``problem.target.heat_recovery_approach_temperature()`` and its
+   * - Inverse heat-recovery ``dt_min`` targeting
+     - ``problem.target.heat_recovery_dt_min()`` and its
        ``all_periods`` mirror
-     - non-mutating equivalent global HRAT with thermodynamic-limit evidence
+     - non-mutating equivalent global ``dt_min`` with thermodynamic-limit evidence
      - base
    * - Variable heat-capacity streams
      - segmented mapping input through ``PinchProblem``

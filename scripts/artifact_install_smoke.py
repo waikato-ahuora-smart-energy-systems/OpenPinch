@@ -57,10 +57,10 @@ def main(argv: list[str] | None = None) -> int:
     direct = problem.target.direct_heat_integration()
     if problem.results.name != "Wheel contract" or not problem.results.targets:
         raise AssertionError("Installed wheel failed the PinchProblem workflow.")
-    inverse = problem.target.heat_recovery_approach_temperature(
+    inverse = problem.target.heat_recovery_dt_min(
         heat_recovery=float(direct.heat_recovery_target)
     )
-    if abs(inverse.approach_temperature.value - 10.0) > 2e-6:
+    if abs(inverse.dt_min.value - 10.0) > 2e-6:
         raise AssertionError("Installed wheel failed inverse heat-recovery targeting.")
     workspace = PinchWorkspace(json.loads(sample), project_name="Wheel contract")
     if workspace.list_cases() != ["baseline"]:

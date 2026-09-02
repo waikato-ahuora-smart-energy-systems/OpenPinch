@@ -23,7 +23,7 @@ EXPECTED_TARGET_METHODS = {
     "energy_transfer",
     "exergy",
     "heat_exchanger_area_and_cost",
-    "heat_recovery_approach_temperature",
+    "heat_recovery_dt_min",
     "indirect_heat_integration",
     "isentropic_cogeneration",
     "mvr_heat_pump",
@@ -157,9 +157,7 @@ def test_workspace_class_matches_the_case_only_manifest():
 
 
 def test_utility_placement_signature_uses_short_level_names() -> None:
-    parameters = inspect.signature(
-        PinchProblem().target.utility_placement
-    ).parameters
+    parameters = inspect.signature(PinchProblem().target.utility_placement).parameters
 
     assert "isothermal" in parameters
     assert "sensible" in parameters
