@@ -6505,3 +6505,131 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 **Context**: BUILD AND TEST COMPLETE - Release version 0.6.2
 
 ---
+
+## PyPI Deployment Stop Investigation
+**Timestamp**: 2026-09-01T16:36:19Z
+**User Input**: "The workflow has encounter a stop. The package needs the published release before Pypi deployment. What do you suggest?"
+**AI Response**: "Inspected Validate, Release & Publish run 33528423337 and the pypi environment configuration. All validation, build, artifact smoke, draft-release, and TestPyPI jobs passed. Production PyPI was rejected before execution because the workflow runs on main while the pypi environment allows only v*.*.* tags; publishing the draft release would not change that run's ref. Recommended a tag-context production-publish workflow dispatched only after the GitHub Release is published, preserving the tag-only environment gate and manual approval while downloading and publishing the already validated release assets."
+**Context**: DIAGNOSIS AND WORKFLOW DESIGN RECOMMENDATION - PyPI deployment source restriction
+
+---
+
+## PyPI Release Workflow Flowchart
+**Timestamp**: 2026-09-01T16:41:13Z
+**User Input**: "Show a flowchart."
+**AI Response**: "Presented a Mermaid flowchart of the recommended two-workflow release process: main-context validation and GitHub Release publication followed by an explicitly dispatched tag-context PyPI deployment using the same validated artifacts, protected environment approval, Trusted Publishing, verification, and safe retry behavior."
+**Context**: WORKFLOW VISUALIZATION - Tag-context PyPI release hand-off
+
+---
+
+## Tag-Context PyPI Publication Authorization
+**Timestamp**: 2026-09-01T16:45:30Z
+**User Input**: "Implement and commit."
+**AI Response**: "Accepted authorization to implement and commit the tag-context production publication design under TDD. Created an eight-step plan covering failing workflow contracts, main/tag phase separation within the existing trusted workflow identity, release checksum verification, documentation, the required fresh 0.6.3 version identity, focused and complete validation, scope review, and commit."
+**Context**: CODE GENERATION AUTHORIZATION - GitHub Actions tag-context PyPI publication
+
+---
+
+## Tag-Context PyPI Publication Completion
+**Timestamp**: 2026-09-01T17:01:39Z
+**User Input**: "Implement and commit."
+**AI Response**: "Refactored ci-publish.yml so main validation creates checksummed artifacts, validates them on TestPyPI, publishes the GitHub Release, and dispatches the same workflow at the immutable release tag. The tag-ref phase rejects mismatched or non-public releases, verifies exact artifact names and SHA-256 digests, preserves the protected pypi reviewer gate and existing Trusted Publisher workflow identity, publishes without rebuilding, and verifies the PyPI API. Updated maintainer documentation and advanced canonical release metadata to 0.6.3 because v0.6.2 cannot contain the corrected workflow. The focused packaging gate passes 106 tests with 3 expected skips; all workflows parse; release and lock checks, warning-strict documentation, fresh distributions, Ruff, formatting, and patch hygiene pass; and the complete configured-solver suite passes 2,520 tests with 4 expected skips. PBT-02 through PBT-07 and PBT-10 are N/A for the fixed declarative workflow contract; PBT-08 and PBT-09 remain compliant. Security and Resiliency extensions remain disabled and N/A."
+**Context**: BUILD AND TEST COMPLETE - GitHub Actions tag-context PyPI publication
+
+---
+
+## Release Version Hand-Off Clarification
+**Timestamp**: 2026-09-01T17:03:20Z
+**User Input**: "Once I create a new PR, the version will bump, will that mismatch things again?"
+**AI Response**: "Clarified that PR creation does not mutate the version. The committed branch already declares 0.6.3 while main declares 0.6.2, so PR validation checks the required forward version without changing it. After merge, the main workflow derives v0.6.3 from that merged metadata and dispatches the production invocation with the same tag as both ref and release_tag input. A later intentional bump is also safe when pyproject.toml, uv.lock, and .bumpversion.toml remain synchronized; an inconsistent partial bump is rejected before release creation."
+**Context**: RELEASE WORKFLOW CLARIFICATION - Dynamic version and tag identity
+
+---
+
+## GitHub Review Investigation
+**Timestamp**: 2026-09-01T19:23:41Z
+**User Input**: "Github review reveals some issues. Investigate."
+**AI Response**: "Inspected PR 94 and identified two actionable Codex review findings. Confirmed the P1 provenance finding: SHA256SUMS is mutable alongside the release distributions, so it cannot prove that production receives the original build/TestPyPI artifacts. Recommended anchoring the manifest digest in the unprivileged build run and carrying that immutable value into the tag dispatch, or using a signed artifact attestation. Confirmed the P2 retry finding: inline PyPI API verification can fail after a successful immutable upload, while a fresh workflow retry attempts the upload again. Recommended moving availability verification to a dependent unprivileged job and documenting Re-run failed jobs on the original tag run so the successful upload is not repeated. No workflow or application code was changed during this investigation."
+**Context**: DIAGNOSIS COMPLETE - PR 94 release provenance and retry findings
+
+---
+
+## GitHub Review Corrections Authorization
+**Timestamp**: 2026-09-01T19:26:00Z
+**User Input**: "go"
+**AI Response**: "Accepted authorization to correct both PR 94 findings under TDD without another version bump. Created a seven-step plan covering failing provenance and retry contracts, build-owned manifest digest transport, pre-use tag validation, independent PyPI verification, maintainer retry guidance, focused and complete verification, and final least-privilege review."
+**Context**: CODE GENERATION AUTHORIZATION - PR 94 provenance and retry corrections
+
+---
+
+## GitHub Review Corrections Completion
+**Timestamp**: 2026-09-01T19:37:42Z
+**User Input**: "go"
+**AI Response**: "Corrected both PR 94 findings without changing version 0.6.3. The unprivileged build job now owns the release manifest digest; the write-privileged release job must reproduce it before creating or updating release assets; the automatic tag dispatch carries it as an immutable event input; and the tag job verifies it before trusting the mutable release manifest or distributions. PyPI API availability verification is now a separate zero-permission job, and maintainer documentation requires Re-run failed jobs on the original tag run so verification can retry without repeating a successful upload. The packaging/workflow gate passes 108 tests with 3 expected skips; all workflows parse; release and lock checks, warning-strict documentation, fresh 0.6.3 distributions, repository Ruff, changed-test formatting, and patch hygiene pass; and the complete configured-solver suite passes 2,522 tests with 4 expected skips. PBT-02 through PBT-07 and PBT-10 are N/A for the deterministic workflow contract; PBT-08 and PBT-09 remain compliant. Security and Resiliency extensions remain disabled and N/A."
+**Context**: BUILD AND TEST COMPLETE - PR 94 provenance and retry corrections
+
+---
+
+## GitHub Workflow Audit Request
+**Timestamp**: 2026-09-01T19:46:10Z
+**User Input**: "Audit the github workflow for issues."
+**AI Response**: "Started a read-only audit of all GitHub Actions workflows and the pending release provenance/retry corrections, including static job dependency, permission, artifact, release, retry, and version-flow analysis plus relevant live PR/check evidence."
+**Context**: REVIEW - GitHub Actions workflow audit
+
+---
+
+## GitHub Workflow Audit Completion
+**Timestamp**: 2026-09-01T19:53:12Z
+**User Input**: "Audit the github workflow for issues."
+**AI Response**: "Completed a read-only audit of the three workflow files, release scripts and tests, PR 94, recent Actions runs, and repository protection settings. Identified critical gaps: main branch protection does not require CI status checks; the proposed tag phase treats a caller-controlled workflow_dispatch checksum as build provenance; manual dispatch on main enters the release pipeline; and an existing public release can have assets overwritten with --clobber. Identified additional reliability and efficiency gaps: solver tests occur only after merge, partial PyPI upload failures remain non-idempotent, pull-request retargeting is not handled, duplicate develop/PR suites waste compute, parallel uv cache writers produce repeated live warnings, release tags have no ruleset, and repository Actions defaults remain broader than the workflow needs. Confirmed current workflow YAML parses, the focused workflow/documentation contract suite passes 46 tests, and two isolated local builds produced identical wheel and sdist hashes. No workflow, application, documentation, or repository setting was changed by the audit."
+**Context**: REVIEW COMPLETE - GitHub Actions workflow and repository controls
+
+---
+
+## GitHub Workflow Hardening Authorization
+**Timestamp**: 2026-09-01T21:09:58Z
+**User Input**: "Fix these issues. Re-audit the github workflows for further issues."
+**AI Response**: "Accepted authorization to correct the audited workflow and repository-control findings under TDD, preserve the existing uncommitted PR 94 corrections, validate the complete release path, apply safe live GitHub protection settings, and perform a fresh post-change audit."
+**Context**: CODE GENERATION AUTHORIZATION - GitHub Actions comprehensive hardening
+
+---
+
+## GitHub Workflow Hardening Validation and Re-audit
+**Timestamp**: 2026-09-01T21:47:27Z
+**User Input**: "No new user input; continued under the approved GitHub workflow hardening request."
+**AI Response**: "Implemented immutable source-run artifact identity, fail-closed release mutation, exact and retry-safe TestPyPI/PyPI state verification, invalid-dispatch rejection, PR retarget and solver gates, aggregate pr-gate reporting, develop/PR deduplication, and single-writer uv cache behavior. Re-auditing found and corrected workflow-run path formatting, build-attempt drift on reruns, index propagation and HTTP 429 retry handling, and acceptance of extra GitHub Release assets. The focused gate passes 58 tests; all workflows parse; Ruff, changed-file formatting, warning-strict documentation, OpenPinch 0.6.3 distributions, release-artifact tests, and patch hygiene pass; and the complete configured-solver suite passes 2,534 tests with 4 expected skips in 338.40 seconds. Live repository defaults now require full-SHA action pins, use a read-only default GITHUB_TOKEN, and prevent Actions from creating or approving pull requests. The pypi environment remains reviewer-protected and restricted to v*.*.* tags. GitHub passkey/2FA re-authentication blocked saving the accurate Code Owner setting and stable-tag ruleset, and pr-gate cannot become a required check until its first successful pushed run. PBT-08 and PBT-09 remain compliant; PBT-02 through PBT-07 and PBT-10 are N/A for deterministic workflow configuration and bounded exact-file validation. Security and Resiliency extensions remain disabled and were not enforced."
+**Context**: BUILD, TEST, AND RE-AUDIT COMPLETE - Live branch/tag controls awaiting external GitHub sequencing
+
+---
+
+## GitHub Re-authentication Retry
+**Timestamp**: 2026-09-01T22:36:24Z
+**User Input**: "Again"
+**AI Response**: "Recreated the active stable-release-tag ruleset form for v*.*.*, preserving tag creation while restricting updates, deletions, and force pushes, then reopened GitHub's Confirm access prompt for passkey or 2FA completion."
+**Context**: LIVE REPOSITORY CONTROL - Stable-tag ruleset awaiting GitHub identity confirmation
+
+---
+
+## GitHub Stable-Tag Protection Confirmation
+**Timestamp**: 2026-09-01T22:51:11Z
+**User Input**: "Done"
+**AI Response**: "Verified that the active Protect stable release tags ruleset was created for v*.*.* with tag creation preserved and tag updates, deletions, and force pushes restricted. Opened the main branch protection editor and prepared removal of the stale Code Owners review requirement, stopping before the server-side save for action-time confirmation."
+**Context**: LIVE REPOSITORY CONTROL - Stable-tag protection complete; branch-protection correction prepared
+
+---
+
+## GitHub Main Branch Protection Correction
+**Timestamp**: 2026-09-02T00:17:59Z
+**User Input**: "Save"
+**AI Response**: "Saved and verified the main branch protection correction. Require review from Code Owners is disabled, while pull requests, conversation resolution, and administrator enforcement remain enabled."
+**Context**: LIVE REPOSITORY CONTROL COMPLETE - Main branch protection aligned with repository ownership configuration
+
+---
+
+## GitHub Workflow Hardening Commit Authorization
+**Timestamp**: 2026-09-02T03:04:28Z
+**User Input**: "Commit"
+**AI Response**: "Reviewed the pending workflow-hardening diff and supporting tests, documentation, plans, and audit history; started final focused validation before staging and committing the complete change set on develop."
+**Context**: SOURCE CONTROL AUTHORIZATION - GitHub Actions comprehensive hardening
+
+---
