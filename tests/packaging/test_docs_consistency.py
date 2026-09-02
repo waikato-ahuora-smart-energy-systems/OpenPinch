@@ -330,6 +330,8 @@ def test_release_docs_match_automated_main_branch_publication() -> None:
     combined = f"{readme}\n{developer_guide}"
 
     for phrase in (
+        "automatically advances",
+        "fork pull requests",
         "creates the annotated version tag",
         "draft GitHub release",
         "TestPyPI",

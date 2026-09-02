@@ -7007,3 +7007,85 @@ It is not giving the right approach temperature."
 **Context**: SOURCE CONTROL AUTHORIZATION - Heat-recovery DT_MIN audit resolutions
 
 ---
+
+## Pull-Request Automatic Version-Bump Ordering Request
+**Timestamp**: 2026-09-02T21:54:48Z
+**User Input**: "The PR failed due to \"Release version '0.6.3' must be greater than base version '0.6.3'.\"
+
+Version bump should do this automatically; however, the release version is being checked before the version bump happens."
+**AI Response**: "Started a focused brownfield CI workflow correction. Confirmed that the current PR workflow removed the automatic bump job and validates the unchanged PR version directly against main. Loaded the current reverse-engineering context and existing extension decisions, classified the request as a clear, simple workflow bug, and prepared minimal requirements for automatic bump-before-validation ordering, updated-head checkout, repeat-run idempotence, and fork-safe validation."
+**Context**: WORKSPACE DETECTION AND REQUIREMENTS ANALYSIS - Pull-request automatic version bump ordering
+
+---
+
+## Pull-Request Automatic Version-Bump Requirements Approval Prompt
+**Timestamp**: 2026-09-02T21:55:51Z
+**User Input**: "No new user input; presenting the automatic version-bump ordering requirements for approval."
+**AI Response**: "Completed minimal requirements analysis for the clear CI bug and requested approval through the dedicated requirements question file before Workflow Planning. User Stories are recommended for omission because this is an internal workflow correction."
+**Context**: REQUIREMENTS ANALYSIS APPROVAL - Pull-request automatic version bump ordering
+
+---
+
+## Pull-Request Automatic Version-Bump Requirements Approval
+**Timestamp**: 2026-09-02T21:57:40Z
+**User Input**: "A -- just proceed automatically through to implementation and completion. Only pause for needed input."
+**AI Response**: "Recorded option A as approval of the requirements and the user's explicit standing authorization to proceed through the focused workflow, implementation, and completion without ceremonial pauses. User Stories, Application Design, Units Generation, Functional Design, NFR stages, and Infrastructure Design are skipped as unnecessary for this isolated CI ordering bug. Created the minimal workflow and TDD code-generation plans and proceeded to Red tests."
+**Context**: REQUIREMENTS AND WORKFLOW APPROVAL; CODE GENERATION AUTHORIZATION - Pull-request automatic version bump ordering
+
+---
+
+## Pull-Request Automatic Version-Bump Red Gate
+**Timestamp**: 2026-09-02T21:57:40Z
+**User Input**: "No new user input; continued under the approved automatic version-bump ordering plan."
+**AI Response**: "Replaced the obsolete no-mutation workflow assertion with the approved automatic bump, ordering, latest-head, fork, and aggregate-gate contracts. The isolated test failed as expected because the current PR workflow contains no bump-version job."
+**Context**: CODE GENERATION RED TEST - Pull-request automatic version bump ordering
+
+---
+
+## Pull-Request Automatic Version-Bump Green Implementation
+**Timestamp**: 2026-09-02T21:57:40Z
+**User Input**: "No new user input; continued under the approved automatic version-bump ordering plan."
+**AI Response**: "Restored a same-repository main-PR bump job with job-scoped contents write permission, exact bump-tool pinning, label/title selection, equal-only mutation, stale-version rejection, lock and forward-version checks, and no tag creation. Ordered release validation after bump evaluation, made it check out the latest head, preserved read-only fork validation, extended aggregate gate semantics, and synchronized README and RTD release instructions. The workflow and documentation Red tests are Green."
+**Context**: CODE GENERATION GREEN - Pull-request automatic version bump ordering
+
+---
+
+## Pull-Request Automatic Version-Bump Build and Test Completion
+**Timestamp**: 2026-09-02T22:12:50Z
+**User Input**: "No new user input; completed under the user's standing authorization to proceed through implementation and completion."
+**AI Response**: "Completed all six TDD plan steps. The focused packaging and workflow gate passes 123 tests with 3 expected optional-profile skips. The CI-equivalent non-solver suite passes 2,638 tests with 3 expected skips and 4 solver deselections at 96 percent branch coverage. Every workflow YAML file parses; Ruff and changed-file formatting pass; warning-strict Sphinx passes; patch hygiene passes; and an isolated temporary-repository smoke confirms the pinned bump command advances pyproject.toml, uv.lock, and .bumpversion.toml from 0.6.3 to 0.6.4 in one clean no-tag commit. The workspace's canonical 0.6.3 version files remain unchanged. Security and Resiliency extensions remain disabled. PBT-01 was assessed with deterministic workflow contracts selected as the stronger oracle; PBT-02 through PBT-10 are N/A."
+**Context**: CODE GENERATION AND BUILD AND TEST COMPLETE - Pull-request automatic version bump ordering
+
+---
+
+## GitHub Codex Heat-Recovery Review Request
+**Timestamp**: 2026-09-02T22:14:15Z
+**User Input**: "Action the Github codex review."
+**AI Response**: "Retrieved the signed-in review for pull request 95 and validated both unresolved P2 findings against the current implementation. Started an authorized focused TDD correction for near-limit requested-recovery targeting and Pint-compatible absolute-temperature aliases, while preserving the existing uncommitted pull-request version-bump work."
+**Context**: WORKSPACE CONTINUITY, REVIEW RETRIEVAL, AND CODE GENERATION PLANNING - GitHub Codex heat-recovery review corrections
+
+---
+
+## GitHub Codex Heat-Recovery Review Red and Green
+**Timestamp**: 2026-09-02T22:14:15Z
+**User Input**: "No new user input; continued under the standing authorization to proceed automatically through implementation and completion."
+**AI Response**: "Added deterministic regressions for a shallow-slope near-limit inverse and Pint-compatible Celsius, Fahrenheit, and Kelvin aliases. The Red gate failed with the old 0.5-degree boundary error and five delta-to-absolute conversion errors. Corrected the solver to retain the requested recovery as its comparison target and added Pint-resolved delta-temperature unit derivation."
+**Context**: TDD RED AND GREEN IMPLEMENTATION - GitHub Codex heat-recovery review corrections
+
+---
+
+## GitHub Codex Heat-Recovery Review Completion
+**Timestamp**: 2026-09-02T22:28:07Z
+**User Input**: "No new user input; completed under the standing authorization to proceed automatically through implementation and completion."
+**AI Response**: "Resolved both unresolved Codex findings from pull request 95. Near-limit bisection now uses the exact requested recovery and returns the greatest feasible dt_min without changing its documented status. Output temperature aliases are resolved through Pint, offset units are converted to their delta equivalents, and delta Fahrenheit serialization is canonicalized. The focused gate passes 142 tests; Ruff, formatting, and patch hygiene pass; and the CI-equivalent non-solver suite passes 2,647 tests with 3 expected skips and 4 solver deselections at 96 percent branch coverage. Existing uncommitted version-bump work was preserved and no commit or GitHub review mutation was performed."
+**Context**: CODE GENERATION AND BUILD AND TEST COMPLETE - GitHub Codex heat-recovery review corrections
+
+---
+
+## Pull-Request Corrections Commit Authorization
+**Timestamp**: 2026-09-02T23:39:35Z
+**User Input**: "Commit"
+**AI Response**: "Accepted authorization to stage and commit the complete verified pull-request correction set: automatic version-bump ordering, Codex heat-recovery review fixes, regression tests, documentation, and AI-DLC evidence."
+**Context**: SOURCE CONTROL AUTHORIZATION - Pull-request corrections
+
+---

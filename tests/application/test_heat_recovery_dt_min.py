@@ -111,6 +111,31 @@ def test_output_unit_overrides_apply_to_every_thermal_quantity() -> None:
     assert result.heat_recovery_residual.unit == "MW"
 
 
+@pytest.mark.parametrize(
+    ("temperature_alias", "expected_value", "expected_unit"),
+    [
+        ("degree_Celsius", 100.0, "delta_degC"),
+        ("degree_Fahrenheit", 180.0, "delta_degF"),
+    ],
+)
+def test_service_returns_delta_units_for_absolute_temperature_aliases(
+    temperature_alias,
+    expected_value,
+    expected_unit,
+) -> None:
+    payload = _multiperiod_payload()
+    payload["options"]["OUTPUT_UNIT_TEMPERATURE"] = temperature_alias
+
+    result = PinchProblem(payload, project_name="Site").target.heat_recovery_dt_min(
+        heat_recovery=50.0,
+        zone="Site/Process",
+        period_id="0",
+    )
+
+    assert result.dt_min.value == pytest.approx(expected_value, abs=2e-6)
+    assert result.dt_min.unit == expected_unit
+
+
 @pytest.mark.parametrize("value", [-1, float("nan"), float("inf"), True])
 def test_invalid_recovery_values_are_rejected(value) -> None:
     problem = PinchProblem("basic_pinch.json", project_name="Site")

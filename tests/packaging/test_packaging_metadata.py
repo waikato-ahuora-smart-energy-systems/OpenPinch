@@ -453,26 +453,54 @@ def test_publish_solver_gate_uses_supported_runner_and_probes_binaries():
     assert "('couenne', 'ipopt')" in solver_block
 
 
-def test_pr_workflow_validates_main_and_develop_without_mutating_pr_heads():
+def test_pr_workflow_bumps_same_repository_main_pr_before_release_validation():
     workflow = (REPO_ROOT / ".github" / "workflows" / "ci-pull-request.yml").read_text(
         encoding="utf-8"
     )
+    bump_block = workflow.split("  bump-version:", 1)[1].split("  release-version:", 1)[
+        0
+    ]
+    release_block = workflow.split("  release-version:", 1)[1].split("  docs:", 1)[0]
 
     assert 'branches: ["main", "develop"]' in workflow
     assert "edited" in workflow
-    assert "bump-version:" not in workflow
-    assert "contents: write" not in workflow
     assert "pull-requests: write" not in workflow
-    assert "persist-credentials: true" not in workflow
-    assert "git push" not in workflow
-    assert "release-version:" in workflow
+    assert "github.event.pull_request.head.repo.full_name == github.repository" in (
+        bump_block
+    )
     assert "github.event.pull_request.base.ref == 'main'" in workflow
+    assert "contents: write" in bump_block
+    assert "persist-credentials: true" in bump_block
+    assert "bump-my-version==1.2.3" in bump_block
+    assert 'BUMP_PART="patch"' in bump_block
+    assert 'NORMALIZED_LABELS=",${PR_LABELS,,},"' in bump_block
+    assert '[[ "${PR_TITLE,,}" =~ \\[(major|minor|patch)\\] ]]' in bump_block
+    assert 'if [ "${CURRENT_VERSION}" = "${BASE_VERSION}" ]; then' in bump_block
+    assert "elif ! python scripts/check_release_version.py" in bump_block
+    assert '--base-pyproject "${RUNNER_TEMP}/base-pyproject.toml"' in bump_block
+    assert 'bump "${BUMP_PART}" --no-tag' in bump_block
+    assert "python scripts/check_lockfile_version.py" in bump_block
+    assert "git push origin" in bump_block
+    assert "needs: bump-version" in release_block
+    assert "needs.bump-version.result" in release_block
+    assert "repository: ${{ github.event.pull_request.head.repo.full_name }}" in (
+        release_block
+    )
+    assert "ref: ${{ github.event.pull_request.head.ref }}" in release_block
+    assert "persist-credentials: false" in release_block
+    assert "python scripts/check_release_version.py --base-pyproject" in release_block
     assert "coverage report --fail-under=95" in workflow
     assert "surface: [core, dashboard, notebook, brayton_cycle, synthesis]" in workflow
     assert "solver-tests:" in workflow
     assert 'pytest --hypothesis-seed=20260715 -m "solver"' in workflow
     assert "pr-gate:" in workflow
-    assert "needs:" in workflow.split("  pr-gate:", 1)[1]
+    gate_block = workflow.split("  pr-gate:", 1)[1]
+    assert "- bump-version" in gate_block
+    assert "BUMP_VERSION_RESULT: ${{ needs.bump-version.result }}" in gate_block
+    assert (
+        "HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}" in gate_block
+    )
+    assert "REPOSITORY: ${{ github.repository }}" in gate_block
 
 
 def test_develop_workflow_defers_to_an_open_develop_to_main_pull_request():

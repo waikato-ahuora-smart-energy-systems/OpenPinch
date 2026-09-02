@@ -286,7 +286,7 @@ def solve_heat_recovery_dt_min(
             iterations=iterations,
         )
 
-    comparison_target = limit if at_thermodynamic_limit else requested
+    comparison_target = requested
 
     def is_feasible(recovery: float) -> bool:
         if at_thermodynamic_limit or requested <= RECOVERY_ABSOLUTE_TOLERANCE:

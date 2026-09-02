@@ -38,13 +38,117 @@ jobs:
       - run: uv run --no-sync coverage run --branch --source=OpenPinch -m pytest --hypothesis-seed=20260715 -m "not solver"
       - run: uv run --no-sync coverage report --fail-under=95
 
+  bump-version:
+    if: >-
+      ${{
+        github.event.action != 'closed' &&
+        github.event.pull_request.draft == false &&
+        github.event.pull_request.base.ref == 'main' &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the latest pull-request head
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          save-cache: false
+      - name: Resolve the requested version part
+        id: bump-part
+        shell: bash
+        env:
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          BUMP_PART="patch"
+          NORMALIZED_LABELS=",${PR_LABELS,,},"
+          if [[ "${NORMALIZED_LABELS}" == *",major,"* ]]; then
+            BUMP_PART="major"
+          elif [[ "${NORMALIZED_LABELS}" == *",minor,"* ]]; then
+            BUMP_PART="minor"
+          elif [[ "${NORMALIZED_LABELS}" == *",patch,"* ]]; then
+            BUMP_PART="patch"
+          elif [[ "${PR_TITLE,,}" =~ \[(major|minor|patch)\] ]]; then
+            BUMP_PART="${BASH_REMATCH[1]}"
+          fi
+          echo "part=${BUMP_PART}" >> "${GITHUB_OUTPUT}"
+      - name: Advance an equal release version exactly once
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          BASE_REPOSITORY: ${{ github.event.pull_request.base.repo.full_name }}
+          BUMP_PART: ${{ steps.bump-part.outputs.part }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --no-tags \
+            "https://github.com/${BASE_REPOSITORY}.git" \
+            "${BASE_REF}:refs/remotes/pull-base/${BASE_REF}"
+          git show \
+            "refs/remotes/pull-base/${BASE_REF}:pyproject.toml" \
+            > "${RUNNER_TEMP}/base-pyproject.toml"
+
+          BUMP_TOOL=(uvx --from "bump-my-version==1.2.3" bump-my-version)
+          CURRENT_VERSION="$(python scripts/check_release_version.py)"
+          BASE_VERSION="$(python scripts/check_release_version.py \
+            --pyproject "${RUNNER_TEMP}/base-pyproject.toml")"
+          CONFIG_VERSION="$("${BUMP_TOOL[@]}" show current_version)"
+
+          if [ "${CONFIG_VERSION}" != "${CURRENT_VERSION}" ]; then
+            echo ".bumpversion.toml version '${CONFIG_VERSION}' does not match project version '${CURRENT_VERSION}'." >&2
+            exit 1
+          fi
+
+          if [ "${CURRENT_VERSION}" = "${BASE_VERSION}" ]; then
+            "${BUMP_TOOL[@]}" bump "${BUMP_PART}" --no-tag
+            python scripts/check_lockfile_version.py
+            python scripts/check_release_version.py \
+              --base-pyproject "${RUNNER_TEMP}/base-pyproject.toml"
+            git push origin "HEAD:refs/heads/${HEAD_REF}"
+          elif ! python scripts/check_release_version.py \
+            --base-pyproject "${RUNNER_TEMP}/base-pyproject.toml"; then
+            echo "Candidate version '${CURRENT_VERSION}' is behind base version '${BASE_VERSION}'; refusing a speculative bump." >&2
+            exit 1
+          else
+            echo "Candidate version '${CURRENT_VERSION}' is already forward; no bump required."
+          fi
+
   release-version:
-    if: ${{ github.event.action != 'closed' && github.event.pull_request.draft == false && github.event.pull_request.base.ref == 'main' }}
+    needs: bump-version
+    if: >-
+      ${{
+        always() &&
+        github.event.action != 'closed' &&
+        github.event.pull_request.draft == false &&
+        github.event.pull_request.base.ref == 'main' &&
+        (
+          needs.bump-version.result == 'success' ||
+          github.event.pull_request.head.repo.full_name != github.repository
+        )
+      }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - name: Check out the latest pull-request head
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
@@ -60,10 +164,15 @@ jobs:
       - name: Require a forward release version
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
+          BASE_REPOSITORY: ${{ github.event.pull_request.base.repo.full_name }}
         run: |
           set -euo pipefail
-          git fetch --no-tags origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}"
-          git show "refs/remotes/origin/${BASE_REF}:pyproject.toml" > "${RUNNER_TEMP}/base-pyproject.toml"
+          git fetch --no-tags \
+            "https://github.com/${BASE_REPOSITORY}.git" \
+            "${BASE_REF}:refs/remotes/pull-base/${BASE_REF}"
+          git show \
+            "refs/remotes/pull-base/${BASE_REF}:pyproject.toml" \
+            > "${RUNNER_TEMP}/base-pyproject.toml"
           uv run --no-sync python scripts/check_release_version.py --base-pyproject "${RUNNER_TEMP}/base-pyproject.toml"
 
   docs:
@@ -201,6 +310,7 @@ jobs:
     if: ${{ always() && github.event.pull_request.draft == false }}
     needs:
       - test
+      - bump-version
       - release-version
       - docs
       - optional-install-smoke
@@ -213,7 +323,10 @@ jobs:
       - name: Require every applicable validation job
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPOSITORY: ${{ github.repository }}
           TEST_RESULT: ${{ needs.test.result }}
+          BUMP_VERSION_RESULT: ${{ needs.bump-version.result }}
           RELEASE_VERSION_RESULT: ${{ needs.release-version.result }}
           DOCS_RESULT: ${{ needs.docs.result }}
           OPTIONAL_RESULT: ${{ needs.optional-install-smoke.result }}
@@ -231,9 +344,15 @@ jobs:
             test "${result}" = "success"
           done
           if [ "${BASE_REF}" = "main" ]; then
+            if [ "${HEAD_REPO}" = "${REPOSITORY}" ]; then
+              test "${BUMP_VERSION_RESULT}" = "success"
+            else
+              test "${BUMP_VERSION_RESULT}" = "skipped"
+            fi
             test "${RELEASE_VERSION_RESULT}" = "success"
             test "${SOLVER_RESULT}" = "success"
           else
+            test "${BUMP_VERSION_RESULT}" = "skipped"
             test "${RELEASE_VERSION_RESULT}" = "skipped"
             test "${SOLVER_RESULT}" = "skipped"
           fi

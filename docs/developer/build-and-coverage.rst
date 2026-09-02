@@ -39,31 +39,41 @@ Release Process
 
 Production publication is automated from the ``main`` branch:
 
-1. set a strict, forward ``X.Y.Z`` version in ``pyproject.toml`` and keep the
-   OpenPinch entry in ``uv.lock`` synchronized in the pull request
-2. merge only after the read-only validation jobs, external-solver suite, and
-   aggregate ``pr-gate`` result pass
-3. let the main-branch workflow repeat the test, documentation, solver, build,
+1. for a same-repository pull request targeting ``main``, the PR workflow
+   automatically advances an unchanged release version before validating it;
+   a ``major``, ``minor``, or ``patch`` label takes precedence, followed by a
+   matching title marker such as ``[minor]``, with ``patch`` as the default
+2. let the generated bump commit update ``pyproject.toml``, ``uv.lock``, and
+   ``.bumpversion.toml`` together; the ordered release-version job checks out
+   and validates that updated head, and any later ``synchronize`` run or manual
+   rerun recognizes the forward version without another commit
+3. note that fork pull requests remain read-only and must provide a synchronized
+   forward version in the contributor branch; merge only after the validation
+   jobs, external-solver suite, and aggregate ``pr-gate`` result pass
+4. let the main-branch workflow repeat the test, documentation, solver, build,
    and cross-platform artifact gates
-4. after validation, the workflow creates the annotated version tag and a
+5. after validation, the workflow creates the annotated version tag and a
    draft GitHub release containing checksummed release artifacts, then
    publishes the same distributions to TestPyPI; exact filename and SHA-256
    preflight/postflight checks safely distinguish absent, partial, complete,
    and mismatched index state
-5. after TestPyPI succeeds:
+6. after TestPyPI succeeds:
 
    * it publishes the GitHub release before production PyPI
    * it dispatches the same workflow at the version tag
-6. the tag-ref run verifies the source push, workflow identity, latest required
+7. the tag-ref run verifies the source push, workflow identity, latest required
    jobs, and immutable build artifact ID, digest, and build attempt; it then
    requires the public release files to match that artifact byte-for-byte
    without rebuilding and waits at the protected ``pypi`` environment
-7. after approval, PyPI Trusted Publishing uploads the verified distributions
+8. after approval, PyPI Trusted Publishing uploads the verified distributions
    and a separate unprivileged job confirms the version through the PyPI API
 
-Version bumping does not create a local tag. The release workflow owns the
-``v{project.version}`` tag and rejects malformed versions, lock mismatches, or
-an existing tag that points to a different commit. A production failure can
+The automatic pull-request bump is idempotent: a candidate already greater than
+the base is validated without another commit, while a candidate behind the base
+fails for manual reconciliation. Version bumping does not create a local tag.
+The release workflow owns the ``v{project.version}`` tag and rejects malformed
+versions, lock mismatches, or an existing tag that points to a different commit.
+A production failure can
 therefore leave a public GitHub Release while PyPI is pending. Open the
 original tag run and select **Re-run failed jobs**. Exact index preflight,
 ``skip-existing``, and a separately retryable availability check recover an

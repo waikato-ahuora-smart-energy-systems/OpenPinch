@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: GitHub Actions comprehensive hardening awaiting the first successful pushed `pr-gate` run before that check can be required on `main`.
+- **Current Stage**: GitHub Codex heat-recovery review corrections complete
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -29,6 +29,28 @@
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
 
 ## Utility Placement Optimisation Progress
+
+- [x] GITHUB CODEX HEAT-RECOVERY REVIEW CORRECTIONS - Preserved the requested
+  recovery as the near-limit inverse feasibility target and resolved valid
+  configured temperature aliases through Pint to delta-temperature output
+  units. The focused gate passes 142 tests; Ruff, formatting, and patch hygiene
+  pass; and the CI-equivalent non-solver suite passes 2,647 tests with 3
+  expected skips and 4 solver deselections at 96 percent branch coverage.
+  Plan:
+  `aidlc-docs/construction/plans/github-codex-review-heat-recovery-corrections-plan.md`.
+
+- [x] PULL-REQUEST AUTOMATIC VERSION-BUMP ORDERING - Restored automatic version
+  advancement for same-repository pull requests targeting `main`, then validate
+  the updated head version against the base without repeat bumps or fork writes.
+  The focused gate passes 123 tests with 3 expected skips; the CI-equivalent
+  non-solver suite passes 2,638 tests with 3 expected skips and 4 solver
+  deselections at 96 percent branch coverage. Workflow YAML, Ruff, formatting,
+  warning-strict RTD, the isolated pinned bump-tool smoke, version-file
+  non-mutation, and patch hygiene pass.
+  Plans:
+  `aidlc-docs/inception/plans/pr-automatic-version-bump-ordering-execution-plan.md`
+  and
+  `aidlc-docs/construction/plans/pr-automatic-version-bump-ordering-code-generation-plan.md`.
 
 - [ ] GITHUB ACTIONS COMPREHENSIVE HARDENING - Code, tests, documentation, and
   the post-change audit are complete. The focused gate passes 58 tests; YAML,

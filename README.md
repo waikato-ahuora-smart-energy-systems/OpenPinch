@@ -143,10 +143,17 @@ IDAES extensions and runs this gate automatically. Run it locally with
 
 ## Release Process
 
-1. In the pull request targeting `main`, set a strict, forward `X.Y.Z` version
-   in `pyproject.toml` and keep the OpenPinch entry in `uv.lock` synchronized.
-2. Merge only after the read-only validation jobs, external-solver suite, and
-   aggregate `pr-gate` result pass.
+1. For a same-repository pull request targeting `main`, the PR workflow
+   automatically advances an unchanged release version before validating it.
+   A `major`, `minor`, or `patch` label takes precedence, followed by a matching
+   title marker such as `[minor]`; the default is `patch`. The bump updates
+   `pyproject.toml`, `uv.lock`, and `.bumpversion.toml` together without creating
+   a tag. Fork pull requests remain read-only and must provide those synchronized
+   forward-version changes in the contributor branch.
+2. The ordered release-version job checks out and validates the updated PR head
+   after the bump. Any later `synchronize` run or manual rerun recognizes the
+   already-forward version without another commit. Merge only after the
+   validation jobs, external-solver suite, and aggregate `pr-gate` result pass.
 3. The main-branch workflow repeats the test, documentation, solver, build, and
    cross-platform artifact gates.
 4. After those gates pass, it creates the annotated version tag and a draft
@@ -164,9 +171,12 @@ IDAES extensions and runs this gate automatically. Run it locally with
 7. Approve that deployment to use PyPI Trusted Publishing; the workflow uploads
    the verified distributions and confirms the version through the PyPI API.
 
-Version bumping does not create a tag locally. The release workflow owns tags
-and rejects malformed versions, mismatched lock metadata, or an existing tag
-that points anywhere other than the main-branch release commit. If production
+The automatic pull-request bump is idempotent: a candidate already greater than
+the base is validated without another commit, while a candidate behind the base
+fails for manual reconciliation. Version bumping does not create a tag. The
+release workflow owns tags and rejects malformed versions, mismatched lock
+metadata, or an existing tag that points anywhere other than the main-branch
+release commit. If production
 publication or its availability check fails after the GitHub Release becomes
 public, open the original tag run and select **Re-run failed jobs**. Exact index
 preflight, `skip-existing`, and a separately retryable availability check make

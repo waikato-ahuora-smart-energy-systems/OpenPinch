@@ -165,6 +165,32 @@ def test_heat_flow_unit_group_override_applies_to_each_output_metric(metric_name
     assert value.unit == "MW"
 
 
+@pytest.mark.parametrize(
+    ("alias", "expected_value", "expected_unit"),
+    [
+        ("degree_Celsius", 10.0, "delta_degC"),
+        ("celsius", 10.0, "delta_degC"),
+        ("°C", 10.0, "delta_degC"),
+        ("degree_Fahrenheit", 18.0, "delta_degF"),
+        ("fahrenheit", 18.0, "delta_degF"),
+        ("kelvin", 10.0, "K"),
+    ],
+)
+def test_heat_recovery_dt_min_resolves_temperature_aliases_as_deltas(
+    alias,
+    expected_value,
+    expected_unit,
+):
+    value = unit_system.coerce_output_value(
+        Value(10.0, "delta_degC"),
+        metric_name="heat_recovery_dt_min",
+        config={"output_unit_overrides": {"temperature": alias}},
+    )
+
+    assert value.value == pytest.approx(expected_value)
+    assert value.unit == expected_unit
+
+
 def test_coerce_output_value_uses_default_and_configured_display_units():
     fixture = _unit_fixture()
 

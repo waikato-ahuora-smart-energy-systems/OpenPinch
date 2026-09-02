@@ -111,6 +111,61 @@ def test_threshold_problem_limit_returns_greatest_feasible_dt_min() -> None:
     )
 
 
+def test_near_limit_request_retains_requested_recovery_boundary() -> None:
+    problem = PinchProblem(
+        {
+            "streams": [
+                {
+                    "zone": "Site/Process",
+                    "name": "Hot",
+                    "t_supply": 2_000_000.0,
+                    "t_target": 1_000_000.0,
+                    "heat_flow": 1.0,
+                    "dt_cont": 0.0,
+                    "htc": 1.0,
+                },
+                {
+                    "zone": "Site/Process",
+                    "name": "Cold",
+                    "t_supply": 0.0,
+                    "t_target": 1_000_000.0,
+                    "heat_flow": 1.0,
+                    "dt_cont": 0.0,
+                    "htc": 1.0,
+                },
+            ],
+            "utilities": [],
+            "zone_tree": {
+                "name": "Site",
+                "type": "Site",
+                "children": [{"name": "Process", "type": "Process Zone"}],
+            },
+        },
+        project_name="Site",
+    )
+    zone = problem._master_zone
+
+    result = solve_heat_recovery_dt_min(
+        zone.hot_streams,
+        zone.cold_streams,
+        requested_heat_recovery=0.9999995,
+        period_idx=0,
+    )
+
+    assert result.status is HeatRecoveryDtMinStatus.AT_THERMODYNAMIC_LIMIT
+    assert result.dt_min == pytest.approx(1_000_000.5, abs=2e-6)
+    assert result.achieved_heat_recovery >= result.requested_heat_recovery
+    assert (
+        evaluate_process_heat_recovery(
+            zone.hot_streams,
+            zone.cold_streams,
+            dt_min=result.dt_min + 2e-6,
+            period_idx=0,
+        )
+        < result.requested_heat_recovery
+    )
+
+
 def test_packaged_threshold_problem_returns_positive_limit_dt_min() -> None:
     problem = PinchProblem("pulp_mill.json", project_name="Site")
     forward = problem.target.direct_heat_integration(
