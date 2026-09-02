@@ -23,6 +23,7 @@ EXPECTED_TARGET_METHODS = {
     "energy_transfer",
     "exergy",
     "heat_exchanger_area_and_cost",
+    "heat_recovery_approach_temperature",
     "indirect_heat_integration",
     "isentropic_cogeneration",
     "mvr_heat_pump",

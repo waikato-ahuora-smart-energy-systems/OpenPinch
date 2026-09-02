@@ -1464,3 +1464,44 @@ refreshed reverse-engineering artifacts.
   and Ruff plus patch-hygiene checks passed.
 - **Extensions**: Security and Resiliency disabled. Partial PBT is N/A for the
   isolated example repair except existing fixed-seed and framework compliance.
+
+## Heat-Recovery Approach Temperature Progress
+
+- [x] INCEPTION - Workspace Detection resumed from the current brownfield
+  repository.
+- [x] INCEPTION - Reverse Engineering reused current repository artifacts.
+- [x] INCEPTION - Requirements Analysis completed from the approved feature
+  specification.
+- [x] INCEPTION - Requirements approval supplied by the implementation request.
+- [x] INCEPTION - Minimal user-story assessment completed through the explicit
+  public API workflows and acceptance scenarios in the approved plan.
+- [x] INCEPTION - Workflow Planning completed and approved.
+- [x] INCEPTION - Application Design completed and approved.
+- [x] CONSTRUCTION - Functional Design completed and approved.
+- [x] CONSTRUCTION - NFR Requirements and NFR Design skipped; the established
+  numerical and property-testing stack is reused.
+- [x] CONSTRUCTION - Infrastructure Design skipped; no infrastructure changes.
+- [x] CONSTRUCTION - Code Generation Part 1 planned and approved.
+- [x] CONSTRUCTION - Code Generation Part 2 implementation.
+- [x] CONSTRUCTION - Build and Test.
+- [x] OPERATIONS - N/A; no deployment work requested.
+- **Requirements**:
+  `aidlc-docs/inception/requirements/heat-recovery-approach-temperature-requirements.md`.
+- **Application design**:
+  `aidlc-docs/inception/application-design/heat-recovery-approach-temperature-application-design.md`.
+- **Functional design**:
+  `aidlc-docs/construction/heat-recovery-approach-temperature/functional-design/functional-design.md`.
+- **Workflow plan**:
+  `aidlc-docs/inception/plans/heat-recovery-approach-temperature-execution-plan.md`.
+- **Code Generation plan**:
+  `aidlc-docs/construction/plans/heat-recovery-approach-temperature-code-generation-plan.md`.
+- **Extensions**: Property-Based Testing enabled. Security and Resiliency are
+  disabled. PBT-01 through PBT-05 and PBT-07 through PBT-10 apply; PBT-06 is
+  N/A because the solver has no persistent mutable state.
+- **Code Generation summary**:
+  `aidlc-docs/construction/heat-recovery-approach-temperature/code/code-generation-summary.md`.
+- **Build and Test summary**:
+  `aidlc-docs/construction/heat-recovery-approach-temperature/build-and-test/build-and-test-summary.md`.
+- **Current stage**: Complete. The service, contracts, orchestration,
+  properties, documentation, generated tutorials, full coverage suite,
+  distributions, and installed-wheel smoke are verified.

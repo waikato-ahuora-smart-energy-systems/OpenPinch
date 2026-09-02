@@ -6633,3 +6633,157 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 **Context**: SOURCE CONTROL AUTHORIZATION - GitHub Actions comprehensive hardening
 
 ---
+
+## Heat-Recovery Approach Temperature Implementation Authorization
+**Timestamp**: 2026-09-02T05:34:32Z
+**User Input**: "PLEASE IMPLEMENT THIS PLAN:
+# Heat-Recovery Approach Temperature Service
+
+## Summary
+
+Add a non-mutating inverse pinch-analysis service that determines the global heat-recovery approach temperature—HRAT/global ΔTmin—corresponding to a requested process heat recovery.
+
+Users will supply streams through the existing `PinchProblem(source)` contract and call:
+
+```python
+result = problem.target.heat_recovery_approach_temperature(
+    heat_recovery=4_000.0,
+    zone=\"Site/Process\",
+    period_id=\"0\",
+)
+```
+
+The implementation is additive, uses the existing problem-table cascade, introduces no optimizer or dependency, and leaves the problem’s inputs, configured `dt_cont` values, targets, results, and period caches unchanged.
+
+## Public API and Contracts
+
+- Add:
+
+  ```python
+  problem.target.heat_recovery_approach_temperature(
+      *,
+      heat_recovery,
+      zone=None,
+      period_id=None,
+  ) -> HeatRecoveryApproachResult
+  ```
+
+  `heat_recovery` accepts a finite non-negative scalar or existing scalar value-with-unit representation. Plain numbers use the problem’s configured input heat-flow unit, defaulting to kW.
+
+- Add the all-period equivalent:
+
+  ```python
+  problem.target.all_periods.heat_recovery_approach_temperature(
+      *,
+      heat_recovery,
+      zone=None,
+      workers=1,
+  ) -> dict[str, HeatRecoveryApproachResult]
+  ```
+
+  A scalar recovery is broadcast to every period; a mapping must contain exactly the canonical period IDs. Results retain canonical period order.
+
+- Mirror both methods through active `PinchWorkspace.target`, ordered case batches, and batch all-period targeting. Batch failures remain isolated in `CaseBatchResult`.
+
+- Return a frozen, strict, JSON-serializable `HeatRecoveryApproachResult` containing:
+
+  - `scope` and canonical `period_id`
+  - `approach_temperature`
+  - `requested_heat_recovery`
+  - `achieved_heat_recovery`
+  - `thermodynamic_limit`
+  - `heat_recovery_residual`
+  - `status`: `solved`, `at_thermodynamic_limit`, or `zero_recovery_boundary`
+  - `iterations`
+
+  Thermal quantities carry explicit units and honor existing output-unit overrides. The specialist contract remains in its concrete module and is not added to the package-root exports.
+
+## Implementation Design
+
+- Add the typed contract under `OpenPinch/contracts/heat_recovery.py`, the numerical inverse solver under `OpenPinch/analysis/targeting/approach_temperature.py`, and problem/period orchestration under `OpenPinch/application/heat_recovery_approach.py`.
+- Resolve zones with the same rules as direct targeting. Permit Site, Process Zone, and Unit Operation scopes; reject Community/Region scopes with guidance. A selected parent zone already contains descendant process streams, so `include_subzones` is unnecessary.
+- Ignore utilities and existing stream-specific `dt_cont` values for this calculation. On detached process-stream copies, assign half the trial global approach to every hot and cold stream/segment and force the local contribution multiplier to one.
+- Evaluate recovery with the existing vectorized process heat cascade, omitting graph, utility-allocation, and constant-enthalpy presentation work.
+- Calculate the thermodynamic limit at global ΔTmin = 0. Reject negative, non-finite, Boolean, or above-limit recovery. The above-limit error must report requested recovery, limit, scope, period, and units.
+- Use the finite no-overlap bound:
+
+  ```text
+  upper bound = max(0, maximum hot temperature - minimum cold temperature)
+  ```
+
+  At this separation, process recovery is zero.
+- Apply deterministic bisection:
+
+  - At the thermodynamic limit, return 0 with `at_thermodynamic_limit`.
+  - For an interior request, return the greatest approach whose calculated recovery remains at least the requested recovery. This resolves non-unique plateaus consistently.
+  - For zero recovery, return the smallest approach producing zero within tolerance, with `zero_recovery_boundary`.
+  - Use an absolute temperature tolerance of `1e-6 delta_degC`, recovery comparison tolerances of `1e-6 kW` absolute and `1e-9` relative, and a hard limit of 100 iterations.
+  - Clamp only tolerance-sized numerical excursions below zero or above the limit. Fail closed on non-finite evaluations, an invalid bracket, or failure to converge.
+
+- A call must not alter `problem.results`, `problem.period_results`, `_last_target_run_spec`, stream state, configuration, or previously calculated targets. Each all-period worker receives isolated local stream copies.
+- Keep `direct_heat_integration(...)` and `DirectIntegrationTarget` unchanged. No input-schema, workspace-bundle, persistence, configuration, infrastructure, or migration changes are required.
+
+## TDD Delivery Sequence
+
+1. **Red — contract and API tests**
+   - Pin the exact single-period, all-period, workspace, and batch signatures.
+   - Require frozen finite result fields, status validation, unit metadata, and JSON round-trip behavior.
+   - Update closed API inventories and tutorial-coverage expectations.
+
+2. **Red/green — core inverse solver**
+   - Add a simple analytical two-stream fixture and a packaged `basic_pinch.json` regression: forward targeting at a known global approach, followed by inverse recovery, must reproduce that approach.
+   - Cover the thermodynamic-limit boundary, an interior target, plateau selection, zero-recovery onset, no-overlap inputs, empty-side cases, and numerical clamping.
+   - Cover invalid values and recovery above the calculated limit.
+
+3. **Red/green — application integration**
+   - Verify zone selection, canonical periods, scalar broadcast, exact mapping validation, worker-count validation, stable result ordering, and sequential/parallel parity.
+   - Verify active workspace delegation and per-case batch error isolation.
+   - Snapshot canonical problem input, configured stream contributions, cached targets/results, and target-run metadata before and after every call to prove non-mutation.
+
+4. **Property-based tests with Hypothesis**
+   - Generate realistic hot/cold sensible and segmented stream sets with finite temperatures, positive duties, active/inactive streams, and bounded period data.
+   - Assert recovery is non-increasing as global approach increases.
+   - Assert results stay within `[0, no-overlap bound]`, achieved recovery meets the request within tolerance, and a larger approach fails the request unless within a documented plateau/tolerance.
+   - Assert stream-order invariance, repeated-call idempotence, equivalent-unit invariance, and sequential/parallel equivalence.
+   - Compare inverse results with ordinary forward `direct_heat_integration` targeting on detached uniform-approach cases.
+   - Round-trip generated result contracts through JSON.
+   - Use reusable domain strategies, fixed seeds, normal Hypothesis shrinking, and permanent example regressions for any discovered counterexample.
+
+5. **Refactor and documentation**
+   - Keep numerical logic independent of application orchestration and contracts independent of application code.
+   - Explain HRAT/global ΔTmin versus exchanger-level EMAT in the pinch-analysis fundamentals and API/service documentation. HRAT describes composite-curve heat-recovery spacing, whereas EMAT applies to individual exchangers and would require HEN data; this distinction follows established pinch-analysis usage described in the [process integration user guide](https://moodle.unige.ch/pluginfile.php/386097/mod_folder/content/0/Pinch_Analysis_and_Process_Integration.pdf).
+   - Extend generated notebook 02 with the selected-period workflow and notebook 06 with all-period scalar/mapped recovery examples.
+   - Update notebook generators, tutorial ownership/coverage data, API inventories, and release notes.
+
+6. **Verification gates**
+   - Run focused analysis, contract, application, architecture, unit, notebook, and documentation tests first.
+   - Run Ruff lint and formatting checks, warning-strict Sphinx build, generated-notebook drift and execution checks, the full configured pytest suite with the existing 95% coverage gate, distribution builds, and isolated installed-wheel smoke tests.
+
+## Assumptions and Workflow
+
+- “Equivalent minimum approach temperature” means a process-level global HRAT/ΔTmin, not exchanger EMAT.
+- Requested recovery is valid from zero through the zero-approach thermodynamic limit; values above that limit are rejected.
+- Existing heterogeneous `dt_cont` values are deliberately ignored because the requested output is one equivalent global approach.
+- Recovery is solved independently per operating period; no weighted aggregate inverse is introduced.
+- This is one cohesive feature unit. Execute minimal user-story, application-design, functional-design, TDD code-generation, and build/test stages. Existing Hypothesis and numerical-stack decisions are reused; separate NFR, infrastructure, and operations designs are unnecessary.
+- PBT-01 through PBT-05 and PBT-07 through PBT-10 apply. PBT-06 is N/A because the solver owns no persistent mutable state."
+**AI Response**: "Recorded the approved requirements, minimal application and functional design, workflow plan, and TDD code-generation checklist; began Red contract and public API tests."
+**Context**: CODE GENERATION AUTHORIZATION - Heat-recovery approach temperature service
+
+---
+
+## Heat-Recovery Approach Temperature Completion
+**Timestamp**: 2026-09-02T06:13:04Z
+**User Input**: "No new user input; continued under the approved Heat-Recovery Approach Temperature Service implementation plan."
+**AI Response**: "Implemented the non-mutating selected-period and all-period inverse HRAT service, frozen unit-aware result contract, deterministic cascade bisection, problem/workspace/batch delegation, seeded property-based coverage, API inventories, generated tutorials, fundamentals/API/service documentation, release notes, and installed-wheel smoke. Verified 2,578 tests passed with four expected skips, 96 percent branch coverage, warning-strict Sphinx, notebook drift/execution, Ruff lint and feature formatting, distribution builds, and an isolated Python 3.14 wheel installation. Repository-wide formatting continues to report 16 pre-existing files outside this feature; no unrelated formatting rewrite was made."
+**Context**: BUILD AND TEST COMPLETE - Heat-recovery approach temperature service
+
+---
+
+## Heat-Recovery Approach Temperature Commit Authorization
+**Timestamp**: 2026-09-02T10:05:56Z
+**User Input**: "Commit."
+**AI Response**: "Accepted authorization to stage and commit the completed heat-recovery approach temperature feature as one cohesive change."
+**Context**: SOURCE CONTROL AUTHORIZATION - Heat-recovery approach temperature service
+
+---

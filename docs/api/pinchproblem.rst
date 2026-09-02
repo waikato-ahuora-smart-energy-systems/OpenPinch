@@ -56,6 +56,11 @@ Interaction Matrix
      - target output
      - targeted
      - base
+   * - ``target.heat_recovery_approach_temperature``
+     - Invert requested process recovery to an equivalent global HRAT
+     - frozen diagnostic result
+     - source unchanged
+     - base
    * - ``target.carnot_*``, ``vapour_compression_*``, ``brayton_*``,
        ``mvr_heat_pump``
      - Model-specific HPR studies
@@ -77,6 +82,7 @@ Interaction Matrix
      - period-to-output mapping
      - period cache
      - method-specific
+
    * - ``components.add_process_mvr``, ``components.inventory``
      - Add or inspect process MVR mutations
      - component or mapping
@@ -104,6 +110,47 @@ Interaction Matrix
      - paths or dashboard handle
      - none
      - output-specific
+
+Inverse Heat-Recovery Target
+----------------------------
+
+Use the inverse target when process heat recovery is specified and the
+corresponding global HRAT is unknown:
+
+.. code-block:: python
+
+   result = problem.target.heat_recovery_approach_temperature(
+       heat_recovery=4_000.0,
+       zone="Site/Process",
+       period_id="0",
+   )
+
+Plain recovery values use the configured input heat-flow unit; value-with-unit
+mappings are also accepted. The result reports the requested and achieved
+recovery, zero-approach thermodynamic limit, residual, status, and iteration
+count with explicit output units. Requests above the thermodynamic limit are
+rejected.
+
+For all periods, a scalar broadcasts deliberately, while a mapping must contain
+exactly the canonical period IDs:
+
+.. code-block:: python
+
+   period_results = (
+       problem.target.all_periods.heat_recovery_approach_temperature(
+           heat_recovery={"base": 4_000.0, "turndown": 3_200.0},
+           workers=2,
+       )
+   )
+
+The inverse service is non-mutating: it does not replace ordinary target
+results, populate ``period_results``, alter stream contributions, or update the
+last target-run specification. The value is process-level HRAT/global delta
+Tmin, not exchanger-level EMAT.
+
+.. autoclass:: OpenPinch.contracts.heat_recovery.HeatRecoveryApproachResult
+   :members:
+   :no-index:
 
 Argument Precedence
 -------------------

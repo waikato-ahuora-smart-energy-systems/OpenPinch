@@ -65,6 +65,26 @@ The package exposes base ``delta_t_contribution`` and
 so zone-level multiplier studies can alter the effective shift while preserving
 the original input.
 
+HRAT and exchanger EMAT
+~~~~~~~~~~~~~~~~~~~~~~~
+
+The process-level heat-recovery approach temperature (HRAT), also called the
+global minimum approach temperature or global delta Tmin, is the separation
+between the shifted hot and cold process composite curves. OpenPinch can invert
+that relationship: given a required process heat recovery, it calculates the
+equivalent global HRAT with
+``problem.target.heat_recovery_approach_temperature(...)``. The calculation
+uses uniform half-shifts on detached hot and cold process streams, so existing
+stream-specific ``delta_t_contribution`` values and utilities do not affect the
+answer.
+
+HRAT is not exchanger minimum approach temperature (EMAT). EMAT constrains an
+individual exchanger and requires HEN match and temperature data. An inverse
+process target cannot establish exchanger feasibility by itself. This
+distinction follows established pinch-analysis terminology in the `process
+integration user guide
+<https://moodle.unige.ch/pluginfile.php/386097/mod_folder/content/0/Pinch_Analysis_and_Process_Integration.pdf>`_.
+
 What The Pinch Represents
 -------------------------
 

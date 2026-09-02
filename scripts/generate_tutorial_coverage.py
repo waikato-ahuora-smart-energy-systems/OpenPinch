@@ -42,6 +42,7 @@ NOTEBOOK_PROFILES = {
     16: "solver",
     17: "solver",
     18: "interactive",
+    19: "base",
 }
 NOTEBOOKS = {
     1: "01_first_solve_and_core_curves.ipynb",
@@ -62,6 +63,7 @@ NOTEBOOKS = {
     16: "16_advanced_hen_methods.ipynb",
     17: "17_multiperiod_hen_synthesis.ipynb",
     18: "18_results_plots_reports_exports.ipynb",
+    19: "19_utility_placement_optimisation.ipynb",
 }
 
 TARGET_TUTORIALS = {
@@ -70,6 +72,7 @@ TARGET_TUTORIALS = {
     "indirect_heat_integration": 2,
     "total_site_heat_integration": 2,
     "heat_exchanger_area_and_cost": 7,
+    "heat_recovery_approach_temperature": 2,
     "exergy": 7,
     "carnot_heat_pump": 8,
     "carnot_refrigeration": 8,
@@ -84,6 +87,7 @@ TARGET_TUTORIALS = {
     "isentropic_cogeneration": 12,
     "energy_transfer": 14,
     "all_periods": 6,
+    "utility_placement": 19,
 }
 ALL_PERIOD_TUTORIALS = {
     "all_heat_integration": 6,
@@ -91,6 +95,7 @@ ALL_PERIOD_TUTORIALS = {
     "indirect_heat_integration": 6,
     "total_site_heat_integration": 6,
     "heat_exchanger_area_and_cost": 7,
+    "heat_recovery_approach_temperature": 6,
     "exergy": 7,
     "energy_transfer": 14,
     "carnot_heat_pump": 10,
@@ -102,6 +107,7 @@ ALL_PERIOD_TUTORIALS = {
     "sun_smith_cogeneration": 13,
     "varbanov_cogeneration": 13,
     "isentropic_cogeneration": 13,
+    "utility_placement": 19,
 }
 DESIGN_TUTORIALS = {
     "heat_exchanger_network": 15,
@@ -256,6 +262,8 @@ def _dimensions(
 
 
 def _problem_tutorial(name: str) -> int:
+    if name == "utility_placement_result":
+        return 19
     if name in {"period_ids", "period_results"}:
         return 6
     if name in {"components", "process_components"}:
@@ -278,6 +286,8 @@ def _problem_tutorial(name: str) -> int:
 
 
 def _workspace_tutorial(name: str) -> int:
+    if name == "add":
+        return 19
     if name in {
         "active_case_name",
         "case",

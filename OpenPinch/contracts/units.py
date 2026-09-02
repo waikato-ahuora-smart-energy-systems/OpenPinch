@@ -55,6 +55,11 @@ OUTPUT_UNIT_RULES: dict[str, OutputUnitRule] = {
     "Qh": OutputUnitRule("kW", "kW", unit_groups=("heat_flow",)),
     "Qc": OutputUnitRule("kW", "kW", unit_groups=("heat_flow",)),
     "Qr": OutputUnitRule("kW", "kW", unit_groups=("heat_flow",)),
+    "heat_recovery_approach_temperature": OutputUnitRule(
+        "delta_degC",
+        "delta_degC",
+        unit_groups=("delta_temperature", "temperature_difference", "temperature"),
+    ),
     "utility_heat_flow": OutputUnitRule("kW", "kW", unit_groups=("heat_flow",)),
     "cold_temp": OutputUnitRule("degC", "degC", unit_groups=("temperature",)),
     "hot_temp": OutputUnitRule("degC", "degC", unit_groups=("temperature",)),
@@ -299,4 +304,9 @@ def coerce_output_value(
     target_unit = rule.default_unit if display_unit is None else display_unit
     if target_unit is None:
         return resolved
+    if metric_name == "heat_recovery_approach_temperature":
+        target_unit = {
+            "degC": "delta_degC",
+            "degF": "delta_degF",
+        }.get(target_unit, target_unit)
     return resolved.to(target_unit)

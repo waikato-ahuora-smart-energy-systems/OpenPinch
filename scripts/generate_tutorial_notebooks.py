@@ -116,6 +116,11 @@ NOTEBOOKS = {
             ),
             code(
                 'direct = problem.target.direct_heat_integration(zone="Bleaching")\n'
+                "recovery_approach = "
+                "problem.target.heat_recovery_approach_temperature(\n"
+                "    heat_recovery=float(direct.heat_recovery_target),\n"
+                '    zone="Bleaching",\n'
+                ")\n"
                 "indirect = problem.target.indirect_heat_integration()\n"
                 "total_site = problem.target.total_site_heat_integration()\n"
                 "total_site_profiles = problem.plot.total_site_profiles()\n"
@@ -286,6 +291,18 @@ NOTEBOOKS = {
                 "period_outputs = problem.target.all_periods.all_heat_integration()\n"
                 "direct_periods = "
                 "problem.target.all_periods.direct_heat_integration()\n"
+                "zero_recovery_approaches = "
+                "problem.target.all_periods.heat_recovery_approach_temperature(\n"
+                "    heat_recovery=0.0\n"
+                ")\n"
+                "recovery_requests = {\n"
+                "    period_id: result.thermodynamic_limit.value * 0.8\n"
+                "    for period_id, result in zero_recovery_approaches.items()\n"
+                "}\n"
+                "mapped_recovery_approaches = "
+                "problem.target.all_periods.heat_recovery_approach_temperature(\n"
+                "    heat_recovery=recovery_requests, workers=2\n"
+                ")\n"
                 "indirect_periods = "
                 "problem.target.all_periods.indirect_heat_integration()\n"
                 "site_periods = "
@@ -849,10 +866,13 @@ GUIDANCE = {
         ),
     ),
     "02_focused_direct_and_total_site.ipynb": (
-        "How do local process targets differ from indirect and Total Site opportunities?",
-        "Compare like-for-like duties and retain the zone name with every focused result; Total Site curves describe utility-system opportunities, not individual exchanger matches.",
+        "How do local process targets and their equivalent global HRAT differ from indirect and Total Site opportunities?",
+        "Compare like-for-like duties and retain the zone name with every focused result. The inverse result is process-level composite-curve spacing, not an exchanger EMAT; Total Site curves describe utility-system opportunities, not individual exchanger matches.",
         'Change `zone="Bleaching"` to a path from your zone tree and compare the same scope across scenarios.',
-        ("Establish the site-wide reference", "Run explicit integration scopes"),
+        (
+            "Establish the site-wide reference",
+            "Run explicit integration scopes and infer the equivalent HRAT",
+        ),
     ),
     "03_multisegment_streams.ipynb": (
         "How should a stream with changing heat-capacity flow be represented without hiding its temperature intervals?",
@@ -873,10 +893,13 @@ GUIDANCE = {
         ("Inspect the active case", "Persist and restore the workspace"),
     ),
     "06_multiperiod_heat_integration.ipynb": (
-        "How do heat-integration targets change by operating period, and what is the weighted annual view?",
-        "Review every period before the weighted average; an annual average can conceal a limiting or infeasible operating state.",
+        "How do heat-integration targets and equivalent global HRAT values change by operating period, and what is the weighted annual view?",
+        "Review every period before the weighted average; use a scalar recovery only when broadcasting the same requirement is intentional, and use an exact period mapping otherwise.",
         "Replace the sample with period-tagged plant data and verify period order and weights before comparing annual totals.",
-        ("Run aligned period analyses", "Compare period and weighted summaries"),
+        (
+            "Run aligned period analyses and scalar/mapped inverse targets",
+            "Compare period and weighted summaries",
+        ),
     ),
     "07_area_cost_and_exergy.ipynb": (
         "How do energy targets translate into exchanger area, cost, and thermodynamic quality?",
@@ -994,6 +1017,7 @@ PRESENTATIONS: dict[str, tuple[str, str]] = {
         "Compare the process summary with the Total Site profiles and utility grand composite curve; the site views reveal opportunities that are not visible within one process zone.",
         "from IPython.display import display\n\n"
         "display(summary)\n"
+        "display(recovery_approach)\n"
         "display(total_site_profiles)\n"
         "display(site_utility_curve)",
     ),
@@ -1022,6 +1046,8 @@ PRESENTATIONS: dict[str, tuple[str, str]] = {
         "Review period results beside the weighted aggregate; the largest single-period target does not necessarily dominate the weighted study.",
         "from IPython.display import display\n\n"
         "display(all_periods)\n"
+        "display(zero_recovery_approaches)\n"
+        "display(mapped_recovery_approaches)\n"
         "display(weighted)\n"
         "display(combined)",
     ),

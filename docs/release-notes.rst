@@ -4,6 +4,20 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat-recovery approach temperature service
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Added non-mutating selected-period and all-period inverse pinch targeting
+  through ``target.heat_recovery_approach_temperature``. The service returns
+  the global HRAT/delta Tmin corresponding to requested process heat recovery,
+  validates the zero-approach thermodynamic limit, supports explicit units,
+  and mirrors through active workspaces and isolated ordered case batches.
+- Added deterministic plateau and zero-recovery boundary handling, analytical,
+  packaged-regression, immutability, and seeded property-based coverage.
+- Documented the distinction between process composite-curve HRAT and
+  exchanger-level EMAT, and extended tutorials 02 and 06 with selected-period
+  and scalar/mapped all-period workflows.
+
 0.5.0 architecture clean break
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

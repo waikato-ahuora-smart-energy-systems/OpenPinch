@@ -54,9 +54,14 @@ def main(argv: list[str] | None = None) -> int:
         raise AssertionError("Installed wheel is missing the Process MVR tutorial.")
 
     problem = PinchProblem(json.loads(sample), project_name="Wheel contract")
-    problem.target.direct_heat_integration()
+    direct = problem.target.direct_heat_integration()
     if problem.results.name != "Wheel contract" or not problem.results.targets:
         raise AssertionError("Installed wheel failed the PinchProblem workflow.")
+    inverse = problem.target.heat_recovery_approach_temperature(
+        heat_recovery=float(direct.heat_recovery_target)
+    )
+    if abs(inverse.approach_temperature.value - 10.0) > 2e-6:
+        raise AssertionError("Installed wheel failed inverse heat-recovery targeting.")
     workspace = PinchWorkspace(json.loads(sample), project_name="Wheel contract")
     if workspace.list_cases() != ["baseline"]:
         raise AssertionError("Installed wheel failed the PinchWorkspace workflow.")

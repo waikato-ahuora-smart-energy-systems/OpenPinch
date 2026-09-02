@@ -37,6 +37,30 @@ Main Service Surface
    :members:
    :no-index:
 
+Inverse Heat-Recovery Approach Service
+--------------------------------------
+
+``OpenPinch.application.heat_recovery_approach`` orchestrates the non-mutating
+inverse target. It resolves direct-targeting zones and canonical periods,
+normalizes requested heat flow, delegates deterministic bisection to
+``OpenPinch.analysis.targeting.approach_temperature``, and converts the result
+to configured output units. The analysis module evaluates only detached
+process-stream copies through the existing vectorized cascade; it does not run
+utility allocation, graph construction, constant-enthalpy presentation work,
+or an optimizer.
+
+Application code should normally call
+``problem.target.heat_recovery_approach_temperature(...)`` or its
+``all_periods`` mirror. The concrete specialist contract remains at
+``OpenPinch.contracts.heat_recovery`` and is intentionally absent from the
+package root.
+
+.. autofunction:: OpenPinch.application.heat_recovery_approach.calculate_heat_recovery_approach
+   :no-index:
+
+.. autofunction:: OpenPinch.application.heat_recovery_approach.calculate_all_period_heat_recovery_approach
+   :no-index:
+
 Preparation Entry Point
 -----------------------
 
