@@ -17,6 +17,11 @@ Heat-recovery approach temperature service
 - Documented the distinction between process composite-curve HRAT and
   exchanger-level EMAT, and extended tutorials 02 and 06 with selected-period
   and scalar/mapped all-period workflows.
+- Added a dedicated inverse-HRAT task guide and integrated the workflow through
+  RTD navigation, overview, fundamentals, public problem/workspace API,
+  contributor service reference, and notebook-series pages. Tutorial 02 now
+  demonstrates explicit recovery units, every result field, and preservation
+  of the ordinary cached target.
 
 0.5.0 architecture clean break
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

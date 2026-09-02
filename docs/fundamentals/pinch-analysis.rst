@@ -78,12 +78,28 @@ uses uniform half-shifts on detached hot and cold process streams, so existing
 stream-specific ``delta_t_contribution`` values and utilities do not affect the
 answer.
 
+At zero global approach, the process cascade gives the thermodynamic limit:
+the largest recovery available without allowing the shifted composites to
+cross. Increasing the global approach cannot increase process heat recovery.
+The inverse service searches this monotonic relationship between zero and the
+finite no-overlap spacing.
+
+The inverse can have more than one temperature answer when recovery is flat
+over an approach interval. For an interior request, OpenPinch returns the
+greatest feasible approach that still meets the requested recovery. For a zero
+request it returns the smallest zero-recovery boundary. A request equal to the
+thermodynamic limit returns zero approach. These rules make the boundary and
+plateau results deterministic.
+
 HRAT is not exchanger minimum approach temperature (EMAT). EMAT constrains an
 individual exchanger and requires HEN match and temperature data. An inverse
 process target cannot establish exchanger feasibility by itself. This
 distinction follows established pinch-analysis terminology in the `process
 integration user guide
 <https://moodle.unige.ch/pluginfile.php/386097/mod_folder/content/0/Pinch_Analysis_and_Process_Integration.pdf>`_.
+
+See :doc:`../guides/heat-recovery-approach-temperature` for runnable
+single-period, multiperiod, workspace, and batch workflows.
 
 What The Pinch Represents
 -------------------------
@@ -117,4 +133,5 @@ Recommended Follow-On Pages
 
 - :doc:`problem-table-and-temperature-shifting`
 - :doc:`direct-vs-indirect-integration`
+- :doc:`../guides/heat-recovery-approach-temperature`
 - :doc:`graphs-and-interpretation`

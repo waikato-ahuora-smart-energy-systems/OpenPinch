@@ -10,16 +10,18 @@ Core and Intermediate
 
 1. ``01_first_solve_and_core_curves.ipynb`` -- first solve, cached results,
    reports, and core curves (``base``).
-2. ``02_focused_direct_and_total_site.ipynb`` -- focused direct, indirect, and
-   Total Site analysis (``base``).
+2. ``02_focused_direct_and_total_site.ipynb`` -- focused direct, inverse
+   equivalent global HRAT, indirect, and Total Site analysis, including the
+   frozen result fields and non-mutation check (``base``).
 3. ``03_multisegment_streams.ipynb`` -- piecewise stream input and prepared
    segment inspection (``base``).
 4. ``04_workspace_cases_and_scenarios.ipynb`` -- cases, scenarios, batches,
    configuration fallback, and comparison (``base``).
 5. ``05_workspace_persistence.ipynb`` -- load, validation, case data, and
    bundle persistence (``base``).
-6. ``06_multiperiod_heat_integration.ipynb`` -- ordered period targeting and
-   weighted summaries (``base``).
+6. ``06_multiperiod_heat_integration.ipynb`` -- ordered period targeting,
+   scalar and mapped equivalent global HRAT requests, and weighted summaries
+   (``base``).
 7. ``07_area_cost_and_exergy.ipynb`` -- area/cost and exergy enrichment
    (``base``).
 8. ``08_carnot_heat_pump_and_refrigeration.ipynb`` -- Carnot HPR placement and

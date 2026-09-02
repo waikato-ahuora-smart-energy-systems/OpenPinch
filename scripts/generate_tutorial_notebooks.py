@@ -115,11 +115,23 @@ NOTEBOOKS = {
                 "summary"
             ),
             code(
-                'direct = problem.target.direct_heat_integration(zone="Bleaching")\n'
+                "direct = problem.target.direct_heat_integration(\n"
+                '    zone="Bleaching", period_id="0"\n'
+                ")\n"
+                "requested_recovery_kw = float(direct.heat_recovery_target)\n"
+                "cached_results_before_inverse = problem.results\n"
                 "recovery_approach = "
                 "problem.target.heat_recovery_approach_temperature(\n"
-                "    heat_recovery=float(direct.heat_recovery_target),\n"
+                '    heat_recovery={"value": requested_recovery_kw, "unit": "kW"},\n'
                 '    zone="Bleaching",\n'
+                '    period_id="0",\n'
+                ")\n"
+                "ordinary_target_preserved = (\n"
+                "    problem.results is cached_results_before_inverse\n"
+                ")\n"
+                'recovery_approach_summary = recovery_approach.model_dump(mode="json")\n'
+                'recovery_approach_summary["ordinary_target_preserved"] = (\n'
+                "    ordinary_target_preserved\n"
                 ")\n"
                 "indirect = problem.target.indirect_heat_integration()\n"
                 "total_site = problem.target.total_site_heat_integration()\n"
@@ -867,11 +879,11 @@ GUIDANCE = {
     ),
     "02_focused_direct_and_total_site.ipynb": (
         "How do local process targets and their equivalent global HRAT differ from indirect and Total Site opportunities?",
-        "Compare like-for-like duties and retain the zone name with every focused result. The inverse result is process-level composite-curve spacing, not an exchanger EMAT; Total Site curves describe utility-system opportunities, not individual exchanger matches.",
+        "Compare like-for-like duties and retain the zone and period with every focused result. For an interior request, the inverse service returns the greatest feasible global HRAT whose calculated recovery still meets the request. It is a process-level composite-curve spacing, not an exchanger EMAT; Total Site curves describe utility-system opportunities, not individual exchanger matches.",
         'Change `zone="Bleaching"` to a path from your zone tree and compare the same scope across scenarios.',
         (
             "Establish the site-wide reference",
-            "Run explicit integration scopes and infer the equivalent HRAT",
+            "Run explicit integration scopes and inspect the equivalent HRAT",
         ),
     ),
     "03_multisegment_streams.ipynb": (
@@ -1014,10 +1026,10 @@ PRESENTATIONS: dict[str, tuple[str, str]] = {
         "display(grand)",
     ),
     "02_focused_direct_and_total_site.ipynb": (
-        "Compare the process summary with the Total Site profiles and utility grand composite curve; the site views reveal opportunities that are not visible within one process zone.",
+        "Inspect the requested and achieved recovery, approach temperature, thermodynamic limit, residual, status, and iteration count together. The ordinary target identity demonstrates that the inverse call is non-mutating. Then compare the process summary with the Total Site profiles and utility grand composite curve; the site views reveal opportunities that are not visible within one process zone.",
         "from IPython.display import display\n\n"
         "display(summary)\n"
-        "display(recovery_approach)\n"
+        "display(recovery_approach_summary)\n"
         "display(total_site_profiles)\n"
         "display(site_utility_curve)",
     ),

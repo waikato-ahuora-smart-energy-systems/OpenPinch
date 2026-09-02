@@ -6787,3 +6787,29 @@ The implementation is additive, uses the existing problem-table cascade, introdu
 **Context**: SOURCE CONTROL AUTHORIZATION - Heat-recovery approach temperature service
 
 ---
+
+## Heat-Recovery Approach Documentation Amendment
+**Timestamp**: 2026-09-02T10:10:45Z
+**User Input**: "Add this new method to a notebook example.
+
+Thoroughly review and update RTD."
+**AI Response**: "Resumed the completed feature workflow, audited the existing notebook and Read the Docs coverage, and began a TDD documentation amendment covering a richer generated notebook example and complete RTD discovery, guide, API, workspace, service, and interpretation surfaces."
+**Context**: CODE GENERATION AUTHORIZATION - Heat-recovery approach documentation amendment
+
+---
+
+## Heat-Recovery Approach Documentation Amendment Completion
+**Timestamp**: 2026-09-02T10:21:56Z
+**User Input**: "No new user input; continued under the authorized notebook and RTD documentation amendment."
+**AI Response**: "Expanded generated notebook 02 with explicit-unit selected-period inverse targeting, serialized result evidence, and a non-mutation observation. Added a dedicated task guide and updated RTD navigation, overview, fundamentals, problem/workspace APIs, service and contributor references, notebook catalog, release notes, and stale notebook-count references. The complete focused documentation gate passed 46 tests with 3 expected optional-profile skips; notebook execution, generator drift, warning-strict Sphinx, Ruff lint/format, and patch hygiene passed."
+**Context**: BUILD AND TEST COMPLETE - Heat-recovery approach documentation amendment
+
+---
+
+## Heat-Recovery Approach Documentation Commit Authorization
+**Timestamp**: 2026-09-02T10:52:13Z
+**User Input**: "commit"
+**AI Response**: "Accepted authorization to stage and commit the completed notebook and Read the Docs documentation amendment as one cohesive change."
+**Context**: SOURCE CONTROL AUTHORIZATION - Heat-recovery approach documentation amendment
+
+---

@@ -15,7 +15,8 @@ The service stack is designed in three steps:
 
 1. validate or receive typed request data
 2. prepare the inputs into a :class:`~OpenPinch.domain.zone.Zone` hierarchy
-3. dispatch direct, indirect, HPR, exergy, cogeneration, or area/cost targeting
+3. dispatch direct, inverse-recovery, indirect, HPR, exergy, cogeneration, or
+   area/cost targeting
 
 Use Cases
 ---------
@@ -55,11 +56,21 @@ Application code should normally call
 ``OpenPinch.contracts.heat_recovery`` and is intentionally absent from the
 package root.
 
+The application functions below own public validation, scope and period
+resolution, all-period ordering, and output-unit conversion. The lower-level
+``solve_heat_recovery_approach(...)`` and
+``evaluate_process_heat_recovery(...)`` functions in
+``OpenPinch.analysis.targeting.approach_temperature`` operate in canonical kW
+and ``delta_degC`` and are contributor implementation details.
+
 .. autofunction:: OpenPinch.application.heat_recovery_approach.calculate_heat_recovery_approach
    :no-index:
 
 .. autofunction:: OpenPinch.application.heat_recovery_approach.calculate_all_period_heat_recovery_approach
    :no-index:
+
+Process-engineer examples and the full behavioral contract are in
+:doc:`../guides/heat-recovery-approach-temperature`.
 
 Preparation Entry Point
 -----------------------

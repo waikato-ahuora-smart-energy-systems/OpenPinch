@@ -109,7 +109,7 @@ Copy the notebook series from the CLI:
 openpinch notebook -o notebooks
 ```
 
-The eighteen-notebook series progresses from first solve through multiperiod
+The nineteen-notebook series progresses from first solve through multiperiod
 HPR, cogeneration, HEN synthesis, and publication workflows.
 
 The CLI intentionally copies notebooks only. Solves, validation, graph export,

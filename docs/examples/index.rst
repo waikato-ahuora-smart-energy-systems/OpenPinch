@@ -1,7 +1,7 @@
 Examples
 ========
 
-OpenPinch ships eighteen output-free process-engineer tutorials and maintained
+OpenPinch ships nineteen output-free process-engineer tutorials and maintained
 sample cases. Every supported public operation has an executable tutorial owner
 in the canonical coverage manifest.
 

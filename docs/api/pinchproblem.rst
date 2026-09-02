@@ -120,16 +120,26 @@ corresponding global HRAT is unknown:
 .. code-block:: python
 
    result = problem.target.heat_recovery_approach_temperature(
-       heat_recovery=4_000.0,
+       heat_recovery={"value": 4_000.0, "unit": "kW"},
        zone="Site/Process",
        period_id="0",
    )
+
+   payload = result.model_dump(mode="json")
 
 Plain recovery values use the configured input heat-flow unit; value-with-unit
 mappings are also accepted. The result reports the requested and achieved
 recovery, zero-approach thermodynamic limit, residual, status, and iteration
 count with explicit output units. Requests above the thermodynamic limit are
-rejected.
+rejected with the request, limit, scope, period, and units in the error.
+
+``HeatRecoveryApproachResult`` is frozen and contains ``scope``, canonical
+``period_id``, ``approach_temperature``, ``requested_heat_recovery``,
+``achieved_heat_recovery``, ``thermodynamic_limit``,
+``heat_recovery_residual``, ``status``, and ``iterations``. Status is
+``solved`` for an interior request, ``at_thermodynamic_limit`` for the
+zero-approach maximum, or ``zero_recovery_boundary`` for the first approach
+that produces zero recovery.
 
 For all periods, a scalar broadcasts deliberately, while a mapping must contain
 exactly the canonical period IDs:
@@ -148,9 +158,18 @@ results, populate ``period_results``, alter stream contributions, or update the
 last target-run specification. The value is process-level HRAT/global delta
 Tmin, not exchanger-level EMAT.
 
+Supported scopes are Site, Process Zone, and Unit Operation. Community and
+Region scopes are rejected because they are not direct process-targeting
+scopes. On an interior plateau, the returned value is the greatest feasible
+approach that still meets the requested recovery.
+
 .. autoclass:: OpenPinch.contracts.heat_recovery.HeatRecoveryApproachResult
    :members:
    :no-index:
+
+The complete runnable workflow, validation matrix, unit behavior, workspace
+batch examples, and numerical interpretation are in
+:doc:`../guides/heat-recovery-approach-temperature`.
 
 Argument Precedence
 -------------------

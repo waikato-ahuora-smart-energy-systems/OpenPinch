@@ -57,6 +57,11 @@ Interaction Matrix
      - ordered case result
      - source cases unchanged
      - base
+   * - active and batch ``target.heat_recovery_approach_temperature``
+     - Invert a requested process recovery for one or every canonical period
+     - frozen result or ordered case result
+     - source cases unchanged
+     - base
    * - ``cases(names).summary_frames()``, ``metrics()``, and ``reports()``
      - Observe every selected solved case and preserve per-case failures
      - result and error mappings
@@ -107,6 +112,43 @@ Batch target and design namespaces are intentionally separate: a target batch
 does not advertise HEN design methods, and a design batch does not advertise
 targeting methods. One case failing does not discard successful cases; inspect
 ``outcome.errors`` before using ``outcome.results``.
+
+Inverse Heat-Recovery Batches
+-----------------------------
+
+The active target accessor mirrors the active case. A case batch preserves its
+requested order and isolates above-limit or validation failures:
+
+.. code-block:: python
+
+   active = workspace.target.heat_recovery_approach_temperature(
+       heat_recovery=4_000.0,
+       period_id="0",
+   )
+   outcome = workspace.cases(["baseline", "retrofit"]).target.heat_recovery_approach_temperature(
+       heat_recovery=4_000.0,
+       period_id="0",
+   )
+
+   outcome.results
+   outcome.errors
+
+The all-period batch mirror accepts one broadcast recovery or a canonical
+period mapping per case call and forwards ``workers`` to each isolated case:
+
+.. code-block:: python
+
+   period_outcome = (
+       workspace.cases(["baseline", "retrofit"])
+       .target.all_periods.heat_recovery_approach_temperature(
+           heat_recovery=4_000.0,
+           workers=2,
+       )
+   )
+
+Neither form changes the active case, the source cases' ordinary results, or
+their period caches. See
+:doc:`../guides/heat-recovery-approach-temperature` for the complete contract.
 
 Complete API
 ------------

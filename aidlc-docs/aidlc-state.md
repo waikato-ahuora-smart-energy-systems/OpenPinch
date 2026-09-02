@@ -1467,6 +1467,13 @@ refreshed reverse-engineering artifacts.
 
 ## Heat-Recovery Approach Temperature Progress
 
+- [x] DOCUMENTATION AMENDMENT - Expanded the generated selected-period notebook
+  example and comprehensively integrated the inverse HRAT workflow throughout
+  Read the Docs. The focused gate passes 46 tests with 3 expected skips,
+  including notebook execution and warning-strict Sphinx; Ruff and patch
+  hygiene also pass. Plan:
+  `aidlc-docs/construction/plans/heat-recovery-approach-documentation-amendment-code-generation-plan.md`.
+
 - [x] INCEPTION - Workspace Detection resumed from the current brownfield
   repository.
 - [x] INCEPTION - Reverse Engineering reused current repository artifacts.

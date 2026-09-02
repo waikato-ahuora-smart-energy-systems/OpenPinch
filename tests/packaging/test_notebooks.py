@@ -132,6 +132,41 @@ def test_utility_placement_has_one_executable_thermodynamic_notebook() -> None:
     assert "monetary" not in markdown.lower()
 
 
+def test_inverse_heat_recovery_has_complete_selected_period_notebook_example() -> None:
+    notebook = _load_notebook(
+        ROOT
+        / "OpenPinch"
+        / "data"
+        / "notebooks"
+        / "02_focused_direct_and_total_site.ipynb"
+    )
+    source = _combined_source(notebook)
+    markdown_text = "\n".join(
+        "".join(cell.get("source", []))
+        for cell in notebook["cells"]
+        if cell["cell_type"] == "markdown"
+    )
+
+    for token in (
+        "problem.target.heat_recovery_approach_temperature(",
+        'heat_recovery={"value": requested_recovery_kw, "unit": "kW"}',
+        'period_id="0"',
+        "cached_results_before_inverse",
+        "ordinary_target_preserved",
+        'recovery_approach.model_dump(mode="json")',
+        "display(recovery_approach_summary)",
+    ):
+        assert token in source
+    for phrase in (
+        "thermodynamic limit",
+        "requested and achieved recovery",
+        "non-mutating",
+        "greatest feasible",
+        "exchanger EMAT",
+    ):
+        assert phrase in markdown_text
+
+
 def test_manifest_and_packaged_inventory_are_identical() -> None:
     rows = _manifest_rows()
 
@@ -227,13 +262,10 @@ def test_tutorial_review_preserves_notebook_invariants(name: str) -> None:
     assert [cell["id"] for cell in notebook["cells"]] == [
         f"cell-{index:02d}" for index in range(1, len(notebook["cells"]) + 1)
     ]
-    code_cells = [
-        cell for cell in notebook["cells"] if cell["cell_type"] == "code"
-    ]
+    code_cells = [cell for cell in notebook["cells"] if cell["cell_type"] == "code"]
     if name == "19_utility_placement_optimisation.ipynb":
         assert all(
-            cell["execution_count"] is None
-            or isinstance(cell["execution_count"], int)
+            cell["execution_count"] is None or isinstance(cell["execution_count"], int)
             for cell in code_cells
         )
     else:
