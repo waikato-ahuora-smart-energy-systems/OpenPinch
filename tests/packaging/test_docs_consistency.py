@@ -289,6 +289,11 @@ def test_release_docs_match_automated_main_branch_publication() -> None:
         "dispatches the same workflow at the version tag",
         "checksummed release artifacts",
         "protected ``pypi`` environment",
+        "Re-run failed jobs",
+        "original tag run",
+        "immutable build artifact ID",
+        "partial",
+        "pr-gate",
     ):
         assert phrase in combined
 

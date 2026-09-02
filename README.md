@@ -145,26 +145,34 @@ IDAES extensions and runs this gate automatically. Run it locally with
 
 1. In the pull request targeting `main`, set a strict, forward `X.Y.Z` version
    in `pyproject.toml` and keep the OpenPinch entry in `uv.lock` synchronized.
-2. Merge only after the required read-only validation checks pass.
+2. Merge only after the read-only validation jobs, external-solver suite, and
+   aggregate `pr-gate` result pass.
 3. The main-branch workflow repeats the test, documentation, solver, build, and
    cross-platform artifact gates.
 4. After those gates pass, it creates the annotated version tag and a draft
    GitHub release with checksummed release artifacts, then publishes the same
-   distributions to TestPyPI.
+   distributions to TestPyPI. Preflight and postflight checks require the exact
+   expected filenames and SHA-256 hashes, including safe recovery from a
+   partial upload.
 5. After TestPyPI succeeds:
    - it publishes the GitHub release before production PyPI
    - it dispatches the same workflow at the version tag
-6. The tag-ref run downloads and verifies the published artifacts without
-   rebuilding them, then waits at the protected `pypi` environment.
+6. The tag-ref run verifies the source push, workflow, prerequisite jobs, and
+   immutable build artifact ID, digest, and build attempt. It then requires the
+   public release files to match that artifact byte-for-byte without rebuilding
+   and waits at the protected `pypi` environment.
 7. Approve that deployment to use PyPI Trusted Publishing; the workflow uploads
    the verified distributions and confirms the version through the PyPI API.
 
 Version bumping does not create a tag locally. The release workflow owns tags
 and rejects malformed versions, mismatched lock metadata, or an existing tag
 that points anywhere other than the main-branch release commit. If production
-publication fails after the GitHub Release becomes public, rerun the workflow
-at that version tag with the matching `release_tag`; it reuses the published
-artifacts and never rebuilds the release.
+publication or its availability check fails after the GitHub Release becomes
+public, open the original tag run and select **Re-run failed jobs**. Exact index
+preflight, `skip-existing`, and a separately retryable availability check make
+an absent, partial, or already-complete release recoverable without accepting
+mismatched files. Do not start a fresh tag dispatch when the upload may already
+have succeeded.
 
 Build the documentation locally:
 

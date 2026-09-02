@@ -41,28 +41,53 @@ Production publication is automated from the ``main`` branch:
 
 1. set a strict, forward ``X.Y.Z`` version in ``pyproject.toml`` and keep the
    OpenPinch entry in ``uv.lock`` synchronized in the pull request
-2. merge only after the required read-only validation jobs pass
+2. merge only after the read-only validation jobs, external-solver suite, and
+   aggregate ``pr-gate`` result pass
 3. let the main-branch workflow repeat the test, documentation, solver, build,
    and cross-platform artifact gates
 4. after validation, the workflow creates the annotated version tag and a
    draft GitHub release containing checksummed release artifacts, then
-   publishes the same distributions to TestPyPI
+   publishes the same distributions to TestPyPI; exact filename and SHA-256
+   preflight/postflight checks safely distinguish absent, partial, complete,
+   and mismatched index state
 5. after TestPyPI succeeds:
 
    * it publishes the GitHub release before production PyPI
    * it dispatches the same workflow at the version tag
-6. the tag-ref run downloads the public release artifacts, verifies their
-   names and SHA-256 digests without rebuilding, and then waits at the
-   protected ``pypi`` environment
+6. the tag-ref run verifies the source push, workflow identity, latest required
+   jobs, and immutable build artifact ID, digest, and build attempt; it then
+   requires the public release files to match that artifact byte-for-byte
+   without rebuilding and waits at the protected ``pypi`` environment
 7. after approval, PyPI Trusted Publishing uploads the verified distributions
-   and the workflow confirms the version through the PyPI API
+   and a separate unprivileged job confirms the version through the PyPI API
 
 Version bumping does not create a local tag. The release workflow owns the
 ``v{project.version}`` tag and rejects malformed versions, lock mismatches, or
 an existing tag that points to a different commit. A production failure can
-therefore leave a public GitHub Release while PyPI is pending. Rerun
-``ci-publish.yml`` at that version tag with the matching ``release_tag`` input;
-the tag phase reuses the published artifacts and does not rebuild the release.
+therefore leave a public GitHub Release while PyPI is pending. Open the
+original tag run and select **Re-run failed jobs**. Exact index preflight,
+``skip-existing``, and a separately retryable availability check recover an
+absent, partial, or already-complete release without accepting mismatched
+files. Do not start a fresh tag dispatch when the upload may already have
+succeeded.
+
+Repository Controls
+-------------------
+
+Keep the repository controls aligned with the workflow contract:
+
+* require full-length commit SHAs for Actions and keep the default
+  ``GITHUB_TOKEN`` read-only; grant write scopes only on the release jobs that
+  need them
+* do not let GitHub Actions create or approve pull requests
+* require pull requests, conversation resolution, an up-to-date branch, and
+  the unique ``pr-gate`` check before merging ``main``; do not require a Code
+  Owner review unless the repository contains a maintained ``CODEOWNERS`` file
+* protect stable ``v*.*.*`` tags from updates and deletion while leaving tag
+  creation available to the release workflow
+* retain a reviewer on the protected ``pypi`` environment; a sole-maintainer
+  repository cannot also require self-review prevention without introducing a
+  second eligible reviewer
 
 Alternative Direct Sphinx Build
 -------------------------------

@@ -16,7 +16,31 @@ env:
   UV_VERSION: "0.11.29"
 
 jobs:
+  detect-main-pr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      should_run: ${{ steps.open_pr.outputs.should_run }}
+    steps:
+      - name: Detect an open ready develop-to-main pull request
+        id: open_pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          should_run="$(gh api --method GET "repos/${GITHUB_REPOSITORY}/pulls" \
+            -f state=open \
+            -f head="${GITHUB_REPOSITORY_OWNER}:develop" \
+            -f base="main" \
+            --jq 'if map(select(.draft == false)) | length == 0 then "true" else "false" end')"
+          echo "should_run=${should_run}" >> "${GITHUB_OUTPUT}"
+
   test:
+    needs: detect-main-pr
+    if: ${{ needs.detect-main-pr.outputs.should_run == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -37,6 +61,8 @@ jobs:
       - run: uv run --no-sync coverage report --fail-under=95
 
   docs:
+    needs: detect-main-pr
+    if: ${{ needs.detect-main-pr.outputs.should_run == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -50,10 +76,13 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
+          save-cache: false
       - run: uv sync --frozen --group dev
       - run: uv run --no-sync python scripts/build_docs.py
 
   optional-install-smoke:
+    needs: detect-main-pr
+    if: ${{ needs.detect-main-pr.outputs.should_run == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -71,6 +100,7 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
+          save-cache: false
       - name: Install locked package surface
         env:
           SURFACE: ${{ matrix.surface }}
@@ -82,6 +112,8 @@ jobs:
       - run: uv run --no-sync python scripts/optional_install_smoke.py ${{ matrix.surface }}
 
   artifact-build:
+    needs: detect-main-pr
+    if: ${{ needs.detect-main-pr.outputs.should_run == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -95,6 +127,7 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
+          save-cache: false
       - run: uv sync --frozen --group dev
       - run: uv run --no-sync python scripts/build_dist.py
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -104,7 +137,8 @@ jobs:
           if-no-files-found: error
 
   artifact-install-smoke:
-    needs: artifact-build
+    needs: [detect-main-pr, artifact-build]
+    if: ${{ needs.detect-main-pr.outputs.should_run == 'true' }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -122,6 +156,7 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
+          save-cache: ${{ runner.os != 'Linux' }}
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: openpinch-dist

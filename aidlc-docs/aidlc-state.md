@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: GitHub Actions tag-context PyPI publication complete.
+- **Current Stage**: GitHub Actions comprehensive hardening awaiting the first successful pushed `pr-gate` run before that check can be required on `main`.
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -29,6 +29,25 @@
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
 
 ## Utility Placement Optimisation Progress
+
+- [ ] GITHUB ACTIONS COMPREHENSIVE HARDENING - Code, tests, documentation, and
+  the post-change audit are complete. The focused gate passes 58 tests; YAML,
+  Ruff, formatting, documentation, distributions, and patch hygiene pass; and
+  the complete configured-solver suite passes 2,534 tests with 4 expected
+  skips. Live Actions defaults are hardened, the PyPI environment remains
+  protected, stable release tags are protected, and the stale Code Owners
+  requirement is removed. The first successful pushed `pr-gate` run remains
+  before that check can be required on `main`. Plan:
+  `aidlc-docs/construction/plans/github-actions-comprehensive-hardening-code-generation-plan.md`.
+
+- [x] GITHUB ACTIONS REVIEW PROVENANCE AND RETRY CORRECTIONS - Anchor the
+  release manifest to the unprivileged build run and separate PyPI availability
+  verification from the immutable upload. The focused gate passes 108 tests
+  with 3 expected skips; all workflows parse; release checks, documentation,
+  0.6.3 distributions, Ruff, formatting, and patch hygiene pass; and the
+  complete configured-solver suite passes 2,522 tests with 4 expected skips.
+  Plan:
+  `aidlc-docs/construction/plans/github-actions-review-provenance-retry-corrections-plan.md`.
 
 - [x] GITHUB ACTIONS TAG-CONTEXT PYPI PUBLICATION - Publish the GitHub Release
   after TestPyPI validation, dispatch the existing trusted workflow at the
