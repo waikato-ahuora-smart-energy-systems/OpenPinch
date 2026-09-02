@@ -14,6 +14,13 @@ Heat-recovery ``dt_min`` service
   and mirrors through active workspaces and isolated ordered case batches.
 - Added deterministic plateau and zero-recovery boundary handling, analytical,
   packaged-regression, immutability, and seeded property-based coverage.
+- Hardened the service after a full edge-case audit: scalar inputs and
+  low-level numerical arguments now reject implicit coercions; inverse cascade
+  boundaries preserve exact shifted temperatures to ``1e-6 delta_degC``;
+  foreign ``Zone`` selectors resolve locally by address; positive micro-duty
+  requests are distinct from exact zero; result contracts validate units and
+  cross-field relationships; and exact all-period IDs take precedence over the
+  ``value``/``unit`` scalar-mapping shape.
 - Corrected thermodynamic-limit inversion for threshold problems: maximum
   recovery now returns the greatest positive global ``dt_min`` that retains the
   limit, rather than forcing zero ``dt_min``.

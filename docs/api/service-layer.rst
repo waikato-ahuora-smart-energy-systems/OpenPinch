@@ -64,6 +64,10 @@ resolution, all-period ordering, and output-unit conversion. The lower-level
 and ``delta_degC`` and are contributor implementation details. The solver uses
 the greatest-feasible plateau boundary for both interior and
 thermodynamic-limit requests, including positive threshold-problem results.
+It preserves exact finite shifted temperatures for the inverse-only cascade,
+uses strict scalar and period-index validation at contributor boundaries, and
+re-verifies both sides of the final bisection bracket before returning.
+Ordinary targeting continues to use its established cascade grid.
 
 .. autofunction:: OpenPinch.application.heat_recovery_dt_min.calculate_heat_recovery_dt_min
    :no-index:

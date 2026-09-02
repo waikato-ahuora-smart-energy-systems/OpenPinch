@@ -3,9 +3,17 @@
 from __future__ import annotations
 
 import math
+from decimal import Decimal
 from enum import StrEnum
+from numbers import Real
 
-from pydantic import BaseModel, ConfigDict, field_validator
+import numpy as np
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+
+from ..domain.value import Value
+
+_RECOVERY_ABSOLUTE_TOLERANCE = 1e-6
+_RECOVERY_RELATIVE_TOLERANCE = 1e-9
 
 
 class _FrozenContract(BaseModel):
@@ -35,16 +43,21 @@ class HeatRecoveryQuantity(_FrozenContract):
     @field_validator("value", mode="before")
     @classmethod
     def _validate_value(cls, value: object) -> float:
-        if isinstance(value, bool):
+        if isinstance(value, (bool, np.bool_)) or not isinstance(
+            value,
+            (Real, Decimal, np.integer, np.floating),
+        ):
             raise ValueError("value must be a finite number")
-        result = float(value)  # type: ignore[arg-type]
+        result = float(value)
         if not math.isfinite(result):
             raise ValueError("value must be finite")
         return 0.0 if result == 0.0 else result
 
-    @field_validator("unit")
+    @field_validator("unit", mode="before")
     @classmethod
-    def _validate_unit(cls, value: str) -> str:
+    def _validate_unit(cls, value: object) -> str:
+        if not isinstance(value, str):
+            raise ValueError("unit must be text")
         unit = value.strip()
         if not unit:
             raise ValueError("unit must not be empty")
@@ -85,6 +98,79 @@ class HeatRecoveryDtMinResult(_FrozenContract):
         if value < 0:
             raise ValueError("iterations must be non-negative")
         return value
+
+    @staticmethod
+    def _canonical(quantity: HeatRecoveryQuantity, unit: str, field: str) -> float:
+        try:
+            return float(Value(quantity.value, unit=quantity.unit).to(unit))
+        except Exception as exc:
+            raise ValueError(f"{field} must use units compatible with {unit}") from exc
+
+    @model_validator(mode="after")
+    def _validate_thermal_relationships(self) -> "HeatRecoveryDtMinResult":
+        dt_min = self._canonical(self.dt_min, "delta_degC", "dt_min")
+        requested = self._canonical(
+            self.requested_heat_recovery,
+            "kW",
+            "requested_heat_recovery",
+        )
+        achieved = self._canonical(
+            self.achieved_heat_recovery,
+            "kW",
+            "achieved_heat_recovery",
+        )
+        limit = self._canonical(
+            self.thermodynamic_limit,
+            "kW",
+            "thermodynamic_limit",
+        )
+        residual = self._canonical(
+            self.heat_recovery_residual,
+            "kW",
+            "heat_recovery_residual",
+        )
+        if dt_min < 0.0:
+            raise ValueError("dt_min must be non-negative")
+        for field, value in (
+            ("requested_heat_recovery", requested),
+            ("achieved_heat_recovery", achieved),
+            ("thermodynamic_limit", limit),
+        ):
+            if value < 0.0:
+                raise ValueError(f"{field} must be non-negative")
+
+        scale = max(abs(requested), abs(achieved), abs(limit), abs(residual))
+        tolerance = max(
+            _RECOVERY_ABSOLUTE_TOLERANCE,
+            _RECOVERY_RELATIVE_TOLERANCE * scale,
+        )
+        if requested > limit + tolerance:
+            raise ValueError("requested heat recovery exceeds the thermodynamic limit")
+        if achieved > limit + tolerance:
+            raise ValueError("achieved heat recovery exceeds the thermodynamic limit")
+        if requested > 0.0:
+            meets_request = (
+                achieved >= requested
+                if requested <= _RECOVERY_ABSOLUTE_TOLERANCE
+                else achieved + tolerance >= requested
+            )
+            if not meets_request:
+                raise ValueError("achieved heat recovery does not meet the request")
+        if abs(residual - (achieved - requested)) > tolerance:
+            raise ValueError("heat recovery residual is inconsistent")
+
+        at_limit = abs(requested - limit) <= tolerance
+        if self.status is HeatRecoveryDtMinStatus.ZERO_RECOVERY_BOUNDARY:
+            if requested != 0.0:
+                raise ValueError("zero_recovery_boundary requires a zero request")
+            if achieved > tolerance:
+                raise ValueError("zero_recovery_boundary requires zero recovery")
+        elif self.status is HeatRecoveryDtMinStatus.AT_THERMODYNAMIC_LIMIT:
+            if not at_limit:
+                raise ValueError("at_thermodynamic_limit requires a limit request")
+        elif requested <= 0.0 or at_limit:
+            raise ValueError("solved requires a positive non-limit request")
+        return self
 
 
 __all__ = [

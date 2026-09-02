@@ -150,6 +150,10 @@ Neither form changes the active case, the source cases' ordinary results, or
 their period caches. See
 :doc:`../guides/heat-recovery-dt-min` for the complete contract.
 
+If ``zone`` is a ``Zone`` object, every case resolves its address against that
+case's own hierarchy. This prevents a batch from accidentally evaluating the
+streams attached to the case from which the selector object originated.
+
 Complete API
 ------------
 

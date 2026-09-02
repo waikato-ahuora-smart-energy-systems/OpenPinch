@@ -89,6 +89,12 @@ greatest feasible ``dt_min`` that still meets the requested recovery. For a zero
 request it returns the smallest zero-recovery boundary. The same
 greatest-feasible rule applies at the thermodynamic limit.
 
+Recovery tolerances do not turn a positive request into a zero request. Even a
+very small positive duty must be achieved at the returned boundary and is
+reported as ``solved`` unless it is within the thermodynamic-limit boundary
+classification. Only an exact zero request can return
+``zero_recovery_boundary``.
+
 This distinction matters for a threshold problem, where no external heating or
 no external cooling is required. Maximum recovery can persist over a positive
 global ``dt_min`` plateau. Its thermodynamic-limit inverse is the greatest

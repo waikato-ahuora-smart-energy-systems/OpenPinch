@@ -198,8 +198,8 @@ def test_inverse_heat_recovery_notebook_pins_threshold_limit_solution(
         float(direct.heat_recovery_target)
     )
     assert result.dt_min.value == pytest.approx(
-        58.34505097121001,
-        abs=2e-6,
+        58.34505012947355,
+        abs=1e-6,
     )
     assert result.status.value == "at_thermodynamic_limit"
 

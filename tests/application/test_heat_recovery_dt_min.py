@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import pickle
 from copy import deepcopy
+from decimal import Decimal
+from fractions import Fraction
 
+import numpy as np
 import pytest
 
 from OpenPinch import PinchProblem, PinchWorkspace
@@ -12,6 +15,7 @@ from OpenPinch.contracts.heat_recovery_dt_min import (
     HeatRecoveryDtMinResult,
     HeatRecoveryDtMinStatus,
 )
+from OpenPinch.domain.value import Q_, Value
 
 
 def _multiperiod_payload() -> dict:
@@ -114,6 +118,58 @@ def test_invalid_recovery_values_are_rejected(value) -> None:
         problem.target.heat_recovery_dt_min(heat_recovery=value)
 
 
+@pytest.mark.parametrize(
+    "value",
+    [
+        "50",
+        b"50",
+        [50.0],
+        (50.0,),
+        np.array(50.0),
+        np.array([50.0]),
+        {"0": 50.0},
+        {"value": 50.0},
+        {"value": True, "unit": "kW"},
+        {"value": np.bool_(True), "unit": "kW"},
+    ],
+)
+def test_selected_period_rejects_implicitly_coercible_non_scalars(value) -> None:
+    problem = PinchProblem(_multiperiod_payload(), project_name="Site")
+
+    with pytest.raises((TypeError, ValueError), match="finite non-negative scalar"):
+        problem.target.heat_recovery_dt_min(
+            heat_recovery=value,
+            zone="Site/Process",
+            period_id="0",
+        )
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        50,
+        50.0,
+        np.int64(50),
+        np.float64(50.0),
+        Decimal("50"),
+        Fraction(100, 2),
+        Value(50.0, unit="kW"),
+        Q_(0.05, "MW"),
+        {"value": 0.05, "unit": "MW"},
+    ],
+)
+def test_selected_period_accepts_only_supported_scalar_forms(value) -> None:
+    result = PinchProblem(
+        _multiperiod_payload(), project_name="Site"
+    ).target.heat_recovery_dt_min(
+        heat_recovery=value,
+        zone="Site/Process",
+        period_id="0",
+    )
+
+    assert result.requested_heat_recovery.value == pytest.approx(50.0)
+
+
 def test_above_limit_error_reports_complete_context() -> None:
     problem = PinchProblem(_multiperiod_payload(), project_name="Site")
 
@@ -180,6 +236,31 @@ def test_all_period_scalar_broadcast_mapping_order_and_parallel_parity() -> None
     assert list(parallel) == ["0", "peak"]
     assert [result.period_id for result in sequential.values()] == ["0", "peak"]
     assert sequential == parallel
+
+    explicit_scalar = problem.target.all_periods.heat_recovery_dt_min(
+        heat_recovery={"value": 0.05, "unit": "MW"},
+        zone="Site/Process",
+    )
+    assert list(explicit_scalar) == ["0", "peak"]
+    assert all(
+        result.requested_heat_recovery.value == pytest.approx(50.0)
+        for result in explicit_scalar.values()
+    )
+
+
+def test_exact_period_ids_take_precedence_over_scalar_mapping_keys() -> None:
+    payload = _multiperiod_payload()
+    payload["options"]["PROBLEM_PERIOD_IDS"] = ["value", "unit"]
+    problem = PinchProblem(payload, project_name="Site")
+
+    results = problem.target.all_periods.heat_recovery_dt_min(
+        heat_recovery={"value": 40.0, "unit": 60.0},
+        zone="Site/Process",
+    )
+
+    assert list(results) == ["value", "unit"]
+    assert results["value"].requested_heat_recovery.value == pytest.approx(40.0)
+    assert results["unit"].requested_heat_recovery.value == pytest.approx(60.0)
 
 
 @pytest.mark.parametrize(
@@ -272,3 +353,53 @@ def test_workspace_active_case_and_batch_failure_isolation() -> None:
     assert list(batch.errors) == ["no-overlap"]
     assert list(batch_periods.results) == [workspace.baseline_name]
     assert list(batch_periods.errors) == ["no-overlap"]
+
+
+def test_zone_objects_are_resolved_locally_by_address() -> None:
+    local = PinchProblem(_multiperiod_payload(), project_name="Site")
+    foreign_payload = _multiperiod_payload()
+    for stream in foreign_payload["streams"]:
+        stream["heat_flow"] = {"values": [250.0, 300.0], "unit": "kW"}
+    foreign = PinchProblem(foreign_payload, project_name="Site")
+    foreign_zone = foreign._master_zone.get_subzone("Site/Process")
+
+    by_object = local.target.heat_recovery_dt_min(
+        heat_recovery=50.0,
+        zone=foreign_zone,
+        period_id="0",
+    )
+    by_address = local.target.heat_recovery_dt_min(
+        heat_recovery=50.0,
+        zone="Site/Process",
+        period_id="0",
+    )
+
+    assert by_object == by_address
+
+
+def test_foreign_zone_with_missing_local_address_is_rejected() -> None:
+    local = PinchProblem(_multiperiod_payload(), project_name="Site")
+    foreign = PinchProblem("basic_pinch.json", project_name="Site")
+    foreign_zone = foreign._master_zone.get_subzone("Site/Plant")
+
+    with pytest.raises((KeyError, ValueError), match="Site/Plant"):
+        local.target.heat_recovery_dt_min(
+            heat_recovery=50.0,
+            zone=foreign_zone,
+            period_id="0",
+        )
+
+
+def test_batch_resolves_zone_object_independently_for_each_case() -> None:
+    workspace = PinchWorkspace(_multiperiod_payload(), project_name="Site")
+    workspace.load(_no_overlap_payload(), case_name="no-overlap", activate=False)
+    zone = workspace.case()._master_zone.get_subzone("Site/Process")
+
+    batch = workspace.cases().target.heat_recovery_dt_min(
+        heat_recovery=50.0,
+        zone=zone,
+        period_id="0",
+    )
+
+    assert list(batch.results) == [workspace.baseline_name]
+    assert list(batch.errors) == ["no-overlap"]

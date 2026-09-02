@@ -1541,3 +1541,30 @@ refreshed reverse-engineering artifacts.
 - **Current stage**: Complete. The service, contracts, orchestration,
   properties, documentation, generated tutorials, full coverage suite,
   distributions, and installed-wheel smoke are verified.
+
+## Heat-Recovery `dt_min` Audit Resolutions
+
+- [x] REQUIREMENTS ANALYSIS - Approved strict scalar inputs, physical
+  `1e-6 delta_degC` boundary accuracy, local address-based zone resolution,
+  exact-zero status semantics, strict dimensional and relational result
+  contracts, canonical-period mapping precedence, and expanded adversarial/PBT
+  coverage.
+- [x] WORKFLOW PLANNING - Focused one-unit correction workflow approved.
+- [x] FUNCTIONAL DESIGN - Strict predicates, precise inverse evaluation,
+  bracket verification, local zone resolution, contract invariants, and PBT
+  properties approved.
+- [x] CODE GENERATION - Plan approved; Red Steps 1 through 4 produced 44
+  expected failures and 46 passing existing cases. Green Steps 5 through 9 are
+  complete: the six corrections, expanded properties, permanent shrunk
+  examples, RTD synchronization, and generated-notebook drift validation pass.
+  Step 10 verification and summaries are complete; the user approved the
+  generated correction with option B.
+- [x] BUILD AND TEST - Verification evidence is complete and approved: 2,641 configured
+  tests pass with 4 expected skips; the CI-equivalent selection passes 2,638
+  tests with 3 expected skips and 4 solver deselections at 96 percent branch
+  coverage; RTD, notebooks, distributions, installed-wheel smoke, Ruff, and
+  patch hygiene pass.
+- [x] OPERATIONS - N/A; this library-level numerical, contract, test, notebook,
+  and documentation correction introduces no deployment or monitoring change.
+- **Current stage**: Complete. All six audit findings are resolved and the
+  generated correction plus Build and Test evidence are approved.

@@ -9,6 +9,17 @@ def _value(draw, *, minimum: int, maximum: int) -> float:
     return float(draw(st.integers(min_value=minimum, max_value=maximum)))
 
 
+def _duty(draw) -> float:
+    return float(
+        draw(
+            st.one_of(
+                st.integers(min_value=1, max_value=500),
+                st.sampled_from([1e-12, 5e-7, 1e-6, 1e-3, 0.5]),
+            )
+        )
+    )
+
+
 @st.composite
 def heat_recovery_problem_payloads(draw):
     """Generate bounded scalar sensible and segmented process stream sets."""
@@ -16,8 +27,8 @@ def heat_recovery_problem_payloads(draw):
     hot_span = _value(draw, minimum=50, maximum=120)
     cold_supply = _value(draw, minimum=0, maximum=80)
     cold_span = _value(draw, minimum=70, maximum=150)
-    hot_duty = _value(draw, minimum=50, maximum=500)
-    cold_duty = _value(draw, minimum=50, maximum=500)
+    hot_duty = _duty(draw)
+    cold_duty = _duty(draw)
     hot_target = hot_supply - hot_span
     cold_target = cold_supply + cold_span
 
@@ -36,7 +47,9 @@ def heat_recovery_problem_payloads(draw):
             "htc": 1.0,
             "active": True,
         }
-        if not segmented:
+        # Segment validation requires every segment duty to exceed 1e-6. Keep
+        # micro-duty examples sensible so the generated input remains valid.
+        if not segmented or duty <= 2.5e-6:
             return base | {
                 "t_supply": supply,
                 "t_target": target,
@@ -86,6 +99,30 @@ def heat_recovery_problem_payloads(draw):
             "active": False,
         },
     ]
+    for index in range(draw(st.integers(min_value=0, max_value=2))):
+        supply = _value(draw, minimum=160, maximum=320)
+        span = _value(draw, minimum=20, maximum=140)
+        streams.append(
+            stream(
+                name=f"Hot active {index + 2}",
+                supply=supply,
+                target=supply - span,
+                duty=_duty(draw),
+                segmented=draw(st.booleans()),
+            )
+        )
+    for index in range(draw(st.integers(min_value=0, max_value=2))):
+        supply = _value(draw, minimum=-20, maximum=120)
+        span = _value(draw, minimum=20, maximum=170)
+        streams.append(
+            stream(
+                name=f"Cold active {index + 2}",
+                supply=supply,
+                target=supply + span,
+                duty=_duty(draw),
+                segmented=draw(st.booleans()),
+            )
+        )
     return {
         "streams": streams,
         "utilities": [],
@@ -101,8 +138,16 @@ def heat_recovery_problem_payloads(draw):
 @st.composite
 def multiperiod_heat_recovery_problem_payloads(draw):
     """Generate bounded aligned multiperiod sensible stream sets."""
-    period_count = draw(st.integers(min_value=2, max_value=3))
-    period_ids = ["0", *[f"period-{index}" for index in range(1, period_count)]]
+    period_ids = draw(
+        st.sampled_from(
+            [
+                ["0", "peak"],
+                ["value", "unit"],
+                ["base", "peak", "night"],
+            ]
+        )
+    )
+    period_count = len(period_ids)
 
     def values(minimum: int, maximum: int) -> list[float]:
         return [

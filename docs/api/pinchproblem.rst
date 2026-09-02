@@ -127,8 +127,10 @@ corresponding global ``dt_min`` is unknown:
 
    payload = result.model_dump(mode="json")
 
-Plain recovery values use the configured input heat-flow unit; value-with-unit
-mappings are also accepted. The result reports the requested and achieved
+Plain recovery values use the configured input heat-flow unit; scalar
+``Value``/Pint quantities and exact ``{"value", "unit"}`` mappings are also
+accepted. Input shapes are strict: Booleans, numeric strings, sequences,
+arrays, and unrelated mappings are rejected. The result reports the requested and achieved
 recovery, zero-``dt_min`` thermodynamic limit, residual, status, and iteration
 count with explicit output units. Requests above the thermodynamic limit are
 rejected with the request, limit, scope, period, and units in the error.
@@ -145,7 +147,8 @@ zero approach defines how the maximum recovery is calculated, not a mandatory
 inverse result.
 
 For all periods, a scalar broadcasts deliberately, while a mapping must contain
-exactly the canonical period IDs:
+exactly the canonical period IDs. Exact period keys take precedence when the
+IDs themselves are ``value`` and ``unit``:
 
 .. code-block:: python
 
@@ -163,7 +166,8 @@ not exchanger-level EMAT.
 
 Supported scopes are Site, Process Zone, and Unit Operation. Community and
 Region scopes are rejected because they are not direct process-targeting
-scopes. On an interior plateau, the returned value is the greatest feasible
+scopes. A ``Zone`` argument contributes only its address, which is resolved
+against the current problem or current batch case. On an interior plateau, the returned value is the greatest feasible
 approach that still meets the requested recovery.
 
 .. autoclass:: OpenPinch.contracts.heat_recovery_dt_min.HeatRecoveryDtMinResult

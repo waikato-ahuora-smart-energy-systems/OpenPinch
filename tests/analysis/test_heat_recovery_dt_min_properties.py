@@ -5,7 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 
 import pytest
-from hypothesis import given, seed, settings
+from hypothesis import example, given, seed, settings
 from hypothesis import strategies as st
 
 from OpenPinch import PinchProblem
@@ -109,7 +109,7 @@ def test_inverse_is_bounded_idempotent_unit_invariant_and_json_safe(
         HeatRecoveryDtMinResult.model_validate_json(result.model_dump_json()) == result
     )
 
-    larger = min(bound, result.dt_min.value + 2e-5)
+    larger = min(bound, result.dt_min.value + 2e-6)
     if larger > result.dt_min.value + 1e-6:
         larger_recovery = evaluate_process_heat_recovery(
             zone.hot_streams,
@@ -122,6 +122,8 @@ def test_inverse_is_bounded_idempotent_unit_invariant_and_json_safe(
 
 @seed(20260902)
 @settings(max_examples=20, deadline=None)
+@example(dt_min=45.5)
+@example(dt_min=1.828125)
 @given(
     dt_min=st.floats(
         min_value=1.0,
@@ -143,8 +145,14 @@ def test_generated_uniform_forward_targets_round_trip_through_inverse(
     forward_problem = PinchProblem(payload, project_name="Site")
     forward = forward_problem.target.direct_heat_integration()
 
+    precise_forward_recovery = evaluate_process_heat_recovery(
+        source_problem._master_zone.hot_streams,
+        source_problem._master_zone.cold_streams,
+        dt_min=dt_min,
+        period_idx=0,
+    )
     inverse = source_problem.target.heat_recovery_dt_min(
-        heat_recovery=float(forward.heat_recovery_target),
+        heat_recovery=precise_forward_recovery,
     )
     recovered = evaluate_process_heat_recovery(
         source_problem._master_zone.hot_streams,
@@ -153,8 +161,22 @@ def test_generated_uniform_forward_targets_round_trip_through_inverse(
         period_idx=0,
     )
 
-    assert recovered == pytest.approx(float(forward.heat_recovery_target), abs=2e-5)
-    assert inverse.dt_min.value == pytest.approx(dt_min, abs=2e-5)
+    # Ordinary targeting retains its historic 1e-5 cascade quantization; its
+    # result must agree with the precise forward oracle at that resolution.
+    result_scale = max(
+        precise_forward_recovery,
+        inverse.thermodynamic_limit.value,
+        recovered,
+    )
+    assert float(forward.heat_recovery_target) == pytest.approx(
+        precise_forward_recovery,
+        abs=1e-4,
+    )
+    assert recovered >= precise_forward_recovery - max(
+        1e-6,
+        result_scale * 1e-9,
+    )
+    assert inverse.dt_min.value == pytest.approx(dt_min, abs=1e-6)
 
 
 @seed(20260903)
@@ -201,7 +223,7 @@ def test_threshold_limit_returns_maximal_order_invariant_json_safe_dt_min(
     assert result.status.value == "at_thermodynamic_limit"
     assert result.dt_min.value == pytest.approx(
         expected_dt_min,
-        abs=2e-5,
+        abs=1e-6,
     )
     assert repeated == result
     assert reversed_result == result
@@ -218,7 +240,7 @@ def test_threshold_limit_returns_maximal_order_invariant_json_safe_dt_min(
         evaluate_process_heat_recovery(
             zone.hot_streams,
             zone.cold_streams,
-            dt_min=result.dt_min.value + 2e-5,
+            dt_min=result.dt_min.value + 2e-6,
             period_idx=0,
         )
         < limit

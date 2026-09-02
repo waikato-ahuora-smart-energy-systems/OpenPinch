@@ -71,3 +71,77 @@ def test_quantity_requires_explicit_nonempty_unit() -> None:
         HeatRecoveryQuantity(value=1.0, unit=" ")
     with pytest.raises(ValidationError, match="finite number"):
         HeatRecoveryQuantity(value=True, unit="kW")
+    with pytest.raises(ValidationError, match="finite number"):
+        HeatRecoveryQuantity(value="1", unit="kW")
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("dt_min", {"value": -1.0, "unit": "delta_degC"}),
+        ("dt_min", {"value": 10.0, "unit": "kW"}),
+        ("dt_min", {"value": 10.0, "unit": "nonsense"}),
+        ("requested_heat_recovery", {"value": -1.0, "unit": "kW"}),
+        ("requested_heat_recovery", {"value": 1.0, "unit": "degC"}),
+        ("achieved_heat_recovery", {"value": -1.0, "unit": "kW"}),
+        ("thermodynamic_limit", {"value": -1.0, "unit": "kW"}),
+        ("heat_recovery_residual", {"value": 0.0, "unit": "degC"}),
+    ],
+)
+def test_result_rejects_invalid_dimensions_and_nonnegative_fields(
+    field,
+    value,
+) -> None:
+    with pytest.raises(ValidationError):
+        _result(**{field: value})
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {
+            "requested_heat_recovery": {"value": 6_000.0, "unit": "kW"},
+            "heat_recovery_residual": {"value": -1_999.9999999, "unit": "kW"},
+        },
+        {
+            "achieved_heat_recovery": {"value": 5_001.0, "unit": "kW"},
+            "heat_recovery_residual": {"value": 1_001.0, "unit": "kW"},
+        },
+        {
+            "achieved_heat_recovery": {"value": 3_999.0, "unit": "kW"},
+            "heat_recovery_residual": {"value": -1_000.0, "unit": "kW"},
+        },
+        {"heat_recovery_residual": {"value": 1.0, "unit": "kW"}},
+        {"status": "zero_recovery_boundary"},
+        {"status": "at_thermodynamic_limit"},
+    ],
+)
+def test_result_rejects_inconsistent_relationships(overrides) -> None:
+    with pytest.raises(ValidationError):
+        _result(**overrides)
+
+
+def test_result_accepts_compatible_mixed_units_and_status_boundaries() -> None:
+    solved = _result(
+        dt_min={"value": 18.0, "unit": "delta_degF"},
+        requested_heat_recovery={"value": 4.0, "unit": "MW"},
+        achieved_heat_recovery={"value": 4_000.0000001, "unit": "kW"},
+        thermodynamic_limit={"value": 5.0, "unit": "MW"},
+        heat_recovery_residual={"value": 1e-10, "unit": "MW"},
+    )
+    zero = _result(
+        requested_heat_recovery={"value": 0.0, "unit": "MW"},
+        achieved_heat_recovery={"value": 0.0, "unit": "kW"},
+        heat_recovery_residual={"value": 0.0, "unit": "kW"},
+        status="zero_recovery_boundary",
+    )
+    maximum = _result(
+        requested_heat_recovery={"value": 5.0, "unit": "MW"},
+        achieved_heat_recovery={"value": 5_000.0, "unit": "kW"},
+        heat_recovery_residual={"value": 0.0, "unit": "kW"},
+        status="at_thermodynamic_limit",
+    )
+
+    assert solved.dt_min.value == 18.0
+    assert zero.status is HeatRecoveryDtMinStatus.ZERO_RECOVERY_BOUNDARY
+    assert maximum.status is HeatRecoveryDtMinStatus.AT_THERMODYNAMIC_LIMIT
