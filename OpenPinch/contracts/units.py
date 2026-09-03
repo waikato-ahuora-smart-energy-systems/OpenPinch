@@ -6,7 +6,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from ..domain.value import Value
+from pint.errors import DimensionalityError
+
+from ..domain.value import Value, ureg
 
 if TYPE_CHECKING:
     from ..domain.configuration import Configuration
@@ -55,6 +57,11 @@ OUTPUT_UNIT_RULES: dict[str, OutputUnitRule] = {
     "Qh": OutputUnitRule("kW", "kW", unit_groups=("heat_flow",)),
     "Qc": OutputUnitRule("kW", "kW", unit_groups=("heat_flow",)),
     "Qr": OutputUnitRule("kW", "kW", unit_groups=("heat_flow",)),
+    "heat_recovery_dt_min": OutputUnitRule(
+        "delta_degC",
+        "delta_degC",
+        unit_groups=("delta_temperature", "temperature_difference", "temperature"),
+    ),
     "utility_heat_flow": OutputUnitRule("kW", "kW", unit_groups=("heat_flow",)),
     "cold_temp": OutputUnitRule("degC", "degC", unit_groups=("temperature",)),
     "hot_temp": OutputUnitRule("degC", "degC", unit_groups=("temperature",)),
@@ -201,6 +208,22 @@ def _unit_from_value_like(value: Any) -> str | None:
     return None
 
 
+def _as_temperature_difference_unit(unit: str) -> str:
+    """Resolve one temperature spelling and return its delta-unit equivalent."""
+    canonical_unit = Value(0.0, unit=unit).unit
+    resolved_unit = ureg.Unit(canonical_unit)
+    reference = Value(1.0, unit="delta_degC")
+    if resolved_unit.dimensionality != ureg.Unit("K").dimensionality:
+        return canonical_unit
+    try:
+        reference.to(canonical_unit)
+    except DimensionalityError:
+        delta_unit = f"delta_{resolved_unit}"
+        reference.to(delta_unit)
+        return delta_unit
+    return canonical_unit
+
+
 def _has_explicit_unit(value: Any) -> bool:
     unit = _unit_from_value_like(value)
     return unit is not None and unit not in _DIMENSIONLESS_UNIT_TOKENS
@@ -299,4 +322,6 @@ def coerce_output_value(
     target_unit = rule.default_unit if display_unit is None else display_unit
     if target_unit is None:
         return resolved
+    if metric_name == "heat_recovery_dt_min":
+        target_unit = _as_temperature_difference_unit(target_unit)
     return resolved.to(target_unit)

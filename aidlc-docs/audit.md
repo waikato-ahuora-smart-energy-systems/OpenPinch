@@ -6633,3 +6633,475 @@ When a child cascade contains temperatures or enthalpies requiring more than fou
 **Context**: SOURCE CONTROL AUTHORIZATION - GitHub Actions comprehensive hardening
 
 ---
+
+## Heat-Recovery Approach Temperature Implementation Authorization
+**Timestamp**: 2026-09-02T05:34:32Z
+**User Input**: "PLEASE IMPLEMENT THIS PLAN:
+# Heat-Recovery Approach Temperature Service
+
+## Summary
+
+Add a non-mutating inverse pinch-analysis service that determines the global heat-recovery approach temperature—HRAT/global ΔTmin—corresponding to a requested process heat recovery.
+
+Users will supply streams through the existing `PinchProblem(source)` contract and call:
+
+```python
+result = problem.target.heat_recovery_approach_temperature(
+    heat_recovery=4_000.0,
+    zone=\"Site/Process\",
+    period_id=\"0\",
+)
+```
+
+The implementation is additive, uses the existing problem-table cascade, introduces no optimizer or dependency, and leaves the problem’s inputs, configured `dt_cont` values, targets, results, and period caches unchanged.
+
+## Public API and Contracts
+
+- Add:
+
+  ```python
+  problem.target.heat_recovery_approach_temperature(
+      *,
+      heat_recovery,
+      zone=None,
+      period_id=None,
+  ) -> HeatRecoveryApproachResult
+  ```
+
+  `heat_recovery` accepts a finite non-negative scalar or existing scalar value-with-unit representation. Plain numbers use the problem’s configured input heat-flow unit, defaulting to kW.
+
+- Add the all-period equivalent:
+
+  ```python
+  problem.target.all_periods.heat_recovery_approach_temperature(
+      *,
+      heat_recovery,
+      zone=None,
+      workers=1,
+  ) -> dict[str, HeatRecoveryApproachResult]
+  ```
+
+  A scalar recovery is broadcast to every period; a mapping must contain exactly the canonical period IDs. Results retain canonical period order.
+
+- Mirror both methods through active `PinchWorkspace.target`, ordered case batches, and batch all-period targeting. Batch failures remain isolated in `CaseBatchResult`.
+
+- Return a frozen, strict, JSON-serializable `HeatRecoveryApproachResult` containing:
+
+  - `scope` and canonical `period_id`
+  - `approach_temperature`
+  - `requested_heat_recovery`
+  - `achieved_heat_recovery`
+  - `thermodynamic_limit`
+  - `heat_recovery_residual`
+  - `status`: `solved`, `at_thermodynamic_limit`, or `zero_recovery_boundary`
+  - `iterations`
+
+  Thermal quantities carry explicit units and honor existing output-unit overrides. The specialist contract remains in its concrete module and is not added to the package-root exports.
+
+## Implementation Design
+
+- Add the typed contract under `OpenPinch/contracts/heat_recovery.py`, the numerical inverse solver under `OpenPinch/analysis/targeting/approach_temperature.py`, and problem/period orchestration under `OpenPinch/application/heat_recovery_approach.py`.
+- Resolve zones with the same rules as direct targeting. Permit Site, Process Zone, and Unit Operation scopes; reject Community/Region scopes with guidance. A selected parent zone already contains descendant process streams, so `include_subzones` is unnecessary.
+- Ignore utilities and existing stream-specific `dt_cont` values for this calculation. On detached process-stream copies, assign half the trial global approach to every hot and cold stream/segment and force the local contribution multiplier to one.
+- Evaluate recovery with the existing vectorized process heat cascade, omitting graph, utility-allocation, and constant-enthalpy presentation work.
+- Calculate the thermodynamic limit at global ΔTmin = 0. Reject negative, non-finite, Boolean, or above-limit recovery. The above-limit error must report requested recovery, limit, scope, period, and units.
+- Use the finite no-overlap bound:
+
+  ```text
+  upper bound = max(0, maximum hot temperature - minimum cold temperature)
+  ```
+
+  At this separation, process recovery is zero.
+- Apply deterministic bisection:
+
+  - At the thermodynamic limit, return 0 with `at_thermodynamic_limit`.
+  - For an interior request, return the greatest approach whose calculated recovery remains at least the requested recovery. This resolves non-unique plateaus consistently.
+  - For zero recovery, return the smallest approach producing zero within tolerance, with `zero_recovery_boundary`.
+  - Use an absolute temperature tolerance of `1e-6 delta_degC`, recovery comparison tolerances of `1e-6 kW` absolute and `1e-9` relative, and a hard limit of 100 iterations.
+  - Clamp only tolerance-sized numerical excursions below zero or above the limit. Fail closed on non-finite evaluations, an invalid bracket, or failure to converge.
+
+- A call must not alter `problem.results`, `problem.period_results`, `_last_target_run_spec`, stream state, configuration, or previously calculated targets. Each all-period worker receives isolated local stream copies.
+- Keep `direct_heat_integration(...)` and `DirectIntegrationTarget` unchanged. No input-schema, workspace-bundle, persistence, configuration, infrastructure, or migration changes are required.
+
+## TDD Delivery Sequence
+
+1. **Red — contract and API tests**
+   - Pin the exact single-period, all-period, workspace, and batch signatures.
+   - Require frozen finite result fields, status validation, unit metadata, and JSON round-trip behavior.
+   - Update closed API inventories and tutorial-coverage expectations.
+
+2. **Red/green — core inverse solver**
+   - Add a simple analytical two-stream fixture and a packaged `basic_pinch.json` regression: forward targeting at a known global approach, followed by inverse recovery, must reproduce that approach.
+   - Cover the thermodynamic-limit boundary, an interior target, plateau selection, zero-recovery onset, no-overlap inputs, empty-side cases, and numerical clamping.
+   - Cover invalid values and recovery above the calculated limit.
+
+3. **Red/green — application integration**
+   - Verify zone selection, canonical periods, scalar broadcast, exact mapping validation, worker-count validation, stable result ordering, and sequential/parallel parity.
+   - Verify active workspace delegation and per-case batch error isolation.
+   - Snapshot canonical problem input, configured stream contributions, cached targets/results, and target-run metadata before and after every call to prove non-mutation.
+
+4. **Property-based tests with Hypothesis**
+   - Generate realistic hot/cold sensible and segmented stream sets with finite temperatures, positive duties, active/inactive streams, and bounded period data.
+   - Assert recovery is non-increasing as global approach increases.
+   - Assert results stay within `[0, no-overlap bound]`, achieved recovery meets the request within tolerance, and a larger approach fails the request unless within a documented plateau/tolerance.
+   - Assert stream-order invariance, repeated-call idempotence, equivalent-unit invariance, and sequential/parallel equivalence.
+   - Compare inverse results with ordinary forward `direct_heat_integration` targeting on detached uniform-approach cases.
+   - Round-trip generated result contracts through JSON.
+   - Use reusable domain strategies, fixed seeds, normal Hypothesis shrinking, and permanent example regressions for any discovered counterexample.
+
+5. **Refactor and documentation**
+   - Keep numerical logic independent of application orchestration and contracts independent of application code.
+   - Explain HRAT/global ΔTmin versus exchanger-level EMAT in the pinch-analysis fundamentals and API/service documentation. HRAT describes composite-curve heat-recovery spacing, whereas EMAT applies to individual exchangers and would require HEN data; this distinction follows established pinch-analysis usage described in the [process integration user guide](https://moodle.unige.ch/pluginfile.php/386097/mod_folder/content/0/Pinch_Analysis_and_Process_Integration.pdf).
+   - Extend generated notebook 02 with the selected-period workflow and notebook 06 with all-period scalar/mapped recovery examples.
+   - Update notebook generators, tutorial ownership/coverage data, API inventories, and release notes.
+
+6. **Verification gates**
+   - Run focused analysis, contract, application, architecture, unit, notebook, and documentation tests first.
+   - Run Ruff lint and formatting checks, warning-strict Sphinx build, generated-notebook drift and execution checks, the full configured pytest suite with the existing 95% coverage gate, distribution builds, and isolated installed-wheel smoke tests.
+
+## Assumptions and Workflow
+
+- “Equivalent minimum approach temperature” means a process-level global HRAT/ΔTmin, not exchanger EMAT.
+- Requested recovery is valid from zero through the zero-approach thermodynamic limit; values above that limit are rejected.
+- Existing heterogeneous `dt_cont` values are deliberately ignored because the requested output is one equivalent global approach.
+- Recovery is solved independently per operating period; no weighted aggregate inverse is introduced.
+- This is one cohesive feature unit. Execute minimal user-story, application-design, functional-design, TDD code-generation, and build/test stages. Existing Hypothesis and numerical-stack decisions are reused; separate NFR, infrastructure, and operations designs are unnecessary.
+- PBT-01 through PBT-05 and PBT-07 through PBT-10 apply. PBT-06 is N/A because the solver owns no persistent mutable state."
+**AI Response**: "Recorded the approved requirements, minimal application and functional design, workflow plan, and TDD code-generation checklist; began Red contract and public API tests."
+**Context**: CODE GENERATION AUTHORIZATION - Heat-recovery approach temperature service
+
+---
+
+## Heat-Recovery Approach Temperature Completion
+**Timestamp**: 2026-09-02T06:13:04Z
+**User Input**: "No new user input; continued under the approved Heat-Recovery Approach Temperature Service implementation plan."
+**AI Response**: "Implemented the non-mutating selected-period and all-period inverse HRAT service, frozen unit-aware result contract, deterministic cascade bisection, problem/workspace/batch delegation, seeded property-based coverage, API inventories, generated tutorials, fundamentals/API/service documentation, release notes, and installed-wheel smoke. Verified 2,578 tests passed with four expected skips, 96 percent branch coverage, warning-strict Sphinx, notebook drift/execution, Ruff lint and feature formatting, distribution builds, and an isolated Python 3.14 wheel installation. Repository-wide formatting continues to report 16 pre-existing files outside this feature; no unrelated formatting rewrite was made."
+**Context**: BUILD AND TEST COMPLETE - Heat-recovery approach temperature service
+
+---
+
+## Heat-Recovery Approach Temperature Commit Authorization
+**Timestamp**: 2026-09-02T10:05:56Z
+**User Input**: "Commit."
+**AI Response**: "Accepted authorization to stage and commit the completed heat-recovery approach temperature feature as one cohesive change."
+**Context**: SOURCE CONTROL AUTHORIZATION - Heat-recovery approach temperature service
+
+---
+
+## Heat-Recovery Approach Documentation Amendment
+**Timestamp**: 2026-09-02T10:10:45Z
+**User Input**: "Add this new method to a notebook example.
+
+Thoroughly review and update RTD."
+**AI Response**: "Resumed the completed feature workflow, audited the existing notebook and Read the Docs coverage, and began a TDD documentation amendment covering a richer generated notebook example and complete RTD discovery, guide, API, workspace, service, and interpretation surfaces."
+**Context**: CODE GENERATION AUTHORIZATION - Heat-recovery approach documentation amendment
+
+---
+
+## Heat-Recovery Approach Documentation Amendment Completion
+**Timestamp**: 2026-09-02T10:21:56Z
+**User Input**: "No new user input; continued under the authorized notebook and RTD documentation amendment."
+**AI Response**: "Expanded generated notebook 02 with explicit-unit selected-period inverse targeting, serialized result evidence, and a non-mutation observation. Added a dedicated task guide and updated RTD navigation, overview, fundamentals, problem/workspace APIs, service and contributor references, notebook catalog, release notes, and stale notebook-count references. The complete focused documentation gate passed 46 tests with 3 expected optional-profile skips; notebook execution, generator drift, warning-strict Sphinx, Ruff lint/format, and patch hygiene passed."
+**Context**: BUILD AND TEST COMPLETE - Heat-recovery approach documentation amendment
+
+---
+
+## Heat-Recovery Approach Documentation Commit Authorization
+**Timestamp**: 2026-09-02T10:52:13Z
+**User Input**: "commit"
+**AI Response**: "Accepted authorization to stage and commit the completed notebook and Read the Docs documentation amendment as one cohesive change."
+**Context**: SOURCE CONTROL AUTHORIZATION - Heat-recovery approach documentation amendment
+
+---
+
+## Heat-Recovery Notebook Approach Correction
+**Timestamp**: 2026-09-02T11:02:47Z
+**User Input**: "OpenPinch/data/notebooks/02_focused_direct_and_total_site.ipynb
+
+It is not giving the right approach temperature."
+**AI Response**: "Reproduced the notebook result and identified that its 14,121.972 kW request equals the Bleaching zone's zero-approach thermodynamic limit, so the documented boundary contract correctly returns 0 delta_degC with at_thermodynamic_limit. Began a TDD correction using an explicit 12,000 kW interior request with an expected approach of approximately 61.86735 delta_degC. Preserved the user's executed notebook copy in /tmp before regenerating the output-free package asset."
+**Context**: CODE GENERATION AUTHORIZATION - Heat-recovery notebook example correction
+
+---
+
+## Heat-Recovery Notebook Approach Correction Completion
+**Timestamp**: 2026-09-02T11:07:18Z
+**User Input**: "No new user input; continued under the authorized notebook approach correction."
+**AI Response**: "Corrected notebook 02 to use an explicit 12,000 kW interior recovery requirement, producing approximately 61.8673468 delta_degC with solved status. Retained and displayed the fact that the 14,121.972 kW ordinary direct target equals the thermodynamic limit and therefore maps to the zero-approach boundary. Added an executable numerical regression. The focused gate passed 47 tests with 3 expected skips; notebook execution, generator drift, warning-strict Sphinx, Ruff, and patch hygiene passed."
+**Context**: BUILD AND TEST COMPLETE - Heat-recovery notebook example correction
+
+---
+
+## Heat-Recovery Threshold-Limit Requirement Correction
+**Timestamp**: 2026-09-02T17:40:00Z
+**User Input**: "If a problem doesn't need heating or cooling, i.e. a threshold problem, the dtmin can be greater than zero at ther thermodynamic limit."
+**AI Response**: "Accepted the thermodynamic correction. Identified that maximum recovery can occupy a positive global-approach plateau in a threshold problem, so the inverse must return the greatest feasible approach on that plateau instead of forcing zero. Began a TDD solver, property, notebook, and documentation correction while preserving zero-limit and non-threshold behavior."
+**Context**: REQUIREMENTS AND CODE GENERATION AUTHORIZATION - Heat-recovery threshold-limit correction
+
+---
+
+## Heat-Recovery Threshold-Limit Correction Completion
+**Timestamp**: 2026-09-02T18:03:46Z
+**User Input**: "No new user input; continued under the authorized threshold-limit requirement correction."
+**AI Response**: "Corrected thermodynamic-limit inversion to return the greatest feasible global HRAT on a maximum-recovery plateau. The Bleaching notebook regression now returns approximately 58.34505 delta_degC for its 14,121.972 kW thermodynamic limit. Added analytical, packaged, and generated threshold regressions and corrected the requirements, functional design, API, guide, fundamentals, notebook catalog, and release notes. The inverse suite passed 46 tests; notebook and RTD checks passed 47 tests with 3 expected skips; the full configured suite passed 2,583 tests with 4 skips; the exact non-solver coverage selection passed 2,580 tests with 3 skips and 4 deselections at 96 percent branch coverage. Ruff, formatting, and patch hygiene passed."
+**Context**: BUILD AND TEST COMPLETE - Heat-recovery threshold-limit correction
+
+---
+
+## Heat-Recovery DT_MIN Terminology Change Request
+**Timestamp**: 2026-09-02T18:07:38Z
+**User Input**: "Use dt_min instead of approach_temperature and its derivatives."
+**AI Response**: "Inventoried the new inverse service's naming family and prepared a focused TDD rename plan. The proposed contract replaces heat_recovery_approach_temperature with heat_recovery_dt_min, HeatRecoveryApproachResult with HeatRecoveryDtMinResult, approach_temperature with dt_min, and matching internal symbols, modules, tests, notebooks, and RTD references. Existing HEN approach-temperature APIs are outside this feature and remain unchanged."
+**Context**: CODE GENERATION CHANGE REQUEST - Heat-recovery DT_MIN terminology
+
+---
+
+## Heat-Recovery DT_MIN Code-Generation Plan Approval Prompt
+**Timestamp**: 2026-09-02T18:08:47Z
+**User Input**: "No new user input; presenting the required code-generation plan for approval."
+**AI Response**: "Prepared the nine-step clean rename plan at aidlc-docs/construction/plans/heat-recovery-dt-min-terminology-code-generation-plan.md. Requested explicit approval to execute the mapping and verification sequence."
+**Context**: CODE GENERATION PLAN APPROVAL - Heat-recovery DT_MIN terminology
+
+---
+
+## Heat-Recovery DT_MIN Code-Generation Approval
+**Timestamp**: 2026-09-02T18:09:50Z
+**User Input**: "go"
+**AI Response**: "Accepted approval for the nine-step DT_MIN terminology plan. Updated contract and closed API tests first; the Red gate failed as expected because OpenPinch.contracts.heat_recovery_dt_min did not yet exist."
+**Context**: CODE GENERATION AUTHORIZATION AND RED TEST - Heat-recovery DT_MIN terminology
+
+---
+
+## Heat-Recovery DT_MIN Terminology Completion
+**Timestamp**: 2026-09-02T18:41:29Z
+**User Input**: "No new user input; continued under the approved DT_MIN terminology plan."
+**AI Response**: "Completed the clean rename of the inverse heat-recovery service to heat_recovery_dt_min, HeatRecoveryDtMinResult, HeatRecoveryDtMinStatus, and result.dt_min, including derived numerical/application symbols and module paths. Updated generated notebooks 02 and 06, tutorial inventories, installed-artifact smoke, RTD navigation and guide, API/service references, requirements, design, and workflow evidence. The superseded public names are explicitly absent. Focused behavior passed 47 tests; notebook and RTD tests passed 52 tests with 3 expected skips; warning-strict Sphinx passed; the full configured suite passed 2,584 tests with 4 skips; the exact non-solver selection passed 2,581 tests with 3 skips and 4 deselections at 96 percent branch coverage. Ruff, formatting, distribution builds, isolated Python 3.14 installed-wheel smoke, and patch hygiene passed."
+**Context**: BUILD AND TEST COMPLETE - Heat-recovery DT_MIN terminology
+
+---
+
+## Heat-Recovery DT_MIN Commit Authorization
+**Timestamp**: 2026-09-02T18:43:25Z
+**User Input**: "commit if tests are green"
+**AI Response**: "Confirmed all verification gates are green and accepted authorization to stage and commit the threshold-limit correction and complete dt_min terminology change as one cohesive commit."
+**Context**: SOURCE CONTROL AUTHORIZATION - Heat-recovery DT_MIN terminology
+
+---
+
+## Heat-Recovery DT_MIN Audit Resolution Request
+**Timestamp**: 2026-09-02T19:42:20Z
+**User Input**: "Let's resolve each issue. Ask me questions."
+**AI Response**: "Started a requirements amendment for all six audit findings and prepared explicit decisions covering accepted input shapes, numerical boundary accuracy, zone ownership, sub-tolerance recovery semantics, result-contract validation, and period-mapping precedence."
+**Context**: REQUIREMENTS ANALYSIS - Heat-recovery DT_MIN audit resolutions
+
+---
+
+## Heat-Recovery DT_MIN Audit Resolution Answers
+**Timestamp**: 2026-09-02T19:46:58Z
+**User Input**: "go"
+**AI Response**: "Validated that all six question-file answers select option A without contradiction: strict scalar inputs, physical 1e-6 delta_degC boundary accuracy, local address-based zone resolution, exact-zero status semantics, dimensionally and relationally strict result contracts, and canonical-period mapping precedence. Generated the corresponding requirements amendment for review."
+**Context**: REQUIREMENTS ANALYSIS - Heat-recovery DT_MIN audit resolutions
+
+---
+
+## Heat-Recovery DT_MIN Audit Resolution Requirements Approval Prompt
+**Timestamp**: 2026-09-02T19:47:45Z
+**User Input**: "No new user input; presenting the audit-resolution requirements amendment for approval."
+**AI Response**: "Completed the moderate-depth requirements amendment for all six findings, including PBT coverage expansion, and requested approval through the dedicated requirements approval question file before workflow planning."
+**Context**: REQUIREMENTS ANALYSIS APPROVAL - Heat-recovery DT_MIN audit resolutions
+
+---
+
+## Heat-Recovery DT_MIN Audit Resolution Requirements Approval
+**Timestamp**: 2026-09-02T19:50:20Z
+**User Input**: "A and implement."
+**AI Response**: "Recorded option A as approval of the audit-resolution requirements and began the mandatory minimal workflow-planning stage. User stories, application design, units generation, NFR stages, and infrastructure design are skipped; one functional-design correction unit, TDD code generation, documentation, and full build-and-test verification will execute."
+**Context**: REQUIREMENTS APPROVAL AND IMPLEMENTATION REQUEST - Heat-recovery DT_MIN audit resolutions
+
+---
+
+## Heat-Recovery DT_MIN Audit Resolution Workflow Approval Prompt
+**Timestamp**: 2026-09-02T19:51:42Z
+**User Input**: "No new user input; presenting the focused audit-resolution workflow for approval."
+**AI Response**: "Generated and validated the focused workflow plan and requested approval through its dedicated question file before functional design."
+**Context**: WORKFLOW PLANNING APPROVAL - Heat-recovery DT_MIN audit resolutions
+
+---
+
+## Heat-Recovery DT_MIN Audit Resolution Workflow Approval
+**Timestamp**: 2026-09-02T20:27:17Z
+**User Input**: "go"
+**AI Response**: "Recorded option A as workflow approval and completed the functional design for strict validation, precise inverse-only cascade evaluation, bracket semantics, local zone resolution, result invariants, and property-based testing."
+**Context**: WORKFLOW APPROVAL AND FUNCTIONAL DESIGN - Heat-recovery DT_MIN audit resolutions
+
+---
+
+## Heat-Recovery DT_MIN Audit Resolution Functional Design Approval
+**Timestamp**: 2026-09-02T20:32:51Z
+**User Input**: "Go"
+**AI Response**: "Recorded option A as functional-design approval and prepared the ten-step TDD code-generation plan for all six audit findings."
+**Context**: FUNCTIONAL DESIGN APPROVAL AND CODE GENERATION PLANNING - Heat-recovery DT_MIN audit resolutions
+
+---
+
+## Heat-Recovery DT_MIN Audit Resolution Code Generation Approval Prompt
+**Timestamp**: 2026-09-02T20:33:50Z
+**User Input**: "No new user input; presenting the TDD code-generation plan for approval."
+**AI Response**: "Prepared and validated the ten-step Red/Green implementation, PBT, documentation, and verification plan and requested approval through its dedicated question file."
+**Context**: CODE GENERATION PLAN APPROVAL - Heat-recovery DT_MIN audit resolutions
+
+---
+
+## Heat-Recovery DT_MIN Audit Resolution Code Generation Approval and Red Gate
+**Timestamp**: 2026-09-02T20:36:16Z
+**User Input**: "Go"
+**AI Response**: "Recorded option A as approval of the complete ten-step plan. Added adversarial example tests for strict inputs, precise boundaries, micro recovery, local zones, period-key precedence, and strict result relationships. The focused Red gate produced 44 expected failures while 46 existing cases passed."
+**Context**: CODE GENERATION AUTHORIZATION AND RED TEST - Heat-recovery DT_MIN audit resolutions
+
+---
+
+## Heat-Recovery DT_MIN Audit Resolution Functional Design Approval Prompt
+**Timestamp**: 2026-09-02T20:28:48Z
+**User Input**: "No new user input; presenting the completed audit-resolution functional design for approval."
+**AI Response**: "Completed and validated the business logic, business rules, domain-entity invariants, and PBT property catalog. Requested the standardized functional-design approval before TDD code-generation planning."
+**Context**: FUNCTIONAL DESIGN APPROVAL - Heat-recovery DT_MIN audit resolutions
+
+---
+
+## Heat-Recovery DT_MIN Audit Resolution Green Implementation
+**Timestamp**: 2026-09-02T20:58:21Z
+**User Input**: "No new user input; continued under the approved audit-resolution code-generation plan."
+**AI Response**: "Completed Green Steps 5 through 9 for all six findings. Added strict scalar and contributor validation, inverse-only precise cascade evaluation, exact-zero and micro-duty semantics, final bracket re-verification, local address-based Zone resolution, canonical period-key precedence, strict dimensional and relational result validation, widened seeded properties, permanent shrunk regressions, and synchronized RTD/release documentation. The focused feature suite passes 104 tests, ordinary cascade regressions pass 122 tests, architecture/unit/tutorial coverage passes 71 tests, notebook checks pass 23 tests with 3 expected skips, and warning-strict Sphinx succeeds."
+**Context**: CODE GENERATION GREEN AND FOCUSED VERIFICATION - Heat-recovery DT_MIN audit resolutions
+
+---
+
+## Heat-Recovery DT_MIN Audit Resolution Code Generation Completion Prompt
+**Timestamp**: 2026-09-02T21:22:31Z
+**User Input**: "No new user input; completed work under the approved code-generation plan."
+**AI Response**: "Resolved all six audit findings and completed every plan checkbox. The feature gate passes 104 tests; ordinary cascade regressions pass 122; architecture/unit/tutorial checks pass 71; notebooks pass 23 with 3 expected skips; warning-strict Sphinx passes; the configured suite passes 2,641 with 4 expected skips; and the CI-equivalent suite passes 2,638 with 3 expected skips and 4 solver deselections at 96 percent branch coverage. Ruff, changed-file formatting, generated-notebook drift, distribution builds, isolated Python 3.14 wheel smoke, and patch hygiene pass. Prepared the standardized two-option generated-code approval prompt."
+**Context**: CODE GENERATION COMPLETION APPROVAL - Heat-recovery DT_MIN audit resolutions
+
+---
+
+## Heat-Recovery DT_MIN Audit Resolution Generated-Code Approval
+**Timestamp**: 2026-09-02T21:44:09Z
+**User Input**: "B"
+**AI Response**: "Recorded option B as approval of the generated audit corrections. Closed Code Generation and presented the required Build and Test completion question using the already completed green verification evidence and reproducible instruction files."
+**Context**: CODE GENERATION APPROVAL AND BUILD AND TEST COMPLETION PROMPT - Heat-recovery DT_MIN audit resolutions
+
+---
+
+## Heat-Recovery DT_MIN Audit Resolution Build and Test Approval
+**Timestamp**: 2026-09-02T21:45:05Z
+**User Input**: "B"
+**AI Response**: "Recorded option B as approval of Build and Test. Closed the audit-resolution workflow with Operations marked N/A because no deployment or monitoring change is introduced. All six findings, documentation, tests, coverage, distributions, and installed-wheel evidence are complete and approved."
+**Context**: BUILD AND TEST APPROVAL AND WORKFLOW COMPLETION - Heat-recovery DT_MIN audit resolutions
+
+---
+
+## Heat-Recovery DT_MIN Audit Resolution Commit Authorization
+**Timestamp**: 2026-09-02T21:45:40Z
+**User Input**: "Commit"
+**AI Response**: "Accepted authorization to stage and commit the complete approved audit-resolution implementation, tests, RTD and release documentation, and AI-DLC evidence as one cohesive change."
+**Context**: SOURCE CONTROL AUTHORIZATION - Heat-recovery DT_MIN audit resolutions
+
+---
+
+## Pull-Request Automatic Version-Bump Ordering Request
+**Timestamp**: 2026-09-02T21:54:48Z
+**User Input**: "The PR failed due to \"Release version '0.6.3' must be greater than base version '0.6.3'.\"
+
+Version bump should do this automatically; however, the release version is being checked before the version bump happens."
+**AI Response**: "Started a focused brownfield CI workflow correction. Confirmed that the current PR workflow removed the automatic bump job and validates the unchanged PR version directly against main. Loaded the current reverse-engineering context and existing extension decisions, classified the request as a clear, simple workflow bug, and prepared minimal requirements for automatic bump-before-validation ordering, updated-head checkout, repeat-run idempotence, and fork-safe validation."
+**Context**: WORKSPACE DETECTION AND REQUIREMENTS ANALYSIS - Pull-request automatic version bump ordering
+
+---
+
+## Pull-Request Automatic Version-Bump Requirements Approval Prompt
+**Timestamp**: 2026-09-02T21:55:51Z
+**User Input**: "No new user input; presenting the automatic version-bump ordering requirements for approval."
+**AI Response**: "Completed minimal requirements analysis for the clear CI bug and requested approval through the dedicated requirements question file before Workflow Planning. User Stories are recommended for omission because this is an internal workflow correction."
+**Context**: REQUIREMENTS ANALYSIS APPROVAL - Pull-request automatic version bump ordering
+
+---
+
+## Pull-Request Automatic Version-Bump Requirements Approval
+**Timestamp**: 2026-09-02T21:57:40Z
+**User Input**: "A -- just proceed automatically through to implementation and completion. Only pause for needed input."
+**AI Response**: "Recorded option A as approval of the requirements and the user's explicit standing authorization to proceed through the focused workflow, implementation, and completion without ceremonial pauses. User Stories, Application Design, Units Generation, Functional Design, NFR stages, and Infrastructure Design are skipped as unnecessary for this isolated CI ordering bug. Created the minimal workflow and TDD code-generation plans and proceeded to Red tests."
+**Context**: REQUIREMENTS AND WORKFLOW APPROVAL; CODE GENERATION AUTHORIZATION - Pull-request automatic version bump ordering
+
+---
+
+## Pull-Request Automatic Version-Bump Red Gate
+**Timestamp**: 2026-09-02T21:57:40Z
+**User Input**: "No new user input; continued under the approved automatic version-bump ordering plan."
+**AI Response**: "Replaced the obsolete no-mutation workflow assertion with the approved automatic bump, ordering, latest-head, fork, and aggregate-gate contracts. The isolated test failed as expected because the current PR workflow contains no bump-version job."
+**Context**: CODE GENERATION RED TEST - Pull-request automatic version bump ordering
+
+---
+
+## Pull-Request Automatic Version-Bump Green Implementation
+**Timestamp**: 2026-09-02T21:57:40Z
+**User Input**: "No new user input; continued under the approved automatic version-bump ordering plan."
+**AI Response**: "Restored a same-repository main-PR bump job with job-scoped contents write permission, exact bump-tool pinning, label/title selection, equal-only mutation, stale-version rejection, lock and forward-version checks, and no tag creation. Ordered release validation after bump evaluation, made it check out the latest head, preserved read-only fork validation, extended aggregate gate semantics, and synchronized README and RTD release instructions. The workflow and documentation Red tests are Green."
+**Context**: CODE GENERATION GREEN - Pull-request automatic version bump ordering
+
+---
+
+## Pull-Request Automatic Version-Bump Build and Test Completion
+**Timestamp**: 2026-09-02T22:12:50Z
+**User Input**: "No new user input; completed under the user's standing authorization to proceed through implementation and completion."
+**AI Response**: "Completed all six TDD plan steps. The focused packaging and workflow gate passes 123 tests with 3 expected optional-profile skips. The CI-equivalent non-solver suite passes 2,638 tests with 3 expected skips and 4 solver deselections at 96 percent branch coverage. Every workflow YAML file parses; Ruff and changed-file formatting pass; warning-strict Sphinx passes; patch hygiene passes; and an isolated temporary-repository smoke confirms the pinned bump command advances pyproject.toml, uv.lock, and .bumpversion.toml from 0.6.3 to 0.6.4 in one clean no-tag commit. The workspace's canonical 0.6.3 version files remain unchanged. Security and Resiliency extensions remain disabled. PBT-01 was assessed with deterministic workflow contracts selected as the stronger oracle; PBT-02 through PBT-10 are N/A."
+**Context**: CODE GENERATION AND BUILD AND TEST COMPLETE - Pull-request automatic version bump ordering
+
+---
+
+## GitHub Codex Heat-Recovery Review Request
+**Timestamp**: 2026-09-02T22:14:15Z
+**User Input**: "Action the Github codex review."
+**AI Response**: "Retrieved the signed-in review for pull request 95 and validated both unresolved P2 findings against the current implementation. Started an authorized focused TDD correction for near-limit requested-recovery targeting and Pint-compatible absolute-temperature aliases, while preserving the existing uncommitted pull-request version-bump work."
+**Context**: WORKSPACE CONTINUITY, REVIEW RETRIEVAL, AND CODE GENERATION PLANNING - GitHub Codex heat-recovery review corrections
+
+---
+
+## GitHub Codex Heat-Recovery Review Red and Green
+**Timestamp**: 2026-09-02T22:14:15Z
+**User Input**: "No new user input; continued under the standing authorization to proceed automatically through implementation and completion."
+**AI Response**: "Added deterministic regressions for a shallow-slope near-limit inverse and Pint-compatible Celsius, Fahrenheit, and Kelvin aliases. The Red gate failed with the old 0.5-degree boundary error and five delta-to-absolute conversion errors. Corrected the solver to retain the requested recovery as its comparison target and added Pint-resolved delta-temperature unit derivation."
+**Context**: TDD RED AND GREEN IMPLEMENTATION - GitHub Codex heat-recovery review corrections
+
+---
+
+## GitHub Codex Heat-Recovery Review Completion
+**Timestamp**: 2026-09-02T22:28:07Z
+**User Input**: "No new user input; completed under the standing authorization to proceed automatically through implementation and completion."
+**AI Response**: "Resolved both unresolved Codex findings from pull request 95. Near-limit bisection now uses the exact requested recovery and returns the greatest feasible dt_min without changing its documented status. Output temperature aliases are resolved through Pint, offset units are converted to their delta equivalents, and delta Fahrenheit serialization is canonicalized. The focused gate passes 142 tests; Ruff, formatting, and patch hygiene pass; and the CI-equivalent non-solver suite passes 2,647 tests with 3 expected skips and 4 solver deselections at 96 percent branch coverage. Existing uncommitted version-bump work was preserved and no commit or GitHub review mutation was performed."
+**Context**: CODE GENERATION AND BUILD AND TEST COMPLETE - GitHub Codex heat-recovery review corrections
+
+---
+
+## Pull-Request Corrections Commit Authorization
+**Timestamp**: 2026-09-02T23:39:35Z
+**User Input**: "Commit"
+**AI Response**: "Accepted authorization to stage and commit the complete verified pull-request correction set: automatic version-bump ordering, Codex heat-recovery review fixes, regression tests, documentation, and AI-DLC evidence."
+**Context**: SOURCE CONTROL AUTHORIZATION - Pull-request corrections
+
+---
+
+## GitHub Codex Review Conversation Action
+**Timestamp**: 2026-09-03T00:43:28Z
+**User Input**: "Review the codex comments and action them"
+**AI Response**: "Retrieved the current signed-in pull-request review. Confirmed that no new Codex findings were present and that both remaining conversations were outdated findings already corrected, tested, committed, and pushed. Resolved both completed review conversations and verified that GitHub now offers Show resolved for each thread with no unresolved conversation controls remaining."
+**Context**: REVIEW TRIAGE AND CONVERSATION RESOLUTION - Pull request 95
+
+---
+
+## GitHub Codex Review Resolution Commit Authorization
+**Timestamp**: 2026-09-03T02:37:10Z
+**User Input**: "Commit"
+**AI Response**: "Accepted authorization to stage and commit the completed GitHub Codex review-resolution audit record as a focused documentation change."
+**Context**: SOURCE CONTROL AUTHORIZATION - Pull request 95 review resolution
+
+---

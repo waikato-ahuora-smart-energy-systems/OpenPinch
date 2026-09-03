@@ -32,6 +32,7 @@ from ..arguments import (
 )
 
 if TYPE_CHECKING:
+    from ....contracts.heat_recovery_dt_min import HeatRecoveryDtMinResult
     from ....domain.zone import Zone
     from ...problem import PinchProblem
 
@@ -119,6 +120,24 @@ class _AllPeriodsTargetAccessor:
 
     def direct_heat_integration(self, *, workers: int = 1, **kwargs):
         return self._run("direct_heat_integration", workers=workers, kwargs=kwargs)
+
+    def heat_recovery_dt_min(
+        self,
+        *,
+        heat_recovery,
+        zone=None,
+        workers=1,
+    ) -> dict[str, "HeatRecoveryDtMinResult"]:
+        from ...heat_recovery_dt_min import (
+            calculate_all_period_heat_recovery_dt_min,
+        )
+
+        return calculate_all_period_heat_recovery_dt_min(
+            self._target._problem,
+            heat_recovery=heat_recovery,
+            zone=zone,
+            workers=workers,
+        )
 
     def indirect_heat_integration(self, *, workers: int = 1, **kwargs):
         return self._run("indirect_heat_integration", workers=workers, kwargs=kwargs)
@@ -252,6 +271,23 @@ class _TargetAccessor:
             include_subzones=include_subzones,
             period_id=period_id,
             direct_service=direct_heat_integration_service,
+        )
+
+    def heat_recovery_dt_min(
+        self,
+        *,
+        heat_recovery,
+        zone=None,
+        period_id=None,
+    ) -> "HeatRecoveryDtMinResult":
+        """Return the global dt_min corresponding to requested process recovery."""
+        from ...heat_recovery_dt_min import calculate_heat_recovery_dt_min
+
+        return calculate_heat_recovery_dt_min(
+            self._problem,
+            heat_recovery=heat_recovery,
+            zone=zone,
+            period_id=period_id,
         )
 
     def indirect_heat_integration(self, **kwargs) -> BaseTargetModel:

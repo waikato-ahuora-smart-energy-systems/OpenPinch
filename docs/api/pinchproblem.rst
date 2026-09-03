@@ -56,6 +56,11 @@ Interaction Matrix
      - target output
      - targeted
      - base
+   * - ``target.heat_recovery_dt_min``
+     - Invert requested process recovery to an equivalent global ``dt_min``
+     - frozen diagnostic result
+     - source unchanged
+     - base
    * - ``target.carnot_*``, ``vapour_compression_*``, ``brayton_*``,
        ``mvr_heat_pump``
      - Model-specific HPR studies
@@ -77,6 +82,7 @@ Interaction Matrix
      - period-to-output mapping
      - period cache
      - method-specific
+
    * - ``components.add_process_mvr``, ``components.inventory``
      - Add or inspect process MVR mutations
      - component or mapping
@@ -104,6 +110,73 @@ Interaction Matrix
      - paths or dashboard handle
      - none
      - output-specific
+
+Inverse Heat-Recovery Target
+----------------------------
+
+Use the inverse target when process heat recovery is specified and the
+corresponding global ``dt_min`` is unknown:
+
+.. code-block:: python
+
+   result = problem.target.heat_recovery_dt_min(
+       heat_recovery={"value": 4_000.0, "unit": "kW"},
+       zone="Site/Process",
+       period_id="0",
+   )
+
+   payload = result.model_dump(mode="json")
+
+Plain recovery values use the configured input heat-flow unit; scalar
+``Value``/Pint quantities and exact ``{"value", "unit"}`` mappings are also
+accepted. Input shapes are strict: Booleans, numeric strings, sequences,
+arrays, and unrelated mappings are rejected. The result reports the requested and achieved
+recovery, zero-``dt_min`` thermodynamic limit, residual, status, and iteration
+count with explicit output units. Requests above the thermodynamic limit are
+rejected with the request, limit, scope, period, and units in the error.
+
+``HeatRecoveryDtMinResult`` is frozen and contains ``scope``, canonical
+``period_id``, ``dt_min``, ``requested_heat_recovery``,
+``achieved_heat_recovery``, ``thermodynamic_limit``,
+``heat_recovery_residual``, ``status``, and ``iterations``. Status is
+``solved`` for an interior request, ``at_thermodynamic_limit`` for the
+greatest approach retaining maximum recovery, or ``zero_recovery_boundary``
+for the first approach that produces zero recovery. The
+``at_thermodynamic_limit`` approach may be positive for a threshold problem;
+zero approach defines how the maximum recovery is calculated, not a mandatory
+inverse result.
+
+For all periods, a scalar broadcasts deliberately, while a mapping must contain
+exactly the canonical period IDs. Exact period keys take precedence when the
+IDs themselves are ``value`` and ``unit``:
+
+.. code-block:: python
+
+   period_results = (
+       problem.target.all_periods.heat_recovery_dt_min(
+           heat_recovery={"base": 4_000.0, "turndown": 3_200.0},
+           workers=2,
+       )
+   )
+
+The inverse service is non-mutating: it does not replace ordinary target
+results, populate ``period_results``, alter stream contributions, or update the
+last target-run specification. The value is process-level global ``dt_min``,
+not exchanger-level EMAT.
+
+Supported scopes are Site, Process Zone, and Unit Operation. Community and
+Region scopes are rejected because they are not direct process-targeting
+scopes. A ``Zone`` argument contributes only its address, which is resolved
+against the current problem or current batch case. On an interior plateau, the returned value is the greatest feasible
+approach that still meets the requested recovery.
+
+.. autoclass:: OpenPinch.contracts.heat_recovery_dt_min.HeatRecoveryDtMinResult
+   :members:
+   :no-index:
+
+The complete runnable workflow, validation matrix, unit behavior, workspace
+batch examples, and numerical interpretation are in
+:doc:`../guides/heat-recovery-dt-min`.
 
 Argument Precedence
 -------------------

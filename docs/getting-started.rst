@@ -45,6 +45,28 @@ cycles through the zone hierarchy, computes direct targets where needed, and
 then completes direct and utility-mediated indirect targeting across the Zone
 hierarchy.
 
+Specified Heat Recovery
+-----------------------
+
+When heat recovery is the requirement and global delta Tmin is unknown, use
+the non-mutating inverse target:
+
+.. code-block:: python
+
+   recovery_dt_min = problem.target.heat_recovery_dt_min(
+       heat_recovery={"value": 4_000.0, "unit": "kW"},
+       period_id="0",
+   )
+
+   recovery_dt_min.dt_min
+   recovery_dt_min.thermodynamic_limit
+   recovery_dt_min.status
+
+This returns process-level global ``dt_min`` evidence without replacing the ordinary cached
+target. See :doc:`guides/heat-recovery-dt-min` for supported
+zones, multiperiod and workspace calls, validation, units, and the distinction
+from exchanger-level EMAT.
+
 Named Scenarios
 ---------------
 
@@ -68,6 +90,7 @@ Next Steps
 ----------
 
 - :doc:`guides/first-solve-python` for the full lifecycle.
+- :doc:`guides/heat-recovery-dt-min` when recovery is specified.
 - :doc:`api/pinchproblem` and :doc:`api/pinchworkspace` for interaction maps.
-- :doc:`examples/notebook-series` for the eighteen maintained tutorials.
+- :doc:`examples/notebook-series` for the nineteen maintained tutorials.
 - :doc:`examples/tutorial-coverage-map` for the complete operation coverage.

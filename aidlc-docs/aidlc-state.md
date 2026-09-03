@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: GitHub Actions comprehensive hardening awaiting the first successful pushed `pr-gate` run before that check can be required on `main`.
+- **Current Stage**: GitHub Codex heat-recovery review corrections complete
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -29,6 +29,28 @@
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
 
 ## Utility Placement Optimisation Progress
+
+- [x] GITHUB CODEX HEAT-RECOVERY REVIEW CORRECTIONS - Preserved the requested
+  recovery as the near-limit inverse feasibility target and resolved valid
+  configured temperature aliases through Pint to delta-temperature output
+  units. The focused gate passes 142 tests; Ruff, formatting, and patch hygiene
+  pass; and the CI-equivalent non-solver suite passes 2,647 tests with 3
+  expected skips and 4 solver deselections at 96 percent branch coverage.
+  Plan:
+  `aidlc-docs/construction/plans/github-codex-review-heat-recovery-corrections-plan.md`.
+
+- [x] PULL-REQUEST AUTOMATIC VERSION-BUMP ORDERING - Restored automatic version
+  advancement for same-repository pull requests targeting `main`, then validate
+  the updated head version against the base without repeat bumps or fork writes.
+  The focused gate passes 123 tests with 3 expected skips; the CI-equivalent
+  non-solver suite passes 2,638 tests with 3 expected skips and 4 solver
+  deselections at 96 percent branch coverage. Workflow YAML, Ruff, formatting,
+  warning-strict RTD, the isolated pinned bump-tool smoke, version-file
+  non-mutation, and patch hygiene pass.
+  Plans:
+  `aidlc-docs/inception/plans/pr-automatic-version-bump-ordering-execution-plan.md`
+  and
+  `aidlc-docs/construction/plans/pr-automatic-version-bump-ordering-code-generation-plan.md`.
 
 - [ ] GITHUB ACTIONS COMPREHENSIVE HARDENING - Code, tests, documentation, and
   the post-change audit are complete. The focused gate passes 58 tests; YAML,
@@ -1464,3 +1486,107 @@ refreshed reverse-engineering artifacts.
   and Ruff plus patch-hygiene checks passed.
 - **Extensions**: Security and Resiliency disabled. Partial PBT is N/A for the
   isolated example repair except existing fixed-seed and framework compliance.
+
+## Heat-Recovery `dt_min` Progress
+
+- [x] DT_MIN TERMINOLOGY CORRECTION - Replaced the new inverse service's
+  `approach_temperature` naming family with `dt_min` across its public API,
+  contracts, implementation, tests, notebooks, RTD, and workflow artifacts.
+  Pre-existing exchanger-network approach-temperature contracts remain out of
+  scope. The focused behavioral suite passed 47 tests; notebook and RTD tests
+  passed 52 tests with 3 expected skips; warning-strict Sphinx passed; the full
+  configured suite passed 2,584 tests with 4 skips; the exact non-solver
+  coverage selection passed 2,581 tests with 3 skips and 4 deselections at 96
+  percent branch coverage. Distributions built and the isolated Python 3.14
+  installed-wheel smoke passed. Ruff, formatting, and patch hygiene passed.
+  Plan:
+  `aidlc-docs/construction/plans/heat-recovery-dt-min-terminology-code-generation-plan.md`.
+
+- [x] THRESHOLD-LIMIT CORRECTION - Return the greatest positive global `dt_min`
+  that retains maximum recovery for threshold problems, then use that boundary
+  directly in notebook 02. The Bleaching regression returns approximately
+  58.34505 delta_degC at 14,121.972 kW. The inverse feature suite passed 46
+  tests; notebook and RTD checks passed 47 tests with 3 expected skips; the
+  configured full suite passed 2,583 tests with 4 expected skips; the exact
+  non-solver coverage job passed 2,580 tests with 3 expected skips and 4
+  deselections at 96 percent branch coverage. Ruff, formatting, and patch
+  hygiene passed. Plan:
+  `aidlc-docs/construction/plans/heat-recovery-threshold-limit-correction-plan.md`.
+
+- [x] SUPERSEDED NOTEBOOK DT_MIN CORRECTION - A provisional 12,000 kW
+  notebook-only workaround was completed locally but superseded before commit
+  by the threshold-limit requirement correction. Plan:
+  `aidlc-docs/construction/plans/heat-recovery-notebook-dt-min-correction-plan.md`.
+
+- [x] DOCUMENTATION AMENDMENT - Expanded the generated selected-period notebook
+  example and comprehensively integrated the inverse `dt_min` workflow throughout
+  Read the Docs. The focused gate passes 46 tests with 3 expected skips,
+  including notebook execution and warning-strict Sphinx; Ruff and patch
+  hygiene also pass. Plan:
+  `aidlc-docs/construction/plans/heat-recovery-dt-min-documentation-amendment-code-generation-plan.md`.
+
+- [x] INCEPTION - Workspace Detection resumed from the current brownfield
+  repository.
+- [x] INCEPTION - Reverse Engineering reused current repository artifacts.
+- [x] INCEPTION - Requirements Analysis completed from the approved feature
+  specification.
+- [x] INCEPTION - Requirements approval supplied by the implementation request.
+- [x] INCEPTION - Minimal user-story assessment completed through the explicit
+  public API workflows and acceptance scenarios in the approved plan.
+- [x] INCEPTION - Workflow Planning completed and approved.
+- [x] INCEPTION - Application Design completed and approved.
+- [x] CONSTRUCTION - Functional Design completed and approved.
+- [x] CONSTRUCTION - NFR Requirements and NFR Design skipped; the established
+  numerical and property-testing stack is reused.
+- [x] CONSTRUCTION - Infrastructure Design skipped; no infrastructure changes.
+- [x] CONSTRUCTION - Code Generation Part 1 planned and approved.
+- [x] CONSTRUCTION - Code Generation Part 2 implementation.
+- [x] CONSTRUCTION - Build and Test.
+- [x] OPERATIONS - N/A; no deployment work requested.
+- **Requirements**:
+  `aidlc-docs/inception/requirements/heat-recovery-dt-min-requirements.md`.
+- **Application design**:
+  `aidlc-docs/inception/application-design/heat-recovery-dt-min-application-design.md`.
+- **Functional design**:
+  `aidlc-docs/construction/heat-recovery-dt-min/functional-design/functional-design.md`.
+- **Workflow plan**:
+  `aidlc-docs/inception/plans/heat-recovery-dt-min-execution-plan.md`.
+- **Code Generation plan**:
+  `aidlc-docs/construction/plans/heat-recovery-dt-min-code-generation-plan.md`.
+- **Extensions**: Property-Based Testing enabled. Security and Resiliency are
+  disabled. PBT-01 through PBT-05 and PBT-07 through PBT-10 apply; PBT-06 is
+  N/A because the solver has no persistent mutable state.
+- **Code Generation summary**:
+  `aidlc-docs/construction/heat-recovery-dt-min/code/code-generation-summary.md`.
+- **Build and Test summary**:
+  `aidlc-docs/construction/heat-recovery-dt-min/build-and-test/build-and-test-summary.md`.
+- **Current stage**: Complete. The service, contracts, orchestration,
+  properties, documentation, generated tutorials, full coverage suite,
+  distributions, and installed-wheel smoke are verified.
+
+## Heat-Recovery `dt_min` Audit Resolutions
+
+- [x] REQUIREMENTS ANALYSIS - Approved strict scalar inputs, physical
+  `1e-6 delta_degC` boundary accuracy, local address-based zone resolution,
+  exact-zero status semantics, strict dimensional and relational result
+  contracts, canonical-period mapping precedence, and expanded adversarial/PBT
+  coverage.
+- [x] WORKFLOW PLANNING - Focused one-unit correction workflow approved.
+- [x] FUNCTIONAL DESIGN - Strict predicates, precise inverse evaluation,
+  bracket verification, local zone resolution, contract invariants, and PBT
+  properties approved.
+- [x] CODE GENERATION - Plan approved; Red Steps 1 through 4 produced 44
+  expected failures and 46 passing existing cases. Green Steps 5 through 9 are
+  complete: the six corrections, expanded properties, permanent shrunk
+  examples, RTD synchronization, and generated-notebook drift validation pass.
+  Step 10 verification and summaries are complete; the user approved the
+  generated correction with option B.
+- [x] BUILD AND TEST - Verification evidence is complete and approved: 2,641 configured
+  tests pass with 4 expected skips; the CI-equivalent selection passes 2,638
+  tests with 3 expected skips and 4 solver deselections at 96 percent branch
+  coverage; RTD, notebooks, distributions, installed-wheel smoke, Ruff, and
+  patch hygiene pass.
+- [x] OPERATIONS - N/A; this library-level numerical, contract, test, notebook,
+  and documentation correction introduces no deployment or monitoring change.
+- **Current stage**: Complete. All six audit findings are resolved and the
+  generated correction plus Build and Test evidence are approved.

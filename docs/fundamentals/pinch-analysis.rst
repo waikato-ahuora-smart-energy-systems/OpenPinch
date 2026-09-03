@@ -65,6 +65,53 @@ The package exposes base ``delta_t_contribution`` and
 so zone-level multiplier studies can alter the effective shift while preserving
 the original input.
 
+Global ``dt_min`` and exchanger EMAT
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The process-level global ``dt_min`` (sometimes called HRAT) is the separation
+between the shifted hot and cold process composite curves. OpenPinch can invert
+that relationship: given a required process heat recovery, it calculates the
+equivalent global ``dt_min`` with
+``problem.target.heat_recovery_dt_min(...)``. The calculation
+uses uniform half-shifts on detached hot and cold process streams, so existing
+stream-specific ``delta_t_contribution`` values and utilities do not affect the
+answer.
+
+At zero global ``dt_min``, the process cascade gives the thermodynamic limit:
+the largest recovery available without allowing the shifted composites to
+cross. Increasing the global ``dt_min`` cannot increase process heat recovery.
+The inverse service searches this monotonic relationship between zero and the
+finite no-overlap spacing.
+
+The inverse can have more than one temperature answer when recovery is flat
+over a ``dt_min`` interval. For an interior request, OpenPinch returns the
+greatest feasible ``dt_min`` that still meets the requested recovery. For a zero
+request it returns the smallest zero-recovery boundary. The same
+greatest-feasible rule applies at the thermodynamic limit.
+
+Recovery tolerances do not turn a positive request into a zero request. Even a
+very small positive duty must be achieved at the returned boundary and is
+reported as ``solved`` unless it is within the thermodynamic-limit boundary
+classification. Only an exact zero request can return
+``zero_recovery_boundary``.
+
+This distinction matters for a threshold problem, where no external heating or
+no external cooling is required. Maximum recovery can persist over a positive
+global ``dt_min`` plateau. Its thermodynamic-limit inverse is the greatest
+``dt_min`` on that plateau, not automatically zero. A non-threshold problem whose
+recovery decreases immediately has a limit boundary at approximately zero.
+These rules make all boundary and plateau results deterministic.
+
+Global ``dt_min`` is not exchanger minimum approach temperature (EMAT). EMAT constrains an
+individual exchanger and requires HEN match and temperature data. An inverse
+process target cannot establish exchanger feasibility by itself. This
+distinction follows established pinch-analysis terminology in the `process
+integration user guide
+<https://moodle.unige.ch/pluginfile.php/386097/mod_folder/content/0/Pinch_Analysis_and_Process_Integration.pdf>`_.
+
+See :doc:`../guides/heat-recovery-dt-min` for runnable
+single-period, multiperiod, workspace, and batch workflows.
+
 What The Pinch Represents
 -------------------------
 
@@ -97,4 +144,5 @@ Recommended Follow-On Pages
 
 - :doc:`problem-table-and-temperature-shifting`
 - :doc:`direct-vs-indirect-integration`
+- :doc:`../guides/heat-recovery-dt-min`
 - :doc:`graphs-and-interpretation`

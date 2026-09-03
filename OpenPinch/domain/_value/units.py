@@ -31,7 +31,7 @@ def clean_unit_text(text: str) -> str:
     """Return stable OpenPinch unit spelling for serialization and display."""
     text = text.replace("USD", "$").replace("NZD", "$").replace(" ", "")
     text = text.replace("°", "deg")
-    text = text.replace("ΔdegC", "delta_degC").replace("Δ°C", "delta_degC")
+    text = text.replace("Δdeg", "delta_deg").replace("Δ°C", "delta_degC")
     text = text.replace("**2", "^2").replace("**3", "^3")
     text = text.replace("$/a", "$/y").replace("$/year", "$/y")
     return "-" if text == "" else text

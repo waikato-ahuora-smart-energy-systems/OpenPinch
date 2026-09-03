@@ -182,6 +182,54 @@ def test_utility_placement_guide_documents_the_complete_public_contract():
     assert "command-line" not in page.lower()
 
 
+def test_heat_recovery_dt_min_docs_cover_complete_public_contract() -> None:
+    guide = _read(GUIDES_ROOT / "heat-recovery-dt-min.rst")
+    guide_index = _read(GUIDES_ROOT / "index.rst")
+    capability_matrix = _read(DOCS_ROOT / "overview" / "capability-matrix.rst")
+    workflow_map = _read(DOCS_ROOT / "overview" / "workflow-map.rst")
+    fundamentals = _read(DOCS_ROOT / "fundamentals" / "pinch-analysis.rst")
+    problem_api = _read(API_ROOT / "pinchproblem.rst")
+    workspace_api = _read(API_ROOT / "pinchworkspace.rst")
+    service_layer = _read(API_ROOT / "service-layer.rst")
+    notebook_series = _read(EXAMPLES_ROOT / "notebook-series.rst")
+
+    for heading in GUIDE_REQUIRED_HEADINGS:
+        assert heading in guide
+    for phrase in (
+        "problem.target.heat_recovery_dt_min(",
+        ".target.all_periods.heat_recovery_dt_min(",
+        "workspace.cases",
+        "HeatRecoveryDtMinResult",
+        "at_thermodynamic_limit",
+        "zero_recovery_boundary",
+        "solved",
+        "thermodynamic limit",
+        "threshold problem",
+        "greatest feasible ``dt_min``",
+        "positive global ``dt_min``",
+        "delta_degC",
+        "workers=2",
+        'model_dump(mode="json")',
+        "period_results",
+        "Community",
+        "Region",
+        "EMAT",
+        "02_focused_direct_and_total_site.ipynb",
+        "06_multiperiod_heat_integration.ipynb",
+    ):
+        assert phrase in guide
+
+    assert "heat-recovery-dt-min" in guide_index
+    assert "heat_recovery_dt_min" in capability_matrix
+    assert "heat_recovery_dt_min" in workflow_map
+    assert "greatest feasible" in fundamentals
+    assert "threshold problem" in fundamentals
+    assert "HeatRecoveryDtMinResult" in problem_api
+    assert "heat_recovery_dt_min" in workspace_api
+    assert "calculate_heat_recovery_dt_min" in service_layer
+    assert "equivalent global ``dt_min``" in notebook_series
+
+
 def test_packaged_assets_are_documented_in_examples_and_guides():
     combined = _docs_text(
         [
@@ -282,6 +330,8 @@ def test_release_docs_match_automated_main_branch_publication() -> None:
     combined = f"{readme}\n{developer_guide}"
 
     for phrase in (
+        "automatically advances",
+        "fork pull requests",
         "creates the annotated version tag",
         "draft GitHub release",
         "TestPyPI",

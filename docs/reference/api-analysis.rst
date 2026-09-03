@@ -82,6 +82,10 @@ workflows depend on.
 
 - :mod:`OpenPinch.analysis.targeting.cascade` generates the cascade tables
   and extracts pinch, utility, and heat-recovery targets from them.
+- :mod:`OpenPinch.analysis.targeting.heat_recovery_dt_min` evaluates detached
+  uniform-global-``dt_min`` cascades and deterministically inverts requested
+  process recovery. External callers should use the
+  ``PinchProblem.target.heat_recovery_dt_min`` facade.
 - :mod:`OpenPinch.analysis.targeting.utilities` assigns multiple utilities across
   heating and cooling deficits while respecting temperature feasibility.
 - :mod:`OpenPinch.analysis.targeting.grand_composite` derives pocket-free, assisted, and
@@ -92,6 +96,10 @@ workflows depend on.
 
 .. automodule:: OpenPinch.analysis.targeting.cascade
    :members:
+
+.. automodule:: OpenPinch.analysis.targeting.heat_recovery_dt_min
+   :members:
+   :no-index:
 
 .. automodule:: OpenPinch.analysis.targeting.utilities
    :members:

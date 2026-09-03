@@ -18,7 +18,6 @@ from ...domain.enums import ProblemTableLabel
 from ...domain.problem_table import ProblemTable
 from ...domain.stream_collection import StreamCollection
 from ..numerics import (
-    delta_with_zero_at_start,
     linear_interpolation,
 )
 from .grand_composite import get_additional_GCCs
@@ -96,6 +95,37 @@ def get_process_heat_cascade(
         get_additional_GCCs(pt, is_process_stream=True)
 
     return pt
+
+
+def _get_precise_process_heat_cascade(
+    hot_streams: StreamCollection,
+    cold_streams: StreamCollection,
+    *,
+    period_idx: int,
+) -> ProblemTable:
+    """Evaluate the process cascade without presentation-grid tolerances.
+
+    This inverse-targeting path preserves exact finite shifted temperatures and
+    strict segment overlap. Ordinary targeting deliberately continues to use
+    the canonical temperature grid and its established interval tolerance.
+    """
+    all_streams = hot_streams + cold_streams
+    numeric = all_streams.segment_numeric_view(period_idx)
+    temperatures = np.concatenate((numeric.t_min_star, numeric.t_max_star))
+    temperatures = temperatures[np.isfinite(temperatures)]
+    if temperatures.size == 0:
+        return ProblemTable({ProblemTableLabel.T: []})
+    temperature_grid = np.unique(temperatures)[::-1]
+    pt = ProblemTable({ProblemTableLabel.T: temperature_grid})
+    return _problem_table_algorithm(
+        pt=pt,
+        hot_streams=hot_streams,
+        cold_streams=cold_streams,
+        is_shifted=True,
+        idx=period_idx,
+        interval_tolerance=0.0,
+        delta_tolerance=0.0,
+    )
 
 
 def get_utility_heat_cascade(
@@ -192,11 +222,38 @@ def problem_table_algorithm(
 ) -> ProblemTable:
     """Fast calculation of the problem table using vectorized cascade formulas."""
 
+    return _problem_table_algorithm(
+        pt=pt,
+        hot_streams=hot_streams,
+        cold_streams=cold_streams,
+        is_shifted=is_shifted,
+        idx=idx,
+        interval_tolerance=tol * 10,
+        delta_tolerance=tol,
+    )
+
+
+def _problem_table_algorithm(
+    pt: ProblemTable,
+    hot_streams: StreamCollection | None,
+    cold_streams: StreamCollection | None,
+    is_shifted: bool,
+    idx: int | None,
+    *,
+    interval_tolerance: float,
+    delta_tolerance: float,
+) -> ProblemTable:
+    """Populate one problem table with an explicit interval tolerance."""
+
     # Sum m_dot*Cp contributions from hot streams per interval (sets CP_HOT and rCP_HOT)
     if hot_streams is not None:
         pt[ProblemTableLabel.CP_HOT], pt[ProblemTableLabel.RCP_HOT] = (
             _sum_mcp_between_temperature_boundaries(
-                pt[ProblemTableLabel.T], hot_streams, is_shifted, idx=idx
+                pt[ProblemTableLabel.T],
+                hot_streams,
+                is_shifted,
+                idx=idx,
+                interval_tolerance=interval_tolerance,
             )
         )
     else:
@@ -207,7 +264,11 @@ def problem_table_algorithm(
     if cold_streams is not None:
         pt[ProblemTableLabel.CP_COLD], pt[ProblemTableLabel.RCP_COLD] = (
             _sum_mcp_between_temperature_boundaries(
-                pt[ProblemTableLabel.T], cold_streams, is_shifted, idx=idx
+                pt[ProblemTableLabel.T],
+                cold_streams,
+                is_shifted,
+                idx=idx,
+                interval_tolerance=interval_tolerance,
             )
         )
     else:
@@ -215,7 +276,11 @@ def problem_table_algorithm(
         pt[ProblemTableLabel.RCP_COLD].fill(0.0)
 
     # ΔT_i = T_{i-1} - T_i
-    pt[ProblemTableLabel.DELTA_T] = delta_with_zero_at_start(pt[ProblemTableLabel.T])
+    temperatures = pt[ProblemTableLabel.T]
+    deltas = temperatures[:-1] - temperatures[1:]
+    deltas[np.abs(deltas) <= delta_tolerance] = 0.0
+    delta_t = np.insert(deltas, 0, 0.0)
+    pt[ProblemTableLabel.DELTA_T] = delta_t
 
     # ΔH_hot = ΔT * CP_hot
     pt[ProblemTableLabel.DELTA_H_HOT] = (
@@ -316,6 +381,8 @@ def _sum_mcp_between_temperature_boundaries(
     streams: StreamCollection,
     is_shifted: bool = True,
     idx: int | None = None,
+    *,
+    interval_tolerance: float = tol * 10,
 ) -> tuple[list[float], list[float]]:
     """Vectorized CP and rCP summation across temperature intervals."""
     return_lists = not isinstance(streams, StreamCollection)
@@ -344,9 +411,9 @@ def _sum_mcp_between_temperature_boundaries(
     lower_bounds = temperatures[1:]
     upper_bounds = temperatures[:-1]
 
-    active = (t_max[np.newaxis, :] > lower_bounds[:, np.newaxis] + tol * 10) & (
-        t_min[np.newaxis, :] < upper_bounds[:, np.newaxis] - tol * 10
-    )
+    active = (
+        t_max[np.newaxis, :] > lower_bounds[:, np.newaxis] + interval_tolerance
+    ) & (t_min[np.newaxis, :] < upper_bounds[:, np.newaxis] - interval_tolerance)
 
     cp_array = np.empty(temperatures.size, dtype=float)
     rcp_array = np.empty(temperatures.size, dtype=float)

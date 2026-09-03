@@ -132,6 +132,78 @@ def test_utility_placement_has_one_executable_thermodynamic_notebook() -> None:
     assert "monetary" not in markdown.lower()
 
 
+def test_inverse_heat_recovery_has_complete_selected_period_notebook_example() -> None:
+    notebook = _load_notebook(
+        ROOT
+        / "OpenPinch"
+        / "data"
+        / "notebooks"
+        / "02_focused_direct_and_total_site.ipynb"
+    )
+    source = _combined_source(notebook)
+    markdown_text = "\n".join(
+        "".join(cell.get("source", []))
+        for cell in notebook["cells"]
+        if cell["cell_type"] == "markdown"
+    )
+
+    for token in (
+        "problem.target.heat_recovery_dt_min(",
+        'heat_recovery={"value": requested_recovery_kw, "unit": "kW"}',
+        'period_id="0"',
+        "direct_recovery_kw = float(direct.heat_recovery_target)",
+        "requested_recovery_kw = direct_recovery_kw",
+        "thermodynamic_limit_matches_direct",
+        "cached_results_before_inverse",
+        "ordinary_target_preserved",
+        'recovery_dt_min.model_dump(mode="json")',
+        "display(recovery_dt_min_summary)",
+    ):
+        assert token in source
+    for phrase in (
+        "thermodynamic limit",
+        "requested and achieved recovery",
+        "non-mutating",
+        "greatest feasible",
+        "exchanger EMAT",
+    ):
+        assert phrase in markdown_text
+
+
+def test_inverse_heat_recovery_notebook_pins_threshold_limit_solution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    notebook = _load_notebook(
+        ROOT
+        / "OpenPinch"
+        / "data"
+        / "notebooks"
+        / "02_focused_direct_and_total_site.ipynb"
+    )
+    namespace = {"__name__": "__main__"}
+    for index, source in enumerate(_code_sources(notebook)[:2], start=1):
+        exec(compile(source, f"notebook-02:cell-{index}", "exec"), namespace)
+
+    direct = namespace["direct"]
+    result = namespace["recovery_dt_min"]
+    assert namespace["requested_recovery_kw"] == pytest.approx(
+        float(direct.heat_recovery_target)
+    )
+    assert result.requested_heat_recovery.value == pytest.approx(
+        float(direct.heat_recovery_target)
+    )
+    assert result.thermodynamic_limit.value == pytest.approx(
+        float(direct.heat_recovery_target)
+    )
+    assert result.dt_min.value == pytest.approx(
+        58.34505012947355,
+        abs=1e-6,
+    )
+    assert result.status.value == "at_thermodynamic_limit"
+
+
 def test_manifest_and_packaged_inventory_are_identical() -> None:
     rows = _manifest_rows()
 
@@ -227,13 +299,10 @@ def test_tutorial_review_preserves_notebook_invariants(name: str) -> None:
     assert [cell["id"] for cell in notebook["cells"]] == [
         f"cell-{index:02d}" for index in range(1, len(notebook["cells"]) + 1)
     ]
-    code_cells = [
-        cell for cell in notebook["cells"] if cell["cell_type"] == "code"
-    ]
+    code_cells = [cell for cell in notebook["cells"] if cell["cell_type"] == "code"]
     if name == "19_utility_placement_optimisation.ipynb":
         assert all(
-            cell["execution_count"] is None
-            or isinstance(cell["execution_count"], int)
+            cell["execution_count"] is None or isinstance(cell["execution_count"], int)
             for cell in code_cells
         )
     else:

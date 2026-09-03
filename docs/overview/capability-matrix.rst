@@ -18,6 +18,11 @@ Capability Matrix
      - ``problem.target.all_periods.*``
      - ordered period outputs and weighted summaries
      - base
+   * - Inverse heat-recovery ``dt_min`` targeting
+     - ``problem.target.heat_recovery_dt_min()`` and its
+       ``all_periods`` mirror
+     - non-mutating equivalent global ``dt_min`` with thermodynamic-limit evidence
+     - base
    * - Variable heat-capacity streams
      - segmented mapping input through ``PinchProblem``
      - one physical stream with ordered thermal segments
@@ -52,7 +57,7 @@ Capability Matrix
      - output-specific
    * - Packaged learning assets
      - ``OpenPinch.resources`` and ``openpinch notebook``
-     - sample cases and eighteen clean notebooks
+     - sample cases and nineteen clean notebooks
      - base; optional profiles as declared
 
 All workflow classes and accessors in this matrix are supported package

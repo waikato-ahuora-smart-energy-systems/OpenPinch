@@ -72,6 +72,20 @@ class _CaseBatchTargetAccessor(_CaseBatchAccessor):
     def direct_heat_integration(self, **kwargs):
         return self._run("direct_heat_integration", **kwargs)
 
+    def heat_recovery_dt_min(
+        self,
+        *,
+        heat_recovery,
+        zone=None,
+        period_id=None,
+    ) -> CaseBatchResult:
+        return self._run(
+            "heat_recovery_dt_min",
+            heat_recovery=heat_recovery,
+            zone=zone,
+            period_id=period_id,
+        )
+
     def indirect_heat_integration(self, **kwargs):
         return self._run("indirect_heat_integration", **kwargs)
 
@@ -132,6 +146,20 @@ class _CaseBatchAllPeriodsTargetAccessor(_CaseBatchAccessor):
 
     def direct_heat_integration(self, **kwargs):
         return self._run("direct_heat_integration", **kwargs)
+
+    def heat_recovery_dt_min(
+        self,
+        *,
+        heat_recovery,
+        zone=None,
+        workers=1,
+    ) -> CaseBatchResult:
+        return self._run(
+            "heat_recovery_dt_min",
+            heat_recovery=heat_recovery,
+            zone=zone,
+            workers=workers,
+        )
 
     def indirect_heat_integration(self, **kwargs):
         return self._run("indirect_heat_integration", **kwargs)

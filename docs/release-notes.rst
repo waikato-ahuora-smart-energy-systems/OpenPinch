@@ -4,6 +4,36 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat-recovery ``dt_min`` service
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Added non-mutating selected-period and all-period inverse pinch targeting
+  through ``target.heat_recovery_dt_min``. The service returns
+  the global ``dt_min`` corresponding to requested process heat recovery,
+  validates the zero-``dt_min`` thermodynamic limit, supports explicit units,
+  and mirrors through active workspaces and isolated ordered case batches.
+- Added deterministic plateau and zero-recovery boundary handling, analytical,
+  packaged-regression, immutability, and seeded property-based coverage.
+- Hardened the service after a full edge-case audit: scalar inputs and
+  low-level numerical arguments now reject implicit coercions; inverse cascade
+  boundaries preserve exact shifted temperatures to ``1e-6 delta_degC``;
+  foreign ``Zone`` selectors resolve locally by address; positive micro-duty
+  requests are distinct from exact zero; result contracts validate units and
+  cross-field relationships; and exact all-period IDs take precedence over the
+  ``value``/``unit`` scalar-mapping shape.
+- Corrected thermodynamic-limit inversion for threshold problems: maximum
+  recovery now returns the greatest positive global ``dt_min`` that retains the
+  limit, rather than forcing zero ``dt_min``.
+- Documented the distinction between process composite-curve global
+  ``dt_min`` and exchanger-level EMAT, and extended tutorials 02 and 06 with
+  selected-period
+  and scalar/mapped all-period workflows.
+- Added a dedicated inverse-``dt_min`` task guide and integrated the workflow
+  through RTD navigation, overview, fundamentals, public problem/workspace API,
+  contributor service reference, and notebook-series pages. Tutorial 02 now
+  demonstrates explicit recovery units, every result field, and preservation
+  of the ordinary cached target.
+
 0.5.0 architecture clean break
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
