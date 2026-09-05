@@ -42,11 +42,24 @@ def _check_core_surface() -> None:
     from OpenPinch.analysis.heat_pumps.cycles.brayton_heat_pump import (
         SimpleBraytonHeatPumpCycle,
     )
+    from OpenPinch.analysis.heat_pumps.performance_maps import (
+        HprTargetMapBasis,
+        get_hpr_point_simulator,
+    )
+    from OpenPinch.analysis.heat_pumps.performance_maps.resources import (
+        load_tespy_compressor_characteristic,
+    )
     from OpenPinch.presentation.dashboard import dependencies as dashboard_dependencies
     from OpenPinch.presentation.graphs.simple import graph_simple_cc_plot
 
     assert OpenPinch.__version__ if hasattr(OpenPinch, "__version__") else True
     assert PinchProblem is not None
+    assert HprTargetMapBasis is not None
+    assert get_hpr_point_simulator("coolprop") is not None
+    assert (
+        load_tespy_compressor_characteristic().characteristic_set_id
+        == "openpinch-single-stage-compressor-v1"
+    )
     _exercise_cli_help()
 
     for module_name in [
@@ -130,6 +143,46 @@ def _check_brayton_cycle_surface() -> None:
     assert SimpleBraytonHeatPumpCycle() is not None
 
 
+def _check_tespy_surface() -> None:
+    import inspect
+
+    from OpenPinch import PinchProblem
+    from OpenPinch.analysis.heat_pumps.performance_maps.adapters.tespy import (
+        TespyHprPointSimulator,
+    )
+    from OpenPinch.analysis.heat_pumps.performance_maps.factory import (
+        get_hpr_point_simulator,
+    )
+    from OpenPinch.analysis.heat_pumps.performance_maps.resources import (
+        load_tespy_compressor_characteristic,
+    )
+    from OpenPinch.analysis.heat_pumps.performance_maps.target_basis import (
+        build_hpr_target_map_basis,
+    )
+    from OpenPinch.analysis.heat_pumps.performance_maps.targeting import (
+        HprTargetEvaluatorCoordinator,
+    )
+    from OpenPinch.contracts.hpr import HprTargetSimulationRecord
+
+    _exercise_cli_help()
+    _assert_module_present("tespy")
+    assert isinstance(get_hpr_point_simulator("tespy"), TespyHprPointSimulator)
+    assert len(load_tespy_compressor_characteristic().points) == 17
+    assert HprTargetSimulationRecord.model_json_schema()["title"] == (
+        "HprTargetSimulationRecord"
+    )
+    assert HprTargetEvaluatorCoordinator is not None
+    assert build_hpr_target_map_basis is not None
+    target = PinchProblem().target
+    assert (
+        inspect.signature(target.vapour_compression_heat_pump)
+        .parameters["simulation_backend"]
+        .default
+        == "coolprop"
+    )
+    assert callable(target.hpr_performance_map)
+
+
 def _check_synthesis_surface() -> None:
     from OpenPinch.analysis.heat_exchanger_networks.solver import (
         dependencies,
@@ -147,7 +200,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "surface",
-        choices=["core", "dashboard", "notebook", "brayton_cycle", "synthesis"],
+        choices=[
+            "core",
+            "dashboard",
+            "notebook",
+            "brayton_cycle",
+            "tespy",
+            "synthesis",
+        ],
         help="Install surface to verify.",
     )
     return parser
@@ -166,6 +226,8 @@ def main(argv: list[str] | None = None) -> int:
         _check_notebook_surface()
     elif args.surface == "brayton_cycle":
         _check_brayton_cycle_surface()
+    elif args.surface == "tespy":
+        _check_tespy_surface()
     elif args.surface == "synthesis":
         _check_synthesis_surface()
 

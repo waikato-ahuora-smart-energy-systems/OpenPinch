@@ -165,3 +165,76 @@ services; none point back into application.
   graph. Existing generator, manifest, execution-profile, and package-data
   owners verify it after Unit 3 stabilizes the public workflow; no CLI
   dependency is introduced.
+
+## TESPy HPR Performance-Map Dependencies
+
+### Dependency matrix
+
+| Caller | Allowed dependency | Communication | Prohibited coupling |
+|---|---|---|---|
+| Problem target accessor | HPR contracts and application bridge | Backend selector, successful target, map request | Thermodynamic equations or TESPy imports |
+| Application bridge | HPR map context builder and generation service | Validated target plus request | OpenUtility or Pyomo objects |
+| HPR targeting service | Point-simulator factory | Normalized backend string and internal context | Silent backend fallback |
+| Map context builder | HPR target, map request, plain analysis values | Immutable generation context | Target mutation or runtime engine objects |
+| Grid generation service | Point-simulator protocol and map contracts | Ordered operating points to completed map | Candidate economics or MILP constraints |
+| CoolProp simulator | Existing HPR cycle calculations | Normalized point simulation | TESPy or application layer |
+| TESPy simulator | Optional dependency guard and TESPy | Normalized point simulation | Package import-time TESPy dependency |
+| Contract resources | JSON Schema and golden fixtures | Versioned JSON-compatible data | Python-class identity |
+| OpenUtility | Vendored schema/fixture data | Plain mapping decode | OpenPinch or TESPy runtime import |
+
+### Dependency direction
+
+The diagram contains ten declared nodes and eleven edges. Node identifiers are
+alphanumeric, labels are quoted, and every edge references a declared node.
+
+```mermaid
+flowchart LR
+    Caller["Process engineer"]
+    Target["Problem target accessor"]
+    Contracts["HPR map contracts"]
+    Service["HPR map generation service"]
+    Context["Map context builder"]
+    Factory["Point simulator factory"]
+    CoolProp["CoolProp simulator"]
+    Tespy["Optional TESPy simulator"]
+    Resources["JSON Schema and fixtures"]
+    OpenUtility["OpenUtility consumer"]
+
+    Caller --> Target
+    Target --> Contracts
+    Target --> Service
+    Service --> Context
+    Context --> Contracts
+    Service --> Factory
+    Factory --> CoolProp
+    Factory --> Tespy
+    Service --> Contracts
+    Contracts --> Resources
+    Resources --> OpenUtility
+```
+
+Text alternative: a process engineer calls the existing problem target accessor.
+The accessor validates map contracts and delegates to the HPR map service. The
+service builds an immutable context and obtains either the existing CoolProp
+simulator or the optional TESPy simulator through one protocol factory. The
+service returns a strict contract, from which OpenPinch publishes JSON Schema and
+fixtures. OpenUtility consumes only the data resource; the final diagram edge to
+OpenUtility denotes data transfer, not a Python import.
+
+### Communication and import rules
+
+- Public map contracts contain only JSON-compatible values and Pydantic
+  validation; they do not import current runtime HPR contracts.
+- Application coordinates target identity and request validation, while analysis
+  owns simulation and map assembly.
+- Concrete simulator modules may import their thermodynamic engine. The protocol,
+  context, contracts, and application imports may not import TESPy.
+- The optional adapter uses the existing dependency guard at call time. Base
+  `import OpenPinch`, contract imports, and CoolProp targeting remain independent
+  of TESPy availability.
+- OpenUtility is an external conformance consumer. It may copy or vendor schema
+  resources for tests but must not appear in OpenPinch runtime dependencies.
+- OpenPinch exports no candidate identity, node assignment, period tariff,
+  equipment cost, selection variable, dispatch result, or Pyomo formulation.
+- Schema changes use explicit version policy and synchronized golden fixtures;
+  neither repository infers compatibility from Python dataclass names.

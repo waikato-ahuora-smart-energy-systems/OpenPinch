@@ -2,12 +2,22 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
+from typing import Any
 
 _SAMPLE_CASE_ROOT = files("OpenPinch.data.sample_cases")
 _NOTEBOOK_ROOT = files("OpenPinch.data.notebooks")
+_HPR_PERFORMANCE_MAP_CONTRACT_ROOT = files(
+    "OpenPinch.data.contracts.hpr_performance_map"
+)
+_HPR_PERFORMANCE_MAP_CONTRACT_RESOURCES = (
+    "heat-pump-1.0.json",
+    "refrigeration-1.0.json",
+    "schema-1.0.json",
+)
 
 
 @dataclass(frozen=True)
@@ -209,6 +219,31 @@ def list_notebooks() -> list[str]:
     )
 
 
+def list_hpr_performance_map_contract_resources() -> list[str]:
+    """Return the closed HPR performance-map contract resource catalog."""
+    return list(_HPR_PERFORMANCE_MAP_CONTRACT_RESOURCES)
+
+
+def read_hpr_performance_map_contract_resource(name: str) -> str:
+    """Return one packaged HPR contract schema or golden fixture as text."""
+    resolved = _resolve_resource(
+        name,
+        list_hpr_performance_map_contract_resources(),
+        "HPR performance-map contract resource",
+    )
+    return _HPR_PERFORMANCE_MAP_CONTRACT_ROOT.joinpath(resolved).read_text(
+        encoding="utf-8"
+    )
+
+
+def load_hpr_performance_map_contract_resource(name: str) -> dict[str, Any]:
+    """Return one packaged HPR contract resource as detached plain JSON data."""
+    value = json.loads(read_hpr_performance_map_contract_resource(name))
+    if not isinstance(value, dict):
+        raise ValueError(f"HPR performance-map resource {name!r} is not an object")
+    return value
+
+
 def sample_case_metadata(name: str | None = None):
     """Return metadata for one or all packaged sample cases."""
     if name is not None:
@@ -289,9 +324,12 @@ __all__ = [
     "SampleCaseMetadata",
     "copy_notebook",
     "copy_sample_case",
+    "list_hpr_performance_map_contract_resources",
     "list_notebooks",
     "list_sample_cases",
+    "load_hpr_performance_map_contract_resource",
     "notebook_metadata",
+    "read_hpr_performance_map_contract_resource",
     "read_sample_case",
     "sample_case_metadata",
 ]

@@ -31,7 +31,11 @@ Stability Levels
 
 Optional feature profiles are installed with ``openpinch[notebook]`` for the
 tutorial environment, ``openpinch[dashboard]`` for Streamlit presentation, and
-``openpinch[synthesis]`` for solver-backed HEN design.
+``openpinch[synthesis]`` for solver-backed HEN design. Use
+``openpinch[tespy]`` for explicitly selected TESPy vapour-compression targeting
+and target-owned part-load map generation. CoolProp remains the base-package
+default. The initial TESPy targeting surface is advanced and restricted to one
+scalar refrigerant loop, one evaporator, and one condenser.
 
 Contributor Modules
 -------------------

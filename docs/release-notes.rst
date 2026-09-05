@@ -4,6 +4,31 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Target-owned HPR performance maps
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Added ``simulation_backend="coolprop"`` to the existing
+  vapour-compression heat-pump and refrigeration target methods. Omission keeps
+  the unchanged CoolProp path; selecting ``"tespy"`` uses optional TESPy design
+  solves to rank supported scalar single-stage target candidates, with no
+  CoolProp fallback.
+- Successful compatible targets retain a frozen, versioned-data-friendly
+  ``HprTargetSimulationRecord``. The explicit
+  ``problem.target.hpr_performance_map(target=..., request=...)`` operation uses
+  that target-owned backend and nominal basis to generate one atomic physical
+  map. TESPy map points use a winning-design/offdesign lifecycle.
+- Pure fluids, registered blends, and explicit N-component molar mixtures are
+  capability-checked at dew-point evaporation and bubble-point condensation
+  states. ``REFPROP`` and unsupported topology or state combinations fail
+  before optimization.
+- The map remains a plain schema ``1.0`` boundary for OpenUtility and other
+  MILP consumers. OpenPinch imports neither OpenUtility, Pyomo, nor HiGHS;
+  downstream consumers own capacity scaling, adjacent-segment interpolation,
+  commitment, electricity coupling, and multiperiod dispatch.
+- Selected scalar periods and sequential independent all-period replay are
+  supported. Shared-vector multiperiod TESPy targeting, multi-port flattening,
+  automatic grids, partial maps, and a thread-safety promise are not included.
+
 Heat-recovery ``dt_min`` service
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

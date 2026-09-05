@@ -318,3 +318,154 @@ Its code cells call the public target accessor once with concise counts, add the
 returned normal case to the workspace, then use ordinary target, summary, GCC,
 and Total Site Profile methods. It has no CLI invocation, nested result-to-input
 conversion, or placement-specific presentation method.
+
+## TESPy HPR Performance-Map Methods
+
+The signatures define the application boundary. Detailed thermodynamic network
+configuration and validation algorithms remain outside Application Design.
+
+### Existing targeting methods with backend selection
+
+```python
+_TargetAccessor.vapour_compression_heat_pump(
+    *,
+    simulation_backend: str = "coolprop",
+    **existing_keyword_arguments,
+) -> HeatPumpTargetBase
+
+_TargetAccessor.vapour_compression_refrigeration(
+    *,
+    simulation_backend: str = "coolprop",
+    **existing_keyword_arguments,
+) -> HeatPumpTargetBase
+```
+
+The supported selector values are `coolprop` and `tespy`. The accessor normalizes
+case and validates the value before targeting. Omitting the argument preserves
+the current path and result type. Unsupported cycle/backend combinations raise a
+focused validation error; they never fall back to CoolProp silently.
+
+### Explicit follow-up map operation
+
+```python
+_TargetAccessor.hpr_performance_map(
+    *,
+    target: HeatPumpTargetBase,
+    request: HprPerformanceMapRequest,
+) -> HprPerformanceMap
+```
+
+The method accepts only a successful target from one of the two supported
+vapour-compression methods. The map uses the backend recorded by that target, so
+the caller cannot accidentally target with CoolProp and label the resulting map
+as TESPy. Map generation is explicit and does not alter the target or problem.
+
+### Public contract models
+
+```python
+class HprPerformanceMapRequest(BaseModel):
+    map_id: str
+    source_temperatures: tuple[float, ...]
+    sink_temperatures: tuple[float, ...]
+    load_fractions: tuple[float, ...]
+    reference_capacity: float | None = None
+
+
+class HprPerformancePoint(BaseModel):
+    name: str
+    curve_id: str
+    source_temperature: float
+    sink_temperature: float
+    load_fraction: float
+    q_source: float
+    q_sink: float
+    electric_power: float
+    cop: float
+
+
+class HprPerformanceMap(BaseModel):
+    schema_version: Literal["1.0"]
+    map_id: str
+    mode: Literal["heat_pump", "refrigeration"]
+    units: HprPerformanceMapUnits
+    reference_capacity: float
+    reference_capacity_basis: Literal["q_sink", "q_source"]
+    interpolation_topology: Literal["ordered_part_load_curve"]
+    thermodynamic_backend: Literal["coolprop", "tespy"]
+    model_id: str
+    provenance: dict[str, JsonValue]
+    points: tuple[HprPerformancePoint, ...]
+    cop_convention: Literal["heating", "cooling"]
+    energy_balance_tolerance: float = 1e-6
+    temperature_match_tolerance: float = 1e-6
+```
+
+`HprPerformanceMapUnits` fixes schema `1.0` output to `degC` for temperature and
+`kW` for source duty, sink duty, and electric power. A producer may accept other
+input units internally, but it converts before contract construction. The
+payload carries separate tolerances: `energy_balance_tolerance` applies to
+energy, useful-capacity, and COP consistency in `kW`, while
+`temperature_match_tolerance` applies only to consumer matching of canonical
+`degC` source/sink coordinates.
+
+### Contract serialization
+
+```python
+HprPerformanceMap.model_dump(mode="json") -> dict[str, JsonValue]
+HprPerformanceMap.model_dump_json() -> str
+HprPerformanceMap.model_validate_json(value: str) -> HprPerformanceMap
+```
+
+Unknown versions, extra fields, non-finite values, inconsistent capacity/COP
+conventions, duplicate coordinates, duplicate load fractions within a curve,
+unordered curves, and physical-balance violations fail validation.
+
+### Analysis context and simulator protocol
+
+```python
+build_hpr_map_context(
+    *,
+    target: HeatPumpTargetBase,
+    request: HprPerformanceMapRequest,
+) -> HprMapGenerationContext
+
+
+class HprPointSimulator(Protocol):
+    def prepare(self, context: HprMapGenerationContext) -> None: ...
+
+    def simulate(
+        self,
+        operating_point: HprOperatingPoint,
+    ) -> HprPointSimulation: ...
+
+    def close(self) -> None: ...
+
+
+get_hpr_point_simulator(
+    backend: str,
+) -> ContextManager[HprPointSimulator]
+
+
+generate_hpr_performance_map(
+    context: HprMapGenerationContext,
+    *,
+    simulator_factory: HprPointSimulatorFactory = get_hpr_point_simulator,
+) -> HprPerformanceMap
+```
+
+The injectable factory permits deterministic fake-adapter tests. Concrete
+simulators normalize their results to `HprPointSimulation`; the grid service is
+the sole owner of public contract assembly and ordering.
+
+### Target result provenance
+
+```python
+HeatPumpTargetInputs.simulation_backend: str = "coolprop"
+HeatPumpTargetOutputs.simulation_backend: str = "coolprop"
+HeatPumpTargetBase.hpr_simulation_backend: str = "coolprop"
+```
+
+These are lightweight strings, not TESPy or CoolProp runtime objects. The map
+builder copies the target value into
+`HprPerformanceMap.thermodynamic_backend` and records package versions and
+modeling assumptions in structured provenance.

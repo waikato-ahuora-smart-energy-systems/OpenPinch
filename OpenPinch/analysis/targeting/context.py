@@ -49,6 +49,7 @@ def apply_zone_config_overrides(zone: Zone, args: dict | None) -> None:
         "base_target_type",
         "_calculate_area_cost",
         "_prepared_direct_profiles",
+        "simulation_backend",
     }
     invalid_keys = sorted(
         str(key) for key in args if str(key) not in allowed_runtime_keys

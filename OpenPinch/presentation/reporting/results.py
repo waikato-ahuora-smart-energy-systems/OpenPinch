@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from ...contracts.reporting import HeatUtility, PinchTemp, TargetResults
@@ -62,6 +63,8 @@ def target_to_result(
                     "turbine_efficiency_target",
                 ),
                 "hpr_cycle": target.hpr_cycle,
+                "hpr_simulation_backend": target.hpr_simulation_backend,
+                "hpr_target_simulation_record": _target_simulation_record(target),
                 "hpr_utility_total": _metric(target, "hpr_utility_total"),
                 "hpr_work": _metric(target, "hpr_work"),
                 "hpr_external_utility": _metric(target, "hpr_external_utility"),
@@ -93,6 +96,13 @@ def target_to_result(
             }
         )
     return result
+
+
+def _target_simulation_record(target: HeatPumpTargetBase):
+    details = target.hpr_details
+    if isinstance(details, Mapping):
+        return details.get("target_simulation_record")
+    return getattr(details, "target_simulation_record", None)
 
 
 def serialize_target(

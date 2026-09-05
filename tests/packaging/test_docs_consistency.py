@@ -435,3 +435,48 @@ def test_heat_pump_docs_keep_advanced_workflow_boundaries():
         assert phrase in guide
 
     assert "Simulated-cycle integration accounting" in fundamentals
+
+
+def test_hpr_backend_and_target_owned_map_docs_publish_the_complete_boundary():
+    guide = _read(GUIDES_ROOT / "heat-pump-workflows.rst")
+    fundamentals = _read(
+        DOCS_ROOT / "fundamentals" / "heat-pump-and-refrigeration-methods.rst"
+    )
+    api = _read(DOCS_ROOT / "reference" / "api-heat-pump.rst")
+    capability = _read(DOCS_ROOT / "overview" / "capability-matrix.rst")
+    support = _read(DOCS_ROOT / "overview" / "support-and-stability.rst")
+    release_notes = _read(DOCS_ROOT / "release-notes.rst")
+    normalized_fundamentals = " ".join(fundamentals.split())
+
+    for phrase in (
+        'simulation_backend="tespy"',
+        "HprPerformanceMapRequest",
+        "target.hpr_performance_map",
+        'model_dump(mode="json")',
+        "openpinch[tespy]",
+    ):
+        assert phrase in guide
+
+    for phrase in (
+        "fresh design solve",
+        "offdesign",
+        "dew point",
+        "bubble point",
+        "compressor-only power",
+        "no CoolProp fallback",
+        "no partial map",
+        "explicit N-component molar mixtures",
+    ):
+        assert phrase in normalized_fundamentals
+
+    for symbol in (
+        "HprTargetSimulationRecord",
+        "HprPerformanceMapRequest",
+        "HprPerformanceMap",
+        "hpr_performance_map",
+    ):
+        assert symbol in api
+
+    assert "CoolProp default; optional TESPy" in capability
+    assert "openpinch[tespy]" in support
+    assert "Target-owned HPR performance maps" in release_notes

@@ -18,6 +18,7 @@ from ..optimisation_adapter import (
     translate_hpr_output,
     translate_hpr_result,
 )
+from ..performance_maps.targeting import preflight_tespy_hpr_targeting
 from .aggregation import evaluate_multiperiod_candidate, selected_period_case
 from .preparation import period_case_by_id
 from .setup import get_multiperiod_hpr_optimisation_setup
@@ -33,10 +34,6 @@ def get_multiperiod_hpr_targets(
     """Solve a shared HPR design and project it into the output contract."""
     solver_cases = [case.solver_case for case in period_cases]
     selected_case = period_case_by_id(period_cases, selected_period_id).solver_case
-    initial_points, bounds, period_objective = get_multiperiod_hpr_optimisation_setup(
-        solver_cases,
-        selected_case=selected_case,
-    )
     args = MultiPeriodHPRTargetInputs(
         period_cases=solver_cases,
         selected_period_id=selected_period_id,
@@ -44,7 +41,14 @@ def get_multiperiod_hpr_targets(
         hpr_type=selected_case.args.hpr_type,
         max_multi_start=selected_case.args.max_multi_start,
         bb_minimiser=selected_case.args.bb_minimiser,
+        simulation_backend=selected_case.args.simulation_backend,
         debug=selected_case.args.debug,
+    )
+    if args.simulation_backend == "tespy":
+        preflight_tespy_hpr_targeting(args)
+    initial_points, bounds, period_objective = get_multiperiod_hpr_optimisation_setup(
+        solver_cases,
+        selected_case=selected_case,
     )
     result = solve_hpr_multiperiod_placement(
         f_obj=period_objective,

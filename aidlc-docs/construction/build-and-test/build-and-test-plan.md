@@ -1,73 +1,45 @@
-# Repository Issue Remediation Build and Test Plan
+# HPR Performance Map Build and Test Plan
 
 ## Applicability Assessment
 
-- Unit tests: applicable to application, workspace, reporting, import isolation,
-  and documentation guards.
-- Integration/contract tests: applicable to root API, architecture, HEN
-  transport, workspace bundles, reporting, packaging, and tutorials.
-- End-to-end tests: included in the complete non-solver suite and installed
-  artifact smoke.
-- Performance load/stress tests: N/A; no service, latency objective, throughput
-  requirement, or algorithmic complexity change.
-- Security tests: N/A because the Security Baseline extension is disabled; the
-  concrete input/path protections are covered as functional contracts.
-- External solver execution: unchanged and outside this remediation's required
-  acceptance gate. Solver-facing contracts remain included in non-solver tests.
+- Unit tests: applicable to contracts, fluid resolution, simulator adapters,
+  target integration, records, basis conversion, public accessors, and period
+  propagation.
+- Property tests: applicable to schema round trips, physical closure, mixture
+  fidelity, selector determinism, cache identity, lifecycle, ordering, and
+  failure isolation.
+- Integration and contract tests: applicable across Units 1 through 3, current
+  HPR targeting, reporting, resources, documentation, and package artifacts.
+- End-to-end tests: applicable to public CoolProp and explicit TESPy target to
+  map workflows from both the checkout and installed wheel.
+- Performance tests: applicable to large fake maps, exact-cache memory and call
+  bounds, repeated cleanup, and the guarded real TESPy workflow.
+- Security tests: N/A because the Security extension is disabled and the change
+  introduces no authentication, network service, or secret boundary.
+- External solver tests: applicable as the repository-wide regression gate;
+  HPR map generation itself introduces no solver dependency.
 
 ## Execution Checklist
 
-- [x] Analyze unit, integration, contract, end-to-end, performance, security,
-  documentation, and distribution requirements.
-- [x] Generate build instructions.
-- [x] Generate unit/property test instructions.
-- [x] Generate integration/contract/end-to-end instructions.
-- [x] Record performance and external-solver applicability.
-- [x] Run the complete fixed-seed non-solver suite.
+- [x] Analyze unit, property, integration, contract, end-to-end, performance,
+  documentation, packaging, and external-solver requirements.
+- [x] Refresh the canonical build, unit, integration, and performance
+  instructions for the HPR delivery.
+- [x] Run Ruff, changed-surface formatting, compilation, patch hygiene, and the
+  warning-strict documentation build.
+- [x] Run the complete repository suite with fixed Hypothesis seed `20260715`
+  and configured external solvers.
+- [x] Run the dedicated real-TESPy and 300-second public target-to-map profile.
+- [x] Verify fresh source/wheel archives and isolated core/TESPy wheel smokes.
+- [x] Generate the final build-and-test summary and update workflow state/audit.
+- [x] Present the standardized Build and Test review prompt.
 
-**Test evidence**: the final post-correction run passed 2,181 tests, with 3
-explicitly guarded optional-profile tests skipped and 4 solver-marked tests
-deselected in 148.03 seconds using Hypothesis seed `20260715`.
-- [x] Run repository Ruff lint and format checks.
-- [x] Run patch hygiene and stale current-contract scans.
+## Extension Compliance
 
-**Static evidence**: Ruff lint passed, all 460 Python files were already
-formatted, `git diff --check` reported no findings, and the closed current-
-contract scan returned no matches.
-- [x] Build warning-free Sphinx HTML from a clean temporary destination.
+- Property-Based Testing: enabled and applicable throughout the unit and
+  integration gates.
+- Security: disabled; N/A.
+- Resiliency: disabled; N/A.
 
-**Documentation evidence**: Sphinx 9.1.0 read and built all 53 sources with
-`--fail-on-warning`; the clean HTML output completed with zero warnings.
-- [x] Build wheel and source distribution into a clean temporary destination.
-- [x] Install and smoke the wheel outside the checkout.
-- [x] Generate the final build-and-test summary.
-- [x] Update state, audit, requirements traceability, and Operations N/A.
-
-**Artifact evidence**: `openpinch-0.5.2-py3-none-any.whl` and
-`openpinch-0.5.2.tar.gz` built successfully in a clean temporary directory. The
-wheel was installed with its declared runtime dependencies into a temporary
-Python 3.14 environment and passed the workflow, resources, two-name root API,
-retired-package absence, and CLI smoke outside the checkout.
-
-**Focused HEN evidence**: 458 non-external OpenHENS/HEN tests passed with four
-solver-marked deselections in 15.86 seconds.
-
-## Post-Gate Contract Audit
-
-- [x] Reproduce generic-mapping bundle validation bypass.
-- [x] Validate all mapping-shaped bundle inputs and nested case mappings.
-- [x] Rerun focused workspace, static, complete non-solver, distribution, and
-  installed-wheel gates.
-
-**Discovery**: a final manual probe showed that Pydantic accepts generic
-`Mapping` inputs while the pre-validator inspected only concrete `dict`
-instances. A read-only mapping containing `../escape` was therefore accepted.
-The completed result is reopened until this edge case is closed.
-
-**Closure evidence**: the regression failed before the correction, then 158
-focused workspace/contracts tests passed. The complete suite passed 2,181 tests,
-the corrected artifacts rebuilt, and the installed wheel passed both the
-standard smoke and an explicit generic-mapping rejection probe.
-
-The user's `Continue to Completion` authorization covers these approved gates
-and the final Operations N/A transition.
+This plan contains no Mermaid or ASCII diagram. Its Markdown headings,
+checkboxes, inline paths, and code identifiers were validated before update.

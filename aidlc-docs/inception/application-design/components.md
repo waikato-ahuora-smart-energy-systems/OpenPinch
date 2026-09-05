@@ -194,3 +194,89 @@ the returned normal case, and contains lightweight executable assertions over
 standard summaries and plots. Existing
 tutorial-manifest, execution-profile, and package-data owners register and
 verify it. This component adds no CLI surface.
+
+## TESPy HPR Performance-Map Components
+
+### HPR Performance-Map Contract Family
+
+`OpenPinch.contracts.hpr_performance_map` owns strict Pydantic models for the
+map-generation request, operating points, completed map, schema version, mode,
+capacity basis, COP convention, interpolation topology, units, and structured
+JSON provenance. It has no NumPy, stream, target, TESPy, Pyomo, or OpenUtility
+dependency. Its serialized field names form the language-neutral consumer
+contract.
+
+Schema `1.0` represents a fixed-capacity, single-source/single-sink conversion
+unit. Source and sink temperatures are external thermal-service temperatures.
+Heat-pump reference capacity is `q_sink`; refrigeration reference capacity is
+`q_source`. The sole topology is an adjacent-breakpoint
+`ordered_part_load_curve` at each fixed temperature pair.
+
+### HPR Backend Selection and Result Provenance
+
+The current HPR input/output contracts gain a normalized string-valued
+`simulation_backend`, defaulting to `coolprop`. The application accessor accepts
+the selector, analysis dispatches it, and returned HPR targets retain the selected
+value as `hpr_simulation_backend`. Cycle identity and black-box optimization
+backend remain separate. Existing calls that omit the selector follow the
+unchanged CoolProp path.
+
+### HPR Map Context Builder
+
+An analysis-owned pure builder combines a successful supported HPR target with a
+validated map request. It extracts mode, selected cycle configuration,
+refrigerant/model identity, approach temperatures, reference capacity, units,
+and provenance without mutating the target. A scalar target useful duty may
+supply omitted reference capacity; array/multiperiod results require an explicit
+capacity.
+
+The builder rejects analytic Carnot, Brayton, MVR, failed targets, unsupported
+backend/cycle combinations, and multi-port cascade or parallel configurations.
+The first release accepts only single external source and sink configurations
+produced through the existing vapour-compression targeting methods.
+
+### HPR Point-Simulator Protocol
+
+An internal `HprPointSimulator` protocol owns design/offdesign lifecycle and one
+normalized operating-point calculation. Its inputs and outputs are immutable
+analysis value objects with plain numbers and strings. It exposes no CoolProp or
+TESPy object beyond its concrete module.
+
+### CoolProp HPR Point Simulator
+
+The default simulator adapts existing vapour-compression cycle calculations to
+the protocol. Its nominal-point behavior is checked against current targeting
+results so the backend abstraction cannot silently change existing numbers.
+
+### TESPy HPR Point Simulator
+
+The optional simulator owns TESPy network construction, design-point solution,
+offdesign characteristic configuration, convergence checks, aggregate duty and
+power extraction, and cleanup. TESPy is imported lazily inside this concrete
+leaf. The initial topology is one explicitly documented single-stage
+vapour-compression heat-pump/refrigeration network; no generic TESPy-cycle claim
+is made.
+
+### HPR Performance-Map Generation Service
+
+The grid service traverses source temperature, sink temperature, and load
+fraction in deterministic order, reuses one prepared simulator session where
+valid, normalizes signs and units, calculates COP, and assembles the strict map.
+Any missing or non-converged requested point rejects the map by default. It owns
+no optimization-candidate, economics, Pyomo, or interpolation-constraint logic.
+
+### Target-Accessor Map Bridge
+
+The existing `_TargetAccessor` gains one explicit follow-up
+`hpr_performance_map(...)` operation. It accepts a successful target returned by
+`vapour_compression_heat_pump(...)` or
+`vapour_compression_refrigeration(...)` and a map request, then delegates once to
+the context builder and generation service. It preserves current target method
+return types and never evaluates a grid during an ordinary targeting call.
+
+### HPR Contract Resources
+
+OpenPinch owns the canonical JSON Schema and one heat-pump plus one refrigeration
+golden fixture as package/test resources. OpenUtility vendors these data files or
+their exact content for consumer contract tests; it never imports OpenPinch
+classes. Schema promotion requires both repositories to accept the same fixtures.

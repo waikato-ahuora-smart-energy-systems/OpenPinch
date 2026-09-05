@@ -2,13 +2,63 @@
 
 from __future__ import annotations
 
-from typing import Any, List, Optional
+from typing import Any, List, Literal, Optional, Self
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ..domain.stream_collection import StreamCollection
 from ..domain.value import Value
+from .hpr_performance_map import JsonValue
+
+
+class HprTargetSimulationRecord(BaseModel):
+    """Detached nominal simulation facts retained by a successful HPR target."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
+
+    simulation_backend: Literal["coolprop", "tespy"]
+    mode: Literal["heat_pump", "refrigeration"]
+    cycle_id: Literal["single_stage_vapour_compression"]
+    model_id: str
+    refrigerant_spec: str
+    nominal_evaporating_temperature: float
+    nominal_condensing_temperature: float
+    nominal_useful_duty: float = Field(gt=0.0)
+    source_approach_temperature: float = Field(ge=0.0)
+    sink_approach_temperature: float = Field(ge=0.0)
+    compressor_isentropic_efficiency: float = Field(gt=0.0, le=1.0)
+    superheat: float = Field(ge=0.0)
+    subcooling: float = Field(ge=0.0)
+    internal_hx_gas_temperature_change: float = Field(ge=0.0)
+    evaporator_count: int = Field(ge=1)
+    condenser_count: int = Field(ge=1)
+    period_id: str | None = None
+    engine_version: str
+    power_boundary: Literal["compressor_only"] = "compressor_only"
+    assumptions: dict[str, JsonValue]
+
+    @field_validator("model_id", "refrigerant_spec", "engine_version")
+    @classmethod
+    def _require_nonempty_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("simulation record text fields must not be empty")
+        return value
+
+    @field_validator("period_id")
+    @classmethod
+    def _validate_period_id(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("period_id must be nonempty when supplied")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_record(self) -> Self:
+        if self.nominal_condensing_temperature <= self.nominal_evaporating_temperature:
+            raise ValueError("nominal target must have positive temperature lift")
+        if not self.assumptions:
+            raise ValueError("assumptions must not be empty")
+        return self
 
 
 class HeatPumpTargetInputs(BaseModel):
@@ -67,6 +117,7 @@ class HeatPumpTargetInputs(BaseModel):
     eta_penalty: float
     rho_penalty: float
     period_idx: int = 0
+    simulation_backend: Literal["coolprop", "tespy"] = "coolprop"
     debug: bool
 
 
@@ -92,6 +143,7 @@ class MultiPeriodHPRTargetInputs(BaseModel):
     hpr_type: str
     max_multi_start: int
     bb_minimiser: str
+    simulation_backend: Literal["coolprop", "tespy"] = "coolprop"
     debug: bool = False
 
 
@@ -140,6 +192,8 @@ class HeatPumpTargetOutputs(BaseModel):
     design_vector: Optional[np.ndarray] = None
     period_ids: Optional[List[str]] = None
     period_weights: Optional[List[float]] = None
+    simulation_backend: Literal["coolprop", "tespy"] = "coolprop"
+    target_simulation_record: HprTargetSimulationRecord | None = None
 
 
 class SimulatedHPRAnnualizedCostAccounting(BaseModel):
@@ -243,6 +297,8 @@ class HPRBackendResult(BaseModel):
     design_vector: np.ndarray | None = None
     period_ids: list[str] | None = None
     period_weights: list[float] | None = None
+    simulation_backend: Literal["coolprop", "tespy"] = "coolprop"
+    target_simulation_record: HprTargetSimulationRecord | None = None
 
     @property
     def Q_ext(self) -> float:
@@ -315,6 +371,8 @@ class HPRBackendResult(BaseModel):
             "design_vector": self.design_vector,
             "period_ids": self.period_ids,
             "period_weights": self.period_weights,
+            "simulation_backend": self.simulation_backend,
+            "target_simulation_record": self.target_simulation_record,
         }
         return {key: value for key, value in output_values.items() if value is not None}
 
@@ -341,6 +399,7 @@ class HPRBackendResult(BaseModel):
 
 __all__ = [
     "HPRPeriodCase",
+    "HprTargetSimulationRecord",
     "HeatPumpTargetInputs",
     "HeatPumpTargetOutputs",
     "MultiPeriodHPRTargetInputs",

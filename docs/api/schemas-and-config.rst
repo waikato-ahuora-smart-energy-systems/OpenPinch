@@ -237,6 +237,52 @@ optimiser configuration accepts the exact identifiers ``dual_annealing``,
    :members:
    :no-index:
 
+HPR Performance-Map Contract
+----------------------------
+
+The specialist performance-map contract is a plain-data boundary for exporting
+active heat-pump and refrigeration operating points. Schema version ``1.0`` is
+closed: unknown fields and unknown versions are rejected rather than migrated.
+It is deliberately separate from the runtime HPR target records above.
+
+Compatible successful scalar targets retain one detached nominal record used
+to construct a map basis without retaining a thermodynamic engine object:
+
+.. autoclass:: OpenPinch.contracts.hpr.HprTargetSimulationRecord
+   :members:
+   :no-index:
+
+``HprPerformanceMap`` contains exactly ``schema_version``, ``map_id``, ``mode``,
+``units``, ``reference_capacity``, ``reference_capacity_basis``,
+``interpolation_topology``, ``thermodynamic_backend``, ``model_id``,
+``provenance``, ``points``, ``cop_convention``,
+``energy_balance_tolerance``, and ``temperature_match_tolerance``. Each
+``HprPerformancePoint`` contains ``name``, ``curve_id``, source and sink
+temperatures, ``load_fraction``, ``q_source``, ``q_sink``, ``electric_power``,
+and ``cop``.
+
+Validation enforces canonical ordering, unique names and coordinates, one
+source/sink temperature pair per ordered part-load curve, physical energy and
+COP identities, and the mode-specific capacity basis. The models are immutable
+after validation. Structured ``provenance`` is restricted to JSON-compatible
+values so a dumped map remains independent of OpenPinch Python objects.
+
+.. autoclass:: OpenPinch.contracts.hpr_performance_map.HprPerformanceMapRequest
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.contracts.hpr_performance_map.HprPerformanceMapUnits
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.contracts.hpr_performance_map.HprPerformancePoint
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.contracts.hpr_performance_map.HprPerformanceMap
+   :members:
+   :no-index:
+
 Enums and Typed Constants
 -------------------------
 

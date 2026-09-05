@@ -84,9 +84,16 @@ def test_manifest_exactly_matches_live_public_inventory() -> None:
     assert manifest == _live_operations()
     assert all(row["owner"] in OWNERS for row in rows)
     assert {row["coverage_status"] for row in rows} == {
+        "documented and pytest executable",
         "mapped and executable",
         "mapped; runtime unsupported",
     }
+    pytest_only = {
+        row["operation"]
+        for row in rows
+        if row["coverage_status"] == "documented and pytest executable"
+    }
+    assert pytest_only == {"problem.target.hpr_performance_map"}
     unsupported = {
         row["operation"]
         for row in rows
@@ -155,4 +162,4 @@ def test_rtd_coverage_summary_matches_manifest_denominator() -> None:
     count = len(_rows())
 
     assert f"**{count} operations**" in summary
-    assert f"**{count}/{count}, or 100 percent mapping" in summary
+    assert f"**{count}/{count}, or 100 percent operation coverage**" in summary

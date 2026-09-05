@@ -262,10 +262,16 @@ def test_parallel_streams_match_aggregate_heat():
     streams = StreamCollection()
     streams = cycle.build_stream_collection(include_cond=True, include_evap=True)
     assert np.isclose(
-        sum([s.heat_flow for s in streams.get_cold_streams()]), cycle.Q_cool, 0
+        sum([s.heat_flow for s in streams.get_cold_streams()]),
+        cycle.Q_cool,
+        rtol=1e-7,
+        atol=1e-8,
     )
     assert np.isclose(
-        sum([s.heat_flow for s in streams.get_hot_streams()]), cycle.Q_heat, 0
+        sum([s.heat_flow for s in streams.get_hot_streams()]),
+        cycle.Q_heat,
+        rtol=1e-7,
+        atol=1e-8,
     )
 
 

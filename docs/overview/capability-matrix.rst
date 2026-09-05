@@ -28,9 +28,10 @@ Capability Matrix
      - one physical stream with ordered thermal segments
      - base
    * - Heat Pump and refrigeration
-     - named Carnot, vapour-compression, Brayton, and MVR target methods
-     - HPR targets, costs, and graphs
-     - model-specific HPR extras
+     - named Carnot, vapour-compression, Brayton, and MVR target methods;
+       explicit target-owned performance-map generation
+     - HPR targets, costs, graphs, and versioned plain maps
+     - CoolProp default; optional TESPy through ``openpinch[tespy]``
    * - Process MVR
      - ``problem.components.add_process_mvr()``
      - replacement streams and stage results

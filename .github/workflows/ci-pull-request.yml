@@ -201,7 +201,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        surface: [core, dashboard, notebook, brayton_cycle, synthesis]
+        surface: [core, dashboard, notebook, brayton_cycle, tespy, synthesis]
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
@@ -223,6 +223,27 @@ jobs:
             *) uv sync --frozen --no-default-groups --extra "${SURFACE}" ;;
           esac
       - run: uv run --no-sync python scripts/optional_install_smoke.py ${{ matrix.surface }}
+
+  hpr-tespy-tests:
+    if: ${{ github.event.action != 'closed' && github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          save-cache: false
+      - run: uv sync --frozen --group dev --extra tespy
+      - run: uv run --no-sync pytest --hypothesis-seed=20260715 -m "tespy"
+      - name: Run guarded public TESPy target-map smoke
+        run: timeout 300s uv run --no-sync pytest tests/analysis/heat_pumps/test_hpr_tespy_target_evaluator.py::test_real_public_tespy_target_and_minimal_map_stay_within_smoke_budget
 
   artifact-build:
     if: ${{ github.event.action != 'closed' && github.event.pull_request.draft == false }}
@@ -274,7 +295,31 @@ jobs:
           path: dist
       - run: uv sync --frozen --no-default-groups
       - run: uv pip install --python .venv --no-deps --reinstall --no-index --find-links dist OpenPinch
-      - run: uv run --no-sync python scripts/artifact_install_smoke.py
+      - run: uv run --no-sync python scripts/artifact_install_smoke.py --surface core
+
+  artifact-install-tespy-smoke:
+    needs: artifact-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          save-cache: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: openpinch-dist
+          path: dist
+      - run: uv sync --frozen --no-default-groups --extra tespy
+      - run: uv pip install --python .venv --no-deps --reinstall --no-index --find-links dist OpenPinch
+      - run: uv run --no-sync python scripts/artifact_install_smoke.py --surface tespy
 
   solver-tests:
     if: ${{ github.event.action != 'closed' && github.event.pull_request.draft == false && github.event.pull_request.base.ref == 'main' }}
@@ -314,8 +359,10 @@ jobs:
       - release-version
       - docs
       - optional-install-smoke
+      - hpr-tespy-tests
       - artifact-build
       - artifact-install-smoke
+      - artifact-install-tespy-smoke
       - solver-tests
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -330,8 +377,10 @@ jobs:
           RELEASE_VERSION_RESULT: ${{ needs.release-version.result }}
           DOCS_RESULT: ${{ needs.docs.result }}
           OPTIONAL_RESULT: ${{ needs.optional-install-smoke.result }}
+          HPR_TESPY_RESULT: ${{ needs.hpr-tespy-tests.result }}
           ARTIFACT_BUILD_RESULT: ${{ needs.artifact-build.result }}
           ARTIFACT_INSTALL_RESULT: ${{ needs.artifact-install-smoke.result }}
+          ARTIFACT_TESPY_RESULT: ${{ needs.artifact-install-tespy-smoke.result }}
           SOLVER_RESULT: ${{ needs.solver-tests.result }}
         run: |
           set -euo pipefail
@@ -339,8 +388,10 @@ jobs:
             "${TEST_RESULT}" \
             "${DOCS_RESULT}" \
             "${OPTIONAL_RESULT}" \
+            "${HPR_TESPY_RESULT}" \
             "${ARTIFACT_BUILD_RESULT}" \
-            "${ARTIFACT_INSTALL_RESULT}"; do
+            "${ARTIFACT_INSTALL_RESULT}" \
+            "${ARTIFACT_TESPY_RESULT}"; do
             test "${result}" = "success"
           done
           if [ "${BASE_REF}" = "main" ]; then

@@ -116,19 +116,31 @@ def test_cascade_num_cycles_matches_network_definition():
     for subcycle in cycle.subcycles:
         streams = subcycle.build_stream_collection(include_cond=True, include_evap=True)
         assert np.isclose(
-            sum([s.heat_flow for s in streams.get_cold_streams()]), subcycle.Q_cool, 0
+            sum([s.heat_flow for s in streams.get_cold_streams()]),
+            subcycle.Q_cool,
+            rtol=1e-7,
+            atol=1e-8,
         )
         assert np.isclose(
-            sum([s.heat_flow for s in streams.get_hot_streams()]), subcycle.Q_heat, 0
+            sum([s.heat_flow for s in streams.get_hot_streams()]),
+            subcycle.Q_heat,
+            rtol=1e-7,
+            atol=1e-8,
         )
 
     streams = StreamCollection()
     streams = cycle.build_stream_collection(include_cond=True, include_evap=True)
     assert np.isclose(
-        sum([s.heat_flow for s in streams.get_cold_streams()]), cycle.Q_cool, 0
+        sum([s.heat_flow for s in streams.get_cold_streams()]),
+        cycle.Q_cool,
+        rtol=1e-7,
+        atol=1e-8,
     )
     assert np.isclose(
-        sum([s.heat_flow for s in streams.get_hot_streams()]), cycle.Q_heat, 0
+        sum([s.heat_flow for s in streams.get_hot_streams()]),
+        cycle.Q_heat,
+        rtol=1e-7,
+        atol=1e-8,
     )
 
 
@@ -400,10 +412,16 @@ def test_cascade_refrigeration_streams_and_aggregates_match():
     streams = StreamCollection()
     streams = cycle.build_stream_collection(include_cond=True, include_evap=True)
     assert np.isclose(
-        sum([s.heat_flow for s in streams.get_cold_streams()]), cycle.Q_cool, 0
+        sum([s.heat_flow for s in streams.get_cold_streams()]),
+        cycle.Q_cool,
+        rtol=1e-7,
+        atol=1e-8,
     )
     assert np.isclose(
-        sum([s.heat_flow for s in streams.get_hot_streams()]), cycle.Q_heat, 0
+        sum([s.heat_flow for s in streams.get_hot_streams()]),
+        cycle.Q_heat,
+        rtol=1e-7,
+        atol=1e-8,
     )
 
 

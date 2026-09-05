@@ -6,6 +6,19 @@ from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any, Mapping
 
+from ....analysis.heat_pumps.performance_maps.generation import (
+    generate_hpr_performance_map,
+)
+from ....analysis.heat_pumps.performance_maps.target_basis import (
+    build_hpr_target_map_basis,
+)
+from ....analysis.heat_pumps.performance_maps.targeting import (
+    normalize_hpr_simulation_backend,
+)
+from ....contracts.hpr_performance_map import (
+    HprPerformanceMap,
+    HprPerformanceMapRequest,
+)
 from ....contracts.output import TargetOutput
 from ....domain.enums import (
     HeatPumpAndRefrigerationCycle,
@@ -205,6 +218,18 @@ class _TargetAccessor:
     def all_periods(self) -> _AllPeriodsTargetAccessor:
         return _AllPeriodsTargetAccessor(self)
 
+    def hpr_performance_map(
+        self,
+        *,
+        target: BaseTargetModel,
+        request: HprPerformanceMapRequest,
+    ) -> HprPerformanceMap:
+        """Generate one explicit map from a compatible scalar HPR target."""
+        basis = build_hpr_target_map_basis(target)
+        if not isinstance(request, HprPerformanceMapRequest):
+            raise TypeError("request must be an HprPerformanceMapRequest")
+        return generate_hpr_performance_map(basis, request)
+
     def _runtime(
         self,
         *,
@@ -379,7 +404,13 @@ class _TargetAccessor:
         minimum_approach_temperature: float | None = None,
         maximum_restarts: int | None = None,
         extra_configuration: Mapping[str, Any] | None = None,
+        simulation_backend: str | None = None,
     ) -> BaseTargetModel:
+        normalized_backend = (
+            None
+            if simulation_backend is None
+            else normalize_hpr_simulation_backend(simulation_backend)
+        )
         if is_cascade_cycle is not None:
             if cycle is HeatPumpAndRefrigerationCycle.CascadeCarnot:
                 cycle = (
@@ -428,11 +459,14 @@ class _TargetAccessor:
             if is_heat_pump
             else TargetType.DR.value
         )
+        runtime_options = dict(options or {})
+        if normalized_backend is not None:
+            runtime_options["simulation_backend"] = normalized_backend
         return self._execute(
             surface=surface,
             target_id=target_id,
             zone=zone,
-            options=options,
+            options=runtime_options,
             configuration=configuration,
             include_subzones=include_subzones,
             period_id=period_id,
@@ -529,6 +563,7 @@ class _TargetAccessor:
         initialize_from_carnot=None,
         sort_refrigerants=None,
         allow_integrated_expander=None,
+        simulation_backend="coolprop",
         zone=None,
         include_subzones=False,
         period_id=None,
@@ -543,6 +578,7 @@ class _TargetAccessor:
         minimum_approach_temperature=None,
         maximum_restarts=None,
     ):
+        simulation_backend = normalize_hpr_simulation_backend(simulation_backend)
         extra = {}
         for key, value in (
             ("HPR_REFRIGERANTS", refrigerants),
@@ -571,6 +607,7 @@ class _TargetAccessor:
             expander_efficiency=expander_efficiency,
             minimum_approach_temperature=minimum_approach_temperature,
             maximum_restarts=maximum_restarts,
+            simulation_backend=simulation_backend,
         )
 
     def vapour_compression_refrigeration(
@@ -582,6 +619,7 @@ class _TargetAccessor:
         initialize_from_carnot=None,
         sort_refrigerants=None,
         allow_integrated_expander=None,
+        simulation_backend="coolprop",
         zone=None,
         include_subzones=False,
         period_id=None,
@@ -596,6 +634,7 @@ class _TargetAccessor:
         minimum_approach_temperature=None,
         maximum_restarts=None,
     ):
+        simulation_backend = normalize_hpr_simulation_backend(simulation_backend)
         extra = {}
         for key, value in (
             ("HPR_REFRIGERANTS", refrigerants),
@@ -624,6 +663,7 @@ class _TargetAccessor:
             expander_efficiency=expander_efficiency,
             minimum_approach_temperature=minimum_approach_temperature,
             maximum_restarts=maximum_restarts,
+            simulation_backend=simulation_backend,
         )
 
     def brayton_heat_pump(

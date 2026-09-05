@@ -30,7 +30,7 @@ dependencies=[
   "numpy<3",
   "pint<1",
   "pandas<3",
-  "coolprop<8",
+  "CoolProp>=8",
   "pydantic<3",
   "scipy<2",
 ]
@@ -63,7 +63,10 @@ dashboard = [
   "pyxlsb",
 ]
 brayton_cycle = [
-  "tespy",
+  "tespy>=0.10.1.post2",
+]
+tespy = [
+  "tespy>=0.10.1.post2",
 ]
 synthesis = [
   "pyomo>=6.10.0",
@@ -86,7 +89,7 @@ full = [
   "plotly>=6.8.0",
   "openpyxl>=3.1.5",
   "pyxlsb",
-  "tespy",
+  "tespy>=0.10.1.post2",
   "ipykernel>=7.2.0",
   "nbformat>=5.10.4",
   "pyomo>=6.10.0",
@@ -102,6 +105,7 @@ dev = [
     "hatchling>=1.26",
     "hypothesis>=6.135.0",
     "ipykernel>=7.2.0",
+    "jsonschema>=4.25.1",
     "nbformat>=5.10.4",
     "pytest>=9.0.3",
     "ruff>=0.15.8",
@@ -116,7 +120,7 @@ dev = [
     "openpyxl>=3.1.5",
     "wakepy>=1.0.0",
     "pyxlsb",
-    "tespy",
+    "tespy>=0.10.1.post2",
     "pylint>=4.0.5",
     "graphviz>=0.21",
     "idaes-pse>=2.11.0",

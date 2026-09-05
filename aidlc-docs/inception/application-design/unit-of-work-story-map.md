@@ -250,3 +250,94 @@ Every approved story, functional requirement, non-functional requirement,
 example-based acceptance item, TDD obligation, and enabled PBT rule has an
 implementation or verification owner. Security and Resiliency extensions
 remain disabled and introduce no unit work.
+
+## TESPy HPR Performance-Map Requirement Map
+
+User Stories are intentionally skipped for this internal technical integration.
+The approved functional requirements, non-functional requirements, and thirteen
+acceptance criteria provide complete unit traceability.
+
+### Functional requirements
+
+| Requirement | Primary unit | Supporting/final verification |
+|---|---|---|
+| FR-1 Engine-neutral map contract | 1 | Unit 3 public serialization |
+| FR-2 Required operating-point data | 1 | Unit 2 calculation; Unit 3 examples |
+| FR-3 Grid and interpolation semantics | 1 | Unit 2 ordering; external fixture verification |
+| FR-4 Version and provenance | 1 | Unit 2 provenance population |
+| FR-5 Backend selection on current HPR methods | 3 | Unit 2 simulator registry |
+| FR-6 TESPy grid generation | 2 | Unit 3 explicit accessor |
+| FR-7 Failure policy | 2 | Unit 1 typed errors; Unit 3 translation |
+| FR-8 Targeting and map-export bridge | 3 | Unit 2 context builder/generator |
+| FR-9 Downstream independence | 1 | Units 2 and 3 architecture/package gates |
+| FR-10 Optional dependency isolation | 2 | Units 1 and 3 cold-import gates |
+
+### Non-functional requirements
+
+| Requirement | Primary unit(s) | Final verification |
+|---|---|---|
+| Determinism | 1 and 2 | Unit 3 and integrated fixed-seed gate |
+| Validation | 1 | Units 2 and 3 reject invalid outputs/inputs |
+| Separate tolerance dimensions | 1 | External fixture decode and Unit 2 usage |
+| Explicit thermodynamic system boundary | 2 | Unit 3 documentation/examples |
+| Fake-adapter testability | 2 | Integrated base-profile suite |
+| Versioned compatibility | 1 | Unit 3 publication and package checks |
+| Existing HPR backward compatibility | 3 | Omitted-selector numerical regressions |
+| Environment-safe optional TESPy smoke | 2 | Unit 3 install guidance and integrated profiles |
+| Existing runtime models remain non-transport | 1 and 2 | Unit 3 architecture checks |
+
+### Acceptance criteria
+
+| Acceptance criterion | Primary unit | Final verification |
+|---|---|---|
+| 1. JSON round trip and unknown-version rejection | 1 | 3 |
+| 2. Core/contract imports with TESPy blocked | 1 | 3 |
+| 3. Fake adapter proves traversal, COP, failure, validation, provenance | 2 | 3 |
+| 4. Property tests cover serialization and physical/schema invariants | 1 and 2 | Integrated gate |
+| 5. Guarded real-TESPy design/offdesign smoke | 2 | Integrated optional profile |
+| 6. Checked-in plain JSON fixture and downstream docs | 1 | 3 |
+| 7. Existing targeting behavior/root exports unchanged by default | 3 | Integrated regressions |
+| 8. Default CoolProp, explicit TESPy, unsupported combination behavior | 3 | Integrated regressions |
+| 9. Period conditions cannot select incompatible temperature curves | 1 | External consumer fixture test |
+| 10. Explicit fixed-capacity/reference scaling semantics | 1 | External consumer fixture test |
+| 11. Three-point curve forbids nonadjacent interpolation | 1 | External consumer MILP test |
+| 12. Mode-specific useful capacity, load, and COP fixtures | 1 | Units 2 and 3 |
+| 13. Consumer rejects versions and enforces explicit capacity scaling | 1 | External OpenUtility test evidence |
+
+### Enabled Property-Based Testing extension
+
+| PBT rule | Owner | Units Generation disposition |
+|---|---|---|
+| PBT-01 Property identification | Units 1, 2, and 3 | Required in each Functional Design artifact |
+| PBT-02 Round trips | Unit 1 | JSON model/mapping/text round trips with valid generated maps |
+| PBT-03 Invariants | Units 1 and 2 | Physical balance, COP, load/capacity, ordering, traversal-size, and completeness properties |
+| PBT-04 Idempotency | N/A | No operation claims idempotent mutation or normalization |
+| PBT-05 Oracle/model comparison | Unit 2 | Supported CoolProp nominal points compared with the existing target calculation within declared tolerance |
+| PBT-06 Stateful testing | N/A | Contracts are immutable and generator sessions expose no reusable mutable public state |
+| PBT-07 Generator quality | Unit 1 | Reusable constrained heat-pump/refrigeration map and request strategies |
+| PBT-08 Shrinking/reproducibility | Units 1 and 2 | Hypothesis shrinking retained and repository seed/reproduction policy used |
+| PBT-09 Framework selection | Units 1 and 2 | Existing Python Hypothesis dependency and pytest integration retained |
+| PBT-10 Complementary examples | Units 1, 2, and 3 | Golden fixtures and explicit backend/failure regressions accompany properties |
+
+### TDD and quality-gate ownership
+
+- Each unit receives approved Functional Design, NFR Requirements, NFR Design,
+  and Code Generation planning before production edits.
+- Every behavior begins with a failing example or property test, advances with
+  the smallest production change, and refactors only while the focused gate is
+  green.
+- Unit 1 owns reusable Hypothesis strategies, golden fixtures, and strict
+  contract tests; Unit 2 owns simulator/oracle/lifecycle tests; Unit 3 owns
+  public compatibility, architecture, docs, and installed-package tests.
+- Build and Test owns the fixed-seed PBT, full regression, optional-profile,
+  formatting, typing, documentation, build, audit, and distribution gates.
+
+### TESPy HPR coverage validation
+
+Validation set: FR-1 through FR-10; all nine named NFR groups; acceptance
+criteria 1 through 13; and enabled PBT-01 through PBT-10 with PBT-04 and PBT-06
+explicitly N/A.
+
+Every approved requirement and acceptance criterion has a primary unit and
+final verification owner. Property-Based Testing is enabled and fully assigned.
+Security Baseline and Resiliency Baseline remain disabled and add no unit work.

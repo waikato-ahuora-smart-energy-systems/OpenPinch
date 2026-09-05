@@ -1,0 +1,71 @@
+{
+  "cop_convention": "cooling",
+  "energy_balance_tolerance": 1e-06,
+  "interpolation_topology": "ordered_part_load_curve",
+  "map_id": "openpinch-golden-refrigeration-1.0",
+  "mode": "refrigeration",
+  "model_id": "reference-single-stage-refrigeration-v1",
+  "points": [
+    {
+      "cop": 3.3333333333333335,
+      "curve_id": "ref--5C-35C",
+      "electric_power": 12.0,
+      "load_fraction": 0.5,
+      "name": "ref--5C-35C-plr-050",
+      "q_sink": 52.0,
+      "q_source": 40.0,
+      "sink_temperature": 35.0,
+      "source_temperature": -5.0
+    },
+    {
+      "cop": 3.75,
+      "curve_id": "ref--5C-35C",
+      "electric_power": 16.0,
+      "load_fraction": 0.75,
+      "name": "ref--5C-35C-plr-075",
+      "q_sink": 76.0,
+      "q_source": 60.0,
+      "sink_temperature": 35.0,
+      "source_temperature": -5.0
+    },
+    {
+      "cop": 4.0,
+      "curve_id": "ref--5C-35C",
+      "electric_power": 20.0,
+      "load_fraction": 1.0,
+      "name": "ref--5C-35C-plr-100",
+      "q_sink": 100.0,
+      "q_source": 80.0,
+      "sink_temperature": 35.0,
+      "source_temperature": -5.0
+    }
+  ],
+  "provenance": {
+    "assumptions": [
+      "external service temperatures",
+      "electric power includes declared auxiliaries",
+      "no hidden thermal losses"
+    ],
+    "cycle": {
+      "family": "vapour_compression_refrigeration",
+      "refrigerant": "R290"
+    },
+    "fixture": true,
+    "generator": "OpenPinch contract fixture",
+    "versions": {
+      "openpinch": "0.6.4"
+    }
+  },
+  "reference_capacity": 80.0,
+  "reference_capacity_basis": "q_source",
+  "schema_version": "1.0",
+  "temperature_match_tolerance": 1e-06,
+  "thermodynamic_backend": "coolprop",
+  "units": {
+    "electric_power": "kW",
+    "q_sink": "kW",
+    "q_source": "kW",
+    "sink_temperature": "degC",
+    "source_temperature": "degC"
+  }
+}

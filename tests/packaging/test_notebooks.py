@@ -382,6 +382,8 @@ def test_manifest_operations_are_demonstrated_in_notebook_source(
         "show_dashboard": "show_dashboard",
     }
     for row in _manifest_rows():
+        if row["coverage_status"] == "documented and pytest executable":
+            continue
         operation = row["operation"]
         notebook_name = row["primary_tutorial"]
         source = _combined_source(_copied_notebook(tmp_path, notebook_name))

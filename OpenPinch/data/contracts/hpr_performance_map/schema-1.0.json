@@ -1,0 +1,237 @@
+{
+  "$defs": {
+    "HprPerformanceMapUnits": {
+      "additionalProperties": false,
+      "description": "Closed canonical units for performance-map schema 1.0.",
+      "properties": {
+        "electric_power": {
+          "const": "kW",
+          "title": "Electric Power",
+          "type": "string"
+        },
+        "q_sink": {
+          "const": "kW",
+          "title": "Q Sink",
+          "type": "string"
+        },
+        "q_source": {
+          "const": "kW",
+          "title": "Q Source",
+          "type": "string"
+        },
+        "sink_temperature": {
+          "const": "degC",
+          "title": "Sink Temperature",
+          "type": "string"
+        },
+        "source_temperature": {
+          "const": "degC",
+          "title": "Source Temperature",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_temperature",
+        "sink_temperature",
+        "q_source",
+        "q_sink",
+        "electric_power"
+      ],
+      "title": "HprPerformanceMapUnits",
+      "type": "object"
+    },
+    "HprPerformancePoint": {
+      "additionalProperties": false,
+      "description": "One active point on a fixed-temperature part-load curve.",
+      "properties": {
+        "cop": {
+          "exclusiveMinimum": 0.0,
+          "title": "Cop",
+          "type": "number"
+        },
+        "curve_id": {
+          "title": "Curve Id",
+          "type": "string"
+        },
+        "electric_power": {
+          "exclusiveMinimum": 0.0,
+          "title": "Electric Power",
+          "type": "number"
+        },
+        "load_fraction": {
+          "exclusiveMinimum": 0.0,
+          "maximum": 1.0,
+          "title": "Load Fraction",
+          "type": "number"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "q_sink": {
+          "minimum": 0.0,
+          "title": "Q Sink",
+          "type": "number"
+        },
+        "q_source": {
+          "minimum": 0.0,
+          "title": "Q Source",
+          "type": "number"
+        },
+        "sink_temperature": {
+          "title": "Sink Temperature",
+          "type": "number"
+        },
+        "source_temperature": {
+          "title": "Source Temperature",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "curve_id",
+        "source_temperature",
+        "sink_temperature",
+        "load_fraction",
+        "q_source",
+        "q_sink",
+        "electric_power",
+        "cop"
+      ],
+      "title": "HprPerformancePoint",
+      "type": "object"
+    },
+    "JsonValue": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "items": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "type": "array"
+        },
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "description": "Complete versioned physical HPR performance map.",
+  "properties": {
+    "cop_convention": {
+      "enum": [
+        "heating",
+        "cooling"
+      ],
+      "title": "Cop Convention",
+      "type": "string"
+    },
+    "energy_balance_tolerance": {
+      "default": 1e-06,
+      "minimum": 0.0,
+      "title": "Energy Balance Tolerance",
+      "type": "number"
+    },
+    "interpolation_topology": {
+      "const": "ordered_part_load_curve",
+      "title": "Interpolation Topology",
+      "type": "string"
+    },
+    "map_id": {
+      "title": "Map Id",
+      "type": "string"
+    },
+    "mode": {
+      "enum": [
+        "heat_pump",
+        "refrigeration"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "model_id": {
+      "title": "Model Id",
+      "type": "string"
+    },
+    "points": {
+      "items": {
+        "$ref": "#/$defs/HprPerformancePoint"
+      },
+      "minItems": 1,
+      "title": "Points",
+      "type": "array"
+    },
+    "provenance": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "title": "Provenance",
+      "type": "object"
+    },
+    "reference_capacity": {
+      "exclusiveMinimum": 0.0,
+      "title": "Reference Capacity",
+      "type": "number"
+    },
+    "reference_capacity_basis": {
+      "enum": [
+        "q_sink",
+        "q_source"
+      ],
+      "title": "Reference Capacity Basis",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "temperature_match_tolerance": {
+      "default": 1e-06,
+      "minimum": 0.0,
+      "title": "Temperature Match Tolerance",
+      "type": "number"
+    },
+    "thermodynamic_backend": {
+      "title": "Thermodynamic Backend",
+      "type": "string"
+    },
+    "units": {
+      "$ref": "#/$defs/HprPerformanceMapUnits"
+    }
+  },
+  "required": [
+    "schema_version",
+    "map_id",
+    "mode",
+    "units",
+    "reference_capacity",
+    "reference_capacity_basis",
+    "interpolation_topology",
+    "thermodynamic_backend",
+    "model_id",
+    "provenance",
+    "points",
+    "cop_convention"
+  ],
+  "title": "HprPerformanceMap",
+  "type": "object"
+}

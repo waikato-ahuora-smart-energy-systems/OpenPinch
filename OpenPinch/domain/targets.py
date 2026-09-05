@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -229,6 +229,7 @@ class HeatPumpTargetBase(GraphBackedTarget, UtilitySummaryTarget):
     work_target: Optional[float] = None
     turbine_efficiency_target: Optional[float] = None
     hpr_cycle: str
+    hpr_simulation_backend: Literal["coolprop", "tespy"] = "coolprop"
     hpr_utility_total: Any
     hpr_work: Any
     hpr_external_utility: Any

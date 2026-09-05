@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, List, Optional
+from typing import Any, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 from ..domain.stream_collection import StreamCollection
 from ..domain.value import Value
+from .hpr import HprTargetSimulationRecord
 from .units import coerce_output_value
 from .workspace import ValidationReport
 
@@ -105,6 +106,8 @@ class TargetResults(_ReportModel):
     exergy_req_min: Value | None = None
     exergy_des_min: Value | None = None
     hpr_cycle: Optional[str] = None
+    hpr_simulation_backend: Literal["coolprop", "tespy"] | None = None
+    hpr_target_simulation_record: HprTargetSimulationRecord | None = None
     hpr_utility_total: Value | None = None
     hpr_work: Value | None = None
     hpr_external_utility: Value | None = None

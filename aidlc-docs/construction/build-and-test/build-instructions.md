@@ -2,80 +2,78 @@
 
 ## Prerequisites
 
-- **Build tool**: `uv`, Python build frontend, and Hatchling.
-- **Python**: CPython 3.14.2 or later, as declared by `pyproject.toml`.
-- **Core dependencies**: NumPy, Pint, pandas, CoolProp, Pydantic, and SciPy.
-- **Development dependencies**: pytest, Hypothesis, coverage, Ruff, Sphinx,
+- Build tool: uv with Hatchling through the PEP 517 build interface.
+- Runtime: CPython 3.14.2 or later.
+- Core dependencies: NumPy, Pint, pandas, CoolProp 8 or later, Pydantic, and
+  SciPy.
+- HPR optional dependency: install the `tespy` extra for TESPy target and map
+  generation. The verified environment uses TESPy 0.11.2.
+- Development dependencies: pytest, Hypothesis, coverage, Ruff, Sphinx,
   `build`, and Hatchling from the locked development group.
-- **Optional dependencies**: notebook extras for an interactive Jupyter
-  session; solver extras only for solver-marked HEN tests.
-- **Environment variables**: none for the utility-placement core, build, or
-  base-profile notebook. External solver executable variables are required
-  only for the separately marked solver suite.
-- **System requirements**: any supported operating system with a Python 3.14
-  environment; temporary disk space for one source archive and wheel.
+- External solver profile: locally configured IPOPT, CBC, Bonmin, Couenne,
+  APOPT, MojoPSE, and AMPL function libraries for solver-marked repository
+  tests. They are not required by HPR targeting or map generation.
+- Disk: temporary space for a source archive, wheel, and two isolated virtual
+  environments.
 
 ## Build Steps
 
-### 1. Install Dependencies
-
-From the repository root:
+### 1. Synchronize Dependencies
 
 ```bash
 uv sync --all-extras --group dev
 ```
 
-For the core feature and base notebook only, the locked default and development
-dependencies are sufficient; solver executables are not needed.
-
-### 2. Configure Environment
-
-No runtime configuration is needed for utility placement. Confirm the selected
-interpreter and import source:
+### 2. Verify the Runtime and Optional Boundaries
 
 ```bash
 uv run python --version
-uv run python -c "import OpenPinch; print(OpenPinch.__file__)"
+uv run python scripts/optional_install_smoke.py tespy
 ```
 
-### 3. Build All Units
+### 3. Build Source and Wheel Artifacts
 
-Use installed locked build tooling without dependency download:
+Use a clean output directory:
 
 ```bash
-uv run python -m build --no-isolation --outdir dist
+uv build --out-dir dist
 ```
 
 ### 4. Verify Build Success
 
-- **Expected output**: `Successfully built openpinch-0.5.4.tar.gz and
-  openpinch-0.5.4-py3-none-any.whl` for the current project version.
-- **Build artifacts**: `dist/openpinch-*.tar.gz` and
-  `dist/openpinch-*-py3-none-any.whl`.
-- **Required archive content**: `OpenPinch/contracts/utility_placement.py`, all
-  `OpenPinch/analysis/utility_placement/` modules,
-  `OpenPinch/application/utility_placement.py`,
-  `OpenPinch/application/_problem/accessors/target.py`, and
-  `OpenPinch/analysis/targeting/utilities.py`,
-  `OpenPinch/domain/stream.py`, and
-  `OpenPinch/data/notebooks/19_utility_placement_optimisation.ipynb`.
-- **Common warnings**: none are accepted from the build itself. Shell startup
-  warnings about a restricted process list are environment noise, not build
-  output.
+- Expected artifacts for version 0.6.4 are
+  `dist/openpinch-0.6.4.tar.gz` and
+  `dist/openpinch-0.6.4-py3-none-any.whl`.
+- Both archives must contain the versioned HPR schema, heat-pump and
+  refrigeration fixtures, compressor characteristic, all performance-map
+  modules, target record/basis modules, and public accessor integration.
+- Wheel metadata must expose a `tespy` extra requiring TESPy 0.10.1.post2 or
+  later.
+- Archive members must be unique and resource bytes must match the checkout.
+
+## Installed Artifact Verification
+
+Install the wheel into two clean environments outside the checkout. Run:
+
+```bash
+python scripts/artifact_install_smoke.py --surface core
+python scripts/artifact_install_smoke.py --surface tespy
+```
+
+The core environment must not contain TESPy. The TESPy environment must execute
+the explicit public target, winning-record, target-derived basis, and minimal
+performance-map workflow. Both imports must resolve from site-packages.
 
 ## Troubleshooting
 
-### Build Fails with Dependency Errors
+### Dependency or Build Frontend Failure
 
-- **Cause**: isolated build mode tries to download Hatchling in a network-
-  restricted environment, or the lock is not synchronized.
-- **Solution**: run `uv sync --all-extras --group dev`, then use
-  `python -m build --no-isolation` through the synchronized environment.
+Synchronize the lock and rerun the build from the repository root. In a
+network-restricted environment, ensure uv can access its existing package
+cache. Do not weaken the optional dependency boundary to make the build pass.
 
-### Build Fails with Compilation or Package-Data Errors
+### Missing Resource or Signature Mismatch
 
-- **Cause**: invalid Python syntax, stale generated notebook output, or missing
-  Hatchling package-data discovery.
-- **Solution**: run Ruff and the focused packaging/notebook tests, regenerate
-  notebooks with `uv run python scripts/generate_tutorial_notebooks.py`, and
-  rebuild. Do not hand-edit the generated notebook.
+Run the packaging, resource, and cold-import tests. Compare the source, sdist,
+and wheel resource digests, then rebuild from a clean output directory. Do not
+manually patch a built archive.

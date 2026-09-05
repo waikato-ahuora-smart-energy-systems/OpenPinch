@@ -144,3 +144,99 @@ and uses ordinary summary, target, GCC, and Total Site Profile operations. The
 canonical tutorial manifest selects its dependency profile, CI executes the
 generated artifact, and distribution tests verify its inclusion. The notebook
 does not manually construct utilities or invoke a utility-placement CLI.
+
+## TESPy HPR Performance-Map Service Orchestration
+
+### Default CoolProp targeting
+
+1. The current vapour-compression accessor normalizes
+   `simulation_backend="coolprop"` before calling `_hpr`.
+2. `_hpr` carries the value as transient runtime intent and records it for
+   period replay; it does not overload `HPR_TYPE` or the black-box minimizer.
+3. The HPR service selects the existing CoolProp simulator and otherwise follows
+   the current placement, targeting, aggregation, and result-normalization path.
+4. The returned target records `hpr_simulation_backend="coolprop"`. Existing
+   calls, return types, and numerical baselines remain unchanged.
+
+### Explicit TESPy targeting
+
+1. The same current method accepts `simulation_backend="tespy"`.
+2. The HPR service verifies that the selected vapour-compression configuration is
+   supported before expensive targeting begins.
+3. The TESPy adapter constructs its documented network lazily, solves the design
+   condition, evaluates requested target conditions, and returns the same
+   normalized internal result shape as the CoolProp adapter.
+4. Import or convergence failures identify TESPy, the selected cycle, operating
+   condition, and installation extra. No automatic CoolProp fallback occurs.
+5. The ordinary target remains a normal `HeatPumpTargetBase` subtype with the
+   selected backend recorded as plain provenance.
+
+### Follow-up map generation
+
+1. The caller passes a successful HPR target and `HprPerformanceMapRequest` to
+   `problem.target.hpr_performance_map(...)`.
+2. The application layer checks that the target belongs to a supported
+   heat-pump/refrigeration result family, then delegates without equations.
+3. The context builder validates the target backend, mode, single-port topology,
+   reference-capacity basis, grid coordinates, and target configuration.
+4. Grid traversal is deterministic: source temperature, then sink temperature,
+   then ascending load fraction. Curve and point identifiers derive from these
+   normalized coordinates rather than input object identity.
+5. The selected simulator prepares once. TESPy uses the declared design point
+   derived from the target's nominal condition, then solves offdesign points;
+   CoolProp evaluates the equivalent existing cycle equations.
+6. Each result is normalized to nonnegative `q_source`, `q_sink`, and total
+   external electric power. Heat-pump COP is `q_sink / electric_power`;
+   refrigeration COP is `q_source / electric_power`.
+7. Any missing, failed, non-finite, or physically inconsistent point aborts the
+   complete map. Diagnostics identify the coordinate and backend but are not
+   embedded as successful map points.
+8. The service validates the completed map and returns a detached Pydantic
+   contract. Serialization is caller-controlled and performs no simulation.
+
+### Fixed-capacity and load semantics
+
+The map is absolute for one declared `reference_capacity`. At every active point,
+useful duty equals `load_fraction * reference_capacity` within tolerance. The
+first release does not scale capacity. OpenUtility must either use a candidate
+whose capacity equals the map reference capacity or apply a documented constant
+scale to every duty and power value; variable sizing remains downstream work.
+
+### Temperature semantics
+
+Request coordinates are external thermal-service temperatures in `degC`. The
+simulator applies target approach-temperature assumptions to obtain internal
+refrigerant conditions. Internal evaporation, condensation, superheat, subcool,
+and characteristic values are structured provenance and never replace the
+external coordinates used by OpenUtility thermal nodes.
+
+### Multi-period behavior
+
+The map grid contains the temperature combinations needed by downstream periods,
+but it is not itself a period-dispatch result. A scalar successful target can
+supply the default reference capacity. A multi-period target with an array or
+aggregate useful duty requires the request to state one explicit fixed reference
+capacity. Period weights, tariffs, node demands, candidate selection, and dispatch
+remain exclusively in OpenUtility.
+
+### Failure and dependency boundaries
+
+- Invalid public selector or request values fail before simulation.
+- Unsupported target families or multi-port configurations fail with a typed
+  compatibility error rather than being flattened into one node pair.
+- TESPy import occurs only when selected and uses the existing optional-dependency
+  error style.
+- A simulator failure closes its session and rejects the map; partial maps are not
+  returned in schema `1.0`.
+- No service imports OpenUtility, Pyomo, HiGHS, application objects, or presentation
+  modules.
+- Contract-only imports remain successful when TESPy is unavailable or blocked.
+
+### Cross-package contract promotion
+
+OpenPinch publishes canonical JSON Schema and golden heat-pump/refrigeration
+fixtures. OpenUtility validates its plain mapping decoder against the same field
+semantics and rejects unknown versions. Schema `1.0` is promoted only after the
+consumer enforces capacity consistency, adjacent-segment interpolation, strict
+COP/version/unit validation, mode-aware useful duty, and a separate
+temperature-matching tolerance.

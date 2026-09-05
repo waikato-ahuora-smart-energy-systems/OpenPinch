@@ -153,7 +153,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        surface: [core, dashboard, notebook, brayton_cycle, synthesis]
+        surface: [core, dashboard, notebook, brayton_cycle, tespy, synthesis]
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
@@ -175,6 +175,27 @@ jobs:
             *) uv sync --frozen --no-default-groups --extra "${SURFACE}" ;;
           esac
       - run: uv run --no-sync python scripts/optional_install_smoke.py ${{ matrix.surface }}
+
+  hpr-tespy-tests:
+    needs: release-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          save-cache: false
+      - run: uv sync --frozen --group dev --extra tespy
+      - run: uv run --no-sync pytest --hypothesis-seed=20260715 -m "tespy"
+      - name: Run guarded public TESPy target-map smoke
+        run: timeout 300s uv run --no-sync pytest tests/analysis/heat_pumps/test_hpr_tespy_target_evaluator.py::test_real_public_tespy_target_and_minimal_map_stay_within_smoke_budget
 
   solver-tests:
     needs: release-check
@@ -207,7 +228,7 @@ jobs:
       - run: uv run --no-sync pytest --hypothesis-seed=20260715 -m "solver"
 
   build:
-    needs: [test, docs, optional-install-smoke, solver-tests]
+    needs: [test, docs, optional-install-smoke, hpr-tespy-tests, solver-tests]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
@@ -265,10 +286,34 @@ jobs:
           path: dist
       - run: uv sync --frozen --no-default-groups
       - run: uv pip install --python .venv --no-deps --reinstall --no-index --find-links dist OpenPinch
-      - run: uv run --no-sync python scripts/artifact_install_smoke.py
+      - run: uv run --no-sync python scripts/artifact_install_smoke.py --surface core
+
+  artifact-install-tespy-smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          save-cache: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact_id }}
+          path: dist
+      - run: uv sync --frozen --no-default-groups --extra tespy
+      - run: uv pip install --python .venv --no-deps --reinstall --no-index --find-links dist OpenPinch
+      - run: uv run --no-sync python scripts/artifact_install_smoke.py --surface tespy
 
   create-draft-release:
-    needs: [release-check, artifact-install-smoke, build]
+    needs: [release-check, artifact-install-smoke, artifact-install-tespy-smoke, build]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -531,6 +576,8 @@ jobs:
             "artifact-install-smoke (ubuntu-latest)"
             "artifact-install-smoke (windows-latest)"
             "artifact-install-smoke (macos-latest)"
+            "artifact-install-tespy-smoke"
+            "hpr-tespy-tests"
             "verify-testpypi"
             "publish-release"
           )

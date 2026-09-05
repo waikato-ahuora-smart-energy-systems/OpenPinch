@@ -113,7 +113,7 @@ def target_output_for_recorded_period(
     runtime_options = period_options_for_replay(spec, period_id=period_id)
     target_method = getattr(problem.target, spec.surface)
     target_method(
-        zone_name=spec.zone_name,
+        zone=spec.zone_name,
         options=runtime_options,
         include_subzones=spec.include_subzones,
     )
@@ -200,6 +200,7 @@ _HPR_MAX_VALUE_FIELDS = (
 _NUMERIC_FIELDS = ("num_units",)
 _CONSENSUS_FIELDS = (
     "hpr_cycle",
+    "hpr_simulation_backend",
     "hpr_success",
     "hpr_hot_streams",
     "hpr_cold_streams",

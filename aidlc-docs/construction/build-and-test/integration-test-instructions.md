@@ -2,77 +2,59 @@
 
 ## Purpose
 
-Verify the contracts, numerical service, public problem/workspace workflows,
-presentation adapters, notebook generator, documentation, and packaged
-distribution as one detached feature.
+Verify that the three HPR units work together through current targeting,
+reporting, public accessors, multi-period boundaries, resources, documentation,
+and installed distributions without coupling OpenPinch to OpenUtility.
 
-## Test Scenarios
+## Scenario 1: Target Selection to Winning Record
 
-### Scenario 1: Contracts to Numerical Service
+- Description: compare omitted and explicit CoolProp behavior, then prove
+  explicit TESPy candidate thermodynamics determine the returned heat-pump or
+  refrigeration target.
+- Command: `uv run pytest -q tests/analysis/heat_pumps/test_hpr_tespy_targeting_integration.py tests/analysis/heat_pumps/test_hpr_tespy_target_evaluator.py`.
+- Expected: CoolProp compatibility oracles pass; supported TESPy scalar targets
+  contain a detached winning record; no fallback or engine object leaks.
+- Cleanup: evaluator sessions close exactly once and call-local caches clear.
 
-- **Description**: Validate normalized requests, feasible models, cascade-owned
-  duties, per-period named caps, residual fallback, thermodynamic objectives,
-  deterministic ranking, and typed failures.
-- **Setup**: synchronized development environment; no external service.
-- **Test command**: `uv run pytest tests/analysis/utility_placement -q`.
-- **Expected result**: all specialist tests pass, including real dual annealing,
-  analytical equations, the grid oracle, and fixed-seed repeatability.
-- **Cleanup**: none; evaluations are detached and process-local.
+## Scenario 2: Winning Target to Plain Performance Map
 
-### Scenario 2: Numerical Service to Public Workflows
+- Description: convert the winning record to a target-owned basis and generate
+  an atomic schema 1.0 map with the same backend and provenance.
+- Command: `uv run pytest -q tests/analysis/heat_pumps/test_hpr_target_basis.py tests/application/test_hpr_performance_map_accessor.py`.
+- Expected: target, backend, record, basis, map, and JSON round trip remain
+  consistent; incompatible or aggregate targets fail before simulation.
+- Cleanup: no persistent cache or temporary model state remains.
 
-- **Description**: Verify isolated direct and Total Site context construction,
-  scalar and period-resolved maximum duties, shared all-period placement,
-  detached-case cap persistence, dedicated result caching, ordered batches,
-  and pure reporting.
-- **Setup**: packaged `chocolate_factory.json` sample case.
-- **Test command**:
+## Scenario 3: Period and Batch Boundaries
 
-```bash
-uv run pytest tests/application/test_utility_placement.py tests/application/test_utility_placement_batch.py tests/application/test_utility_placement_maximum_duties.py -q --hypothesis-seed=20260715
-```
+- Description: verify selected-period and independent all-period targeting,
+  canonical ordering, isolated failure behavior, and shared-vector TESPy
+  rejection.
+- Command: `uv run pytest --hypothesis-seed=20260715 -q tests/application/test_hpr_period_batch_boundaries.py tests/analysis/heat_pumps/test_multiperiod_hpr.py`.
+- Expected: each scalar target owns its record, weighted aggregates fabricate no
+  record, and batch failures do not mutate sibling cases.
+- Cleanup: none; cases and outputs are detached.
 
-- **Expected result**: 50 tests pass; invalid input is rejected before target
-  analysis, caps remain independent, residual HU/CU coverage is explicit,
-  physical process entropy is present, and source/case order is unchanged.
-- **Cleanup**: none.
-
-### Scenario 3: Public Workflow to Notebook and Package
-
-- **Description**: Verify exactly one generated utility-placement notebook,
-  package-root imports, capped thermodynamic Process placement, uncapped
-  thermodynamic Site placement, standard plots, manifest ownership, and
-  package-data inclusion.
-- **Setup**: base dependencies; no solver or shell workflow for the feature.
-- **Test command**:
+## Scenario 4: Documentation, Architecture, and Packaging
 
 ```bash
-uv run pytest tests/packaging/test_notebooks.py tests/packaging/test_tutorial_coverage.py tests/packaging/test_release_artifacts.py -q
-```
-
-- **Expected result**: 29 tests pass; notebook 19 compiles, retains verified
-  execution outputs, the generator preserves those outputs when source is
-  unchanged, inventories match, and release artifact checks pass.
-- **Cleanup**: pytest removes its temporary copied notebooks.
-
-## Run the Integrated Regression
-
-```bash
-uv run pytest -m "not solver" -q --hypothesis-seed=20260715
+uv run pytest -q tests/architecture tests/packaging
 uv run sphinx-build -W -b html docs docs/_build/html
 uv run ruff check .
+git diff --check
 ```
 
-The verified solver-enabled run produced 2,438 passing tests and 4 expected
-environment/profile-specific skips with no failures.
+Expected results are a clean dependency firewall, cold core imports, exact API
+inventory, byte-identical resources, warning-free documentation, and no patch
+hygiene findings.
 
-## Verify Installed-Wheel Isolation
+## Complete Repository Regression
 
-Install the generated wheel into a clean virtual environment without the
-source checkout on `PYTHONPATH`. Import the specialist, load notebook 19 through
-the installed package, and execute its setup, Process, and Site code cells.
-Assert that the capped Process case reports positive `fallback_penalty`, each
-named hot duty respects its independent cap, residual `HU` is present, the
-uncapped Site objective remains thermodynamic, ordinary GCC and TSP figures
-render, and the imported `OpenPinch` path resolves inside the isolated wheel
-target rather than the source checkout.
+Run all tests with the configured solver environment and fixed Hypothesis seed:
+
+```bash
+uv run pytest --hypothesis-seed=20260715
+```
+
+The TESPy-marked selection and dedicated 300-second public target-to-map smoke
+must also pass in CI and locally where the optional extra is installed.
