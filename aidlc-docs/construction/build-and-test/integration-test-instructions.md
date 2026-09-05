@@ -1,10 +1,21 @@
-# Integration Test Instructions
+# Integration Test Instructions - RTD and Comprehensive HPR Notebook
 
 ## Purpose
 
 Verify that the three HPR units work together through current targeting,
 reporting, public accessors, multi-period boundaries, resources, documentation,
 and installed distributions without coupling OpenPinch to OpenUtility.
+
+## Scenario 0: Generated Notebook and RTD Ownership
+
+- Description: regenerate notebook 09, verify byte idempotence, compile every
+  cell, audit its public imports and operations, and build RTD with warnings as
+  errors.
+- Command: `uv run pytest -q tests/packaging/test_notebooks.py tests/packaging/test_tutorial_coverage.py tests/packaging/test_docs_consistency.py`.
+- Expected: notebook 09 owns the complete target-record-map-export example,
+  every one of 197 public operations maps to executable notebook source, and
+  the documented backend/mixture/OpenUtility boundary is consistent.
+- Cleanup: documentation output should be written to a temporary directory.
 
 ## Scenario 1: Target Selection to Winning Record
 
@@ -39,7 +50,7 @@ and installed distributions without coupling OpenPinch to OpenUtility.
 
 ```bash
 uv run pytest -q tests/architecture tests/packaging
-uv run sphinx-build -W -b html docs docs/_build/html
+uv run sphinx-build -W --keep-going -b html docs /tmp/openpinch-rtd-html
 uv run ruff check .
 git diff --check
 ```
@@ -58,3 +69,11 @@ uv run pytest --hypothesis-seed=20260715
 
 The TESPy-marked selection and dedicated 300-second public target-to-map smoke
 must also pass in CI and locally where the optional extra is installed.
+
+## Clean Notebook Execution
+
+Execute only notebook 09 from a clean temporary directory, compiling and
+running each code cell in order. Numerical infeasibility is an accepted guarded
+screening outcome; an uncaught exception, backend relabeling, fallback, or
+partial map is a failure. The successful map branch is independently required
+to pass in the real TESPy public smoke.

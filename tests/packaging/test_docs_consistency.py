@@ -446,6 +446,7 @@ def test_hpr_backend_and_target_owned_map_docs_publish_the_complete_boundary():
     capability = _read(DOCS_ROOT / "overview" / "capability-matrix.rst")
     support = _read(DOCS_ROOT / "overview" / "support-and-stability.rst")
     release_notes = _read(DOCS_ROOT / "release-notes.rst")
+    notebook_series = _read(EXAMPLES_ROOT / "notebook-series.rst")
     normalized_fundamentals = " ".join(fundamentals.split())
 
     for phrase in (
@@ -480,3 +481,5 @@ def test_hpr_backend_and_target_owned_map_docs_publish_the_complete_boundary():
     assert "CoolProp default; optional TESPy" in capability
     assert "openpinch[tespy]" in support
     assert "Target-owned HPR performance maps" in release_notes
+    assert "Notebook 09 is the comprehensive executable target-to-map example" in guide
+    assert "target-owned performance maps" in notebook_series

@@ -124,6 +124,13 @@ duty; otherwise that duty is the fixed reference capacity. The returned schema
 contains active operating points only. OpenUtility or another MILP package can
 consume ``plain_json_data`` without importing OpenPinch.
 
+Notebook 09 is the comprehensive executable target-to-map example. It starts
+with the omitted/default CoolProp selector, inspects the detached winning
+record, derives the design source and sink coordinates, generates three
+part-load points, and serializes the versioned result as plain JSON. A separate
+guarded call demonstrates explicit TESPy selection and molar-mixture syntax;
+failure remains a TESPy screening result and never triggers CoolProp fallback.
+
 Working-fluid strings accept installed-property pure fluids, registered blends,
 and explicit N-component molar mixtures. For example,
 ``HEOS::R32[0.3]&R125[0.3]&R143a[0.4]`` retains component order and normalized

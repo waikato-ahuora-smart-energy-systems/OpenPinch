@@ -1,45 +1,46 @@
-# HPR Performance Map Build and Test Plan
+# RTD and Comprehensive HPR Notebook Build and Test Plan
 
 ## Applicability Assessment
 
-- Unit tests: applicable to contracts, fluid resolution, simulator adapters,
-  target integration, records, basis conversion, public accessors, and period
-  propagation.
-- Property tests: applicable to schema round trips, physical closure, mixture
-  fidelity, selector determinism, cache identity, lifecycle, ordering, and
-  failure isolation.
-- Integration and contract tests: applicable across Units 1 through 3, current
-  HPR targeting, reporting, resources, documentation, and package artifacts.
-- End-to-end tests: applicable to public CoolProp and explicit TESPy target to
-  map workflows from both the checkout and installed wheel.
-- Performance tests: applicable to large fake maps, exact-cache memory and call
-  bounds, repeated cleanup, and the guarded real TESPy workflow.
+- Build verification is applicable because the generated notebook and RTD data
+  ship in the source and wheel distributions.
+- Unit and property tests are applicable to generator reproducibility, notebook
+  source policy, map serialization, target records, fluids, and physical map
+  invariants.
+- Integration and end-to-end tests are applicable to the public HPR
+  target-record-map-export boundary, notebook execution, RTD, resources, and
+  packaging.
+- Performance checks are applicable to notebook runtime and the existing
+  300-second real TESPy public target-to-map smoke.
+- Network/concurrent-user load testing is N/A because OpenPinch is a local
+  Python library.
 - Security tests: N/A because the Security extension is disabled and the change
   introduces no authentication, network service, or secret boundary.
-- External solver tests: applicable as the repository-wide regression gate;
-  HPR map generation itself introduces no solver dependency.
 
 ## Execution Checklist
 
-- [x] Analyze unit, property, integration, contract, end-to-end, performance,
-  documentation, packaging, and external-solver requirements.
+- [x] Analyze build, unit, property, integration, end-to-end, performance,
+  documentation, packaging, and extension requirements for the focused
+  follow-up.
 - [x] Refresh the canonical build, unit, integration, and performance
-  instructions for the HPR delivery.
-- [x] Run Ruff, changed-surface formatting, compilation, patch hygiene, and the
-  warning-strict documentation build.
-- [x] Run the complete repository suite with fixed Hypothesis seed `20260715`
-  and configured external solvers.
-- [x] Run the dedicated real-TESPy and 300-second public target-to-map profile.
-- [x] Verify fresh source/wheel archives and isolated core/TESPy wheel smokes.
-- [x] Generate the final build-and-test summary and update workflow state/audit.
-- [x] Present the standardized Build and Test review prompt.
+  instructions for notebook 09 and RTD verification.
+- [x] Build fresh source and wheel artifacts and verify that notebook 09 is
+  packaged; verify repository-owned RTD/tutorial inventory through its own
+  Sphinx and test gates.
+- [x] Run the complete repository regression with Hypothesis seed `20260715`,
+  plus warning-strict Sphinx, Ruff, formatting, compilation, and patch hygiene.
+- [x] Execute notebook 09 in a clean directory and retain the successful bounded
+  real TESPy public target-to-map test as the engine oracle.
+- [x] Generate the final build-and-test summary, update state/audit, and present
+  the standardized review prompt.
 
 ## Extension Compliance
 
-- Property-Based Testing: enabled and applicable throughout the unit and
-  integration gates.
-- Security: disabled; N/A.
-- Resiliency: disabled; N/A.
+- Property-Based Testing: enabled; generated, invariant, round-trip, ordering,
+  lifecycle, cache, and oracle tests remain blocking.
+- Security Baseline: disabled; N/A.
+- Resiliency Baseline: disabled; N/A.
 
 This plan contains no Mermaid or ASCII diagram. Its Markdown headings,
-checkboxes, inline paths, and code identifiers were validated before update.
+checkboxes, paths, identifiers, and special characters were validated before
+update.

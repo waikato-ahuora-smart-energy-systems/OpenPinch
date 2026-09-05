@@ -1,4 +1,18 @@
-# Unit Test Execution
+# Unit Test Execution - RTD and Comprehensive HPR Notebook
+
+## Run Focused Tutorial and Documentation Contracts
+
+```bash
+uv run pytest --hypothesis-seed=20260715 -q \
+  tests/packaging/test_notebooks.py \
+  tests/packaging/test_tutorial_coverage.py \
+  tests/packaging/test_docs_consistency.py \
+  tests/packaging/test_resources.py
+```
+
+This gate validates notebook 09 source, compilation, specialist-import policy,
+generator idempotence, 197/197 manifest coverage, RTD consistency, and packaged
+resources.
 
 ## Run HPR Unit and Property Tests
 
@@ -23,9 +37,9 @@ uv run coverage run --branch --source=OpenPinch -m pytest \
 uv run coverage report --show-missing
 ```
 
-The Unit 3 acceptance gate is at least 95 percent combined statement and branch
-coverage over new target modules and materially changed target integration
-paths. The completed code-generation measurement is 97 percent.
+The existing HPR acceptance gate remains at least 95 percent combined statement
+and branch coverage over the map and target integration surface. The notebook
+and RTD-only follow-up does not lower that threshold.
 
 ## Review Failures
 

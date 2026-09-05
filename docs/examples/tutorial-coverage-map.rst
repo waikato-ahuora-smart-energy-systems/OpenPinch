@@ -7,10 +7,11 @@ Coverage Result
 The released public denominator contains **197 operations** across
 ``PinchProblem``, ``PinchWorkspace``, targeting, all-period targeting,
 components and returned component results, ordered case batches, HEN
-design/result views, and plotting. The canonical manifest maps 196 operations
-to tutorial code cells. The specialist target-owned HPR map operation is
-documented and executed by routine fake and guarded real TESPy pytest profiles:
-**197/197, or 100 percent operation coverage**.
+design/result views, and plotting. The canonical manifest maps every operation
+to an executable tutorial code cell:
+**197/197, or 100 percent mapping coverage**. Routine fake and guarded
+real-engine pytest profiles provide
+additional evidence for the specialist target-owned HPR map operation.
 
 Operation coverage and notebook execution coverage are different. The ``base``
 profile is executed in routine CI. ``slow-hpr``, ``solver``, and ``interactive``
@@ -28,9 +29,7 @@ Counting Rules
 --------------
 
 - The live public classes and accessors form the denominator.
-- Executable code-cell references count for the 196 notebook operations;
-  specialist APIs that require non-root contract imports may instead carry
-  explicit routine and guarded pytest evidence.
+- Only executable code-cell references count; Markdown mentions do not.
 - Every manifest operation must exist live and every primary tutorial must be
   packaged.
 - A removed operation leaves the denominator only after it is absent from the

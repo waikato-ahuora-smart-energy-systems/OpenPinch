@@ -1,4 +1,4 @@
-# Build Instructions
+# Build Instructions - RTD and Comprehensive HPR Notebook
 
 ## Prerequisites
 
@@ -10,9 +10,9 @@
   generation. The verified environment uses TESPy 0.11.2.
 - Development dependencies: pytest, Hypothesis, coverage, Ruff, Sphinx,
   `build`, and Hatchling from the locked development group.
-- External solver profile: locally configured IPOPT, CBC, Bonmin, Couenne,
-  APOPT, MojoPSE, and AMPL function libraries for solver-marked repository
-  tests. They are not required by HPR targeting or map generation.
+- External solver profile: locally configured solvers are needed only for the
+  complete repository regression; the tutorial/RTD follow-up adds no solver
+  dependency.
 - Disk: temporary space for a source archive, wheel, and two isolated virtual
   environments.
 
@@ -39,6 +39,14 @@ Use a clean output directory:
 uv build --out-dir dist
 ```
 
+Before building, regenerate the packaged tutorial and prove that a second pass
+is byte-idempotent:
+
+```bash
+uv run python scripts/generate_tutorial_notebooks.py
+uv run python scripts/generate_tutorial_notebooks.py
+```
+
 ### 4. Verify Build Success
 
 - Expected artifacts for version 0.6.4 are
@@ -47,6 +55,11 @@ uv build --out-dir dist
 - Both archives must contain the versioned HPR schema, heat-pump and
   refrigeration fixtures, compressor characteristic, all performance-map
   modules, target record/basis modules, and public accessor integration.
+- Both archives must contain
+  `OpenPinch/data/notebooks/09_vapour_compression_and_brayton.ipynb`. RTD source
+  remains repository-owned rather than a distribution artifact; verify the HPR
+  guide, notebook series, tutorial coverage page, and canonical coverage CSV
+  through the warning-strict Sphinx and packaging-test gates.
 - Wheel metadata must expose a `tespy` extra requiring TESPy 0.10.1.post2 or
   later.
 - Archive members must be unique and resource bytes must match the checkout.
@@ -77,3 +90,9 @@ cache. Do not weaken the optional dependency boundary to make the build pass.
 Run the packaging, resource, and cold-import tests. Compare the source, sdist,
 and wheel resource digests, then rebuild from a clean output directory. Do not
 manually patch a built archive.
+
+### Notebook or RTD Artifact Is Stale
+
+Run the canonical generator, notebook/coverage packaging tests, and
+warning-strict Sphinx build. Update the generator first; never hand-edit only
+the packaged notebook.

@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Inception - Workflow Planning Review (RTD and HPR Notebook Follow-up)
+- **Current Stage**: Workflow Complete (RTD and HPR Notebook Follow-up)
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -44,6 +44,32 @@
   by Build and Test; user stories, application/unit/functional/NFR/
   infrastructure design skipped because no product behavior or architecture
   changes. Awaiting execution-plan approval.
+- [x] FOLLOW-UP - Workflow plan approved by the user's `go` response.
+- [x] FOLLOW-UP - Code Generation: detailed six-step plan approved. Step 1 RED
+  tutorial and RTD contracts are complete with four intended missing-content
+  failures and a passing live-public-inventory contract. Step 2 expanded the
+  canonical notebook 09 generator with the default CoolProp target, winning
+  record, map/export sequence, explicit TESPy mixture screen, and comparison
+  context. Step 3 regenerated only packaged notebook 09, proved a stable SHA-256
+  across a second pass, compiled all five code cells, verified the full required
+  source sequence, and retained the `slow-hpr` profile. Step 4 restored the map
+  row to notebook-executable coverage and synchronized the HPR guide, notebook
+  series, and 197/197 coverage page; all five focused contracts pass. Step 5
+  verification passed: 56 tutorial/RTD/resource tests plus 3 expected profile
+  skips, 302 focused HPR tests, real clean-directory notebook 09 execution in
+  27.716 seconds, the isolated real TESPy public target/map oracle, warning-strict
+  Sphinx, repository Ruff, formatting, compilation, idempotence, and patch
+  hygiene. Step 6 produced the validated code summary and full requirement
+  traceability. Code Generation was approved by the user's `Build & Test`
+  response.
+- [x] FOLLOW-UP - Build and Test: fresh sdist and wheel built with packaged
+  notebook 09; 3060 of 3064 repository tests passed with 4 expected skips;
+  clean notebook execution, real TESPy target-to-map smoke, warning-strict
+  Sphinx, Ruff, formatting, compilation, idempotence, and patch hygiene passed.
+  Approved by the user's `Go` response.
+- [x] FOLLOW-UP - Operations: placeholder reviewed. No deployment, publication,
+  monitoring, external service, or infrastructure action was requested or
+  performed. The RTD and comprehensive HPR notebook follow-up is complete.
 
 - [x] INCEPTION - Workspace Detection confirmed the existing brownfield Python
   library and current reverse-engineering artifacts.

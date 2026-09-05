@@ -27,8 +27,10 @@ Core and Intermediate
    (``base``).
 8. ``08_carnot_heat_pump_and_refrigeration.ipynb`` -- Carnot HPR placement and
    topology (``slow-hpr``).
-9. ``09_vapour_compression_and_brayton.ipynb`` -- simulated vapour-compression
-   and Brayton models (``slow-hpr``).
+9. ``09_vapour_compression_and_brayton.ipynb`` -- comprehensive simulated
+   vapour-compression targeting, detached winning records, target-owned performance maps,
+   plain-data export, explicit TESPy mixtures, and guarded
+   refrigeration/Brayton comparisons (``slow-hpr``).
 10. ``10_multiperiod_heat_pumps.ipynb`` -- mirrored multiperiod HPR methods
     (``slow-hpr``).
 11. ``11_process_mvr_and_cascade.ipynb`` -- process MVR components and cascade

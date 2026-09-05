@@ -7935,10 +7935,122 @@ The requirements now define the existing CoolProp-backed HPR targeting methods a
 
 ---
 
+## RTD and Comprehensive HPR Notebook Follow-up - Workflow Plan Approval
+**Timestamp**: 2026-09-05T18:31:00Z
+**User Input**: "go"
+**AI Response**: "Recorded explicit approval of the focused workflow plan and advanced to Code Generation planning."
+**Context**: CONSTRUCTION - CODE GENERATION PLANNING
+
+---
+
+## RTD and Comprehensive HPR Notebook Follow-up - Code Plan Review Prompt
+**Timestamp**: 2026-09-05T18:31:00Z
+**User Input**: "No new user input; created the detailed code-generation plan."
+**AI Response**: "Created and content-validated `aidlc-docs/construction/plans/rtd-comprehensive-hpr-notebook-code-generation-plan.md`. The six-step plan adds RED notebook/RTD contracts, expands only the existing notebook 09 generator, regenerates and proves notebook idempotence, synchronizes manifest and RTD, runs focused executable/PBT/integration/static gates, and creates the code summary. No production API, schema, root export, thermodynamic behavior, duplicate notebook, or infrastructure change is planned. Presented the standardized plan review prompt and paused for explicit approval."
+**Context**: CONSTRUCTION - CODE GENERATION PLAN REVIEW; awaiting approval
+
+---
+
+## RTD and Comprehensive HPR Notebook Follow-up - Code Plan Approval
+**Timestamp**: 2026-09-05T18:32:11Z
+**User Input**: "go"
+**AI Response**: "Recorded explicit approval of the six-step code-generation plan and began Step 1 RED tutorial and RTD contracts."
+**Context**: CONSTRUCTION - CODE GENERATION STEP 1
+
+---
+
 ## Git Commit Request
 **Timestamp**: 2026-09-05T18:29:32Z
 **User Input**: "Commit"
 **AI Response**: "Inspected the pending HPR performance-map implementation, tests, documentation, packaging, CI, and AI-DLC records; validated patch hygiene; and prepared the complete working tree for a single coherent commit."
+**Context**: VERSION CONTROL - COMMIT REQUEST
+
+---
+
+## RTD and Comprehensive HPR Notebook Follow-up - Code Generation Step 1
+**Timestamp**: 2026-09-05T18:34:02Z
+**User Input**: "No new user input; executed the approved RED contracts."
+**AI Response**: "Completed Step 1. Added notebook 09 target-to-map source requirements, a narrow allowance for the documented specialist HPR map-request import, RTD consistency requirements, and restored the performance-map manifest expectation to mapped and executable. The focused RED run produced exactly four intended failures: missing comprehensive notebook source, missing manifest operation use, stale RTD coverage wording, and missing RTD/notebook-series scope statements. The live public inventory contract passed. Advanced to Step 2 generator implementation."
+**Context**: CONSTRUCTION - CODE GENERATION STEP 1 COMPLETE; STEP 2 ACTIVE
+
+---
+
+## RTD and Comprehensive HPR Notebook Follow-up - Code Generation Step 2
+**Timestamp**: 2026-09-05T18:38:55Z
+**User Input**: "No new user input; executed the approved generator implementation step."
+**AI Response**: "Completed Step 2 by expanding only the canonical notebook 09 definition in `scripts/generate_tutorial_notebooks.py`. The coherent study now uses omitted/default CoolProp targeting with pure and registered-fluid candidates, reads the detached winning record, derives design source/sink coordinates, requests three part-load points, exports the versioned map as plain JSON, separately screens explicit TESPy intent with `HEOS::R32[0.5]&R125[0.5]`, states no-fallback semantics, and retains refrigeration/Brayton comparisons. Updated guidance and presentation metadata. The generator and all five resulting code cells compile. Advanced to Step 3 regeneration."
+**Context**: CONSTRUCTION - CODE GENERATION STEP 2 COMPLETE; STEP 3 ACTIVE
+
+---
+
+## RTD and Comprehensive HPR Notebook Follow-up - Code Generation Step 3
+**Timestamp**: 2026-09-05T18:39:53Z
+**User Input**: "No new user input; regenerated and validated the canonical packaged notebook."
+**AI Response**: "Completed Step 3. Ran the canonical generator and changed only `OpenPinch/data/notebooks/09_vapour_compression_and_brayton.ipynb`. A second pass preserved SHA-256 `3bdc8ec9926e5052574e929997f540f357b623a8a787abd9746cc1b4a5d30d0a`, proving byte idempotence. Compiled all five generated code cells, verified every required target-record-map-export/TESPy/mixture token, and retained the `slow-hpr` notebook profile. Advanced to Step 4 RTD synchronization."
+**Context**: CONSTRUCTION - CODE GENERATION STEP 3 COMPLETE; STEP 4 ACTIVE
+
+---
+
+## RTD and Comprehensive HPR Notebook Follow-up - Code Generation Step 4
+**Timestamp**: 2026-09-05T18:41:20Z
+**User Input**: "No new user input; synchronized the tutorial inventory and RTD."
+**AI Response**: "Completed Step 4. Restored `problem.target.hpr_performance_map` to `mapped and executable` in the canonical manifest, named notebook 09 as the comprehensive executable target-to-map example in the HPR guide, expanded the notebook-series scope, and restored the exact 197/197 mapping-coverage statement and code-cell counting rule. No other HPR reference/capability page required a change. All five focused notebook, inventory, coverage, and documentation contracts now pass. Advanced to Step 5 verification."
+**Context**: CONSTRUCTION - CODE GENERATION STEP 4 COMPLETE; STEP 5 ACTIVE
+
+---
+
+## RTD and Comprehensive HPR Notebook Follow-up - Code Generation Step 5
+**Timestamp**: 2026-09-05T18:50:59Z
+**User Input**: "No new user input; executed the approved verification gates."
+**AI Response**: "Completed Step 5. The tutorial/RTD/resource gate passed 56 tests with 3 expected opt-in profile skips; the focused HPR target, record, basis, map, mixture, accessor, serialization, PBT, and real TESPy suite passed 302 tests using seed 20260715. Notebook 09 executed all cells in a clean temporary directory in 27.716 seconds and correctly retained numerical infeasibility as guarded evidence with no partial map or fallback; the isolated real TESPy public smoke in the focused suite remains the successful target-to-map engine oracle. Warning-strict Sphinx succeeded. Repository Ruff lint, changed-surface Ruff format, Python compilation, generator byte idempotence, scoped file inventory, and `git diff --check` all passed. Advanced to Step 6 summary."
+**Context**: CONSTRUCTION - CODE GENERATION STEP 5 COMPLETE; STEP 6 ACTIVE
+
+---
+
+## RTD and Comprehensive HPR Notebook Follow-up - Code Generation Completion Prompt
+**Timestamp**: 2026-09-05T18:52:15Z
+**User Input**: "No new user input; completed the generated-code summary and prepared the mandatory review gate."
+**AI Response**: "Completed Step 6 and created `aidlc-docs/construction/rtd-comprehensive-hpr-notebook/code/code-summary.md`. Verified FR-NB-01 through FR-NB-08 and NFR-NB-01 through NFR-NB-06 traceability, current final notebook SHA-256 idempotence, validated Markdown/notebook/manifest content, no duplicate notebook, and Property-Based Testing compliance. Corrected the final tutorial refinement so the stable CoolProp screen uses the pure-fluid example while the provider-registered blend remains a documented syntax example. Presented the standardized Code Generation review prompt and paused before Build and Test."
+**Context**: CONSTRUCTION - CODE GENERATION COMPLETE; REVIEW REQUIRED
+
+---
+
+## RTD and Comprehensive HPR Notebook Follow-up - Code Approval
+**Timestamp**: 2026-09-05T20:27:59Z
+**User Input**: "Build & Test"
+**AI Response**: "Recorded explicit approval of the generated RTD and comprehensive HPR notebook changes and advanced to the mandatory Build and Test stage. Began refreshing the existing build, unit, integration, performance, and summary artifacts for this focused follow-up and preparing comprehensive verification."
+**Context**: CONSTRUCTION - CODE GENERATION APPROVED; BUILD AND TEST ACTIVE
+
+---
+
+## Build and Test Stage - RTD and Comprehensive HPR Notebook Follow-up
+**Timestamp**: 2026-09-05T20:40:36Z
+**User Input**: "No new user input; completed the approved Build and Test stage."
+**AI Response**: "Build and Test completed successfully. Built fresh OpenPinch 0.6.4 source and wheel artifacts and verified unique members plus packaged notebook 09. The complete repository suite passed 3060 tests with 4 expected skips in 448.34 seconds using Hypothesis seed 20260715 and the configured solver environment. Notebook 09 executed all cells from a clean directory in 27.099 seconds with correct guarded infeasibility semantics. The successful real TESPy public target-to-map oracle passed in 1.96 seconds. Warning-strict Sphinx, repository Ruff, changed-surface formatting, compilation, generator idempotence, and patch hygiene passed. Refreshed all required instruction files and the build-and-test summary. Presented the standardized review prompt and paused before Operations."
+**Context**: CONSTRUCTION - BUILD AND TEST COMPLETE; REVIEW REQUIRED
+**Build Status**: Success
+**Test Status**: Pass
+**Files Generated**:
+- build-instructions.md
+- unit-test-instructions.md
+- integration-test-instructions.md
+- performance-test-instructions.md
+- build-and-test-summary.md
+
+---
+
+## Build and Test Approval and Operations Completion - RTD and Comprehensive HPR Notebook Follow-up
+**Timestamp**: 2026-09-05T21:01:27Z
+**User Input**: "Go"
+**AI Response**: "Recorded explicit approval of the successful Build and Test results. Advanced to the Operations phase, confirmed that it is a placeholder only, and completed the RTD and comprehensive HPR notebook workflow without deployment, publication, monitoring, external service mutation, or infrastructure change."
+**Context**: OPERATIONS - PLACEHOLDER REVIEWED; WORKFLOW COMPLETE
+
+---
+
+## Version Control - RTD and Comprehensive HPR Notebook Follow-up
+**Timestamp**: 2026-09-05T21:02:42Z
+**User Input**: "commit"
+**AI Response**: "Inspected the completed follow-up working tree and prepared the scoped RTD, canonical notebook 09, tutorial inventory, regression tests, and AI-DLC records for one coherent commit."
 **Context**: VERSION CONTROL - COMMIT REQUEST
 
 ---

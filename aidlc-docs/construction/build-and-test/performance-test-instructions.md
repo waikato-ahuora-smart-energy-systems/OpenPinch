@@ -1,4 +1,4 @@
-# Performance Test Instructions
+# Performance Test Instructions - RTD and Comprehensive HPR Notebook
 
 ## Purpose
 
@@ -17,6 +17,8 @@ and concurrent-user load are N/A because OpenPinch is a local library.
 - Ten fake calls and at least three real guarded calls retain no engine object
   after cleanup.
 - The public real TESPy target plus minimal map completes within 300 seconds.
+- Notebook 09 compiles and completes its guarded clean-directory study within
+  the same 300-second tutorial budget.
 - Execution inside one call is sequential; independent callers may use
   process-level parallelism.
 
@@ -29,10 +31,10 @@ uv run pytest --hypothesis-seed=20260715 -q \
   tests/analysis/heat_pumps/test_hpr_simulator_stateful.py
 ```
 
-Run the guarded real profile:
+Run the guarded real profile; the test itself enforces the 300-second budget:
 
 ```bash
-timeout 300s uv run pytest -q \
+uv run pytest -q \
   tests/analysis/heat_pumps/test_hpr_tespy_target_evaluator.py::test_real_public_tespy_target_and_minimal_map_stay_within_smoke_budget
 ```
 
