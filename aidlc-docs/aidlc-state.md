@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: GitHub Codex heat-recovery review corrections complete
+- **Current Stage**: Workflow Complete (RTD and HPR Notebook Follow-up)
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -27,6 +27,304 @@
 | Security Baseline | No | Utility Placement Requirements Analysis |
 | Property-Based Testing | Yes | Utility Placement Requirements Analysis |
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
+
+## TESPy HPR Performance-Map Design Progress
+
+- [x] FOLLOW-UP - Workspace Detection: existing brownfield Python library,
+  current reverse-engineering artifacts, existing generated tutorial system,
+  and completed HPR implementation detected. Requirements Analysis is active
+  for the requested RTD update and comprehensive executable notebook.
+- [x] FOLLOW-UP - Requirements Analysis: minimal requirements define notebook
+  09 as the canonical comprehensive target-to-map tutorial, covering default
+  CoolProp, explicit TESPy, mixtures, the winning record, multi-point map,
+  plain JSON export, guarded failures, RTD integration, inventory alignment,
+  and executable quality gates. Approved.
+- [x] FOLLOW-UP - Requirements approved by the user's `Go` response.
+- [x] FOLLOW-UP - Workflow Planning: one focused Code Generation unit followed
+  by Build and Test; user stories, application/unit/functional/NFR/
+  infrastructure design skipped because no product behavior or architecture
+  changes. Awaiting execution-plan approval.
+- [x] FOLLOW-UP - Workflow plan approved by the user's `go` response.
+- [x] FOLLOW-UP - Code Generation: detailed six-step plan approved. Step 1 RED
+  tutorial and RTD contracts are complete with four intended missing-content
+  failures and a passing live-public-inventory contract. Step 2 expanded the
+  canonical notebook 09 generator with the default CoolProp target, winning
+  record, map/export sequence, explicit TESPy mixture screen, and comparison
+  context. Step 3 regenerated only packaged notebook 09, proved a stable SHA-256
+  across a second pass, compiled all five code cells, verified the full required
+  source sequence, and retained the `slow-hpr` profile. Step 4 restored the map
+  row to notebook-executable coverage and synchronized the HPR guide, notebook
+  series, and 197/197 coverage page; all five focused contracts pass. Step 5
+  verification passed: 56 tutorial/RTD/resource tests plus 3 expected profile
+  skips, 302 focused HPR tests, real clean-directory notebook 09 execution in
+  27.716 seconds, the isolated real TESPy public target/map oracle, warning-strict
+  Sphinx, repository Ruff, formatting, compilation, idempotence, and patch
+  hygiene. Step 6 produced the validated code summary and full requirement
+  traceability. Code Generation was approved by the user's `Build & Test`
+  response.
+- [x] FOLLOW-UP - Build and Test: fresh sdist and wheel built with packaged
+  notebook 09; 3060 of 3064 repository tests passed with 4 expected skips;
+  clean notebook execution, real TESPy target-to-map smoke, warning-strict
+  Sphinx, Ruff, formatting, compilation, idempotence, and patch hygiene passed.
+  Approved by the user's `Go` response.
+- [x] FOLLOW-UP - Operations: placeholder reviewed. No deployment, publication,
+  monitoring, external service, or infrastructure action was requested or
+  performed. The RTD and comprehensive HPR notebook follow-up is complete.
+
+- [x] INCEPTION - Workspace Detection confirmed the existing brownfield Python
+  library and current reverse-engineering artifacts.
+- [x] INCEPTION - Reverse Engineering skipped because current repository-wide
+  artifacts already cover HPR, optional TESPy, contracts, and dependency direction.
+- [x] INCEPTION - Requirements Analysis documented in
+  `aidlc-docs/inception/requirements/tespy-hpr-performance-map-requirements.md`;
+  amended so existing CoolProp-backed HPR targeting methods are the tie-in point,
+  CoolProp remains the default, and TESPy is explicitly selectable; approved by
+  the user.
+- [x] INCEPTION - Cross-project review of the OpenUtility Multi-Period HPR
+  Optimization Boundary Plan documented in
+  `aidlc-docs/inception/requirements/openutility-multiperiod-hpr-boundary-plan-review.md`;
+  eight initial amendments were adopted by the revised plan. A follow-up review
+  of the completed alpha implementation confirmed the package boundary and found
+  remaining contract/formulation issues around adjacent-segment interpolation,
+  capacity scaling, the separate electricity overlay, strict schema semantics,
+  dimensional tolerances, refrigeration duty basis, and structured provenance.
+  OpenUtility's correction pass resolved the contract/formulation findings and
+  passed its release gate with 186 tests at 90.24 percent coverage. The separate
+  HPR electricity overlay remains an explicitly documented alpha limitation.
+  The final consumer field names are reflected in the approved OpenPinch design.
+- [x] INCEPTION - User Stories skipped because the internal technical contract
+  already has detailed acceptance criteria and no multi-persona workflow.
+- [x] INCEPTION - Workflow Planning documented in
+  `aidlc-docs/inception/plans/execution-plan.md`; focused Application Design is
+  the only remaining authorized stage; approved by the user.
+- [x] INCEPTION - Focused Application Design documented in
+  `aidlc-docs/inception/application-design/`; exact contracts, public methods,
+  services, dependencies, first-release single-port scope, OpenUtility
+  preconditions, and optional TESPy isolation are defined and approved by the
+  user.
+- [x] INCEPTION - Units Generation Part 1 approved and Part 2 artifacts
+  generated using the contract-first three-unit decomposition. Unit boundaries,
+  dependency acyclicity, full requirement/acceptance traceability, optional
+  TESPy isolation, and enabled Property-Based Testing ownership are validated.
+  The user explicitly approved the generated units.
+- [x] CONSTRUCTION - Unit 1 HPR Performance-Map Contract and Golden Fixtures:
+  Functional Design, NFR Requirements, and NFR Design approved. Infrastructure
+  Design is N/A. Code Generation Part 1 approved; all twelve Part 2 steps are
+  complete and verified. Generated code approved by the user.
+- [x] CONSTRUCTION - Unit 2 HPR Point Simulators and Map Generation: Functional
+  Design, NFR Requirements, technology-stack decisions, and NFR Design are
+  approved. Code Generation Part 1 and its thirteen-step
+  RED-GREEN-REFACTOR plan are approved. Step 1 RED dependency/profile
+  contracts are complete with four expected failures and a passing cold-import
+  boundary. Step 2 upgraded the locked environment to CoolProp 8.0.0 and TESPy
+  0.11.2; all dependency contracts and 532 existing thermodynamic/HPR tests
+  pass. Step 3 internal-value, fluid, context, and point tests are complete with
+  the expected absent-package RED collection result. Step 4 implemented the
+  engine-neutral values, fluid resolution, immutable context, and lazy point
+  iterator with 21 focused tests passing. Step 5 lifecycle/coordinator tests are
+  complete with the expected absent-error/coordinator RED collection result;
+  Step 6 engine-neutral coordinator implementation is complete with 36 focused
+  example, property, and lifecycle tests passing. Step 7 CoolProp adapter oracle
+  tests are complete with the expected absent-adapter RED collection result;
+  Step 8 default adapter implementation is complete with 12 oracle tests and
+  the complete 407-test heat-pump suite passing. Step 9 TESPy settings,
+  resource, and adapter tests are complete with the expected absent-adapter RED
+  collection result. Step 10 implemented the optional TESPy leaf, fixed
+  convergence settings, strict characteristic resource, single-stage design
+  and restored offdesign lifecycle, and typed engine failures; all 20 focused
+  tests pass against TESPy 0.11.2. Step 11 enforces the optional-import firewall,
+  exact source/wheel resource inclusion, core/TESPy install smokes, and blocking
+  TESPy source and artifact jobs; all 186 packaging and architecture tests pass
+  with three expected skips. Step 12 passes 125 seeded Unit 2 tests at 99 percent
+  statement-and-branch coverage, the 10,000-point fake time/memory budget and
+  linear call-count checks, 600 thermodynamic/stream/HPR regressions, and the
+  41-test blocking TESPy profile. Step 13 built source and wheel distributions,
+  verified byte-identical characteristic assets, passed isolated core/no-TESPy
+  and explicit-TESPy wheel smokes, and created the Unit 2 code summary. All
+  thirteen generation steps are complete; generated code was approved by the
+  user on 2026-09-05.
+  The
+  approved 18 patterns and
+  15
+  logical components define the dependency firewall, lazy traversal, isolated
+  simulator sessions, typed point-local/fatal failures, deterministic TESPy
+  design restoration/settings/resources, exact provenance, blocking base/TESPy
+  profiles, PBT lifecycle model, real-engine smokes, and performance gates. The
+  design keeps
+  CoolProp as the default simulator, defines TESPy as an explicitly selected
+  optional refrigerant-only leaf, uses one global target-derived design point,
+  reports compressor-only electricity with auxiliaries excluded, and preserves
+  existing single-loop support for registered refrigerant blends and explicit
+  mole-fraction mixtures of arbitrary component count with dew/bubble
+  saturation anchors. There is no Unit 2 refrigerant allowlist; actual support
+  is validated against the installed property backend and operating state.
+  TESPy accepts the same working-fluid input categories and may not reject a
+  fluid solely because it is a blend or N-component mixture. The approved NFR
+  decisions require CoolProp 8 or newer, reject REFPROP, add a neutral TESPy
+  extra with a tested minimum, and enforce separate blocking base/TESPy CI
+  profiles.
+- [ ] CONSTRUCTION - Unit 3 Current HPR Target API Integration and Publication:
+  Functional Design, NFR Requirements, and technology-stack decisions are
+  generated and approved. NFR Design is generated and approved. Infrastructure
+  Design is N/A because the unit adds no service, deployment, persistence, or
+  cloud component. Code Generation Part 1 produced an 18-step
+  RED-GREEN-REFACTOR plan that is approved; Part 2 has begun with Step 1.
+  Step 1 recorded a 164-test focused green baseline and the expected eight RED
+  failures for the absent selectors, explicit map method, forwarding, and
+  closed target manifest. Step 2 added the strict frozen winning-target
+  simulation record, additive CoolProp defaults, reusable pure-fluid/blend/
+  N-component-mixture and target/profile strategies, and deterministic seeded
+  record properties; 107 focused contract and HPR regression tests pass. Step
+  3 implemented one closed selector normalizer and carried runtime backend
+  intent through the public vapour-compression methods, preprocessing, output,
+  domain provenance, all-period forwarding, and recorded-period replay without
+  storing it in numerical configuration. The 85-test affected API/HPR slice,
+  34 cold-import/dependency tests, Ruff, formatting, and patch hygiene pass.
+  Step 4 added a pure fail-fast TESPy compatibility gate and frozen prepared
+  specification. It accepts the approved one-by-one scalar vapour-compression
+  topology in heat-pump or refrigeration mode, reuses installed-property
+  dew/bubble capability checks without a fluid allowlist or mixture-size cap,
+  and rejects unsupported cycles, multi-loop/shared-vector forms, integrated
+  expanders, REFPROP, unavailable dependencies, and invalid states before the
+  optimizer. The complete 546-test HPR/import-firewall regression, Ruff,
+  formatting, and patch hygiene pass. Step 5 added engine-neutral request,
+  result, profile, metadata, validation, local/fatal failure, cleanup, fake
+  evaluator, generated-physics, and stateful lifecycle RED contracts. The RED
+  run stopped at the expected absent coordinator/model surface. Step 6
+  implemented frozen slotted engine-neutral values, deep-frozen sanitized
+  metadata, independent physical/profile validation, the evaluator protocol,
+  and an exactly-once lifecycle coordinator with recoverable/fatal partitioning.
+  Fifty-nine focused tests pass; the new modules have an 84 percent branch
+  coverage checkpoint, and 34 import-boundary tests plus Ruff/format/hygiene
+  pass. Step 7 added the exact unquantized call-local 512-entry LRU with
+  immutable success/local-failure values; diagnostic identity is excluded from
+  otherwise complete physical keys. Hit movement, 513th-key eviction,
+  fatal non-caching, cache clearing, counters, call isolation, order
+  independence, and seeded generated call counts pass in 72 focused tests;
+  import boundaries, Ruff, formatting, and patch hygiene pass. Step 8 is
+  active. Step 8 extended only the concrete optional TESPy leaf with a nominal
+  targeting evaluator. Every cache miss builds fresh isolated topology and
+  performs a design solve; it never uses offdesign state from another
+  candidate. Detached compressor-only power, source/sink duties and profiles,
+  metadata, mixtures, order independence, local recovery, fatal cleanup, and
+  object isolation pass in 79 real TESPy/preflight/legacy-adapter tests plus 78
+  engine-neutral/import-boundary tests. Ruff, formatting, and patch hygiene
+  pass. Step 9 integrated a call-owned TESPy coordinator into only the approved
+  scalar single-stage cascade path, translated detached profiles into ordinary
+  condenser/evaporator utility streams, and routed TESPy duties and
+  compressor-only power through the existing HPR accounting pipeline. Local,
+  fatal, optimizer, cleanup, cache, ranking, no-CoolProp-fallback, and real
+  TESPy accounting examples pass. The final focused regression is 195 tests,
+  with a separate 24-test fake/real integration slice; Ruff, formatting, and
+  patch hygiene pass. Step 10 built CoolProp records directly from already
+  solved cycles and TESPy records from detached winning results/metadata,
+  propagated scalar period identity without mutating the optimizer result, and
+  added the pure typed target-to-map-basis compatibility bridge. Deterministic,
+  deep-detachment, private-model isolation, mixture-preservation, and seeded
+  generated-record properties pass in a 75-test focused slice with real TESPy,
+  Ruff, formatting, and patch hygiene. Step 11 added the explicit keyword-only
+  target accessor bridge. It validates one scalar target and the public request,
+  constructs a detached basis, and calls the existing Unit 2 map generator once.
+  Backend ownership, reference-capacity override, target/request/problem
+  non-mutation, no automatic all-period mirror, no root export, public JSON
+  round trips, and semantic alignment with both golden fixtures pass in 137
+  focused application/contract tests; Ruff, formatting, and patch hygiene pass.
+  Step 12 preserved backend and detached winning-record provenance in report
+  outputs, proved canonical independent scalar-period order and isolation,
+  verified generic workspace batch forwarding and per-case failure isolation,
+  retained the explicit shared-vector TESPy rejection before optimizer setup,
+  and kept CoolProp multiperiod behavior green. Generated backend/order/state
+  properties and aggregate-map early rejection pass in a 71-test application,
+  workspace, multiperiod, reporting, and accessor slice; Ruff, formatting, and
+  patch hygiene pass. Step 13 completed all applicable PBT-01 through PBT-10
+  gates with reusable seeded properties and explicit examples. The fixed-seed
+  Unit 3 selection passes 150 tests with shrinking enabled. Structural tests
+  prove linear callback handling, exact resident-key solve bounds, no added
+  CoolProp evaluation on the TESPy path, 512-entry eviction, and less than 64
+  MiB traced Python heap for 512 maximum-size fake records. Ten fake calls and
+  three real TESPy calls release caches, sessions, temporary state, and engine
+  objects. The marked public pulp-mill TESPy target plus two-point map smoke
+  completes in 0.43 seconds against the supported local profile, below the
+  300-second guard. Ruff and formatting pass. Step 14 published the CoolProp
+  default and explicit TESPy target-to-map workflow, exact optional extra,
+  mixture and dew/bubble rules, winning-design/offdesign lifecycle, scalar and
+  independent-period limits, atomic fixed-capacity map semantics, adjacent
+  interpolation ownership, process-parallel guidance, and the plain-data-only
+  OpenUtility boundary across the guide, fundamentals, API, schema, capability,
+  support, install/resource, README, and release-note surfaces. Twenty
+  documentation consistency tests and the complete 55-source warnings-as-errors
+  Sphinx build pass. No notebook, CLI, or downstream dependency was added. Step
+  15 extended cold-import coverage through HPR contracts, target records,
+  target/basis builders, accessors, and default CoolProp targeting with TESPy
+  blocked; reinforced the TESPy leaf and downstream-optimizer dependency
+  firewalls; and kept the root/API/CLI inventory closed. Optional and artifact
+  smokes now verify the target record, evaluator boundary, default selector, and
+  a real installed-package public TESPy target-to-map workflow. Develop, pull
+  request, and publish jobs retain the complete TESPy suite and add a dedicated
+  300-second public smoke guard. The workflows parse, the optional TESPy smoke
+  and public helper pass, and 87 architecture, packaging, resource, and API tests
+  pass. Step 16 ran the complete fixed-seed Unit 3 selection, the broad
+  non-solver regression profile, and focused closure tests for the four Unit 3
+  compatibility findings. The affected 871-test heat-pump, application,
+  contract, architecture, packaging, and resource selection passes. Combined
+  statement/branch coverage is 97 percent across the new Unit 3 modules and
+  materially changed targeting paths, exceeding the 95-percent gate. Ruff,
+  changed-surface formatting, compilation, workflow parsing, patch hygiene,
+  optional TESPy smoke, and the warnings-as-errors 55-source Sphinx build pass;
+  the repository-wide format check identifies 14 unrelated pre-existing files.
+  Step 17 built fresh OpenPinch 0.6.4 source and wheel artifacts under the unique
+  `/private/tmp/openpinch-step17.cUgtgY/artifacts` directory. Archive inspection
+  found no duplicate members and proved byte-exact schema, fixture, and TESPy
+  characteristic resources. The isolated 18-package core wheel profile excludes
+  TESPy and passes in 3.11 seconds; the isolated 33-package TESPy 0.11.2 profile
+  completes the public target, winning-record, basis, and two-point map workflow
+  in 3.71 seconds. Checkout, core wheel, and TESPy wheel public signatures and
+  resource digests match. Step 18 created and validated the complete
+  generated-code summary, confirmed Steps 1 through 18 and FR-5 through
+  FR-10/NFR-U3-001 through NFR-U3-033 traceability, found no duplicate
+  brownfield files or enabled extension finding, and logged the standardized
+  review prompt. Unit 3 Code Generation awaits explicit approval before
+  integrated Build and Test. The user approved Unit 3 Code Generation with
+  `go`. Integrated Build and Test completed with 3,059 passes, 4 expected
+  optional-profile skips, and zero failures in the final 458.40-second
+  solver-enabled run. The dedicated public TESPy target-to-map smoke passes in
+  1.99 seconds under its 300-second guard. Ruff, changed-surface formatting,
+  Python compilation, patch hygiene, warning-strict Sphinx, coverage,
+  performance/lifecycle, source/wheel archives, and isolated core/TESPy wheel
+  profiles pass. The tutorial inventory now accurately distinguishes 196
+  notebook-demonstrated operations from the specialist target-owned map API,
+  which is documented and executable through routine fake and guarded TESPy
+  tests. The user approved Build and Test. The Operations phase is the current
+  workflow placeholder and performs no deployment, publication, monitoring, or
+  external mutation. The TESPy HPR performance-map workflow is complete.
+  The user's answer B establishes full targeting semantics: explicit TESPy must
+  replace the thermodynamic cycle evaluations inside ordinary single-stage HPR
+  placement optimization and determine the returned target values. CoolProp
+  remains the omitted-selector default with unchanged numerical behavior.
+  TESPy targeting is initially restricted to one evaporator, one condenser, one
+  refrigerant loop, and scalar period evaluation; pure fluids, registered
+  blends, and explicit N-component molar mixtures remain eligible according to
+  installed property support. Each optimizer candidate receives an independent
+  TESPy design solve, while the winning detached simulation record supplies the
+  later Unit 2 offdesign map basis. Shared-vector multi-period TESPy targeting,
+  multi-port flattening, automatic grids, OpenUtility imports, Pyomo, and HiGHS
+  remain excluded. PBT-01 is compliant with identified oracle, invariant,
+  round-trip, idempotence, and easy-verification properties.
+  The NFR design basis uses an exact-key call-local LRU cache capped at 512
+  immutable entries, at most one TESPy design solve per resident unique
+  candidate, less than 64 MiB traced Python cache overhead, isolated evaluator
+  state per call, and one marked public TESPy target-and-map smoke within 300
+  seconds on the supported CI profile. CoolProp performs no extra cycle solve,
+  TESPy imports remain lazy, and base/TESPy source and artifact profiles remain
+  blocking. PBT-09 is compliant through the existing Hypothesis/pytest stack.
+  The NFR Design defines 19 patterns and 16 logical components. Current
+  execution stays sequential and call-isolated with no scheduler, shared cache,
+  global lock, or thread-safety promise. Frozen candidate inputs/results and
+  call-owned factories remain process-ready for a future separately approved
+  parallel optimizer. Recoverable candidate failures are not retried; fatal
+  lifecycle/configuration failures abort. Every NFR-U3-001 through
+  NFR-U3-033 and applicable PBT-01 through PBT-10 rule has an explicit pattern,
+  component, and verification owner.
 
 ## Utility Placement Optimisation Progress
 
@@ -763,7 +1061,7 @@
 - [x] CONSTRUCTION - Build and Test
 - [x] CONSTRUCTION - Post-Implementation Quality Audit
 - [x] CONSTRUCTION - Revalidation after quality corrections
-- [ ] OPERATIONS - Placeholder (no deployment work requested)
+- [x] OPERATIONS - Placeholder (no deployment work requested)
 
 ## Reverse Engineering Status
 - [x] Reverse Engineering - Completed on 2026-07-12T21:26:45Z
@@ -1590,3 +1888,35 @@ refreshed reverse-engineering artifacts.
   and documentation correction introduces no deployment or monitoring change.
 - **Current stage**: Complete. All six audit findings are resolved and the
   generated correction plus Build and Test evidence are approved.
+
+## Analysis Reliability and Extensibility
+
+- [x] Implementation plan approved by the user.
+- [x] Regression-first baseline: 11 expected failures.
+- [x] Execution snapshots and invalidation.
+- [x] Targeting corrections and period chaining.
+- [x] Method/provenance/result adapters.
+- [x] Metric policies and documentation.
+- [x] Full Build and Test verification.
+- Plan: `construction/plans/analysis-reliability-code-generation-plan.md`.
+- Current stage: Complete. All approved implementation and local verification finished.
+
+- Verification: `construction/build-and-test/analysis-reliability-verification.md`.
+
+## PR 96 Review Corrections
+
+- [x] Investigated three Codex findings; user authorized fixes.
+- [x] Regressions and implementation.
+- [x] Verification and documentation.
+- Current stage: Complete; steps 11–15 of the analysis reliability plan finished.
+- Verification: 3,094 configured tests passed; combined line/branch coverage
+  95.73%. Real-solver, real TESPy smoke, lint, warning-strict docs, inventory,
+  and installed core/TESPy artifact checks passed. Existing skips unchanged.
+- User authorized committing and pushing these fixes to PR 96; no GitHub review replies or resolutions.
+
+## PR 96 CI Fixture Correction
+
+- [x] Reproduced the version-bump failure before correction.
+- [x] Pinned golden-fixture generating provenance; runtime maps unchanged.
+- [x] Verified 207 contract/resource/docs-consistency tests, generated release property, original CI test with 0.6.5 metadata, generator check, Ruff and strict Sphinx.
+- Current stage: Complete; plan steps 16–18 finished. User authorized commit and push to PR 96.

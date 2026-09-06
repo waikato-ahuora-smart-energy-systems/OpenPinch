@@ -47,6 +47,7 @@ def ensure_base_target(
         target,
         args=compare_args,
         period_ids=getattr(zone, "period_ids", None),
+        config=zone.config,
     ):
         return target
     refresh_service = refresh_services.get(target_type)
@@ -60,6 +61,7 @@ def ensure_base_target(
             direct_target,
             args=compare_args,
             period_ids=getattr(zone, "period_ids", None),
+            config=zone.config,
         ):
             refresh_services[TargetType.DI.value](zone, refresh_args)
         for subzone in zone.subzones.values():
@@ -68,6 +70,7 @@ def ensure_base_target(
                 subtarget,
                 args=compare_args,
                 period_ids=getattr(subzone, "period_ids", None),
+                config=subzone.config,
             ):
                 refresh_services[TargetType.DI.value](subzone, refresh_args)
     refresh_service(zone, refresh_args)
@@ -76,6 +79,7 @@ def ensure_base_target(
         refreshed_target,
         args=compare_args,
         period_ids=getattr(zone, "period_ids", None),
+        config=zone.config,
     ):
         return refreshed_target
     return None

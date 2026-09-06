@@ -39,6 +39,10 @@ from .common.postprocessing import _get_hpr_residual_utility_summary
 from .common.preprocessing import (
     construct_HPRTargetInputs,
 )
+from .performance_maps.targeting import (
+    normalize_hpr_simulation_backend,
+    preflight_tespy_hpr_targeting,
+)
 from .targeting.brayton import (
     optimise_brayton_heat_pump_placement,
 )
@@ -107,6 +111,7 @@ def compute_direct_heat_pump_or_refrigeration_target(
         config=zone.config,
         is_heat_pumping=is_heat_pumping,
         period_idx=idx,
+        simulation_backend=(args or {}).get("simulation_backend", "coolprop"),
     )
     pt = _calc_hpr_cascade(
         pt=pt,
@@ -131,7 +136,7 @@ def compute_direct_heat_pump_or_refrigeration_target(
         "period_id": period_id,
         "period_idx": idx,
     }
-    hpr_results = _get_hpr_target_summary(res, zone)
+    hpr_results = _get_hpr_target_summary(res, zone, period_id=period_id)
     util_results = _get_hpr_residual_utility_summary(
         pt=pt,
         base_target=base_target,
@@ -190,6 +195,7 @@ def compute_indirect_heat_pump_or_refrigeration_target(
         config=zone.config,
         is_heat_pumping=is_heat_pumping,
         period_idx=idx,
+        simulation_backend=(args or {}).get("simulation_backend", "coolprop"),
     )
     pt = _calc_hpr_cascade(
         pt=pt,
@@ -214,7 +220,7 @@ def compute_indirect_heat_pump_or_refrigeration_target(
         "period_id": period_id,
         "period_idx": idx,
     }
-    hpr_results = _get_hpr_target_summary(res, zone)
+    hpr_results = _get_hpr_target_summary(res, zone, period_id=period_id)
     util_results = _get_hpr_residual_utility_summary(
         pt=pt,
         base_target=base_target,
@@ -320,7 +326,9 @@ def _get_hpr_targets(
     config: Configuration,
     is_heat_pumping: bool,
     period_idx: int = 0,
+    simulation_backend: str = "coolprop",
 ) -> HeatPumpTargetOutputs:
+    normalized_backend = normalize_hpr_simulation_backend(simulation_backend)
     args = construct_HPRTargetInputs(
         Q_hpr_target=Q_hpr_target,
         T_vals=T_vals,
@@ -330,20 +338,40 @@ def _get_hpr_targets(
         config=config,
         period_idx=period_idx,
         debug=False,
+        simulation_backend=normalized_backend,
     )
     handler = _HP_PLACEMENT_HANDLERS.get(args.hpr_type)
     if handler is None:
         raise ValueError("No valid heat pump targeting type selected.")
-    result = handler(args)
+    if getattr(args, "simulation_backend", normalized_backend) == "tespy":
+        prepared_tespy = preflight_tespy_hpr_targeting(args)
+        result = handler(
+            args,
+            prepared_tespy=prepared_tespy,
+        )
+    else:
+        result = handler(args)
     return HeatPumpTargetOutputs.model_validate(result.to_output_fields())
 
 
 def _get_hpr_target_summary(
     res: HeatPumpTargetOutputs,
     zone: Zone,
+    *,
+    period_id: str | None = None,
 ) -> dict:
+    target_simulation_record = getattr(res, "target_simulation_record", None)
+    if target_simulation_record is not None and period_id is not None:
+        res = res.model_copy(
+            update={
+                "target_simulation_record": target_simulation_record.model_copy(
+                    update={"period_id": period_id}
+                )
+            }
+        )
     return {
         "hpr_cycle": str(zone.config.hpr.type),
+        "hpr_simulation_backend": getattr(res, "simulation_backend", "coolprop"),
         "hpr_utility_total": res.utility_tot,
         "hpr_work": res.w_net,
         "hpr_external_utility": res.Q_ext,

@@ -200,6 +200,51 @@ Configuration belongs in ``TargetInput.options`` and is materialized as a
 runtime ``Configuration`` object on prepared zones. Use
 ``config_options()`` to discover supported option keys.
 
+Consuming HPR Performance Maps
+------------------------------
+
+HPR performance maps use a separate, versioned JSON contract rather than the
+case-input schema. Version ``1.0`` fixes temperatures to ``degC`` and thermal
+duties and electrical power to ``kW``. It includes only active points, so
+``0 < load_fraction <= 1`` and ``electric_power > 0``; an optimization package
+owns the off state.
+
+For every point::
+
+   q_sink = q_source + electric_power
+
+The useful duty depends on the operating mode::
+
+   heat_pump:    q_useful = q_sink,   COP = q_sink / electric_power
+   refrigeration: q_useful = q_source, COP = q_source / electric_power
+
+The useful duty must also equal ``load_fraction * reference_capacity``. The
+``energy_balance_tolerance`` applies to duty and COP identities, while
+``temperature_match_tolerance`` is reserved for matching map temperatures to
+downstream thermal nodes. They are distinct quantities and consumers should not
+combine them.
+
+Read the committed schema or examples as detached plain mappings:
+
+.. code-block:: python
+
+   from OpenPinch.contracts.hpr_performance_map import HprPerformanceMap
+   from OpenPinch.resources import (
+       load_hpr_performance_map_contract_resource,
+   )
+
+   payload = load_hpr_performance_map_contract_resource(
+       "heat-pump-1.0.json"
+   )
+   performance_map = HprPerformanceMap.model_validate(payload)
+   plain_json_data = performance_map.model_dump(mode="json")
+
+The catalog also contains ``refrigeration-1.0.json`` and
+``schema-1.0.json``. These resources work from an installed wheel and do not
+assume an unpacked source checkout. The contract validates data only: it does
+not run CoolProp or TESPy, construct a Pyomo model, invoke HiGHS, or import
+OpenUtility.
+
 Next Steps
 ----------
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -141,7 +142,17 @@ def run_power_cogeneration_service(
                 )
             continue
 
+        target = deepcopy(target, {id(target.parent_zone): target.parent_zone})
+        target.config._values.update(
+            {
+                key: value
+                for key, value in zone.config._values.items()
+                if key.startswith("POWER_")
+            }
+        )
+        target.config._build_groups(target.config._values)
         cogeneration_func(target, args=runtime_args)
+        zone.add_target(target, invalidate_dependents=False)
         zone._selected_cogeneration_target_type = target_type
         return zone
 
@@ -192,6 +203,7 @@ def _ensure_cogeneration_target(
         target,
         args=compare_args,
         period_ids=getattr(zone, "period_ids", None),
+        config=zone.config,
     ):
         return target
 
@@ -205,6 +217,7 @@ def _ensure_cogeneration_target(
         refreshed_target,
         args=compare_args,
         period_ids=getattr(zone, "period_ids", None),
+        config=zone.config,
     ):
         return refreshed_target
     return None

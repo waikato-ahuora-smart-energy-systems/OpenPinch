@@ -7105,3 +7105,1116 @@ Version bump should do this automatically; however, the release version is being
 **Context**: SOURCE CONTROL AUTHORIZATION - Pull request 95 review resolution
 
 ---
+
+## TESPy HPR Performance-Map Design Request and Workspace Detection
+**Timestamp**: 2026-09-03T16:21:36Z
+**User Input**: "<codex_delegation>
+  <source_thread_id>019f0b71-87c1-7f93-9638-b98b49582deb</source_thread_id>
+  <input>Context from the OpenUtility design discussion:
+
+OpenUtility is being refactored to remain a generic utility-system optimization package and should not import OpenPinch directly. The intended relationship is that OpenUtility can be an optional optimization extension around OpenPinch outputs, while OpenPinch remains the core pinch/targeting package. OpenUtility should consume plain data structures or exported performance maps and build Pyomo MILP models using HiGHS.
+
+Recent conclusions from the discussion:
+- Heat pumps and refrigeration should participate in OpenUtility as dispatchable conversion units linked to thermal balances and electricity balances.
+- OpenUtility should represent part-load heat-pump behavior as MILP-ready piecewise-linear maps: breakpoints or convex-combination/SOS2/segment-binary formulations over delivered heat, source/sink temperatures, PLR, power, and COP.
+- OpenUtility should not own thermodynamic cycle simulation or OpenPinch/TESPy object imports.
+- TESPy appears best used as an offline performance-map generator: configure thermodynamic heat-pump/refrigeration networks, solve design/offdesign points, then export points or segments for OpenUtility.
+- Because OpenPinch already has HPR targeting workflows, TESPy part-load analysis may be better placed inside core OpenPinch or an OpenPinch-side optional module, with OpenUtility consuming exported maps.
+
+Research notes already gathered:
+- TESPy does not appear to expose a single generic heat-pump part-load model; it models thermodynamic networks and supports design/offdesign solves, component characteristic lines/maps such as compressor `eta_s_char`, heat-exchanger `kA_char`, and turbo compressor maps.
+- The oemof heat-pump tutorial demonstrates using TESPy to generate part-load performance across operating points and calculating COP from delivered heat divided by compressor/pump power.
+- Common building/heat-pump literature uses PLR/PLF cycling degradation or EIR modifier curves; for MILP these are best precomputed into piecewise-linear points.
+
+Task for OpenPinch:
+Please evaluate where TESPy-based heat-pump/refrigeration part-load map generation should live in OpenPinch. Focus on an API design that can:
+1. Use TESPy optionally to generate heat pump/refrigeration performance maps from source/sink temperature grids and load fractions.
+2. Integrate with OpenPinch HPR targeting concepts without making OpenUtility import OpenPinch.
+3. Export plain, versioned data structures suitable for downstream MILP optimization packages such as OpenUtility.
+4. Keep dependencies optional if TESPy is heavy or environment-sensitive.
+5. Propose minimal classes/functions and tests, but do not implement unless the design is clear and low-risk.
+
+Please produce a concise design recommendation and note any changes needed in OpenPinch data models or docs.</input>
+</codex_delegation>"
+**AI Response**: "Displayed the mandatory AI-DLC welcome, resumed the existing brownfield workspace context, confirmed current reverse-engineering artifacts, and began a design-only requirements assessment. No application code changes were authorized or made."
+**Context**: WORKSPACE DETECTION AND REQUIREMENTS ANALYSIS - TESPy HPR performance-map design
+
+---
+
+## TESPy HPR Performance-Map Requirements Approval Prompt
+**Timestamp**: 2026-09-03T16:23:58Z
+**User Input**: "No new user input; requirements were derived from the complete delegated design brief and current repository evidence."
+**AI Response**: "# 🔍 Requirements Analysis Complete
+
+Requirements analysis has identified a moderate, design-only enhancement:
+
+- Put thermodynamic map generation in OpenPinch while keeping TESPy in an optional leaf.
+- Define a separate versioned, JSON-compatible performance-map contract rather than exporting existing runtime HPR result models.
+- Preserve downstream independence: OpenUtility owns Pyomo/HiGHS formulations and imports neither OpenPinch nor TESPy.
+- Bridge solved HPR targets to map requests without mutating target objects or making target schemas engine-aware.
+- Require deterministic validation, strict version rejection, cold imports without TESPy, fake-adapter tests, property tests, and a guarded real-TESPy smoke test.
+
+> **📋 <u>**REVIEW REQUIRED:**</u>**
+> Please examine the requirements document at: `aidlc-docs/inception/requirements/tespy-hpr-performance-map-requirements.md`
+
+
+
+> **🚀 <u>**WHAT'S NEXT?**</u>**
+>
+> **You may:**
+>
+> 🔧 **Request Changes** - Ask for modifications to the requirements if required based on your review
+> 📝 **Add User Stories** - Choose to include **User Stories** stage (currently skipped based on the design-only scope)
+> ✅ **Approve & Continue** - Approve requirements and proceed to **Workflow Planning**
+
+---"
+**Context**: REQUIREMENTS APPROVAL GATE - TESPy HPR performance-map design
+
+---
+
+## TESPy HPR Backend Tie-In Requirements Amendment
+**Timestamp**: 2026-09-03T16:39:02Z
+**User Input**: "I want the tie in point to be the current CoolProp backed HPR targeting methods. TESPy simulation should be selectable; while CoolProp is the default."
+**AI Response**: "Amended the requirements so applicable existing CoolProp-backed HPR targeting methods remain the public tie-in point, CoolProp remains the default when the selector is omitted, and TESPy is chosen explicitly through a distinct thermodynamic-backend selector. Kept analytic Carnot and existing TESPy-specific Brayton behavior outside implicit backend substitution, required clear rejection of unsupported combinations, and retained explicit map generation so ordinary targeting does not incur grid-simulation cost. Presented the revised requirements approval gate."
+**Context**: REQUIREMENTS AMENDMENT - TESPy HPR performance-map design
+
+---
+
+## TESPy HPR Performance-Map Revised Requirements Approval Prompt
+**Timestamp**: 2026-09-03T16:39:02Z
+**User Input**: "No new user input; revised approval prompt follows the requested backend tie-in amendment."
+**AI Response**: "# 🔍 Requirements Analysis Updated
+
+The requirements now define the existing CoolProp-backed HPR targeting methods as the integration point. CoolProp remains the default, TESPy is explicitly selectable, and unsupported cycle/backend combinations fail clearly without fallback.
+
+> **📋 REVIEW REQUIRED:**
+> Review `aidlc-docs/inception/requirements/tespy-hpr-performance-map-requirements.md`.
+
+> **WHAT'S NEXT?**
+>
+> 🔧 **Request Changes**
+> 📝 **Add User Stories**
+> ✅ **Approve & Continue** to Workflow Planning and the focused API design recommendation."
+**Context**: REVISED REQUIREMENTS APPROVAL GATE - TESPy HPR performance-map design
+
+---
+
+## OpenUtility Multi-Period HPR Boundary Plan Review
+**Timestamp**: 2026-09-03T16:51:45Z
+**User Input**: "Review the Multi-Period HPR Optimization Boundary Plan from the OpenUtility project"
+**AI Response**: "Read the current plan from OpenUtility task 019f0b71-87c1-7f93-9638-b98b49582deb and compared it with both repositories' current architecture and the pending OpenPinch TESPy HPR requirements. Confirmed the ownership boundary but found eight required amendments: constrain map points to applicable period temperatures, resolve the missing installed-capacity formulation, define a versioned map interchange contract, key thermal quantities by node and period, specify refrigeration condenser-heat routing, enforce local rather than unrestricted global convex interpolation, align the OpenPinch tie-in with CoolProp-default/TESPy-selectable existing HPR methods, and define exact energy/power system boundaries. Documented the review and amended the pending OpenPinch requirements. No OpenUtility files or application code were changed."
+**Context**: CROSS-PROJECT DESIGN REVIEW - TESPy HPR performance-map boundary
+
+---
+
+## Revised OpenUtility Multi-Period HPR Boundary Implementation Review
+**Timestamp**: 2026-09-03T17:13:58Z
+**User Input**: "Review the new OpenUtility Multi-Period HPR Boundary Plan from the OpenUtility project, which has proceeded to implementation. OpenPinch should complement this plan."
+**AI Response**: "Read the revised plan and followed its OpenUtility implementation through completion. Confirmed that the plan adopted the prior eight architectural amendments and that the implementation removed the OpenPinch runtime dependency, added a plain-data HPR map decoder, period-indexed heat-pump and refrigeration optimization, thermal-node balances, explicit condenser-heat routing, documentation, focused tests, and installed-wheel smoke solves. Identified remaining pre-stable-contract issues: unrestricted convex combinations do not enforce adjacent ordered segments; candidate fixed capacity can disagree with unscaled absolute map duties; the HPR period electricity balance remains separate from the existing onsite-generation and grid balance; schema version, units, COP, load-fraction, coordinate, and curve invariants are too permissive; energy and temperature tolerances are conflated; refrigeration minimum-load and variable-cost equations use sink rather than useful source duty; and structured provenance is coerced to strings. Updated the OpenPinch requirements and cross-project review with a complementary producer design. No application code was changed."
+**Context**: CROSS-PROJECT IMPLEMENTATION REVIEW - OpenUtility HPR consumer boundary and OpenPinch producer alignment
+
+---
+
+## TESPy HPR Performance-Map Requirements Approval
+**Timestamp**: 2026-09-03T18:59:42Z
+**User Input**: "B"
+**AI Response**: "Accepted the user's explicit approval of the amended TESPy HPR performance-map requirements and advanced to Workflow Planning."
+**Context**: REQUIREMENTS APPROVAL - TESPy HPR performance-map design
+
+---
+
+## TESPy HPR Performance-Map Workflow Planning
+**Timestamp**: 2026-09-03T19:00:45Z
+**User Input**: "No new user input; workflow planning followed the approved requirements and the user's design-only authorization boundary."
+**AI Response**: "Created `aidlc-docs/inception/plans/execution-plan.md`. Recommended one remaining authorized stage: focused Application Design at standard depth. Skipped User Stories and Infrastructure Design, and deferred Units Generation and all construction work until the design and OpenUtility schema are approved. Defined component impacts, medium risk, the future package sequence, Property-Based Testing compliance, a validated Mermaid workflow with a text alternative, and success criteria. Requested explicit approval before proceeding."
+**Context**: WORKFLOW PLANNING APPROVAL GATE - TESPy HPR performance-map design
+
+---
+
+## TESPy HPR Performance-Map Workflow Plan Approval
+**Timestamp**: 2026-09-03T19:03:13Z
+**User Input**: "B"
+**AI Response**: "Accepted the user's explicit approval of the workflow plan and advanced to the focused Application Design stage."
+**Context**: WORKFLOW PLANNING APPROVAL - TESPy HPR performance-map design
+
+---
+
+## TESPy HPR Performance-Map Application Design Approval Prompt
+**Timestamp**: 2026-09-03T19:09:47Z
+**User Input**: "No new user input; the focused design followed the approved requirements and workflow plan."
+**AI Response**: "Completed the focused Application Design across components.md, component-methods.md, services.md, component-dependency.md, and application-design.md. Defined the current vapour-compression target methods with a CoolProp-default/TESPy-selectable simulation_backend, an explicit target-accessor hpr_performance_map follow-up, isolated point-simulator adapters, strict versioned JSON contracts, canonical external-temperature and useful-capacity semantics, deterministic grid generation, optional TESPy imports, golden schema fixtures, and OpenUtility contract-promotion preconditions. Restricted schema 1.0 to fixed-capacity single-source/single-sink units because the current OpenUtility candidate contract cannot faithfully represent coupled multi-port cascades. Validated Markdown, code fences, diagram identifiers and edges, text alternatives, requirements traceability, and enabled-extension applicability. Requested explicit design approval; implementation remains unauthorized."
+**Context**: APPLICATION DESIGN APPROVAL GATE - TESPy HPR performance-map design
+
+---
+
+## TESPy HPR Performance-Map Application Design Approval
+**Timestamp**: 2026-09-04T18:55:15Z
+**User Input**: "B"
+**AI Response**: "Accepted the user's explicit approval of the focused Application Design and concluded the authorized design-only workflow. Marked Application Design complete, recorded Units Generation as skipped, and retained all construction work as not authorized. No application code was changed."
+**Context**: APPLICATION DESIGN APPROVAL AND DESIGN-SCOPE COMPLETION - TESPy HPR performance-map design
+
+---
+
+## TESPy HPR Performance-Map Next-Step Guidance
+**Timestamp**: 2026-09-04T19:02:00Z
+**User Input**: "what next"
+**AI Response**: "Recommended stabilizing the OpenUtility alpha consumer contract before implementing the OpenPinch producer: correct ordered-curve adjacency, fixed-capacity scaling, strict version/unit/COP and curve validation, refrigeration useful-duty semantics, dimensional tolerance separation, and structured provenance; then freeze shared JSON Schema and golden fixtures. After that, resume OpenPinch with Units Generation and separately approved construction for contracts/resources, backend adapters, the target-accessor bridge, documentation, and tests."
+**Context**: POST-DESIGN SEQUENCING GUIDANCE - TESPy HPR performance-map integration
+
+---
+
+## OpenUtility HPR Boundary Correction Authorization
+**Timestamp**: 2026-09-04T19:04:08Z
+**User Input**: "go"
+**AI Response**: "Sent the concrete contract, formulation, validation, documentation, and test corrections to the existing OpenUtility implementation task. Began monitoring that task so the settled consumer schema can be brought back into OpenPinch before Units Generation."
+**Context**: POST-DESIGN EXECUTION AUTHORIZATION - OpenUtility boundary stabilization before OpenPinch construction
+
+---
+
+## OpenUtility HPR Boundary Correction Completion
+**Timestamp**: 2026-09-04T19:15:48Z
+**User Input**: "No new user input; continued the authorized post-design sequence."
+**AI Response**: "Confirmed that OpenUtility resolved the reviewed contract and formulation findings: strict alpha schema 1.0, explicit useful-capacity basis and fixed-capacity scaling, adjacent-only interpolation, mode-aware useful duty, separate energy and temperature tolerances, and structured provenance. Its release gate passed 186 tests at 90.24 percent coverage plus static, documentation, build, audit, and wheel-smoke checks. Recorded the deliberately separate HPR electricity overlay as an alpha limitation and synchronized the OpenPinch design field names to energy_balance_tolerance and temperature_match_tolerance. Resumed OpenPinch Units Generation planning."
+**Context**: CROSS-PACKAGE CONTRACT STABILIZATION - TESPy HPR performance-map integration
+
+---
+
+## TESPy HPR Performance-Map Unit Plan Approval Prompt
+**Timestamp**: 2026-09-04T19:17:05Z
+**User Input**: "No new user input; continued the authorized Units Generation planning stage."
+**AI Response**: "Unit of work plan complete. Review the plan in aidlc-docs/inception/plans/unit-of-work-plan.md. Ready to proceed to generation? Proposed answer A approves the contract-first three-unit split: contract and golden fixtures; point simulators and map generation; current HPR target API integration and publication. Answer B requests boundary changes."
+**Context**: UNITS GENERATION PART 1 APPROVAL GATE - TESPy HPR performance-map integration
+
+---
+
+## TESPy HPR Performance-Map Unit Plan Approval
+**Timestamp**: 2026-09-04T19:22:19Z
+**User Input**: "A"
+**AI Response**: "Accepted the contract-first three-unit decomposition and began Units Generation Part 2. The answer was clear and introduced no ambiguity requiring follow-up."
+**Context**: UNITS GENERATION PART 1 APPROVAL - TESPy HPR performance-map integration
+
+---
+
+## TESPy HPR Performance-Map Units Generation Completion Prompt
+**Timestamp**: 2026-09-04T19:26:46Z
+**User Input**: "No new user input; executed the approved Units Generation plan."
+**AI Response**: "Generated the three scoped units in unit-of-work.md, the acyclic contract-to-simulators-to-public-API dependency matrix and checkpoints in unit-of-work-dependency.md, and complete FR-1 through FR-10, nine NFR-group, acceptance 1 through 13, and PBT-01 through PBT-10 ownership in unit-of-work-story-map.md. Validated Markdown fences, tabs, table shapes, full traceability, optional TESPy leaf isolation, and absence of OpenUtility/Pyomo/HiGHS dependency leakage. Property-Based Testing is enabled and assigned; PBT-04 and PBT-06 are N/A because no idempotent mutation or reusable mutable public state is introduced. Security Baseline and Resiliency Baseline are disabled and were skipped. Requested explicit approval using: '# 🔧 Units Generation Complete ... Approve & Continue to CONSTRUCTION PHASE or Request Changes.'"
+**Context**: UNITS GENERATION PART 2 APPROVAL GATE - TESPy HPR performance-map integration
+
+---
+
+## TESPy HPR Performance-Map Units Approval
+**Timestamp**: 2026-09-04T19:29:27Z
+**User Input**: "B"
+**AI Response**: "Accepted the generated three-unit decomposition, completed Units Generation, and entered Construction with Unit 1 Functional Design for the HPR performance-map contract and golden fixtures."
+**Context**: UNITS GENERATION APPROVAL AND CONSTRUCTION TRANSITION - TESPy HPR performance-map integration
+
+---
+
+## Unit 1 HPR Performance-Map Contract Functional Design Completion Prompt
+**Timestamp**: 2026-09-04T19:33:40Z
+**User Input**: "No new user input; executed the approved Construction transition into Unit 1 Functional Design."
+**AI Response**: "Completed business-logic-model.md, business-rules.md, and domain-entities.md for the strict HPR alpha schema 1.0 contract and golden fixtures. Defined closed field and unit sets, mode-dependent useful capacity and COP, ordered-curve and physical invariants, structured JSON provenance, deterministic serialization/resources, fail-closed errors, and immutable ownership boundaries. Validated Markdown, tables, field coverage, BR-001 through BR-027, and enabled PBT-01 through PBT-10 treatment; PBT-04 and PBT-06 are N/A and no PBT finding is blocking. Security Baseline and Resiliency Baseline remain disabled and were skipped. Requested the standardized two-option Functional Design approval before Unit 1 NFR Requirements."
+**Context**: UNIT 1 FUNCTIONAL DESIGN APPROVAL GATE - TESPy HPR performance-map contract and golden fixtures
+
+---
+
+## Unit 1 HPR Performance-Map Contract Functional Design Approval
+**Timestamp**: 2026-09-04T19:38:05Z
+**User Input**: "b"
+**AI Response**: "Accepted the Unit 1 Functional Design, marked it complete, and entered Unit 1 NFR Requirements."
+**Context**: UNIT 1 FUNCTIONAL DESIGN APPROVAL - TESPy HPR performance-map contract and golden fixtures
+
+---
+
+## Unit 1 HPR Performance-Map Contract NFR Requirements Completion Prompt
+**Timestamp**: 2026-09-04T19:41:01Z
+**User Input**: "No new user input; executed the approved transition into Unit 1 NFR Requirements."
+**AI Response**: "Completed nfr-requirements.md with NFR-U1-001 through NFR-U1-020 and tech-stack-decisions.md. Defined Python/Pydantic compatibility, closed alpha schema behavior, linear and bounded validation performance, deterministic resources, fail-closed reliability, cold-import and dependency isolation, data-only deserialization, detachment, maintainability, documentation, and distribution gates. Selected existing Python 3.14, Pydantic 2, standard JSON/importlib.resources, pytest, Hypothesis, Hatchling, Ruff, and development-only jsonschema; no runtime dependency is added. Validated Markdown, table structure, all NFR identifiers, stack coverage, and PBT-08/PBT-09 requirements. PBT-04 and PBT-06 remain N/A; no PBT finding is blocking. Security and Resiliency extensions remain disabled. Requested the standardized two-option approval before Unit 1 NFR Design."
+**Context**: UNIT 1 NFR REQUIREMENTS APPROVAL GATE - TESPy HPR performance-map contract and golden fixtures
+
+---
+
+## Unit 1 HPR Performance-Map Contract NFR Requirements Approval
+**Timestamp**: 2026-09-04T19:41:59Z
+**User Input**: "b"
+**AI Response**: "Accepted the Unit 1 NFR Requirements and technology-stack decisions, marked the stage complete, and entered Unit 1 NFR Design."
+**Context**: UNIT 1 NFR REQUIREMENTS APPROVAL - TESPy HPR performance-map contract and golden fixtures
+
+---
+
+## Unit 1 HPR Performance-Map Contract NFR Design Completion Prompt
+**Timestamp**: 2026-09-04T19:44:42Z
+**User Input**: "No new user input; executed the approved transition into Unit 1 NFR Design."
+**AI Response**: "Completed nfr-design-patterns.md with NFRP-001 through NFRP-012 and logical-components.md with LC-01 through LC-09. Designed strict immutable and layered fail-fast validation, linear index/group checks, canonical request and JSON behavior, generated schema/fixtures with drift checks, package-resource abstraction, dependency firewall, dual schema/model conformance, deterministic complementary tests, and layered quality gates. Mapped all NFR-U1-001 through NFR-U1-020 and explicit PBT-08/PBT-09 mechanisms. Retries, fallback coercion, stateful availability, infrastructure, caches, queues, and services are N/A. Validated Markdown, tables, component identifiers, complete NFR coverage, and dependency isolation; no PBT finding is blocking. Security and Resiliency extensions remain disabled. Requested the standardized two-option approval before Unit 1 Code Generation planning."
+**Context**: UNIT 1 NFR DESIGN APPROVAL GATE - TESPy HPR performance-map contract and golden fixtures
+
+---
+
+## Unit 1 HPR Performance-Map Contract NFR Design Approval
+**Timestamp**: 2026-09-04T20:39:14Z
+**User Input**: "B"
+**AI Response**: "Accepted the Unit 1 NFR Design, marked it complete, confirmed Infrastructure Design remains N/A, and entered Unit 1 Code Generation Part 1 planning."
+**Context**: UNIT 1 NFR DESIGN APPROVAL - TESPy HPR performance-map contract and golden fixtures
+
+---
+
+## Unit 1 HPR Performance-Map Contract Code Generation Plan Approval Prompt
+**Timestamp**: 2026-09-04T20:41:28Z
+**User Input**: "No new user input; executed the approved transition into Unit 1 Code Generation planning."
+**AI Response**: "Created and validated aidlc-docs/construction/plans/hpr-performance-map-contract-code-generation-plan.md as the single source of truth. The twelve-step test-first plan covers strict contract examples, Hypothesis strategies/properties, the contract module, canonical schema and heat-pump/refrigeration fixtures, independent jsonschema validation, package-resource access, architecture and backward-compatibility guards, distribution/wheel smoke, documentation, bounded performance, full quality gates, and a code summary. Exact created and modified paths, FR/acceptance/NFR ownership, and PBT-01 through PBT-10 treatment are included. No application code was changed. Requested explicit approval of the complete plan before executing Step 1."
+**Context**: UNIT 1 CODE GENERATION PART 1 APPROVAL GATE - TESPy HPR performance-map contract and golden fixtures
+
+---
+
+## Unit 1 HPR Performance-Map Contract Code Generation Plan Approval
+**Timestamp**: 2026-09-04T20:44:09Z
+**User Input**: "B"
+**AI Response**: "Accepted the complete twelve-step Unit 1 Code Generation plan, marked Part 1 approved, and began Part 2 with RED contract example tests."
+**Context**: UNIT 1 CODE GENERATION PART 1 APPROVAL - TESPy HPR performance-map contract and golden fixtures
+
+---
+
+## Unit 1 HPR Performance-Map Contract Code Generation Steps 1-8
+**Timestamp**: 2026-09-04T20:57:20Z
+**User Input**: "No new user input; executed approved Unit 1 Code Generation Steps 1 through 8."
+**AI Response**: "Implemented the strict immutable alpha-1.0 request/map contract, deterministic schema and heat-pump/refrigeration resources, independent JSON Schema validation, importlib.resources accessors, example/property/resource coverage, and architecture guards. Corrected the cold-import gate to block optional TESPy and external optimizer packages while statically proving Unit 1 has no direct CoolProp dependency, because CoolProp remains OpenPinch's required default backend. The focused architecture, API, existing HPR contract, new contract, and property matrix passed 82 tests."
+**Context**: UNIT 1 CODE GENERATION PART 2 STEPS 1-8 - TESPy HPR performance-map contract and golden fixtures
+
+---
+
+## Unit 1 HPR Performance-Map Contract Code Generation Completion Prompt
+**Timestamp**: 2026-09-04T21:07:27Z
+**User Input**: "No new user input; completed approved Unit 1 Code Generation Steps 9 through 12."
+**AI Response**: "Completed the Unit 1 HPR performance-map contract, deterministic schema and fixtures, package-resource and distribution boundaries, documentation, and verification. The focused complete gate passed 101 tests, the packaging/archive gate passed 33 tests, the 10,000-point validation took approximately 0.02 seconds, the new contract reached 100 percent statement/branch coverage, warning-strict Sphinx built 55 pages, the offline lock check resolved 149 packages, distributions built, and the isolated installed-wheel smoke passed. Ruff, formatting, resource drift, byte equality, size limits, and patch hygiene passed. Created the Unit 1 code summary and requested the standardized two-option generated-code approval before Unit 2."
+**Context**: UNIT 1 CODE GENERATION PART 2 APPROVAL GATE - TESPy HPR performance-map contract and golden fixtures
+
+---
+
+## Unit 1 HPR Performance-Map Contract Generated-Code Approval
+**Timestamp**: 2026-09-04T22:13:36Z
+**User Input**: "B"
+**AI Response**: "Accepted the generated Unit 1 code, marked the unit complete, and entered Unit 2 Functional Design for selectable CoolProp/TESPy point simulation and deterministic map generation."
+**Context**: UNIT 1 CODE GENERATION APPROVAL AND UNIT 2 FUNCTIONAL DESIGN START - TESPy HPR performance maps
+
+---
+
+## Unit 2 HPR Point Simulators Functional Design Questions
+**Timestamp**: 2026-09-04T22:15:43Z
+**User Input**: "No new user input; executed the approved transition into Unit 2 Functional Design planning."
+**AI Response**: "Created the Unit 2 Functional Design plan and a six-question file covering CoolProp part-load semantics, the first TESPy topology, global versus per-curve design/offdesign reference, characteristic ownership, electrical system boundary, and all-or-nothing failure diagnostics. Paused for completed answer tags because these choices materially change physical results and cannot be inferred safely."
+**Context**: UNIT 2 FUNCTIONAL DESIGN QUESTION GATE - HPR point simulators and map generation
+
+---
+
+## Unit 2 HPR Point Simulators Functional Design Answers
+**Timestamp**: 2026-09-04T23:07:13Z
+**User Input**: "Done"
+**AI Response**: "Read the completed answer file. Questions 1, 2, 3, 4, and 6 selected A, A, A, A, and B and are mutually consistent. Question 5 contains `Not selected` rather than a valid letter; because the selected refrigerant-only topology still requires an explicit electric-power boundary, created one focused clarification question and paused."
+**Context**: UNIT 2 FUNCTIONAL DESIGN CLARIFICATION GATE - HPR point simulators and map generation
+
+---
+
+## Unit 2 HPR Point Simulators Functional Design Clarification and Completion Prompt
+**Timestamp**: 2026-09-04T23:13:59Z
+**User Input**: "done"
+**AI Response**: "Validated clarification answer A as compressor-only electrical power with no modeled auxiliaries or secondary loops. Completed business-logic-model.md, business-rules.md, and domain-entities.md. Defined the immutable target-derived generation context, canonical Cartesian traversal and point identities, prepare/simulate/close lifecycle, default CoolProp duty scaling, optional TESPy refrigerant-only topology, one global design point with all requested coordinates evaluated offdesign, OpenPinch-owned versioned compressor characteristic, strict normalized results, ordered aggregate diagnostics, cleanup semantics, and plain Unit 1 map assembly. Validated Markdown and patch hygiene, all 60 unique BR-U2 rules, entity coverage, and PBT-01 testable properties; PBT-04 is N/A and no PBT finding is blocking. Security and Resiliency extensions remain disabled. Requested the standardized two-option Functional Design approval before Unit 2 NFR Requirements."
+**Context**: UNIT 2 FUNCTIONAL DESIGN APPROVAL GATE - HPR point simulators and map generation
+
+---
+
+## Unit 2 Functional Design Review - Refrigerant Mixtures
+**Timestamp**: 2026-09-04T23:28:08Z
+**User Input**: "What about refrigerant mixtures?"
+**AI Response**: "Identified that the draft's single-working-fluid wording was too narrow because the existing CoolProp vapour-compression cycle supports registered blends and explicit mole-fraction mixtures. Reopened the Functional Design review and amended the logic, rules, entities, provenance, saturation-anchor semantics, TESPy translation, failure policy, and test properties to preserve mixture capability within the supported single-loop topology."
+**Context**: UNIT 2 FUNCTIONAL DESIGN CHANGE REVIEW - HPR refrigerant-mixture support
+
+---
+
+## Unit 2 Functional Design Review - Arbitrary Valid CoolProp Mixtures
+**Timestamp**: 2026-09-04T23:28:08Z
+**User Input**: "I think CoolProp supports any refrigerant mixture"
+**AI Response**: "Confirmed that Unit 2 should impose no refrigerant-name, component-pair, or component-count allowlist. Qualified support as any pure fluid, registered blend, or explicit N-component mole-fraction mixture that the installed CoolProp property backend can construct and evaluate at every required cycle state. Missing interaction data, unavailable flash behavior, and out-of-domain states fail explicitly; OpenPinch does not silently install estimated mixing rules or mutate global interaction parameters. Updated the design to 71 business rules and added binary/ternary examples plus generated arbitrary-component mixture properties. The existing CoolProp 7.2.0 mixture and glide tests pass 4 of 4."
+**Context**: UNIT 2 FUNCTIONAL DESIGN CHANGE COMPLETION - HPR refrigerant-mixture support
+
+---
+
+## Unit 2 Functional Design Review - TESPy Mixture Acceptance
+**Timestamp**: 2026-09-04T23:38:10Z
+**User Input**: "Tespy should also accept such fluids"
+**AI Response**: "Required TESPy to accept the same pure-fluid, registered-blend, and explicit N-component mixture input categories as CoolProp, without a mixture or component-count allowlist. Defined exact `|molar` translation for existing OpenPinch explicit-mixture syntax and prohibited rejection based solely on mixture kind. Confirmed installed TESPy 0.10.1.post2 constructs R407C and explicit R32/R125 mixture wrappers with dew/bubble states. Retained typed diagnostics for genuine installed-wrapper, property-data, or operating-state failures and prohibited automatic fallback. Updated the Functional Design to 73 business rules and added TESPy mixture success and failure-oracle coverage."
+**Context**: UNIT 2 FUNCTIONAL DESIGN CHANGE COMPLETION - TESPy refrigerant-mixture acceptance
+
+---
+
+## Unit 2 Functional Design Approval and NFR Requirements Questions
+**Timestamp**: 2026-09-04T23:56:34Z
+**User Input**: "Go"
+**AI Response**: "Accepted the amended Unit 2 Functional Design, marked the stage complete, and entered Unit 2 NFR Requirements. Created a checkbox plan with seven decision questions covering optional-extra naming, TESPy version bounds, blocking real-engine CI, numerical reproducibility, mixture property backends, concurrency, and production grid-performance policy. Paused for completed answer tags before generating NFR artifacts."
+**Context**: UNIT 2 NFR REQUIREMENTS QUESTION GATE - HPR point simulators and map generation
+
+---
+
+## Unit 2 NFR Requirements Answers and Clarification
+**Timestamp**: 2026-09-05T00:03:03Z
+**User Input**: "Go"
+**AI Response**: "Read and validated the seven NFR answer tags. Questions 1, 2, 3, 4, 6, and 7 select A and are complete and mutually consistent. Question 5 contains a prose response rather than a valid letter and combines two material decisions: whether to raise the package-wide CoolProp baseline to version 8 and whether HPR permits only HEOS or other CoolProp-native property backends while rejecting REFPROP. Created two focused clarification questions and paused before generating NFR artifacts."
+**Context**: UNIT 2 NFR REQUIREMENTS CLARIFICATION GATE - HPR dependency and property-backend policy
+
+---
+
+## Unit 2 NFR Requirements Completion Prompt
+**Timestamp**: 2026-09-05T00:10:16Z
+**User Input**: "Done"
+**AI Response**: "Validated clarification answers A and B: require CoolProp 8 or newer package-wide, reject REFPROP, retain HEOS as the tested default, and permit capability-checked CoolProp-native alternatives. Generated nfr-requirements.md with NFR-U2-001 through NFR-U2-028 and tech-stack-decisions.md. Defined the neutral TESPy extra and compatibility alias, TESPy minimum without an upper bound, separate blocking base/TESPy CI profiles, common pure/blend/N-component mixture input categories, tolerance-based numerical reproducibility, no quantization, linear orchestration, a 10,000-point fake-engine budget, atomic cleanup/failure, process-isolated parallel guidance, layered fake/CoolProp/TESPy testing, and complete quality gates. Validated Markdown, patch hygiene, 28 unique NFR identifiers, decision coverage, and PBT-09 framework selection. PBT-06 is applicable to the internal session lifecycle, PBT-04 is N/A, and no PBT finding is blocking. Security and Resiliency extensions remain disabled. Requested standardized NFR Requirements approval before Unit 2 NFR Design."
+**Context**: UNIT 2 NFR REQUIREMENTS APPROVAL GATE - HPR point simulators and map generation
+
+---
+
+## Unit 2 NFR Requirements Approval and NFR Design Questions
+**Timestamp**: 2026-09-05T00:19:14Z
+**User Input**: "go"
+**AI Response**: "Accepted the Unit 2 NFR Requirements and technology decisions, marked the stage complete, and entered Unit 2 NFR Design. Created a checkbox plan with seven questions covering point-local versus fatal engine failure, lazy Cartesian traversal, per-session invariant caching, sanitized diagnostics, module layout, versioned TESPy convergence controls, and compressor-characteristic resource ownership. Evaluated resilience, scalability, performance, security, and logical-component categories explicitly and paused for completed answer tags."
+**Context**: UNIT 2 NFR DESIGN QUESTION GATE - HPR point simulators and map generation
+
+---
+
+## Unit 2 NFR Design Completion Prompt
+**Timestamp**: 2026-09-05T00:35:16Z
+**User Input**: "done"
+**AI Response**: "Validated all seven answer tags as A and found them complete and mutually consistent. Generated nfr-design-patterns.md with NFRP-U2-001 through NFRP-U2-018 and logical-components.md with LC-U2-01 through LC-U2-15. Defined the engine dependency firewall, per-call state isolation, capability-checked pure/blend/N-component fluid resolution, lazy Cartesian traversal, point-local versus fatal failure state machine, atomic ordered diagnostics, sanitized causes, existing-cycle CoolProp adapter, restorable TESPy design snapshot, fixed versioned convergence settings, strict versioned characteristic JSON with SHA-256 provenance, numerical acceptance layers, deterministic provenance, blocking base/TESPy profiles, Hypothesis lifecycle model, real-engine smokes, 10,000-point performance guard, and layered quality gates. Clarified NFR-U2-022 so every call owns isolated adapter state while the unique temporary directory applies to TESPy calls. Validated patch hygiene, 18 unique patterns, 15 unique components, complete coverage of all 28 NFRs, complete plan checkboxes, and enabled Property-Based Testing rules; PBT-04 and Infrastructure Design remain N/A. Security and Resiliency extensions remain disabled. Requested the standardized two-option NFR Design approval before Unit 2 Code Generation planning."
+**Context**: UNIT 2 NFR DESIGN APPROVAL GATE - HPR point simulators and map generation
+
+---
+
+## Unit 2 NFR Design Approval and Code Generation Plan Prompt
+**Timestamp**: 2026-09-05T00:51:28Z
+**User Input**: "go"
+**AI Response**: "Accepted the Unit 2 NFR Design, marked it approved, loaded the Code Generation rules, and completed Part 1 planning. Created hpr-point-simulators-map-generation-code-generation-plan.md as the single source of truth with thirteen test-first steps: dependency/profile contract tests; CoolProp 8 and TESPy-extra updates; engine-neutral values, fluid/context, and lazy points; coordinator, diagnostics, provenance, lifecycle, and stateful PBT; CoolProp oracle and adapter; owned characteristic resource, fixed convergence settings, and optional TESPy design/offdesign adapter; architecture, packaging, installed-package, and blocking CI profiles; performance, coverage, regression, build, and summary gates. Listed exact create/modify paths, interfaces, unit dependencies, FR/acceptance/PBT traceability, and N/A layers. Validated the plan as parser-safe Markdown and requested explicit approval before any production code changes."
+**Context**: UNIT 2 CODE GENERATION PART 1 APPROVAL GATE - HPR point simulators and map generation
+
+---
+
+## Unit 2 Code Generation Plan Approval
+**Timestamp**: 2026-09-05T00:54:32Z
+**User Input**: "Go"
+**AI Response**: "Accepted the complete thirteen-step Unit 2 Code Generation plan, marked Part 1 approval complete, and started Step 1 with test-first dependency, optional-extra, cold-import, and CI-profile contracts before package metadata changes."
+**Context**: UNIT 2 CODE GENERATION STEP 1 - RED dependency and profile contract tests
+
+---
+
+## Unit 2 Code Generation Step 1 Completion
+**Timestamp**: 2026-09-05T00:55:47Z
+**User Input**: "No new user input; continued the approved Unit 2 Code Generation plan."
+**AI Response**: "Added test-first package metadata, optional surface, marker, workflow, and cold-import contracts. The focused run produced four expected RED failures for the old CoolProp constraint, unversioned/missing neutral TESPy extra, undeclared TESPy marker, and absent blocking profile; the existing root and Unit 1 cold-import contract passed. Marked all Step 1 checkboxes complete and advanced to Step 2."
+**Context**: UNIT 2 CODE GENERATION STEP 2 - dependency and CoolProp 8 compatibility
+
+---
+
+## Unit 2 Code Generation Step 2 Completion
+**Timestamp**: 2026-09-05T01:00:46Z
+**User Input**: "No new user input; continued the approved Unit 2 Code Generation plan."
+**AI Response**: "Updated pyproject metadata, optional surfaces, marker, workflow profile skeletons, and the uv lock. The environment now uses CoolProp 8.0.0 and TESPy 0.11.2. Converted five legacy stream-profile assertions from near-bitwise comparisons to explicit rtol=1e-7 and atol=1e-8 compatibility tolerances after CoolProp 8 produced sub-micro-kilowatt reconstruction differences. The dependency contract passed 5 tests and the complete selected thermodynamic, stream, vapour-compression, MVR, HPR, and Unit 1 boundary passed 532 tests. Marked Step 2 complete and advanced to Step 3."
+**Context**: UNIT 2 CODE GENERATION STEP 3 - RED internal values, fluid, context, and point tests
+
+---
+
+## Unit 2 Code Generation Step 3 Completion
+**Timestamp**: 2026-09-05T01:03:24Z
+**User Input**: "No new user input; continued the approved Unit 2 Code Generation plan."
+**AI Response**: "Created reusable target-basis, request, mixture, and simulation strategies plus example/property tests for frozen context, capacity and mode, supported/invalid targets, approach translation, pure/blend/N-component fluids, REFPROP rejection before state construction, deterministic molar normalization, TESPy token translation, dew/bubble resolution, lazy Cartesian order, size, identity, and load induction. The focused run produced the expected two collection errors because the Unit 2 package does not exist. Marked Step 3 complete and advanced to Step 4."
+**Context**: UNIT 2 CODE GENERATION STEP 4 - values, fluids, context, and lazy points
+
+---
+
+## Unit 2 Code Generation Step 4 Completion
+**Timestamp**: 2026-09-05T01:07:00Z
+**User Input**: "No new user input; continued the approved Unit 2 Code Generation plan."
+**AI Response**: "Created the engine-neutral performance_maps package initializer, frozen slotted values, CoolProp-backed fluid parser/resolver, pure context builder, and lazy canonical point iterator. Pure, registered-blend, and explicit N-component molar specifications retain their approved semantics; REFPROP is rejected before state construction and dew/bubble states are capability checked. Corrected the invalid-lift example coordinate and constrained generated R134a design states below the critical region. The focused suite passes 21 tests and the new slice is Ruff-clean and formatted. Marked Step 4 complete and advanced to Step 5."
+**Context**: UNIT 2 CODE GENERATION STEP 5 - RED coordinator, diagnostics, provenance, and lifecycle tests
+
+---
+
+## Unit 2 Code Generation Step 5 Completion
+**Timestamp**: 2026-09-05T01:09:45Z
+**User Input**: "No new user input; continued the approved Unit 2 Code Generation plan."
+**AI Response**: "Created a deterministic configurable simulator fake and added example/property/state-machine tests for complete Unit 1 map assembly, exact lifecycle, physical corruption, useful-duty and energy tolerances, local/fatal failures, session-unavailable completion, cleanup ordering, no partial map, cause sanitization, unquantized floats, deterministic provenance, JSON round trips, generated failure sets, and fresh/prepared/fatal/closed states. The focused run produced the expected three collection errors because the error and generation modules are absent. Marked Step 5 complete and advanced to Step 6."
+**Context**: UNIT 2 CODE GENERATION STEP 6 - engine-neutral lifecycle and map coordinator
+
+---
+
+## Unit 2 Code Generation Step 6 Completion
+**Timestamp**: 2026-09-05T01:12:55Z
+**User Input**: "No new user input; continued the approved Unit 2 Code Generation plan."
+**AI Response**: "Implemented the structural simulator protocol and injectable closed factory, stable simulator and aggregate errors, bounded recursive diagnostic sanitization, point-local/fatal classification, exact lifecycle cleanup, independent finite/sign/energy/useful-duty/COP checks, deterministic provenance, and atomic Unit 1 map construction. Local failures continue without retry, fatal failures assign ordered session-unavailable diagnostics, and any cleanup failure invalidates output. The focused example/property/state-machine suite passes 36 tests and the slice is Ruff-clean and formatted. Marked Step 6 complete and advanced to Step 7."
+**Context**: UNIT 2 CODE GENERATION STEP 7 - RED CoolProp adapter oracle tests
+
+---
+
+## Unit 2 Code Generation Step 7 Completion
+**Timestamp**: 2026-09-05T01:15:08Z
+**User Input**: "No new user input; continued the approved Unit 2 Code Generation plan."
+**AI Response**: "Created the CoolProp adapter oracle suite for heat-pump and refrigeration modes; pure R134a, registered R407C, explicit R32/R125 binary, and an explicit R32/R125/R143a ternary supported by CoolProp 8; fixed-temperature load scaling and COP invariance; fresh closed-factory sessions; watts-to-kilowatts normalization; and typed point-local engine failures. A read-only compatibility probe selected a genuinely supported ternary. The focused run produced the expected absent-adapter collection error. Marked Step 7 complete and advanced to Step 8."
+**Context**: UNIT 2 CODE GENERATION STEP 8 - default CoolProp adapter
+
+---
+
+## Unit 2 Code Generation Step 8 Completion
+**Timestamp**: 2026-09-05T01:18:11Z
+**User Input**: "No new user input; continued the approved Unit 2 Code Generation plan."
+**AI Response**: "Implemented the fresh default CoolProp simulator session using the existing VapourCompressionCycle as the sole calculation owner. The adapter validates backend ownership, preserves pure/blend/N-component specifications, applies mode-specific useful duty, converts request kilowatts to cycle watts and outputs back once, exposes compressor-only power and stable metadata, and translates engine errors to point-local typed failures without fallback. All 12 new oracle tests and the complete 407-test heat-pump suite pass; the adapter and tests are Ruff-clean and formatted. Marked Step 8 complete and advanced to Step 9."
+**Context**: UNIT 2 CODE GENERATION STEP 9 - RED TESPy settings, resource, and adapter tests
+
+---
+
+## Unit 2 Code Generation Step 9 Completion
+**Timestamp**: 2026-09-05T01:25:17Z
+**User Input**: "No new user input; continued the approved Unit 2 Code Generation plan."
+**AI Response**: "Pinned the exact OpenPinch-owned 17-point relative-mass-flow compressor characteristic, strict five-key canonical JSON contract, 458-byte resource size, and SHA-256 digest; pinned the frozen openpinch-tespy-hpr-convergence-v1 solve arguments and schema-private method signatures; and added real heat-pump/refrigeration smokes for pure R134a, registered R407C, explicit binary, and explicit ternary molar mixtures. Added design restoration/order-independence, temporary cleanup, missing dependency, no-CoolProp-fallback, actual invalid-wrapper, offdesign non-convergence, and restoration-failure tests. A read-only TESPy 0.11.2 compatibility probe confirmed all four approved fluid categories solve in the selected topology. The focused test run produced the expected absent-adapter collection error. Marked Step 9 complete and advanced to Step 10."
+**Context**: UNIT 2 CODE GENERATION STEP 10 - optional TESPy leaf and owned resource
+
+---
+
+## Unit 2 Code Generation Step 10 Completion
+**Timestamp**: 2026-09-05T01:33:46Z
+**User Input**: "No new user input; continued the approved Unit 2 Code Generation plan."
+**AI Response**: "Implemented the canonical five-key compressor characteristic package resource, strict duplicate-key/canonical-byte/schema/numeric validator, immutable characteristic value, and fixed immutable TESPy convergence settings. Implemented the optional concrete TESPy leaf with one cycle-closer/compressor/condenser/valve/evaporator refrigerant loop, target-derived design duty and dew/bubble pressures, OpenPinch-owned compressor part-load characteristic, one private JSON design snapshot, forced public design/init restoration before every offdesign solve, compressor-only power, typed preparation/point/restoration failures, and cleanup. Pure R134a, registered R407C, explicit binary, and explicit ternary molar mixtures work in both heat-pump and refrigeration modes without an allowlist or CoolProp-cycle fallback. All 20 focused tests pass in 57.03 seconds against TESPy 0.11.2; a complete coordinator-generated TESPy map serializes successfully; Ruff, formatting, and patch hygiene pass. Marked Step 10 complete and advanced to Step 11."
+**Context**: UNIT 2 CODE GENERATION STEP 11 - architecture, packaging, and blocking CI profiles
+
+---
+
+## Unit 2 Code Generation Step 11 Completion
+**Timestamp**: 2026-09-05T01:42:48Z
+**User Input**: "No new user input; continued the approved Unit 2 Code Generation plan."
+**AI Response**: "Extended the dependency firewall so OpenUtility, Pyomo, HiGHS, application-layer imports, and TESPy imports outside the one concrete leaf are rejected, while engine-neutral/root imports remain cold with TESPy blocked. Added exact package-resource and source/wheel archive assertions for the 458-byte characteristic. Extended core, TESPy, and installed-wheel smoke contracts for engine-neutral imports, resource access, explicit simulator creation, and no-TESPy core behavior. Added blocking TESPy artifact-install jobs and made the TESPy source profile part of pull-request and release gates; all workflows parse. The complete packaging and architecture slice passes 186 tests with three expected skips, the marked real-TESPy profile passes 13 tests, the TESPy optional-install smoke passes, and Ruff, formatting, and patch hygiene pass. Marked Step 11 complete and advanced to Step 12."
+**Context**: UNIT 2 CODE GENERATION STEP 12 - properties, performance, coverage, and regressions
+
+---
+
+## Unit 2 Code Generation Step 12 Completion
+**Timestamp**: 2026-09-05T01:56:37Z
+**User Input**: "No new user input; continued the approved Unit 2 Code Generation plan."
+**AI Response**: "Added and passed the deterministic 10,000-point fake-map regression under the approved 5-second and 256-MiB limits plus exact increasing-grid Cartesian call-count checks. Expanded edge and failure examples across context validation, fluid parsing and backend failures, diagnostics, metadata, raw simulator exceptions, factory selection, provenance, CoolProp lifecycle/results, strict resource schema, TESPy compatibility helpers, design/snapshot failures, state/solve/restoration failures, and nonfinite results. The complete seeded Unit 2 slice passes 125 tests and measures 99 percent combined statement-and-branch coverage with no path exclusions. The selected CoolProp 8 thermodynamic/stream/HPR boundary passes 600 tests; the blocking marked TESPy profile passes all 41 tests with 2,809 deselected. Focused Ruff lint/format, workflow/package/resource/firewall checks, and patch hygiene pass. A module-name coverage invocation exposed the known Python 3.14 NumPy reload limitation, so the equivalent path-scoped coverage source was used successfully. Marked Step 12 complete and advanced to Step 13."
+**Context**: UNIT 2 CODE GENERATION STEP 13 - build, install, and summary
+
+---
+
+## Unit 2 Code Generation Step 13 Completion
+**Timestamp**: 2026-09-05T02:00:42Z
+**User Input**: "No new user input; continued the approved Unit 2 Code Generation plan."
+**AI Response**: "Built openpinch-0.6.4-py3-none-any.whl and openpinch-0.6.4.tar.gz with repository tooling in a fresh temporary output. Both archives contain the exact 458-byte compressor characteristic with SHA-256 f7e1864476a243366aac8721a41aa09e4b909025414428d59b4ae7df9683b8af. Installed the wheel with core dependencies into an isolated Python 3.14.2 environment and passed the full artifact smoke while proving TESPy absent; installed the same wheel with its tespy extra into a second isolated environment and passed explicit simulator/resource smoke with TESPy 0.11.2. Created and validated the Unit 2 code summary, confirmed no duplicate brownfield files or premature target-accessor integration, reran 66 final packaging/resource/architecture checks, and passed patch hygiene. Marked every Step 1 through Step 13 checkbox complete and advanced to generated-code review."
+**Context**: UNIT 2 CODE GENERATION - generated-code review pending
+
+---
+
+## Unit 2 Code Generation Review Prompt
+**Timestamp**: 2026-09-05T02:00:42Z
+**User Input**: "No new user input; completion prompt for the approved Unit 2 generation plan."
+**AI Response**: "Requested review of the completed Unit 2 application code and code-summary documentation, with the standardized choices Request Changes or Continue to Next Stage - Unit 3 HPR Targeting Integration and Documentation."
+**Context**: UNIT 2 CODE GENERATION - explicit approval required before Unit 3
+
+---
+
+## Unit 2 Code Generation Approval
+**Timestamp**: 2026-09-05T03:01:59Z
+**User Input**: "&#x20;Go"
+**AI Response**: "Recorded explicit approval of the generated Unit 2 code, completed the final Unit 2 plan checkbox, closed Unit 2 in the workflow state, and advanced to Unit 3 Functional Design."
+**Context**: UNIT 2 CODE GENERATION APPROVED - Unit 3 may begin
+
+---
+
+## Unit 3 Functional Design Question
+**Timestamp**: 2026-09-05T03:04:19Z
+**User Input**: "No new user input; began Unit 3 after the user's explicit Unit 2 approval."
+**AI Response**: "Created the Unit 3 Functional Design plan and a dedicated one-question decision file. The approved conceptual design says TESPy is selectable on ordinary targeting, while completed Unit 2 intentionally supplies a target-derived point/map simulator rather than a replacement for the current HPR targeting optimizer. Requested a precise choice among map-only selection, full TESPy targeting evaluation, or CoolProp targeting with TESPy nominal validation before generating the Unit 3 artifacts."
+**Context**: UNIT 3 FUNCTIONAL DESIGN - backend-selector semantic clarification required
+
+---
+
+## Unit 3 Functional Design Answer
+**Timestamp**: 2026-09-05T03:06:02Z
+**User Input**: "done"
+**AI Response**: "Read and validated Question 1 answer B. The choice is complete and unambiguous: selecting TESPy must replace thermodynamic cycle evaluations inside ordinary HPR targeting optimization and determine returned target numbers. Began the corresponding expanded Unit 3 functional design."
+**Context**: UNIT 3 FUNCTIONAL DESIGN - full TESPy targeting semantics selected
+
+---
+
+## Unit 3 Functional Design Approval and NFR Requirements Start
+**Timestamp**: 2026-09-05T03:16:20Z
+**User Input**: "go"
+**AI Response**: "Accepted explicit approval of the Unit 3 Functional Design, completed its final plan checkbox, and advanced to NFR Requirements. Created the NFR plan and a dedicated two-question file covering exact-duplicate TESPy candidate caching and a portable environment-sensitive performance gate."
+**Context**: UNIT 3 FUNCTIONAL DESIGN APPROVED - NFR Requirements questions pending
+
+---
+
+## Unit 3 NFR Requirements Answers
+**Timestamp**: 2026-09-05T03:34:35Z
+**User Input**: "done"
+**AI Response**: "Read and validated answers A and A. TESPy targeting will use a bounded exact-key call-local cache for immutable successful and candidate-local failure results, with no approximate or cross-call reuse. Performance will use structural solve/call/memory gates plus one marked public single-stage target-and-map workflow within 300 seconds on the supported TESPy CI profile, with elapsed trend evidence rather than a tight portable latency promise. Generated the corresponding NFR and technology-stack artifacts."
+**Context**: UNIT 3 NFR REQUIREMENTS - answers complete and artifacts generated
+
+---
+
+## Unit 3 NFR Requirements Approval and NFR Design Start
+**Timestamp**: 2026-09-05T03:48:11Z
+**User Input**: "Go"
+**AI Response**: "Accepted explicit approval of the Unit 3 NFR Requirements, completed the final NFR Requirements plan checkbox, and advanced to NFR Design. Created the NFR Design plan and five-question file covering every mandatory category: resilience, scalability, performance, security, and logical components."
+**Context**: UNIT 3 NFR REQUIREMENTS APPROVED - NFR Design questions pending
+
+---
+
+## Unit 3 NFR Design Answers and Clarification
+**Timestamp**: 2026-09-05T03:51:54Z
+**User Input**: "Done"
+**AI Response**: "Validated answers A for resilience, performance, security, and logical components. Detected one ambiguity in Question 2: option A specifies sequential isolated calls, while the added note says the optimizer may run simulations in parallel. Created one clarification question to distinguish future-compatible sequential design, process-parallel implementation now, or in-process shared concurrent evaluation."
+**Context**: UNIT 3 NFR DESIGN - optimizer-level parallelism clarification required
+
+---
+
+## Unit 3 NFR Design Clarification Answer
+**Timestamp**: 2026-09-05T04:40:20Z
+**User Input**: "done"
+**AI Response**: "Read and validated clarification answer A. Unit 3 remains sequential and isolated per target/map call, adds no parallel scheduler, and uses immutable evaluator requests/results plus call-owned factory/session/cache state so a future separately approved optimizer may distribute independent candidates across isolated processes. Generated the NFR pattern and logical-component artifacts accordingly."
+**Context**: UNIT 3 NFR DESIGN - parallelism scope resolved and artifacts generated
+
+---
+
+## Unit 3 NFR Requirements Completion Prompt
+**Timestamp**: 2026-09-05T03:37:44Z
+**User Input**: "No new user input; completed and validated the Unit 3 NFR Requirements artifacts."
+**AI Response**: "Completed 33 measurable NFRs and the technology-stack decisions for compatibility, optional dependencies, numerical integrity, exact bounded caching, performance, resource stability, lifecycle, failure isolation, replay, documentation, PBT, coverage, CI, builds, and artifact parity. Confirmed PBT-09 compliance with Hypothesis/pytest and no blocking enabled-extension finding. Requested review using the standardized Request Changes or Continue to Next Stage choices."
+**Context**: UNIT 3 NFR REQUIREMENTS - explicit approval required before NFR Design
+
+---
+
+## Unit 3 Functional Design Completion Prompt
+**Timestamp**: 2026-09-05T03:12:14Z
+**User Input**: "No new user input; generated the Unit 3 Functional Design from validated answer B."
+**AI Response**: "Generated and content-validated the Unit 3 business logic model, 60 business rules, and domain entities. Defined full TESPy participation in single-stage ordinary targeting, independent per-candidate design solves, unchanged CoolProp default behavior, optional dependency isolation, detached winning-target simulation records, explicit target-to-map basis extraction, scalar/all-period/batch behavior, shared-vector multi-period rejection, refrigerant-mixture preservation, typed failures, documentation boundaries, and PBT-01 properties. Requested review using the standardized Request Changes or Continue to Next Stage choices."
+**Context**: UNIT 3 FUNCTIONAL DESIGN - explicit approval required before NFR Requirements
+
+---
+
+## Unit 3 NFR Design Completion Prompt
+**Timestamp**: 2026-09-05T04:43:34Z
+**User Input**: "No new user input; completed and validated the Unit 3 NFR Design artifacts."
+**AI Response**: "Completed 19 NFR patterns and 16 logical components covering closed selector dispatch, default-path isolation, fail-fast compatibility, evaluator strategy/factory, candidate-as-design semantics, exact bounded caching, layered validation, recoverable/fatal failure partitioning, explicit lifecycle cleanup, engine anti-corruption, detached winning records, pure basis extraction, atomic map bridging, replay, future process-ready isolation, diagnostics, structural performance gates, layered testing, and dual-profile artifact release. Mapped all 33 NFRs and applicable PBT-01 through PBT-10 rules with no blocking extension finding. Requested review using the standardized Request Changes or Continue to Next Stage choices."
+**Context**: UNIT 3 NFR DESIGN - explicit approval required before Code Generation
+
+---
+
+## Unit 3 NFR Design Approval and Code Generation Plan
+**Timestamp**: 2026-09-05T07:04:43Z
+**User Input**: "Continue"
+**AI Response**: "Accepted explicit approval of the Unit 3 NFR Design, completed its final plan checkbox, and recorded Infrastructure Design as N/A because no infrastructure changes exist. Created and content-validated the 18-step Unit 3 test-first Code Generation plan covering baselines, contracts, backend plumbing, compatibility preflight, evaluator models/lifecycle/cache, real TESPy target evaluation, optimizer integration, winning records, map access, replay, PBT/performance, documentation, architecture/CI, regression, artifacts, and final summary. Requested explicit approval of the complete plan before implementation."
+**Context**: UNIT 3 CODE GENERATION PART 1 - plan approval required before Step 1
+
+---
+
+## Unit 3 Code Generation Plan Approval
+**Timestamp**: 2026-09-05T07:55:59Z
+**User Input**: "done"
+**AI Response**: "Read and validated Code Generation plan answer A, recorded explicit approval of the complete 18-step plan, completed the plan approval checkbox, and began Part 2 with Step 1 baseline and public RED contracts."
+**Context**: UNIT 3 CODE GENERATION PART 2 - Step 1 active
+
+---
+
+## Unit 3 Code Generation Step 1 Completion
+**Timestamp**: 2026-09-05T07:55:59Z
+**User Input**: "No new user input; executed approved Step 1."
+**AI Response**: "Recorded a focused 164-test green pre-change baseline. Added public RED contracts for both simulation_backend selectors, exact CoolProp forwarding, invalid-selector fail-fast behavior, explicit keyword-only hpr_performance_map, no hidden map work, and the closed target accessor manifest. The RED run produced exactly eight expected failures for absent Unit 3 surfaces and no unrelated regression. Marked Step 1 complete and advanced to Step 2."
+**Context**: UNIT 3 CODE GENERATION STEP 2 - target record and property strategies
+
+---
+
+## Unit 3 Code Generation Step 2 Completion
+**Timestamp**: 2026-09-05T08:01:43Z
+**User Input**: "No new user input; executed approved Step 2."
+**AI Response**: "Added the strict frozen JSON-compatible HprTargetSimulationRecord and additive backend/provenance fields with explicit CoolProp defaults. Extended deterministic Hypothesis strategies and properties for valid and invalid records, target values, thermal profiles, pure fluids, registered blends, and explicit N-component molar mixtures. Ruff and formatting checks pass, and 107 focused contract and existing HPR regression tests pass. Marked Step 2 complete and advanced to Step 3."
+**Context**: UNIT 3 CODE GENERATION STEP 3 - backend intent plumbing and isolation
+
+---
+
+## Unit 3 Code Generation Step 3 Completion
+**Timestamp**: 2026-09-05T08:08:15Z
+**User Input**: "No new user input; executed approved Step 3."
+**AI Response**: "Implemented a closed case-insensitive simulation_backend normalizer and threaded backend intent independently of numerical HPR configuration through the two current vapour-compression accessors, preprocessing, normalized outputs, service summaries, domain targets, generic all-period forwarding, and recorded-period replay. Invalid values fail before _hpr, omitted and explicit CoolProp normalize identically, and non-vapour HPR calls retain their prior runtime shape. The 85-test affected API/HPR slice, 34 cold-import and forbidden-dependency tests, Ruff, formatting, and git diff hygiene pass. Marked Step 3 complete and advanced to Step 4."
+**Context**: UNIT 3 CODE GENERATION STEP 4 - TESPy compatibility preflight
+
+---
+
+## Unit 3 Code Generation Step 4 Completion
+**Timestamp**: 2026-09-05T08:19:57Z
+**User Input**: "No new user input; executed approved Step 4."
+**AI Response**: "Implemented the pure TESPy compatibility preflight and frozen PreparedTespyHprTargeting value. The gate runs before optimizer setup, accepts only one evaporator, one condenser, one loop, scalar vapour-compression heat-pump or refrigeration targeting, preserves pure fluids, registered blends, and explicit arbitrary-length molar mixtures according to installed dew/bubble property capability, and rejects unsupported cycles/topologies, shared-vector multi-period optimization, integrated expanders, missing TESPy, REFPROP, malformed mixtures, and unavailable states. Seeded topology/fluid/period properties pass. The complete 546-test HPR and import-firewall regression passes in 78.82 seconds, with Ruff, formatting, and patch hygiene clean. Marked Step 4 complete and advanced to Step 5."
+**Context**: UNIT 3 CODE GENERATION STEP 5 - engine-neutral evaluator RED contracts
+
+---
+
+## Unit 3 Code Generation Step 5 Completion
+**Timestamp**: 2026-09-05T08:22:26Z
+**User Input**: "No new user input; executed approved Step 5."
+**AI Response**: "Added engine-neutral RED contracts for frozen candidate requests, profile points, normalized results, success physics, independent validation failures, sanitized candidate-local errors, fatal/restoration/cleanup behavior, exactly-once closure, generated energy/COP invariants, a deterministic scripted fake evaluator, and a Hypothesis lifecycle state machine. The RED run stopped at the expected missing HprTargetEvaluatorCoordinator/model surface with no unrelated failure. Marked Step 5 complete and advanced to Step 6."
+**Context**: UNIT 3 CODE GENERATION STEP 6 - evaluator models, validation, and lifecycle
+
+---
+
+## Unit 3 Code Generation Step 6 Completion
+**Timestamp**: 2026-09-05T08:26:22Z
+**User Input**: "No new user input; executed approved Step 6."
+**AI Response**: "Implemented frozen slotted engine-neutral request, profile, result, metadata, and failure values; recursively frozen sanitized structured details; separately named validation tolerances for quantities, energy, useful duty, COP, and ordered profile duties; an explicit evaluator protocol; and a sequential lifecycle coordinator with candidate-local recovery, fatal-state exclusion, and exactly-once cleanup. The deterministic and Hypothesis lifecycle suite passes with 59 focused tests, the two new modules record 84 percent branch coverage at this checkpoint, 34 cold-import/dependency tests pass, and Ruff, formatting, and patch hygiene are clean. Marked Step 6 complete and advanced to Step 7."
+**Context**: UNIT 3 CODE GENERATION STEP 7 - exact bounded candidate cache
+
+---
+
+## Unit 3 Code Generation Step 7 Completion
+**Timestamp**: 2026-09-05T08:29:23Z
+**User Input**: "No new user input; executed approved Step 7."
+**AI Response**: "Added an exact unquantized call-local OrderedDict LRU capped at 512 immutable candidate results. Complete physical requests form keys while diagnostic candidate identity is excluded. Implemented callback, hit, miss, solve, insertion, and eviction counters; hit-to-tail movement; exact 513th-key eviction; recoverable-failure caching; fatal non-caching; close-time clearing; and per-call isolation. Seventy-two focused deterministic and seeded generated tests pass, plus 29 cold-import/dependency tests, Ruff, formatting, and patch hygiene. Marked Step 7 complete and advanced to Step 8."
+**Context**: UNIT 3 CODE GENERATION STEP 8 - TESPy targeting design evaluation
+
+---
+
+## Unit 3 Code Generation Step 8 Completion
+**Timestamp**: 2026-09-05T08:35:41Z
+**User Input**: "No new user input; executed approved Step 8."
+**AI Response**: "Extended only the existing concrete TESPy adapter leaf with TespyHprTargetEvaluator and added a lazy closed engine-neutral factory. Each exact cache miss builds a fresh isolated single-stage topology and performs one nominal design solve, never offdesign against a prior candidate. The leaf extracts detached nonnegative source/sink duties, compressor-only power, COP, ordered temperature-enthalpy profiles, engine version, and stable assumptions. Real tests cover heat-pump and refrigeration modes with R134a, R407C, explicit binary, and explicit ternary mixtures, candidate order independence, local recovery, fatal cleanup, design-only solve modes, and no TESPy object leakage. Seventy-nine real TESPy/preflight/legacy-adapter tests and 78 engine-neutral/import-boundary tests pass; Ruff, formatting, and patch hygiene are clean. Marked Step 8 complete and advanced to Step 9."
+**Context**: UNIT 3 CODE GENERATION STEP 9 - TESPy single-stage optimizer integration
+
+---
+
+## Unit 3 Code Generation Plan Approval Continuation
+**Timestamp**: 2026-09-05T08:38:12Z
+**User Input**: "done"
+**AI Response**: "Confirmed the previously approved Unit 3 Code Generation plan remains active and continued Step 9 implementation of TESPy single-stage optimizer integration."
+**Context**: UNIT 3 CODE GENERATION STEP 9 - TESPy single-stage optimizer integration
+
+---
+
+## Unit 3 Code Generation Step 9 Completion
+**Timestamp**: 2026-09-05T08:47:46Z
+**User Input**: "No new user input; executed approved Step 9."
+**AI Response**: "Added RED objective, service, local/fatal failure, optimizer, cleanup, cache, ranking, and no-CoolProp-fallback examples. Integrated one call-owned evaluator coordinator into only the scalar single-stage cascade vapour-compression TESPy path, reused the current duty allocator, converted detached source/sink profiles into ordinary condenser-hot and evaporator-cold utility streams, and routed TESPy duties, compressor-only power, COP, feasibility, costs, and objective through the existing accounting pipeline. Established an explicit 5 K TESPy targeting superheat assumption after the real-engine integration test demonstrated the saturated-inlet topology is singular, while subcooling remains the existing optimizer variable. The real TESPy candidate-to-accounting test and fake integration slice pass; the final focused and existing vapour-compression regression passes 195 tests, with Ruff, formatting, and patch hygiene clean. Marked Step 9 complete and advanced to Step 10."
+**Context**: UNIT 3 CODE GENERATION STEP 10 - winning target record and map basis
+
+---
+
+## Unit 3 Code Generation Step 10 Completion
+**Timestamp**: 2026-09-05T08:54:57Z
+**User Input**: "No new user input; executed approved Step 10."
+**AI Response**: "Added winning-record and target-to-basis RED examples and seeded properties. CoolProp now builds a detached record from the already-solved compatible single-stage cycle without another solve; TESPy builds the equivalent record only from its accepted detached request, result, and session metadata and retains no engine model. Scalar service translation attaches period identity on a copied output. Added a pure typed compatibility bridge with distinct failed, unsupported-type, missing-record, aggregate, multi-port, nonscalar, and inconsistent-target codes; it constructs a field-exact HprTargetMapBasis with deep-detached provenance and never reads current configuration or a private engine model. Repeated extraction, target non-mutation, backend/mode/fluid/mixture preservation, record properties, CoolProp, fake and real TESPy cases pass in 75 tests; Ruff, formatting, and patch hygiene are clean. Marked Step 10 complete and advanced to Step 11."
+**Context**: UNIT 3 CODE GENERATION STEP 11 - explicit public map accessor
+
+---
+
+## Unit 3 Code Generation Step 11 Completion
+**Timestamp**: 2026-09-05T08:57:22Z
+**User Input**: "No new user input; executed approved Step 11."
+**AI Response**: "Added public RED examples for CoolProp and TESPy targets, request validation, reference-capacity override, incompatible-target early failure, and complete map return. Implemented the keyword-only hpr_performance_map target accessor as pure basis extraction followed by exactly one existing Unit 2 generation call. The backend comes solely from the target record; the operation does not mutate target, request, problem state, configuration, or workspace state. No all-period/batch mirror or package-root export was added. Generated maps round-trip through the public contract and match the key schema/mode/topology semantics of both golden fixtures. The focused application, basis, generation, and contract suite passes 137 tests; Ruff, formatting, and patch hygiene are clean. Marked Step 11 complete and advanced to Step 12."
+**Context**: UNIT 3 CODE GENERATION STEP 12 - replay, period, batch, and failure coverage
+
+---
+
+## Unit 3 Code Generation Step 12 Completion
+**Timestamp**: 2026-09-05T09:02:10Z
+**User Input**: "No new user input; executed approved Step 12."
+**AI Response**: "Added selected and independent all-period backend/record examples, canonical order and state-restoration properties, generic workspace case-batch forwarding with generated order and isolated failure behavior, explicit shared-vector TESPy rejection before optimizer setup, and unchanged CoolProp multiperiod regressions. Extended report output with normalized backend and detached HPR target simulation record so independently targeted period results retain their scalar provenance; weighted aggregate output intentionally does not fabricate one record. Aggregate and shared-period targets fail the map bridge before simulator work. The application, workspace, multiperiod, reporting, and accessor slice passes 71 tests with seeded properties; Ruff, formatting, and patch hygiene are clean. Marked Step 12 complete and advanced to Step 13."
+**Context**: UNIT 3 CODE GENERATION STEP 13 - PBT, cache, memory, and performance gates
+
+---
+
+## Unit 3 Code Generation Step 13 Completion
+**Timestamp**: 2026-09-05T09:13:29Z
+**User Input**: "No new user input; executed approved Step 13."
+**AI Response**: "Closed every applicable PBT-01 through PBT-10 gap with fixed-seed normalization idempotence, generated CoolProp selector-oracle equivalence, evaluator order independence, generated invalid-context rejection, and seeded map properties. Added deterministic structural gates for linear callback/unique-solve bounds, 512 maximum-size fake cached results below the 64 MiB traced-Python limit, ten collectible fake call owners, and three real TESPy evaluator calls that release engine objects and private state. Added a marked real public pulp-mill heat-pump target using one bounded ammonia candidate followed by a two-point target-owned TESPy map; target, map, and total elapsed trends are recorded and the isolated workflow completes in 0.43 seconds, below the 300-second guard. The complete Unit 3 fixed-seed property/contract selection passes 150 tests, the two isolated real lifecycle/performance gates pass, and Ruff/formatting are clean. Marked Step 13 complete and advanced to Step 14. Property-Based Testing is compliant; Security and Resiliency remain disabled and N/A."
+**Context**: UNIT 3 CODE GENERATION STEP 14 - public documentation and examples
+
+---
+
+## Unit 3 Code Generation Step 14 Completion
+**Timestamp**: 2026-09-05T09:17:42Z
+**User Input**: "No new user input; executed approved Step 14."
+**AI Response**: "Published the complete HPR backend and target-owned map boundary. The workflow guide now shows the omitted CoolProp default, explicit TESPy single-stage targeting, explicit N-component mixture syntax, winning-record grid construction, public hpr_performance_map call, and plain JSON export. Fundamentals now define fresh candidate design solves, winning-design map offdesign, dew/bubble anchors, compressor-only power, local/fatal failure policy, no fallback or partial map, fixed capacity, adjacent interpolation, scalar/all-period support, process-parallel guidance, and OpenUtility's downstream ownership. Updated the reference API, schema, capability, support, optional-install/resource, README, and release-note surfaces. Added a blocking documentation consistency contract; all 20 documentation tests pass. The complete 55-source Sphinx build succeeds with warnings treated as errors. No notebook, CLI surface, or OpenUtility/Pyomo/HiGHS dependency was added. Marked Step 14 complete and advanced to Step 15. Property-Based Testing remains compliant; Security and Resiliency remain disabled and N/A."
+**Context**: UNIT 3 CODE GENERATION STEP 15 - architecture, packaging, and CI gates
+
+---
+
+## Unit 3 Code Generation Step 15 Completion
+**Timestamp**: 2026-09-05T09:22:17Z
+**User Input**: "No new user input; executed approved Step 15."
+**AI Response**: "Extended the optional dependency firewall through HPR contracts, domain targets, the public accessor, target evaluator interfaces, winning-record and basis builders, and default CoolProp targeting with TESPy blocked. Added direct import checks prohibiting OpenUtility, Pyomo, and HiGHS from the target integration while preserving TESPy imports only in the existing concrete adapter leaf. Kept the package root and CLI inventories closed and verified the new specialist contracts are not root exports. Source/wheel archive expectations now include the record, map contract, targeting, record, and basis modules. Optional and installed-artifact smokes verify HprTargetSimulationRecord, the evaluator/basis boundary, the CoolProp default, and a real bounded public TESPy target plus minimal map. Develop, pull-request, and publish workflows retain the complete seeded TESPy suite and add an explicit 300-second guard for the public target-map smoke. All workflow YAML parses; the TESPy optional smoke and public artifact helper pass; and 87 architecture, packaging, resource, API, and artifact-layout tests pass. Marked Step 15 complete and advanced to Step 16. Property-Based Testing remains compliant; Security and Resiliency remain disabled and N/A."
+**Context**: UNIT 3 CODE GENERATION STEP 16 - focused quality and regression gates
+
+---
+
+## Unit 3 Code Generation Step 16 Completion
+**Timestamp**: 2026-09-05T09:39:22Z
+**User Input**: "No new user input; executed approved Step 16."
+**AI Response**: "Ran the complete fixed-seed Unit 3 example/property selection and the broad non-solver regression profile. Corrected only four Unit 3 compatibility regressions: preserved legacy test-double compatibility for an absent target simulation record, allowed two legacy targeting spies to accept the new keyword, and closed the documented public API inventory for the HPR performance-map accessor. The affected rerun passes 7 tests, and the focused heat-pump/application/contract/architecture/packaging/resource gate passes 871 tests. Added focused defensive-contract coverage for evaluator identity, lifecycle exception translation, malformed results, map-basis inconsistencies, refrigerant selection, finite bounds, and record helper behavior. Combined statement and branch coverage across the new Unit 3 modules and materially changed targeting paths is 97 percent, above the required 95 percent. Repository Ruff lint, changed-surface formatting, compilation, workflow parsing, diff hygiene, optional TESPy smoke, and the complete 55-source Sphinx warnings-as-errors build pass. The repository-wide format check reports only 14 unrelated pre-existing files. Marked Step 16 complete and advanced to Step 17. Property-Based Testing remains compliant; Security and Resiliency remain disabled and N/A."
+**Context**: UNIT 3 CODE GENERATION STEP 17 - source and wheel artifact verification
+
+---
+
+## Unit 3 Code Generation Step 17 Completion
+**Timestamp**: 2026-09-05T09:43:17Z
+**User Input**: "No new user input; executed approved Step 17."
+**AI Response**: "Built fresh OpenPinch 0.6.4 source and wheel artifacts in `/private/tmp/openpinch-step17.cUgtgY/artifacts`. The sdist SHA-256 is `78ff433120b332acc788b70916d879ed6da463f988266cf4b06b598a03bbd040`; the wheel SHA-256 is `03f0557f2df029862a7bf08fa9fe3daee9abb70c224ac4abf17849b644a85069`. Both archives contain the planned contracts, fixtures, complete performance-map modules, targeting record/basis modules, and 458-byte TESPy characteristic with zero duplicate members; source, sdist, and wheel resource bytes match exactly. Verified the `tespy` extra metadata. Installed the same wheel into isolated Python 3.14 environments: the 18-package core profile excludes TESPy and passes the root/default targeting, fixture, plain-map, resource, problem, workspace, and CLI smoke in 3.11 seconds; the 33-package TESPy 0.11.2 profile passes a real public TESPy target, winning record, target-derived basis, and two-point map smoke in 3.71 seconds. Both import from isolated site-packages, not the checkout. Checkout, core wheel, and TESPy wheel expose identical target/map signatures and resource digests. Marked Step 17 complete and advanced to Step 18. Property-Based Testing remains compliant; Security and Resiliency remain disabled and N/A."
+**Context**: UNIT 3 CODE GENERATION STEP 18 - generated-code summary and review
+
+---
+
+## Unit 3 Code Generation Step 18 Completion and Review Prompt
+**Timestamp**: 2026-09-05T09:45:21Z
+**User Input**: "No new user input; executed approved Step 18."
+**AI Response**: "Created and validated `aidlc-docs/construction/hpr-target-api-integration-publication/code/code-summary.md` with created/modified production surfaces, design decisions, FR-5 through FR-10 and NFR-U3-001 through NFR-U3-033 traceability, RED/GREEN and PBT evidence, 97-percent coverage, performance/memory/lifecycle gates, optional profiles, docs, regressions, distribution hashes, resource digests, limitations, and the plain-data OpenUtility boundary. Confirmed every Step 1 through Step 18 execution checkbox complete, no duplicate brownfield file, valid JSON resources, clean Markdown/content structure, and no enabled-extension finding. Property-Based Testing is compliant; Security and Resiliency remain disabled and N/A. Marked Step 18 complete. Presented the standardized generated-code review prompt and paused for explicit approval before integrated Build and Test."
+**Context**: UNIT 3 CODE GENERATION REVIEW - awaiting explicit user approval
+
+---
+
+## Unit 3 Code Generation Approval
+**Timestamp**: 2026-09-05T10:21:49Z
+**User Input**: "go"
+**AI Response**: "Recorded explicit approval of generated Unit 3 code, completed the Unit 3 Code Generation approval gate, and advanced to integrated Build and Test."
+**Context**: CONSTRUCTION - BUILD AND TEST
+
+---
+
+## Build and Test Stage
+**Timestamp**: 2026-09-05T10:44:00Z
+**User Input**: "No new user input; executed the approved integrated Build and Test stage."
+**AI Response**: "Refreshed the canonical HPR build, unit, integration, and performance instructions. Ruff, changed-surface formatting, compilation, patch hygiene, and the 55-source warning-strict Sphinx build pass. The first complete solver-enabled run produced 3,058 passes and one tutorial-manifest integration failure because the specialist map API was intentionally not demonstrated in notebook 09. Updated the manifest contract to distinguish 196 notebook-demonstrated operations from the documented and pytest-executable specialist map API; the focused correction passes 6 tests. The final complete run passes 3,059 tests with 4 expected skips and zero failures in 458.40 seconds using Hypothesis seed 20260715 and configured external solvers. The dedicated real TESPy public target-to-map smoke passes in 1.99 seconds under a Python-enforced 300-second timeout. Fresh 0.6.4 source/wheel hashes remain stable and isolated core/TESPy artifact smokes pass. Created the final Build and Test summary, marked every execution-plan checkbox complete, and presented the standardized review prompt. Property-Based Testing is compliant; Security and Resiliency remain disabled and N/A."
+**Context**: CONSTRUCTION - BUILD AND TEST REVIEW, awaiting explicit Operations approval
+**Build Status**: Success
+**Test Status**: Pass
+**Files Generated**:
+- build-instructions.md
+- unit-test-instructions.md
+- integration-test-instructions.md
+- performance-test-instructions.md
+- build-and-test-summary.md
+
+---
+
+## Build and Test Approval and Workflow Completion
+**Timestamp**: 2026-09-05T17:34:35Z
+**User Input**: "Approve"
+**AI Response**: "Recorded explicit approval of the successful Build and Test results. Advanced to the Operations phase, which is a placeholder only, and completed the TESPy HPR performance-map workflow without deployment, publication, monitoring, or external mutation."
+**Context**: OPERATIONS - PLACEHOLDER; WORKFLOW COMPLETE
+
+---
+
+## RTD and Comprehensive HPR Notebook Follow-up - Workspace Detection
+**Timestamp**: 2026-09-05T18:25:54Z
+**User Input**: "Update RTD and make sure there is a notebook covering a comprehensive example"
+**AI Response**: "Started a focused AI-DLC follow-up. Detected the existing brownfield Python library, current reverse-engineering artifacts, completed HPR target/map implementation, generated notebook system, tutorial manifest, and warning-strict Sphinx build. Reverse Engineering remains current and is skipped. Advanced automatically to minimal Requirements Analysis for an RTD update and comprehensive executable HPR notebook. Existing extension configuration is retained: Property-Based Testing enabled; Security and Resiliency disabled."
+**Context**: INCEPTION - WORKSPACE DETECTION COMPLETE; REQUIREMENTS ANALYSIS ACTIVE
+
+---
+
+## RTD and Comprehensive HPR Notebook Follow-up - Requirements Review Prompt
+**Timestamp**: 2026-09-05T18:25:54Z
+**User Input**: "No new user input; analyzed the requested RTD and notebook follow-up."
+**AI Response**: "Created `aidlc-docs/inception/requirements/rtd-comprehensive-hpr-notebook-requirements.md`. Defined notebook 09 as the canonical comprehensive example rather than adding a duplicate. Requirements cover omitted/default CoolProp, explicit TESPy, pure/registered and explicit molar-mixture syntax, detached winning records, multi-point performance maps, plain JSON export, guarded failure/no-fallback semantics, OpenUtility separation, RTD/tutorial inventory synchronization, bounded execution, and focused quality gates. Existing Property-Based Testing enablement remains applicable; Security and Resiliency remain disabled. Presented the standardized Requirements Analysis review prompt and paused for explicit approval before Workflow Planning."
+**Context**: INCEPTION - REQUIREMENTS ANALYSIS REVIEW; awaiting approval
+
+---
+
+## RTD and Comprehensive HPR Notebook Follow-up - Requirements Approval
+**Timestamp**: 2026-09-05T18:28:40Z
+**User Input**: "Go"
+**AI Response**: "Recorded explicit approval of the focused RTD and comprehensive HPR notebook requirements and advanced to Workflow Planning."
+**Context**: INCEPTION - REQUIREMENTS ANALYSIS APPROVED; WORKFLOW PLANNING ACTIVE
+
+---
+
+## RTD and Comprehensive HPR Notebook Follow-up - Workflow Plan Review Prompt
+**Timestamp**: 2026-09-05T18:28:40Z
+**User Input**: "No new user input; created the execution plan."
+**AI Response**: "Created and content-validated `aidlc-docs/inception/plans/rtd-comprehensive-hpr-notebook-execution-plan.md`. Recommended one focused Code Generation unit followed by Build and Test. The sequence updates the canonical notebook 09 generator, regenerates the packaged notebook, restores notebook-demonstrated manifest coverage, explicitly permits the documented specialist request contract, updates RTD, and runs executable notebook/HPR/documentation gates. User Stories, Application Design, Units Generation, Functional Design, NFR stages, Infrastructure Design, and Operations are skipped because no product behavior, component, schema, infrastructure, or deployment change is required. Presented the standardized plan review prompt and paused for approval."
+**Context**: INCEPTION - WORKFLOW PLANNING REVIEW; awaiting approval
+
+---
+
+## RTD and Comprehensive HPR Notebook Follow-up - Workflow Plan Approval
+**Timestamp**: 2026-09-05T18:31:00Z
+**User Input**: "go"
+**AI Response**: "Recorded explicit approval of the focused workflow plan and advanced to Code Generation planning."
+**Context**: CONSTRUCTION - CODE GENERATION PLANNING
+
+---
+
+## RTD and Comprehensive HPR Notebook Follow-up - Code Plan Review Prompt
+**Timestamp**: 2026-09-05T18:31:00Z
+**User Input**: "No new user input; created the detailed code-generation plan."
+**AI Response**: "Created and content-validated `aidlc-docs/construction/plans/rtd-comprehensive-hpr-notebook-code-generation-plan.md`. The six-step plan adds RED notebook/RTD contracts, expands only the existing notebook 09 generator, regenerates and proves notebook idempotence, synchronizes manifest and RTD, runs focused executable/PBT/integration/static gates, and creates the code summary. No production API, schema, root export, thermodynamic behavior, duplicate notebook, or infrastructure change is planned. Presented the standardized plan review prompt and paused for explicit approval."
+**Context**: CONSTRUCTION - CODE GENERATION PLAN REVIEW; awaiting approval
+
+---
+
+## RTD and Comprehensive HPR Notebook Follow-up - Code Plan Approval
+**Timestamp**: 2026-09-05T18:32:11Z
+**User Input**: "go"
+**AI Response**: "Recorded explicit approval of the six-step code-generation plan and began Step 1 RED tutorial and RTD contracts."
+**Context**: CONSTRUCTION - CODE GENERATION STEP 1
+
+---
+
+## Git Commit Request
+**Timestamp**: 2026-09-05T18:29:32Z
+**User Input**: "Commit"
+**AI Response**: "Inspected the pending HPR performance-map implementation, tests, documentation, packaging, CI, and AI-DLC records; validated patch hygiene; and prepared the complete working tree for a single coherent commit."
+**Context**: VERSION CONTROL - COMMIT REQUEST
+
+---
+
+## RTD and Comprehensive HPR Notebook Follow-up - Code Generation Step 1
+**Timestamp**: 2026-09-05T18:34:02Z
+**User Input**: "No new user input; executed the approved RED contracts."
+**AI Response**: "Completed Step 1. Added notebook 09 target-to-map source requirements, a narrow allowance for the documented specialist HPR map-request import, RTD consistency requirements, and restored the performance-map manifest expectation to mapped and executable. The focused RED run produced exactly four intended failures: missing comprehensive notebook source, missing manifest operation use, stale RTD coverage wording, and missing RTD/notebook-series scope statements. The live public inventory contract passed. Advanced to Step 2 generator implementation."
+**Context**: CONSTRUCTION - CODE GENERATION STEP 1 COMPLETE; STEP 2 ACTIVE
+
+---
+
+## RTD and Comprehensive HPR Notebook Follow-up - Code Generation Step 2
+**Timestamp**: 2026-09-05T18:38:55Z
+**User Input**: "No new user input; executed the approved generator implementation step."
+**AI Response**: "Completed Step 2 by expanding only the canonical notebook 09 definition in `scripts/generate_tutorial_notebooks.py`. The coherent study now uses omitted/default CoolProp targeting with pure and registered-fluid candidates, reads the detached winning record, derives design source/sink coordinates, requests three part-load points, exports the versioned map as plain JSON, separately screens explicit TESPy intent with `HEOS::R32[0.5]&R125[0.5]`, states no-fallback semantics, and retains refrigeration/Brayton comparisons. Updated guidance and presentation metadata. The generator and all five resulting code cells compile. Advanced to Step 3 regeneration."
+**Context**: CONSTRUCTION - CODE GENERATION STEP 2 COMPLETE; STEP 3 ACTIVE
+
+---
+
+## RTD and Comprehensive HPR Notebook Follow-up - Code Generation Step 3
+**Timestamp**: 2026-09-05T18:39:53Z
+**User Input**: "No new user input; regenerated and validated the canonical packaged notebook."
+**AI Response**: "Completed Step 3. Ran the canonical generator and changed only `OpenPinch/data/notebooks/09_vapour_compression_and_brayton.ipynb`. A second pass preserved SHA-256 `3bdc8ec9926e5052574e929997f540f357b623a8a787abd9746cc1b4a5d30d0a`, proving byte idempotence. Compiled all five generated code cells, verified every required target-record-map-export/TESPy/mixture token, and retained the `slow-hpr` notebook profile. Advanced to Step 4 RTD synchronization."
+**Context**: CONSTRUCTION - CODE GENERATION STEP 3 COMPLETE; STEP 4 ACTIVE
+
+---
+
+## RTD and Comprehensive HPR Notebook Follow-up - Code Generation Step 4
+**Timestamp**: 2026-09-05T18:41:20Z
+**User Input**: "No new user input; synchronized the tutorial inventory and RTD."
+**AI Response**: "Completed Step 4. Restored `problem.target.hpr_performance_map` to `mapped and executable` in the canonical manifest, named notebook 09 as the comprehensive executable target-to-map example in the HPR guide, expanded the notebook-series scope, and restored the exact 197/197 mapping-coverage statement and code-cell counting rule. No other HPR reference/capability page required a change. All five focused notebook, inventory, coverage, and documentation contracts now pass. Advanced to Step 5 verification."
+**Context**: CONSTRUCTION - CODE GENERATION STEP 4 COMPLETE; STEP 5 ACTIVE
+
+---
+
+## RTD and Comprehensive HPR Notebook Follow-up - Code Generation Step 5
+**Timestamp**: 2026-09-05T18:50:59Z
+**User Input**: "No new user input; executed the approved verification gates."
+**AI Response**: "Completed Step 5. The tutorial/RTD/resource gate passed 56 tests with 3 expected opt-in profile skips; the focused HPR target, record, basis, map, mixture, accessor, serialization, PBT, and real TESPy suite passed 302 tests using seed 20260715. Notebook 09 executed all cells in a clean temporary directory in 27.716 seconds and correctly retained numerical infeasibility as guarded evidence with no partial map or fallback; the isolated real TESPy public smoke in the focused suite remains the successful target-to-map engine oracle. Warning-strict Sphinx succeeded. Repository Ruff lint, changed-surface Ruff format, Python compilation, generator byte idempotence, scoped file inventory, and `git diff --check` all passed. Advanced to Step 6 summary."
+**Context**: CONSTRUCTION - CODE GENERATION STEP 5 COMPLETE; STEP 6 ACTIVE
+
+---
+
+## RTD and Comprehensive HPR Notebook Follow-up - Code Generation Completion Prompt
+**Timestamp**: 2026-09-05T18:52:15Z
+**User Input**: "No new user input; completed the generated-code summary and prepared the mandatory review gate."
+**AI Response**: "Completed Step 6 and created `aidlc-docs/construction/rtd-comprehensive-hpr-notebook/code/code-summary.md`. Verified FR-NB-01 through FR-NB-08 and NFR-NB-01 through NFR-NB-06 traceability, current final notebook SHA-256 idempotence, validated Markdown/notebook/manifest content, no duplicate notebook, and Property-Based Testing compliance. Corrected the final tutorial refinement so the stable CoolProp screen uses the pure-fluid example while the provider-registered blend remains a documented syntax example. Presented the standardized Code Generation review prompt and paused before Build and Test."
+**Context**: CONSTRUCTION - CODE GENERATION COMPLETE; REVIEW REQUIRED
+
+---
+
+## RTD and Comprehensive HPR Notebook Follow-up - Code Approval
+**Timestamp**: 2026-09-05T20:27:59Z
+**User Input**: "Build & Test"
+**AI Response**: "Recorded explicit approval of the generated RTD and comprehensive HPR notebook changes and advanced to the mandatory Build and Test stage. Began refreshing the existing build, unit, integration, performance, and summary artifacts for this focused follow-up and preparing comprehensive verification."
+**Context**: CONSTRUCTION - CODE GENERATION APPROVED; BUILD AND TEST ACTIVE
+
+---
+
+## Build and Test Stage - RTD and Comprehensive HPR Notebook Follow-up
+**Timestamp**: 2026-09-05T20:40:36Z
+**User Input**: "No new user input; completed the approved Build and Test stage."
+**AI Response**: "Build and Test completed successfully. Built fresh OpenPinch 0.6.4 source and wheel artifacts and verified unique members plus packaged notebook 09. The complete repository suite passed 3060 tests with 4 expected skips in 448.34 seconds using Hypothesis seed 20260715 and the configured solver environment. Notebook 09 executed all cells from a clean directory in 27.099 seconds with correct guarded infeasibility semantics. The successful real TESPy public target-to-map oracle passed in 1.96 seconds. Warning-strict Sphinx, repository Ruff, changed-surface formatting, compilation, generator idempotence, and patch hygiene passed. Refreshed all required instruction files and the build-and-test summary. Presented the standardized review prompt and paused before Operations."
+**Context**: CONSTRUCTION - BUILD AND TEST COMPLETE; REVIEW REQUIRED
+**Build Status**: Success
+**Test Status**: Pass
+**Files Generated**:
+- build-instructions.md
+- unit-test-instructions.md
+- integration-test-instructions.md
+- performance-test-instructions.md
+- build-and-test-summary.md
+
+---
+
+## Build and Test Approval and Operations Completion - RTD and Comprehensive HPR Notebook Follow-up
+**Timestamp**: 2026-09-05T21:01:27Z
+**User Input**: "Go"
+**AI Response**: "Recorded explicit approval of the successful Build and Test results. Advanced to the Operations phase, confirmed that it is a placeholder only, and completed the RTD and comprehensive HPR notebook workflow without deployment, publication, monitoring, external service mutation, or infrastructure change."
+**Context**: OPERATIONS - PLACEHOLDER REVIEWED; WORKFLOW COMPLETE
+
+---
+
+## Version Control - RTD and Comprehensive HPR Notebook Follow-up
+**Timestamp**: 2026-09-05T21:02:42Z
+**User Input**: "commit"
+**AI Response**: "Inspected the completed follow-up working tree and prepared the scoped RTD, canonical notebook 09, tutorial inventory, regression tests, and AI-DLC records for one coherent commit."
+**Context**: VERSION CONTROL - COMMIT REQUEST
+
+---
+
+## Analysis Reliability - Authorized Implementation
+**Timestamp**: 2026-09-05T21:41:40Z
+**User Input**: "PLEASE IMPLEMENT THIS PLAN:
+# OpenPinch analysis reliability and extensibility
+
+## Summary
+
+Fix the five reproduced defects and establish shared execution, provenance, reporting, and aggregation contracts for future analysis methods.
+
+Retain descriptive `PinchProblem` and `PinchWorkspace` methods and method-specific result types. Permit targeted breaking changes to eliminate mutable-state ambiguity. Retain prepared state for each successfully solved period so dependent analyses can reuse calculations.
+
+New scientific methods—including Brayton completion, uncertainty analysis, and thermal storage—are excluded.
+
+## 1. Shared execution and state ownership
+
+- Introduce an application-owned execution context containing the selected local zone address, canonical period, effective configuration, prepared inputs, components, and compatible prerequisites.
+- Implement one snapshot operation for serial and parallel execution. Copy the zone tree and component records together, preserving internal stream references and rebinding component ownership to the isolated execution instance. Never reconstruct these snapshots solely from `to_problem_json()`.
+- Execute calculations and validate outputs before committing state. Failed targeting leaves the previous successful state intact. All-period calls commit the complete ordered batch only after every period succeeds; workspace batches retain their existing per-case failure isolation.
+- Retain one current prepared state per canonical period. Follow-on all-period analyses operate on those states. Missing prerequisites produce actionable errors for enrichment methods; methods that already calculate prerequisites continue doing so explicitly.
+- Centralize invalidation for input changes, configuration updates, component creation/activation/deactivation, and zone changes. Clear dependent scalar results, period states, graphs, and design/placement caches together.
+- Make public observation properties return detached snapshots or read-only mappings. Preserve explicit component activation methods as supported mutations; direct editing of observed domain state becomes unsupported.
+- Keep period states memory-only and replace superseded states rather than accumulating run history.
+
+## 2. Correct targeting behavior
+
+- **Period provenance:** preserve each target’s actual period ID and index. Selected-period reports include only compatible rows; never overwrite row identity during serialization. Invalidate dependent targets when their prerequisite changes.
+- **Configuration:** pass effective settings directly into enrichment calculations. Exergy must use the invocation’s ambient temperature rather than a cached target’s configuration. Reuse prerequisites only when their input and numerical configuration provenance remains compatible.
+- **Zone ownership:** convert `Zone` arguments to addresses and resolve them against the current execution tree, matching inverse-`dt_min` behavior. Reject missing or ambiguous addresses before execution.
+- **Subzone traversal:** honor `include_subzones=False` for the requested analysis. Aggregate methods may calculate necessary child prerequisites in scratch state, but must not commit or report child analyses unless traversal is enabled.
+- **Parallel equivalence:** use identical preparation, prerequisite selection, component accounting, and extraction for every worker count. Validate `workers` as a positive integer.
+
+## 3. Extensible methods and typed results
+
+- Add an immutable internal method catalog describing supported scopes, prerequisites, period behavior, configuration fields, optional dependencies, availability, and result adapters. Keep named public callables; introduce no runtime plugin registry or string-based public dispatcher.
+- Route thermal targeting and enrichment through the shared executor. Describe inverse targeting, utility placement, performance maps, and HEN workflows in the catalog while preserving their existing specialized execution semantics.
+- Add immutable `AnalysisProvenance` metadata to method-specific results: method identity, zone address, period selection, prepared-input fingerprint, effective settings, and prerequisite identities. Place shared domain metadata inward in the dependency hierarchy.
+- Replace central target-classification and reporting type switches with explicit family-owned adapters. Thermal results retain utility metrics; other result families need not inherit `UtilitySummaryTarget`.
+- Preserve existing result payloads and named methods where practical. Document breaking changes to observation mutability, provenance fields, stale-result handling, and result ownership; add no legacy aliases.
+- Validate supplied `base_target` references against the current problem, scope, period, and input provenance.
+- Keep report, plot, and export operations observational. Inverse targeting and performance-map generation retain their non-mutating contracts.
+
+## 4. Aggregation and contributor contracts
+
+- Replace manually maintained aggregation field lists with metric specifications declaring units and behavior: weighted mean, maximum, consensus, derived value, or exclusion.
+- Preserve established aggregation behavior for current metrics. Keep period-specific simulation records attached to their originating periods; do not present the first period’s record as provenance for an aggregate.
+- Fail validation when a new reportable metric lacks an aggregation policy.
+- Check catalog consistency against public accessors, workspace mirrors, result adapters, and the capability documentation.
+- Add a contributor guide covering the minimum steps for adding a method, with an existing nonthermal result family demonstrating the extension path.
+- Mark Brayton as unavailable in capability metadata and fail before preparing or mutating analysis state.
+
+## 5. Implementation sequence and acceptance
+
+Implement in four sequential units: **execution snapshots and invalidation → targeting corrections and period chaining → method/result adapters → aggregation and documentation**. Add failing regressions before each correction.
+
+Acceptance tests must demonstrate:
+
+- Process-MVR recovery and compressor work agree between serial and parallel runs.
+- Mixed `base`/`peak` execution cannot relabel stale rows or mismatch IDs and indices.
+- Exergy overrides match an independently prepared problem using the same ambient temperature.
+- Foreign-zone selectors resolve locally without modifying the originating problem.
+- Subzone traversal and scratch prerequisites follow the defined commit/report policy.
+- All-period direct integration followed by exergy succeeds without rerunning compatible thermal prerequisites.
+- Failures leave prior successful state unchanged; component changes invalidate all dependent period state.
+- New result families integrate without changing the central thermal serializer.
+- Every reportable metric has an explicit, tested aggregation policy.
+
+Use Hypothesis for lifecycle sequences, snapshot isolation, serial/parallel equivalence, provenance consistency, and serialization round trips, retaining shrinking and the repository seed. Run the full configured suite, relevant real-solver/TESPy gates, branch coverage, Ruff, warning-strict documentation, notebook checks, and installed-artifact smoke tests.
+
+Update the tutorial inventory, affected notebooks, migration notes, and release notes together. Record implementation progress and verification in the existing AI-DLC artifacts once implementation begins. Property-based testing remains enabled; the existing disabled security and resiliency extensions remain unchanged."
+**AI Response**: "Implementing the four approved units; initial regression suite produced 11 expected failures. Shared snapshots, transactional execution, and targeted corrections are in progress."
+**Context**: User explicitly approved implementation and validation of the entire plan.
+
+---
+
+## Construction — execution and extension contracts
+**Timestamp**: 2026-09-05T22:11:36Z
+**AI Response**: Implemented shared transactional snapshots and centralized invalidation, canonical period filtering, local zone resolution, effective enrichment settings, prepared-period retention, immutable provenance/catalog, family reporting adapters, and explicit aggregation policies. Added and verified 27 focused reliability/contract/property checks; lifecycle tests retain Hypothesis shrinking and seed 20260715. Updated contributor and migration guides, capability generator, release notes, tutorial source and inventory. Warning-strict Sphinx passed. Full application/non-solver, notebook, and real-solver gates are running; historical mutable-observation fixtures are being migrated.
+**Context**: Units 1–4 implementation complete; full verification and follow-up corrections in progress. PBT enabled; Security and Resiliency remain disabled.
+
+---
+
+## Build and Test — analysis reliability complete
+**Timestamp**: 2026-09-05T22:47:11Z
+**AI Response**: Completed the four approved units. Final configured suite: 3,086 passed, 3 expected optional-notebook skips, 4 solver deselections; combined line/branch coverage 95.73% exceeds the configured 95% floor. Real-solver gate: 3 passed, existing nine-stream benchmark skipped. TESPy: 58 passed plus guarded public target/map smoke. Ruff, warning-strict Sphinx, notebook/inventory checks, wheel/sdist builds, and isolated installed core/TESPy artifact smoke tests passed. Updated migration/contributor guides, capabilities, notebooks, release notes, state, and all plan checkboxes. Additional review regressions fixed temporary configuration fingerprints, component source identity, and multiperiod HEN method identity.
+**Context**: Implementation and verification complete. PBT remains enabled; disabled Security and Resiliency configurations unchanged. No publication or deployment performed. Detailed evidence is in construction/build-and-test/analysis-reliability-verification.md.
+
+---
+
+## Commit — analysis reliability and extensibility
+**Timestamp**: 2026-09-06T12:53:47Z
+**User Input**: "commit"
+**AI Response**: "Reviewed the implementation changes and verified patch whitespace. Committing the completed implementation, tests, documentation, notebooks, and AI-DLC records as requested."
+**Context**: Explicit authorization to commit; prior full verification remains recorded above. No push or deployment requested.
+
+---
+
+## Pull Request — develop to main
+**Timestamp**: 2026-09-06T19:05:50Z
+**User Input**: "create a PR"
+**AI Response**: "Created PR #96: Add HPR performance maps and improve analysis reliability. The open PR proposes all three develop commits into main, including ca4ab8cd, with scope, intentional API changes, and local verification evidence."
+**Context**: GitHub CLI was unauthenticated; used the signed-in browser. Verified the open PR and its branches at https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch/pull/96. No merge performed. This audit entry remains a local uncommitted update.
+
+---
+
+## Review Investigation — PR 96 Codex comments
+**Timestamp**: 2026-09-06T19:25:44Z
+**User Input**: "Investigate the codex review comments"
+**AI Response**: "All three P2 findings are valid against reviewed commit ca4ab8cd. Confirmed sibling-zone rows and graphs leak into subsequent all-period outputs for workers 1 and 2. Confirmed frozen HPR map provenance accepts dictionary/nested-list mutation and exports the changed values. A controlled HPR service double exercised the real public accessors, provenance stamping, base-target validation, and exergy service: CoolProp/TESPy identities were equal, the old CoolProp reference was accepted, and exergy enriched the current TESPy target. An attempted real CoolProp solve did not converge, so the backend result is an orchestration reproduction rather than a successful two-backend numerical comparison."
+**Context**: Read all three review threads on PR 96, review 5126330964. GitHub also shows the subsequent automated version-bump commit 9bcf03b; local investigation used the exact reviewed ca4ab8cd. No source/test changes, GitHub replies, thread resolutions, commits, or pushes performed. Security and Resiliency remain disabled and were skipped; property-based testing configuration unchanged. This investigation used targeted reproductions, not a new full-suite run.
+
+### Findings and correction boundaries
+
+- [x] Investigated discussion_r3944982338: AreaA batch followed by AreaB batch returns both Site/AreaA and Site/AreaB targets and graph zones for base and peak, with both worker counts. Retained states copy the entire tree; nontraversing execution extracts from the master root and only filters descendants of the requested scope. Correct output scoping and retained-state compatibility without discarding the same-scope thermal prerequisites needed by enrichment. Add sibling-switch, traversal, and same-scope enrichment regressions.
+- [x] Investigated discussion_r3944982339: simulation_backend is passed as a runtime option but stamp_targets only fingerprints ready.config._values. The controlled reproduction prints IDENTITIES_EQUAL True, STALE_ACCEPTED Direct Heat Pump, and ENRICHED_BACKEND tespy. Include normalized calculation-affecting runtime settings in analysis identity and verify backend changes reject superseded base references before enrichment. Existing propagation tests do not cover cross-backend reference identity.
+- [x] Investigated discussion_r3944982344: HprPerformanceMap inherits frozen=True but its provenance field is a mutable dictionary. A packaged map accepts an invalid_backend provenance value and nested mutation; model_dump exports the changes. Existing frozen tests check attribute reassignment and detached model_dump outputs, not direct nested provenance edits. Use a deeply immutable value or detached observation while retaining the schema 1.0 JSON boundary; test nested maps/lists and round trips.
+
+---
+
+## Construction — PR 96 review corrections
+**Timestamp**: 2026-09-06T19:28:21Z
+**User Input**: "fix them"
+**AI Response**: "Adding regressions and correcting the three confirmed review findings, followed by relevant verification and documentation. Steps 11–15 extend the existing approved implementation plan."
+**Context**: Explicit authorization covers these corrections and testing. PBT remains enabled with shrinking and seed 20260715. Disabled Security and Resiliency extensions remain skipped.
+
+---
+
+## Build and Test — PR 96 corrections complete
+**Timestamp**: 2026-09-06T19:44:56Z
+**AI Response**: "Fixed all three Codex findings. Published scope excludes sibling rows/graphs while retaining prepared calculations; HPR-owned provenance settings include the effective backend; map provenance reads return recursively detached dictionaries. Six expected regression failures preceded correction. Final configured suite: 3,094 passed, 3 existing skips, 4 solver deselections, with 95.73% combined line/branch coverage. Broader focused suite: 634 passed. Real solver: 3 passed and 1 existing benchmark skip. Real public TESPy target/map smoke: 1 passed. Ruff, format and whitespace, strict Sphinx, 25 inventory/schema checks, wheel/sdist builds, and installed core/TESPy smoke tests passed. Updated migration/contributor/release documentation and completed plan steps 11–15."
+**Context**: Property testing remains enabled with shrinking and seed 20260715; Security and Resiliency remain disabled and skipped. No code was committed or pushed; no review threads were replied to or resolved. Detailed verification is in construction/build-and-test/analysis-reliability-verification.md.
+
+---
+
+## CI Investigation — PR 96 contract fixture version drift
+**Timestamp**: 2026-09-06T19:50:13Z
+**User Input**: "1 test also failed. investigate. "
+**AI Response**: "Investigated the failed test job in PR Validation run 34053816305, attempt 2, job 101542322573. Exactly one test failed: tests/contracts/test_hpr_performance_map.py::test_committed_contract_resources_match_authoritative_generation; 3,085 passed, 3 skipped, 4 deselected. The heat-pump and refrigeration golden JSON resources contain OpenPinch 0.6.4, but their generator reads the installed package version, now 0.6.5 after automated commit 9bcf03b. The schema is identical. Reproduced the exact test locally with the generator's version lookup controlled: 0.6.4 passes; 0.6.5 fails. Both differing JSON payloads are otherwise identical. A normal targeted pytest run also passed locally on installed 0.6.4 (1 passed). Recommend deterministic fixture provenance independent of the installed release, with a version-change regression; retain actual runtime versions for real generated analysis maps."
+**Context**: Investigation only; no new source/test changes, commits, pushes, reruns, or GitHub replies. Prior three review fixes remain uncommitted and do not address this separate release-dependent fixture defect. The pr-gate failure follows the failed test job. Security and Resiliency remain disabled and skipped; property-based testing settings remain unchanged. Evidence: https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch/actions/runs/34053816305/job/101542322573?pr=96 .
+
+---
+
+## Construction — CI fixture version correction
+**Timestamp**: 2026-09-06T19:58:12Z
+**User Input**: "Fix it"
+**AI Response**: "Add a failing version-change property, pin golden-fixture provenance to its original generating release, and verify contract generation and documentation."
+**Context**: Explicit authorization continues the existing plan. PBT enabled with seed 20260715 and shrinking; Security and Resiliency disabled and skipped.
+
+---
+
+## Build and Test — CI fixture correction complete
+**Timestamp**: 2026-09-06T19:59:56Z
+**AI Response**: "Fixed version-dependent golden fixture generation and added a regression-first Hypothesis property. 207 contract/resource/docs-consistency tests pass; original CI test passes with 0.6.5 metadata; generator check, Ruff and strict Sphinx pass. Release notes, verification, state and plan checkboxes updated. Changes remain uncommitted."
+**Context**: No push or CI rerun performed. Scientific runtime provenance unchanged. Enabled property testing retains seed and shrinking; disabled extensions skipped.
+
+---
+
+## Commit and Push — PR 96 corrections
+**Timestamp**: 2026-09-06T20:03:23Z
+**User Input**: "Commit and push"
+**AI Response**: "Committing the three review corrections and CI golden-fixture correction, tests, release/migration documentation and workflow records to develop, then pushing to origin for PR 96. Remote version bump 9bcf03b is already fast-forwarded locally and preserved."
+**Context**: Explicit commit and push authorization. Previous verification is recorded above; rerunning focused regressions after the version-bump fast-forward. No force push, merge or GitHub review replies requested.
+
+---

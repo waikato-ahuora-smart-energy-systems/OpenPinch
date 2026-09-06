@@ -34,6 +34,7 @@ _PROBLEM_STATE_FIELDS = (
     "_results",
     "_last_target_run_spec",
     "_period_results",
+    "_period_states",
     "_utility_placement_result",
 )
 
@@ -71,10 +72,7 @@ def rebuild_problem_state(
     problem._validated_data = problem.validate()
     problem._master_zone = preprocessing()
     problem._process_components = {}
-    problem._results = None
-    problem._last_target_run_spec = None
-    problem._period_results = {}
-    problem._utility_placement_result = None
+    problem._invalidate_analysis()
     return problem._master_zone
 
 

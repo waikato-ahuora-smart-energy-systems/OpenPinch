@@ -58,6 +58,98 @@ X) Other (please describe after the `[Answer]:` tag below)
 
 [Answer]: A
 
+## TESPy HPR Performance-Map Unit Plan
+
+### Decomposition Assessment
+
+- **Story grouping**: user stories were intentionally skipped because the
+  approved technical requirements already contain acceptance criteria. The
+  work divides cleanly into the transport contract, thermodynamic map
+  generation, and current-target API integration.
+- **Dependencies**: contract fields and fixtures must stabilize before either
+  simulator emits maps; simulators and the generation service must stabilize
+  before the public target accessor exposes them. Documentation and tests stay
+  with their owning unit, followed by one integrated gate.
+- **Team alignment**: OpenPinch is one in-process Python package. Units are
+  sequential implementation, TDD, and review boundaries rather than separate
+  teams or independently owned services.
+- **Technical considerations**: all units ship in one distribution. CoolProp
+  remains the default installed path; TESPy is isolated behind an optional
+  extra and leaf import. OpenUtility, Pyomo, and HiGHS are not dependencies.
+- **Business domain**: all three units serve one HPR targeting and physical-map
+  generation capability. OpenUtility's investment and dispatch optimization
+  remains outside the domain boundary.
+- **Code organization**: this is brownfield work. Existing `contracts`, HPR
+  target/service, optional-adapter, application accessor, documentation, test,
+  and package-data owners remain authoritative; no new deployable service or
+  top-level package is introduced.
+
+### Proposed Units
+
+1. **HPR Performance-Map Contract and Golden Fixtures**
+   - Strict Pydantic request, units, point, map, JSON-value, and typed-error
+     contracts.
+   - Exact alpha schema `1.0` fields matching OpenUtility, including
+     `energy_balance_tolerance` and `temperature_match_tolerance`.
+   - Canonical JSON Schema plus heat-pump and refrigeration golden fixtures.
+   - Deterministic serialization, invariant, property, cold-import, and package
+     content tests without TESPy or OpenUtility.
+2. **HPR Point Simulators and Map Generation**
+   - Engine-neutral context, operating-point/result values, simulator protocol,
+     deterministic grid driver, lifecycle, and all-or-nothing failure behavior.
+   - CoolProp-backed simulator as the default path tied to current
+     vapour-compression HPR target semantics.
+   - Explicit TESPy simulator leaf, optional dependency extra, design/offdesign
+     policy, convergence diagnostics, and fake-adapter/optional smoke tests.
+3. **Current HPR Target API Integration and Publication**
+   - `simulation_backend="coolprop"` on current vapour-compression heat-pump
+     and refrigeration target methods, with explicit `"tespy"` selection and
+     unchanged default call behavior.
+   - Normalized backend replay intent on target results and explicit
+     `problem.target.hpr_performance_map(target=..., request=...)` generation.
+   - Compatibility rejection for unsupported and multi-port targets, public
+     documentation/examples, architecture checks, cross-package golden-fixture
+     verification instructions, and final distribution gates.
+
+### Generation Steps
+
+- [x] Reconcile the approved requirements and Application Design with the
+  corrected OpenUtility alpha consumer contract.
+- [x] Evaluate story grouping, dependencies, team alignment, technical and
+  deployment concerns, business-domain boundaries, and brownfield code
+  organization.
+- [x] Define the proposed three-unit contract-first decomposition and its
+  implementation order.
+- [x] Collect and analyze the user's unit-plan answer; add follow-up questions
+  if it is ambiguous.
+- [x] Obtain explicit approval before generating unit artifacts.
+- [x] Add the three scoped unit definitions, responsibilities, inputs, outputs,
+  exclusions, and exit evidence to
+  `aidlc-docs/inception/application-design/unit-of-work.md`.
+- [x] Add the dependency matrix, critical path, coordination points, rollback
+  boundaries, and test checkpoints to
+  `aidlc-docs/inception/application-design/unit-of-work-dependency.md`.
+- [x] Map every TESPy HPR requirement, acceptance criterion, and enabled
+  property-testing obligation in
+  `aidlc-docs/inception/application-design/unit-of-work-story-map.md`.
+- [x] Validate acyclic dependencies, complete traceability, optional-dependency
+  isolation, and absence of OpenUtility/Pyomo/HiGHS ownership leakage.
+- [x] Obtain explicit approval of generated units before Construction.
+
+### Unit Plan Approval Question
+
+How should Units Generation proceed with this contract-first three-unit
+decomposition?
+
+A) Approve the proposed units and generate the three unit artifacts
+
+B) Request changes to the unit boundaries and describe them after the
+`[Answer]:` tag
+
+X) Other (please describe after the `[Answer]:` tag below)
+
+[Answer]: A (approved by explicit chat response `A`)
+
 ## Utility Placement Optimisation Unit Plan
 
 ### Decomposition Assessment

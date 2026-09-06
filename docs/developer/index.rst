@@ -11,3 +11,5 @@ surface around the core analysis code.
    architecture
    build-and-coverage
    synthesis-dependency-policy
+
+   adding-analysis-methods

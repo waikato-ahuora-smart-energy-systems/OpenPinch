@@ -1,0 +1,71 @@
+{
+  "cop_convention": "heating",
+  "energy_balance_tolerance": 1e-06,
+  "interpolation_topology": "ordered_part_load_curve",
+  "map_id": "openpinch-golden-heat-pump-1.0",
+  "mode": "heat_pump",
+  "model_id": "reference-single-stage-heat-pump-v1",
+  "points": [
+    {
+      "cop": 4.0,
+      "curve_id": "hp-20C-60C",
+      "electric_power": 12.5,
+      "load_fraction": 0.5,
+      "name": "hp-20C-60C-plr-050",
+      "q_sink": 50.0,
+      "q_source": 37.5,
+      "sink_temperature": 60.0,
+      "source_temperature": 20.0
+    },
+    {
+      "cop": 4.285714285714286,
+      "curve_id": "hp-20C-60C",
+      "electric_power": 17.5,
+      "load_fraction": 0.75,
+      "name": "hp-20C-60C-plr-075",
+      "q_sink": 75.0,
+      "q_source": 57.5,
+      "sink_temperature": 60.0,
+      "source_temperature": 20.0
+    },
+    {
+      "cop": 4.545454545454546,
+      "curve_id": "hp-20C-60C",
+      "electric_power": 22.0,
+      "load_fraction": 1.0,
+      "name": "hp-20C-60C-plr-100",
+      "q_sink": 100.0,
+      "q_source": 78.0,
+      "sink_temperature": 60.0,
+      "source_temperature": 20.0
+    }
+  ],
+  "provenance": {
+    "assumptions": [
+      "external service temperatures",
+      "electric power includes declared auxiliaries",
+      "no hidden thermal losses"
+    ],
+    "cycle": {
+      "family": "vapour_compression_heat_pump",
+      "refrigerant": "R134a"
+    },
+    "fixture": true,
+    "generator": "OpenPinch contract fixture",
+    "versions": {
+      "openpinch": "0.6.4"
+    }
+  },
+  "reference_capacity": 100.0,
+  "reference_capacity_basis": "q_sink",
+  "schema_version": "1.0",
+  "temperature_match_tolerance": 1e-06,
+  "thermodynamic_backend": "coolprop",
+  "units": {
+    "electric_power": "kW",
+    "q_sink": "kW",
+    "q_source": "kW",
+    "sink_temperature": "degC",
+    "source_temperature": "degC"
+  }
+}

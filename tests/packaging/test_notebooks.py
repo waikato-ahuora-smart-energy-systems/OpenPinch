@@ -32,6 +32,7 @@ FORBIDDEN_IMPORT_PREFIXES = (
     "OpenPinch.domain",
     "OpenPinch.presentation",
 )
+ALLOWED_SPECIALIST_IMPORTS = frozenset({"OpenPinch.contracts.hpr_performance_map"})
 
 
 def _manifest_rows() -> list[dict[str, str]]:
@@ -355,16 +356,38 @@ def test_every_code_cell_compiles_and_uses_only_public_package_imports(
             compile(tree, f"{name}:cell-{index}", "exec")
             for node in ast.walk(tree):
                 if isinstance(node, ast.ImportFrom) and node.module:
-                    assert not node.module.startswith(FORBIDDEN_IMPORT_PREFIXES), (
-                        name,
-                        node.module,
-                    )
+                    assert (
+                        node.module in ALLOWED_SPECIALIST_IMPORTS
+                        or not node.module.startswith(FORBIDDEN_IMPORT_PREFIXES)
+                    ), (name, node.module)
                 if isinstance(node, ast.Import):
                     for alias in node.names:
-                        assert not alias.name.startswith(FORBIDDEN_IMPORT_PREFIXES), (
-                            name,
-                            alias.name,
-                        )
+                        assert (
+                            alias.name in ALLOWED_SPECIALIST_IMPORTS
+                            or not alias.name.startswith(FORBIDDEN_IMPORT_PREFIXES)
+                        ), (name, alias.name)
+
+
+def test_notebook_09_demonstrates_comprehensive_hpr_target_to_map() -> None:
+    notebook = _load_notebook(
+        ROOT
+        / "OpenPinch"
+        / "data"
+        / "notebooks"
+        / "09_vapour_compression_and_brayton.ipynb"
+    )
+    source = _combined_source(notebook)
+
+    for token in (
+        "HprPerformanceMapRequest",
+        'simulation_backend="tespy"',
+        "HEOS::R32[0.5]&R125[0.5]",
+        "target_simulation_record",
+        "hpr_performance_map",
+        "load_fractions=[0.50, 0.75, 1.00]",
+        'model_dump(mode="json")',
+    ):
+        assert token in source
 
 
 def test_manifest_operations_are_demonstrated_in_notebook_source(
@@ -382,6 +405,8 @@ def test_manifest_operations_are_demonstrated_in_notebook_source(
         "show_dashboard": "show_dashboard",
     }
     for row in _manifest_rows():
+        if row["coverage_status"] == "documented and pytest executable":
+            continue
         operation = row["operation"]
         notebook_name = row["primary_tutorial"]
         source = _combined_source(_copied_notebook(tmp_path, notebook_name))

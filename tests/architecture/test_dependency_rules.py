@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import subprocess
+import sys
 from pathlib import Path
 
 import OpenPinch
@@ -284,6 +286,113 @@ def test_contracts_depend_only_on_domain_and_contract_peers() -> None:
     }
     for path in (PACKAGE_DIR / "contracts").rglob("*.py"):
         assert _openpinch_import_roots(path).isdisjoint(forbidden), path
+
+
+def test_hpr_performance_map_contract_has_no_runtime_or_external_dependencies() -> None:
+    contract_path = PACKAGE_DIR / "contracts" / "hpr_performance_map.py"
+    forbidden_roots = {
+        "CoolProp",
+        "OpenUtility",
+        "highspy",
+        "numpy",
+        "pandas",
+        "pint",
+        "pyomo",
+        "tespy",
+    }
+
+    assert contract_path.is_file()
+    imports = _import_targets(contract_path)
+    assert not {
+        target
+        for target in imports
+        if target.split(".", 1)[0] in forbidden_roots
+        or target == "OpenPinch.contracts.hpr"
+    }
+
+
+def test_hpr_performance_map_contract_imports_with_optional_dependencies_blocked() -> (
+    None
+):
+    code = """
+import importlib.abc
+import sys
+
+BLOCKED = {"OpenUtility", "highspy", "pyomo", "tespy"}
+
+class Blocker(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname.split(".", 1)[0] in BLOCKED:
+            raise ModuleNotFoundError(f"blocked test import: {fullname}")
+        return None
+
+sys.meta_path.insert(0, Blocker())
+import OpenPinch
+from OpenPinch.contracts.hpr_performance_map import HprPerformanceMap
+from OpenPinch.analysis.heat_pumps.performance_maps import (
+    HprTargetMapBasis,
+    get_hpr_point_simulator,
+)
+from OpenPinch.analysis.heat_pumps.performance_maps.errors import HprSimulatorFailure
+assert OpenPinch.PinchProblem is not None
+assert "schema_version" in HprPerformanceMap.model_json_schema()["properties"]
+assert HprTargetMapBasis is not None
+assert get_hpr_point_simulator("coolprop") is not None
+try:
+    get_hpr_point_simulator("tespy")
+except HprSimulatorFailure as exc:
+    assert exc.code == "dependency_unavailable"
+else:
+    raise AssertionError("blocked TESPy import unexpectedly succeeded")
+"""
+    completed = subprocess.run(
+        [sys.executable, "-c", code],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_hpr_map_generation_keeps_external_optimisers_and_tespy_at_the_leaf():
+    package = PACKAGE_DIR / "analysis" / "heat_pumps" / "performance_maps"
+    tespy_leaf = package / "adapters" / "tespy.py"
+    forbidden_roots = {"OpenUtility", "highspy", "pyomo"}
+    tespy_importers: list[str] = []
+
+    for path in package.rglob("*.py"):
+        relative = str(path.relative_to(PACKAGE_DIR))
+        imports = _import_targets(path)
+        assert "OpenPinch.application" not in imports, relative
+        assert not {
+            target for target in imports if target.split(".", 1)[0] in forbidden_roots
+        }, relative
+        if any(target.split(".", 1)[0] == "tespy" for target in imports):
+            tespy_importers.append(relative)
+
+    assert tespy_importers == [str(tespy_leaf.relative_to(PACKAGE_DIR))]
+
+
+def test_hpr_target_integration_keeps_downstream_optimisers_outside_openpinch():
+    target_paths = (
+        PACKAGE_DIR / "analysis" / "heat_pumps" / "service.py",
+        PACKAGE_DIR
+        / "analysis"
+        / "heat_pumps"
+        / "targeting"
+        / "cascade_vapour_compression.py",
+        PACKAGE_DIR / "application" / "_problem" / "accessors" / "target.py",
+        PACKAGE_DIR / "contracts" / "hpr.py",
+        PACKAGE_DIR / "domain" / "targets.py",
+    )
+    forbidden_roots = {"OpenUtility", "highspy", "pyomo"}
+
+    for path in target_paths:
+        imports = _import_targets(path)
+        assert not {
+            target for target in imports if target.split(".", 1)[0] in forbidden_roots
+        }, path
 
 
 def test_core_domain_classes_have_concrete_domain_owners() -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 
 from ..arguments import (
@@ -161,15 +162,38 @@ class _DesignAccessor:
             runtime["period_id"] = period_id
         return runtime, configuration
 
-    def _run(self, service, *, runtime, configuration, **service_kwargs):
-        root = self._problem._build_execution_master_zone()
+    def _run(self, service, *, surface, runtime, configuration, **service_kwargs):
+        from ..targeting.execution import walk_zone_tree
+        from ..targeting.provenance import make_provenance
+        from ..targeting.state import commit_problem, snapshot_problem
+
+        isolated = snapshot_problem(self._problem)
+        root = isolated._build_execution_master_zone()
+        stored_configs = {zone.address: zone.config for zone in walk_zone_tree(root)}
         with temporary_zone_configuration(root, configuration):
-            result = service(
-                self._problem,
-                options=runtime,
-                **service_kwargs,
+            result = service(isolated, options=runtime, **service_kwargs)
+        # A specialized service may prepare thermal targets transactionally and
+        # replace the tree. Restore stored configuration on the committed tree too.
+        for zone in walk_zone_tree(isolated._master_zone):
+            zone.config = stored_configs[zone.address]
+        if hasattr(result, "provenance"):
+            period_ids = (
+                (runtime["period_id"],)
+                if runtime.get("period_id") is not None
+                else tuple(root.period_ids)
             )
-        return HeatExchangerNetworkDesignView(result)
+            result.provenance = make_provenance(
+                isolated,
+                "design." + surface,
+                isolated._master_zone,
+                period_ids=period_ids,
+                settings={**root.config._values, **configuration, **runtime},
+            )
+            if isolated._results is not None:
+                isolated._results.design = result
+        view = HeatExchangerNetworkDesignView(deepcopy(result))
+        commit_problem(self._problem, isolated)
+        return view
 
     def heat_exchanger_network(
         self,
@@ -209,6 +233,7 @@ class _DesignAccessor:
         )
         return self._run(
             heat_exchanger_network_synthesis_service,
+            surface="heat_exchanger_network",
             runtime=runtime,
             configuration=configuration,
             initial_networks=initial_networks,
@@ -234,6 +259,7 @@ class _DesignAccessor:
         )
         return self._run(
             _heat_exchanger_network_enhanced_synthesis_method_service,
+            surface="enhanced_heat_exchanger_network",
             runtime=runtime,
             configuration=configuration,
             quality_tier=quality_tier,
@@ -251,6 +277,7 @@ class _DesignAccessor:
         )
         return self._run(
             heat_exchanger_network_open_hens_method_service,
+            surface="open_hens",
             runtime=runtime,
             configuration=configuration,
             workspace_variant=None,
@@ -267,6 +294,7 @@ class _DesignAccessor:
         )
         return self._run(
             heat_exchanger_network_pinch_design_method_service,
+            surface="pinch_design",
             runtime=runtime,
             configuration=configuration,
             workspace_variant=None,
@@ -290,6 +318,7 @@ class _DesignAccessor:
         )
         return self._run(
             heat_exchanger_network_thermal_derivative_method_service,
+            surface="thermal_derivative",
             runtime=runtime,
             configuration=configuration,
             initial_networks=initial_networks,
@@ -314,6 +343,7 @@ class _DesignAccessor:
         )
         return self._run(
             heat_exchanger_network_evolution_method_service,
+            surface="network_evolution",
             runtime=runtime,
             configuration=configuration,
             initial_networks=initial_networks,
@@ -329,7 +359,13 @@ class _DesignAccessor:
             )
         if "period_id" in kwargs:
             raise TypeError("multiperiod synthesis does not accept period_id.")
-        return self.heat_exchanger_network(**kwargs)
+        view = self.heat_exchanger_network(**kwargs)
+        provenance = view.result.provenance.model_copy(
+            update={"method_id": "design.multiperiod_heat_exchanger_network"}
+        )
+        view.result.provenance = provenance
+        self._problem._results.design.provenance = provenance
+        return view
 
 
 class _DesignAccessorDescriptor:

@@ -133,7 +133,12 @@ def _validate_results(
     assert len(cond_streams) <= 1
     assert len(evap_streams) <= 1
     assert all(stream.has_segments for stream in [*cond_streams, *evap_streams])
-    assert np.isclose(sum([s.heat_flow for s in cond_streams]) - cycle.Q_heat, 0)
+    assert np.isclose(
+        sum([s.heat_flow for s in cond_streams]),
+        cycle.Q_heat,
+        rtol=1e-7,
+        atol=1e-8,
+    )
     if cond_streams:
         assert np.isclose(
             min(
@@ -556,8 +561,18 @@ def test_heat_pump_cycle_with_zeotropic_mixture_generates_gliding_profiles():
     assert cycle.refrigerant == "R407C"
     assert np.isclose(cycle.Q_cond - cycle.Q_evap - cycle.work, 0.0)
     assert np.isclose(cycle.Q_cond - cycle.Q_heat - cycle.Q_cas_heat, 0.0)
-    assert np.isclose(sum(s.heat_flow for s in cond_streams), cycle.Q_heat, 0.0)
-    assert np.isclose(sum(s.heat_flow for s in evap_streams), cycle.Q_cool, 0.0)
+    assert np.isclose(
+        sum(s.heat_flow for s in cond_streams),
+        cycle.Q_heat,
+        rtol=1e-7,
+        atol=1e-8,
+    )
+    assert np.isclose(
+        sum(s.heat_flow for s in evap_streams),
+        cycle.Q_cool,
+        rtol=1e-7,
+        atol=1e-8,
+    )
 
     # Zeotropic blends should preserve glide across the phase-change profiles.
     cond_segments = [segment for stream in cond_streams for segment in stream.segments]

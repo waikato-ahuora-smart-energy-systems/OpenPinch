@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, List, Optional
+from typing import Any, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
+from ..domain.analysis import AnalysisProvenance
 from ..domain.stream_collection import StreamCollection
 from ..domain.value import Value
+from .hpr import HprTargetSimulationRecord
+from .report_metrics import report_field
 from .units import coerce_output_value
 from .workspace import ValidationReport
 
@@ -77,50 +80,140 @@ class PinchTemp(_ReportModel):
 class TargetResults(_ReportModel):
     """Summary metrics for a single zone/target returned by the analysis."""
 
-    scope: str
-    zone_type: str
-    integration_type: str
-    target_method: str
-    period_idx: Optional[int] = None
-    period_id: Optional[str] = None
-    degree_of_integration: Value | None = None
-    Qh: Value
-    Qc: Value
-    Qr: Value
-    utility_cost: Value | None = None
-    row_type: Optional[str] = None
-    hot_utilities: List[HeatUtility] = Field(default_factory=list)
-    cold_utilities: List[HeatUtility] = Field(default_factory=list)
-    pinch_temp: PinchTemp
-    work_target: Value | None = None
-    process_component_work_target: Value | None = None
-    turbine_efficiency_target: Value | None = None
-    area: Value | None = None
-    num_units: Optional[float] = None
-    capital_cost: Value | None = None
-    total_cost: Value | None = None
-    exergy_sources: Value | None = None
-    exergy_sinks: Value | None = None
-    ETE: Value | None = None
-    exergy_req_min: Value | None = None
-    exergy_des_min: Value | None = None
-    hpr_cycle: Optional[str] = None
-    hpr_utility_total: Value | None = None
-    hpr_work: Value | None = None
-    hpr_external_utility: Value | None = None
-    hpr_ambient_hot: Value | None = None
-    hpr_ambient_cold: Value | None = None
-    hpr_cop: Value | None = None
-    hpr_eta_he: Value | None = None
-    hpr_operating_cost: Value | None = None
-    hpr_capital_cost: Value | None = None
-    hpr_annualized_capital_cost: Value | None = None
-    hpr_total_annualized_cost: Value | None = None
-    hpr_compressor_capital_cost: Value | None = None
-    hpr_heat_exchanger_capital_cost: Value | None = None
-    hpr_success: Optional[bool] = None
-    hpr_hot_streams: Optional[StreamCollection] = None
-    hpr_cold_streams: Optional[StreamCollection] = None
+    scope: str = report_field("scope", "consensus", representation="structured")
+    provenance: AnalysisProvenance | None = report_field(
+        "provenance", "exclude", None, representation="structured"
+    )
+    zone_type: str = report_field("zone_type", "consensus", representation="structured")
+    integration_type: str = report_field(
+        "integration_type", "consensus", representation="structured"
+    )
+    target_method: str = report_field(
+        "target_method", "consensus", representation="structured"
+    )
+    period_idx: Optional[int] = report_field(
+        "period_idx", "exclude", None, representation="structured"
+    )
+    period_id: Optional[str] = report_field(
+        "period_id", "derived", None, representation="structured"
+    )
+    degree_of_integration: Value | None = report_field(
+        "degree_of_integration", "weighted_mean", None, representation="quantity"
+    )
+    Qh: Value = report_field("Qh", "weighted_mean", representation="quantity")
+    Qc: Value = report_field("Qc", "weighted_mean", representation="quantity")
+    Qr: Value = report_field("Qr", "weighted_mean", representation="quantity")
+    utility_cost: Value | None = report_field(
+        "utility_cost", "weighted_mean", None, representation="quantity"
+    )
+    row_type: Optional[str] = report_field(
+        "row_type", "consensus", None, representation="structured"
+    )
+    hot_utilities: List[HeatUtility] = report_field(
+        "hot_utilities", "derived", default_factory=list, representation="structured"
+    )
+    cold_utilities: List[HeatUtility] = report_field(
+        "cold_utilities", "derived", default_factory=list, representation="structured"
+    )
+    pinch_temp: PinchTemp = report_field(
+        "pinch_temp", "derived", representation="structured"
+    )
+    work_target: Value | None = report_field(
+        "work_target", "weighted_mean", None, representation="quantity"
+    )
+    process_component_work_target: Value | None = report_field(
+        "process_component_work_target",
+        "weighted_mean",
+        None,
+        representation="quantity",
+    )
+    turbine_efficiency_target: Value | None = report_field(
+        "turbine_efficiency_target", "weighted_mean", None, representation="quantity"
+    )
+    area: Value | None = report_field(
+        "area", "weighted_mean", None, representation="quantity"
+    )
+    num_units: Optional[float] = report_field(
+        "num_units", "weighted_mean", None, representation="scalar"
+    )
+    capital_cost: Value | None = report_field(
+        "capital_cost", "weighted_mean", None, representation="quantity"
+    )
+    total_cost: Value | None = report_field(
+        "total_cost", "weighted_mean", None, representation="quantity"
+    )
+    exergy_sources: Value | None = report_field(
+        "exergy_sources", "weighted_mean", None, representation="quantity"
+    )
+    exergy_sinks: Value | None = report_field(
+        "exergy_sinks", "weighted_mean", None, representation="quantity"
+    )
+    ETE: Value | None = report_field(
+        "ETE", "weighted_mean", None, representation="quantity"
+    )
+    exergy_req_min: Value | None = report_field(
+        "exergy_req_min", "weighted_mean", None, representation="quantity"
+    )
+    exergy_des_min: Value | None = report_field(
+        "exergy_des_min", "weighted_mean", None, representation="quantity"
+    )
+    hpr_cycle: Optional[str] = report_field(
+        "hpr_cycle", "consensus", None, representation="structured"
+    )
+    hpr_simulation_backend: Literal["coolprop", "tespy"] | None = report_field(
+        "hpr_simulation_backend", "consensus", None, representation="structured"
+    )
+    hpr_target_simulation_record: HprTargetSimulationRecord | None = report_field(
+        "hpr_target_simulation_record", "exclude", None, representation="structured"
+    )
+    hpr_utility_total: Value | None = report_field(
+        "hpr_utility_total", "weighted_mean", None, representation="quantity"
+    )
+    hpr_work: Value | None = report_field(
+        "hpr_work", "weighted_mean", None, representation="quantity"
+    )
+    hpr_external_utility: Value | None = report_field(
+        "hpr_external_utility", "weighted_mean", None, representation="quantity"
+    )
+    hpr_ambient_hot: Value | None = report_field(
+        "hpr_ambient_hot", "weighted_mean", None, representation="quantity"
+    )
+    hpr_ambient_cold: Value | None = report_field(
+        "hpr_ambient_cold", "weighted_mean", None, representation="quantity"
+    )
+    hpr_cop: Value | None = report_field(
+        "hpr_cop", "weighted_mean", None, representation="quantity"
+    )
+    hpr_eta_he: Value | None = report_field(
+        "hpr_eta_he", "weighted_mean", None, representation="quantity"
+    )
+    hpr_operating_cost: Value | None = report_field(
+        "hpr_operating_cost", "weighted_mean", None, representation="quantity"
+    )
+    hpr_capital_cost: Value | None = report_field(
+        "hpr_capital_cost", "maximum", None, representation="quantity"
+    )
+    hpr_annualized_capital_cost: Value | None = report_field(
+        "hpr_annualized_capital_cost", "maximum", None, representation="quantity"
+    )
+    hpr_total_annualized_cost: Value | None = report_field(
+        "hpr_total_annualized_cost", "derived", None, representation="structured"
+    )
+    hpr_compressor_capital_cost: Value | None = report_field(
+        "hpr_compressor_capital_cost", "maximum", None, representation="quantity"
+    )
+    hpr_heat_exchanger_capital_cost: Value | None = report_field(
+        "hpr_heat_exchanger_capital_cost", "maximum", None, representation="quantity"
+    )
+    hpr_success: Optional[bool] = report_field(
+        "hpr_success", "consensus", None, representation="structured"
+    )
+    hpr_hot_streams: Optional[StreamCollection] = report_field(
+        "hpr_hot_streams", "consensus", None, representation="structured"
+    )
+    hpr_cold_streams: Optional[StreamCollection] = report_field(
+        "hpr_cold_streams", "consensus", None, representation="structured"
+    )
 
     @field_validator(
         "degree_of_integration",

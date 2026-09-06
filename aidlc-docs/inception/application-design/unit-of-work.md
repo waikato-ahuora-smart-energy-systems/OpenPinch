@@ -421,3 +421,163 @@ Ruff, packaging, and distribution gates.
 - Every unit remains inside the existing package and preserves established
   component ownership.
 - Infrastructure Design remains skipped for every unit.
+
+## TESPy HPR Performance-Map Units
+
+These are logical construction units within the existing OpenPinch Python
+distribution. They are not services, deployment boundaries, or new top-level
+packages. The contract-first order prevents engine details from leaking into
+the interchange format or the public targeting surface.
+
+### Unit 1: HPR Performance-Map Contract and Golden Fixtures
+
+**Purpose**: establish the complete engine-neutral alpha schema `1.0` contract
+that OpenPinch produces and plain-data consumers such as OpenUtility validate.
+
+**Inputs**:
+
+- approved FR-1 through FR-4, FR-9, and the corrected OpenUtility decoder;
+- canonical external-service temperature and useful-capacity semantics;
+- existing Pydantic, JSON, package-data, and Hypothesis conventions.
+
+**Responsibilities**:
+
+- define strict request, units, point, map, JSON-value, and typed-error models;
+- enforce exact schema version, units, modes, capacity/COP conventions,
+  non-finite and range rejection, energy balance, load/capacity consistency,
+  curve identity, unique coordinates, and ascending unique load fractions;
+- preserve structured JSON provenance without runtime objects or string
+  coercion;
+- provide deterministic JSON serialization, canonical JSON Schema, and golden
+  heat-pump and refrigeration fixtures;
+- package and document the fixtures without importing TESPy, OpenUtility,
+  Pyomo, or HiGHS.
+
+**Outputs**: stable specialist contract imports, schema `1.0` JSON Schema,
+two canonical fixtures, validation errors, and reusable domain-specific
+Hypothesis strategies.
+
+**Exclusions**:
+
+- no thermodynamic calculation, target mutation, grid traversal, or engine
+  selection;
+- no optimizer candidate, cost, node assignment, sizing, dispatch, or MILP
+  formulation;
+- no OpenUtility runtime or test dependency.
+
+**Construction readiness**: Functional Design is required for validation and
+serialization rules. NFR Requirements and NFR Design are required for optional
+dependency isolation, compatibility, determinism, and reproducibility.
+Infrastructure Design is skipped.
+
+**Exit evidence**: example and property tests for JSON round trips and physical
+invariants; invalid-version/unit/COP/capacity/curve cases; deterministic fixture
+bytes; cold imports with TESPy blocked; schema and fixtures present in wheel and
+source distributions.
+
+### Unit 2: HPR Point Simulators and Map Generation
+
+**Purpose**: generate complete deterministic physical maps through one
+engine-neutral lifecycle while keeping CoolProp as the default and TESPy as an
+explicit optional leaf.
+
+**Inputs**:
+
+- Unit 1 contracts and golden-fixture semantics;
+- approved FR-5 through FR-8 and FR-10;
+- existing vapour-compression HPR target outputs and optional-dependency style;
+- explicit first-release single-source/single-sink compatibility boundary.
+
+**Responsibilities**:
+
+- define immutable generation context, operating-point, point-result, simulator
+  protocol, and session lifecycle values;
+- implement deterministic Cartesian traversal, useful-duty scaling, COP and
+  power accounting, provenance assembly, and all-or-nothing failure behavior;
+- implement the CoolProp-backed point simulator as the default for supported
+  current vapour-compression heat-pump and refrigeration targets;
+- implement one documented TESPy design/offdesign simulator leaf with lazy
+  imports, explicit model assumptions, convergence checks, and cleanup;
+- add fake-simulator tests for the core suite and a guarded optional real-TESPy
+  smoke test.
+
+**Outputs**: an engine-neutral map-generation service, CoolProp and optional
+TESPy simulator adapters, structured diagnostics, and maps validated by Unit 1.
+
+**Exclusions**:
+
+- no public target accessor changes, OpenUtility imports, optimizer logic, or
+  automatic part-load generation during ordinary targeting;
+- no generic TESPy cycle claim, analytic Carnot substitution, Brayton
+  consolidation, multi-port cascade/parallel flattening, or partial-map return.
+
+**Construction readiness**: Functional Design is required for lifecycle,
+calculation, and failure rules. NFR Requirements and NFR Design are required
+for numerical determinism, optional dependency behavior, performance, and
+environment-sensitive smoke coverage. Infrastructure Design is skipped.
+
+**Exit evidence**: fake-adapter example and property tests prove traversal
+order, size, balance, useful-duty conventions, failure cleanup, and repeatable
+provenance; CoolProp examples reproduce supported nominal behavior; guarded
+TESPy smoke proves one design/offdesign sequence; base installs remain green.
+
+### Unit 3: Current HPR Target API Integration and Publication
+
+**Purpose**: expose map generation through the current CoolProp-backed HPR
+targeting concepts without changing the normal targeting return contract.
+
+**Inputs**:
+
+- completed Unit 1 contracts and Unit 2 generation service;
+- existing `vapour_compression_heat_pump` and
+  `vapour_compression_refrigeration` methods and target accessor;
+- approved backend-selector, replay-intent, compatibility, and documentation
+  design.
+
+**Responsibilities**:
+
+- add `simulation_backend="coolprop"` to the two applicable current targeting
+  methods and accept explicit `"tespy"` without conflating simulation, cycle,
+  or black-box optimization identity;
+- retain the normalized backend string on successful target results while
+  preserving default numerical behavior and return types;
+- expose explicit
+  `problem.target.hpr_performance_map(target=..., request=...)` generation with
+  typed rejection of unsupported or multi-port targets;
+- publish field semantics, examples, optional-install guidance, limitations,
+  and cross-package golden-fixture verification instructions;
+- enforce dependency direction and run final API, architecture,
+  documentation, packaging, and distribution gates.
+
+**Outputs**: the selectable public targeting tie-in, explicit follow-up map
+operation, stable documentation, examples, and integrated release evidence.
+
+**Exclusions**:
+
+- no automatic grid solve on a normal target call and no target mutation;
+- no OpenUtility/Pyomo/HiGHS import, candidate economics, or electricity/
+  thermal optimization balance;
+- no new root workflow, CLI surface, or independently deployable service.
+
+**Construction readiness**: Functional Design is required for method behavior,
+state, and compatibility rules. NFR Requirements and NFR Design are required
+for backward compatibility, optional dependency isolation, and public quality
+gates. Infrastructure Design is skipped.
+
+**Exit evidence**: focused default/explicit backend dispatch and unsupported
+combination tests; unchanged omitted-selector regressions; explicit accessor
+round trip to both golden fixtures; cold-import and forbidden-dependency checks;
+warning-free docs; complete package tests and installed-wheel smoke.
+
+### TESPy HPR Unit Boundary Validation
+
+- Unit 1 owns only plain contracts and artifacts; Unit 2 depends on Unit 1 and
+  owns physical simulation; Unit 3 depends on both and owns public integration.
+- No earlier unit imports a later unit, and no OpenUtility, Pyomo, or HiGHS edge
+  enters OpenPinch.
+- TESPy appears only in Unit 2's concrete leaf and optional test/profile paths;
+  Unit 1 and base-package imports remain engine independent.
+- OpenUtility continues to own candidates, periods, costs, selection, sizing,
+  dispatch, thermal/electricity balances, Pyomo, and HiGHS.
+- All units ship together in one OpenPinch wheel and source distribution;
+  Infrastructure Design is N/A.

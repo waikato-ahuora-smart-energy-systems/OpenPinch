@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -57,15 +58,17 @@ class ProcessMVRComponent(ProcessComponent):
 
     @property
     def original_streams(self) -> list[Stream]:
-        return [record.original_stream for record in self.stream_records]
+        return deepcopy([record.original_stream for record in self.stream_records])
 
     @property
     def replacement_streams(self) -> list[Stream]:
-        return [
-            stream
-            for record in self.stream_records
-            for stream in record.replacement_streams
-        ]
+        return deepcopy(
+            [
+                stream
+                for record in self.stream_records
+                for stream in record.replacement_streams
+            ]
+        )
 
     @property
     def stage_results_by_period(self) -> dict[str, list[DirectGasMVRStageResult]]:
@@ -73,7 +76,7 @@ class ProcessMVRComponent(ProcessComponent):
         for record in self.stream_records:
             for period_id, stages in record.stage_results_by_period.items():
                 combined.setdefault(period_id, []).extend(stages)
-        return combined
+        return deepcopy(combined)
 
     @property
     def affected_zone_paths(self) -> list[str]:
@@ -173,7 +176,7 @@ def create_process_mvr_component(
     )
     for record in records:
         add_replacement_streams_to_memberships(record, component_id)
-    problem.process_components[component_id] = component
+    problem._process_components[component_id] = component
     component.activate()
     return component
 

@@ -525,6 +525,41 @@ def test_supported_hpr_cycles_prepare_shared_target_inputs(
         assert captured["has_initial_candidate"] is True
 
 
+def test_shared_vector_tespy_rejects_before_optimizer_setup(monkeypatch) -> None:
+    case = _PreparedHPRPeriodCase(
+        period_id="p0",
+        period_idx=0,
+        weight=1.0,
+        solver_case=HPRPeriodCase(
+            period_id="p0",
+            period_idx=0,
+            weight=1.0,
+            args=_input_args(
+                hpr_type=HeatPumpAndRefrigerationCycle.CascadeVapourComp.value,
+                simulation_backend="tespy",
+                n_cond=1,
+                n_evap=1,
+                allow_integrated_expander=False,
+                dt_hp_ihx=0.0,
+            ),
+        ),
+        base_target=_base_target(_pt([120.0, 60.0], [100.0, 0.0], [0.0, -50.0])),
+        optimizer_pt=_pt([120.0, 60.0], [100.0, 0.0], [0.0, -50.0]),
+    )
+    monkeypatch.setattr(
+        hp_execution,
+        "get_multiperiod_hpr_optimisation_setup",
+        lambda *_args, **_kwargs: pytest.fail("optimizer setup must not start"),
+    )
+
+    with pytest.raises(ValueError, match="shared-vector multi-period"):
+        hp_execution.get_multiperiod_hpr_targets(
+            period_cases=[case],
+            selected_period_id="p0",
+            selected_period_idx=0,
+        )
+
+
 def test_hpr_multiperiod_flag_false_uses_selected_period_path(monkeypatch):
     zone = Zone(
         config=Configuration(

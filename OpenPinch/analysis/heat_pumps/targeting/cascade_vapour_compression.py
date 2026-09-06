@@ -2,19 +2,26 @@
 
 from __future__ import annotations
 
+from functools import partial
+
 import numpy as np
 
 from ....contracts.hpr import HeatPumpTargetInputs, HPRBackendResult, HPRParsedState
+from ....domain.configuration import tol
+from ....domain.stream import Stream
+from ....domain.stream_collection import StreamCollection
 from ..common._shared.ambient_preallocation import preallocate_direct_ambient_duties
 from ..common._shared.streams import get_Q_vals_at_T_hpr_from_bckgrd_profile
 from ..common.encoding import (
     AMBIENT_X_BOUNDS,
+    DutyAllocation,
     encode_base_and_duty_splits,
     map_Q_amb_to_x,
     map_T_arr_to_x_arr,
     map_x_arr_to_DT_arr,
     map_x_arr_to_T_arr,
     map_x_to_Q_amb,
+    require_stage_duty_allocation,
 )
 from ..common.layout import HPRoptVectorLayout
 from ..common.shared import (
@@ -23,6 +30,22 @@ from ..common.shared import (
 )
 from ..cycles.cascade_vapour_compression_cycle import CascadeVapourCompressionCycle
 from ..optimisation_adapter import solve_hpr_placement
+from ..performance_maps.target_records import (
+    build_coolprop_target_simulation_record,
+    build_tespy_target_simulation_record,
+)
+from ..performance_maps.targeting import (
+    HprTargetEvaluatorCoordinator,
+    PreparedTespyHprTargeting,
+    get_hpr_target_evaluator,
+    preflight_tespy_hpr_targeting,
+)
+from ..performance_maps.targeting_models import (
+    HprTargetEvaluationFailure,
+    HprTargetThermodynamicRequest,
+    HprTargetThermodynamicResult,
+    HprThermalProfilePoint,
+)
 from .cascade_carnot import (
     optimise_cascade_carnot_heat_pump_placement,
 )
@@ -30,6 +53,8 @@ from .cascade_carnot import (
 __all__ = [
     "optimise_cascade_heat_pump_placement",
 ]
+
+_TESPY_TARGET_SUPERHEAT = 5.0
 
 
 ################################################################################
@@ -39,8 +64,18 @@ __all__ = [
 
 def optimise_cascade_heat_pump_placement(
     args: HeatPumpTargetInputs,
+    *,
+    prepared_tespy: PreparedTespyHprTargeting | None = None,
 ) -> HPRBackendResult:
     """Optimise a cascade vapour-compression placement for the prepared HPR case."""
+    if getattr(args, "simulation_backend", "coolprop") == "tespy":
+        prepared = (
+            preflight_tespy_hpr_targeting(args)
+            if prepared_tespy is None
+            else prepared_tespy
+        )
+        return _optimise_tespy_cascade_heat_pump_placement(args, prepared)
+
     num_stages = int(args.n_cond + args.n_evap - 1)
     init_res = (
         optimise_cascade_carnot_heat_pump_placement(args)
@@ -56,6 +91,29 @@ def optimise_cascade_heat_pump_placement(
         bnds=bnds,
         args=args,
     )
+
+
+def _optimise_tespy_cascade_heat_pump_placement(
+    args: HeatPumpTargetInputs,
+    prepared: PreparedTespyHprTargeting,
+) -> HPRBackendResult:
+    """Run one scalar placement with a call-owned TESPy evaluator session."""
+    x0_ls, bnds = _get_cascade_hp_opt_setup(None, args)
+    coordinator = HprTargetEvaluatorCoordinator(get_hpr_target_evaluator(prepared))
+    coordinator.open()
+    try:
+        return solve_hpr_placement(
+            f_obj=partial(
+                _compute_tespy_cascade_hp_system_obj,
+                coordinator=coordinator,
+                prepared=prepared,
+            ),
+            x0_ls=x0_ls,
+            bnds=bnds,
+            args=args,
+        )
+    finally:
+        coordinator.close()
 
 
 ################################################################################
@@ -94,7 +152,9 @@ def _get_cascade_hp_opt_setup(
         x_cool_base=(0.0, 1.0),
         x_heat_split=(0.0, 1.0),
         x_cool_split=(0.0, 1.0),
-        x_ihx=(0.0, 1.0),
+        x_ihx=(0.0, 0.0)
+        if getattr(args, "simulation_backend", "coolprop") == "tespy"
+        else (0.0, 1.0),
     )
     if init_res is None:
         return None, bnds
@@ -290,7 +350,7 @@ def _compute_cascade_hp_system_obj(
         w_hpr = hp.work
         primary_duty = hp.Q_heat_arr.sum() if is_heat_pumping else hp.Q_cool_arr.sum()
         cop = primary_duty / w_hpr if w_hpr > 0 else 1.0
-        return evaluate_vapour_hpr_result(
+        result = evaluate_vapour_hpr_result(
             args=args,
             state=state_vars,
             work=w_hpr,
@@ -304,9 +364,184 @@ def _compute_cascade_hp_system_obj(
             dT_subcool=state_vars.dT_subcool,
             debug=debug,
         )
+        record = build_coolprop_target_simulation_record(
+            args=args,
+            state=state_vars,
+            cycle=hp,
+        )
+        return result.with_updates(
+            simulation_backend="coolprop",
+            target_simulation_record=record,
+        )
     except Exception as exc:
         return HPRBackendResult.failure(
             reason=str(exc),
             Q_amb_hot=state_vars.Q_amb_hot,
             Q_amb_cold=state_vars.Q_amb_cold,
         )
+
+
+def _compute_tespy_cascade_hp_system_obj(
+    x: np.ndarray,
+    args: HeatPumpTargetInputs,
+    *,
+    coordinator: HprTargetEvaluatorCoordinator,
+    prepared: PreparedTespyHprTargeting,
+    debug: bool = False,
+) -> HPRBackendResult:
+    """Evaluate one optimizer candidate through the normalized TESPy boundary."""
+    state = _parse_cascade_hp_state_variables(x, args)
+    allocation = _tespy_primary_duty_allocation(state, args)
+    useful_duty = float(allocation.Q_model[0])
+    if useful_duty <= tol:
+        return _tespy_candidate_failure(
+            state,
+            "TESPy target candidate requires a positive allocated useful duty.",
+        )
+
+    try:
+        request = HprTargetThermodynamicRequest(
+            mode=prepared.mode,
+            cycle_id=prepared.cycle_id,
+            model_id=prepared.model_id,
+            working_fluid=prepared.working_fluid,
+            evaporating_temperature=float(state.T_evap[0]),
+            condensing_temperature=float(state.T_cond[0]),
+            useful_duty=useful_duty,
+            source_approach_temperature=float(args.dtcont_hp),
+            sink_approach_temperature=float(args.dtcont_hp),
+            compressor_isentropic_efficiency=float(args.eta_comp),
+            superheat=_TESPY_TARGET_SUPERHEAT,
+            subcooling=float(state.dT_subcool[0]),
+            internal_hx_gas_temperature_change=float(state.dT_ihx_gas_side[0]),
+            candidate_id=_tespy_candidate_id(x),
+        )
+    except (TypeError, ValueError) as exc:
+        return _tespy_candidate_failure(state, str(exc))
+
+    evaluated = coordinator.evaluate(request)
+    if isinstance(evaluated, HprTargetEvaluationFailure):
+        return _tespy_candidate_failure(
+            state,
+            f"{evaluated.code}: {evaluated.message}",
+        )
+    if not isinstance(evaluated, HprTargetThermodynamicResult):
+        raise TypeError("HPR target evaluator coordinator returned an invalid value")
+
+    hpr_streams = _build_tespy_hpr_streams(evaluated, args)
+    result = evaluate_vapour_hpr_result(
+        args=args,
+        state=state,
+        work=evaluated.compressor_power,
+        work_arr=np.array([evaluated.compressor_power], dtype=float),
+        Q_heat=np.array([evaluated.q_sink], dtype=float),
+        Q_cool=np.array([evaluated.q_source], dtype=float),
+        cop_h=evaluated.cop,
+        hpr_streams=hpr_streams,
+        model=None,
+        penalty_terms=allocation.Q_excess.tolist(),
+        dT_subcool=state.dT_subcool,
+        dT_superheat=np.array([request.superheat], dtype=float),
+        debug=debug,
+    )
+    metadata = coordinator.metadata
+    if metadata is None:
+        raise RuntimeError("TESPy evaluator metadata is unavailable after open")
+    record = build_tespy_target_simulation_record(
+        request=request,
+        result=evaluated,
+        metadata=metadata,
+    )
+    return result.with_updates(
+        simulation_backend="tespy",
+        target_simulation_record=record,
+    )
+
+
+def _tespy_primary_duty_allocation(
+    state: HPRParsedState,
+    args: HeatPumpTargetInputs,
+) -> DutyAllocation:
+    if args.is_heat_pumping:
+        return require_stage_duty_allocation(
+            Q_base=float(state.Q_heat_base or 0.0),
+            x_split=state.x_heat_split,
+            Q_available=state.Q_heat_available,
+            duty_name="heat",
+        )
+    return require_stage_duty_allocation(
+        Q_base=float(state.Q_cool_base or 0.0),
+        x_split=state.x_cool_split,
+        Q_available=state.Q_cool_available,
+        duty_name="cool",
+    )
+
+
+def _build_tespy_hpr_streams(
+    result: HprTargetThermodynamicResult,
+    args: HeatPumpTargetInputs,
+) -> StreamCollection:
+    """Convert detached source/sink profiles into ordinary HPR utility streams."""
+    streams = StreamCollection()
+    _add_profile_streams(
+        streams,
+        result.source_profile,
+        prefix="TESPy Evaporator",
+        heat_flow=result.q_source,
+        is_hot=False,
+        args=args,
+    )
+    _add_profile_streams(
+        streams,
+        result.sink_profile,
+        prefix="TESPy Condenser",
+        heat_flow=result.q_sink,
+        is_hot=True,
+        args=args,
+    )
+    return streams
+
+
+def _add_profile_streams(
+    streams: StreamCollection,
+    profile: tuple[HprThermalProfilePoint, ...],
+    *,
+    prefix: str,
+    heat_flow: float,
+    is_hot: bool,
+    args: HeatPumpTargetInputs,
+) -> None:
+    enthalpy_span = float(profile[-1].enthalpy - profile[0].enthalpy)
+    for index, (start, end) in enumerate(zip(profile, profile[1:], strict=False), 1):
+        segment_duty = heat_flow * (end.enthalpy - start.enthalpy) / enthalpy_span
+        if segment_duty <= tol:
+            continue
+        low_temperature = min(start.temperature, end.temperature)
+        high_temperature = max(start.temperature, end.temperature)
+        if high_temperature - low_temperature <= tol:
+            high_temperature = low_temperature + float(args.dt_phase_change)
+        streams.add(
+            Stream(
+                name=f"{prefix} {index}",
+                supply_temperature=(high_temperature if is_hot else low_temperature),
+                target_temperature=(low_temperature if is_hot else high_temperature),
+                heat_flow=segment_duty,
+                delta_t_contribution=float(args.dtcont_hp),
+                is_process_stream=False,
+            )
+        )
+
+
+def _tespy_candidate_id(x: np.ndarray) -> str:
+    return "candidate:" + ",".join(float(value).hex() for value in np.asarray(x))
+
+
+def _tespy_candidate_failure(
+    state: HPRParsedState,
+    reason: str,
+) -> HPRBackendResult:
+    return HPRBackendResult.failure(
+        reason=reason,
+        Q_amb_hot=state.Q_amb_hot,
+        Q_amb_cold=state.Q_amb_cold,
+    ).with_updates(simulation_backend="tespy")

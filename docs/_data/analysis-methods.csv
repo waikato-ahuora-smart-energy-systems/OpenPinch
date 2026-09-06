@@ -1,0 +1,29 @@
+Method,Scopes,Periods,Prerequisites,Adapter,Availability
+target.direct_heat_integration,Site; Process Zone; Unit Operation,independent,none,thermal,available
+target.indirect_heat_integration,Region; Community; Site; Process Zone,independent,direct_heat_integration,thermal,available
+target.total_site_heat_integration,Site,independent,direct_heat_integration,thermal,available
+target.all_heat_integration,Region; Community; Site; Process Zone; Unit Operation,independent,none,thermal,available
+target.heat_exchanger_area_and_cost,Site; Process Zone; Unit Operation,independent,direct_heat_integration,thermal,available
+target.heat_recovery_dt_min,Site; Process Zone; Unit Operation,nonmutating,none,inverse_dt_min,available
+target.carnot_heat_pump,Region; Community; Site; Process Zone; Unit Operation,independent,direct_heat_integration; indirect_heat_integration,thermal,available
+target.carnot_refrigeration,Region; Community; Site; Process Zone; Unit Operation,independent,direct_heat_integration; indirect_heat_integration,thermal,available
+target.vapour_compression_heat_pump,Region; Community; Site; Process Zone; Unit Operation,independent,direct_heat_integration; indirect_heat_integration,thermal,available
+target.vapour_compression_refrigeration,Region; Community; Site; Process Zone; Unit Operation,independent,direct_heat_integration; indirect_heat_integration,thermal,available
+target.mvr_heat_pump,Region; Community; Site; Process Zone; Unit Operation,independent,direct_heat_integration; indirect_heat_integration,thermal,available
+target.brayton_heat_pump,Site; Process Zone; Unit Operation,unsupported,none,thermal,unavailable
+target.brayton_refrigeration,Site; Process Zone; Unit Operation,unsupported,none,thermal,unavailable
+target.cogeneration,Region; Community; Site; Process Zone; Unit Operation,independent,compatible_thermal_target,thermal,available
+target.sun_smith_cogeneration,Region; Community; Site; Process Zone; Unit Operation,independent,compatible_thermal_target,thermal,available
+target.varbanov_cogeneration,Region; Community; Site; Process Zone; Unit Operation,independent,compatible_thermal_target,thermal,available
+target.isentropic_cogeneration,Region; Community; Site; Process Zone; Unit Operation,independent,compatible_thermal_target,thermal,available
+target.exergy,Region; Community; Site; Process Zone; Unit Operation,independent,compatible_thermal_target,thermal,available
+target.energy_transfer,Region; Community; Site; Process Zone; Unit Operation,independent,compatible_thermal_target,thermal,available
+target.utility_placement,Region; Community; Site; Process Zone; Unit Operation,shared,direct_heat_integration,placement,available
+target.hpr_performance_map,Site; Process Zone; Unit Operation,nonmutating,scalar_hpr_target,hpr_map,available
+design.heat_exchanger_network,Site; Process Zone; Unit Operation,specialized,direct_heat_integration,hen,available
+design.enhanced_heat_exchanger_network,Site; Process Zone; Unit Operation,specialized,direct_heat_integration,hen,available
+design.multiperiod_heat_exchanger_network,Site; Process Zone; Unit Operation,shared,direct_heat_integration,hen,available
+design.network_evolution,Site; Process Zone; Unit Operation,specialized,direct_heat_integration,hen,available
+design.open_hens,Site; Process Zone; Unit Operation,specialized,direct_heat_integration,hen,available
+design.pinch_design,Site; Process Zone; Unit Operation,specialized,direct_heat_integration,hen,available
+design.thermal_derivative,Site; Process Zone; Unit Operation,specialized,direct_heat_integration,hen,available

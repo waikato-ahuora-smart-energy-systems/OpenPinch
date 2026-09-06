@@ -654,7 +654,10 @@ def test_direct_design_run_populates_results_cache_and_preserves_targets(
     design = problem.design.heat_exchanger_network()
 
     assert problem.results is not None
-    assert problem._results is problem.results
+    assert problem._results is not problem.results
+    assert problem._results.model_dump(mode="json") == problem.results.model_dump(
+        mode="json"
+    )
     assert problem.results.design == design.result
     assert problem.results.targets == target_output.targets
     assert design.selected_network.exchangers

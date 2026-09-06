@@ -53,6 +53,8 @@ The current optional install split is:
 - ``openpinch[dashboard]`` for Streamlit plus the same plotting/export stack
 - ``openpinch[synthesis]`` for solver-backed heat exchanger network synthesis
 - ``openpinch[brayton_cycle]`` for TESPy-backed Brayton-cycle tooling
+- ``openpinch[tespy]`` for optional TESPy vapour-compression targeting and
+  target-owned HPR performance-map generation
 - ``openpinch[full]`` for every optional surface, including the IDAES/Pyomo
   synthesis stack; run ``idaes get-extensions`` after installation
 

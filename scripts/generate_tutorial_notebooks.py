@@ -128,7 +128,8 @@ NOTEBOOKS = {
                 '    period_id="0",\n'
                 ")\n"
                 "ordinary_target_preserved = (\n"
-                "    problem.results is cached_results_before_inverse\n"
+                '    problem.results.model_dump(mode="json")\n'
+                '    == cached_results_before_inverse.model_dump(mode="json")\n'
                 ")\n"
                 'recovery_dt_min_summary = recovery_dt_min.model_dump(mode="json")\n'
                 "thermodynamic_limit_matches_direct = abs(\n"
@@ -179,7 +180,9 @@ NOTEBOOKS = {
                 'problem = PinchProblem(segmented_input, project_name="Site")\n'
                 "validated = problem.validate()\n"
                 "target = problem.target.direct_heat_integration()\n"
+                "# Observations are detached; use problem methods for changes.\n"
                 "site_zone = problem.master_zone\n"
+                "assert site_zone is not problem.master_zone\n"
                 "problem.summary_frame()"
             ),
             code(
@@ -311,6 +314,12 @@ NOTEBOOKS = {
                 "period_outputs = problem.target.all_periods.all_heat_integration()\n"
                 "direct_periods = "
                 "problem.target.all_periods.direct_heat_integration()\n"
+                "# Enrich the retained period states without solving direct targets again.\n"
+                "period_exergy = problem.target.all_periods.exergy(workers=2)\n"
+                "assert all(\n"
+                "    row.provenance.period_ids == (sid,)\n"
+                "    for sid, output in period_exergy.items() for row in output.targets\n"
+                ")\n"
                 "zero_recovery_dt_mins = "
                 "problem.target.all_periods.heat_recovery_dt_min(\n"
                 "    heat_recovery=0.0\n"
@@ -357,7 +366,10 @@ NOTEBOOKS = {
             ),
             code(
                 "base_target = problem.target.direct_heat_integration()\n"
-                "exergy = problem.target.exergy(base_target=base_target)\n"
+                "exergy = problem.target.exergy(\n"
+                '    base_target=base_target, options={"ENV_TEMPERATURE": 25.0}\n'
+                ")\n"
+                'assert exergy.provenance.effective_settings["ENV_TEMPERATURE"] == 25.0\n'
                 "period_area_cost = "
                 "problem.target.all_periods.heat_exchanger_area_and_cost()\n"
                 "period_exergy = problem.target.all_periods.exergy()\n"
@@ -399,30 +411,95 @@ NOTEBOOKS = {
         ],
     ),
     "09_vapour_compression_and_brayton.ipynb": tutorial(
-        "Vapour Compression and Brayton HPR",
+        "Vapour Compression HPR Targets and Performance Maps",
         level="Advanced",
         profile="slow-hpr",
         runtime="5 to 30 minutes",
         extras="hpr",
         cells=[
             code(
-                "from OpenPinch import PinchProblem\n\n"
+                "from OpenPinch import PinchProblem\n"
+                "from OpenPinch.contracts.hpr_performance_map import (\n"
+                "    HprPerformanceMapRequest,\n"
+                ")\n\n"
                 'problem = PinchProblem("heat_pump_targeting.json", '
                 'project_name="HPR Models")\n'
                 "def screen_cycle(method, **arguments):\n"
                 "    try:\n"
                 '        return {"status": "feasible", '
                 '"result": method(**arguments)}\n'
-                "    except (ValueError, NotImplementedError) as error:\n"
+                "    except (ImportError, RuntimeError, ValueError, "
+                "NotImplementedError) as error:\n"
                 '        return {"status": "no feasible solution", '
                 '"reason": str(error)}\n\n'
-                "vapour_compression = screen_cycle(\n"
+                "working_fluid_examples = {\n"
+                '    "pure": "ammonia",\n'
+                '    "registered_blend": "R410A.mix",\n'
+                "}\n"
+                "# Omitting simulation_backend selects the CoolProp default.\n"
+                "coolprop_target = screen_cycle(\n"
                 "    problem.target.vapour_compression_heat_pump,\n"
-                '    refrigerants=["water", "ammonia"],\n'
+                '    refrigerants=[working_fluid_examples["pure"]],\n'
                 "    load_fraction=0.25,\n"
+                "    condensers=1,\n"
+                "    evaporators=1,\n"
                 "    maximum_restarts=1,\n"
                 ")\n"
-                "vapour_compression"
+                "coolprop_target"
+            ),
+            code(
+                'target = coolprop_target.get("result")\n'
+                "target_simulation_record = (\n"
+                "    None if target is None\n"
+                "    else target.hpr_details.target_simulation_record\n"
+                ")\n"
+                "if target_simulation_record is None:\n"
+                "    performance_map = None\n"
+                "    plain_performance_map = {\n"
+                '        "status": "target unavailable; no partial map exported",\n'
+                "    }\n"
+                "else:\n"
+                "    source_temperature = (\n"
+                "        target_simulation_record.nominal_evaporating_temperature\n"
+                "        + target_simulation_record.source_approach_temperature\n"
+                "    )\n"
+                "    sink_temperature = (\n"
+                "        target_simulation_record.nominal_condensing_temperature\n"
+                "        - target_simulation_record.sink_approach_temperature\n"
+                "    )\n"
+                "    map_request = HprPerformanceMapRequest(\n"
+                '        map_id="notebook-09-coolprop-map",\n'
+                "        source_temperatures=[source_temperature],\n"
+                "        sink_temperatures=[sink_temperature],\n"
+                "        load_fractions=[0.50, 0.75, 1.00],\n"
+                "    )\n"
+                "    performance_map = problem.target.hpr_performance_map(\n"
+                "        target=target, request=map_request\n"
+                "    )\n"
+                '    plain_performance_map = performance_map.model_dump(mode="json")\n'
+                "target_record_json = (\n"
+                "    None if target_simulation_record is None\n"
+                '    else target_simulation_record.model_dump(mode="json")\n'
+                ")\n"
+                "plain_performance_map"
+            ),
+            code(
+                "# Explicit N-component mixtures use component[mole_fraction].\n"
+                'explicit_molar_mixture = "HEOS::R32[0.5]&R125[0.5]"\n'
+                "tespy_target = screen_cycle(\n"
+                "    problem.target.vapour_compression_heat_pump,\n"
+                '    simulation_backend="tespy",\n'
+                "    refrigerants=[explicit_molar_mixture],\n"
+                "    initialize_from_carnot=False,\n"
+                "    allow_integrated_expander=False,\n"
+                "    load_fraction=0.25,\n"
+                "    condensers=1,\n"
+                "    evaporators=1,\n"
+                "    maximum_restarts=1,\n"
+                ")\n"
+                "# TESPy is a separate selection: failure never falls back to CoolProp.\n"
+                "tespy_no_fallback = tespy_target\n"
+                "tespy_no_fallback"
             ),
             code(
                 "vc_refrigeration = screen_cycle(\n"
@@ -520,6 +597,11 @@ NOTEBOOKS = {
                 "stage_results = mvr.stage_results_by_period\n"
                 "affected_zones = mvr.affected_zone_paths\n"
                 "compressor_work = mvr.work_for_zone(problem.master_zone)\n"
+                "serial = problem.target.all_periods.direct_heat_integration(workers=1)\n"
+                "parallel = problem.target.all_periods.direct_heat_integration(workers=2)\n"
+                'assert [o.model_dump(mode="json") for o in serial.values()] == [\n'
+                '    o.model_dump(mode="json") for o in parallel.values()\n'
+                "]\n"
                 "try:\n"
                 "    cascade = problem.target.mvr_heat_pump(\n"
                 "        load_fraction=0.25, maximum_restarts=1\n"
@@ -549,10 +631,10 @@ NOTEBOOKS = {
                 "cogeneration_summary = problem.summary_frame()"
             ),
             code(
-                "sun_smith = problem.target.sun_smith_cogeneration(base_target=base)\n"
-                "varbanov = problem.target.varbanov_cogeneration(base_target=base)\n"
+                "sun_smith = problem.target.sun_smith_cogeneration(base_target=default)\n"
+                "varbanov = problem.target.varbanov_cogeneration(base_target=sun_smith)\n"
                 "isentropic = problem.target.isentropic_cogeneration(\n"
-                "    efficiency=0.8, base_target=base\n"
+                "    efficiency=0.8, base_target=varbanov\n"
                 ")"
             ),
         ],
@@ -594,7 +676,9 @@ NOTEBOOKS = {
                 'site = PinchProblem("pulp_mill.json", project_name="Site")\n'
                 "site.target.all_heat_integration()\n"
                 "base = site.target.total_site_heat_integration()\n"
-                "energy_transfer = site.target.energy_transfer(base_target=base)\n"
+                "energy_transfer = site.target.energy_transfer(\n"
+                "    base_target=base, include_subzones=True\n"
+                ")\n"
                 "transfer_summary = site.summary_frame()"
             ),
             code(
@@ -934,11 +1018,13 @@ GUIDANCE = {
         ("Screen a process heat pump", "Screen refrigeration and inspect curves"),
     ),
     "09_vapour_compression_and_brayton.ipynb": (
-        "Which simulated heat-pump family and working fluid best fit the required temperature lift?",
-        "Reject candidates on feasibility before ranking energy performance; Brayton and vapour-compression results are not interchangeable design models.",
-        "Use a short, defensible refrigerant list and record why each cycle family is in scope.",
+        "How does a successful HPR target become a versioned part-load map for downstream utility optimization?",
+        "Treat the winning simulation record as the immutable bridge from targeting to map generation. CoolProp remains the default; selecting TESPy is explicit and never implies fallback. Pure fluids, provider-registered blends, and explicit molar mixtures still depend on installed property support and feasible dew/bubble states.",
+        "Replace the sample with a reviewed HPR target, keep the one-evaporator/one-condenser schema 1.0 boundary, choose representative temperature and load grids, and pass only the plain versioned export to OpenUtility or another optimizer.",
         (
-            "Evaluate vapour-compression candidates",
+            "Build a default CoolProp target",
+            "Generate and export a target-owned part-load map",
+            "Screen explicit TESPy and molar-mixture intent",
             "Compare refrigeration and Brayton variants",
         ),
     ),
@@ -1086,14 +1172,31 @@ PRESENTATIONS: dict[str, tuple[str, str]] = {
         "display(gcc_plot)",
     ),
     "09_vapour_compression_and_brayton.ipynb": (
-        "Compare feasibility and returned cycle results on the same process basis before selecting a thermodynamic model.",
+        "Inspect the detached winning record and the complete plain-data map before comparing optional TESPy, refrigeration, or Brayton screens. A failed optional screen is evidence, not permission to relabel a CoolProp result as TESPy.",
         "from IPython.display import display\n\n"
+        "map_preview = (\n"
+        "    plain_performance_map\n"
+        "    if performance_map is None\n"
+        "    else {\n"
+        '        "schema_version": plain_performance_map["schema_version"],\n'
+        '        "thermodynamic_backend": plain_performance_map[\n'
+        '            "thermodynamic_backend"\n'
+        "        ],\n"
+        '        "reference_capacity_basis": plain_performance_map[\n'
+        '            "reference_capacity_basis"\n'
+        "        ],\n"
+        '        "points": plain_performance_map["points"],\n'
+        "    }\n"
+        ")\n"
         "cycle_comparison = {\n"
-        '    "vapour compression heat pump": vapour_compression,\n'
+        '    "default CoolProp heat pump": coolprop_target,\n'
+        '    "explicit TESPy mixture heat pump": tespy_target,\n'
         '    "vapour compression refrigeration": vc_refrigeration,\n'
         '    "Brayton heat pump": brayton,\n'
         '    "Brayton refrigeration": brayton_refrigeration,\n'
         "}\n"
+        "display(target_record_json)\n"
+        "display(map_preview)\n"
         "display(cycle_comparison)",
     ),
     "10_multiperiod_heat_pumps.ipynb": (

@@ -95,6 +95,7 @@ def build_multiperiod_hpr_cases(
                 config=zone.config,
                 period_idx=period_idx,
                 debug=False,
+                simulation_backend=(args or {}).get("simulation_backend", "coolprop"),
             ),
         )
         period_cases.append(

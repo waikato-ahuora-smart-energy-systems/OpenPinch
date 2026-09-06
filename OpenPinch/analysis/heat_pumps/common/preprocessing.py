@@ -12,6 +12,7 @@ from ....domain.enums import ProblemTableLabel
 from ....domain.problem_table import ProblemTable
 from ....domain.stream import Stream
 from ....domain.stream_collection import StreamCollection
+from ..performance_maps.targeting import normalize_hpr_simulation_backend
 
 __all__ = ["construct_HPRTargetInputs"]
 
@@ -31,6 +32,7 @@ def construct_HPRTargetInputs(
     config: Configuration,
     period_idx: int = 0,
     debug: bool = False,
+    simulation_backend: str = "coolprop",
 ) -> HeatPumpTargetInputs:
     """Prepare normalised background cascades and solver arguments for HPR targeting."""
     T_vals, H_hot, H_cold = T_vals.copy(), H_hot.copy(), H_cold.copy()
@@ -76,6 +78,7 @@ def construct_HPRTargetInputs(
         is_heat_pumping=bool(is_heat_pumping),
         debug=debug,
         period_idx=period_idx,
+        simulation_backend=normalize_hpr_simulation_backend(simulation_backend),
         # Direct config pass-through.
         hpr_type=hpr.type,
         hpr_comp_fixed_cost=costing.hpr_comp_fixed_cost,

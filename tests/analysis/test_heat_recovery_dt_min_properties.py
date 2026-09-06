@@ -226,7 +226,10 @@ def test_threshold_limit_returns_maximal_order_invariant_json_safe_dt_min(
         abs=1e-6,
     )
     assert repeated == result
-    assert reversed_result == result
+    assert reversed_result.model_dump(exclude={"provenance"}) == result.model_dump(
+        exclude={"provenance"}
+    )
+    assert reversed_result.provenance.owner_id != result.provenance.owner_id
     assert equivalent_unit_result.status == result.status
     assert equivalent_unit_result.dt_min.value == pytest.approx(
         result.dt_min.value,

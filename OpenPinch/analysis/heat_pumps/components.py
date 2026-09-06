@@ -32,10 +32,7 @@ class ProcessComponent:
         return self
 
     def _invalidate_problem_targets(self) -> None:
-        root = self.problem.master_zone
-        if root is not None:
-            _clear_zone_targets(root)
-        self.problem._results = None
+        self.problem._invalidate_analysis()
 
 
 def _clear_zone_targets(zone: "Zone") -> None:

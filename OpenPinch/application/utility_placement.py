@@ -1617,7 +1617,20 @@ def run_problem_utility_placement(
     from .problem import PinchProblem
 
     optimized_case = PinchProblem(optimized_input, project_name=problem.project_name)
-    optimized_case._utility_placement_result = result
+    from ._problem.targeting.provenance import make_provenance
+
+    selected = problem._resolve_target_zone(zone)
+    optimized_case._utility_placement_result = result.model_copy(
+        update={
+            "provenance": make_provenance(
+                problem,
+                "target.utility_placement",
+                selected,
+                period_ids=result.period_ids,
+                settings=result.request.model_dump(mode="json"),
+            )
+        }
+    )
     return optimized_case
 
 

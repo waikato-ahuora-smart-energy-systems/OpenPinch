@@ -135,3 +135,143 @@ UPO-11, and UPO-12.
   so those obligations can be assigned without architectural rework.
 - **Security Baseline**: skipped because it is disabled for this feature.
 - **Resiliency Baseline**: skipped because it is disabled for this feature.
+
+## TESPy HPR Performance-Map Design
+
+### Design outcome
+
+OpenPinch owns HPR targeting, thermodynamic point simulation, and production of
+a strict fixed-capacity performance map. OpenUtility owns candidate definitions,
+thermal-node assignment, period data, investment and operating costs, selection,
+dispatch, piecewise-linear Pyomo constraints, and HiGHS execution. Neither package
+imports the other. The stable integration surface is versioned JSON-compatible
+data plus shared golden fixtures.
+
+The existing `vapour_compression_heat_pump(...)` and
+`vapour_compression_refrigeration(...)` methods remain the entry points. Each gains
+`simulation_backend="coolprop"`; `tespy` is explicit. Ordinary calls keep current
+return types. A separate
+`problem.target.hpr_performance_map(target=..., request=...)` follow-up performs
+the potentially expensive grid simulation.
+
+### Supported first-release topology
+
+OpenUtility's alpha contract models one source node and one sink or rejection
+node. OpenPinch schema `1.0` therefore exports only a single-source/single-sink,
+fixed-capacity vapour-compression unit. Current cascade or parallel targeting
+configurations with multiple externally active evaporators, condensers, or
+coupled stages cannot be flattened into this contract and are rejected clearly.
+
+The first TESPy adapter implements one explicitly documented single-stage
+vapour-compression heat-pump/refrigeration network. Analytic Carnot, Brayton, MVR,
+multi-port cascade, and multi-port parallel maps require later schemas or adapter
+designs. This restriction preserves the requested current-method tie-in without
+claiming that every existing HPR configuration fits OpenUtility's single-unit
+boundary.
+
+### Public and transport contracts
+
+`OpenPinch.contracts.hpr_performance_map` contains the isolated request, units,
+point, map, and JSON-value types. It fixes these schema `1.0` semantics:
+
+- `schema_version` is exactly `1.0`; unknown versions fail closed.
+- `mode` is `heat_pump` or `refrigeration`.
+- `source_temperature` and `sink_temperature` are external service coordinates
+  in `degC`.
+- `q_source`, `q_sink`, and total external `electric_power` are nonnegative `kW`
+  magnitudes.
+- Heat-pump capacity and load fraction use `q_sink`; refrigeration uses
+  `q_source`. `reference_capacity_basis` makes this explicit.
+- Heating COP is `q_sink / electric_power`; cooling COP is
+  `q_source / electric_power`.
+- `q_sink = q_source + electric_power` holds within the map's power-balance
+  tolerance. Schema `1.0` does not hide thermal losses.
+- Each fixed-temperature curve has unique, ascending load fractions and permits
+  interpolation only between adjacent breakpoints.
+- Structured provenance records OpenPinch and engine versions, cycle identity,
+  refrigerant, approach temperatures, auxiliary-power boundary, characteristics,
+  convergence policy, and design/offdesign assumptions.
+
+The external field remains `thermodynamic_backend` to match OpenUtility's
+implemented decoder; `simulation_backend` is the OpenPinch method argument and
+target-result terminology. Both carry the same normalized value.
+
+`energy_balance_tolerance` applies to the thermal-power, useful-capacity, and
+COP consistency checks in `kW`. `temperature_match_tolerance` is a distinct
+schema field used by OpenUtility only when matching canonical `degC` source and
+sink coordinates; OpenPinch does not reuse it for thermodynamic validation.
+
+### Component and service model
+
+1. The target accessor validates the backend selector and records it as runtime
+   replay intent.
+2. Existing HPR service orchestration selects an internal point simulator while
+   preserving the default CoolProp handler path.
+3. The returned target stores only a normalized backend string; no engine object
+   enters domain or transport state.
+4. The map bridge validates a successful supported target and builds an immutable
+   generation context from its configuration and explicit request.
+5. The grid service traverses coordinates deterministically and operates through
+   one simulator-session protocol.
+6. CoolProp adapts current cycle calculations. TESPy owns lazy network setup,
+   design/offdesign solves, result extraction, and cleanup in its leaf module.
+7. The grid service rejects incomplete maps, normalizes units and signs, validates
+   all invariants, and returns a detached map contract.
+8. JSON Schema and heat-pump/refrigeration fixtures provide the consumer boundary.
+
+### OpenUtility preconditions
+
+OpenPinch must not declare schema `1.0` stable until the OpenUtility consumer:
+
+- enforces adjacent-segment interpolation for `ordered_part_load_curve`;
+- requires candidate capacity to equal map reference capacity or applies one
+  documented constant scale to all duties and power;
+- rejects unknown schema versions and incompatible units/COP conventions;
+- validates coordinates, curve structure, load fraction, useful capacity, COP,
+  and energy balance;
+- uses `q_source` as useful refrigeration duty; and
+- separates power-balance tolerance from temperature matching.
+
+The separate HPR electricity overlay may remain an explicitly documented alpha
+limitation, but it is not evidence of competition with existing onsite generation
+until OpenUtility creates one period-indexed electricity balance.
+
+### Alternatives considered
+
+| Alternative | Decision | Reason |
+|---|---|---|
+| Make TESPy a required dependency | Rejected | Environment-sensitive simulation must not affect normal imports or CoolProp targeting. |
+| Put map generation in OpenUtility | Rejected | OpenUtility owns optimization, not thermodynamic cycle simulation. |
+| Return a map from every target call | Rejected | Grid simulation is expensive and would change established return semantics. |
+| Add map methods to domain target objects | Rejected | Domain results would need application/analysis behavior and optional-engine knowledge. |
+| Relabel the existing TESPy Brayton cycle as a backend | Rejected | Cycle topology and simulation backend are separate dimensions. |
+| Export current `HeatPumpTargetOutputs` | Rejected | It contains runtime/domain artifacts and lacks interchange topology semantics. |
+| Export multi-stage targets as one node pair | Rejected | It loses coupled ports and permits physically invalid downstream dispatch. |
+| Create a shared Python contract package | Deferred | A JSON Schema and fixtures achieve language-neutral decoupling with less release coordination. |
+
+### Requirements traceability
+
+| Design area | Requirements and acceptance criteria |
+|---|---|
+| Isolated strict transport contract | FR-1 through FR-4; acceptance 1, 4, 6, 10 through 13 |
+| Current-method selector and compatibility | FR-5; acceptance 7 and 8 |
+| Point simulators and deterministic grid | FR-6, FR-7; acceptance 3 and 5 |
+| Explicit target-accessor bridge | FR-8 |
+| OpenUtility-independent data boundary | FR-9; acceptance 6, 9, and 13 |
+| Optional TESPy leaf | FR-10; acceptance 2 and 5 |
+
+All FR-1 through FR-10 and acceptance criteria 1 through 13 have an owning
+component, interface, orchestration path, and verification boundary. Detailed
+TESPy component parameters, numeric tolerances, and characteristic datasets
+remain for a future Functional Design after implementation authorization.
+
+### Extension compliance at Application Design
+
+- **PBT-01 through PBT-10**: N/A for blocking enforcement at Application Design.
+  The extension matrix begins formal enforcement at Functional Design. This
+  design nevertheless isolates serialization round trips, deterministic ordering,
+  physical invariants, fake-adapter oracles, and default-CoolProp parity so those
+  properties can be assigned without architectural changes.
+- **Security Baseline**: skipped because it is disabled for this feature.
+- **Resiliency Baseline**: skipped because it is disabled for this feature.
+- **Finding status**: No applicable enabled-extension blocking findings.

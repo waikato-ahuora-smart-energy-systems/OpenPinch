@@ -24,6 +24,7 @@ EXPECTED_TARGET_METHODS = {
     "exergy",
     "heat_exchanger_area_and_cost",
     "heat_recovery_dt_min",
+    "hpr_performance_map",
     "indirect_heat_integration",
     "isentropic_cogeneration",
     "mvr_heat_pump",
@@ -82,6 +83,9 @@ def test_root_exports_are_exact_and_intentional():
     assert set(OpenPinch.__all__) == EXPECTED_ROOT_EXPORTS
     assert OpenPinch.PinchProblem.__name__ == "PinchProblem"
     assert OpenPinch.PinchWorkspace.__name__ == "PinchWorkspace"
+    assert not hasattr(OpenPinch, "HprTargetSimulationRecord")
+    assert not hasattr(OpenPinch, "HprPerformanceMapRequest")
+    assert not hasattr(OpenPinch, "HprPerformanceMap")
 
 
 def test_target_contract_manifest_is_closed_and_descriptive():
@@ -191,6 +195,7 @@ def test_hpr_signatures_use_named_engineering_arguments():
 
     assert {"is_utility_heat_pump", "is_cascade_cycle", "load_fraction"} <= set(carnot)
     assert {"refrigerants", "initialize_from_carnot"} <= set(vapour_compression)
+    assert vapour_compression["simulation_backend"].default == "coolprop"
     assert {"mvr_fluids", "mvr_stages", "motor_efficiency"} <= set(mvr)
     assert "placement" not in carnot
     assert "cycle" not in carnot

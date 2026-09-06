@@ -374,7 +374,7 @@ def test_compute_indirect_hpr_uses_idx_not_period_id_for_utility_profile(monkeyp
     monkeypatch.setattr(
         hp,
         "_get_hpr_target_summary",
-        lambda res, target_zone: {
+        lambda res, target_zone, **_kwargs: {
             "hpr_cycle": "stub",
             "hpr_utility_total": 11.0,
             "hpr_work": 2.0,
@@ -463,7 +463,7 @@ def test_indirect_hpr_load_uses_finite_utility_profile_when_base_target_has_nans
     monkeypatch.setattr(
         hp,
         "_get_hpr_target_summary",
-        lambda res, target_zone: {
+        lambda res, target_zone, **_kwargs: {
             "hpr_cycle": "stub",
             "hpr_utility_total": 11.0,
             "hpr_work": 2.0,

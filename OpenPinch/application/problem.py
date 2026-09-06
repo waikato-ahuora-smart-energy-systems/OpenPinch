@@ -112,6 +112,10 @@ class PinchProblem:
         self._last_target_run_spec = None
         self._suspend_target_run_recording = False
         self._period_results = {}
+        self._period_states = {}
+        from uuid import uuid4
+
+        self._analysis_owner_id = uuid4().hex
         self._utility_placement_result = None
 
         if source is not None:
@@ -281,7 +285,7 @@ class PinchProblem:
     def period_ids(self) -> dict[str, int]:
         """Return the canonical ``period_id -> idx`` lookup for the loaded problem."""
         master_zone = self._require_prepared_root_zone()
-        return master_zone.period_ids
+        return dict(master_zone.period_ids)
 
     @property
     def config(self):
@@ -301,7 +305,7 @@ class PinchProblem:
     @property
     def utility_placement_result(self):
         """Return the last detached placement result without running analysis."""
-        return self._utility_placement_result
+        return deepcopy(self._utility_placement_result)
 
     def _record_target_run(
         self,
@@ -530,37 +534,37 @@ class PinchProblem:
     @property
     def results(self) -> Optional[TargetOutput]:
         """Return the cached targeting results, if targeting has been executed."""
-        return self._results
+        return deepcopy(self._results)
 
     @property
     def master_zone(self) -> Optional["Zone"]:
         """Return the prepared root zone after a successful ``load()`` pass."""
-        return self._master_zone
+        return deepcopy(self._master_zone)
 
     @property
     def process_components(self) -> dict[str, Any]:
         """Memory-only process components applied to the prepared model."""
-        return self._process_components
+        return MappingProxyType(dict(self._process_components))
 
     @property
     def hot_streams(self) -> StreamCollection:
         """Hot process streams on the root analysis zone."""
-        return self._require_prepared_root_zone().hot_streams
+        return deepcopy(self._require_prepared_root_zone().hot_streams)
 
     @property
     def cold_streams(self) -> StreamCollection:
         """Cold process streams on the root analysis zone."""
-        return self._require_prepared_root_zone().cold_streams
+        return deepcopy(self._require_prepared_root_zone().cold_streams)
 
     @property
     def hot_utilities(self) -> StreamCollection:
         """Hot utility streams on the root analysis zone."""
-        return self._require_prepared_root_zone().hot_utilities
+        return deepcopy(self._require_prepared_root_zone().hot_utilities)
 
     @property
     def cold_utilities(self) -> StreamCollection:
         """Cold utility streams on the root analysis zone."""
-        return self._require_prepared_root_zone().cold_utilities
+        return deepcopy(self._require_prepared_root_zone().cold_utilities)
 
     @property
     def project_name(self) -> str:
@@ -570,9 +574,12 @@ class PinchProblem:
     @project_name.setter
     def project_name(self, value: str):
         """Update the root project label and mirror it onto the loaded root zone."""
+        changed = self._project_name != value
         self._project_name = value
         if isinstance(self._master_zone, Zone):
             self._master_zone.name = value
+            if changed:
+                self._invalidate_analysis()
 
     def to_problem_json(self) -> JsonDict:
         """Return canonical JSON-compatible problem inputs."""
@@ -683,6 +690,11 @@ class PinchProblem:
                 raise RuntimeError("No input loaded. Call load(...) first.")
             return self._rebuild_problem_state()
         return self._master_zone
+
+    def _invalidate_analysis(self) -> None:
+        from ._problem.targeting.state import invalidate_analysis
+
+        invalidate_analysis(self)
 
     def _apply_loaded_source(self, loaded_source: _LoadedProblemSource) -> None:
         """Apply one normalized source bundle to this problem instance."""

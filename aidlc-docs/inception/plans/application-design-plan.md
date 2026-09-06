@@ -89,3 +89,33 @@ The existing notebook generator, tutorial manifest, execution profiles, and
 package-data gates own the single example artifact; no CLI owner is involved.
 Consequently, no unresolved design question would change a component boundary
 or interface and there are no blank `[Answer]:` tags.
+
+## TESPy HPR Performance-Map Application Design
+
+- [x] Reconcile the approved performance-map requirements, the revised
+  OpenUtility boundary, its implemented alpha consumer, and the current OpenPinch
+  HPR targeting architecture.
+- [x] Define the engine-neutral map contract, backend-selection value objects,
+  simulation request/result boundaries, and golden-fixture ownership in
+  `components.md`.
+- [x] Define additive public accessor signatures and internal protocol/service
+  signatures in `component-methods.md` without changing current return types.
+- [x] Define CoolProp-default targeting, explicit TESPy dispatch, follow-up map
+  generation, failure handling, and export orchestration in `services.md`.
+- [x] Define dependency direction, optional-import isolation, cross-package data
+  flow, a validated Mermaid diagram, and a text alternative in
+  `component-dependency.md`.
+- [x] Consolidate decisions, alternatives, requirements traceability, consumer
+  preconditions, and extension compliance in `application-design.md`.
+- [x] Validate design completeness and consistency against FR-1 through FR-10,
+  acceptance criteria 1 through 13, and the enabled Property-Based Testing
+  extension.
+- [x] Obtain explicit user approval before any implementation decomposition or
+  construction work.
+
+The approved requirements resolve the material application choices: the current
+vapour-compression targeting methods remain the entry point, CoolProp is the
+default, TESPy is explicit, map generation is a follow-up target-accessor
+operation, and OpenUtility consumes only versioned JSON-compatible data. The
+design will select precise names and owner packages consistent with those
+decisions. No unresolved question requires a blank `[Answer]:` tag.

@@ -4,6 +4,58 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Analysis reliability and extensibility
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Made golden HPR contract fixture provenance independent of the installed
+  release, preventing automatic version bumps from making fixtures stale.
+  Calculated performance maps continue to record their runtime versions.
+- Scoped published rows and graphs to the requested zone and traversal,
+  including successive all-period batches for different sibling zones.
+- Included the effective HPR simulation backend in target provenance so
+  backend changes invalidate superseded ``base_target`` references.
+- Detached nested HPR performance-map provenance observations to preserve
+  validated maps and exports without changing the schema 1.0 JSON boundary.
+- Unified serial and parallel runtime snapshots, preserving process-MVR stream
+  references and compressor work. Target execution and complete period batches
+  commit only after success, with prepared period state retained for enrichment.
+- Fixed period-row relabeling, invocation-specific exergy settings, foreign-zone
+  ownership, and selected-zone traversal. Replacing prerequisites invalidates
+  dependent targets; component and input changes clear dependent caches.
+- Added immutable provenance and method metadata, family-owned reporting adapters,
+  and complete aggregation policies. Weighted rows exclude period-specific HPR
+  simulation records. Brayton fails before state preparation.
+- Observation properties now return detached snapshots or read-only mappings.
+  Stale and foreign ``base_target`` references are rejected. See
+  :doc:`overview/analysis-migration` for the intentional API changes and
+  :doc:`developer/adding-analysis-methods` for the extension contract.
+
+
+Target-owned HPR performance maps
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Added ``simulation_backend="coolprop"`` to the existing
+  vapour-compression heat-pump and refrigeration target methods. Omission keeps
+  the unchanged CoolProp path; selecting ``"tespy"`` uses optional TESPy design
+  solves to rank supported scalar single-stage target candidates, with no
+  CoolProp fallback.
+- Successful compatible targets retain a frozen, versioned-data-friendly
+  ``HprTargetSimulationRecord``. The explicit
+  ``problem.target.hpr_performance_map(target=..., request=...)`` operation uses
+  that target-owned backend and nominal basis to generate one atomic physical
+  map. TESPy map points use a winning-design/offdesign lifecycle.
+- Pure fluids, registered blends, and explicit N-component molar mixtures are
+  capability-checked at dew-point evaporation and bubble-point condensation
+  states. ``REFPROP`` and unsupported topology or state combinations fail
+  before optimization.
+- The map remains a plain schema ``1.0`` boundary for OpenUtility and other
+  MILP consumers. OpenPinch imports neither OpenUtility, Pyomo, nor HiGHS;
+  downstream consumers own capacity scaling, adjacent-segment interpolation,
+  commitment, electricity coupling, and multiperiod dispatch.
+- Selected scalar periods and sequential independent all-period replay are
+  supported. Shared-vector multiperiod TESPy targeting, multi-port flattening,
+  automatic grids, partial maps, and a thread-safety promise are not included.
+
 Heat-recovery ``dt_min`` service
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

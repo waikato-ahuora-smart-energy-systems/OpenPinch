@@ -400,9 +400,23 @@ class Zone:
         else:
             loc[base_name] = zone_to_add
 
-    def add_target(self, target_to_add: BaseTargetModel):
+    def add_target(self, target_to_add: BaseTargetModel, *, invalidate_dependents=True):
         """Add one target to a specific zone."""
         if isinstance(target_to_add, BaseTargetModel):
+            if invalidate_dependents:
+                stale = {target_to_add.type}
+                while True:
+                    dependents = {
+                        key
+                        for key, target in self._targets.items()
+                        if key not in stale
+                        and stale.intersection(target.prerequisite_types())
+                    }
+                    if not dependents:
+                        break
+                    stale.update(dependents)
+                for key in stale - {target_to_add.type}:
+                    self._targets.pop(key, None)
             self._targets[target_to_add.type] = target_to_add
 
     def add_targets(self, targets: list | None = None):

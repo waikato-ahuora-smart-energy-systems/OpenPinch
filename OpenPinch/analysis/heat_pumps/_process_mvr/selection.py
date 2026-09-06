@@ -46,6 +46,22 @@ def match_source_streams(root: Zone, selectors: list) -> list[Stream]:
 
 def match_one_selector(root: Zone, selector) -> list[Stream]:
     """Resolve one stream object, key, or display-name selector."""
+    if isinstance(selector, Stream):
+        streams = {
+            id(stream): stream
+            for zone in walk_zones(root)
+            for stream in [*zone.hot_streams, *zone.cold_streams]
+        }
+        if id(selector) not in streams:
+            # Observed streams are detached; resolve a unique name locally.
+            named = [
+                stream for stream in streams.values() if stream.name == selector.name
+            ]
+            if len(named) > 1:
+                raise ValueError(
+                    "Ambiguous MVR stream selector; supply a qualified stream key."
+                )
+            selector = selector.name
     matches: list[Stream] = []
     for zone in walk_zones(root):
         for key, stream in zone.hot_streams.items():

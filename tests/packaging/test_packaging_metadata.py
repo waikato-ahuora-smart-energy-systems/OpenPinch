@@ -23,6 +23,7 @@ WORKFLOWS = [
 ]
 UPLOAD_ARTIFACT_SHA = "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
 DOWNLOAD_ARTIFACT_SHA = "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"
+TESPY_REQUIREMENT = "tespy>=0.10.1.post2"
 
 
 def _read_pyproject() -> dict:
@@ -90,7 +91,7 @@ def test_notebook_extra_declares_jupyter_runtime_dependencies():
     ]
 
 
-def test_dashboard_and_brayton_cycle_extras_are_declared():
+def test_dashboard_brayton_and_tespy_extras_are_declared():
     optional_deps = _optional_deps()
     assert optional_deps["dashboard"] == [
         "streamlit",
@@ -98,9 +99,25 @@ def test_dashboard_and_brayton_cycle_extras_are_declared():
         "openpyxl",
         "pyxlsb",
     ]
-    assert optional_deps["brayton_cycle"] == [
-        "tespy",
+    assert optional_deps["brayton_cycle"] == [TESPY_REQUIREMENT]
+    assert optional_deps["tespy"] == [TESPY_REQUIREMENT]
+
+
+def test_hpr_runtime_requires_coolprop_8_and_dev_retains_tespy_floor():
+    project = _read_pyproject()["project"]
+    coolprop_entries = [
+        dependency
+        for dependency in project["dependencies"]
+        if _dependency_name(dependency) == "coolprop"
     ]
+    tespy_dev_entries = [
+        dependency
+        for dependency in _dependency_groups()["dev"]
+        if _dependency_name(dependency) == "tespy"
+    ]
+
+    assert coolprop_entries == ["CoolProp>=8"]
+    assert tespy_dev_entries == [TESPY_REQUIREMENT]
 
 
 def test_synthesis_extra_declares_optional_solver_stack_only():
@@ -162,6 +179,31 @@ def test_dev_dependency_group_has_one_ruff_entry():
     assert ruff_entries == ["ruff>=0.15.8"]
 
 
+def test_jsonschema_is_a_development_only_contract_verifier():
+    project = _read_pyproject()["project"]
+    runtime_entries = [
+        *project["dependencies"],
+        *(
+            dependency
+            for dependencies in project["optional-dependencies"].values()
+            for dependency in dependencies
+        ),
+    ]
+    jsonschema_runtime_entries = [
+        dependency
+        for dependency in runtime_entries
+        if _dependency_name(dependency) == "jsonschema"
+    ]
+    jsonschema_dev_entries = [
+        dependency
+        for dependency in _dependency_groups()["dev"]
+        if _dependency_name(dependency) == "jsonschema"
+    ]
+
+    assert jsonschema_runtime_entries == []
+    assert jsonschema_dev_entries == ["jsonschema>=4.25.1"]
+
+
 def test_requires_python_matches_python_version_files_and_ci():
     minimum_version = _minimum_python_version()
 
@@ -192,7 +234,7 @@ def test_requires_python_classifier_matches_minimum_version():
     assert "Programming Language :: Python :: 3.14" in project["classifiers"]
 
 
-def test_pytest_marker_policy_declares_synthesis_and_solver_tiers():
+def test_pytest_marker_policy_declares_optional_and_solver_tiers():
     pytest_ini = PYTEST_INI.read_text(encoding="utf-8")
 
     assert (
@@ -203,6 +245,38 @@ def test_pytest_marker_policy_declares_synthesis_and_solver_tiers():
         "solver: tests that require external solver binaries such as Couenne or IPOPT"
         in pytest_ini
     )
+    assert (
+        "tespy: tests that require the optional TESPy HPR simulation extra"
+        in pytest_ini
+    )
+
+
+def test_workflows_declare_blocking_tespy_hpr_profile_and_install_surface():
+    expected_surfaces = (
+        "surface: [core, dashboard, notebook, brayton_cycle, tespy, synthesis]"
+    )
+    expected_test = 'pytest --hypothesis-seed=20260715 -m "tespy"'
+
+    for workflow_path in WORKFLOWS:
+        workflow = workflow_path.read_text(encoding="utf-8")
+        assert expected_surfaces in workflow
+        assert "hpr-tespy-tests:" in workflow
+        assert "uv sync --frozen --group dev --extra tespy" in workflow
+        assert expected_test in workflow
+        assert "timeout 300s uv run --no-sync pytest" in workflow
+        assert (
+            "test_real_public_tespy_target_and_minimal_map_stay_within_smoke_budget"
+            in workflow
+        )
+
+    optional_smoke = (REPO_ROOT / "scripts" / "optional_install_smoke.py").read_text(
+        encoding="utf-8"
+    )
+    assert '"tespy"' in optional_smoke
+    assert "_check_tespy_surface" in optional_smoke
+    assert "HprTargetSimulationRecord" in optional_smoke
+    assert "HprTargetEvaluatorCoordinator" in optional_smoke
+    assert "build_hpr_target_map_basis" in optional_smoke
 
 
 def test_lockfile_project_version_matches_pyproject():
@@ -365,7 +439,10 @@ def test_release_artifacts_are_anchored_to_a_verified_immutable_source_run():
     assert "id: release_artifact" in build_block
     assert "contents: write" not in build_block
 
-    assert "needs: [release-check, artifact-install-smoke, build]" in release_block
+    assert (
+        "needs: [release-check, artifact-install-smoke, "
+        "artifact-install-tespy-smoke, build]" in release_block
+    )
     assert "SOURCE_ARTIFACT_ID: ${{ needs.build.outputs.artifact_id }}" in release_block
     assert "artifact-ids: ${{ needs.build.outputs.artifact_id }}" in release_block
 
@@ -437,7 +514,10 @@ def test_publish_workflow_hands_off_from_public_release_to_tag_ref_pypi():
     assert "needs: [validate-published-release, preflight-pypi]" in workflow
     assert "finalize-release:" not in workflow
     assert "coverage report --fail-under=95" in workflow
-    assert "surface: [core, dashboard, notebook, brayton_cycle, synthesis]" in workflow
+    assert (
+        "surface: [core, dashboard, notebook, brayton_cycle, tespy, synthesis]"
+        in workflow
+    )
     assert "os: [ubuntu-latest, windows-latest, macos-latest]" in workflow
 
 
@@ -490,7 +570,10 @@ def test_pr_workflow_bumps_same_repository_main_pr_before_release_validation():
     assert "persist-credentials: false" in release_block
     assert "python scripts/check_release_version.py --base-pyproject" in release_block
     assert "coverage report --fail-under=95" in workflow
-    assert "surface: [core, dashboard, notebook, brayton_cycle, synthesis]" in workflow
+    assert (
+        "surface: [core, dashboard, notebook, brayton_cycle, tespy, synthesis]"
+        in workflow
+    )
     assert "solver-tests:" in workflow
     assert 'pytest --hypothesis-seed=20260715 -m "solver"' in workflow
     assert "pr-gate:" in workflow
@@ -624,16 +707,40 @@ def test_installed_wheel_smoke_uses_only_the_root_workflow_contract():
     assert "Installed wheel failed the PinchProblem workflow" in smoke
     assert "Unexpected root exports" in smoke
     assert "Installed wheel contains retired packages" in smoke
+    assert 'choices=("core", "tespy")' in smoke
+    assert "load_tespy_compressor_characteristic" in smoke
+    assert 'get_hpr_point_simulator("tespy")' in smoke
+    assert "HprTargetSimulationRecord" in smoke
+    assert "_exercise_tespy_public_target_and_map" in smoke
+    assert "hpr_performance_map" in smoke
 
 
-def test_core_dependencies_have_incompatible_major_release_ceilings():
+def test_tespy_profiles_are_required_by_release_and_pull_request_gates():
+    pull_request = WORKFLOWS[1].read_text(encoding="utf-8")
+    pr_gate = pull_request.split("  pr-gate:", 1)[1]
+    publish = WORKFLOWS[2].read_text(encoding="utf-8")
+    build = publish.split("  build:", 1)[1].split("  artifact-install-smoke:", 1)[0]
+
+    assert "- hpr-tespy-tests" in pr_gate
+    assert "- artifact-install-tespy-smoke" in pr_gate
+    assert "HPR_TESPY_RESULT: ${{ needs.hpr-tespy-tests.result }}" in pr_gate
+    assert (
+        "ARTIFACT_TESPY_RESULT: "
+        "${{ needs.artifact-install-tespy-smoke.result }}" in pr_gate
+    )
+    assert "hpr-tespy-tests" in build.splitlines()[1]
+    assert "artifact-install-tespy-smoke:" in publish
+    assert "python scripts/artifact_install_smoke.py --surface tespy" in publish
+
+
+def test_core_dependencies_have_required_coolprop_floor_and_other_major_ceilings():
     dependencies = _read_pyproject()["project"]["dependencies"]
 
     assert dependencies == [
         "numpy<3",
         "pint<1",
         "pandas<3",
-        "coolprop<8",
+        "CoolProp>=8",
         "pydantic<3",
         "scipy<2",
     ]

@@ -155,4 +155,4 @@ def test_rtd_coverage_summary_matches_manifest_denominator() -> None:
     count = len(_rows())
 
     assert f"**{count} operations**" in summary
-    assert f"**{count}/{count}, or 100 percent mapping" in summary
+    assert f"**{count}/{count}, or 100 percent mapping coverage**" in summary

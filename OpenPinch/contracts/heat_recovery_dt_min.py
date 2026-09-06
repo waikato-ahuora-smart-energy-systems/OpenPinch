@@ -10,6 +10,7 @@ from numbers import Real
 import numpy as np
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
+from ..domain.analysis import AnalysisProvenance
 from ..domain.value import Value
 
 _RECOVERY_ABSOLUTE_TOLERANCE = 1e-6
@@ -67,6 +68,7 @@ class HeatRecoveryQuantity(_FrozenContract):
 class HeatRecoveryDtMinResult(_FrozenContract):
     """Diagnostic result from process-level global dt_min inversion."""
 
+    provenance: AnalysisProvenance | None = None
     scope: str
     period_id: str
     dt_min: HeatRecoveryQuantity

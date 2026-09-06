@@ -301,6 +301,12 @@ def test_compute_cascade_refrigeration_obj_solves_refrigeration_mode(monkeypatch
     np.testing.assert_allclose(captured["x_cool_split"], np.array([1.0]))
     np.testing.assert_allclose(captured["Q_cool_available"], np.array([80.0]))
     assert out.cop_h == pytest.approx(4.0)
+    record = out.target_simulation_record
+    assert record is not None
+    assert record.simulation_backend == "coolprop"
+    assert record.mode == "refrigeration"
+    assert record.nominal_useful_duty == pytest.approx(80.0)
+    assert record.refrigerant_spec == args.refrigerant_ls[0]
 
 
 def test_cascade_x0_branch_for_single_stage():

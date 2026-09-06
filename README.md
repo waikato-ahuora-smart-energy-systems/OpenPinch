@@ -32,6 +32,7 @@ python -m pip install "openpinch[notebook]"      # Jupyter, Plotly graphs, Excel
 python -m pip install "openpinch[dashboard]"     # Streamlit dashboard
 python -m pip install "openpinch[synthesis]"     # HEN synthesis, then run: idaes get-extensions
 python -m pip install "openpinch[brayton_cycle]" # TESPy-backed Brayton-cycle tooling
+python -m pip install "openpinch[tespy]"          # TESPy HPR targeting and performance maps
 python -m pip install "openpinch[full]"          # all optional surfaces, including synthesis
 ```
 

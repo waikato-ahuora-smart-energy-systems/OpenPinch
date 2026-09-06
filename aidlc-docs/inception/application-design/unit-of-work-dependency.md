@@ -152,3 +152,89 @@ drafted after Unit 1, but production code cannot consume a temporary interface.
   Unit 1 reverts last after all consumers are removed.
 - All units ship together; version skew and independent deployment are out of
   scope.
+
+## TESPy HPR Performance-Map Dependencies
+
+### Dependency matrix
+
+Rows consume columns. `Required` means the provider's unit exit evidence must
+pass before the consumer begins production integration.
+
+| Consumer | Unit 1: Contract/fixtures | Unit 2: Simulators/generation | Unit 3: API/publication |
+|---|---|---|---|
+| Unit 1: Contract/fixtures | Self | None | None |
+| Unit 2: Simulators/generation | Required | Self | None |
+| Unit 3: API/publication | Required | Required | Self |
+
+External dependencies retain their existing ownership:
+
+| External owner | Consuming unit | Boundary |
+|---|---|---|
+| Current HPR target/result models | Units 2 and 3 | Read stable scalar/metadata context; do not become transport contracts |
+| CoolProp | Unit 2 | Default installed thermodynamic property/simulation path |
+| TESPy | Unit 2 only | Explicit optional concrete simulator leaf and guarded smoke profile |
+| Pydantic and JSON tooling | Unit 1 | Strict plain-data contract, schema, and serialization |
+| OpenUtility alpha schema semantics | Units 1 and 3 | Fixture/field compatibility only; never a Python import or dependency |
+
+### Critical path
+
+1. **Unit 1 first**: freeze the strict producer contract, schema, fixtures, and
+   validation before an engine can emit values.
+2. **Unit 2 second**: implement both point simulators and the grid driver only
+   against Unit 1 values.
+3. **Unit 3 third**: expose backend selection and explicit map generation only
+   after both producer layers are stable.
+4. **Integrated gate**: verify APIs, optional profiles, docs, packages, and
+   installed distributions after all units pass their focused gates.
+
+Non-blocking test strategies and documentation outlines may be prepared early,
+but no production unit consumes a temporary downstream interface.
+
+### Coordination points
+
+| Boundary | Provider | Consumer | Stabilization evidence |
+|---|---|---|---|
+| Map/request/error models and JSON Schema | Unit 1 | Units 2 and 3 | JSON round-trip, validation, and schema snapshot tests |
+| Golden heat-pump/refrigeration fixtures | Unit 1 | Units 2 and 3; external OpenUtility contract test | Deterministic bytes and independent mapping decode |
+| Context and point-simulator protocol | Unit 2 | Unit 3 | Fake-adapter lifecycle, failure, and deterministic-grid tests |
+| CoolProp/TESPy selection registry | Unit 2 | Unit 3 | Default/explicit selection and missing-extra tests |
+| Existing target compatibility bridge | Unit 2 | Unit 3 | Single-port acceptance and typed unsupported-target tests |
+| Current target method/accessor surface | Existing application owner | Unit 3 | Signature, return-type, numerical-regression, and no-hidden-work tests |
+
+### Rollback boundaries
+
+- Unit 3 can be reverted without changing the internal contracts or simulator
+  service when no public consumer remains.
+- Unit 2 and Unit 3 revert together if simulator semantics prove invalid;
+  Unit 1 fixtures may remain only if no emitted behavior claims conformance.
+- Unit 1 reverts last, after Unit 2 and Unit 3 consumers are removed.
+- TESPy-specific failures disable or revert only the optional leaf/profile; they
+  must not require reverting the CoolProp default or base imports.
+- All units release in one distribution, so independent version skew is not
+  supported.
+
+### Testing checkpoints
+
+1. **Unit 1 checkpoint**: strict example validation; JSON round-trip and
+   physical/schema invariant properties; deterministic schema/fixture bytes;
+   blocked-TESPy imports; package-data inspection.
+2. **Unit 2 checkpoint**: fake-simulator traversal, size, balance, COP,
+   capacity, lifecycle, and failure properties; CoolProp nominal regressions;
+   missing-TESPy guidance; guarded real-TESPy design/offdesign smoke.
+3. **Unit 3 checkpoint**: default and explicit backend dispatch; unchanged
+   target calls when selector omitted; typed unsupported-target rejection;
+   public map generation; architecture and documentation checks.
+4. **Integrated checkpoint**: cross-package fixture decode instructions and
+   evidence; fixed-seed Hypothesis suite; complete regressions; Ruff, typing,
+   warning-strict docs, build, package validation, dependency audit, and
+   installed-wheel smoke.
+
+### Dependency validation
+
+- The graph is acyclic with the sole production order Unit 1, Unit 2, Unit 3.
+- Unit 1 has no simulation-engine dependency; Unit 2 imports Unit 1 but not the
+  application layer; Unit 3 composes both without becoming their dependency.
+- TESPy has one inward edge to its Unit 2 leaf. OpenUtility, Pyomo, and HiGHS
+  have no import or packaging edge into any unit.
+- The external fixture relationship is data-only and does not create runtime
+  package coupling.

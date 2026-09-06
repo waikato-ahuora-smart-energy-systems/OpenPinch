@@ -1,39 +1,52 @@
-# Unit Test Execution
+# Unit Test Execution - RTD and Comprehensive HPR Notebook
 
-## Run Unit Tests
-
-### 1. Execute Utility-Placement Unit Tests
+## Run Focused Tutorial and Documentation Contracts
 
 ```bash
-uv run pytest tests/analysis/utility_placement -q --hypothesis-seed=20260715
+uv run pytest --hypothesis-seed=20260715 -q \
+  tests/packaging/test_notebooks.py \
+  tests/packaging/test_tutorial_coverage.py \
+  tests/packaging/test_docs_consistency.py \
+  tests/packaging/test_resources.py
 ```
 
-This exercises contracts, normalization, bounds, vector encoding and decoding,
-cap-aware allocation, thermodynamics, residual fallback penalties, evaluation,
-optimization, service orchestration, analytical oracles, properties, and
-performance thresholds.
+This gate validates notebook 09 source, compilation, specialist-import policy,
+generator idempotence, 197/197 manifest coverage, RTD consistency, and packaged
+resources.
 
-### 2. Review Test Results
-
-- **Expected**: 177 utility-placement specialist tests pass with zero failures.
-- **Property testing**: Hypothesis uses reproducible seed `20260715` while
-  retaining shrinking.
-- **Coverage**: Example and Hypothesis tests exercise zero, positive, invalid,
-  scaling, monotonicity, and raw-weight aggregation branches in the new
-  numerical penalty kernel. On Python 3.14, standalone `coverage run` may hit
-  NumPy's duplicate-module guard even though ordinary pytest is green.
-- **Report location**: terminal output by default. Generate `.coverage` with
-  the following command when a persistent coverage database is required:
+## Run HPR Unit and Property Tests
 
 ```bash
-uv run coverage run --branch -m pytest tests/analysis/utility_placement -q --hypothesis-seed=20260715
+uv run pytest --hypothesis-seed=20260715 -q \
+  tests/contracts/test_hpr_performance_map.py \
+  tests/contracts/test_hpr_performance_map_properties.py \
+  tests/contracts/test_hpr_target_simulation_record.py \
+  tests/analysis/heat_pumps
+```
+
+This selection covers the versioned plain-data contract, fluid categories,
+CoolProp and TESPy adapters, map generation, thermodynamic validation,
+targeting lifecycle, exact cache, winning records, basis compatibility, and
+failure policy.
+
+## Coverage Gate
+
+```bash
+uv run coverage run --branch --source=OpenPinch -m pytest \
+  --hypothesis-seed=20260715 -q tests/analysis/heat_pumps tests/contracts
 uv run coverage report --show-missing
 ```
 
-### 3. Fix Failing Tests
+The existing HPR acceptance gate remains at least 95 percent combined statement
+and branch coverage over the map and target integration surface. The notebook
+and RTD-only follow-up does not lower that threshold.
 
-1. Read the first failing example and its minimized Hypothesis input.
-2. Reproduce only that test with the same seed.
-3. Correct the owning contract or pure numerical module; do not move numerical
-   rules into application or presentation code.
-4. Rerun the focused file, then the entire specialist directory.
+## Review Failures
+
+1. Reproduce the first failure with seed `20260715`.
+2. For a generated failure, retain the minimized Hypothesis example and normal
+   shrinking behavior.
+3. Correct the owning contract, pure coordinator, adapter, or integration
+   layer without adding a fallback.
+4. Rerun the focused file, the complete HPR selection, then the repository
+   regression profile.

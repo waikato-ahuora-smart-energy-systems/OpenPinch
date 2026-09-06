@@ -20,7 +20,11 @@ def extract_results(zone: Zone, period_id: str | None = None) -> dict:
         "period_id": period_id,
         "targets": _get_report(zone, period_id=period_id),
         "utilities": _get_utilities(zone),
-        "graphs": get_output_graph_data(zone),
+        "graphs": {
+            name: graphs
+            for name, graphs in get_output_graph_data(zone).items()
+            if period_id is None or graphs.get("period_id") == period_id
+        },
     }
 
 
@@ -31,9 +35,9 @@ def _get_report(zone: Zone, period_id: str | None = None) -> dict:
     for target in zone.targets.values():
         if not target.reportable:
             continue
+        if period_id is not None and target.period_id != period_id:
+            continue
         target_data = serialize_target(target)
-        if period_id is not None:
-            target_data["period_id"] = period_id
         targets.append(target_data)
 
     if len(zone.subzones) > 0:
