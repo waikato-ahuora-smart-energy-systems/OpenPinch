@@ -76,6 +76,10 @@ class BaseTargetModel(BaseModel):
     active: bool = True
     reportable: bool = Field(default=True, exclude=True, repr=False)
 
+    def provenance_settings(self) -> dict[str, Any]:
+        """Effective calculation settings, including family-owned runtime choices."""
+        return dict(self.config._values)
+
     @model_validator(mode="before")
     @classmethod
     def _set_name(cls, data: Any) -> Any:
@@ -253,6 +257,12 @@ class HeatPumpTargetBase(GraphBackedTarget, UtilitySummaryTarget):
     hpr_hot_streams: StreamCollection
     hpr_cold_streams: StreamCollection
     hpr_details: Any
+
+    def provenance_settings(self) -> dict[str, Any]:
+        return {
+            **super().provenance_settings(),
+            "simulation_backend": self.hpr_simulation_backend,
+        }
 
 
 class DirectHeatPumpTarget(HeatPumpTargetBase):

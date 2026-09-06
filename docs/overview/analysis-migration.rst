@@ -39,12 +39,19 @@ is replaced when superseded and is not serialized as run history. A scalar
 mutation supersedes the published all-period report; run the desired all-period
 workflow again to publish a complete batch.
 
+Published rows and graphs belong to the selected zone and, when requested,
+its descendants. Switching between sibling zones does not include the earlier
+zone's outputs in the new result, including in all-period batches. Prepared
+calculations remain available for compatible follow-on enrichment.
+
 Enrichment uses the invocation's effective settings, including exergy ambient
 temperature. A thermal prerequisite produced with incompatible numerical
 settings must be recalculated. A supplied ``base_target`` must belong to the
 current problem, zone, period, and prepared inputs and still be current. Keep
 the result returned by each enrichment if passing it to a subsequent method;
 an earlier reference becomes stale when that target is replaced.
+The effective HPR ``simulation_backend`` is part of the target's provenance:
+switching between CoolProp and TESPy invalidates the earlier backend's reference.
 
 Zone objects are selectors by address. A zone observed from another problem
 resolves against the receiving problem's tree. Missing and ambiguous addresses
@@ -59,6 +66,10 @@ owner, zone address, period selection, input fingerprint, effective settings,
 and prerequisite identities. Manually constructed low-level results may have
 no application provenance and cannot be passed as current ``base_target``
 references. Returned results are detached from problem-owned state.
+
+``HprPerformanceMap.provenance`` returns a detached dictionary, including nested
+objects and arrays. Editing that observation does not change the validated map
+or its exported JSON. The schema 1.0 field names and JSON types remain unchanged.
 
 Weighted summaries preserve existing metric policies, but no longer attach the
 first period's HPR simulation record to the aggregate. Inspect the originating

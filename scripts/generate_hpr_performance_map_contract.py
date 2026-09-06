@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import json
-from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +15,9 @@ from OpenPinch.contracts.hpr_performance_map import (
 
 ROOT = Path(__file__).resolve().parents[1]
 RESOURCE_ROOT = ROOT / "OpenPinch" / "data" / "contracts" / "hpr_performance_map"
+# Historical generating release for these schema 1.0 examples. Golden resources
+# must not change when a different OpenPinch release is installed.
+FIXTURE_GENERATOR_VERSION = "0.6.4"
 
 
 def _units() -> HprPerformanceMapUnits:
@@ -41,7 +43,7 @@ def _heat_pump_fixture() -> HprPerformanceMap:
         model_id="reference-single-stage-heat-pump-v1",
         provenance={
             "generator": "OpenPinch contract fixture",
-            "versions": {"openpinch": version("OpenPinch")},
+            "versions": {"openpinch": FIXTURE_GENERATOR_VERSION},
             "cycle": {
                 "family": "vapour_compression_heat_pump",
                 "refrigerant": "R134a",
@@ -105,7 +107,7 @@ def _refrigeration_fixture() -> HprPerformanceMap:
         model_id="reference-single-stage-refrigeration-v1",
         provenance={
             "generator": "OpenPinch contract fixture",
-            "versions": {"openpinch": version("OpenPinch")},
+            "versions": {"openpinch": FIXTURE_GENERATOR_VERSION},
             "cycle": {
                 "family": "vapour_compression_refrigeration",
                 "refrigerant": "R290",

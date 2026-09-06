@@ -1902,3 +1902,21 @@ refreshed reverse-engineering artifacts.
 - Current stage: Complete. All approved implementation and local verification finished.
 
 - Verification: `construction/build-and-test/analysis-reliability-verification.md`.
+
+## PR 96 Review Corrections
+
+- [x] Investigated three Codex findings; user authorized fixes.
+- [x] Regressions and implementation.
+- [x] Verification and documentation.
+- Current stage: Complete; steps 11–15 of the analysis reliability plan finished.
+- Verification: 3,094 configured tests passed; combined line/branch coverage
+  95.73%. Real-solver, real TESPy smoke, lint, warning-strict docs, inventory,
+  and installed core/TESPy artifact checks passed. Existing skips unchanged.
+- User authorized committing and pushing these fixes to PR 96; no GitHub review replies or resolutions.
+
+## PR 96 CI Fixture Correction
+
+- [x] Reproduced the version-bump failure before correction.
+- [x] Pinned golden-fixture generating provenance; runtime maps unchanged.
+- [x] Verified 207 contract/resource/docs-consistency tests, generated release property, original CI test with 0.6.5 metadata, generator check, Ruff and strict Sphinx.
+- Current stage: Complete; plan steps 16–18 finished. User authorized commit and push to PR 96.

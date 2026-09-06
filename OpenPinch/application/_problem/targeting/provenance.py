@@ -155,6 +155,6 @@ def stamp_targets(problem, surface: str, previous: dict[int, Any]) -> None:
                 "target." + surface,
                 zone,
                 period_ids=() if sid is None else (sid,),
-                settings=ready.config._values,
+                settings=ready.provenance_settings(),
                 prerequisites=prerequisites,
             )

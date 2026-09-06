@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping, Sequence
+from copy import deepcopy
 from typing import Literal, Self, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -154,6 +155,11 @@ class HprPerformanceMap(_FrozenContract):
     cop_convention: Literal["heating", "cooling"]
     energy_balance_tolerance: float = Field(default=1e-6, ge=0.0)
     temperature_match_tolerance: float = Field(default=1e-6, ge=0.0)
+
+    def __getattribute__(self, name: str):
+        value = super().__getattribute__(name)
+        # Preserve the JSON field/schema while keeping nested observations detached.
+        return deepcopy(value) if name == "provenance" else value
 
     @field_validator("map_id")
     @classmethod

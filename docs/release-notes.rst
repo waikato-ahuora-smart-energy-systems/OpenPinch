@@ -7,6 +7,15 @@ Unreleased
 Analysis reliability and extensibility
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Made golden HPR contract fixture provenance independent of the installed
+  release, preventing automatic version bumps from making fixtures stale.
+  Calculated performance maps continue to record their runtime versions.
+- Scoped published rows and graphs to the requested zone and traversal,
+  including successive all-period batches for different sibling zones.
+- Included the effective HPR simulation backend in target provenance so
+  backend changes invalidate superseded ``base_target`` references.
+- Detached nested HPR performance-map provenance observations to preserve
+  validated maps and exports without changing the schema 1.0 JSON boundary.
 - Unified serial and parallel runtime snapshots, preserving process-MVR stream
   references and compressor work. Target execution and complete period batches
   commit only after success, with prepared period state retained for enrichment.

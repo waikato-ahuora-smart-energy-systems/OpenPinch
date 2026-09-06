@@ -15,6 +15,9 @@ Contribution checklist
 2. Keep shared metadata in ``domain.analysis.AnalysisProvenance``. Put the
    method-specific payload in its owning contract or domain family. A
    nonthermal result does not need utility metrics or ``UtilitySummaryTarget``.
+   Target families extend ``provenance_settings`` for calculation-affecting
+   runtime choices outside configuration. HPR includes its effective simulation
+   backend this way, so switching engines invalidates superseded references.
 3. Thermal and enrichment accessors use the application execution transaction.
    It owns the local zone address, canonical period, settings, prepared zone
    tree, components, and prerequisites. Snapshot the zone and components

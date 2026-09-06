@@ -39,3 +39,32 @@ Property testing covers round trips, isolation, lifecycle sequences, period
 identity, and aggregation invariants, using Hypothesis seed 20260715 with
 shrinking. PBT is enabled; Security and Resiliency remain disabled. Deployment
 and additional scientific algorithms are not part of this implementation.
+
+## PR 96 review corrections
+
+The user authorized these three investigated corrections with "fix them".
+They preserve the approved execution, provenance, and JSON contracts.
+
+- [x] 11. Add failing regressions for sibling-scope period batches, backend
+  replacement identity, and nested performance-map provenance mutation.
+- [x] 12. Scope published rows/graphs to the selected zone and requested
+  descendants while retaining compatible prepared prerequisites.
+- [x] 13. Include the effective HPR simulation backend in family-owned
+  provenance settings; reject references superseded by a backend change.
+- [x] 14. Detach map provenance observations, preserving schema 1.0 and
+  JSON serialization, copying, and equality behavior.
+- [x] 15. Run regression/property, broader application/contract, TESPy, lint,
+  documentation, and artifact checks; record results and migration notes.
+
+Properties: generated scope-switch sequences preserve selected-scope output
+and same-scope enrichment without thermal recalculation; backend transitions
+invalidate superseded references; nested JSON observation mutations leave the
+validated map unchanged and serialization round trips preserve equality.
+Use Hypothesis shrinking and seed 20260715. Security and Resiliency remain
+disabled. Deployment and GitHub review replies are outside this correction.
+
+## PR 96 CI fixture correction
+
+- [x] 16. Reproduce golden-resource drift with generated installed versions.
+- [x] 17. Make fixture provenance deterministic while preserving real-map runtime provenance.
+- [x] 18. Verify contract/property, generator, lint, documentation checks and record evidence.

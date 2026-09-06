@@ -159,22 +159,25 @@ def target_transaction(method):
                     )
                     if match is not None:
                         row.provenance = match.provenance
-        if (
-            not kwargs.get(
+        if isolated._results is not None:
+            include_subzones = kwargs.get(
                 "include_subzones", method.__name__ == "all_heat_integration"
             )
-            and isolated._results is not None
-        ):
             prefix = context.zone_address + "/"
+
+            def in_scope(address):
+                return address == context.zone_address or (
+                    include_subzones and (address or "").startswith(prefix)
+                )
+
+            # Retain prepared prerequisites, but publish only this invocation's scope.
             isolated._results.targets = [
-                row
-                for row in isolated._results.targets
-                if not row.scope.startswith(prefix)
+                row for row in isolated._results.targets if in_scope(row.scope)
             ]
             isolated._results.graphs = {
                 name: graph
                 for name, graph in (isolated._results.graphs or {}).items()
-                if not (graph.zone_address or "").startswith(prefix)
+                if in_scope(graph.zone_address)
             }
         # Detach before committing: even failure to copy an output is atomic.
         detached = deepcopy(result)

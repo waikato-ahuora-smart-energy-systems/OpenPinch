@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import copy
+import importlib.metadata
 import json
 import random
+from unittest.mock import PropertyMock, patch
 
 import pytest
-from hypothesis import given, seed, settings
+from hypothesis import example, given, seed, settings
+from hypothesis import strategies as st
 from jsonschema import validators
 from pydantic import ValidationError
 
@@ -23,6 +26,45 @@ from tests.strategies.hpr_performance_maps import (
 
 _SCHEMA = json.loads(contract_generator.render_contract_resources()["schema-1.0.json"])
 _SCHEMA_VALIDATOR = validators.validator_for(_SCHEMA)(_SCHEMA)
+
+
+@seed(20260715)
+@settings(max_examples=20)
+@example(release=(0, 6, 5))
+@given(release=st.tuples(*(st.integers(0, 100) for _ in range(3))))
+def test_golden_resources_are_independent_of_installed_release(release) -> None:
+    installed_version = ".".join(map(str, release))
+    with patch.object(
+        importlib.metadata.Distribution,
+        "version",
+        new_callable=PropertyMock,
+        return_value=installed_version,
+    ):
+        assert importlib.metadata.version("OpenPinch") == installed_version
+        contract_generator.check_contract_resources()
+
+
+@seed(20260715)
+@settings(max_examples=30)
+@given(payload=hpr_performance_map_payloads())
+def test_provenance_observations_cannot_mutate_validated_map(payload) -> None:
+    payload["provenance"]["nested"] = {"backends": ["coolprop"]}
+    performance_map = HprPerformanceMap.model_validate(payload)
+    before = performance_map.model_dump(mode="json")
+    observed = performance_map.provenance
+    observed["nested"]["backends"].append("tespy")
+    observed["simulation_backend"] = "invalid_backend"
+    performance_map.provenance.clear()
+
+    assert performance_map.model_dump(mode="json") == before
+    assert performance_map.provenance == before["provenance"]
+    assert copy.deepcopy(performance_map) == performance_map
+    assert performance_map.model_copy(deep=True) == performance_map
+    assert (
+        HprPerformanceMap.model_validate_json(performance_map.model_dump_json())
+        == performance_map
+    )
+    _SCHEMA_VALIDATOR.validate(performance_map.model_dump(mode="json"))
 
 
 @seed(20260905)

@@ -8150,3 +8150,71 @@ Update the tutorial inventory, affected notebooks, migration notes, and release 
 **Context**: Explicit authorization to commit; prior full verification remains recorded above. No push or deployment requested.
 
 ---
+
+## Pull Request — develop to main
+**Timestamp**: 2026-09-06T19:05:50Z
+**User Input**: "create a PR"
+**AI Response**: "Created PR #96: Add HPR performance maps and improve analysis reliability. The open PR proposes all three develop commits into main, including ca4ab8cd, with scope, intentional API changes, and local verification evidence."
+**Context**: GitHub CLI was unauthenticated; used the signed-in browser. Verified the open PR and its branches at https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch/pull/96. No merge performed. This audit entry remains a local uncommitted update.
+
+---
+
+## Review Investigation — PR 96 Codex comments
+**Timestamp**: 2026-09-06T19:25:44Z
+**User Input**: "Investigate the codex review comments"
+**AI Response**: "All three P2 findings are valid against reviewed commit ca4ab8cd. Confirmed sibling-zone rows and graphs leak into subsequent all-period outputs for workers 1 and 2. Confirmed frozen HPR map provenance accepts dictionary/nested-list mutation and exports the changed values. A controlled HPR service double exercised the real public accessors, provenance stamping, base-target validation, and exergy service: CoolProp/TESPy identities were equal, the old CoolProp reference was accepted, and exergy enriched the current TESPy target. An attempted real CoolProp solve did not converge, so the backend result is an orchestration reproduction rather than a successful two-backend numerical comparison."
+**Context**: Read all three review threads on PR 96, review 5126330964. GitHub also shows the subsequent automated version-bump commit 9bcf03b; local investigation used the exact reviewed ca4ab8cd. No source/test changes, GitHub replies, thread resolutions, commits, or pushes performed. Security and Resiliency remain disabled and were skipped; property-based testing configuration unchanged. This investigation used targeted reproductions, not a new full-suite run.
+
+### Findings and correction boundaries
+
+- [x] Investigated discussion_r3944982338: AreaA batch followed by AreaB batch returns both Site/AreaA and Site/AreaB targets and graph zones for base and peak, with both worker counts. Retained states copy the entire tree; nontraversing execution extracts from the master root and only filters descendants of the requested scope. Correct output scoping and retained-state compatibility without discarding the same-scope thermal prerequisites needed by enrichment. Add sibling-switch, traversal, and same-scope enrichment regressions.
+- [x] Investigated discussion_r3944982339: simulation_backend is passed as a runtime option but stamp_targets only fingerprints ready.config._values. The controlled reproduction prints IDENTITIES_EQUAL True, STALE_ACCEPTED Direct Heat Pump, and ENRICHED_BACKEND tespy. Include normalized calculation-affecting runtime settings in analysis identity and verify backend changes reject superseded base references before enrichment. Existing propagation tests do not cover cross-backend reference identity.
+- [x] Investigated discussion_r3944982344: HprPerformanceMap inherits frozen=True but its provenance field is a mutable dictionary. A packaged map accepts an invalid_backend provenance value and nested mutation; model_dump exports the changes. Existing frozen tests check attribute reassignment and detached model_dump outputs, not direct nested provenance edits. Use a deeply immutable value or detached observation while retaining the schema 1.0 JSON boundary; test nested maps/lists and round trips.
+
+---
+
+## Construction — PR 96 review corrections
+**Timestamp**: 2026-09-06T19:28:21Z
+**User Input**: "fix them"
+**AI Response**: "Adding regressions and correcting the three confirmed review findings, followed by relevant verification and documentation. Steps 11–15 extend the existing approved implementation plan."
+**Context**: Explicit authorization covers these corrections and testing. PBT remains enabled with shrinking and seed 20260715. Disabled Security and Resiliency extensions remain skipped.
+
+---
+
+## Build and Test — PR 96 corrections complete
+**Timestamp**: 2026-09-06T19:44:56Z
+**AI Response**: "Fixed all three Codex findings. Published scope excludes sibling rows/graphs while retaining prepared calculations; HPR-owned provenance settings include the effective backend; map provenance reads return recursively detached dictionaries. Six expected regression failures preceded correction. Final configured suite: 3,094 passed, 3 existing skips, 4 solver deselections, with 95.73% combined line/branch coverage. Broader focused suite: 634 passed. Real solver: 3 passed and 1 existing benchmark skip. Real public TESPy target/map smoke: 1 passed. Ruff, format and whitespace, strict Sphinx, 25 inventory/schema checks, wheel/sdist builds, and installed core/TESPy smoke tests passed. Updated migration/contributor/release documentation and completed plan steps 11–15."
+**Context**: Property testing remains enabled with shrinking and seed 20260715; Security and Resiliency remain disabled and skipped. No code was committed or pushed; no review threads were replied to or resolved. Detailed verification is in construction/build-and-test/analysis-reliability-verification.md.
+
+---
+
+## CI Investigation — PR 96 contract fixture version drift
+**Timestamp**: 2026-09-06T19:50:13Z
+**User Input**: "1 test also failed. investigate. "
+**AI Response**: "Investigated the failed test job in PR Validation run 34053816305, attempt 2, job 101542322573. Exactly one test failed: tests/contracts/test_hpr_performance_map.py::test_committed_contract_resources_match_authoritative_generation; 3,085 passed, 3 skipped, 4 deselected. The heat-pump and refrigeration golden JSON resources contain OpenPinch 0.6.4, but their generator reads the installed package version, now 0.6.5 after automated commit 9bcf03b. The schema is identical. Reproduced the exact test locally with the generator's version lookup controlled: 0.6.4 passes; 0.6.5 fails. Both differing JSON payloads are otherwise identical. A normal targeted pytest run also passed locally on installed 0.6.4 (1 passed). Recommend deterministic fixture provenance independent of the installed release, with a version-change regression; retain actual runtime versions for real generated analysis maps."
+**Context**: Investigation only; no new source/test changes, commits, pushes, reruns, or GitHub replies. Prior three review fixes remain uncommitted and do not address this separate release-dependent fixture defect. The pr-gate failure follows the failed test job. Security and Resiliency remain disabled and skipped; property-based testing settings remain unchanged. Evidence: https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch/actions/runs/34053816305/job/101542322573?pr=96 .
+
+---
+
+## Construction — CI fixture version correction
+**Timestamp**: 2026-09-06T19:58:12Z
+**User Input**: "Fix it"
+**AI Response**: "Add a failing version-change property, pin golden-fixture provenance to its original generating release, and verify contract generation and documentation."
+**Context**: Explicit authorization continues the existing plan. PBT enabled with seed 20260715 and shrinking; Security and Resiliency disabled and skipped.
+
+---
+
+## Build and Test — CI fixture correction complete
+**Timestamp**: 2026-09-06T19:59:56Z
+**AI Response**: "Fixed version-dependent golden fixture generation and added a regression-first Hypothesis property. 207 contract/resource/docs-consistency tests pass; original CI test passes with 0.6.5 metadata; generator check, Ruff and strict Sphinx pass. Release notes, verification, state and plan checkboxes updated. Changes remain uncommitted."
+**Context**: No push or CI rerun performed. Scientific runtime provenance unchanged. Enabled property testing retains seed and shrinking; disabled extensions skipped.
+
+---
+
+## Commit and Push — PR 96 corrections
+**Timestamp**: 2026-09-06T20:03:23Z
+**User Input**: "Commit and push"
+**AI Response**: "Committing the three review corrections and CI golden-fixture correction, tests, release/migration documentation and workflow records to develop, then pushing to origin for PR 96. Remote version bump 9bcf03b is already fast-forwarded locally and preserved."
+**Context**: Explicit commit and push authorization. Previous verification is recorded above; rerunning focused regressions after the version-bump fast-forward. No force push, merge or GitHub review replies requested.
+
+---
