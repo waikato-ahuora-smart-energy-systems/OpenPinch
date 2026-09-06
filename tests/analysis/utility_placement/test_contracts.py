@@ -269,6 +269,7 @@ def test_result_contract_rejects_nonfinite_coordinates_and_infeasible_best() -> 
 
 def test_result_schema_exposes_stable_top_level_fields() -> None:
     assert set(UtilityPlacementResult.model_json_schema()["properties"]) == {
+        "provenance",
         "request",
         "scope",
         "base_target_id",

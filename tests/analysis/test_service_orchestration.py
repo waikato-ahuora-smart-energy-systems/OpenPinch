@@ -368,8 +368,8 @@ def test_indirect_hpr_services_enable_flags_and_bootstrap_total_site_targets(
 
 def test_exergy_targeting_service_auto_selects_total_site_first(monkeypatch):
     zone = _make_zone()
-    zone.add_target(_make_target(zone, TargetType.II.value))
     zone.add_target(_make_target(zone, TargetType.DI.value))
+    zone.add_target(_make_target(zone, TargetType.II.value))
     enriched = []
 
     monkeypatch.setattr(
@@ -387,8 +387,8 @@ def test_exergy_targeting_service_auto_selects_total_site_first(monkeypatch):
 
 def test_exergy_targeting_service_honours_explicit_base_target_type(monkeypatch):
     zone = _make_zone()
-    zone.add_target(_make_target(zone, TargetType.II.value))
     zone.add_target(_make_target(zone, TargetType.DI.value))
+    zone.add_target(_make_target(zone, TargetType.II.value))
     enriched = []
 
     monkeypatch.setattr(
@@ -621,8 +621,8 @@ def test_energy_transfer_service_bootstraps_direct_target_on_leaf(monkeypatch):
 
 def test_energy_transfer_service_prefers_existing_total_site_target():
     zone = _make_zone()
-    zone.add_target(_make_target(zone, TargetType.II.value))
     zone.add_target(_make_target(zone, TargetType.DI.value))
+    zone.add_target(_make_target(zone, TargetType.II.value))
 
     out = svc.energy_transfer_analysis_service(zone)
 
@@ -754,8 +754,8 @@ def test_cogeneration_service_prefers_total_site_before_direct_integration(
     monkeypatch,
 ):
     zone = _make_zone()
-    zone.add_target(_make_target(zone, TargetType.II.value))
     zone.add_target(_make_target(zone, TargetType.DI.value))
+    zone.add_target(_make_target(zone, TargetType.II.value))
     selected_targets: list[str] = []
 
     def fake_get_power_cogeneration_above_pinch(target, args=None):
@@ -906,12 +906,12 @@ def test_cogeneration_service_explicit_override_targets_exact_family(
 ):
     zone = _make_zone()
     for target_type in (
+        TargetType.DI.value,
         TargetType.II.value,
         TargetType.IHP.value,
         TargetType.IR.value,
         TargetType.DHP.value,
         TargetType.DR.value,
-        TargetType.DI.value,
     ):
         zone.add_target(_make_target(zone, target_type))
 
@@ -1011,8 +1011,8 @@ def test_cogeneration_service_refreshes_state_mismatched_target(monkeypatch):
 
 def test_cogeneration_service_no_viable_stage_does_not_fall_back(monkeypatch):
     zone = _make_zone()
-    zone.add_target(_make_target(zone, TargetType.II.value))
     zone.add_target(_make_target(zone, TargetType.DI.value))
+    zone.add_target(_make_target(zone, TargetType.II.value))
     selected_targets: list[str] = []
 
     def fake_get_power_cogeneration_above_pinch(target, args=None):

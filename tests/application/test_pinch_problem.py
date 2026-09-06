@@ -89,7 +89,7 @@ def test_failed_problem_input_replacement_is_atomic(replacement_method: str) -> 
     problem.target.direct_heat_integration()
     canonical_before = problem.to_problem_json()
     problem_data_before = problem._problem_data
-    master_zone_before = problem.master_zone
+    master_zone_before = problem._master_zone
     results_before = problem._results
     target_spec_before = problem._last_target_run_spec
     period_results_before = problem._period_results
@@ -104,7 +104,7 @@ def test_failed_problem_input_replacement_is_atomic(replacement_method: str) -> 
 
     assert problem.to_problem_json() == canonical_before
     assert problem._problem_data is problem_data_before
-    assert problem.master_zone is master_zone_before
+    assert problem._master_zone is master_zone_before
     assert problem._results is results_before
     assert problem._last_target_run_spec is target_spec_before
     assert problem._period_results is period_results_before
@@ -385,7 +385,7 @@ def test_set_dt_cont_multiplier_lazily_rebuilds_prepared_root():
 
     root = problem.set_dt_cont_multiplier(2.0)
 
-    assert root is problem.master_zone
+    assert root is problem._master_zone
     assert root.dt_cont_multiplier == 2.0
     assert problem.results is None
 
@@ -406,9 +406,9 @@ def test_dt_cont_multiplier_round_trips_through_canonical_problem_input(
     assert find_zone_tree_node(serialized["zone_tree"], zone_path)[
         "dt_cont_multiplier"
     ] == pytest.approx(multiplier)
-    assert restored.master_zone.get_subzone(zone_path).dt_cont_multiplier == pytest.approx(
-        multiplier
-    )
+    assert restored.master_zone.get_subzone(
+        zone_path
+    ).dt_cont_multiplier == pytest.approx(multiplier)
 
 
 @seed(20260715)
@@ -461,8 +461,7 @@ def test_transactional_loading_matches_generated_command_model(scenario) -> None
             with pytest.raises(ValueError):
                 problem.load(invalid)
             assert all(
-                getattr(problem, name) is value
-                for name, value in state_before.items()
+                getattr(problem, name) is value for name, value in state_before.items()
             )
         assert_model()
 
@@ -496,10 +495,11 @@ def test_root_stream_views_are_exposed_on_problem():
 
     problem = PinchProblem(source=payload, project_name="Site")
 
-    assert problem.hot_streams is problem.master_zone.hot_streams
-    assert problem.cold_streams is problem.master_zone.cold_streams
-    assert problem.hot_utilities is problem.master_zone.hot_utilities
-    assert problem.cold_utilities is problem.master_zone.cold_utilities
+    for name in ("hot_streams", "cold_streams", "hot_utilities", "cold_utilities"):
+        observed = getattr(problem, name)
+        owned = getattr(problem._master_zone, name)
+        assert observed is not owned
+        assert [s.name for s in observed] == [s.name for s in owned]
 
 
 def test_root_stream_views_require_loaded_problem():
@@ -509,7 +509,7 @@ def test_root_stream_views_require_loaded_problem():
         _ = problem.hot_streams
 
 
-def test_problem_hot_stream_temperature_mutation_updates_root_zone_stream():
+def test_problem_hot_stream_temperature_mutation_is_detached():
     payload = {
         "options": {"THERMAL_DT_CONT": 10},
         "streams": [
@@ -531,11 +531,11 @@ def test_problem_hot_stream_temperature_mutation_updates_root_zone_stream():
     hot_stream.supply_temperature = 195.0
 
     assert float(problem.hot_streams["Area1.H1"].supply_temperature) == pytest.approx(
-        195.0
+        180.0
     )
     assert float(
         problem.master_zone.hot_streams["Area1.H1"].supply_temperature
-    ) == pytest.approx(195.0)
+    ) == pytest.approx(180.0)
     assert float(hot_stream.maximum_temperature) == pytest.approx(195.0)
 
 
@@ -630,6 +630,12 @@ def test_target_accessor_supports_named_workflow(monkeypatch):
 
     obj = PinchProblem()
     obj._master_zone = Zone("Site")
+    plant = Zone("Plant", parent_zone=obj._master_zone)
+    obj._master_zone.subzones["Plant"] = plant
+    for name in ("DI", "TS"):
+        plant.subzones[name] = Zone(name, parent_zone=plant)
+    for current in obj._walk_zone_tree(obj._master_zone):
+        current.set_period_context({"base": 0, "peak": 1}, [1.0, 1.0], 2)
     out = obj.target.direct_heat_integration(
         zone="Plant/DI",
         options={"dt_min": 15},
@@ -669,6 +675,12 @@ def test_target_accessor_supports_named_workflow_with_period_id(monkeypatch):
 
     obj = PinchProblem()
     obj._master_zone = Zone("Site")
+    plant = Zone("Plant", parent_zone=obj._master_zone)
+    obj._master_zone.subzones["Plant"] = plant
+    for name in ("DI", "TS"):
+        plant.subzones[name] = Zone(name, parent_zone=plant)
+    for current in obj._walk_zone_tree(obj._master_zone):
+        current.set_period_context({"base": 0, "peak": 1}, [1.0, 1.0], 2)
     out = obj.target.direct_heat_integration(
         zone="Plant/DI",
         options={"dt_min": 15},
@@ -707,6 +719,12 @@ def test_target_accessor_cogeneration_uses_dedicated_execution_path(monkeypatch)
 
     obj = PinchProblem()
     obj._master_zone = Zone("Site")
+    plant = Zone("Plant", parent_zone=obj._master_zone)
+    obj._master_zone.subzones["Plant"] = plant
+    for name in ("DI", "TS"):
+        plant.subzones[name] = Zone(name, parent_zone=plant)
+    for current in obj._walk_zone_tree(obj._master_zone):
+        current.set_period_context({"base": 0, "peak": 1}, [1.0, 1.0], 2)
     out = obj.target.cogeneration(
         zone="Plant/TS",
         options={"base_target_type": "Indirect"},
@@ -749,6 +767,12 @@ def test_target_accessor_exergy_uses_dedicated_execution_path(monkeypatch):
 
     obj = PinchProblem()
     obj._master_zone = Zone("Site")
+    plant = Zone("Plant", parent_zone=obj._master_zone)
+    obj._master_zone.subzones["Plant"] = plant
+    for name in ("DI", "TS"):
+        plant.subzones[name] = Zone(name, parent_zone=plant)
+    for current in obj._walk_zone_tree(obj._master_zone):
+        current.set_period_context({"base": 0, "peak": 1}, [1.0, 1.0], 2)
     out = obj.target.exergy(
         zone="Plant",
         options={"base_target_type": "Direct Integration"},
@@ -792,6 +816,12 @@ def test_target_accessor_include_subzones_uses_run_targeting(monkeypatch):
 
     obj = PinchProblem()
     obj._master_zone = Zone("Site")
+    plant = Zone("Plant", parent_zone=obj._master_zone)
+    obj._master_zone.subzones["Plant"] = plant
+    for name in ("DI", "TS"):
+        plant.subzones[name] = Zone(name, parent_zone=plant)
+    for current in obj._walk_zone_tree(obj._master_zone):
+        current.set_period_context({"base": 0, "peak": 1}, [1.0, 1.0], 2)
     out = obj.target.direct_heat_integration(
         zone="Plant/DI",
         include_subzones=True,
@@ -837,8 +867,8 @@ def test_execute_cogeneration_targeting_returns_selected_target_family():
         cold_utility_target=0.0,
         heat_recovery_target=0.0,
     )
-    zone.add_target(ts_target)
     zone.add_target(di_target)
+    zone.add_target(ts_target)
 
     problem = PinchProblem()
     problem._master_zone = zone
@@ -889,8 +919,8 @@ def test_execute_exergy_targeting_returns_selected_target_family():
         cold_utility_target=0.0,
         heat_recovery_target=0.0,
     )
-    zone.add_target(ts_target)
     zone.add_target(di_target)
+    zone.add_target(ts_target)
 
     problem = PinchProblem()
     problem._master_zone = zone
@@ -2098,7 +2128,10 @@ def test_prepared_zone_dt_cont_multiplier_setter_guides_callers_to_problem_api(
 
     m = 2.0
     problem.master_zone.dt_cont_multiplier = m
-    present_value = hot_stream.effective_delta_t_contribution
+    assert hot_stream.effective_delta_t_contribution == former_value
+    problem.set_dt_cont_multiplier(m)
+    fresh_unit = problem.master_zone.get_subzone("Crude Unit")
+    present_value = next(iter(fresh_unit.hot_streams)).effective_delta_t_contribution
 
     assert former_value != present_value
     assert float(present_value) == pytest.approx(
@@ -2851,9 +2884,14 @@ def test_resolve_and_lazy_build_guard_paths(monkeypatch, sample_problem):
         problem._resolve_target_zone()
 
     explicit_zone = Zone("Explicit")
-    assert problem._resolve_target_zone(explicit_zone, master_zone=Zone("Root")) is (
-        explicit_zone
-    )
+    root = Zone("Root")
+    local_zone = Zone("Explicit", parent_zone=root)
+    root.subzones["Explicit"] = local_zone
+    foreign_root = Zone("Root")
+    explicit_zone.parent_zone = foreign_root
+    assert problem._resolve_target_zone(explicit_zone, master_zone=root) is local_zone
+    with pytest.raises(ValueError, match="not found"):
+        problem._resolve_target_zone(Zone("Missing"), master_zone=root)
 
     problem._problem_data = sample_problem
     loaded_zone = Zone("Loaded")
@@ -2875,7 +2913,9 @@ def test_process_component_work_and_target_attachment_paths():
     zone = Zone("Site")
     child = Zone("Area", parent_zone=zone)
     zone.subzones["Area"] = child
-    target = SimpleNamespace(process_component_work_target=None, work_target=None)
+    target = SimpleNamespace(
+        process_component_work_target=None, work_target=None, period_idx=0
+    )
     child.targets["Direct Integration"] = target
     component = SimpleNamespace(
         work_for_zone=lambda zone, period_id, period_idx: (

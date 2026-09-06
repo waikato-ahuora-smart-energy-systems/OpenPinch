@@ -91,6 +91,7 @@ def indirect_heat_integration_service(zone: Zone, args: dict | None = None) -> Z
         zone.targets.get(TargetType.DI.value),
         args=args,
         period_ids=zone.period_ids,
+        config=zone.config,
     ):
         direct_heat_integration_service(zone, args)
     for subzone in zone.subzones.values():
@@ -98,6 +99,7 @@ def indirect_heat_integration_service(zone: Zone, args: dict | None = None) -> Z
             subzone.targets.get(TargetType.DI.value),
             args=args,
             period_ids=subzone.period_ids,
+            config=subzone.config,
         ):
             direct_heat_integration_service(subzone, args)
     record_selected_period(zone, args)
@@ -116,6 +118,7 @@ def direct_heat_pump_service(zone: Zone, args: dict | None = None) -> Zone:
         zone.targets.get(TargetType.DI.value),
         args=args,
         period_ids=zone.period_ids,
+        config=zone.config,
     ):
         direct_heat_integration_service(zone, args)
     target = compute_direct_heat_pump_or_refrigeration_target(
@@ -138,6 +141,7 @@ def indirect_heat_pump_service(zone: Zone, args: dict | None = None) -> Zone:
         zone.targets.get(TargetType.II.value),
         args=args,
         period_ids=zone.period_ids,
+        config=zone.config,
     ):
         indirect_heat_integration_service(zone, args)
     target = compute_indirect_heat_pump_or_refrigeration_target(
@@ -160,6 +164,7 @@ def direct_refrigeration_service(zone: Zone, args: dict | None = None) -> Zone:
         zone.targets.get(TargetType.DI.value),
         args=args,
         period_ids=zone.period_ids,
+        config=zone.config,
     ):
         direct_heat_integration_service(zone, args)
     target = compute_direct_heat_pump_or_refrigeration_target(
@@ -182,6 +187,7 @@ def indirect_refrigeration_service(zone: Zone, args: dict | None = None) -> Zone
         zone.targets.get(TargetType.II.value),
         args=args,
         period_ids=zone.period_ids,
+        config=zone.config,
     ):
         indirect_heat_integration_service(zone, args)
     target = compute_indirect_heat_pump_or_refrigeration_target(

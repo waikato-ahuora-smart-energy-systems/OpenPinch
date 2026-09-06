@@ -4,6 +4,24 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Analysis reliability and extensibility
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Unified serial and parallel runtime snapshots, preserving process-MVR stream
+  references and compressor work. Target execution and complete period batches
+  commit only after success, with prepared period state retained for enrichment.
+- Fixed period-row relabeling, invocation-specific exergy settings, foreign-zone
+  ownership, and selected-zone traversal. Replacing prerequisites invalidates
+  dependent targets; component and input changes clear dependent caches.
+- Added immutable provenance and method metadata, family-owned reporting adapters,
+  and complete aggregation policies. Weighted rows exclude period-specific HPR
+  simulation records. Brayton fails before state preparation.
+- Observation properties now return detached snapshots or read-only mappings.
+  Stale and foreign ``base_target`` references are rejected. See
+  :doc:`overview/analysis-migration` for the intentional API changes and
+  :doc:`developer/adding-analysis-methods` for the extension contract.
+
+
 Target-owned HPR performance maps
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

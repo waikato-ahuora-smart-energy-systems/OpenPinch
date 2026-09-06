@@ -73,6 +73,7 @@ TARGET_TUTORIALS = {
     "total_site_heat_integration": 2,
     "heat_exchanger_area_and_cost": 7,
     "heat_recovery_dt_min": 2,
+    "hpr_performance_map": 9,
     "exergy": 7,
     "carnot_heat_pump": 8,
     "carnot_refrigeration": 8,
@@ -195,7 +196,9 @@ def _dimensions(
             else "n/a"
         ),
         "config_precedence": (
-            "keyword > options > stored config > default"
+            "target-owned winning record"
+            if name == "hpr_performance_map"
+            else "keyword > options > stored config > default"
             if owner_name
             in {
                 "Target",
@@ -247,7 +250,22 @@ def _dimensions(
             else "n/a"
         ),
         "execution_evidence": (
-            "batch delegation contract; "
+            "guarded TESPy and routine fake pytest execution"
+            if name == "hpr_performance_map"
+            else "detached observation contract; routine pytest execution"
+            if name
+            in {
+                "master_zone",
+                "results",
+                "period_results",
+                "hot_streams",
+                "cold_streams",
+                "hot_utilities",
+                "cold_utilities",
+            }
+            else "retained-period chaining; routine pytest execution"
+            if owner_name == "All-period target" and name == "exergy"
+            else "batch delegation contract; "
             + (
                 "routine pytest execution"
                 if profile == "base"

@@ -136,7 +136,14 @@ def test_add_process_mvr_applies_replacements_and_registers_component():
     assert isinstance(component, ProcessMVRComponent)
     assert component.id == "mvr_1"
     assert problem.process_components["mvr_1"] is component
-    assert source.is_active is False
+    assert source.is_active is True  # The original observation stays detached.
+    zone = problem.master_zone.get_subzone("Evaporation Train")
+    assert (
+        next(
+            stream for stream in zone.hot_streams if stream.name == source.name
+        ).is_active
+        is False
+    )
     assert len(component.replacement_streams) >= 2
     assert all(stream.is_active for stream in component.replacement_streams)
     assert all(
@@ -147,7 +154,7 @@ def test_add_process_mvr_applies_replacements_and_registers_component():
         float(stream.target_temperature) for stream in component.replacement_streams
     ) == (pytest.approx(float(source.target_temperature), abs=0.05))
     assert "Site/Evaporation Train" in component.affected_zone_paths
-    assert any(stream is source for _key, stream in zone.hot_streams.items())
+    assert any(stream.name == source.name for _key, stream in zone.hot_streams.items())
     assert any(
         ".mvr_1.Evaporator vapour_direct_MVR_H1" in key
         for key, _stream in zone.hot_streams.items()

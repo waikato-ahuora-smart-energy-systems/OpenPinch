@@ -26,12 +26,17 @@ def run_targeting_for_zone_and_subzones(
     if zone.type not in _KNOWN_ZONE_TYPES:
         raise ValueError("No valid zone passed into OpenPinch for analysis.")
 
+    child_args = args
+    if args is not None and "base_target_type" in args:
+        child_args = {
+            key: value for key, value in args.items() if key != "base_target_type"
+        }
     for subzone in zone.subzones.values():
         run_targeting_for_zone_and_subzones(
             subzone,
             direct_service_func=direct_service_func,
             indirect_service_func=indirect_service_func,
-            args=args,
+            args=child_args,
         )
 
     if callable(direct_service_func) and zone.type in _DIRECT_ZONE_TYPES:

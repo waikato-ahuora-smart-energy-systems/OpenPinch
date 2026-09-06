@@ -28,10 +28,18 @@ Capability Matrix
      - one physical stream with ordered thermal segments
      - base
    * - Heat Pump and refrigeration
-     - named Carnot, vapour-compression, Brayton, and MVR target methods;
+     - named Carnot, vapour-compression, and MVR target methods;
        explicit target-owned performance-map generation
      - HPR targets, costs, graphs, and versioned plain maps
      - CoolProp default; optional TESPy through ``openpinch[tespy]``
+   * - Brayton
+     - ``brayton_heat_pump()``, ``brayton_refrigeration()``
+     - unavailable; rejected before preparation
+     - no execution supported
+   * - Utility placement
+     - ``problem.target.utility_placement()`` and all-period mirror
+     - optimized case with shared utility placement evidence
+     - base
    * - Process MVR
      - ``problem.components.add_process_mvr()``
      - replacement streams and stage results
@@ -66,3 +74,16 @@ surfaces. Contributor analysis modules remain implementation owners rather than
 alternative process-engineer entry points.
 
 See :doc:`../examples/tutorial-coverage-map` for exact operation coverage.
+
+Method contracts
+----------------
+
+This generated inventory is checked against the immutable internal catalog and
+public accessors. Specialized methods keep their existing execution semantics.
+
+.. csv-table::
+   :file: ../_data/analysis-methods.csv
+   :header-rows: 1
+
+See :doc:`analysis-migration` for observation ownership and period chaining, and
+:doc:`../developer/adding-analysis-methods` for the contributor contract.

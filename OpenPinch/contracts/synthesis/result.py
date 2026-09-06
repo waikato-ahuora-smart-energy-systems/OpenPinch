@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from ...domain.analysis import AnalysisProvenance
 from ...domain.enums import HeatExchangerNetworkDesignMethod
 from ...domain.heat_exchanger_network import HeatExchangerNetwork
 from .common import (
@@ -19,6 +20,7 @@ class HeatExchangerNetworkSynthesisResult(BaseModel):
     """Problem-owned heat exchanger network synthesis result data."""
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
+    provenance: AnalysisProvenance | None = None
 
     network: HeatExchangerNetwork
     run_id: str

@@ -1888,3 +1888,17 @@ refreshed reverse-engineering artifacts.
   and documentation correction introduces no deployment or monitoring change.
 - **Current stage**: Complete. All six audit findings are resolved and the
   generated correction plus Build and Test evidence are approved.
+
+## Analysis Reliability and Extensibility
+
+- [x] Implementation plan approved by the user.
+- [x] Regression-first baseline: 11 expected failures.
+- [x] Execution snapshots and invalidation.
+- [x] Targeting corrections and period chaining.
+- [x] Method/provenance/result adapters.
+- [x] Metric policies and documentation.
+- [x] Full Build and Test verification.
+- Plan: `construction/plans/analysis-reliability-code-generation-plan.md`.
+- Current stage: Complete. All approved implementation and local verification finished.
+
+- Verification: `construction/build-and-test/analysis-reliability-verification.md`.

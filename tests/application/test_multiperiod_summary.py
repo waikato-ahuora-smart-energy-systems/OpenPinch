@@ -218,6 +218,9 @@ def test_weighted_average_output_tolerates_partially_missing_pinch_diagnostic():
 def test_weighted_summary_uses_explicit_cached_all_period_results(monkeypatch):
     root = Zone("Site")
     root.set_period_context({"base": 0, "peak": 1}, [1.0, 3.0], 2)
+    child = Zone("AreaA", parent_zone=root)
+    child.set_period_context(root.period_ids, [1.0, 3.0], 2)
+    root.subzones["AreaA"] = child
     problem = PinchProblem()
     problem._master_zone = root
     calls = []
@@ -332,10 +335,10 @@ def test_weighted_summary_replay_uses_fresh_zone_copies_and_restores_state(
         ("sentinel",),
         ("sentinel",),
     ]
-    assert problem.master_zone is root
+    assert problem._master_zone is root
     assert problem.master_zone.name == "Site"
     assert tuple(problem.master_zone.targets) == ("sentinel",)
-    assert problem.results is cached_results
+    assert problem._results is cached_results
     assert problem._last_target_run_spec is recorded_spec
 
 
@@ -380,10 +383,10 @@ def test_weighted_summary_replay_restores_state_when_a_period_fails(monkeypatch)
 
     assert seen[0][0] is not seen[1][0]
     assert [name for _zone, name in seen] == ["Site", "Site"]
-    assert problem.master_zone is root
+    assert problem._master_zone is root
     assert problem.master_zone.name == "Site"
     assert tuple(problem.master_zone.targets) == ("sentinel",)
-    assert problem.results is cached_results
+    assert problem._results is cached_results
     assert problem._last_target_run_spec is recorded_spec
 
 

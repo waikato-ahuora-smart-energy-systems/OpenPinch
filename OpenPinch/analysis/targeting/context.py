@@ -19,10 +19,21 @@ def target_matches_requested_period(
     *,
     args: dict | None,
     period_ids,
+    config=None,
 ) -> bool:
     """Return ``True`` when an existing target was solved for the requested period."""
     if target is None:
         return False
+    if config is not None:
+        previous = getattr(getattr(target, "config", None), "_values", {})
+        current = config._values
+        prefixes = ("THERMAL_", "DIRECT_", "INPUT_UNIT_", "OUTPUT_UNIT_", "COSTING_")
+        if any(
+            previous.get(key) != value
+            for key, value in current.items()
+            if key.startswith(prefixes)
+        ):
+            return False
 
     idx, sid = get_period_index(period_ids=period_ids, args=args)
     target_idx = getattr(target, "period_idx", None)

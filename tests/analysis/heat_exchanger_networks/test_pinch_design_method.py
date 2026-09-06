@@ -829,12 +829,12 @@ def test_solver_arrays_serialise_shapes_and_reject_invalid_entry_points() -> Non
 
 def test_solver_arrays_reject_missing_stream_and_utility_collections() -> None:
     missing_hot = _four_stream_problem()
-    missing_hot.master_zone.hot_streams._streams = {}
+    missing_hot._master_zone.hot_streams._streams = {}
     with pytest.raises(ValueError, match="hot and cold streams"):
         problem_to_solver_arrays(missing_hot, 14.0)
 
     missing_hot_utility = _four_stream_problem()
-    missing_hot_utility.master_zone.hot_utilities._streams = {}
+    missing_hot_utility._master_zone.hot_utilities._streams = {}
     with pytest.raises(ValueError, match="hot and cold utilities"):
         problem_to_solver_arrays(missing_hot_utility, 14.0)
 

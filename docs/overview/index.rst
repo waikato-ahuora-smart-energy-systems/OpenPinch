@@ -12,3 +12,5 @@ deeper fundamentals or API reference.
    capability-matrix
    workflow-map
    support-and-stability
+
+   analysis-migration

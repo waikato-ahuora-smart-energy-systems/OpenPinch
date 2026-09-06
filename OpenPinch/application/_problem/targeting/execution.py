@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+from copy import deepcopy
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from ....analysis.numerics import get_period_index
@@ -28,10 +30,40 @@ def resolve_target_zone(
     if selected_master_zone is None:
         raise RuntimeError("Load problem source data first before targeting.")
     if isinstance(application_zone, Zone):
-        return application_zone
+        application_zone = application_zone.address
     if application_zone is None:
         return selected_master_zone
-    return selected_master_zone.get_subzone(application_zone)
+    if not isinstance(application_zone, str) or not application_zone.strip():
+        raise ValueError("Target zone must be a non-empty local address.")
+    selector = application_zone.strip()
+    matches = [
+        zone
+        for zone in walk_zone_tree(selected_master_zone)
+        if selector in (zone.address, zone.name)
+        or zone.address == f"{selected_master_zone.name}/{selector}"
+    ]
+    if len(matches) != 1:
+        raise ValueError(f"Target zone {selector!r} was not found or is ambiguous.")
+    return matches[0]
+
+
+@contextmanager
+def scratch_child_targets(zone: Zone):
+    """Keep child prerequisite products private to one selected-zone operation."""
+    children = list(walk_zone_tree(zone))[1:]
+    previous = [(child, child._targets, child._graphs) for child in children]
+    root = zone
+    while isinstance(root.parent_zone, Zone):
+        root = root.parent_zone
+    memo = {id(current): current for current in walk_zone_tree(root)}
+    for child in children:
+        child._targets, child._graphs = deepcopy((child._targets, child._graphs), memo)
+    try:
+        yield
+    finally:
+        for child, targets, graphs in previous:
+            child._targets = targets
+            child._graphs = graphs
 
 
 def walk_zone_tree(zone: Zone):
@@ -77,6 +109,11 @@ def attach_process_component_work_targets(
             period_idx=period_idx,
         )
         for target in current_zone.targets.values():
+            if (
+                period_idx is not None
+                and getattr(target, "period_idx", None) != period_idx
+            ):
+                continue
             if hasattr(target, "process_component_work_target"):
                 target.process_component_work_target = component_work
             if (
@@ -104,6 +141,10 @@ def resolve_runtime_period_options(
     """Normalize runtime period selectors to canonical id/index values."""
     runtime_options = dict(options or {})
     idx, sid = get_period_index(period_ids=zone.period_ids, args=runtime_options)
+    if sid is None:
+        sid = next(
+            (name for name, index in zone.period_ids.items() if index == idx), None
+        )
     runtime_options["period_idx"] = idx
     if sid is not None:
         runtime_options["period_id"] = sid
@@ -152,6 +193,12 @@ def execute_targeting(
     master = problem._build_execution_master_zone()
     runtime_options, sid = problem._resolve_runtime_period_options(options, zone=master)
     zone = problem._resolve_target_zone(application_zone, master_zone=master)
+    if target_id != "Energy Transfer Analysis":
+        parent = zone.parent_zone
+        while isinstance(parent, Zone):
+            parent.targets.clear()
+            parent.graphs.clear()
+            parent = parent.parent_zone
     if include_subzones:
         problem._run_targeting_for_zone_and_subzones(
             zone=zone,
@@ -161,10 +208,11 @@ def execute_targeting(
             sid=sid,
         )
     else:
-        if direct_service_func is not None:
-            direct_service_func(zone, runtime_options)
-        if indirect_service_func is not None:
-            indirect_service_func(zone, runtime_options)
+        with scratch_child_targets(zone):
+            if direct_service_func is not None:
+                direct_service_func(zone, runtime_options)
+            if indirect_service_func is not None:
+                indirect_service_func(zone, runtime_options)
         problem._attach_process_component_work_targets(master, runtime_options)
         problem._results = TargetOutput.model_validate(
             extract_func(master, period_id=sid)
@@ -199,8 +247,9 @@ def execute_cogeneration_targeting(
             sid=sid,
         )
     else:
-        if service_func is not None:
-            service_func(zone, runtime_options)
+        with scratch_child_targets(zone):
+            if service_func is not None:
+                service_func(zone, runtime_options)
         problem._attach_process_component_work_targets(master, runtime_options)
         problem._results = TargetOutput.model_validate(
             extract_func(master, period_id=sid)

@@ -43,6 +43,13 @@ from ..arguments import (
     split_runtime_and_configuration_options,
     temporary_zone_configuration,
 )
+from ..targeting.catalog import require_available
+from ..targeting.provenance import validate_base_target
+from ..targeting.state import (
+    prepared_period_state,
+    snapshot_problem,
+    target_transaction,
+)
 
 if TYPE_CHECKING:
     from ....contracts.heat_recovery_dt_min import HeatRecoveryDtMinResult
@@ -91,45 +98,30 @@ class _AllPeriodsTargetAccessor:
         self._target = target
 
     def _run(self, method_name: str, *, workers: int, kwargs: dict[str, Any]):
-        if isinstance(workers, bool) or int(workers) < 1:
+        if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
             raise ValueError("workers must be a positive integer.")
         problem = self._target._problem
         period_ids = list(problem.period_ids)
-        original_zone = problem._master_zone
-        original_results = problem._results
-        original_spec = problem._last_target_run_spec
-        baseline_zone = deepcopy(original_zone)
+        if "period_id" in kwargs:
+            raise ValueError("all_periods selects every canonical period itself.")
 
-        def solve(period_id: str) -> TargetOutput:
-            isolated = type(problem)(
-                source=problem.to_problem_json(),
-                project_name=problem.project_name,
-            )
+        def solve(period_id: str):
+            isolated = snapshot_problem(problem, problem._period_states.get(period_id))
             method = getattr(isolated.target, method_name)
             method(period_id=period_id, **kwargs)
-            return TargetOutput.model_validate(
-                isolated.results.model_dump(mode="python")
-            )
+            return deepcopy(isolated._results), prepared_period_state(isolated)
 
-        try:
-            if workers == 1:
-                outputs = {}
-                for period_id in period_ids:
-                    problem._master_zone = deepcopy(baseline_zone)
-                    getattr(problem.target, method_name)(period_id=period_id, **kwargs)
-                    outputs[period_id] = TargetOutput.model_validate(
-                        problem.results.model_dump(mode="python")
-                    )
-            else:
-                with ThreadPoolExecutor(max_workers=workers) as executor:
-                    solved = executor.map(solve, period_ids)
-                    outputs = dict(zip(period_ids, solved, strict=True))
-            problem._period_results = outputs
-            return outputs
-        finally:
-            problem._master_zone = original_zone
-            problem._results = original_results
-            problem._last_target_run_spec = original_spec
+        if workers == 1:
+            solved = [solve(period_id) for period_id in period_ids]
+        else:
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                solved = list(executor.map(solve, period_ids))
+        outputs = {sid: item[0] for sid, item in zip(period_ids, solved, strict=True)}
+        states = {sid: item[1] for sid, item in zip(period_ids, solved, strict=True)}
+        detached = deepcopy(outputs)
+        problem._period_results = outputs
+        problem._period_states = states
+        return detached
 
     def direct_heat_integration(self, *, workers: int = 1, **kwargs):
         return self._run("direct_heat_integration", workers=workers, kwargs=kwargs)
@@ -228,7 +220,31 @@ class _TargetAccessor:
         basis = build_hpr_target_map_basis(target)
         if not isinstance(request, HprPerformanceMapRequest):
             raise TypeError("request must be an HprPerformanceMapRequest")
-        return generate_hpr_performance_map(basis, request)
+        result = generate_hpr_performance_map(basis, request)
+        if target.provenance is not None:
+            from ..targeting.provenance import canonical_json
+
+            provenance = target.provenance.model_copy(
+                update={
+                    "method_id": "target.hpr_performance_map",
+                    "effective_settings_json": canonical_json(
+                        {
+                            "target": dict(target.provenance.effective_settings),
+                            "request": request.model_dump(mode="json"),
+                        }
+                    ),
+                    "prerequisite_ids": (target.provenance.identity,),
+                }
+            )
+            result = result.model_copy(
+                update={
+                    "provenance": {
+                        **result.provenance,
+                        "analysis": provenance.model_dump(mode="json"),
+                    }
+                }
+            )
+        return result
 
     def _runtime(
         self,
@@ -243,6 +259,7 @@ class _TargetAccessor:
             runtime["period_id"] = period_id
         return runtime, option_config
 
+    @target_transaction
     def _execute(
         self,
         *,
@@ -353,6 +370,7 @@ class _TargetAccessor:
             indirect_service=indirect_heat_integration_service,
         )
 
+    @target_transaction
     def all_heat_integration(
         self,
         *,
@@ -368,12 +386,23 @@ class _TargetAccessor:
         root = self._problem._build_execution_master_zone()
         selected = self._problem._resolve_target_zone(zone, master_zone=root)
         with temporary_zone_configuration(root, config_overrides):
-            result = self._problem._run_targeting_for_zone_and_subzones(
-                zone=selected,
-                direct_service_func=direct_heat_integration_service,
-                indirect_service_func=indirect_heat_integration_service,
-                options=runtime,
-            )
+            if include_subzones:
+                result = self._problem._run_targeting_for_zone_and_subzones(
+                    zone=selected,
+                    direct_service_func=direct_heat_integration_service,
+                    indirect_service_func=indirect_heat_integration_service,
+                    options=runtime,
+                )
+            else:
+                self._problem._execute_targeting(
+                    target_id=TargetType.DI.value,
+                    application_zone=selected,
+                    options=runtime,
+                    include_subzones=False,
+                    direct_service_func=direct_heat_integration_service,
+                    indirect_service_func=indirect_heat_integration_service,
+                )
+                result = self._problem._results
         self._problem._record_target_run(
             "all_heat_integration",
             options={**config_overrides, **runtime},
@@ -406,6 +435,7 @@ class _TargetAccessor:
         extra_configuration: Mapping[str, Any] | None = None,
         simulation_backend: str | None = None,
     ) -> BaseTargetModel:
+        require_available(f"target.{surface}")
         normalized_backend = (
             None
             if simulation_backend is None
@@ -819,6 +849,7 @@ class _TargetAccessor:
             direct_service=area_cost_targeting_service,
         )
 
+    @target_transaction
     def _cogeneration(
         self,
         surface,
@@ -835,7 +866,13 @@ class _TargetAccessor:
         _set_if_not_none(configuration, "POWER_MIN_EFF", efficiency)
         runtime = dict(options or {})
         if base_target is not None:
-            runtime["base_target_type"] = getattr(base_target, "type", None)
+            runtime["base_target_type"] = validate_base_target(
+                self._problem,
+                base_target,
+                zone=zone,
+                period_id=period_id,
+                options=options,
+            )
         root = self._problem._build_execution_master_zone()
         runtime, option_config = self._runtime(
             options=runtime, period_id=period_id, configuration=configuration
@@ -878,6 +915,7 @@ class _TargetAccessor:
             **kwargs,
         )
 
+    @target_transaction
     def exergy(
         self,
         *,
@@ -889,7 +927,13 @@ class _TargetAccessor:
     ):
         runtime = dict(options or {})
         if base_target is not None:
-            runtime["base_target_type"] = getattr(base_target, "type", None)
+            runtime["base_target_type"] = validate_base_target(
+                self._problem,
+                base_target,
+                zone=zone,
+                period_id=period_id,
+                options=options,
+            )
         runtime, config = self._runtime(options=runtime, period_id=period_id)
         root = self._problem._build_execution_master_zone()
         with temporary_zone_configuration(root, config):
@@ -918,7 +962,13 @@ class _TargetAccessor:
     ):
         runtime = dict(options or {})
         if base_target is not None:
-            runtime["base_target_type"] = getattr(base_target, "type", None)
+            runtime["base_target_type"] = validate_base_target(
+                self._problem,
+                base_target,
+                zone=zone,
+                period_id=period_id,
+                options=options,
+            )
         return self._execute(
             surface="energy_transfer",
             target_id=TargetType.ET.value,

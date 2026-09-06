@@ -159,6 +159,7 @@ def test_energy_transfer_service_handles_period_context_and_error_paths():
     class FakeZone:
         def __init__(self):
             self.name = "Plant"
+            self.config = None
             self.targets = {}
             self.subzones = {}
             self.period_ids = {"peak": 1}
@@ -211,6 +212,7 @@ def test_energy_transfer_service_handles_period_context_and_error_paths():
 def test_ensure_energy_transfer_base_target_reports_missing_and_stale_refreshes():
     zone = SimpleNamespace(
         name="Plant",
+        config=None,
         targets={},
         subzones={},
         period_ids={"peak": 0},

@@ -8054,3 +8054,99 @@ The requirements now define the existing CoolProp-backed HPR targeting methods a
 **Context**: VERSION CONTROL - COMMIT REQUEST
 
 ---
+
+## Analysis Reliability - Authorized Implementation
+**Timestamp**: 2026-09-05T21:41:40Z
+**User Input**: "PLEASE IMPLEMENT THIS PLAN:
+# OpenPinch analysis reliability and extensibility
+
+## Summary
+
+Fix the five reproduced defects and establish shared execution, provenance, reporting, and aggregation contracts for future analysis methods.
+
+Retain descriptive `PinchProblem` and `PinchWorkspace` methods and method-specific result types. Permit targeted breaking changes to eliminate mutable-state ambiguity. Retain prepared state for each successfully solved period so dependent analyses can reuse calculations.
+
+New scientific methods—including Brayton completion, uncertainty analysis, and thermal storage—are excluded.
+
+## 1. Shared execution and state ownership
+
+- Introduce an application-owned execution context containing the selected local zone address, canonical period, effective configuration, prepared inputs, components, and compatible prerequisites.
+- Implement one snapshot operation for serial and parallel execution. Copy the zone tree and component records together, preserving internal stream references and rebinding component ownership to the isolated execution instance. Never reconstruct these snapshots solely from `to_problem_json()`.
+- Execute calculations and validate outputs before committing state. Failed targeting leaves the previous successful state intact. All-period calls commit the complete ordered batch only after every period succeeds; workspace batches retain their existing per-case failure isolation.
+- Retain one current prepared state per canonical period. Follow-on all-period analyses operate on those states. Missing prerequisites produce actionable errors for enrichment methods; methods that already calculate prerequisites continue doing so explicitly.
+- Centralize invalidation for input changes, configuration updates, component creation/activation/deactivation, and zone changes. Clear dependent scalar results, period states, graphs, and design/placement caches together.
+- Make public observation properties return detached snapshots or read-only mappings. Preserve explicit component activation methods as supported mutations; direct editing of observed domain state becomes unsupported.
+- Keep period states memory-only and replace superseded states rather than accumulating run history.
+
+## 2. Correct targeting behavior
+
+- **Period provenance:** preserve each target’s actual period ID and index. Selected-period reports include only compatible rows; never overwrite row identity during serialization. Invalidate dependent targets when their prerequisite changes.
+- **Configuration:** pass effective settings directly into enrichment calculations. Exergy must use the invocation’s ambient temperature rather than a cached target’s configuration. Reuse prerequisites only when their input and numerical configuration provenance remains compatible.
+- **Zone ownership:** convert `Zone` arguments to addresses and resolve them against the current execution tree, matching inverse-`dt_min` behavior. Reject missing or ambiguous addresses before execution.
+- **Subzone traversal:** honor `include_subzones=False` for the requested analysis. Aggregate methods may calculate necessary child prerequisites in scratch state, but must not commit or report child analyses unless traversal is enabled.
+- **Parallel equivalence:** use identical preparation, prerequisite selection, component accounting, and extraction for every worker count. Validate `workers` as a positive integer.
+
+## 3. Extensible methods and typed results
+
+- Add an immutable internal method catalog describing supported scopes, prerequisites, period behavior, configuration fields, optional dependencies, availability, and result adapters. Keep named public callables; introduce no runtime plugin registry or string-based public dispatcher.
+- Route thermal targeting and enrichment through the shared executor. Describe inverse targeting, utility placement, performance maps, and HEN workflows in the catalog while preserving their existing specialized execution semantics.
+- Add immutable `AnalysisProvenance` metadata to method-specific results: method identity, zone address, period selection, prepared-input fingerprint, effective settings, and prerequisite identities. Place shared domain metadata inward in the dependency hierarchy.
+- Replace central target-classification and reporting type switches with explicit family-owned adapters. Thermal results retain utility metrics; other result families need not inherit `UtilitySummaryTarget`.
+- Preserve existing result payloads and named methods where practical. Document breaking changes to observation mutability, provenance fields, stale-result handling, and result ownership; add no legacy aliases.
+- Validate supplied `base_target` references against the current problem, scope, period, and input provenance.
+- Keep report, plot, and export operations observational. Inverse targeting and performance-map generation retain their non-mutating contracts.
+
+## 4. Aggregation and contributor contracts
+
+- Replace manually maintained aggregation field lists with metric specifications declaring units and behavior: weighted mean, maximum, consensus, derived value, or exclusion.
+- Preserve established aggregation behavior for current metrics. Keep period-specific simulation records attached to their originating periods; do not present the first period’s record as provenance for an aggregate.
+- Fail validation when a new reportable metric lacks an aggregation policy.
+- Check catalog consistency against public accessors, workspace mirrors, result adapters, and the capability documentation.
+- Add a contributor guide covering the minimum steps for adding a method, with an existing nonthermal result family demonstrating the extension path.
+- Mark Brayton as unavailable in capability metadata and fail before preparing or mutating analysis state.
+
+## 5. Implementation sequence and acceptance
+
+Implement in four sequential units: **execution snapshots and invalidation → targeting corrections and period chaining → method/result adapters → aggregation and documentation**. Add failing regressions before each correction.
+
+Acceptance tests must demonstrate:
+
+- Process-MVR recovery and compressor work agree between serial and parallel runs.
+- Mixed `base`/`peak` execution cannot relabel stale rows or mismatch IDs and indices.
+- Exergy overrides match an independently prepared problem using the same ambient temperature.
+- Foreign-zone selectors resolve locally without modifying the originating problem.
+- Subzone traversal and scratch prerequisites follow the defined commit/report policy.
+- All-period direct integration followed by exergy succeeds without rerunning compatible thermal prerequisites.
+- Failures leave prior successful state unchanged; component changes invalidate all dependent period state.
+- New result families integrate without changing the central thermal serializer.
+- Every reportable metric has an explicit, tested aggregation policy.
+
+Use Hypothesis for lifecycle sequences, snapshot isolation, serial/parallel equivalence, provenance consistency, and serialization round trips, retaining shrinking and the repository seed. Run the full configured suite, relevant real-solver/TESPy gates, branch coverage, Ruff, warning-strict documentation, notebook checks, and installed-artifact smoke tests.
+
+Update the tutorial inventory, affected notebooks, migration notes, and release notes together. Record implementation progress and verification in the existing AI-DLC artifacts once implementation begins. Property-based testing remains enabled; the existing disabled security and resiliency extensions remain unchanged."
+**AI Response**: "Implementing the four approved units; initial regression suite produced 11 expected failures. Shared snapshots, transactional execution, and targeted corrections are in progress."
+**Context**: User explicitly approved implementation and validation of the entire plan.
+
+---
+
+## Construction — execution and extension contracts
+**Timestamp**: 2026-09-05T22:11:36Z
+**AI Response**: Implemented shared transactional snapshots and centralized invalidation, canonical period filtering, local zone resolution, effective enrichment settings, prepared-period retention, immutable provenance/catalog, family reporting adapters, and explicit aggregation policies. Added and verified 27 focused reliability/contract/property checks; lifecycle tests retain Hypothesis shrinking and seed 20260715. Updated contributor and migration guides, capability generator, release notes, tutorial source and inventory. Warning-strict Sphinx passed. Full application/non-solver, notebook, and real-solver gates are running; historical mutable-observation fixtures are being migrated.
+**Context**: Units 1–4 implementation complete; full verification and follow-up corrections in progress. PBT enabled; Security and Resiliency remain disabled.
+
+---
+
+## Build and Test — analysis reliability complete
+**Timestamp**: 2026-09-05T22:47:11Z
+**AI Response**: Completed the four approved units. Final configured suite: 3,086 passed, 3 expected optional-notebook skips, 4 solver deselections; combined line/branch coverage 95.73% exceeds the configured 95% floor. Real-solver gate: 3 passed, existing nine-stream benchmark skipped. TESPy: 58 passed plus guarded public target/map smoke. Ruff, warning-strict Sphinx, notebook/inventory checks, wheel/sdist builds, and isolated installed core/TESPy artifact smoke tests passed. Updated migration/contributor guides, capabilities, notebooks, release notes, state, and all plan checkboxes. Additional review regressions fixed temporary configuration fingerprints, component source identity, and multiperiod HEN method identity.
+**Context**: Implementation and verification complete. PBT remains enabled; disabled Security and Resiliency configurations unchanged. No publication or deployment performed. Detailed evidence is in construction/build-and-test/analysis-reliability-verification.md.
+
+---
+
+## Commit — analysis reliability and extensibility
+**Timestamp**: 2026-09-06T12:53:47Z
+**User Input**: "commit"
+**AI Response**: "Reviewed the implementation changes and verified patch whitespace. Committing the completed implementation, tests, documentation, notebooks, and AI-DLC records as requested."
+**Context**: Explicit authorization to commit; prior full verification remains recorded above. No push or deployment requested.
+
+---

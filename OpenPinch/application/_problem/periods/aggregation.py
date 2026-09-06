@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from ....contracts.output import TargetOutput
+from ....contracts.report_metrics import AggregationPolicy, metric_specifications
 from ....contracts.report_units import split_report_value
 from ....contracts.reporting import HeatUtility, PinchTemp, TargetResults
 from ....domain._stream.value_state import resolve_period_weights
@@ -165,48 +166,6 @@ def summary_results(
     return output_for_period_mode(outputs, weights, periods=periods)
 
 
-_VALUE_FIELDS = (
-    "degree_of_integration",
-    "Qh",
-    "Qc",
-    "Qr",
-    "utility_cost",
-    "work_target",
-    "process_component_work_target",
-    "turbine_efficiency_target",
-    "area",
-    "capital_cost",
-    "total_cost",
-    "exergy_sources",
-    "exergy_sinks",
-    "ETE",
-    "exergy_req_min",
-    "exergy_des_min",
-    "hpr_utility_total",
-    "hpr_work",
-    "hpr_external_utility",
-    "hpr_ambient_hot",
-    "hpr_ambient_cold",
-    "hpr_cop",
-    "hpr_eta_he",
-    "hpr_operating_cost",
-)
-_HPR_MAX_VALUE_FIELDS = (
-    "hpr_capital_cost",
-    "hpr_annualized_capital_cost",
-    "hpr_compressor_capital_cost",
-    "hpr_heat_exchanger_capital_cost",
-)
-_NUMERIC_FIELDS = ("num_units",)
-_CONSENSUS_FIELDS = (
-    "hpr_cycle",
-    "hpr_simulation_backend",
-    "hpr_success",
-    "hpr_hot_streams",
-    "hpr_cold_streams",
-)
-
-
 def combine_period_outputs(outputs: Sequence[TargetOutput]) -> TargetOutput:
     """Return one output with period-specific target rows concatenated."""
     ordered_outputs = list(outputs)
@@ -324,17 +283,31 @@ def _weighted_average_target(
     data = first.model_dump(mode="python")
     data["period_id"] = WEIGHTED_AVERAGE_PERIOD_ID
     data["period_idx"] = None
-    for field in _VALUE_FIELDS:
-        data[field] = _weighted_report_value(targets, field, weights)
-    for field in _HPR_MAX_VALUE_FIELDS:
-        data[field] = _max_report_value(targets, field)
+    for field, spec in metric_specifications(type(first)).items():
+        if spec.aggregation is AggregationPolicy.WEIGHTED_MEAN:
+            aggregate = (
+                _weighted_numeric_attr
+                if spec.representation == "scalar"
+                else _weighted_report_value
+            )
+            data[field] = aggregate(targets, field, weights)
+        elif spec.aggregation is AggregationPolicy.MAXIMUM:
+            data[field] = _max_report_value(targets, field)
+        elif spec.aggregation is AggregationPolicy.CONSENSUS:
+            data[field] = _consensus_value(
+                getattr(target, field, None) for target in targets
+            )
+        elif spec.aggregation is AggregationPolicy.EXCLUDE:
+            data[field] = None
+        elif field not in {
+            "period_id",
+            "hpr_total_annualized_cost",
+            "pinch_temp",
+            "hot_utilities",
+            "cold_utilities",
+        }:
+            raise ValueError(f"No derived aggregation implementation for {field!r}.")
     data["hpr_total_annualized_cost"] = _total_hpr_annualized_cost(data)
-    for field in _NUMERIC_FIELDS:
-        data[field] = _weighted_numeric_attr(targets, field, weights)
-    for field in _CONSENSUS_FIELDS:
-        data[field] = _consensus_value(
-            getattr(target, field, None) for target in targets
-        )
     data["pinch_temp"] = PinchTemp(
         cold_temp=_weighted_report_value(
             targets,
@@ -351,7 +324,7 @@ def _weighted_average_target(
     )
     data["hot_utilities"] = _weighted_utilities(targets, "hot_utilities", weights)
     data["cold_utilities"] = _weighted_utilities(targets, "cold_utilities", weights)
-    return TargetResults.model_validate(data)
+    return type(first).model_validate(data)
 
 
 def _weighted_report_value(

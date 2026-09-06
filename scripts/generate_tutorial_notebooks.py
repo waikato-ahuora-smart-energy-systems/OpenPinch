@@ -128,7 +128,8 @@ NOTEBOOKS = {
                 '    period_id="0",\n'
                 ")\n"
                 "ordinary_target_preserved = (\n"
-                "    problem.results is cached_results_before_inverse\n"
+                '    problem.results.model_dump(mode="json")\n'
+                '    == cached_results_before_inverse.model_dump(mode="json")\n'
                 ")\n"
                 'recovery_dt_min_summary = recovery_dt_min.model_dump(mode="json")\n'
                 "thermodynamic_limit_matches_direct = abs(\n"
@@ -179,7 +180,9 @@ NOTEBOOKS = {
                 'problem = PinchProblem(segmented_input, project_name="Site")\n'
                 "validated = problem.validate()\n"
                 "target = problem.target.direct_heat_integration()\n"
+                "# Observations are detached; use problem methods for changes.\n"
                 "site_zone = problem.master_zone\n"
+                "assert site_zone is not problem.master_zone\n"
                 "problem.summary_frame()"
             ),
             code(
@@ -311,6 +314,12 @@ NOTEBOOKS = {
                 "period_outputs = problem.target.all_periods.all_heat_integration()\n"
                 "direct_periods = "
                 "problem.target.all_periods.direct_heat_integration()\n"
+                "# Enrich the retained period states without solving direct targets again.\n"
+                "period_exergy = problem.target.all_periods.exergy(workers=2)\n"
+                "assert all(\n"
+                "    row.provenance.period_ids == (sid,)\n"
+                "    for sid, output in period_exergy.items() for row in output.targets\n"
+                ")\n"
                 "zero_recovery_dt_mins = "
                 "problem.target.all_periods.heat_recovery_dt_min(\n"
                 "    heat_recovery=0.0\n"
@@ -357,7 +366,10 @@ NOTEBOOKS = {
             ),
             code(
                 "base_target = problem.target.direct_heat_integration()\n"
-                "exergy = problem.target.exergy(base_target=base_target)\n"
+                "exergy = problem.target.exergy(\n"
+                '    base_target=base_target, options={"ENV_TEMPERATURE": 25.0}\n'
+                ")\n"
+                'assert exergy.provenance.effective_settings["ENV_TEMPERATURE"] == 25.0\n'
                 "period_area_cost = "
                 "problem.target.all_periods.heat_exchanger_area_and_cost()\n"
                 "period_exergy = problem.target.all_periods.exergy()\n"
@@ -585,6 +597,11 @@ NOTEBOOKS = {
                 "stage_results = mvr.stage_results_by_period\n"
                 "affected_zones = mvr.affected_zone_paths\n"
                 "compressor_work = mvr.work_for_zone(problem.master_zone)\n"
+                "serial = problem.target.all_periods.direct_heat_integration(workers=1)\n"
+                "parallel = problem.target.all_periods.direct_heat_integration(workers=2)\n"
+                'assert [o.model_dump(mode="json") for o in serial.values()] == [\n'
+                '    o.model_dump(mode="json") for o in parallel.values()\n'
+                "]\n"
                 "try:\n"
                 "    cascade = problem.target.mvr_heat_pump(\n"
                 "        load_fraction=0.25, maximum_restarts=1\n"
@@ -614,10 +631,10 @@ NOTEBOOKS = {
                 "cogeneration_summary = problem.summary_frame()"
             ),
             code(
-                "sun_smith = problem.target.sun_smith_cogeneration(base_target=base)\n"
-                "varbanov = problem.target.varbanov_cogeneration(base_target=base)\n"
+                "sun_smith = problem.target.sun_smith_cogeneration(base_target=default)\n"
+                "varbanov = problem.target.varbanov_cogeneration(base_target=sun_smith)\n"
                 "isentropic = problem.target.isentropic_cogeneration(\n"
-                "    efficiency=0.8, base_target=base\n"
+                "    efficiency=0.8, base_target=varbanov\n"
                 ")"
             ),
         ],
@@ -659,7 +676,9 @@ NOTEBOOKS = {
                 'site = PinchProblem("pulp_mill.json", project_name="Site")\n'
                 "site.target.all_heat_integration()\n"
                 "base = site.target.total_site_heat_integration()\n"
-                "energy_transfer = site.target.energy_transfer(base_target=base)\n"
+                "energy_transfer = site.target.energy_transfer(\n"
+                "    base_target=base, include_subzones=True\n"
+                ")\n"
                 "transfer_summary = site.summary_frame()"
             ),
             code(

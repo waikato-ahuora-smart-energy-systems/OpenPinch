@@ -542,7 +542,8 @@ def test_workspace_active_case_delegates_and_compare_to(monkeypatch, tmp_path: P
     assert workspace.problem_data is not None
     assert workspace.problem_filepath is None
     assert workspace.results is None
-    assert workspace.master_zone is case.master_zone
+    assert workspace.master_zone is not case.master_zone
+    assert workspace.master_zone.address == case.master_zone.address
     assert workspace.validate().streams
     assert workspace.export_excel(tmp_path) == tmp_path
 

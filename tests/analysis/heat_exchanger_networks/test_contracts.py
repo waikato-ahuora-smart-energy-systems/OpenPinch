@@ -467,7 +467,7 @@ def test_hen_dt_cont_multipliers_feed_quality_pdm_multiplier_grid():
     problem = PinchProblem(
         source=FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json"
     )
-    problem.master_zone.config = Configuration(
+    problem._master_zone.config = Configuration(
         options={
             "HENS_APPROACH_TEMPERATURES": [10.0, 20.0],
             "HENS_DT_CONT_MULTIPLIERS": [1.0, 1.5],
@@ -484,7 +484,7 @@ def test_hen_dt_cont_multipliers_feed_quality_pdm_multiplier_grid():
     tier_problem = PinchProblem(
         source=FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json"
     )
-    tier_problem.master_zone.config = Configuration(
+    tier_problem._master_zone.config = Configuration(
         options={
             "HENS_APPROACH_TEMPERATURES": [10.0, 20.0],
             "HENS_DT_CONT_MULTIPLIERS": [1.0, 1.5],
@@ -634,7 +634,7 @@ def test_evm_branch_options_round_trip_to_workflow_settings():
     problem = PinchProblem(
         source=FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json"
     )
-    problem.master_zone.config = Configuration(
+    problem._master_zone.config = Configuration(
         options={
             "HENS_EVM_N_AD_BRANCHES": 2,
             "HENS_EVM_N_RM_BRANCHES": 3,
@@ -653,7 +653,7 @@ def test_synthesis_quality_tier_derives_evm_branch_widths() -> None:
     problem = PinchProblem(
         source=FIXTURE_ROOT / "Four-stream-Yee-and-Grossmann-1990-1.json"
     )
-    problem.master_zone.config = Configuration(
+    problem._master_zone.config = Configuration(
         options={"HENS_SYNTHESIS_QUALITY_TIER": 5}
     )
 

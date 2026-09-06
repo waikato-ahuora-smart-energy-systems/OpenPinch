@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from copy import deepcopy
 from typing import Any, Iterable
 
 import numpy as np
@@ -293,6 +294,7 @@ def run_exergy_targeting_service(
             target,
             args=compare_args,
             period_ids=getattr(zone, "period_ids", None),
+            config=zone.config,
         ):
             if explicit_target_type is not None:
                 raise RuntimeError(
@@ -303,7 +305,17 @@ def run_exergy_targeting_service(
                 )
             continue
 
-        zone.add_target(apply_func(target))
+        # Enrichment uses this invocation's settings, not the base run's settings.
+        target = deepcopy(target, {id(target.parent_zone): target.parent_zone})
+        target.config._values.update(
+            {
+                key: value
+                for key, value in zone.config._values.items()
+                if key.startswith("ENV_")
+            }
+        )
+        target.config._build_groups(target.config._values)
+        zone.add_target(apply_func(target), invalidate_dependents=False)
         zone._selected_exergy_target_type = target_type
         return zone
 

@@ -207,7 +207,20 @@ def calculate_heat_recovery_dt_min(
             f"thermodynamic limit {exc.limit:g} kW for scope "
             f"{selected.address!r}, period {canonical_id!r}."
         ) from exc
-    return _result_contract(solution, zone=selected, period_id=canonical_id)
+    from ._problem.targeting.provenance import make_provenance
+
+    result = _result_contract(solution, zone=selected, period_id=canonical_id)
+    return result.model_copy(
+        update={
+            "provenance": make_provenance(
+                problem,
+                "target.heat_recovery_dt_min",
+                selected,
+                period_ids=(canonical_id,),
+                settings={**selected.config._values, "heat_recovery": requested},
+            )
+        }
+    )
 
 
 def _period_requests(

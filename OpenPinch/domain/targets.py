@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional
+from types import MappingProxyType
+from typing import Any, ClassVar, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .analysis import AnalysisProvenance
 from .configuration import Configuration
 from .enums import IntegrationType, TargetMethod, TargetType, ZoneType
 from .problem_table import ProblemTable
@@ -31,49 +33,6 @@ def _normalise_target_name(
     return zone_name if str(zone_name).endswith(suffix) else f"{zone_name}{suffix}"
 
 
-def _target_classification(
-    target_type: str,
-    *,
-    base_target_type: str | None = None,
-) -> tuple[str, str]:
-    """Return the public integration route and analysis method."""
-    process_types = {
-        TargetType.DI.value,
-        TargetType.DHP.value,
-        TargetType.DR.value,
-        TargetType.TL.value,
-    }
-    utility_types = {
-        TargetType.II.value,
-        TargetType.IHP.value,
-        TargetType.IR.value,
-        TargetType.SA.value,
-    }
-    if target_type == TargetType.ET.value:
-        route = (
-            IntegrationType.Utility.value
-            if base_target_type
-            in {TargetType.II.value, TargetType.IHP.value, TargetType.IR.value}
-            else IntegrationType.Process.value
-        )
-        return route, TargetMethod.EnergyTransfer.value
-    if target_type in process_types:
-        route = IntegrationType.Process.value
-    elif target_type in utility_types:
-        route = IntegrationType.Utility.value
-    else:
-        raise ValueError(
-            f"No reporting classification for target type {target_type!r}."
-        )
-    if target_type in {TargetType.DHP.value, TargetType.IHP.value}:
-        method = TargetMethod.HeatPump.value
-    elif target_type in {TargetType.DR.value, TargetType.IR.value}:
-        method = TargetMethod.Refrigeration.value
-    else:
-        method = TargetMethod.HeatExchange.value
-    return route, method
-
-
 class BaseTargetModel(BaseModel):
     """Shared metadata for all solved target objects."""
 
@@ -83,7 +42,27 @@ class BaseTargetModel(BaseModel):
         arbitrary_types_allowed=True,
     )
 
+    target_types: ClassVar[tuple[str, ...]] = ()
+    integration_route: ClassVar[str | None] = None
+    analysis_method: ClassVar[str | None] = None
+    prerequisite_target_types: ClassVar[tuple[str, ...]] = ()
+
+    def prerequisite_types(self) -> tuple[str, ...]:
+        return self.prerequisite_target_types
+
+    @classmethod
+    def _classification(cls, data):
+        if cls.integration_route is not None and cls.analysis_method is not None:
+            return cls.integration_route, cls.analysis_method
+        family = _TARGET_FAMILIES.get(str(data.get("type", "")))
+        if family is None:
+            raise ValueError(
+                f"No reporting classification for target type {data.get('type')!r}."
+            )
+        return family._classification(data)
+
     zone_name: Optional[str] = Field(default=None, exclude=True, repr=False)
+    provenance: AnalysisProvenance | None = None
     scope: str
     zone_type: str = ZoneType.P.value
     integration_type: str
@@ -119,10 +98,7 @@ class BaseTargetModel(BaseModel):
         data["scope"] = str(scope)
         if not data.get("type"):
             raise ValueError("type is required.")
-        integration_type, target_method = _target_classification(
-            str(data.get("type") or ""),
-            base_target_type=data.get("base_target_type"),
-        )
+        integration_type, target_method = cls._classification(data)
         data["integration_type"] = integration_type
         data["target_method"] = target_method
         data["name"] = _normalise_target_name(
@@ -177,6 +153,13 @@ class UtilitySummaryTarget(BaseTargetModel):
 class DirectIntegrationTarget(GraphBackedTarget, UtilitySummaryTarget):
     """Detailed direct-integration runtime target."""
 
+    target_types = (
+        TargetType.DI.value,
+        TargetType.TL.value,
+    )
+    integration_route = IntegrationType.Process.value
+    analysis_method = TargetMethod.HeatExchange.value
+
     pt: ProblemTable
     pt_real: ProblemTable
     utility_heat_recovery_target: Optional[float] = None
@@ -191,11 +174,20 @@ class DirectIntegrationTarget(GraphBackedTarget, UtilitySummaryTarget):
 class SubzoneAggregateTarget(UtilitySummaryTarget):
     """Internal utility summary built from immediate solved subzones."""
 
+    target_types = (TargetType.SA.value,)
+    integration_route = IntegrationType.Utility.value
+    analysis_method = TargetMethod.HeatExchange.value
+
     reportable: bool = Field(default=False, exclude=True, repr=False)
 
 
 class IndirectIntegrationTarget(GraphBackedTarget, UtilitySummaryTarget):
     """Utility-mediated integration target for an aggregate Zone scope."""
+
+    target_types = (TargetType.II.value,)
+    prerequisite_target_types = (TargetType.DI.value, TargetType.SA.value)
+    integration_route = IntegrationType.Utility.value
+    analysis_method = TargetMethod.HeatExchange.value
 
     pt: ProblemTable
     work_target: Optional[float] = None
@@ -204,6 +196,20 @@ class IndirectIntegrationTarget(GraphBackedTarget, UtilitySummaryTarget):
 
 class EnergyTransferTarget(GraphBackedTarget, UtilitySummaryTarget):
     """Energy transfer diagram and heat-surplus/deficit table target."""
+
+    target_types = (TargetType.ET.value,)
+
+    def prerequisite_types(self) -> tuple[str, ...]:
+        return (self.base_target_type,)
+
+    integration_route = IntegrationType.Process.value
+    analysis_method = TargetMethod.EnergyTransfer.value
+
+    @classmethod
+    def _classification(cls, data):
+        base = _TARGET_FAMILIES.get(data.get("base_target_type"))
+        route = base.integration_route if base is not None else cls.integration_route
+        return route, cls.analysis_method
 
     pt: ProblemTable
     base_target_type: str
@@ -252,17 +258,37 @@ class HeatPumpTargetBase(GraphBackedTarget, UtilitySummaryTarget):
 class DirectHeatPumpTarget(HeatPumpTargetBase):
     """Direct heat pump targeting result."""
 
+    target_types = (TargetType.DHP.value,)
+    prerequisite_target_types = (TargetType.DI.value,)
+    integration_route = IntegrationType.Process.value
+    analysis_method = TargetMethod.HeatPump.value
+
 
 class IndirectHeatPumpTarget(HeatPumpTargetBase):
     """Indirect heat pump targeting result."""
+
+    target_types = (TargetType.IHP.value,)
+    prerequisite_target_types = (TargetType.II.value,)
+    integration_route = IntegrationType.Utility.value
+    analysis_method = TargetMethod.HeatPump.value
 
 
 class DirectRefrigerationTarget(HeatPumpTargetBase):
     """Direct refrigeration targeting result."""
 
+    target_types = (TargetType.DR.value,)
+    prerequisite_target_types = (TargetType.DI.value,)
+    integration_route = IntegrationType.Process.value
+    analysis_method = TargetMethod.Refrigeration.value
+
 
 class IndirectRefrigerationTarget(HeatPumpTargetBase):
     """Indirect refrigeration targeting result."""
+
+    target_types = (TargetType.IR.value,)
+    prerequisite_target_types = (TargetType.II.value,)
+    integration_route = IntegrationType.Utility.value
+    analysis_method = TargetMethod.Refrigeration.value
 
 
 AnyTargetModel = (
@@ -291,3 +317,21 @@ __all__ = [
     "SubzoneAggregateTarget",
     "UtilitySummaryTarget",
 ]
+
+
+_TARGET_FAMILIES = MappingProxyType(
+    {
+        target_type: family
+        for family in (
+            DirectIntegrationTarget,
+            SubzoneAggregateTarget,
+            IndirectIntegrationTarget,
+            EnergyTransferTarget,
+            DirectHeatPumpTarget,
+            IndirectHeatPumpTarget,
+            DirectRefrigerationTarget,
+            IndirectRefrigerationTarget,
+        )
+        for target_type in family.target_types
+    }
+)

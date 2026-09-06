@@ -85,7 +85,7 @@ def test_decomposition_targets_use_copied_zone_with_minimum_dt_cont(
 
     def fake_compute_direct_integration_targets(zone, args=None):
         assert args == {"period_id": "0"}
-        captured["same_zone"] = zone is problem.master_zone
+        captured["same_zone"] = zone is problem._master_zone
         captured["dt_cont_multiplier"] = zone.dt_cont_multiplier
         captured["process_dt_cont"] = [
             float(stream.delta_t_contribution.to("delta_degC").value)

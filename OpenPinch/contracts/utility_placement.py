@@ -8,6 +8,8 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from ..domain.analysis import AnalysisProvenance
+
 
 class _FrozenContract(BaseModel):
     """Base configuration shared by specialist public values."""
@@ -732,6 +734,7 @@ class PlacementTermination(_FrozenContract):
 class UtilityPlacementResult(_FrozenContract):
     """Complete detached result exposed by the later service and presentation."""
 
+    provenance: AnalysisProvenance | None = None
     request: UtilityPlacementRequest
     scope: UtilityPlacementBaseTarget
     base_target_id: str
