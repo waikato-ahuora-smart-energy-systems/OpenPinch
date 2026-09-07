@@ -3246,7 +3246,8 @@ def test_loading_zone_tree_and_packaged_sample_edges(monkeypatch, tmp_path: Path
         current_project_name="Demo",
     )
 
-    assert loaded_target_input.input_data is target_input
+    assert loaded_target_input.input_data == target_input
+    assert loaded_target_input.input_data is not target_input
     assert loaded_target_input.source_kind == "target_input"
     assert loaded_csv_tuple.source_kind == "csv"
 

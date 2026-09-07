@@ -71,10 +71,9 @@ def _cluster_candidates(
     tol_norm: float,
 ) -> list:
     """Cluster candidate points in normalized space and keep best per cluster."""
-    if np.all(ub != lb):
-        xs_norm = (xs - lb) / (ub - lb)
-    else:
-        xs_norm = (xs - lb) / (ub - lb + 1e-3)
+    span = ub - lb
+    # A fixed coordinate must not rescale any of the varying coordinates.
+    xs_norm = (xs - lb) / np.where(span == 0.0, 1.0, span)
 
     centers_norm = []
     best_idx_per_cluster = []

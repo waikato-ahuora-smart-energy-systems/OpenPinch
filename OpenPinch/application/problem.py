@@ -377,11 +377,11 @@ class PinchProblem:
         )
 
     def validate(self) -> TargetInput:
-        """Validate the currently loaded problem data without running targeting."""
+        """Validate loaded input and return a detached model without targeting."""
         if self._problem_data is None:
             raise RuntimeError("No input loaded. Call load(...) first.")
         try:
-            input_data = TargetInput.model_validate(self._problem_data)
+            input_data = TargetInput.model_validate(deepcopy(self._problem_data))
         except ValidationError as exc:
             raise ValueError(
                 _format_schema_validation_error(

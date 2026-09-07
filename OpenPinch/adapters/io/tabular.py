@@ -77,6 +77,16 @@ def problem_records_from_frame(df_data: pd.DataFrame, units_map: dict) -> list:
         column_values = clean_df[column_name]
         if isinstance(unit, str) and unit.strip():
             numeric_values = pd.to_numeric(column_values, errors="coerce")
+            missing = column_values.isna() | column_values.map(
+                lambda value: isinstance(value, str) and not value.strip()
+            )
+            invalid = numeric_values.isna() & ~missing
+            if invalid.any():
+                row = invalid[invalid].index[0]
+                raise ValueError(
+                    f"Column {column_name!r} has a non-numeric value at "
+                    f"data row {row + 1}: {column_values.iloc[row]!r}."
+                )
             value_entries = [
                 {"value": (None if pd.isna(val) else float(val)), "unit": unit}
                 for val in numeric_values

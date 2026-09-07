@@ -130,8 +130,8 @@ def prepare_in_memory_problem_source(
 ) -> _LoadedProblemSource:
     """Normalize one in-memory problem definition without filesystem access."""
     if isinstance(source, TargetInput):
-        input_data: TargetInput | JsonDict = source
-        context_data = source.model_dump(mode="python")
+        input_data: TargetInput | JsonDict = deepcopy(source)
+        context_data = input_data.model_dump(mode="python")
     else:
         input_data = normalize_problem_mapping(source)
         context_data = input_data
