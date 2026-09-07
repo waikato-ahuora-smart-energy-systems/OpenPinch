@@ -14,6 +14,7 @@ def create_problem_and_results_json():
     filepath_root = os.path.dirname(__file__)
     filepath_load = os.path.join(filepath_root, "OpenPinchWkbs")
     filepath_save = filepath_root
+    os.makedirs(os.path.join(filepath_save, "results"), exist_ok=True)
 
     for filename in os.listdir(filepath_load):
         if (

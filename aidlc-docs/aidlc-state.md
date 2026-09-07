@@ -1920,3 +1920,21 @@ refreshed reverse-engineering artifacts.
 - [x] Pinned golden-fixture generating provenance; runtime maps unchanged.
 - [x] Verified 207 contract/resource/docs-consistency tests, generated release property, original CI test with 0.6.5 metadata, generator check, Ruff and strict Sphinx.
 - Current stage: Complete; plan steps 16–18 finished. User authorized commit and push to PR 96.
+
+## Obsolete Files Cleanup
+
+- [x] Workspace inspection and minimal cleanup requirements.
+- [x] Single-unit workflow and removal plan.
+- [x] Cleanup implementation.
+- [x] Focused verification and summary.
+- Plan: `construction/plans/obsolete-files-cleanup-code-generation-plan.md`.
+- Current stage: Complete. 128 focused tests, wheel/sdist builds, Ruff, ignore rules, and patch hygiene pass.
+- Verification: `construction/obsolete-files-cleanup/build-and-test/build-and-test-summary.md`.
+
+### Cleanup second pass
+
+- [x] Verify 55 unused workbook result snapshots and remove them.
+- [x] Preserve regeneration and ignore review result exports.
+- [x] Verify examples, workbook adapter, generator, and preserved assets.
+- Second pass complete: 55 tracked snapshots removed; 79 tests and generator smoke passed.
+- Historical Excel releases retained; independently edited notebooks preserved.

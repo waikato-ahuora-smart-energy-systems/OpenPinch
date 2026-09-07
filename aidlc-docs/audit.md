@@ -8218,3 +8218,41 @@ Update the tutorial inventory, affected notebooks, migration notes, and release 
 **Context**: Explicit commit and push authorization. Previous verification is recorded above; rerunning focused regressions after the version-bump fast-forward. No force push, merge or GitHub review replies requested.
 
 ---
+
+## Repository cleanup — Inspection and plan
+**Timestamp**: 2026-09-07T09:11:15Z
+**User Input**: "Clean up obsolete and old files. "
+**AI Response**: "Inspected obsolete files and references. Remove unconsumed June coverage JSON, retired debug notebook, stale release artifacts and disposable local caches; add root coverage JSON ignore rule. Preserve active examples, historical baselines, research/private files and modified notebook 19. Execute focused verification."
+**Context**: Brownfield maintenance; existing workflow and extension settings retained. Security and Resiliency disabled and skipped. No algorithm changes; PBT remains enabled. Scope and checklist are in construction/plans/obsolete-files-cleanup-code-generation-plan.md.
+
+---
+
+## Repository cleanup — Complete
+**Timestamp**: 2026-09-07T09:13:34Z
+**AI Response**: "Removed 1,411 files totaling 56,479,311 bytes, including two tracked obsolete artifacts. Added coverage JSON ignore rule. 128 focused tests passed; current wheel and sdist built in /tmp; 19 maintained notebooks retained. Ruff, ignore verification, removal manifest and patch hygiene passed. Notebook 19 checksum unchanged; independently modified notebooks 01 and 02 preserved."
+**Context**: Plan checkboxes and verification summaries completed. No application behavior changes, commits, pushes or deployment. Security and Resiliency disabled and skipped. PBT-08 and PBT-09 compliant; other PBT rules N/A for artifact deletion.
+
+---
+
+## Repository cleanup — Second pass
+**Timestamp**: 2026-09-07T09:15:36Z
+**User Input**: "Clean up obsolete and old files. "
+**AI Response**: "Deeper reference and schema inspection identified 55 unused generated workbook result files. Remove them, retain source workbooks and input fixtures, ensure the regeneration helper creates its output directory, and ignore regenerated review results. Historical workflow records remain useful and are retained."
+**Context**: Existing cleanup plan extended with steps 6–8. Asked optional preference about removing Excel v4.02 while keeping v5.30 and template; no answer yet, so workbook removal is not authorized. Security and Resiliency remain disabled and skipped; PBT settings retained.
+
+---
+
+## Repository cleanup — Second pass complete
+**Timestamp**: 2026-09-07T09:16:33Z
+**AI Response**: "Removed another 55 tracked generated workbook result snapshots (744,812 bytes). All 79 focused tests passed; controlled generator smoke proved directory recreation and repeat invocation. Ruff, output ignore rules, removal checks and patch hygiene passed. Source workbooks, input fixtures and specialist test fixtures are unchanged. Notebook 05 changed independently and was preserved. Both Excel releases retained without an answer to the optional question."
+**Context**: Cleanup steps 6–8 completed and existing verification summary extended. No commits or pushes. Disabled extensions remain skipped; no numerical behavior changed.
+
+---
+
+## Repository cleanup — Commit
+**Timestamp**: 2026-09-07T09:19:53Z
+**User Input**: "commit"
+**AI Response**: "Commit both verified cleanup passes, ignore rules, regeneration directory repair and workflow records. Leave all notebook edits and notebook-generated workspace JSON uncommitted."
+**Context**: Explicit commit authorization on develop. Verification from both cleanup passes remains applicable; no source changes since verification. No push requested.
+
+---
