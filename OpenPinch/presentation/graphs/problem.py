@@ -236,6 +236,8 @@ class _PlotAccessor:
             "grand_composite_curve_with_heat_pump": GraphType.GCC_HP,
             "net_load_profiles": GraphType.NLP,
             "net_load_profiles_with_heat_pump": GraphType.NLP_HP,
+            "grand_composite_curve_with_refrigeration": GraphType.GCC_RFRG,
+            "net_load_profiles_with_refrigeration": GraphType.NLP_RFRG,
             "exergetic_net_load_profiles": GraphType.NLP_X,
             "total_site_profiles": GraphType.TSP,
             "site_utility_grand_composite_curve": GraphType.SUGCC,
@@ -351,15 +353,18 @@ class _PlotAccessor:
     def grand_composite_curve_with_heat_pump(
         self,
         *,
-        zone_name: Optional[str] = None,
-        index: int = 0,
-        show: bool = False,
-        return_graph_data: bool = False,
+        target=None,
+        zone_name=None,
+        index=0,
+        show=False,
+        return_graph_data=False,
     ):
-        """Return the first matching GCC with Heat Pump data or figure."""
-        return self._plot_graph(
-            zone_name=zone_name,
+        """Render the selected heat-pump target without executing targeting."""
+        return self._plot_hpr(
+            target=target,
+            mode="heat_pump",
             graph_type=GraphType.GCC_HP,
+            zone_name=zone_name,
             index=index,
             show=show,
             return_graph_data=return_graph_data,
@@ -385,19 +390,83 @@ class _PlotAccessor:
     def net_load_profiles_with_heat_pump(
         self,
         *,
-        zone_name: Optional[str] = None,
-        index: int = 0,
-        show: bool = False,
-        return_graph_data: bool = False,
+        target=None,
+        zone_name=None,
+        index=0,
+        show=False,
+        return_graph_data=False,
     ):
-        """Return the first matching net load profile (with Heat Pump) or figure."""
-        return self._plot_graph(
-            zone_name=zone_name,
+        """Render the selected heat-pump target without executing targeting."""
+        return self._plot_hpr(
+            target=target,
+            mode="heat_pump",
             graph_type=GraphType.NLP_HP,
+            zone_name=zone_name,
             index=index,
             show=show,
             return_graph_data=return_graph_data,
         )
+
+    def grand_composite_curve_with_refrigeration(
+        self,
+        *,
+        target=None,
+        zone_name=None,
+        index=0,
+        show=False,
+        return_graph_data=False,
+    ):
+        """Render the selected refrigeration grand composite curve."""
+        return self._plot_hpr(
+            target=target,
+            mode="refrigeration",
+            graph_type=GraphType.GCC_RFRG,
+            zone_name=zone_name,
+            index=index,
+            show=show,
+            return_graph_data=return_graph_data,
+        )
+
+    def net_load_profiles_with_refrigeration(
+        self,
+        *,
+        target=None,
+        zone_name=None,
+        index=0,
+        show=False,
+        return_graph_data=False,
+    ):
+        """Render the selected refrigeration net load profiles."""
+        return self._plot_hpr(
+            target=target,
+            mode="refrigeration",
+            graph_type=GraphType.NLP_RFRG,
+            zone_name=zone_name,
+            index=index,
+            show=show,
+            return_graph_data=return_graph_data,
+        )
+
+    def _plot_hpr(
+        self, *, target, mode, graph_type, zone_name, index, show, return_graph_data
+    ):
+        from ...application.hpr_selection import select_hpr_graphs
+
+        graphs = [
+            g
+            for g in select_hpr_graphs(
+                self._problem, target=target, mode=mode, zone_name=zone_name
+            )
+            if g["type"] == graph_type.value
+        ]
+        if not graphs:
+            raise ValueError("No graphs matched the selected HPR target.")
+        graph = graphs[index]
+        if return_graph_data:
+            if show:
+                raise ValueError("show=True requires a Plotly figure.")
+            return graph
+        return self._build_graph_figure(graph, show=show)
 
     def exergetic_net_load_profiles(
         self,

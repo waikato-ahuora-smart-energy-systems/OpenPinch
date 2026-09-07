@@ -74,7 +74,7 @@ Interaction Matrix
      - base
    * - ``target.utility_placement``
      - Optimize or infer hot and cold utility levels at a selected hierarchy zone
-     - detached optimized problem
+     - solved detached optimized problem
      - source unchanged
      - base
    * - ``target.all_periods.*``
@@ -207,3 +207,32 @@ Complete API
 
 The operation-level inventory and tutorial owner for every member is published
 in :doc:`../examples/tutorial-coverage-map`.
+
+Derived cases and explicit bases
+--------------------------------
+
+``problem.residual_utility(base_target=heat_pump)`` creates an unsolved case
+retaining the frozen HPR residual. ``problem.with_utilities_from(other_problem,
+project_name=None)`` creates an unsolved receiver-based study with the donor's
+canonical utilities. Matching period sets are required and arrays follow period
+identity; runtime components and receiver thermal inputs are preserved.
+
+The keyword-only ``base_target=None`` on direct/all integration and utility
+placement selects a compatible scalar HPR residual. Without it, the established
+ordinary process workflow applies. With it, the source study remains unchanged:
+direct integration returns ``ResidualUtilityTarget``, all integration returns
+``TargetOutput``, and placement returns a solved residual ``PinchProblem``.
+For all integration, omitted ``include_subzones`` means true for ordinary cases
+and false for a scalar HPR or residual case; explicit expansion is unsupported
+for a frozen scalar basis.
+
+Exergy, energy transfer and the four cogeneration methods retain their existing
+base-target capabilities and infer omitted scalar zone/period selections.
+Area/cost, new HPR targeting and aggregate integration do not gain new basis
+capabilities in this release. ``hpr_performance_map`` keeps its required
+``target=`` argument. See :doc:`../guides/heat-pump-workflows` for examples,
+unsupported selections and ownership rules.
+
+Input JSON remains input-only. Reconstructing a solved placement case from
+``to_problem_json()`` starts an unsolved study. Utility transfer does not copy
+results, placement evidence or a donor's residual basis into the receiver.

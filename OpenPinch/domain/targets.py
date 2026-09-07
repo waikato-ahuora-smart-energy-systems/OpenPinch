@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from .analysis import AnalysisProvenance
 from .configuration import Configuration
 from .enums import IntegrationType, TargetMethod, TargetType, ZoneType
+from .hpr import HPRLoadSummary, HPRResidualData
 from .problem_table import ProblemTable
 from .stream_collection import StreamCollection
 
@@ -175,6 +176,12 @@ class DirectIntegrationTarget(GraphBackedTarget, UtilitySummaryTarget):
     turbine_efficiency_target: Optional[float] = None
 
 
+class ResidualUtilityTarget(DirectIntegrationTarget):
+    """Utility allocation against a frozen HPR residual."""
+
+    integration_route = IntegrationType.Residual.value
+
+
 class SubzoneAggregateTarget(UtilitySummaryTarget):
     """Internal utility summary built from immediate solved subzones."""
 
@@ -257,6 +264,8 @@ class HeatPumpTargetBase(GraphBackedTarget, UtilitySummaryTarget):
     hpr_hot_streams: StreamCollection
     hpr_cold_streams: StreamCollection
     hpr_details: Any
+    hpr_load: HPRLoadSummary | None = Field(default=None, frozen=True)
+    hpr_residual: HPRResidualData | None = Field(default=None, frozen=True)
 
     def provenance_settings(self) -> dict[str, Any]:
         return {

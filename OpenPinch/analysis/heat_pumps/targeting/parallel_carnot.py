@@ -94,7 +94,9 @@ def _parse_parallel_carnot_hp_state_variables(
     )
     H_cold_with_amb = args.H_cold + args.z_amb_cold * Q_amb_cold
     H_hot_with_amb = args.H_hot + args.z_amb_hot * Q_amb_hot
-    Q_heat_base = float(parts["x_heat_base"][0]) * (args.Q_heat_max + Q_amb_cold)
+    Q_heat_base = float(parts["x_heat_base"][0]) * (
+        args.Q_heat_max + (0.0 if args.is_heat_pumping else Q_amb_cold)
+    )
     Q_heat_available = get_Q_vals_at_T_hpr_from_bckgrd_profile(
         T_cond,
         args.T_cold,

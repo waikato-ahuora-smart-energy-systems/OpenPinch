@@ -17,6 +17,11 @@ class DataPoint(BaseModel):
 class Segment(BaseModel):
     """Continuous plot segment optionally annotated with colour/arrows."""
 
+    series: Optional[str] = None
+    series_id: Optional[str] = None
+    series_description: Optional[str] = None
+    is_vertical: Optional[bool] = None
+    is_utility_stream: Optional[bool] = None
     title: Optional[str] = None
     colour: Optional[int] = Field(
         default=None,
@@ -33,6 +38,7 @@ class Graph(BaseModel):
     """Collection of segments representing a single graph (e.g., GCC)."""
 
     type: str
+    name: Optional[str] = None
     segments: List[Segment] = Field(default_factory=list)
 
     model_config = ConfigDict(use_enum_values=True)

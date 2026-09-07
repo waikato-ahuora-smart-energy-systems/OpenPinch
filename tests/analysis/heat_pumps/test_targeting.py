@@ -84,13 +84,21 @@ def _make_base_utility_collections(
         ),
     ],
 )
+@pytest.mark.parametrize("is_direct", [True, False])
 def test_calc_heat_pump_and_refrigeration_cascade_branches(
-    monkeypatch, q_amb_hot, q_amb_cold, expected_hot, expected_cold, expected_w_air
+    monkeypatch,
+    q_amb_hot,
+    q_amb_cold,
+    expected_hot,
+    expected_cold,
+    expected_w_air,
+    is_direct,
 ):
     pt = ProblemTable(
         {
             ProblemTableLabel.T: [120.0, 60.0],
             ProblemTableLabel.H_NET_A: [1.0, 1.0],
+            ProblemTableLabel.H_NET_UT: [11.0, 11.0],
             ProblemTableLabel.H_NET_HOT: [2.0, 2.0],
             ProblemTableLabel.H_NET_COLD: [3.0, 3.0],
         }
@@ -141,11 +149,14 @@ def test_calc_heat_pump_and_refrigeration_cascade_branches(
         is_T_vals_shifted=True,
         is_heat_pumping=True,
         period_idx=0,
+        is_direct=is_direct,
     )
     assert isinstance(out, ProblemTable)
     np.testing.assert_allclose(out[ProblemTableLabel.H_NET_HOT], expected_hot)
     np.testing.assert_allclose(out[ProblemTableLabel.H_NET_COLD], expected_cold)
-    np.testing.assert_allclose(out[ProblemTableLabel.H_NET_W_AIR], expected_w_air)
+    np.testing.assert_allclose(
+        out[ProblemTableLabel.H_NET_W_AIR], expected_w_air + (0 if is_direct else 10)
+    )
 
 
 def test_calc_hpr_cascade_uses_shared_temperature_intervals_for_hpr_and_air(
@@ -371,6 +382,7 @@ def test_compute_indirect_hpr_uses_idx_not_period_id_for_utility_profile(monkeyp
     )
     monkeypatch.setattr(hp, "_calc_hpr_cascade", lambda **kwargs: kwargs["pt"])
     monkeypatch.setattr(hp, "_get_hpr_graphs", lambda **kwargs: {})
+    monkeypatch.setattr(hp, "_hpr_numerical_records", lambda **kwargs: {})
     monkeypatch.setattr(
         hp,
         "_get_hpr_target_summary",
@@ -393,6 +405,7 @@ def test_compute_indirect_hpr_uses_idx_not_period_id_for_utility_profile(monkeyp
         hp,
         "_get_hpr_residual_utility_summary",
         lambda **kwargs: {
+            "residual_profile": None,
             "hot_utilities": StreamCollection(),
             "cold_utilities": StreamCollection(),
             "hot_utility_target": 0.0,
@@ -460,6 +473,7 @@ def test_indirect_hpr_load_uses_finite_utility_profile_when_base_target_has_nans
     )
     monkeypatch.setattr(hp, "_calc_hpr_cascade", lambda **kwargs: kwargs["pt"])
     monkeypatch.setattr(hp, "_get_hpr_graphs", lambda **kwargs: {})
+    monkeypatch.setattr(hp, "_hpr_numerical_records", lambda **kwargs: {})
     monkeypatch.setattr(
         hp,
         "_get_hpr_target_summary",
@@ -482,6 +496,7 @@ def test_indirect_hpr_load_uses_finite_utility_profile_when_base_target_has_nans
         hp,
         "_get_hpr_residual_utility_summary",
         lambda **kwargs: {
+            "residual_profile": None,
             "hot_utilities": StreamCollection(),
             "cold_utilities": StreamCollection(),
             "hot_utility_target": 0.0,
@@ -705,10 +720,12 @@ def test_compute_direct_heat_pump_target_orchestrates_target_summary(
 
     monkeypatch.setattr(hp, "_get_hpr_targets", fake_get_hpr_targets)
     monkeypatch.setattr(hp, "_calc_hpr_cascade", fake_calc_hpr_cascade)
+    monkeypatch.setattr(hp, "_hpr_numerical_records", lambda **kwargs: {})
     monkeypatch.setattr(
         hp,
         "_get_hpr_residual_utility_summary",
         lambda **_kwargs: {
+            "residual_profile": None,
             "hot_utilities": StreamCollection(),
             "cold_utilities": StreamCollection(),
             "hot_utility_target": 0.0,
@@ -878,6 +895,7 @@ def test_hpr_residual_utility_summary_retargets_indirect_utilities():
         {
             ProblemTableLabel.T: [120.0, 80.0, 60.0, 20.0],
             ProblemTableLabel.H_NET_UT: [40.0, 0.0, 0.0, 30.0],
+            ProblemTableLabel.H_NET_W_AIR: [40.0, 0.0, 0.0, 30.0],
             ProblemTableLabel.H_NET_HP: [15.0, 0.0, 0.0, 10.0],
             ProblemTableLabel.RCP_UT_NET: [0.0, 0.0, 0.0, 0.0],
         }
@@ -966,11 +984,14 @@ def test_get_hpr_graphs_covers_refrigeration_and_indirect_heat_pump_outputs():
         is_heat_pumping=True,
     )
 
-    assert refrigeration_graphs == {}
-    assert set(indirect_graphs) == {GraphType.SUGCC.value}
-    assert list(indirect_graphs[GraphType.SUGCC.value].columns) == [
+    assert set(refrigeration_graphs) == {
+        GraphType.GCC_RFRG.value,
+        GraphType.NLP_RFRG.value,
+    }
+    assert set(indirect_graphs) == {GraphType.GCC_HP.value, GraphType.NLP_HP.value}
+    assert list(indirect_graphs[GraphType.GCC_HP.value].columns) == [
         ProblemTableLabel.T.value,
-        ProblemTableLabel.H_NET_UT.value,
+        ProblemTableLabel.H_NET_W_AIR.value,
         ProblemTableLabel.H_NET_HP.value,
     ]
 

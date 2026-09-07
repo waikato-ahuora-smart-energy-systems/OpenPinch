@@ -12,7 +12,7 @@ from ....domain.zone import Zone
 from ..arguments import split_runtime_and_configuration_options
 from .catalog import require_available
 from .execution import walk_zone_tree
-from .provenance import stamp_targets
+from .provenance import resolve_target_selection, stamp_targets
 
 
 @dataclass(frozen=True)
@@ -112,6 +112,7 @@ def invalidate_analysis(problem) -> None:
     problem._period_states = {}
     problem._last_target_run_spec = None
     problem._utility_placement_result = None
+    problem._retained_hpr_targets = {}
 
 
 def target_transaction(method):
@@ -121,8 +122,28 @@ def target_transaction(method):
     def execute(accessor, *args, **kwargs):
         problem = accessor._problem
         surface = kwargs.get("surface") or (
-            args[0] if method.__name__ == "_cogeneration" and args else method.__name__
+            args[0]
+            if method.__name__ == "_cogeneration" and args
+            else method.__name__.removeprefix("_")
         )
+        if (
+            problem._validated_data is not None
+            and problem._validated_data.residual_basis is not None
+            and surface != "direct_heat_integration"
+        ):
+            raise ValueError(
+                "This analysis requires original physical streams, "
+                "not a frozen HPR residual."
+            )
+        if kwargs.get("base_target") is not None:
+            selected, sid = resolve_target_selection(
+                problem,
+                kwargs["base_target"],
+                zone=kwargs.get("zone"),
+                period_id=kwargs.get("period_id"),
+                options=kwargs.get("options"),
+            )
+            kwargs = {**kwargs, "zone": selected.address, "period_id": sid}
         require_available("target." + surface)
         context = AnalysisExecutionContext.prepare(problem, kwargs)
         isolated = context.problem
@@ -187,6 +208,9 @@ def target_transaction(method):
             problem._period_states[context.period_id] = retained
         # A scalar mutation supersedes any previously published complete batch.
         problem._period_results = {}
+        from ...hpr_selection import retain_hpr_target
+
+        retain_hpr_target(problem, detached)
         return detached
 
     return execute

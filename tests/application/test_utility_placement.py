@@ -902,7 +902,7 @@ def test_public_signature_uses_optional_counts_and_zone_only() -> None:
     assert "sensible_level_count" not in parameters
     assert "hot_templates" not in parameters
     assert "cold_templates" not in parameters
-    assert "base_target" not in parameters
+    assert parameters["base_target"].default is None
 
 
 @pytest.mark.parametrize(

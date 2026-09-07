@@ -388,7 +388,13 @@ def _build_problem_placement_request(
         if isinstance(options, UtilityPlacementOptions)
         else UtilityPlacementOptions.model_validate(options or {})
     )
-    scope = _scope_for_zone(selected_zone)
+    from .residual_utility import residual_basis
+
+    scope = (
+        UtilityPlacementBaseTarget.DIRECT
+        if residual_basis(problem) is not None
+        else _scope_for_zone(selected_zone)
+    )
     generated = isothermal is not None or sensible is not None
     if generated:
         if isothermal is None:
@@ -685,6 +691,11 @@ def _snapshot_from_target(
     target,
 ) -> tuple[PlacementTargetSnapshot, float, float]:
     """Extract the exact target arrays and candidate-local utility totals."""
+    from .residual_utility import residual_basis
+
+    basis = residual_basis(isolated)
+    if basis is not None:
+        return _residual_placement_snapshot(basis.data)
     analysis_zone = isolated.master_zone.get_subzone(request.zone)
     if analysis_zone is None:
         raise PlacementContextError(
@@ -1532,6 +1543,43 @@ class _ExactTargetReplayAdapter:
         return self._allocate_cached_aggregate(period, placement)
 
 
+def _finalize_placement_case(problem, result):
+    """Publish deterministic allocations for exactly the winning study periods."""
+    from copy import deepcopy
+
+    outputs = {}
+    request = result.request
+    method = (
+        problem.target.direct_heat_integration
+        if request.base_target is UtilityPlacementBaseTarget.DIRECT
+        else problem.target.indirect_heat_integration
+    )
+    for period in result.best.period_results:
+        target = method(zone=request.zone, period_id=period.period_id)
+        idx = problem.period_ids[period.period_id]
+        for utilities, levels in (
+            (target.hot_utilities, period.hot_levels),
+            (target.cold_utilities, period.cold_levels),
+        ):
+            actual = {
+                u.name: float(get_scalar_value(u.heat_flow, period_idx=idx))
+                for u in utilities
+            }
+            for level in levels:
+                expected = level.allocated_duty.value
+                if not math.isclose(
+                    actual.get(level.template_key.name, 0.0),
+                    expected,
+                    rel_tol=1e-5,
+                    abs_tol=1e-4,
+                ):
+                    raise ValueError(
+                        "Final utility allocation differs from the winning placement."
+                    )
+        outputs[period.period_id] = deepcopy(problem._results)
+    problem._period_results = outputs
+
+
 def run_problem_utility_placement(
     problem: "PinchProblem",
     *,
@@ -1564,7 +1612,11 @@ def run_problem_utility_placement(
         request=resolved_request,
         blueprints=blueprints,
         context=context,
-        allocation_adapter=_ExactTargetReplayAdapter(
+        allocation_adapter=(
+            _ResidualAllocationAdapter
+            if problem._validated_data.residual_basis is not None
+            else _ExactTargetReplayAdapter
+        )(
             source=problem.to_problem_json(),
             project_name=problem.project_name,
             request=resolved_request,
@@ -1619,6 +1671,7 @@ def run_problem_utility_placement(
     optimized_case = PinchProblem(optimized_input, project_name=problem.project_name)
     from ._problem.targeting.provenance import make_provenance
 
+    _finalize_placement_case(optimized_case, result)
     selected = problem._resolve_target_zone(zone)
     optimized_case._utility_placement_result = result.model_copy(
         update={
@@ -1635,3 +1688,62 @@ def run_problem_utility_placement(
 
 
 __all__ = ["build_problem_placement_context", "run_problem_utility_placement"]
+
+
+def _residual_placement_snapshot(data):
+    p = data.profile
+    table = ProblemTable(
+        {ProblemTableLabel.T: p.temperatures, ProblemTableLabel.H_NET: p.net}
+    )
+    hp, cp, _ = table.pinch_idx()
+    slices = tuple(
+        ProcessEntropySlice(
+            interval_index=i,
+            side=UtilitySide(s.side),
+            temperature_in_kelvin=s.supply_temperature + 273.15,
+            temperature_out_kelvin=s.target_temperature + 273.15,
+            available_duty=s.duty,
+            heat_capacity_flow=s.duty / abs(s.supply_temperature - s.target_temperature)
+            if s.supply_temperature != s.target_temperature
+            else 0.0,
+        )
+        for i, s in enumerate(data.thermal_slices)
+    )
+    snapshot = PlacementTargetSnapshot(
+        shifted_temperatures=p.temperatures,
+        real_temperatures=data.physical_temperatures,
+        hot_load_profile=p.heating,
+        cold_load_profile=p.cooling,
+        real_hot_composite=data.physical_hot_composite,
+        real_cold_composite=data.physical_cold_composite,
+        hot_pinch_index=int(hp),
+        cold_pinch_index=int(cp),
+        entropy_slices=slices,
+    )
+    return snapshot, max(p.heating), max(p.cooling)
+
+
+class _ResidualAllocationAdapter(_ExactTargetReplayAdapter):
+    """Allocate each candidate against the exact same frozen thermal basis."""
+
+    def __init__(self, *, source, project_name, request):
+        from ..domain.hpr import HPRResidualSnapshot
+
+        self.data = HPRResidualSnapshot.model_validate(source["residual_basis"]).data
+        self.request = request
+
+    def allocate(self, period, placement):
+        from ..analysis.targeting.residual import allocate_residual_utilities
+
+        hot, cold = self._placement_utility_collections(period, placement)
+        hot, cold = allocate_residual_utilities(self.data, hot, cold)
+        snapshot, required_hot, required_cold = _residual_placement_snapshot(self.data)
+        return self._allocation_result(
+            hot_utilities=hot,
+            cold_utilities=cold,
+            period_idx=0,
+            placement=placement,
+            required_hot=required_hot,
+            required_cold=required_cold,
+            snapshot=snapshot,
+        )

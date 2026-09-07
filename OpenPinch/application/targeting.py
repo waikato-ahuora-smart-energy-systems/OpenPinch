@@ -51,6 +51,10 @@ def data_preprocessing_service(
     project_name: str = "Site",
 ) -> Zone:
     """Validate raw input data and construct the in-memory zone tree."""
+    if input_data.residual_basis is not None:
+        from .residual_utility import prepare_residual_problem
+
+        return prepare_residual_problem(input_data, project_name)
     return prepare_problem(
         project_name=project_name,
         streams=input_data.streams,

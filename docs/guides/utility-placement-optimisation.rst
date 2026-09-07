@@ -111,21 +111,23 @@ may therefore have zero duty; there is no implicit minimum-duty constraint.
 Retargeting replaces prior utility duties, including writing exact zero for
 capped, unused, and zero-load levels.
 
-The return value is already a normal detached :class:`OpenPinch.PinchProblem`
-containing the best utility set. Register it, then target and plot it with the
-standard public workflow. The baseline remains unchanged:
+The return value is an already solved detached :class:`OpenPinch.PinchProblem`.
+The baseline remains unchanged. Inspect the cached result immediately:
 
 .. code-block:: python
 
-   process_case = workspace.add(
-       process_case,
-       name="optimized_process_utilities",
-       activate=False,
-   )
-
-   process_case.target.direct_heat_integration(zone="Almond", period_id="0")
    process_summary = process_case.summary_frame()
    process_gcc = process_case.plot.grand_composite_curve(zone_name="Almond")
+   periods = process_case.period_results
+
+Final allocation runs once for each requested period and only at the selected
+scope. It checks duties against the winning candidate and retains placement
+evidence. Summary, plot and report access do not trigger another analysis.
+
+``workspace.add(process_case, name="optimized_process_utilities")`` registers
+an input copy, whose thermal results initially remain unsolved. Keep
+``process_case`` for immediate observation; explicitly target the registered copy
+when starting that separate workspace study.
 
 Run Site-level placement separately. Because the master zone is a Site, no
 ``zone`` argument is required:
@@ -137,12 +139,6 @@ Run Site-level placement separately. Because the master zone is a Site, no
        sensible=0,
        period_ids=("0",),
    )
-   site_case = workspace.add(
-       site_case,
-       name="optimized_site_utilities",
-       activate=False,
-   )
-   site_case.target.total_site_heat_integration(period_id="0")
    site_summary = site_case.summary_frame()
    site_tsp = site_case.plot.total_site_profiles()
 
@@ -252,5 +248,19 @@ thermodynamic workflow, four isothermal and zero sensible levels per side,
 named-case replacement, inspectable optimizer-versus-retarget duty comparison
 tables, and standard GCC and Total Site Profile plots. Replace
 the sample with reviewed site data and defensible bounds, then increase
-``iteration_limit`` and ``evaluation_limit`` beyond the tutorial's deliberately
-small values before using the result for engineering decisions.
+``iteration_limit`` and ``evaluation_limit`` as appropriate before using the result for engineering decisions.
+
+Placement after a fixed heat pump or refrigerator
+-------------------------------------------------
+
+Use ``problem.target.utility_placement(base_target=heat_pump, isothermal=2)``
+to return a solved residual case. The explicit equivalent is to derive
+``residual = problem.residual_utility(base_target=heat_pump)`` and call
+``residual.target.utility_placement(isothermal=2)``. Both retain the frozen HPR
+basis and allocate the winning utilities before returning.
+
+``problem.with_utilities_from(optimized)`` copies those utility definitions to a
+fresh receiver-based problem. It does not install the donor heat pump or carry
+its residual into the receiver. See :doc:`heat-pump-workflows` for return types,
+period rules and the complete sequence. Ordinary placement without a base target
+continues to use the original process loads.

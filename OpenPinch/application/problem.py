@@ -587,6 +587,28 @@ class PinchProblem:
             raise RuntimeError("No problem data is available. Call load(...) first.")
         return self._canonical_problem_inputs()
 
+    def residual_utility(
+        self, *, base_target: BaseTargetModel, project_name: str | None = None
+    ) -> "PinchProblem":
+        """Derive an unsolved utility case retaining a scalar HPR residual."""
+        from .residual_utility import create_hpr_residual_case
+
+        return create_hpr_residual_case(
+            self, base_target=base_target, project_name=project_name
+        )
+
+    def with_utilities_from(
+        self, other_problem: "PinchProblem", *, project_name: str | None = None
+    ) -> "PinchProblem":
+        """Copy donor utility definitions into a fresh unsolved receiver study.
+
+        Period sets must match; arrays are aligned by period identity. Receiver
+        streams and components survive; donor residuals and results are not copied.
+        """
+        from .case_derivation import with_utilities_from
+
+        return with_utilities_from(self, other_problem, project_name=project_name)
+
     def set_dt_cont_multiplier(
         self,
         value: float,
@@ -594,6 +616,13 @@ class PinchProblem:
         zone_name: Optional[str] = None,
     ) -> Zone:
         """Update one zone-tree multiplier and rebuild the prepared analysis state."""
+        if (
+            self._validated_data is not None
+            and self._validated_data.residual_basis is not None
+        ):
+            raise ValueError(
+                "A frozen HPR residual cannot change process temperature shifts."
+            )
         resolved_value = float(value)
         if not math.isfinite(resolved_value) or resolved_value < 0.0:
             warnings.warn(

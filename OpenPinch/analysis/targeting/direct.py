@@ -649,11 +649,4 @@ def _save_graph_data(pt: ProblemTable, pt_real: ProblemTable) -> dict:
                 ProblemTableLabel.H_COLD_HP,
             ]
         ),
-        GraphType.GCC_HP.value: pt_graph.slice(
-            [
-                ProblemTableLabel.T,
-                ProblemTableLabel.H_NET_W_AIR,
-                ProblemTableLabel.H_NET_HP,
-            ]
-        ),
     }

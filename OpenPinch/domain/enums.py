@@ -58,6 +58,7 @@ class TargetType(Enum):
 class IntegrationType(str, Enum):
     """Heat-exchange route represented by a reportable target."""
 
+    Residual = "Residual"
     Process = "Process"
     Utility = "Utility"
 
@@ -180,6 +181,7 @@ class FluidPhase(str, Enum):
 class StreamID(str, Enum):
     """Stream identity"""
 
+    Residual = "Residual"
     Process = "Process"
     Utility = "Utility"
     Unassigned = "Unassigned"
@@ -318,6 +320,8 @@ class GraphType(Enum):
     NLP_X = "Exergetic Net Load Profiles"
     GCC_HP = "Grand Composite Curve with Heat Pump"
     NLP_HP = "Net Load Profiles with Heat Pump"
+    GCC_RFRG = "Grand Composite Curve with Refrigeration"
+    NLP_RFRG = "Net Load Profiles with Refrigeration"
     NLP = "Net Load Profiles"
     ETD = "Energy Transfer Diagram"
     TSP = "Total Site Profiles"

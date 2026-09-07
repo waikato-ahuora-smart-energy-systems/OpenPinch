@@ -163,3 +163,12 @@ Complete API
 
 See :doc:`../examples/tutorial-coverage-map` for every workspace operation and
 its executable tutorial owner.
+
+Explicit scalar bases
+---------------------
+
+A scalar ``base_target`` cannot be broadcast across a case batch or all-period
+accessor. Use explicit per-case/per-period calls so each handle belongs to the
+selected case and period. Ordinary batch calls without a base target are unchanged.
+``workspace.add`` registers canonical inputs; the returned workspace case does
+not inherit thermal caches from an already solved placement case.

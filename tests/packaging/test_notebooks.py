@@ -9,6 +9,7 @@ import os
 import shutil
 from pathlib import Path
 
+import nbformat
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
@@ -111,8 +112,10 @@ def test_utility_placement_has_one_executable_thermodynamic_notebook() -> None:
     assert 'name="optimized_site_utilities"' in source
     assert "replacement_input" not in source
     assert "workspace.add(" in source
-    assert "process_case.target.direct_heat_integration(" in source
-    assert "site_case.target.total_site_heat_integration(" in source
+    assert "process_target = process_case.results.targets[-1]" in source
+    assert "process_case.target.direct_heat_integration(" not in source
+    assert "site_target = site_case.results.targets[-1]" in source
+    assert "site_case.target.total_site_heat_integration(" not in source
     assert "process_case.plot.grand_composite_curve(" in source
     assert "site_case.plot.total_site_profiles(" in source
     assert "display(process_gcc)" in source
@@ -223,6 +226,7 @@ def test_manifest_and_packaged_inventory_are_identical() -> None:
 def test_notebooks_are_valid_nbformat_documents(tmp_path: Path) -> None:
     for name in EXPECTED_NOTEBOOKS:
         notebook = _copied_notebook(tmp_path, name)
+        nbformat.validate(notebook)
 
         assert notebook["nbformat"] == 4, name
         assert notebook["nbformat_minor"] >= 5, name
@@ -251,15 +255,6 @@ def test_notebooks_are_valid_nbformat_documents(tmp_path: Path) -> None:
             "Adapt this template",
         ):
             assert heading in markdown_text, (name, heading)
-        for cell in notebook["cells"]:
-            if cell["cell_type"] == "code":
-                if name == "19_utility_placement_optimisation.ipynb":
-                    assert cell["execution_count"] is None or isinstance(
-                        cell["execution_count"], int
-                    ), name
-                else:
-                    assert cell["execution_count"] is None, name
-                    assert cell["outputs"] == [], name
 
 
 def _assert_review_contract(name: str, notebook: dict) -> None:
@@ -300,17 +295,9 @@ def test_tutorial_review_preserves_notebook_invariants(name: str) -> None:
     assert [cell["id"] for cell in notebook["cells"]] == [
         f"cell-{index:02d}" for index in range(1, len(notebook["cells"]) + 1)
     ]
-    code_cells = [cell for cell in notebook["cells"] if cell["cell_type"] == "code"]
-    if name == "19_utility_placement_optimisation.ipynb":
-        assert all(
-            cell["execution_count"] is None or isinstance(cell["execution_count"], int)
-            for cell in code_cells
-        )
-    else:
-        assert all(
-            cell["execution_count"] is None and cell["outputs"] == []
-            for cell in code_cells
-        )
+    # Saved tutorials may retain valid execution evidence. The generator's
+    # fresh-output contract is checked independently below.
+    nbformat.validate(notebook)
 
 
 def test_notebook_generator_is_repeatable_in_process(
@@ -320,6 +307,13 @@ def test_notebook_generator_is_repeatable_in_process(
 
     notebook_generator.main()
     first = {path.name: path.read_bytes() for path in tmp_path.glob("*.ipynb")}
+    for name, payload in first.items():
+        notebook = json.loads(payload)
+        nbformat.validate(notebook)
+        for cell in notebook["cells"]:
+            if cell["cell_type"] == "code":
+                assert cell["execution_count"] is None, name
+                assert cell["outputs"] == [], name
     notebook_generator.main()
     second = {path.name: path.read_bytes() for path in tmp_path.glob("*.ipynb")}
 

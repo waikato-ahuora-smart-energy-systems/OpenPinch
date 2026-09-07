@@ -71,9 +71,59 @@ def make_provenance(
     )
 
 
+def resolve_target_selection(
+    problem, target, *, zone=None, period_id=None, options=None
+):
+    """Infer omitted scalar selectors and reject contradictory explicit scope."""
+    provenance = getattr(target, "provenance", None)
+    if provenance is None or len(provenance.period_ids) != 1:
+        raise ValueError("base_target requires a solved scalar target with one period.")
+    selected = problem._resolve_target_zone(
+        provenance.zone_address if zone is None else zone
+    )
+    if selected.address != provenance.zone_address:
+        raise ValueError("base_target does not match the requested zone.")
+    if period_id is None:
+        period_id = (options or {}).get("period_id")
+    selected_period = provenance.period_ids[0]
+    if period_id is not None and period_id != selected_period:
+        raise ValueError("base_target does not match the requested period.")
+    return selected, selected_period
+
+
+def resolve_hpr_residual_case(
+    problem,
+    target,
+    *,
+    zone=None,
+    period_id=None,
+    period_ids=None,
+    include_subzones=False,
+    options=None,
+):
+    """Select a frozen scalar HPR basis before entering a derived transaction."""
+    from ...hpr_selection import validate_hpr_target
+
+    validate_hpr_target(problem, target)
+    selected, sid = resolve_target_selection(
+        problem, target, zone=zone, period_id=period_id, options=options
+    )
+    if include_subzones:
+        raise ValueError("A scalar base_target cannot include subzones.")
+    if period_ids is not None and tuple(period_ids) != (sid,):
+        raise ValueError("base_target requires exactly its selected period.")
+    if options:
+        raise ValueError(
+            "base_target uses a frozen basis; thermal overrides are unsupported."
+        )
+    return problem.residual_utility(base_target=target)
+
+
 def validate_base_target(problem, target, *, zone, period_id, options=None):
     """Reject foreign, stale, and mismatched references before any calculation."""
-    selected = problem._resolve_target_zone(zone)
+    selected, period_id = resolve_target_selection(
+        problem, target, zone=zone, period_id=period_id, options=options
+    )
     runtime, sid = problem._resolve_runtime_period_options(
         {**dict(options or {}), **({"period_id": period_id} if period_id else {})},
         zone=selected,
@@ -150,6 +200,11 @@ def stamp_targets(problem, surface: str, previous: dict[int, Any]) -> None:
                     if t.provenance is not None and t.period_idx == ready.period_idx
                 )
             )
+            basis = getattr(problem._validated_data, "residual_basis", None)
+            if basis is not None:
+                prerequisites = tuple(
+                    dict.fromkeys((*prerequisites, basis.source_identity))
+                )
             ready.provenance = make_provenance(
                 problem,
                 "target." + surface,

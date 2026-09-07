@@ -173,7 +173,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     # Heat pump and refrigeration.
     "HPR_TYPE": _spec(str, HeatPumpAndRefrigerationCycle.CascadeCarnot.value, "hpr", "type", enum_cls=HeatPumpAndRefrigerationCycle),
     "HPR_LOAD_MODE": _spec(str, "fraction", "hpr", "load_mode"),
-    "HPR_LOAD_FRACTION": _spec(float, 1.0, "hpr", "load_fraction", numeric_min=0.0),
+    "HPR_LOAD_FRACTION": _spec(float, 1.0, "hpr", "load_fraction", numeric_min=0.0, numeric_max=1.0),
     "HPR_LOAD_DUTY": _spec(float | None, None, "hpr", "load_duty", numeric_min=0.0),
     "HPR_LOAD_PERIOD_VALUES": _spec(dict[str, float], {}, "hpr", "load_period_values"),
     "HPR_MULTIPERIOD_OPTIMIZATION_ENABLED": _spec(bool, False, "hpr", "multiperiod_optimization_enabled"),
