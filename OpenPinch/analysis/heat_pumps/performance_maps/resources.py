@@ -10,7 +10,7 @@ from importlib.resources import files
 from typing import Any
 
 CHARACTERISTIC_RESOURCE_NAME = "openpinch-single-stage-compressor-v1.json"
-_RESOURCE_PACKAGE = "OpenPinch.data.heat_pumps.performance_maps"
+_RESOURCE_PACKAGE = "OpenPinch.analysis.heat_pumps.performance_maps.characteristics"
 _EXPECTED_KEYS = frozenset(
     {
         "schema_version",

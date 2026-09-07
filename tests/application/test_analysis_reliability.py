@@ -13,7 +13,7 @@ def problem():
 
 
 def test_mvr_serial_parallel_equivalence():
-    p = PinchProblem("OpenPinch/data/sample_cases/process_mvr.json")
+    p = PinchProblem("OpenPinch/tutorials/sample_cases/process_mvr.json")
     p.components.add_process_mvr("Evaporator vapour", mvr_stage_t_lift=10.0)
     serial = p.target.all_periods.direct_heat_integration(workers=1)
     parallel = p.target.all_periods.direct_heat_integration(workers=2)
@@ -106,7 +106,7 @@ def test_failed_targeting_preserves_previous_success(monkeypatch):
 
 
 def test_component_changes_invalidate_period_outputs():
-    p = PinchProblem("OpenPinch/data/sample_cases/process_mvr.json")
+    p = PinchProblem("OpenPinch/tutorials/sample_cases/process_mvr.json")
     component = p.components.add_process_mvr("Evaporator vapour", mvr_stage_t_lift=10.0)
     p.target.all_periods.direct_heat_integration()
     component.deactivate()

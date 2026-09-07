@@ -2042,3 +2042,17 @@ refreshed reverse-engineering artifacts.
 - [x] Pass 3: sorting/deep-copy and remaining selector repairs complete. Full suite: 3244 passed, 1 intentional benchmark skip; combined coverage 96.19%. Three-pass limit reached; report complete.
 - Plan: construction/plans/repository-audit-cycle-2-plan.md.
 - [x] Commit cycle 2 repairs, regressions and verification records on develop; generated notebook workspace remains untracked.
+
+## Tutorial Package Relocation
+
+- [x] Inspect layout and capture file identities.
+- [x] Relocate tutorial packages and update consumers/documentation.
+- [x] Verify packaging, resource behavior and preservation.
+- Plan: construction/plans/tutorial-package-relocation-plan.md.
+
+## Data Resource Relocation
+
+- [x] Inspect assets and consumers; user approved proposed locations.
+- [x] Move resources, update consumers and remove obsolete data package.
+- [x] Verify and record completion.
+- Plan: construction/plans/data-resource-relocation-plan.md.

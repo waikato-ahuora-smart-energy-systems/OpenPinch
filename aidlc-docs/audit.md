@@ -8744,3 +8744,73 @@ utilities = problem.target.all_heat_integration(base_target=heat_pump)"
 **Context**: User-requested commits complete; final bookkeeping included in the notebook metadata commit.
 
 ---
+
+## Tutorial layout discussion
+**Timestamp**: 2026-09-07T19:38:33Z
+**User Input**: "I don't like the data folder. "
+**AI Response**: "Inspected mixed packaged tutorial, sample, runtime-map and contract resources to propose a clearer structure."
+**Context**: Existing Python project, minimal package refactor; prior extension choices retained.
+
+---
+
+## Tutorial layout discussion
+**Timestamp**: 2026-09-07T19:38:33Z
+**User Input**: "I think it is better to move notebooks and sample\_cases into a new folder `OpenPinch/`tutorials"
+**AI Response**: "Move both packages beneath OpenPinch/tutorials, update resource lookups, generators, tests and documentation, and preserve every file. Keep runtime assets in data. Verify installed-package access and existing resource APIs; no new approval gate is needed for this explicit layout request."
+**Context**: Existing Python project, minimal package refactor; prior extension choices retained.
+
+---
+
+## Tutorial Package Relocation Completion
+**Timestamp**: 2026-09-07T19:44:33Z
+**AI Response**: "Moved notebooks and sample_cases into OpenPinch/tutorials, updated consumers and documentation, and preserved all 32 original file hashes. 164 selected tests and one executed tutorial passed, as did strict documentation, both installed distribution checks, Ruff and whitespace checks. Initial core-only smoke rejected the TESPy-enabled environment; the matching TESPy profile passed for both installations. No commit or push performed."
+**Context**: Plan and state checkboxes complete. PBT preservation/repeatability checks passed; disabled Security and Resiliency extensions skipped. Details: construction/build-and-test/tutorial-package-relocation-summary.md.
+
+---
+
+## Remaining Data Asset Placement Discussion
+**Timestamp**: 2026-09-07T19:45:11Z
+**User Input**: "The folders and files in OpenPinch/data seem oddly placed. Where could they move? "
+**AI Response**: "Inspected all remaining data assets, loaders, contract generator and consumers. Recommend contract schema and canonical examples under OpenPinch/contracts/resources/hpr_performance_map, and compressor characteristic under OpenPinch/analysis/heat_pumps/performance_maps/characteristics. This places resources with their owning components and would allow removal of the empty data package while preserving resource helper behavior. Recommendation only; no assets moved."
+**Context**: Follow-up layout discussion.
+
+---
+
+## Conditional Empty Data Directory Removal
+**Timestamp**: 2026-09-07T19:45:41Z
+**User Input**: "If OpenPinch/data is empty, remove it. "
+**AI Response**: "Checked OpenPinch/data. It still contains four JSON resources and package initializer files, so the empty-directory condition is not met. Left the directory intact; the previously proposed resource relocation has not been implemented."
+**Context**: Conditional cleanup; no assets moved or deleted.
+
+---
+
+## Data Resource Relocation
+**Timestamp**: 2026-09-07T19:48:06Z
+**User Input**: "Move the files out of OpenPinch/data as suggested. "
+**AI Response**: "Proceeding with the approved owner-based layout and removal of the obsolete data package. Preserve existing tutorial changes, resource bytes and helper APIs. Verify generator, affected tests, documentation and installed distributions."
+**Context**: Existing workflow resumed; minimal requirements and single-unit plan recorded. Disabled Security and Resiliency extensions skipped.
+
+---
+
+## Data Resource Relocation Completion
+**Timestamp**: 2026-09-07T19:50:07Z
+**AI Response**: "Moved the four JSON resources to their approved owner packages, removed OpenPinch/data, and updated consumers and documentation. All resource bytes and prior tutorial files preserved. 218 selected tests passed, 14 notebook execution tests deselected. Generator, strict documentation, installed wheel and sdist, Ruff and whitespace checks passed. No commit or push performed."
+**Context**: All plan and state checkboxes complete. Per-rule extension applicability and verification commands recorded in construction/build-and-test/data-resource-relocation-summary.md.
+
+---
+
+## Conditional Data Directory Cleanup
+**Timestamp**: 2026-09-07T19:50:27Z
+**User Input**: "If OpenPinch/data is empty, remove it."
+**AI Response**: "OpenPinch/data is already removed."
+**Context**: Verified directory state after resource relocation.
+
+---
+
+## Commit Package Resource Relocations
+**Timestamp**: 2026-09-07T19:50:54Z
+**User Input**: "commit."
+**AI Response**: "Reviewed pending tutorial and owned-resource relocations, documentation, tests and workflow records. Verified all 36 preserved tutorial files and JSON resources against HEAD bytes; OpenPinch/data is absent. Committing the reviewed changes together as a package-layout refactor. Existing verification passed; no push requested."
+**Context**: Explicit commit authorization.
+
+---

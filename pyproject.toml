@@ -134,7 +134,7 @@ target-version = ["py314"]
 [tool.ruff]
 line-length = 88
 target-version = "py314"
-extend-exclude = ["docs/_build", "dist", "OpenPinch/data/notebooks"]
+extend-exclude = ["docs/_build", "dist", "OpenPinch/tutorials/notebooks"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B006"]

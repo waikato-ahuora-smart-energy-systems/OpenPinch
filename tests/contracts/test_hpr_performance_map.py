@@ -21,7 +21,7 @@ from scripts import generate_hpr_performance_map_contract as contract_generator
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_RESOURCE_ROOT = (
-    ROOT / "OpenPinch" / "data" / "contracts" / "hpr_performance_map"
+    ROOT / "OpenPinch" / "contracts" / "resources" / "hpr_performance_map"
 )
 EXPECTED_CONTRACT_RESOURCES = {
     "schema-1.0.json",

@@ -307,7 +307,11 @@ def write_migration_fixtures(openhens_root: Path, repo_root: Path) -> None:
                 output_formats=[],
             )
             _write_json(
-                repo_root / "OpenPinch" / "data" / "sample_cases" / f"{case_id}.json",
+                repo_root
+                / "OpenPinch"
+                / "tutorials"
+                / "sample_cases"
+                / f"{case_id}.json",
                 sample_case,
             )
 

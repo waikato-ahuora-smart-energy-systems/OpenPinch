@@ -103,7 +103,7 @@ def test_manifest_exactly_matches_live_public_inventory() -> None:
 def test_manifest_has_complete_tutorial_and_profile_ownership() -> None:
     notebooks = {
         path.name
-        for path in (ROOT / "OpenPinch" / "data" / "notebooks").glob("*.ipynb")
+        for path in (ROOT / "OpenPinch" / "tutorials" / "notebooks").glob("*.ipynb")
     }
     rows = _rows()
 

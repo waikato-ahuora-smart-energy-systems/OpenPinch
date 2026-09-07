@@ -68,7 +68,7 @@ def _combined_source(notebook: dict) -> str:
 def test_utility_placement_has_one_executable_thermodynamic_notebook() -> None:
     names = [
         path.name
-        for path in (ROOT / "OpenPinch" / "data" / "notebooks").glob("*.ipynb")
+        for path in (ROOT / "OpenPinch" / "tutorials" / "notebooks").glob("*.ipynb")
         if "utility_placement" in path.name
     ]
 
@@ -76,7 +76,7 @@ def test_utility_placement_has_one_executable_thermodynamic_notebook() -> None:
     notebook = _load_notebook(
         ROOT
         / "OpenPinch"
-        / "data"
+        / "tutorials"
         / "notebooks"
         / "19_utility_placement_optimisation.ipynb"
     )
@@ -140,7 +140,7 @@ def test_inverse_heat_recovery_has_complete_selected_period_notebook_example() -
     notebook = _load_notebook(
         ROOT
         / "OpenPinch"
-        / "data"
+        / "tutorials"
         / "notebooks"
         / "02_focused_direct_and_total_site.ipynb"
     )
@@ -182,7 +182,7 @@ def test_inverse_heat_recovery_notebook_pins_threshold_limit_solution(
     notebook = _load_notebook(
         ROOT
         / "OpenPinch"
-        / "data"
+        / "tutorials"
         / "notebooks"
         / "02_focused_direct_and_total_site.ipynb"
     )
@@ -289,7 +289,7 @@ def test_every_notebook_has_one_explicit_result_review(tmp_path: Path) -> None:
 
 @given(name=TUTORIAL_NAMES)
 def test_tutorial_review_preserves_notebook_invariants(name: str) -> None:
-    notebook = _load_notebook(ROOT / "OpenPinch" / "data" / "notebooks" / name)
+    notebook = _load_notebook(ROOT / "OpenPinch" / "tutorials" / "notebooks" / name)
 
     _assert_review_contract(name, notebook)
     assert [cell["id"] for cell in notebook["cells"]] == [
@@ -324,7 +324,7 @@ def test_notebook_generator_is_repeatable_in_process(
 def test_notebook_generator_does_not_rewrite_current_notebooks(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    notebook_dir = ROOT / "OpenPinch" / "data" / "notebooks"
+    notebook_dir = ROOT / "OpenPinch" / "tutorials" / "notebooks"
     for source in notebook_dir.glob("*.ipynb"):
         shutil.copy2(source, tmp_path / source.name)
     before = {path.name: path.read_bytes() for path in tmp_path.glob("*.ipynb")}
@@ -366,7 +366,7 @@ def test_notebook_09_demonstrates_comprehensive_hpr_target_to_map() -> None:
     notebook = _load_notebook(
         ROOT
         / "OpenPinch"
-        / "data"
+        / "tutorials"
         / "notebooks"
         / "09_vapour_compression_and_brayton.ipynb"
     )

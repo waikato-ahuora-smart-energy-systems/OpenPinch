@@ -12,7 +12,7 @@ from io import StringIO
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-NOTEBOOK_DIR = ROOT / "OpenPinch" / "data" / "notebooks"
+NOTEBOOK_DIR = ROOT / "OpenPinch" / "tutorials" / "notebooks"
 
 
 def markdown(text: str) -> dict:
