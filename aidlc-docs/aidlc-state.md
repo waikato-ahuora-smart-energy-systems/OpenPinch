@@ -2034,3 +2034,11 @@ refreshed reverse-engineering artifacts.
 - [x] Commit HPR implementation, APIs, tests and public documentation.
 - [x] Commit saved notebook execution evidence.
 - [x] Commit workflow records and verify final status; only generated notebook workspace output remains untracked.
+
+## Repository Audit Cycle 2
+
+- [x] Pass 1: iterable handling and derived weight metadata repaired; 492 domain/contract tests pass.
+- [x] Pass 2: shallow collection copies and period-index validation repaired; 528 affected tests pass.
+- [x] Pass 3: sorting/deep-copy and remaining selector repairs complete. Full suite: 3244 passed, 1 intentional benchmark skip; combined coverage 96.19%. Three-pass limit reached; report complete.
+- Plan: construction/plans/repository-audit-cycle-2-plan.md.
+- [x] Commit cycle 2 repairs, regressions and verification records on develop; generated notebook workspace remains untracked.

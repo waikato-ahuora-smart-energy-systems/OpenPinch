@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from .._value.coercion import coerce_period_index
 from ..enums import StreamType
 from ..value import Value
 
@@ -155,8 +156,8 @@ def value_at_idx(value: Value | None, idx: int | None = None) -> float:
     """Return one canonical numeric magnitude from a scalar or multiperiod value."""
     if value is None:
         return np.nan
+    period_idx = 0 if idx is None else coerce_period_index(idx)
     magnitudes = value._quantity.magnitude
     if magnitudes.size == 1:
         return float(magnitudes[0])
-    period_idx = 0 if idx is None else int(idx)
     return float(magnitudes[period_idx])

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from operator import index as integer_index
 from typing import Any
 
 import numpy as np
@@ -26,6 +27,16 @@ def is_numeric_scalar(data: Any) -> bool:
     )
 
 
+def coerce_period_index(value: Any) -> int:
+    """Resolve a non-negative integer position without truncation or booleans."""
+    if is_bool_like(value):
+        raise TypeError("period index must be an integer, not a boolean.")
+    resolved = int(value) if isinstance(value, str) else integer_index(value)
+    if resolved < 0:
+        raise IndexError("period index must be a non-negative integer.")
+    return resolved
+
+
 def is_array_like_input(data: Any) -> bool:
     """Return whether input can represent a one-dimensional value sequence."""
     if data is None or isinstance(data, (str, bytes, Mapping)):
@@ -33,7 +44,7 @@ def is_array_like_input(data: Any) -> bool:
     if is_bool_like(data) or np.isscalar(data):
         return False
     try:
-        list(data)
+        iter(data)
     except TypeError:
         return False
     return True
@@ -257,15 +268,7 @@ class ValueCoercion:
 
     @staticmethod
     def _is_array_like_input(data: Any) -> bool:
-        if data is None or isinstance(data, (str, bytes, Mapping)):
-            return False
-        if is_bool_like(data) or np.isscalar(data):
-            return False
-        try:
-            list(data)
-        except TypeError:
-            return False
-        return True
+        return is_array_like_input(data)
 
     def _is_serialized_scalar_data(self, data: Mapping[Any, Any]) -> bool:
         return set(data).issubset(self._serialized_scalar_keys) and "value" in data

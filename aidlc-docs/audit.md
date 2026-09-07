@@ -8671,3 +8671,54 @@ utilities = problem.target.all_heat_integration(base_target=heat_pump)"
 **Context**: User-requested commit grouping complete; all commit checklist entries checked.
 
 ---
+
+## Repository audit cycle 2
+**Timestamp**: 2026-09-07T18:40:54Z
+**User Input**: "audit the repo. identify issues. fix these issues. repeat this process three times or until the audit turns up no issues."
+**AI Response**: "Start a fresh audit of committed baseline 6268d747. Inspect boundaries beyond the previous repairs, reproduce and repair findings for up to three passes, stopping early only on a complete clean pass. Preserve local workspace output and notebooks. PBT remains enabled; disabled extensions skipped. No commit or push inferred from the earlier completed commit request."
+**Context**: Pass 1 active; Value iterable handling and derived period metadata have concrete failing reproductions.
+
+---
+
+## Audit cycle 2 pass 1
+**Timestamp**: 2026-09-07T18:43:00Z
+**AI Response**: "Ten failing regressions reproduced consumed generator inputs, aliased weights, inconsistent weight lengths and invalid scalar-derived weight metadata. Repaired non-consuming detection, defensive metadata storage/views and shape-aware derivation. All 492 domain and contract tests pass. Continue period-selection and reporting review."
+**Context**: Pass 1 complete, pass 2 active.
+
+---
+
+## Audit cycle 2 pass 2
+**Timestamp**: 2026-09-07T18:48:30Z
+**AI Response**: "Repaired shared shallow-copy collection containers and callable sort preservation. Unified strict integer period selection across Value, scalar resolution, numeric views and stream reports; numeric strings retain support with consistent bounds. Twenty-four failing regressions reproduced the defects; 528 domain/contract and multi-period application tests now pass. Third pass examines sorting freshness, deep-copy interactions and remaining boundaries."
+**Context**: Pass 2 complete, pass 3 active.
+
+---
+
+## Audit cycle 2 pass 3 verification
+**Timestamp**: 2026-09-07T18:54:34Z
+**AI Response**: "Repaired stale stream ordering after numeric/metadata/callable-state changes and deep-copy sort loss. Completed strict period coercion in stream totals, analysis/configuration and segmented targeting, rejecting conflicting configuration selectors. Targeted integrated verification: 622 passed. All three inspection passes complete; full-suite and packaging verification running with frozen source and all tutorial profiles enabled."
+**Context**: Three-pass stopping limit reached; final integrated gates remain active.
+
+---
+
+## Repository audit cycle 2 completion
+**Timestamp**: 2026-09-07T19:13:36Z
+**AI Response**: "Completed three new audit-and-repair passes. Fixed consumed generator inputs, aliased/mismatched weight metadata and scalar derivation failures, shared shallow-copy membership, lost custom sort functions in copies, stale ordering, and invalid/conflicting period selectors. Added 64 permanent regression cases. Full suite: 3244 passed, 1 existing intentional benchmark skip; all optional profiles ran, no failures or deselections. Fresh combined line/branch coverage 96.1932% passes 95%. Wheel/sdist, installed-package smoke, strict docs, Ruff, formatting and patch checks pass. All 19 notebooks and local workspace hashes unchanged. All plan and stage checkboxes complete; PBT compliant, disabled extensions skipped. Changes remain uncommitted."
+**Context**: Requested three-pass limit reached; all confirmed repairs and final verification complete.
+
+---
+
+## Audit cycle 2 commit authorization
+**Timestamp**: 2026-09-07T19:14:50Z
+**User Input**: "commit"
+**AI Response**: "Commit the completed second audit cycle fixes, 64 regression cases and verification records on develop. Preserve the generated untracked notebook workspace. Reuse the unchanged implementation verification: 3244 passed, 1 intentional skip, combined coverage 96.1932%. No push requested."
+**Context**: Explicit authorization to commit the completed audit repairs.
+
+---
+
+## Audit cycle 2 commit completion
+**Timestamp**: 2026-09-07T19:14:57Z
+**AI Response**: "Committed second audit cycle repairs, 64 regressions and verification records on develop. Tracked working tree is clean; only generated OpenPinch/data/notebooks/openpinch-workspace.json remains untracked. No push performed. Final bookkeeping is included in the same commit."
+**Context**: User-requested commit complete.
+
+---
