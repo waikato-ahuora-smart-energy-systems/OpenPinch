@@ -1,0 +1,3 @@
+# Integrated verification
+
+Run coverage with `coverage run --branch --source=OpenPinch -m pytest -q -m "not solver" --hypothesis-seed=20260715`, then `coverage report --fail-under=95`. The gate is combined line/branch coverage. Run solver-marked tests separately. Execute notebooks 08 and 19 in fresh Jupyter kernels in temporary directories; preserve repository outputs. Check nonempty finite figures, cached summaries, exact residual lineage and candidate-duty reconciliation. Validate all notebook sources against the generator without invoking its all-notebook writer. Run Ruff, changed-file format checks, git diff --check and strict Sphinx.

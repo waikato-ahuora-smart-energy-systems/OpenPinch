@@ -16,6 +16,7 @@ from ...domain.enums import (
     ProblemTableLabel,
     TargetType,
 )
+from ...domain.hpr import HPRLoadSummary, HPRResidualData, HPRThermalSlice
 from ...domain.problem_table import ProblemTable
 from ...domain.targets import (
     DirectHeatPumpTarget,
@@ -145,7 +146,26 @@ def compute_direct_heat_pump_or_refrigeration_target(
         is_heat_pumping=is_heat_pumping,
     )
     model_cls = DirectHeatPumpTarget if is_heat_pumping else DirectRefrigerationTarget
-    return model_cls.model_validate(general_results | hpr_results | util_results)
+    profile = util_results.pop("residual_profile")
+    numerical = _hpr_numerical_records(
+        zone=zone,
+        base_target=base_target,
+        res=res,
+        profile=profile,
+        selected=target_load,
+        period_id=period_id,
+        period_idx=idx,
+        is_direct=True,
+        is_heat_pumping=is_heat_pumping,
+    )
+    general_results["graphs"] = _get_hpr_graphs(
+        pt=pt,
+        is_direct=True,
+        is_heat_pumping=is_heat_pumping,
+    )
+    return model_cls.model_validate(
+        general_results | hpr_results | util_results | numerical
+    )
 
 
 def compute_indirect_heat_pump_or_refrigeration_target(
@@ -203,6 +223,7 @@ def compute_indirect_heat_pump_or_refrigeration_target(
         is_T_vals_shifted=True,
         is_heat_pumping=is_heat_pumping,
         period_idx=idx,
+        is_direct=False,
     )
     general_results = {
         "zone_name": zone.name,
@@ -231,7 +252,26 @@ def compute_indirect_heat_pump_or_refrigeration_target(
     model_cls = (
         IndirectHeatPumpTarget if is_heat_pumping else IndirectRefrigerationTarget
     )
-    return model_cls.model_validate(general_results | hpr_results | util_results)
+    profile = util_results.pop("residual_profile")
+    numerical = _hpr_numerical_records(
+        zone=zone,
+        base_target=base_target,
+        res=res,
+        profile=profile,
+        selected=target_load,
+        period_id=period_id,
+        period_idx=idx,
+        is_direct=False,
+        is_heat_pumping=is_heat_pumping,
+    )
+    general_results["graphs"] = _get_hpr_graphs(
+        pt=pt,
+        is_direct=False,
+        is_heat_pumping=is_heat_pumping,
+    )
+    return model_cls.model_validate(
+        general_results | hpr_results | util_results | numerical
+    )
 
 
 ################################################################################
@@ -275,6 +315,7 @@ def _compute_multiperiod_heat_pump_or_refrigeration_target(
         is_T_vals_shifted=True,
         is_heat_pumping=is_heat_pumping,
         period_idx=idx,
+        is_direct=is_direct,
     )
     general_results = {
         "zone_name": zone.name,
@@ -300,6 +341,7 @@ def _compute_multiperiod_heat_pump_or_refrigeration_target(
         is_direct=is_direct,
         is_heat_pumping=is_heat_pumping,
     )
+    util_results.pop("residual_profile")
     return _hpr_target_model_cls(
         is_direct=is_direct,
         is_heat_pumping=is_heat_pumping,
@@ -398,37 +440,38 @@ def _get_hpr_graphs(
     is_direct: bool,
     is_heat_pumping: bool,
 ) -> dict:
-    if not is_heat_pumping:
-        return {}
-
-    if is_direct:
-        return {
-            GraphType.NLP_HP.value: pt.slice(
-                [
-                    ProblemTableLabel.T,
-                    ProblemTableLabel.H_NET_HOT,
-                    ProblemTableLabel.H_NET_COLD,
-                    ProblemTableLabel.H_HOT_HP,
-                    ProblemTableLabel.H_COLD_HP,
-                ]
-            ),
-            GraphType.GCC_HP.value: pt.slice(
-                [
-                    ProblemTableLabel.T,
-                    ProblemTableLabel.H_NET_W_AIR,
-                    ProblemTableLabel.H_NET_HP,
-                ]
-            ),
-        }
-
+    graph_pt = deepcopy(pt)
+    if not is_direct:
+        graph_pt[ProblemTableLabel.H_NET_HOT] = pt[ProblemTableLabel.H_COLD_UT]
+        graph_pt[ProblemTableLabel.H_NET_COLD] = pt[ProblemTableLabel.H_HOT_UT]
+    net = (
+        ProblemTableLabel.H_NET_HP if is_heat_pumping else ProblemTableLabel.H_NET_RFRG
+    )
+    hot = (
+        ProblemTableLabel.H_HOT_HP if is_heat_pumping else ProblemTableLabel.H_HOT_RFRG
+    )
+    cold = (
+        ProblemTableLabel.H_COLD_HP
+        if is_heat_pumping
+        else ProblemTableLabel.H_COLD_RFRG
+    )
     return {
-        GraphType.SUGCC.value: pt.slice(
+        (
+            GraphType.NLP_HP if is_heat_pumping else GraphType.NLP_RFRG
+        ).value: graph_pt.slice(
             [
                 ProblemTableLabel.T,
-                ProblemTableLabel.H_NET_UT,
-                ProblemTableLabel.H_NET_HP,
+                ProblemTableLabel.H_NET_HOT,
+                ProblemTableLabel.H_NET_COLD,
+                hot,
+                cold,
             ]
-        )
+        ),
+        (
+            GraphType.GCC_HP if is_heat_pumping else GraphType.GCC_RFRG
+        ).value: graph_pt.slice(
+            [ProblemTableLabel.T, ProblemTableLabel.H_NET_W_AIR, net]
+        ),
     }
 
 
@@ -438,6 +481,7 @@ def _calc_hpr_cascade(
     is_T_vals_shifted: bool = True,
     is_heat_pumping: bool = True,
     period_idx: int | None = None,
+    is_direct: bool = True,
 ) -> ProblemTable:
     # Add new temperature intervals to the process heat cascade
     pt_hpr_grid = create_problem_table_with_t_int(
@@ -453,7 +497,8 @@ def _calc_hpr_cascade(
     pt.share_temperature_intervals(pt_hpr_grid)
 
     # Ambient air addition to the process stream set
-    pt[ProblemTableLabel.H_NET_W_AIR] = pt[ProblemTableLabel.H_NET_A]
+    base_col = ProblemTableLabel.H_NET_A if is_direct else ProblemTableLabel.H_NET_UT
+    pt[ProblemTableLabel.H_NET_W_AIR] = pt[base_col]
     if len(res.amb_streams) > 0:
         pt_air = get_process_heat_cascade(
             hot_streams=res.amb_streams.get_hot_streams(),
@@ -516,3 +561,84 @@ _HP_PLACEMENT_HANDLERS = {
         optimise_parallel_carnot_heat_pump_placement
     ),
 }
+
+
+def _hpr_numerical_records(
+    *,
+    zone,
+    base_target,
+    res,
+    profile,
+    selected,
+    period_id,
+    period_idx,
+    is_direct,
+    is_heat_pumping,
+):
+    if is_direct:
+        hot = zone.hot_streams.copy(deep=True)
+        cold = zone.cold_streams.copy(deep=True)
+        available_col = (
+            ProblemTableLabel.H_NET_COLD
+            if is_heat_pumping
+            else ProblemTableLabel.H_NET_HOT
+        )
+        available = float(np.max(np.abs(base_target.pt[available_col])))
+    else:
+        hot = base_target.cold_utilities.get_hot_streams(invert_utility=True)
+        cold = base_target.hot_utilities.get_cold_streams(invert_utility=True)
+        available = float(
+            base_target.hot_utility_target
+            if is_heat_pumping
+            else base_target.cold_utility_target
+        )
+    hot = hot + res.hpr_hot_streams + res.amb_streams.get_hot_streams()
+    cold = cold + res.hpr_cold_streams + res.amb_streams.get_cold_streams()
+    physical = get_process_heat_cascade(
+        hot_streams=hot, cold_streams=cold, is_shifted=False, period_idx=period_idx
+    )
+    slices = []
+    for side, streams in (("hot", hot), ("cold", cold)):
+        for stream in streams:
+            for part in stream.segments or (stream,):
+                q = float(part.heat_flow[period_idx])
+                if stream.is_active and q > 0:
+                    slices.append(
+                        HPRThermalSlice(
+                            side=side,
+                            supply_temperature=float(
+                                part.supply_temperature[period_idx]
+                            ),
+                            target_temperature=float(
+                                part.target_temperature[period_idx]
+                            ),
+                            duty=q,
+                        )
+                    )
+    qh = float(res.hpr_hot_streams.sum_stream_attribute("heat_flow", idx=period_idx))
+    qc = float(res.hpr_cold_streams.sum_stream_attribute("heat_flow", idx=period_idx))
+    return {
+        "hpr_load": HPRLoadSummary(
+            mode="heat_pump" if is_heat_pumping else "refrigeration",
+            available=available,
+            selected=selected,
+            achieved=min(selected, qh if is_heat_pumping else qc),
+            cycle_heating=qh,
+            cycle_cooling=qc,
+            work=float(res.w_net),
+            ambient_hot=float(res.Q_amb_hot),
+            ambient_cold=float(res.Q_amb_cold),
+        ),
+        "hpr_residual": HPRResidualData(
+            profile=profile,
+            period_id=str(
+                period_id
+                or next(k for k, v in zone.period_ids.items() if v == period_idx)
+            ),
+            mode="heat_pump" if is_heat_pumping else "refrigeration",
+            physical_temperatures=tuple(physical[ProblemTableLabel.T]),
+            physical_hot_composite=tuple(physical[ProblemTableLabel.H_HOT]),
+            physical_cold_composite=tuple(physical[ProblemTableLabel.H_COLD]),
+            thermal_slices=tuple(slices),
+        ),
+    }

@@ -7,6 +7,8 @@ from typing import Any
 
 import numpy as np
 
+from .._value.coercion import coerce_period_index
+
 _WIRE_TO_RUNTIME = {
     "t_supply": "supply_temperature",
     "t_target": "target_temperature",
@@ -138,7 +140,7 @@ def set_total_heat_flow_at_idx(parent, value: float, *, idx: int | None) -> None
             "Segmented stream targeting duty must be finite and non-negative."
         )
     target = max(target, 0.0)
-    period_idx = 0 if idx is None else int(idx)
+    period_idx = 0 if idx is None else coerce_period_index(idx)
     duties = np.asarray(
         [float(segment.heat_flow[period_idx]) for segment in parent._segments],
         dtype=float,

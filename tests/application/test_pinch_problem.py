@@ -1454,6 +1454,10 @@ def test_plot_helper_can_return_heat_pump_net_load_graph_data(monkeypatch):
     }
     monkeypatch.setattr(_PlotAccessor, "data", lambda self: payload)
 
+    monkeypatch.setattr(
+        "OpenPinch.application.hpr_selection.select_hpr_graphs",
+        lambda *args, **kwargs: payload["Plant/DHP"]["graphs"],
+    )
     obj = PinchProblem()
     nlp_hp_graph = obj.plot.net_load_profiles_with_heat_pump(
         zone_name="Plant/DHP",
@@ -1502,7 +1506,7 @@ def test_plot_helper_can_build_energy_transfer_diagram(monkeypatch):
     }
 
 
-def test_plot_accessor_shortcuts_select_all_named_graph_types():
+def test_plot_accessor_shortcuts_select_all_named_graph_types(monkeypatch):
     payload = {
         "Plant/All": {
             "name": "Plant/All Graphs",
@@ -1519,6 +1523,10 @@ def test_plot_accessor_shortcuts_select_all_named_graph_types():
             ],
         }
     }
+    monkeypatch.setattr(
+        "OpenPinch.application.hpr_selection.select_hpr_graphs",
+        lambda *args, **kwargs: payload["Plant/All"]["graphs"],
+    )
     problem = SimpleNamespace(_results=SimpleNamespace(graphs=payload))
     accessor = _PlotAccessor(problem)
 
@@ -3246,7 +3254,8 @@ def test_loading_zone_tree_and_packaged_sample_edges(monkeypatch, tmp_path: Path
         current_project_name="Demo",
     )
 
-    assert loaded_target_input.input_data is target_input
+    assert loaded_target_input.input_data == target_input
+    assert loaded_target_input.input_data is not target_input
     assert loaded_target_input.source_kind == "target_input"
     assert loaded_csv_tuple.source_kind == "csv"
 

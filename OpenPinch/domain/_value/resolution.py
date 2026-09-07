@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 
 from ..value import Value
+from .coercion import coerce_period_index
 
 _SCALAR_VALUE_DATA_KEYS = {"value", "unit", "weights"}
 _PERIOD_VALUE_DATA_KEYS = {"values", "period_ids", "weights", "unit"}
@@ -89,9 +90,10 @@ def _resolve_period_values(
             raise ValueError("period_idx is required for period values.")
         period_idx = 0
 
-    period_idx = int(period_idx)
-    if period_idx < 0:
-        raise ValueError("period_idx must be a non-negative integer.")
+    try:
+        period_idx = coerce_period_index(period_idx)
+    except IndexError as exc:
+        raise ValueError("period_idx must be a non-negative integer.") from exc
     if period_idx >= resolved.size:
         raise ValueError(
             f"period_idx {period_idx} is out of range for {resolved.size} period(s)."

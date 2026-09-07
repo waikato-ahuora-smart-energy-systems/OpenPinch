@@ -6,6 +6,7 @@ from copy import deepcopy
 from types import SimpleNamespace
 from typing import Any
 
+from ._value.coercion import coerce_period_index
 from .configuration_fields import (
     CONFIG_FIELD_SPECS,
     input_unit_options_to_map,
@@ -117,13 +118,24 @@ class Configuration:
         """Return a lightweight period context for this configuration."""
         period_ids = list(self.problem.period_ids)
         period_lookup = {period: index for index, period in enumerate(period_ids)}
+        try:
+            explicit_idx = (
+                None if period_idx is None else coerce_period_index(period_idx)
+            )
+        except IndexError as exc:
+            raise ValueError(f"Unknown period index {period_idx!r}.") from exc
         if period_id is not None:
             if period_id not in period_lookup:
                 raise ValueError(f"Unknown period_id {period_id!r}.")
             resolved_idx = period_lookup[period_id]
             resolved_period = period_id
-        elif period_idx is not None:
-            resolved_idx = int(period_idx)
+            if explicit_idx is not None and explicit_idx != resolved_idx:
+                raise ValueError(
+                    f"period_id {period_id!r} resolves to period_idx {resolved_idx}, "
+                    f"but period_idx {explicit_idx} was also provided."
+                )
+        elif explicit_idx is not None:
+            resolved_idx = explicit_idx
             try:
                 resolved_period = period_ids[resolved_idx]
             except IndexError as exc:

@@ -31,6 +31,101 @@ separate load-mode string.
 The Carnot methods cover Cascade Carnot cycles and parallel Carnot screening
 without asking for a cycle-name string.
 
+Load, economics and target-specific plots
+-----------------------------------------
+
+``load_fraction`` is a number from zero to one selecting a fraction of the
+available net heating load (HP) or cooling load (refrigeration) near the pinch.
+It is a service selection, not compressor part-load. A heat pump can supply less
+than its selected ceiling if utilities are cheaper. Inspect
+``heat_pump.hpr_load`` for available, selected and achieved service, cycle duties,
+work and separate ambient exchanges (kW). Zero selected load returns no HPR target.
+Use ``load_duty`` for an absolute duty or ``period_loads`` for per-period duties
+instead of ``load_fraction``; these selectors are mutually exclusive.
+
+Heat pumps have no penalty requiring them to consume all low-grade heat.
+Refrigeration retains a feasibility term for unserved selected cooling. The
+Carnot objective uses electricity-equivalent price ratios in
+``COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE`` and
+``COSTING_HPR_PRICE_RATIO_COLD_TO_ELE``. These differ from utility stream prices.
+Both ratios default to 1.0; notebook 08 explicitly uses a positive cold ratio of
+0.1 to illustrate inexpensive cooling without changing global defaults. For a
+fixed candidate leaving 100 kW of cooling, this lowers the cooling-cost term
+from 100 to 10 kW electricity-equivalent; it adds no heat-pump feasibility
+penalty.
+
+Use the same process/utility basis and stage counts when comparing modes.
+Select a solved target explicitly when inspecting several results::
+
+   gcc_hp = problem.plot.grand_composite_curve_with_heat_pump(target=heat_pump)
+   gcc_rf = problem.plot.grand_composite_curve_with_refrigeration(target=refrigeration)
+   nlp_rf = problem.plot.net_load_profiles_with_refrigeration(target=refrigeration)
+
+Plotting only reads results. Ambiguous selections require ``target=``; an HP plot
+never selects a refrigeration result. Changed or foreign target handles fail.
+
+Residual utility allocation and placement
+-----------------------------------------
+
+Select a solved scalar HPR result, then allocate existing utilities or optimize
+their temperatures against its remaining load profiles::
+
+   utilities = problem.target.all_heat_integration(base_target=heat_pump)
+   optimized = problem.target.utility_placement(base_target=heat_pump, isothermal=2)
+   placement_summary = optimized.summary_frame()
+   optimized_gcc = optimized.plot.grand_composite_curve()
+
+``heat_pump`` is the solved ``DirectHeatPumpTarget`` returned by the Carnot call
+above (or ``IndirectHeatPumpTarget`` for utility HPR). It retains its selected
+load, cycle result, residual profiles and provenance. A zero-service call returns
+``None`` and cannot be used as a basis.
+
+The original process study and HPR result remain unchanged. ``utilities`` is a
+``TargetOutput`` containing residual allocation; it does not report artificial
+original-process recovery. For a single ``ResidualUtilityTarget``, use
+``problem.target.direct_heat_integration(base_target=heat_pump)``.
+
+``optimized`` is an independent, already solved ``PinchProblem``. Its summary,
+plots, selected ``period_results`` and ``utility_placement_result`` are ready to
+read without another targeting call. Candidate evaluation and final allocation
+use the same frozen HPR profile, including physical boundary temperatures for
+entropy calculations. Placement still requires at least two isothermal levels.
+
+For an editable intermediate case, derive it explicitly::
+
+   residual = problem.residual_utility(base_target=heat_pump)
+   residual_results = residual.target.all_heat_integration()
+
+Case derivation returns an unsolved problem. The former, unreleased
+``problem.target.residual_utility`` spelling has moved to ``problem``.
+
+Transfer the optimized utility definitions into a fresh original-process study::
+
+   new_problem = problem.with_utilities_from(optimized)
+   new_results = new_problem.target.all_heat_integration()
+
+This copies utility definitions, not installed HPR equipment. ``new_problem``
+starts unsolved, with the receiver's process streams, runtime components,
+configuration and zone tree. The donor's residual and results are not copied.
+Nominal segment shapes, costs, units, fluid metadata, active flags and capacity
+limits are retained. Period sets must match; ordered values are aligned by ID.
+Use ``project_name=`` to override the receiver's name. To keep the fixed HPR study,
+continue analysing ``optimized`` or derive from an existing residual receiver.
+
+The three HPR shortcuts accept a current, local, unmodified scalar HPR result;
+strings, whole result collections and other target kinds are unsupported.
+Omitted zone and period selectors inherit the HPR result. Explicit conflicts,
+``include_subzones=True``, shared HPR aggregates and scalar-handle broadcasting
+through all-period or workspace batches fail clearly. Thermal overrides cannot
+change a frozen basis; placement search controls remain available in ``options``.
+
+This is sequential optimization with HPR duties and temperatures fixed. To
+resize HPR, retarget on a process case. Residual cases support allocation and
+placement; other analyses require original physical streams. Their input JSON
+retains the residual basis, but ordinary JSON serialization does not persist a
+solved result cache: reconstructing it creates an unsolved case. A derived target
+belongs to its derived case, rather than becoming a local handle on the source.
+
 Simulated Models
 ----------------
 

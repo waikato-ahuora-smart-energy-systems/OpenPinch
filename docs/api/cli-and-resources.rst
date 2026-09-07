@@ -39,8 +39,8 @@ The internal ``PinchProblem`` and ``PinchWorkspace`` coordinators also resolve
 packaged sample-case names such as ``basic_pinch.json`` directly when no local
 file with the same name exists.
 
-The packaged notebooks are intended to be copied as clean source assets. They
-ship without stored execution output and exercise the same unsupported
+The packaged notebooks include saved execution outputs and can be copied for
+local exploration. They exercise the same unsupported
 ``PinchWorkspace`` and plotting internals documented elsewhere in RTD. The
 series is ordered around first solves, Total Site method interpretation,
 multiperiod studies, advanced Heat Pump screening, direct gas/vapour MVR,
@@ -65,15 +65,26 @@ The current optional install split is:
 Packaged Asset Modules
 ----------------------
 
-.. automodule:: OpenPinch.data
+Tutorial notebooks and sample cases live in ``OpenPinch/tutorials/notebooks``
+and ``OpenPinch/tutorials/sample_cases``. HPR interchange schemas and canonical
+examples live in ``OpenPinch/contracts/resources/hpr_performance_map``. Runtime
+compressor characteristics live in
+``OpenPinch/analysis/heat_pumps/performance_maps/characteristics``. Resource helper
+calls and sample-case name resolution are unchanged by this layout.
+
+.. automodule:: OpenPinch.tutorials
    :no-members:
    :no-index:
 
-.. automodule:: OpenPinch.data.sample_cases
+.. automodule:: OpenPinch.contracts.resources
    :no-members:
    :no-index:
 
-.. automodule:: OpenPinch.data.notebooks
+.. automodule:: OpenPinch.tutorials.sample_cases
+   :no-members:
+   :no-index:
+
+.. automodule:: OpenPinch.tutorials.notebooks
    :no-members:
    :no-index:
 

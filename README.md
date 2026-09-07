@@ -110,6 +110,10 @@ Copy the notebook series from the CLI:
 openpinch notebook -o notebooks
 ```
 
+Notebooks and sample cases live in `OpenPinch/tutorials/notebooks` and
+`OpenPinch/tutorials/sample_cases`, with discovery and copying available through
+`OpenPinch.resources`.
+
 The nineteen-notebook series progresses from first solve through multiperiod
 HPR, cogeneration, HEN synthesis, and publication workflows.
 

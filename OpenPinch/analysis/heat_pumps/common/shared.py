@@ -193,6 +193,7 @@ def evaluate_carnot_hpr_result(
 
     return HPRBackendResult(
         obj=obj,
+        feasibility_penalty=penalty,
         utility_tot=float(w_net + Q_ext_heat + Q_ext_cold),
         w_net=float(w_net),
         w_hpr=w_hpr,

@@ -40,9 +40,7 @@ def _standardise_maximum_heat_flow(value, config: Configuration) -> Value | None
     by_period = dict(zip(period_ids, values, strict=True))
     canonical_period_ids = tuple(str(item) for item in config.problem.period_ids)
     unknown = tuple(
-        period_id
-        for period_id in period_ids
-        if period_id not in canonical_period_ids
+        period_id for period_id in period_ids if period_id not in canonical_period_ids
     )
     if unknown:
         raise ValueError(
@@ -419,9 +417,6 @@ def _create_utilities_list(
         candidates.append((selected, supply_value, target_value, endpoints_swapped))
 
     for selected, supply_value, target_value, endpoints_swapped in candidates:
-        if selected.type == utility_type:
-            selected.active = False
-
         key = (
             ".".join([StreamLoc.HotU.value, selected.name])
             if utility_type == StreamType.Hot.value
@@ -491,5 +486,7 @@ def _create_utilities_list(
             )
         created_utilities.add(created, key)
         created_utilities[key].delta_t_contribution_multiplier = dt_cont_multiplier
+        if selected.type == utility_type:
+            selected.active = False
 
     return created_utilities, unassigned_utilities

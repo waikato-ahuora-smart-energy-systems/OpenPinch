@@ -165,6 +165,7 @@ def test_compute_parallel_carnot_objective_handles_mixed_lift_without_ambiguous_
         eta_ii_hpr_carnot=0.5,
         eta_ii_he_carnot=0.5,
         Q_hpr_target=300.0,
+        is_heat_pumping=False,
         Q_heat_max=300.0,
         Q_cool_max=260.0,
         heat_to_power_ratio=1.0,
@@ -196,6 +197,7 @@ def test_compute_parallel_carnot_utility_total_includes_residual_cold_utility():
         eta_ii_hpr_carnot=0.5,
         eta_ii_he_carnot=0.0,
         Q_hpr_target=200.0,
+        is_heat_pumping=False,
         Q_heat_max=200.0,
         Q_cool_max=20.0,
         heat_to_power_ratio=1.0,
@@ -220,6 +222,7 @@ def test_parse_parallel_carnot_state_variables_uses_bounded_ambient_mapping():
         H_hot=np.array([0.0, -160.0]),
         z_amb_hot=np.zeros(2),
         z_amb_cold=np.zeros(2),
+        is_heat_pumping=False,
         Q_heat_max=200.0,
         Q_cool_max=160.0,
     )

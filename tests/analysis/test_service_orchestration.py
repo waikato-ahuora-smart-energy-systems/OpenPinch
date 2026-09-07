@@ -135,6 +135,7 @@ def test_data_preprocessing_service_delegates_target_input_payload(monkeypatch):
         "StaticTargetInput",
         (),
         {
+            "residual_basis": None,
             "streams": [{"name": "H1"}],
             "utilities": [{"name": "Steam"}],
             "options": {"THERMAL_DT_CONT": 10.0},

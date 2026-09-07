@@ -73,7 +73,7 @@ def semantic_issues(
         {name: spec.default for name, spec in CONFIG_FIELD_SPECS.items()} | options
     )
 
-    if len(problem_inputs.streams) == 0:
+    if len(problem_inputs.streams) == 0 and problem_inputs.residual_basis is None:
         issues.append(
             ValidationIssue(
                 severity="error",

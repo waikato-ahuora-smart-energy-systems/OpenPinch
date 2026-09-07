@@ -38,6 +38,7 @@ def test_public_signature_exposes_maximum_duties_as_physical_input() -> None:
         "period_ids",
         "maximum_duties",
         "options",
+        "base_target",
     )
 
 
@@ -312,9 +313,9 @@ def test_period_identity_limit_canonicalizes_and_leaves_unselected_unbounded() -
         cu_t_max=10.0,
         config=config,
     )
-    maximum = prepared.get_hot_utility_streams().get_stream_by_name(
-        "HPS"
-    ).maximum_heat_flow
+    maximum = (
+        prepared.get_hot_utility_streams().get_stream_by_name("HPS").maximum_heat_flow
+    )
 
     assert maximum.period_values[[0, 2]] == pytest.approx([100.0, 200.0])
     assert maximum.period_values[1] != maximum.period_values[1]
@@ -382,8 +383,7 @@ def test_maximum_duties_round_trip_on_request_and_returned_case() -> None:
     assert hot["hot_iso_1"].heat_flow.value <= 1.0 + 1e-9
     assert hot["hot_iso_1"].maximum_heat_flow.value == pytest.approx(1.0)
     assert {
-        utility.name: float(utility.heat_flow.value)
-        for utility in target.hot_utilities
+        utility.name: float(utility.heat_flow.value) for utility in target.hot_utilities
     } == pytest.approx(
         {
             level.template_key.name: level.allocated_duty.value
@@ -429,9 +429,7 @@ def test_unequal_multiperiod_caps_complete_and_retarget_by_identity() -> None:
         "unit": "kW",
     }
     optimized = case.master_zone.get_subzone("Almond")
-    maximum = optimized.hot_utilities.get_stream_by_name(
-        "hot_iso_1"
-    ).maximum_heat_flow
+    maximum = optimized.hot_utilities.get_stream_by_name("hot_iso_1").maximum_heat_flow
     assert maximum.period_values == pytest.approx([1.0, 2.0])
 
     for period_id, expected_limit in (("summer", 1.0), ("winter", 2.0)):

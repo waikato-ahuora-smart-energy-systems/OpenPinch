@@ -39,23 +39,22 @@ class ProblemTable:
             self.columns = list([index.value for index in ProblemTableLabel])
         else:
             self.columns = list([key for key in data_input.keys()])
-
-            for key in self.columns:
-                if np.isnan(data_input[key]).all():
-                    data_input.pop(key)
         self.col_index = {col: idx for idx, col in enumerate(self.columns)}
 
         if isinstance(data_input, dict):
             # Align data from dict into array using columns order
-            self.data = np.array(
-                [
-                    data_input.get(col, [np.nan] * len(next(iter(data_input.values()))))
-                    for col in self.columns
-                ]
-            ).T
+            n_rows = len(next(iter(data_input.values()), []))
+            self.data = (
+                np.array(
+                    [data_input.get(col, [np.nan] * n_rows) for col in self.columns],
+                    dtype=float,
+                )
+                .reshape(len(self.columns), n_rows)
+                .T
+            )
         elif isinstance(data_input, list):
             data_input = self._pad_data_input(data_input, len(self.columns))
-            self.data = np.array(data_input).T
+            self.data = np.array(data_input, dtype=float).T
         else:
             self.data = None
 
@@ -105,7 +104,8 @@ class ProblemTable:
             [
                 data_input.get(col, [np.nan] * len(next(iter(data_input.values()))))
                 for col in self.columns
-            ]
+            ],
+            dtype=float,
         ).T
 
     def _column_index_for(self, col_name: str | ProblemTableLabel) -> int:
@@ -303,9 +303,10 @@ class ProblemTable:
 
     def _pad_data_input(self, data_input, n_cols):
         """Pad a list-of-columns input so it matches ``n_cols`` length."""
+        data_input = list(data_input)
         current_cols = len(data_input)
         if current_cols < n_cols:
-            n_rows = len(data_input[0])  # assume all rows are same length
+            n_rows = len(data_input[0]) if data_input else 0
             padding = [[np.nan] * n_rows for _ in range(n_cols - current_cols)]
             data_input += padding
         return data_input

@@ -8,10 +8,10 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
-_SAMPLE_CASE_ROOT = files("OpenPinch.data.sample_cases")
-_NOTEBOOK_ROOT = files("OpenPinch.data.notebooks")
+_SAMPLE_CASE_ROOT = files("OpenPinch.tutorials.sample_cases")
+_NOTEBOOK_ROOT = files("OpenPinch.tutorials.notebooks")
 _HPR_PERFORMANCE_MAP_CONTRACT_ROOT = files(
-    "OpenPinch.data.contracts.hpr_performance_map"
+    "OpenPinch.contracts.resources.hpr_performance_map"
 )
 _HPR_PERFORMANCE_MAP_CONTRACT_RESOURCES = (
     "heat-pump-1.0.json",

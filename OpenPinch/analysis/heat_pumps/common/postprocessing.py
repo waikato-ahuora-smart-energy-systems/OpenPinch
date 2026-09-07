@@ -8,8 +8,12 @@ from ....analysis.targeting.grand_composite import (
     get_GCC_without_pockets,
     get_seperated_gcc_heat_load_profiles,
 )
-from ....analysis.targeting.utilities import target_utilities_for_load_profiles
+from ....analysis.targeting.utilities import (
+    _apply_utility_duties,
+    target_utilities_for_load_profiles,
+)
 from ....domain.enums import ProblemTableLabel
+from ....domain.hpr import HPRResidualProfile
 from ....domain.problem_table import ProblemTable
 
 
@@ -90,6 +94,13 @@ def _get_hpr_residual_utility_summary(
         ),
         "hot_pinch": hot_pinch,
         "cold_pinch": cold_pinch,
+        "residual_profile": HPRResidualProfile(
+            temperatures=tuple(utility_T_vals),
+            net=tuple(utility_net),
+            heating=tuple(np.maximum(hot_profile, 0.0)),
+            cooling=tuple(np.abs(cold_profile)),
+            temperature_basis="shifted" if is_direct else "real",
+        ),
     }
 
 
@@ -99,9 +110,7 @@ def _get_hpr_residual_net_profile(
     is_direct: bool,
     is_heat_pumping: bool,
 ) -> np.ndarray:
-    base_col = (
-        ProblemTableLabel.H_NET_W_AIR if is_direct else ProblemTableLabel.H_NET_UT
-    )
+    base_col = ProblemTableLabel.H_NET_W_AIR
     hpr_col = (
         ProblemTableLabel.H_NET_HP if is_heat_pumping else ProblemTableLabel.H_NET_RFRG
     )
@@ -113,6 +122,12 @@ def _get_hpr_residual_utility_net_profile(
     T_vals: np.ndarray,
     residual_net: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
+    residual_net = np.asarray(residual_net, dtype=float)
+    if not residual_net.size or not np.isfinite(residual_net).all():
+        raise ValueError("HPR residual cascade must be finite and nonempty.")
+    # Reintegrate the combined cascade before finding its pinch. In particular,
+    # a tiny positive minimum must not turn a valid pinch into an absent one.
+    residual_net = residual_net - residual_net.min()
     residual_pt = ProblemTable(
         {ProblemTableLabel.T: T_vals, ProblemTableLabel.H_NET: residual_net}
     )
@@ -191,13 +206,7 @@ def _get_hpr_residual_load_profiles(
             cold_after_col: cold_profile,
         }
 
-    if len(T_vals) == len(pt[ProblemTableLabel.T]) and np.allclose(
-        T_vals, pt[ProblemTableLabel.T]
-    ):
-        pt.update(
-            T_col=pt[ProblemTableLabel.T],
-            updates=stored_profiles,
-        )
+    pt.update(T_col=T_vals, updates=stored_profiles)
     return hot_profile, cold_profile
 
 
@@ -212,8 +221,8 @@ def _retarget_hpr_residual_utilities(
     is_real_temperatures: bool,
     period_idx: int,
 ):
-    hot_utilities.set_common_stream_attribute("heat_flow", 0.0, idx=period_idx)
-    cold_utilities.set_common_stream_attribute("heat_flow", 0.0, idx=period_idx)
+    _apply_utility_duties(hot_utilities, (0.0,) * len(hot_utilities), idx=period_idx)
+    _apply_utility_duties(cold_utilities, (0.0,) * len(cold_utilities), idx=period_idx)
     pinch_idx = ProblemTable(
         {ProblemTableLabel.T: T_vals, ProblemTableLabel.H_NET: residual_net}
     ).pinch_idx(ProblemTableLabel.H_NET)

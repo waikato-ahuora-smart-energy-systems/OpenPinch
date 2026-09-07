@@ -170,7 +170,8 @@ def test_utility_placement_guide_documents_the_complete_public_contract():
     ):
         assert phrase in page
     assert "problem.plot.utility_placement" not in page
-    assert "base_target" not in page
+    assert "residual_utility(base_target=heat_pump)" in page
+    assert "utility_placement(base_target=" in page
     assert "isothermal_level_count" not in page
     assert "sensible_level_count" not in page
     assert "replacement_input" not in page

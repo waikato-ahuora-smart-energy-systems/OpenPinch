@@ -14,14 +14,14 @@ from scripts.artifact_install_smoke import is_checkout_source_import
 from tests.strategies.artifact_paths import artifact_import_path_cases
 from tests.support.paths import REPOSITORY_ROOT
 
-HPR_CONTRACT_RESOURCE_ROOT = Path("OpenPinch/data/contracts/hpr_performance_map")
+HPR_CONTRACT_RESOURCE_ROOT = Path("OpenPinch/contracts/resources/hpr_performance_map")
 HPR_CONTRACT_RESOURCES = (
     "heat-pump-1.0.json",
     "refrigeration-1.0.json",
     "schema-1.0.json",
 )
 TESPY_CHARACTERISTIC_RESOURCE = Path(
-    "OpenPinch/data/heat_pumps/performance_maps/"
+    "OpenPinch/analysis/heat_pumps/performance_maps/characteristics/"
     "openpinch-single-stage-compressor-v1.json"
 )
 
@@ -116,27 +116,31 @@ def _assert_common_release_boundary(names: list[str], *, root_prefix: str = "") 
         assert not any(fragment in name for name in names)
 
     assert any(
-        name.endswith("OpenPinch/data/sample_cases/basic_pinch.json") for name in names
+        name.endswith("OpenPinch/tutorials/sample_cases/basic_pinch.json")
+        for name in names
     )
     assert any(
-        name.endswith("OpenPinch/data/sample_cases/heat_pump_targeting.json")
+        name.endswith("OpenPinch/tutorials/sample_cases/heat_pump_targeting.json")
         for name in names
     )
     assert any(
         name.endswith(
-            "OpenPinch/data/sample_cases/Four-stream-Yee-and-Grossmann-1990-1.json"
+            "OpenPinch/tutorials/sample_cases/Four-stream-Yee-and-Grossmann-1990-1.json"
         )
         for name in names
     )
     assert any(
-        name.endswith("OpenPinch/data/notebooks/01_first_solve_and_core_curves.ipynb")
+        name.endswith(
+            "OpenPinch/tutorials/notebooks/01_first_solve_and_core_curves.ipynb"
+        )
         for name in names
     )
     assert any(
-        name.endswith("OpenPinch/data/sample_cases/process_mvr.json") for name in names
+        name.endswith("OpenPinch/tutorials/sample_cases/process_mvr.json")
+        for name in names
     )
     assert any(
-        name.endswith("OpenPinch/data/notebooks/11_process_mvr_and_cascade.ipynb")
+        name.endswith("OpenPinch/tutorials/notebooks/11_process_mvr_and_cascade.ipynb")
         for name in names
     )
 

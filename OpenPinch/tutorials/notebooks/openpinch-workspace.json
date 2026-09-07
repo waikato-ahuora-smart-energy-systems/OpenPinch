@@ -1,0 +1,382 @@
+{
+  "schema_version": "3",
+  "project_name": "Site",
+  "baseline_name": "baseline",
+  "cases": {
+    "baseline": {
+      "case_input": {
+        "streams": [
+          {
+            "zone": "Site/Plant/O1",
+            "name": "F1",
+            "segments": null,
+            "profile": null,
+            "t_supply": {
+              "value": 20.0,
+              "unit": "degC"
+            },
+            "t_target": {
+              "value": 140.0,
+              "unit": "degC"
+            },
+            "p_supply": null,
+            "p_target": null,
+            "h_supply": null,
+            "h_target": null,
+            "heat_flow": {
+              "value": 2400.0,
+              "unit": "kW"
+            },
+            "heat_capacity_flowrate": null,
+            "dt_cont": {
+              "value": 5.0,
+              "unit": "degC"
+            },
+            "htc": {
+              "value": 1.0,
+              "unit": "kW/m^2/degC"
+            },
+            "fluid_name": null,
+            "fluid_phase": null,
+            "active": true
+          },
+          {
+            "zone": "Site/Plant/O2",
+            "name": "F1",
+            "segments": null,
+            "profile": null,
+            "t_supply": {
+              "value": 140.0,
+              "unit": "degC"
+            },
+            "t_target": {
+              "value": 180.0,
+              "unit": "degC"
+            },
+            "p_supply": null,
+            "p_target": null,
+            "h_supply": null,
+            "h_target": null,
+            "heat_flow": {
+              "value": 800.0,
+              "unit": "kW"
+            },
+            "heat_capacity_flowrate": null,
+            "dt_cont": {
+              "value": 5.0,
+              "unit": "degC"
+            },
+            "htc": {
+              "value": 1.0,
+              "unit": "kW/m^2/degC"
+            },
+            "fluid_name": null,
+            "fluid_phase": null,
+            "active": true
+          },
+          {
+            "zone": "Site/Plant/O5",
+            "name": "F3",
+            "segments": null,
+            "profile": null,
+            "t_supply": {
+              "value": 140.0,
+              "unit": "degC"
+            },
+            "t_target": {
+              "value": 230.0,
+              "unit": "degC"
+            },
+            "p_supply": null,
+            "p_target": null,
+            "h_supply": null,
+            "h_target": null,
+            "heat_flow": {
+              "value": 2700.0,
+              "unit": "kW"
+            },
+            "heat_capacity_flowrate": null,
+            "dt_cont": {
+              "value": 5.0,
+              "unit": "degC"
+            },
+            "htc": {
+              "value": 1.0,
+              "unit": "kW/m^2/degC"
+            },
+            "fluid_name": null,
+            "fluid_phase": null,
+            "active": true
+          },
+          {
+            "zone": "Site/Plant/O3",
+            "name": "F2",
+            "segments": null,
+            "profile": null,
+            "t_supply": {
+              "value": 196.666667,
+              "unit": "degC"
+            },
+            "t_target": {
+              "value": 40.0,
+              "unit": "degC"
+            },
+            "p_supply": null,
+            "p_target": null,
+            "h_supply": null,
+            "h_target": null,
+            "heat_flow": {
+              "value": 2350.000005,
+              "unit": "kW"
+            },
+            "heat_capacity_flowrate": null,
+            "dt_cont": {
+              "value": 5.0,
+              "unit": "degC"
+            },
+            "htc": {
+              "value": 1.0,
+              "unit": "kW/m^2/degC"
+            },
+            "fluid_name": null,
+            "fluid_phase": null,
+            "active": true
+          },
+          {
+            "zone": "Site/Plant/O6",
+            "name": "F4",
+            "segments": null,
+            "profile": null,
+            "t_supply": {
+              "value": 104.0,
+              "unit": "degC"
+            },
+            "t_target": {
+              "value": 80.0,
+              "unit": "degC"
+            },
+            "p_supply": null,
+            "p_target": null,
+            "h_supply": null,
+            "h_target": null,
+            "heat_flow": {
+              "value": 600.0,
+              "unit": "kW"
+            },
+            "heat_capacity_flowrate": null,
+            "dt_cont": {
+              "value": 5.0,
+              "unit": "degC"
+            },
+            "htc": {
+              "value": 1.0,
+              "unit": "kW/m^2/degC"
+            },
+            "fluid_name": null,
+            "fluid_phase": null,
+            "active": true
+          },
+          {
+            "zone": "Site/Plant/O7",
+            "name": "F4",
+            "segments": null,
+            "profile": null,
+            "t_supply": {
+              "value": 200.0,
+              "unit": "degC"
+            },
+            "t_target": {
+              "value": 104.0,
+              "unit": "degC"
+            },
+            "p_supply": null,
+            "p_target": null,
+            "h_supply": null,
+            "h_target": null,
+            "heat_flow": {
+              "value": 2400.0,
+              "unit": "kW"
+            },
+            "heat_capacity_flowrate": null,
+            "dt_cont": {
+              "value": 5.0,
+              "unit": "degC"
+            },
+            "htc": {
+              "value": 1.0,
+              "unit": "kW/m^2/degC"
+            },
+            "fluid_name": null,
+            "fluid_phase": null,
+            "active": true
+          },
+          {
+            "zone": "Site/Plant/O4",
+            "name": "F2",
+            "segments": null,
+            "profile": null,
+            "t_supply": {
+              "value": 250.0,
+              "unit": "degC"
+            },
+            "t_target": {
+              "value": 196.666667,
+              "unit": "degC"
+            },
+            "p_supply": null,
+            "p_target": null,
+            "h_supply": null,
+            "h_target": null,
+            "heat_flow": {
+              "value": 800.0,
+              "unit": "kW"
+            },
+            "heat_capacity_flowrate": null,
+            "dt_cont": {
+              "value": 5.0,
+              "unit": "degC"
+            },
+            "htc": {
+              "value": 1.0,
+              "unit": "kW/m^2/degC"
+            },
+            "fluid_name": null,
+            "fluid_phase": null,
+            "active": true
+          }
+        ],
+        "utilities": [
+          {
+            "name": "HU",
+            "type": "Hot",
+            "segments": null,
+            "profile": null,
+            "t_supply": {
+              "value": 260.0,
+              "unit": "degC"
+            },
+            "t_target": {
+              "value": 259.9,
+              "unit": "degC"
+            },
+            "p_supply": null,
+            "p_target": null,
+            "h_supply": null,
+            "h_target": null,
+            "heat_flow": null,
+            "maximum_heat_flow": null,
+            "dt_cont": {
+              "value": 1.0,
+              "unit": "degC"
+            },
+            "htc": {
+              "value": 1.0,
+              "unit": "kW/m^2/degC"
+            },
+            "price": {
+              "value": 10.0,
+              "unit": "$/MWh"
+            },
+            "fluid_name": null,
+            "fluid_phase": null,
+            "active": true
+          },
+          {
+            "name": "CU",
+            "type": "Cold",
+            "segments": null,
+            "profile": null,
+            "t_supply": {
+              "value": 10.0,
+              "unit": "degC"
+            },
+            "t_target": {
+              "value": 10.1,
+              "unit": "degC"
+            },
+            "p_supply": null,
+            "p_target": null,
+            "h_supply": null,
+            "h_target": null,
+            "heat_flow": null,
+            "maximum_heat_flow": null,
+            "dt_cont": {
+              "value": 1.0,
+              "unit": "degC"
+            },
+            "htc": {
+              "value": 1.0,
+              "unit": "kW/m^2/degC"
+            },
+            "price": {
+              "value": 10.0,
+              "unit": "$/MWh"
+            },
+            "fluid_name": null,
+            "fluid_phase": null,
+            "active": true
+          }
+        ],
+        "options": {},
+        "zone_tree": {
+          "name": "Site",
+          "type": "Site",
+          "dt_cont_multiplier": null,
+          "children": [
+            {
+              "name": "Plant",
+              "type": "Process Zone",
+              "dt_cont_multiplier": null,
+              "children": [
+                {
+                  "name": "O1",
+                  "type": "Unit Operation",
+                  "dt_cont_multiplier": null,
+                  "children": null
+                },
+                {
+                  "name": "O2",
+                  "type": "Unit Operation",
+                  "dt_cont_multiplier": null,
+                  "children": null
+                },
+                {
+                  "name": "O3",
+                  "type": "Unit Operation",
+                  "dt_cont_multiplier": null,
+                  "children": null
+                },
+                {
+                  "name": "O4",
+                  "type": "Unit Operation",
+                  "dt_cont_multiplier": null,
+                  "children": null
+                },
+                {
+                  "name": "O5",
+                  "type": "Unit Operation",
+                  "dt_cont_multiplier": null,
+                  "children": null
+                },
+                {
+                  "name": "O6",
+                  "type": "Unit Operation",
+                  "dt_cont_multiplier": null,
+                  "children": null
+                },
+                {
+                  "name": "O7",
+                  "type": "Unit Operation",
+                  "dt_cont_multiplier": null,
+                  "children": null
+                }
+              ]
+            }
+          ]
+        },
+        "network": null,
+        "plant_profile_data": []
+      }
+    }
+  }
+}

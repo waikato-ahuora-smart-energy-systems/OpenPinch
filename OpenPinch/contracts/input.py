@@ -16,6 +16,7 @@ from pydantic import (
 
 from ..domain.configuration_fields import validate_configuration_options
 from ..domain.enums import FluidPhase, HeatExchangerKind, StreamID, StreamType
+from ..domain.hpr import HPRResidualSnapshot
 from .common import PeriodValueWithUnitAndIds, ScalarOrVU
 
 MaximumHeatFlowValue = Union[ScalarOrVU, PeriodValueWithUnitAndIds]
@@ -585,6 +586,7 @@ class TargetInput(BaseModel):
     """Validated top-level input data for :class:`PinchProblem`."""
 
     streams: List[StreamSchema]
+    residual_basis: HPRResidualSnapshot | None = None
     utilities: List[UtilitySchema] = Field(default_factory=list)
     options: Optional[dict] = None
     zone_tree: Optional[ZoneTreeSchema] = None
@@ -592,6 +594,36 @@ class TargetInput(BaseModel):
     plant_profile_data: List[PlantProfileSchema] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def _validate_residual_basis(self):
+        if self.residual_basis is not None and (
+            self.streams or self.network or self.plant_profile_data
+        ):
+            raise ValueError(
+                "Residual utility input cannot contain physical streams, "
+                "networks or plant profiles."
+            )
+        if self.residual_basis is not None:
+            sid = self.residual_basis.data.period_id
+            options = dict(self.options or {})
+            if options.get("PROBLEM_PERIOD_IDS", [sid]) != [sid]:
+                raise ValueError("Residual input must use exactly its frozen period.")
+            if options.get("HPR_MULTIPERIOD_OPTIMIZATION_ENABLED", False):
+                raise ValueError("A scalar residual cannot enable shared-period HPR.")
+            options.setdefault("PROBLEM_PERIOD_IDS", [sid])
+            options.setdefault("PROBLEM_PERIOD_WEIGHTS", [1.0])
+            self.options = options
+            if self.zone_tree is not None and (
+                self.zone_tree.children
+                or self.zone_tree.type not in (None, "Process Zone")
+                or self.zone_tree.dt_cont_multiplier not in (None, 1.0)
+            ):
+                raise ValueError(
+                    "Residual input requires one Process Zone "
+                    "with fixed temperature shifts."
+                )
+        return self
 
     @field_validator("options")
     @classmethod

@@ -41,7 +41,13 @@ class Value:
         """Create a scalar or multiperiod value from data and optional unit."""
         quantity, weights = self._coerce_input(data, unit)
         self._set_storage(quantity)
-        self._weights = weights
+        self._weights = (
+            None
+            if weights is None
+            else np.array(weights, dtype=float, copy=True).reshape(-1)
+        )
+        if self._weights is not None and self._weights.size != self.num_periods:
+            raise ValueError("weights length must match the number of periods.")
         self._read_only_reason: str | None = None
 
     @property
@@ -102,8 +108,8 @@ class Value:
 
     @property
     def weights(self) -> np.ndarray:
-        """Return optional passive period weights carried with this value."""
-        return self._weights
+        """Return a detached copy of optional passive period weights."""
+        return self._weights.copy() if self._weights is not None else None
 
     @property
     def num_periods(self) -> int:
@@ -138,9 +144,9 @@ class Value:
             subset = self._quantity.magnitude[idx]
             result = Value(subset, unit=self.unit)
             if self._weights is not None:
-                result._weights = np.asarray(self._weights[idx], dtype=float).reshape(
-                    -1
-                )
+                result._weights = np.array(
+                    self._weights[idx], dtype=float, copy=True
+                ).reshape(-1)
             return result
 
         resolved_idx = self._resolve_period_index(idx)
@@ -312,7 +318,9 @@ class Value:
         """Build a new ``Value`` instance from a Pint quantity."""
         instance = type(self).__new__(type(self))
         instance._set_storage(qty)
-        instance._weights = self.weights
+        instance._weights = (
+            self.weights if instance.num_periods == self.num_periods else None
+        )
         instance._read_only_reason = None
         return instance
 
@@ -358,13 +366,11 @@ class Value:
             return 0
         if idx is None:
             return 0
-        if isinstance(idx, str):
-            try:
-                return int(idx)
-            except (TypeError, ValueError) as exc:
-                raise KeyError(idx) from exc
-        idx = int(idx)
-        if idx < 0 or idx >= self.num_periods:
+        try:
+            idx = _value_coercion.coerce_period_index(idx)
+        except ValueError as exc:
+            raise KeyError(idx) from exc
+        if idx >= self.num_periods:
             raise IndexError(idx)
         return idx
 

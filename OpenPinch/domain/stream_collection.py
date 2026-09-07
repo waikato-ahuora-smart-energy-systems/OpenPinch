@@ -24,6 +24,7 @@ from ._stream_collection.sorting import (
     _sort_by_attrs,
     _stream_attr_value,
 )
+from ._value.coercion import coerce_period_index
 from .enums import StreamType
 from .stream import Stream
 
@@ -49,6 +50,7 @@ class StreamCollection:
         self._sort_key: Callable = partial(_sort_by_attr, "supply_temperature")
         self._sort_reverse: bool = True
         self._sorted_cache: List[object] = []
+        self._sort_signature: tuple | None = None
         self._needs_sort: bool = True
         self._numeric_cache: dict[
             tuple[str, int | None, tuple],
@@ -212,6 +214,30 @@ class StreamCollection:
         """Return a copy of the collection, optionally deep-copying streams."""
         return deepcopy(self) if deep else copy(self)
 
+    def __copy__(self):
+        """Copy container state while retaining the existing stream objects."""
+        copied = type(self).__new__(type(self))
+        copied.__dict__ = self.__dict__.copy()
+        copied._streams = self._streams.copy()
+        copied._period_ids = deepcopy(self._period_ids)
+        copied._weights = deepcopy(self._weights)
+        copied._sorted_cache = list(self._sorted_cache)
+        copied._numeric_cache = {}
+        return copied
+
+    def __deepcopy__(self, memo):
+        """Copy live state without applying the pickle-only callable fallback."""
+        copied = type(self).__new__(type(self))
+        memo[id(self)] = copied
+        state = {
+            key: value
+            for key, value in self.__dict__.items()
+            if key != "_numeric_cache"
+        }
+        copied.__dict__ = deepcopy(state, memo)
+        copied._numeric_cache = {}
+        return copied
+
     def set_period_context(
         self,
         period_ids: dict[str, int] | list[str] | tuple[str, ...] | None,
@@ -268,7 +294,7 @@ class StreamCollection:
 
     def numeric_view(self, idx: int | None = None) -> StreamCollectionNumericView:
         """Return a cached dense numeric view for stream-analysis kernels."""
-        period_idx = None if idx is None else int(idx)
+        period_idx = None if idx is None else coerce_period_index(idx)
         signature = self._numeric_signature()
         cache_key = ("parent", period_idx, signature)
         cached = self._numeric_cache.get(cache_key)
@@ -285,7 +311,7 @@ class StreamCollection:
         idx: int | None = None,
     ) -> StreamCollectionNumericView:
         """Return a cached numeric view expanded to ordered thermal segments."""
-        period_idx = None if idx is None else int(idx)
+        period_idx = None if idx is None else coerce_period_index(idx)
         signature = self._numeric_signature()
         cache_key = ("segment", period_idx, signature)
         cached = self._numeric_cache.get(cache_key)
@@ -339,13 +365,28 @@ class StreamCollection:
 
     def _ensure_sorted(self):
         """(Internal) Sort streams if needed."""
-        if self._needs_sort:
+        mode, detail = self._sort_spec
+        attributes = (detail,) if mode == "attr" else detail if mode == "attrs" else ()
+        # Numeric stream setters track revisions. Metadata and arbitrary callables
+        # may change without a revision, so their order must be recomputed.
+        can_cache = (
+            bool(attributes)
+            and all(attribute in Stream._PUBLIC_VALUE_ATTRS for attribute in attributes)
+            and all(isinstance(stream, Stream) for stream in self._streams.values())
+        )
+        signature = self._numeric_signature() if can_cache else None
+        if (
+            self._needs_sort
+            or signature is None
+            or signature != getattr(self, "_sort_signature", None)
+        ):
             self._sorted_cache = sorted(
                 self._streams.values(),
                 key=self._sort_key,
                 reverse=self._sort_reverse,
             )
             self._needs_sort = False
+            self._sort_signature = signature
 
     def items(self):
         """Return the underlying keyed stream items in insertion order."""

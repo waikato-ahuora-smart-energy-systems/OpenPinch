@@ -133,6 +133,8 @@ PLOT_TUTORIALS = {
     "exergetic_net_load_profiles": 7,
     "grand_composite_curve_with_heat_pump": 8,
     "net_load_profiles_with_heat_pump": 8,
+    "grand_composite_curve_with_refrigeration": 8,
+    "net_load_profiles_with_refrigeration": 8,
     "energy_transfer_diagram": 14,
     "net_load_profiles": 18,
     "export": 18,
@@ -280,6 +282,8 @@ def _dimensions(
 
 
 def _problem_tutorial(name: str) -> int:
+    if name in {"residual_utility", "with_utilities_from"}:
+        return 8
     if name == "utility_placement_result":
         return 19
     if name in {"period_ids", "period_results"}:

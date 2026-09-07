@@ -172,7 +172,7 @@ def test_utility_placement_signature_uses_short_level_names() -> None:
     assert "sensible_level_count" not in parameters
     assert "hot_templates" not in parameters
     assert "cold_templates" not in parameters
-    assert "base_target" not in parameters
+    assert parameters["base_target"].default is None
 
 
 def test_root_only_quickstart_import_compiles():

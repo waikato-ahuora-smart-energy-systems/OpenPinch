@@ -44,7 +44,11 @@ from ..arguments import (
     temporary_zone_configuration,
 )
 from ..targeting.catalog import require_available
-from ..targeting.provenance import validate_base_target
+from ..targeting.provenance import (
+    resolve_hpr_residual_case,
+    resolve_target_selection,
+    validate_base_target,
+)
 from ..targeting.state import (
     prepared_period_state,
     snapshot_problem,
@@ -98,6 +102,10 @@ class _AllPeriodsTargetAccessor:
         self._target = target
 
     def _run(self, method_name: str, *, workers: int, kwargs: dict[str, Any]):
+        if kwargs.get("base_target") is not None:
+            raise ValueError(
+                "all_periods cannot broadcast base_target; use per-period calls."
+            )
         if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
             raise ValueError("workers must be a positive integer.")
         problem = self._target._problem
@@ -193,6 +201,10 @@ class _AllPeriodsTargetAccessor:
 
     def utility_placement(self, **kwargs):
         """Optimize one shared placement over every canonical period."""
+        if kwargs.get("base_target") is not None:
+            raise ValueError(
+                "all_periods cannot broadcast base_target; use per-period calls."
+            )
         kwargs.pop("period_ids", None)
         return self._target.utility_placement(
             period_ids=tuple(self._target._problem.period_ids),
@@ -273,6 +285,21 @@ class _TargetAccessor:
         direct_service=None,
         indirect_service=None,
     ) -> BaseTargetModel:
+        from ...residual_utility import residual_basis, residual_utility_service
+
+        basis = residual_basis(self._problem)
+        if basis is not None:
+            if surface != "direct_heat_integration" or include_subzones:
+                raise ValueError(
+                    "This analysis requires original physical streams; "
+                    "the case contains a frozen HPR residual."
+                )
+            if options:
+                raise ValueError(
+                    "Residual allocation uses the frozen temperature basis; "
+                    "edit utility definitions instead."
+                )
+            direct_service = residual_utility_service(basis.data)
         runtime, config_overrides = self._runtime(
             options=options,
             period_id=period_id,
@@ -303,7 +330,18 @@ class _TargetAccessor:
         include_subzones: bool = False,
         period_id: str | None = None,
         options: Mapping[str, Any] | None = None,
+        base_target: BaseTargetModel | None = None,
     ) -> BaseTargetModel:
+        if base_target is not None:
+            residual = resolve_hpr_residual_case(
+                self._problem,
+                base_target,
+                zone=zone,
+                period_id=period_id,
+                include_subzones=include_subzones,
+                options=options,
+            )
+            return residual.target.direct_heat_integration()
         return self._execute(
             surface="direct_heat_integration",
             target_id=TargetType.DI.value,
@@ -370,8 +408,48 @@ class _TargetAccessor:
             indirect_service=indirect_heat_integration_service,
         )
 
-    @target_transaction
     def all_heat_integration(
+        self,
+        *,
+        zone: str | Zone | None = None,
+        include_subzones: bool | None = None,
+        period_id: str | None = None,
+        options: Mapping[str, Any] | None = None,
+        base_target: BaseTargetModel | None = None,
+    ) -> TargetOutput:
+        """Run integration, or allocate utilities on an explicit frozen HPR basis."""
+        from ...residual_utility import residual_basis
+
+        if base_target is not None:
+            residual = resolve_hpr_residual_case(
+                self._problem,
+                base_target,
+                zone=zone,
+                period_id=period_id,
+                include_subzones=include_subzones,
+                options=options,
+            )
+            return residual.target.all_heat_integration()
+        is_residual = residual_basis(self._problem) is not None
+        if include_subzones is None:
+            include_subzones = not is_residual
+        if is_residual:
+            self.direct_heat_integration(
+                zone=zone,
+                include_subzones=include_subzones,
+                period_id=period_id,
+                options=options,
+            )
+            return deepcopy(self._problem._results)
+        return self._all_heat_integration(
+            zone=zone,
+            include_subzones=include_subzones,
+            period_id=period_id,
+            options=options,
+        )
+
+    @target_transaction
+    def _all_heat_integration(
         self,
         *,
         zone: str | Zone | None = None,
@@ -962,6 +1040,14 @@ class _TargetAccessor:
     ):
         runtime = dict(options or {})
         if base_target is not None:
+            selected, period_id = resolve_target_selection(
+                self._problem,
+                base_target,
+                zone=zone,
+                period_id=period_id,
+                options=options,
+            )
+            zone = selected.address
             runtime["base_target_type"] = validate_base_target(
                 self._problem,
                 base_target,
@@ -989,10 +1075,24 @@ class _TargetAccessor:
         period_ids=None,
         maximum_duties=None,
         options=None,
+        base_target: BaseTargetModel | None = None,
     ):
-        """Return a detached normal case containing the best utility set."""
+        """Return a solved detached case containing the best utility set."""
         from ...utility_placement import run_problem_utility_placement
 
+        if base_target is not None:
+            residual = resolve_hpr_residual_case(
+                self._problem,
+                base_target,
+                zone=zone,
+                period_ids=period_ids,
+            )
+            return residual.target.utility_placement(
+                isothermal=isothermal,
+                sensible=sensible,
+                maximum_duties=maximum_duties,
+                options=options,
+            )
         return run_problem_utility_placement(
             self._problem,
             isothermal=isothermal,

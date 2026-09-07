@@ -147,7 +147,9 @@ def test_packaged_four_stream_sample_matches_converted_fixture_without_outputs()
 ):
     converter = _load_converter_module()
     case_id = converter.PACKAGE_SAMPLE_CASE_ID
-    sample_path = REPO_ROOT / "OpenPinch" / "data" / "sample_cases" / f"{case_id}.json"
+    sample_path = (
+        REPO_ROOT / "OpenPinch" / "tutorials" / "sample_cases" / f"{case_id}.json"
+    )
     fixture = json.loads((FIXTURE_ROOT / f"{case_id}.json").read_text())
     expected_sample = deepcopy(fixture)
     expected_sample["options"] = {

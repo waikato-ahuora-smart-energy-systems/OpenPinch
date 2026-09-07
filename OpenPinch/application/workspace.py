@@ -46,6 +46,10 @@ class _CaseBatchAccessor:
         self._surface = surface
 
     def _run(self, method: str, **kwargs) -> CaseBatchResult:
+        if kwargs.get("base_target") is not None:
+            raise ValueError(
+                "A case batch cannot broadcast base_target; use per-case calls."
+            )
         results: dict[str, Any] = {}
         errors: dict[str, Exception] = {}
         for name in self._batch.names:

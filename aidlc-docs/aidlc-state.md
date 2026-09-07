@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Workflow Complete (RTD and HPR Notebook Follow-up)
+- **Current Stage**: HPR Derived-Case API — Complete
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -27,6 +27,76 @@
 | Security Baseline | No | Utility Placement Requirements Analysis |
 | Property-Based Testing | Yes | Utility Placement Requirements Analysis |
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
+
+## HPR Derived-Case API Refinement
+
+- [x] Consolidate the user's API discussion and inspect live implementation.
+- [x] Define requirements, first-delivery scope and later capability extensions.
+- [x] Produce and validate a comprehensive execution plan with test obligations.
+- [x] Execute the proposed runtime API changes and verification.
+- Requirements: inception/requirements/hpr-derived-case-api-requirements.md.
+- Plan: inception/plans/hpr-derived-case-api-execution-plan.md.
+- Current status: Complete. Includes
+  problem-level case derivation, three HPR base-target shortcuts, solved placement
+  returns, utility transfer, shared validation, migration and verification.
+- The previous numerical/plotting HPR correction remains complete. This refinement
+  is implemented and verified. Existing user edits and extension choices are preserved.
+
+
+- [x] Focused stories, application/unit design and functional design complete.
+- [x] Code generation units 1-6 and documentation complete.
+- [x] Unit 7 verification complete: 3134 non-solver tests passed; final application
+  rerun 442 passed; combined coverage 95.66%; solver checks 3 passed, 1 skipped.
+- [x] Clean kernels 08/19, generator, strict Sphinx, artifacts and installed smoke passed.
+- [x] Independent saved-output failures reproduced, documented and preserved;
+  notebook 19 generator drift resolved while retaining user settings.
+- Build/test summary: construction/build-and-test/hpr-derived-case-api/build-and-test-summary.md.
+- PBT-01 through PBT-10 compliant; disabled Security/Resiliency skipped.
+- Separate NFR/infrastructure stages skipped; Operations N/A. No commit or deployment.
+
+## HPR Notebook Observations
+
+- [x] Workspace Detection and focused inspection of existing owner architecture.
+- [x] Requirements investigation: real notebook calls, graph inventory,
+  accounting probe, price/load sensitivity and residual-path inspection.
+- [x] Requirements document and extension applicability assessment.
+- [x] Requirements approval supplied by the user's `approve` response.
+- [x] User Stories Part 1: assessment and story-generation plan prepared.
+- [x] Story-generation plan approval: user entered answer A and replied `done`.
+- [x] User Stories Part 2: six stories and Process Engineer persona generated;
+  acceptance coverage, INVEST and extension applicability reviewed.
+- [x] Completed-story approval supplied by the user's `proceed` response.
+- [x] Workflow planning: four-unit sequence, stage selection and quality gates.
+- [x] Execution-plan approval supplied by the user's `approve` response.
+- [x] Application Design: components, methods, services, dependencies and
+  consolidated public residual/plot interface design complete.
+- [x] Application-design approval supplied by the user's `ok` response.
+- [x] Units Generation Part 1: decomposition plan prepared.
+- [x] Unit-of-work plan approval; user authorized every remaining stage through completion.
+- [x] Units Generation Part 2 and generated-unit approval under completion authorization.
+- [x] Functional Design: accounting, graph and residual units; tutorial design N/A.
+- [x] Code Generation: all four unit plans, implementations and code summaries.
+- [x] Build and Test: final aggregate, properties, notebook, docs and artifacts.
+- [x] Operations: N/A; no deployment or publication requested.
+- Findings: `inception/requirements/hpr-notebook-observations-findings.md`.
+- Requirements: `inception/requirements/hpr-notebook-observations-requirements.md`.
+- Story plan: `inception/plans/hpr-notebook-observations-story-generation-plan.md`.
+- Stories: `inception/user-stories/hpr-notebook-observations/stories.md`.
+- Persona: `inception/user-stories/hpr-notebook-observations/personas.md`.
+- Execution plan: `inception/plans/hpr-notebook-observations-execution-plan.md`.
+- Application design:
+  `inception/application-design/hpr-notebook-observations/application-design.md`.
+- Unit plan: `inception/plans/hpr-notebook-observations-unit-of-work-plan.md`.
+- Current stage: Complete under the user's authorization through all stages.
+  Four code plans and summaries are complete. Final verification: 3,116 passed,
+  3 skipped, 7 deselected; 95.75177% combined line/branch coverage passes the
+  repository gate. The final affected gate passed 731 tests. Fresh notebook 08,
+  strict docs, Ruff, wheel/sdist and installed artifact/residual placement pass.
+  Three pre-existing notebook checks are excluded to preserve independent edits;
+  four solver tests were deselected and verified separately (3 pass, 1 skip).
+- Verification: construction/build-and-test/hpr-notebook-observations/build-and-test-summary.md.
+- NFR/Infrastructure stages remain N/A as approved; Security/Resiliency disabled
+  and skipped, enabled PBT rules compliant. No further approval gate applies.
 
 ## TESPy HPR Performance-Map Design Progress
 
@@ -1920,3 +1990,69 @@ refreshed reverse-engineering artifacts.
 - [x] Pinned golden-fixture generating provenance; runtime maps unchanged.
 - [x] Verified 207 contract/resource/docs-consistency tests, generated release property, original CI test with 0.6.5 metadata, generator check, Ruff and strict Sphinx.
 - Current stage: Complete; plan steps 16–18 finished. User authorized commit and push to PR 96.
+
+## Obsolete Files Cleanup
+
+- [x] Workspace inspection and minimal cleanup requirements.
+- [x] Single-unit workflow and removal plan.
+- [x] Cleanup implementation.
+- [x] Focused verification and summary.
+- Plan: `construction/plans/obsolete-files-cleanup-code-generation-plan.md`.
+- Current stage: Complete. 128 focused tests, wheel/sdist builds, Ruff, ignore rules, and patch hygiene pass.
+- Verification: `construction/obsolete-files-cleanup/build-and-test/build-and-test-summary.md`.
+
+### Cleanup second pass
+
+- [x] Verify 55 unused workbook result snapshots and remove them.
+- [x] Preserve regeneration and ignore review result exports.
+- [x] Verify examples, workbook adapter, generator, and preserved assets.
+- Second pass complete: 55 tracked snapshots removed; 79 tests and generator smoke passed.
+- Historical Excel releases retained; independently edited notebooks preserved.
+
+## HPR Repeated Change Audit
+
+- [x] Pass 1: reproduce and repair integrity and residual round-trip defects (43 tests pass).
+- [x] Pass 2: uncapped-period conversion and notebook guidance corrected (113 tests pass).
+- [x] Pass 3: unit/period vector conversion fixed; final gates and report complete (3152 passed; combined coverage 95.78%).
+
+## Complete Test-Suite Repair
+
+- [x] Reproduce saved-notebook contract mismatch.
+- [x] Repair and run full suite, including optional tutorial profiles (3160 passed, 1 intentional benchmark skip).
+- [x] Final verification and report; combined coverage 96.15%, saved notebooks unchanged.
+
+## Repository-Wide Audit and Repair
+
+- [x] Pass 1: input ownership defects fixed; 128 affected tests pass.
+- [x] Pass 2: tabular numeric validation and candidate scaling fixed; 123 tests pass.
+- [x] Pass 3: problem-table precision, missing/empty inputs and list ownership fixed. Final full suite: 3180 passed, 1 intentional benchmark skip; combined coverage 96.15%. Three-pass limit reached; report complete.
+
+## Commit Completed Changes
+
+- [x] Inspect and group changes; generated local workspace output excluded.
+- [x] Commit repository audit fixes: fb530a91.
+- [x] Commit HPR implementation, APIs, tests and public documentation.
+- [x] Commit saved notebook execution evidence.
+- [x] Commit workflow records and verify final status; only generated notebook workspace output remains untracked.
+
+## Repository Audit Cycle 2
+
+- [x] Pass 1: iterable handling and derived weight metadata repaired; 492 domain/contract tests pass.
+- [x] Pass 2: shallow collection copies and period-index validation repaired; 528 affected tests pass.
+- [x] Pass 3: sorting/deep-copy and remaining selector repairs complete. Full suite: 3244 passed, 1 intentional benchmark skip; combined coverage 96.19%. Three-pass limit reached; report complete.
+- Plan: construction/plans/repository-audit-cycle-2-plan.md.
+- [x] Commit cycle 2 repairs, regressions and verification records on develop; generated notebook workspace remains untracked.
+
+## Tutorial Package Relocation
+
+- [x] Inspect layout and capture file identities.
+- [x] Relocate tutorial packages and update consumers/documentation.
+- [x] Verify packaging, resource behavior and preservation.
+- Plan: construction/plans/tutorial-package-relocation-plan.md.
+
+## Data Resource Relocation
+
+- [x] Inspect assets and consumers; user approved proposed locations.
+- [x] Move resources, update consumers and remove obsolete data package.
+- [x] Verify and record completion.
+- Plan: construction/plans/data-resource-relocation-plan.md.

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from ....analysis.numerics import get_period_index
 from ....contracts.output import TargetOutput
+from ....domain.enums import TargetType
 from ....domain.targets import BaseTargetModel
 from ....domain.zone import Zone
 from ..output.result_extraction import extract_results
@@ -220,6 +221,14 @@ def execute_targeting(
     try:
         return zone.targets[target_id]
     except KeyError as exc:
+        if target_id in {
+            TargetType.DHP.value,
+            TargetType.IHP.value,
+            TargetType.DR.value,
+            TargetType.IR.value,
+        }:
+            # A zero selected/available service produces no HPR target.
+            return None
         raise RuntimeError(
             f"Targeting did not produce target {target_id!r} for zone {zone.name!r}."
         ) from exc

@@ -6,6 +6,7 @@ from typing import Tuple
 
 import numpy as np
 
+from ..domain._value.coercion import coerce_period_index
 from ..domain.configuration import tol
 from ..domain.enums import PenaltyForm
 
@@ -27,7 +28,10 @@ def get_period_index(
     sid = None if not isinstance(args, dict) else args.get("period_id")
     sid = None if sid is None else str(sid)
     raw_idx = None if not isinstance(args, dict) else args.get("period_idx")
-    explicit_idx = None if raw_idx is None else int(raw_idx)
+    try:
+        explicit_idx = None if raw_idx is None else coerce_period_index(raw_idx)
+    except IndexError as exc:
+        raise ValueError("period_idx must be a non-negative integer.") from exc
 
     lookup = {} if period_ids is None else period_ids
 
@@ -46,8 +50,6 @@ def get_period_index(
         return resolved_idx, sid
 
     if explicit_idx is not None:
-        if explicit_idx < 0:
-            raise ValueError("period_idx must be a non-negative integer.")
         if lookup and explicit_idx not in set(lookup.values()):
             raise ValueError(
                 f"period_idx {explicit_idx} was not found on this collection. "

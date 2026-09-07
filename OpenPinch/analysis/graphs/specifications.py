@@ -158,7 +158,30 @@ ENERGY_TRANSFER_GRAPH_SPECS = (
     ),
 )
 
+REFRIGERATION_GRAPH_SPECS = (
+    _GraphBuildSpec(
+        graph_type=GraphType.NLP_RFRG,
+        label="Net Load Profiles with Refrigeration",
+        builder="composite",
+        value_fields=(
+            ProblemTableLabel.H_NET_HOT,
+            ProblemTableLabel.H_NET_COLD,
+            ProblemTableLabel.H_HOT_RFRG,
+            ProblemTableLabel.H_COLD_RFRG,
+        ),
+        stream_types=(StreamLoc.HotS, StreamLoc.ColdS, StreamLoc.HotU, StreamLoc.ColdU),
+    ),
+    _GraphBuildSpec(
+        graph_type=GraphType.GCC_RFRG,
+        label="Grand Composite Curve with Refrigeration",
+        builder="gcc",
+        value_fields=(ProblemTableLabel.H_NET_W_AIR, ProblemTableLabel.H_NET_RFRG),
+        utility_profile_flags=(False, True),
+    ),
+)
+
 GRAPH_BUILD_SPECS = (
+    *REFRIGERATION_GRAPH_SPECS,
     COMPOSITE_GRAPH_SPECS[0],
     COMPOSITE_GRAPH_SPECS[1],
     COMPOSITE_GRAPH_SPECS[2],

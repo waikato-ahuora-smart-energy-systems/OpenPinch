@@ -103,7 +103,9 @@ def test_catalog_workspace_period_adapters_and_docs_remain_consistent():
     designs = {
         name.split(".")[1] for name in METHOD_CATALOG if name.startswith("design.")
     }
-    assert names(_CaseBatchTargetAccessor) == targets - {"hpr_performance_map"}
+    assert names(_CaseBatchTargetAccessor) == targets - {
+        "hpr_performance_map",
+    }
     assert names(_CaseBatchDesignAccessor) == designs
     period_names = targets - {
         "hpr_performance_map",
@@ -112,7 +114,14 @@ def test_catalog_workspace_period_adapters_and_docs_remain_consistent():
     }
     assert names(_AllPeriodsTargetAccessor) == period_names
     assert names(_CaseBatchAllPeriodsTargetAccessor) == period_names
-    adapter_families = {"thermal", "inverse_dt_min", "placement", "hpr_map", "hen"}
+    adapter_families = {
+        "thermal",
+        "inverse_dt_min",
+        "placement",
+        "hpr_map",
+        "hen",
+        "residual",
+    }
     for spec in METHOD_CATALOG.values():
         assert spec.result_adapter in adapter_families
         assert set(spec.configuration_fields) <= USER_CONFIG_FIELD_SPECS.keys()

@@ -12,7 +12,7 @@ from io import StringIO
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-NOTEBOOK_DIR = ROOT / "OpenPinch" / "data" / "notebooks"
+NOTEBOOK_DIR = ROOT / "OpenPinch" / "tutorials" / "notebooks"
 
 
 def markdown(text: str) -> dict:
@@ -386,27 +386,13 @@ NOTEBOOKS = {
         extras="hpr",
         cells=[
             code(
-                "from OpenPinch import PinchProblem\n\n"
-                'problem = PinchProblem("heat_pump_targeting.json", '
-                'project_name="Heat Pump Study")\n'
-                "heat_pump = problem.target.carnot_heat_pump(\n"
-                "    is_utility_heat_pump=False,\n"
-                "    is_cascade_cycle=True,\n"
-                "    load_fraction=0.25,\n"
-                "    condensers=1,\n"
-                "    evaporators=1,\n"
-                "    maximum_restarts=1,\n"
-                ")\n"
-                "hpr_summary = problem.summary_frame()"
+                'from OpenPinch import PinchProblem\n\nproblem = PinchProblem("heat_pump_targeting.json", project_name="Heat Pump Study")\n# Ratios to electricity price affect Carnot screening; utility stream prices\n# affect the subsequent utility allocation. Keep global defaults unchanged.\neconomics = {"COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE": 1.0,\n             "COSTING_HPR_PRICE_RATIO_COLD_TO_ELE": 0.1}\nheat_pump = problem.target.carnot_heat_pump(\n    is_utility_heat_pump=False,\n    is_cascade_cycle=True,\n    load_fraction=0.25,\n    condensers=1,\n    evaporators=1,\n    maximum_restarts=1,\n    options=economics,\n)\nhpr_summary = problem.summary_frame()\nload_hp_plot = problem.plot.net_load_profiles_with_heat_pump(target=heat_pump)\ngcc_hp_plot = problem.plot.grand_composite_curve_with_heat_pump(target=heat_pump)\nprint(heat_pump.hpr_load.model_dump())\n'
             ),
             code(
-                "refrigeration = problem.target.carnot_refrigeration(\n"
-                "    is_utility_refrigeration=True,\n"
-                "    load_fraction=0.25,\n"
-                "    maximum_restarts=1,\n"
-                ")\n"
-                "load_plot = problem.plot.net_load_profiles_with_heat_pump()\n"
-                "gcc_plot = problem.plot.grand_composite_curve_with_heat_pump()"
+                "# Compare modes with the same process basis and stage counts.\nrefrigeration = problem.target.carnot_refrigeration(\n    is_utility_refrigeration=False,\n    is_cascade_cycle=True,\n    load_fraction=0.25,\n    condensers=1,\n    evaporators=1,\n    maximum_restarts=1,\n    options=economics,\n)\nrefrigeration_summary = problem.summary_frame()\nload_rfgn_plot = problem.plot.net_load_profiles_with_refrigeration(target=refrigeration)\ngcc_rfgn_plot = problem.plot.grand_composite_curve_with_refrigeration(target=refrigeration)\nprint(refrigeration.hpr_load.model_dump())\n"
+            ),
+            code(
+                '# Allocate the existing utilities on the fixed heat-pump residual.\nutilities = problem.target.all_heat_integration(base_target=heat_pump)\noptimized = problem.target.utility_placement(\n    base_target=heat_pump,\n    isothermal=2,\n    options={"iteration_limit": 20, "evaluation_limit": 200, "seed": 20260715},\n)\nplacement_summary = optimized.summary_frame()\noptimized_gcc = optimized.plot.grand_composite_curve()\n# Explicit case derivation is also available and does not solve.\nresidual = problem.residual_utility(base_target=heat_pump)\n# Transfer utilities to a new ORIGINAL-process study; this does not install HPR.\nnew_problem = problem.with_utilities_from(optimized)\nnew_results = new_problem.target.all_heat_integration()\nassert optimized.to_problem_json()["residual_basis"] == residual.to_problem_json()["residual_basis"]\n'
             ),
         ],
     ),
@@ -898,10 +884,10 @@ NOTEBOOKS = {
                 "    return pd.DataFrame(rows)\n"
                 "\n"
                 "search_options = {\n"
-                '    "iteration_limit": 1,\n'
+                '    "iteration_limit": 100,\n'
                 '    "evaluation_limit": 100,\n'
-                '    "candidate_limit": 2,\n'
-                '    "run_count": 1,\n'
+                '    "candidate_limit": 20,\n'
+                '    "run_count": 10,\n'
                 "}"
             ),
             code(
@@ -916,14 +902,12 @@ NOTEBOOKS = {
                 "process_objective = process_evidence.best.aggregate_objective\n"
                 "process_fallback_penalty = process_evidence.best.fallback_penalty\n"
                 'process_utilities = process_case.to_problem_json()["utilities"]\n'
-                "process_case = workspace.add(\n"
+                "registered_process = workspace.add(\n"
                 "    process_case,\n"
                 '    name="optimized_process_utilities",\n'
                 "    activate=False,\n"
                 ")\n"
-                "process_target = process_case.target.direct_heat_integration(\n"
-                '    zone="Almond", period_id="0"\n'
-                ")\n"
+                "process_target = process_case.results.targets[-1]\n"
                 "process_retarget_comparison = retarget_comparison(\n"
                 "    process_evidence, process_target\n"
                 ")\n"
@@ -942,13 +926,13 @@ NOTEBOOKS = {
                 "site_evidence = site_case.utility_placement_result\n"
                 "site_objective = site_evidence.best.aggregate_objective\n"
                 'site_utilities = site_case.to_problem_json()["utilities"]\n'
-                "site_case = workspace.add(\n"
+                "registered_site = workspace.add(\n"
                 "    site_case,\n"
                 '    name="optimized_site_utilities",\n'
                 "    activate=False,\n"
                 ")\n"
                 'baseline_unchanged = workspace.use_case("baseline").to_problem_json() == baseline_input\n'
-                'site_target = site_case.target.total_site_heat_integration(period_id="0")\n'
+                "site_target = site_case.results.targets[-1]\n"
                 "site_retarget_comparison = retarget_comparison(site_evidence, site_target)\n"
                 "site_summary = site_case.summary_frame()\n"
                 "site_tsp = site_case.plot.total_site_profiles()"
@@ -1013,9 +997,13 @@ GUIDANCE = {
     ),
     "08_carnot_heat_pump_and_refrigeration.ipynb": (
         "Where can idealized heat pumping or refrigeration reduce utility demand before detailed equipment selection?",
-        "Use Carnot results as screening bounds; compare delivered duty, lift, and utility displacement rather than COP alone.",
+        "load_fraction selects a fraction of available net heating (heat pump) or net cooling (refrigeration), in [0, 1]. It is not compressor part-load. Heat pumps may use less than the selected ceiling when economics favour utilities. Refrigeration targets the selected cooling service. Inspect available, selected and achieved duty separately from ambient exchange. The explicit positive cold/electricity price ratio is 0.1 here; the global default 1.0 can favour more cooling displacement. Utility stream prices do not set this screening ratio. For the same candidate leaving 100 kW of cooling, the cooling-cost contribution falls from 100 to 10 kW electricity-equivalent as this ratio falls from 1.0 to 0.1. This changes cost without adding a heat-pump feasibility penalty.",
         "Vary load fraction and utility placement deliberately, then carry promising duties into a simulated-cycle study.",
-        ("Screen a process heat pump", "Screen refrigeration and inspect curves"),
+        (
+            "Screen a process heat pump",
+            "Screen refrigeration and inspect curves",
+            "Allocate and place residual utilities",
+        ),
     ),
     "09_vapour_compression_and_brayton.ipynb": (
         "How does a successful HPR target become a versioned part-load map for downstream utility optimization?",
@@ -1100,7 +1088,7 @@ GUIDANCE = {
     ),
     "19_utility_placement_optimisation.ipynb": (
         "Where should four isothermal hot and cold utility levels be placed at Process and Site hierarchy levels to minimize thermodynamic cost?",
-        "Compare the Process result against its direct GCC and the Site result against its Total Site Profile. Candidate duties come from those exact ordinary target workflows; they are not independent optimizer decisions, and a requested level may be unused. Inspect physical entropy generation from the balanced composite curves using the signed Q / T limit for the isothermal intervals; CP * ln(T_out / T_in) in kelvin applies when adapting the workflow to sensible utilities. Confirm that ordinary retargeting reproduces every selected duty and that the Utility GCC does not cross the Process GCC.",
+        "Compare the Process result against its direct GCC and the Site result against its Total Site Profile. Candidate duties come from those exact ordinary target workflows; they are not independent optimizer decisions, and a requested level may be unused. Inspect physical entropy generation from the balanced composite curves using the signed Q / T limit for the isothermal intervals; CP * ln(T_out / T_in) in kelvin applies when adapting the workflow to sensible utilities. Confirm that final allocation reproduces every selected duty and that the Utility GCC does not cross the Process GCC.",
         "Replace the sample with validated plant data, apply defensible temperature bounds, and increase the optimizer limits before making an engineering decision.",
         (
             "Prepare the placement study",
@@ -1165,11 +1153,16 @@ PRESENTATIONS: dict[str, tuple[str, str]] = {
         "display(exergy_loads)",
     ),
     "08_carnot_heat_pump_and_refrigeration.ipynb": (
-        "Compare cycle performance with the modified load and grand composite profiles to see whether the selected lift and placement reduce the intended utility demand.",
+        "Inspect separate target-specific plots and both duty summaries. Residual utility placement is sequential: HPR duty and temperatures remain fixed. It does not jointly optimize the heat pump and utilities. Changing utility prices later does not resize HPR.",
         "from IPython.display import display\n\n"
         "display(hpr_summary)\n"
-        "display(load_plot)\n"
-        "display(gcc_plot)",
+        "display(refrigeration_summary)\n"
+        "display(load_hp_plot)\n"
+        "display(gcc_hp_plot)\n"
+        "display(load_rfgn_plot)\n"
+        "display(gcc_rfgn_plot)\n"
+        "display(utilities)\n"
+        "display(placement_summary)",
     ),
     "09_vapour_compression_and_brayton.ipynb": (
         "Inspect the detached winning record and the complete plain-data map before comparing optional TESPy, refrigeration, or Brayton screens. A failed optional screen is evidence, not permission to relabel a CoolProp result as TESPy.",
@@ -1288,7 +1281,7 @@ PRESENTATIONS: dict[str, tuple[str, str]] = {
         "display(publication_outputs)",
     ),
     "19_utility_placement_optimisation.ipynb": (
-        "Review both optimized cases exactly like normal cases: compare the Process utilities on the standard GCC with the Site utilities on the standard Total Site Profile. The Process Utility GCC must not cross the Process GCC. The comparison tables place optimizer-evidence and ordinary-retarget duties side by side; a zero difference shows exact replay.",
+        "Review both optimized cases exactly like normal cases: compare the Process utilities on the standard GCC with the Site utilities on the standard Total Site Profile. The Process Utility GCC must not cross the Process GCC. The comparison tables place optimizer-evidence and cached allocation duties side by side; a zero difference shows exact replay.",
         "from IPython.display import display\n\n"
         "display(process_objective)\n"
         "display(process_fallback_penalty)\n"

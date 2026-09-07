@@ -587,10 +587,11 @@ def test_hpr_multiperiod_flag_false_uses_selected_period_path(monkeypatch):
 
     monkeypatch.setattr(hp, "_get_hpr_targets", fake_get_hpr_targets)
     monkeypatch.setattr(hp, "_calc_hpr_cascade", lambda **kwargs: kwargs["pt"])
+    monkeypatch.setattr(hp, "_hpr_numerical_records", lambda **kwargs: {})
     monkeypatch.setattr(
         hp,
         "_get_hpr_residual_utility_summary",
-        lambda **kwargs: _residual_summary(),
+        lambda **kwargs: {**_residual_summary(), "residual_profile": None},
     )
 
     target = hp.compute_direct_heat_pump_or_refrigeration_target(
@@ -650,10 +651,11 @@ def test_hpr_multiperiod_flag_true_returns_selected_period_from_shared_design(
 
     monkeypatch.setattr(hp, "get_multiperiod_hpr_targets", fake_multiperiod_targets)
     monkeypatch.setattr(hp, "_calc_hpr_cascade", lambda **kwargs: kwargs["pt"])
+    monkeypatch.setattr(hp, "_hpr_numerical_records", lambda **kwargs: {})
     monkeypatch.setattr(
         hp,
         "_get_hpr_residual_utility_summary",
-        lambda **kwargs: _residual_summary(),
+        lambda **kwargs: {**_residual_summary(), "residual_profile": None},
     )
 
     target = hp.compute_direct_heat_pump_or_refrigeration_target(

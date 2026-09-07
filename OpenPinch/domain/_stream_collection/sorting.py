@@ -5,6 +5,7 @@ from __future__ import annotations
 import pickle
 from typing import Tuple
 
+from .._value.coercion import coerce_period_index
 from ..value import Value
 
 
@@ -19,7 +20,7 @@ def _sort_by_attrs(attrs: Tuple[str, ...], stream: object):
 def _stream_attr_value(stream: object, attr_name: str, idx: int | None = None):
     value = getattr(stream, attr_name)
     if isinstance(value, Value):
-        period_idx = 0 if idx is None else int(idx)
+        period_idx = 0 if idx is None else coerce_period_index(idx)
         return float(value[period_idx])
     return value
 
