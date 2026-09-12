@@ -8822,3 +8822,19 @@ utilities = problem.target.all_heat_integration(base_target=heat_pump)"
 **Context**: Explicit authorization to push all completed changes.
 
 ---
+
+## Create Pull Request to Main
+**Timestamp**: 2026-09-07T19:55:29Z
+**User Input**: "create a PR to main. "
+**AI Response**: "Created PR #97, Compose HPR utility workflows, fix numerical integrity, and reorganize resources, from develop to main: https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch/pull/97. GitHub CLI was unauthenticated; used the existing signed-in browser. The remote comparison already contained all ten local commits through 02f74481, so no push was needed or attempted. Verified the created PR is open with the requested base/head branches, full change description and recorded test evidence. Did not merge."
+**Context**: Explicit PR creation authorization. Required local audit entry remains uncommitted; no application source edits.
+
+---
+
+## Verify Develop Synchronization
+**Timestamp**: 2026-09-08T01:39:16Z
+**User Input**: "Check develop has the up-to-date changes. "
+**AI Response**: "Local develop, live remote develop and PR #97 head all equal ac87767437790f00f96fbf64ce79d369a12dc055. Confirmed ancestry includes HPR workflows, audit fixes and resource relocations; version 0.6.6 bump is present. Remote main is 85635b77, the merge commit for PR #97, with an identical file tree to develop. Only local audit-log entries are uncommitted. Package layout verified and OpenPinch/data is absent."
+**Context**: Read-only branch and tree verification; no source edits, commits or pushes.
+
+---
