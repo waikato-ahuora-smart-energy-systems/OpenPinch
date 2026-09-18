@@ -17,26 +17,61 @@ env:
   UV_VERSION: "0.11.29"
 
 jobs:
-  test:
+  develop-validation:
     if: ${{ github.event.action != 'closed' && github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      reuse: ${{ steps.develop.outputs.reuse }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
           persist-credentials: false
+          fetch-depth: 2
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+      - name: Check completed develop validation for this exact source tree
+        id: develop
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/reuse_develop_ci.py
+
+  test:
+    needs: develop-validation
+    if: ${{ !cancelled() && github.event.action != 'closed' && github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - if: ${{ needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true' }}
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+      - if: ${{ needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true' }}
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - if: ${{ needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true' }}
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-      - run: uv sync --frozen --group dev
-      - run: uv run --no-sync python scripts/check_lockfile_version.py
-      - run: uv run --no-sync ruff check .
-      - run: uv run --no-sync coverage run --branch --source=OpenPinch -m pytest --hypothesis-seed=20260715 -m "not solver"
-      - run: uv run --no-sync coverage report --fail-under=95
+      - if: ${{ needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true' }}
+        run: uv sync --frozen --group dev
+      - if: ${{ needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true' }}
+        run: uv run --no-sync python scripts/check_lockfile_version.py
+      - if: ${{ needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true' }}
+        run: uv run --no-sync ruff check .
+      - if: ${{ needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true' }}
+        run: uv run --no-sync coverage run --branch --source=OpenPinch -m pytest --hypothesis-seed=20260715 -m "not solver"
+      - if: ${{ needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true' }}
+        run: uv run --no-sync coverage report --fail-under=95
+      - name: Accept verified develop validation
+        if: ${{ needs.develop-validation.result == 'success' && needs.develop-validation.outputs.reuse == 'true' }}
+        run: echo "The same source tree passed every CI Develop validation job."
 
   bump-version:
     if: >-
@@ -176,7 +211,8 @@ jobs:
           uv run --no-sync python scripts/check_release_version.py --base-pyproject "${RUNNER_TEMP}/base-pyproject.toml"
 
   docs:
-    if: ${{ github.event.action != 'closed' && github.event.pull_request.draft == false }}
+    needs: develop-validation
+    if: ${{ !cancelled() && github.event.action != 'closed' && github.event.pull_request.draft == false && (needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -195,7 +231,8 @@ jobs:
       - run: uv run --no-sync python scripts/build_docs.py
 
   optional-install-smoke:
-    if: ${{ github.event.action != 'closed' && github.event.pull_request.draft == false }}
+    needs: develop-validation
+    if: ${{ !cancelled() && github.event.action != 'closed' && github.event.pull_request.draft == false && (needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -225,7 +262,8 @@ jobs:
       - run: uv run --no-sync python scripts/optional_install_smoke.py ${{ matrix.surface }}
 
   hpr-tespy-tests:
-    if: ${{ github.event.action != 'closed' && github.event.pull_request.draft == false }}
+    needs: develop-validation
+    if: ${{ !cancelled() && github.event.action != 'closed' && github.event.pull_request.draft == false && (needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -246,7 +284,8 @@ jobs:
         run: timeout 300s uv run --no-sync pytest tests/analysis/heat_pumps/test_hpr_tespy_target_evaluator.py::test_real_public_tespy_target_and_minimal_map_stay_within_smoke_budget
 
   artifact-build:
-    if: ${{ github.event.action != 'closed' && github.event.pull_request.draft == false }}
+    needs: develop-validation
+    if: ${{ !cancelled() && github.event.action != 'closed' && github.event.pull_request.draft == false && (needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -354,6 +393,7 @@ jobs:
   pr-gate:
     if: ${{ always() && github.event.pull_request.draft == false }}
     needs:
+      - develop-validation
       - test
       - bump-version
       - release-version
@@ -372,6 +412,7 @@ jobs:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           REPOSITORY: ${{ github.repository }}
+          REUSE_DEVELOP: ${{ needs.develop-validation.result == 'success' && needs.develop-validation.outputs.reuse == 'true' }}
           TEST_RESULT: ${{ needs.test.result }}
           BUMP_VERSION_RESULT: ${{ needs.bump-version.result }}
           RELEASE_VERSION_RESULT: ${{ needs.release-version.result }}
@@ -384,15 +425,19 @@ jobs:
           SOLVER_RESULT: ${{ needs.solver-tests.result }}
         run: |
           set -euo pipefail
+          test "${TEST_RESULT}" = "success"
+          expected_shared_result="success"
+          if [ "${REUSE_DEVELOP}" = "true" ]; then
+            expected_shared_result="skipped"
+          fi
           for result in \
-            "${TEST_RESULT}" \
             "${DOCS_RESULT}" \
             "${OPTIONAL_RESULT}" \
             "${HPR_TESPY_RESULT}" \
             "${ARTIFACT_BUILD_RESULT}" \
             "${ARTIFACT_INSTALL_RESULT}" \
             "${ARTIFACT_TESPY_RESULT}"; do
-            test "${result}" = "success"
+            test "${result}" = "${expected_shared_result}"
           done
           if [ "${BASE_REF}" = "main" ]; then
             if [ "${HEAD_REPO}" = "${REPOSITORY}" ]; then

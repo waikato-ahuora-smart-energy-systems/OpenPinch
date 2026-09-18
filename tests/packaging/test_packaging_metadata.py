@@ -348,7 +348,7 @@ def test_workflows_use_frozen_uv_environment_and_read_only_default_permissions()
 
 
 def test_every_external_action_is_pinned_to_an_immutable_commit():
-    action_ref = re.compile(r"^\s*- uses: ([^\s]+)$", re.MULTILINE)
+    action_ref = re.compile(r"^\s*(?:- )?uses: ([^\s]+)$", re.MULTILINE)
 
     for workflow_path in WORKFLOWS:
         workflow = workflow_path.read_text(encoding="utf-8")
@@ -586,17 +586,23 @@ def test_pr_workflow_bumps_same_repository_main_pr_before_release_validation():
     assert "REPOSITORY: ${{ github.repository }}" in gate_block
 
 
-def test_develop_workflow_defers_to_an_open_develop_to_main_pull_request():
-    workflow = (REPO_ROOT / ".github" / "workflows" / "ci-develop.yml").read_text(
-        encoding="utf-8"
-    )
+def test_develop_always_validates_and_main_pr_can_reuse_proven_results():
+    develop = WORKFLOWS[0].read_text(encoding="utf-8")
+    pr = WORKFLOWS[1].read_text(encoding="utf-8")
 
-    assert "detect-main-pr:" in workflow
-    assert "pull-requests: read" in workflow
-    assert 'head="${GITHUB_REPOSITORY_OWNER}:develop"' in workflow
-    assert 'base="main"' in workflow
-    assert workflow.count("needs: detect-main-pr") >= 4
-    assert "needs.detect-main-pr.outputs.should_run == 'true'" in workflow
+    assert 'branches: ["develop"]' in develop
+    assert "detect-main-pr" not in develop
+    assert "needs.detect-main-pr" not in develop
+    assert 'pytest --hypothesis-seed=20260715 -m "not solver"' in develop
+    assert "develop-validation:" in pr
+    assert "actions: read" in pr
+    assert "fetch-depth: 2" in pr
+    assert "run: python3 scripts/reuse_develop_ci.py" in pr
+    assert "Accept verified develop validation" in pr
+    assert "REUSE_DEVELOP:" in pr
+    assert "expected_shared_result" in pr
+    solver_block = pr.split("  solver-tests:", 1)[1].split("  pr-gate:", 1)[0]
+    assert "needs.develop-validation" not in solver_block
 
 
 def test_parallel_jobs_restore_uv_caches_without_competing_to_save_them():

@@ -49,3 +49,13 @@ PBT-04 now applies to normalization and will be checked on generated segments.
 - [x] 6. Add failing regressions for copied-zone effective values and fallback.
 - [x] 7. Implement shared contribution semantics and update metadata.
 - [x] 8. Run affected tests and HEN checks; update verification records.
+
+## PR 98 metadata correction
+
+User approved the proposed metadata-only correction with Go. Restore the
+active fallback input and synthesis multiplier setting, remove the misleading
+active contribution multiplier, and describe effective-value fallback semantics.
+No numerical logic changes; existing PBT coverage remains applicable and unchanged.
+
+- [x] 9. Inspect current diff and confirm the approved metadata scope.
+- [x] 10. Correct metadata and verify serialized output, adapter tests and lint.

@@ -28,3 +28,8 @@ examples, generated valid segment objects, independent domain multiplier oracle,
 fixed seed, shrinking and existing Hypothesis dependency). PBT-02 N/A (no inverse),
 PBT-04 compliant (generated repeated PDM normalization), PBT-06 N/A (read-only adapter).
 Security/Resiliency disabled and skipped. Operations N/A. No commit or push.
+
+PR 98 metadata follow-up: retained active_dTmin and HENS_DT_CONT_MULTIPLIERS,
+removed active_dt_cont_multiplier and corrected the contribution description.
+Serialized JSON smoke verifies each field, including a configured multiplier
+list. All 28 adapter tests, Ruff and diff checks pass. Numerical code unchanged.

@@ -16,31 +16,7 @@ env:
   UV_VERSION: "0.11.29"
 
 jobs:
-  detect-main-pr:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      pull-requests: read
-    outputs:
-      should_run: ${{ steps.open_pr.outputs.should_run }}
-    steps:
-      - name: Detect an open ready develop-to-main pull request
-        id: open_pr
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          should_run="$(gh api --method GET "repos/${GITHUB_REPOSITORY}/pulls" \
-            -f state=open \
-            -f head="${GITHUB_REPOSITORY_OWNER}:develop" \
-            -f base="main" \
-            --jq 'if map(select(.draft == false)) | length == 0 then "true" else "false" end')"
-          echo "should_run=${should_run}" >> "${GITHUB_OUTPUT}"
-
   test:
-    needs: detect-main-pr
-    if: ${{ needs.detect-main-pr.outputs.should_run == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -61,8 +37,6 @@ jobs:
       - run: uv run --no-sync coverage report --fail-under=95
 
   docs:
-    needs: detect-main-pr
-    if: ${{ needs.detect-main-pr.outputs.should_run == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -81,8 +55,6 @@ jobs:
       - run: uv run --no-sync python scripts/build_docs.py
 
   optional-install-smoke:
-    needs: detect-main-pr
-    if: ${{ needs.detect-main-pr.outputs.should_run == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -112,8 +84,6 @@ jobs:
       - run: uv run --no-sync python scripts/optional_install_smoke.py ${{ matrix.surface }}
 
   hpr-tespy-tests:
-    needs: detect-main-pr
-    if: ${{ needs.detect-main-pr.outputs.should_run == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -134,8 +104,7 @@ jobs:
         run: timeout 300s uv run --no-sync pytest tests/analysis/heat_pumps/test_hpr_tespy_target_evaluator.py::test_real_public_tespy_target_and_minimal_map_stay_within_smoke_budget
 
   artifact-build:
-    needs: [detect-main-pr, hpr-tespy-tests]
-    if: ${{ needs.detect-main-pr.outputs.should_run == 'true' }}
+    needs: hpr-tespy-tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -159,8 +128,7 @@ jobs:
           if-no-files-found: error
 
   artifact-install-smoke:
-    needs: [detect-main-pr, artifact-build]
-    if: ${{ needs.detect-main-pr.outputs.should_run == 'true' }}
+    needs: artifact-build
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -188,8 +156,7 @@ jobs:
       - run: uv run --no-sync python scripts/artifact_install_smoke.py --surface core
 
   artifact-install-tespy-smoke:
-    needs: [detect-main-pr, artifact-build]
-    if: ${{ needs.detect-main-pr.outputs.should_run == 'true' }}
+    needs: artifact-build
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

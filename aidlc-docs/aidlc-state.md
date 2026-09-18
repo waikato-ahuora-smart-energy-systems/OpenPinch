@@ -2069,3 +2069,15 @@ refreshed reverse-engineering artifacts.
 - [x] Requirements and implementation plan authorized by the user request.
 - [x] Shared effective contribution semantics and regression coverage.
 - [x] Verification and summary: full HEN suite 463 passed, 1 skipped; Ruff and diff checks pass.
+
+### PR 98 Metadata Correction
+
+- [x] Approved metadata correction implemented.
+- [x] Serialized metadata smoke, 28 adapter tests, Ruff and diff checks pass.
+
+## CI Develop Simplification
+
+- [x] Workspace inspection and minimal requirements/plan.
+- [x] Full develop validation retained; exact-commit PR reuse implemented per user preference.
+- [x] Validation and summary: 167 packaging tests passed, 3 skipped; final focused 66 tests, Ruff, YAML, shell and workflow consistency checks passed.
+- Plan: construction/plans/ci-develop-simplification-plan.md.
