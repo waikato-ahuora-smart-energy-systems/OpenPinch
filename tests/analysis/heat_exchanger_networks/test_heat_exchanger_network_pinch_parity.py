@@ -13,6 +13,7 @@ from OpenPinch.analysis.heat_exchanger_networks.solver.pinch_design_decompositio
     build_pinch_design_decomposition,
 )
 from OpenPinch.application.problem import PinchProblem
+from OpenPinch.domain.configuration import tol
 from tests.support.paths import FIXTURES_ROOT, REPOSITORY_ROOT
 
 REPO_ROOT = REPOSITORY_ROOT
@@ -77,10 +78,21 @@ def test_decomposition_targets_are_finite_for_required_fixture() -> None:
     assert target.shifted_pinch_temperature is not None
 
 
-def test_decomposition_targets_use_copied_zone_with_minimum_dt_cont(
+@pytest.mark.parametrize("multiplier", [0.0, 0.5, 2.0])
+def test_decomposition_targets_preserve_original_effective_contributions(
     monkeypatch,
+    multiplier,
 ) -> None:
     problem = _load_problem(CASE_IDS[0])
+    original_streams = list(problem._master_zone.all_streams)
+    bases = [1.0, 9.0, 0.0, tol / 4.0, 3.0, 0.0]
+    assert len(original_streams) == len(bases)
+    for stream, base in zip(original_streams, bases):
+        stream.delta_t_contribution = base
+    problem._master_zone.dt_cont_multiplier = multiplier
+    for stream in original_streams:
+        stream.delta_t_contribution_multiplier_locked = True
+    expected = [base * multiplier if base * multiplier > tol else 6.0 for base in bases]
     captured: dict[str, float | bool | list[float]] = {}
 
     def fake_compute_direct_integration_targets(zone, args=None):
@@ -89,11 +101,11 @@ def test_decomposition_targets_use_copied_zone_with_minimum_dt_cont(
         captured["dt_cont_multiplier"] = zone.dt_cont_multiplier
         captured["process_dt_cont"] = [
             float(stream.delta_t_contribution.to("delta_degC").value)
-            for stream in zone.process_streams
+            for stream in zone.all_streams
         ]
         captured["process_dt_cont_act"] = [
             float(stream.effective_delta_t_contribution.to("delta_degC").value)
-            for stream in zone.process_streams
+            for stream in zone.all_streams
         ]
         return SimpleNamespace(
             hot_utility_target=1.0,
@@ -113,9 +125,18 @@ def test_decomposition_targets_use_copied_zone_with_minimum_dt_cont(
 
     assert captured["same_zone"] is False
     assert captured["dt_cont_multiplier"] == pytest.approx(1.0)
-    assert captured["process_dt_cont"] == pytest.approx([6.0, 6.0, 6.0, 6.0])
-    assert captured["process_dt_cont_act"] == pytest.approx([6.0, 6.0, 6.0, 6.0])
+    assert captured["process_dt_cont"] == pytest.approx(expected)
+    assert captured["process_dt_cont_act"] == pytest.approx(expected)
     assert target.shifted_pinch_temperature == pytest.approx(373.15)
+
+    for stream, base in zip(original_streams, bases):
+        assert stream.delta_t_contribution.value == pytest.approx(base)
+        assert stream.effective_delta_t_contribution.value == pytest.approx(
+            base * multiplier
+        )
+        assert stream.delta_t_contribution_multiplier == multiplier
+        assert stream.delta_t_contribution_multiplier_locked is True
+    assert problem._master_zone.dt_cont_multiplier == multiplier
 
 
 def _load_problem(case_id: str, *, reordered: bool = False) -> PinchProblem:

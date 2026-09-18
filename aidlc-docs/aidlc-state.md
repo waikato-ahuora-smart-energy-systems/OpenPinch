@@ -2056,3 +2056,16 @@ refreshed reverse-engineering artifacts.
 - [x] Move resources, update consumers and remove obsolete data package.
 - [x] Verify and record completion.
 - Plan: construction/plans/data-resource-relocation-plan.md.
+
+## Effective HEN Contribution
+
+- [x] Workspace detection, minimal requirements and focused execution plan.
+- [x] User adapter correction verified; regression tests updated and extended.
+- [x] Build and test verification: all observed HEN failures resolved on targeted reruns; one existing skip.
+- Plan: construction/plans/effective-hen-contribution-plan.md.
+
+### PDM Contribution Follow-up
+
+- [x] Requirements and implementation plan authorized by the user request.
+- [x] Shared effective contribution semantics and regression coverage.
+- [x] Verification and summary: full HEN suite 463 passed, 1 skipped; Ruff and diff checks pass.

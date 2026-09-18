@@ -347,6 +347,7 @@ def test_adapter_scales_explicit_dt_cont_by_active_multiplier() -> None:
             "zone_tree": {
                 "name": "Site",
                 "type": "Site",
+                "dt_cont_multiplier": 2.0,
                 "children": [
                     {"name": "Process A", "type": "Process Zone", "children": None}
                 ],
@@ -354,7 +355,7 @@ def test_adapter_scales_explicit_dt_cont_by_active_multiplier() -> None:
         }
     )
 
-    payload = problem_to_solver_arrays(problem, 2.0)
+    payload = problem_to_solver_arrays(problem, 20.0)
 
     np.testing.assert_allclose(_single_state_array(payload, "T_h_cont"), [6.0])
     np.testing.assert_allclose(_single_state_array(payload, "T_c_cont"), [8.0])

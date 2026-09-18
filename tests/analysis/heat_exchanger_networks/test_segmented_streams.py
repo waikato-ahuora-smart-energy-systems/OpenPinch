@@ -26,6 +26,7 @@ from OpenPinch.analysis.heat_exchanger_networks.solver import (
     pinch_design_decomposition as pdm_decomposition,
 )
 from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
+    _temperature_contribution,
     problem_to_solver_arrays,
 )
 from OpenPinch.analysis.heat_exchanger_networks.solver.piecewise import (
@@ -38,6 +39,7 @@ from OpenPinch.analysis.heat_exchanger_networks.solver.pinch_design_decompositio
 )
 from OpenPinch.application.problem import PinchProblem
 from OpenPinch.domain._stream.segment import StreamSegment
+from OpenPinch.domain.configuration import tol
 from OpenPinch.domain.enums import StreamType
 from OpenPinch.domain.stream import Stream
 from OpenPinch.domain.zone import Zone
@@ -247,19 +249,19 @@ def test_segmented_utility_dt_cont_tensors_and_boundary_mapping_are_local():
 
     np.testing.assert_allclose(
         arrays.arrays["hot_utility_segment_dt_cont_period"][0, 0],
-        [2.0, 8.0],
+        [0.2, 0.8],
     )
     np.testing.assert_allclose(
         arrays.arrays["cold_utility_segment_dt_cont_period"][0, 0],
-        [7.0, 3.0],
+        [0.7, 0.3],
     )
-    assert hot_profile.temperature_contribution_at_heat(0.0) == pytest.approx(2.0)
-    assert hot_profile.temperature_contribution_at_heat(25.0) == pytest.approx(2.0)
-    assert hot_profile.temperature_contribution_at_heat(50.0) == pytest.approx(8.0)
-    assert hot_profile.temperature_contribution_at_heat(75.0) == pytest.approx(8.0)
-    assert cold_profile.temperature_contribution_at_heat(0.0) == pytest.approx(7.0)
-    assert cold_profile.temperature_contribution_at_heat(50.0) == pytest.approx(7.0)
-    assert cold_profile.temperature_contribution_at_heat(75.0) == pytest.approx(3.0)
+    assert hot_profile.temperature_contribution_at_heat(0.0) == pytest.approx(0.2)
+    assert hot_profile.temperature_contribution_at_heat(25.0) == pytest.approx(0.2)
+    assert hot_profile.temperature_contribution_at_heat(50.0) == pytest.approx(0.8)
+    assert hot_profile.temperature_contribution_at_heat(75.0) == pytest.approx(0.8)
+    assert cold_profile.temperature_contribution_at_heat(0.0) == pytest.approx(0.7)
+    assert cold_profile.temperature_contribution_at_heat(50.0) == pytest.approx(0.7)
+    assert cold_profile.temperature_contribution_at_heat(75.0) == pytest.approx(0.3)
 
 
 def test_flat_utility_dt_cont_keeps_scalar_contribution():
@@ -299,8 +301,8 @@ def test_segmented_utility_dt_cont_mapping_is_built_into_stagewise_constraints()
         tol=1e-3,
     )
 
-    assert model.T_hu_in_cont_by_period == [2.0]
-    assert model.T_cu_in_cont_by_period == [7.0]
+    assert model.T_hu_in_cont_by_period == [0.2]
+    assert model.T_cu_in_cont_by_period == [0.7]
     assert len(model.T_hu_out_cont_by_period) == 1
     assert len(model.T_cu_out_cont_by_period) == 1
     assert len(model.T_hu_solved_out_by_period) == 1
@@ -416,10 +418,67 @@ def test_multiperiod_segmented_utility_cost_profiles_keep_stable_identities():
     np.testing.assert_allclose(profiles[1].cumulative_duties, [0.0, 100.0, 200.0])
     assert profiles[0].cost_at_heat(75.0) == pytest.approx(3000.0)
     assert profiles[1].cost_at_heat(150.0) == pytest.approx(5000.0)
-    np.testing.assert_allclose(profiles[0].temperature_contributions, [2.0, 8.0])
-    np.testing.assert_allclose(profiles[1].temperature_contributions, [6.0, 3.0])
-    assert profiles[0].temperature_contribution_at_heat(50.0) == pytest.approx(8.0)
-    assert profiles[1].temperature_contribution_at_heat(100.0) == pytest.approx(6.0)
+    np.testing.assert_allclose(profiles[0].temperature_contributions, [0.2, 0.8])
+    np.testing.assert_allclose(profiles[1].temperature_contributions, [0.6, 0.3])
+    assert profiles[0].temperature_contribution_at_heat(50.0) == pytest.approx(0.8)
+    assert profiles[1].temperature_contribution_at_heat(100.0) == pytest.approx(0.6)
+
+
+@pytest.mark.parametrize(
+    ("base", "multiplier", "expected"),
+    [
+        (3.0, 2.0, 6.0),
+        (12.0, 2.0, 24.0),
+        (0.0, 2.0, 10.0),
+        (tol / 4.0, 2.0, 10.0),
+        (tol / 2.0, 2.0, 10.0),
+        (tol, 2.0, 2.0 * tol),
+    ],
+)
+def test_effective_temperature_contribution_uses_fallback_only(
+    base, multiplier, expected
+):
+    stream = Stream(
+        supply_temperature=200.0,
+        target_temperature=100.0,
+        heat_flow=100.0,
+        delta_t_contribution=base,
+        delta_t_contribution_multiplier=multiplier,
+    )
+    assert _temperature_contribution(stream, 20.0) == pytest.approx(expected)
+    assert stream.delta_t_contribution.value == pytest.approx(base)
+
+
+def test_effective_temperature_contribution_selects_operating_period():
+    stream = Stream(
+        supply_temperature=[200.0, 210.0, 220.0],
+        target_temperature=[100.0, 110.0, 120.0],
+        heat_flow=[100.0, 100.0, 100.0],
+        delta_t_contribution={"values": [0.0, 3.0, 12.0], "unit": "delta_degC"},
+        delta_t_contribution_multiplier=2.0,
+    )
+    assert [
+        _temperature_contribution(stream, 20.0, period_idx=n) for n in range(3)
+    ] == pytest.approx([10.0, 6.0, 24.0])
+
+
+@seed(20260918)
+@given(
+    segmented_streams(),
+    st.floats(min_value=0.1, max_value=4.0, allow_nan=False, allow_infinity=False),
+)
+@settings(max_examples=30)
+def test_effective_segment_contributions_are_independent_of_solver_approach(
+    stream, multiplier
+):
+    for index in range(stream.segment_count):
+        stream.update_segment(index, delta_t_contribution=float(index + 1))
+    stream.delta_t_contribution_multiplier = multiplier
+    for index, segment in enumerate(stream.segments):
+        expected = (index + 1) * multiplier
+        assert _temperature_contribution(segment, 0.1) == pytest.approx(expected)
+        assert _temperature_contribution(segment, 100.0) == pytest.approx(expected)
+        assert segment.delta_t_contribution.value == pytest.approx(index + 1)
 
 
 def test_pdm_targeting_applies_hen_dtmin_to_every_expanded_segment(monkeypatch):
@@ -465,7 +524,7 @@ def test_pdm_targeting_applies_hen_dtmin_to_every_expanded_segment(monkeypatch):
         )
 
 
-def test_pdm_dt_cont_minimum_is_applied_per_segment_and_period():
+def test_pdm_preserves_effective_contributions_per_segment_and_period():
     stream = Stream(
         name="Multiperiod segmented hot stream",
         segments=[
@@ -479,26 +538,28 @@ def test_pdm_dt_cont_minimum_is_applied_per_segment_and_period():
                 supply_temperature=[150.0, 160.0],
                 target_temperature=[100.0, 110.0],
                 heat_flow=[100.0, 120.0],
-                delta_t_contribution=[8.0, 2.0],
+                delta_t_contribution=[0.0, tol / 4.0],
             ),
         ],
     )
-    zone = SimpleNamespace(all_streams=(stream,), dt_cont_multiplier=2.0)
+    zone = Zone()
+    zone.hot_streams.add(stream)
+    zone.dt_cont_multiplier = 2.0
 
     pdm_decomposition._apply_hen_dt_cont_convention(zone, dTmin=14.0)
 
     assert zone.dt_cont_multiplier == 1.0
     np.testing.assert_allclose(
         stream.segments[0].delta_t_contribution.to("delta_degC").period_values,
-        [7.0, 9.0],
+        [2.0, 18.0],
     )
     np.testing.assert_allclose(
         stream.segments[1].delta_t_contribution.to("delta_degC").period_values,
-        [8.0, 7.0],
+        [7.0, 7.0],
     )
     np.testing.assert_allclose(
         stream.delta_t_contribution.to("delta_degC").period_values,
-        [7.0, 9.0],
+        [2.0, 18.0],
     )
 
 
@@ -513,7 +574,7 @@ def test_pdm_dt_cont_minimum_is_applied_per_segment_and_period():
     ),
 )
 @settings(max_examples=30)
-def test_pdm_dt_cont_minimum_holds_for_all_generated_segments(stream, dTmin):
+def test_pdm_fallback_matches_arrays_and_is_idempotent_for_segments(stream, dTmin):
     minimum = dTmin / 2.0
     original = []
     for index in range(stream.segment_count):
@@ -529,9 +590,17 @@ def test_pdm_dt_cont_minimum_holds_for_all_generated_segments(stream, dTmin):
     )
     destination.add(stream)
 
+    zone.dt_cont_multiplier = 2.0
+    expected = np.where(
+        np.asarray(original) * 2.0 > tol, np.asarray(original) * 2.0, minimum
+    )
+    from_arrays = [
+        _temperature_contribution(segment, dTmin)
+        for segment in next(iter(zone.process_streams)).segments
+    ]
+    np.testing.assert_allclose(from_arrays, expected)
     pdm_decomposition._apply_hen_dt_cont_convention(zone, dTmin=dTmin)
-
-    expected = np.maximum(original, minimum)
+    pdm_decomposition._apply_hen_dt_cont_convention(zone, dTmin=dTmin)
     numeric = zone.process_streams.segment_numeric_view()
     np.testing.assert_allclose(numeric.dt_cont, expected)
     np.testing.assert_allclose(

@@ -23,7 +23,11 @@ from ....domain.configuration import tol
 from ....domain.stream import Stream
 from ....domain.zone import Zone
 from ..indexing import ordered_mapping_keys
-from .arrays import PreparedSolverArrays, problem_to_solver_arrays
+from .arrays import (
+    PreparedSolverArrays,
+    _temperature_contribution,
+    problem_to_solver_arrays,
+)
 
 PinchLocation = Literal["above", "below"]
 StageSelection = Literal["automated"] | tuple[int, int]
@@ -48,7 +52,7 @@ class PinchDesignTarget(BaseModel):
         default=(
             "OpenPinch direct_heat_integration on copied Zone",
             "Zone.process_streams",
-            "Stream.delta_t_contribution clamped to dTmin / 2 minimum",
+            "Stream.effective_delta_t_contribution with dTmin / 2 fallback",
         )
     )
 
@@ -268,62 +272,54 @@ def _zone_with_hen_dt_contribution(problem: PinchProblem, *, dTmin: float) -> Zo
 
 
 def _apply_hen_dt_cont_convention(zone: Zone, *, dTmin: float) -> None:
-    """Apply the HEN dTmin convention to copied streams before targeting."""
+    """Materialize effective contributions in a detached targeting zone."""
 
-    minimum_dt_cont = float(dTmin) / 2.0
-    zone.dt_cont_multiplier = 1.0
+    # Capture every value before the zone setter changes inherited multipliers.
+    prepared = []
     for stream in zone.all_streams:
+        parts = stream.segments if stream.has_segments else (stream,)
+        contributions = [
+            _stream_dt_cont_with_fallback(part, dTmin=dTmin) for part in parts
+        ]
+        prepared.append(
+            (stream, contributions, stream.delta_t_contribution_multiplier_locked)
+        )
+
+    # These are copied streams. Preserve their locks after baking the effective
+    # values into base values with unit multipliers, including zero multipliers.
+    for stream, _contributions, _locked in prepared:
+        stream.delta_t_contribution_multiplier_locked = False
+    zone.dt_cont_multiplier = 1.0
+    for stream, contributions, locked in prepared:
         if stream.has_segments:
-            _apply_segment_dt_cont_minimum(
-                stream,
-                minimum_dt_cont=minimum_dt_cont,
+            stream.update_segments(
+                {
+                    index: {"delta_t_contribution": contribution}
+                    for index, contribution in enumerate(contributions)
+                }
             )
         else:
-            stream.delta_t_contribution = _stream_dt_cont_with_minimum(
-                stream,
-                minimum_dt_cont=minimum_dt_cont,
-            )
+            stream.delta_t_contribution = contributions[0]
+        stream.delta_t_contribution_multiplier_locked = locked
 
 
-def _apply_segment_dt_cont_minimum(
+def _stream_dt_cont_with_fallback(
     stream: Stream,
     *,
-    minimum_dt_cont: float,
-) -> None:
-    """Apply the HEN contribution to every child used by numeric targeting."""
-
-    stream.update_segments(
-        {
-            segment_index: {
-                "delta_t_contribution": _stream_dt_cont_with_minimum(
-                    segment,
-                    minimum_dt_cont=minimum_dt_cont,
-                )
-            }
-            for segment_index, segment in enumerate(stream.segments)
-        }
-    )
-
-
-def _stream_dt_cont_with_minimum(
-    stream: Stream,
-    *,
-    minimum_dt_cont: float,
+    dTmin: float,
 ) -> dict[str, float | list[float] | str]:
-    current = getattr(stream, "_dt_cont", None)
+    """Use the solver-array contribution policy for each effective period."""
+    current = getattr(stream, "effective_delta_t_contribution", None)
     if current is None:
-        return {"value": minimum_dt_cont, "unit": "delta_degC"}
+        return {"value": float(dTmin) / 2.0, "unit": "delta_degC"}
 
-    converted = current.to("delta_degC")
-    if converted.num_periods > 1:
-        return {
-            "values": np.maximum(converted.period_values, minimum_dt_cont).tolist(),
-            "unit": "delta_degC",
-        }
-    return {
-        "value": max(float(converted.value), minimum_dt_cont),
-        "unit": "delta_degC",
-    }
+    values = [
+        _temperature_contribution(stream, dTmin, period_idx=period_index)
+        for period_index in range(current.num_periods)
+    ]
+    if len(values) > 1:
+        return {"values": values, "unit": "delta_degC"}
+    return {"value": values[0], "unit": "delta_degC"}
 
 
 def _shifted_pinch_temperature(
@@ -438,9 +434,9 @@ def _build_decomposition(
             "utility_targets": "kW",
         },
         dt_cont_convention=(
-            "Copied stream and explicit segment dt_cont values are "
-            "max(prepared dt_cont, dTmin / 2), and the copied zone "
-            "dt_cont_multiplier is set to 1.0."
+            "Copied stream and explicit segment dt_cont values preserve prepared "
+            "effective contributions above tol, with dTmin / 2 as fallback. "
+            "The copied zone dt_cont_multiplier is then set to 1.0."
         ),
     )
 
