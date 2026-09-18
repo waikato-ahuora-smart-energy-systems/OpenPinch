@@ -172,7 +172,6 @@ def problem_to_solver_arrays(
             "HENS_STAGE_SELECTION": list(hens.stage_selection),
             "active_dTmin": float(dTmin),
             "segment_profile_version": SEGMENT_PROFILE_VERSION,
-            "active_dt_cont_multiplier": float(dTmin),
             "period_ids": list(period_ids),
             "period_weights": [float(weight) for weight in period_weights],
             "costing": {
@@ -205,9 +204,8 @@ def problem_to_solver_arrays(
             "heat_transfer_coefficient": "kW/m^2/K",
             "temperature": "K",
             "temperature_contribution": (
-                "K, using the stream contribution multiplied by the active HEN sweep "
-                "value and falling back to dTmin / 2 when the prepared "
-                "contribution is absent"
+                "K, using effective_delta_t_contribution directly; "
+                "dTmin / 2 is the fallback for missing values or values <= tol"
             ),
             "utility_price": (
                 "numeric UtilitySchema.price passed through for OpenHENS "

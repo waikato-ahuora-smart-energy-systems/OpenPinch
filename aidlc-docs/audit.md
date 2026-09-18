@@ -8885,3 +8885,57 @@ utilities = problem.target.all_heat_integration(base_target=heat_pump)"
 **Context**: Authorized correction complete; PBT-04 now applies and passes. Other extension applicability unchanged. No commit or push.
 
 ---
+
+## PR 98 Metadata Review Check
+**Timestamp**: 2026-09-18T05:15:39Z
+**User Input**: "Check my changes are sufficient to answer the Codex review. All the tests passed. "
+**AI Response**: "Read the Codex review on PR 98 and compared it with the current working-tree diff. Removing active_dt_cont_multiplier addresses one part, but arrays.py still serializes temperature_contribution as multiplied by the active HEN sweep value. The review is not fully addressed. Recommend updating that description to effective contribution with fallback at or below tol. Removing active_dTmin and HENS_DT_CONT_MULTIPLIERS is unnecessary for this finding; active_dTmin still records the fallback input. No source edits, tests reruns, GitHub replies or review state changes."
+**Context**: Review only. GitHub thread is already marked resolved, but current local code retains the reported misleading unit description.
+
+---
+
+## PR 98 Metadata Correction - Authorization
+**Timestamp**: 2026-09-18T06:31:23Z
+**User Input**: "Go"
+**AI Response**: "Apply the proposed metadata correction: restore active_dTmin and HENS_DT_CONT_MULTIPLIERS, omit active_dt_cont_multiplier, and update temperature_contribution description. Verify serialized output and adapter tests."
+**Context**: Explicit approval of the concrete correction. Reuse loaded workflow rules; numerical behavior unchanged.
+
+---
+
+## PR 98 Metadata Correction - Complete
+**Timestamp**: 2026-09-18T06:32:05Z
+**AI Response**: "Implemented the approved metadata correction. Serialized metadata smoke, 28 adapter tests, Ruff and diff checks pass. Both parts of the Codex finding are addressed locally. No commit, push, or GitHub comment."
+**Context**: Plan step 10 complete; documentation-only metadata change, no new PBT obligations, disabled extensions remain skipped.
+
+---
+
+## CI Develop Simplification - Requirements and Plan
+**Timestamp**: 2026-09-18T06:38:06Z
+**User Input**: "Currently, tests run every time I push to develop branch and then again when I PR to main. This seems like a duplication. Can this be simplified? "
+**AI Response**: "Inspected existing PR detection, workflows and main ruleset. Offered an optional preference question and proceeded with the stated recommended assumption: quick lint and lockfile checks on develop; unchanged full PR and release validation. Main requires test, which remains unchanged on PRs. Adapt packaging workflow contracts and verify YAML and checks."
+**Context**: Authorized local CI simplification. Legacy branch protection API returned 403; active main ruleset read successfully. No remote settings changes.
+
+---
+
+## CI Develop Simplification - User Preference
+**Timestamp**: 2026-09-18T06:39:52Z
+**User Input**: "Keep full tests on develop but skip tests on PR to main if develop already passes"
+**AI Response**: "Revised the plan before workflow edits. Preserve full develop validation, reuse only a successful run for the exact PR head with matching merge tree and all expected jobs passed. Keep required test status, solver/version/release gates. Missing or unavailable proof runs normal PR validation."
+**Context**: User preference supersedes the earlier quick-check default. No quick-check workflow was implemented.
+
+---
+
+## CI Develop Simplification - Complete
+**Timestamp**: 2026-09-18T06:49:14Z
+**AI Response**: "Implemented full develop validation and verified exact-commit, identical-merge-tree reuse for main PRs. Missing or incomplete proof runs normal PR checks. Solver and release checks remain. Packaging tests: 167 passed, 3 skipped; final focused tests: 66 passed. Ruff, YAML, job dependency/matrix/command consistency, shell syntax and whitespace checks passed. Explicit Python setup fixes preflight runner compatibility. No push or live modified Actions execution."
+**Context**: All CI plan steps complete; build and test instructions recorded under construction/build-and-test/ci-develop-simplification. PBT compliance recorded; disabled Security/Resiliency extensions skipped. Prior contribution metadata edits preserved.
+
+---
+
+## Develop Push
+**Timestamp**: 2026-09-18T06:49:42Z
+**User Input**: "Push to dev. "
+**AI Response**: "Committing the verified CI reuse changes and previously approved contribution metadata correction, then pushing the develop branch to origin."
+**Context**: Explicit user authorization to commit and push; local whitespace checks pass and existing test results are recorded above.
+
+---
