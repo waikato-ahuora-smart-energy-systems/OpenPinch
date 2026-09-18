@@ -8838,3 +8838,50 @@ utilities = problem.target.all_heat_integration(base_target=heat_pump)"
 **Context**: Read-only branch and tree verification; no source edits, commits or pushes.
 
 ---
+
+## Effective HEN Contribution - Requirements and Planning
+**Timestamp**: 2026-09-17T23:35:24Z
+**User Input**: "`effective_delta_t_contribution` should be used"
+**AI Response**: "Use the effective contribution directly above tol; dTmin / 2 is fallback only. Add focused regressions and verify HEN tests. Existing max edit superseded by the explicit fallback instruction."
+**Context**: Minimal authorized correction. Security and Resiliency disabled and skipped; Property-Based Testing enabled.
+
+---
+
+## Effective HEN Contribution - Requirements and Planning
+**Timestamp**: 2026-09-17T23:35:24Z
+**User Input**: "float(dTmin) / 2.0 should be a fallback"
+**AI Response**: "Use the effective contribution directly above tol; dTmin / 2 is fallback only. Add focused regressions and verify HEN tests. Existing max edit superseded by the explicit fallback instruction."
+**Context**: Minimal authorized correction. Security and Resiliency disabled and skipped; Property-Based Testing enabled.
+
+---
+
+## Effective HEN Contribution - Verification
+**Timestamp**: 2026-09-17T23:39:34Z
+**User Input**: "I've made the chang. "
+**AI Response**: "Inspected and preserved the user implementation. Updated outdated scaling assertions, configured a real zone multiplier in the adapter integration test, and added boundary, period and generated-segment regressions. 102 focused tests and 28 adapter tests pass. Full HEN run: 459 passed, 1 skipped, 2 failures; both failures resolved on targeted reruns (adapter expectation and sandbox Chrome launch). Ruff and diff checks pass. PDM targeting still applies its separate minimum-floor convention."
+**Context**: Verification complete. PBT compliance recorded; disabled extensions skipped. No source changes made by the assistant, no commit or push.
+
+---
+
+## Effective HEN Contribution - Clarification
+**Timestamp**: 2026-09-17T23:44:58Z
+**User Input**: "So, are you saying that the dt cont assigned when the stream data is uploaded to PinchProblem is being overwritten?"
+**AI Response**: "The original PinchProblem values remain intact. PDM deep-copies the master zone, resets the copied zone multiplier to 1.0 and replaces copied base contributions with max(base contribution, dTmin / 2) for its targeting calculation. The updated array adapter reads the original effective contributions, so targeting and solver assumptions can differ."
+**Context**: Read-only source verification; no application edits.
+
+---
+
+## PDM Contribution Follow-up
+**Timestamp**: 2026-09-17T23:48:16Z
+**User Input**: "I want PDM to use the original contribution values. If a value is missing or near zero, then dtmin / 2 should be used."
+**AI Response**: "Apply the same effective-value and fallback policy to copied-zone PDM targeting. Capture effective contributions before multiplier normalization; preserve the source problem; add regression and property coverage and update metadata."
+**Context**: Explicit authorization for the PDM follow-up. Reuse loaded workflow rules and extension configuration.
+
+---
+
+## PDM Contribution Follow-up - Complete
+**Timestamp**: 2026-09-17T23:53:45Z
+**AI Response**: "PDM now preserves original effective contributions, with dTmin / 2 only for missing or near-zero values. It shares the solver-array helper and snapshots values before neutralizing copied multipliers. Original data and locks remain unchanged. Updated metadata, scalar/multiperiod/segment regressions and idempotency properties. Full HEN suite: 463 passed, 1 skipped; Ruff and diff checks pass."
+**Context**: Authorized correction complete; PBT-04 now applies and passes. Other extension applicability unchanged. No commit or push.
+
+---

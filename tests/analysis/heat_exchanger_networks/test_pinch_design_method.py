@@ -93,6 +93,7 @@ from OpenPinch.contracts.synthesis.task import HeatExchangerNetworkSynthesisTask
 from OpenPinch.domain.configuration import tol
 from OpenPinch.domain.enums import HeatExchangerKind
 from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
+from OpenPinch.domain.value import Value
 from tests.support.paths import REPOSITORY_ROOT
 
 REPO_ROOT = REPOSITORY_ROOT
@@ -852,9 +853,9 @@ def test_solver_array_private_helpers_cover_period_and_value_edges() -> None:
         )
 
     assert arrays_module._temperature_contribution(
-        SimpleNamespace(delta_t_contribution=_SinglePeriodValue(0.25)),
+        SimpleNamespace(effective_delta_t_contribution=_SinglePeriodValue(0.25)),
         20.0,
-    ) == pytest.approx(5.0)
+    ) == pytest.approx(0.25)
     assert (
         arrays_module._stream_heat_capacity_flowrate(
             SimpleNamespace(heat_capacity_flowrate=_SinglePeriodValue(8.0)),
@@ -2014,16 +2015,6 @@ def _pdm_decomposition_kwargs(updates: dict | None = None) -> dict:
     return values
 
 
-class _MultiPeriodDtCont:
-    def __init__(self, period_values: list[float]) -> None:
-        self.period_values = np.asarray(period_values, dtype=float)
-        self.num_periods = len(period_values)
-
-    def to(self, unit: str) -> "_MultiPeriodDtCont":
-        assert unit == "delta_degC"
-        return self
-
-
 class _SinglePeriodValue:
     num_periods = 1
 
@@ -2742,14 +2733,16 @@ def test_pdm_decomposition_private_helpers_cover_guard_and_stage_edges() -> None
             dTmin=14.0,
         )
 
-    assert pdm_decomposition._stream_dt_cont_with_minimum(
+    assert pdm_decomposition._stream_dt_cont_with_fallback(
         SimpleNamespace(),
-        minimum_dt_cont=7.0,
+        dTmin=14.0,
     ) == {"value": 7.0, "unit": "delta_degC"}
-    assert pdm_decomposition._stream_dt_cont_with_minimum(
-        SimpleNamespace(_dt_cont=_MultiPeriodDtCont([1.0, 9.0])),
-        minimum_dt_cont=7.0,
-    ) == {"values": [7.0, 9.0], "unit": "delta_degC"}
+    assert pdm_decomposition._stream_dt_cont_with_fallback(
+        SimpleNamespace(
+            effective_delta_t_contribution=Value([0.0, 1.0, 9.0], "delta_degC")
+        ),
+        dTmin=14.0,
+    ) == {"values": [7.0, 1.0, 9.0], "unit": "delta_degC"}
 
     assert (
         pdm_decomposition._shifted_pinch_temperature(

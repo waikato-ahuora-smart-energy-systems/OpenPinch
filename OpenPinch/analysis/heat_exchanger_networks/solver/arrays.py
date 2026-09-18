@@ -463,10 +463,10 @@ def _temperature_contribution(
     period_idx: int = 0,
 ) -> float:
     contribution = _value(
-        stream.delta_t_contribution, "delta_degC", period_idx=period_idx
+        stream.effective_delta_t_contribution, "delta_degC", period_idx=period_idx
     )
     if contribution > tol:
-        return contribution * float(dTmin)
+        return contribution
     return float(dTmin) / 2.0
 
 
