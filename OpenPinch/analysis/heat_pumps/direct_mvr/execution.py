@@ -11,10 +11,16 @@ from ....domain.stream import Stream
 from ....domain.stream_collection import StreamCollection
 from ....domain.value import Value
 from .models import (
+    DirectGasMVRFallbackDiagnostic as _DirectGasMVRFallbackDiagnostic,
+)
+from .models import (
     DirectGasMVROutputUnits as _DirectGasMVROutputUnits,
 )
 from .models import (
     DirectGasMVRSettings as _DirectGasMVRSettings,
+)
+from .models import (
+    DirectGasMVRStageError as _DirectGasMVRStageError,
 )
 from .models import (
     DirectGasMVRStageResult as _DirectGasMVRStageResult,
@@ -55,6 +61,8 @@ __all__ = [
 ]
 
 DEFAULT_MVR_STAGE_T_SAT_LIFT = 20.0
+MAX_DIRECT_MVR_STAGE_T_LIFT = 200.0
+MAX_DIRECT_MVR_STAGE_PRESSURE_RATIO = 20.0
 DEFAULT_MVR_COMP_EFFICIENCY = 0.7
 DEFAULT_MOTOR_EFFICIENCY = 0.95
 DEFAULT_DIRECT_MVR_STAGES = 1
@@ -71,11 +79,19 @@ def solve_direct_gas_mvr_stream(
     idx: int = 0,
 ) -> _DirectGasMVRStreamSolveResult:
     """Solve direct gas MVR replacement streams for one source stream and period."""
+    _validate_efficiencies(settings.eta_mvr_comp, settings.eta_motor)
+    compression_target = _resolve_compression_target(settings)
+    n_mvr = coerce_positive_mvr_stage_count(settings.n_stages)
     fluid = str(stream.fluid_name)
     t_supply = _value(stream.supply_temperature, idx, unit="degC")
     t_target = _value(stream.target_temperature, idx, unit="degC")
     p_supply = _value(stream.supply_pressure, idx, unit="kPa")
     heat_flow = _value(stream.heat_flow, idx, unit="kW")
+    if any(
+        value is not None and not np.isfinite(value)
+        for value in (t_supply, t_target, p_supply, heat_flow)
+    ):
+        raise ValueError("MVR source state and duty must be finite.")
     if heat_flow is None or heat_flow <= tol:
         raise ValueError(f"MVR source stream {stream.name!r} requires positive duty.")
     if p_supply is None:
@@ -85,14 +101,25 @@ def solve_direct_gas_mvr_stream(
             f"MVR source stream {stream.name!r} must cool from supply to target."
         )
 
-    h_supply, h_target = _source_enthalpies(
-        stream,
-        fluid,
-        p_supply,
-        t_supply,
-        t_target,
-        idx,
-    )
+    try:
+        h_supply, h_target = _source_enthalpies(
+            stream,
+            fluid,
+            p_supply,
+            t_supply,
+            t_target,
+            idx,
+        )
+        if not np.isfinite([h_supply, h_target]).all():
+            raise ValueError("Non-finite source enthalpy")
+    except ValueError as exc:
+        raise _DirectGasMVRStageError(
+            reason_code="coolprop.source_state_unavailable",
+            source_stream=stream.name,
+            period_index=idx,
+            stage_index=1,
+            fluid=fluid,
+        ) from exc
     delta_h = h_supply - h_target
     if delta_h <= tol:
         raise ValueError(
@@ -109,29 +136,39 @@ def solve_direct_gas_mvr_stream(
     stage_results: list[_DirectGasMVRStageResult] = []
     p_in = _to_pascal(p_supply)
     t_in = t_supply
-    compression_target = _resolve_compression_target(settings)
-    n_mvr = coerce_positive_mvr_stage_count(settings.n_stages)
     output_units = _source_output_units(stream)
 
     eta_comp = settings.eta_mvr_comp
     eta_motor = settings.eta_motor
     liquid_injection = settings.liquid_injection
     for stage_idx in range(n_mvr):
-        stage = _solve_compression_stage(
-            fluid=fluid,
-            source_stream=stream.name,
-            stage_index=stage_idx + 1,
-            m_dot=m_dot,
-            p_in=p_in,
-            t_in=t_in,
-            t_target=t_target,
-            compression_target=compression_target,
-            eta_comp=eta_comp,
-            eta_motor=eta_motor,
-            liquid_injection=liquid_injection,
-            dt_diff_max=settings.dt_diff_max,
-            output_units=output_units,
-        )
+        try:
+            stage = _solve_compression_stage(
+                fluid=fluid,
+                source_stream=stream.name,
+                period_index=idx,
+                stage_index=stage_idx + 1,
+                m_dot=m_dot,
+                p_in=p_in,
+                t_in=t_in,
+                t_target=t_target,
+                compression_target=compression_target,
+                eta_comp=eta_comp,
+                eta_motor=eta_motor,
+                liquid_injection=liquid_injection,
+                dt_diff_max=settings.dt_diff_max,
+                output_units=output_units,
+            )
+        except _DirectGasMVRStageError:
+            raise
+        except ValueError as exc:
+            raise _DirectGasMVRStageError(
+                reason_code="coolprop.required_state_unavailable",
+                source_stream=stream.name,
+                period_index=idx,
+                stage_index=stage_idx + 1,
+                fluid=fluid,
+            ) from exc
         replacement_streams.add(_stage_to_stream(stream, stage, idx=idx))
         stage_results.append(stage)
         p_in = _stage_pressure_to_pa(stage.p_out, stage.pressure_unit)
@@ -155,8 +192,13 @@ def _resolve_compression_target(
         )
     if has_pressure_ratio:
         pressure_ratio = float(settings.mvr_stage_pressure_ratio)
-        if pressure_ratio <= 1.0:
+        if not np.isfinite(pressure_ratio) or pressure_ratio <= 1.0:
             raise ValueError("mvr_stage_pressure_ratio must be greater than 1.0.")
+        if pressure_ratio > MAX_DIRECT_MVR_STAGE_PRESSURE_RATIO:
+            raise ValueError(
+                "mvr_stage_pressure_ratio must not exceed "
+                f"{MAX_DIRECT_MVR_STAGE_PRESSURE_RATIO:.0f}."
+            )
         return "pressure_ratio", pressure_ratio
 
     stage_t_lift = (
@@ -164,8 +206,12 @@ def _resolve_compression_target(
         if settings.mvr_stage_t_lift is None
         else float(settings.mvr_stage_t_lift)
     )
-    if stage_t_lift <= 0.0:
+    if not np.isfinite(stage_t_lift) or stage_t_lift <= 0.0:
         raise ValueError("mvr_stage_t_lift must be positive.")
+    if stage_t_lift > MAX_DIRECT_MVR_STAGE_T_LIFT:
+        raise ValueError(
+            f"mvr_stage_t_lift must not exceed {MAX_DIRECT_MVR_STAGE_T_LIFT:.0f} degC."
+        )
     return "stage_t_lift", stage_t_lift
 
 
@@ -186,10 +232,21 @@ def coerce_positive_mvr_stage_count(value, *, context: str = "Direct gas MVR") -
     return stage_count
 
 
+def _validate_efficiencies(eta_comp: float, eta_motor: float) -> None:
+    if (
+        not np.isfinite(eta_comp)
+        or not np.isfinite(eta_motor)
+        or not (0.0 < eta_comp <= 1.0)
+        or not (0.0 < eta_motor <= 1.0)
+    ):
+        raise ValueError("eta_mvr_comp and eta_motor must be in the interval (0, 1].")
+
+
 def _solve_compression_stage(
     *,
     fluid: str,
     source_stream: str,
+    period_index: int = 0,
     stage_index: int,
     m_dot: float,
     p_in: float,
@@ -202,8 +259,7 @@ def _solve_compression_stage(
     dt_diff_max: float,
     output_units: _DirectGasMVROutputUnits,
 ) -> _DirectGasMVRStageResult:
-    if not (0.0 < eta_comp <= 1.0) or not (0.0 < eta_motor <= 1.0):
-        raise ValueError("eta_mvr_comp and eta_motor must be in the interval (0, 1].")
+    _validate_efficiencies(eta_comp, eta_motor)
 
     t_in_k = _to_kelvin(t_in)
     h_in = _state_property_at_temperature_pressure(
@@ -248,14 +304,29 @@ def _solve_compression_stage(
     q_liquid_injection = 0.0
     liquid_injection_ratio = 0.0
     injection_applied = False
+    fallback_diagnostics: list[_DirectGasMVRFallbackDiagnostic] = []
     h_stage_target = PropsSI("H", "T", _to_kelvin(t_target), "P", p_out, fluid)
     if liquid_injection:
         try:
             h_sat_vap = PropsSI("H", "P", p_out, "Q", 1.0, fluid)
             t_sat_vap = PropsSI("T", "P", p_out, "Q", 1.0, fluid)
-        except Exception:
+            if not np.isfinite([h_sat_vap, t_sat_vap]).all():
+                raise ValueError("Non-finite optional saturation state")
+        except ValueError:
             h_sat_vap = np.nan
             t_sat_vap = np.nan
+            fallback_diagnostics.append(
+                _DirectGasMVRFallbackDiagnostic(
+                    code="dry_stage",
+                    summary=(
+                        "Liquid-injection saturation state unavailable; dry stage used."
+                    ),
+                    source_stream=source_stream,
+                    period_index=period_index,
+                    stage_index=stage_index,
+                    fluid=fluid,
+                )
+            )
         if (
             np.isfinite(h_sat_vap)
             and np.isfinite(t_sat_vap)
@@ -274,11 +345,25 @@ def _solve_compression_stage(
             injection_applied = True
 
     heat_flow = _to_kw(hot_m_dot * max(h_hot_supply - h_stage_target, 0.0))
+    profile_fallback_codes: list[str] = []
     th_curve_si = _build_cooling_th_curve(
         fluid=fluid,
         outlet_pressure=p_out,
         hot_supply_enthalpy=h_hot_supply,
         target_enthalpy=h_stage_target,
+        fallback_codes=profile_fallback_codes,
+    )
+    fallback_diagnostics.extend(
+        _DirectGasMVRFallbackDiagnostic(
+            code="reduced_profile",
+            summary="Saturation breakpoints unavailable; reduced cooling profile used.",
+            source_stream=source_stream,
+            period_index=period_index,
+            stage_index=stage_index,
+            fluid=fluid,
+        )
+        for code in profile_fallback_codes
+        if code == "reduced_profile"
     )
     linearised_profile_si = get_piecewise_data_points(
         curve=th_curve_si,
@@ -331,6 +416,7 @@ def _solve_compression_stage(
         source_mass_flow=m_dot,
         hot_mass_flow=hot_m_dot,
         liquid_injection_ratio=liquid_injection_ratio,
+        fallback_diagnostics=tuple(fallback_diagnostics),
     )
 
 

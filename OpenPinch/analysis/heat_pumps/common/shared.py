@@ -18,6 +18,7 @@ from ....analysis.numerics import g_ineq_penalty as _g_ineq_penalty
 from ....contracts.hpr import (
     HeatPumpTargetInputs,
     HPRBackendResult,
+    HPREvaluationMode,
     HPRParsedState,
     HPRThermoArtifacts,
     SimulatedHPRAnnualizedCostAccounting,
@@ -25,7 +26,12 @@ from ....contracts.hpr import (
 from ....domain.configuration import tol as _tol
 from ....domain.enums import PenaltyForm, ProblemTableLabel
 from ....domain.stream_collection import StreamCollection
-from ..optimisation_adapter import build_hpr_accounting as _build_hpr_accounting
+from ..optimisation_adapter import (
+    build_hpr_accounting as _build_hpr_accounting,
+)
+from ..optimisation_adapter import (
+    normalise_hpr_penalty_terms as _normalise_hpr_penalty_terms,
+)
 from ._shared import plotting as _plotting
 from ._shared import streams as _streams
 from ._shared.ambient_preallocation import (
@@ -48,10 +54,10 @@ def _cycle_penalty(
     args: HeatPumpTargetInputs,
     cycle_penalty_terms: list[float] | None = None,
 ) -> float:
-    if cycle_penalty_terms is None:
-        cycle_terms = np.array([])
-    else:
-        cycle_terms = np.maximum(np.asarray(cycle_penalty_terms, dtype=float), 0.0)
+    cycle_terms = np.maximum(
+        np.asarray(_normalise_hpr_penalty_terms(cycle_penalty_terms), dtype=float),
+        0.0,
+    )
     if not cycle_terms.size:
         return 0.0
     return float(
@@ -153,6 +159,7 @@ def evaluate_carnot_hpr_result(
     Q_evap_he: np.ndarray | None = None,
     penalty_terms: np.ndarray | None = None,
     debug: bool = False,
+    artifact_mode: HPREvaluationMode = HPREvaluationMode.FINAL,
 ) -> HPRBackendResult:
     """Shared Carnot-family accounting, plotting, and result assembly."""
     H_cold_with_amb = args.H_cold + args.z_amb_cold * state.Q_amb_cold
@@ -166,15 +173,17 @@ def evaluate_carnot_hpr_result(
         penalty_terms=penalty_terms,
         penalise_external_cold_when_refrigerating=True,
     )
-    hpr_streams = _streams.get_carnot_hpr_cycle_streams(
-        state.T_cond,
-        Q_cond_total,
-        state.T_evap,
-        Q_evap_total,
-        args,
-    )
+    hpr_streams = None
     debug_figure = None
-    if debug:
+    if artifact_mode is HPREvaluationMode.FINAL:
+        hpr_streams = _streams.get_carnot_hpr_cycle_streams(
+            state.T_cond,
+            Q_cond_total,
+            state.T_evap,
+            Q_evap_total,
+            args,
+        )
+    if debug and artifact_mode is HPREvaluationMode.FINAL:
         debug_figure = _plotting.plot_multi_hp_profiles_from_results(
             args.T_hot,
             H_hot_with_amb,
@@ -211,8 +220,10 @@ def evaluate_carnot_hpr_result(
         Q_evap=Q_evap_total if Q_evap is None else Q_evap,
         Q_cond_he=Q_cond_he,
         Q_evap_he=Q_evap_he,
-        artifacts=HPRThermoArtifacts(
-            hpr_streams=hpr_streams, debug_figure=debug_figure
+        artifacts=(
+            HPRThermoArtifacts(hpr_streams=hpr_streams, debug_figure=debug_figure)
+            if artifact_mode is HPREvaluationMode.FINAL
+            else None
         ),
     )
 
@@ -232,6 +243,7 @@ def evaluate_vapour_hpr_result(
     dT_subcool: np.ndarray | None = None,
     dT_superheat: np.ndarray | None = None,
     debug: bool = False,
+    artifact_mode: HPREvaluationMode = HPREvaluationMode.FINAL,
 ) -> HPRBackendResult:
     """Shared simulated-vapour accounting, plotting, and result assembly."""
     ambient_prealloc = _preallocate_direct_ambient_duties(
@@ -288,7 +300,11 @@ def evaluate_vapour_hpr_result(
         + len(evap_hot_streams)
         + len(evap_cold_streams)
     )
-    all_penalty_terms = [*(penalty_terms or []), cond_wrong_side, evap_wrong_side]
+    all_penalty_terms = [
+        *_normalise_hpr_penalty_terms(penalty_terms),
+        cond_wrong_side,
+        evap_wrong_side,
+    ]
     penalty_power_equivalent = _cycle_penalty(
         args=args,
         cycle_penalty_terms=all_penalty_terms,
@@ -307,7 +323,7 @@ def evaluate_vapour_hpr_result(
     obj = float(cost_accounting.hpr_total_annualized_cost.to("$/y").value) + penalty
 
     debug_figure = None
-    if debug:
+    if debug and artifact_mode is HPREvaluationMode.FINAL:
         debug_figure = _plotting.plot_multi_hp_profiles_from_results(
             ambient_prealloc.T_hot_residual,
             H_hot_with_amb,
@@ -348,10 +364,14 @@ def evaluate_vapour_hpr_result(
         dT_superheat=dT_superheat,
         Q_heat=Q_heat,
         Q_cool=Q_cool,
-        artifacts=HPRThermoArtifacts(
-            hpr_streams=hpr_streams,
-            model=model,
-            debug_figure=debug_figure,
+        artifacts=(
+            HPRThermoArtifacts(
+                hpr_streams=hpr_streams,
+                model=model,
+                debug_figure=debug_figure,
+            )
+            if artifact_mode is HPREvaluationMode.FINAL
+            else None
         ),
     )
 

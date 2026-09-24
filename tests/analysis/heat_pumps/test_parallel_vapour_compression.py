@@ -247,6 +247,11 @@ def test_parallel_optimiser_allows_missing_initial_seed(monkeypatch):
     captured = {}
     args = _base_args(n_cond=2, n_evap=2, initialise_simulated_cycle=False)
     _patch_output_model_validate(monkeypatch)
+    monkeypatch.setattr(
+        hp_parallel_vapour,
+        "preflight_coolprop_hpr_targeting",
+        lambda **_kwargs: None,
+    )
 
     monkeypatch.setattr(
         hp_parallel_vapour,

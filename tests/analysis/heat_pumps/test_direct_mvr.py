@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+from dataclasses import FrozenInstanceError
 
 import numpy as np
 import pytest
 from CoolProp.CoolProp import PropsSI
+from hypothesis import HealthCheck, given, seed, settings
+from hypothesis import strategies as st
 
 import OpenPinch.analysis.heat_pumps.direct_mvr.execution as direct_mvr_execution
 import OpenPinch.analysis.heat_pumps.direct_mvr.thermodynamics as direct_mvr_thermodynamics
@@ -13,6 +16,7 @@ from OpenPinch.analysis.heat_pumps.direct_mvr.execution import (
     solve_direct_gas_mvr_stream,
 )
 from OpenPinch.analysis.heat_pumps.direct_mvr.models import (
+    DirectGasMVRFallbackDiagnostic,
     DirectGasMVROutputUnits,
     DirectGasMVRSettings,
     DirectGasMVRStageResult,
@@ -134,6 +138,132 @@ def test_direct_mvr_solver_rejects_invalid_settings(settings, message):
 
     with pytest.raises(ValueError, match=message):
         solve_direct_gas_mvr_stream(_gas_stream(), settings=settings)
+
+
+@seed(20260924)
+@settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
+@given(st.floats(min_value=200.000001, max_value=5000.0, allow_nan=False))
+def test_direct_mvr_rejects_unsupported_lift_before_stage_iteration(
+    monkeypatch,
+    lift: float,
+) -> None:
+    stage_calls = []
+    monkeypatch.setattr(
+        direct_mvr_execution,
+        "_solve_compression_stage",
+        lambda **kwargs: stage_calls.append(kwargs),
+    )
+
+    with pytest.raises(ValueError, match="200"):
+        solve_direct_gas_mvr_stream(
+            _gas_stream(name="Bounded gas"),
+            settings=DirectGasMVRSettings(mvr_stage_t_lift=lift),
+            idx=0,
+        )
+
+    assert stage_calls == []
+
+
+@seed(20260924)
+@settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
+@given(st.floats(min_value=20.000001, max_value=100.0, allow_nan=False))
+def test_direct_mvr_rejects_unsupported_pressure_ratio_before_stage_iteration(
+    monkeypatch,
+    ratio: float,
+) -> None:
+    stage_calls = []
+    monkeypatch.setattr(
+        direct_mvr_execution,
+        "_solve_compression_stage",
+        lambda **kwargs: stage_calls.append(kwargs),
+    )
+
+    with pytest.raises(ValueError, match="20"):
+        solve_direct_gas_mvr_stream(
+            _gas_stream(name="Bounded gas"),
+            settings=DirectGasMVRSettings(mvr_stage_pressure_ratio=ratio),
+            idx=0,
+        )
+
+    assert stage_calls == []
+
+
+@pytest.mark.parametrize(
+    ("settings", "expected"),
+    [
+        (DirectGasMVRSettings(mvr_stage_t_lift=200.0), ("stage_t_lift", 200.0)),
+        (
+            DirectGasMVRSettings(mvr_stage_pressure_ratio=20.0),
+            ("pressure_ratio", 20.0),
+        ),
+    ],
+)
+def test_direct_mvr_accepts_closed_compression_upper_bounds(settings, expected):
+    assert direct_mvr_execution._resolve_compression_target(settings) == expected
+
+
+def test_required_stage_property_failure_is_contextual_and_chained(monkeypatch) -> None:
+    monkeypatch.setattr(
+        direct_mvr_execution,
+        "_solve_compression_stage",
+        lambda **_kwargs: (_ for _ in ()).throw(ValueError("raw PropsSI payload")),
+    )
+
+    with pytest.raises(ValueError) as captured:
+        solve_direct_gas_mvr_stream(
+            _gas_stream(name="Context gas", fluid="Air"),
+            settings=DirectGasMVRSettings(mvr_stage_t_lift=10.0),
+            idx=2,
+        )
+
+    error = captured.value
+    assert type(error).__name__ == "DirectGasMVRStageError"
+    assert error.source_stream == "Context gas"
+    assert error.period_index == 2
+    assert error.stage_index == 1
+    assert error.fluid == "Air"
+    assert "raw PropsSI" not in str(error)
+    assert isinstance(error.__cause__, ValueError)
+
+
+def test_unexpected_stage_defect_propagates_unchanged(monkeypatch) -> None:
+    defect = RuntimeError("programming defect")
+    monkeypatch.setattr(
+        direct_mvr_execution,
+        "_solve_compression_stage",
+        lambda **_kwargs: (_ for _ in ()).throw(defect),
+    )
+
+    with pytest.raises(RuntimeError) as captured:
+        solve_direct_gas_mvr_stream(
+            _gas_stream(),
+            settings=DirectGasMVRSettings(mvr_stage_t_lift=10.0),
+        )
+
+    assert captured.value is defect
+
+
+def test_direct_mvr_fallback_diagnostic_is_closed_and_immutable() -> None:
+    diagnostic = DirectGasMVRFallbackDiagnostic(
+        code="dry_stage",
+        summary="Optional saturation state unavailable.",
+        source_stream="Gas",
+        period_index=0,
+        stage_index=1,
+        fluid="Air",
+    )
+
+    with pytest.raises(FrozenInstanceError):
+        diagnostic.summary = "changed"
+    with pytest.raises(ValueError, match="fallback code"):
+        DirectGasMVRFallbackDiagnostic(
+            code="unknown",
+            summary="Not permitted.",
+            source_stream="Gas",
+            period_index=0,
+            stage_index=1,
+            fluid="Air",
+        )
 
 
 def test_direct_mvr_solver_can_use_pressure_ratio_target():
@@ -486,18 +616,21 @@ def test_direct_mvr_pressure_search_and_profile_helpers_cover_failure_edges(
     monkeypatch.setattr(
         direct_mvr_thermodynamics,
         "PropsSI",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("no props")),
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("no props")),
     )
+    fallback_codes = []
     enthalpy_values = direct_mvr_thermodynamics.profile_enthalpy_values(
         fluid="Air",
         outlet_pressure=101325.0,
         hot_supply_enthalpy=300.0,
         target_enthalpy=100.0,
+        fallback_codes=fallback_codes,
     )
 
     assert enthalpy_values[0] == pytest.approx(300.0)
     assert enthalpy_values[-1] == pytest.approx(100.0)
     assert len(enthalpy_values) == 31
+    assert fallback_codes == ["reduced_profile"]
 
 
 def test_direct_mvr_liquid_injection_property_failure_falls_back_to_dry_stage(
@@ -505,7 +638,7 @@ def test_direct_mvr_liquid_injection_property_failure_falls_back_to_dry_stage(
 ):
     def fake_props(output, input_1, value_1, input_2=None, value_2=None, fluid=None):
         if input_1 == "P" and input_2 == "Q":
-            raise RuntimeError("saturation data unavailable")
+            raise ValueError("saturation data unavailable")
         if output == "S":
             return 10.0
         if output == "T":
@@ -530,7 +663,7 @@ def test_direct_mvr_liquid_injection_property_failure_falls_back_to_dry_stage(
         lambda curve, **_kwargs: curve,
     )
 
-    stage = direct_mvr_execution._solve_compression_stage(
+    stage_kwargs = dict(
         fluid="FakeFluid",
         source_stream="HotGas",
         stage_index=1,
@@ -541,11 +674,22 @@ def test_direct_mvr_liquid_injection_property_failure_falls_back_to_dry_stage(
         compression_target=("pressure_ratio", 1.2),
         eta_comp=0.75,
         eta_motor=0.95,
-        liquid_injection=True,
         dt_diff_max=0.1,
         output_units=DirectGasMVROutputUnits(),
+    )
+    dry_stage = direct_mvr_execution._solve_compression_stage(
+        **stage_kwargs,
+        liquid_injection=False,
+    )
+    stage = direct_mvr_execution._solve_compression_stage(
+        **stage_kwargs,
+        liquid_injection=True,
     )
 
     assert stage.liquid_injection_applied is False
     assert stage.q_liquid_injection == 0.0
     assert stage.hot_mass_flow == pytest.approx(stage.source_mass_flow)
+    assert [item.code for item in stage.fallback_diagnostics] == ["dry_stage"]
+    assert stage.work == pytest.approx(dry_stage.work)
+    assert stage.heat_flow == pytest.approx(dry_stage.heat_flow)
+    assert stage.p_out == pytest.approx(dry_stage.p_out)

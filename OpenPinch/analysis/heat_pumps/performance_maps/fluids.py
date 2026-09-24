@@ -112,7 +112,7 @@ def resolve_hpr_working_fluid(
         state.p()
         state.update(CoolProp.QT_INPUTS, 0.0, condensing_temperature + 273.15)
         state.p()
-    except Exception as exc:
+    except ValueError as exc:
         raise ValueError(
             "working fluid is unsupported at the required dew/bubble states"
         ) from exc

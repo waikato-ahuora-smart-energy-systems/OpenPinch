@@ -155,10 +155,12 @@ def test_warm_start_is_ranked_with_backend_candidates():
         optimiser=optimiser,
     )
 
-    assert [candidate.point for candidate in candidates] == [(0.2,), (0.8,)]
-    assert [candidate.objective for candidate in candidates] == pytest.approx(
-        [0.2, 0.8]
-    )
+    by_point = {candidate.point: candidate.objective for candidate in candidates}
+    assert by_point[(0.2,)] == pytest.approx(0.2)
+    assert by_point[(0.8,)] == pytest.approx(0.8)
+    assert candidates == tuple(sorted(candidates))
+    # Serial polishing may improve the result; neither original point is lost.
+    assert candidates[0].objective <= 0.2
 
 
 def test_no_backend_candidate_uses_valid_warm_start():

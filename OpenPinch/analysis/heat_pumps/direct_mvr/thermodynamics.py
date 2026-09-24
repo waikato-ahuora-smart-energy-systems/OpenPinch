@@ -182,6 +182,7 @@ def build_cooling_temperature_enthalpy_curve(
     outlet_pressure: float,
     hot_supply_enthalpy: float,
     target_enthalpy: float,
+    fallback_codes: list[str] | None = None,
 ) -> np.ndarray:
     """Build the stage cooling curve in J/kg and degrees Celsius."""
     if hot_supply_enthalpy <= target_enthalpy:
@@ -191,6 +192,7 @@ def build_cooling_temperature_enthalpy_curve(
         outlet_pressure=outlet_pressure,
         hot_supply_enthalpy=hot_supply_enthalpy,
         target_enthalpy=target_enthalpy,
+        fallback_codes=fallback_codes,
     )
     points = [
         [
@@ -210,19 +212,25 @@ def profile_enthalpy_values(
     outlet_pressure: float,
     hot_supply_enthalpy: float,
     target_enthalpy: float,
+    fallback_codes: list[str] | None = None,
 ) -> np.ndarray:
     """Return cooling-curve enthalpies including saturation breakpoints."""
     breakpoints = [float(hot_supply_enthalpy), float(target_enthalpy)]
     try:
         critical_pressure = PropsSI("PCRIT", fluid)
+        if not np.isfinite(critical_pressure):
+            raise ValueError("Non-finite critical pressure")
         if outlet_pressure < critical_pressure:
             saturated_vapour = PropsSI("H", "P", outlet_pressure, "Q", 1.0, fluid)
             saturated_liquid = PropsSI("H", "P", outlet_pressure, "Q", 0.0, fluid)
+            if not np.isfinite([saturated_vapour, saturated_liquid]).all():
+                raise ValueError("Non-finite optional saturation enthalpy")
             for saturation_enthalpy in (saturated_vapour, saturated_liquid):
                 if target_enthalpy < saturation_enthalpy < hot_supply_enthalpy:
                     breakpoints.append(float(saturation_enthalpy))
-    except Exception:
-        pass
+    except ValueError:
+        if fallback_codes is not None:
+            fallback_codes.append("reduced_profile")
 
     ordered = sorted(set(breakpoints), reverse=True)
     values: list[float] = []

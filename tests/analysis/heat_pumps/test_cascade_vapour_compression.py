@@ -8,7 +8,7 @@ import OpenPinch.analysis.heat_pumps.common._shared.plotting as hp_plotting
 import OpenPinch.analysis.heat_pumps.targeting.cascade_vapour_compression as hp_cascade
 import OpenPinch.analysis.targeting.cascade as target_cascade
 from OpenPinch.analysis.heat_pumps.common.encoding import decode_duty_splits
-from OpenPinch.contracts.hpr import HPRParsedState
+from OpenPinch.contracts.hpr import HPRParsedState, HPRTopologyIdentifier
 
 from .helpers import (
     _base_args,
@@ -17,6 +17,20 @@ from .helpers import (
     _sc,
     _stream,
 )
+
+
+@pytest.mark.parametrize(
+    ("n_cond", "n_evap", "expected"),
+    [
+        (1, 1, HPRTopologyIdentifier.SINGLE_STAGE_VAPOUR_COMPRESSION),
+        (2, 1, HPRTopologyIdentifier.CASCADE_VAPOUR_COMPRESSION),
+        (1, 2, HPRTopologyIdentifier.CASCADE_VAPOUR_COMPRESSION),
+    ],
+)
+def test_cascade_topology_identifies_scalar_cycle(n_cond, n_evap, expected):
+    args = _base_args(n_cond=n_cond, n_evap=n_evap)
+
+    assert hp_cascade._cascade_topology_id(args) is expected
 
 
 def test_cascade_hp_x0_and_bounds_shapes_are_consistent():
@@ -344,6 +358,11 @@ def test_cascade_optimiser_allows_missing_initial_seed(monkeypatch):
     captured = {}
     args = _base_args(n_cond=2, n_evap=2, initialise_simulated_cycle=False)
     _patch_output_model_validate(monkeypatch)
+    monkeypatch.setattr(
+        hp_cascade,
+        "preflight_coolprop_hpr_targeting",
+        lambda **_kwargs: None,
+    )
 
     monkeypatch.setattr(
         hp_cascade,

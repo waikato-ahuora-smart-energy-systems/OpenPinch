@@ -501,7 +501,7 @@ class MechanicalVapourRecompressionCycle(VapourCompressionCycle):
                 T=T_cond_out,
                 phase=0.0,
             )
-        except Exception:
+        except ValueError:
             self._max_work *= 1e3
             return None
 

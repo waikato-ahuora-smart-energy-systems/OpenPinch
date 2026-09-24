@@ -8,6 +8,7 @@ import pytest
 import OpenPinch.analysis.heat_pumps._multiperiod.aggregation as hp_aggregation
 import OpenPinch.analysis.heat_pumps._multiperiod.execution as hp_execution
 import OpenPinch.analysis.heat_pumps._multiperiod.preparation as hp_preparation
+import OpenPinch.analysis.heat_pumps._multiperiod.setup as hp_setup
 import OpenPinch.analysis.heat_pumps.service as hp
 import OpenPinch.application.targeting as svc
 from OpenPinch.analysis.heat_pumps._multiperiod.state import (
@@ -493,6 +494,11 @@ def test_supported_hpr_cycles_prepare_shared_target_inputs(
         ),
     ]
     captured = {}
+    monkeypatch.setattr(
+        hp_setup,
+        "preflight_coolprop_hpr_targeting",
+        lambda **_kwargs: None,
+    )
 
     def fake_solve_hpr_multiperiod_placement(*, f_obj, x0_ls, bnds, args):
         captured["period_ids"] = [case.period_id for case in args.period_cases]

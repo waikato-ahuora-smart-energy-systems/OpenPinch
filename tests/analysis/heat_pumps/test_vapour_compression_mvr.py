@@ -1111,6 +1111,11 @@ def test_vc_mvr_optimise_prepares_seeded_setup(monkeypatch):
     )
     marker = SimpleNamespace(success=True)
     captured = {}
+    monkeypatch.setattr(
+        hp_vc_mvr,
+        "preflight_coolprop_hpr_targeting",
+        lambda **_kwargs: None,
+    )
 
     monkeypatch.setattr(
         hp_vc_mvr,
@@ -1411,10 +1416,8 @@ def test_compute_vc_mvr_system_obj_debug_reraises(monkeypatch):
 
     monkeypatch.setattr(hp_vc_mvr, "VapourCompressionMvrCascade", _BrokenCascade)
 
-    out = hp_vc_mvr._compute_vc_mvr_system_obj(x, args)
-
-    assert out.success is False
-    assert "cascade exploded" in out.failure_reason
+    with pytest.raises(RuntimeError, match="cascade exploded"):
+        hp_vc_mvr._compute_vc_mvr_system_obj(x, args)
     with pytest.raises(RuntimeError, match="cascade exploded"):
         hp_vc_mvr._compute_vc_mvr_system_obj(x, args, debug=True)
 

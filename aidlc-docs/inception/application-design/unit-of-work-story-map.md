@@ -341,3 +341,104 @@ explicitly N/A.
 Every approved requirement and acceptance criterion has a primary unit and
 final verification owner. Property-Based Testing is enabled and fully assigned.
 Security Baseline and Resiliency Baseline remain disabled and add no unit work.
+
+
+## CoolProp HPR and MVR Reliability Requirement Map
+
+### Mapping Basis
+
+User Stories were explicitly skipped. This mandatory story-map artifact therefore
+maps the approved functional requirements (FR), verification requirements (VR),
+and enabled Property-Based Testing rules directly to delivery units. The source
+of truth is
+`aidlc-docs/inception/requirements/coolprop-hpr-optimisation-investigation.md`.
+
+Unit abbreviations:
+
+- **U1** — Candidate Correctness and Detached HPR Results.
+- **U2** — CoolProp HPR and VC+MVR Search Reliability.
+- **U3** — Direct Process-MVR Hardening and Integrated Proof.
+
+### Functional Requirement Mapping
+
+| Requirement | Requirement summary | Primary unit | Supporting/final owner | Exit evidence |
+|---|---|---|---|---|
+| FR-1 | Normalize every cycle/allocation penalty before shared aggregation | U1 | U3 integrated gate | Generated scalar, empty, singleton, and multi-term properties plus explicit regressions |
+| FR-2 | Preserve finite solved candidates through ranking, finalization, detachment, and commit | U1 | U2 public orchestration; U3 integrated gate | Real CoolProp finite candidate completes the public transaction |
+| FR-3 | Publish detached facts only; no live CoolProp/TESPy engine object | U1 | U2 and U3 verification | `model=None`, canonical record, recursive deep-copy proof |
+| FR-4 | Continue only candidate-local physical failures; propagate fatal defects | U2 | U1 defines contracts; U3 failure matrix | Generated failure-sequence model plus explicit fatal examples |
+| FR-5 | Raise bounded structured no-candidate diagnostics | U2 | U1 defines summary/error | Category counts and capped representative diagnostics asserted |
+| FR-6 | Preflight VC refrigerants and MVR fluids/states before optimization | U2 | U3 integrated real-engine profile | Optimizer spy remains uncalled for invalid fluid/state |
+| FR-7 | Accept bounded iteration/evaluation controls and retain viable fallback | U2 | U1 budget contract; U3 public docs/gate | Wrapper/multiperiod forwarding and exhausted-budget fallback tests |
+| FR-8 | Avoid transient public artifacts during search; finalize accepted point only | U1 | U2 coordinator | Search-mode artifact absence and single final-build call count |
+| FR-9 | Evaluate and retain VC+MVR Carnot warm start before bounded global search | U2 | U3 real public matrix | Direct and utility VC+MVR return retained detached baseline |
+| FR-10 | Validate direct process-MVR compression and contextualize property failures | U3 | U1 diagnostic vocabulary | Unsupported lift/ratio failure identifies stream, period, stage, and fluid |
+| FR-11 | Make permitted direct process-MVR fallbacks explicit and inspectable | U3 | U3 integrated gate | Typed `dry_stage` and `reduced_profile` diagnostic assertions |
+
+### Verification Requirement Mapping
+
+| Requirement | Verification summary | Primary unit | Integrated owner | Gate |
+|---|---|---|---|---|
+| VR-1 | Real public direct/indirect, heat-pump/refrigeration, cascade/parallel/VC+MVR regressions | U2 | U3 | Supported real-engine public matrix |
+| VR-2 | Unsupported fluid/state proves optimizer is not entered | U2 | U3 | Preflight spy regression |
+| VR-3 | Atomic detachment with a real successful CoolProp result | U1 | U3 | Copy/deep-copy and transaction regression |
+| VR-4 | Property tests for scalar/empty/single/multi-term penalties and finite objectives | U1 | U3 | Fixed-seed Hypothesis profile |
+| VR-5 | Model/randomized candidate-local continuation and fatal-abort sequences | U2 | U3 | Stateful/model-based property suite |
+| VR-6 | Notebook 09 requires successful default CoolProp target and map | U3 | U3 | Clean executable notebook profile |
+| VR-7 | Deterministic evaluation-count and elapsed-time gates | U2 | U3 | Call budget plus documented runtime profile |
+| VR-8 | Real direct and utility `mvr_heat_pump` warm-start transaction regressions | U2 | U3 | Detached public VC+MVR target tests |
+| VR-9 | Invalid MVR-fluid preflight identifies stage/fluid and makes zero optimizer calls | U2 | U3 | Atomic preflight regression |
+| VR-10 | Preserve packaged direct process-MVR and test target/fallback failures | U3 | U3 | Component, replacement-stream, target, and diagnostic tests |
+| VR-11 | Notebook 11 distinguishes physical infeasibility from service defects | U3 | U3 | Clean executable notebook profile |
+
+### Property-Based Testing Mapping
+
+| PBT rule | Applicability and property | Owner | Units Generation disposition |
+|---|---|---|---|
+| PBT-01 Property identification | Applicable to all units: transformations, search, diagnostics, and stage logic | U1, U2, U3 | Each Functional Design must list categorized testable properties and carry them into Code Generation |
+| PBT-02 Round trips | Detached Pydantic/JSON-compatible budget, diagnostic, simulation, and fallback records | U1; U3 additive records | Generate valid domain records and assert model/mapping/text round trips within declared float tolerance |
+| PBT-03 Invariants | Finite scalar objective, no live public model, bounded diagnostics, positive budgets, energy/accounting and context invariants | U1, U2, U3 | Map every documented invariant to a generated property with boundary values |
+| PBT-04 Idempotency | Penalty normalization, candidate-key normalization/deduplication, and repeated cache observation claim stable results | U1 and U2 | Prove `f(f(x)) = f(x)` where the Functional Design retains an idempotency claim; otherwise mark the specific operation N/A |
+| PBT-05 Oracle/model comparison | Existing scalar/manual penalty formula, warm-start/reference candidate evaluation, and thermodynamic verification provide oracles | U1 and U2 | Compare generated supported cases to the simplest independent oracle with explicit tolerance |
+| PBT-06 Stateful testing | Search coordinator owns cache, diagnostic accumulator, and candidate transition state | U2 | Define a reference model and generated command sequences including empty and mixed local/fatal outcomes |
+| PBT-07 Generator quality | HPR penalty shapes, valid budgets, candidate sequences, fluid/state envelopes, and process-MVR stages need constrained domain strategies | U1 owns shared strategies; U2/U3 extend | Centralize reusable Hypothesis strategies and include boundary values |
+| PBT-08 Shrinking/reproducibility | Applicable to every property suite | U1, U2, U3; final gate U3 | Keep Hypothesis shrinking enabled and fixed/logged seeds in CI and failure output |
+| PBT-09 Framework selection | Existing Python Hypothesis and pytest stack is already selected | U1, U2, U3 | Retain the existing dependency/integration; NFR Requirements must record the decision |
+| PBT-10 Complementary examples | Every critical path needs explicit examples alongside properties | U1, U2, U3 | Pin known regressions, real-engine examples, and any shrunk counterexample as permanent examples |
+
+### Unit Acceptance Coverage
+
+#### U1 acceptance set
+
+- FR-1, FR-2, FR-3, and FR-8 are primary.
+- FR-4, FR-5, and FR-7 receive their foundational contract shapes.
+- VR-3 and VR-4 are primary.
+- PBT-01 through PBT-05 and PBT-07 through PBT-10 apply; PBT-06 is evaluated
+  as N/A for immutable contracts but applies later to U2 state.
+
+#### U2 acceptance set
+
+- FR-4 through FR-7 and FR-9 are primary.
+- FR-2, FR-3, and FR-8 are consumed as invariants.
+- VR-1, VR-2, VR-5, VR-7, VR-8, and VR-9 are primary.
+- PBT-01 and PBT-03 through PBT-10 apply, including the stateful search model.
+
+#### U3 acceptance set
+
+- FR-10 and FR-11 are primary.
+- All FRs are exercised by the final integrated gate.
+- VR-6, VR-10, and VR-11 are primary; every VR is included in integrated
+  completion evidence.
+- PBT-01 through PBT-03 and PBT-07 through PBT-10 apply directly. PBT-04 through
+  PBT-06 apply only where Functional Design identifies an idempotent operation,
+  independent oracle, or mutable state; otherwise each is explicitly N/A with
+  rationale.
+
+### Traceability Validation
+
+- FR-1 through FR-11 each have exactly one primary unit.
+- VR-1 through VR-11 each have exactly one primary unit and an integrated owner.
+- No synthetic user story or persona was introduced.
+- Every requirement is covered by a unit exit checkpoint and the final gate.
+- PBT-01 through PBT-10 have an owner and an applicability disposition.
+- Security Baseline and Resiliency Baseline are disabled and add no unit work.

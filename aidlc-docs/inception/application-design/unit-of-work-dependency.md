@@ -238,3 +238,140 @@ but no production unit consumes a temporary downstream interface.
   have no import or packaging edge into any unit.
 - The external fixture relationship is data-only and does not create runtime
   package coupling.
+
+
+## CoolProp HPR and MVR Reliability Unit Dependencies
+
+### Dependency Diagram
+
+```mermaid
+flowchart LR
+    U1[Unit 1 Candidate Correctness and Detached Results]
+    U2[Unit 2 CoolProp HPR and VC plus MVR Reliability]
+    U3[Unit 3 Direct Process MVR and Integrated Proof]
+    U1 --> U2
+    U1 --> U3
+    U2 --> U3
+```
+
+**Text alternative**: Unit 1 establishes candidate semantics, detached result
+contracts, and shared diagnostics. Unit 2 consumes Unit 1 to implement preflight,
+budgets, warm-start retention, and public optimized-service reliability. Unit 3
+consumes Unit 1 diagnostics and Unit 2 public behavior to harden deterministic
+process-MVR and run the final integrated gate.
+
+### Dependency Matrix
+
+| Unit | Depends on | Provides to later units | Must not depend on |
+|---|---|---|---|
+| Unit 1 — Candidate Correctness and Detached HPR Results | Existing HPR contracts, objectives, and transaction behavior | Detached result/failure/budget contracts, corrected scalar semantics, search/final boundary | Unit 2 orchestration, Unit 3 direct-MVR implementation |
+| Unit 2 — CoolProp HPR and VC+MVR Search Reliability | Unit 1 plus existing fluid resolvers and generic optimiser | Stable optimized public services, preflight, bounded search and diagnostics | Unit 3 direct process-MVR solver |
+| Unit 3 — Direct Process-MVR Hardening and Integrated Proof | Unit 1 diagnostic vocabulary and Unit 2 stabilized public paths | Process-MVR evidence and final integrated release proof | No downstream production unit |
+
+### Critical Path
+
+1. **Unit 1 contract checkpoint**: freeze public detachment, budget, diagnostic,
+   and simulation-record shapes; correct penalty semantics and finalization.
+2. **Unit 2 search checkpoint**: consume those shapes to implement preflight,
+   bounded search, caching, warm-start retention, and public propagation.
+3. **Unit 3 component checkpoint**: consume only the detached diagnostic
+   vocabulary to harden direct process-MVR.
+4. **Integrated checkpoint**: run real public topology, property/state-model,
+   notebook, documentation, packaging, and installed-artifact gates.
+
+The production path is acyclic: Unit 1 → Unit 2 → Unit 3. Unit 3's direct-MVR
+implementation may be prepared after the Unit 1 diagnostic contract stabilizes,
+but it is not considered complete until the Unit 2 integration behavior is
+available for the shared final gate.
+
+### Coordination Points
+
+| Interface | Producer | Consumer | Stabilization condition |
+|---|---|---|---|
+| `HPRSearchBudget` | Unit 1 | Unit 2 | Positive-value validation and serialization fixed |
+| `HPRFailureDiagnostic` and summary | Unit 1 | Units 2 and 3 | Closed categories, bounded messages, no exception objects |
+| `HPRTargetingError(ValueError)` | Unit 1 | Unit 2 and public callers | Compatibility and diagnostics attribute fixed |
+| Generalized simulation record | Unit 1 | Unit 2 and public/tutorial verification | All supported accepted topologies representable |
+| Search/final evaluation mode | Unit 1 | Unit 2 | Artifact and failure responsibilities fixed |
+| Prepared CoolProp capability specification | Unit 2 | Unit 2 topology evaluators | Detached, topology complete, and private to analysis |
+| Public iteration/evaluation controls | Unit 2 | Unit 3 integrated tests/docs | Wrapper coverage and precedence fixed |
+| Direct-MVR fallback diagnostic | Unit 3 | Component/public observation and docs | Two-policy closed vocabulary fixed |
+| Real-engine profile | Unit 2 | Unit 3 integrated gate | Supported environment and deterministic limits documented |
+
+### Package and Ownership Boundaries
+
+- All units modify the existing in-process OpenPinch package and ship together.
+- `OpenPinch/contracts` owns detached shapes and imports no analysis,
+  application, optimiser, or CoolProp module.
+- HPR analysis adapts its scalar callable to `OpenPinch/optimisation`; the
+  generic optimiser does not import HPR contracts or CoolProp.
+- Application accessors call HPR analysis but analysis does not import the
+  accessor.
+- CoolProp remains a leaf dependency of capability/property modules.
+- Direct process-MVR shares detached diagnostic vocabulary only; it never calls
+  optimized HPR search.
+- Tutorials and tests consume public APIs and are not production dependencies.
+- No OpenUtility, Pyomo, HiGHS, network, process, or infrastructure edge is
+  introduced.
+
+### Test Checkpoints
+
+#### Unit 1 checkpoint
+
+- penalty normalization examples and generated shape properties;
+- finite objective and malformed-contract invariants;
+- real accepted-result detachment and deep-copy proof;
+- multiperiod recursive detachment;
+- simulation-record validation and compatibility;
+- focused objective/contract/application regression.
+
+#### Unit 2 checkpoint
+
+- invalid VC refrigerant and MVR fluid stop before optimizer entry;
+- generated candidate-local/fatal state-machine sequences;
+- positive budget validation and wrapper/multiperiod forwarding;
+- exact-point cache and deterministic evaluation-count properties;
+- viable warm-start survival under exhausted backend budgets;
+- real public direct/utility cascade, parallel, and VC+MVR regressions.
+
+#### Unit 3 checkpoint
+
+- normal packaged direct process-MVR result preservation;
+- unsupported lift/ratio atomic failures with bounded context;
+- named fallback diagnostic examples and generated unexpected-failure cases;
+- notebook 09 and 11 executable assertions;
+- combined real-engine matrix and elapsed-time profile.
+
+#### Integrated checkpoint
+
+- fixed-seed property suite and explicit examples;
+- full solver-enabled regressions;
+- Ruff, formatting, compilation, and patch hygiene;
+- warning-strict documentation;
+- source/wheel build and archive inspection;
+- isolated installed-wheel public smoke.
+
+### Rollback Boundaries
+
+1. Unit 3 direct-MVR changes and tutorial assertions can revert without changing
+   Unit 1 contracts or Unit 2 optimized search, provided shared diagnostic fields
+   have no remaining consumer.
+2. Unit 2 public budget and search changes revert before Unit 1 foundational
+   contracts. Additive Unit 1 contracts may remain only if unused and correctly
+   detached.
+3. Unit 1 result-finalization changes revert last because Units 2 and 3 consume
+   their public invariants.
+4. A failing optional TESPy profile does not justify reverting CoolProp changes;
+   explicit TESPy behavior remains independently gated.
+5. No unit has an independent deployment or version, so partial-release version
+   skew is unsupported.
+
+### Dependency Validation
+
+- The graph contains three nodes and three forward edges with no cycle.
+- Unit 1 has no dependency on later-unit implementation.
+- Unit 2 depends only on Unit 1 and existing lower-level owners.
+- Unit 3 consumes stable Unit 1/2 outputs and defines no earlier-unit contract.
+- Tests are colocated by behavior owner; the final gate adds no runtime edge.
+- Existing package boundaries are retained and no new dependency or deployable
+  service is introduced.

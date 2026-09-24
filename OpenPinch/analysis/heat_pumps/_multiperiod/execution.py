@@ -14,6 +14,8 @@ from ....contracts.hpr import (
 )
 from ..optimisation_adapter import (
     evaluate_hpr_candidate,
+    normalise_initial_points,
+    raise_hpr_targeting_error,
     run_hpr_candidate_search,
     translate_hpr_output,
     translate_hpr_result,
@@ -35,6 +37,7 @@ def get_multiperiod_hpr_targets(
     solver_cases = [case.solver_case for case in period_cases]
     selected_case = period_case_by_id(period_cases, selected_period_id).solver_case
     args = MultiPeriodHPRTargetInputs(
+        search_budget=selected_case.args.search_budget,
         period_cases=solver_cases,
         selected_period_id=selected_period_id,
         selected_period_idx=selected_period_idx,
@@ -77,12 +80,20 @@ def solve_hpr_multiperiod_placement(
         args=args,
     )
     if not candidates:
-        raise ValueError(
-            "Multi-period heat pump and refrigeration targeting "
-            f"({args.hpr_type}) failed to return any local minima."
+        raise_hpr_targeting_error(
+            args=args,
+            message=(
+                "Multi-period heat pump and refrigeration targeting "
+                f"({args.hpr_type}) failed to return any local minima."
+            ),
+            failures=(),
+            evaluated_count=0,
+            warm_start_evaluated=bool(normalise_initial_points(x0_ls)),
+            search_diagnostics=getattr(candidates, "diagnostics", None),
         )
 
     selected_case = selected_period_case(args)
+    failures: list[tuple[int, HPRBackendResult]] = []
     for candidate in candidates:
         result = evaluate_hpr_candidate(
             objective=objective,
@@ -91,10 +102,18 @@ def solve_hpr_multiperiod_placement(
         )
         if result.success and np.isfinite(float(result.obj)):
             return translate_hpr_result(result, ambient_args=selected_case.args)
+        failures.append((len(failures), result))
 
-    raise ValueError(
-        "Multi-period heat pump and refrigeration targeting "
-        f"({args.hpr_type}) failed to return an optimal result."
+    raise_hpr_targeting_error(
+        args=args,
+        message=(
+            "Multi-period heat pump and refrigeration targeting "
+            f"({args.hpr_type}) failed to return an optimal result."
+        ),
+        failures=failures,
+        evaluated_count=len(candidates),
+        warm_start_evaluated=bool(normalise_initial_points(x0_ls)),
+        search_diagnostics=getattr(candidates, "diagnostics", None),
     )
 
 

@@ -182,6 +182,9 @@ def _postprocess_candidates(
     if max_minima is not None:
         basin_reps_idx = basin_reps_idx[:max_minima]
 
+    if local_method is None:
+        return all_x[basin_reps_idx], all_f[basin_reps_idx]
+
     polished_x, polished_f = polish_fn(
         func=func,
         args=args,

@@ -120,7 +120,9 @@ class CascadeVapourCompressionCycle:
         """Total penalty for excessive subcooling."""
         if self.solved:
             cycle_penalty = sum(
-                cycle.penalty if cycle.solved else 0 for cycle in self._subcycles
+                float(np.asarray(cycle.penalty, dtype=float).sum())
+                for cycle in self._subcycles
+                if cycle.solved
             )
             return cycle_penalty + float(self._allocation_penalty.sum())
         else:

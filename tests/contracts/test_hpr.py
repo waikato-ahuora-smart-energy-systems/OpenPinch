@@ -127,6 +127,6 @@ def test_hpr_backend_result_projects_artifacts_and_output_fields():
     assert output_fields["hpr_hot_streams"][0].name == "HPR hot utility"
     assert output_fields["hpr_cold_streams"][0].name == "HPR cold utility"
     assert output_fields["amb_streams"] == StreamCollection()
-    assert output_fields["model"] == {"name": "model"}
+    assert "model" not in output_fields
     assert output_fields["T_cond"].tolist() == [90.0]
     assert output_fields["Q_cool"].tolist() == [10.0]

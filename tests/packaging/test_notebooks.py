@@ -33,7 +33,12 @@ FORBIDDEN_IMPORT_PREFIXES = (
     "OpenPinch.domain",
     "OpenPinch.presentation",
 )
-ALLOWED_SPECIALIST_IMPORTS = frozenset({"OpenPinch.contracts.hpr_performance_map"})
+ALLOWED_SPECIALIST_IMPORTS = frozenset(
+    {
+        "OpenPinch.contracts.hpr",
+        "OpenPinch.contracts.hpr_performance_map",
+    }
+)
 
 
 def _manifest_rows() -> list[dict[str, str]]:
@@ -374,6 +379,8 @@ def test_notebook_09_demonstrates_comprehensive_hpr_target_to_map() -> None:
 
     for token in (
         "HprPerformanceMapRequest",
+        "HPRTargetingError",
+        'assert coolprop_target["status"] == "feasible"',
         'simulation_backend="tespy"',
         "HEOS::R32[0.5]&R125[0.5]",
         "target_simulation_record",
@@ -382,6 +389,22 @@ def test_notebook_09_demonstrates_comprehensive_hpr_target_to_map() -> None:
         'model_dump(mode="json")',
     ):
         assert token in source
+    assert "except (ImportError, RuntimeError, ValueError" not in source
+
+
+def test_notebook_11_distinguishes_typed_hpr_failure_from_service_defects() -> None:
+    notebook = _load_notebook(
+        ROOT
+        / "OpenPinch"
+        / "tutorials"
+        / "notebooks"
+        / "11_process_mvr_and_cascade.ipynb"
+    )
+    source = _combined_source(notebook)
+
+    assert "except HPRTargetingError as error" in source
+    assert "assert all(stages for stages in stage_results.values())" in source
+    assert "except (ValueError, RuntimeError, NotImplementedError)" not in source
 
 
 def test_manifest_operations_are_demonstrated_in_notebook_source(

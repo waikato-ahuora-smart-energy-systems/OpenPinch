@@ -8,7 +8,7 @@ import numpy as np
 
 from ...analysis.numerics import get_period_index
 from ...analysis.targeting.cascade import create_problem_table_with_t_int
-from ...contracts.hpr import HeatPumpTargetOutputs
+from ...contracts.hpr import HeatPumpTargetOutputs, HPRSearchBudget
 from ...domain.configuration import Configuration, tol
 from ...domain.enums import (
     GraphType,
@@ -40,6 +40,7 @@ from .common.postprocessing import _get_hpr_residual_utility_summary
 from .common.preprocessing import (
     construct_HPRTargetInputs,
 )
+from .optimisation_adapter import translate_hpr_output
 from .performance_maps.targeting import (
     normalize_hpr_simulation_backend,
     preflight_tespy_hpr_targeting,
@@ -113,6 +114,7 @@ def compute_direct_heat_pump_or_refrigeration_target(
         is_heat_pumping=is_heat_pumping,
         period_idx=idx,
         simulation_backend=(args or {}).get("simulation_backend", "coolprop"),
+        search_budget=_hpr_search_budget(args),
     )
     pt = _calc_hpr_cascade(
         pt=pt,
@@ -216,6 +218,7 @@ def compute_indirect_heat_pump_or_refrigeration_target(
         is_heat_pumping=is_heat_pumping,
         period_idx=idx,
         simulation_backend=(args or {}).get("simulation_backend", "coolprop"),
+        search_budget=_hpr_search_budget(args),
     )
     pt = _calc_hpr_cascade(
         pt=pt,
@@ -369,6 +372,7 @@ def _get_hpr_targets(
     is_heat_pumping: bool,
     period_idx: int = 0,
     simulation_backend: str = "coolprop",
+    search_budget: HPRSearchBudget | None = None,
 ) -> HeatPumpTargetOutputs:
     normalized_backend = normalize_hpr_simulation_backend(simulation_backend)
     args = construct_HPRTargetInputs(
@@ -381,6 +385,7 @@ def _get_hpr_targets(
         period_idx=period_idx,
         debug=False,
         simulation_backend=normalized_backend,
+        search_budget=search_budget,
     )
     handler = _HP_PLACEMENT_HANDLERS.get(args.hpr_type)
     if handler is None:
@@ -393,7 +398,15 @@ def _get_hpr_targets(
         )
     else:
         result = handler(args)
-    return HeatPumpTargetOutputs.model_validate(result.to_output_fields())
+    return translate_hpr_output(result)
+
+
+def _hpr_search_budget(args: dict | None) -> HPRSearchBudget:
+    runtime = args or {}
+    return HPRSearchBudget(
+        maximum_iterations=runtime.get("maximum_iterations", 300),
+        maximum_evaluations=runtime.get("maximum_evaluations", 1_000_000),
+    )
 
 
 def _get_hpr_target_summary(

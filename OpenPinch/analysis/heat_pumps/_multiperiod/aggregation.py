@@ -8,6 +8,7 @@ import numpy as np
 
 from ....contracts.hpr import (
     HPRBackendResult,
+    HPREvaluationMode,
     HPRPeriodCase,
     MultiPeriodHPRTargetInputs,
 )
@@ -23,6 +24,7 @@ def evaluate_multiperiod_candidate(
     *,
     period_objective: Callable,
     debug: bool = False,
+    artifact_mode: HPREvaluationMode = HPREvaluationMode.FINAL,
 ) -> HPRBackendResult:
     """Evaluate one design vector in every period and apply shared policies."""
     if not args.period_cases:
@@ -35,6 +37,7 @@ def evaluate_multiperiod_candidate(
             point=point,
             args=case.args,
             debug=debug,
+            artifact_mode=artifact_mode,
         )
         if not result.success or not np.isfinite(float(result.obj)):
             reason = result.failure_reason or "candidate failed"

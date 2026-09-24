@@ -6,7 +6,7 @@ import numpy as np
 
 from ....analysis.graphs.composite import clean_composite_curve
 from ....analysis.numerics import delta_vals, linear_interpolation
-from ....contracts.hpr import HeatPumpTargetInputs
+from ....contracts.hpr import HeatPumpTargetInputs, HPRSearchBudget
 from ....domain.configuration import Configuration, tol
 from ....domain.enums import ProblemTableLabel
 from ....domain.problem_table import ProblemTable
@@ -33,6 +33,7 @@ def construct_HPRTargetInputs(
     period_idx: int = 0,
     debug: bool = False,
     simulation_backend: str = "coolprop",
+    search_budget: HPRSearchBudget | None = None,
 ) -> HeatPumpTargetInputs:
     """Prepare normalised background cascades and solver arguments for HPR targeting."""
     T_vals, H_hot, H_cold = T_vals.copy(), H_hot.copy(), H_cold.copy()
@@ -62,6 +63,7 @@ def construct_HPRTargetInputs(
     )
 
     return HeatPumpTargetInputs(
+        search_budget=search_budget or HPRSearchBudget(),
         # Derived targeting state.
         Q_hpr_target=Q_hpr_target,
         Q_heat_max=H_cold[0],
