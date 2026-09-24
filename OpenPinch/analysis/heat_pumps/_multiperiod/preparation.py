@@ -11,7 +11,7 @@ from ....analysis.targeting.indirect import (
     compute_indirect_integration_targets,
     compute_subzone_aggregate_target,
 )
-from ....contracts.hpr import HPRPeriodCase
+from ....contracts.hpr import HPRPeriodCase, HPRSearchBudget
 from ....domain._stream.value_state import resolve_period_weights
 from ....domain.configuration import tol
 from ....domain.enums import ProblemTableLabel
@@ -96,6 +96,7 @@ def build_multiperiod_hpr_cases(
                 period_idx=period_idx,
                 debug=False,
                 simulation_backend=(args or {}).get("simulation_backend", "coolprop"),
+                search_budget=_hpr_search_budget(args),
             ),
         )
         period_cases.append(
@@ -109,6 +110,14 @@ def build_multiperiod_hpr_cases(
             )
         )
     return period_cases
+
+
+def _hpr_search_budget(args: dict | None) -> HPRSearchBudget:
+    runtime = args or {}
+    return HPRSearchBudget(
+        maximum_iterations=runtime.get("maximum_iterations", 300),
+        maximum_evaluations=runtime.get("maximum_evaluations", 1_000_000),
+    )
 
 
 def period_id_for_index(zone: Zone, period_idx: int) -> str:

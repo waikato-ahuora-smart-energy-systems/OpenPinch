@@ -60,6 +60,8 @@ def apply_zone_config_overrides(zone: Zone, args: dict | None) -> None:
         "base_target_type",
         "_calculate_area_cost",
         "_prepared_direct_profiles",
+        "maximum_iterations",
+        "maximum_evaluations",
         "simulation_backend",
     }
     invalid_keys = sorted(

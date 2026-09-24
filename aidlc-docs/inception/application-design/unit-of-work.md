@@ -581,3 +581,257 @@ warning-free docs; complete package tests and installed-wheel smoke.
   dispatch, thermal/electricity balances, Pyomo, and HiGHS.
 - All units ship together in one OpenPinch wheel and source distribution;
   Infrastructure Design is N/A.
+
+
+## CoolProp HPR and MVR Reliability Units
+
+### Decomposition Basis
+
+These units implement the approved
+[CoolProp HPR and MVR Application Design](coolprop-hpr-mvr/application-design.md).
+They are sequential implementation, TDD, and review boundaries inside one
+OpenPinch package. They are not deployable services or separate ownership silos.
+User Stories were explicitly skipped; approved functional and verification
+requirements are the delivery authority.
+
+### Unit 1 — Candidate Correctness and Detached HPR Results
+
+**Purpose**: restore the correctness and public-boundary foundations required by
+every optimized CoolProp HPR topology.
+
+**Responsibilities**:
+
+- normalize scalar, empty, one-element, and multi-term cycle/allocation
+  penalties to the approved scalar semantics;
+- reject malformed penalty shapes as fatal contract failures rather than
+  converting them to an infeasible candidate;
+- separate lightweight search-time evaluation from accepted-point final
+  artifact construction;
+- broaden the existing simulation record for cascade, parallel, and VC+MVR
+  accepted designs without retaining engine state;
+- preserve `HeatPumpTargetOutputs.model` for compatibility while publishing
+  it as `None`;
+- recursively detach multiperiod outputs and prove copy/deep-copy safety before
+  the application transaction;
+- define the engine-neutral search-budget, failure-diagnostic, and targeting
+  exception contracts consumed by Unit 2;
+- add unit-owned examples and generated properties for penalty, finite-objective,
+  result-shape, and detachment invariants.
+
+**Primary existing owners**:
+
+- `OpenPinch/contracts/hpr.py`;
+- HPR topology objective modules under
+  `OpenPinch/analysis/heat_pumps/targeting/`;
+- `OpenPinch/analysis/heat_pumps/optimisation_adapter.py` translation seam;
+- multiperiod aggregation/result translation;
+- focused contract, objective, and application-transaction tests.
+
+**Inputs**:
+
+- prepared `HeatPumpTargetInputs` or `MultiPeriodHPRTargetInputs`;
+- topology candidate vectors and raw penalty contributions;
+- internal `HPRBackendResult` values;
+- existing application copy/commit behavior.
+
+**Outputs**:
+
+- normalized finite scalar objective facts;
+- search-mode result facts without public artifacts;
+- complete final-mode backend results for accepted points;
+- detached `HeatPumpTargetOutputs` with `model=None`;
+- generalized `HprTargetSimulationRecord`;
+- foundational `HPRSearchBudget`, diagnostic summary, and
+  `HPRTargetingError(ValueError)` contracts.
+
+**Exclusions**:
+
+- no CoolProp capability preflight or global-search policy;
+- no public accessor budget parameters;
+- no direct process-MVR stage behavior;
+- no thermodynamic-equation or compressor-power-boundary change;
+- no generic optimiser dependency on HPR or CoolProp.
+
+**Construction readiness**: Functional Design is required for penalty
+normalization, failure-shape classification, search/final evaluation boundaries,
+and the generalized simulation record. NFR Requirements and NFR Design are
+required for copy safety, bounded data, compatibility, property invariants, and
+performance-neutral finalization. Infrastructure Design remains skipped.
+
+**Exit evidence**:
+
+- generated penalty-shape properties and explicit malformed-shape examples;
+- a finite real CoolProp candidate remains successful through finalization;
+- real accepted output is copy/deep-copy safe and contains no live engine object;
+- nested multiperiod outputs satisfy the same detachment invariant;
+- existing callers can read `model` and receive `None`;
+- focused Unit 1 regressions, Ruff, formatting, and patch hygiene pass.
+
+### Unit 2 — CoolProp HPR and VC+MVR Search Reliability
+
+**Purpose**: make all optimized CoolProp HPR services fail early, search within
+explicit limits, retain viable warm starts, and report actionable bounded
+failures.
+
+**Depends on**: Unit 1 contracts, objective semantics, and detached finalizer.
+
+**Responsibilities**:
+
+- preflight every configured VC refrigerant and MVR-stage fluid against
+  topology-derived dew, bubble, compression, and critical-state requirements;
+- reuse existing fluid resolution/capability owners and return a detached
+  prepared CoolProp specification;
+- classify only documented thermodynamic infeasibility as candidate-local;
+- propagate type, lifecycle, contract, and detachment defects with their cause;
+- accumulate category counts and a fixed maximum number of sanitized
+  representative failure diagnostics;
+- expose optional `maximum_iterations` and `maximum_evaluations` on every
+  public HPR wrapper and carry them through single- and multiperiod inputs;
+- translate public limits to `OptimisationOptions.maxiter` and `maxfun`
+  without making the generic optimiser HPR-aware;
+- evaluate normalized warm starts through CoolProp before global search, cache
+  exact candidate outcomes, and retain the best viable point;
+- merge unique backend and warm-start candidates and return a retained viable
+  point after budget exhaustion;
+- align direct/utility, heat-pump/refrigeration, cascade/parallel/VC+MVR, and
+  multiperiod orchestration;
+- add unit-owned real-engine, state-model, and deterministic call-budget tests.
+
+**Primary existing owners**:
+
+- `OpenPinch/application/_problem/accessors/target.py`;
+- `OpenPinch/analysis/heat_pumps/service.py`;
+- `OpenPinch/analysis/heat_pumps/optimisation_adapter.py`;
+- `OpenPinch/analysis/heat_pumps/performance_maps/fluids.py` and targeting
+  preflight helpers;
+- `OpenPinch/analysis/heat_pumps/_multiperiod/`;
+- reusable `OpenPinch/optimisation` options and service;
+- public HPR application, analysis, and real-engine tests.
+
+**Inputs**:
+
+- Unit 1 budget and diagnostic contracts;
+- prepared HPR bounds, topology, fluids, backend, warm starts, and period cases;
+- explicit public iteration/evaluation limits;
+- generic optimizer candidate results.
+
+**Outputs**:
+
+- prepared CoolProp capability specification;
+- ranked unique candidate facts and retained viable warm start;
+- detached successful public targets;
+- bounded structured `HPRTargetingError` failures;
+- consistent single- and multiperiod budget behavior.
+
+**Exclusions**:
+
+- no direct process-MVR compression-stage solver changes;
+- no wall-clock cancellation public contract;
+- no fallback from explicit TESPy selection to CoolProp;
+- no new fluid allowlist;
+- no change to reusable optimiser domain ownership;
+- no infrastructure, process, or runtime dependency.
+
+**Construction readiness**: Functional Design is required for capability
+envelopes, stable failure categories, candidate caching, precedence rules, and
+budget-exhaustion behavior. NFR Requirements and NFR Design are required for
+bounded memory/messages, deterministic evaluation counts, supported elapsed-time
+profiles, compatibility, and generated search state models.
+
+**Exit evidence**:
+
+- invalid refrigerant and MVR fluid fail before an optimiser call;
+- generated failure sequences prove local failures continue and fatal failures
+  abort;
+- a CoolProp-evaluated viable warm start survives backend budget exhaustion;
+- public direct and utility VC+MVR results cross the detached transaction;
+- every public wrapper and multiperiod path honors the same positive limits;
+- deterministic evaluation-count and documented elapsed-time gates pass;
+- focused Unit 2 regressions, Ruff, formatting, and patch hygiene pass.
+
+### Unit 3 — Direct Process-MVR Hardening and Integrated Proof
+
+**Purpose**: harden deterministic direct process-MVR while closing the
+real-public-workflow and tutorial gaps across all three units.
+
+**Depends on**: Unit 1 detached diagnostic vocabulary and Unit 2 stabilized
+optimized-service behavior.
+
+**Responsibilities**:
+
+- validate direct process-MVR lift or pressure-ratio requests against CoolProp
+  capability before stage iteration;
+- translate required property failures into bounded stream-, period-, stage-,
+  and fluid-specific domain errors with causal chaining;
+- allow only named `dry_stage` and `reduced_profile` policies;
+- attach immutable `DirectGasMVRFallbackDiagnostic` values to stage results;
+- preserve normal packaged process-MVR component, replacement-stream, and
+  downstream-target behavior;
+- run the real public CoolProp matrix for direct/utility heat pump and
+  refrigeration across cascade, parallel, and VC+MVR topologies;
+- assert notebook 09 default CoolProp target/map success;
+- make notebook 11 distinguish demonstrated infeasibility from service defects;
+- own integrated property, performance, documentation, packaging, and installed
+  artifact verification.
+
+**Primary existing owners**:
+
+- `OpenPinch/analysis/heat_pumps/direct_mvr/models.py`;
+- `OpenPinch/analysis/heat_pumps/direct_mvr/execution.py`;
+- `OpenPinch/analysis/heat_pumps/direct_mvr/thermodynamics.py`;
+- component/direct-target integration;
+- notebook 09 and notebook 11 generators and generated artifacts;
+- integration, documentation, packaging, and distribution tests.
+
+**Inputs**:
+
+- process stream, period, fluid, and validated MVR settings;
+- Unit 1 detached diagnostic contracts;
+- stabilized public optimized HPR services from Unit 2;
+- packaged examples and supported real-engine test profile.
+
+**Outputs**:
+
+- deterministic process-MVR streams and stage results;
+- observable typed fallback diagnostics;
+- contextual required-state failures without raw unbounded CoolProp messages;
+- executable notebook success/failure evidence;
+- integrated source and wheel verification evidence.
+
+**Exclusions**:
+
+- no merger of deterministic process-MVR with the global HPR optimizer;
+- no redesign of direct process-MVR thermodynamic equations;
+- no silent arbitrary property fallback;
+- no new service, dependency, infrastructure, or deployment boundary;
+- no synthetic user stories.
+
+**Construction readiness**: Functional Design is required for capability
+thresholds, contextual exception contracts, and the closed fallback
+classification. NFR Requirements and NFR Design are required for diagnostic
+bounds, deterministic real-engine profiles, notebook assertions, package
+quality gates, and enabled property/state-model tests.
+
+**Exit evidence**:
+
+- packaged direct process-MVR workflow remains green;
+- unsupported lift/ratio fails atomically with stream/period/stage/fluid context;
+- approved fallbacks are visible and unexpected property failures propagate;
+- all optimized real-public regression variants return detached results or the
+  expected typed physical failure;
+- notebooks 09 and 11 execute with the corrected assertions;
+- fixed-seed properties, focused and full regressions, warning-strict docs,
+  build, archive inspection, and isolated installed-wheel smoke pass.
+
+### Shared Unit Rules
+
+- Production order is Unit 1, Unit 2, Unit 3.
+- Tests belong to the unit that owns the behavior; Unit 3 adds the integrated
+  release gate rather than becoming a test-only unit.
+- Existing source-module ownership is preserved.
+- No unit may introduce a live engine object at a public boundary.
+- No later unit may define a contract required by an earlier unit.
+- All three units release in one OpenPinch wheel and source distribution.
+- Security and Resiliency extensions remain disabled.
+- Enabled Property-Based Testing obligations are assigned in the accompanying
+  requirement map.

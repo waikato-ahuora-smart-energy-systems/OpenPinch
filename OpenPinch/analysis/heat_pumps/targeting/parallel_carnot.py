@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import numpy as np
 
-from ....contracts.hpr import HeatPumpTargetInputs, HPRBackendResult, HPRParsedState
+from ....contracts.hpr import (
+    HeatPumpTargetInputs,
+    HPRBackendResult,
+    HPREvaluationMode,
+    HPRParsedState,
+)
 from ..common._shared.streams import get_Q_vals_at_T_hpr_from_bckgrd_profile
 from ..common.encoding import (
     AMBIENT_X_BOUNDS,
@@ -126,6 +131,7 @@ def _compute_parallel_carnot_hp_opt_obj(
     args: HeatPumpTargetInputs,
     *,
     debug: bool = False,
+    artifact_mode: HPREvaluationMode = HPREvaluationMode.FINAL,
 ) -> HPRBackendResult:
     state_vars = _parse_parallel_carnot_hp_state_variables(x, args)
     cycle = ParallelCarnotCycles()
@@ -153,4 +159,5 @@ def _compute_parallel_carnot_hp_opt_obj(
         Q_evap_total=cycle.Q_evap,
         penalty_terms=cycle.penalty,
         debug=debug,
+        artifact_mode=artifact_mode,
     )

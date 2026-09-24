@@ -4,7 +4,13 @@ from __future__ import annotations
 
 import numpy as np
 
-from ....contracts.hpr import HeatPumpTargetInputs, HPRBackendResult, HPRParsedState
+from ....contracts.hpr import (
+    HeatPumpTargetInputs,
+    HPRBackendResult,
+    HPREvaluationMode,
+    HPRParsedState,
+    HPRTopologyIdentifier,
+)
 from ..common._shared.ambient_preallocation import preallocate_direct_ambient_duties
 from ..common._shared.streams import get_Q_vals_at_T_hpr_from_bckgrd_profile
 from ..common.encoding import (
@@ -24,7 +30,13 @@ from ..common.shared import (
 from ..cycles.parallel_vapour_compression_cycles import (
     ParallelVapourCompressionCycles,
 )
-from ..optimisation_adapter import solve_hpr_placement
+from ..optimisation_adapter import initialise_hpr_seed, solve_hpr_placement
+from ..performance_maps.coolprop_preflight import (
+    preflight_coolprop_fluid_names,
+    preflight_coolprop_hpr_targeting,
+    representative_hpr_point,
+)
+from ..performance_maps.target_records import build_coolprop_target_simulation_record
 from .parallel_carnot import optimise_parallel_carnot_heat_pump_placement
 
 __all__ = [
@@ -42,13 +54,19 @@ def optimise_parallel_heat_pump_placement(
 ) -> HPRBackendResult:
     """Optimise multiple parallel vapour-compression stages for the HPR case."""
     num_stages = args.n_cond = args.n_evap = int(max(args.n_cond, args.n_evap))
-    init_res = (
-        optimise_parallel_carnot_heat_pump_placement(args)
-        if args.initialise_simulated_cycle
-        else None
+    preflight_coolprop_fluid_names(
+        args, HPRTopologyIdentifier.PARALLEL_VAPOUR_COMPRESSION
     )
+    init_res = initialise_hpr_seed(optimise_parallel_carnot_heat_pump_placement, args)
     args.refrigerant_ls = validate_vapour_hp_refrigerant_ls(num_stages, args)
     x0_ls, bnds = _get_parallel_hp_opt_setup(init_res, args)
+    preflight_coolprop_hpr_targeting(
+        args=args,
+        state=_parse_parallel_hp_state_temperatures(
+            representative_hpr_point(x0_ls, bnds), args
+        ),
+        topology_id=HPRTopologyIdentifier.PARALLEL_VAPOUR_COMPRESSION,
+    )
     return solve_hpr_placement(
         f_obj=_compute_parallel_hp_system_obj,
         x0_ls=x0_ls,
@@ -223,7 +241,9 @@ def _parse_parallel_hp_state_temperatures(
 def _compute_parallel_hp_system_obj(
     x: np.ndarray,
     args: HeatPumpTargetInputs,
+    *,
     debug: bool = False,
+    artifact_mode: HPREvaluationMode = HPREvaluationMode.FINAL,
 ) -> HPRBackendResult:
     is_heat_pumping = getattr(args, "is_heat_pumping", True)
     state_vars = _parse_parallel_hp_state_temperatures(x, args)
@@ -240,6 +260,7 @@ def _compute_parallel_hp_system_obj(
             Q_amb_cold=state_vars.Q_amb_cold,
         )
 
+    cycle_evaluated = False
     try:
         hp = ParallelVapourCompressionCycles()
         hp.solve(
@@ -271,10 +292,13 @@ def _compute_parallel_hp_system_obj(
             is_process_stream=False,
             dtcont=args.dtcont_hp,
         )
+        cycle_evaluated = True
         w_hpr = hp.work
         primary_duty = hp.Q_heat_arr.sum() if is_heat_pumping else hp.Q_cool_arr.sum()
+        if not np.isfinite(primary_duty) or primary_duty <= 0.0:
+            return HPRBackendResult.failure(reason="Cycle delivers no useful duty.")
         cop = primary_duty / w_hpr if w_hpr > 0 else 1.0
-        return evaluate_vapour_hpr_result(
+        result = evaluate_vapour_hpr_result(
             args=args,
             state=state_vars,
             work=w_hpr,
@@ -288,8 +312,27 @@ def _compute_parallel_hp_system_obj(
             dT_subcool=state_vars.dT_subcool,
             dT_superheat=state_vars.dT_superheat,
             debug=debug,
+            artifact_mode=artifact_mode,
         )
-    except Exception as exc:
+        record = (
+            build_coolprop_target_simulation_record(
+                args=args,
+                state=state_vars,
+                cycle=hp,
+                topology_id=HPRTopologyIdentifier.PARALLEL_VAPOUR_COMPRESSION,
+            )
+            if artifact_mode is HPREvaluationMode.FINAL
+            else None
+        )
+        return result.with_updates(
+            simulation_backend=(
+                "coolprop" if artifact_mode is HPREvaluationMode.FINAL else None
+            ),
+            target_simulation_record=record,
+        )
+    except ValueError as exc:
+        if cycle_evaluated:
+            raise
         return HPRBackendResult.failure(
             reason=str(exc),
             Q_amb_hot=state_vars.Q_amb_hot,

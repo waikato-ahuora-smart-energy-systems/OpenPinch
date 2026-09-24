@@ -8,6 +8,21 @@
 
 ---
 
+## CoolProp HPR and MVR Reliability - PR Review Follow-up
+**Timestamp**: 2026-09-24T08:56:03Z
+**User Input**: "Go"
+**AI Response**: "I’ll fix the confirmed topology misclassification, add regression coverage for both diagnostic paths, run the focused checks, then update the existing PR."
+**Context**: User authorizes correction of the valid Codex P2 review finding on PR #100. The change is limited to structured failure-topology classification and regression coverage; it does not alter thermodynamic calculations. Property-Based Testing remains compliant because the existing generated-input topology and record properties are retained, while explicit regressions cover the two affected failure boundaries. Security and Resiliency extensions remain disabled.
+
+---
+
+## CoolProp HPR and MVR Reliability - PR Review Finding Resolved
+**Timestamp**: 2026-09-24T08:57:28Z
+**AI Response**: "Corrected single-stage vapour-compression topology classification in both cached search and final-candidate failure diagnostics. Added single-stage and cascade regression cases for each boundary. Focused verification passed 130 tests; Ruff, format and patch hygiene checks pass."
+**Context**: The Codex P2 finding is resolved locally. The correction uses the selected period's scalar stage counts for multi-period inputs, following stable period-id then period-index selection. No thermodynamic or optimization behavior changed. Property-Based Testing remains compliant; existing generated topology/record properties and explicit boundary regressions complement one another. Security and Resiliency extensions remain disabled.
+
+---
+
 ## Excel v5 VBA Redesign Implementation Authorization
 **Timestamp**: 2026-08-21T02:01:37Z
 **User Input**: "PLEASE IMPLEMENT THIS PLAN:
@@ -8937,5 +8952,345 @@ utilities = problem.target.all_heat_integration(base_target=heat_pump)"
 **User Input**: "Push to dev. "
 **AI Response**: "Committing the verified CI reuse changes and previously approved contribution metadata correction, then pushing the develop branch to origin."
 **Context**: Explicit user authorization to commit and push; local whitespace checks pass and existing test results are recorded above.
+
+---
+
+## CoolProp-Backed HPR Optimisation Investigation - Initial Request
+**Timestamp**: 2026-09-23T22:09:42Z
+**User Input**: "The Coolprop backed HPR optimisation services are failing and lack robustness. Investigate this issue. "
+**AI Response**: "Started the required AI-DLC workflow, loaded the common rules and extension configuration, and began workspace detection for a read-only failure investigation."
+**Context**: New focused investigation in the existing brownfield OpenPinch project. The request authorizes diagnosis and evidence gathering, not implementation. Existing Security and Resiliency extensions remain disabled; Property-Based Testing remains enabled.
+
+---
+
+## CoolProp-Backed HPR Optimisation Investigation - Workspace Detection
+**Timestamp**: 2026-09-23T22:11:28Z
+**AI Response**: "Workspace detection confirmed the existing brownfield Python library, reusable HPR and optimisation owners, current repository-wide reverse-engineering artifacts, and a clean code worktree before investigation. Proceeded to focused requirements investigation without rerunning repository-wide reverse engineering."
+**Context**: Workspace Detection complete. Existing reverse-engineering architecture remains sufficient for the component boundary; live HPR code and tests are the authority for this focused failure analysis. Property-Based Testing is enabled; Security and Resiliency remain disabled and are skipped.
+
+---
+
+## CoolProp-Backed HPR Optimisation Investigation - Requirements Review
+**Timestamp**: 2026-09-23T22:30:57Z
+**AI Response**: "Completed the failure investigation and documented six findings: viable-candidate penalty-shape corruption, non-detachable live CoolProp models, exception opacity, missing CoolProp state preflight, unbounded expensive search behavior, and end-to-end test gaps. Logged the evidence, temporary in-memory isolation probes, and remediation requirements without changing runtime code. Requested review before any implementation workflow."
+**Context**: Requirements Analysis complete. Focused configured tests passed 758 tests, while real public CoolProp cascade and parallel services failed. Temporary in-memory isolation showed all four service variants can return detached successful water targets after the two blocking defects are bypassed. Property-Based Testing obligations are identified; Security and Resiliency remain disabled and skipped.
+
+---
+
+## CoolProp-Backed HPR and MVR Optimisation Investigation - Scope Expansion
+**Timestamp**: 2026-09-23T22:44:33Z
+**User Input**: "Expand the investigation to include MVR\* services too."
+**AI Response**: "Expanded the active requirements investigation to cover all MVR-prefixed public services, including VC+MVR heat-pump targeting and direct process-MVR execution. Workflow Planning was deferred until the combined runtime evidence and requirements are reviewed."
+**Context**: The new request extends the approved HPR investigation rather than authorizing implementation. Requirements Analysis is reopened for focused MVR service tracing, real-backend reproduction, failure-boundary analysis, and test-gap assessment.
+
+---
+
+## CoolProp-Backed HPR Optimisation Investigation - Prior Requirements Approval
+**Timestamp**: 2026-09-23T22:58:01Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded approval of the original HPR-only findings and began Workflow Planning. The immediately following MVR scope expansion superseded that transition and reopened Requirements Analysis before a workflow plan was written."
+**Context**: Retrospective audit entry for the approval received before the scope-expansion request. The complete raw input is preserved; the combined HPR and MVR requirements require a new approval.
+
+---
+
+## CoolProp-Backed HPR and MVR Services Investigation - Combined Requirements Review
+**Timestamp**: 2026-09-23T22:58:01Z
+**AI Response**: "# 🔍 Requirements Analysis Complete\n\nRequirements analysis now covers both optimised HPR/VC+MVR targeting and deterministic direct process-MVR. It distinguishes two blocking public defects, shared diagnostics/preflight/budget weaknesses, the MVR optimiser's sparse feasible region, and narrower process-MVR property-error/fallback gaps. No runtime code was changed.\n\n> **📋 <u>**REVIEW REQUIRED:**</u>**  \n> Please examine the requirements document at: `aidlc-docs/inception/requirements/coolprop-hpr-optimisation-investigation.md`\n\n> **🚀 <u>**WHAT'S NEXT?**</u>**\n>\n> **You may:**\n>\n> 🔧 **Request Changes** -  Ask for modifications to the combined requirements based on your review  \n> ✅ **Approve & Continue** - Approve the combined requirements and proceed to **User Stories**\n\n---"
+**Context**: Combined Requirements Analysis complete. Real public MVR probes reproduced generic optimal-result failures and non-copyable live CoolProp models; the packaged direct process-MVR workflow succeeded. User Stories are recommended due to the expanded public API, diagnostics, performance, and cross-component acceptance scope. Property-Based Testing remains enabled; Security and Resiliency remain disabled and skipped.
+
+---
+
+## CoolProp-Backed HPR and MVR Services - Combined Requirements Approval
+**Timestamp**: 2026-09-24T00:03:57Z
+**User Input**: "**Approve & Continue** "
+**AI Response**: "Recorded approval of the combined HPR and MVR requirements. Started User Stories Part 1, documented why stories add value, and created a scoped story-generation plan with five required methodology questions."
+**Context**: Combined Requirements Analysis approved. User Stories execute because the remediation changes public service outcomes, failure recovery, diagnostics, and performance across several components and caller roles. No runtime implementation has started.
+
+---
+
+## CoolProp-Backed HPR and MVR Services - User Stories Planning Questions
+**Timestamp**: 2026-09-24T00:07:01Z
+**AI Response**: "User Stories Part 1 is ready. Please answer all five questions in `aidlc-docs/inception/plans/coolprop-hpr-mvr-story-generation-plan.md` by entering a letter after each `[Answer]:` tag, then tell me when the file is complete."
+**Context**: Awaiting required methodology input before ambiguity analysis and story-plan approval. The question file follows the mandatory multiple-choice format and preserves all prior workflow artifacts.
+
+---
+
+## CoolProp-Backed HPR and MVR Services - User Stories Override
+**Timestamp**: 2026-09-24T00:08:16Z
+**User Input**: "User stories are not needed."
+**AI Response**: "Accepted the explicit user override, closed User Stories without generating personas or stories, retained the approved requirements as the acceptance authority, and proceeded directly to Workflow Planning."
+**Context**: User Stories skipped by user control. The initial assessment and abandoned question plan remain as audit artifacts with their final skipped disposition. Property-Based Testing traceability remains required in later stages.
+
+---
+
+## CoolProp-Backed HPR and MVR Services - Workflow Planning Review
+**Timestamp**: 2026-09-24T00:11:48Z
+**AI Response**: "# 📋 Workflow Planning Complete\n\nCreated a high-risk, multi-component remediation plan. Seven remaining stages are recommended: focused Application Design, Units Generation, per-unit Functional Design, NFR Requirements, NFR Design, Code Generation, and Build and Test. Reverse Engineering and User Stories remain skipped; Infrastructure Design is skipped because no deployment or infrastructure change is required. The proposed sequence is contracts and result semantics, cycle/objective correctness, optimiser preflight/diagnostics/budgets, application and process-MVR integration, then real-engine regression and tutorial proof. Requested explicit approval before Application Design."
+**Context**: Workflow Planning complete. The Mermaid workflow was structurally validated and has a text alternative. Risk is high, rollback is moderate, and no new dependency or infrastructure is proposed. Property-Based Testing is enabled for later design and implementation; Security and Resiliency remain disabled and skipped.
+
+---
+
+## CoolProp-Backed HPR and MVR Services - Workflow Plan Approval
+**Timestamp**: 2026-09-24T00:19:23Z
+**User Input**: "go"
+**AI Response**: "Recorded approval of the workflow plan and started focused Application Design. Created a scoped plan covering detached results, failure contracts, CoolProp preflight, optimisation budgets and warm starts, process-MVR fallback evidence, and component ownership, with six required design questions."
+**Context**: Workflow Planning approved. Application Design Part 1 is active; runtime implementation remains gated.
+
+---
+
+## CoolProp-Backed HPR and MVR Services - Application Design Questions
+**Timestamp**: 2026-09-24T00:21:04Z
+**AI Response**: "Application Design Part 1 is ready. Please answer all six questions in `aidlc-docs/inception/plans/coolprop-hpr-mvr-application-design-plan.md` by entering a letter after each `[Answer]:` tag, then tell me when the file is complete."
+**Context**: Awaiting explicit decisions on the public model field, failure contract, budget surface, warm-start policy, process-MVR fallback evidence, and component organization before design artifacts are generated.
+
+---
+
+## CoolProp-Backed HPR and MVR Services - Application Design Answers
+**Timestamp**: 2026-09-24T00:26:26Z
+**User Input**: "Go"
+**AI Response**: "Validated all six completed design answers. Normalized the expanded warm-start response to option A while preserving its explicit CoolProp-backed evaluation detail, and began generation of the five mandatory Application Design artifacts."
+**Context**: Application Design Part 1 complete. The answers select detached public model semantics, typed bounded failure diagnostics, public iteration/evaluation controls, warm-start-first search, observable process-MVR fallbacks, and extension of existing component owners. No ambiguity or contradiction remains; runtime code is still unchanged.
+
+---
+
+## CoolProp-Backed HPR and MVR Services - Application Design Review
+**Timestamp**: 2026-09-24T00:31:09Z
+**AI Response**: "# 🏗️ Application Design Complete\n\nGenerated and validated the component, method, service, dependency, and consolidated design artifacts. The design keeps the public `model` field as `None`, makes the simulation record canonical, adds typed bounded diagnostics and public search budgets, evaluates CoolProp warm starts before bounded global search, preserves the engine-neutral optimiser boundary, and makes direct process-MVR fallbacks observable. No runtime code was changed.\n\n> **📋 <u>**REVIEW REQUIRED:**</u>**  \n> Please examine the application design artifacts at: `aidlc-docs/inception/application-design/coolprop-hpr-mvr/`\n\n> **🚀 <u>**WHAT'S NEXT?**</u>**\n>\n> **You may:**\n>\n> 🔧 **Request Changes** - Ask for modifications to the application design if required\n> ✅ **Approve & Continue** - Approve design and proceed to **Units Generation**"
+**Context**: Application Design complete. All five mandatory artifacts, Markdown links, code fences, Mermaid structure, text alternatives, cross-artifact decisions, and patch whitespace were validated. Property-Based Testing is compliant at design level; disabled Security and Resiliency extensions are N/A. Awaiting explicit approval before Units Generation.
+
+---
+
+## CoolProp-Backed HPR and MVR Services - Application Design Approval
+**Timestamp**: 2026-09-24T00:34:17Z
+**User Input**: "Go"
+**AI Response**: "Recorded approval of the focused Application Design and started Units Generation Part 1. Created a three-unit decomposition plan with five required questions covering grouping, dependencies, team alignment, the MVR domain boundary, and requirement-based traceability."
+**Context**: Application Design approved. Units Generation Part 1 is active; User Stories remain skipped and the mandatory story-map artifact will map approved functional and verification requirements directly. No runtime implementation has started.
+
+---
+
+## CoolProp-Backed HPR and MVR Services - Units Generation Questions
+**Timestamp**: 2026-09-24T00:36:56Z
+**AI Response**: "Units Generation Part 1 is ready. Please complete all five `[Answer]:` lines in the `CoolProp HPR and MVR Reliability Unit Plan` section of `aidlc-docs/inception/plans/unit-of-work-plan.md`, then tell me when the file is complete."
+**Context**: Awaiting decomposition decisions for requirement grouping, delivery dependencies, team alignment, the direct process-MVR boundary, and requirement-based traceability. Unit artifacts and runtime implementation remain gated.
+
+---
+
+## CoolProp-Backed HPR and MVR Services - Units Generation Input Check
+**Timestamp**: 2026-09-24T00:46:51Z
+**User Input**: "Go"
+**AI Response**: "Checked the scoped unit plan, but all five required `[Answer]:` lines remain blank. Requested completion of those answers before ambiguity analysis and plan approval."
+**Context**: Units Generation Part 1 remains active. The workflow prohibits inferring five decomposition decisions from a generic continuation response; no unit artifacts or runtime code were generated.
+
+---
+
+## CoolProp-Backed HPR and MVR Services - Units Generation Input Recheck
+**Timestamp**: 2026-09-24T00:57:55Z
+**User Input**: "Go"
+**AI Response**: "Rechecked the scoped unit plan. All five required answer lines are still blank, so Units Generation cannot advance. Asked the user either to populate the file or explicitly answer `A for all five`."
+**Context**: Units Generation Part 1 remains gated. No decomposition choice was inferred and no unit artifacts or runtime code were generated.
+
+---
+
+## CoolProp-Backed HPR and MVR Services - Units Generation Answers
+**Timestamp**: 2026-09-24T01:00:58Z
+**User Input**: "Go"
+**AI Response**: "Found all five unit-plan answers completed as A, validated them, and completed ambiguity analysis. The selections are mutually consistent and retain the approved three-unit, contract-first decomposition."
+**Context**: Units Generation Part 1 answers complete. No ambiguous, combined, undefined, or contradictory answer remains. No generation or runtime implementation has started.
+
+---
+
+## CoolProp-Backed HPR and MVR Services - Unit Plan Approval Prompt
+**Timestamp**: 2026-09-24T01:00:58Z
+**AI Response**: "**Unit of work plan complete. Review the plan in aidlc-docs/inception/plans/unit-of-work-plan.md. Ready to proceed to generation?**"
+**Context**: Awaiting explicit approval before Units Generation Part 2. All five answers have been recorded and ambiguity analysis is complete.
+
+---
+
+## CoolProp-Backed HPR and MVR Services - Unit Plan Approval
+**Timestamp**: 2026-09-24T01:05:50Z
+**User Input**: "Go"
+**AI Response**: "Recorded approval of the resolved three-unit plan and began Units Generation Part 2 using the approved contract-first sequence."
+**Context**: Units Generation Part 1 approved. Generation is limited to the three shared documentation artifacts; no runtime implementation is authorized in this stage.
+
+---
+
+## CoolProp-Backed HPR and MVR Services - Units Generation Review
+**Timestamp**: 2026-09-24T01:09:17Z
+**AI Response**: "# 🔧 Units Generation Complete\n\n- **Unit 1 — Candidate Correctness and Detached HPR Results** owns penalty normalization, search/final evaluation separation, simulation evidence, public detachment, and foundational reliability contracts.\n- **Unit 2 — CoolProp HPR and VC+MVR Search Reliability** owns state-capability preflight, failure classification, bounded diagnostics and budgets, warm-start retention, caching, and public optimized-service integration.\n- **Unit 3 — Direct Process-MVR Hardening and Integrated Proof** owns compression validation, observable stage fallbacks, real-engine regression coverage, notebooks 09/11, and final package verification.\n- Dependencies are acyclic in the approved Unit 1 → Unit 2 → Unit 3 order. All 11 functional requirements, 11 verification requirements, and PBT-01 through PBT-10 have explicit owners.\n- **PBT Compliance**: compliant at Units Generation. Every rule has an applicability disposition and downstream owner; no blocking PBT finding exists. Security and Resiliency remain disabled and are N/A.\n\n> **📋 <u>**REVIEW REQUIRED:**</u>**  \n> Please examine the units generation artifacts at: `aidlc-docs/inception/application-design/`\n\n> **🚀 <u>**WHAT'S NEXT?**</u>**\n>\n> **You may:**\n>\n> 🔧 **Request Changes** - Ask for modifications to the units generation if required\n> ✅ **Approve & Continue** - Approve units and proceed to **CONSTRUCTION PHASE**"
+**Context**: Units Generation Part 2 complete. The three scoped sections were appended to the existing shared artifacts without overwriting prior workflows. Markdown, local links, Mermaid structure and text fallback, the three-node acyclic dependency graph, all 22 requirement rows, PBT-01 through PBT-10 dispositions, and patch whitespace were validated. No runtime code changed.
+
+---
+
+## CoolProp-Backed HPR and MVR Services - Units Generation Approval
+**Timestamp**: 2026-09-24T01:25:07Z
+**User Input**: "Proceed to the **Construction Phase**"
+**AI Response**: "Recorded approval of the generated units and entered Construction with Unit 1 Functional Design. Created a six-question plan covering penalty normalization, generalized simulation evidence, final-evaluation divergence, detachment proof, failure vocabulary, and budget validation."
+**Context**: Units Generation approved. Unit 1 — Candidate Correctness and Detached HPR Results is the active construction unit. Runtime implementation remains gated behind Functional Design, NFR, and Code Generation approvals.
+
+---
+
+## CoolProp HPR and MVR Unit 1 - Functional Design Questions
+**Timestamp**: 2026-09-24T01:25:07Z
+**AI Response**: "Unit 1 Functional Design planning is ready. Please complete all six `[Answer]:` lines in `aidlc-docs/construction/plans/coolprop-hpr-mvr-unit-1-functional-design-plan.md`, then tell me when the file is complete."
+**Context**: Awaiting detailed decisions for Unit 1 before generating business logic, business rules, and domain entity artifacts. No runtime implementation has started.
+
+---
+
+## CoolProp HPR and MVR Unit 1 - Functional Design Answers
+**Timestamp**: 2026-09-24T01:35:08Z
+**User Input**: "Go"
+**AI Response**: "Found all six Functional Design answers completed as A, validated them as mutually consistent, and began Unit 1 artifact generation. No follow-up question was required."
+**Context**: Unit 1 Functional Design answers resolved. The design will use deterministic penalty flattening, additive topology/stage evidence, classified final reevaluation, recursive detachment plus deep-copy proof, closed bounded diagnostics, and positive bounded default budgets.
+
+---
+
+## CoolProp HPR and MVR Unit 1 - Functional Design Review
+**Timestamp**: 2026-09-24T01:39:15Z
+**AI Response**: "# 🔧 Functional Design Complete - coolprop-hpr-mvr-unit-1\n\nFunctional design has created:\n\n- deterministic penalty normalization and search/final evaluation algorithms;\n- 39 numbered business rules for result correctness, detachment, simulation evidence, budgets, diagnostics, and compatibility;\n- detailed budget, diagnostic, error, search-evaluation, loop, stage, simulation-record, backend-result, and public-output entities;\n- 12 categorized Unit 1 properties with constrained generator requirements.\n\n**PBT Compliance**\n\n- **PBT-01: Compliant.** Every Unit 1 transformation and entity has categorized testable properties carried forward to Code Generation.\n- PBT-02 through PBT-10 have explicit downstream obligations; PBT-06 is N/A to Unit 1 immutable entities and applies to Unit 2 search state.\n- No blocking PBT finding exists. Security and Resiliency remain disabled and are N/A.\n\n> **📋 <u>**REVIEW REQUIRED:**</u>**  \n> Please examine the functional design artifacts at: `aidlc-docs/construction/coolprop-hpr-mvr-unit-1/functional-design/`\n\n\n\n> **🚀 <u>**WHAT'S NEXT?**</u>**\n>\n> **You may:**\n>\n> 🔧 **Request Changes** - Ask for modifications to the functional design based on your review  \n> ✅ **Continue to Next Stage** - Approve functional design and proceed to **NFR Requirements**\n\n---"
+**Context**: Unit 1 Functional Design complete. The three artifacts, local links, code fences, Mermaid structure and text alternatives, six decisions, 39 sequential rules, 12 named properties, entity coverage, PBT-01 obligations, and patch whitespace were validated. No blocking PBT finding exists and no runtime code changed.
+
+---
+
+## CoolProp HPR and MVR Services - Completion Authorization
+**Timestamp**: 2026-09-24T01:50:24Z
+**User Input**: "Keep going through to completion"
+**AI Response**: "Accepted the Functional Design and authorization to continue through all remaining stages without intermediate pauses, while retaining every required plan, artifact, validation, and audit gate."
+**Context**: Unit 1 Functional Design approved. Subsequent recommended decisions may use the documented recommended option when no genuine ambiguity remains; unsafe or scope-changing blockers still require user input.
+
+---
+
+## CoolProp HPR and MVR Unit 1 - NFR Requirements Complete
+**Timestamp**: 2026-09-24T01:50:24Z
+**AI Response**: "Completed Unit 1 NFR Requirements with 25 measurable requirements and existing-stack decisions. PBT-09 is compliant; no blocking extension finding exists. Continued to NFR Design under completion authorization."
+**Context**: Unit 1 NFR Requirements complete and approved under the user's authorization. No runtime code changed.
+
+---
+
+## CoolProp HPR and MVR Unit 1 - NFR Design Complete
+**Timestamp**: 2026-09-24T01:50:24Z
+**AI Response**: "Completed Unit 1 NFR Design with ten patterns and eight logical components covering pure normalization, explicit evaluation modes, typed failures, detached DTOs, recursive guards, atomic commit, record evolution, bounded values, call-local lifetime, and property/example testing. Continued to Code Generation under completion authorization."
+**Context**: Unit 1 NFR Design complete and approved under the user's authorization. No infrastructure design applies and no runtime code changed.
+
+---
+
+## CoolProp HPR and MVR Unit 1 - Code Generation Plan
+**Timestamp**: 2026-09-24T01:50:24Z
+**AI Response**: "Created and approved a nine-step RED-GREEN-REFACTOR Unit 1 plan under the user's completion authorization. The sequence covers reliability contracts, penalty normalization, evaluation modes, generalized simulation evidence, detached finalization, properties, focused verification, and traceability."
+**Context**: Unit 1 Code Generation Part 1 complete. Part 2 may proceed without another pause under the user's explicit instruction to continue through completion.
+
+---
+
+## CoolProp HPR and MVR Unit 1 - Code Generation Step 4
+**Timestamp**: 2026-09-24T02:01:30Z
+**AI Response**: "Completed explicit search/final evaluation modes across the shared adapter, multiperiod aggregation, Carnot, CoolProp vapour-compression, VC+MVR, and TESPy objective boundaries. Search evaluations now discard engine, figure, debug, and simulation-record artifacts while retaining identical accounting semantics. The focused run passed 62 tests; its two expected failures are the already-planned public-detachment RED tests in Step 6."
+**Context**: Unit 1 Code Generation Step 4 complete. Step 5 generalized detached simulation evidence is active under the user's completion authorization.
+
+---
+
+## CoolProp HPR and MVR Unit 1 - Code Generation Step 5
+**Timestamp**: 2026-09-24T02:05:41Z
+**AI Response**: "Generalized CoolProp winning-simulation records across cascade, parallel, and VC+MVR final evaluations. Records now carry topology-matched identifiers and ordered detached loop/stage facts while single-stage and TESPy schemas remain compatible. The focused gate passed 112 tests; only the two pre-existing Step 6 public-detachment RED tests remain failing."
+**Context**: Unit 1 Code Generation Step 5 complete. Step 6 detached public result finalization is active under the user's completion authorization.
+
+---
+
+## CoolProp HPR and MVR Unit 1 - Code Generation Step 6
+**Timestamp**: 2026-09-24T02:07:27Z
+**AI Response**: "Detached the caller-facing HPR contract from live thermodynamic engines and debug figures, recursively finalized nested period and weighted outputs, routed the public service through the shared finalizer, and added an active deep-copy proof. The focused compatibility gate passed all 166 tests."
+**Context**: Unit 1 Code Generation Step 6 complete. Step 7 property and compatibility completion is active under the user's completion authorization.
+
+---
+
+## CoolProp HPR and MVR Unit 1 - Code Generation Step 7
+**Timestamp**: 2026-09-24T02:09:09Z
+**AI Response**: "Completed executable coverage for U1-P1 through U1-P12: normalized-penalty invariants and scalar oracle, search/final equivalence, artifact exclusion, contract round trips, bounded diagnostic representatives, generalized-record ordering, recursive multiperiod detachment, and deep-copy safety. Existing detached-model expectations were updated. The expanded gate, including TESPy compatibility, passed 197 tests."
+**Context**: Unit 1 Code Generation Step 7 complete. Step 8 focused verification and refactoring is active under the user's completion authorization.
+
+---
+
+## CoolProp HPR and MVR Unit 1 - Code Generation Complete
+**Timestamp**: 2026-09-24T02:10:54Z
+**AI Response**: "Completed Unit 1 focused verification and traceability. The 197-test gate passes; Ruff, formatting, compilation, and patch hygiene are clean; no dependency or duplicate-source change was introduced. Generated the Unit 1 code summary and continued to Unit 2 under the user's completion authorization."
+**Context**: Unit 1 Code Generation Steps 8 and 9 complete and approved. Unit 2 Functional Design is active. Property-Based Testing is compliant; disabled Security and Resiliency extensions are N/A.
+
+---
+
+## CoolProp HPR and MVR Unit 2 - Design and Code Plan
+**Timestamp**: 2026-09-24T02:10:54Z
+**AI Response**: "Completed and approved Unit 2 Functional Design, NFR Requirements, and NFR Design under the user's completion authorization. Resolved exact-coordinate caching, warm-start-state preflight, named/options/default budget precedence, a 16-item diagnostic cap, and fatal propagation. Created an approved eight-step TDD/PBT Code Generation plan."
+**Context**: Unit 2 Code Generation Part 2 Step 1 is active. Property-Based Testing obligations U2-P1 through U2-P12 are mapped. Infrastructure Design is N/A; Security and Resiliency extensions remain disabled.
+
+---
+
+## CoolProp HPR and MVR Unit 2 - Code Generation Steps 1 through 6
+**Timestamp**: 2026-09-24T02:26:09Z
+**AI Response**: "Implemented strict public and multiperiod budgets, optimizer-option mapping, detached CoolProp stage preflight for VC and MVR fluids, warm-start-first exact-coordinate caching, retained viable baselines, bounded typed diagnostics, and fatal-defect propagation. Updated deliberate compatibility expectations. The focused gate passed 131 tests."
+**Context**: Unit 2 Code Generation Steps 1 through 6 complete. Step 7 focused verification is active under the user's completion authorization.
+
+---
+
+## CoolProp HPR and MVR Unit 2 - Code Generation Complete
+**Timestamp**: 2026-09-24T02:28:49Z
+**AI Response**: "Completed Unit 2 verification and traceability. The focused HPR, contract, and application gate passed 762 tests; Ruff, formatting, compilation, and patch hygiene are clean. Generated the Unit 2 code summary and continued to Unit 3."
+**Context**: Unit 2 Code Generation Steps 7 and 8 complete and approved. Unit 3 Functional Design is active under completion authorization. Property-Based Testing is compliant; disabled extensions are N/A.
+
+---
+
+## CoolProp HPR and MVR Unit 3 - Design and Code Plan
+**Timestamp**: 2026-09-24T02:28:49Z
+**AI Response**: "Completed and approved Unit 3 Functional Design, NFR Requirements, and NFR Design. Defined 200 degC/20 pressure-ratio bounds, contextual required-state errors, closed dry-stage/reduced-profile fallback evidence, atomic stream behavior, and integrated notebook/package gates. Created an approved seven-step TDD/PBT Code Generation plan."
+**Context**: Unit 3 Code Generation Step 1 is active. Infrastructure Design is N/A. Property-Based Testing obligations U3-P1 through U3-P12 are mapped; disabled extensions remain N/A.
+
+---
+
+## CoolProp HPR and MVR Unit 3 - Code Generation Complete
+**Timestamp**: 2026-09-24T02:47:45Z
+**AI Response**: "Completed direct process-MVR bounds, contextual required-state errors, observable named fallback evidence, scalar CoolProp topology correction, and typed notebook handling. Real notebooks 09 and 11 execute successfully; the expanded gate passed 975 tests with 3 expected profile skips. Ruff, formatting, compilation, generator idempotence, and patch hygiene are clean. Generated the Unit 3 code summary and entered Build and Test."
+**Context**: Unit 3 Code Generation Steps 1 through 7 are complete and approved under the user's completion authorization. Property-Based Testing is compliant; disabled Security and Resiliency extensions are N/A. Build and Test is active.
+
+---
+
+## CoolProp HPR and MVR Reliability - Build and Test Complete
+**Timestamp**: 2026-09-24T03:03:54Z
+**Build Status**: Success
+**Test Status**: Pass
+**Files Generated**:
+- build-instructions.md
+- unit-test-instructions.md
+- integration-test-instructions.md
+- performance-test-instructions.md
+- build-and-test-summary.md
+**AI Response**: "Completed warning-strict documentation, wheel/source builds, a 3,341-case repository run, isolated renderer replay, real notebook 09/11 workflows, installed-wheel TESPy smoke, and final static/generator/hygiene gates. The aggregate run passed 3,336 tests with 4 declared skips; its only sandboxed Chrome failure passed on the authorized isolated replay, yielding 3,337 distinct passing tests. Operations is N/A and the workflow is complete."
+**Context**: Build and Test complete under the user's authorization through completion. Property-Based Testing is compliant. Security and Resiliency extensions were disabled and skipped. No deployment, publication, commit, or external system change was performed.
+
+---
+
+## CoolProp HPR and MVR Reliability - Implementation Audit
+**Timestamp**: 2026-09-24T03:08:19Z
+**User Input**: "Thoroughly audit all the changes/improvements. Refine the changes as required. "
+**AI Response**: "I’ll audit the implementation against the approved requirements, trace the numerical and public API boundaries, and refine any defects I find. I’ll also check whether the tests support the completion claims, particularly around preflight rejection, search budgets, result records, and MVR fallbacks."
+**Context**: Audit/refinement plan active. Existing completion authorization applies. Property-Based Testing enabled; disabled Security and Resiliency extensions skipped. No deployment or commit authorized.
+
+---
+
+## CoolProp HPR and MVR Reliability - Audit Corrections
+**Timestamp**: 2026-09-24T03:36:00Z
+**AI Response**: "The audit exposed unenforced budgets, incomplete failure evidence, overly broad seed rejection, invalid multi-stage records and a public runtime-key rejection hidden by mocked tests. Real multi-stage solves also reproduced unequal penalty-vector broadcasting. Corrected these defects, isolated HPR polishing from generic worker exception suppression, tightened fatal and detached-output boundaries, made contextual errors transportable, and strengthened direct-MVR validation and tutorial assertions. Real direct/utility HPR, refrigeration, optimized MVR, asymmetric multi-stage and three-period CoolProp workflows now complete."
+**Context**: Audit steps 1-3 complete. Added explicit regression and fixed-seed oracle/stateful properties. Strict documentation, wheel/source build, real notebooks 09/11 and installed-wheel smoke passed. Repository/focused verification remains active. The first overlapping full run had a Chrome sandbox failure and stale generator snapshot; later focused runs exposed outdated ranking expectations and incomplete new test fixtures, corrected without weakening production boundaries. A clean affected-surface rerun and renderer-enabled repository run are in progress. The implementation audit records precise guarantees and limitations rather than claiming universal thermodynamic correctness.
+
+---
+
+## CoolProp HPR and MVR Reliability - Audit Complete
+**Timestamp**: 2026-09-24T03:42:37Z
+**AI Response**: "Audited and refined the HPR/MVR changes. Fixed public budget routing and enforcement, preflight over-rejection, multi-stage penalty/record defects, error propagation and detached-output validation. Added 37 regression/property/public cases. Validation totals 3,374 distinct passing tests across the repository run and targeted replays, with four declared skips; documentation, builds, notebooks and installed-package checks passed. Detailed findings and limitations are recorded in implementation-audit.md. No commit or deployment was performed."
+**Context**: All audit plan checkboxes complete. Full renderer-enabled run: 3,368 passed, four skipped and two stale in-process test snapshots; both exact tests passed in fresh replay. Four later regression cases passed, giving a final 3,378-case inventory. Final adapter/search/result/audit replay passed 90 tests; affected gate passed 1,047 with its sole stale generator check resolved by fresh notebook/isolated replays. Property-Based Testing PBT-01 through PBT-10 compliance is itemized in the audit; Security/Resiliency remain disabled. The audit explicitly disclaims a single uninterrupted all-green final-tree full-suite run, universal fluid feasibility, global optimality and a wall-clock SLA.
+
+---
+
+## CoolProp HPR and MVR Reliability - Publication Authorization
+**Timestamp**: 2026-09-24T04:03:03Z
+**User Input**: "Commit the changes to develop and create a PR to main.  "
+**AI Response**: "I’ll check the branch and working tree, commit the HPR/MVR changes to develop, then push and open a PR targeting main."
+**Context**: User authorizes commit, normal push and PR creation, not merge or deployment. Remote refs refreshed; develop matches origin/develop. Change inventory is scoped to the completed HPR/MVR workflow and git diff --check passes. Existing verification evidence and limitations will accompany the PR. GitHub CLI authentication is being checked before publication. Property-Based Testing remains compliant per the completed audit; no new executable changes are made. Disabled Security and Resiliency extensions are skipped.
 
 ---

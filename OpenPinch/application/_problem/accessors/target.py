@@ -15,6 +15,7 @@ from ....analysis.heat_pumps.performance_maps.target_basis import (
 from ....analysis.heat_pumps.performance_maps.targeting import (
     normalize_hpr_simulation_backend,
 )
+from ....contracts.hpr import HPRSearchBudget
 from ....contracts.hpr_performance_map import (
     HprPerformanceMap,
     HprPerformanceMapRequest,
@@ -510,6 +511,8 @@ class _TargetAccessor:
         expander_efficiency: float | None = None,
         minimum_approach_temperature: float | None = None,
         maximum_restarts: int | None = None,
+        maximum_iterations: int | None = None,
+        maximum_evaluations: int | None = None,
         extra_configuration: Mapping[str, Any] | None = None,
         simulation_backend: str | None = None,
     ) -> BaseTargetModel:
@@ -568,6 +571,24 @@ class _TargetAccessor:
             else TargetType.DR.value
         )
         runtime_options = dict(options or {})
+        if maximum_iterations is not None:
+            runtime_options["maximum_iterations"] = maximum_iterations
+        if maximum_evaluations is not None:
+            runtime_options["maximum_evaluations"] = maximum_evaluations
+        if {
+            "maximum_iterations",
+            "maximum_evaluations",
+        } & runtime_options.keys():
+            budget = HPRSearchBudget(
+                maximum_iterations=runtime_options.get("maximum_iterations", 300),
+                maximum_evaluations=runtime_options.get(
+                    "maximum_evaluations", 1_000_000
+                ),
+            )
+            runtime_options.update(
+                maximum_iterations=budget.maximum_iterations,
+                maximum_evaluations=budget.maximum_evaluations,
+            )
         if normalized_backend is not None:
             runtime_options["simulation_backend"] = normalized_backend
         return self._execute(
@@ -600,6 +621,8 @@ class _TargetAccessor:
         expander_efficiency=None,
         minimum_approach_temperature=None,
         maximum_restarts=None,
+        maximum_iterations=None,
+        maximum_evaluations=None,
     ):
         return self._hpr(
             surface="carnot_heat_pump",
@@ -620,6 +643,8 @@ class _TargetAccessor:
             expander_efficiency=expander_efficiency,
             minimum_approach_temperature=minimum_approach_temperature,
             maximum_restarts=maximum_restarts,
+            maximum_iterations=maximum_iterations,
+            maximum_evaluations=maximum_evaluations,
         )
 
     def carnot_refrigeration(
@@ -640,6 +665,8 @@ class _TargetAccessor:
         expander_efficiency=None,
         minimum_approach_temperature=None,
         maximum_restarts=None,
+        maximum_iterations=None,
+        maximum_evaluations=None,
     ):
         return self._hpr(
             surface="carnot_refrigeration",
@@ -660,6 +687,8 @@ class _TargetAccessor:
             expander_efficiency=expander_efficiency,
             minimum_approach_temperature=minimum_approach_temperature,
             maximum_restarts=maximum_restarts,
+            maximum_iterations=maximum_iterations,
+            maximum_evaluations=maximum_evaluations,
         )
 
     def vapour_compression_heat_pump(
@@ -685,6 +714,8 @@ class _TargetAccessor:
         expander_efficiency=None,
         minimum_approach_temperature=None,
         maximum_restarts=None,
+        maximum_iterations=None,
+        maximum_evaluations=None,
     ):
         simulation_backend = normalize_hpr_simulation_backend(simulation_backend)
         extra = {}
@@ -715,6 +746,8 @@ class _TargetAccessor:
             expander_efficiency=expander_efficiency,
             minimum_approach_temperature=minimum_approach_temperature,
             maximum_restarts=maximum_restarts,
+            maximum_iterations=maximum_iterations,
+            maximum_evaluations=maximum_evaluations,
             simulation_backend=simulation_backend,
         )
 
@@ -741,6 +774,8 @@ class _TargetAccessor:
         expander_efficiency=None,
         minimum_approach_temperature=None,
         maximum_restarts=None,
+        maximum_iterations=None,
+        maximum_evaluations=None,
     ):
         simulation_backend = normalize_hpr_simulation_backend(simulation_backend)
         extra = {}
@@ -771,6 +806,8 @@ class _TargetAccessor:
             expander_efficiency=expander_efficiency,
             minimum_approach_temperature=minimum_approach_temperature,
             maximum_restarts=maximum_restarts,
+            maximum_iterations=maximum_iterations,
+            maximum_evaluations=maximum_evaluations,
             simulation_backend=simulation_backend,
         )
 
@@ -788,6 +825,8 @@ class _TargetAccessor:
         expander_efficiency=None,
         minimum_approach_temperature=None,
         maximum_restarts=None,
+        maximum_iterations=None,
+        maximum_evaluations=None,
     ):
         return self._hpr(
             surface="brayton_heat_pump",
@@ -805,6 +844,8 @@ class _TargetAccessor:
             expander_efficiency=expander_efficiency,
             minimum_approach_temperature=minimum_approach_temperature,
             maximum_restarts=maximum_restarts,
+            maximum_iterations=maximum_iterations,
+            maximum_evaluations=maximum_evaluations,
         )
 
     def brayton_refrigeration(
@@ -821,6 +862,8 @@ class _TargetAccessor:
         expander_efficiency=None,
         minimum_approach_temperature=None,
         maximum_restarts=None,
+        maximum_iterations=None,
+        maximum_evaluations=None,
     ):
         return self._hpr(
             surface="brayton_refrigeration",
@@ -838,6 +881,8 @@ class _TargetAccessor:
             expander_efficiency=expander_efficiency,
             minimum_approach_temperature=minimum_approach_temperature,
             maximum_restarts=maximum_restarts,
+            maximum_iterations=maximum_iterations,
+            maximum_evaluations=maximum_evaluations,
         )
 
     def mvr_heat_pump(
@@ -859,6 +904,8 @@ class _TargetAccessor:
         evaporators=None,
         minimum_approach_temperature=None,
         maximum_restarts=None,
+        maximum_iterations=None,
+        maximum_evaluations=None,
     ):
         extra = {}
         for key, value in (
@@ -886,6 +933,8 @@ class _TargetAccessor:
             evaporators=evaporators,
             minimum_approach_temperature=minimum_approach_temperature,
             maximum_restarts=maximum_restarts,
+            maximum_iterations=maximum_iterations,
+            maximum_evaluations=maximum_evaluations,
         )
 
     def heat_exchanger_area_and_cost(

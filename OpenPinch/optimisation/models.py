@@ -54,7 +54,7 @@ class OptimisationOptions:
     maxfun: int = 1_000_000
     cluster_tol: float = 0.01
     max_minima: int | None = 4
-    local_method: str = "SLSQP"
+    local_method: str | None = "SLSQP"
     feasibility_tolerance: float = 1.0e-6
     backend_options: tuple[tuple[str, Any], ...] = ()
 

@@ -4,7 +4,13 @@ from __future__ import annotations
 
 import numpy as np
 
-from ....contracts.hpr import HeatPumpTargetInputs, HPRBackendResult, HPRParsedState
+from ....contracts.hpr import (
+    HeatPumpTargetInputs,
+    HPRBackendResult,
+    HPREvaluationMode,
+    HPRParsedState,
+    HPRTopologyIdentifier,
+)
 from ..common._shared.ambient_preallocation import preallocate_direct_ambient_duties
 from ..common._shared.streams import get_Q_vals_at_T_hpr_from_bckgrd_profile
 from ..common.encoding import (
@@ -22,7 +28,17 @@ from ..common.shared import (
     validate_vapour_hp_refrigerant_ls,
 )
 from ..cycles.vapour_compression_mvr_cascade import VapourCompressionMvrCascade
-from ..optimisation_adapter import solve_hpr_placement
+from ..optimisation_adapter import (
+    initialise_hpr_seed,
+    normalise_hpr_penalty_terms,
+    solve_hpr_placement,
+)
+from ..performance_maps.coolprop_preflight import (
+    preflight_coolprop_fluid_names,
+    preflight_coolprop_hpr_targeting,
+    representative_hpr_point,
+)
+from ..performance_maps.target_records import build_coolprop_target_simulation_record
 from .cascade_carnot import (
     optimise_cascade_carnot_heat_pump_placement,
 )
@@ -45,14 +61,18 @@ def optimise_vapour_compression_mvr_heat_pump_placement(
         )
 
     n_vc = _num_vc_stages(args)
-    init_res = (
-        optimise_cascade_carnot_heat_pump_placement(args)
-        if args.initialise_simulated_cycle
-        else None
-    )
+    preflight_coolprop_fluid_names(args, HPRTopologyIdentifier.VAPOUR_COMPRESSION_MVR)
+    init_res = initialise_hpr_seed(optimise_cascade_carnot_heat_pump_placement, args)
     args.refrigerant_ls = validate_vapour_hp_refrigerant_ls(n_vc, args)
     args.mvr_fluid_ls = _normalise_fluid_list(getattr(args, "mvr_fluid_ls", ["Water"]))
     x0_ls, bnds = _get_vc_mvr_opt_setup(init_res, args)
+    preflight_coolprop_hpr_targeting(
+        args=args,
+        state=_parse_vc_mvr_state_variables(
+            representative_hpr_point(x0_ls, bnds), args
+        ),
+        topology_id=HPRTopologyIdentifier.VAPOUR_COMPRESSION_MVR,
+    )
     return solve_hpr_placement(
         f_obj=_compute_vc_mvr_system_obj,
         x0_ls=x0_ls,
@@ -217,6 +237,7 @@ def _compute_vc_mvr_system_obj(
     args: HeatPumpTargetInputs,
     *,
     debug: bool = False,
+    artifact_mode: HPREvaluationMode = HPREvaluationMode.FINAL,
 ) -> HPRBackendResult:
     if not getattr(args, "is_heat_pumping", True):
         return HPRBackendResult.failure(
@@ -231,6 +252,7 @@ def _compute_vc_mvr_system_obj(
         state_vars = HPRParsedState.model_validate(state_vars)
     parsed = _unpack_vc_mvr_state(state_vars, args)
 
+    cycle_evaluated = False
     try:
         hp = VapourCompressionMvrCascade()
         hp.solve(
@@ -269,10 +291,13 @@ def _compute_vc_mvr_system_obj(
             is_process_stream=False,
             dtcont=args.dtcont_hp,
         )
+        cycle_evaluated = True
         w_hpr = hp.work
+        if not np.isfinite(hp.Q_heat) or hp.Q_heat <= 0.0:
+            return HPRBackendResult.failure(reason="Cycle delivers no useful duty.")
         cop = hp.Q_heat / w_hpr if w_hpr > 0 else 1.0
         Q_heat_ordered, Q_cool_ordered = _order_vc_mvr_result_duties(hp, args)
-        return evaluate_vapour_hpr_result(
+        result = evaluate_vapour_hpr_result(
             args=args,
             state=solved_state,
             work=w_hpr,
@@ -285,9 +310,26 @@ def _compute_vc_mvr_system_obj(
             penalty_terms=hp.penalty,
             dT_subcool=solved_state.dT_subcool,
             debug=debug,
+            artifact_mode=artifact_mode,
         )
-    except Exception as exc:
-        if debug:
+        record = (
+            build_coolprop_target_simulation_record(
+                args=args,
+                state=solved_state,
+                cycle=hp,
+                topology_id=HPRTopologyIdentifier.VAPOUR_COMPRESSION_MVR,
+            )
+            if artifact_mode is HPREvaluationMode.FINAL
+            else None
+        )
+        return result.with_updates(
+            simulation_backend=(
+                "coolprop" if artifact_mode is HPREvaluationMode.FINAL else None
+            ),
+            target_simulation_record=record,
+        )
+    except ValueError as exc:
+        if debug or cycle_evaluated:
             raise
         parsed = _unpack_vc_mvr_state(state_vars, args)
         fallback_work = max(float(state_vars.Q_heat_base or 0.0), 1.0)
@@ -309,7 +351,12 @@ def _finite_failed_vc_mvr_result(
     args: HeatPumpTargetInputs,
 ) -> HPRBackendResult:
     work = max(float(work), 1.0)
-    penalty = float(np.maximum(np.asarray(penalty_terms, dtype=float), 0.0).sum())
+    penalty = float(
+        np.maximum(
+            np.asarray(normalise_hpr_penalty_terms(penalty_terms), dtype=float),
+            0.0,
+        ).sum()
+    )
     obj = (work + penalty) / max(float(args.Q_hpr_target), 1.0)
     return HPRBackendResult(
         obj=float(obj),

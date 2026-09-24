@@ -6,7 +6,13 @@ from functools import partial
 
 import numpy as np
 
-from ....contracts.hpr import HeatPumpTargetInputs, HPRBackendResult, HPRParsedState
+from ....contracts.hpr import (
+    HeatPumpTargetInputs,
+    HPRBackendResult,
+    HPREvaluationMode,
+    HPRParsedState,
+    HPRTopologyIdentifier,
+)
 from ....domain.configuration import tol
 from ....domain.stream import Stream
 from ....domain.stream_collection import StreamCollection
@@ -29,7 +35,12 @@ from ..common.shared import (
     validate_vapour_hp_refrigerant_ls,
 )
 from ..cycles.cascade_vapour_compression_cycle import CascadeVapourCompressionCycle
-from ..optimisation_adapter import solve_hpr_placement
+from ..optimisation_adapter import initialise_hpr_seed, solve_hpr_placement
+from ..performance_maps.coolprop_preflight import (
+    preflight_coolprop_fluid_names,
+    preflight_coolprop_hpr_targeting,
+    representative_hpr_point,
+)
 from ..performance_maps.target_records import (
     build_coolprop_target_simulation_record,
     build_tespy_target_simulation_record,
@@ -77,14 +88,19 @@ def optimise_cascade_heat_pump_placement(
         return _optimise_tespy_cascade_heat_pump_placement(args, prepared)
 
     num_stages = int(args.n_cond + args.n_evap - 1)
-    init_res = (
-        optimise_cascade_carnot_heat_pump_placement(args)
-        if args.initialise_simulated_cycle
-        else None
-    )
+    preflight_coolprop_fluid_names(args, _cascade_topology_id(args))
+    init_res = initialise_hpr_seed(optimise_cascade_carnot_heat_pump_placement, args)
 
     args.refrigerant_ls = validate_vapour_hp_refrigerant_ls(num_stages, args)
     x0_ls, bnds = _get_cascade_hp_opt_setup(init_res, args)
+    warm_state = _parse_cascade_hp_state_variables(
+        representative_hpr_point(x0_ls, bnds), args
+    )
+    preflight_coolprop_hpr_targeting(
+        args=args,
+        state=_cascade_stage_preflight_state(warm_state, args),
+        topology_id=_cascade_topology_id(args),
+    )
     return solve_hpr_placement(
         f_obj=_compute_cascade_hp_system_obj,
         x0_ls=x0_ls,
@@ -119,6 +135,12 @@ def _optimise_tespy_cascade_heat_pump_placement(
 ################################################################################
 # Helper Functions
 ################################################################################
+
+
+def _cascade_topology_id(args: HeatPumpTargetInputs) -> HPRTopologyIdentifier:
+    if int(args.n_cond) == 1 and int(args.n_evap) == 1:
+        return HPRTopologyIdentifier.SINGLE_STAGE_VAPOUR_COMPRESSION
+    return HPRTopologyIdentifier.CASCADE_VAPOUR_COMPRESSION
 
 
 def _get_cascade_hp_opt_setup(
@@ -304,17 +326,38 @@ def _cascade_process_control_counts(
     return max(n_cond - 1, 0), n_evap
 
 
+def _cascade_stage_preflight_state(
+    state: HPRParsedState,
+    args: HeatPumpTargetInputs,
+) -> HPRParsedState:
+    """Expand process temperature controls to physical cascade stage states."""
+    T_cond = np.asarray(state.T_cond, dtype=float)
+    T_evap = np.asarray(state.T_evap, dtype=float)
+    return state.model_copy(
+        update={
+            "T_cond": np.sort(
+                np.concatenate([T_cond, T_evap[:-1] + args.dt_cascade_hx])
+            ),
+            "T_evap": np.sort(
+                np.concatenate([T_cond[1:] - args.dt_cascade_hx, T_evap])
+            ),
+        }
+    )
+
+
 def _compute_cascade_hp_system_obj(
     x: np.ndarray,
     args: HeatPumpTargetInputs,
     *,
     debug: bool = False,
+    artifact_mode: HPREvaluationMode = HPREvaluationMode.FINAL,
 ) -> HPRBackendResult:
     is_heat_pumping = getattr(args, "is_heat_pumping", True)
     state_vars = _parse_cascade_hp_state_variables(x, args)
     if not isinstance(state_vars, HPRParsedState):
         state_vars = HPRParsedState.model_validate(state_vars)
 
+    cycle_evaluated = False
     try:
         hp = CascadeVapourCompressionCycle()
         hp.solve(
@@ -347,8 +390,11 @@ def _compute_cascade_hp_system_obj(
             is_process_stream=False,
             dtcont=args.dtcont_hp,
         )
+        cycle_evaluated = True
         w_hpr = hp.work
         primary_duty = hp.Q_heat_arr.sum() if is_heat_pumping else hp.Q_cool_arr.sum()
+        if not np.isfinite(primary_duty) or primary_duty <= 0.0:
+            return HPRBackendResult.failure(reason="Cycle delivers no useful duty.")
         cop = primary_duty / w_hpr if w_hpr > 0 else 1.0
         result = evaluate_vapour_hpr_result(
             args=args,
@@ -363,17 +409,27 @@ def _compute_cascade_hp_system_obj(
             penalty_terms=[hp.penalty],
             dT_subcool=state_vars.dT_subcool,
             debug=debug,
+            artifact_mode=artifact_mode,
         )
-        record = build_coolprop_target_simulation_record(
-            args=args,
-            state=state_vars,
-            cycle=hp,
+        record = (
+            build_coolprop_target_simulation_record(
+                args=args,
+                state=state_vars,
+                cycle=hp,
+                topology_id=_cascade_topology_id(args),
+            )
+            if artifact_mode is HPREvaluationMode.FINAL
+            else None
         )
         return result.with_updates(
-            simulation_backend="coolprop",
+            simulation_backend=(
+                "coolprop" if artifact_mode is HPREvaluationMode.FINAL else None
+            ),
             target_simulation_record=record,
         )
-    except Exception as exc:
+    except ValueError as exc:
+        if cycle_evaluated:
+            raise
         return HPRBackendResult.failure(
             reason=str(exc),
             Q_amb_hot=state_vars.Q_amb_hot,
@@ -388,6 +444,7 @@ def _compute_tespy_cascade_hp_system_obj(
     coordinator: HprTargetEvaluatorCoordinator,
     prepared: PreparedTespyHprTargeting,
     debug: bool = False,
+    artifact_mode: HPREvaluationMode = HPREvaluationMode.FINAL,
 ) -> HPRBackendResult:
     """Evaluate one optimizer candidate through the normalized TESPy boundary."""
     state = _parse_cascade_hp_state_variables(x, args)
@@ -443,17 +500,24 @@ def _compute_tespy_cascade_hp_system_obj(
         dT_subcool=state.dT_subcool,
         dT_superheat=np.array([request.superheat], dtype=float),
         debug=debug,
+        artifact_mode=artifact_mode,
     )
     metadata = coordinator.metadata
     if metadata is None:
         raise RuntimeError("TESPy evaluator metadata is unavailable after open")
-    record = build_tespy_target_simulation_record(
-        request=request,
-        result=evaluated,
-        metadata=metadata,
+    record = (
+        build_tespy_target_simulation_record(
+            request=request,
+            result=evaluated,
+            metadata=metadata,
+        )
+        if artifact_mode is HPREvaluationMode.FINAL
+        else None
     )
     return result.with_updates(
-        simulation_backend="tespy",
+        simulation_backend="tespy"
+        if artifact_mode is HPREvaluationMode.FINAL
+        else None,
         target_simulation_record=record,
     )
 

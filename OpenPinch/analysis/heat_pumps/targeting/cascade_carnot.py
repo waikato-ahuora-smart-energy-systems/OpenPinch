@@ -2,7 +2,12 @@
 
 import numpy as np
 
-from ....contracts.hpr import HeatPumpTargetInputs, HPRBackendResult, HPRParsedState
+from ....contracts.hpr import (
+    HeatPumpTargetInputs,
+    HPRBackendResult,
+    HPREvaluationMode,
+    HPRParsedState,
+)
 from ..common._shared.streams import get_Q_vals_at_T_hpr_from_bckgrd_profile
 from ..common.encoding import (
     AMBIENT_X_BOUNDS,
@@ -125,6 +130,7 @@ def _compute_cascade_carnot_cycle_obj(
     args: HeatPumpTargetInputs,
     *,
     debug: bool = False,
+    artifact_mode: HPREvaluationMode = HPREvaluationMode.FINAL,
 ) -> HPRBackendResult:
     state_vars = _parse_cascade_carnot_cycle_state_variables(x, args)
     if not isinstance(state_vars, HPRParsedState):
@@ -159,4 +165,5 @@ def _compute_cascade_carnot_cycle_obj(
         Q_evap_he=cycle.Q_evap_he,
         penalty_terms=cycle.penalty,
         debug=debug,
+        artifact_mode=artifact_mode,
     )

@@ -1,6 +1,7 @@
 """Edge-path tests for simulated HPR backend wrappers."""
 
 import numpy as np
+import pytest
 
 import OpenPinch.analysis.heat_pumps.targeting.cascade_carnot as cascade_carnot
 import OpenPinch.analysis.heat_pumps.targeting.cascade_vapour_compression as cascade_vapour_compression
@@ -72,7 +73,7 @@ def test_cascade_carnot_backend_validates_mapping_state(monkeypatch):
     assert result.Q_amb_cold == 3.0
 
 
-def test_cascade_vapour_backend_returns_failure_when_cycle_raises(monkeypatch):
+def test_cascade_vapour_backend_propagates_unexpected_cycle_error(monkeypatch):
     state = _state()
     monkeypatch.setattr(
         cascade_vapour_compression,
@@ -90,14 +91,11 @@ def test_cascade_vapour_backend_returns_failure_when_cycle_raises(monkeypatch):
         RaisingCycle,
     )
 
-    result = cascade_vapour_compression._compute_cascade_hp_system_obj(
-        np.array([0.0]),
-        _base_args(),
-    )
-
-    assert result.success is False
-    assert result.failure_reason == "cycle failed"
-    assert result.Q_amb_hot == 2.0
+    with pytest.raises(RuntimeError, match="cycle failed"):
+        cascade_vapour_compression._compute_cascade_hp_system_obj(
+            np.array([0.0]),
+            _base_args(),
+        )
 
 
 def test_parallel_vapour_backend_failure_paths(monkeypatch):
@@ -136,10 +134,8 @@ def test_parallel_vapour_backend_failure_paths(monkeypatch):
         "ParallelVapourCompressionCycles",
         RaisingCycle,
     )
-    result = parallel_vapour_compression._compute_parallel_hp_system_obj(
-        np.array([0.0]),
-        _base_args(),
-    )
-
-    assert result.success is False
-    assert result.failure_reason == "parallel failed"
+    with pytest.raises(RuntimeError, match="parallel failed"):
+        parallel_vapour_compression._compute_parallel_hp_system_obj(
+            np.array([0.0]),
+            _base_args(),
+        )

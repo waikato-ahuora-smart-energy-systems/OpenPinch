@@ -58,6 +58,202 @@ X) Other (please describe after the `[Answer]:` tag below)
 
 [Answer]: A
 
+## CoolProp HPR and MVR Reliability Unit Plan
+
+Status: Units Generation complete; artifacts validated and awaiting approval.
+
+### Inputs
+
+- Approved requirements:
+  `aidlc-docs/inception/requirements/coolprop-hpr-optimisation-investigation.md`.
+- Approved Application Design:
+  `aidlc-docs/inception/application-design/coolprop-hpr-mvr/`.
+- Approved execution plan:
+  `aidlc-docs/inception/plans/coolprop-hpr-mvr-execution-plan.md`.
+- User Stories were explicitly skipped; the story-map artifact will map approved
+  requirements and verification criteria instead.
+
+### Decomposition Assessment
+
+- **Story grouping**: no user stories exist by explicit direction. The approved
+  requirements cluster into candidate/result correctness, optimised-service
+  reliability, and deterministic process-MVR plus integrated proof.
+- **Dependencies**: detached contracts and correct candidate semantics must
+  stabilize before search orchestration. The integrated public and tutorial
+  gates consume both optimised-service and direct process-MVR behavior.
+- **Team alignment**: no team topology is documented. OpenPinch is one
+  in-process Python package, so units are implementation, TDD, and review
+  boundaries unless the user identifies separate ownership.
+- **Technical considerations**: the approved Application Design fixes a single
+  wheel/source distribution, no new dependency, no infrastructure, and no
+  separately deployed service. Deployment-based decomposition is therefore
+  not applicable.
+- **Business domain**: optimised HPR/VC+MVR targeting and deterministic direct
+  process-MVR share property diagnostics but have different orchestration and
+  failure lifecycles.
+- **Code organization**: this is brownfield, not greenfield. The approved design
+  retains existing `application`, `contracts`, `analysis`,
+  `optimisation`, direct-MVR, tests, and notebook owners; a new top-level
+  package layout is not applicable.
+
+### Proposed Units
+
+1. **Unit 1 — Candidate Correctness and Detached HPR Results**
+   - penalty normalization and finite-objective invariants;
+   - search-time versus final-time artifact boundary;
+   - generalized detached simulation evidence;
+   - public `model=None`, recursive multiperiod detachment, and transaction
+     copy safety;
+   - foundational failure and budget contracts needed by later units.
+2. **Unit 2 — CoolProp HPR and VC+MVR Search Reliability**
+   - VC and MVR-fluid state-capability preflight;
+   - candidate-local versus fatal failure classification;
+   - bounded diagnostics, public iteration/evaluation controls, and multiperiod
+     propagation;
+   - CoolProp-evaluated warm-start retention, cached unique points, and bounded
+     global search;
+   - public direct/utility heat-pump and refrigeration integration.
+3. **Unit 3 — Direct Process-MVR Hardening and Integrated Proof**
+   - compression-target capability validation and contextual errors;
+   - typed stage-level dry-stage and reduced-profile fallback diagnostics;
+   - real-engine public regression matrix, property/state-model tests, budget
+     gates, notebook 09 and 11 assertions, documentation, and final package
+     verification.
+
+### Mandatory Generation Steps
+
+- [x] Reconcile the approved requirements, execution plan, and Application
+  Design with User Stories explicitly skipped.
+- [x] Evaluate story grouping, dependencies, team alignment, technical and
+  deployment concerns, business-domain boundaries, and brownfield code
+  organization.
+- [x] Define a proposed three-unit decomposition and implementation order.
+- [x] Include every mandatory unit artifact in this plan.
+- [x] Create context-specific questions for every decomposition decision where
+  user input can improve the result.
+- [x] Collect and validate every answer below.
+- [x] Resolve every ambiguity or contradiction through follow-up questions.
+- [x] Obtain explicit approval of this completed plan before generation.
+- [x] Append the scoped unit definitions, responsibilities, inputs, outputs,
+  exclusions, and exit evidence to
+  `aidlc-docs/inception/application-design/unit-of-work.md`.
+- [x] Append the scoped dependency matrix, critical path, coordination points,
+  rollback boundaries, and test checkpoints to
+  `aidlc-docs/inception/application-design/unit-of-work-dependency.md`.
+- [x] Append a requirement-and-verification map, used in place of skipped
+  stories, to
+  `aidlc-docs/inception/application-design/unit-of-work-story-map.md`.
+- [x] Validate complete FR-1 through FR-11 and verification-requirement 1
+  through 11 assignment.
+- [x] Validate dependency acyclicity, existing package ownership, and absence of
+  new deployable services or dependencies.
+- [x] Mark each completed generation step in the same interaction.
+- [x] Present generated units for explicit approval before Construction.
+
+### Question 1 — Requirement Grouping
+
+Which grouping should define the implementation units?
+
+A) Use the proposed three-unit split: candidate/result correctness, optimised
+service reliability, then process-MVR and integrated proof (recommended)
+
+B) Add a fourth verification-only unit, separating tests, notebooks, and
+documentation from process-MVR hardening
+
+C) Use a different grouping and describe the desired unit boundaries after the
+`[Answer]:` tag
+
+X) Other (please describe after the `[Answer]:` tag below)
+
+[Answer]: A
+
+### Question 2 — Dependency Sequence
+
+How should delivery be sequenced?
+
+A) Use the contract-first sequence Unit 1 → Unit 2 → Unit 3, with tests owned by
+each unit and one final integrated gate (recommended)
+
+B) Allow Units 2 and 3 to proceed independently after Unit 1, then add a separate
+integration pass
+
+C) Use another dependency order and describe it after the `[Answer]:` tag
+
+X) Other (please describe after the `[Answer]:` tag below)
+
+[Answer]: A
+
+### Question 3 — Team Alignment
+
+Should units represent delivery boundaries or separate ownership boundaries?
+
+A) Treat them as sequential implementation, TDD, and review boundaries inside
+one OpenPinch team/package (recommended)
+
+B) Treat the three units as separately owned workstreams and document explicit
+handoff contracts
+
+C) Use another ownership model and describe it after the `[Answer]:` tag
+
+X) Other (please describe after the `[Answer]:` tag below)
+
+[Answer]: A
+
+### Question 4 — MVR Domain Boundary
+
+How should deterministic direct process-MVR relate to optimised VC+MVR?
+
+A) Keep direct process-MVR in Unit 3, separate from optimised targeting, while
+sharing only detached diagnostic vocabulary (recommended)
+
+B) Move all MVR-prefixed behavior into one unit even though direct process-MVR
+does not use the optimiser
+
+C) Exclude direct process-MVR from this delivery and handle it later
+
+X) Other (please describe after the `[Answer]:` tag below)
+
+[Answer]: A
+
+### Question 5 — Story-Map Substitute
+
+Because User Stories were explicitly skipped, what should the mandatory
+unit-of-work story map contain?
+
+A) Map all 11 functional and 11 verification requirements directly to units,
+including enabled property-testing obligations (recommended)
+
+B) Create synthetic story identifiers solely for the mapping artifact
+
+C) Use another traceability basis and describe it after the `[Answer]:` tag
+
+X) Other (please describe after the `[Answer]:` tag below)
+
+[Answer]: A
+
+### Resolved Decisions
+
+1. Use the proposed three-unit split.
+2. Deliver Unit 1, then Unit 2, then Unit 3, with unit-owned tests and one final
+   integrated gate.
+3. Treat units as implementation, TDD, and review boundaries inside one package,
+   not as separate team or deployment ownership.
+4. Keep deterministic direct process-MVR separate from optimised VC+MVR while
+   sharing only detached diagnostic vocabulary.
+5. Map the 11 functional and 11 verification requirements directly instead of
+   creating synthetic user stories.
+
+The five selections are mutually consistent with the approved Application
+Design and execution plan. No ambiguity, undefined decision rule, combined
+option, or contradiction remains.
+
+### Part 1 Exit Criteria
+
+- All five answers are complete and unambiguous.
+- The user explicitly approves this plan after answer analysis.
+- Only then may the three shared unit artifacts be extended.
+
+
 ## TESPy HPR Performance-Map Unit Plan
 
 ### Decomposition Assessment

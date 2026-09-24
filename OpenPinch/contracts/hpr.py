@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Any, List, Literal, Optional, Self
 
 import numpy as np
@@ -12,6 +13,159 @@ from ..domain.value import Value
 from .hpr_performance_map import JsonValue
 
 
+class HPREvaluationMode(str, Enum):
+    """Artifact policy for one internal HPR candidate evaluation."""
+
+    SEARCH = "search"
+    FINAL = "final"
+
+
+class HPRFailureCategory(str, Enum):
+    """Stable high-level categories for bounded HPR diagnostics."""
+
+    PREFLIGHT_REJECTION = "preflight_rejection"
+    CANDIDATE_PHYSICAL_INFEASIBILITY = "candidate_physical_infeasibility"
+    BUDGET_EXHAUSTION = "budget_exhaustion"
+    NO_VIABLE_CANDIDATE = "no_viable_candidate"
+    DIRECT_MVR_REQUIRED_STATE = "direct_mvr_required_state"
+    FATAL_INTERNAL_BOUNDARY = "fatal_internal_boundary"
+
+
+class HPRTopologyIdentifier(str, Enum):
+    """Engine-neutral topology identifiers retained by accepted targets."""
+
+    SINGLE_STAGE_VAPOUR_COMPRESSION = "single_stage_vapour_compression"
+    CASCADE_VAPOUR_COMPRESSION = "cascade_vapour_compression"
+    PARALLEL_VAPOUR_COMPRESSION = "parallel_vapour_compression"
+    VAPOUR_COMPRESSION_MVR = "vapour_compression_mvr"
+
+
+class HPRSearchBudget(BaseModel):
+    """Resolved engine-neutral limits for one HPR optimisation request."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    maximum_iterations: int = Field(default=300, strict=True, ge=1)
+    maximum_evaluations: int = Field(default=1_000_000, strict=True, ge=1)
+
+
+class HPRFailureDiagnostic(BaseModel):
+    """One detached, bounded HPR failure fact."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    category: HPRFailureCategory
+    reason_code: str = Field(min_length=1, max_length=128, pattern=r"^[a-z0-9_.-]+$")
+    summary: str = Field(min_length=1, max_length=512)
+    fluid: str | None = Field(default=None, min_length=1, max_length=256)
+    stage_index: int | None = Field(default=None, ge=0)
+    period_id: str | None = Field(default=None, min_length=1, max_length=256)
+    candidate_index: int | None = Field(default=None, ge=0)
+    topology: HPRTopologyIdentifier | None = None
+
+    @field_validator("summary")
+    @classmethod
+    def _require_single_line_summary(cls, value: str) -> str:
+        if "\n" in value or "\r" in value:
+            raise ValueError("diagnostic summary must be a single line")
+        return value
+
+
+class HPRFailureSummary(BaseModel):
+    """Bounded failure evidence attached to a public targeting error."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    simulation_backend: Literal["coolprop", "tespy"]
+    cycle: str = Field(min_length=1, max_length=256)
+    evaluated_count: int = Field(strict=True, ge=0)
+    category_counts: dict[HPRFailureCategory, int]
+    representative_failures: tuple[HPRFailureDiagnostic, ...] = Field(
+        default=(), max_length=16
+    )
+    budget: HPRSearchBudget
+    warm_start_evaluated: bool
+    warm_start_viable: bool
+
+    @field_validator("category_counts", mode="before")
+    @classmethod
+    def _validate_category_counts(
+        cls,
+        value: dict[HPRFailureCategory, int],
+    ) -> dict[HPRFailureCategory, int]:
+        if any(
+            isinstance(count, bool) or not isinstance(count, int) or count < 0
+            for count in value.values()
+        ):
+            raise ValueError("diagnostic category counts must be non-negative integers")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_warm_start_flags(self) -> Self:
+        if self.warm_start_viable and not self.warm_start_evaluated:
+            raise ValueError("warm_start_viable requires warm_start_evaluated")
+        return self
+
+
+class HPRTargetingError(ValueError):
+    """Public HPR failure with bounded structured diagnostics."""
+
+    def __init__(self, message: str, *, diagnostics: HPRFailureSummary) -> None:
+        super().__init__(message)
+        self.diagnostics = diagnostics
+
+    def __reduce__(self):
+        return (_restore_hpr_targeting_error, (str(self), self.diagnostics))
+
+
+def _restore_hpr_targeting_error(message, diagnostics):
+    return HPRTargetingError(message, diagnostics=diagnostics)
+
+
+class HPRSimulationStageRecord(BaseModel):
+    """Detached nominal facts for one accepted HPR stage."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
+
+    stage_id: str = Field(min_length=1, max_length=128)
+    ordinal: int = Field(strict=True, ge=0)
+    role: Literal["vapour_compression", "mvr", "evaporator", "condenser"]
+    fluid_spec: str = Field(min_length=1, max_length=512)
+    evaporating_or_suction_temperature: float | None = None
+    condensing_or_discharge_temperature: float | None = None
+    source_approach_temperature: float | None = Field(default=None, ge=0.0)
+    sink_approach_temperature: float | None = Field(default=None, ge=0.0)
+    compressor_isentropic_efficiency: float | None = Field(default=None, gt=0.0, le=1.0)
+    motor_efficiency: float | None = Field(default=None, gt=0.0, le=1.0)
+    useful_duty: float | None = Field(default=None, ge=0.0)
+    compressor_work: float | None = Field(default=None, ge=0.0)
+    assumptions: dict[str, JsonValue] = Field(default_factory=dict)
+
+
+class HPRSimulationLoopRecord(BaseModel):
+    """Ordered detached stage facts for one accepted HPR loop."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
+
+    loop_id: str = Field(min_length=1, max_length=128)
+    ordinal: int = Field(strict=True, ge=0)
+    loop_role: Literal["vapour_compression", "mvr"]
+    fluid_spec: str = Field(min_length=1, max_length=512)
+    nominal_duty: float = Field(ge=0.0)
+    nominal_work: float = Field(ge=0.0)
+    stages: tuple[HPRSimulationStageRecord, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _validate_stage_order(self) -> Self:
+        ordinals = [stage.ordinal for stage in self.stages]
+        if ordinals != list(range(len(self.stages))):
+            raise ValueError("stage ordinals must be contiguous from zero")
+        identifiers = [stage.stage_id for stage in self.stages]
+        if len(set(identifiers)) != len(identifiers):
+            raise ValueError("stage identifiers must be unique within a loop")
+        return self
+
+
 class HprTargetSimulationRecord(BaseModel):
     """Detached nominal simulation facts retained by a successful HPR target."""
 
@@ -19,7 +173,16 @@ class HprTargetSimulationRecord(BaseModel):
 
     simulation_backend: Literal["coolprop", "tespy"]
     mode: Literal["heat_pump", "refrigeration"]
-    cycle_id: Literal["single_stage_vapour_compression"]
+    cycle_id: Literal[
+        "single_stage_vapour_compression",
+        "cascade_vapour_compression",
+        "parallel_vapour_compression",
+        "vapour_compression_mvr",
+    ]
+    topology_id: HPRTopologyIdentifier = (
+        HPRTopologyIdentifier.SINGLE_STAGE_VAPOUR_COMPRESSION
+    )
+    schema_version: str = Field(default="1.0", min_length=1, max_length=32)
     model_id: str
     refrigerant_spec: str
     nominal_evaporating_temperature: float
@@ -37,6 +200,7 @@ class HprTargetSimulationRecord(BaseModel):
     engine_version: str
     power_boundary: Literal["compressor_only"] = "compressor_only"
     assumptions: dict[str, JsonValue]
+    loops: tuple[HPRSimulationLoopRecord, ...] = ()
 
     @field_validator("model_id", "refrigerant_spec", "engine_version")
     @classmethod
@@ -58,6 +222,21 @@ class HprTargetSimulationRecord(BaseModel):
             raise ValueError("nominal target must have positive temperature lift")
         if not self.assumptions:
             raise ValueError("assumptions must not be empty")
+        if self.topology_id.value != self.cycle_id:
+            raise ValueError("topology_id must match cycle_id")
+        if (
+            self.topology_id
+            is not HPRTopologyIdentifier.SINGLE_STAGE_VAPOUR_COMPRESSION
+        ):
+            if not self.loops:
+                raise ValueError("multi-loop topology requires loop evidence")
+        if self.loops:
+            ordinals = [loop.ordinal for loop in self.loops]
+            if ordinals != list(range(len(self.loops))):
+                raise ValueError("loop ordinals must be contiguous from zero")
+            identifiers = [loop.loop_id for loop in self.loops]
+            if len(set(identifiers)) != len(identifiers):
+                raise ValueError("loop identifiers must be unique")
         return self
 
 
@@ -66,6 +245,7 @@ class HeatPumpTargetInputs(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
+    search_budget: HPRSearchBudget = Field(default_factory=HPRSearchBudget)
     hpr_type: str
     Q_hpr_target: float
     Q_heat_max: float
@@ -137,6 +317,7 @@ class MultiPeriodHPRTargetInputs(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
+    search_budget: HPRSearchBudget = Field(default_factory=HPRSearchBudget)
     period_cases: List[HPRPeriodCase]
     selected_period_id: str
     selected_period_idx: int
@@ -330,6 +511,7 @@ class HPRBackendResult(BaseModel):
         return self.model_copy(update=kwargs)
 
     def to_output_fields(self) -> dict[str, Any]:
+        """Return detached caller-facing fields without live engine artifacts."""
         output_values = {
             "utility_tot": self.utility_tot,
             "w_net": self.w_net,
@@ -365,9 +547,8 @@ class HPRBackendResult(BaseModel):
             "dT_comp": self.dT_comp,
             "Q_heat": self.Q_heat,
             "Q_cool": self.Q_cool,
-            "model": self.model,
-            "period_outputs": self.period_outputs,
-            "weighted_output": self.weighted_output,
+            "period_outputs": _detach_hpr_output_value(self.period_outputs),
+            "weighted_output": _detach_hpr_output_value(self.weighted_output),
             "design_vector": self.design_vector,
             "period_ids": self.period_ids,
             "period_weights": self.period_weights,
@@ -397,8 +578,39 @@ class HPRBackendResult(BaseModel):
         )
 
 
+def _detach_hpr_output_value(value: Any) -> Any:
+    """Recursively remove internal HPR engine artifacts from nested outputs."""
+    if isinstance(value, HPRBackendResult):
+        return value.to_output_fields()
+    if isinstance(value, HeatPumpTargetOutputs):
+        fields = value.model_dump(mode="python", exclude={"model"})
+        return _detach_hpr_output_value(fields)
+    if isinstance(value, HPRThermoArtifacts):
+        raise TypeError("HPR thermodynamic artifacts cannot enter public output.")
+    if isinstance(value, dict):
+        return {
+            key: _detach_hpr_output_value(item)
+            for key, item in value.items()
+            if key not in {"artifacts", "debug_figure", "model"}
+        }
+    if isinstance(value, list):
+        return [_detach_hpr_output_value(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_detach_hpr_output_value(item) for item in value)
+    return value
+
+
 __all__ = [
+    "HPREvaluationMode",
+    "HPRFailureCategory",
+    "HPRFailureDiagnostic",
+    "HPRFailureSummary",
     "HPRPeriodCase",
+    "HPRSearchBudget",
+    "HPRSimulationLoopRecord",
+    "HPRSimulationStageRecord",
+    "HPRTargetingError",
+    "HPRTopologyIdentifier",
     "HprTargetSimulationRecord",
     "HeatPumpTargetInputs",
     "HeatPumpTargetOutputs",

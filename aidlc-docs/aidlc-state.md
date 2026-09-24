@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: HPR Derived-Case API — Complete
+- **Current Stage**: CoolProp HPR and MVR Reliability — Audit complete
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -27,6 +27,44 @@
 | Security Baseline | No | Utility Placement Requirements Analysis |
 | Property-Based Testing | Yes | Utility Placement Requirements Analysis |
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
+
+## CoolProp HPR and MVR Reliability
+
+- [x] PR review follow-up: failure diagnostics now classify 1x1 vapour-
+  compression configurations as single-stage while preserving cascade
+  classification for multi-stage configurations; search and final failure paths
+  pass focused regression coverage.
+- [x] Post-construction audit: corrected public budget routing, hard search caps,
+  restart/polish/cache behavior, preflight classification, penalty aggregation,
+  records, fatal boundaries, detachment, direct-MVR evidence and tutorial proof.
+- [x] Audit verification: 37 new regression/property/public cases; 3,374 distinct
+  passes across repository run and targeted replays, four declared skips.
+  No unresolved failure; not represented as one clean full-suite invocation.
+- Audit: `construction/build-and-test/coolprop-hpr-mvr-reliability/implementation-audit.md`.
+- Final limits and evidence supersede the original construction claims below.
+
+- [x] Inception: investigation, requirements, workflow plan, application design,
+  and three-unit decomposition complete; user stories skipped by request.
+- [x] Unit 1: candidate correctness, evaluation modes, generalized records, and
+  detached public results complete.
+- [x] Unit 2: CoolProp preflight, bounded budgets, warm-start retention, exact
+  caching, typed failure summaries, and optimized service integration complete.
+- [x] Unit 3: direct process-MVR bounds, contextual errors, observable fallbacks,
+  scalar topology correction, and notebook/public proof complete.
+- [x] Build and Test: strict docs, distributions, full suite, real notebooks,
+  installed-wheel smoke, and final static gates complete.
+- [x] Operations: N/A; no deployment, publication, infrastructure, or monitoring
+  change was requested.
+- Requirements:
+  `inception/requirements/coolprop-hpr-optimisation-investigation.md`.
+- Unit summaries:
+  `construction/coolprop-hpr-mvr-unit-1/code/code-generation-summary.md`,
+  `construction/coolprop-hpr-mvr-unit-2/code/code-generation-summary.md`, and
+  `construction/coolprop-hpr-mvr-unit-3/code/code-generation-summary.md`.
+- Build/test summary:
+  `construction/build-and-test/coolprop-hpr-mvr-reliability/build-and-test-summary.md`.
+- Enabled Property-Based Testing extension is compliant through all three units;
+  disabled Security and Resiliency extensions are skipped.
 
 ## HPR Derived-Case API Refinement
 
@@ -2081,3 +2119,50 @@ refreshed reverse-engineering artifacts.
 - [x] Full develop validation retained; exact-commit PR reuse implemented per user preference.
 - [x] Validation and summary: 167 packaging tests passed, 3 skipped; final focused 66 tests, Ruff, YAML, shell and workflow consistency checks passed.
 - Plan: construction/plans/ci-develop-simplification-plan.md.
+
+## CoolProp-Backed HPR and MVR Services Investigation
+
+- [x] INCEPTION - Workspace Detection confirmed the existing brownfield Python
+  library, existing reverse-engineering baseline, HPR analysis owners, reusable
+  optimisation services, and focused test surfaces.
+- [x] INCEPTION - Reverse Engineering skipped because the existing architecture,
+  component, API, and technology records establish the required boundaries;
+  live source and tests will be inspected for the failure diagnosis.
+- [x] INCEPTION - Requirements Analysis completed for CoolProp-backed cascade,
+  parallel, VC+MVR optimisation, and deterministic direct process-MVR services.
+- [x] INCEPTION - User Stories skipped by explicit user direction. No personas
+  or stories were generated; approved requirements remain the acceptance source.
+- [x] INCEPTION - Workflow Planning completed and approved by the user's `go`
+  response.
+- [x] INCEPTION - Focused Application Design completed and approved by the
+  user's `Go` response.
+- [x] INCEPTION - Units Generation complete and approved by the user's
+  `Proceed to the **Construction Phase**` response.
+- [x] CONSTRUCTION - Unit 1 Functional Design approved under the user's
+  completion authorization.
+- [x] CONSTRUCTION - Unit 1 NFR Requirements complete; 25 requirements and
+  existing-stack decisions validated under completion authorization.
+- [x] CONSTRUCTION - Unit 1 NFR Design complete; ten patterns and eight logical
+  components validated under completion authorization.
+- [x] CONSTRUCTION - Unit 1 Code Generation Part 1 complete and approved under
+  completion authorization; nine-step Part 2 execution is active.
+- [ ] CONSTRUCTION - Functional Design recommended per unit.
+- [ ] CONSTRUCTION - NFR Requirements and NFR Design recommended.
+- [x] CONSTRUCTION - Infrastructure Design skipped; no infrastructure change.
+- [ ] CONSTRUCTION - Code Generation and Build and Test required.
+- **Findings and remediation requirements**:
+  `inception/requirements/coolprop-hpr-optimisation-investigation.md`.
+- **Execution plan**:
+  `inception/plans/coolprop-hpr-mvr-execution-plan.md`.
+- **Application design**:
+  `inception/application-design/coolprop-hpr-mvr/application-design.md`.
+- [x] CONSTRUCTION - Unit 2 Functional Design complete and approved under completion authorization.
+- [x] CONSTRUCTION - Unit 2 NFR Requirements complete and approved under completion authorization.
+- [x] CONSTRUCTION - Unit 2 NFR Design complete and approved under completion authorization.
+- [x] CONSTRUCTION - Unit 2 Code Generation complete and approved under completion authorization.
+- [x] CONSTRUCTION - Unit 3 Functional Design complete and approved under completion authorization.
+- [x] CONSTRUCTION - Unit 3 NFR Requirements complete and approved under completion authorization.
+- [x] CONSTRUCTION - Unit 3 NFR Design complete and approved under completion authorization.
+- [ ] CONSTRUCTION - Unit 3 Code Generation Part 1 approved; seven-step Part 2 is active.
+- **Current stage**: Construction, Unit 3 Code Generation Part 2, Step 1 of 7.
+- **Extensions**: Property-Based Testing enabled. Security and Resiliency disabled.

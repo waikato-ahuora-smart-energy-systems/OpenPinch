@@ -405,6 +405,7 @@ NOTEBOOKS = {
         cells=[
             code(
                 "from OpenPinch import PinchProblem\n"
+                "from OpenPinch.contracts.hpr import HPRTargetingError\n"
                 "from OpenPinch.contracts.hpr_performance_map import (\n"
                 "    HprPerformanceMapRequest,\n"
                 ")\n\n"
@@ -412,14 +413,17 @@ NOTEBOOKS = {
                 'project_name="HPR Models")\n'
                 "def screen_cycle(method, **arguments):\n"
                 "    try:\n"
+                "        result = method(**arguments)\n"
+                "        if result is None:\n"
+                '            return {"status": "no applicable target", "result": None}\n'
                 '        return {"status": "feasible", '
-                '"result": method(**arguments)}\n'
-                "    except (ImportError, RuntimeError, ValueError, "
+                '"result": result}\n'
+                "    except (HPRTargetingError, ImportError, "
                 "NotImplementedError) as error:\n"
                 '        return {"status": "no feasible solution", '
                 '"reason": str(error)}\n\n'
                 "working_fluid_examples = {\n"
-                '    "pure": "ammonia",\n'
+                '    "pure": "water",\n'
                 '    "registered_blend": "R410A.mix",\n'
                 "}\n"
                 "# Omitting simulation_backend selects the CoolProp default.\n"
@@ -431,6 +435,8 @@ NOTEBOOKS = {
                 "    evaporators=1,\n"
                 "    maximum_restarts=1,\n"
                 ")\n"
+                'assert coolprop_target["status"] == "feasible"\n'
+                'assert coolprop_target["result"] is not None\n'
                 "coolprop_target"
             ),
             code(
@@ -467,6 +473,8 @@ NOTEBOOKS = {
                 "    None if target_simulation_record is None\n"
                 '    else target_simulation_record.model_dump(mode="json")\n'
                 ")\n"
+                "assert target_simulation_record is not None\n"
+                "assert performance_map is not None\n"
                 "plain_performance_map"
             ),
             code(
@@ -513,14 +521,15 @@ NOTEBOOKS = {
         extras="hpr",
         cells=[
             code(
-                "from OpenPinch import PinchProblem\n\n"
+                "from OpenPinch import PinchProblem\n"
+                "from OpenPinch.contracts.hpr import HPRTargetingError\n\n"
                 'problem = PinchProblem("crude_preheat_train_multiperiod.json", '
                 'project_name="Crude HPR")\n'
                 "def screen_periods(method, **arguments):\n"
                 "    try:\n"
-                '        return {"status": "feasible", '
+                '        return {"status": "completed", '
                 '"results": method(**arguments)}\n'
-                "    except ValueError as error:\n"
+                "    except HPRTargetingError as error:\n"
                 '        return {"status": "no shared feasible solution", '
                 '"reason": str(error)}\n\n'
                 "period_heat_pumps = problem.target.all_periods.carnot_heat_pump(\n"
@@ -560,7 +569,8 @@ NOTEBOOKS = {
         extras="hpr",
         cells=[
             code(
-                "from OpenPinch import PinchProblem\n\n"
+                "from OpenPinch import PinchProblem\n"
+                "from OpenPinch.contracts.hpr import HPRTargetingError\n\n"
                 'problem = PinchProblem("process_mvr.json", project_name="Site")\n'
                 "mvr = problem.components.add_process_mvr(\n"
                 '    "Evaporator vapour",\n'
@@ -581,6 +591,8 @@ NOTEBOOKS = {
                 "original_streams = mvr.original_streams\n"
                 "replacement_streams = mvr.replacement_streams\n"
                 "stage_results = mvr.stage_results_by_period\n"
+                "assert stage_results\n"
+                "assert all(stages for stages in stage_results.values())\n"
                 "affected_zones = mvr.affected_zone_paths\n"
                 "compressor_work = mvr.work_for_zone(problem.master_zone)\n"
                 "serial = problem.target.all_periods.direct_heat_integration(workers=1)\n"
@@ -588,13 +600,21 @@ NOTEBOOKS = {
                 'assert [o.model_dump(mode="json") for o in serial.values()] == [\n'
                 '    o.model_dump(mode="json") for o in parallel.values()\n'
                 "]\n"
+                "# The process-MVR example can have no residual heating load.\n"
+                "# Use a separate loaded case to demonstrate optimized VC+MVR.\n"
+                'cascade_problem = PinchProblem("heat_pump_targeting.json")\n'
                 "try:\n"
-                "    cascade = problem.target.mvr_heat_pump(\n"
-                "        load_fraction=0.25, maximum_restarts=1\n"
+                "    cascade = cascade_problem.target.mvr_heat_pump(\n"
+                "        load_fraction=0.25, maximum_restarts=1,\n"
+                "        condensers=1, evaporators=1,\n"
+                "        maximum_iterations=3, maximum_evaluations=100,\n"
+                '        options={"HPR_REFRIGERANTS": ["Water"]},\n'
                 "    )\n"
-                "except (ValueError, RuntimeError, NotImplementedError) as error:\n"
+                "except HPRTargetingError as error:\n"
                 '    cascade = {"status": "no feasible solution", '
                 '"reason": str(error)}\n'
+                "assert cascade is not None and not isinstance(cascade, dict), cascade\n"
+                "assert cascade.hpr_details.target_simulation_record.loops\n"
                 "mvr.deactivate()\n"
                 "mvr.activate()\n"
                 "component_inventory"
