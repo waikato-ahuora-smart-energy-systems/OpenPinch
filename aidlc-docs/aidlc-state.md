@@ -30,6 +30,10 @@
 
 ## CoolProp HPR and MVR Reliability
 
+- [x] PR review follow-up: failure diagnostics now classify 1x1 vapour-
+  compression configurations as single-stage while preserving cascade
+  classification for multi-stage configurations; search and final failure paths
+  pass focused regression coverage.
 - [x] Post-construction audit: corrected public budget routing, hard search caps,
   restart/polish/cache behavior, preflight classification, penalty aggregation,
   records, fatal boundaries, detachment, direct-MVR evidence and tutorial proof.

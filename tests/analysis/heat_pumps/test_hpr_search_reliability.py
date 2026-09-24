@@ -25,6 +25,7 @@ from OpenPinch.contracts.hpr import (
     HPRTargetingError,
     HPRTopologyIdentifier,
 )
+from OpenPinch.domain.enums import HeatPumpAndRefrigerationCycle
 from OpenPinch.optimisation.models import (
     OptimisationCandidate,
     OptimisationResult,
@@ -126,7 +127,18 @@ def test_backend_exhaustion_retains_viable_warm_start() -> None:
     assert candidates == (OptimisationCandidate(objective=0.25, point=(0.5,)),)
 
 
-def test_no_viable_candidate_raises_bounded_typed_diagnostics() -> None:
+@pytest.mark.parametrize(
+    ("n_cond", "n_evap", "expected_topology"),
+    [
+        (1, 1, HPRTopologyIdentifier.SINGLE_STAGE_VAPOUR_COMPRESSION),
+        (2, 1, HPRTopologyIdentifier.CASCADE_VAPOUR_COMPRESSION),
+    ],
+)
+def test_no_viable_candidate_raises_bounded_typed_diagnostics(
+    n_cond: int,
+    n_evap: int,
+    expected_topology: HPRTopologyIdentifier,
+) -> None:
     def objective(*_args, **_kwargs):
         return HPRBackendResult.failure(reason="state outside CoolProp envelope")
 
@@ -135,7 +147,12 @@ def test_no_viable_candidate_raises_bounded_typed_diagnostics() -> None:
             f_obj=objective,
             x0_ls=[[0.5]],
             bnds=[(0.0, 1.0)],
-            args=_base_args(search_budget=HPRSearchBudget()),
+            args=_base_args(
+                hpr_type=HeatPumpAndRefrigerationCycle.CascadeVapourComp.value,
+                n_cond=n_cond,
+                n_evap=n_evap,
+                search_budget=HPRSearchBudget(),
+            ),
             candidate_search=lambda **_kwargs: (
                 OptimisationCandidate(objective=1e30, point=(0.5,)),
             ),
@@ -143,6 +160,45 @@ def test_no_viable_candidate_raises_bounded_typed_diagnostics() -> None:
 
     assert captured.value.diagnostics.evaluated_count == 1
     assert len(captured.value.diagnostics.representative_failures) == 1
+    assert (
+        captured.value.diagnostics.representative_failures[0].topology
+        is expected_topology
+    )
+
+
+@pytest.mark.parametrize(
+    ("n_cond", "n_evap", "expected_topology"),
+    [
+        (1, 1, HPRTopologyIdentifier.SINGLE_STAGE_VAPOUR_COMPRESSION),
+        (2, 1, HPRTopologyIdentifier.CASCADE_VAPOUR_COMPRESSION),
+    ],
+)
+def test_search_failure_diagnostics_classify_vapour_topology_by_stage_count(
+    n_cond: int,
+    n_evap: int,
+    expected_topology: HPRTopologyIdentifier,
+) -> None:
+    candidates = run_hpr_candidate_search(
+        objective=lambda *_args, **_kwargs: HPRBackendResult.failure(
+            reason="state outside CoolProp envelope"
+        ),
+        initial_points=[[0.5]],
+        bounds=[(0.0, 1.0)],
+        args=_base_args(
+            hpr_type=HeatPumpAndRefrigerationCycle.CascadeVapourComp.value,
+            n_cond=n_cond,
+            n_evap=n_evap,
+            max_multi_start=1,
+            search_budget=HPRSearchBudget(),
+        ),
+        optimiser=lambda _problem, *, method, options: OptimisationResult(
+            method=method, candidates=()
+        ),
+    )
+
+    assert (
+        candidates.diagnostics.representative_failures[0].topology is expected_topology
+    )
 
 
 def test_coolprop_preflight_covers_vc_and_mvr_stage_fluids(monkeypatch) -> None:

@@ -8,6 +8,21 @@
 
 ---
 
+## CoolProp HPR and MVR Reliability - PR Review Follow-up
+**Timestamp**: 2026-09-24T08:56:03Z
+**User Input**: "Go"
+**AI Response**: "I’ll fix the confirmed topology misclassification, add regression coverage for both diagnostic paths, run the focused checks, then update the existing PR."
+**Context**: User authorizes correction of the valid Codex P2 review finding on PR #100. The change is limited to structured failure-topology classification and regression coverage; it does not alter thermodynamic calculations. Property-Based Testing remains compliant because the existing generated-input topology and record properties are retained, while explicit regressions cover the two affected failure boundaries. Security and Resiliency extensions remain disabled.
+
+---
+
+## CoolProp HPR and MVR Reliability - PR Review Finding Resolved
+**Timestamp**: 2026-09-24T08:57:28Z
+**AI Response**: "Corrected single-stage vapour-compression topology classification in both cached search and final-candidate failure diagnostics. Added single-stage and cascade regression cases for each boundary. Focused verification passed 130 tests; Ruff, format and patch hygiene checks pass."
+**Context**: The Codex P2 finding is resolved locally. The correction uses the selected period's scalar stage counts for multi-period inputs, following stable period-id then period-index selection. No thermodynamic or optimization behavior changed. Property-Based Testing remains compliant; existing generated topology/record properties and explicit boundary regressions complement one another. Security and Resiliency extensions remain disabled.
+
+---
+
 ## Excel v5 VBA Redesign Implementation Authorization
 **Timestamp**: 2026-08-21T02:01:37Z
 **User Input**: "PLEASE IMPLEMENT THIS PLAN:

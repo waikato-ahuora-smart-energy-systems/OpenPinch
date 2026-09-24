@@ -116,7 +116,7 @@ class _CachedHPRScalarObjective:
                             reason_code="candidate.no_viable_result",
                             summary=_bounded_failure_summary(result.failure_reason),
                             candidate_index=len(self.cache),
-                            topology=_hpr_topology_identifier(self.args.hpr_type),
+                            topology=_hpr_topology_identifier(self.args),
                         )
                     )
             self.cache[key] = value
@@ -229,7 +229,7 @@ def raise_hpr_targeting_error(
     search_diagnostics: HPRFailureSummary | None = None,
 ) -> None:
     """Raise one bounded public failure from detached candidate facts."""
-    topology = _hpr_topology_identifier(args.hpr_type)
+    topology = _hpr_topology_identifier(args)
     representatives = tuple(
         HPRFailureDiagnostic(
             category=HPRFailureCategory.CANDIDATE_PHYSICAL_INFEASIBILITY,
@@ -278,7 +278,39 @@ def _bounded_failure_summary(reason: str | None) -> str:
     return summary[:512]
 
 
-def _hpr_topology_identifier(hpr_type: str) -> HPRTopologyIdentifier | None:
+def _hpr_topology_identifier(
+    args: HPRTargetInputs,
+) -> HPRTopologyIdentifier | None:
+    hpr_type = args.hpr_type
+    if hpr_type == HeatPumpAndRefrigerationCycle.CascadeVapourComp.value:
+        stage_args: HeatPumpTargetInputs | None
+        if isinstance(args, MultiPeriodHPRTargetInputs):
+            selected_case = next(
+                (
+                    case
+                    for case in args.period_cases
+                    if str(case.period_id) == str(args.selected_period_id)
+                ),
+                None,
+            )
+            if selected_case is None:
+                selected_case = next(
+                    (
+                        case
+                        for case in args.period_cases
+                        if int(case.period_idx) == int(args.selected_period_idx)
+                    ),
+                    None,
+                )
+            stage_args = selected_case.args if selected_case is not None else None
+        else:
+            stage_args = args
+        if (
+            stage_args is not None
+            and int(stage_args.n_cond) == 1
+            and int(stage_args.n_evap) == 1
+        ):
+            return HPRTopologyIdentifier.SINGLE_STAGE_VAPOUR_COMPRESSION
     mapping = {
         HeatPumpAndRefrigerationCycle.CascadeVapourComp.value: (
             HPRTopologyIdentifier.CASCADE_VAPOUR_COMPRESSION
