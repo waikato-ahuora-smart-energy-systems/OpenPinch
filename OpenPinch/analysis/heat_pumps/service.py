@@ -488,6 +488,34 @@ def _get_hpr_graphs(
     }
 
 
+def _align_problem_table_column(
+    *,
+    target_temperatures: np.ndarray,
+    source: ProblemTable,
+    column: ProblemTableLabel,
+) -> np.ndarray:
+    """Align one shared-grid column while preserving duplicate target rows."""
+    target = np.asarray(target_temperatures, dtype=float)
+    source_temperatures = np.asarray(source[ProblemTableLabel.T], dtype=float)
+    if (
+        target.ndim != 1
+        or source_temperatures.ndim != 1
+        or not len(source_temperatures)
+    ):
+        raise ValueError(
+            "HPR problem-table temperature grids must be non-empty 1D arrays."
+        )
+    distances = np.abs(target[:, None] - source_temperatures[None, :])
+    source_indices = np.argmin(distances, axis=1)
+    closest = distances[np.arange(len(target)), source_indices]
+    if np.any(closest > tol):
+        raise ValueError(
+            "HPR problem-table columns cannot be aligned to the shared "
+            "temperature grid."
+        )
+    return np.asarray(source[column], dtype=float)[source_indices]
+
+
 def _calc_hpr_cascade(
     pt: ProblemTable,
     res: HeatPumpTargetOutputs,
@@ -521,9 +549,22 @@ def _calc_hpr_cascade(
             period_idx=period_idx,
         )
         pt.share_temperature_intervals(pt_air)
-        pt[ProblemTableLabel.H_NET_W_AIR] += pt_air[ProblemTableLabel.H_NET]
-        pt[ProblemTableLabel.H_NET_HOT] += pt_air[ProblemTableLabel.H_NET_HOT]
-        pt[ProblemTableLabel.H_NET_COLD] += pt_air[ProblemTableLabel.H_NET_COLD]
+        target_temperatures = pt[ProblemTableLabel.T]
+        pt[ProblemTableLabel.H_NET_W_AIR] += _align_problem_table_column(
+            target_temperatures=target_temperatures,
+            source=pt_air,
+            column=ProblemTableLabel.H_NET,
+        )
+        pt[ProblemTableLabel.H_NET_HOT] += _align_problem_table_column(
+            target_temperatures=target_temperatures,
+            source=pt_air,
+            column=ProblemTableLabel.H_NET_HOT,
+        )
+        pt[ProblemTableLabel.H_NET_COLD] += _align_problem_table_column(
+            target_temperatures=target_temperatures,
+            source=pt_air,
+            column=ProblemTableLabel.H_NET_COLD,
+        )
 
     # Heat pump or refrigeration cascade
     hpr_profile = get_utility_heat_cascade(

@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: CoolProp HPR and MVR Reliability — Audit complete
+- **Current Stage**: HPR and MVR Benchmark E2E Reliability — Complete
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -65,6 +65,53 @@
   `construction/build-and-test/coolprop-hpr-mvr-reliability/build-and-test-summary.md`.
 - Enabled Property-Based Testing extension is compliant through all three units;
   disabled Security and Resiliency extensions are skipped.
+
+## HPR and MVR Benchmark E2E Reliability
+
+- [x] Workspace Detection: existing brownfield package and current architecture
+  artifacts confirmed; reverse engineering refresh is not required.
+- [x] Requirements questions answered: all 54 standard problems, bounded
+  six-profile rotation, dedicated packaged direct-MVR case, normal CI, full PBT,
+  and disabled Security/Resiliency.
+- [x] Requirements Analysis: approved by the user.
+- [x] User Stories: skipped for internal test/reliability work with no new user
+  workflow.
+- [x] Workflow Planning: approved by the user.
+- [x] Application Design and Units Generation: skipped; one cohesive test unit
+  within existing component boundaries.
+- [x] Functional Design: approved by the user.
+- [x] NFR Requirements: approved by the user.
+- [x] NFR Design: approved by the user.
+- [x] Code Generation Part 1: nine-step implementation plan approved by the
+  user.
+- [x] Code Generation Part 2: all nine implementation steps complete and
+  approved by the user.
+- [x] Build and Test: complete; 3,443 non-solver tests passed, three declared
+  optional-profile skips, four solver tests deselected, 96% branch-aware
+  coverage, 66 focused HPR/MVR tests passed, and build, documentation,
+  distribution, installed-wheel, static-quality and bounded-convergence gates
+  passed. Approved by the user.
+- [x] Operations: N/A. The phase is a workflow placeholder, and this test and
+  robustness change requires no deployment, infrastructure, monitoring,
+  publication, or external-system action.
+- Requirements: `inception/requirements/hpr-mvr-benchmark-e2e-requirements.md`.
+- Plan: `inception/plans/hpr-mvr-benchmark-e2e-execution-plan.md`.
+- Functional design:
+  `construction/hpr-mvr-benchmark-e2e/functional-design/`.
+- NFR requirements:
+  `construction/hpr-mvr-benchmark-e2e/nfr-requirements/`.
+- NFR design:
+  `construction/hpr-mvr-benchmark-e2e/nfr-design/`.
+- Code Generation plan:
+  `construction/plans/hpr-mvr-benchmark-e2e-code-generation-plan.md`.
+- Code Generation summary:
+  `construction/hpr-mvr-benchmark-e2e/code/code-generation-summary.md`.
+- Build and Test summary:
+  `construction/build-and-test/hpr-mvr-benchmark-e2e/build-and-test-summary.md`.
+- Extension compliance: Property-Based Testing compliant; disabled Security and
+  Resiliency extensions are N/A.
+- Workflow status: Complete. All approved implementation and local verification
+  work is finished; no external operational action was authorized or required.
 
 ## HPR Derived-Case API Refinement
 

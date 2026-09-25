@@ -12,6 +12,7 @@ from ....analysis.targeting.utilities import (
     _apply_utility_duties,
     target_utilities_for_load_profiles,
 )
+from ....domain.configuration import tol
 from ....domain.enums import ProblemTableLabel
 from ....domain.hpr import HPRResidualProfile
 from ....domain.problem_table import ProblemTable
@@ -76,6 +77,14 @@ def _get_hpr_residual_utility_summary(
             ProblemTableLabel.H_NET: utility_net,
         }
     ).pinch_temperatures(col_H=ProblemTableLabel.H_NET)
+    profile_temperatures, profile_net, profile_heating, profile_cooling = (
+        _deduplicate_residual_profile_rows(
+            temperatures=utility_T_vals,
+            net=utility_net,
+            heating=np.maximum(hot_profile, 0.0),
+            cooling=np.abs(cold_profile),
+        )
+    )
 
     return {
         "hot_utilities": hot_utilities,
@@ -95,13 +104,47 @@ def _get_hpr_residual_utility_summary(
         "hot_pinch": hot_pinch,
         "cold_pinch": cold_pinch,
         "residual_profile": HPRResidualProfile(
-            temperatures=tuple(utility_T_vals),
-            net=tuple(utility_net),
-            heating=tuple(np.maximum(hot_profile, 0.0)),
-            cooling=tuple(np.abs(cold_profile)),
+            temperatures=tuple(profile_temperatures),
+            net=tuple(profile_net),
+            heating=tuple(profile_heating),
+            cooling=tuple(profile_cooling),
             temperature_basis="shifted" if is_direct else "real",
         ),
     }
+
+
+def _deduplicate_residual_profile_rows(
+    *,
+    temperatures: np.ndarray,
+    net: np.ndarray,
+    heating: np.ndarray,
+    cooling: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Collapse equivalent duplicate temperatures at the detached contract edge."""
+    arrays = tuple(
+        np.asarray(values, dtype=float)
+        for values in (temperatures, net, heating, cooling)
+    )
+    if any(values.ndim != 1 for values in arrays) or len({len(v) for v in arrays}) != 1:
+        raise ValueError("HPR residual profile columns must be aligned 1D arrays.")
+    if not len(arrays[0]) or any(not np.isfinite(values).all() for values in arrays):
+        raise ValueError("HPR residual profile columns must be finite and nonempty.")
+
+    kept = [0]
+    for index in range(1, len(arrays[0])):
+        previous = kept[-1]
+        if abs(arrays[0][previous] - arrays[0][index]) <= tol:
+            if any(
+                not np.isclose(values[previous], values[index], rtol=1e-9, atol=tol)
+                for values in arrays[1:]
+            ):
+                raise ValueError(
+                    "Duplicate HPR residual temperatures contain conflicting values."
+                )
+            continue
+        kept.append(index)
+    indices = np.asarray(kept, dtype=int)
+    return tuple(values[indices] for values in arrays)
 
 
 def _get_hpr_residual_net_profile(

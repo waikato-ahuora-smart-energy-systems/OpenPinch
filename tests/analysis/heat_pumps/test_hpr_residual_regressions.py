@@ -6,6 +6,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from OpenPinch.analysis.heat_pumps.common.postprocessing import (
+    _deduplicate_residual_profile_rows,
     _get_hpr_residual_load_profiles,
     _get_hpr_residual_utility_net_profile,
 )
@@ -31,6 +32,30 @@ def test_residual_profile_is_stored_after_pocket_grid_changes():
     )
     assert np.isfinite(pt[L.H_NET_HOT_AFTR_HP]).all()
     assert np.isfinite(pt[L.H_NET_COLD_AFTR_HP]).all()
+
+
+def test_equivalent_duplicate_residual_temperatures_are_collapsed_for_contract():
+    temperatures, net, heating, cooling = _deduplicate_residual_profile_rows(
+        temperatures=np.array([120.0, 90.0, 90.0, 60.0]),
+        net=np.array([6.0, 3.0, 3.0, 0.0]),
+        heating=np.array([4.0, 2.0, 2.0, 0.0]),
+        cooling=np.array([0.0, 1.0, 1.0, 3.0]),
+    )
+
+    np.testing.assert_allclose(temperatures, [120.0, 90.0, 60.0])
+    np.testing.assert_allclose(net, [6.0, 3.0, 0.0])
+    np.testing.assert_allclose(heating, [4.0, 2.0, 0.0])
+    np.testing.assert_allclose(cooling, [0.0, 1.0, 3.0])
+
+
+def test_conflicting_duplicate_residual_temperatures_are_rejected():
+    with pytest.raises(ValueError, match="conflicting values"):
+        _deduplicate_residual_profile_rows(
+            temperatures=np.array([120.0, 90.0, 90.0, 60.0]),
+            net=np.array([6.0, 3.0, 4.0, 0.0]),
+            heating=np.array([4.0, 2.0, 2.0, 0.0]),
+            cooling=np.array([0.0, 1.0, 1.0, 3.0]),
+        )
 
 
 @pytest.mark.parametrize("fraction", [-0.01, 1.01, float("inf"), float("nan")])
