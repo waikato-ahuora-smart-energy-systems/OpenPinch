@@ -5,8 +5,6 @@ from __future__ import annotations
 import subprocess
 import sys
 
-import pytest
-
 from tests.support.paths import REPOSITORY_ROOT
 
 BLOCKED_OPTIONAL_PACKAGES = {
@@ -61,20 +59,14 @@ IMPORT_CASES = {
 }
 
 
-@pytest.mark.parametrize(
-    "case_name",
-    IMPORT_CASES,
-    ids=IMPORT_CASES,
-)
-def test_layer_is_cold_importable_without_optional_packages(case_name: str) -> None:
-    modules = IMPORT_CASES[case_name]
+def _run_cold_import_cases(cases):
     code = f"""
 import builtins
 import importlib
 import sys
 
 blocked = {BLOCKED_OPTIONAL_PACKAGES!r}
-modules = {modules!r}
+cases = {cases!r}
 real_import = builtins.__import__
 
 def guarded_import(name, *args, **kwargs):
@@ -84,19 +76,31 @@ def guarded_import(name, *args, **kwargs):
     return real_import(name, *args, **kwargs)
 
 builtins.__import__ = guarded_import
-for module in modules:
-    importlib.import_module(module)
-loaded = sorted(blocked.intersection(sys.modules))
-if loaded:
-    raise AssertionError(f"optional packages imported eagerly: {{loaded}}")
+for case_name, modules in cases.items():
+    for module in modules:
+        try:
+            importlib.import_module(module)
+        except Exception as error:
+            raise AssertionError(
+                f"cold import case {{case_name!r}} failed at module {{module!r}}"
+            ) from error
+    loaded = sorted(blocked.intersection(sys.modules))
+    if loaded:
+        raise AssertionError(
+            f"cold import case {{case_name!r}} imported optional packages: {{loaded}}"
+        )
 """
-    completed = subprocess.run(
+    return subprocess.run(
         [sys.executable, "-c", code],
         cwd=REPOSITORY_ROOT,
         check=False,
         capture_output=True,
         text=True,
     )
+
+
+def test_layers_are_cold_importable_without_optional_packages() -> None:
+    completed = _run_cold_import_cases(IMPORT_CASES)
 
     assert completed.returncode == 0, completed.stderr
 
@@ -155,3 +159,13 @@ if "tespy" in sys.modules:
     )
 
     assert completed.returncode == 0, completed.stderr
+
+
+def test_cold_import_batch_attributes_failure_to_logical_case() -> None:
+    completed = _run_cold_import_cases(
+        {"broken-case": ("OpenPinch.module_that_does_not_exist",)}
+    )
+
+    assert completed.returncode != 0
+    assert "broken-case" in completed.stderr
+    assert "OpenPinch.module_that_does_not_exist" in completed.stderr

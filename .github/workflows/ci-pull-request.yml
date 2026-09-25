@@ -66,7 +66,7 @@ jobs:
       - if: ${{ needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true' }}
         run: uv run --no-sync ruff check .
       - if: ${{ needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true' }}
-        run: uv run --no-sync coverage run --branch --source=OpenPinch -m pytest --hypothesis-seed=20260715 -m "not solver"
+        run: uv run --no-sync coverage run --branch --source=OpenPinch -m pytest --hypothesis-seed=20260715 -m "not solver and not tespy and not performance and not docs"
       - if: ${{ needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true' }}
         run: uv run --no-sync coverage report --fail-under=95
       - name: Accept verified develop validation
@@ -228,7 +228,7 @@ jobs:
           enable-cache: true
           save-cache: false
       - run: uv sync --frozen --group dev
-      - run: uv run --no-sync python scripts/build_docs.py
+      - run: uv run --no-sync pytest --hypothesis-seed=20260715 -m "docs"
 
   optional-install-smoke:
     needs: develop-validation
@@ -279,9 +279,27 @@ jobs:
           enable-cache: true
           save-cache: false
       - run: uv sync --frozen --group dev --extra tespy
-      - run: uv run --no-sync pytest --hypothesis-seed=20260715 -m "tespy"
-      - name: Run guarded public TESPy target-map smoke
-        run: timeout 300s uv run --no-sync pytest tests/analysis/heat_pumps/test_hpr_tespy_target_evaluator.py::test_real_public_tespy_target_and_minimal_map_stay_within_smoke_budget
+      - run: timeout 900s uv run --no-sync pytest --hypothesis-seed=20260715 -m "tespy"
+
+  performance-tests:
+    needs: develop-validation
+    if: ${{ !cancelled() && github.event.action != 'closed' && github.event.pull_request.draft == false && (needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          save-cache: false
+      - run: uv sync --frozen --group dev
+      - run: timeout 900s uv run --no-sync pytest --hypothesis-seed=20260715 -m "performance"
 
   artifact-build:
     needs: develop-validation
@@ -400,6 +418,7 @@ jobs:
       - docs
       - optional-install-smoke
       - hpr-tespy-tests
+      - performance-tests
       - artifact-build
       - artifact-install-smoke
       - artifact-install-tespy-smoke
@@ -419,6 +438,7 @@ jobs:
           DOCS_RESULT: ${{ needs.docs.result }}
           OPTIONAL_RESULT: ${{ needs.optional-install-smoke.result }}
           HPR_TESPY_RESULT: ${{ needs.hpr-tespy-tests.result }}
+          PERFORMANCE_RESULT: ${{ needs.performance-tests.result }}
           ARTIFACT_BUILD_RESULT: ${{ needs.artifact-build.result }}
           ARTIFACT_INSTALL_RESULT: ${{ needs.artifact-install-smoke.result }}
           ARTIFACT_TESPY_RESULT: ${{ needs.artifact-install-tespy-smoke.result }}
@@ -434,6 +454,7 @@ jobs:
             "${DOCS_RESULT}" \
             "${OPTIONAL_RESULT}" \
             "${HPR_TESPY_RESULT}" \
+            "${PERFORMANCE_RESULT}" \
             "${ARTIFACT_BUILD_RESULT}" \
             "${ARTIFACT_INSTALL_RESULT}" \
             "${ARTIFACT_TESPY_RESULT}"; do

@@ -1,52 +1,48 @@
-# Unit Test Execution - RTD and Comprehensive HPR Notebook
+# Unit Test Execution - Test-Suite Runtime Reduction
 
-## Run Focused Tutorial and Documentation Contracts
+## Scope
 
-```bash
-uv run pytest --hypothesis-seed=20260715 -q \
-  tests/packaging/test_notebooks.py \
-  tests/packaging/test_tutorial_coverage.py \
-  tests/packaging/test_docs_consistency.py \
-  tests/packaging/test_resources.py
-```
+OpenPinch does not use a single `unit` marker. Inner-layer unit, property, and
+contract tests live primarily under `tests/domain`, `tests/contracts`,
+`tests/optimisation`, and `tests/analysis`. Hypothesis uses the reproducible CI
+seed `20260715`; shrinking remains enabled.
 
-This gate validates notebook 09 source, compilation, specialist-import policy,
-generator idempotence, 197/197 manifest coverage, RTD consistency, and packaged
-resources.
-
-## Run HPR Unit and Property Tests
+## Run Fast Unit and Property Tests
 
 ```bash
-uv run pytest --hypothesis-seed=20260715 -q \
-  tests/contracts/test_hpr_performance_map.py \
-  tests/contracts/test_hpr_performance_map_properties.py \
-  tests/contracts/test_hpr_target_simulation_record.py \
-  tests/analysis/heat_pumps
+uv run --no-sync pytest --hypothesis-seed=20260715 -q \
+  tests/domain tests/contracts tests/optimisation tests/analysis \
+  -m "not solver and not tespy and not performance and not docs"
 ```
 
-This selection covers the versioned plain-data contract, fluid categories,
-CoolProp and TESPy adapters, map generation, thermodynamic validation,
-targeting lifecycle, exact cache, winning records, basis compatibility, and
-failure policy.
+Expected result: all selected tests pass with no unexpected skip or retry.
 
-## Coverage Gate
+## Run the Complete Ordinary Coverage Gate
 
 ```bash
-uv run coverage run --branch --source=OpenPinch -m pytest \
-  --hypothesis-seed=20260715 -q tests/analysis/heat_pumps tests/contracts
-uv run coverage report --show-missing
+uv run --no-sync coverage erase
+uv run --no-sync coverage run --branch --source=OpenPinch -m pytest \
+  --hypothesis-seed=20260715 \
+  -m "not solver and not tespy and not performance and not docs"
+uv run --no-sync coverage report --fail-under=95
 ```
 
-The existing HPR acceptance gate remains at least 95 percent combined statement
-and branch coverage over the map and target integration surface. The notebook
-and RTD-only follow-up does not lower that threshold.
+Verified result for this change:
 
-## Review Failures
+- 3,390 passed;
+- 6 expected optional tutorial-profile skips;
+- 65 intentional specialized-lane deselections;
+- the configured 95 percent coverage threshold passed.
 
-1. Reproduce the first failure with seed `20260715`.
-2. For a generated failure, retain the minimized Hypothesis example and normal
-   shrinking behavior.
-3. Correct the owning contract, pure coordinator, adapter, or integration
-   layer without adding a fallback.
-4. Rerun the focused file, the complete HPR selection, then the repository
-   regression profile.
+The coverage report is written to the terminal; `.coverage` contains the raw
+data unless `COVERAGE_FILE` selects another path.
+
+## Failure Triage
+
+1. Re-run the exact failing node with `-vv --showlocals` and the same Hypothesis
+   seed.
+2. For generated failures, retain the shrunk reproducer and do not disable
+   shrinking.
+3. Confirm that the failing test belongs to the ordinary lane before installing
+   an optional engine or external solver.
+4. Re-run the complete ordinary coverage gate after the focused correction.

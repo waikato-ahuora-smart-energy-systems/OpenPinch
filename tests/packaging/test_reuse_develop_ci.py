@@ -205,7 +205,14 @@ def test_github_request_uses_pagination_and_bounded_timeout(monkeypatch):
 @pytest.mark.parametrize("accepted_reuse", [False, True])
 @pytest.mark.parametrize(
     "failed_job",
-    [None, "TEST_RESULT", "DOCS_RESULT", "SOLVER_RESULT", "RELEASE_VERSION_RESULT"],
+    [
+        None,
+        "TEST_RESULT",
+        "DOCS_RESULT",
+        "PERFORMANCE_RESULT",
+        "SOLVER_RESULT",
+        "RELEASE_VERSION_RESULT",
+    ],
 )
 def test_pr_gate_requires_fresh_or_proved_reused_checks(accepted_reuse, failed_job):
     workflow = (REPOSITORY_ROOT / ".github/workflows/ci-pull-request.yml").read_text()
@@ -226,6 +233,7 @@ def test_pr_gate_requires_fresh_or_proved_reused_checks(accepted_reuse, failed_j
         "DOCS_RESULT",
         "OPTIONAL_RESULT",
         "HPR_TESPY_RESULT",
+        "PERFORMANCE_RESULT",
         "ARTIFACT_BUILD_RESULT",
         "ARTIFACT_INSTALL_RESULT",
         "ARTIFACT_TESPY_RESULT",

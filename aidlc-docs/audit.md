@@ -9820,3 +9820,231 @@ Notebook #10 fails to solve with the error:
 **Context**: Local commit authorized. No push, pull request, merge, deployment, or publication is authorized by this instruction.
 
 ---
+
+## Test-Suite Runtime Reduction - Workspace Detection
+**Timestamp**: 2026-09-25T06:48:18Z
+**User Input**: "Address the top 7 issues."
+**AI Response**: "Resumed the existing brownfield project, reused the current reverse-engineering baseline, and opened a focused workflow for the seven measured test-suite runtime hotspots."
+**Context**: INCEPTION - Workspace Detection. The preceding profile is the quantitative baseline. The worktree is clean on `develop` at `9fc34b68`. Security and Resiliency remain disabled; Property-Based Testing remains enabled.
+
+---
+
+## Test-Suite Runtime Reduction - Requirements Approval Prompt
+**Timestamp**: 2026-09-25T06:48:18Z
+**AI Response**: "Created standard-depth requirements for bounding Notebook 19, consolidating utility-placement solves, removing TESPy and documentation duplication from the ordinary lane, isolating optimizer benchmarks, reducing overlapping CoolProp audit work, and batching fresh-process import assertions while preserving coverage and all robustness contracts."
+**Context**: INCEPTION - Requirements Analysis complete and awaiting explicit approval. No clarification file was needed because the user selected all seven issues from the immediately preceding measured audit. User Stories are provisionally skipped. Property-Based Testing is applicable to invariant preservation; disabled Security and Resiliency extensions are N/A.
+
+---
+
+## Test-Suite Runtime Reduction - Requirements Approval
+**Timestamp**: 2026-09-25T06:51:13Z
+**User Input**: "**Approve & Continue** "
+**AI Response**: "Recorded approval of the seven runtime-reduction requirements, skipped User Stories after the mandatory applicability assessment, and proceeded to Workflow Planning."
+**Context**: INCEPTION - Requirements Analysis approved. User Stories add no value for an internal test and CI performance refactor with explicit acceptance criteria and no user-facing behavior. Property-Based Testing remains enabled; Security and Resiliency remain disabled.
+
+---
+
+## Test-Suite Runtime Reduction - Workflow Plan Approval Prompt
+**Timestamp**: 2026-09-25T06:51:13Z
+**AI Response**: "Created a one-unit execution plan covering NFR Requirements, NFR Design, Code Generation, and Build and Test. Application Design, Units Generation, Functional Design, and Infrastructure Design are skipped because no production API, data model, business rule, component boundary, or deployment resource changes are required."
+**Context**: INCEPTION - Workflow Planning complete and awaiting explicit approval. The plan sequences baseline guards, bounded tutorial and optimizer work, safe fixture reuse, dedicated CI lanes, fresh-process batching, focused verification, and final serial profiling. Mermaid syntax was checked for valid node identifiers, quoted labels, balanced connections, and style declarations; a text alternative is included. Property-Based Testing is compliant; disabled Security and Resiliency extensions are N/A.
+
+---
+
+## Test-Suite Runtime Reduction - Workflow Plan Approval
+**Timestamp**: 2026-09-25T06:52:48Z
+**User Input**: "\\*\\*Approve & Continue\\*\\*&#x20;"
+**AI Response**: "Recorded workflow-plan approval and proceeded to NFR Requirements for the single test-suite runtime-reduction unit."
+**Context**: INCEPTION - Workflow Planning approved. NFR Requirements is the next selected stage. No test, tutorial, or CI implementation changed. Property-Based Testing remains enabled; Security and Resiliency remain disabled.
+
+---
+
+## Test-Suite Runtime Reduction - NFR Requirements Approval Prompt
+**Timestamp**: 2026-09-25T06:52:48Z
+**AI Response**: "Defined quantitative runtime budgets, single-owner CI lanes, the 95 percent branch-coverage floor, deterministic fixture isolation, complete specialized-test retention, timeout behavior, and the retained Python/pytest/Hypothesis/Coverage/GitHub Actions stack."
+**Context**: CONSTRUCTION - NFR Requirements complete and awaiting explicit approval. All eight NFR plan checkboxes were completed in the same interaction. No clarification questions were required because the approved requirements define the performance target, coverage floor, lane inventory, evidence constraints, and existing-stack boundary. Property-Based Testing is compliant; disabled Security and Resiliency extensions are N/A.
+
+---
+
+## Test-Suite Runtime Reduction - NFR Requirements Approval
+**Timestamp**: 2026-09-25T07:09:00Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded NFR Requirements approval and proceeded to NFR Design for the single test-suite runtime-reduction unit."
+**Context**: CONSTRUCTION - NFR Requirements approved. The runtime budgets, lane ownership, coverage floor, deterministic isolation, timeout, and retained-stack decisions are now design inputs.
+
+---
+
+## Test-Suite Runtime Reduction - NFR Design Approval Prompt
+**Timestamp**: 2026-09-25T07:09:00Z
+**AI Response**: "Mapped the approved NFRs to work-elimination, copy-on-consume fixture isolation, single-owner marker lanes, convergence-preserving search budgets, batched subprocess diagnostics, coverage protection, and fail-visible timeout patterns. Defined the exact logical owners and dependency sequence for all seven changes."
+**Context**: CONSTRUCTION - NFR Design complete and awaiting explicit approval. All nine NFR-design plan checkboxes were completed in the same interaction. Resilience, scalability, performance, security, and logical-component categories were evaluated; no questions were required because the approved NFRs resolve every applicable design choice and explicitly classify infrastructure/security concerns as N/A. Property-Based Testing is compliant; disabled Security and Resiliency extensions are N/A.
+
+---
+
+## Test-Suite Runtime Reduction - NFR Design Approval
+**Timestamp**: 2026-09-25T07:11:20Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded NFR Design approval and proceeded to Code Generation Part 1 planning."
+**Context**: CONSTRUCTION - NFR Design approved. The nine design patterns and logical component map are the implementation constraints. No source, test, notebook, or workflow implementation changed.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Plan Approval Prompt
+**Timestamp**: 2026-09-25T07:11:20Z
+**AI Response**: "Created a thirteen-step test-first implementation plan covering baseline preservation, contract tests, central markers, three CI workflows, Notebook 19, utility-placement fixture isolation, CoolProp audit refinement, optimizer benchmarks, documentation ownership, batched child processes, focused verification, full coverage and specialized lanes, final profiling, and generated-code audit."
+**Context**: CONSTRUCTION - Code Generation Part 1 complete and awaiting explicit approval. The plan is the single source of truth for implementation. No production API or numerical algorithm change is planned. Property-Based Testing PBT-01, PBT-03, PBT-07, PBT-08, PBT-09, and PBT-10 remain applicable; Security and Resiliency are disabled and N/A.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Plan Approval
+**Timestamp**: 2026-09-25T07:14:35Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded approval of all thirteen Code Generation steps and began Part 2 with baseline preservation and implementation-boundary verification."
+**Context**: CONSTRUCTION - Code Generation Part 2 authorized. The worktree contains only the current workflow records, branch is `develop`, HEAD is `9fc34b68`, and the locked runtime is Python 3.14.2. The approved 3,455-pass, 600.89-second uninstrumented and 762.76-second coverage baselines plus all seven hotspot timings are recorded in requirements. Existing assertions and CI owners were inventoried; no production API or numerical source change is required before test and workflow implementation.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 2
+**Timestamp**: 2026-09-25T07:14:35Z
+**AI Response**: "Added red contracts for central marker registration, single-owner specialized CI lanes, Notebook 19 search caps, copy-isolated solved placement evidence, and batched import failure attribution. The focused pre-change run produced the intended five failures and one missing-fixture error."
+**Context**: CONSTRUCTION - Code Generation Step 2 complete. Failures correspond exactly to unregistered markers, old CI commands, unbounded Notebook 19 settings, absent shared placement fixture, and absent import-batch helper. No unexpected failure was observed. Property-Based Testing remains enabled with existing generators and shrinking untouched.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 3
+**Timestamp**: 2026-09-25T07:14:35Z
+**AI Response**: "Registered docs and performance markers, excluded TESPy/performance/docs from the ordinary lane, made TESPy execute once under a command timeout, added dedicated performance jobs, routed docs through the pytest smoke, and connected performance results to PR and release gates in all three workflows."
+**Context**: CONSTRUCTION - Code Generation Step 3 complete. All 37 packaging workflow contracts pass and the three edited CI YAML files parse successfully. The docs and performance tests are marked in later plan steps; workflow selection is intentionally completed first. No production source changed.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 4
+**Timestamp**: 2026-09-25T07:14:35Z
+**AI Response**: "Probed two bounded Notebook 19 profiles and selected the smaller fixed-seed 5-iteration, 10-evaluation, 1-candidate, 1-run profile after it retained feasible, finite, zero-fallback process and site solutions. Added visible termination metadata, regenerated the source-only notebook, and passed its contracts, real execution, and canonical drift check."
+**Context**: CONSTRUCTION - Code Generation Step 4 complete. Notebook 19 real execution is 6.45 seconds versus the 44.51-second baseline and the 20-second target. Process objective is approximately 0.047881 kW/K; site objective is approximately 0.637136 kW/K; both results are feasible with zero fallback penalty. Three focused notebook tests and the generator drift test pass.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 5
+**Timestamp**: 2026-09-25T07:14:35Z
+**AI Response**: "Added module-scoped real process and site placement evidence, converted matching consumers to deep-copy isolation, retained independent optimizer coverage, and added a source-preservation regression."
+**Context**: CONSTRUCTION - Code Generation Step 5 complete. All 50 tests in `test_utility_placement.py` pass in 89.08 seconds versus 105.13 seconds before consolidation. Canonical source input and detached result payloads remain unchanged after representative targeting, option mutation, plotting, workspace addition, and reversed scope consumption. Step 6 continues because the focused 75-second target is not yet met.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 6
+**Timestamp**: 2026-09-25T07:14:35Z
+**AI Response**: "Reduced the common test search allowance from 100 to 20 evaluations, cached immutable baseline input construction for utility-inference properties, reduced redundant generated permutation examples from six to three, and consolidated the remaining repeated isothermal placement evidence."
+**Context**: CONSTRUCTION - Code Generation Step 6 complete. Hypothesis, shrinking, constrained permutation strategies, seed 20260715, and explicit real process/site optimizer examples remain. All 50 main utility-placement tests pass in 79.03 seconds, a 24.8 percent reduction from 105.13 seconds; the 75-second guide is exceeded by 4.03 seconds but is permitted if the final 480-second suite target is met. The five batch tests also pass; the combined pair completes in 83.35 seconds.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 7
+**Timestamp**: 2026-09-25T07:14:35Z
+**AI Response**: "Reduced the representative CoolProp audit to 2 iterations and 20 evaluations for single-stage/public cases, 30 evaluations for multistage VC cases, and the empirically required 60 evaluations for the multistage MVR topology. Retained every audit parameter and the complete E2E corpus."
+**Context**: CONSTRUCTION - Code Generation Step 7 complete. A 30-evaluation MVR cascade probe failed visibly and was raised to the smallest tested passing 60-evaluation budget. All 14 CoolProp audit cases pass in 25.30 seconds versus 43.87 seconds and the 30-second target. The unchanged E2E file passes 55 tests in 48.33 seconds, comprising all 54 standard benchmark/profile cases plus the dedicated direct process-MVR case.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 8
+**Timestamp**: 2026-09-25T07:14:35Z
+**AI Response**: "Marked the two cross-backend convergence benchmarks as performance tests and reduced their fixed-seed profiles from 4 runs, 45 iterations, and 15,000 evaluations to 2 runs, 25 iterations, and 5,000 evaluations while retaining all four backend quality and relative-tolerance assertions."
+**Context**: CONSTRUCTION - Code Generation Step 8 complete. The dedicated performance selection passes 2 tests with 3,468 ordinary tests deselected. Measured call time remains approximately 33.66 seconds because backend/process overhead dominates the reduced budgets; the primary improvement is removal from the ordinary critical lane, not a claimed benchmark runtime reduction.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 9
+**Timestamp**: 2026-09-25T07:14:35Z
+**AI Response**: "Marked the Sphinx smoke as the docs lane owner and verified that all three docs jobs now invoke `pytest -m docs` once instead of directly launching a duplicate build."
+**Context**: CONSTRUCTION - Code Generation Step 9 complete. The dedicated docs selection passes one test in 15.12 seconds, invoking the existing warning-strict, keep-going Sphinx builder and verifying `index.html`. The ordinary lane excludes the marker and the workflow contract prohibits direct duplicate `scripts/build_docs.py` commands.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 10
+**Timestamp**: 2026-09-25T07:14:35Z
+**AI Response**: "Collapsed eight compatible layer cold-import processes into one ordered child and five retired-package processes into one child, preserving separate root-export and default-TESPy pristine processes. Added direct failure-attribution coverage naming the logical case and module."
+**Context**: CONSTRUCTION - Code Generation Step 10 complete. Thirty-nine cold-import, API-boundary, marker, and dependency tests pass in 18.53 seconds versus the 34.58-second aggregated baseline and the 20-second target. Batched failures retain case/module or package attribution through captured stderr.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 11
+**Timestamp**: 2026-09-25T07:14:35Z
+**AI Response**: "Completed focused verification across workflow/marker contracts, Notebook 19 generation and execution, placement fixture isolation and properties, the CoolProp audit, the complete HPR/MVR E2E corpus, batched architecture checks, YAML parsing, Ruff lint/format, and patch hygiene."
+**Context**: CONSTRUCTION - Code Generation Step 11 complete. Marker collection partitions all 3,459 tests exactly into 3,394 ordinary, 61 specialized TESPy/performance/docs, and 4 solver cases. Thirteen focused workflow/tutorial contracts pass; prior focused gates pass 50 placement, 5 batch, 14 CoolProp audit, 55 HPR/MVR E2E, 39 architecture, 2 performance, and 1 docs cases. Ruff and `git diff --check` pass after mechanical formatting.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 12
+**Timestamp**: 2026-09-25T08:09:52Z
+**AI Response**: "Completed the ordinary coverage gate, all specialized marker selections, solver selection, distribution builds, packaged notebook verification, and an isolated installed-wheel smoke."
+**Context**: CONSTRUCTION - Code Generation Step 12 complete. The ordinary branch-aware selection passes 3,390 tests with 6 expected optional-profile skips and 65 intentional deselections at the configured 95 percent threshold in 434.68 seconds. Dedicated selections pass 58 TESPy tests in 58.23 seconds, 2 performance plus 1 docs test in 45.41 seconds, and 3 solver tests with 1 existing environment-dependent skip in 99.63 seconds. The wheel and source distribution contain Notebook 19; the core wheel imports from the isolated environment and passes its package, resource, CLI, and targeting smoke. No specialized marker is orphaned or duplicated in the ordinary lane.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 13
+**Timestamp**: 2026-09-25T08:09:52Z
+**AI Response**: "Re-profiled the complete ordinary selection, audited all seven remediations and assertion boundaries, corrected a final formatting drift, and created the code-generation summary."
+**Context**: CONSTRUCTION - Code Generation Step 13 complete. The uninstrumented serial selection passes 3,390 tests with 6 expected skips and 65 intentional deselections in 383.17 seconds versus the 600.89-second baseline: 217.72 seconds and 36.2 percent faster, with 96.83 seconds of margin under the 480-second threshold. Notebook 19 is 6.06 seconds, utility placement is 65.63 seconds, the CoolProp audit is 22.82 seconds, and the focused fresh-process set is 18.53 seconds. All 54 standard HPR/MVR cases plus direct MVR remain. No production module, public API, duplicate brownfield file, hidden retry, or unexpected skip was introduced. Final Ruff, patch hygiene, and 72 workflow/notebook contract tests pass. Property-Based Testing is compliant; disabled Security and Resiliency extensions are N/A.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Review Prompt
+**Timestamp**: 2026-09-25T08:09:52Z
+**AI Response**: "Presented the completed runtime-reduction implementation for generated-code review and requested either changes or explicit approval to continue to Build and Test."
+**Context**: CONSTRUCTION - All thirteen Code Generation Part 2 steps are complete. Code Generation remains pending until the user approves the generated code. Build and Test has not started.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Approval
+**Timestamp**: 2026-09-25T08:36:52Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded generated-code approval and began Build and Test instruction generation and final evidence consolidation."
+**Context**: CONSTRUCTION - Code Generation approved and complete. Build and Test is active. The completed local verification evidence remains authoritative; this stage documents reproducible build, unit, integration, performance, E2E, and artifact commands without re-running unchanged expensive lanes.
+
+---
+
+## Test-Suite Runtime Reduction - Build and Test Stage
+**Timestamp**: 2026-09-25T08:39:15Z
+**Build Status**: Success
+**Test Status**: Pass
+**Files Generated**:
+- build-instructions.md
+- unit-test-instructions.md
+- integration-test-instructions.md
+- performance-test-instructions.md
+- e2e-test-instructions.md
+- build-and-test-summary.md
+**AI Response**: "Updated the canonical Build and Test instructions for OpenPinch 0.6.9 and consolidated the successful build, coverage, specialized-lane, E2E, runtime, and artifact evidence."
+**Context**: CONSTRUCTION - Build and Test complete and awaiting explicit approval. The wheel and source distribution build, isolated core-wheel smoke, 3,390-pass ordinary coverage lane, 58-test TESPy lane, two-test performance lane, warning-strict docs lane, solver lane, 55-case HPR/MVR E2E file, Ruff, generator drift, workflow contracts, and patch hygiene all pass subject only to the documented expected optional/environment skips. Property-Based Testing is compliant; disabled Security and Resiliency extensions are N/A.
+
+---
+
+## Test-Suite Runtime Reduction - Build and Test Approval Prompt
+**Timestamp**: 2026-09-25T08:39:15Z
+**AI Response**: "Presented the completed Build and Test results and requested either instruction changes or explicit approval to proceed to Operations."
+**Context**: CONSTRUCTION - Build and Test artifacts and evidence are complete. Operations has not started.
+
+---
+
+## Test-Suite Runtime Reduction - Build and Test Approval
+**Timestamp**: 2026-09-25T08:44:09Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded Build and Test approval, evaluated the Operations placeholder, and completed the workflow."
+**Context**: CONSTRUCTION - Build and Test approved. OPERATIONS - N/A placeholder: this local Python library test/CI performance change introduces no deployment target, monitoring service, incident response process, or production runtime resource.
+
+---
+
+## Test-Suite Runtime Reduction - Workflow Complete
+**Timestamp**: 2026-09-25T08:44:09Z
+**AI Response**: "Closed the AI-DLC workflow with all seven performance findings addressed, all acceptance evidence passing, and Operations recorded as non-applicable."
+**Context**: Final state. Ordinary runtime is 383.17 seconds versus 600.89 seconds baseline, the 95 percent coverage threshold passes, complete HPR/MVR robustness evidence remains, specialized CI lanes are independently owned, artifacts install successfully, and no production API changed. Property-Based Testing is compliant; disabled Security and Resiliency extensions are N/A.
+
+---
+
+## Test-Suite Runtime Reduction - Commit Request
+**Timestamp**: 2026-09-25T08:45:29Z
+**User Input**: "Commit."
+**AI Response**: "Prepared the complete runtime-reduction implementation, tests, CI changes, generated notebook, and workflow records for one commit on develop."
+**Context**: Post-workflow repository handoff. The user authorized a local commit only; no push or pull-request mutation is authorized by this input.
+
+---

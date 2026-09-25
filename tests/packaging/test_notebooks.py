@@ -119,6 +119,10 @@ def test_utility_placement_has_one_executable_thermodynamic_notebook() -> None:
     assert "maximum_duties=" not in source
     assert "process_evidence.best.fallback_penalty" in source
     assert "display(process_fallback_penalty)" in source
+    assert 'process_evidence.termination.model_dump(mode="json")' in source
+    assert 'site_evidence.termination.model_dump(mode="json")' in source
+    assert "display(process_search)" in source
+    assert "display(site_search)" in source
     assert "def retarget_comparison(evidence, target):" in source
     assert source.count("retarget_comparison(") == 3
     assert "period = evidence.best.period_results[0]" in source
@@ -159,6 +163,31 @@ def test_utility_placement_has_one_executable_thermodynamic_notebook() -> None:
     assert "signed Q / T limit" in markdown
     assert "Utility GCC must not cross the Process GCC" in markdown
     assert "monetary" not in markdown.lower()
+
+
+def test_utility_placement_notebook_uses_a_bounded_demonstration_search() -> None:
+    notebook = _load_notebook(
+        ROOT
+        / "OpenPinch"
+        / "tutorials"
+        / "notebooks"
+        / "19_utility_placement_optimisation.ipynb"
+    )
+    tree = ast.parse(_combined_source(notebook))
+    search_options = next(
+        ast.literal_eval(node.value)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "search_options"
+            for target in node.targets
+        )
+    )
+
+    assert search_options["iteration_limit"] <= 30
+    assert search_options["evaluation_limit"] <= 50
+    assert search_options["candidate_limit"] <= 4
+    assert search_options["run_count"] <= 2
 
 
 def test_inverse_heat_recovery_has_complete_selected_period_notebook_example() -> None:

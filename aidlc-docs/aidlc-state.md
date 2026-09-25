@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: HPR and MVR Notebook Reliability — Complete
+- **Current Stage**: Test-Suite Runtime Reduction — Code Generation Step 12 of 13
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -2320,3 +2320,98 @@ refreshed reverse-engineering artifacts.
 - [ ] CONSTRUCTION - Unit 3 Code Generation Part 1 approved; seven-step Part 2 is active.
 - **Current stage**: Construction, Unit 3 Code Generation Part 2, Step 1 of 7.
 - **Extensions**: Property-Based Testing enabled. Security and Resiliency disabled.
+
+## Test-Suite Runtime Reduction
+
+- [x] INCEPTION - Workspace Detection resumed the existing brownfield Python
+  package on `develop`; the current reverse-engineering artifacts cover the
+  affected test, tutorial, optimisation, documentation, and CI owners.
+- [x] INCEPTION - Reverse Engineering skipped because the existing artifacts
+  remain current for this test-performance change.
+- [x] INCEPTION - Requirements Analysis completed from the seven measured
+  hotspots in the repository-wide serial profile.
+- [x] INCEPTION - Requirements approved by the user.
+- [x] INCEPTION - User Stories skipped because this is internal test and CI
+  performance work with no new user workflow, persona, or public API behavior.
+- [x] INCEPTION - Workflow Planning completed for one performance-focused unit.
+- [x] INCEPTION - Workflow plan approved by the user.
+- [x] CONSTRUCTION - NFR Requirements artifacts completed for the single unit.
+- [x] CONSTRUCTION - NFR Requirements approved by the user.
+- [x] CONSTRUCTION - NFR Design artifacts completed for the single unit.
+- [x] CONSTRUCTION - NFR Design approved by the user.
+- [x] CONSTRUCTION - Code Generation Part 1 plan completed with thirteen
+  executable steps.
+- [x] CONSTRUCTION - Code Generation plan approved by the user.
+- [x] CONSTRUCTION - Code Generation Step 1 baseline and implementation
+  boundary preserved.
+- [x] CONSTRUCTION - Code Generation Step 2 regression contracts added; five
+  expected failures and one expected missing-fixture error confirm the intended
+  pre-change gaps.
+- [x] CONSTRUCTION - Code Generation Step 3 central markers and single-owner CI
+  lanes implemented across develop, pull-request, and publish workflows; 37
+  workflow contracts and YAML parsing pass.
+- [x] CONSTRUCTION - Code Generation Step 4 Notebook 19 reduced to a fixed
+  1/5/10/1 candidate/iteration/evaluation/run profile, regenerated canonically,
+  and verified in 6.45 seconds with feasible zero-fallback process and site
+  results.
+- [x] CONSTRUCTION - Code Generation Step 5 copy-isolated process/site solved
+  evidence added; 50 utility-placement tests pass in 89.08 seconds with source
+  mutation and reversed-use isolation verified.
+- [x] CONSTRUCTION - Code Generation Step 6 property and batch setup shortened
+  without removing Hypothesis, shrinking, or explicit optimizer examples; 50
+  utility-placement tests pass in 79.03 seconds and 55 combined application and
+  batch tests pass in 83.35 seconds.
+- [x] CONSTRUCTION - Code Generation Step 7 CoolProp audit budgets refined by
+  topology; all 14 audit cases pass in 25.30 seconds and the unchanged complete
+  54-case standard plus direct-MVR E2E file passes 55 tests.
+- [x] CONSTRUCTION - Code Generation Step 8 both four-backend convergence
+  benchmarks marked performance and verified under bounded 2/25/5000
+  run/iteration/evaluation budgets; two tests pass in the dedicated lane.
+- [x] CONSTRUCTION - Code Generation Step 9 Sphinx smoke marked docs and made
+  the sole warning-strict documentation build owner; the dedicated selection
+  passes once in 15.12 seconds.
+- [x] CONSTRUCTION - Code Generation Step 10 compatible cold imports and retired
+  packages batched with per-case attribution; 39 related architecture tests
+  pass in 18.53 seconds.
+- [x] CONSTRUCTION - Code Generation Step 11 focused correctness, marker
+  partition, generator, timing, lint, formatting, YAML, and patch gates pass.
+- [x] CONSTRUCTION - Code Generation Step 12 complete: ordinary coverage passes
+  the 95 percent gate; 58 TESPy, 2 performance, 1 docs, and 4 solver tests are
+  accounted for in dedicated selections; distributions and the isolated
+  installed-wheel smoke pass.
+- [x] CONSTRUCTION - Code Generation Step 13 complete: the final ordinary
+  profile passes 3,390 tests with 6 expected skips and 65 intentional
+  deselections in 383.17 seconds, 36.2 percent faster than the 600.89-second
+  baseline and below the 480-second target.
+- [x] CONSTRUCTION - Code Generation approved by the user after all thirteen
+  plan steps and the generated-code audit completed.
+- [x] CONSTRUCTION - Build and Test complete: canonical build, unit,
+  integration, performance, E2E, and summary instructions updated for 0.6.9;
+  build artifacts, isolated installation, complete ordinary coverage,
+  specialized lanes, runtime target, and quality gates pass.
+- [x] OPERATIONS - Placeholder acknowledged; no deployment, monitoring,
+  incident-response, or production operations changes apply to this local
+  library test/CI performance workflow.
+- User Stories, Application Design, Units Generation, Functional Design, and
+  Infrastructure Design are provisionally skipped because this is an internal
+  test/CI performance refactor within existing component boundaries.
+- Requirements:
+  `inception/requirements/test-suite-runtime-reduction-requirements.md`.
+- User-story assessment:
+  `inception/plans/test-suite-runtime-reduction-user-stories-assessment.md`.
+- Execution plan:
+  `inception/plans/test-suite-runtime-reduction-execution-plan.md`.
+- NFR Requirements plan:
+  `construction/plans/test-suite-runtime-reduction-nfr-requirements-plan.md`.
+- NFR Requirements:
+  `construction/test-suite-runtime-reduction/nfr-requirements/`.
+- NFR Design plan:
+  `construction/plans/test-suite-runtime-reduction-nfr-design-plan.md`.
+- NFR Design:
+  `construction/test-suite-runtime-reduction/nfr-design/`.
+- Code Generation plan:
+  `construction/plans/test-suite-runtime-reduction-code-generation-plan.md`.
+- Extensions: Property-Based Testing remains enabled and applies to preservation
+  of existing generated invariants; Security and Resiliency remain disabled.
+- Current stage: Complete. Code Generation and Build and Test are approved;
+  Operations is a non-applicable placeholder for this workflow.

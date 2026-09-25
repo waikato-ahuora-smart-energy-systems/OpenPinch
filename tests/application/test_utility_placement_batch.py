@@ -86,7 +86,7 @@ def test_workspace_batch_forwards_maximum_duties_unchanged(monkeypatch) -> None:
 
 
 @given(order=st.permutations(("baseline", "scenario", "third")))
-@settings(deadline=None, max_examples=6)
+@settings(deadline=None, max_examples=3)
 def test_workspace_batch_preserves_generated_case_order(order) -> None:
     workspace = PinchWorkspace(source="chocolate_factory.json")
     workspace.scenario("scenario", activate=False)
@@ -101,9 +101,7 @@ def test_workspace_batch_preserves_generated_case_order(order) -> None:
         "utility_placement",
         lambda self, **_kwargs: self._problem.project_name,
     ):
-        outcome = workspace.cases(order).target.utility_placement(
-            isothermal=2
-        )
+        outcome = workspace.cases(order).target.utility_placement(isothermal=2)
 
     assert tuple(outcome.results) == tuple(order)
     assert workspace.active_case_name == active

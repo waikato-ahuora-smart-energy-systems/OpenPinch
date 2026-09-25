@@ -249,13 +249,17 @@ def test_pytest_marker_policy_declares_optional_and_solver_tiers():
         "tespy: tests that require the optional TESPy HPR simulation extra"
         in pytest_ini
     )
+    assert "performance: bounded convergence and runtime benchmark tests" in pytest_ini
+    assert "docs: warning-strict documentation build tests" in pytest_ini
 
 
 def test_workflows_declare_blocking_tespy_hpr_profile_and_install_surface():
     expected_surfaces = (
         "surface: [core, dashboard, notebook, brayton_cycle, tespy, synthesis]"
     )
-    expected_test = 'pytest --hypothesis-seed=20260715 -m "tespy"'
+    expected_test = (
+        'timeout 900s uv run --no-sync pytest --hypothesis-seed=20260715 -m "tespy"'
+    )
 
     for workflow_path in WORKFLOWS:
         workflow = workflow_path.read_text(encoding="utf-8")
@@ -263,10 +267,10 @@ def test_workflows_declare_blocking_tespy_hpr_profile_and_install_surface():
         assert "hpr-tespy-tests:" in workflow
         assert "uv sync --frozen --group dev --extra tespy" in workflow
         assert expected_test in workflow
-        assert "timeout 300s uv run --no-sync pytest" in workflow
+        assert workflow.count('-m "tespy"') == 1
         assert (
             "test_real_public_tespy_target_and_minimal_map_stay_within_smoke_budget"
-            in workflow
+            not in workflow
         )
 
     optional_smoke = (REPO_ROOT / "scripts" / "optional_install_smoke.py").read_text(
@@ -277,6 +281,23 @@ def test_workflows_declare_blocking_tespy_hpr_profile_and_install_surface():
     assert "HprTargetSimulationRecord" in optional_smoke
     assert "HprTargetEvaluatorCoordinator" in optional_smoke
     assert "build_hpr_target_map_basis" in optional_smoke
+
+
+def test_workflows_partition_expensive_profiles_into_single_owners():
+    ordinary = '-m "not solver and not tespy and not performance and not docs"'
+    performance = (
+        "timeout 900s uv run --no-sync pytest --hypothesis-seed=20260715 "
+        '-m "performance"'
+    )
+    docs = 'pytest --hypothesis-seed=20260715 -m "docs"'
+
+    for workflow_path in WORKFLOWS:
+        workflow = workflow_path.read_text(encoding="utf-8")
+        assert workflow.count(ordinary) == 1
+        assert workflow.count("performance-tests:") == 1
+        assert workflow.count(performance) == 1
+        assert workflow.count(docs) == 1
+        assert "python scripts/build_docs.py" not in workflow
 
 
 def test_lockfile_project_version_matches_pyproject():
@@ -593,7 +614,10 @@ def test_develop_always_validates_and_main_pr_can_reuse_proven_results():
     assert 'branches: ["develop"]' in develop
     assert "detect-main-pr" not in develop
     assert "needs.detect-main-pr" not in develop
-    assert 'pytest --hypothesis-seed=20260715 -m "not solver"' in develop
+    assert (
+        'pytest --hypothesis-seed=20260715 -m "not solver and not tespy and not performance and not docs"'
+        in develop
+    )
     assert "develop-validation:" in pr
     assert "actions: read" in pr
     assert "fetch-depth: 2" in pr
@@ -737,6 +761,17 @@ def test_tespy_profiles_are_required_by_release_and_pull_request_gates():
     assert "hpr-tespy-tests" in build.splitlines()[1]
     assert "artifact-install-tespy-smoke:" in publish
     assert "python scripts/artifact_install_smoke.py --surface tespy" in publish
+
+
+def test_performance_profiles_are_required_by_release_and_pull_request_gates():
+    pull_request = WORKFLOWS[1].read_text(encoding="utf-8")
+    pr_gate = pull_request.split("  pr-gate:", 1)[1]
+    publish = WORKFLOWS[2].read_text(encoding="utf-8")
+    build = publish.split("  build:", 1)[1].split("  artifact-install-smoke:", 1)[0]
+
+    assert "- performance-tests" in pr_gate
+    assert "PERFORMANCE_RESULT: ${{ needs.performance-tests.result }}" in pr_gate
+    assert "performance-tests" in build.splitlines()[1]
 
 
 def test_core_dependencies_have_required_coolprop_floor_and_other_major_ceilings():

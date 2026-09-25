@@ -1,98 +1,92 @@
-# Build Instructions - RTD and Comprehensive HPR Notebook
+# Build Instructions - Test-Suite Runtime Reduction
 
 ## Prerequisites
 
-- Build tool: uv with Hatchling through the PEP 517 build interface.
-- Runtime: CPython 3.14.2 or later.
-- Core dependencies: NumPy, Pint, pandas, CoolProp 8 or later, Pydantic, and
-  SciPy.
-- HPR optional dependency: install the `tespy` extra for TESPy target and map
-  generation. The verified environment uses TESPy 0.11.2.
-- Development dependencies: pytest, Hypothesis, coverage, Ruff, Sphinx,
-  `build`, and Hatchling from the locked development group.
-- External solver profile: locally configured solvers are needed only for the
-  complete repository regression; the tutorial/RTD follow-up adds no solver
-  dependency.
-- Disk: temporary space for a source archive, wheel, and two isolated virtual
-  environments.
+- Python 3.14.2, matching `pyproject.toml` and CI.
+- uv 0.11.29, matching the GitHub Actions workflows.
+- Hatchling and `build` from the locked development dependency group.
+- macOS, Linux, or Windows for the core wheel smoke. CI uses Ubuntu for the
+  TESPy, performance, documentation, and solver lanes.
+- Temporary disk space for `.venv/`, `dist/`, documentation output, coverage
+  data, and isolated installed-wheel environments.
+
+The core build requires no credentials or network service. The solver lane
+additionally requires usable Couenne and IPOPT binaries. Local installations
+may expose solver paths through `IPOPT_EXECUTABLE`, `CBC_EXECUTABLE`,
+`BONMIN_EXECUTABLE`, `COUENNE_EXECUTABLE`, `APOPT_EXECUTABLE`,
+`MOJOPSE_EXECUTABLE`, and `AMPLFUNC` when those tools are not discoverable on
+`PATH`.
 
 ## Build Steps
 
-### 1. Synchronize Dependencies
+### 1. Synchronize the Locked Environment
 
 ```bash
-uv sync --all-extras --group dev
+uv sync --frozen --group dev
+uv run --no-sync python scripts/check_lockfile_version.py
 ```
 
-### 2. Verify the Runtime and Optional Boundaries
+Expected result: the Python 3.14.2 environment is synchronized without
+changing `uv.lock`, and the package version agrees across project metadata.
+
+### 2. Run Static Validation
 
 ```bash
-uv run python --version
-uv run python scripts/optional_install_smoke.py tespy
+uv run --no-sync ruff check .
+git diff --check
 ```
 
-### 3. Build Source and Wheel Artifacts
+Expected result: both commands exit zero.
 
-Use a clean output directory:
+### 3. Build the Wheel and Source Distribution
 
 ```bash
-uv build --out-dir dist
+uv run --no-sync python scripts/build_dist.py
 ```
 
-Before building, regenerate the packaged tutorial and prove that a second pass
-is byte-idempotent:
+Expected artifacts for version 0.6.9:
+
+- `dist/openpinch-0.6.9-py3-none-any.whl`
+- `dist/openpinch-0.6.9.tar.gz`
+
+Both archives must contain
+`OpenPinch/tutorials/notebooks/19_utility_placement_optimisation.ipynb`.
+
+### 4. Verify an Installed Artifact
+
+Use a clean virtual environment outside the repository so an editable checkout
+cannot satisfy the import accidentally:
 
 ```bash
-uv run python scripts/generate_tutorial_notebooks.py
-uv run python scripts/generate_tutorial_notebooks.py
+uv venv --python 3.14.2 /tmp/openpinch-wheel-smoke/.venv
+uv pip install --python /tmp/openpinch-wheel-smoke/.venv/bin/python \
+  dist/openpinch-0.6.9-py3-none-any.whl
+cd /tmp/openpinch-wheel-smoke
+.venv/bin/python /path/to/OpenPinch/scripts/artifact_install_smoke.py \
+  --repo-root /path/to/OpenPinch --surface core
 ```
 
-### 4. Verify Build Success
-
-- Expected artifacts for version 0.6.4 are
-  `dist/openpinch-0.6.4.tar.gz` and
-  `dist/openpinch-0.6.4-py3-none-any.whl`.
-- Both archives must contain the versioned HPR schema, heat-pump and
-  refrigeration fixtures, compressor characteristic, all performance-map
-  modules, target record/basis modules, and public accessor integration.
-- Both archives must contain
-  `OpenPinch/data/notebooks/09_vapour_compression_and_brayton.ipynb`. RTD source
-  remains repository-owned rather than a distribution artifact; verify the HPR
-  guide, notebook series, tutorial coverage page, and canonical coverage CSV
-  through the warning-strict Sphinx and packaging-test gates.
-- Wheel metadata must expose a `tespy` extra requiring TESPy 0.10.1.post2 or
-  later.
-- Archive members must be unique and resource bytes must match the checkout.
-
-## Installed Artifact Verification
-
-Install the wheel into two clean environments outside the checkout. Run:
-
-```bash
-python scripts/artifact_install_smoke.py --surface core
-python scripts/artifact_install_smoke.py --surface tespy
-```
-
-The core environment must not contain TESPy. The TESPy environment must execute
-the explicit public target, winning-record, target-derived basis, and minimal
-performance-map workflow. Both imports must resolve from site-packages.
+Expected result: the smoke reports an import path inside the isolated virtual
+environment and validates the CLI, packaged resources, root API, and targeting
+workflow.
 
 ## Troubleshooting
 
-### Dependency or Build Frontend Failure
+### Dependency or Lock Failure
 
-Synchronize the lock and rerun the build from the repository root. In a
-network-restricted environment, ensure uv can access its existing package
-cache. Do not weaken the optional dependency boundary to make the build pass.
+- Confirm Python is exactly 3.14.2 and uv is compatible with 0.11.29.
+- Run `uv lock --check`; do not regenerate the lock merely to bypass a mismatch.
+- Install the required optional extra when running a specialized surface.
 
-### Missing Resource or Signature Mismatch
+### Artifact Smoke Imports the Checkout
 
-Run the packaging, resource, and cold-import tests. Compare the source, sdist,
-and wheel resource digests, then rebuild from a clean output directory. Do not
-manually patch a built archive.
+- Run the smoke from outside the repository.
+- Recreate the temporary virtual environment and reinstall the wheel.
+- Do not set `PYTHONPATH` to the checkout.
 
-### Notebook or RTD Artifact Is Stale
+### Solver Selection Skips or Fails
 
-Run the canonical generator, notebook/coverage packaging tests, and
-warning-strict Sphinx build. Update the generator first; never hand-edit only
-the packaged notebook.
+- Run `uv run --no-sync idaes get-extensions` on a supported platform.
+- Verify Couenne and IPOPT with `pyomo.environ.SolverFactory` before pytest.
+- Treat missing external binaries as environment setup, not an ordinary-lane
+  failure.

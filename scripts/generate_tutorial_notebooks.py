@@ -1091,10 +1091,10 @@ NOTEBOOKS = {
                 "    return pd.DataFrame(rows)\n"
                 "\n"
                 "search_options = {\n"
-                '    "iteration_limit": 100,\n'
-                '    "evaluation_limit": 100,\n'
-                '    "candidate_limit": 20,\n'
-                '    "run_count": 10,\n'
+                '    "iteration_limit": 5,\n'
+                '    "evaluation_limit": 10,\n'
+                '    "candidate_limit": 1,\n'
+                '    "run_count": 1,\n'
                 "}"
             ),
             code(
@@ -1106,6 +1106,7 @@ NOTEBOOKS = {
                 "    options=search_options,\n"
                 ")\n"
                 "process_evidence = process_case.utility_placement_result\n"
+                'process_search = process_evidence.termination.model_dump(mode="json")\n'
                 "process_objective = process_evidence.best.aggregate_objective\n"
                 "process_fallback_penalty = process_evidence.best.fallback_penalty\n"
                 'process_utilities = process_case.to_problem_json()["utilities"]\n'
@@ -1131,6 +1132,7 @@ NOTEBOOKS = {
                 "    options=search_options,\n"
                 ")\n"
                 "site_evidence = site_case.utility_placement_result\n"
+                'site_search = site_evidence.termination.model_dump(mode="json")\n'
                 "site_objective = site_evidence.best.aggregate_objective\n"
                 'site_utilities = site_case.to_problem_json()["utilities"]\n'
                 "registered_site = workspace.add(\n"
@@ -1483,10 +1485,12 @@ PRESENTATIONS: dict[str, tuple[str, str]] = {
         "from IPython.display import display\n\n"
         "display(process_objective)\n"
         "display(process_fallback_penalty)\n"
+        "display(process_search)\n"
         "display(process_retarget_comparison)\n"
         "display(process_summary)\n"
         "display(process_gcc)\n"
         "display(site_objective)\n"
+        "display(site_search)\n"
         "display(site_retarget_comparison)\n"
         'display({"baseline_unchanged": baseline_unchanged})\n'
         "display(site_summary)\n"
