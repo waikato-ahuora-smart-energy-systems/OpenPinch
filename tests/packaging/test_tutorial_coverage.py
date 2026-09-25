@@ -85,6 +85,7 @@ def test_manifest_exactly_matches_live_public_inventory() -> None:
     assert all(row["owner"] in OWNERS for row in rows)
     assert {row["coverage_status"] for row in rows} == {
         "mapped and executable",
+        "mapped; documented independent replay",
         "mapped; runtime unsupported",
     }
     unsupported = {
@@ -97,6 +98,18 @@ def test_manifest_exactly_matches_live_public_inventory() -> None:
         "problem.target.brayton_refrigeration",
         "batch.target.brayton_heat_pump",
         "batch.target.brayton_refrigeration",
+    }
+    documented_replays = {
+        row["operation"]
+        for row in rows
+        if row["coverage_status"] == "mapped; documented independent replay"
+    }
+    assert documented_replays == {
+        "problem.target.all_periods.carnot_heat_pump",
+        "problem.target.all_periods.carnot_refrigeration",
+        "problem.target.all_periods.mvr_heat_pump",
+        "problem.target.all_periods.vapour_compression_heat_pump",
+        "problem.target.all_periods.vapour_compression_refrigeration",
     }
 
 

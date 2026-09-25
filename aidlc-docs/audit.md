@@ -9601,3 +9601,222 @@ utilities = problem.target.all_heat_integration(base_target=heat_pump)"
 **Context**: Requested local commit complete. This audit entry is included by amending that same commit; the final commit identifier supersedes the pre-amend identifier recorded by Git during creation.
 
 ---
+
+## Notebook 10 HPR Screening Reliability - Initial Request
+**Timestamp**: 2026-09-25T02:00:44Z
+**User Input**:
+```text
+# Files pasted by the user:
+
+## "{'Carnot heat pump': {'turndown': TargetOutput(name='Crude HPR', period_id='tur…": /Users/timothyw/.codex/attachments/19aca391-900a-4012-ba96-18ba8db20274/pasted-text.txt
+
+## My request:
+Notebook #10 fails to solve with the error:
+```
+**AI Response**: "Started a focused brownfield bug-fix workflow, inspected the pasted output and executed notebook, and reproduced the three failed simulated HPR screens with their structured diagnostics."
+**Context**: New AI-DLC workflow. Notebook 10 is a packaged slow-HPR tutorial. The working-tree notebook contains user-executed outputs and is preserved pending an explicit output-handling decision.
+
+---
+
+## Notebook 10 HPR Screening Reliability - Workspace Detection and Reproduction
+**Timestamp**: 2026-09-25T02:00:44Z
+**AI Response**: "Confirmed current reverse-engineering artifacts and existing HPR owners. Exact replay showed 1,174 failed CoolProp candidates for vapour-compression heat pumping, 1,174 for vapour-compression refrigeration, and 1,336 for VC+MVR, all categorized as physical infeasibility under inherited default topology and search limits. An explicit single-stage configuration with maximum_iterations=20 and maximum_evaluations=50 solved all three methods across turndown, base, and peak in 14.3 seconds."
+**Context**: Brownfield workspace detection complete; reverse engineering refresh is not required. Requirements Analysis is standard depth because notebook output handling and diagnostic presentation require user decisions. Security and Resiliency remain provisionally disabled and full PBT provisionally enabled pending answers.
+
+---
+
+## Notebook 10 HPR Screening Reliability - Requirements Questions
+**Timestamp**: 2026-09-25T02:00:44Z
+**AI Prompt**: "Please complete all six `[Answer]:` tags in `aidlc-docs/inception/requirements/notebook-10-hpr-screening-reliability-questions.md`."
+**Context**: Requirements question gate. No application, generator, notebook source, or test implementation has been changed.
+
+---
+
+## Notebook 10 HPR Screening Reliability - Q1 Discussion
+**Timestamp**: 2026-09-25T02:07:00Z
+**User Input**: "Q1 needs more discussion"
+**AI Response**: "Expanded Question 1 to distinguish successful workflow demonstration from engineering feasibility screening. Added four mutually exclusive choices: a recommended two-tier tutorial, a success-only tutorial, a feasibility-led tutorial, and a minimal three-call correction. Recorded the evidence that the inherited complex cascade fails while explicit bounded single-stage configurations solve every period."
+**Context**: Requirements Analysis question refinement. Questions 2 through 6 are answered A, A, B, A, B respectively. Question 1 remains pending; no implementation files changed.
+
+---
+
+## Notebook 10 HPR Screening Reliability - Shared Optimisation Discussion
+**Timestamp**: 2026-09-25T02:09:42Z
+**User Input**: "What about running Run bounded single-stage VC, refrigeration, and MVR configurations that solve across all three periods as an optimisat?"
+**AI Response**: "Confirmed that shared-design multiperiod HPR optimization is supported and better matches the notebook's study question. Real bounded probes solved shared designs for all five Carnot, VC, refrigeration and VC+MVR methods across turndown, base and peak. Updated Question 1 to distinguish one shared installed design from independently retuned per-period designs."
+**Context**: Requirements Analysis question refinement. The shared objective uses weighted operating cost and feasibility penalty plus peak annualized capital cost. Each technology is optimized separately; there is no single meta-optimization selecting among technologies. Question 1 remains pending; no implementation files changed.
+
+---
+
+## Notebook 10 HPR Screening Reliability - Requirements Decisions Complete
+**Timestamp**: 2026-09-25T02:12:55Z
+**User Input**: "Proceed"
+**AI Response**: "Recorded Question 1 as option A: bounded shared-design multiperiod optimization for all five technologies as the main workflow, followed by one optional advanced cascade feasibility screen. Finalized the standard-depth requirements using the completed output, diagnostics, and extension decisions."
+**Context**: Requirements Analysis. All six answers are complete. Property-Based Testing is enabled in full; Security Baseline and Resiliency Baseline are disabled. No application, generator, notebook, or test implementation changed.
+
+---
+
+## Notebook 10 HPR Screening Reliability - Requirements Approval Prompt
+**Timestamp**: 2026-09-25T02:14:04Z
+**AI Response**: "Presented the completed Notebook 10 HPR Screening Reliability requirements for explicit review."
+**Context**: Requirements Analysis approval gate. Workflow Planning and implementation remain blocked pending explicit approval.
+
+---
+
+## HPR and MVR Notebook Reliability - Scope Expansion
+**Timestamp**: 2026-09-25T02:17:02Z
+**User Input**: "Expand the scope to all notebooks involving HPR / MVR targeting to ensure they work properly too."
+**AI Response**: "Reopened Requirements Analysis and expanded the static inventory to every generated notebook that invokes HPR or MVR targeting. Identified notebooks 08, 09, 10, and 11 as the applicable slow-HPR tutorial set and began baseline execution analysis."
+**Context**: Requirements revision. The prior Notebook 10 approval prompt is superseded. No application, generator, notebook, or test implementation changed.
+
+---
+
+## HPR and MVR Notebook Reliability - Expanded Baseline Evidence
+**Timestamp**: 2026-09-25T02:24:32Z
+**AI Response**: "Inventoried and exercised all four HPR/MVR targeting notebooks. Notebook 08 completed; Notebook 09 completed while masking a VC refrigeration failure and using inherited work limits; Notebook 10 remained in optimizer work until the combined profile was interrupted after 243 seconds; Notebook 11 completed in approximately 3.3 seconds. Verified bounded 20-iteration/50-evaluation settings solve Notebook 08's two Carnot calls and Notebook 09's required CoolProp heat-pump and refrigeration calls."
+**Context**: Requirements Analysis evidence. The diagnostic profile was intentionally interrupted at Notebook 10 after reproducing its unbounded behavior. No source notebook, generator, runtime, or test implementation changed.
+
+---
+
+## HPR and MVR Notebook Reliability - Expanded Requirements Approval Prompt
+**Timestamp**: 2026-09-25T02:24:32Z
+**AI Response**: "Expanded the requirements and acceptance criteria to generated notebooks 08, 09, 10, and 11, including distinct required and optional outcomes, explicit optimization caps, compact presentation, and separately attributable notebook execution tests."
+**Context**: Requirements Analysis approval gate. Property-Based Testing remains enabled in full; Security Baseline and Resiliency Baseline remain disabled. Workflow Planning and implementation remain blocked pending explicit approval.
+
+---
+
+## HPR and MVR Notebook Reliability - Requirements Approval
+**Timestamp**: 2026-09-25T02:26:43Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded approval of the expanded requirements and proceeded to Workflow Planning."
+**Context**: Requirements Analysis approved. User Stories remain skipped by prior user direction. No implementation changed.
+
+---
+
+## HPR and MVR Notebook Reliability - Workflow Plan Approval Prompt
+**Timestamp**: 2026-09-25T02:28:22Z
+**AI Response**: "Created a one-unit execution plan with NFR Requirements, NFR Design, Code Generation, and Build and Test selected; Application Design, Units Generation, Functional Design, Infrastructure Design, and Operations are skipped or N/A."
+**Context**: Workflow Planning approval gate. The plan sequences generator changes, four source-only notebooks, coverage metadata and guidance, per-notebook execution tests, PBT, and broad verification. Implementation remains blocked pending explicit approval.
+
+---
+
+## HPR and MVR Notebook Reliability - Workflow Plan Approval
+**Timestamp**: 2026-09-25T02:36:25Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded workflow-plan approval and started NFR Requirements for the HPR and MVR Notebook Reliability unit."
+**Context**: Workflow Planning approved. NFR Requirements is the next selected construction stage; no implementation changed.
+
+---
+
+## HPR and MVR Notebook Reliability - NFR Requirements Approval Prompt
+**Timestamp**: 2026-09-25T02:36:25Z
+**AI Response**: "Defined measurable NFR requirements for optimizer caps, explicit topology, required and optional outcomes, shared-design completeness, bounded diagnostics, compact output, deterministic source-only generation, per-notebook test attribution, and layered verification. Retained the existing stack."
+**Context**: NFR Requirements approval gate. Property-Based Testing is compliant; disabled Security and Resiliency extensions are N/A. NFR Design remains blocked pending explicit approval.
+
+---
+
+## HPR and MVR Notebook Reliability - NFR Requirements Approval
+**Timestamp**: 2026-09-25T02:46:57Z
+**User Input**: "Continue to Next Stage"
+**AI Response**: "Recorded NFR Requirements approval and proceeded to NFR Design."
+**Context**: NFR Requirements approved. The measurable work limits, reliability boundaries, deterministic generation, compact output, test attribution, and retained stack are now design inputs.
+
+---
+
+## HPR and MVR Notebook Reliability - Continuation Direction
+**Timestamp**: 2026-09-25T02:47:59Z
+**User Input**: "Keep going until there is a question for me to respond to."
+**AI Response**: "Continued through NFR Design and stopped at its mandatory review choice."
+**Context**: NFR Design execution direction. No additional clarification was needed because every mandatory design category was resolved by approved requirements or an explicit N/A rationale.
+
+---
+
+## HPR and MVR Notebook Reliability - NFR Design Approval Prompt
+**Timestamp**: 2026-09-25T02:48:41Z
+**AI Response**: "Mapped all NFRs to explicit notebook call matrices, fresh-problem shared-design isolation, required-versus-optional exception boundaries, plain-data summaries, deterministic regeneration, per-notebook execution tests, synchronized guidance, and Property-Based Testing seams."
+**Context**: NFR Design approval gate. Security and Resiliency remain disabled and N/A. Code Generation planning remains blocked pending explicit approval.
+
+---
+
+## HPR and MVR Notebook Reliability - NFR Design Approval
+**Timestamp**: 2026-09-25T03:39:09Z
+**User Input**: "Continue to Next Stage"
+**AI Response**: "Recorded NFR Design approval and proceeded to Code Generation Part 1 planning."
+**Context**: NFR Design approved. No application, generator, notebook, test, or user documentation implementation changed.
+
+---
+
+## HPR and MVR Notebook Reliability - Code Generation Plan Approval Prompt
+**Timestamp**: 2026-09-25T03:39:52Z
+**AI Response**: "Created a fourteen-step test-first Code Generation plan covering brownfield preservation, generator-owned helpers, notebooks 08 through 11, source-only regeneration, metadata and guidance synchronization, per-notebook execution attribution, property tests, focused real execution, audit, and summary."
+**Context**: Code Generation Part 1 approval gate. Implementation remains blocked pending explicit approval of the complete plan.
+
+---
+
+## HPR and MVR Notebook Reliability - Code Generation Plan Approval
+**Timestamp**: 2026-09-25T03:47:35Z
+**User Input**: "**Approve & Begin Code Generation** "
+**AI Response**: "Recorded approval of all fourteen Code Generation steps and began implementation with brownfield preservation and baseline checks."
+**Context**: Code Generation Part 2 authorized. The pre-existing Notebook 10 execution-only diff contained 243 added and 26 removed lines and is explicitly approved for replacement during canonical regeneration. The fast generator repeatability and notebook compilation/import baseline passed 2 tests. No unrelated user change was found.
+
+---
+
+## HPR and MVR Notebook Reliability - Code Generation Completion Prompt
+**Timestamp**: 2026-09-25T04:18:28Z
+**AI Response**: "Completed all fourteen approved Code Generation steps. Regenerated and validated notebooks 08 through 11, synchronized documentation and coverage metadata, added separately attributable execution and property tests, and completed the generated-code audit. Four real slow-HPR notebook cases, 165 focused HPR/MVR regressions, 49 static/property/docs/coverage checks, and 11 base notebook executions pass; Ruff and patch hygiene pass. Requested review with the standardized Request Changes or Continue to Next Stage choice."
+**Context**: Code Generation Part 2 complete for HPR and MVR Notebook Reliability. Property-Based Testing is compliant; disabled Security and Resiliency extensions are N/A. Code Generation remains at its mandatory approval gate before Build and Test.
+
+---
+
+## HPR and MVR Notebook Reliability - Code Generation Review Change
+**Timestamp**: 2026-09-25T05:17:02Z
+**User Input**: "Update RTD"
+**AI Response**: "Reopened Code Generation to extend the Read the Docs sources with the bounded HPR/MVR and shared-design multiperiod contracts, then validate the warnings-as-errors RTD build."
+**Context**: User requested changes at the Code Generation review gate. Existing generated notebook behavior remains approved implementation scope; Build and Test remains blocked until the revised generated code and documentation are reviewed.
+
+---
+
+## HPR and MVR Notebook Reliability - Revised Code Generation Completion Prompt
+**Timestamp**: 2026-09-25T05:21:29Z
+**AI Response**: "Updated the RTD fundamentals, public HPR reference, capability matrix, support and stability boundary, and release notes. Added focused drift assertions; all 25 documentation consistency and tutorial coverage tests pass, the Sphinx 9.1 HTML build passes with warnings treated as errors, Ruff passes, and patch hygiene passes. Requested review of the revised Code Generation output."
+**Context**: Code Generation review change complete. The local RTD HTML artifact is available under docs/_build/html. Code Generation remains at its mandatory approval gate before Build and Test.
+
+---
+
+## HPR and MVR Notebook Reliability - Revised Code Generation Approval
+**Timestamp**: 2026-09-25T05:22:52Z
+**User Input**: "Continue to Next Stage"
+**AI Response**: "Recorded approval of the revised Code Generation output and proceeded to Build and Test."
+**Context**: Code Generation approved after the RTD update. Build and Test is active.
+
+---
+
+## HPR and MVR Notebook Reliability - Build and Test Completion Prompt
+**Timestamp**: 2026-09-25T05:45:44Z
+**AI Response**: "Completed Build and Test. The CI-equivalent non-solver gate passed 3,455 tests with six expected opt-in skips, four external-solver deselections, zero failures, and 96% branch coverage. Four real HPR/MVR notebooks, 192 focused HPR/MVR integration tests, warning-strict RTD, wheel and source distribution builds, and an isolated installed-wheel smoke passed. Generated and validated the workflow-specific build, unit, integration, end-to-end, performance, and summary instructions. Requested the standardized Request Changes or Approve and Continue review choice."
+**Context**: Build and Test completion gate. Property-Based Testing is compliant; disabled Security and Resiliency extensions are N/A. Operations remains blocked pending explicit approval.
+
+---
+
+## HPR and MVR Notebook Reliability - Build and Test Approved
+**Timestamp**: 2026-09-25T05:46:47Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded Build and Test approval and evaluated the Operations placeholder. No deployment, infrastructure, monitoring, publication, or external-system work applies, so Operations is N/A and the workflow is complete."
+**Context**: Build and Test approved. Operations is a placeholder under the active AI-DLC rules and requires no action for this notebook, test, and documentation workflow. Property-Based Testing remains compliant; disabled Security and Resiliency extensions remain N/A.
+
+---
+
+## HPR and MVR Notebook Reliability - Workflow Complete
+**Timestamp**: 2026-09-25T05:46:47Z
+**AI Response**: "Completed the approved HPR/MVR notebook reliability workflow. Four real tutorials, 192 focused HPR/MVR integration tests, 3,455 CI-equivalent non-solver tests, 96% branch coverage, strict RTD, distributions, and isolated installed-wheel verification all pass. Operations is N/A."
+**Context**: Final workflow state. No deployment, publication, infrastructure mutation, commit, push, or merge was performed during this final transition.
+
+---
+
+## HPR and MVR Notebook Reliability - Commit Authorization
+**Timestamp**: 2026-09-25T05:48:30Z
+**User Input**: "Commit"
+**AI Response**: "Resolved the completed workflow file set on develop, excluded the ignored .DS_Store artifact, rechecked patch hygiene, and prepared a local commit containing the approved HPR/MVR notebooks, generator, tests, RTD, coverage metadata, and AI-DLC records."
+**Context**: Local commit authorized. No push, pull request, merge, deployment, or publication is authorized by this instruction.
+
+---

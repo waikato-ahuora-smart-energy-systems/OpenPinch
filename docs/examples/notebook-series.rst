@@ -25,16 +25,19 @@ Core and Intermediate
    (``base``).
 7. ``07_area_cost_and_exergy.ipynb`` -- area/cost and exergy enrichment
    (``base``).
-8. ``08_carnot_heat_pump_and_refrigeration.ipynb`` -- Carnot HPR placement and
-   topology (``slow-hpr``).
+8. ``08_carnot_heat_pump_and_refrigeration.ipynb`` -- bounded one-stage Carnot
+   heat-pump and refrigeration targets, plots, and residual utility placement
+   (``slow-hpr``).
 9. ``09_vapour_compression_and_brayton.ipynb`` -- comprehensive simulated
    vapour-compression targeting, detached winning records, target-owned performance maps,
-   plain-data export, explicit TESPy mixtures, and guarded
-   refrigeration/Brayton comparisons (``slow-hpr``).
-10. ``10_multiperiod_heat_pumps.ipynb`` -- mirrored multiperiod HPR methods
+   plain-data export, required CoolProp refrigeration, explicit optional TESPy
+   mixtures, and optional Brayton comparisons (``slow-hpr``).
+10. ``10_multiperiod_heat_pumps.ipynb`` -- five separate bounded shared-design
+    optimizations across ``turndown``, ``base``, and ``peak``, plus one optional
+    advanced cascade screen (``slow-hpr``).
+11. ``11_process_mvr_and_cascade.ipynb`` -- direct process-MVR stage/work
+    evidence and a required bounded one-stage CoolProp VC+MVR target
     (``slow-hpr``).
-11. ``11_process_mvr_and_cascade.ipynb`` -- process MVR components and cascade
-    HPR (``slow-hpr``).
 12. ``12_cogeneration.ipynb`` -- default and named turbine models (``base``).
 13. ``13_multiperiod_cogeneration.ipynb`` -- multiperiod cogeneration
     (``base``).

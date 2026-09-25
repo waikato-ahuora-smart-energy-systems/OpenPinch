@@ -19,6 +19,7 @@ documented in :doc:`api-core`:
 - ``problem.target.carnot_refrigeration(...)``
 - ``problem.target.vapour_compression_heat_pump(...)``
 - ``problem.target.vapour_compression_refrigeration(...)``
+- ``problem.target.mvr_heat_pump(...)``
 - ``problem.target.hpr_performance_map(target=..., request=...)``
 
 The modules on this page are the lower-level implementation layers behind
@@ -56,11 +57,45 @@ CoolProp nor TESPy. OpenUtility or another optimization package consumes only
 the exported mapping and owns MILP construction; OpenPinch has no OpenUtility,
 Pyomo, or HiGHS dependency at this boundary.
 
+Public Targeting Reliability Contract
+-------------------------------------
+
+The scalar Carnot, vapour-compression, and VC+MVR target methods accept bounded
+search controls through ``maximum_restarts``, ``maximum_iterations``, and
+``maximum_evaluations``. Vapour-compression methods additionally accept
+explicit condenser, evaporator, backend, and refrigerant selections;
+``mvr_heat_pump`` accepts explicit MVR fluids and stage count. A successful
+target exposes ``hpr_success``, ``hpr_load`` where scalar load evidence exists,
+and detached ``hpr_details``.
+
+If the bounded search cannot produce a valid target, the method raises
+``HPRTargetingError``. Its ``diagnostics`` value is an ``HPRFailureSummary``
+with the search budget, evaluated count, category totals, and a bounded set of
+representative failures. This typed outcome is distinct from dependency,
+configuration, programming, and service defects.
+
+Independent period replay uses ``problem.target.all_periods``. Shared installed
+design optimization instead uses a scalar target method with
+``HPR_MULTIPERIOD_OPTIMIZATION_ENABLED`` set to true. Successful shared results
+publish the common design vector, aligned period identifiers and weights,
+period outputs, and weighted output through ``hpr_details``. The scalar
+``period_id`` remains the reporting period.
+
+Direct process MVR is a component workflow through
+``problem.components.add_process_mvr(...)``. Its replacement streams,
+per-period stage results, compressor work, affected zones, and active state are
+separate from the optimized ``problem.target.mvr_heat_pump(...)`` VC+MVR
+service.
+
 .. automodule:: OpenPinch.contracts.hpr_performance_map
    :members:
    :no-index:
 
 .. autoclass:: OpenPinch.contracts.hpr.HprTargetSimulationRecord
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.contracts.hpr.HPRFailureSummary
    :members:
    :no-index:
 

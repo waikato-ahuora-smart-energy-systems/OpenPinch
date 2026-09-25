@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: HPR and MVR Benchmark E2E Reliability — Complete
+- **Current Stage**: HPR and MVR Notebook Reliability — Complete
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -27,6 +27,113 @@
 | Security Baseline | No | Utility Placement Requirements Analysis |
 | Property-Based Testing | Yes | Utility Placement Requirements Analysis |
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
+
+## Notebook 10 HPR Screening Reliability
+
+- [x] Workspace Detection: existing brownfield Python package confirmed;
+  current reverse-engineering artifacts are sufficient.
+- [x] Failure reproduction: Notebook 10's three simulated screens reproduce as
+  typed HPR failures after 1,174, 1,174, and 1,336 physically infeasible
+  candidates under the inherited 300-iteration/1,000,000-evaluation defaults.
+- [x] Feasibility probe: explicit one-condenser, one-evaporator, one-MVR-stage
+  configurations with 20 iterations and 50 evaluations solve all three methods
+  across `turndown`, `base`, and `peak` in the current environment.
+- [x] Requirements Analysis: all six decisions recorded; bounded shared-design
+  optimization is the main workflow for five technologies, followed by one
+  optional advanced cascade screen.
+- [x] Notebook 10-only requirements approval: superseded by the user's expanded
+  four-notebook scope before approval.
+- [x] Extension configuration: Property-Based Testing enabled in full;
+  Security Baseline and Resiliency Baseline disabled.
+- [x] User Stories: skipped because this focused technical tutorial correction
+  has direct acceptance criteria and the user stated stories are not needed.
+- Reverse Engineering, Application Design, Units Generation and Infrastructure
+  Design: provisionally skipped; existing owners and public APIs are sufficient.
+
+## HPR and MVR Notebook Reliability Scope Expansion
+
+- [x] Requirements reopened after the user expanded scope beyond Notebook 10.
+- [x] Static inventory identifies four generated slow-HPR notebooks with HPR or
+  MVR targeting: 08, 09, 10, and 11.
+- [x] Execute and diagnose the current four-notebook baseline: Notebook 08
+  succeeds; Notebook 09 masks an unbounded VC refrigeration failure; Notebook
+  10 remains in inherited optimizer work after four minutes; Notebook 11
+  succeeds in approximately 3.3 seconds.
+- [x] Bounded probes: Notebook 08 Carnot targets and Notebook 09 CoolProp VC heat
+  pump and refrigeration all solve with one stage, 20 iterations, and 50
+  evaluations.
+- [x] Revise requirements, acceptance criteria, and verification scope in
+  `inception/requirements/hpr-mvr-notebook-reliability-requirements.md`.
+- [x] Expanded requirements approved by the user.
+- [x] Workflow Planning complete in
+  `inception/plans/hpr-mvr-notebook-reliability-execution-plan.md`.
+- [x] Workflow plan approved by the user.
+- [x] NFR Requirements artifacts complete for the single construction unit.
+- [x] NFR Requirements approved by the user.
+- [x] NFR Design artifacts complete for the single construction unit.
+- [x] NFR Design approved by the user.
+- [x] Code Generation Part 1 plan complete with fourteen executable steps.
+- [x] Code Generation plan approved by the user.
+- [x] Code Generation Step 1: brownfield state and Notebook 10's approved
+  executed-output replacement boundary recorded; fast generator/static baseline
+  passed 2 tests.
+- [x] Code Generation Step 2: added static contracts for all four notebooks,
+  canonical source-only drift, and seeded bounded diagnostic JSON properties;
+  confirmed five expected failures against the pre-change notebooks.
+- [x] Code Generation Step 3: added generator-owned notebook-local helpers for
+  compact feasible summaries, bounded JSON-mode typed diagnostics, and distinct
+  optional dependency, unavailable-method, and infeasible statuses.
+- [x] Code Generation Step 4: bounded both Notebook 08 Carnot targets at a
+  one-stage 1/20/50 search, asserted successful targets, retained residual
+  utility analysis and plots, and replaced oversized target output with compact
+  evidence.
+- [x] Code Generation Step 5: made required Notebook 09 CoolProp heat-pump and
+  refrigeration solves direct and bounded, preserved target-owned map evidence,
+  and isolated TESPy and Brayton behind typed optional-status handling.
+- [x] Code Generation Step 6: rebuilt Notebook 10 around five fresh-problem,
+  scalar shared-design optimizations across the exact three-period set, added
+  finite/alignment/success evidence, and isolated one tighter optional cascade
+  behind bounded typed diagnostics.
+- [x] Code Generation Step 7: retained direct process-MVR lifecycle and
+  serial/parallel evidence, made the required VC+MVR topology and fluids
+  explicit, capped it at 1/3/50, removed catch-and-continue behavior, and
+  reduced review output to compact stage/work/loop evidence.
+- [x] Code Generation Step 8: canonically regenerated notebooks 08 through 11,
+  replacing Notebook 10's approved executed artifact; all four are source-only,
+  valid, compilable through public imports, generator-matched, and repeatable.
+- [x] Code Generation Step 9: synchronized notebook guidance, series catalog,
+  heat-pump workflow documentation, and generated coverage evidence; documented
+  independent all-period replay separately from scalar shared-design solving.
+- [x] Code Generation Step 10: factored notebook execution and exposed four
+  separately parameterized slow-HPR pytest cases with notebook and code-cell
+  attribution while retaining existing profile opt-in behavior.
+- [x] Code Generation Step 11: added seeded Hypothesis oracles for all four
+  notebook-local target summaries and bounded typed diagnostics plus explicit
+  optional-status examples; six property/example tests pass.
+- [x] Code Generation Step 12: 25 fast static/generator/property checks pass;
+  real notebook calls pass individually in 3.81 seconds (08), 5.55 seconds
+  (09), 16.89 seconds (10), and 1.65 seconds (11). Refinement removed an
+  invalid single-stage loop assertion and allowed shared targets without a
+  scalar `hpr_load` summary while retaining finite shared-design evidence.
+- [x] Code Generation Step 13: the combined slow-HPR profile passes 4 cases;
+  165 focused HPR/MVR benchmark, multiperiod, process-component, and CoolProp
+  regressions pass; 49 static/property/docs/coverage checks and 11 base-notebook
+  executions pass; Ruff and patch hygiene pass.
+- [x] Code Generation Step 14: final diff, generator ownership, source-only
+  notebooks, bounded error boundaries, absence of production API changes,
+  extension compliance, and unrelated-change preservation audited; generated
+  code summary created.
+- [x] Code Generation Part 2 implementation complete.
+- [x] Code Generation review change: updated HPR/MVR fundamentals, public API,
+  capability, stability, and release-note RTD sources; 25 consistency/coverage
+  tests and the warnings-as-errors Sphinx 9.1 HTML build pass.
+- [x] Code Generation generated-code approval received.
+- [x] Build and Test complete.
+- [x] Build and Test approval received.
+- [x] Operations: N/A. The phase is a workflow placeholder, and this notebook,
+  test, and documentation change requires no deployment, infrastructure,
+  monitoring, publication, or external-system action.
+- [x] HPR and MVR Notebook Reliability workflow complete.
 
 ## CoolProp HPR and MVR Reliability
 

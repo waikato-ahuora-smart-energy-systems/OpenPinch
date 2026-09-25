@@ -30,6 +30,30 @@ Analysis reliability and extensibility
   :doc:`overview/analysis-migration` for the intentional API changes and
   :doc:`developer/adding-analysis-methods` for the extension contract.
 
+HPR and MVR robustness and tutorial reliability
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Hardened CoolProp-backed HPR residual accounting when shared temperature
+  grids contain duplicate levels. Equivalent detached residual rows collapse
+  deterministically, while conflicting duplicates and unalignable grids fail
+  explicitly instead of corrupting HPR utility profiles.
+- Added a standard-corpus end-to-end benchmark with 54 distinct assignments:
+  18 vapour-compression heat-pump, 18 vapour-compression refrigeration, and 18
+  optimized VC+MVR cases. Bounded typed failures remain atomic, and declared
+  sentinel cases must show convergence toward the selected finite objective.
+- Rebuilt tutorials 08 through 11 with explicit topology and search limits,
+  compact plain evidence, direct required CoolProp solves, distinct optional
+  TESPy and Brayton statuses, and separately attributable execution tests.
+- Notebook 10 now demonstrates five separate shared-design optimizations over
+  ``turndown``, ``base``, and ``peak`` using fresh problems, followed by one
+  more tightly bounded optional advanced cascade. It no longer presents
+  independent ``target.all_periods`` replay as shared installed-design
+  optimization.
+- Expanded the fundamentals, workflow guide, public HPR reference, capability
+  matrix, support boundary, notebook catalog, and generated coverage metadata
+  to document budgets, diagnostics, direct process MVR, optimized VC+MVR, and
+  the two multiperiod modes.
+
 
 Target-owned HPR performance maps
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

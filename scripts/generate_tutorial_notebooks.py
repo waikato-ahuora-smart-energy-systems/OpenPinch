@@ -14,6 +14,56 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 NOTEBOOK_DIR = ROOT / "OpenPinch" / "tutorials" / "notebooks"
 
+HPR_TARGET_SUMMARY_SOURCE = """def summarize_hpr_target(label, target):
+    details = target.hpr_details
+    record = details.target_simulation_record
+    design_vector = details.design_vector
+    load = target.hpr_load
+    return {
+        "name": label,
+        "status": "feasible",
+        "backend": details.simulation_backend,
+        "cycle": target.hpr_cycle,
+        "selected_load": None if load is None else float(load.selected),
+        "achieved_load": None if load is None else float(load.achieved),
+        "objective": float(details.obj),
+        "period_ids": (
+            [] if details.period_ids is None else list(details.period_ids)
+        ),
+        "period_weights": (
+            []
+            if details.period_weights is None
+            else [float(value) for value in details.period_weights]
+        ),
+        "design_vector": (
+            [] if design_vector is None else [float(value) for value in design_vector]
+        ),
+        "loop_count": 0 if record is None else len(record.loops),
+    }
+"""
+
+HPR_FAILURE_SUMMARY_SOURCE = """def summarize_hpr_failure(error):
+    return {
+        "status": "typed infeasible",
+        "reason": str(error),
+        "diagnostics": error.diagnostics.model_dump(mode="json"),
+    }
+"""
+
+HPR_OPTIONAL_SCREEN_SOURCE = """def screen_optional_hpr(method, **arguments):
+    try:
+        result = method(**arguments)
+        if result is None:
+            return {"status": "method unavailable", "reason": "no target returned"}
+        return summarize_hpr_target(method.__name__, result)
+    except HPRTargetingError as error:
+        return summarize_hpr_failure(error)
+    except ImportError as error:
+        return {"status": "optional dependency unavailable", "reason": str(error)}
+    except NotImplementedError as error:
+        return {"status": "method unavailable", "reason": str(error)}
+"""
+
 
 def markdown(text: str) -> dict:
     return {"cell_type": "markdown", "metadata": {}, "source": text.splitlines(True)}
@@ -386,10 +436,12 @@ NOTEBOOKS = {
         extras="hpr",
         cells=[
             code(
-                'from OpenPinch import PinchProblem\n\nproblem = PinchProblem("heat_pump_targeting.json", project_name="Heat Pump Study")\n# Ratios to electricity price affect Carnot screening; utility stream prices\n# affect the subsequent utility allocation. Keep global defaults unchanged.\neconomics = {"COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE": 1.0,\n             "COSTING_HPR_PRICE_RATIO_COLD_TO_ELE": 0.1}\nheat_pump = problem.target.carnot_heat_pump(\n    is_utility_heat_pump=False,\n    is_cascade_cycle=True,\n    load_fraction=0.25,\n    condensers=1,\n    evaporators=1,\n    maximum_restarts=1,\n    options=economics,\n)\nhpr_summary = problem.summary_frame()\nload_hp_plot = problem.plot.net_load_profiles_with_heat_pump(target=heat_pump)\ngcc_hp_plot = problem.plot.grand_composite_curve_with_heat_pump(target=heat_pump)\nprint(heat_pump.hpr_load.model_dump())\n'
+                "from OpenPinch import PinchProblem\n\n"
+                + HPR_TARGET_SUMMARY_SOURCE
+                + '\nproblem = PinchProblem("heat_pump_targeting.json", project_name="Heat Pump Study")\n# Ratios to electricity price affect Carnot screening; utility stream prices\n# affect the subsequent utility allocation. Keep global defaults unchanged.\neconomics = {"COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE": 1.0,\n             "COSTING_HPR_PRICE_RATIO_COLD_TO_ELE": 0.1}\nheat_pump = problem.target.carnot_heat_pump(\n    is_utility_heat_pump=False,\n    is_cascade_cycle=True,\n    load_fraction=0.25,\n    condensers=1,\n    evaporators=1,\n    maximum_restarts=1,\n    maximum_iterations=20,\n    maximum_evaluations=50,\n    options=economics,\n)\nassert heat_pump.hpr_success\nheat_pump_evidence = summarize_hpr_target("Carnot heat pump", heat_pump)\nload_hp_plot = problem.plot.net_load_profiles_with_heat_pump(target=heat_pump)\ngcc_hp_plot = problem.plot.grand_composite_curve_with_heat_pump(target=heat_pump)\n'
             ),
             code(
-                "# Compare modes with the same process basis and stage counts.\nrefrigeration = problem.target.carnot_refrigeration(\n    is_utility_refrigeration=False,\n    is_cascade_cycle=True,\n    load_fraction=0.25,\n    condensers=1,\n    evaporators=1,\n    maximum_restarts=1,\n    options=economics,\n)\nrefrigeration_summary = problem.summary_frame()\nload_rfgn_plot = problem.plot.net_load_profiles_with_refrigeration(target=refrigeration)\ngcc_rfgn_plot = problem.plot.grand_composite_curve_with_refrigeration(target=refrigeration)\nprint(refrigeration.hpr_load.model_dump())\n"
+                '# Compare modes with the same process basis and stage counts.\nrefrigeration = problem.target.carnot_refrigeration(\n    is_utility_refrigeration=False,\n    is_cascade_cycle=True,\n    load_fraction=0.25,\n    condensers=1,\n    evaporators=1,\n    maximum_restarts=1,\n    maximum_iterations=20,\n    maximum_evaluations=50,\n    options=economics,\n)\nassert refrigeration.hpr_success\nrefrigeration_evidence = summarize_hpr_target(\n    "Carnot refrigeration", refrigeration\n)\nload_rfgn_plot = problem.plot.net_load_profiles_with_refrigeration(target=refrigeration)\ngcc_rfgn_plot = problem.plot.grand_composite_curve_with_refrigeration(target=refrigeration)\n'
             ),
             code(
                 '# Allocate the existing utilities on the fixed heat-pump residual.\nutilities = problem.target.all_heat_integration(base_target=heat_pump)\noptimized = problem.target.utility_placement(\n    base_target=heat_pump,\n    isothermal=2,\n    options={"iteration_limit": 20, "evaluation_limit": 200, "seed": 20260715},\n)\nplacement_summary = optimized.summary_frame()\noptimized_gcc = optimized.plot.grand_composite_curve()\n# Explicit case derivation is also available and does not solve.\nresidual = problem.residual_utility(base_target=heat_pump)\n# Transfer utilities to a new ORIGINAL-process study; this does not install HPR.\nnew_problem = problem.with_utilities_from(optimized)\nnew_results = new_problem.target.all_heat_integration()\nassert optimized.to_problem_json()["residual_basis"] == residual.to_problem_json()["residual_basis"]\n'
@@ -409,78 +461,65 @@ NOTEBOOKS = {
                 "from OpenPinch.contracts.hpr_performance_map import (\n"
                 "    HprPerformanceMapRequest,\n"
                 ")\n\n"
+                + HPR_TARGET_SUMMARY_SOURCE
+                + "\n"
+                + HPR_FAILURE_SUMMARY_SOURCE
+                + "\n"
+                + HPR_OPTIONAL_SCREEN_SOURCE
+                + "\n"
                 'problem = PinchProblem("heat_pump_targeting.json", '
                 'project_name="HPR Models")\n'
-                "def screen_cycle(method, **arguments):\n"
-                "    try:\n"
-                "        result = method(**arguments)\n"
-                "        if result is None:\n"
-                '            return {"status": "no applicable target", "result": None}\n'
-                '        return {"status": "feasible", '
-                '"result": result}\n'
-                "    except (HPRTargetingError, ImportError, "
-                "NotImplementedError) as error:\n"
-                '        return {"status": "no feasible solution", '
-                '"reason": str(error)}\n\n'
                 "working_fluid_examples = {\n"
                 '    "pure": "water",\n'
                 '    "registered_blend": "R410A.mix",\n'
                 "}\n"
                 "# Omitting simulation_backend selects the CoolProp default.\n"
-                "coolprop_target = screen_cycle(\n"
-                "    problem.target.vapour_compression_heat_pump,\n"
+                "coolprop_target = problem.target.vapour_compression_heat_pump(\n"
                 '    refrigerants=[working_fluid_examples["pure"]],\n'
                 "    load_fraction=0.25,\n"
                 "    condensers=1,\n"
                 "    evaporators=1,\n"
                 "    maximum_restarts=1,\n"
+                "    maximum_iterations=20,\n"
+                "    maximum_evaluations=50,\n"
                 ")\n"
-                'assert coolprop_target["status"] == "feasible"\n'
-                'assert coolprop_target["result"] is not None\n'
-                "coolprop_target"
+                "assert coolprop_target.hpr_success\n"
+                "coolprop_summary = summarize_hpr_target(\n"
+                '    "default CoolProp heat pump", coolprop_target\n'
+                ")"
             ),
             code(
-                'target = coolprop_target.get("result")\n'
                 "target_simulation_record = (\n"
-                "    None if target is None\n"
-                "    else target.hpr_details.target_simulation_record\n"
-                ")\n"
-                "if target_simulation_record is None:\n"
-                "    performance_map = None\n"
-                "    plain_performance_map = {\n"
-                '        "status": "target unavailable; no partial map exported",\n'
-                "    }\n"
-                "else:\n"
-                "    source_temperature = (\n"
-                "        target_simulation_record.nominal_evaporating_temperature\n"
-                "        + target_simulation_record.source_approach_temperature\n"
-                "    )\n"
-                "    sink_temperature = (\n"
-                "        target_simulation_record.nominal_condensing_temperature\n"
-                "        - target_simulation_record.sink_approach_temperature\n"
-                "    )\n"
-                "    map_request = HprPerformanceMapRequest(\n"
-                '        map_id="notebook-09-coolprop-map",\n'
-                "        source_temperatures=[source_temperature],\n"
-                "        sink_temperatures=[sink_temperature],\n"
-                "        load_fractions=[0.50, 0.75, 1.00],\n"
-                "    )\n"
-                "    performance_map = problem.target.hpr_performance_map(\n"
-                "        target=target, request=map_request\n"
-                "    )\n"
-                '    plain_performance_map = performance_map.model_dump(mode="json")\n'
-                "target_record_json = (\n"
-                "    None if target_simulation_record is None\n"
-                '    else target_simulation_record.model_dump(mode="json")\n'
+                "    coolprop_target.hpr_details.target_simulation_record\n"
                 ")\n"
                 "assert target_simulation_record is not None\n"
-                "assert performance_map is not None\n"
-                "plain_performance_map"
+                'assert target_simulation_record.simulation_backend == "coolprop"\n'
+                "assert target_simulation_record.nominal_useful_duty > 0.0\n"
+                "source_temperature = (\n"
+                "    target_simulation_record.nominal_evaporating_temperature\n"
+                "    + target_simulation_record.source_approach_temperature\n"
+                ")\n"
+                "sink_temperature = (\n"
+                "    target_simulation_record.nominal_condensing_temperature\n"
+                "    - target_simulation_record.sink_approach_temperature\n"
+                ")\n"
+                "map_request = HprPerformanceMapRequest(\n"
+                '    map_id="notebook-09-coolprop-map",\n'
+                "    source_temperatures=[source_temperature],\n"
+                "    sink_temperatures=[sink_temperature],\n"
+                "    load_fractions=[0.50, 0.75, 1.00],\n"
+                ")\n"
+                "performance_map = problem.target.hpr_performance_map(\n"
+                "    target=coolprop_target, request=map_request\n"
+                ")\n"
+                'plain_performance_map = performance_map.model_dump(mode="json")\n'
+                'target_record_json = target_simulation_record.model_dump(mode="json")\n'
+                'assert plain_performance_map["points"]'
             ),
             code(
                 "# Explicit N-component mixtures use component[mole_fraction].\n"
                 'explicit_molar_mixture = "HEOS::R32[0.5]&R125[0.5]"\n'
-                "tespy_target = screen_cycle(\n"
+                "tespy_target = screen_optional_hpr(\n"
                 "    problem.target.vapour_compression_heat_pump,\n"
                 '    simulation_backend="tespy",\n'
                 "    refrigerants=[explicit_molar_mixture],\n"
@@ -490,25 +529,36 @@ NOTEBOOKS = {
                 "    condensers=1,\n"
                 "    evaporators=1,\n"
                 "    maximum_restarts=1,\n"
+                "    maximum_iterations=20,\n"
+                "    maximum_evaluations=50,\n"
                 ")\n"
                 "# TESPy is a separate selection: failure never falls back to CoolProp.\n"
                 "tespy_no_fallback = tespy_target\n"
                 "tespy_no_fallback"
             ),
             code(
-                "vc_refrigeration = screen_cycle(\n"
-                "    problem.target.vapour_compression_refrigeration,\n"
+                "vc_refrigeration = problem.target.vapour_compression_refrigeration(\n"
                 '    refrigerants=["ammonia"],\n'
                 "    load_fraction=0.25,\n"
+                "    condensers=1,\n"
+                "    evaporators=1,\n"
                 "    maximum_restarts=1,\n"
+                "    maximum_iterations=20,\n"
+                "    maximum_evaluations=50,\n"
                 ")\n"
-                "brayton = screen_cycle(\n"
+                "assert vc_refrigeration.hpr_success\n"
+                "vc_refrigeration_summary = summarize_hpr_target(\n"
+                '    "vapour compression refrigeration", vc_refrigeration\n'
+                ")\n"
+                "brayton = screen_optional_hpr(\n"
                 "    problem.target.brayton_heat_pump,\n"
-                "    load_fraction=0.25, maximum_restarts=1\n"
+                "    load_fraction=0.25, maximum_restarts=1,\n"
+                "    maximum_iterations=20, maximum_evaluations=50,\n"
                 ")\n"
-                "brayton_refrigeration = screen_cycle(\n"
+                "brayton_refrigeration = screen_optional_hpr(\n"
                 "    problem.target.brayton_refrigeration,\n"
-                "    load_fraction=0.25, maximum_restarts=1\n"
+                "    load_fraction=0.25, maximum_restarts=1,\n"
+                "    maximum_iterations=20, maximum_evaluations=50,\n"
                 ")"
             ),
         ],
@@ -521,43 +571,162 @@ NOTEBOOKS = {
         extras="hpr",
         cells=[
             code(
+                "import math\n\n"
                 "from OpenPinch import PinchProblem\n"
                 "from OpenPinch.contracts.hpr import HPRTargetingError\n\n"
-                'problem = PinchProblem("crude_preheat_train_multiperiod.json", '
-                'project_name="Crude HPR")\n'
-                "def screen_periods(method, **arguments):\n"
-                "    try:\n"
-                '        return {"status": "completed", '
-                '"results": method(**arguments)}\n'
-                "    except HPRTargetingError as error:\n"
-                '        return {"status": "no shared feasible solution", '
-                '"reason": str(error)}\n\n'
-                "period_heat_pumps = problem.target.all_periods.carnot_heat_pump(\n"
-                "    load_fraction=0.25, maximum_restarts=1\n"
-                ")\n"
-                "weighted = problem.summary_frame(include_weighted_average=True)\n"
-                "weighted"
+                + HPR_TARGET_SUMMARY_SOURCE
+                + "\n"
+                + HPR_FAILURE_SUMMARY_SOURCE
+                + "\n"
+                'EXPECTED_PERIODS = {"turndown", "base", "peak"}\n'
+                "SHARED_OPTIONS = {\n"
+                '    "HPR_MULTIPERIOD_OPTIMIZATION_ENABLED": True,\n'
+                "}\n\n"
+                "def new_shared_problem():\n"
+                "    return PinchProblem(\n"
+                '        "crude_preheat_train_multiperiod.json",\n'
+                '        project_name="Crude HPR",\n'
+                "    )\n\n"
+                "def validate_shared_target(label, target):\n"
+                "    assert target.hpr_success\n"
+                "    details = target.hpr_details\n"
+                "    assert details.design_vector is not None\n"
+                "    assert details.period_ids is not None\n"
+                "    assert set(details.period_ids) == EXPECTED_PERIODS\n"
+                "    assert details.period_weights is not None\n"
+                "    assert len(details.period_weights) == len(details.period_ids)\n"
+                "    assert all(math.isfinite(float(value)) for value in details.design_vector)\n"
+                "    assert math.isfinite(float(details.obj))\n"
+                "    assert details.period_outputs is not None\n"
+                "    assert set(details.period_outputs) == EXPECTED_PERIODS\n"
+                "    period_success = {\n"
+                '        period_id: bool(output["success"])\n'
+                "        for period_id, output in details.period_outputs.items()\n"
+                "    }\n"
+                "    assert all(period_success.values())\n"
+                "    assert details.weighted_output is not None\n"
+                '    weighted_objective = float(details.weighted_output["obj"])\n'
+                "    assert math.isfinite(weighted_objective)\n"
+                "    summary = summarize_hpr_target(label, target)\n"
+                '    summary["period_success"] = period_success\n'
+                '    summary["weighted_objective"] = weighted_objective\n'
+                "    return summary"
             ),
             code(
-                "period_refrigeration = screen_periods(\n"
-                "    problem.target.all_periods.carnot_refrigeration,\n"
-                "    load_fraction=0.25, maximum_restarts=1\n"
-                ")\n"
-                "period_vc_heat_pumps = screen_periods(\n"
-                "    problem.target.all_periods.vapour_compression_heat_pump,\n"
-                '    refrigerants=["water"], load_fraction=0.25,\n'
+                "carnot_heat_pump_problem = new_shared_problem()\n"
+                "carnot_heat_pump = carnot_heat_pump_problem.target.carnot_heat_pump(\n"
+                '    period_id="base",\n'
+                "    load_fraction=0.25,\n"
+                "    condensers=1,\n"
+                "    evaporators=1,\n"
                 "    maximum_restarts=1,\n"
+                "    maximum_iterations=20,\n"
+                "    maximum_evaluations=50,\n"
+                "    options=SHARED_OPTIONS,\n"
                 ")\n"
-                "period_vc_refrigeration = screen_periods(\n"
-                "    problem.target.all_periods.vapour_compression_refrigeration,\n"
-                '    refrigerants=["ammonia"], load_fraction=0.25,\n'
+                "carnot_heat_pump_summary = validate_shared_target(\n"
+                '    "Carnot heat pump", carnot_heat_pump\n'
+                ")\n\n"
+                "carnot_refrigeration_problem = new_shared_problem()\n"
+                "carnot_refrigeration = (\n"
+                "    carnot_refrigeration_problem.target.carnot_refrigeration(\n"
+                '        period_id="base",\n'
+                "        load_fraction=0.25,\n"
+                "        condensers=1,\n"
+                "        evaporators=1,\n"
+                "        maximum_restarts=1,\n"
+                "        maximum_iterations=20,\n"
+                "        maximum_evaluations=50,\n"
+                "        options=SHARED_OPTIONS,\n"
+                "    )\n"
+                ")\n"
+                "carnot_refrigeration_summary = validate_shared_target(\n"
+                '    "Carnot refrigeration", carnot_refrigeration\n'
+                ")"
+            ),
+            code(
+                "vc_heat_pump_problem = new_shared_problem()\n"
+                "vc_heat_pump = vc_heat_pump_problem.target.vapour_compression_heat_pump(\n"
+                '    period_id="base",\n'
+                '    refrigerants=["water"],\n'
+                "    load_fraction=0.25,\n"
+                "    condensers=1,\n"
+                "    evaporators=1,\n"
                 "    maximum_restarts=1,\n"
+                "    maximum_iterations=20,\n"
+                "    maximum_evaluations=50,\n"
+                "    options=SHARED_OPTIONS,\n"
                 ")\n"
-                "period_mvr = screen_periods(\n"
-                "    problem.target.all_periods.mvr_heat_pump,\n"
-                "    load_fraction=0.25, maximum_restarts=1\n"
+                "vc_heat_pump_summary = validate_shared_target(\n"
+                '    "CoolProp VC heat pump", vc_heat_pump\n'
+                ")\n\n"
+                "vc_refrigeration_problem = new_shared_problem()\n"
+                "vc_refrigeration = (\n"
+                "    vc_refrigeration_problem.target.vapour_compression_refrigeration(\n"
+                '        period_id="base",\n'
+                '        refrigerants=["ammonia"],\n'
+                "        load_fraction=0.25,\n"
+                "        condensers=1,\n"
+                "        evaporators=1,\n"
+                "        maximum_restarts=1,\n"
+                "        maximum_iterations=20,\n"
+                "        maximum_evaluations=50,\n"
+                "        options=SHARED_OPTIONS,\n"
+                "    )\n"
                 ")\n"
-                "list(problem.period_results)"
+                "vc_refrigeration_summary = validate_shared_target(\n"
+                '    "CoolProp VC refrigeration", vc_refrigeration\n'
+                ")\n\n"
+                "mvr_problem = new_shared_problem()\n"
+                "mvr_heat_pump = mvr_problem.target.mvr_heat_pump(\n"
+                '    period_id="base",\n'
+                '    mvr_fluids=["Water"],\n'
+                "    mvr_stages=1,\n"
+                "    load_fraction=0.25,\n"
+                "    condensers=1,\n"
+                "    evaporators=1,\n"
+                "    maximum_restarts=1,\n"
+                "    maximum_iterations=20,\n"
+                "    maximum_evaluations=50,\n"
+                "    options={\n"
+                "        **SHARED_OPTIONS,\n"
+                '        "HPR_REFRIGERANTS": ["water"],\n'
+                "    },\n"
+                ")\n"
+                "mvr_summary = validate_shared_target(\n"
+                '    "CoolProp VC+MVR heat pump", mvr_heat_pump\n'
+                ")\n\n"
+                "shared_design_summaries = {\n"
+                '    "Carnot heat pump": carnot_heat_pump_summary,\n'
+                '    "Carnot refrigeration": carnot_refrigeration_summary,\n'
+                '    "CoolProp VC heat pump": vc_heat_pump_summary,\n'
+                '    "CoolProp VC refrigeration": vc_refrigeration_summary,\n'
+                '    "CoolProp VC+MVR heat pump": mvr_summary,\n'
+                "}"
+            ),
+            code(
+                "# This is a sixth, separate optimization with a deliberately more\n"
+                "# complex topology and a tighter budget than the required screens.\n"
+                "advanced_problem = new_shared_problem()\n"
+                "try:\n"
+                "    advanced_cascade = (\n"
+                "        advanced_problem.target.vapour_compression_heat_pump(\n"
+                '            period_id="base",\n'
+                '            refrigerants=["water", "ammonia"],\n'
+                "            load_fraction=0.25,\n"
+                "            condensers=3,\n"
+                "            evaporators=2,\n"
+                "            maximum_restarts=1,\n"
+                "            maximum_iterations=5,\n"
+                "            maximum_evaluations=20,\n"
+                "            options=SHARED_OPTIONS,\n"
+                "        )\n"
+                "    )\n"
+                "    advanced_cascade_summary = validate_shared_target(\n"
+                '        "optional advanced CoolProp cascade", advanced_cascade\n'
+                "    )\n"
+                "except HPRTargetingError as error:\n"
+                "    advanced_cascade_summary = summarize_hpr_failure(error)"
             ),
         ],
     ),
@@ -569,8 +738,9 @@ NOTEBOOKS = {
         extras="hpr",
         cells=[
             code(
-                "from OpenPinch import PinchProblem\n"
-                "from OpenPinch.contracts.hpr import HPRTargetingError\n\n"
+                "from OpenPinch import PinchProblem\n\n"
+                + HPR_TARGET_SUMMARY_SOURCE
+                + "\n"
                 'problem = PinchProblem("process_mvr.json", project_name="Site")\n'
                 "mvr = problem.components.add_process_mvr(\n"
                 '    "Evaporator vapour",\n'
@@ -580,8 +750,7 @@ NOTEBOOKS = {
                 ")\n"
                 "target = problem.target.direct_heat_integration(\n"
                 '    zone="Evaporation Train"\n'
-                ")\n"
-                "mvr_summary = problem.summary_frame()"
+                ")"
             ),
             code(
                 "component_inventory = problem.components.inventory\n"
@@ -597,27 +766,45 @@ NOTEBOOKS = {
                 "compressor_work = mvr.work_for_zone(problem.master_zone)\n"
                 "serial = problem.target.all_periods.direct_heat_integration(workers=1)\n"
                 "parallel = problem.target.all_periods.direct_heat_integration(workers=2)\n"
-                'assert [o.model_dump(mode="json") for o in serial.values()] == [\n'
+                'serial_parallel_match = [o.model_dump(mode="json") for o in serial.values()] == [\n'
                 '    o.model_dump(mode="json") for o in parallel.values()\n'
                 "]\n"
+                "assert serial_parallel_match\n"
+                "process_mvr_evidence = {\n"
+                '    "component_type": str(component_type),\n'
+                '    "active": bool(component_is_active),\n'
+                '    "original_stream_count": len(original_streams),\n'
+                '    "replacement_stream_count": len(replacement_streams),\n'
+                '    "stage_counts": {\n'
+                "        period_id: len(stages)\n"
+                "        for period_id, stages in stage_results.items()\n"
+                "    },\n"
+                '    "affected_zones": list(affected_zones),\n'
+                '    "compressor_work": float(compressor_work),\n'
+                '    "serial_parallel_match": serial_parallel_match,\n'
+                "}\n"
                 "# The process-MVR example can have no residual heating load.\n"
                 "# Use a separate loaded case to demonstrate optimized VC+MVR.\n"
                 'cascade_problem = PinchProblem("heat_pump_targeting.json")\n'
-                "try:\n"
-                "    cascade = cascade_problem.target.mvr_heat_pump(\n"
-                "        load_fraction=0.25, maximum_restarts=1,\n"
-                "        condensers=1, evaporators=1,\n"
-                "        maximum_iterations=3, maximum_evaluations=100,\n"
-                '        options={"HPR_REFRIGERANTS": ["Water"]},\n'
-                "    )\n"
-                "except HPRTargetingError as error:\n"
-                '    cascade = {"status": "no feasible solution", '
-                '"reason": str(error)}\n'
-                "assert cascade is not None and not isinstance(cascade, dict), cascade\n"
+                "cascade = cascade_problem.target.mvr_heat_pump(\n"
+                '    mvr_fluids=["Water"],\n'
+                "    mvr_stages=1,\n"
+                "    load_fraction=0.25,\n"
+                "    maximum_restarts=1,\n"
+                "    condensers=1,\n"
+                "    evaporators=1,\n"
+                "    maximum_iterations=3,\n"
+                "    maximum_evaluations=50,\n"
+                '    options={"HPR_REFRIGERANTS": ["water"]},\n'
+                ")\n"
+                "assert cascade.hpr_success\n"
                 "assert cascade.hpr_details.target_simulation_record.loops\n"
+                "cascade_summary = summarize_hpr_target(\n"
+                '    "required CoolProp VC+MVR target", cascade\n'
+                ")\n"
                 "mvr.deactivate()\n"
                 "mvr.activate()\n"
-                "component_inventory"
+                "assert mvr.active"
             ),
         ],
     ),
@@ -1038,9 +1225,14 @@ GUIDANCE = {
     ),
     "10_multiperiod_heat_pumps.ipynb": (
         "Does one heat-pump concept remain useful across all operating periods?",
-        "Inspect period feasibility and load before annual weighting; a shared concept must work at the operating extremes.",
-        "Use period-specific loads when plant availability or heat-source duty changes materially.",
-        ("Run period Carnot screening", "Compare simulated and MVR period results"),
+        "A shared-design result is one installed design optimized across the complete period set. Inspect every period's feasibility, the aligned weights, the finite design vector, and the weighted objective before comparing technologies.",
+        "Run each candidate technology as a separate shared-design optimization. Use period-specific loads when plant availability or heat-source duty changes materially, and keep more complex cascade screens optional until a bounded one-stage design is credible.",
+        (
+            "Define shared-design validation",
+            "Optimize the two Carnot designs",
+            "Optimize three CoolProp-backed designs",
+            "Screen one optional advanced cascade",
+        ),
     ),
     "11_process_mvr_and_cascade.ipynb": (
         "How does direct process-vapour recompression change streams and the resulting heat-integration target?",
@@ -1175,22 +1367,18 @@ PRESENTATIONS: dict[str, tuple[str, str]] = {
     "08_carnot_heat_pump_and_refrigeration.ipynb": (
         "Inspect separate target-specific plots and both duty summaries. Residual utility placement is sequential: HPR duty and temperatures remain fixed. It does not jointly optimize the heat pump and utilities. Changing utility prices later does not resize HPR.",
         "from IPython.display import display\n\n"
-        "display(hpr_summary)\n"
-        "display(refrigeration_summary)\n"
+        "display(heat_pump_evidence)\n"
+        "display(refrigeration_evidence)\n"
         "display(load_hp_plot)\n"
         "display(gcc_hp_plot)\n"
         "display(load_rfgn_plot)\n"
         "display(gcc_rfgn_plot)\n"
-        "display(utilities)\n"
         "display(placement_summary)",
     ),
     "09_vapour_compression_and_brayton.ipynb": (
         "Inspect the detached winning record and the complete plain-data map before comparing optional TESPy, refrigeration, or Brayton screens. A failed optional screen is evidence, not permission to relabel a CoolProp result as TESPy.",
         "from IPython.display import display\n\n"
-        "map_preview = (\n"
-        "    plain_performance_map\n"
-        "    if performance_map is None\n"
-        "    else {\n"
+        "map_preview = {\n"
         '        "schema_version": plain_performance_map["schema_version"],\n'
         '        "thermodynamic_backend": plain_performance_map[\n'
         '            "thermodynamic_backend"\n'
@@ -1199,39 +1387,29 @@ PRESENTATIONS: dict[str, tuple[str, str]] = {
         '            "reference_capacity_basis"\n'
         "        ],\n"
         '        "points": plain_performance_map["points"],\n'
-        "    }\n"
-        ")\n"
+        "}\n"
         "cycle_comparison = {\n"
-        '    "default CoolProp heat pump": coolprop_target,\n'
+        '    "default CoolProp heat pump": coolprop_summary,\n'
         '    "explicit TESPy mixture heat pump": tespy_target,\n'
-        '    "vapour compression refrigeration": vc_refrigeration,\n'
+        '    "vapour compression refrigeration": vc_refrigeration_summary,\n'
         '    "Brayton heat pump": brayton,\n'
         '    "Brayton refrigeration": brayton_refrigeration,\n'
         "}\n"
-        "display(target_record_json)\n"
+        "display(coolprop_summary)\n"
         "display(map_preview)\n"
         "display(cycle_comparison)",
     ),
     "10_multiperiod_heat_pumps.ipynb": (
-        "Use the weighted summary and period-screen outcomes to identify which operating condition controls capacity, lift, and feasibility.",
+        "Compare the five independent shared-design optimizations through their common period, weight, design-vector, objective, and success evidence. The optional advanced cascade is a sixth and deliberately tighter screen, not a fallback for a required result.",
         "from IPython.display import display\n\n"
-        "period_screen = {\n"
-        '    "Carnot heat pump": period_heat_pumps,\n'
-        '    "Carnot refrigeration": period_refrigeration,\n'
-        '    "vapour compression heat pump": period_vc_heat_pumps,\n'
-        '    "vapour compression refrigeration": period_vc_refrigeration,\n'
-        '    "MVR": period_mvr,\n'
-        "}\n"
-        "display(weighted)\n"
-        "display(period_screen)",
+        "display(shared_design_summaries)\n"
+        "display(advanced_cascade_summary)",
     ),
     "11_process_mvr_and_cascade.ipynb": (
         "Review the targeted study, component inventory, stage results, and cascade outcome together to check that compression work and replacement streams serve the intended process zone.",
         "from IPython.display import display\n\n"
-        "display(mvr_summary)\n"
-        "display(component_inventory)\n"
-        "display(stage_results)\n"
-        "display(cascade)",
+        "display(process_mvr_evidence)\n"
+        "display(cascade_summary)",
     ),
     "12_cogeneration.ipynb": (
         "Compare the common process summary with the alternative cogeneration results to see how utility conditions and turbine assumptions change recoverable power.",
