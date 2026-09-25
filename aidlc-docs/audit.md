@@ -10048,3 +10048,26 @@ Notebook #10 fails to solve with the error:
 **Context**: Post-workflow repository handoff. The user authorized a local commit only; no push or pull-request mutation is authorized by this input.
 
 ---
+
+## Test-Suite Runtime Reduction - Ubuntu CI Corrective Verification
+**Timestamp**: 2026-09-25T09:22:34Z
+**User Input**: "Tests are failing on Github develop branch."
+**AI Response**: "Inspected GitHub Actions run 36115057800 for develop SHA 32f30335, isolated three numerical search-budget portability failures, and reopened Code Generation for a bounded corrective Step 14."
+**Context**: The ordinary Ubuntu job failed 3 tests while TESPy, performance, docs, optional-install, build, and installed-artifact jobs passed. The multistage MVR audit exhausted the reduced two-iteration allowance without an optimum. The Feng utility-MVR and Pavao direct-MVR sentinels returned valid solutions but exposed only one viable search point, so they could not demonstrate convergence. Local probes show both sentinels produce multiple viable improving points at 32 evaluations; the correction will use a 48-evaluation sentinel-only allowance and restore the single multistage MVR audit to its previously Ubuntu-proven 3-iteration/150-evaluation bounds.
+
+---
+
+## Test-Suite Runtime Reduction - Ubuntu CI Correction Complete
+**Timestamp**: 2026-09-25T09:34:16Z
+**AI Response**: "Added an explicit sentinel-only MVR search policy, restored the multistage MVR audit's Ubuntu-proven allowance, and completed focused, repeated, full-lane, coverage, lint, formatting, and patch verification."
+**Context**: Corrective Code Generation Step 14 complete. The three exact GitHub failures plus helper contracts pass in a 15-test selection. The complete 14-case CoolProp audit and 55-case HPR/MVR E2E file pass twice, 69 tests in 74.17 and 77.15 seconds. The exact ordinary branch-coverage lane passes 3,391 tests with 6 expected skips, 65 intentional deselections, and 95 percent coverage in 407.67 seconds. The two MVR sentinels alone receive 48 evaluations/96 observations; all other standard assignments retain reduced budgets. The multistage MVR audit alone returns to 3 iterations/150 evaluations. Ruff and patch hygiene pass, and no production module or CI workflow changed. Independent Ubuntu confirmation requires a new GitHub Actions run after commit and push.
+
+---
+
+## Test-Suite Runtime Reduction - Ubuntu CI Correction Commit Request
+**Timestamp**: 2026-09-25T09:35:51Z
+**User Input**: "commit"
+**AI Response**: "Prepared the bounded Ubuntu HPR/MVR portability correction, regression contract, and corrective workflow evidence for a local commit on develop."
+**Context**: The user authorized a local commit of the verified correction. No push or other remote mutation is authorized by this input.
+
+---

@@ -98,7 +98,9 @@ def test_real_public_multistage_records(topology):
         maximum_evaluations=30,
     )
     if topology == "mvr":
-        kwargs["maximum_evaluations"] = 60
+        # The multistage MVR landscape needs a third iteration on Ubuntu/x86;
+        # retain the smaller bounds for the faster cascade and parallel cases.
+        kwargs.update(maximum_iterations=3, maximum_evaluations=150)
         target = problem.target.mvr_heat_pump(
             **kwargs, options={"HPR_REFRIGERANTS": ["Water"]}
         )

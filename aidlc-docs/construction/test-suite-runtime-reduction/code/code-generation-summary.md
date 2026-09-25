@@ -73,6 +73,34 @@ interactive-notebook profiles. The dedicated solver skip is the existing
 optional external-solver case. No retry, expected-failure conversion, or hidden
 marker orphan was introduced.
 
+## Ubuntu Corrective Verification
+
+GitHub Actions develop run 36115057800 for commit `32f30335` exposed three
+ordinary-lane failures that did not reproduce on the original profiling host:
+the multistage MVR audit exhausted its reduced two-iteration allowance, while
+the Pavao direct-MVR and Feng utility-MVR convergence sentinels each found a
+valid solution but only one viable search point.
+
+The correction keeps all 52 non-MVR-sentinel standard assignments at their
+reduced limits. Only the two MVR sentinels receive 48 evaluations and 96 total
+observations, enough to retain bounded convergence evidence across numerical
+platforms. The one multistage MVR audit is restored to its previously
+Ubuntu-proven three-iteration, 150-evaluation allowance; cascade and parallel
+audit limits remain reduced.
+
+Corrective evidence:
+
+- The new pure search-limit contract first failed because no sentinel-specific
+  policy existed, then passed after implementation.
+- The three exact GitHub failures plus all helper contracts passed together:
+  15 tests in 11.67 seconds.
+- The complete 14-case CoolProp audit and 55-case HPR/MVR E2E file passed twice:
+  69 tests in 74.17 seconds and 77.15 seconds.
+- The exact ordinary coverage command passed 3,391 tests with 6 expected skips,
+  65 intentional deselections, and 95 percent coverage in 407.67 seconds.
+- Ruff and `git diff --check` passed. No production module or workflow wiring
+  changed.
+
 ## Assertion and Design Audit
 
 - The complete 54-case standard HPR/MVR parameter matrix remains unchanged.

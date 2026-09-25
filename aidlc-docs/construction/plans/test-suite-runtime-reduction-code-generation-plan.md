@@ -229,6 +229,22 @@ workflow-contract tests.
 - [x] Mark every plan checkbox complete and create
   `aidlc-docs/construction/test-suite-runtime-reduction/code/code-generation-summary.md`.
 
+### Step 14: Correct Ubuntu HPR/MVR portability regression
+
+- [x] Capture the exact GitHub Actions failures for the committed develop SHA
+  and distinguish workflow wiring failures from numerical search-budget
+  portability failures.
+- [x] Add pure regression contracts for ordinary versus convergence-sentinel
+  search limits, including the two MVR sentinel profiles.
+- [x] Preserve the reduced ordinary E2E budgets while giving only MVR
+  convergence sentinels a bounded cross-platform allowance.
+- [x] Restore the multistage MVR audit to its previously Ubuntu-proven search
+  bounds without changing the faster cascade and parallel audit cases.
+- [x] Run the helper contracts, all three previously failing cases, the full
+  CoolProp audit, and the complete HPR/MVR E2E file with repetition.
+- [x] Re-run the ordinary serial lane, quality checks, and patch audit; update
+  the generated-code summary, workflow state, and audit evidence.
+
 ## Property-Based Testing Compliance
 
 - **PBT-01 and PBT-03**: Existing utility-placement invariants and metamorphic
@@ -247,6 +263,6 @@ workflow-contract tests.
 
 ## Completion Conditions
 
-Code Generation is complete only when all thirteen steps and every nested
+Code Generation is complete only when all fourteen steps and every nested
 checkbox are `[x]`, the generated-code summary records actual evidence, and the
 user has reviewed the implementation before Build and Test begins.

@@ -46,11 +46,17 @@ def test_standard_problem_hpr_service_is_bounded_and_robust(
     prepare_hpr_baseline(problem, assignment.profile)
     before = snapshot_problem_state(problem)
     error = None
+    is_sentinel = is_sentinel_assignment(assignment)
+    maximum_evaluations, maximum_search_observations = assignment.profile.search_limits(
+        sentinel=is_sentinel
+    )
 
     with observe_hpr_search() as observations:
         try:
             target = getattr(problem.target, assignment.profile.service_name)(
-                **assignment.profile.invocation_kwargs()
+                **assignment.profile.invocation_kwargs(
+                    maximum_evaluations=maximum_evaluations
+                )
             )
         except HPRTargetingError as caught:
             target = None
@@ -59,23 +65,23 @@ def test_standard_problem_hpr_service_is_bounded_and_robust(
     outcome = classify_hpr_outcome(target=target, error=error)
     after = snapshot_problem_state(problem)
     assert_atomic_outcome(before, after, outcome)
-    assert len(observations) <= assignment.profile.maximum_search_observations, (
+    assert len(observations) <= maximum_search_observations, (
         f"{assignment.parameter_id} exceeded its public search observation bound"
     )
     selected_observations = profile_search_observations(
         observations, assignment.profile
     )
-    assert len(selected_observations) <= assignment.profile.maximum_evaluations
+    assert len(selected_observations) <= maximum_evaluations
 
     if outcome.kind is HPROutcomeKind.SOLVED:
         assert_strict_success_contract(outcome.target, problem)
     elif outcome.kind is HPROutcomeKind.TYPED_FAILURE:
         assert_typed_failure_contract(
             outcome.error,
-            maximum_evaluations=assignment.profile.maximum_evaluations,
+            maximum_evaluations=maximum_evaluations,
         )
 
-    if is_sentinel_assignment(assignment):
+    if is_sentinel:
         assert outcome.kind is HPROutcomeKind.SOLVED, (
             f"strict-success sentinel {assignment.parameter_id} returned "
             f"{outcome.kind.value}"
@@ -83,7 +89,7 @@ def test_standard_problem_hpr_service_is_bounded_and_robust(
         witness = build_convergence_witness(
             selected_observations,
             selected_objective=float(outcome.target.hpr_details.obj),
-            maximum_evaluations=assignment.profile.maximum_evaluations,
+            maximum_evaluations=maximum_evaluations,
         )
         assert_bounded_convergence(witness)
 

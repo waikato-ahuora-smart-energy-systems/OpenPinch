@@ -43,6 +43,8 @@ class HPRProfile:
     maximum_iterations: int = 3
     maximum_evaluations: int = 12
     maximum_search_observations: int = 24
+    sentinel_maximum_evaluations: int | None = None
+    sentinel_maximum_search_observations: int | None = None
     refrigerants: tuple[str, ...] = ("Water",)
     mvr_fluids: tuple[str, ...] = ("Water",)
     mvr_stages: int = 1
@@ -84,6 +86,16 @@ class HPRProfile:
             )
         return kwargs
 
+    def search_limits(self, *, sentinel: bool) -> tuple[int, int]:
+        """Return bounded search limits for an ordinary or sentinel assignment."""
+        if not sentinel:
+            return self.maximum_evaluations, self.maximum_search_observations
+        return (
+            self.sentinel_maximum_evaluations or self.maximum_evaluations,
+            self.sentinel_maximum_search_observations
+            or self.maximum_search_observations,
+        )
+
 
 HPR_PROFILES = (
     HPRProfile(
@@ -122,6 +134,8 @@ HPR_PROFILES = (
         objective_name="_compute_vc_mvr_system_obj",
         maximum_evaluations=20,
         maximum_search_observations=40,
+        sentinel_maximum_evaluations=48,
+        sentinel_maximum_search_observations=96,
     ),
     HPRProfile(
         profile_id="utility-optimized-vc-mvr-heat-pump",
@@ -131,6 +145,8 @@ HPR_PROFILES = (
         objective_name="_compute_vc_mvr_system_obj",
         maximum_evaluations=16,
         maximum_search_observations=32,
+        sentinel_maximum_evaluations=48,
+        sentinel_maximum_search_observations=96,
     ),
 )
 

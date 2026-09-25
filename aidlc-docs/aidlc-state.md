@@ -2392,6 +2392,11 @@ refreshed reverse-engineering artifacts.
 - [x] OPERATIONS - Placeholder acknowledged; no deployment, monitoring,
   incident-response, or production operations changes apply to this local
   library test/CI performance workflow.
+- [x] CORRECTIVE VERIFICATION - GitHub Actions run 36115057800 exposed three
+  Ubuntu-only HPR/MVR search-budget portability failures. Code Generation is
+  corrected with sentinel-only E2E limits and an Ubuntu-proven multistage MVR
+  audit allowance; focused repetitions and the complete ordinary coverage lane
+  pass.
 - User Stories, Application Design, Units Generation, Functional Design, and
   Infrastructure Design are provisionally skipped because this is an internal
   test/CI performance refactor within existing component boundaries.
@@ -2413,5 +2418,5 @@ refreshed reverse-engineering artifacts.
   `construction/plans/test-suite-runtime-reduction-code-generation-plan.md`.
 - Extensions: Property-Based Testing remains enabled and applies to preservation
   of existing generated invariants; Security and Resiliency remain disabled.
-- Current stage: Complete. Code Generation and Build and Test are approved;
-  Operations is a non-applicable placeholder for this workflow.
+- Current stage: Complete. Corrective Code Generation Step 14 passes locally;
+  a new GitHub Actions run is required for independent Ubuntu confirmation.
