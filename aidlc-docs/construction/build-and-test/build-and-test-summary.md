@@ -1,114 +1,83 @@
-# Build and Test Summary
+# Build and Test Summary - Test-Suite Runtime Reduction
 
 ## Build Status
 
 - Build tool: uv with Hatchling through PEP 517.
 - Runtime: CPython 3.14.2.
-- Project version: OpenPinch 0.6.4.
-- Build status: success.
-- Artifact directory: `/private/tmp/openpinch-rtd-build.G9fYpj`.
-- Source artifact: `openpinch-0.6.4.tar.gz`, 500471 bytes, SHA-256
-  `3ebb52c1bec2db0de848ec78d5713d6243619e889c21e16c1965650069f8a609`.
-- Wheel artifact: `openpinch-0.6.4-py3-none-any.whl`, 696693 bytes,
-  SHA-256
-  `6ff2b28c6afca26513997761ffcf59db5ebad59defe0af7cd2d808ed092482f5`.
-- Archive verification: members are unique and notebook 09 is present in both
-  artifacts. RTD source is repository-owned and verified separately by Sphinx.
+- Project version: OpenPinch 0.6.9.
+- Status: success.
+- Local distribution build time: 1.4 seconds.
+- Artifacts: `openpinch-0.6.9-py3-none-any.whl` and
+  `openpinch-0.6.9.tar.gz`.
+- Artifact verification: both archives contain Notebook 19; a clean external
+  virtual environment imported the wheel rather than the checkout and passed
+  the core artifact smoke.
 
 ## Test Execution Summary
 
-### Complete Repository Suite
+### Ordinary Coverage and Regression Lane
 
-- Collected: 3064 tests.
-- Passed: 3060.
-- Skipped: 4 expected optional/environment profile tests.
-- Failed: 0.
-- Hypothesis seed: `20260715`, with normal shrinking enabled.
-- Solver coverage: the configured external-solver environment was supplied to
-  solver-marked tests.
-- Duration: 448.34 seconds.
-- Status: pass.
+- 3,390 passed.
+- 6 expected optional tutorial-profile skips.
+- 65 intentional specialized-lane deselections.
+- Branch-aware 95 percent coverage threshold: passed.
+- Coverage-instrumented runtime: 434.68 seconds.
+- Uninstrumented serial runtime: 383.17 seconds.
+- Baseline: 600.89 seconds; improvement: 217.72 seconds or 36.2 percent.
 
-### Comprehensive Notebook 09
+### Integration and End-to-End Evidence
 
-- All five code cells compiled and executed in order from a clean temporary
-  directory.
-- Runtime: 27.099 seconds, below the 300-second tutorial budget.
-- The packaged sample produced guarded numerical infeasibility for its CoolProp,
-  TESPy, refrigeration, and Brayton screens. The notebook completed without an
-  uncaught exception, backend fallback, or partial performance map.
-- The pure-fluid target, provider-registered blend syntax, explicit binary
-  molar mixture, winning-record branch, three-point request, plain JSON export,
-  and OpenUtility boundary remain present in executable source.
-- Status: pass.
+- CoolProp audit: 14 passed.
+- HPR/MVR E2E: 55 passed, including all 54 standard cases and direct MVR.
+- Utility placement: 50 main tests and 5 batch tests passed in focused runs;
+  process/site real optimization and copy isolation remain covered.
+- Notebook 19: generator drift and real execution passed; final profile 6.06
+  seconds with finite feasible process and site results.
+- Fresh-process architecture/API selection: 39 passed in 18.53 seconds.
+- Final workflow and notebook contracts: 72 passed.
 
-### Real TESPy Target-to-Map Oracle
+### Specialized Lanes
 
-- The dedicated public smoke created a successful explicit TESPy target,
-  retained its detached winning record, and generated two ordered part-load map
-  points.
-- Result: 1 passed in 1.96 seconds.
-- Enforced budget: less than 300 seconds.
-- Status: pass.
+- TESPy: 58 passed in 58.23 seconds.
+- Performance: 2 convergence benchmarks passed.
+- Documentation: 1 warning-strict Sphinx build passed and validated output.
+- Solver: 3 passed and 1 existing environment-dependent case skipped.
+- No retry, expected-failure conversion, unexpected deselection, or orphaned
+  marker was introduced.
 
-### Documentation and Static Quality
+### Quality Gates
 
-- Sphinx 9.1.0 built all 55 RTD sources with warnings treated as errors.
-- The complete repository Ruff lint gate passed.
-- All four changed Python/test files pass Ruff format checks.
-- Changed Python/test files compile.
-- Generator repeated output is byte-idempotent.
-- `git diff --check` passes.
-- Status: pass.
-
-## Test Categories
-
-- Unit tests: pass through the complete repository suite.
-- Property-based tests: pass with seed `20260715`.
-- Integration and contract tests: pass, including target-record-map,
-  public-import, manifest, resource, and documentation boundaries.
-- End-to-end tests: pass, including clean notebook execution and the real TESPy
-  public smoke.
-- Performance tests: pass for the 27.099-second notebook execution and
-  1.96-second real target-to-map smoke.
-- Security tests: N/A because the Security extension is disabled and the change
-  adds no security boundary.
-- Network load/stress tests: N/A because OpenPinch is a local Python library.
-
-## Generated Instructions
-
-- `aidlc-docs/construction/build-and-test/build-instructions.md`
-- `aidlc-docs/construction/build-and-test/unit-test-instructions.md`
-- `aidlc-docs/construction/build-and-test/integration-test-instructions.md`
-- `aidlc-docs/construction/build-and-test/performance-test-instructions.md`
-- `aidlc-docs/construction/build-and-test/build-and-test-plan.md`
-
-## Delivered Boundary
-
-OpenPinch owns pinch targeting, the CoolProp default, explicit optional TESPy
-thermodynamic evaluation, detached winning records, and versioned plain-data
-performance maps. OpenUtility consumes the exported mapping/JSON structure and
-independently owns multi-period dispatch, electricity and thermal balances,
-piecewise-linear MILP formulation, Pyomo models, and HiGHS solves. Neither
-package needs to import the other.
-
-## Extension Compliance
-
-- Property-Based Testing: compliant. Applicable generated, invariant,
-  round-trip, ordering, lifecycle, cache, and oracle tests pass with the fixed
-  seed.
-- Security Baseline: disabled; N/A.
-- Resiliency Baseline: disabled; N/A.
-- Blocking enabled-extension findings: none.
+- Ruff: passed.
+- Git patch hygiene: passed.
+- GitHub Actions YAML parsing and workflow contracts: passed.
+- Canonical notebook regeneration: passed.
+- Isolated installed-wheel smoke: passed.
 
 ## Overall Status
 
 - Build: success.
-- All required tests: pass.
-- Documentation: pass.
-- Distribution verification: pass.
-- Ready for Operations placeholder review: yes.
+- Tests: pass.
+- Runtime requirement: pass with 96.83 seconds of margin.
+- Coverage requirement: pass.
+- HPR/MVR robustness evidence: preserved.
+- Production API changes: none.
+- Ready for Operations placeholder review: yes, subject to explicit approval of
+  this Build and Test stage.
 
-This summary contains no Mermaid, ASCII diagram, or embedded JSON/YAML block.
-Markdown headings, lists, paths, identifiers, hashes, and special characters
-were validated before creation.
+## Generated Instructions
+
+- `build-instructions.md`
+- `unit-test-instructions.md`
+- `integration-test-instructions.md`
+- `performance-test-instructions.md`
+- `e2e-test-instructions.md`
+- `build-and-test-summary.md`
+
+## Extension Compliance
+
+- Property-Based Testing: compliant. Domain strategies, shrinking, fixed seed,
+  and example-based integration evidence remain active.
+- Security Baseline: disabled; N/A. No authentication, authorization, secret,
+  network-service, or protected-data boundary changed.
+- Resiliency Baseline: disabled; N/A. No deployed service, failover, or runtime
+  recovery behavior changed.

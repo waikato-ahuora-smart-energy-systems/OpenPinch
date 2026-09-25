@@ -236,6 +236,73 @@ def test_calc_hpr_cascade_uses_shared_temperature_intervals_for_hpr_and_air(
     )
 
 
+def test_calc_hpr_cascade_aligns_air_profile_across_duplicate_temperatures(
+    monkeypatch,
+):
+    pt = ProblemTable(
+        {
+            ProblemTableLabel.T: [120.0, 90.0, 90.0, 60.0],
+            ProblemTableLabel.H_NET_UT: [11.0, 11.0, 11.0, 11.0],
+            ProblemTableLabel.H_NET_HOT: [2.0, 2.0, 2.0, 2.0],
+            ProblemTableLabel.H_NET_COLD: [3.0, 3.0, 3.0, 3.0],
+        }
+    )
+    monkeypatch.setattr(
+        hp,
+        "create_problem_table_with_t_int",
+        lambda **_kwargs: ProblemTable({ProblemTableLabel.T: [120.0, 60.0]}),
+    )
+    monkeypatch.setattr(
+        hp,
+        "get_process_heat_cascade",
+        lambda **_kwargs: ProblemTable(
+            {
+                ProblemTableLabel.T: [120.0, 90.0, 60.0],
+                ProblemTableLabel.H_NET: [6.0, 3.0, 0.0],
+                ProblemTableLabel.H_NET_HOT: [0.0, 3.0, 6.0],
+                ProblemTableLabel.H_NET_COLD: [6.0, 3.0, 0.0],
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        hp,
+        "get_utility_heat_cascade",
+        lambda **kwargs: {
+            "T_col": np.asarray(kwargs["T_int_vals"], dtype=float),
+            "updates": {
+                ProblemTableLabel.H_NET_UT: np.zeros(len(kwargs["T_int_vals"])),
+                ProblemTableLabel.H_HOT_UT: np.zeros(len(kwargs["T_int_vals"])),
+                ProblemTableLabel.H_COLD_UT: np.zeros(len(kwargs["T_int_vals"])),
+            },
+        },
+    )
+    ambient = StreamCollection()
+    ambient.add(
+        Stream(
+            name="Air",
+            supply_temperature=60.0,
+            target_temperature=120.0,
+            heat_flow=10.0,
+        )
+    )
+
+    out = hp._calc_hpr_cascade(
+        pt,
+        SimpleNamespace(
+            hpr_hot_streams=StreamCollection(),
+            hpr_cold_streams=StreamCollection(),
+            amb_streams=ambient,
+        ),
+        is_direct=False,
+    )
+
+    np.testing.assert_allclose(
+        out[ProblemTableLabel.H_NET_W_AIR], [17.0, 14.0, 14.0, 11.0]
+    )
+    np.testing.assert_allclose(out[ProblemTableLabel.H_NET_HOT], [2.0, 5.0, 5.0, 8.0])
+    np.testing.assert_allclose(out[ProblemTableLabel.H_NET_COLD], [9.0, 6.0, 6.0, 3.0])
+
+
 @pytest.mark.parametrize("period_idx", [None, 3])
 def test_calc_hpr_cascade_forwards_period_idx_to_nested_helpers(
     monkeypatch, period_idx

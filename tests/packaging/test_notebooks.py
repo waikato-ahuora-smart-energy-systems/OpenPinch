@@ -70,6 +70,26 @@ def _combined_source(notebook: dict) -> str:
     return "\n".join(_code_sources(notebook))
 
 
+def _profile_notebook_names(profile: str) -> list[str]:
+    return sorted(
+        {
+            row["primary_tutorial"]
+            for row in _manifest_rows()
+            if row["execution_profile"] == profile
+        }
+    )
+
+
+def _execute_notebook(name: str, tmp_path: Path) -> None:
+    namespace = {"__name__": "__main__"}
+    notebook = _copied_notebook(tmp_path, name)
+    for index, source in enumerate(_code_sources(notebook), start=1):
+        try:
+            exec(compile(source, f"{name}:cell-{index}", "exec"), namespace)
+        except Exception as error:
+            raise AssertionError(f"{name} failed in code cell {index}") from error
+
+
 def test_utility_placement_has_one_executable_thermodynamic_notebook() -> None:
     names = [
         path.name
@@ -99,6 +119,10 @@ def test_utility_placement_has_one_executable_thermodynamic_notebook() -> None:
     assert "maximum_duties=" not in source
     assert "process_evidence.best.fallback_penalty" in source
     assert "display(process_fallback_penalty)" in source
+    assert 'process_evidence.termination.model_dump(mode="json")' in source
+    assert 'site_evidence.termination.model_dump(mode="json")' in source
+    assert "display(process_search)" in source
+    assert "display(site_search)" in source
     assert "def retarget_comparison(evidence, target):" in source
     assert source.count("retarget_comparison(") == 3
     assert "period = evidence.best.period_results[0]" in source
@@ -139,6 +163,31 @@ def test_utility_placement_has_one_executable_thermodynamic_notebook() -> None:
     assert "signed Q / T limit" in markdown
     assert "Utility GCC must not cross the Process GCC" in markdown
     assert "monetary" not in markdown.lower()
+
+
+def test_utility_placement_notebook_uses_a_bounded_demonstration_search() -> None:
+    notebook = _load_notebook(
+        ROOT
+        / "OpenPinch"
+        / "tutorials"
+        / "notebooks"
+        / "19_utility_placement_optimisation.ipynb"
+    )
+    tree = ast.parse(_combined_source(notebook))
+    search_options = next(
+        ast.literal_eval(node.value)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "search_options"
+            for target in node.targets
+        )
+    )
+
+    assert search_options["iteration_limit"] <= 30
+    assert search_options["evaluation_limit"] <= 50
+    assert search_options["candidate_limit"] <= 4
+    assert search_options["run_count"] <= 2
 
 
 def test_inverse_heat_recovery_has_complete_selected_period_notebook_example() -> None:
@@ -380,7 +429,7 @@ def test_notebook_09_demonstrates_comprehensive_hpr_target_to_map() -> None:
     for token in (
         "HprPerformanceMapRequest",
         "HPRTargetingError",
-        'assert coolprop_target["status"] == "feasible"',
+        "assert coolprop_target.hpr_success",
         'simulation_backend="tespy"',
         "HEOS::R32[0.5]&R125[0.5]",
         "target_simulation_record",
@@ -392,7 +441,80 @@ def test_notebook_09_demonstrates_comprehensive_hpr_target_to_map() -> None:
     assert "except (ImportError, RuntimeError, ValueError" not in source
 
 
-def test_notebook_11_distinguishes_typed_hpr_failure_from_service_defects() -> None:
+def test_notebook_08_hpr_calls_are_explicitly_bounded() -> None:
+    notebook = _load_notebook(
+        ROOT
+        / "OpenPinch"
+        / "tutorials"
+        / "notebooks"
+        / "08_carnot_heat_pump_and_refrigeration.ipynb"
+    )
+    source = _combined_source(notebook)
+
+    assert source.count("maximum_restarts=1") == 2
+    assert source.count("maximum_iterations=20") == 2
+    assert source.count("maximum_evaluations=50") == 2
+    assert source.count("condensers=1") == 2
+    assert source.count("evaporators=1") == 2
+    assert "assert heat_pump.hpr_success" in source
+    assert "assert refrigeration.hpr_success" in source
+
+
+def test_notebook_09_required_coolprop_calls_fail_loudly_and_are_bounded() -> None:
+    notebook = _load_notebook(
+        ROOT
+        / "OpenPinch"
+        / "tutorials"
+        / "notebooks"
+        / "09_vapour_compression_and_brayton.ipynb"
+    )
+    source = _combined_source(notebook)
+
+    assert "coolprop_target = problem.target.vapour_compression_heat_pump(" in source
+    assert (
+        "vc_refrigeration = problem.target.vapour_compression_refrigeration(" in source
+    )
+    assert "assert coolprop_target.hpr_success" in source
+    assert "assert vc_refrigeration.hpr_success" in source
+    assert source.count("maximum_iterations=20") == 5
+    assert source.count("maximum_evaluations=50") == 5
+    assert source.count("screen_optional_hpr(") == 4
+    assert '"optional dependency unavailable"' in source
+    assert '"method unavailable"' in source
+    assert '"typed infeasible"' in source
+    assert "except Exception" not in source
+
+
+def test_notebook_10_uses_five_isolated_scalar_shared_designs() -> None:
+    notebook = _load_notebook(
+        ROOT
+        / "OpenPinch"
+        / "tutorials"
+        / "notebooks"
+        / "10_multiperiod_heat_pumps.ipynb"
+    )
+    source = _combined_source(notebook)
+
+    assert ".target.all_periods." not in source
+    assert source.count("HPR_MULTIPERIOD_OPTIMIZATION_ENABLED") >= 1
+    assert source.count("= new_shared_problem()") == 6
+    assert source.count('period_id="base"') == 6
+    assert source.count("maximum_restarts=1") == 6
+    assert source.count("maximum_iterations=20") == 5
+    assert source.count("maximum_evaluations=50") == 5
+    assert source.count(".target.carnot_heat_pump(") == 1
+    assert source.count(".target.carnot_refrigeration(") == 1
+    assert source.count(".target.vapour_compression_heat_pump(") == 2
+    assert source.count(".target.vapour_compression_refrigeration(") == 1
+    assert source.count(".target.mvr_heat_pump(") == 1
+    assert 'EXPECTED_PERIODS = {"turndown", "base", "peak"}' in source
+    assert "assert set(details.period_ids) == EXPECTED_PERIODS" in source
+    assert "summarize_hpr_failure" in source
+    assert "except HPRTargetingError as error" in source
+    assert "except Exception" not in source
+
+
+def test_notebook_11_required_mvr_paths_are_explicit_and_bounded() -> None:
     notebook = _load_notebook(
         ROOT
         / "OpenPinch"
@@ -402,7 +524,53 @@ def test_notebook_11_distinguishes_typed_hpr_failure_from_service_defects() -> N
     )
     source = _combined_source(notebook)
 
-    assert "except HPRTargetingError as error" in source
+    assert "mvr_stages=1" in source
+    assert 'mvr_fluids=["Water"]' in source
+    assert "maximum_restarts=1" in source
+    assert "maximum_iterations=3" in source
+    assert "maximum_evaluations=50" in source
+    assert "try:" not in source
+    assert "except HPRTargetingError" not in source
+    assert "assert cascade.hpr_success" in source
+    assert "assert cascade.hpr_details.target_simulation_record.loops" in source
+
+
+def test_checked_in_hpr_notebooks_are_source_only_and_match_generator(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(notebook_generator, "NOTEBOOK_DIR", tmp_path)
+    notebook_generator.main()
+
+    for name in (
+        "08_carnot_heat_pump_and_refrigeration.ipynb",
+        "09_vapour_compression_and_brayton.ipynb",
+        "10_multiperiod_heat_pumps.ipynb",
+        "11_process_mvr_and_cascade.ipynb",
+    ):
+        generated = _load_notebook(tmp_path / name)
+        checked_in = _load_notebook(
+            ROOT / "OpenPinch" / "tutorials" / "notebooks" / name
+        )
+        assert _combined_source(checked_in) == _combined_source(generated), name
+        for cell in checked_in["cells"]:
+            if cell["cell_type"] == "code":
+                assert cell["execution_count"] is None, name
+                assert cell["outputs"] == [], name
+
+
+def test_notebook_11_required_hpr_service_defects_fail_loudly() -> None:
+    notebook = _load_notebook(
+        ROOT
+        / "OpenPinch"
+        / "tutorials"
+        / "notebooks"
+        / "11_process_mvr_and_cascade.ipynb"
+    )
+    source = _combined_source(notebook)
+
+    assert "except HPRTargetingError as error" not in source
+    assert "except Exception" not in source
     assert "assert all(stages for stages in stage_results.values())" in source
     assert "except (ValueError, RuntimeError, NotImplementedError)" not in source
 
@@ -438,24 +606,24 @@ def test_manifest_operations_are_demonstrated_in_notebook_source(
 
 @pytest.mark.parametrize(
     "name",
-    sorted(
-        {
-            row["primary_tutorial"]
-            for row in _manifest_rows()
-            if row["execution_profile"] == "base"
-        }
-    ),
+    _profile_notebook_names("base"),
 )
 def test_base_profile_notebook_executes(name: str, tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
-    namespace = {"__name__": "__main__"}
-    notebook = _copied_notebook(tmp_path, name)
-
-    for index, source in enumerate(_code_sources(notebook), start=1):
-        exec(compile(source, f"{name}:cell-{index}", "exec"), namespace)
+    _execute_notebook(name, tmp_path)
 
 
-@pytest.mark.parametrize("profile", ["slow-hpr", "solver", "interactive"])
+@pytest.mark.parametrize("name", _profile_notebook_names("slow-hpr"))
+def test_slow_hpr_notebook_executes(name: str, tmp_path: Path, monkeypatch) -> None:
+    enabled = set(filter(None, os.getenv("OPENPINCH_TUTORIAL_PROFILES", "").split(",")))
+    if "slow-hpr" not in enabled and "all" not in enabled:
+        pytest.skip("Set OPENPINCH_TUTORIAL_PROFILES=slow-hpr with the HPR extra.")
+
+    monkeypatch.chdir(tmp_path)
+    _execute_notebook(name, tmp_path)
+
+
+@pytest.mark.parametrize("profile", ["solver", "interactive"])
 def test_optional_profile_notebooks_execute(
     profile: str, tmp_path: Path, monkeypatch
 ) -> None:
@@ -472,18 +640,8 @@ def test_optional_profile_notebooks_execute(
         monkeypatch.setattr(PinchWorkspace, "show_dashboard", lambda *_a, **_k: None)
 
     monkeypatch.chdir(tmp_path)
-    names = sorted(
-        {
-            row["primary_tutorial"]
-            for row in _manifest_rows()
-            if row["execution_profile"] == profile
-        }
-    )
-    for name in names:
-        namespace = {"__name__": "__main__"}
-        notebook = _copied_notebook(tmp_path, name)
-        for index, source in enumerate(_code_sources(notebook), start=1):
-            exec(compile(source, f"{name}:cell-{index}", "exec"), namespace)
+    for name in _profile_notebook_names(profile):
+        _execute_notebook(name, tmp_path)
 
 
 def test_packaged_resource_metadata_and_friendly_errors() -> None:

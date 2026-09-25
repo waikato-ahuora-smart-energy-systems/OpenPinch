@@ -110,6 +110,15 @@ ALL_PERIOD_TUTORIALS = {
     "isentropic_cogeneration": 13,
     "utility_placement": 19,
 }
+DOCUMENTED_ALL_PERIOD_HPR_METHODS = frozenset(
+    {
+        "carnot_heat_pump",
+        "carnot_refrigeration",
+        "vapour_compression_heat_pump",
+        "vapour_compression_refrigeration",
+        "mvr_heat_pump",
+    }
+)
 DESIGN_TUTORIALS = {
     "heat_exchanger_network": 15,
     "multiperiod_heat_exchanger_network": 17,
@@ -254,6 +263,10 @@ def _dimensions(
         "execution_evidence": (
             "guarded TESPy and routine fake pytest execution"
             if name == "hpr_performance_map"
+            else "documented independent replay; related shared-design scalar "
+            "optimization in opt-in slow-hpr execution"
+            if owner_name == "All-period target"
+            and name in DOCUMENTED_ALL_PERIOD_HPR_METHODS
             else "detached observation contract; routine pytest execution"
             if name
             in {
@@ -444,6 +457,9 @@ def _rows() -> list[dict[str, str]]:
                     "coverage_status": (
                         "mapped; runtime unsupported"
                         if name.startswith("brayton_")
+                        else "mapped; documented independent replay"
+                        if owner_name == "All-period target"
+                        and name in DOCUMENTED_ALL_PERIOD_HPR_METHODS
                         else "mapped and executable"
                     ),
                     **_dimensions(owner_name, name, tutorial_number, profile),

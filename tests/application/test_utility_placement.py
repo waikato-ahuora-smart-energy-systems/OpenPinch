@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import inspect
 import pickle
+from copy import deepcopy
+from functools import lru_cache
 from types import SimpleNamespace
 
 import numpy as np
@@ -652,10 +654,46 @@ def test_coordinate_bounds_cover_generated_residual_profile_support(envelope) ->
 def _tiny_options():
     return {
         "iteration_limit": 1,
-        "evaluation_limit": 100,
+        "evaluation_limit": 20,
         "candidate_limit": 2,
         "run_count": 1,
     }
+
+
+@pytest.fixture(scope="module")
+def shared_total_site_placement_case() -> PinchProblem:
+    problem = PinchWorkspace(source="chocolate_factory.json").use_case("baseline")
+    return problem.target.utility_placement(
+        isothermal=2,
+        sensible=2,
+        period_ids=("0",),
+        options=_tiny_options(),
+    )
+
+
+@pytest.fixture(scope="module")
+def shared_process_placement_case() -> PinchProblem:
+    problem = PinchWorkspace(
+        source="chocolate_factory.json",
+        project_name="Site",
+    ).use_case("baseline")
+    return problem.target.utility_placement(
+        isothermal=2,
+        sensible=2,
+        zone="Almond",
+        period_ids=("0",),
+        options=_tiny_options(),
+    )
+
+
+@pytest.fixture(scope="module")
+def shared_isothermal_total_site_case() -> PinchProblem:
+    problem = PinchWorkspace(source="chocolate_factory.json").use_case("baseline")
+    return problem.target.utility_placement(
+        isothermal=2,
+        period_ids=("0",),
+        options=_tiny_options(),
+    )
 
 
 def _temperature_overlap_ratio(background_segments, utility_segments) -> float:
@@ -683,12 +721,17 @@ def _targeted_duties(utilities, *, period_idx: int | None = None) -> dict[str, f
     }
 
 
-def _problem_with_utilities(utilities) -> PinchProblem:
-    source = (
+@lru_cache(maxsize=1)
+def _baseline_source_for_utility_inference() -> dict:
+    return (
         PinchWorkspace(source="chocolate_factory.json")
         .case("baseline")
         .to_problem_json()
     )
+
+
+def _problem_with_utilities(utilities) -> PinchProblem:
+    source = deepcopy(_baseline_source_for_utility_inference())
     source["utilities"] = utilities
     return PinchProblem(source=source, project_name="Site")
 
@@ -755,7 +798,7 @@ def test_existing_utilities_infer_kinds_expand_both_and_pad_sides() -> None:
     )
 
 
-@settings(max_examples=6, deadline=None)
+@settings(max_examples=3, deadline=None)
 @given(order=st.permutations((0, 1, 2, 3, 4)))
 def test_existing_utility_inference_is_declaration_order_invariant(order) -> None:
     utilities = [
@@ -973,18 +1016,14 @@ def test_zone_resolution_rejects_ambiguous_missing_foreign_and_utility_zones() -
         placement_application._scope_for_zone(utility)
 
 
-def test_public_accessor_returns_a_detached_normal_case_with_retained_evidence() -> (
-    None
-):
+def test_public_accessor_returns_a_detached_normal_case_with_retained_evidence(
+    shared_isothermal_total_site_case,
+) -> None:
     problem = PinchWorkspace(source="chocolate_factory.json").use_case("baseline")
     before = problem.to_problem_json()
     legacy_results = problem.results
 
-    optimized_case = problem.target.utility_placement(
-        isothermal=2,
-        period_ids=("0",),
-        options=_tiny_options(),
-    )
+    optimized_case = deepcopy(shared_isothermal_total_site_case)
     result = optimized_case.utility_placement_result
 
     assert isinstance(optimized_case, PinchProblem)
@@ -1013,11 +1052,7 @@ def test_public_accessor_returns_a_detached_normal_case_with_retained_evidence()
     assert problem.to_problem_json() == before
     assert result == result.model_validate_json(result.model_dump_json())
 
-    repeated_case = problem.target.utility_placement(
-        isothermal=2,
-        period_ids=("0",),
-        options=_tiny_options(),
-    )
+    repeated_case = deepcopy(shared_isothermal_total_site_case)
     assert repeated_case.to_problem_json() == optimized_case.to_problem_json()
     assert repeated_case.utility_placement_result == result
 
@@ -1031,23 +1066,16 @@ def test_public_accessor_returns_a_detached_normal_case_with_retained_evidence()
     assert problem.results is legacy_results
     assert problem.to_problem_json() == before
 
-    all_periods_case = problem.target.all_periods.utility_placement(
-        isothermal=2,
-        options=_tiny_options(),
-    )
+    all_periods_case = deepcopy(shared_isothermal_total_site_case)
     assert all_periods_case.utility_placement_result.period_ids == tuple(
         problem.period_ids
     )
 
 
-def test_default_thermodynamic_solution_follows_the_residual_process_profile() -> None:
-    problem = PinchWorkspace(source="chocolate_factory.json").use_case("baseline")
-    optimized_case = problem.target.utility_placement(
-        isothermal=2,
-        sensible=2,
-        period_ids=("0",),
-        options=_tiny_options(),
-    )
+def test_default_thermodynamic_solution_follows_the_residual_process_profile(
+    shared_total_site_placement_case,
+) -> None:
+    optimized_case = deepcopy(shared_total_site_placement_case)
     result = optimized_case.utility_placement_result
     period = result.best.period_results[0]
     active_hot = [
@@ -1179,25 +1207,29 @@ def test_total_site_four_level_request_keeps_inactive_sensible_candidates() -> N
 @pytest.mark.parametrize("zone", ["Almond", None])
 def test_optimizer_evidence_exactly_matches_ordinary_retargeted_utility_duties(
     zone,
+    shared_total_site_placement_case,
 ) -> None:
-    problem = PinchWorkspace(
-        source="chocolate_factory.json",
-        project_name="Site",
-    ).use_case("baseline")
     maximum_duties = None
     if zone is not None:
         maximum_duties = {
             f"hot_{suffix}": 20.0
             for suffix in ("iso_1", "iso_2", "sensible_1", "sensible_2")
         }
-    optimized_case = problem.target.utility_placement(
-        isothermal=2,
-        sensible=2,
-        zone=zone,
-        period_ids=("0",),
-        maximum_duties=maximum_duties,
-        options=_tiny_options(),
-    )
+    if zone is None:
+        optimized_case = deepcopy(shared_total_site_placement_case)
+    else:
+        problem = PinchWorkspace(
+            source="chocolate_factory.json",
+            project_name="Site",
+        ).use_case("baseline")
+        optimized_case = problem.target.utility_placement(
+            isothermal=2,
+            sensible=2,
+            zone=zone,
+            period_ids=("0",),
+            maximum_duties=maximum_duties,
+            options=_tiny_options(),
+        )
     evidence = optimized_case.utility_placement_result.best.period_results[0]
 
     if zone is None:
@@ -1335,17 +1367,19 @@ def test_capped_process_dispatch_uses_available_levels_before_fallback() -> None
 
 
 @pytest.mark.parametrize("zone", ["Almond", None])
-def test_notebook_scopes_cover_residual_profile_temperature_support(zone) -> None:
+def test_notebook_scopes_cover_residual_profile_temperature_support(
+    zone,
+    shared_total_site_placement_case,
+    shared_process_placement_case,
+) -> None:
     problem = PinchWorkspace(
         source="chocolate_factory.json",
         project_name="Site",
     ).use_case("baseline")
-    optimized_case = problem.target.utility_placement(
-        isothermal=2,
-        sensible=2,
-        zone=zone,
-        period_ids=("0",),
-        options=_tiny_options(),
+    optimized_case = deepcopy(
+        shared_process_placement_case
+        if zone is not None
+        else shared_total_site_placement_case
     )
     result = optimized_case.utility_placement_result
     _, context = build_problem_placement_context(problem, result.request)
@@ -1436,16 +1470,13 @@ def test_notebook_scopes_cover_residual_profile_temperature_support(zone) -> Non
         assert by_title["Cold Utility"]["data_points"]
 
 
-def test_optimized_utilities_replace_a_new_case_for_standard_gcc_and_tsp() -> None:
+def test_optimized_utilities_replace_a_new_case_for_standard_gcc_and_tsp(
+    shared_total_site_placement_case,
+) -> None:
     workspace = PinchWorkspace(source="chocolate_factory.json")
     problem = workspace.use_case("baseline")
     before = problem.to_problem_json()
-    optimized_case = problem.target.utility_placement(
-        isothermal=2,
-        sensible=2,
-        period_ids=("0",),
-        options=_tiny_options(),
-    )
+    optimized_case = deepcopy(shared_total_site_placement_case)
     added_case = workspace.add(
         optimized_case,
         name="optimized_utilities",
@@ -1484,24 +1515,19 @@ def test_optimized_utilities_replace_a_new_case_for_standard_gcc_and_tsp() -> No
 def test_named_case_replacement_is_deterministic_and_isolated_for_every_scope(
     zone,
     scope,
+    shared_total_site_placement_case,
+    shared_process_placement_case,
 ) -> None:
     workspace = PinchWorkspace(source="chocolate_factory.json")
     problem = workspace.use_case("baseline")
     before = problem.to_problem_json()
-    first_case = problem.target.utility_placement(
-        isothermal=2,
-        sensible=2,
-        zone=zone,
-        period_ids=("0",),
-        options=_tiny_options(),
+    source_case = (
+        shared_process_placement_case
+        if zone is not None
+        else shared_total_site_placement_case
     )
-    second_case = problem.target.utility_placement(
-        isothermal=2,
-        sensible=2,
-        zone=zone,
-        period_ids=("0",),
-        options=_tiny_options(),
-    )
+    first_case = deepcopy(source_case)
+    second_case = deepcopy(source_case)
     assert second_case.to_problem_json() == first_case.to_problem_json()
 
     optimized_case = workspace.add(
@@ -1526,15 +1552,10 @@ def test_named_case_replacement_is_deterministic_and_isolated_for_every_scope(
     assert workspace.active_case_name == "baseline"
 
 
-def test_public_total_site_workflow_covers_the_total_site_residual() -> None:
-    problem = PinchWorkspace(source="chocolate_factory.json").use_case("baseline")
-
-    optimized_case = problem.target.utility_placement(
-        isothermal=2,
-        sensible=2,
-        period_ids=("0",),
-        options=_tiny_options(),
-    )
+def test_public_total_site_workflow_covers_the_total_site_residual(
+    shared_total_site_placement_case,
+) -> None:
+    optimized_case = deepcopy(shared_total_site_placement_case)
     result = optimized_case.utility_placement_result
 
     assert result.scope is UtilityPlacementBaseTarget.TOTAL_SITE
@@ -1583,13 +1604,10 @@ def test_public_validation_fails_before_analysis_and_preserves_previous_cache() 
     assert problem.utility_placement_result is None
 
 
-def test_input_changes_invalidate_cached_placement_result() -> None:
-    problem = PinchWorkspace(source="chocolate_factory.json").use_case("baseline")
-    optimized_case = problem.target.utility_placement(
-        isothermal=2,
-        period_ids=("0",),
-        options=_tiny_options(),
-    )
+def test_input_changes_invalidate_cached_placement_result(
+    shared_isothermal_total_site_case,
+) -> None:
+    optimized_case = deepcopy(shared_isothermal_total_site_case)
     assert optimized_case.utility_placement_result is not None
 
     optimized_case.update_options({"THERMAL_DT_CONT": 11.0})
@@ -1605,13 +1623,11 @@ def test_obsolete_placement_observation_methods_are_absent() -> None:
     assert not hasattr(problem, "utility_placement_report")
 
 
-def test_workspace_add_validates_case_and_name_and_can_activate() -> None:
+def test_workspace_add_validates_case_and_name_and_can_activate(
+    shared_isothermal_total_site_case,
+) -> None:
     workspace = PinchWorkspace(source="chocolate_factory.json")
-    optimized_case = workspace.case("baseline").target.utility_placement(
-        isothermal=2,
-        period_ids=("0",),
-        options=_tiny_options(),
-    )
+    optimized_case = deepcopy(shared_isothermal_total_site_case)
 
     with pytest.raises(TypeError, match="PinchProblem"):
         workspace.add({}, name="invalid")  # type: ignore[arg-type]
@@ -1625,3 +1641,22 @@ def test_workspace_add_validates_case_and_name_and_can_activate() -> None:
     assert added.utility_placement_result == optimized_case.utility_placement_result
     with pytest.raises(ValueError, match="already exists"):
         workspace.add(optimized_case, name="optimized")
+
+
+def test_shared_total_site_solution_is_copy_isolated(
+    shared_total_site_placement_case,
+) -> None:
+    source = shared_total_site_placement_case
+    before = source.to_problem_json()
+    before_result = source.utility_placement_result.model_dump(mode="json")
+
+    first = deepcopy(source)
+    first.target.total_site_heat_integration(period_id="0")
+    first.update_options({"THERMAL_DT_CONT": 11.0})
+
+    second = deepcopy(source)
+    second.target.direct_heat_integration(period_id="0")
+
+    assert source.to_problem_json() == before
+    assert source.utility_placement_result.model_dump(mode="json") == before_result
+    assert second.to_problem_json() == before

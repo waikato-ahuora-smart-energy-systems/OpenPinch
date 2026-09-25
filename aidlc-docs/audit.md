@@ -8,6 +8,228 @@
 
 ---
 
+## HPR and MVR Benchmark E2E Reliability - Initial Request
+**Timestamp**: 2026-09-24T12:03:23Z
+**User Input**: "Investigate the robustness of the HPR and MVR services. Add e2e type tests based on the standard benchmark suite. "
+**AI Response**: "I’ll treat this as a new reliability-testing workflow on the existing HPR/MVR implementation. I’ll first identify the repository’s canonical benchmark cases and current end-to-end coverage, then define and implement representative public-service tests with explicit feasibility and failure assertions."
+**Context**: New adaptive workflow opened for HPR/MVR benchmark-based end-to-end reliability. Complete AI-DLC welcome message displayed. No implementation or external publication authorized by this entry alone.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Workspace Detection Complete
+**Timestamp**: 2026-09-24T12:03:23Z
+**AI Response**: "Workspace detection is complete: this is a brownfield Python library with current architecture artifacts and an established public HPR/MVR service boundary. The relevant packaged benchmark corpus appears to be heat_pump_targeting.json, process_mvr.json, and chocolate_factory.json; existing real tests cover only the first case comprehensively, so cross-case end-to-end behavior is the main gap."
+**Context**: Existing code, pytest/Hypothesis quality stack, public PinchProblem boundary, CoolProp-backed targeting and direct-MVR owners confirmed. Reverse-engineering artifacts remain structurally current and the completed HPR/MVR audit supplies newer feature-specific detail, so Reverse Engineering is skipped. Requirements Analysis begins at standard depth. Existing extension configuration is preserved pending explicit confirmation for this workflow.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Requirements Questions
+**Timestamp**: 2026-09-24T12:04:05Z
+**AI Response**: "Created five requirements questions covering the benchmark corpus, CI execution tier and extension configuration. Please enter one letter after each [Answer]: tag and reply when complete."
+**Context**: Requirements Analysis question gate. The Markdown contains no diagrams or executable blocks and passes patch-whitespace validation. Implementation must not begin until the answers are complete and validated.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Benchmark Corpus Clarification
+**Timestamp**: 2026-09-24T12:06:03Z
+**User Input**: "The e2e targeting test suite can provide problems to test HPR and MVR against. "
+**AI Response**: "Understood—the benchmark source should be the existing end-to-end targeting suite’s problem corpus, with HPR and MVR layered onto those same problems. I’ll locate that harness and revise the scope around its fixtures rather than the three tutorial samples."
+**Context**: Confirmed `tests/e2e/test_main.py` discovers 54 standard problem files from `examples/stream_data/p_*.json`. Requirements Question 1 is answered A from the user's explicit clarification. Questions now distinguish the bounded HPR service matrix, direct process-MVR coverage, CI tier, and extension configuration. No runtime implementation has begun.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Requirements Answers
+**Timestamp**: 2026-09-24T12:10:02Z
+**User Input**: "done"
+**AI Response**: "I’ll validate the completed answers, then turn them into concrete requirements and the proposed implementation/test workflow."
+**Context**: All seven answers are present, valid and mutually consistent: A, A, A, A, B, A, B. The standard 54-case e2e targeting corpus, bounded representative rotation, packaged direct-MVR case and normal-CI placement are approved. Security and Resiliency remain disabled; full Property-Based Testing remains enabled and its rule file was loaded.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Requirements Approval Prompt
+**Timestamp**: 2026-09-24T12:10:57Z
+**AI Response**: "Requirements analysis is complete. Please review hpr-mvr-benchmark-e2e-requirements.md and approve or request changes before workflow planning. User Stories are recommended to be skipped because this is an internal test/reliability change with no new user workflow."
+**Context**: Standard-depth requirements define the 54-case six-profile rotation, allowed public outcome contract, success/failure atomicity, direct process-MVR workflow, bounded CI execution, investigation obligations and PBT applicability. Plain Markdown contains no diagrams or executable blocks. Security and Resiliency extensions are disabled and skipped; Property-Based Testing has no blocking finding at Requirements Analysis.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Requirements Approved
+**Timestamp**: 2026-09-24T12:12:57Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Requirements are approved. I’ll create the execution plan now, keeping this as one focused test/reliability unit: minimal functional and performance design, benchmark investigation, end-to-end test implementation, any evidence-backed production fixes, then full verification."
+**Context**: Requirements approval recorded. User Stories are skipped because this is internal test/reliability work with no new user-facing workflow. Workflow Planning begins. Full Property-Based Testing remains enabled; Security and Resiliency remain disabled.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Workflow Plan Approval Prompt
+**Timestamp**: 2026-09-24T12:12:57Z
+**AI Response**: "Workflow planning is complete. The recommended path executes minimal Functional Design, NFR Requirements, NFR Design, Code Generation, and Build and Test. Application Design, Units Generation, Infrastructure Design, and Operations are skipped. Please approve or request changes."
+**Context**: Medium-risk, one-unit plan generated with a validated Mermaid flow and text alternative, explicit package sequence, bounded exploratory matrix, conditional production fixes, direct-MVR coverage, quality gates and PBT traceability. No implementation has begun.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Content Validation
+**Timestamp**: 2026-09-24T12:14:34Z
+**AI Response**: "Validated the workflow-plan Markdown and Mermaid. An initial static checker incorrectly recognized only nodes declared at line starts and rejected chained node declarations. The checker was corrected without changing the diagram; validation then passed for 15 nodes, 13 edges, balanced delimiters, valid identifiers, and the required text alternative. Patch whitespace validation also passes."
+**Context**: Content-validation false positive recorded as required. The plan content itself did not fail Mermaid validation and no fallback substitution was necessary because the existing text alternative was already present.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Workflow Plan Approved
+**Timestamp**: 2026-09-24T12:16:26Z
+**User Input**: "Approve & Continue"
+**AI Response**: "The execution plan is approved. I’ll complete the minimal functional design next, defining the benchmark-profile mapping, allowed outcome state machine, assertions, and property-test obligations before implementation."
+**Context**: Workflow plan approved. Application Design and Units Generation are skipped as planned. Functional Design begins for the single HPR/MVR benchmark e2e reliability unit. Property-Based Testing remains enabled; Security and Resiliency remain disabled.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Functional Design Approval Prompt
+**Timestamp**: 2026-09-24T12:16:26Z
+**AI Response**: "Functional Design is complete. The artifacts define shared corpus discovery, six-profile assignment, solved/no-op/typed-failure transitions, state atomicity, detached success and diagnostics, direct process-MVR behavior, defect handling, and PBT properties. Please request changes or continue to NFR Requirements."
+**Context**: All seven functional-design plan checkboxes complete in the same interaction. No clarification questions were necessary because approved requirements resolve corpus, matrix, direct-MVR, CI and extension choices. All required functional artifacts were generated. Property-Based Testing PBT-01 is compliant with no blocking finding; Security and Resiliency are disabled and skipped.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Functional Design Approved
+**Timestamp**: 2026-09-24T20:02:12Z
+**User Input**: "Continue"
+**AI Response**: "Functional Design is approved. I’ll define the bounded CI, determinism, isolation, diagnostic, and tooling requirements next, including the exact framework and verification obligations."
+**Context**: Functional Design approved. NFR Requirements begins at minimal depth. Full Property-Based Testing remains enabled; Security and Resiliency remain disabled.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - NFR Requirements Approval Prompt
+**Timestamp**: 2026-09-24T20:02:12Z
+**AI Response**: "NFR Requirements is complete. The artifacts define hard evaluation bounds, linear scaling, deterministic isolation, stable diagnostics, public-boundary assertions, ordinary non-solver CI compatibility, and the existing pytest/Hypothesis/CoolProp stack. Please request changes or continue to NFR Design."
+**Context**: All seven NFR-requirements plan checkboxes complete in the same interaction. No clarification questions were required because approved requirements fixed CI tier, bounds, dependencies and extensions. PBT-08 and PBT-09 are compliant with no blocking finding; Security and Resiliency are disabled and skipped.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Successful Solve Clarification
+**Timestamp**: 2026-09-24T20:05:05Z
+**User Input**: "What will define a successful solve?"
+**AI Response**: "A successful solve is a non-null committed public target with both success flags true, finite public accounting, a positive and internally consistent detached CoolProp simulation record, no retained engine, exact transaction commit, successful copy/JSON serialization, and bounded search evidence. Typed infeasibility and no-op are valid robustness outcomes but are not successful solves. At least one named strict-success sentinel will be required for each of the six profiles."
+**Context**: Tightened FR-08A, VR-03A, the functional outcome model, BR-17A and NFR-RL-01A so the broad robustness oracle cannot pass without demonstrated real success in every service profile. This clarification does not broaden the approved corpus or matrix. Property-Based Testing compliance is unchanged.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Valid-Solution Convergence
+**Timestamp**: 2026-09-24T20:07:01Z
+**User Input**: "It should show some level of convergence towards a valid solution.  "
+**AI Response**: "Agreed. A cleanly returned target is insufficient if the search merely accepts an initial point. I’ll require a convergence witness for each profile’s success sentinel: multiple distinct evaluations and measurable progress from the initial search state to the selected feasible result."
+**Context**: User adds search-progress evidence to the strict-success oracle. This was immediately refined by the following user input from validity toward optimality.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Optimal-Solution Convergence
+**Timestamp**: 2026-09-24T20:07:16Z
+**User Input**: "It should show some level of convergence towards an optimal solution"
+**AI Response**: "Yes—valid is too weak. I’ll define convergence against the actual minimized objective: each profile’s success sentinel must evaluate multiple viable points, strictly improve the incumbent objective by a numeric tolerance, and select the best observed feasible candidate. This demonstrates bounded optimization progress without claiming a proven global optimum."
+**Context**: Added FR-08B, VR-03B, a convergence-witness entity and algorithm, BR-17B/BR-17C/BR-26, NFR-RL-01B and tech-stack constraints. The oracle requires at least two viable points, material strict improvement using a scale-aware tolerance, non-increasing incumbent best, final selection equal to the best observed viable objective, and budget compliance. Observation delegates to real evaluation unchanged. No global-optimum claim is made because the benchmark suite has no certified HPR optima.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - NFR Requirements Approved
+**Timestamp**: 2026-09-24T20:09:34Z
+**User Input**: "Continue"
+**AI Response**: "The refined NFR requirements are approved. I’ll design the concrete harness architecture now: shared corpus ownership, declarative profiles, observation-only convergence tracing, sequential isolation, outcome validation, and failure reporting."
+**Context**: NFR Requirements approved after the strict-success and bounded best-observed convergence refinements. NFR Design begins at minimal depth. Property-Based Testing remains enabled; Security and Resiliency remain disabled.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - NFR Design Approval Prompt
+**Timestamp**: 2026-09-24T20:10:53Z
+**AI Response**: "NFR Design is complete. The artifacts define one shared corpus owner, immutable profile assignment, fresh sequential execution, hard budgets, public outcome validation, an observation-only real-search probe, an independent best-observed convergence oracle, six strict sentinels, direct process-MVR coverage, property tests, and evidence-led defect routing. Please request changes or continue to Code Generation."
+**Context**: All eight NFR-design plan checkboxes were completed in the same interaction. No additional questions were required because the approved requirements resolve resilience, scaling, performance, security and component choices. Infrastructure Design remains skipped. Property-Based Testing obligations are allocated with no blocking finding; Security and Resiliency are disabled and skipped.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - NFR Design Approved
+**Timestamp**: 2026-09-24T20:13:45Z
+**User Input**: "Proceed"
+**AI Response**: "The NFR design is approved. I’ll prepare the implementation plan next, including corpus extraction, exploratory budget/sentinel discovery, regression-first production fixes, the 54-case matrix, direct-MVR coverage, convergence properties, and verification gates."
+**Context**: NFR Design approved. Infrastructure Design remains skipped as planned. Code Generation Part 1 begins for the single benchmark e2e reliability unit.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Code Generation Plan Approval Prompt
+**Timestamp**: 2026-09-24T20:14:34Z
+**AI Response**: "Prepared a nine-step regression-first Code Generation plan covering shared corpus ownership, immutable assignment, pure convergence and outcome helpers, full real-CoolProp exploration, evidence-backed production corrections, the 54-case public HPR matrix, direct process-MVR, focused verification, and complete traceability. Please approve the full plan or request changes before implementation begins."
+**Context**: Code Generation Part 1 plan generated from the approved designs and live brownfield structure. Exact test paths, conditional production owners, FR/VR/PBT traceability and same-interaction checkbox enforcement are documented. No runtime or test code has changed. Property-Based Testing is compliant at planning; Security and Resiliency remain disabled and skipped.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Code Generation Plan Approved
+**Timestamp**: 2026-09-24T20:23:17Z
+**User Input**: "go"
+**AI Response**: "The full implementation plan is approved. I’m starting with the baseline and RED contracts, then I’ll build the shared corpus/profile helpers before running the expensive real-CoolProp investigation."
+**Context**: Code Generation Part 1 approved in full. Part 2 begins at Step 1. The current corpus contains 54 sorted `p_*.json` problems. No source or test code had changed before generation began.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Code Generation Step 1
+**Timestamp**: 2026-09-24T20:24:56Z
+**AI Response**: "Recorded the 54-case baseline and added the first corpus/assignment contracts. Existing direct-target and focused HPR/MVR coverage passed 92 tests. The new helper suite fails at collection only because the planned shared `tests.e2e.cases` module does not yet exist, establishing the intended RED state."
+**Context**: Code Generation Step 1 complete. All three Step 1 checkboxes were marked complete in the same interaction. Step 2 begins with no production-code changes.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Code Generation Step 2
+**Timestamp**: 2026-09-24T20:26:23Z
+**AI Response**: "Created one shared immutable corpus owner, moved the existing direct-target suite onto it, and added six frozen explicit HPR profiles with stable round-robin assignments and readable parameter IDs. The combined helper and existing e2e gate passed 60 tests."
+**Context**: Code Generation Step 2 complete with all four checkboxes updated immediately. The current 54-case corpus is unique, sorted and evenly assigned nine cases per profile. No production code changed. Step 3 pure validation and convergence helpers begins.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Code Generation Step 3
+**Timestamp**: 2026-09-24T20:30:17Z
+**AI Response**: "Implemented pure outcome, state-transition, typed-diagnostic and convergence helpers plus an observation-only real evaluator wrapper. Added fixed-seed generated assignment/incumbent properties and boundary examples for deduplication, improvement tolerance, best-observed selection, atomicity, bounded failures and exact delegation. All 10 helper tests and Ruff pass."
+**Context**: Code Generation Step 3 complete with all five checkboxes updated immediately. Property tests retain shrinking and seed `20260715`; real thermodynamics are not mocked by the later e2e suite. Step 4 exploratory real-CoolProp execution begins.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Code Generation Step 4
+**Timestamp**: 2026-09-24T20:36:53Z
+**AI Response**: "Completed the full 54-case real-CoolProp investigation and calibrated the smallest tested stable budgets: 12 selected-cycle evaluations for all VC profiles, 20 for direct VC+MVR, and 16 for utility VC+MVR. Total observed public-search calls are bounded at 24, 40 and 32 respectively. Named convergent sentinels were found for all six profiles. Two utility cases exposed the same untyped problem-table array broadcast defect; both were reproduced with filenames, profiles and original tracebacks."
+**Context**: Code Generation Step 4 complete and all five checkboxes updated. The six sentinels are Adjiman, Ahmad examples 1/2/3, Pavao example 1, and Feng case study 1 for their assigned profiles. The initial complete matrix took about 31 seconds and had no unexpected exception other than two instances of the same `H_NET_W_AIR`/ambient problem-table shape mismatch. Step 5 begins with regression-first production correction. Timing remains diagnostic only. Security and Resiliency remain disabled; PBT obligations remain compliant.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Code Generation Step 5
+**Timestamp**: 2026-09-24T20:43:31Z
+**AI Response**: "Fixed both evidence-backed utility-path failures. Ambient cascade columns now align to shared temperatures while preserving duplicate target rows, and equivalent duplicate residual rows are collapsed only at the strict detached-contract edge; conflicting duplicates still fail explicitly. Added three focused regressions. The original Ciric/Floudas refrigeration and Fodor heat-pump cases now solve and each commits exactly one HPR target after explicit public prerequisite targeting. The affected gate passed 60 tests."
+**Context**: Code Generation Step 5 complete with every checkbox updated. Only `OpenPinch/analysis/heat_pumps/service.py` and `common/postprocessing.py` changed in production, with focused owner tests. No public API, dependency, optimizer, objective or thermodynamic behavior was replaced. Step 6 begins.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Code Generation Step 6
+**Timestamp**: 2026-09-24T20:45:59Z
+**AI Response**: "Created and passed the complete shared-corpus HPR e2e suite. All 54 assignments enforce allowed outcomes, explicit prerequisite snapshots, one-target success commits, failure/no-op atomicity, selected and total search bounds, finite detached CoolProp evidence, duty consistency, deep-copy safety and JSON serialization. Six explicit sentinel parameters require and demonstrate material best-observed convergence. The combined helper and matrix gate passed 65 tests in 45.43 seconds."
+**Context**: Code Generation Step 6 complete with all five checkboxes updated. Final observed outcome counts after the evidence-backed fixes are 40 solved, five legitimate no-ops and nine bounded typed failures; no unexpected exception remains. Profile counts sum to nine each. Tests contain no retry, sleep, network, external solver or wall-clock oracle. Step 7 direct process-MVR begins.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Code Generation Step 7
+**Timestamp**: 2026-09-24T20:47:32Z
+**AI Response**: "Added a real packaged two-stage process-MVR end-to-end workflow. It verifies public registration, active replacement streams, pressure lift, finite positive stage duty/work, detached copyable stage arrays, absence of engine/model/state artifacts, downstream direct targeting, finite Qh/Qc/Qr, result JSON and problem JSON compatibility. The workflow plus complementary invalid, fallback and second-stage atomicity coverage passed 60 tests."
+**Context**: Code Generation Step 7 complete with all three checkboxes updated. The test uses explicit compression efficiencies, stage count and temperature lift without mocking CoolProp. Step 8 focused verification and refactoring begins.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Code Generation Steps 8 and 9
+**Timestamp**: 2026-09-24T20:52:59Z
+**AI Response**: "Completed focused verification, refactoring and requirement closure. The affected non-solver HPR/MVR, contract, application and e2e gate passed 1,164 tests; architecture/cold-import/usability passed 41; normal-CI collection includes all 55 new e2e parameters; Ruff, formatting, compilation and patch hygiene pass. Generated the Code Generation summary with budgets, sentinels, outcomes, fixes, traceability, PBT compliance and limitations."
+**Context**: Code Generation Steps 8 and 9 complete with every remaining plan checkbox updated immediately. No duplicate file, dependency, marker, workflow, fixture snapshot or unbounded artifact was introduced. Full repository Build and Test remains gated on explicit Code Generation approval.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Code Generation Approval Prompt
+**Timestamp**: 2026-09-24T20:52:59Z
+**AI Response**: "Code Generation is complete. Created the shared e2e harness, 54-case real-CoolProp matrix, six bounded-convergence sentinels and direct process-MVR workflow; corrected two duplicate-temperature production failures; and passed the complete affected verification surface. Please request changes or continue to Build and Test."
+**Context**: Awaiting standardized Code Generation approval. Property-Based Testing PBT-01 through PBT-10 is compliant; Security and Resiliency remain disabled and skipped. No full-repository Build and Test claim is made at this gate.
+
+---
+
 ## CoolProp HPR and MVR Reliability - PR Review Follow-up
 **Timestamp**: 2026-09-24T08:56:03Z
 **User Input**: "Go"
@@ -9292,5 +9514,568 @@ utilities = problem.target.all_heat_integration(base_target=heat_pump)"
 **User Input**: "Commit the changes to develop and create a PR to main.  "
 **AI Response**: "I’ll check the branch and working tree, commit the HPR/MVR changes to develop, then push and open a PR targeting main."
 **Context**: User authorizes commit, normal push and PR creation, not merge or deployment. Remote refs refreshed; develop matches origin/develop. Change inventory is scoped to the completed HPR/MVR workflow and git diff --check passes. Existing verification evidence and limitations will accompany the PR. GitHub CLI authentication is being checked before publication. Property-Based Testing remains compliant per the completed audit; no new executable changes are made. Disabled Security and Resiliency extensions are skipped.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Distinct Case Count
+**Timestamp**: 2026-09-24T21:09:24Z
+**User Input**: "How many distinct cases were run?"
+**AI Response**: "The benchmark ran 54 distinct standard problem inputs, each assigned to exactly one of six HPR profiles. One additional packaged process-MVR workflow was run separately, for 55 distinct end-to-end input/workflow cases. The six convergence sentinels are members of the 54-case matrix, not extra cases."
+**Context**: Code Generation review clarification. The benchmark uses stable round-robin assignment rather than a 54-by-6 Cartesian product.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Placement Case Count
+**Timestamp**: 2026-09-24T21:10:21Z
+**User Input**: "How many were process vs site level integration of heat pumps?"
+**AI Response**: "Within the 54-case HPR benchmark matrix, 27 cases used direct process integration and 27 used utility/site integration. Including the separate direct process-MVR end-to-end workflow produces a total of 28 process-level cases and 27 site-level cases."
+**Context**: Code Generation review clarification. Each of the three direct profiles and three utility profiles receives nine standard problems through stable round-robin assignment; the separate process-MVR workflow is additional and process-level.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Code Generation Approved
+**Timestamp**: 2026-09-24T21:11:07Z
+**User Input**: "Proceed to the next step"
+**AI Response**: "Recorded Code Generation approval and started Build and Test. The stage will execute build, unit, integration, e2e, bounded-performance, packaging and static-quality verification and generate the required instruction and summary artifacts."
+**Context**: Code Generation Part 2 approved. Build and Test is active. Property-Based Testing remains enabled; Security and Resiliency extensions remain disabled and are N/A.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Build and Test Complete
+**Timestamp**: 2026-09-24T21:28:38Z
+**Build Status**: Success
+**Test Status**: Pass
+**Files Generated**:
+- `build-instructions.md`
+- `unit-test-instructions.md`
+- `integration-test-instructions.md`
+- `e2e-test-instructions.md`
+- `performance-test-instructions.md`
+- `build-and-test-summary.md`
+**AI Response**: "Completed the focused 66-test HPR/MVR gate, the authoritative seeded non-solver suite, coverage enforcement, static checks, compilation, warning-strict documentation, wheel and source builds, archive inspection and an isolated installed-wheel smoke. The full suite passed 3,443 tests with three declared optional-profile skips and four external-solver tests deselected; branch-aware coverage was 96%."
+**Context**: Build and Test complete and awaiting explicit review. All 55 distinct e2e workflows passed their allowed outcome contracts; all six sentinels demonstrated bounded convergence toward the best viable observed candidate. Property-Based Testing is compliant. Security and Resiliency are disabled and N/A. No deployment, publication, commit, push, or merge was performed.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Build and Test Approval Prompt
+**Timestamp**: 2026-09-24T21:28:38Z
+**AI Prompt**: "Build and Test is complete. Please review aidlc-docs/construction/build-and-test/hpr-mvr-benchmark-e2e/build-and-test-summary.md, then request changes or approve and continue to Operations."
+**Context**: Standard Build and Test review gate. Operations remains a placeholder; approval does not authorize deployment or publication.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Build and Test Approved
+**Timestamp**: 2026-09-25T00:42:51Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded Build and Test approval and evaluated the Operations placeholder. No deployment, infrastructure, monitoring, publication, or external-system work applies, so Operations is N/A and the workflow is complete."
+**Context**: Build and Test approved. Operations is a placeholder under the active AI-DLC rules and requires no action for this internal HPR/MVR robustness and e2e-test change. Property-Based Testing remains compliant; disabled Security and Resiliency extensions remain N/A.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Workflow Complete
+**Timestamp**: 2026-09-25T00:42:51Z
+**AI Response**: "Completed the approved HPR/MVR benchmark robustness workflow. The implementation, regression corrections, 55 distinct e2e workflows, six bounded-convergence sentinels, full non-solver suite, 96% coverage, documentation build, distributions and installed-wheel smoke all pass. Operations is N/A."
+**Context**: Final workflow state. No commit, push, merge, deployment, publication, or other external mutation was performed by this workflow.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - `screen_periods` Explanation
+**Timestamp**: 2026-09-25T01:51:18Z
+**User Input**: "Explain screen_periods"
+**AI Response**: "Explained that `screen_periods` is a notebook-local error-normalizing wrapper around `problem.target.all_periods.<hpr_method>`, not a public OpenPinch API or optimizer. It returns a consistent status dictionary, catches only `HPRTargetingError`, preserves other programming errors, and does not retain partial per-period results when a batch fails."
+**Context**: Read-only explanation after workflow completion. No application or test code changed.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Commit Authorization
+**Timestamp**: 2026-09-25T01:52:16Z
+**User Input**: "Commit the changes"
+**AI Response**: "Verified the develop branch, scoped the completed HPR/MVR production fixes, tests and workflow records, and prepared one local commit. An independently executed notebook containing cell outputs and execution metadata is preserved unstaged because it appeared after verification and is outside the implementation inventory. No push or pull-request mutation is authorized."
+**Context**: Local commit authorized on develop. The intended tree passes the completed Build and Test gates and `git diff --check`. `OpenPinch/tutorials/notebooks/10_multiperiod_heat_pumps.ipynb` remains an unrelated unstaged user change.
+
+---
+
+## HPR and MVR Benchmark E2E Reliability - Commit Complete
+**Timestamp**: 2026-09-25T01:53:34Z
+**AI Response**: "Committed the verified HPR/MVR reliability changes locally on develop with message `Harden HPR and MVR benchmark reliability`. The executed multiperiod notebook remains preserved and unstaged. No push or pull-request mutation was performed."
+**Context**: Requested local commit complete. This audit entry is included by amending that same commit; the final commit identifier supersedes the pre-amend identifier recorded by Git during creation.
+
+---
+
+## Notebook 10 HPR Screening Reliability - Initial Request
+**Timestamp**: 2026-09-25T02:00:44Z
+**User Input**:
+```text
+# Files pasted by the user:
+
+## "{'Carnot heat pump': {'turndown': TargetOutput(name='Crude HPR', period_id='tur…": /Users/timothyw/.codex/attachments/19aca391-900a-4012-ba96-18ba8db20274/pasted-text.txt
+
+## My request:
+Notebook #10 fails to solve with the error:
+```
+**AI Response**: "Started a focused brownfield bug-fix workflow, inspected the pasted output and executed notebook, and reproduced the three failed simulated HPR screens with their structured diagnostics."
+**Context**: New AI-DLC workflow. Notebook 10 is a packaged slow-HPR tutorial. The working-tree notebook contains user-executed outputs and is preserved pending an explicit output-handling decision.
+
+---
+
+## Notebook 10 HPR Screening Reliability - Workspace Detection and Reproduction
+**Timestamp**: 2026-09-25T02:00:44Z
+**AI Response**: "Confirmed current reverse-engineering artifacts and existing HPR owners. Exact replay showed 1,174 failed CoolProp candidates for vapour-compression heat pumping, 1,174 for vapour-compression refrigeration, and 1,336 for VC+MVR, all categorized as physical infeasibility under inherited default topology and search limits. An explicit single-stage configuration with maximum_iterations=20 and maximum_evaluations=50 solved all three methods across turndown, base, and peak in 14.3 seconds."
+**Context**: Brownfield workspace detection complete; reverse engineering refresh is not required. Requirements Analysis is standard depth because notebook output handling and diagnostic presentation require user decisions. Security and Resiliency remain provisionally disabled and full PBT provisionally enabled pending answers.
+
+---
+
+## Notebook 10 HPR Screening Reliability - Requirements Questions
+**Timestamp**: 2026-09-25T02:00:44Z
+**AI Prompt**: "Please complete all six `[Answer]:` tags in `aidlc-docs/inception/requirements/notebook-10-hpr-screening-reliability-questions.md`."
+**Context**: Requirements question gate. No application, generator, notebook source, or test implementation has been changed.
+
+---
+
+## Notebook 10 HPR Screening Reliability - Q1 Discussion
+**Timestamp**: 2026-09-25T02:07:00Z
+**User Input**: "Q1 needs more discussion"
+**AI Response**: "Expanded Question 1 to distinguish successful workflow demonstration from engineering feasibility screening. Added four mutually exclusive choices: a recommended two-tier tutorial, a success-only tutorial, a feasibility-led tutorial, and a minimal three-call correction. Recorded the evidence that the inherited complex cascade fails while explicit bounded single-stage configurations solve every period."
+**Context**: Requirements Analysis question refinement. Questions 2 through 6 are answered A, A, B, A, B respectively. Question 1 remains pending; no implementation files changed.
+
+---
+
+## Notebook 10 HPR Screening Reliability - Shared Optimisation Discussion
+**Timestamp**: 2026-09-25T02:09:42Z
+**User Input**: "What about running Run bounded single-stage VC, refrigeration, and MVR configurations that solve across all three periods as an optimisat?"
+**AI Response**: "Confirmed that shared-design multiperiod HPR optimization is supported and better matches the notebook's study question. Real bounded probes solved shared designs for all five Carnot, VC, refrigeration and VC+MVR methods across turndown, base and peak. Updated Question 1 to distinguish one shared installed design from independently retuned per-period designs."
+**Context**: Requirements Analysis question refinement. The shared objective uses weighted operating cost and feasibility penalty plus peak annualized capital cost. Each technology is optimized separately; there is no single meta-optimization selecting among technologies. Question 1 remains pending; no implementation files changed.
+
+---
+
+## Notebook 10 HPR Screening Reliability - Requirements Decisions Complete
+**Timestamp**: 2026-09-25T02:12:55Z
+**User Input**: "Proceed"
+**AI Response**: "Recorded Question 1 as option A: bounded shared-design multiperiod optimization for all five technologies as the main workflow, followed by one optional advanced cascade feasibility screen. Finalized the standard-depth requirements using the completed output, diagnostics, and extension decisions."
+**Context**: Requirements Analysis. All six answers are complete. Property-Based Testing is enabled in full; Security Baseline and Resiliency Baseline are disabled. No application, generator, notebook, or test implementation changed.
+
+---
+
+## Notebook 10 HPR Screening Reliability - Requirements Approval Prompt
+**Timestamp**: 2026-09-25T02:14:04Z
+**AI Response**: "Presented the completed Notebook 10 HPR Screening Reliability requirements for explicit review."
+**Context**: Requirements Analysis approval gate. Workflow Planning and implementation remain blocked pending explicit approval.
+
+---
+
+## HPR and MVR Notebook Reliability - Scope Expansion
+**Timestamp**: 2026-09-25T02:17:02Z
+**User Input**: "Expand the scope to all notebooks involving HPR / MVR targeting to ensure they work properly too."
+**AI Response**: "Reopened Requirements Analysis and expanded the static inventory to every generated notebook that invokes HPR or MVR targeting. Identified notebooks 08, 09, 10, and 11 as the applicable slow-HPR tutorial set and began baseline execution analysis."
+**Context**: Requirements revision. The prior Notebook 10 approval prompt is superseded. No application, generator, notebook, or test implementation changed.
+
+---
+
+## HPR and MVR Notebook Reliability - Expanded Baseline Evidence
+**Timestamp**: 2026-09-25T02:24:32Z
+**AI Response**: "Inventoried and exercised all four HPR/MVR targeting notebooks. Notebook 08 completed; Notebook 09 completed while masking a VC refrigeration failure and using inherited work limits; Notebook 10 remained in optimizer work until the combined profile was interrupted after 243 seconds; Notebook 11 completed in approximately 3.3 seconds. Verified bounded 20-iteration/50-evaluation settings solve Notebook 08's two Carnot calls and Notebook 09's required CoolProp heat-pump and refrigeration calls."
+**Context**: Requirements Analysis evidence. The diagnostic profile was intentionally interrupted at Notebook 10 after reproducing its unbounded behavior. No source notebook, generator, runtime, or test implementation changed.
+
+---
+
+## HPR and MVR Notebook Reliability - Expanded Requirements Approval Prompt
+**Timestamp**: 2026-09-25T02:24:32Z
+**AI Response**: "Expanded the requirements and acceptance criteria to generated notebooks 08, 09, 10, and 11, including distinct required and optional outcomes, explicit optimization caps, compact presentation, and separately attributable notebook execution tests."
+**Context**: Requirements Analysis approval gate. Property-Based Testing remains enabled in full; Security Baseline and Resiliency Baseline remain disabled. Workflow Planning and implementation remain blocked pending explicit approval.
+
+---
+
+## HPR and MVR Notebook Reliability - Requirements Approval
+**Timestamp**: 2026-09-25T02:26:43Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded approval of the expanded requirements and proceeded to Workflow Planning."
+**Context**: Requirements Analysis approved. User Stories remain skipped by prior user direction. No implementation changed.
+
+---
+
+## HPR and MVR Notebook Reliability - Workflow Plan Approval Prompt
+**Timestamp**: 2026-09-25T02:28:22Z
+**AI Response**: "Created a one-unit execution plan with NFR Requirements, NFR Design, Code Generation, and Build and Test selected; Application Design, Units Generation, Functional Design, Infrastructure Design, and Operations are skipped or N/A."
+**Context**: Workflow Planning approval gate. The plan sequences generator changes, four source-only notebooks, coverage metadata and guidance, per-notebook execution tests, PBT, and broad verification. Implementation remains blocked pending explicit approval.
+
+---
+
+## HPR and MVR Notebook Reliability - Workflow Plan Approval
+**Timestamp**: 2026-09-25T02:36:25Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded workflow-plan approval and started NFR Requirements for the HPR and MVR Notebook Reliability unit."
+**Context**: Workflow Planning approved. NFR Requirements is the next selected construction stage; no implementation changed.
+
+---
+
+## HPR and MVR Notebook Reliability - NFR Requirements Approval Prompt
+**Timestamp**: 2026-09-25T02:36:25Z
+**AI Response**: "Defined measurable NFR requirements for optimizer caps, explicit topology, required and optional outcomes, shared-design completeness, bounded diagnostics, compact output, deterministic source-only generation, per-notebook test attribution, and layered verification. Retained the existing stack."
+**Context**: NFR Requirements approval gate. Property-Based Testing is compliant; disabled Security and Resiliency extensions are N/A. NFR Design remains blocked pending explicit approval.
+
+---
+
+## HPR and MVR Notebook Reliability - NFR Requirements Approval
+**Timestamp**: 2026-09-25T02:46:57Z
+**User Input**: "Continue to Next Stage"
+**AI Response**: "Recorded NFR Requirements approval and proceeded to NFR Design."
+**Context**: NFR Requirements approved. The measurable work limits, reliability boundaries, deterministic generation, compact output, test attribution, and retained stack are now design inputs.
+
+---
+
+## HPR and MVR Notebook Reliability - Continuation Direction
+**Timestamp**: 2026-09-25T02:47:59Z
+**User Input**: "Keep going until there is a question for me to respond to."
+**AI Response**: "Continued through NFR Design and stopped at its mandatory review choice."
+**Context**: NFR Design execution direction. No additional clarification was needed because every mandatory design category was resolved by approved requirements or an explicit N/A rationale.
+
+---
+
+## HPR and MVR Notebook Reliability - NFR Design Approval Prompt
+**Timestamp**: 2026-09-25T02:48:41Z
+**AI Response**: "Mapped all NFRs to explicit notebook call matrices, fresh-problem shared-design isolation, required-versus-optional exception boundaries, plain-data summaries, deterministic regeneration, per-notebook execution tests, synchronized guidance, and Property-Based Testing seams."
+**Context**: NFR Design approval gate. Security and Resiliency remain disabled and N/A. Code Generation planning remains blocked pending explicit approval.
+
+---
+
+## HPR and MVR Notebook Reliability - NFR Design Approval
+**Timestamp**: 2026-09-25T03:39:09Z
+**User Input**: "Continue to Next Stage"
+**AI Response**: "Recorded NFR Design approval and proceeded to Code Generation Part 1 planning."
+**Context**: NFR Design approved. No application, generator, notebook, test, or user documentation implementation changed.
+
+---
+
+## HPR and MVR Notebook Reliability - Code Generation Plan Approval Prompt
+**Timestamp**: 2026-09-25T03:39:52Z
+**AI Response**: "Created a fourteen-step test-first Code Generation plan covering brownfield preservation, generator-owned helpers, notebooks 08 through 11, source-only regeneration, metadata and guidance synchronization, per-notebook execution attribution, property tests, focused real execution, audit, and summary."
+**Context**: Code Generation Part 1 approval gate. Implementation remains blocked pending explicit approval of the complete plan.
+
+---
+
+## HPR and MVR Notebook Reliability - Code Generation Plan Approval
+**Timestamp**: 2026-09-25T03:47:35Z
+**User Input**: "**Approve & Begin Code Generation** "
+**AI Response**: "Recorded approval of all fourteen Code Generation steps and began implementation with brownfield preservation and baseline checks."
+**Context**: Code Generation Part 2 authorized. The pre-existing Notebook 10 execution-only diff contained 243 added and 26 removed lines and is explicitly approved for replacement during canonical regeneration. The fast generator repeatability and notebook compilation/import baseline passed 2 tests. No unrelated user change was found.
+
+---
+
+## HPR and MVR Notebook Reliability - Code Generation Completion Prompt
+**Timestamp**: 2026-09-25T04:18:28Z
+**AI Response**: "Completed all fourteen approved Code Generation steps. Regenerated and validated notebooks 08 through 11, synchronized documentation and coverage metadata, added separately attributable execution and property tests, and completed the generated-code audit. Four real slow-HPR notebook cases, 165 focused HPR/MVR regressions, 49 static/property/docs/coverage checks, and 11 base notebook executions pass; Ruff and patch hygiene pass. Requested review with the standardized Request Changes or Continue to Next Stage choice."
+**Context**: Code Generation Part 2 complete for HPR and MVR Notebook Reliability. Property-Based Testing is compliant; disabled Security and Resiliency extensions are N/A. Code Generation remains at its mandatory approval gate before Build and Test.
+
+---
+
+## HPR and MVR Notebook Reliability - Code Generation Review Change
+**Timestamp**: 2026-09-25T05:17:02Z
+**User Input**: "Update RTD"
+**AI Response**: "Reopened Code Generation to extend the Read the Docs sources with the bounded HPR/MVR and shared-design multiperiod contracts, then validate the warnings-as-errors RTD build."
+**Context**: User requested changes at the Code Generation review gate. Existing generated notebook behavior remains approved implementation scope; Build and Test remains blocked until the revised generated code and documentation are reviewed.
+
+---
+
+## HPR and MVR Notebook Reliability - Revised Code Generation Completion Prompt
+**Timestamp**: 2026-09-25T05:21:29Z
+**AI Response**: "Updated the RTD fundamentals, public HPR reference, capability matrix, support and stability boundary, and release notes. Added focused drift assertions; all 25 documentation consistency and tutorial coverage tests pass, the Sphinx 9.1 HTML build passes with warnings treated as errors, Ruff passes, and patch hygiene passes. Requested review of the revised Code Generation output."
+**Context**: Code Generation review change complete. The local RTD HTML artifact is available under docs/_build/html. Code Generation remains at its mandatory approval gate before Build and Test.
+
+---
+
+## HPR and MVR Notebook Reliability - Revised Code Generation Approval
+**Timestamp**: 2026-09-25T05:22:52Z
+**User Input**: "Continue to Next Stage"
+**AI Response**: "Recorded approval of the revised Code Generation output and proceeded to Build and Test."
+**Context**: Code Generation approved after the RTD update. Build and Test is active.
+
+---
+
+## HPR and MVR Notebook Reliability - Build and Test Completion Prompt
+**Timestamp**: 2026-09-25T05:45:44Z
+**AI Response**: "Completed Build and Test. The CI-equivalent non-solver gate passed 3,455 tests with six expected opt-in skips, four external-solver deselections, zero failures, and 96% branch coverage. Four real HPR/MVR notebooks, 192 focused HPR/MVR integration tests, warning-strict RTD, wheel and source distribution builds, and an isolated installed-wheel smoke passed. Generated and validated the workflow-specific build, unit, integration, end-to-end, performance, and summary instructions. Requested the standardized Request Changes or Approve and Continue review choice."
+**Context**: Build and Test completion gate. Property-Based Testing is compliant; disabled Security and Resiliency extensions are N/A. Operations remains blocked pending explicit approval.
+
+---
+
+## HPR and MVR Notebook Reliability - Build and Test Approved
+**Timestamp**: 2026-09-25T05:46:47Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded Build and Test approval and evaluated the Operations placeholder. No deployment, infrastructure, monitoring, publication, or external-system work applies, so Operations is N/A and the workflow is complete."
+**Context**: Build and Test approved. Operations is a placeholder under the active AI-DLC rules and requires no action for this notebook, test, and documentation workflow. Property-Based Testing remains compliant; disabled Security and Resiliency extensions remain N/A.
+
+---
+
+## HPR and MVR Notebook Reliability - Workflow Complete
+**Timestamp**: 2026-09-25T05:46:47Z
+**AI Response**: "Completed the approved HPR/MVR notebook reliability workflow. Four real tutorials, 192 focused HPR/MVR integration tests, 3,455 CI-equivalent non-solver tests, 96% branch coverage, strict RTD, distributions, and isolated installed-wheel verification all pass. Operations is N/A."
+**Context**: Final workflow state. No deployment, publication, infrastructure mutation, commit, push, or merge was performed during this final transition.
+
+---
+
+## HPR and MVR Notebook Reliability - Commit Authorization
+**Timestamp**: 2026-09-25T05:48:30Z
+**User Input**: "Commit"
+**AI Response**: "Resolved the completed workflow file set on develop, excluded the ignored .DS_Store artifact, rechecked patch hygiene, and prepared a local commit containing the approved HPR/MVR notebooks, generator, tests, RTD, coverage metadata, and AI-DLC records."
+**Context**: Local commit authorized. No push, pull request, merge, deployment, or publication is authorized by this instruction.
+
+---
+
+## Test-Suite Runtime Reduction - Workspace Detection
+**Timestamp**: 2026-09-25T06:48:18Z
+**User Input**: "Address the top 7 issues."
+**AI Response**: "Resumed the existing brownfield project, reused the current reverse-engineering baseline, and opened a focused workflow for the seven measured test-suite runtime hotspots."
+**Context**: INCEPTION - Workspace Detection. The preceding profile is the quantitative baseline. The worktree is clean on `develop` at `9fc34b68`. Security and Resiliency remain disabled; Property-Based Testing remains enabled.
+
+---
+
+## Test-Suite Runtime Reduction - Requirements Approval Prompt
+**Timestamp**: 2026-09-25T06:48:18Z
+**AI Response**: "Created standard-depth requirements for bounding Notebook 19, consolidating utility-placement solves, removing TESPy and documentation duplication from the ordinary lane, isolating optimizer benchmarks, reducing overlapping CoolProp audit work, and batching fresh-process import assertions while preserving coverage and all robustness contracts."
+**Context**: INCEPTION - Requirements Analysis complete and awaiting explicit approval. No clarification file was needed because the user selected all seven issues from the immediately preceding measured audit. User Stories are provisionally skipped. Property-Based Testing is applicable to invariant preservation; disabled Security and Resiliency extensions are N/A.
+
+---
+
+## Test-Suite Runtime Reduction - Requirements Approval
+**Timestamp**: 2026-09-25T06:51:13Z
+**User Input**: "**Approve & Continue** "
+**AI Response**: "Recorded approval of the seven runtime-reduction requirements, skipped User Stories after the mandatory applicability assessment, and proceeded to Workflow Planning."
+**Context**: INCEPTION - Requirements Analysis approved. User Stories add no value for an internal test and CI performance refactor with explicit acceptance criteria and no user-facing behavior. Property-Based Testing remains enabled; Security and Resiliency remain disabled.
+
+---
+
+## Test-Suite Runtime Reduction - Workflow Plan Approval Prompt
+**Timestamp**: 2026-09-25T06:51:13Z
+**AI Response**: "Created a one-unit execution plan covering NFR Requirements, NFR Design, Code Generation, and Build and Test. Application Design, Units Generation, Functional Design, and Infrastructure Design are skipped because no production API, data model, business rule, component boundary, or deployment resource changes are required."
+**Context**: INCEPTION - Workflow Planning complete and awaiting explicit approval. The plan sequences baseline guards, bounded tutorial and optimizer work, safe fixture reuse, dedicated CI lanes, fresh-process batching, focused verification, and final serial profiling. Mermaid syntax was checked for valid node identifiers, quoted labels, balanced connections, and style declarations; a text alternative is included. Property-Based Testing is compliant; disabled Security and Resiliency extensions are N/A.
+
+---
+
+## Test-Suite Runtime Reduction - Workflow Plan Approval
+**Timestamp**: 2026-09-25T06:52:48Z
+**User Input**: "\\*\\*Approve & Continue\\*\\*&#x20;"
+**AI Response**: "Recorded workflow-plan approval and proceeded to NFR Requirements for the single test-suite runtime-reduction unit."
+**Context**: INCEPTION - Workflow Planning approved. NFR Requirements is the next selected stage. No test, tutorial, or CI implementation changed. Property-Based Testing remains enabled; Security and Resiliency remain disabled.
+
+---
+
+## Test-Suite Runtime Reduction - NFR Requirements Approval Prompt
+**Timestamp**: 2026-09-25T06:52:48Z
+**AI Response**: "Defined quantitative runtime budgets, single-owner CI lanes, the 95 percent branch-coverage floor, deterministic fixture isolation, complete specialized-test retention, timeout behavior, and the retained Python/pytest/Hypothesis/Coverage/GitHub Actions stack."
+**Context**: CONSTRUCTION - NFR Requirements complete and awaiting explicit approval. All eight NFR plan checkboxes were completed in the same interaction. No clarification questions were required because the approved requirements define the performance target, coverage floor, lane inventory, evidence constraints, and existing-stack boundary. Property-Based Testing is compliant; disabled Security and Resiliency extensions are N/A.
+
+---
+
+## Test-Suite Runtime Reduction - NFR Requirements Approval
+**Timestamp**: 2026-09-25T07:09:00Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded NFR Requirements approval and proceeded to NFR Design for the single test-suite runtime-reduction unit."
+**Context**: CONSTRUCTION - NFR Requirements approved. The runtime budgets, lane ownership, coverage floor, deterministic isolation, timeout, and retained-stack decisions are now design inputs.
+
+---
+
+## Test-Suite Runtime Reduction - NFR Design Approval Prompt
+**Timestamp**: 2026-09-25T07:09:00Z
+**AI Response**: "Mapped the approved NFRs to work-elimination, copy-on-consume fixture isolation, single-owner marker lanes, convergence-preserving search budgets, batched subprocess diagnostics, coverage protection, and fail-visible timeout patterns. Defined the exact logical owners and dependency sequence for all seven changes."
+**Context**: CONSTRUCTION - NFR Design complete and awaiting explicit approval. All nine NFR-design plan checkboxes were completed in the same interaction. Resilience, scalability, performance, security, and logical-component categories were evaluated; no questions were required because the approved NFRs resolve every applicable design choice and explicitly classify infrastructure/security concerns as N/A. Property-Based Testing is compliant; disabled Security and Resiliency extensions are N/A.
+
+---
+
+## Test-Suite Runtime Reduction - NFR Design Approval
+**Timestamp**: 2026-09-25T07:11:20Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded NFR Design approval and proceeded to Code Generation Part 1 planning."
+**Context**: CONSTRUCTION - NFR Design approved. The nine design patterns and logical component map are the implementation constraints. No source, test, notebook, or workflow implementation changed.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Plan Approval Prompt
+**Timestamp**: 2026-09-25T07:11:20Z
+**AI Response**: "Created a thirteen-step test-first implementation plan covering baseline preservation, contract tests, central markers, three CI workflows, Notebook 19, utility-placement fixture isolation, CoolProp audit refinement, optimizer benchmarks, documentation ownership, batched child processes, focused verification, full coverage and specialized lanes, final profiling, and generated-code audit."
+**Context**: CONSTRUCTION - Code Generation Part 1 complete and awaiting explicit approval. The plan is the single source of truth for implementation. No production API or numerical algorithm change is planned. Property-Based Testing PBT-01, PBT-03, PBT-07, PBT-08, PBT-09, and PBT-10 remain applicable; Security and Resiliency are disabled and N/A.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Plan Approval
+**Timestamp**: 2026-09-25T07:14:35Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded approval of all thirteen Code Generation steps and began Part 2 with baseline preservation and implementation-boundary verification."
+**Context**: CONSTRUCTION - Code Generation Part 2 authorized. The worktree contains only the current workflow records, branch is `develop`, HEAD is `9fc34b68`, and the locked runtime is Python 3.14.2. The approved 3,455-pass, 600.89-second uninstrumented and 762.76-second coverage baselines plus all seven hotspot timings are recorded in requirements. Existing assertions and CI owners were inventoried; no production API or numerical source change is required before test and workflow implementation.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 2
+**Timestamp**: 2026-09-25T07:14:35Z
+**AI Response**: "Added red contracts for central marker registration, single-owner specialized CI lanes, Notebook 19 search caps, copy-isolated solved placement evidence, and batched import failure attribution. The focused pre-change run produced the intended five failures and one missing-fixture error."
+**Context**: CONSTRUCTION - Code Generation Step 2 complete. Failures correspond exactly to unregistered markers, old CI commands, unbounded Notebook 19 settings, absent shared placement fixture, and absent import-batch helper. No unexpected failure was observed. Property-Based Testing remains enabled with existing generators and shrinking untouched.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 3
+**Timestamp**: 2026-09-25T07:14:35Z
+**AI Response**: "Registered docs and performance markers, excluded TESPy/performance/docs from the ordinary lane, made TESPy execute once under a command timeout, added dedicated performance jobs, routed docs through the pytest smoke, and connected performance results to PR and release gates in all three workflows."
+**Context**: CONSTRUCTION - Code Generation Step 3 complete. All 37 packaging workflow contracts pass and the three edited CI YAML files parse successfully. The docs and performance tests are marked in later plan steps; workflow selection is intentionally completed first. No production source changed.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 4
+**Timestamp**: 2026-09-25T07:14:35Z
+**AI Response**: "Probed two bounded Notebook 19 profiles and selected the smaller fixed-seed 5-iteration, 10-evaluation, 1-candidate, 1-run profile after it retained feasible, finite, zero-fallback process and site solutions. Added visible termination metadata, regenerated the source-only notebook, and passed its contracts, real execution, and canonical drift check."
+**Context**: CONSTRUCTION - Code Generation Step 4 complete. Notebook 19 real execution is 6.45 seconds versus the 44.51-second baseline and the 20-second target. Process objective is approximately 0.047881 kW/K; site objective is approximately 0.637136 kW/K; both results are feasible with zero fallback penalty. Three focused notebook tests and the generator drift test pass.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 5
+**Timestamp**: 2026-09-25T07:14:35Z
+**AI Response**: "Added module-scoped real process and site placement evidence, converted matching consumers to deep-copy isolation, retained independent optimizer coverage, and added a source-preservation regression."
+**Context**: CONSTRUCTION - Code Generation Step 5 complete. All 50 tests in `test_utility_placement.py` pass in 89.08 seconds versus 105.13 seconds before consolidation. Canonical source input and detached result payloads remain unchanged after representative targeting, option mutation, plotting, workspace addition, and reversed scope consumption. Step 6 continues because the focused 75-second target is not yet met.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 6
+**Timestamp**: 2026-09-25T07:14:35Z
+**AI Response**: "Reduced the common test search allowance from 100 to 20 evaluations, cached immutable baseline input construction for utility-inference properties, reduced redundant generated permutation examples from six to three, and consolidated the remaining repeated isothermal placement evidence."
+**Context**: CONSTRUCTION - Code Generation Step 6 complete. Hypothesis, shrinking, constrained permutation strategies, seed 20260715, and explicit real process/site optimizer examples remain. All 50 main utility-placement tests pass in 79.03 seconds, a 24.8 percent reduction from 105.13 seconds; the 75-second guide is exceeded by 4.03 seconds but is permitted if the final 480-second suite target is met. The five batch tests also pass; the combined pair completes in 83.35 seconds.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 7
+**Timestamp**: 2026-09-25T07:14:35Z
+**AI Response**: "Reduced the representative CoolProp audit to 2 iterations and 20 evaluations for single-stage/public cases, 30 evaluations for multistage VC cases, and the empirically required 60 evaluations for the multistage MVR topology. Retained every audit parameter and the complete E2E corpus."
+**Context**: CONSTRUCTION - Code Generation Step 7 complete. A 30-evaluation MVR cascade probe failed visibly and was raised to the smallest tested passing 60-evaluation budget. All 14 CoolProp audit cases pass in 25.30 seconds versus 43.87 seconds and the 30-second target. The unchanged E2E file passes 55 tests in 48.33 seconds, comprising all 54 standard benchmark/profile cases plus the dedicated direct process-MVR case.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 8
+**Timestamp**: 2026-09-25T07:14:35Z
+**AI Response**: "Marked the two cross-backend convergence benchmarks as performance tests and reduced their fixed-seed profiles from 4 runs, 45 iterations, and 15,000 evaluations to 2 runs, 25 iterations, and 5,000 evaluations while retaining all four backend quality and relative-tolerance assertions."
+**Context**: CONSTRUCTION - Code Generation Step 8 complete. The dedicated performance selection passes 2 tests with 3,468 ordinary tests deselected. Measured call time remains approximately 33.66 seconds because backend/process overhead dominates the reduced budgets; the primary improvement is removal from the ordinary critical lane, not a claimed benchmark runtime reduction.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 9
+**Timestamp**: 2026-09-25T07:14:35Z
+**AI Response**: "Marked the Sphinx smoke as the docs lane owner and verified that all three docs jobs now invoke `pytest -m docs` once instead of directly launching a duplicate build."
+**Context**: CONSTRUCTION - Code Generation Step 9 complete. The dedicated docs selection passes one test in 15.12 seconds, invoking the existing warning-strict, keep-going Sphinx builder and verifying `index.html`. The ordinary lane excludes the marker and the workflow contract prohibits direct duplicate `scripts/build_docs.py` commands.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 10
+**Timestamp**: 2026-09-25T07:14:35Z
+**AI Response**: "Collapsed eight compatible layer cold-import processes into one ordered child and five retired-package processes into one child, preserving separate root-export and default-TESPy pristine processes. Added direct failure-attribution coverage naming the logical case and module."
+**Context**: CONSTRUCTION - Code Generation Step 10 complete. Thirty-nine cold-import, API-boundary, marker, and dependency tests pass in 18.53 seconds versus the 34.58-second aggregated baseline and the 20-second target. Batched failures retain case/module or package attribution through captured stderr.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 11
+**Timestamp**: 2026-09-25T07:14:35Z
+**AI Response**: "Completed focused verification across workflow/marker contracts, Notebook 19 generation and execution, placement fixture isolation and properties, the CoolProp audit, the complete HPR/MVR E2E corpus, batched architecture checks, YAML parsing, Ruff lint/format, and patch hygiene."
+**Context**: CONSTRUCTION - Code Generation Step 11 complete. Marker collection partitions all 3,459 tests exactly into 3,394 ordinary, 61 specialized TESPy/performance/docs, and 4 solver cases. Thirteen focused workflow/tutorial contracts pass; prior focused gates pass 50 placement, 5 batch, 14 CoolProp audit, 55 HPR/MVR E2E, 39 architecture, 2 performance, and 1 docs cases. Ruff and `git diff --check` pass after mechanical formatting.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 12
+**Timestamp**: 2026-09-25T08:09:52Z
+**AI Response**: "Completed the ordinary coverage gate, all specialized marker selections, solver selection, distribution builds, packaged notebook verification, and an isolated installed-wheel smoke."
+**Context**: CONSTRUCTION - Code Generation Step 12 complete. The ordinary branch-aware selection passes 3,390 tests with 6 expected optional-profile skips and 65 intentional deselections at the configured 95 percent threshold in 434.68 seconds. Dedicated selections pass 58 TESPy tests in 58.23 seconds, 2 performance plus 1 docs test in 45.41 seconds, and 3 solver tests with 1 existing environment-dependent skip in 99.63 seconds. The wheel and source distribution contain Notebook 19; the core wheel imports from the isolated environment and passes its package, resource, CLI, and targeting smoke. No specialized marker is orphaned or duplicated in the ordinary lane.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Step 13
+**Timestamp**: 2026-09-25T08:09:52Z
+**AI Response**: "Re-profiled the complete ordinary selection, audited all seven remediations and assertion boundaries, corrected a final formatting drift, and created the code-generation summary."
+**Context**: CONSTRUCTION - Code Generation Step 13 complete. The uninstrumented serial selection passes 3,390 tests with 6 expected skips and 65 intentional deselections in 383.17 seconds versus the 600.89-second baseline: 217.72 seconds and 36.2 percent faster, with 96.83 seconds of margin under the 480-second threshold. Notebook 19 is 6.06 seconds, utility placement is 65.63 seconds, the CoolProp audit is 22.82 seconds, and the focused fresh-process set is 18.53 seconds. All 54 standard HPR/MVR cases plus direct MVR remain. No production module, public API, duplicate brownfield file, hidden retry, or unexpected skip was introduced. Final Ruff, patch hygiene, and 72 workflow/notebook contract tests pass. Property-Based Testing is compliant; disabled Security and Resiliency extensions are N/A.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Review Prompt
+**Timestamp**: 2026-09-25T08:09:52Z
+**AI Response**: "Presented the completed runtime-reduction implementation for generated-code review and requested either changes or explicit approval to continue to Build and Test."
+**Context**: CONSTRUCTION - All thirteen Code Generation Part 2 steps are complete. Code Generation remains pending until the user approves the generated code. Build and Test has not started.
+
+---
+
+## Test-Suite Runtime Reduction - Code Generation Approval
+**Timestamp**: 2026-09-25T08:36:52Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded generated-code approval and began Build and Test instruction generation and final evidence consolidation."
+**Context**: CONSTRUCTION - Code Generation approved and complete. Build and Test is active. The completed local verification evidence remains authoritative; this stage documents reproducible build, unit, integration, performance, E2E, and artifact commands without re-running unchanged expensive lanes.
+
+---
+
+## Test-Suite Runtime Reduction - Build and Test Stage
+**Timestamp**: 2026-09-25T08:39:15Z
+**Build Status**: Success
+**Test Status**: Pass
+**Files Generated**:
+- build-instructions.md
+- unit-test-instructions.md
+- integration-test-instructions.md
+- performance-test-instructions.md
+- e2e-test-instructions.md
+- build-and-test-summary.md
+**AI Response**: "Updated the canonical Build and Test instructions for OpenPinch 0.6.9 and consolidated the successful build, coverage, specialized-lane, E2E, runtime, and artifact evidence."
+**Context**: CONSTRUCTION - Build and Test complete and awaiting explicit approval. The wheel and source distribution build, isolated core-wheel smoke, 3,390-pass ordinary coverage lane, 58-test TESPy lane, two-test performance lane, warning-strict docs lane, solver lane, 55-case HPR/MVR E2E file, Ruff, generator drift, workflow contracts, and patch hygiene all pass subject only to the documented expected optional/environment skips. Property-Based Testing is compliant; disabled Security and Resiliency extensions are N/A.
+
+---
+
+## Test-Suite Runtime Reduction - Build and Test Approval Prompt
+**Timestamp**: 2026-09-25T08:39:15Z
+**AI Response**: "Presented the completed Build and Test results and requested either instruction changes or explicit approval to proceed to Operations."
+**Context**: CONSTRUCTION - Build and Test artifacts and evidence are complete. Operations has not started.
+
+---
+
+## Test-Suite Runtime Reduction - Build and Test Approval
+**Timestamp**: 2026-09-25T08:44:09Z
+**User Input**: "Approve & Continue"
+**AI Response**: "Recorded Build and Test approval, evaluated the Operations placeholder, and completed the workflow."
+**Context**: CONSTRUCTION - Build and Test approved. OPERATIONS - N/A placeholder: this local Python library test/CI performance change introduces no deployment target, monitoring service, incident response process, or production runtime resource.
+
+---
+
+## Test-Suite Runtime Reduction - Workflow Complete
+**Timestamp**: 2026-09-25T08:44:09Z
+**AI Response**: "Closed the AI-DLC workflow with all seven performance findings addressed, all acceptance evidence passing, and Operations recorded as non-applicable."
+**Context**: Final state. Ordinary runtime is 383.17 seconds versus 600.89 seconds baseline, the 95 percent coverage threshold passes, complete HPR/MVR robustness evidence remains, specialized CI lanes are independently owned, artifacts install successfully, and no production API changed. Property-Based Testing is compliant; disabled Security and Resiliency extensions are N/A.
+
+---
+
+## Test-Suite Runtime Reduction - Commit Request
+**Timestamp**: 2026-09-25T08:45:29Z
+**User Input**: "Commit."
+**AI Response**: "Prepared the complete runtime-reduction implementation, tests, CI changes, generated notebook, and workflow records for one commit on develop."
+**Context**: Post-workflow repository handoff. The user authorized a local commit only; no push or pull-request mutation is authorized by this input.
+
+---
+
+## Test-Suite Runtime Reduction - Ubuntu CI Corrective Verification
+**Timestamp**: 2026-09-25T09:22:34Z
+**User Input**: "Tests are failing on Github develop branch."
+**AI Response**: "Inspected GitHub Actions run 36115057800 for develop SHA 32f30335, isolated three numerical search-budget portability failures, and reopened Code Generation for a bounded corrective Step 14."
+**Context**: The ordinary Ubuntu job failed 3 tests while TESPy, performance, docs, optional-install, build, and installed-artifact jobs passed. The multistage MVR audit exhausted the reduced two-iteration allowance without an optimum. The Feng utility-MVR and Pavao direct-MVR sentinels returned valid solutions but exposed only one viable search point, so they could not demonstrate convergence. Local probes show both sentinels produce multiple viable improving points at 32 evaluations; the correction will use a 48-evaluation sentinel-only allowance and restore the single multistage MVR audit to its previously Ubuntu-proven 3-iteration/150-evaluation bounds.
+
+---
+
+## Test-Suite Runtime Reduction - Ubuntu CI Correction Complete
+**Timestamp**: 2026-09-25T09:34:16Z
+**AI Response**: "Added an explicit sentinel-only MVR search policy, restored the multistage MVR audit's Ubuntu-proven allowance, and completed focused, repeated, full-lane, coverage, lint, formatting, and patch verification."
+**Context**: Corrective Code Generation Step 14 complete. The three exact GitHub failures plus helper contracts pass in a 15-test selection. The complete 14-case CoolProp audit and 55-case HPR/MVR E2E file pass twice, 69 tests in 74.17 and 77.15 seconds. The exact ordinary branch-coverage lane passes 3,391 tests with 6 expected skips, 65 intentional deselections, and 95 percent coverage in 407.67 seconds. The two MVR sentinels alone receive 48 evaluations/96 observations; all other standard assignments retain reduced budgets. The multistage MVR audit alone returns to 3 iterations/150 evaluations. Ruff and patch hygiene pass, and no production module or CI workflow changed. Independent Ubuntu confirmation requires a new GitHub Actions run after commit and push.
+
+---
+
+## Test-Suite Runtime Reduction - Ubuntu CI Correction Commit Request
+**Timestamp**: 2026-09-25T09:35:51Z
+**User Input**: "commit"
+**AI Response**: "Prepared the bounded Ubuntu HPR/MVR portability correction, regression contract, and corrective workflow evidence for a local commit on develop."
+**Context**: The user authorized a local commit of the verified correction. No push or other remote mutation is authorized by this input.
+
+---
+
+## HPR/MVR Reliability - Pull Request Creation
+**Timestamp**: 2026-09-25T10:40:06Z
+**User Input**: "Create PR"
+**AI Response**: "Verified that no open develop-to-main pull request exists and prepared the completed HPR/MVR reliability, notebook, E2E benchmark, runtime-reduction, and Ubuntu portability work for review against main."
+**Context**: Post-workflow repository handoff. The user authorized publishing the completed develop branch and creating a GitHub pull request targeting main.
 
 ---

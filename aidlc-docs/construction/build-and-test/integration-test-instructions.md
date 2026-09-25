@@ -1,79 +1,59 @@
-# Integration Test Instructions - RTD and Comprehensive HPR Notebook
+# Integration Test Instructions - Test-Suite Runtime Reduction
 
 ## Purpose
 
-Verify that the three HPR units work together through current targeting,
-reporting, public accessors, multi-period boundaries, resources, documentation,
-and installed distributions without coupling OpenPinch to OpenUtility.
+Verify that targeting, utility placement, generated tutorials, CI lane
+contracts, optional simulation engines, documentation, and packaged artifacts
+continue to interact correctly after repeated work was removed.
 
-## Scenario 0: Generated Notebook and RTD Ownership
-
-- Description: regenerate notebook 09, verify byte idempotence, compile every
-  cell, audit its public imports and operations, and build RTD with warnings as
-  errors.
-- Command: `uv run pytest -q tests/packaging/test_notebooks.py tests/packaging/test_tutorial_coverage.py tests/packaging/test_docs_consistency.py`.
-- Expected: notebook 09 owns the complete target-record-map-export example,
-  every one of 197 public operations maps to executable notebook source, and
-  the documented backend/mixture/OpenUtility boundary is consistent.
-- Cleanup: documentation output should be written to a temporary directory.
-
-## Scenario 1: Target Selection to Winning Record
-
-- Description: compare omitted and explicit CoolProp behavior, then prove
-  explicit TESPy candidate thermodynamics determine the returned heat-pump or
-  refrigeration target.
-- Command: `uv run pytest -q tests/analysis/heat_pumps/test_hpr_tespy_targeting_integration.py tests/analysis/heat_pumps/test_hpr_tespy_target_evaluator.py`.
-- Expected: CoolProp compatibility oracles pass; supported TESPy scalar targets
-  contain a detached winning record; no fallback or engine object leaks.
-- Cleanup: evaluator sessions close exactly once and call-local caches clear.
-
-## Scenario 2: Winning Target to Plain Performance Map
-
-- Description: convert the winning record to a target-owned basis and generate
-  an atomic schema 1.0 map with the same backend and provenance.
-- Command: `uv run pytest -q tests/analysis/heat_pumps/test_hpr_target_basis.py tests/application/test_hpr_performance_map_accessor.py`.
-- Expected: target, backend, record, basis, map, and JSON round trip remain
-  consistent; incompatible or aggregate targets fail before simulation.
-- Cleanup: no persistent cache or temporary model state remains.
-
-## Scenario 3: Period and Batch Boundaries
-
-- Description: verify selected-period and independent all-period targeting,
-  canonical ordering, isolated failure behavior, and shared-vector TESPy
-  rejection.
-- Command: `uv run pytest --hypothesis-seed=20260715 -q tests/application/test_hpr_period_batch_boundaries.py tests/analysis/heat_pumps/test_multiperiod_hpr.py`.
-- Expected: each scalar target owns its record, weighted aggregates fabricate no
-  record, and batch failures do not mutate sibling cases.
-- Cleanup: none; cases and outputs are detached.
-
-## Scenario 4: Documentation, Architecture, and Packaging
+## Scenario 1: Utility Placement and Notebook 19
 
 ```bash
-uv run pytest -q tests/architecture tests/packaging
-uv run sphinx-build -W --keep-going -b html docs /tmp/openpinch-rtd-html
-uv run ruff check .
-git diff --check
+uv run --no-sync pytest --hypothesis-seed=20260715 -q \
+  tests/application/test_utility_placement.py \
+  tests/application/test_utility_placement_batch.py \
+  tests/packaging/test_notebooks.py::test_utility_placement_has_one_executable_thermodynamic_notebook \
+  tests/packaging/test_notebooks.py::test_utility_placement_notebook_uses_a_bounded_demonstration_search \
+  tests/packaging/test_notebooks.py::test_base_profile_notebook_executes\[19_utility_placement_optimisation.ipynb\]
 ```
 
-Expected results are a clean dependency firewall, cold core imports, exact API
-inventory, byte-identical resources, warning-free documentation, and no patch
-hygiene findings.
+Expected result: the shared solved evidence remains copy-isolated, real process
+and site optimization remains covered, and Notebook 19 produces feasible,
+finite, zero-fallback solutions under the bounded search.
 
-## Complete Repository Regression
-
-Run all tests with the configured solver environment and fixed Hypothesis seed:
+## Scenario 2: CoolProp and TESPy Service Boundaries
 
 ```bash
-uv run pytest --hypothesis-seed=20260715
+uv run --no-sync pytest --hypothesis-seed=20260715 -q \
+  tests/application/test_coolprop_hpr_audit.py \
+  tests/e2e/test_hpr_mvr.py
+uv run --no-sync pytest --hypothesis-seed=20260715 -q -m tespy
 ```
 
-The TESPy-marked selection and dedicated 300-second public target-to-map smoke
-must also pass in CI and locally where the optional extra is installed.
+Expected result: 14 CoolProp audit cases and 55 HPR/MVR E2E cases pass; the
+complete TESPy selection passes in its optional-engine environment.
 
-## Clean Notebook Execution
+## Scenario 3: CI and Marker Contracts
 
-Execute only notebook 09 from a clean temporary directory, compiling and
-running each code cell in order. Numerical infeasibility is an accepted guarded
-screening outcome; an uncaught exception, backend relabeling, fallback, or
-partial map is a failure. The successful map branch is independently required
-to pass in the real TESPy public smoke.
+```bash
+uv run --no-sync pytest --hypothesis-seed=20260715 -q \
+  tests/packaging/test_packaging_metadata.py \
+  tests/packaging/test_reuse_develop_ci.py
+```
+
+Expected result: the ordinary selection excludes `solver`, `tespy`,
+`performance`, and `docs`; each specialized category has exactly one workflow
+owner and participates in the required PR/release gates.
+
+## Scenario 4: Distribution Boundary
+
+Build both distributions, install the wheel outside the checkout, then execute
+`scripts/artifact_install_smoke.py` as described in `build-instructions.md`.
+The installed package must expose Notebook 19 and must not resolve imports from
+the source checkout.
+
+## Cleanup
+
+Test temporary directories are pytest-owned. Manually created wheel-smoke
+environments under `/tmp` can be removed after verification. Build artifacts in
+`dist/` are reproducible and ignored by Git.

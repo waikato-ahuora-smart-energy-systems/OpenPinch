@@ -1,47 +1,58 @@
-# Performance Test Instructions - RTD and Comprehensive HPR Notebook
+# Performance Test Instructions - Test-Suite Runtime Reduction
 
-## Purpose
+## Requirements
 
-Validate bounded map generation, exact candidate caching, repeat-call resource
-stability, and the real public TESPy target-to-map profile. Network throughput
-and concurrent-user load are N/A because OpenPinch is a local library.
+- Ordinary uninstrumented serial selection: at most 480 seconds on the
+  profiling host with seed `20260715`.
+- Notebook 19: at most 20 seconds.
+- Utility-placement file: target 75 seconds or less.
+- CoolProp audit: at most 30 seconds.
+- Focused fresh-process architecture/API set: at most 20 seconds.
+- Coverage-instrumented time is reported separately from the uninstrumented
+  600.89-second baseline.
 
-## Performance Requirements
+Network throughput, concurrent-user load, and request stress testing are N/A:
+OpenPinch is a local scientific Python library and this change concerns test
+execution cost rather than a deployed service.
 
-- A 10,000-point fake map completes within 5 seconds and 256 MiB traced Python
-  memory.
-- Candidate handling is linear in callback count, with TESPy solves no greater
-  than exact cache misses.
-- The call-local LRU retains at most 512 values and adds less than 64 MiB traced
-  Python memory for maximum-size fake results.
-- Ten fake calls and at least three real guarded calls retain no engine object
-  after cleanup.
-- The public real TESPy target plus minimal map completes within 300 seconds.
-- Notebook 09 compiles and completes its guarded clean-directory study within
-  the same 300-second tutorial budget.
-- Execution inside one call is sequential; independent callers may use
-  process-level parallelism.
-
-## Run Performance and Lifecycle Tests
+## Run the Dedicated Convergence Benchmarks
 
 ```bash
-uv run pytest --hypothesis-seed=20260715 -q \
-  tests/analysis/heat_pumps/test_hpr_map_generation_properties.py \
-  tests/analysis/heat_pumps/test_hpr_target_candidate_cache.py \
-  tests/analysis/heat_pumps/test_hpr_simulator_stateful.py
+timeout 900s uv run --no-sync pytest --hypothesis-seed=20260715 \
+  -m performance --durations=20
 ```
 
-Run the guarded real profile; the test itself enforces the 300-second budget:
+Expected result: both four-backend convergence benchmarks pass under the fixed
+2-run, 25-iteration, 5,000-evaluation profile. A timeout is a hard failure.
+
+## Profile the Ordinary Lane
 
 ```bash
-uv run pytest -q \
-  tests/analysis/heat_pumps/test_hpr_tespy_target_evaluator.py::test_real_public_tespy_target_and_minimal_map_stay_within_smoke_budget
+uv run --no-sync pytest --hypothesis-seed=20260715 \
+  -m "not solver and not tespy and not performance and not docs" \
+  --durations=100 --junitxml=/tmp/openpinch-profile.xml -q
 ```
 
-## Analyze a Failure
+Run serially and without coverage for comparison with the baseline. Do not use
+parallel workers or compare a coverage-instrumented duration to this target.
 
-Rerun the isolated assertion on an otherwise idle machine. Distinguish wall-
-clock noise from a repeatable regression, then inspect cache counters, traced
-memory, retained weak references, and recorded target/map elapsed properties.
-Preserve exact keys, deterministic order, physical validation, and cleanup
-semantics when optimizing.
+## Verified Results
+
+| Area | Baseline | Result | Status |
+|---|---:|---:|---|
+| Ordinary selection | 600.89 s | 383.17 s | Pass, 36.2% faster |
+| Notebook 19 | 44.51 s | 6.06 s | Pass |
+| Utility placement | 105.13 s | 65.63 s | Pass |
+| CoolProp audit | 43.87 s | 22.82 s | Pass |
+| Fresh-process focused set | 34.58 s | 18.53 s | Pass |
+
+The dedicated TESPy selection completed in 58.23 seconds. The performance and
+documentation selections together completed in 45.41 seconds. These are
+separate CI lanes and are intentionally excluded from the ordinary critical
+path.
+
+## Regression Response
+
+If the ordinary lane exceeds 480 seconds, use JUnit testcase durations to group
+time by `classname`, compare the affected hotspot with this table, and optimize
+repeated setup rather than removing assertions or benchmark cases.

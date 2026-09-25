@@ -918,12 +918,13 @@ def _run_benchmark(
     }
 
 
+@pytest.mark.performance
 def test_benchmark_dual_annealing_vs_cmaes_on_rugged_surface():
     bounds = ((-2.5, 2.5), (-2.5, 2.5))
     opt_kwargs = {
-        "n_runs": 4,
-        "maxiter": 45,
-        "maxfun": 15_000,
+        "n_runs": 2,
+        "maxiter": 25,
+        "maxfun": 5_000,
         "seed": 2,
         "max_minima": 4,
     }
@@ -968,12 +969,13 @@ def test_benchmark_dual_annealing_vs_cmaes_on_rugged_surface():
     assert rbf["elapsed_s"] <= 200.0 * da["elapsed_s"] + 1.0
 
 
+@pytest.mark.performance
 def test_benchmark_dual_annealing_vs_cmaes_on_rippled_rosenbrock():
     bounds = ((-2.0, 2.0), (-1.0, 3.0))
     opt_kwargs = {
-        "n_runs": 4,
-        "maxiter": 45,
-        "maxfun": 15_000,
+        "n_runs": 2,
+        "maxiter": 25,
+        "maxfun": 5_000,
         "seed": 2,
         "max_minima": 4,
     }

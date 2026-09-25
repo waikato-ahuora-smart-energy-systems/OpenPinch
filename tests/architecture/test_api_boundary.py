@@ -7,8 +7,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 import OpenPinch
 import OpenPinch.domain.heat_exchanger as heat_exchanger
 import OpenPinch.domain.stream as stream
@@ -57,19 +55,30 @@ def test_utility_placement_uses_a_specialist_api_without_root_exports() -> None:
     assert not hasattr(OpenPinch, "normalize_utility_placement_request")
 
 
-@pytest.mark.parametrize("package_name", RETIRED_PACKAGES)
-def test_retired_package_imports_fail(package_name: str) -> None:
-    qualified_name = f"OpenPinch.{package_name}"
-    assert importlib.util.find_spec(qualified_name) is None
+def test_retired_package_imports_fail() -> None:
+    qualified_names = tuple(f"OpenPinch.{name}" for name in RETIRED_PACKAGES)
+    assert all(importlib.util.find_spec(name) is None for name in qualified_names)
+    code = f"""
+import importlib
 
+for qualified_name in {qualified_names!r}:
+    try:
+        importlib.import_module(qualified_name)
+    except ModuleNotFoundError:
+        continue
+    except Exception as error:
+        raise AssertionError(
+            f"retired package {{qualified_name!r}} failed with the wrong exception"
+        ) from error
+    raise AssertionError(f"retired package {{qualified_name!r}} remains importable")
+"""
     completed = subprocess.run(
-        [sys.executable, "-c", f"import {qualified_name}"],
+        [sys.executable, "-c", code],
         check=False,
         capture_output=True,
         text=True,
     )
-    assert completed.returncode != 0
-    assert "ModuleNotFoundError" in completed.stderr
+    assert completed.returncode == 0, completed.stderr
 
 
 def test_parent_owned_runtime_records_are_not_public() -> None:

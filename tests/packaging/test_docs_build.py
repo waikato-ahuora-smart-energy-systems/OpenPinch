@@ -13,6 +13,7 @@ import pytest
 from tests.support.paths import REPOSITORY_ROOT
 
 
+@pytest.mark.docs
 def test_sphinx_build_smoke(tmp_path: Path):
     if find_spec("sphinx") is None and which("uv") is None:
         pytest.skip("docs build requires sphinx or uv")

@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: CoolProp HPR and MVR Reliability — Audit complete
+- **Current Stage**: Test-Suite Runtime Reduction — Code Generation Step 12 of 13
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -27,6 +27,113 @@
 | Security Baseline | No | Utility Placement Requirements Analysis |
 | Property-Based Testing | Yes | Utility Placement Requirements Analysis |
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
+
+## Notebook 10 HPR Screening Reliability
+
+- [x] Workspace Detection: existing brownfield Python package confirmed;
+  current reverse-engineering artifacts are sufficient.
+- [x] Failure reproduction: Notebook 10's three simulated screens reproduce as
+  typed HPR failures after 1,174, 1,174, and 1,336 physically infeasible
+  candidates under the inherited 300-iteration/1,000,000-evaluation defaults.
+- [x] Feasibility probe: explicit one-condenser, one-evaporator, one-MVR-stage
+  configurations with 20 iterations and 50 evaluations solve all three methods
+  across `turndown`, `base`, and `peak` in the current environment.
+- [x] Requirements Analysis: all six decisions recorded; bounded shared-design
+  optimization is the main workflow for five technologies, followed by one
+  optional advanced cascade screen.
+- [x] Notebook 10-only requirements approval: superseded by the user's expanded
+  four-notebook scope before approval.
+- [x] Extension configuration: Property-Based Testing enabled in full;
+  Security Baseline and Resiliency Baseline disabled.
+- [x] User Stories: skipped because this focused technical tutorial correction
+  has direct acceptance criteria and the user stated stories are not needed.
+- Reverse Engineering, Application Design, Units Generation and Infrastructure
+  Design: provisionally skipped; existing owners and public APIs are sufficient.
+
+## HPR and MVR Notebook Reliability Scope Expansion
+
+- [x] Requirements reopened after the user expanded scope beyond Notebook 10.
+- [x] Static inventory identifies four generated slow-HPR notebooks with HPR or
+  MVR targeting: 08, 09, 10, and 11.
+- [x] Execute and diagnose the current four-notebook baseline: Notebook 08
+  succeeds; Notebook 09 masks an unbounded VC refrigeration failure; Notebook
+  10 remains in inherited optimizer work after four minutes; Notebook 11
+  succeeds in approximately 3.3 seconds.
+- [x] Bounded probes: Notebook 08 Carnot targets and Notebook 09 CoolProp VC heat
+  pump and refrigeration all solve with one stage, 20 iterations, and 50
+  evaluations.
+- [x] Revise requirements, acceptance criteria, and verification scope in
+  `inception/requirements/hpr-mvr-notebook-reliability-requirements.md`.
+- [x] Expanded requirements approved by the user.
+- [x] Workflow Planning complete in
+  `inception/plans/hpr-mvr-notebook-reliability-execution-plan.md`.
+- [x] Workflow plan approved by the user.
+- [x] NFR Requirements artifacts complete for the single construction unit.
+- [x] NFR Requirements approved by the user.
+- [x] NFR Design artifacts complete for the single construction unit.
+- [x] NFR Design approved by the user.
+- [x] Code Generation Part 1 plan complete with fourteen executable steps.
+- [x] Code Generation plan approved by the user.
+- [x] Code Generation Step 1: brownfield state and Notebook 10's approved
+  executed-output replacement boundary recorded; fast generator/static baseline
+  passed 2 tests.
+- [x] Code Generation Step 2: added static contracts for all four notebooks,
+  canonical source-only drift, and seeded bounded diagnostic JSON properties;
+  confirmed five expected failures against the pre-change notebooks.
+- [x] Code Generation Step 3: added generator-owned notebook-local helpers for
+  compact feasible summaries, bounded JSON-mode typed diagnostics, and distinct
+  optional dependency, unavailable-method, and infeasible statuses.
+- [x] Code Generation Step 4: bounded both Notebook 08 Carnot targets at a
+  one-stage 1/20/50 search, asserted successful targets, retained residual
+  utility analysis and plots, and replaced oversized target output with compact
+  evidence.
+- [x] Code Generation Step 5: made required Notebook 09 CoolProp heat-pump and
+  refrigeration solves direct and bounded, preserved target-owned map evidence,
+  and isolated TESPy and Brayton behind typed optional-status handling.
+- [x] Code Generation Step 6: rebuilt Notebook 10 around five fresh-problem,
+  scalar shared-design optimizations across the exact three-period set, added
+  finite/alignment/success evidence, and isolated one tighter optional cascade
+  behind bounded typed diagnostics.
+- [x] Code Generation Step 7: retained direct process-MVR lifecycle and
+  serial/parallel evidence, made the required VC+MVR topology and fluids
+  explicit, capped it at 1/3/50, removed catch-and-continue behavior, and
+  reduced review output to compact stage/work/loop evidence.
+- [x] Code Generation Step 8: canonically regenerated notebooks 08 through 11,
+  replacing Notebook 10's approved executed artifact; all four are source-only,
+  valid, compilable through public imports, generator-matched, and repeatable.
+- [x] Code Generation Step 9: synchronized notebook guidance, series catalog,
+  heat-pump workflow documentation, and generated coverage evidence; documented
+  independent all-period replay separately from scalar shared-design solving.
+- [x] Code Generation Step 10: factored notebook execution and exposed four
+  separately parameterized slow-HPR pytest cases with notebook and code-cell
+  attribution while retaining existing profile opt-in behavior.
+- [x] Code Generation Step 11: added seeded Hypothesis oracles for all four
+  notebook-local target summaries and bounded typed diagnostics plus explicit
+  optional-status examples; six property/example tests pass.
+- [x] Code Generation Step 12: 25 fast static/generator/property checks pass;
+  real notebook calls pass individually in 3.81 seconds (08), 5.55 seconds
+  (09), 16.89 seconds (10), and 1.65 seconds (11). Refinement removed an
+  invalid single-stage loop assertion and allowed shared targets without a
+  scalar `hpr_load` summary while retaining finite shared-design evidence.
+- [x] Code Generation Step 13: the combined slow-HPR profile passes 4 cases;
+  165 focused HPR/MVR benchmark, multiperiod, process-component, and CoolProp
+  regressions pass; 49 static/property/docs/coverage checks and 11 base-notebook
+  executions pass; Ruff and patch hygiene pass.
+- [x] Code Generation Step 14: final diff, generator ownership, source-only
+  notebooks, bounded error boundaries, absence of production API changes,
+  extension compliance, and unrelated-change preservation audited; generated
+  code summary created.
+- [x] Code Generation Part 2 implementation complete.
+- [x] Code Generation review change: updated HPR/MVR fundamentals, public API,
+  capability, stability, and release-note RTD sources; 25 consistency/coverage
+  tests and the warnings-as-errors Sphinx 9.1 HTML build pass.
+- [x] Code Generation generated-code approval received.
+- [x] Build and Test complete.
+- [x] Build and Test approval received.
+- [x] Operations: N/A. The phase is a workflow placeholder, and this notebook,
+  test, and documentation change requires no deployment, infrastructure,
+  monitoring, publication, or external-system action.
+- [x] HPR and MVR Notebook Reliability workflow complete.
 
 ## CoolProp HPR and MVR Reliability
 
@@ -65,6 +172,53 @@
   `construction/build-and-test/coolprop-hpr-mvr-reliability/build-and-test-summary.md`.
 - Enabled Property-Based Testing extension is compliant through all three units;
   disabled Security and Resiliency extensions are skipped.
+
+## HPR and MVR Benchmark E2E Reliability
+
+- [x] Workspace Detection: existing brownfield package and current architecture
+  artifacts confirmed; reverse engineering refresh is not required.
+- [x] Requirements questions answered: all 54 standard problems, bounded
+  six-profile rotation, dedicated packaged direct-MVR case, normal CI, full PBT,
+  and disabled Security/Resiliency.
+- [x] Requirements Analysis: approved by the user.
+- [x] User Stories: skipped for internal test/reliability work with no new user
+  workflow.
+- [x] Workflow Planning: approved by the user.
+- [x] Application Design and Units Generation: skipped; one cohesive test unit
+  within existing component boundaries.
+- [x] Functional Design: approved by the user.
+- [x] NFR Requirements: approved by the user.
+- [x] NFR Design: approved by the user.
+- [x] Code Generation Part 1: nine-step implementation plan approved by the
+  user.
+- [x] Code Generation Part 2: all nine implementation steps complete and
+  approved by the user.
+- [x] Build and Test: complete; 3,443 non-solver tests passed, three declared
+  optional-profile skips, four solver tests deselected, 96% branch-aware
+  coverage, 66 focused HPR/MVR tests passed, and build, documentation,
+  distribution, installed-wheel, static-quality and bounded-convergence gates
+  passed. Approved by the user.
+- [x] Operations: N/A. The phase is a workflow placeholder, and this test and
+  robustness change requires no deployment, infrastructure, monitoring,
+  publication, or external-system action.
+- Requirements: `inception/requirements/hpr-mvr-benchmark-e2e-requirements.md`.
+- Plan: `inception/plans/hpr-mvr-benchmark-e2e-execution-plan.md`.
+- Functional design:
+  `construction/hpr-mvr-benchmark-e2e/functional-design/`.
+- NFR requirements:
+  `construction/hpr-mvr-benchmark-e2e/nfr-requirements/`.
+- NFR design:
+  `construction/hpr-mvr-benchmark-e2e/nfr-design/`.
+- Code Generation plan:
+  `construction/plans/hpr-mvr-benchmark-e2e-code-generation-plan.md`.
+- Code Generation summary:
+  `construction/hpr-mvr-benchmark-e2e/code/code-generation-summary.md`.
+- Build and Test summary:
+  `construction/build-and-test/hpr-mvr-benchmark-e2e/build-and-test-summary.md`.
+- Extension compliance: Property-Based Testing compliant; disabled Security and
+  Resiliency extensions are N/A.
+- Workflow status: Complete. All approved implementation and local verification
+  work is finished; no external operational action was authorized or required.
 
 ## HPR Derived-Case API Refinement
 
@@ -2166,3 +2320,103 @@ refreshed reverse-engineering artifacts.
 - [ ] CONSTRUCTION - Unit 3 Code Generation Part 1 approved; seven-step Part 2 is active.
 - **Current stage**: Construction, Unit 3 Code Generation Part 2, Step 1 of 7.
 - **Extensions**: Property-Based Testing enabled. Security and Resiliency disabled.
+
+## Test-Suite Runtime Reduction
+
+- [x] INCEPTION - Workspace Detection resumed the existing brownfield Python
+  package on `develop`; the current reverse-engineering artifacts cover the
+  affected test, tutorial, optimisation, documentation, and CI owners.
+- [x] INCEPTION - Reverse Engineering skipped because the existing artifacts
+  remain current for this test-performance change.
+- [x] INCEPTION - Requirements Analysis completed from the seven measured
+  hotspots in the repository-wide serial profile.
+- [x] INCEPTION - Requirements approved by the user.
+- [x] INCEPTION - User Stories skipped because this is internal test and CI
+  performance work with no new user workflow, persona, or public API behavior.
+- [x] INCEPTION - Workflow Planning completed for one performance-focused unit.
+- [x] INCEPTION - Workflow plan approved by the user.
+- [x] CONSTRUCTION - NFR Requirements artifacts completed for the single unit.
+- [x] CONSTRUCTION - NFR Requirements approved by the user.
+- [x] CONSTRUCTION - NFR Design artifacts completed for the single unit.
+- [x] CONSTRUCTION - NFR Design approved by the user.
+- [x] CONSTRUCTION - Code Generation Part 1 plan completed with thirteen
+  executable steps.
+- [x] CONSTRUCTION - Code Generation plan approved by the user.
+- [x] CONSTRUCTION - Code Generation Step 1 baseline and implementation
+  boundary preserved.
+- [x] CONSTRUCTION - Code Generation Step 2 regression contracts added; five
+  expected failures and one expected missing-fixture error confirm the intended
+  pre-change gaps.
+- [x] CONSTRUCTION - Code Generation Step 3 central markers and single-owner CI
+  lanes implemented across develop, pull-request, and publish workflows; 37
+  workflow contracts and YAML parsing pass.
+- [x] CONSTRUCTION - Code Generation Step 4 Notebook 19 reduced to a fixed
+  1/5/10/1 candidate/iteration/evaluation/run profile, regenerated canonically,
+  and verified in 6.45 seconds with feasible zero-fallback process and site
+  results.
+- [x] CONSTRUCTION - Code Generation Step 5 copy-isolated process/site solved
+  evidence added; 50 utility-placement tests pass in 89.08 seconds with source
+  mutation and reversed-use isolation verified.
+- [x] CONSTRUCTION - Code Generation Step 6 property and batch setup shortened
+  without removing Hypothesis, shrinking, or explicit optimizer examples; 50
+  utility-placement tests pass in 79.03 seconds and 55 combined application and
+  batch tests pass in 83.35 seconds.
+- [x] CONSTRUCTION - Code Generation Step 7 CoolProp audit budgets refined by
+  topology; all 14 audit cases pass in 25.30 seconds and the unchanged complete
+  54-case standard plus direct-MVR E2E file passes 55 tests.
+- [x] CONSTRUCTION - Code Generation Step 8 both four-backend convergence
+  benchmarks marked performance and verified under bounded 2/25/5000
+  run/iteration/evaluation budgets; two tests pass in the dedicated lane.
+- [x] CONSTRUCTION - Code Generation Step 9 Sphinx smoke marked docs and made
+  the sole warning-strict documentation build owner; the dedicated selection
+  passes once in 15.12 seconds.
+- [x] CONSTRUCTION - Code Generation Step 10 compatible cold imports and retired
+  packages batched with per-case attribution; 39 related architecture tests
+  pass in 18.53 seconds.
+- [x] CONSTRUCTION - Code Generation Step 11 focused correctness, marker
+  partition, generator, timing, lint, formatting, YAML, and patch gates pass.
+- [x] CONSTRUCTION - Code Generation Step 12 complete: ordinary coverage passes
+  the 95 percent gate; 58 TESPy, 2 performance, 1 docs, and 4 solver tests are
+  accounted for in dedicated selections; distributions and the isolated
+  installed-wheel smoke pass.
+- [x] CONSTRUCTION - Code Generation Step 13 complete: the final ordinary
+  profile passes 3,390 tests with 6 expected skips and 65 intentional
+  deselections in 383.17 seconds, 36.2 percent faster than the 600.89-second
+  baseline and below the 480-second target.
+- [x] CONSTRUCTION - Code Generation approved by the user after all thirteen
+  plan steps and the generated-code audit completed.
+- [x] CONSTRUCTION - Build and Test complete: canonical build, unit,
+  integration, performance, E2E, and summary instructions updated for 0.6.9;
+  build artifacts, isolated installation, complete ordinary coverage,
+  specialized lanes, runtime target, and quality gates pass.
+- [x] OPERATIONS - Placeholder acknowledged; no deployment, monitoring,
+  incident-response, or production operations changes apply to this local
+  library test/CI performance workflow.
+- [x] CORRECTIVE VERIFICATION - GitHub Actions run 36115057800 exposed three
+  Ubuntu-only HPR/MVR search-budget portability failures. Code Generation is
+  corrected with sentinel-only E2E limits and an Ubuntu-proven multistage MVR
+  audit allowance; focused repetitions and the complete ordinary coverage lane
+  pass.
+- User Stories, Application Design, Units Generation, Functional Design, and
+  Infrastructure Design are provisionally skipped because this is an internal
+  test/CI performance refactor within existing component boundaries.
+- Requirements:
+  `inception/requirements/test-suite-runtime-reduction-requirements.md`.
+- User-story assessment:
+  `inception/plans/test-suite-runtime-reduction-user-stories-assessment.md`.
+- Execution plan:
+  `inception/plans/test-suite-runtime-reduction-execution-plan.md`.
+- NFR Requirements plan:
+  `construction/plans/test-suite-runtime-reduction-nfr-requirements-plan.md`.
+- NFR Requirements:
+  `construction/test-suite-runtime-reduction/nfr-requirements/`.
+- NFR Design plan:
+  `construction/plans/test-suite-runtime-reduction-nfr-design-plan.md`.
+- NFR Design:
+  `construction/test-suite-runtime-reduction/nfr-design/`.
+- Code Generation plan:
+  `construction/plans/test-suite-runtime-reduction-code-generation-plan.md`.
+- Extensions: Property-Based Testing remains enabled and applies to preservation
+  of existing generated invariants; Security and Resiliency remain disabled.
+- Current stage: Complete. Corrective Code Generation Step 14 passes locally;
+  a new GitHub Actions run is required for independent Ubuntu confirmation.

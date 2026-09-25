@@ -30,8 +30,15 @@ Capability Matrix
    * - Heat Pump and refrigeration
      - named Carnot, vapour-compression, and MVR target methods;
        explicit target-owned performance-map generation
-     - HPR targets, costs, graphs, and versioned plain maps
+     - bounded targets, typed failure diagnostics, costs, graphs, and versioned
+       plain maps
      - CoolProp default; optional TESPy through ``openpinch[tespy]``
+   * - Multiperiod HPR design
+     - independent ``problem.target.all_periods`` replay or scalar targeting
+       with ``HPR_MULTIPERIOD_OPTIMIZATION_ENABLED``
+     - independent period targets or one shared design with aligned period and
+       weighted evidence
+     - CoolProp and Carnot shared design; TESPy independent replay only
    * - Brayton
      - ``brayton_heat_pump()``, ``brayton_refrigeration()``
      - unavailable; rejected before preparation
@@ -41,8 +48,9 @@ Capability Matrix
      - optimized case with shared utility placement evidence
      - base
    * - Process MVR
-     - ``problem.components.add_process_mvr()``
-     - replacement streams and stage results
+     - ``problem.components.add_process_mvr()`` for direct process MVR;
+       ``problem.target.mvr_heat_pump()`` for optimized VC+MVR
+     - replacement streams, stage/work evidence, or bounded optimized target
      - HPR extras
    * - Area/cost, exergy, and energy transfer
      - named ``problem.target`` enrichment methods

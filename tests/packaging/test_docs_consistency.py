@@ -432,10 +432,47 @@ def test_heat_pump_docs_keep_advanced_workflow_boundaries():
         "Vapour compression with MVR cascade",
         "08_carnot_heat_pump_and_refrigeration.ipynb",
         "11_process_mvr_and_cascade.ipynb",
+        "HPR_MULTIPERIOD_OPTIMIZATION_ENABLED",
+        "five optimizations, not a joint technology-selection problem",
+        "independent target for every period",
     ):
         assert phrase in guide
 
     assert "Simulated-cycle integration accounting" in fundamentals
+
+
+def test_hpr_rtd_publishes_bounded_and_multiperiod_reliability_contracts():
+    fundamentals = _read(
+        DOCS_ROOT / "fundamentals" / "heat-pump-and-refrigeration-methods.rst"
+    )
+    reference = _read(DOCS_ROOT / "reference" / "api-heat-pump.rst")
+    capability = _read(DOCS_ROOT / "overview" / "capability-matrix.rst")
+    support = _read(DOCS_ROOT / "overview" / "support-and-stability.rst")
+    release_notes = _read(DOCS_ROOT / "release-notes.rst")
+
+    for phrase in (
+        "Bounded Search and Failure Evidence",
+        "HPRFailureSummary",
+        'diagnostics.model_dump(mode="json")',
+        "Multiperiod Targeting Modes",
+        "joint technology-selection model",
+    ):
+        assert phrase in fundamentals
+
+    for phrase in (
+        "Public Targeting Reliability Contract",
+        "maximum_evaluations",
+        "problem.components.add_process_mvr",
+        "HPR_MULTIPERIOD_OPTIMIZATION_ENABLED",
+    ):
+        assert phrase in reference
+
+    assert "Multiperiod HPR design" in capability
+    assert "typed failure diagnostics" in capability
+    assert "Advanced HPR Reliability Boundary" in support
+    assert "Shared-vector TESPy optimization" in support
+    assert "HPR and MVR robustness and tutorial reliability" in release_notes
+    assert "54 distinct assignments" in release_notes
 
 
 def test_hpr_backend_and_target_owned_map_docs_publish_the_complete_boundary():

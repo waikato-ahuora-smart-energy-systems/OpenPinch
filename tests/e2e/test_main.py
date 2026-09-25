@@ -11,13 +11,10 @@ from pathlib import Path
 import pytest
 
 from OpenPinch import PinchProblem, PinchWorkspace
+from tests.e2e.cases import STANDARD_PROBLEM_INPUTS, standard_problem_paths
 from tests.support.paths import REPOSITORY_ROOT
 
-EXAMPLE_INPUTS = REPOSITORY_ROOT / "examples" / "stream_data"
-
-
-def _example_problem_filepaths() -> list[Path]:
-    return sorted(EXAMPLE_INPUTS.glob("p_*.json"), key=lambda path: path.name)
+EXAMPLE_INPUTS = STANDARD_PROBLEM_INPUTS
 
 
 def _scalar_value(value: dict[str, object]) -> float:
@@ -63,7 +60,7 @@ def test_workspace_uses_case_vocabulary() -> None:
 
 @pytest.mark.parametrize(
     "problem_path",
-    _example_problem_filepaths(),
+    standard_problem_paths(),
     ids=lambda path: path.name,
 )
 def test_problem_pipeline_solves_every_shipped_example(problem_path: Path) -> None:

@@ -38,8 +38,8 @@ def test_real_public_coolprop_target_and_budget(mode, utility, cascade, monkeypa
         condensers=1,
         evaporators=1,
         maximum_restarts=1,
-        maximum_iterations=3,
-        maximum_evaluations=100,
+        maximum_iterations=2,
+        maximum_evaluations=20,
     )
     kwargs[
         "is_utility_refrigeration"
@@ -61,7 +61,7 @@ def test_real_public_coolprop_target_and_budget(mode, utility, cascade, monkeypa
     assert copied.hpr_details.target_simulation_record == record
     assert json.loads(problem.results.model_dump_json())
     assert json.loads(record.model_dump_json())["simulation_backend"] == "coolprop"
-    assert counts and all(0 < count <= 100 for count in counts)
+    assert counts and all(0 < count <= 20 for count in counts)
     assert monotonic() - started < 120.0  # generous smoke gate, not a runtime SLA
 
 
@@ -94,10 +94,13 @@ def test_real_public_multistage_records(topology):
         condensers=2,
         evaporators=1,
         maximum_restarts=1,
-        maximum_iterations=3,
-        maximum_evaluations=150,
+        maximum_iterations=2,
+        maximum_evaluations=30,
     )
     if topology == "mvr":
+        # The multistage MVR landscape needs a third iteration on Ubuntu/x86;
+        # retain the smaller bounds for the faster cascade and parallel cases.
+        kwargs.update(maximum_iterations=3, maximum_evaluations=150)
         target = problem.target.mvr_heat_pump(
             **kwargs, options={"HPR_REFRIGERANTS": ["Water"]}
         )

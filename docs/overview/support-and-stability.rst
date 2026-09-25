@@ -37,6 +37,22 @@ and target-owned part-load map generation. CoolProp remains the base-package
 default. The initial TESPy targeting surface is advanced and restricted to one
 scalar refrigerant loop, one evaporator, and one condenser.
 
+Advanced HPR Reliability Boundary
+---------------------------------
+
+Supported HPR target methods expose explicit search bounds and either return a
+detached successful target or raise ``HPRTargetingError`` with bounded typed
+diagnostics. Required workflows do not convert unexpected service defects into
+screening statuses. TESPy and Brayton remain explicit selections: TESPy never
+falls back to CoolProp, and the currently unavailable Brayton runtime raises
+``NotImplementedError`` before target state is committed.
+
+Independent ``target.all_periods`` replay and shared installed-design
+optimization are different advanced contracts. Shared design is enabled on a
+scalar target call and publishes a common design vector plus aligned period,
+weight, per-period, and weighted evidence. Shared-vector TESPy optimization is
+outside the supported surface.
+
 Contributor Modules
 -------------------
 

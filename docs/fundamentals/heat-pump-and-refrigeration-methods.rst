@@ -32,6 +32,29 @@ successive temperature lifts and is selected with ``is_cascade_cycle`` where
 the model supports it. MVR is a separate named workflow rather than a hidden
 cycle-string combination.
 
+Bounded Search and Failure Evidence
+-----------------------------------
+
+HPR targeting accepts explicit ``maximum_restarts``, ``maximum_iterations``,
+and ``maximum_evaluations`` limits. These are work bounds, not promises that an
+arbitrary topology will converge. Start with a one-condenser,
+one-evaporator configuration and one MVR stage where applicable, prove that the
+required service succeeds, and only then increase topology complexity or search
+allowances.
+
+A successful target has ``hpr_success`` set and exposes finite accounting in
+``hpr_details``. A bounded search that finds no valid candidate raises
+``HPRTargetingError`` with an ``HPRFailureSummary`` containing the configured
+budget, evaluated-candidate count, category counts, and at most sixteen
+representative failures. ``diagnostics.model_dump(mode="json")`` is the stable
+plain-data inspection boundary.
+
+Calls required by an engineering workflow should be allowed to fail loudly.
+An optional dependency or exploratory method may instead handle
+``ImportError``, ``NotImplementedError``, or ``HPRTargetingError`` separately.
+Do not catch a broad ``Exception`` or relabel an unavailable TESPy or Brayton
+calculation as a CoolProp success.
+
 Thermodynamic Backend Selection
 -------------------------------
 
@@ -92,6 +115,28 @@ OpenUtility is such a downstream consumer. It reads the versioned plain mapping
 and owns Pyomo, HiGHS, electricity balances, thermal balances, unit commitment,
 and multiperiod dispatch. OpenPinch does not import OpenUtility, and OpenUtility
 does not need to import OpenPinch to validate or optimize exported JSON.
+
+Multiperiod Targeting Modes
+---------------------------
+
+``problem.target.all_periods.<method>(...)`` runs an independent target for
+each period and returns ordered period results. It does not optimize one
+installed design across those periods.
+
+For one shared installed design, call the scalar Carnot, CoolProp
+vapour-compression, or VC+MVR method with
+``options={"HPR_MULTIPERIOD_OPTIMIZATION_ENABLED": True}``. The selected
+``period_id`` is the reporting period while the optimizer evaluates the full
+problem period set. A successful shared result exposes ``design_vector``,
+``period_ids``, ``period_weights``, ``period_outputs``, and ``weighted_output``
+through ``hpr_details``. Verify the exact period set, aligned weights, finite
+design and objective values, and successful output for every period.
+
+Use a fresh ``PinchProblem`` for each technology comparison. Shared-design
+Carnot heat pumping, Carnot refrigeration, CoolProp heat pumping, CoolProp
+refrigeration, and CoolProp VC+MVR are separate optimizations rather than one
+joint technology-selection model. Shared-vector multiperiod TESPy targeting is
+not supported.
 
 Interpretation
 --------------

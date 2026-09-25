@@ -223,8 +223,11 @@ Notebook 09 is the comprehensive executable target-to-map example. It starts
 with the omitted/default CoolProp selector, inspects the detached winning
 record, derives the design source and sink coordinates, generates three
 part-load points, and serializes the versioned result as plain JSON. A separate
-guarded call demonstrates explicit TESPy selection and molar-mixture syntax;
-failure remains a TESPy screening result and never triggers CoolProp fallback.
+optional call demonstrates explicit TESPy selection and molar-mixture syntax.
+Its result distinguishes an unavailable dependency, an unavailable method, and
+typed infeasibility; none of those outcomes triggers a CoolProp fallback. The
+default CoolProp heat-pump and refrigeration examples are required and therefore
+fail loudly on an unexpected service defect.
 
 Working-fluid strings accept installed-property pure fluids, registered blends,
 and explicit N-component molar mixtures. For example,
@@ -235,15 +238,52 @@ by an OpenPinch refrigerant allowlist; ``REFPROP`` specifications are rejected.
 Multiperiod HPR
 ---------------
 
+There are two different multiperiod workflows. The ``all_periods`` accessor
+replays an independent target for every period. It does not select one installed
+design:
+
 .. code-block:: python
 
    periods = PinchProblem("crude_preheat_train_multiperiod.json")
-   outputs = periods.target.all_periods.carnot_heat_pump(load_fraction=0.25)
+   outputs = periods.target.all_periods.carnot_heat_pump(
+       load_fraction=0.25,
+       maximum_restarts=1,
+       maximum_iterations=20,
+       maximum_evaluations=50,
+   )
    weighted = periods.summary_frame(include_weighted_average=True)
+
+For one installed design optimized across every period, enable the shared-design
+mode on a scalar target call. ``period_id`` identifies the reporting period; it
+does not reduce the optimization to that period:
+
+.. code-block:: python
+
+   shared = PinchProblem("crude_preheat_train_multiperiod.json")
+   target = shared.target.vapour_compression_heat_pump(
+       period_id="base",
+       refrigerants=["water"],
+       load_fraction=0.25,
+       condensers=1,
+       evaporators=1,
+       maximum_restarts=1,
+       maximum_iterations=20,
+       maximum_evaluations=50,
+       options={"HPR_MULTIPERIOD_OPTIMIZATION_ENABLED": True},
+   )
+   details = target.hpr_details
+   assert set(details.period_ids) == {"turndown", "base", "peak"}
+   assert all(output["success"] for output in details.period_outputs.values())
+
+Create a fresh :class:`OpenPinch.PinchProblem` for each technology so their
+committed targets and design vectors cannot contaminate one another. Notebook
+10 applies that pattern separately to Carnot heat pumping, Carnot refrigeration,
+CoolProp VC heat pumping, CoolProp VC refrigeration, and CoolProp VC+MVR. These
+are five optimizations, not a joint technology-selection problem.
 
 TESPy supports one selected scalar period and independent
 ``target.all_periods.vapour_compression_heat_pump(...)`` replay with
-``workers=1``. A shared-vector multiperiod TESPy optimization and automatic map
+``workers=1``. Shared-vector multiperiod TESPy optimization and automatic map
 generation across periods are not supported. Run independent processes if
 separate calls must execute in parallel; external thermodynamic engines have no
 thread-safety promise here.
