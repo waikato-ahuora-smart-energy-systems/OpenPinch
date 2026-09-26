@@ -148,9 +148,10 @@ IDAES extensions and runs this gate automatically. Run it locally with
 
 ## Release Process
 
-Main merges automatically publish new committed versions after successful
-full validation. Prepare version changes in a normal reviewed PR; CI never
-bumps versions. **Release and Publish** promotes the validated candidate's
+After normal review and tests, **Prepare Release** opens an automatic patch-bump
+PR into `develop`. Merge it, then merge the reviewed `develop → main` PR.
+Main reuses verified unaffected tests and freshly checks the bumped package.
+**Release and Publish** promotes the validated candidate's
 immutable build artifact and manifest without rebuilding, verifies
 TestPyPI, verifies production PyPI through the protected `pypi` environment,
 and only then publishes the GitHub release. Completed versions are verified

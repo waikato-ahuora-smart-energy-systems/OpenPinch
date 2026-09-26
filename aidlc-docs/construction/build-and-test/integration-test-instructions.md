@@ -1,5 +1,18 @@
 # Integration Test Instructions - Delivery Workflow
 
+## Version-preparation integration
+
+The packaging suite uses temporary real Git objects and fake GitHub boundaries
+to exercise create, duplicate reconcile, partial PR-create recovery, closed PR
+and unrelated-source rejection. Review proof tests verify job/run/artifact/merge
+identity and publisher behavior for successful reuse versus failed required jobs.
+No remote source or package index is mutated by these tests.
+
+Hosted activation is separate: verify Actions PR creation policy, current review
+decision availability, bot PR-run approval, required complete gate, normal
+two-merge path and trusted-publisher configuration. Install workflows together;
+record the one-time bootstrap boundary and do not weaken branch protections.
+
 ## Delivery orchestration
 
 ### Automatic-release acceptance scenarios

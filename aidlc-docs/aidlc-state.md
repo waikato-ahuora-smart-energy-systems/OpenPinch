@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Automatic Release Restoration — Verified; Commit Handoff Authorized
+- **Current Stage**: Automatic Version Bumps — Verified and Committed Locally
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -29,6 +29,20 @@
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
 
 ## Delivery Workflow Overhaul
+
+- [x] Record requested automatic-version policy, superseding manual preparation.
+- [x] Resolve bump rule: patch by default, explicit major/minor choices retained.
+- [x] Finalize `inception/requirements/automatic-version-bump-requirements.md`.
+- [x] Approve automatic-version requirements before workflow planning (`Approve`).
+- [x] Prepare `inception/plans/automatic-version-bump-execution-plan.md`.
+- [x] Revise plan for normal review before bump PR and evidence-backed main test reuse.
+- [x] Resolve generated bump-PR target: develop, then existing main PR (A).
+- [x] Approve revised generated bump-PR path before focused Functional Design (`Approve`).
+- [x] Complete automatic-version functional design and property identification.
+- [x] Approve Functional Design and remaining code planning/implementation stages.
+- [x] Implement automatic bump PRs, verified review reuse and release proof.
+- [x] Final verification: 424 passed, 6 expected skips; lint, docs and build pass.
+- [x] Commit locally as requested; hosted activation remains separate.
 
 - [x] Automatic-release follow-up: inspected merged workflow and existing version/tag.
 - [x] Resolve version preparation: option A, reviewed committed versions only.

@@ -26,6 +26,7 @@ on:
         type: string
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: openpinch-release
   cancel-in-progress: false

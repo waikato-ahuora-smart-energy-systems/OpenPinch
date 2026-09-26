@@ -1,5 +1,14 @@
 # Performance Test Instructions - Delivery Workflow
 
+## Review-evidence reuse
+
+Verify eligible runs skip TESPy, numerical performance, solver and workflow-lint
+lanes, and replace the general full test invocation with fresh packaging and
+version-sensitive regressions. Docs, install surfaces and new distributions stay
+fresh. An invalid proof must execute ordinary lanes. Compare hosted durations
+only after activation; local tests establish decisions, not a hosted speedup.
+Preparation/evidence I/O retains bounded commands, downloads and pagination.
+
 ## Delivery measurement boundary
 
 Automatic-release restoration adds no numerical performance requirement and

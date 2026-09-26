@@ -1,5 +1,15 @@
 # Build Instructions - Delivery Workflow
 
+## Automatic version preparation
+
+Use Python 3.14.2 and the existing locked dev environment. Check metadata with
+`python scripts/check_release_version.py` and
+`python scripts/check_lockfile_version.py`. Build with
+`python scripts/build_dist.py --output-dir <new-empty-temporary-directory>`;
+do not overwrite recovery distributions or upload this local verification build.
+Run Ruff on changed Python files and actionlint with ShellCheck on workflows.
+No application dependency or project version bump is part of this implementation.
+
 ## Delivery-specific validation
 
 For automatic-release restoration, application code and dependencies are

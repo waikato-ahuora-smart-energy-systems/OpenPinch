@@ -1,5 +1,14 @@
 # Unit Test Execution - Delivery Workflow
 
+## Automatic version preparation and review reuse
+
+Run `.venv/bin/pytest tests/packaging --hypothesis-seed=20260715 -q`.
+Focused tests are `test_release_preparation.py`, `test_review_evidence.py`,
+`test_delivery_workflows.py`, `test_release_manifest.py` and `test_plan_release.py`.
+Hypothesis covers structured version/record round trips, allocation oracle,
+idempotence, real-adapter event sequences and required-lane coverage. Shrinking
+is enabled; reproduce failures with the fixed seed and reported minimized case.
+
 ## Delivery regression contracts
 
 Automatic-release restoration uses this complete packaging selection, including

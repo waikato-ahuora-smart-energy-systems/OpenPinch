@@ -298,7 +298,10 @@ def test_generated_observation_sequences_match_completion_oracle(evidence):
             st.sampled_from(["complete", "draft", "partial", "expired"]), max_size=6
         )
     )
-    @settings(max_examples=30, deadline=2000)
+    # Real filesystem operations vary with host load; this is a state/provenance
+    # property, not a latency benchmark. Sequence/example counts remain bounded,
+    # shrinking stays enabled, and the CI job supplies the outer time limit.
+    @settings(max_examples=30, deadline=None)
     def check(sequence):
         evidence.clear()
         evidence.update(deepcopy(baseline))

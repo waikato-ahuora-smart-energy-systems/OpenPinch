@@ -23,6 +23,10 @@ X) Other (describe the desired versioning policy).
 
 [Answer]: A
 
+Policy superseded by the subsequent user request, "Version bump should be
+automatic." Bump selection is pending in `automatic-version-bump-questions.md`.
+The answer above is retained as historical context, not the current requirement.
+
 ## Existing state and constraints
 
 - Current committed version: 0.6.10; local tag v0.6.10 already exists.

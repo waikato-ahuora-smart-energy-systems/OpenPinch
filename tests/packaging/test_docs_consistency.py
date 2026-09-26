@@ -339,7 +339,10 @@ def test_release_docs_match_automatic_publication() -> None:
         "partial",
     ):
         assert phrase in guide
-    assert "automatically publish new committed versions" in readme
+    assert "automatic patch-bump" in readme
+    assert "reuses verified unaffected tests" in readme
+    assert "CI never changes the package version" not in guide
+    assert "version-only PR" in guide
     assert "completed versions" in guide
     assert "without rebuilding" in guide
     assert "automatically advances" not in readme

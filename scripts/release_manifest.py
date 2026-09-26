@@ -105,14 +105,29 @@ def validate(manifest: dict) -> dict:
         "version",
         "files",
     }
+    if isinstance(manifest, dict) and manifest.get("schema") == 2:
+        fields.add("preparation")
     if not isinstance(manifest, dict) or set(manifest) != fields:
         raise ValueError("Invalid manifest fields")
     if (
         type(manifest["schema"]) is not int
-        or manifest["schema"] != 1
-        or manifest["policy"] != POLICY
+        or not isinstance(manifest["policy"], str)
+        or (
+            manifest["schema"],
+            manifest["policy"],
+        )
+        not in {(1, POLICY), (2, "delivery-v2")}
     ):
         raise ValueError("Unsupported manifest policy/schema")
+    if manifest["schema"] == 2:
+        from scripts.release_preparation import validate as validate_preparation
+
+        validate_preparation(manifest["preparation"])
+        if (
+            manifest["preparation"]["repository"] != manifest["repository"]
+            or manifest["preparation"]["target"] != manifest["version"]
+        ):
+            raise ValueError("Preparation identity differs from bundle")
     for name in ("source_sha", "source_tree"):
         if not isinstance(manifest[name], str) or not SHA.fullmatch(manifest[name]):
             raise ValueError(f"Invalid {name}")
@@ -219,6 +234,17 @@ def next_transition(test_index: str, production: str, finalized: bool) -> str:
 
 def create(directory: Path) -> dict:
     version = read_project_version(Path("pyproject.toml"))
+    extra = {}
+    if os.environ.get("REUSE_REVIEW") == "true":
+        from scripts.review_evidence import reusable
+
+        extra = {
+            "schema": 2,
+            "policy": "delivery-v2",
+            "preparation": reusable(
+                command("git", "rev-parse", "HEAD"), os.environ["GITHUB_REPOSITORY"]
+            ),
+        }
     manifest = validate(
         {
             "schema": 1,
@@ -232,6 +258,7 @@ def create(directory: Path) -> dict:
             "files": expected_distribution_hashes(
                 directory, project="OpenPinch", version=version
             ),
+            **extra,
         }
     )
     (directory / MANIFEST).write_text(
@@ -353,12 +380,24 @@ def verify_source(manifest: dict, artifact_id: int, digest: str) -> None:
         for page in pages
         for job in page["jobs"]
     ]
+    if manifest["schema"] == 2:
+        from scripts.review_evidence import REUSABLE, reusable
+
+        if reusable(manifest["source_sha"], repository) != manifest["preparation"]:
+            raise ValueError("Release review evidence mismatch")
+        jobs = [
+            {**job, "conclusion": "success"}
+            if job["name"] in REUSABLE and job.get("conclusion") == "skipped"
+            else job
+            for job in jobs
+        ]
     # Retained build evidence survives a failed-job retry, but old successful
     # validation must never hide the latest failure.
     if (
         gate_errors(jobs, "full")
         or sum(
-            job["name"] == POLICY and job.get("conclusion") == "success" for job in jobs
+            job["name"] == manifest["policy"] and job.get("conclusion") == "success"
+            for job in jobs
         )
         != 1
     ):

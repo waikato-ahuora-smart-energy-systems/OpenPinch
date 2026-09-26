@@ -24,6 +24,37 @@ def runs(job):
     return "\n".join(step.get("run", "") for step in job.get("steps", []))
 
 
+def test_preparation_authority_and_evidence_contracts():
+    prepare = workflow("ci-prepare-release.yml")
+    assert prepare["concurrency"]["cancel-in-progress"] == "false"
+    job = prepare["jobs"]["prepare"]
+    assert job["permissions"] == {
+        "contents": "write",
+        "pull-requests": "write",
+        "actions": "read",
+    }
+    assert job["steps"][0]["with"]["ref"] == "refs/heads/main"
+    assert job["steps"][0]["with"]["persist-credentials"] == "false"
+    assert "reconcile" in runs(job)
+    notification = workflow("ci-review-notification.yml")
+    assert notification["permissions"] == {}
+    assert all("uses" not in s for s in notification["jobs"]["notify"]["steps"])
+    jobs = workflow("ci-validation.yml")["jobs"]
+    assert "reusable" not in runs(jobs["test"])
+    assert "Fresh version-sensitive" in str(jobs["test"]["steps"])
+    for name in (
+        "artifact-build",
+        "artifact-install-smoke",
+        "artifact-install-tespy-smoke",
+    ):
+        assert "!cancelled()" in jobs[name]["if"]
+    assert "REUSE_REVIEW" in str(jobs["gate"])
+    assert "review-proof" in jobs["gate"]["needs"]
+    assert "scripts.release_preparation gate" in runs(
+        workflow("ci-pull-request.yml")["jobs"]["pr-gate"]
+    )
+
+
 def test_branch_workflows_only_call_read_only_shared_validation():
     for name, branch, profile in [
         ("ci-develop.yml", "develop", "integration"),
@@ -31,7 +62,7 @@ def test_branch_workflows_only_call_read_only_shared_validation():
     ]:
         data = workflow(name)
         assert data["on"] == {"push": {"branches": [branch]}}
-        assert data["permissions"] == {"contents": "read"}
+        assert data["permissions"] == {"contents": "read", "actions": "read"}
         assert data["jobs"] == {
             "validation": {
                 "uses": "./.github/workflows/ci-validation.yml",
@@ -43,8 +74,13 @@ def test_branch_workflows_only_call_read_only_shared_validation():
 def test_shared_validation_has_every_lane_and_bounded_reports():
     data = workflow("ci-validation.yml")
     jobs = data["jobs"]
-    assert set(jobs["gate"]["needs"]) == required_jobs("full", expanded=False)
-    assert jobs["gate"]["name"] == POLICY
+    assert set(jobs["gate"]["needs"]) == required_jobs("full", expanded=False) | {
+        "review-proof"
+    }
+    assert (
+        jobs["gate"]["name"]
+        == "${{ needs.review-proof.outputs.reuse == 'true' && 'delivery-v2' || 'delivery-v1' }}"
+    )
     assert "always()" in jobs["gate"]["if"]
     assert jobs["solver-tests"]["runs-on"] == "ubuntu-22.04"
     assert "SolverFactory(name).available(exception_flag=False)" in runs(
@@ -119,7 +155,16 @@ def test_actual_top_level_gate_script_requires_validation(validation, tmp_path):
         "GITHUB_STEP_SUMMARY": str(tmp_path / "summary"),
     }
     result = subprocess.run(
-        ["bash", "-e", "-c", runs(jobs["pr-gate"])],
+        [
+            "bash",
+            "-e",
+            "-c",
+            next(
+                s["run"]
+                for s in jobs["pr-gate"]["steps"]
+                if s.get("name") == "Require complete validation"
+            ),
+        ],
         env=env,
         capture_output=True,
         timeout=10,

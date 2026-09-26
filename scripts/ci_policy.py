@@ -75,6 +75,17 @@ def main() -> int:
         results = [
             {"name": name, "conclusion": data["result"]} for name, data in needs.items()
         ]
+        proof = needs.get("review-proof")
+        if proof is not None and proof.get("result") != "success":
+            raise ValueError("Review proof planner failed")
+        if os.environ.get("REUSE_REVIEW") == "true":
+            from scripts.release_preparation import command, repository
+            from scripts.review_evidence import REUSABLE, reusable
+
+            reusable(command("git", "rev-parse", "HEAD"), repository())
+            for item in results:
+                if item["name"] in REUSABLE and item["conclusion"] == "skipped":
+                    item["conclusion"] = "success"
         if os.environ.get("REUSE_INTEGRATION") == "true":
             # Only caller-verified integration proof can replace skipped lanes.
             for item in results:
