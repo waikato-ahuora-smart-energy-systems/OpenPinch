@@ -2,6 +2,20 @@
 
 ## Delivery regression contracts
 
+Automatic-release restoration uses this complete packaging selection, including
+the warning-strict documentation build and all 72 added job-condition cases:
+
+```bash
+uv run --no-sync pytest tests/packaging --hypothesis-seed=20260926 -q
+```
+
+For focused troubleshooting, select `test_plan_release.py`,
+`test_release_manifest.py` and `test_delivery_workflows.py` in that directory.
+The planner tests cover event/API identity, original-release completion,
+duplicate checks, generated observation sequences and blocked-state CLI output.
+The seed here reproduces the restoration verification; the existing CI seed
+below remains valid and was not changed. Shrinking remains enabled.
+
 ```bash
 uv run --no-sync pytest tests/packaging --hypothesis-seed=20260715 -m "not docs" -q
 ```

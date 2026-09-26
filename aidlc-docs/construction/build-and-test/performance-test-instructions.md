@@ -2,6 +2,13 @@
 
 ## Delivery measurement boundary
 
+Automatic-release restoration adds no numerical performance requirement and
+does not change the budgets below. Its automatic path reuses the validated
+bundle instead of running another build/validation. This is a workflow
+structure guarantee, not a measured hosted speedup. Planner network checks
+retain finite operation/job bounds; generated tests use fake service boundaries.
+No new numerical benchmark run is required for this delivery-only change.
+
 The numerical budgets and marker selectors below are unchanged. New delivery
 helpers use fake clocks and bounded generated inputs, not network timing.
 Compare hosted runs of the same profile and candidate class, separating

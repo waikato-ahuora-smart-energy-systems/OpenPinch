@@ -1,5 +1,9 @@
-name: Explicit Release
+name: Release and Publish
 on:
+  workflow_run:
+    workflows: ["CI Main"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       mode:
@@ -28,7 +32,19 @@ concurrency:
 jobs:
   request:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      action: ${{ steps.automatic.outputs.action || steps.manual.outputs.action }}
+      version: ${{ steps.automatic.outputs.version || inputs.version }}
+      artifact_id: ${{ steps.automatic.outputs.artifact_id || inputs.source_artifact_id }}
+      artifact_digest: ${{ steps.automatic.outputs.artifact_digest || inputs.source_artifact_digest }}
+      run_id: ${{ steps.automatic.outputs.run_id || inputs.source_run_id }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
@@ -38,7 +54,13 @@ jobs:
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: "3.14.2"
+      - name: Plan automatic publication from verified main evidence
+        id: automatic
+        if: ${{ github.event_name == 'workflow_run' }}
+        run: python -m scripts.plan_release
       - name: Validate deliberate main-context release request
+        id: manual
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         env:
           MODE: ${{ inputs.mode }}
           VERSION: ${{ inputs.version }}
@@ -63,17 +85,18 @@ jobs:
             [[ "$SOURCE_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
             [[ "$SOURCE_ARTIFACT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
           fi
+          echo "action=publish" >> "$GITHUB_OUTPUT"
 
   validation:
     needs: request
-    if: ${{ inputs.mode == 'new' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'new' }}
     uses: ./.github/workflows/ci-validation.yml
     with:
       candidate: ${{ github.sha }}
       profile: full
 
   bundle:
-    if: ${{ always() && needs.request.result == 'success' && (needs.validation.result == 'success' || (inputs.mode == 'resume' && needs.validation.result == 'skipped')) }}
+    if: ${{ !cancelled() && needs.request.result == 'success' && needs.request.outputs.action == 'publish' && (needs.validation.result == 'success' || ((github.event_name == 'workflow_run' || inputs.mode == 'resume') && needs.validation.result == 'skipped')) }}
     needs: [request, validation]
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -84,12 +107,13 @@ jobs:
       artifact_id: ${{ steps.identity.outputs.artifact_id }}
       artifact_digest: ${{ steps.identity.outputs.artifact_digest }}
       run_id: ${{ steps.identity.outputs.run_id }}
+      version: ${{ needs.request.outputs.version }}
     env:
       GH_TOKEN: ${{ github.token }}
-      SOURCE_ARTIFACT_ID: ${{ inputs.mode == 'new' && needs.validation.outputs.artifact_id || inputs.source_artifact_id }}
-      SOURCE_ARTIFACT_DIGEST: ${{ inputs.mode == 'new' && needs.validation.outputs.artifact_digest || inputs.source_artifact_digest }}
-      SOURCE_RUN_ID: ${{ inputs.mode == 'new' && github.run_id || inputs.source_run_id }}
-      VERSION: ${{ inputs.version }}
+      SOURCE_ARTIFACT_ID: ${{ inputs.mode == 'new' && needs.validation.outputs.artifact_id || needs.request.outputs.artifact_id }}
+      SOURCE_ARTIFACT_DIGEST: ${{ inputs.mode == 'new' && needs.validation.outputs.artifact_digest || needs.request.outputs.artifact_digest }}
+      SOURCE_RUN_ID: ${{ inputs.mode == 'new' && github.run_id || needs.request.outputs.run_id }}
+      VERSION: ${{ needs.request.outputs.version }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
@@ -126,7 +150,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
       SOURCE_ARTIFACT_ID: ${{ needs.bundle.outputs.artifact_id }}
       SOURCE_ARTIFACT_DIGEST: ${{ needs.bundle.outputs.artifact_digest }}
-      VERSION: ${{ inputs.version }}
+      VERSION: ${{ needs.bundle.outputs.version }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
@@ -154,7 +178,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
       SOURCE_ARTIFACT_ID: ${{ needs.bundle.outputs.artifact_id }}
       SOURCE_ARTIFACT_DIGEST: ${{ needs.bundle.outputs.artifact_digest }}
-      VERSION: ${{ inputs.version }}
+      VERSION: ${{ needs.bundle.outputs.version }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
@@ -185,7 +209,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
       SOURCE_ARTIFACT_ID: ${{ needs.bundle.outputs.artifact_id }}
       SOURCE_ARTIFACT_DIGEST: ${{ needs.bundle.outputs.artifact_digest }}
-      VERSION: ${{ inputs.version }}
+      VERSION: ${{ needs.bundle.outputs.version }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
@@ -221,7 +245,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
       SOURCE_ARTIFACT_ID: ${{ needs.bundle.outputs.artifact_id }}
       SOURCE_ARTIFACT_DIGEST: ${{ needs.bundle.outputs.artifact_digest }}
-      VERSION: ${{ inputs.version }}
+      VERSION: ${{ needs.bundle.outputs.version }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
@@ -250,7 +274,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
       SOURCE_ARTIFACT_ID: ${{ needs.bundle.outputs.artifact_id }}
       SOURCE_ARTIFACT_DIGEST: ${{ needs.bundle.outputs.artifact_digest }}
-      VERSION: ${{ inputs.version }}
+      VERSION: ${{ needs.bundle.outputs.version }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
@@ -284,7 +308,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
       SOURCE_ARTIFACT_ID: ${{ needs.bundle.outputs.artifact_id }}
       SOURCE_ARTIFACT_DIGEST: ${{ needs.bundle.outputs.artifact_digest }}
-      VERSION: ${{ inputs.version }}
+      VERSION: ${{ needs.bundle.outputs.version }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
@@ -319,7 +343,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
       SOURCE_ARTIFACT_ID: ${{ needs.bundle.outputs.artifact_id }}
       SOURCE_ARTIFACT_DIGEST: ${{ needs.bundle.outputs.artifact_digest }}
-      VERSION: ${{ inputs.version }}
+      VERSION: ${{ needs.bundle.outputs.version }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
@@ -346,7 +370,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
       SOURCE_ARTIFACT_ID: ${{ needs.bundle.outputs.artifact_id }}
       SOURCE_ARTIFACT_DIGEST: ${{ needs.bundle.outputs.artifact_digest }}
-      VERSION: ${{ inputs.version }}
+      VERSION: ${{ needs.bundle.outputs.version }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
@@ -358,3 +382,5 @@ jobs:
           python-version: "3.14.2"
       - run: python -m scripts.release_manifest download --directory bundle
       - run: python -m scripts.release_manifest finalize --directory bundle
+      - name: Record completed publication
+        run: echo "Published v$VERSION; TestPyPI, PyPI and GitHub release verified." >> "$GITHUB_STEP_SUMMARY"

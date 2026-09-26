@@ -325,7 +325,7 @@ def test_docs_define_stability_and_optional_dependency_boundaries():
         assert phrase in combined
 
 
-def test_release_docs_match_explicit_publication() -> None:
+def test_release_docs_match_automatic_publication() -> None:
     readme = _read(REPO_ROOT / "README.md")
     guide = _read(DOCS_ROOT / "developer" / "releasing.rst")
     for phrase in (
@@ -339,7 +339,9 @@ def test_release_docs_match_explicit_publication() -> None:
         "partial",
     ):
         assert phrase in guide
-    assert "do not publish or bump versions" in readme
+    assert "automatically publish new committed versions" in readme
+    assert "completed versions" in guide
+    assert "without rebuilding" in guide
     assert "automatically advances" not in readme
     assert "after pypi succeeds" in guide.lower()
 

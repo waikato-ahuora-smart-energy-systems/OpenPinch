@@ -2,6 +2,10 @@
 
 ## Intent and approval
 
+Current-policy amendment: `automatic-release-requirements.md` supersedes D01
+after approval on 2026-09-26. Main validation now leads to automatic publication
+of reviewed new versions; the earlier approval below is historical context.
+
 The user requested correction of a failing check and an overhaul of testing,
 merging, and PR workflows. This is a high-risk delivery refactor, not a change
 to the OpenPinch application API or thermodynamic algorithms.
@@ -16,7 +20,7 @@ TestPyPI visibility failure from successful application tests.
 
 | ID | Requirement | Acceptance evidence |
 |---|---|---|
-| D01 | Ordinary merges to main validate without publishing or bumping versions. Releases require deliberate initiation. | Event matrix tests distinguish validation, preparation, publication, and recovery. |
+| D01 | Successful main validation automatically publishes reviewed new versions without bumping source. Verified completed versions no-op; partial/conflicting state blocks. | Event matrix and original-release completion tests distinguish validation, publication, no-op, and recovery. |
 | D02 | Commit the selected version and lockfile changes before validating the release candidate. PR validation is read-only. | No source-branch-writing job in PR validation; candidate SHA/tree recorded. |
 | D03 | Use shared lane definitions for develop, PR, and release validation. | All current benchmark cases and specialized lanes remain selected; drift/partition contracts pass. |
 | D04 | Enforce a stable, uniquely named aggregate merge gate. | Mandatory lane failure, cancellation, absence, or unapproved skip fails the gate. Remote required-check configuration is verified separately. |

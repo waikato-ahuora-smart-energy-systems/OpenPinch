@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import subprocess
 
 import pytest
@@ -134,12 +135,28 @@ def test_actual_top_level_gate_script_requires_validation(validation, tmp_path):
 
 def test_explicit_release_uses_one_bundle_and_verifies_before_finalizing():
     data = workflow("ci-publish.yml")
-    assert set(data["on"]) == {"workflow_dispatch"}
+    assert set(data["on"]) == {"workflow_dispatch", "workflow_run"}
+    assert data["on"]["workflow_run"] == {
+        "workflows": ["CI Main"],
+        "types": ["completed"],
+        "branches": ["main"],
+    }
     assert data["concurrency"] == {
         "group": "openpinch-release",
         "cancel-in-progress": "false",
     }
     jobs = data["jobs"]
+    assert jobs["request"]["permissions"] == {"contents": "read", "actions": "read"}
+    assert "python -m scripts.plan_release" in runs(jobs["request"])
+    assert (
+        jobs["validation"]["if"]
+        == "${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'new' }}"
+    )
+    assert "needs.request.outputs.action == 'publish'" in jobs["bundle"]["if"]
+    assert "github.event_name == 'workflow_run'" in jobs["bundle"]["if"]
+    assert (
+        jobs["bundle"]["outputs"]["version"] == "${{ needs.request.outputs.version }}"
+    )
     assert jobs["validation"]["with"]["profile"] == "full"
     assert "refs/heads/main" in runs(jobs["request"])
     assert "check_release_version.py" in runs(jobs["request"])
@@ -181,11 +198,10 @@ def test_explicit_release_uses_one_bundle_and_verifies_before_finalizing():
             assert "SOURCE_ARTIFACT_DIGEST" in job["env"]
             if name != "bundle":
                 assert "!cancelled()" in job["if"]
+                assert job["env"]["VERSION"] == "${{ needs.bundle.outputs.version }}"
 
 
 def test_external_actions_stay_pinned_and_artifact_versions_are_current():
-    import re
-
     for path in (REPOSITORY_ROOT / ".github/workflows").glob("*.yml"):
         data = workflow(path.name)
         for job in data["jobs"].values():
@@ -201,3 +217,38 @@ def test_external_actions_stay_pinned_and_artifact_versions_are_current():
                     assert item["uses"].endswith(
                         "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"
                     )
+
+
+@pytest.mark.parametrize("mode", ["automatic", "new", "resume"])
+@pytest.mark.parametrize("decision", ["publish", "complete", "ignore"])
+@pytest.mark.parametrize("request_result", ["success", "failure"])
+@pytest.mark.parametrize("validation", ["success", "failure", "cancelled", "skipped"])
+def test_bundle_condition_cannot_bypass_planning_or_required_validation(
+    mode, decision, request_result, validation
+):
+    expression = workflow("ci-publish.yml")["jobs"]["bundle"]["if"][3:-3]
+    values = {
+        "needs.request.result": request_result,
+        "needs.request.outputs.action": decision,
+        "needs.validation.result": validation,
+        "github.event_name": "workflow_run"
+        if mode == "automatic"
+        else "workflow_dispatch",
+        "inputs.mode": "" if mode == "automatic" else mode,
+    }
+    for key, value in values.items():
+        expression = expression.replace(key, repr(value))
+    expression = (
+        expression.replace("!cancelled()", "True")
+        .replace("&&", "and")
+        .replace("||", "or")
+    )
+    # Evaluate only the checked-in boolean condition after replacing its entire
+    # context; no service response or user input becomes executable code.
+    actual = eval(expression, {"__builtins__": {}}, {})
+    expected = (
+        request_result == "success"
+        and decision == "publish"
+        and (validation == "success" or (mode != "new" and validation == "skipped"))
+    )
+    assert actual == expected

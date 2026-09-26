@@ -10179,3 +10179,87 @@ Notebook #10 fails to solve with the error:
 **Context**: An initial docs-only selection against test_docs_consistency.py selected no tests; corrected to test_docs_build.py and passed. PBT-01 through PBT-10 compliant through retained approved coverage plus generated rejection cases and finalization regressions; no shrinking disabled. Security and Resiliency extensions disabled and skipped. No push, merge, publication or remote review resolution performed.
 
 ---
+
+## Automatic Release Restoration - Investigation
+**Timestamp**: 2026-09-26T10:25:13Z
+**User Input**: "The PR tests passed but there was no auto release and pyipi"
+**AI Response**: "Confirmed PR 102 merged and CI Main passed. Publishing did not trigger because the approved overhaul selected manual initiation. Offered restoration of automatic publication versus retaining explicit releases."
+**Context**: Read-only GitHub and local workflow inspection; no publication attempted.
+
+---
+
+## Automatic Release Restoration - Requirements Clarification
+**Timestamp**: 2026-09-26T10:25:13Z
+**User Input**: "restore **automatic release and PyPI publishing after successful main validation**"
+**AI Response**: "Inspected the existing main validation and explicit publisher. Current version 0.6.10 already has a tag, so restoring a trigger alone would hit the duplicate-version guard. Recorded a targeted version-preparation question before implementing automatic source writes or deciding when publication should skip."
+**AI Prompt**: "Select version preparation in automatic-release-questions.md: publish reviewed versions automatically, automatically patch-bump every main merge, or specify another policy."
+**Context**: Resumed existing brownfield delivery workflow on clean develop. Existing architecture and delivery evidence reused; no new user stories. Requirements clarification gate pending. Property-Based Testing remains enabled; Security and Resiliency extensions remain disabled and skipped. Plain Markdown checked before creation. No workflow code, version, GitHub settings, package index or release state changed.
+
+---
+
+## Automatic Release Restoration - Requirements Complete
+**Timestamp**: 2026-09-26T10:27:15Z
+**User Input**: "A"
+**AI Response**: "Recorded option A: versions are prepared in reviewed commits; successful main validation automatically publishes new versions. Completed versions require verified completion before a no-op; partial or conflicting states require verified recovery. Finalized ten acceptance requirements while retaining immutable artifacts, full validation, bounded index verification, least privilege and manual recovery."
+**AI Prompt**: "Requirements Analysis Complete. Review automatic-release-requirements.md. Request Changes or Approve & Continue to Workflow Planning."
+**Context**: No additional version-policy ambiguity. Requirements approval is pending under the repository workflow. User stories remain skipped by user direction. PBT-01 through PBT-10 N/A to requirements-only artifacts; implementation obligations retained. Disabled Security and Resiliency extensions skipped. Plain Markdown validated; no code or external state changes.
+
+---
+
+## Automatic Release Restoration - Workflow Planning
+**Timestamp**: 2026-09-26T10:29:34Z
+**User Input**: "Approved"
+**AI Response**: "Recorded requirements approval and prepared the execution plan. Proposed reusing the exact main-validation bundle through the existing publishing workflow, verifying original completed releases before no-op decisions, blocking incomplete or conflicting state, and preventing parent cancellation of active publication. Retained manual recovery and all prior safeguards."
+**AI Prompt**: "Workflow Planning Complete. Review automatic-release-execution-plan.md. Approve & Continue to Code Generation planning, Request Changes, or Add Skipped Stages."
+**Context**: One existing delivery unit; reuse prior architecture and designs. Code Generation planning will specify the exact decision table, workflow interfaces and test obligations. PBT-01 through PBT-10 compliant as planning obligations, implementation evidence pending. Security and Resiliency disabled and skipped. Plain Markdown and text workflow representation checked before creation; no code, version or remote mutation performed.
+
+---
+
+## Automatic Release Restoration - Code Generation Planning
+**Timestamp**: 2026-09-26T10:31:49Z
+**User Input**: "Approved"
+**AI Response**: "Recorded workflow-plan approval and prepared eight implementation steps with exact script/test/workflow owners, state decisions, permissions, source-artifact verification and PBT obligations. Official PyPI documentation rules out the proposed reusable Trusted Publisher; amended the design to keep ci-publish.yml standalone with a guarded CI Main completion listener."
+**AI Prompt**: "Code-generation plan ready. Approve & Begin Code Generation, including the standalone listener compatibility amendment, or Request Changes."
+**Context**: Verified primary PyPI troubleshooting and GitHub event/artifact documentation. The listener must bind provenance to the triggering source run, not its own default-branch SHA; no source code from artifacts is executed. PBT-01 through PBT-10 covered in the plan, implementation pending. Security and Resiliency disabled and skipped. Markdown/table syntax checked before edits. No implementation, version change, commit, push, release dispatch or external mutation performed.
+
+---
+
+## Automatic Release Restoration - Approved Implementation
+**Timestamp**: 2026-09-26T10:41:27Z
+**User Input**: "Approved"
+**AI Response**: "Implemented the approved standalone completion listener, source-artifact planner and original-release completion checks. Baseline 86 tests passed; the first new test failed as expected before the planner existed. Extracted and reused source-proof verification, added strict event/API matching and no-mutation state classification, retained manual new/resume and both PR 102 corrections. Focused tests pass; full packaging and docs verification is running."
+**Context**: No version bump, commit, push, release dispatch or remote configuration change. Generated observation sequences test duplicate/idempotent checks and draft/partial/expired transitions against a completion oracle, with seed 20260926 and shrinking retained. Security and Resiliency remain disabled. Local source, workflow and documentation changes only.
+
+---
+
+## Automatic Release Restoration - Code Generation Complete
+**Timestamp**: 2026-09-26T10:45:56Z
+**AI Response**: "Completed the eight-step implementation. Final full packaging rerun: 314 passed, 6 expected skips in 72.02 seconds, including warning-strict Sphinx. Added 72 executable job-condition cases pass; workflow suite 102 passed in 1.28 seconds. Final planner/release suite 87 passed in 8.97 seconds. Ruff, formatting and actionlint with ShellCheck pass. All source/version/publication mutations remain local-only; no commit, push or release was performed."
+**AI Prompt**: "Code Generation Complete. Review the implementation summary. Request Changes or Continue to Next Stage for the formal Build and Test handoff."
+**Context**: Fixed the sole full-run failure, an RST heading underline, and renamed a reserved pytest parameter before final verification. PBT-01 through PBT-10 compliant with evidence in the implementation summary; disabled Security/Resiliency skipped. Existing publisher identity, manual recovery, 95-percent gate and numerical lanes preserved. Hosted workflow activation and OIDC remain unverified until deployment. Legacy 0.6.10 is intentionally blocked without original proof. The execution-plan directory is ignored by existing repository rules; flagged for any later authorized commit.
+
+---
+
+## Automatic Release Restoration - Build and Test
+**Timestamp**: 2026-09-26T11:26:13Z
+**User Input**: "Approved"
+**AI Response**: "Recorded Code Generation approval and updated reproducible build, unit, integration and performance instructions. Running the final combined packaging selection, including the 72 added job-condition cases, and repeating quality gates before completing the handoff."
+**Context**: Existing development environment reused; no dependency or version change. Numerical benchmarks remain unchanged and are not rerun for this delivery-only change. Hosted activation, trusted-publisher compatibility and real publication remain separate from local verification. No commit, push, merge, dispatch or remote settings mutation authorized by this stage approval.
+
+---
+
+## Automatic Release Restoration - Build and Test Complete
+**Timestamp**: 2026-09-26T11:28:45Z
+**AI Response**: "Final combined packaging suite passed: 386 tests, 6 expected skips in 84.71 seconds, including Sphinx and all added gate cases. Ruff, formatting, actionlint with ShellCheck, diff checks and version/lockfile consistency pass. Updated all five build/test instruction and summary files. Changes remain uncommitted and undeployed."
+**AI Prompt**: "Build and test instructions complete. Ready to proceed to Operations stage? Approve & Continue or Request Changes."
+**Context**: Operations is a placeholder, not deployment authorization. PBT-01 through PBT-10 compliant; disabled Security and Resiliency skipped. Version 0.6.10 unchanged; new reviewed version or separately authorized verified legacy recovery remains a deployment prerequisite. No package build/upload, live publishing, commit, push, merge or remote configuration changes performed in this stage.
+
+---
+
+## Automatic Release Restoration - Commit Handoff
+**Timestamp**: 2026-09-26T19:11:12Z
+**User Input**: "Commit"
+**AI Response**: "Inspected the working tree on develop and prepared a scoped local commit of the verified automatic-release implementation, tests and documentation, including the otherwise ignored execution plan. Prior combined verification: 386 passed, 6 expected skips. No unrelated changes identified."
+**Context**: Commit authorized. Operations placeholder closes without deployment. No push, merge, version bump, release dispatch or publisher configuration change is included. Existing extension decisions unchanged. Final patch/lint checks are repeated before staging.
+
+---

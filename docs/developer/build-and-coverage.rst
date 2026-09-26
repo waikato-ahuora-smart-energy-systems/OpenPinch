@@ -37,8 +37,9 @@ provide core-runtime and wheel-install compatibility coverage.
 Release Process
 ---------------
 
-Normal merges to ``main`` validate without publishing or changing versions.
-PR validation is read-only. Explicit release preparation, publication, and
+Main merges validate and automatically publish new, explicitly prepared
+versions after validation succeeds. CI never bumps versions; PR validation
+is read-only. Version preparation, publication, completed-version no-ops and
 same-artifact recovery are described in :doc:`releasing`.
 
 The shared validator owns ordinary branch coverage, docs, TESPy, performance,

@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Delivery Workflow Overhaul — PR 102 Corrections Verified; Commit Handoff
+- **Current Stage**: Automatic Release Restoration — Verified; Commit Handoff Authorized
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -29,6 +29,25 @@
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
 
 ## Delivery Workflow Overhaul
+
+- [x] Automatic-release follow-up: inspected merged workflow and existing version/tag.
+- [x] Resolve version preparation: option A, reviewed committed versions only.
+- [x] Finalize `inception/requirements/automatic-release-requirements.md`.
+- [x] Approve automatic-release requirements before workflow planning (`Approved`).
+- [x] Prepare `inception/plans/automatic-release-execution-plan.md`.
+- [x] Approve execution plan before Code Generation planning (`Approved`).
+- [x] Prepare eight-step `construction/plans/automatic-release-code-generation-plan.md`.
+- [x] Approve implementation including standalone workflow_run compatibility amendment (`Approved`).
+- [x] Implement automatic trigger, read-only release planning and provenance reuse.
+- [x] Add regression, CLI and generated state-sequence tests.
+- [x] Complete packaging, documentation and quality checks; record handoff evidence.
+  Final packaging run: 314 passed, 6 skipped; 72 added job-condition cases pass.
+- [x] Approve Code Generation before formal Build and Test handoff (`Approved`).
+- [x] Update build, unit, integration and performance instructions for restoration.
+- [x] Final combined packaging verification and Build and Test summary:
+  386 passed, 6 expected skips in 84.71 seconds; all quality gates pass.
+- [x] Accept verified work for commit (`Commit`); Operations placeholder closed
+  without deployment, publishing or remote configuration changes.
 
 - [x] PR 102: remove forced Latest promotion and reject existing prereleases.
 - [x] Correction verification: 282 packaging tests and 1 docs smoke passed;

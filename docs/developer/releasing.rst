@@ -1,12 +1,13 @@
-Explicit Releases and Recovery
-==============================
+Automatic Releases and Recovery
+===============================
 
 Ordinary merges and release preparation
 ---------------------------------------------
 
 Develop and main pushes, and ready pull requests, run shared validation.
-Neither a normal main merge nor a PR label/title changes the package version
-or publishes distributions. Prepare a version increase in a normal branch,
+CI never changes the package version. Successful main validation automatically
+publishes a new committed version; PR and develop validation never publish.
+Prepare a version increase in a normal branch,
 update ``pyproject.toml``, ``.bumpversion.toml``, and ``uv.lock`` together, and
 review the diff before committing. Existing bump-my-version configuration may
 be used with ``--no-tag``; the release workflow owns annotated tags.
@@ -15,11 +16,36 @@ Run ``uv lock`` and ``uv run --no-sync python scripts/check_lockfile_version.py`
 after preparing the version. Merge only after the complete PR gate and existing
 review requirements pass. Source code changes are never made by PR validation.
 
-New release
------------
+Automatic new release
+---------------------
+
+After ``CI Main`` completes successfully, ``ci-publish.yml`` (Release and
+Publish) starts as a separate workflow. It verifies the source repository,
+main push, workflow path, commit, full validation evidence and original build
+artifact. It promotes those exact tested bytes without rebuilding or running
+validation again. The listener's checkout supplies trusted automation code;
+the original source run, not the listener's default-branch SHA, identifies the
+release candidate.
+
+A failed or cancelled main run cannot publish. Existing completed versions
+are verified against their original manifest, retained build artifact, tag,
+GitHub assets and both package indexes before a successful no-op is reported.
+A later same-version commit is not a new release and its newly built files
+are not substituted for the original release. Drafts, partial publication,
+prereleases, conflicts or missing/expired proof block automatic publication
+with recovery guidance. A tag alone does not establish completion.
+
+Because this completion proof requires the original CI artifact, automatic
+no-op verification also stops after that artifact expires. Prepare a reviewed
+new version or investigate the original evidence; do not bypass the proof.
+Legacy 0.6.10 artifacts predate this contract and require the separate recovery
+procedure below. Restoring automation does not repair that release implicitly.
+
+Manual new release
+------------------
 
 After publisher/environment compatibility has been verified, a maintainer
-deliberately runs ``ci-publish.yml`` (Explicit Release) on ``main`` with:
+may also run ``ci-publish.yml`` (Release and Publish) on ``main`` with:
 
 * ``mode``: ``new``
 * ``version``: the exact committed ``X.Y.Z`` version
@@ -70,7 +96,8 @@ of an expired artifact's trusted provenance. This implementation stops if the
 original immutable artifact/evidence cannot be verified. Preserve the source
 run and bundle before expiry; do not rebuild under the same version as fallback.
 
-Publishing is serialized across the repository. Active publication is not
+Automatic and manual publishing are serialized across the repository in the
+same non-cancelling workflow lock. Active publication is not
 cancelled by a newer request. Pending requests are not a guaranteed FIFO queue;
 resubmit a cancelled pending request explicitly if still required.
 

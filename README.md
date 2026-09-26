@@ -148,12 +148,13 @@ IDAES extensions and runs this gate automatically. Run it locally with
 
 ## Release Process
 
-Normal merges to `main` validate but do not publish or bump versions. Prepare
-version changes in a normal reviewed PR, then deliberately run **Explicit
-Release** from main with the exact committed version. The workflow validates
-the full candidate, retains an immutable build artifact and manifest, verifies
+Main merges automatically publish new committed versions after successful
+full validation. Prepare version changes in a normal reviewed PR; CI never
+bumps versions. **Release and Publish** promotes the validated candidate's
+immutable build artifact and manifest without rebuilding, verifies
 TestPyPI, verifies production PyPI through the protected `pypi` environment,
-and only then publishes the GitHub release.
+and only then publishes the GitHub release. Completed versions are verified
+before a no-op; incomplete or conflicting versions stop for verified recovery.
 
 Recovery uses the original artifact ID, digest, and run; it never rebuilds or
 replaces a published version. See [Releasing](docs/developer/releasing.rst) for
