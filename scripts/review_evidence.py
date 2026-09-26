@@ -32,7 +32,40 @@ def find_review_run(repo: str, pr: int, head: str) -> int:
     ]
     if not runs:
         raise ValueError("No matching review validation")
-    return max(runs, key=lambda r: r["id"])["id"]
+    for run in sorted(runs, key=lambda r: r["id"], reverse=True):
+        if not _metadata_only_run(repo, run):
+            return run["id"]
+    raise ValueError("No matching review validation")
+
+
+def _metadata_only_run(repo: str, run: dict) -> bool:
+    """Ignore only explicit completed metadata events, never missing proof."""
+    if run.get("status") != "completed" or run.get("conclusion") not in {
+        "success",
+        "failure",
+    }:
+        return False
+    jobs = [
+        job
+        for page in prep.pages(
+            f"repos/{repo}/actions/runs/{run['id']}/jobs?filter=latest&per_page=100"
+        )
+        for job in page["jobs"]
+    ]
+    for name in ("plan", "review-metadata-only"):
+        matches = [job for job in jobs if job["name"] == name]
+        if (
+            len(matches) != 1
+            or matches[0].get("conclusion") != "success"
+            or matches[0].get("run_attempt") != run.get("run_attempt")
+            or run.get("run_attempt") is None
+        ):
+            return False
+    return all(
+        job.get("conclusion") == "skipped"
+        for job in jobs
+        if job["name"] == "validation" or job["name"].startswith("validation / ")
+    )
 
 
 def verify_review_run(

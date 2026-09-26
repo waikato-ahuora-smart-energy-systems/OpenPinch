@@ -39,3 +39,20 @@ Security and Resiliency extensions remain disabled.
 
 No hosted activation, push, PR creation, merge, release or index upload was run.
 The repository version remains 0.6.10; legacy release recovery is not attempted.
+
+## PR 103 review correction
+
+The selector now walks newest-first and ignores only completed metadata-only
+runs with successful explicit marker and plan jobs for the current attempt and
+no executed validation lanes. Missing markers, duplicate markers, attempt
+mismatches, planning failures, cancellation and incomplete runs remain blocking.
+The marker job has no permissions or checkout and excludes draft/base edits.
+Historical unmarked runs fail closed. Existing merge-gate behavior is unchanged.
+
+Added 10 test cases including a generated paginated-history selection oracle.
+Verification: 434 packaging tests passed, 6 expected skips, 142.13 seconds,
+seed 20260715; Ruff, formatting, actionlint and patch hygiene pass. No numerical
+code or package version changed. PBT-01/03/05/07/08/09/10 compliant;
+PBT-02/04/06 N/A (no new codec or state mutation). Disabled extensions skipped.
+P1/P2 assessment posted on PR 103; no new credentials or repository settings.
+Correction remains local and uncommitted; GitHub threads remain unresolved.

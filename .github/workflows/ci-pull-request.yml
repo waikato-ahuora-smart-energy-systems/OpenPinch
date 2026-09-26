@@ -10,6 +10,14 @@ concurrency:
   group: pr-${{ github.event.pull_request.number }}-${{ github.event.action == 'edited' && !github.event.changes.base && 'metadata' || 'candidate' }}
   cancel-in-progress: true
 jobs:
+  review-metadata-only:
+    if: ${{ github.event.action == 'edited' && !github.event.changes.base && !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - run: echo "Metadata-only event; not new review validation evidence."
+
   plan:
     runs-on: ubuntu-latest
     timeout-minutes: 5

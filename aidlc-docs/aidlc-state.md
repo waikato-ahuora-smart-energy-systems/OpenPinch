@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Automatic Version Bumps — Verified and Committed Locally
+- **Current Stage**: PR 103 review correction — verified locally, uncommitted
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -29,6 +29,12 @@
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
 
 ## Delivery Workflow Overhaul
+
+- [x] PR 103 P2 correction: ignore explicitly proven metadata-only runs, retain
+  fail-closed selection for newer real/ambiguous validations; 434 passed,
+  6 expected skips with seed 20260715. Ruff/format/actionlint/diff checks pass.
+- [x] Post P1 documentation clarification and P2 local-fix status on GitHub;
+  no review thread resolution, commit, push, merge or activation performed.
 
 - [x] Record requested automatic-version policy, superseding manual preparation.
 - [x] Resolve bump rule: patch by default, explicit major/minor choices retained.

@@ -49,6 +49,13 @@ the newly reviewed candidate. Never force-push over conflicting branch content.
 If changes arrive after the bump merges, retain its unpublished version and
 rerun normal validation when exact review equivalence no longer holds.
 
+Completed title/body-only edits are excluded from review-evidence selection
+only when the explicit metadata marker and planning job succeeded in the current
+run attempt, with no executed validation lanes. Newer failed, cancelled,
+incomplete or unclassified validation runs still block older evidence. Historical
+metadata runs without the marker require a fresh candidate validation. This
+does not make metadata-only events satisfy the merge gate.
+
 Preparation currently requires concrete full review-lane evidence, so the
 older develop-to-main aggregate-only optimization is disabled for this path.
 After preparation, verified reuse applies to updated PR, develop and main runs.

@@ -89,6 +89,91 @@ def test_review_lanes_can_pass_before_preparation_merge_gate(proof):
     assert verify(item) == (item["source"], item["tree"])
 
 
+def metadata_jobs():
+    return [
+        dict(name=name, conclusion="success", run_attempt=1)
+        for name in ("plan", "review-metadata-only")
+    ] + [dict(name="validation", conclusion="skipped", run_attempt=1)]
+
+
+def review_history(monkeypatch, state, newer, jobs):
+    original = prep.pages
+
+    def pages(endpoint):
+        if "/workflows/" in endpoint:
+            return [{"workflow_runs": [state["run"], newer]}]
+        if "/runs/11/jobs?" in endpoint:
+            return [{"jobs": jobs}]
+        return original(endpoint)
+
+    monkeypatch.setattr(prep, "pages", pages)
+
+
+def test_metadata_edit_preserves_original_verified_review(proof, monkeypatch):
+    item, state = proof
+    newer = dict(state["run"], id=11)
+    review_history(monkeypatch, state, newer, metadata_jobs())
+    assert verify(item) == (item["source"], item["tree"])
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["missing", "duplicate", "attempt", "plan", "validation", "running", "cancelled"],
+)
+def test_ambiguous_or_actual_newer_runs_block_old_proof(proof, monkeypatch, mutation):
+    item, state = proof
+    newer = dict(state["run"], id=11)
+    jobs = metadata_jobs()
+    if mutation == "missing":
+        jobs.pop(1)
+    elif mutation == "duplicate":
+        jobs.append(dict(jobs[1]))
+    elif mutation == "attempt":
+        jobs[1]["run_attempt"] = 2
+    elif mutation == "plan":
+        jobs[0]["conclusion"] = "failure"
+    elif mutation == "validation":
+        jobs.append(dict(name="validation / test", conclusion="failure"))
+    elif mutation == "running":
+        newer["status"] = "in_progress"
+    else:
+        newer["conclusion"] = "cancelled"
+    review_history(monkeypatch, state, newer, jobs)
+    with pytest.raises(ValueError, match="Newer review validation"):
+        verify(item)
+
+
+@given(st.lists(st.booleans(), min_size=1, max_size=20))
+@settings(max_examples=40)
+def test_generated_review_history_selects_latest_nonmetadata(flags):
+    runs = [
+        dict(
+            id=i + 1,
+            head_sha="a" * 40,
+            head_branch="develop",
+            status="completed",
+            conclusion="failure",
+            run_attempt=1,
+        )
+        for i in range(len(flags))
+    ]
+    with pytest.MonkeyPatch.context() as patch:
+
+        def pages(endpoint):
+            if "/workflows/" in endpoint:
+                return [{"workflow_runs": runs[::2]}, {"workflow_runs": runs[1::2]}]
+            run_id = int(endpoint.split("/runs/")[1].split("/")[0])
+            return [{"jobs": metadata_jobs() if flags[run_id - 1] else []}]
+
+        patch.setattr(prep, "pages", pages)
+        candidates = [i + 1 for i, metadata in enumerate(flags) if not metadata]
+        if candidates:
+            assert evidence.find_review_run("owner/repo", 1, "a" * 40) == candidates[-1]
+        else:
+            with pytest.raises(ValueError, match="No matching"):
+                evidence.find_review_run("owner/repo", 1, "a" * 40)
+
+
 def test_empty_github_pr_association_still_requires_merge_proof(proof):
     item, state = proof
     state["run"]["pull_requests"] = []

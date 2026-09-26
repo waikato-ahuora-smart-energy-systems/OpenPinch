@@ -28,3 +28,23 @@ stories skipped. Source files remain at repository root.
 PBT-01 properties in functional design drive steps 2, 3 and 5. PBT-02 through
 PBT-10 covered by generated codec/decision/state tests plus concrete regressions,
 existing Hypothesis and fixed-seed verification. Disabled extensions skipped.
+
+## PR 103 corrective follow-up
+
+Approved by user "Go." after review assessment. No commit, push or merge is
+included in this follow-up. Preserve the existing token/approval activation path.
+Invariant: only explicitly identified, completed metadata-only runs may be
+ignored; newer actual, incomplete or ambiguous validation remains authoritative.
+
+- [x] 9. Add metadata-only marker and conservative review-run classification.
+- [x] 10. Add concrete regressions and generated run-order/selection oracle tests.
+- [x] 11. Run packaging tests and lint; record evidence and review response.
+
+Verification: 434 passed, 6 expected skips in 142.13 seconds; Hypothesis seed
+20260715. Ruff, formatting, actionlint and git diff --check pass. Review response
+posted to PR 103 (issuecomment-5850389548); threads remain unresolved. Local
+changes are not committed or pushed.
+
+PBT-01/03/05/07/08/09/10 apply to selection invariant and oracle (Hypothesis,
+seed 20260715, normal shrinking). PBT-02/04/06 N/A: no new codec, mutation or
+state machine. Security/Resiliency disabled and skipped. Plain Markdown only.

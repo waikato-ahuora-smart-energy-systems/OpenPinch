@@ -24,6 +24,16 @@ def runs(job):
     return "\n".join(step.get("run", "") for step in job.get("steps", []))
 
 
+def test_metadata_marker_only_identifies_ready_non_base_edits():
+    job = workflow("ci-pull-request.yml")["jobs"]["review-metadata-only"]
+    assert job["if"] == (
+        "${{ github.event.action == 'edited' && !github.event.changes.base "
+        "&& !github.event.pull_request.draft }}"
+    )
+    assert job["permissions"] == {}
+    assert all("uses" not in step for step in job["steps"])
+
+
 def test_preparation_authority_and_evidence_contracts():
     prepare = workflow("ci-prepare-release.yml")
     assert prepare["concurrency"]["cancel-in-progress"] == "false"
