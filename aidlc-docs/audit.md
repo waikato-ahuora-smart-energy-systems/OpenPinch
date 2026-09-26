@@ -10156,3 +10156,26 @@ Notebook #10 fails to solve with the error:
 **Context**: Audited and corrected resumed-job skip propagation, artifact digest prefix/actual archive validation, latest validation evidence with original build identity, and idempotent public-release finalization. Initial image-export failure was a sandbox Chrome-launch restriction; corrected environment passed. Temporary-file property latency was bounded at 2 seconds/example after diagnosing the default 200-ms timing failure; shrinking retained. No numerical assertions or budgets reduced. All PBT rules compliant. Disabled Security/Resiliency extensions skipped. No remote settings, package publication, merge, or legacy release recovery. Unrelated Notebook 10 edits excluded. Documents validated as plain Markdown/RST; warning-strict Sphinx passed. Hosted rollout and publisher activation remain pending.
 
 ---
+
+## Delivery Workflow - PR 102 Review
+**Timestamp**: 2026-09-26T08:52:44Z
+**User Input**: "Review the codex audit on github"
+**AI Response**: "Reviewed both Codex P2 comments against the implementation and local gh help. Confirmed forced Latest promotion during older-release recovery and acceptance of existing prereleases. Recommended corrections and regression tests; no remote changes made."
+**Context**: Read-only review of commit 024205249a on PR 102.
+
+---
+
+## Delivery Workflow - Approved Review Corrections
+**Timestamp**: 2026-09-26T08:52:44Z
+**User Input**: "Fix these issues and then commit. "
+**AI Response**: "Removed explicit Latest promotion, leaving selection to GitHub. Rejected existing prereleases and missing or malformed prerelease state before asset operations. Added generated draft/public rejection cases and exact finalization-command regression assertions; updated recovery documentation. Running packaging tests, lint, formatting and patch checks before the authorized local commit."
+**Context**: Corrective steps 13-15 extend the existing approved delivery plan. No new workflow or user stories required. PBT framework, domain generators, shrinking and existing round-trip, invariant, idempotence, oracle and stateful tests retained; seed 20260926. Disabled Security and Resiliency extensions skipped. No remote mutation, merge or publication authorized by this follow-up. Markdown/RST content checked before edits.
+
+---
+
+## Delivery Workflow - Correction Verification
+**Timestamp**: 2026-09-26T08:55:00Z
+**AI Response**: "Verification passed: 282 packaging tests, 6 expected skips, 1 docs deselection in 65.85 seconds; dedicated Sphinx smoke passed in 11.38 seconds. Ruff, formatting and diff checks passed. Preparing the authorized local commit for both review fixes and regression coverage."
+**Context**: An initial docs-only selection against test_docs_consistency.py selected no tests; corrected to test_docs_build.py and passed. PBT-01 through PBT-10 compliant through retained approved coverage plus generated rejection cases and finalization regressions; no shrinking disabled. Security and Resiliency extensions disabled and skipped. No push, merge, publication or remote review resolution performed.
+
+---

@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Delivery Workflow Overhaul — Local Verification Complete; PR Handoff
+- **Current Stage**: Delivery Workflow Overhaul — PR 102 Corrections Verified; Commit Handoff
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -29,6 +29,10 @@
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
 
 ## Delivery Workflow Overhaul
+
+- [x] PR 102: remove forced Latest promotion and reject existing prereleases.
+- [x] Correction verification: 282 packaging tests and 1 docs smoke passed;
+  6 expected skips; Ruff, formatting and patch checks pass. Local commit authorized.
 
 - [x] Resume existing workspace and delivery context; preserve local develop.
 - [x] Identify latest failed main run and inspect upload/verification logs.

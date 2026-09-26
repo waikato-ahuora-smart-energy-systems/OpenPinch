@@ -298,6 +298,8 @@ def stage(manifest: dict, directory: Path) -> bool:
         assets = []
         draft = True
     else:
+        if matching[0].get("prerelease") is not False:
+            raise ValueError("Existing release must explicitly be a stable release")
         assets = matching[0]["assets"]
         draft = matching[0]["draft"]
     names = [item["name"] for item in assets]
@@ -410,13 +412,14 @@ def main() -> int:
                 ):
                     raise ValueError("Index verification failed before finalization")
             if draft:
+                # Leave latest selection to GitHub: recovery may publish an
+                # older version after a newer release has already completed.
                 command(
                     "gh",
                     "release",
                     "edit",
                     f"v{manifest['version']}",
                     "--draft=false",
-                    "--latest",
                 )
         print(json.dumps(manifest, sort_keys=True))
         return 0

@@ -190,6 +190,25 @@ All PBT obligations have implementation evidence in the code summary.
 Security and Resiliency extensions remain disabled. Explicit design security
 and reliability constraints remain mandatory regardless.
 
+## PR 102 review corrections
+
+Authorized by: "Fix these issues and then commit. "
+
+- [x] Step 13: Remove forced Latest promotion on draft finalization; reject
+  existing prereleases and unknown prerelease state before asset operations.
+- [x] Step 14: Extend CLI finalization assertions and generated staging
+  regression cases for draft/public prereleases and malformed state.
+- [x] Step 15: Run release and packaging tests, lint and patch checks; record
+  evidence and commit only this correction. No publication or merge.
+
+Verification: packaging excluding docs, 282 passed, 6 skipped, 1 deselected
+in 65.85 seconds with seed 20260926. Dedicated Sphinx smoke, 1 passed in
+11.38 seconds. Ruff, formatting and patch checks pass. Commit handoff authorized.
+
+PBT-01 through PBT-10 retain the approved unit coverage. New state rejection
+uses bounded domain manifests and explicit malformed-state examples, with
+shrinking enabled. Security and Resiliency extensions remain disabled.
+
 ## Planning completion
 
 - [x] Map approved unit designs and requirements to existing repository owners.

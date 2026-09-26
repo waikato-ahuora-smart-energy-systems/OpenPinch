@@ -35,6 +35,9 @@ TestPyPI, verifies the exact filenames and SHA-256 hashes, and then reaches the
 protected ``pypi`` environment for production publication. After PyPI succeeds
 and both destinations verify, the workflow publishes the GitHub release.
 No public release is declared complete merely because an upload returned 200.
+Existing prereleases (draft or public) are rejected rather than silently
+accepted as stable releases. Recovery leaves Latest selection to GitHub;
+it never explicitly promotes an older resumed release to Latest.
 
 Verification uses a five-minute default visibility budget per destination.
 Absence, matching partial visibility, and transient transport errors may retry;

@@ -66,6 +66,7 @@ def test_real_staging_resumes_interrupted_uploads_without_replacing_bytes(
                             {
                                 "tag_name": "v" + manifest["version"],
                                 "draft": True,
+                                "prerelease": False,
                                 "assets": [{"name": name} for name in assets],
                             }
                         ]
@@ -99,6 +100,40 @@ def test_real_staging_resumes_interrupted_uploads_without_replacing_bytes(
         assert assets == before == {p.name: p.read_bytes() for p in directory.iterdir()}
         assets[release.MANIFEST] = b"conflict"
         with pytest.raises(ValueError, match="differ"):
+            release.stage(manifest, directory)
+
+
+@pytest.mark.parametrize("draft", [False, True])
+@pytest.mark.parametrize("prerelease", [True, None, "false", 0, "missing"])
+@given(manifest=manifests())
+@settings(max_examples=10, deadline=2000)
+def test_staging_rejects_prerelease_or_unknown_state_before_asset_changes(
+    draft, prerelease, manifest
+):
+    with (
+        tempfile.TemporaryDirectory() as temporary,
+        pytest.MonkeyPatch.context() as patch,
+    ):
+        directory = Path(temporary)
+        manifest = write_bundle(directory, manifest)
+        existing = {
+            "tag_name": "v" + manifest["version"],
+            "draft": draft,
+            "assets": [],
+        }
+        if prerelease != "missing":
+            existing["prerelease"] = prerelease
+
+        def command(*args):
+            if args[:3] == ("git", "tag", "--list"):
+                return existing["tag_name"]
+            if args[:2] == ("gh", "api"):
+                return json.dumps([[existing]])
+            pytest.fail(f"Unexpected release mutation or asset access: {args}")
+
+        patch.setattr(release, "command", command)
+        patch.setattr(release, "verify_tag", lambda _: None)
+        with pytest.raises(ValueError, match="stable release"):
             release.stage(manifest, directory)
 
 
@@ -307,6 +342,8 @@ def test_cli_proof_uses_latest_validation_without_rebuilding_original_attempt(
     def command(*args):
         if args[:3] == ("gh", "release", "edit"):
             assert len(verified) == 2
+            # Recovery must not override Latest, even for an older version.
+            assert args == ("gh", "release", "edit", "v1.2.3", "--draft=false")
             published.append(args)
             return ""
         if args[:2] == ("gh", "api"):
