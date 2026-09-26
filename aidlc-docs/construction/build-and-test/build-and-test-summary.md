@@ -1,4 +1,38 @@
-# Build and Test Summary - Test-Suite Runtime Reduction
+# Build and Test Summary
+
+## Delivery Workflow Overhaul - 2026-09-26
+
+- Complete ordinary lane: 3451 passed, 6 expected skips, 65 deselected in
+  382.68 seconds; branch-aware coverage report passed the 95-percent gate.
+- Final packaging suite after the last recovery audit: 273 passed, 6 expected
+  skips in 63.17 seconds. Includes 28 additional finalization cases added after
+  the complete ordinary run and a successful warning-strict documentation build.
+- Specialized suites: 64 passed, 1 existing environment-dependent solver skip
+  in 214.30 seconds; 58 TESPy, 2 performance, 1 docs, 4 solver cases represented.
+- Final collection: 3485 ordinary cases (including six expected skips), 65
+  specialized cases, and no overlapping specialized markers.
+- OpenPinch 0.6.10 wheel/sdist built; separate temporary core/TESPy environments
+  passed installed-artifact smoke checks, with imports outside the checkout.
+- Ruff, changed-file formatting, actionlint 1.7.12 with ShellCheck 0.11.0,
+  lock validation, and patch hygiene passed. Existing unrelated formatting
+  differences and Notebook 10 edits are not included.
+- Initial failures were diagnosed, not retried blindly: sandbox blocked
+  Chrome image export; filesystem-property timing needed a finite 2-second
+  allowance rather than the pure-function 200-ms default. Both were verified
+  after correction. Numerical assertions and budgets were not weakened.
+- All PBT-01 through PBT-10 obligations are compliant; detailed evidence is in
+  `../delivery-workflow/code/implementation-summary.md`. Security and Resiliency
+  extensions remain disabled (N/A).
+- Local implementation/build/test complete. Hosted PR checks, required-check
+  activation, trusted-publisher configuration, and actual publication remain
+  separate verification layers. No merge, dispatch, publishing, legacy release
+  recovery, or remote settings change was performed.
+
+The instructions in this directory cover reproducible build, unit, integration,
+performance, and E2E verification. The historical results below are retained
+for comparison, not presented as current suite size or a new speedup claim.
+
+## Historical Test-Suite Runtime Reduction
 
 ## Build Status
 

@@ -37,67 +37,32 @@ provide core-runtime and wheel-install compatibility coverage.
 Release Process
 ---------------
 
-Production publication is automated from the ``main`` branch:
+Normal merges to ``main`` validate without publishing or changing versions.
+PR validation is read-only. Explicit release preparation, publication, and
+same-artifact recovery are described in :doc:`releasing`.
 
-1. for a same-repository pull request targeting ``main``, the PR workflow
-   automatically advances an unchanged release version before validating it;
-   a ``major``, ``minor``, or ``patch`` label takes precedence, followed by a
-   matching title marker such as ``[minor]``, with ``patch`` as the default
-2. let the generated bump commit update ``pyproject.toml``, ``uv.lock``, and
-   ``.bumpversion.toml`` together; the ordered release-version job checks out
-   and validates that updated head, and any later ``synchronize`` run or manual
-   rerun recognizes the forward version without another commit
-3. note that fork pull requests remain read-only and must provide a synchronized
-   forward version in the contributor branch; merge only after the validation
-   jobs, external-solver suite, and aggregate ``pr-gate`` result pass
-4. let the main-branch workflow repeat the test, documentation, solver, build,
-   and cross-platform artifact gates
-5. after validation, the workflow creates the annotated version tag and a
-   draft GitHub release containing checksummed release artifacts, then
-   publishes the same distributions to TestPyPI; exact filename and SHA-256
-   preflight/postflight checks safely distinguish absent, partial, complete,
-   and mismatched index state
-6. after TestPyPI succeeds:
-
-   * it publishes the GitHub release before production PyPI
-   * it dispatches the same workflow at the version tag
-7. the tag-ref run verifies the source push, workflow identity, latest required
-   jobs, and immutable build artifact ID, digest, and build attempt; it then
-   requires the public release files to match that artifact byte-for-byte
-   without rebuilding and waits at the protected ``pypi`` environment
-8. after approval, PyPI Trusted Publishing uploads the verified distributions
-   and a separate unprivileged job confirms the version through the PyPI API
-
-The automatic pull-request bump is idempotent: a candidate already greater than
-the base is validated without another commit, while a candidate behind the base
-fails for manual reconciliation. Version bumping does not create a local tag.
-The release workflow owns the ``v{project.version}`` tag and rejects malformed
-versions, lock mismatches, or an existing tag that points to a different commit.
-A production failure can
-therefore leave a public GitHub Release while PyPI is pending. Open the
-original tag run and select **Re-run failed jobs**. Exact index preflight,
-``skip-existing``, and a separately retryable availability check recover an
-absent, partial, or already-complete release without accepting mismatched
-files. Do not start a fresh tag dispatch when the upload may already have
-succeeded.
+The shared validator owns ordinary branch coverage, docs, TESPy, performance,
+optional installs, and cross-platform artifact smoke. Main PRs, main pushes,
+and new releases additionally require solver validation. Ordinary coverage
+remains 95 percent. Exact compatible develop evidence may replace integration
+lanes; it never replaces main's solver requirement.
 
 Repository Controls
 -------------------
 
-Keep the repository controls aligned with the workflow contract:
+Require ``OpenPinch PR Gate`` after its hosted check name has been verified.
+The temporary ``test`` compatibility check also requires the complete gate;
+remove it only after the new required-check configuration is active. Preserve
+existing review, strictness, and tag protections during migration. Remote
+settings changes require separate authorization and verification.
 
-* require full-length commit SHAs for Actions and keep the default
-  ``GITHUB_TOKEN`` read-only; grant write scopes only on the release jobs that
-  need them
-* do not let GitHub Actions create or approve pull requests
-* require pull requests, conversation resolution, an up-to-date branch, and
-  the unique ``pr-gate`` check before merging ``main``; do not require a Code
-  Owner review unless the repository contains a maintained ``CODEOWNERS`` file
-* protect stable ``v*.*.*`` tags from updates and deletion while leaving tag
-  creation available to the release workflow
-* retain a reviewer on the protected ``pypi`` environment; a sole-maintainer
-  repository cannot also require self-review prevention without introducing a
-  second eligible reviewer
+PR description-only edits do not run expensive validation. They do not create
+new success evidence: reopen a ready PR or push a candidate change if a new
+complete gate is required. Base-branch edits trigger the appropriate profile.
+
+Retain the protected ``pypi`` environment and trusted-publisher configuration.
+Before activating explicit main-context publication, verify allowed refs and
+reviewer settings without weakening them to make a run pass.
 
 Alternative Direct Sphinx Build
 -------------------------------
@@ -128,7 +93,7 @@ Current Quality Gates
 ---------------------
 
 - CI runs Ruff, a warning-free docs build, and the non-solver suite with a 95%
-  line-coverage floor.
+  branch-aware coverage floor.
 - Every published optional extra, including ``synthesis``, has an isolated
   installation smoke check.
 - Generated wheels are installed and smoke-tested on Ubuntu, Windows, and macOS.

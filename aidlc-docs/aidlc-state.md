@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-07-12T21:17:32Z
-- **Current Stage**: Test-Suite Runtime Reduction — Code Generation Step 12 of 13
+- **Current Stage**: Delivery Workflow Overhaul — Local Verification Complete; PR Handoff
 
 ## Workspace State
 - **Existing Code**: Yes
@@ -27,6 +27,46 @@
 | Security Baseline | No | Utility Placement Requirements Analysis |
 | Property-Based Testing | Yes | Utility Placement Requirements Analysis |
 | Resiliency Baseline | No | Utility Placement Requirements Analysis |
+
+## Delivery Workflow Overhaul
+
+- [x] Resume existing workspace and delivery context; preserve local develop.
+- [x] Identify latest failed main run and inspect upload/verification logs.
+- [x] Confirm TestPyPI now exposes the exact uploaded distribution hashes.
+- [x] Inspect workflow sequencing and public main-branch enforcement rules.
+- [x] Record seven improvement areas and proposed acceptance criteria.
+- [x] Resolve release-initiation policy in
+  `inception/requirements/delivery-workflow-questions.md`.
+- [x] Finalize approved requirements: explicit releases, retained develop/main,
+  and all seven improvement areas.
+- [x] Prepare execution plan with staged merge-gate migration.
+- [x] Obtain execution-plan approval before Functional Design (`go]`).
+- [x] Generate functional design entities, transitions, rules, and properties.
+- [x] Approve Functional Design before NFR Requirements (`Continue`).
+- [x] Define N01-N18 and technology decisions; PBT-09 compliant.
+- [x] Approve NFR Requirements before NFR Design (`Continue`).
+- [x] Specify NFR patterns, logical components, and requirement traceability.
+- [x] Approve NFR Design before Infrastructure Design (`Continue`).
+- [x] Define workflow ownership, permissions, artifact handling, and rollout.
+- [x] Approve Infrastructure Design before Code Generation planning (`Continue`).
+- [x] Complete Code Generation Part 1: twelve-step implementation/test plan.
+- [x] Approve Code Generation Part 2; commit and PR authorized after completion.
+- [x] Implement Code Generation steps 1-10: shared lanes, complete gates,
+  bounded polling, exact-artifact recovery, behavioral tests, and documentation.
+- [x] Focused audit: real interrupted staging, archive digests, latest retry
+  evidence, actionlint with ShellCheck, Ruff, lock and patch validation.
+- [x] Final complete coverage run: 3451 passed, 6 expected skips, 95-percent
+  gate passed; final packaging selection 273 passed, 6 expected skips.
+- [x] Specialized selection: 64 passed, 1 existing solver skip; built wheel
+  and sdist; isolated core and TESPy installs passed.
+- [x] All twelve code-generation steps and local build/test evidence complete.
+- Commit and PR handoff authorized and proceeding on
+  `codex/delivery-workflow-overhaul`; no merge or publishing authorized.
+- Code plan: `construction/plans/delivery-workflow-code-generation-plan.md`.
+- Requirements: `inception/requirements/delivery-workflow-requirements.md`.
+- Plan: `inception/plans/delivery-workflow-execution-plan.md`.
+- Investigation: `inception/requirements/delivery-workflow-investigation.md`.
+- No code, workflow, publication, merge, or remote settings changes performed.
 
 ## Notebook 10 HPR Screening Reliability
 

@@ -148,46 +148,18 @@ IDAES extensions and runs this gate automatically. Run it locally with
 
 ## Release Process
 
-1. For a same-repository pull request targeting `main`, the PR workflow
-   automatically advances an unchanged release version before validating it.
-   A `major`, `minor`, or `patch` label takes precedence, followed by a matching
-   title marker such as `[minor]`; the default is `patch`. The bump updates
-   `pyproject.toml`, `uv.lock`, and `.bumpversion.toml` together without creating
-   a tag. Fork pull requests remain read-only and must provide those synchronized
-   forward-version changes in the contributor branch.
-2. The ordered release-version job checks out and validates the updated PR head
-   after the bump. Any later `synchronize` run or manual rerun recognizes the
-   already-forward version without another commit. Merge only after the
-   validation jobs, external-solver suite, and aggregate `pr-gate` result pass.
-3. The main-branch workflow repeats the test, documentation, solver, build, and
-   cross-platform artifact gates.
-4. After those gates pass, it creates the annotated version tag and a draft
-   GitHub release with checksummed release artifacts, then publishes the same
-   distributions to TestPyPI. Preflight and postflight checks require the exact
-   expected filenames and SHA-256 hashes, including safe recovery from a
-   partial upload.
-5. After TestPyPI succeeds:
-   - it publishes the GitHub release before production PyPI
-   - it dispatches the same workflow at the version tag
-6. The tag-ref run verifies the source push, workflow, prerequisite jobs, and
-   immutable build artifact ID, digest, and build attempt. It then requires the
-   public release files to match that artifact byte-for-byte without rebuilding
-   and waits at the protected `pypi` environment.
-7. Approve that deployment to use PyPI Trusted Publishing; the workflow uploads
-   the verified distributions and confirms the version through the PyPI API.
+Normal merges to `main` validate but do not publish or bump versions. Prepare
+version changes in a normal reviewed PR, then deliberately run **Explicit
+Release** from main with the exact committed version. The workflow validates
+the full candidate, retains an immutable build artifact and manifest, verifies
+TestPyPI, verifies production PyPI through the protected `pypi` environment,
+and only then publishes the GitHub release.
 
-The automatic pull-request bump is idempotent: a candidate already greater than
-the base is validated without another commit, while a candidate behind the base
-fails for manual reconciliation. Version bumping does not create a tag. The
-release workflow owns tags and rejects malformed versions, mismatched lock
-metadata, or an existing tag that points anywhere other than the main-branch
-release commit. If production
-publication or its availability check fails after the GitHub Release becomes
-public, open the original tag run and select **Re-run failed jobs**. Exact index
-preflight, `skip-existing`, and a separately retryable availability check make
-an absent, partial, or already-complete release recoverable without accepting
-mismatched files. Do not start a fresh tag dispatch when the upload may already
-have succeeded.
+Recovery uses the original artifact ID, digest, and run; it never rebuilds or
+replaces a published version. See [Releasing](docs/developer/releasing.rst) for
+preparation, dispatch, recovery, and required-check migration instructions.
+Require **OpenPinch PR Gate** after observing that check on a real PR. The
+transitional `test` check also depends on the complete gate.
 
 Build the documentation locally:
 

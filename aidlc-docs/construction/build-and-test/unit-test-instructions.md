@@ -1,4 +1,22 @@
-# Unit Test Execution - Test-Suite Runtime Reduction
+# Unit Test Execution - Delivery Workflow
+
+## Delivery regression contracts
+
+```bash
+uv run --no-sync pytest tests/packaging --hypothesis-seed=20260715 -m "not docs" -q
+```
+
+Includes parsed YAML, executable aggregate gates, complete evidence reuse,
+fake-clock index verification, manifest/archive round trips, real staging
+logic with fake external commands, and interrupted-recovery properties.
+No index calls, real sleeps, uploads, or tag mutations occur in these tests.
+Temporary-file properties use a bounded two-second per-example allowance
+because filesystem latency is not a pure-function performance requirement;
+shrinking and the fixed seed remain enabled.
+
+Current verification results are in `build-and-test-summary.md`. Historical
+runtime-reduction counts below are retained as baseline evidence, not current
+suite size.
 
 ## Scope
 

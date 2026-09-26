@@ -1,15 +1,15 @@
-name: CI Develop
+name: CI Main
 on:
   push:
-    branches: ["develop"]
+    branches: ["main"]
 permissions:
   contents: read
 concurrency:
-  group: develop-${{ github.ref }}
+  group: main-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   validation:
     uses: ./.github/workflows/ci-validation.yml
     with:
       candidate: ${{ github.sha }}
-      profile: integration
+      profile: full

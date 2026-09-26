@@ -1,4 +1,18 @@
-# Integration Test Instructions - Test-Suite Runtime Reduction
+# Integration Test Instructions - Delivery Workflow
+
+## Delivery orchestration
+
+Run `tests/packaging/test_delivery_workflows.py` and
+`tests/packaging/test_release_manifest.py` with seed `20260715`. Required
+failures, cancellations, missing proof, wrong attempts, changed trees,
+partial uploads, conflicting bytes, and invalid artifact archives must fail
+closed. Recovery must retain the build identity while checking the latest
+source-run validation jobs. The workflow lint check includes ShellCheck.
+
+Local emulation does not prove GitHub scheduler behavior, cross-platform
+installation, branch-protection activation, or OIDC publisher configuration.
+Observe the real PR before activating the new required check. Publication
+and remote settings require separate authorization.
 
 ## Purpose
 

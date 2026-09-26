@@ -1,0 +1,354 @@
+name: Shared Validation
+on:
+  workflow_call:
+    inputs:
+      candidate:
+        required: true
+        type: string
+      profile:
+        required: true
+        type: string
+      reuse-integration:
+        default: false
+        type: boolean
+    outputs:
+      artifact_id:
+        value: ${{ jobs.artifact-build.outputs.artifact_id }}
+      artifact_digest:
+        value: ${{ jobs.artifact-build.outputs.artifact_digest }}
+permissions:
+  contents: read
+env:
+  PYTHON_VERSION: "3.14.2"
+  UV_VERSION: "0.11.29"
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      surfaces: ${{ steps.matrix.outputs.surfaces }}
+      runners: ${{ steps.matrix.outputs.runners }}
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          ref: ${{ inputs.candidate }}
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.14.2"
+      - id: matrix
+        run: python -m scripts.ci_policy matrix >> "$GITHUB_OUTPUT"
+  test:
+    if: ${{ !inputs.reuse-integration }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.candidate }}
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --frozen --group dev
+      - run: uv run --no-sync python scripts/check_lockfile_version.py
+      - run: uv run --no-sync ruff check .
+      - run: uv run --no-sync coverage run --branch --source=OpenPinch -m pytest --hypothesis-seed=20260715 -m "$(uv run --no-sync python -m scripts.ci_policy selector --lane test)" --junitxml=reports/test.xml --durations=20
+      - run: uv run --no-sync coverage report --fail-under=95
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: ${{ always() }}
+        with:
+          name: reports-test-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/
+          retention-days: 30
+          if-no-files-found: warn
+
+  docs:
+    if: ${{ !inputs.reuse-integration }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.candidate }}
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          save-cache: false
+      - run: uv sync --frozen --group dev
+      - run: uv run --no-sync pytest --hypothesis-seed=20260715 -m "$(uv run --no-sync python -m scripts.ci_policy selector --lane docs)" --junitxml=reports/docs.xml --durations=20
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: ${{ always() }}
+        with:
+          name: reports-docs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/
+          retention-days: 30
+          if-no-files-found: warn
+
+  optional-install-smoke:
+    needs: policy
+    if: ${{ !inputs.reuse-integration }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        surface: ${{ fromJSON(needs.policy.outputs.surfaces) }}
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.candidate }}
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          save-cache: false
+      - name: Install locked package surface
+        env:
+          SURFACE: ${{ matrix.surface }}
+        run: |
+          case "${SURFACE}" in
+            core) uv sync --frozen --no-default-groups ;;
+            *) uv sync --frozen --no-default-groups --extra "${SURFACE}" ;;
+          esac
+      - run: uv run --no-sync python scripts/optional_install_smoke.py ${{ matrix.surface }}
+
+  hpr-tespy-tests:
+    if: ${{ !inputs.reuse-integration }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.candidate }}
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          save-cache: false
+      - run: uv sync --frozen --group dev --extra tespy
+      - run: timeout 900s uv run --no-sync pytest --hypothesis-seed=20260715 -m "$(uv run --no-sync python -m scripts.ci_policy selector --lane hpr-tespy-tests)" --junitxml=reports/hpr-tespy-tests.xml --durations=20
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: ${{ always() }}
+        with:
+          name: reports-hpr-tespy-tests-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/
+          retention-days: 30
+          if-no-files-found: warn
+
+  performance-tests:
+    if: ${{ !inputs.reuse-integration }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.candidate }}
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          save-cache: false
+      - run: uv sync --frozen --group dev
+      - run: timeout 900s uv run --no-sync pytest --hypothesis-seed=20260715 -m "$(uv run --no-sync python -m scripts.ci_policy selector --lane performance-tests)" --junitxml=reports/performance-tests.xml --durations=20
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: ${{ always() }}
+        with:
+          name: reports-performance-tests-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/
+          retention-days: 30
+          if-no-files-found: warn
+
+  artifact-build:
+    if: ${{ !inputs.reuse-integration }}
+    needs: [hpr-tespy-tests, performance-tests]
+    outputs:
+      artifact_id: ${{ steps.distribution.outputs.artifact-id }}
+      artifact_digest: ${{ format('sha256:{0}', steps.distribution.outputs.artifact-digest) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.candidate }}
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          save-cache: false
+      - run: uv sync --frozen --group dev
+      - run: uv run --no-sync python scripts/build_dist.py
+      - run: uv run --no-sync python -m scripts.release_manifest create
+      - id: distribution
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: openpinch-dist-${{ github.run_id }}-${{ github.run_attempt }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+  artifact-install-smoke:
+    if: ${{ !inputs.reuse-integration }}
+    needs: [artifact-build, policy]
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.policy.outputs.runners) }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.candidate }}
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          save-cache: ${{ runner.os != 'Linux' }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          artifact-ids: ${{ needs.artifact-build.outputs.artifact_id }}
+          path: dist
+      - run: uv sync --frozen --no-default-groups
+      - run: uv pip install --python .venv --no-deps --reinstall --no-index --find-links dist OpenPinch
+      - run: uv run --no-sync python scripts/artifact_install_smoke.py --surface core
+
+  artifact-install-tespy-smoke:
+    if: ${{ !inputs.reuse-integration }}
+    needs: artifact-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.candidate }}
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          save-cache: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          artifact-ids: ${{ needs.artifact-build.outputs.artifact_id }}
+          path: dist
+      - run: uv sync --frozen --no-default-groups --extra tespy
+      - run: uv pip install --python .venv --no-deps --reinstall --no-index --find-links dist OpenPinch
+      - run: uv run --no-sync python scripts/artifact_install_smoke.py --surface tespy
+  solver-tests:
+    if: ${{ inputs.profile == 'full' }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.candidate }}
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          save-cache: false
+      - run: uv sync --frozen --group dev
+      - name: Install IDAES solver binaries
+        run: uv run --no-sync idaes get-extensions
+      - name: Verify IDAES solver binaries
+        run: >-
+          uv run --no-sync python -c
+          "import idaes;
+          from pyomo.environ import SolverFactory;
+          required = ('couenne', 'ipopt');
+          unavailable = [name for name in required if not
+          SolverFactory(name).available(exception_flag=False)];
+          assert not unavailable, f'Unavailable solver binaries: {unavailable}'"
+      - run: uv run --no-sync pytest --hypothesis-seed=20260715 -m "$(uv run --no-sync python -m scripts.ci_policy selector --lane solver-tests)" --junitxml=reports/solver-tests.xml --durations=20
+
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: ${{ always() }}
+        with:
+          name: reports-solver-tests-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/
+          retention-days: 30
+          if-no-files-found: warn
+
+  workflow-lint:
+    if: ${{ !inputs.reuse-integration }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          ref: ${{ inputs.candidate }}
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.14.2"
+      - name: Validate workflow contracts
+        run: |
+          curl --fail --silent --show-error --location --max-time 60 -o "$RUNNER_TEMP/actionlint.tar.gz" https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -color
+
+  gate:
+    name: delivery-v1
+    if: ${{ always() }}
+    needs: [test, docs, optional-install-smoke, hpr-tespy-tests, performance-tests, artifact-build, artifact-install-smoke, artifact-install-tespy-smoke, solver-tests, workflow-lint]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          ref: ${{ inputs.candidate }}
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.14.2"
+      - name: Require complete lane evidence
+        env:
+          LANE_RESULTS: ${{ toJSON(needs) }}
+          PROFILE: ${{ inputs.profile }}
+          REUSE_INTEGRATION: ${{ inputs.reuse-integration }}
+        run: python -m scripts.ci_policy gate --profile "$PROFILE"
+      - name: Identify evaluated source
+        run: git rev-parse HEAD 'HEAD^{tree}' >> "$GITHUB_STEP_SUMMARY"

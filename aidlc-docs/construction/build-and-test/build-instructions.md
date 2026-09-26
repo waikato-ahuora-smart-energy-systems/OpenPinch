@@ -1,4 +1,17 @@
-# Build Instructions - Test-Suite Runtime Reduction
+# Build Instructions - Delivery Workflow
+
+## Delivery-specific validation
+
+The shared workflow is `.github/workflows/ci-validation.yml`; callers select
+integration or full profiles from `scripts/ci_policy.py`. Run pinned
+actionlint 1.7.12 with ShellCheck over all workflows, then the existing static
+and build commands below. Artifact smoke environments must be separate for
+core and TESPy; the core check intentionally rejects installed TESPy.
+
+Do not dispatch the publishing workflow as a test. Local builds are not
+trusted release bundles: CI supplies immutable source/run/attempt identity.
+Release initiation, resume, and configuration activation are documented in
+`docs/developer/releasing.rst`.
 
 ## Prerequisites
 
@@ -44,10 +57,10 @@ Expected result: both commands exit zero.
 uv run --no-sync python scripts/build_dist.py
 ```
 
-Expected artifacts for version 0.6.9:
+Expected artifacts for version 0.6.10:
 
-- `dist/openpinch-0.6.9-py3-none-any.whl`
-- `dist/openpinch-0.6.9.tar.gz`
+- `dist/openpinch-0.6.10-py3-none-any.whl`
+- `dist/openpinch-0.6.10.tar.gz`
 
 Both archives must contain
 `OpenPinch/tutorials/notebooks/19_utility_placement_optimisation.ipynb`.
@@ -60,7 +73,7 @@ cannot satisfy the import accidentally:
 ```bash
 uv venv --python 3.14.2 /tmp/openpinch-wheel-smoke/.venv
 uv pip install --python /tmp/openpinch-wheel-smoke/.venv/bin/python \
-  dist/openpinch-0.6.9-py3-none-any.whl
+  dist/openpinch-0.6.10-py3-none-any.whl
 cd /tmp/openpinch-wheel-smoke
 .venv/bin/python /path/to/OpenPinch/scripts/artifact_install_smoke.py \
   --repo-root /path/to/OpenPinch --surface core

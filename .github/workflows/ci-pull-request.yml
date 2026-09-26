@@ -1,475 +1,82 @@
 name: PR Validation
-
 on:
   pull_request:
     branches: ["main", "develop"]
-    types: [opened, synchronize, reopened, ready_for_review, edited]
-
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, edited]
 permissions:
   contents: read
-
 concurrency:
-  group: pr-${{ github.event.pull_request.number }}
+  group: pr-${{ github.event.pull_request.number }}-${{ github.event.action == 'edited' && !github.event.changes.base && 'metadata' || 'candidate' }}
   cancel-in-progress: true
-
-env:
-  PYTHON_VERSION: "3.14.2"
-  UV_VERSION: "0.11.29"
-
 jobs:
-  develop-validation:
-    if: ${{ github.event.action != 'closed' && github.event.pull_request.draft == false }}
+  plan:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
       actions: read
     outputs:
-      reuse: ${{ steps.develop.outputs.reuse }}
+      run: ${{ steps.event.outputs.run }}
+      profile: ${{ steps.event.outputs.profile }}
+      reuse: ${{ steps.proof.outputs.reuse }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
-          persist-credentials: false
+          ref: ${{ github.sha }}
           fetch-depth: 2
+          persist-credentials: false
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Check completed develop validation for this exact source tree
-        id: develop
+          python-version: "3.14.2"
+      - id: event
+        run: python -m scripts.plan_ci_event
+      - id: proof
+        if: ${{ steps.event.outputs.run == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 scripts/reuse_develop_ci.py
+        run: python -m scripts.reuse_develop_ci
 
-  test:
-    needs: develop-validation
-    if: ${{ !cancelled() && github.event.action != 'closed' && github.event.pull_request.draft == false }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - if: ${{ needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true' }}
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          persist-credentials: false
-      - if: ${{ needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true' }}
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - if: ${{ needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true' }}
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-      - if: ${{ needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true' }}
-        run: uv sync --frozen --group dev
-      - if: ${{ needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true' }}
-        run: uv run --no-sync python scripts/check_lockfile_version.py
-      - if: ${{ needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true' }}
-        run: uv run --no-sync ruff check .
-      - if: ${{ needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true' }}
-        run: uv run --no-sync coverage run --branch --source=OpenPinch -m pytest --hypothesis-seed=20260715 -m "not solver and not tespy and not performance and not docs"
-      - if: ${{ needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true' }}
-        run: uv run --no-sync coverage report --fail-under=95
-      - name: Accept verified develop validation
-        if: ${{ needs.develop-validation.result == 'success' && needs.develop-validation.outputs.reuse == 'true' }}
-        run: echo "The same source tree passed every CI Develop validation job."
-
-  bump-version:
-    if: >-
-      ${{
-        github.event.action != 'closed' &&
-        github.event.pull_request.draft == false &&
-        github.event.pull_request.base.ref == 'main' &&
-        github.event.pull_request.head.repo.full_name == github.repository
-      }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    steps:
-      - name: Check out the latest pull-request head
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
-          persist-credentials: true
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          save-cache: false
-      - name: Resolve the requested version part
-        id: bump-part
-        shell: bash
-        env:
-          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-        run: |
-          set -euo pipefail
-          BUMP_PART="patch"
-          NORMALIZED_LABELS=",${PR_LABELS,,},"
-          if [[ "${NORMALIZED_LABELS}" == *",major,"* ]]; then
-            BUMP_PART="major"
-          elif [[ "${NORMALIZED_LABELS}" == *",minor,"* ]]; then
-            BUMP_PART="minor"
-          elif [[ "${NORMALIZED_LABELS}" == *",patch,"* ]]; then
-            BUMP_PART="patch"
-          elif [[ "${PR_TITLE,,}" =~ \[(major|minor|patch)\] ]]; then
-            BUMP_PART="${BASH_REMATCH[1]}"
-          fi
-          echo "part=${BUMP_PART}" >> "${GITHUB_OUTPUT}"
-      - name: Advance an equal release version exactly once
-        env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-          BASE_REPOSITORY: ${{ github.event.pull_request.base.repo.full_name }}
-          BUMP_PART: ${{ steps.bump-part.outputs.part }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch --no-tags \
-            "https://github.com/${BASE_REPOSITORY}.git" \
-            "${BASE_REF}:refs/remotes/pull-base/${BASE_REF}"
-          git show \
-            "refs/remotes/pull-base/${BASE_REF}:pyproject.toml" \
-            > "${RUNNER_TEMP}/base-pyproject.toml"
-
-          BUMP_TOOL=(uvx --from "bump-my-version==1.2.3" bump-my-version)
-          CURRENT_VERSION="$(python scripts/check_release_version.py)"
-          BASE_VERSION="$(python scripts/check_release_version.py \
-            --pyproject "${RUNNER_TEMP}/base-pyproject.toml")"
-          CONFIG_VERSION="$("${BUMP_TOOL[@]}" show current_version)"
-
-          if [ "${CONFIG_VERSION}" != "${CURRENT_VERSION}" ]; then
-            echo ".bumpversion.toml version '${CONFIG_VERSION}' does not match project version '${CURRENT_VERSION}'." >&2
-            exit 1
-          fi
-
-          if [ "${CURRENT_VERSION}" = "${BASE_VERSION}" ]; then
-            "${BUMP_TOOL[@]}" bump "${BUMP_PART}" --no-tag
-            python scripts/check_lockfile_version.py
-            python scripts/check_release_version.py \
-              --base-pyproject "${RUNNER_TEMP}/base-pyproject.toml"
-            git push origin "HEAD:refs/heads/${HEAD_REF}"
-          elif ! python scripts/check_release_version.py \
-            --base-pyproject "${RUNNER_TEMP}/base-pyproject.toml"; then
-            echo "Candidate version '${CURRENT_VERSION}' is behind base version '${BASE_VERSION}'; refusing a speculative bump." >&2
-            exit 1
-          else
-            echo "Candidate version '${CURRENT_VERSION}' is already forward; no bump required."
-          fi
-
-  release-version:
-    needs: bump-version
-    if: >-
-      ${{
-        always() &&
-        github.event.action != 'closed' &&
-        github.event.pull_request.draft == false &&
-        github.event.pull_request.base.ref == 'main' &&
-        (
-          needs.bump-version.result == 'success' ||
-          github.event.pull_request.head.repo.full_name != github.repository
-        )
-      }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Check out the latest pull-request head
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          save-cache: false
-      - run: uv sync --frozen --no-default-groups
-      - run: uv run --no-sync python scripts/check_lockfile_version.py
-      - name: Require a forward release version
-        env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-          BASE_REPOSITORY: ${{ github.event.pull_request.base.repo.full_name }}
-        run: |
-          set -euo pipefail
-          git fetch --no-tags \
-            "https://github.com/${BASE_REPOSITORY}.git" \
-            "${BASE_REF}:refs/remotes/pull-base/${BASE_REF}"
-          git show \
-            "refs/remotes/pull-base/${BASE_REF}:pyproject.toml" \
-            > "${RUNNER_TEMP}/base-pyproject.toml"
-          uv run --no-sync python scripts/check_release_version.py --base-pyproject "${RUNNER_TEMP}/base-pyproject.toml"
-
-  docs:
-    needs: develop-validation
-    if: ${{ !cancelled() && github.event.action != 'closed' && github.event.pull_request.draft == false && (needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          save-cache: false
-      - run: uv sync --frozen --group dev
-      - run: uv run --no-sync pytest --hypothesis-seed=20260715 -m "docs"
-
-  optional-install-smoke:
-    needs: develop-validation
-    if: ${{ !cancelled() && github.event.action != 'closed' && github.event.pull_request.draft == false && (needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        surface: [core, dashboard, notebook, brayton_cycle, tespy, synthesis]
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          save-cache: false
-      - name: Install locked package surface
-        env:
-          SURFACE: ${{ matrix.surface }}
-        run: |
-          case "${SURFACE}" in
-            core) uv sync --frozen --no-default-groups ;;
-            *) uv sync --frozen --no-default-groups --extra "${SURFACE}" ;;
-          esac
-      - run: uv run --no-sync python scripts/optional_install_smoke.py ${{ matrix.surface }}
-
-  hpr-tespy-tests:
-    needs: develop-validation
-    if: ${{ !cancelled() && github.event.action != 'closed' && github.event.pull_request.draft == false && (needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          save-cache: false
-      - run: uv sync --frozen --group dev --extra tespy
-      - run: timeout 900s uv run --no-sync pytest --hypothesis-seed=20260715 -m "tespy"
-
-  performance-tests:
-    needs: develop-validation
-    if: ${{ !cancelled() && github.event.action != 'closed' && github.event.pull_request.draft == false && (needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          save-cache: false
-      - run: uv sync --frozen --group dev
-      - run: timeout 900s uv run --no-sync pytest --hypothesis-seed=20260715 -m "performance"
-
-  artifact-build:
-    needs: develop-validation
-    if: ${{ !cancelled() && github.event.action != 'closed' && github.event.pull_request.draft == false && (needs.develop-validation.result != 'success' || needs.develop-validation.outputs.reuse != 'true') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          save-cache: false
-      - run: uv sync --frozen --group dev
-      - run: uv run --no-sync python scripts/build_dist.py
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: openpinch-dist
-          path: dist/*
-          if-no-files-found: error
-
-  artifact-install-smoke:
-    needs: artifact-build
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          save-cache: ${{ runner.os != 'Linux' }}
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: openpinch-dist
-          path: dist
-      - run: uv sync --frozen --no-default-groups
-      - run: uv pip install --python .venv --no-deps --reinstall --no-index --find-links dist OpenPinch
-      - run: uv run --no-sync python scripts/artifact_install_smoke.py --surface core
-
-  artifact-install-tespy-smoke:
-    needs: artifact-build
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          save-cache: false
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: openpinch-dist
-          path: dist
-      - run: uv sync --frozen --no-default-groups --extra tespy
-      - run: uv pip install --python .venv --no-deps --reinstall --no-index --find-links dist OpenPinch
-      - run: uv run --no-sync python scripts/artifact_install_smoke.py --surface tespy
-
-  solver-tests:
-    if: ${{ github.event.action != 'closed' && github.event.pull_request.draft == false && github.event.pull_request.base.ref == 'main' }}
-    runs-on: ubuntu-22.04
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          save-cache: false
-      - run: uv sync --frozen --group dev
-      - name: Install IDAES solver binaries
-        run: uv run --no-sync idaes get-extensions
-      - name: Verify IDAES solver binaries
-        run: >-
-          uv run --no-sync python -c
-          "import idaes;
-          from pyomo.environ import SolverFactory;
-          required = ('couenne', 'ipopt');
-          unavailable = [name for name in required if not
-          SolverFactory(name).available(exception_flag=False)];
-          assert not unavailable, f'Unavailable solver binaries: {unavailable}'"
-      - run: uv run --no-sync pytest --hypothesis-seed=20260715 -m "solver"
+  validation:
+    needs: plan
+    if: ${{ needs.plan.outputs.run == 'true' }}
+    uses: ./.github/workflows/ci-validation.yml
+    with:
+      candidate: ${{ github.sha }}
+      profile: ${{ needs.plan.outputs.profile }}
+      reuse-integration: ${{ needs.plan.outputs.reuse == 'true' }}
 
   pr-gate:
-    if: ${{ always() && github.event.pull_request.draft == false }}
-    needs:
-      - develop-validation
-      - test
-      - bump-version
-      - release-version
-      - docs
-      - optional-install-smoke
-      - hpr-tespy-tests
-      - performance-tests
-      - artifact-build
-      - artifact-install-smoke
-      - artifact-install-tespy-smoke
-      - solver-tests
+    name: OpenPinch PR Gate
+    if: ${{ always() }}
+    needs: [plan, validation]
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions: {}
     steps:
-      - name: Require every applicable validation job
+      - name: Require complete validation
         env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          REPOSITORY: ${{ github.repository }}
-          REUSE_DEVELOP: ${{ needs.develop-validation.result == 'success' && needs.develop-validation.outputs.reuse == 'true' }}
-          TEST_RESULT: ${{ needs.test.result }}
-          BUMP_VERSION_RESULT: ${{ needs.bump-version.result }}
-          RELEASE_VERSION_RESULT: ${{ needs.release-version.result }}
-          DOCS_RESULT: ${{ needs.docs.result }}
-          OPTIONAL_RESULT: ${{ needs.optional-install-smoke.result }}
-          HPR_TESPY_RESULT: ${{ needs.hpr-tespy-tests.result }}
-          PERFORMANCE_RESULT: ${{ needs.performance-tests.result }}
-          ARTIFACT_BUILD_RESULT: ${{ needs.artifact-build.result }}
-          ARTIFACT_INSTALL_RESULT: ${{ needs.artifact-install-smoke.result }}
-          ARTIFACT_TESPY_RESULT: ${{ needs.artifact-install-tespy-smoke.result }}
-          SOLVER_RESULT: ${{ needs.solver-tests.result }}
+          PLAN_RESULT: ${{ needs.plan.result }}
+          VALIDATION_RESULT: ${{ needs.validation.result }}
+          RUN_VALIDATION: ${{ needs.plan.outputs.run }}
+          CANDIDATE: ${{ github.sha }}
         run: |
-          set -euo pipefail
-          test "${TEST_RESULT}" = "success"
-          expected_shared_result="success"
-          if [ "${REUSE_DEVELOP}" = "true" ]; then
-            expected_shared_result="skipped"
+          echo "Evaluated candidate: ${CANDIDATE}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$RUN_VALIDATION" != true ]; then
+            echo "No new proof: draft or metadata-only event. Reopen the ready PR or push a source change to validate." >&2
+            exit 1
           fi
-          for result in \
-            "${DOCS_RESULT}" \
-            "${OPTIONAL_RESULT}" \
-            "${HPR_TESPY_RESULT}" \
-            "${PERFORMANCE_RESULT}" \
-            "${ARTIFACT_BUILD_RESULT}" \
-            "${ARTIFACT_INSTALL_RESULT}" \
-            "${ARTIFACT_TESPY_RESULT}"; do
-            test "${result}" = "${expected_shared_result}"
-          done
-          if [ "${BASE_REF}" = "main" ]; then
-            if [ "${HEAD_REPO}" = "${REPOSITORY}" ]; then
-              test "${BUMP_VERSION_RESULT}" = "success"
-            else
-              test "${BUMP_VERSION_RESULT}" = "skipped"
-            fi
-            test "${RELEASE_VERSION_RESULT}" = "success"
-            test "${SOLVER_RESULT}" = "success"
-          else
-            test "${BUMP_VERSION_RESULT}" = "skipped"
-            test "${RELEASE_VERSION_RESULT}" = "skipped"
-            test "${SOLVER_RESULT}" = "skipped"
-          fi
+          test "$PLAN_RESULT" = success
+          test "$VALIDATION_RESULT" = success
+
+  test:
+    name: test
+    if: ${{ always() }}
+    needs: pr-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Transitional complete-gate compatibility check
+        env:
+          GATE_RESULT: ${{ needs.pr-gate.result }}
+        run: test "$GATE_RESULT" = success

@@ -325,33 +325,23 @@ def test_docs_define_stability_and_optional_dependency_boundaries():
         assert phrase in combined
 
 
-def test_release_docs_match_automated_main_branch_publication() -> None:
+def test_release_docs_match_explicit_publication() -> None:
     readme = _read(REPO_ROOT / "README.md")
-    developer_guide = _read(DOCS_ROOT / "developer" / "build-and-coverage.rst")
-    combined = f"{readme}\n{developer_guide}"
-
+    guide = _read(DOCS_ROOT / "developer" / "releasing.rst")
     for phrase in (
-        "automatically advances",
-        "fork pull requests",
-        "creates the annotated version tag",
-        "draft GitHub release",
         "TestPyPI",
-        "publishes the GitHub release before production PyPI",
-        "dispatches the same workflow at the version tag",
-        "checksummed release artifacts",
-        "protected ``pypi`` environment",
+        "build artifact ID",
+        "source_artifact_digest",
         "Re-run failed jobs",
-        "original tag run",
-        "immutable build artifact ID",
+        "protected ``pypi`` environment",
+        "OpenPinch PR Gate",
+        "Legacy 0.6.10",
         "partial",
-        "pr-gate",
     ):
-        assert phrase in combined
-
-    assert "maintainers always create release tags explicitly" not in readme
-    assert "after PyPI succeeds, the workflow publishes the GitHub release" not in (
-        combined
-    )
+        assert phrase in guide
+    assert "do not publish or bump versions" in readme
+    assert "automatically advances" not in readme
+    assert "after pypi succeeds" in guide.lower()
 
 
 def test_docs_do_not_present_removed_cli_surfaces():

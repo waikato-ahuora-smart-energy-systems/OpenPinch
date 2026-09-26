@@ -6,31 +6,11 @@ import json
 import os
 import subprocess
 from pathlib import Path
+from urllib.parse import urlencode
 
-REQUIRED_JOBS = frozenset(
-    {
-        "test",
-        "docs",
-        "hpr-tespy-tests",
-        "artifact-build",
-        "artifact-install-tespy-smoke",
-    }
-    | {
-        f"optional-install-smoke ({surface})"
-        for surface in (
-            "core",
-            "dashboard",
-            "notebook",
-            "brayton_cycle",
-            "tespy",
-            "synthesis",
-        )
-    }
-    | {
-        f"artifact-install-smoke ({runner})"
-        for runner in ("ubuntu-latest", "windows-latest", "macos-latest")
-    }
-)
+from scripts.ci_policy import POLICY, gate_errors, required_jobs
+
+REQUIRED_JOBS = required_jobs("integration") | {POLICY}
 
 
 def eligible_pull_request(event: dict, repository: str) -> bool:
@@ -56,11 +36,20 @@ def successful_develop_run(run: dict, jobs: list[dict], head_sha: str) -> bool:
         and run.get("conclusion") == "success"
     ):
         return False
+    # The caller job is deliberately named validation in every branch workflow.
+    normalized = [
+        {**job, "name": job.get("name", "").removeprefix("validation / ")}
+        for job in jobs
+    ]
     for name in REQUIRED_JOBS:
-        matches = [job for job in jobs if job.get("name") == name]
+        matches = [job for job in normalized if job.get("name") == name]
         if len(matches) != 1 or matches[0].get("conclusion") != "success":
             return False
-    return True
+        if "run_attempt" in matches[0] and matches[0]["run_attempt"] != run.get(
+            "run_attempt"
+        ):
+            return False
+    return not gate_errors(normalized, "integration")
 
 
 def github_json(endpoint: str, *, paginate: bool = False):
@@ -70,7 +59,12 @@ def github_json(endpoint: str, *, paginate: bool = False):
     result = subprocess.run(
         command, check=True, capture_output=True, text=True, timeout=90
     )
-    return json.loads(result.stdout)
+    if len(result.stdout) > 10_000_000:
+        raise ValueError("Evidence response exceeds size bound")
+    payload = json.loads(result.stdout)
+    if paginate and (not isinstance(payload, list) or len(payload) > 100):
+        raise ValueError("Evidence pagination exceeds bound")
+    return payload
 
 
 def git_tree(ref: str) -> str:
@@ -95,9 +89,10 @@ def find_reusable_run(event: dict, repository: str) -> tuple[bool, str]:
         return False, "Normal validation: the PR merge tree differs from develop."
 
     endpoint = f"repos/{repository}/actions/workflows/ci-develop.yml/runs"
-    payload = github_json(
-        f"{endpoint}?branch=develop&event=push&head_sha={head_sha}&per_page=100"
+    query = urlencode(
+        dict(branch="develop", event="push", head_sha=head_sha, per_page=100)
     )
+    payload = github_json(f"{endpoint}?{query}")
     runs = [run for run in payload["workflow_runs"] if run.get("head_sha") == head_sha]
     if not runs:
         return False, "Normal validation: no develop run exists for this commit."

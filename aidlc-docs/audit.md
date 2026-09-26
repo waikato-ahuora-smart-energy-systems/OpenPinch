@@ -10079,3 +10079,80 @@ Notebook #10 fails to solve with the error:
 **Context**: Post-workflow repository handoff. The user authorized publishing the completed develop branch and creating a GitHub pull request targeting main.
 
 ---
+
+## Delivery Workflow Overhaul - Investigation and Requirements Clarification
+**Timestamp**: 2026-09-26T01:15:23Z
+**User Input**: "There is a failing test. In general, the testing, merging and PR workflows need an overhaul."
+**AI Response**: "Investigated the latest failed main run. All test lanes passed; TestPyPI verification reported an absent release after about fifty seconds. Both uploads returned HTTP 200 and the exact distribution hashes are now visible. Identified seven improvement areas, including main requiring test rather than pr-gate. Recorded findings and one release-initiation policy question before redesign."
+**Context**: Continued existing delivery work; no repeated welcome or application reverse engineering. Existing Property-Based Testing enablement preserved; Security and Resiliency skipped because disabled. Content validated as plain Markdown without diagrams or executable embedded content. Requirements remain pending the release-policy answer. No workflow or external state modified. User-facing clarification requests completion of delivery-workflow-questions.md; recommends explicit release initiation rather than publishing every main merge.
+
+---
+
+## Delivery Workflow Overhaul - Requirements Approval and Workflow Planning
+**Timestamp**: 2026-09-26T04:57:03Z
+**User Input**: "approved"
+**AI Response**: "Confirmed the user's saved Answer A: explicit releases with develop/main retained. Finalized requirements and prepared a dependency-ordered execution plan covering functional design, focused non-functional and infrastructure design, code generation, and verification."
+**Context**: Approved scope preserved; no application code, workflow, or remote state changed. Existing property-based testing configuration retained; disabled Security and Resiliency extensions skipped. User stories excluded as requested. Local document and checkbox updates only.
+**AI Prompt**: "Workflow planning is complete. Review delivery-workflow-execution-plan.md. Request Changes, Add Skipped Stages, or Approve & Continue to Functional Design. Remote required-check activation remains a separately authorized step."
+
+---
+
+## Delivery Workflow Overhaul - Functional Design
+**Timestamp**: 2026-09-26T04:59:11Z
+**User Input**: "go]"
+**AI Response**: "Accepted execution-plan approval and completed functional design for validation evidence, immutable candidates, explicit release initiation, bounded index verification, and same-artifact recovery. Defined testable properties and traced all D01-D09 requirements."
+**Context**: Single delivery unit per approved plan; no new policy questions required. PBT-01 compliant; PBT-02 through PBT-10 not applicable to this stage, with downstream verification planned. Disabled Security and Resiliency extensions skipped. Plain Markdown tables and text sequence validated before creation. No code or remote mutation."
+**AI Prompt**: "Functional Design Complete - Delivery Workflow. Review the functional design artifacts. Request Changes or Continue to Next Stage to approve the design and proceed to NFR Requirements."
+
+---
+
+## Delivery Workflow Overhaul - NFR Requirements
+**Timestamp**: 2026-09-26T05:03:29Z
+**User Input**: "Continue"
+**AI Response**: "Recorded Functional Design approval and completed N01-N18 covering bounded verification, fail-closed gates, immutable recovery, preserved test quality, permission boundaries, diagnostics, and retention. Proposed a configurable five-minute postflight budget and 30-day report/recovery-bundle retention, subject to repository limits. Retained the existing Python/uv/pytest/Hypothesis stack."
+**Context**: PBT-09 compliant; other PBT rules N/A at this stage with downstream obligations retained. Disabled Security and Resiliency extensions skipped. Plain Markdown validated before writing; no diagrams or executable embedded content. No application, workflow, or remote settings changed.
+**AI Prompt**: "NFR Requirements Complete - Delivery Workflow. Review the NFR requirements. Request Changes or Continue to Next Stage to proceed to NFR Design."
+
+---
+
+## Delivery Workflow Overhaul - NFR Design
+**Timestamp**: 2026-09-26T05:06:04Z
+**User Input**: "Continue"
+**AI Response**: "Recorded NFR Requirements approval and specified single-owner bounded retries, exact evidence checks, serialized same-artifact recovery, scoped authority, and reporting boundaries. Distinguished the logical polling deadline from socket-timeout limitations and required an outer job bound."
+**Context**: N01-N18 mapped to design and test obligations. Existing PBT property catalogue and Hypothesis selection retained; implementation-stage checks remain pending. Disabled Security and Resiliency extensions skipped. Plain Markdown and tables validated before writing. No code, publishing, or settings mutations.
+**AI Prompt**: "NFR Design Complete - Delivery Workflow. Review the NFR design. Request Changes or Continue to Next Stage to proceed to Infrastructure Design."
+
+---
+
+## Delivery Workflow Overhaul - Infrastructure Design
+**Timestamp**: 2026-09-26T05:08:46Z
+**User Input**: "Continue"
+**AI Response**: "Recorded NFR Design approval and mapped the delivery unit to shared GitHub validation, thin branch/PR callers, explicit publishing, scoped permissions, retained artifacts, and staged protection/publisher activation. Preserved the publishing filename and production environment while flagging main-versus-tag restrictions for rollout verification."
+**Context**: Checked existing workflow configuration and official GitHub reusable-workflow/concurrency documentation. PBT implementation obligations retained; no implementation-stage compliance claim. Disabled Security and Resiliency extensions skipped. Plain Markdown tables and text sequences validated before creation. No workflow code or remote state changed.
+**AI Prompt**: "Infrastructure Design Complete - Delivery Workflow. Review the infrastructure design. Request Changes or Continue to Next Stage to proceed to Code Generation planning."
+
+---
+
+## Delivery Workflow Overhaul - Code Generation Planning
+**Timestamp**: 2026-09-26T05:10:58Z
+**User Input**: "Continue"
+**AI Response**: "Recorded Infrastructure Design approval and prepared the twelve-step code-generation plan with exact paths, dependency order, all PBT obligations, focused/full verification, documentation, and remote activation boundaries. Identified existing YAML-substring tests that must be replaced without losing integrity assertions."
+**Context**: Code Generation Part 1 complete; Part 2 requires explicit approval. No production code or workflows changed. PBT planning coverage complete; disabled Security and Resiliency extensions skipped. Plain Markdown content validated before writing."
+**AI Prompt**: "Code-generation plan ready. Review delivery-workflow-code-generation-plan.md. Request Changes or Approve & Begin Code Generation to authorize the complete twelve-step implementation and local verification sequence. No remote publishing, merge, or settings changes are included."
+
+---
+
+## Delivery Workflow Overhaul - Approved Implementation
+**Timestamp**: 2026-09-26T05:48:28Z
+**User Input**: "Approve. Commit once complete and create a PR to main."
+**AI Response**: "Implementing the twelve-step plan, verifying the result, and preparing a scoped commit and PR to main. Preserving the unrelated Notebook 10 edit."
+**Context**: Full implementation, local verification, commit, push, and PR creation authorized. No merge, publishing, release recovery, or remote configuration changes authorized. Security and Resiliency extensions remain disabled; Property-Based Testing enabled. Implementation includes shared validation policy, complete merge gates, explicit releases, bounded polling, immutable recovery, behavioral tests, and developer documentation. Verification is in progress.
+
+---
+
+## Delivery Workflow Overhaul - Verification and Commit Handoff
+**Timestamp**: 2026-09-26T06:04:44Z
+**AI Response**: "Completed all twelve implementation steps. Complete ordinary lane: 3451 passed, 6 expected skips, 65 deselected in 382.68 seconds; 95-percent branch-aware coverage passed. Final packaging suite: 273 passed, 6 expected skips. Specialized suites: 64 passed, 1 existing solver skip. Wheel/sdist builds, isolated core/TESPy installs, Ruff, changed-file formatting, actionlint with ShellCheck, lock validation, and patch hygiene pass. Preparing the authorized scoped commit and PR to main."
+**Context**: Audited and corrected resumed-job skip propagation, artifact digest prefix/actual archive validation, latest validation evidence with original build identity, and idempotent public-release finalization. Initial image-export failure was a sandbox Chrome-launch restriction; corrected environment passed. Temporary-file property latency was bounded at 2 seconds/example after diagnosing the default 200-ms timing failure; shrinking retained. No numerical assertions or budgets reduced. All PBT rules compliant. Disabled Security/Resiliency extensions skipped. No remote settings, package publication, merge, or legacy release recovery. Unrelated Notebook 10 edits excluded. Documents validated as plain Markdown/RST; warning-strict Sphinx passed. Hosted rollout and publisher activation remain pending.
+
+---
