@@ -10,6 +10,7 @@ surface around the core analysis code.
    docs-conventions
    architecture
    build-and-coverage
+   releasing
    synthesis-dependency-policy
 
    adding-analysis-methods

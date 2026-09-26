@@ -1,765 +1,360 @@
-name: Validate, Release & Publish
-
+name: Explicit Release
 on:
-  push:
-    branches: ["main"]
   workflow_dispatch:
     inputs:
-      release_tag:
-        description: Version tag for the production PyPI phase
-        required: false
+      mode:
+        description: New release or resume the original verified bundle
+        type: choice
+        options: [new, resume]
+        default: new
+      version:
+        description: Exact committed X.Y.Z version to publish
         type: string
+        required: true
       source_run_id:
-        description: Main-push workflow run that produced the release artifact
-        required: false
-        type: string
-      source_artifact_attempt:
-        description: Build attempt that produced the release artifact
-        required: false
+        description: Original build run ID (resume only)
         type: string
       source_artifact_id:
-        description: Immutable GitHub Actions artifact identifier
-        required: false
+        description: Original immutable artifact ID (resume only)
         type: string
       source_artifact_digest:
-        description: GitHub Actions artifact SHA-256 digest
-        required: false
+        description: Original sha256 artifact digest (resume only)
         type: string
-
 permissions:
   contents: read
-
 concurrency:
-  group: release-${{ github.ref }}
+  group: openpinch-release
   cancel-in-progress: false
-
-env:
-  PYTHON_VERSION: "3.14.2"
-  UV_VERSION: "0.11.29"
-
 jobs:
-  reject-invalid-dispatch:
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref_type != 'tag' }}
+  request:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions: {}
-    steps:
-      - name: Reject production publication outside a tag ref
-        run: |
-          echo "Production publication must be dispatched at a release tag." >&2
-          exit 1
-
-  release-check:
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    outputs:
-      version: ${{ steps.release.outputs.version }}
-      tag: ${{ steps.release.outputs.tag }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          save-cache: false
-      - run: uv sync --frozen --no-default-groups
-      - run: uv run --no-sync python scripts/check_lockfile_version.py
-      - name: Resolve and validate release identity
-        id: release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          version="$(uv run --no-sync python scripts/check_release_version.py)"
-          tag="v${version}"
-          uv run --no-sync python scripts/check_release_tag.py "${tag}"
-          echo "version=${version}" >> "${GITHUB_OUTPUT}"
-          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
-
-          git fetch --force --tags origin
-          if git rev-parse --verify --quiet "refs/tags/${tag}^{commit}"; then
-            tag_type="$(git cat-file -t "refs/tags/${tag}")"
-            if [ "${tag_type}" != "tag" ]; then
-              echo "Release tag ${tag} exists but is not annotated." >&2
-              exit 1
-            fi
-            tagged_commit="$(git rev-list -n 1 "refs/tags/${tag}")"
-            if [ "${tagged_commit}" != "${GITHUB_SHA}" ]; then
-              echo "Release tag ${tag} already points to ${tagged_commit}, not ${GITHUB_SHA}." >&2
-              exit 1
-            fi
-          fi
-
-          if gh release view "${tag}" >/dev/null 2>&1; then
-            release_is_draft="$(gh release view "${tag}" --json isDraft --jq .isDraft)"
-            if [ "${release_is_draft}" != "true" ]; then
-              echo "GitHub Release ${tag} is already public; rerun its original tag workflow instead." >&2
-              exit 1
-            fi
-          fi
-
-  test:
-    needs: release-check
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-      - run: uv sync --frozen --group dev
-      - run: uv run --no-sync python scripts/check_lockfile_version.py
-      - run: uv run --no-sync ruff check .
-      - run: uv run --no-sync coverage run --branch --source=OpenPinch -m pytest --hypothesis-seed=20260715 -m "not solver and not tespy and not performance and not docs"
-      - run: uv run --no-sync coverage report --fail-under=95
-
-  docs:
-    needs: release-check
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          save-cache: false
-      - run: uv sync --frozen --group dev
-      - run: uv run --no-sync pytest --hypothesis-seed=20260715 -m "docs"
-
-  optional-install-smoke:
-    needs: release-check
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        surface: [core, dashboard, notebook, brayton_cycle, tespy, synthesis]
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          save-cache: false
-      - name: Install locked package surface
-        env:
-          SURFACE: ${{ matrix.surface }}
-        run: |
-          case "${SURFACE}" in
-            core) uv sync --frozen --no-default-groups ;;
-            *) uv sync --frozen --no-default-groups --extra "${SURFACE}" ;;
-          esac
-      - run: uv run --no-sync python scripts/optional_install_smoke.py ${{ matrix.surface }}
-
-  hpr-tespy-tests:
-    needs: release-check
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          save-cache: false
-      - run: uv sync --frozen --group dev --extra tespy
-      - run: timeout 900s uv run --no-sync pytest --hypothesis-seed=20260715 -m "tespy"
-
-  performance-tests:
-    needs: release-check
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          save-cache: false
-      - run: uv sync --frozen --group dev
-      - run: timeout 900s uv run --no-sync pytest --hypothesis-seed=20260715 -m "performance"
-
-  solver-tests:
-    needs: release-check
-    runs-on: ubuntu-22.04
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          save-cache: false
-      - run: uv sync --frozen --group dev
-      - name: Install IDAES solver binaries
-        run: uv run --no-sync idaes get-extensions
-      - name: Verify IDAES solver binaries
-        run: >-
-          uv run --no-sync python -c
-          "import idaes;
-          from pyomo.environ import SolverFactory;
-          required = ('couenne', 'ipopt');
-          unavailable = [name for name in required if not
-          SolverFactory(name).available(exception_flag=False)];
-          assert not unavailable, f'Unavailable solver binaries: {unavailable}'"
-      - run: uv run --no-sync pytest --hypothesis-seed=20260715 -m "solver"
-
-  build:
-    needs: [test, docs, optional-install-smoke, hpr-tespy-tests, performance-tests, solver-tests]
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    outputs:
-      artifact_id: ${{ steps.release_artifact.outputs.artifact-id }}
-      artifact_digest: ${{ steps.release_artifact.outputs.artifact-digest }}
-      artifact_attempt: ${{ steps.artifact_identity.outputs.run_attempt }}
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          save-cache: false
-      - run: uv sync --frozen --group dev
-      - run: uv run --no-sync python scripts/build_dist.py
-      - name: Record the build artifact attempt
-        id: artifact_identity
-        shell: bash
-        run: echo "run_attempt=${GITHUB_RUN_ATTEMPT}" >> "${GITHUB_OUTPUT}"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        id: release_artifact
-        with:
-          name: openpinch-dist-${{ github.run_id }}-${{ github.run_attempt }}
-          path: dist/*
-          if-no-files-found: error
-
-  artifact-install-smoke:
-    needs: build
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          save-cache: ${{ runner.os != 'Linux' }}
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          artifact-ids: ${{ needs.build.outputs.artifact_id }}
-          path: dist
-      - run: uv sync --frozen --no-default-groups
-      - run: uv pip install --python .venv --no-deps --reinstall --no-index --find-links dist OpenPinch
-      - run: uv run --no-sync python scripts/artifact_install_smoke.py --surface core
-
-  artifact-install-tespy-smoke:
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          save-cache: false
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          artifact-ids: ${{ needs.build.outputs.artifact_id }}
-          path: dist
-      - run: uv sync --frozen --no-default-groups --extra tespy
-      - run: uv pip install --python .venv --no-deps --reinstall --no-index --find-links dist OpenPinch
-      - run: uv run --no-sync python scripts/artifact_install_smoke.py --surface tespy
-
-  create-draft-release:
-    needs: [release-check, artifact-install-smoke, artifact-install-tespy-smoke, build]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          fetch-depth: 0
           ref: ${{ github.sha }}
-          persist-credentials: true
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          artifact-ids: ${{ needs.build.outputs.artifact_id }}
-          path: dist
-      - name: Create annotated tag and draft GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG_NAME: ${{ needs.release-check.outputs.tag }}
-          VERSION: ${{ needs.release-check.outputs.version }}
-          SOURCE_ARTIFACT_ID: ${{ needs.build.outputs.artifact_id }}
-        run: |
-          set -euo pipefail
-
-          expected_wheel="openpinch-${VERSION}-py3-none-any.whl"
-          expected_sdist="openpinch-${VERSION}.tar.gz"
-          test -f "dist/${expected_wheel}"
-          test -f "dist/${expected_sdist}"
-          artifact_count="$(find dist -maxdepth 1 -type f | wc -l | tr -d ' ')"
-          if [ "${artifact_count}" != "2" ]; then
-            echo "Source artifact ${SOURCE_ARTIFACT_ID} must contain exactly two distributions." >&2
-            exit 1
-          fi
-          (cd dist && sha256sum *) > SHA256SUMS
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          if git rev-parse --verify --quiet "refs/tags/${TAG_NAME}^{commit}"; then
-            tag_type="$(git cat-file -t "refs/tags/${TAG_NAME}")"
-            if [ "${tag_type}" != "tag" ]; then
-              echo "Release tag ${TAG_NAME} exists but is not annotated." >&2
-              exit 1
-            fi
-            tagged_commit="$(git rev-list -n 1 "refs/tags/${TAG_NAME}")"
-            if [ "${tagged_commit}" != "${GITHUB_SHA}" ]; then
-              echo "Release tag ${TAG_NAME} points to ${tagged_commit}, not ${GITHUB_SHA}." >&2
-              exit 1
-            fi
-          else
-            git tag -a "${TAG_NAME}" -m "OpenPinch ${TAG_NAME}"
-            git push origin "refs/tags/${TAG_NAME}"
-          fi
-
-          if gh release view "${TAG_NAME}" >/dev/null 2>&1; then
-            release_is_draft="$(gh release view "${TAG_NAME}" --json isDraft --jq .isDraft)"
-            if [ "${release_is_draft}" != "true" ]; then
-              echo "GitHub Release ${TAG_NAME} is already public and cannot be modified." >&2
-              exit 1
-            fi
-            expected_asset_names="$(printf '%s\n%s\n%s\n' SHA256SUMS "${expected_sdist}" "${expected_wheel}" | sort)"
-            existing_asset_names="$(gh release view "${TAG_NAME}" --json assets --jq '.assets[].name' | sort)"
-            if [ "${existing_asset_names}" != "${expected_asset_names}" ]; then
-              echo "Draft release must contain exactly the expected three assets." >&2
-              exit 1
-            fi
-            existing_dir="${RUNNER_TEMP}/existing-release"
-            mkdir "${existing_dir}"
-            gh release download "${TAG_NAME}" --pattern "*.whl" --pattern "*.tar.gz" --pattern SHA256SUMS --dir "${existing_dir}"
-            existing_count="$(find "${existing_dir}" -maxdepth 1 -type f | wc -l | tr -d ' ')"
-            if [ "${existing_count}" != "3" ] || \
-               ! cmp "dist/${expected_wheel}" "${existing_dir}/${expected_wheel}" || \
-               ! cmp "dist/${expected_sdist}" "${existing_dir}/${expected_sdist}" || \
-               ! cmp SHA256SUMS "${existing_dir}/SHA256SUMS"; then
-              echo "Draft existing release assets do not exactly match the source artifact." >&2
-              exit 1
-            fi
-            echo "Reusing exact existing release assets from draft ${TAG_NAME}."
-          else
-            gh release create "${TAG_NAME}" dist/* SHA256SUMS --draft --generate-notes --title "OpenPinch ${TAG_NAME}"
-          fi
-
-  preflight-testpypi:
-    needs: [release-check, create-draft-release, build]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    outputs:
-      should_upload: ${{ steps.preflight.outputs.should_upload }}
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          artifact-ids: ${{ needs.build.outputs.artifact_id }}
-          path: dist
-      - name: Compare the candidate with TestPyPI
-        id: preflight
+          python-version: "3.14.2"
+      - name: Validate deliberate main-context release request
         env:
-          VERSION: ${{ needs.release-check.outputs.version }}
-        run: |
-          set -euo pipefail
-          status="$(python scripts/check_package_index_release.py --index-url https://test.pypi.org/pypi --version "${VERSION}" --dist-dir dist --allow-partial)"
-          if [ "${status}" = "complete" ]; then
-            echo "should_upload=false" >> "${GITHUB_OUTPUT}"
-          else
-            echo "should_upload=true" >> "${GITHUB_OUTPUT}"
-          fi
-
-  publish-testpypi:
-    needs: [build, preflight-testpypi]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          artifact-ids: ${{ needs.build.outputs.artifact_id }}
-          path: dist
-      - if: ${{ needs.preflight-testpypi.outputs.should_upload == 'true' }}
-        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
-        with:
-          repository-url: https://test.pypi.org/legacy/
-          skip-existing: true
-
-  verify-testpypi:
-    needs: [release-check, build, publish-testpypi]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          artifact-ids: ${{ needs.build.outputs.artifact_id }}
-          path: dist
-      - name: Require the complete exact TestPyPI release
-        env:
-          VERSION: ${{ needs.release-check.outputs.version }}
-        run: python scripts/check_package_index_release.py --index-url https://test.pypi.org/pypi --version "${VERSION}" --dist-dir dist --require-complete
-
-  publish-release:
-    needs: [release-check, verify-testpypi]
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    steps:
-      - name: Publish the GitHub release after TestPyPI succeeds
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          TAG_NAME: ${{ needs.release-check.outputs.tag }}
-        run: gh release edit "${TAG_NAME}" --draft=false --latest
-
-  dispatch-pypi:
-    needs: [release-check, publish-release, build]
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      actions: write
-      contents: read
-    steps:
-      - name: Dispatch production publication at the release tag
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          TAG_NAME: ${{ needs.release-check.outputs.tag }}
-          SOURCE_RUN_ID: ${{ github.run_id }}
-          SOURCE_ARTIFACT_ATTEMPT: ${{ needs.build.outputs.artifact_attempt }}
-          SOURCE_ARTIFACT_ID: ${{ needs.build.outputs.artifact_id }}
-          SOURCE_ARTIFACT_DIGEST: ${{ needs.build.outputs.artifact_digest }}
-        run: >-
-          gh workflow run ci-publish.yml --ref "${TAG_NAME}"
-          -f release_tag="${TAG_NAME}"
-          -f source_run_id="${SOURCE_RUN_ID}"
-          -f source_artifact_attempt="${SOURCE_ARTIFACT_ATTEMPT}"
-          -f source_artifact_id="${SOURCE_ARTIFACT_ID}"
-          -f source_artifact_digest="${SOURCE_ARTIFACT_DIGEST}"
-
-  validate-published-release:
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref_type == 'tag' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      actions: read
-      contents: read
-    outputs:
-      artifact_id: ${{ steps.release_artifact.outputs.artifact-id }}
-    steps:
-      - name: Validate the immutable source run and public release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          TAG_NAME: ${{ inputs.release_tag }}
+          MODE: ${{ inputs.mode }}
+          VERSION: ${{ inputs.version }}
           SOURCE_RUN_ID: ${{ inputs.source_run_id }}
-          SOURCE_ARTIFACT_ATTEMPT: ${{ inputs.source_artifact_attempt }}
           SOURCE_ARTIFACT_ID: ${{ inputs.source_artifact_id }}
           SOURCE_ARTIFACT_DIGEST: ${{ inputs.source_artifact_digest }}
         run: |
           set -euo pipefail
-
-          if [ "${GITHUB_REF_TYPE}" != "tag" ]; then
-            echo "Production publication requires a tag ref, not ${GITHUB_REF}." >&2
-            exit 1
-          fi
-          if [ "${TAG_NAME}" != "${GITHUB_REF_NAME}" ]; then
-            echo "Release input ${TAG_NAME} does not match ref ${GITHUB_REF_NAME}." >&2
-            exit 1
-          fi
-          if [[ ! "${TAG_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Release tag ${TAG_NAME} is not a stable semantic version." >&2
-            exit 1
-          fi
-          if [[ ! "${SOURCE_RUN_ID}" =~ ^[1-9][0-9]*$ ]] || \
-             [[ ! "${SOURCE_ARTIFACT_ATTEMPT}" =~ ^[1-9][0-9]*$ ]] || \
-             [[ ! "${SOURCE_ARTIFACT_ID}" =~ ^[1-9][0-9]*$ ]] || \
-             [[ ! "${SOURCE_ARTIFACT_DIGEST}" =~ ^[0-9a-f]{64}$ ]]; then
-            echo "Source run and artifact inputs are invalid." >&2
-            exit 1
-          fi
-
-          tag_object="$(gh api "repos/${GH_REPO}/git/ref/tags/${TAG_NAME}")"
-          tag_object_type="$(jq -r .object.type <<<"${tag_object}")"
-          tag_object_sha="$(jq -r .object.sha <<<"${tag_object}")"
-          if [ "${tag_object_type}" != "tag" ]; then
-            echo "Release tag ${TAG_NAME} is not annotated." >&2
-            exit 1
-          fi
-          tagged_commit="$(gh api "repos/${GH_REPO}/git/tags/${tag_object_sha}" --jq .object.sha)"
-
-          source_run="$(gh api "repos/${GH_REPO}/actions/runs/${SOURCE_RUN_ID}")"
-          source_event="$(jq -r .event <<<"${source_run}")"
-          source_branch="$(jq -r .head_branch <<<"${source_run}")"
-          source_sha="$(jq -r .head_sha <<<"${source_run}")"
-          source_workflow_id="$(jq -r .workflow_id <<<"${source_run}")"
-          source_workflow_path="$(gh api "repos/${GH_REPO}/actions/workflows/${source_workflow_id}" --jq .path)"
-          if [ "${source_event}" != "push" ] || [ "${source_branch}" != "main" ] || \
-             [ "${source_sha}" != "${tagged_commit}" ] || \
-             [ "${source_workflow_path}" != ".github/workflows/ci-publish.yml" ]; then
-            echo "Source run is not the trusted main-push release run for ${TAG_NAME}." >&2
-            exit 1
-          fi
-
-          source_jobs="$(gh api --method GET "repos/${GH_REPO}/actions/runs/${SOURCE_RUN_ID}/jobs" -f filter=latest -f per_page=100)"
-          required_jobs=(
-            "build"
-            "artifact-install-smoke (ubuntu-latest)"
-            "artifact-install-smoke (windows-latest)"
-            "artifact-install-smoke (macos-latest)"
-            "artifact-install-tespy-smoke"
-            "hpr-tespy-tests"
-            "verify-testpypi"
-            "publish-release"
-          )
-          for required_job in "${required_jobs[@]}"; do
-            conclusion="$(jq -r --arg name "${required_job}" '[.jobs[] | select(.name == $name)] | if length == 1 then .[0].conclusion else "missing" end' <<<"${source_jobs}")"
-            if [ "${conclusion}" != "success" ]; then
-              echo "Required source job ${required_job} is ${conclusion}." >&2
+          test "$GITHUB_REF" = refs/heads/main
+          [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          if [ "$MODE" = new ]; then
+            test -z "$SOURCE_RUN_ID$SOURCE_ARTIFACT_ID$SOURCE_ARTIFACT_DIGEST"
+            test "$(python scripts/check_release_version.py)" = "$VERSION"
+            python scripts/check_lockfile_version.py
+            if git show-ref --verify --quiet "refs/tags/v$VERSION"; then
+              echo "Version already staged. Resume its original bundle; do not rebuild." >&2
               exit 1
             fi
-          done
-
-          artifact="$(gh api "repos/${GH_REPO}/actions/artifacts/${SOURCE_ARTIFACT_ID}")"
-          artifact_run_id="$(jq -r .workflow_run.id <<<"${artifact}")"
-          artifact_name="$(jq -r .name <<<"${artifact}")"
-          artifact_digest="$(jq -r .digest <<<"${artifact}")"
-          artifact_expired="$(jq -r .expired <<<"${artifact}")"
-          artifact_digest="${artifact_digest#sha256:}"
-          expected_artifact_name="openpinch-dist-${SOURCE_RUN_ID}-${SOURCE_ARTIFACT_ATTEMPT}"
-          if [ "${artifact_run_id}" != "${SOURCE_RUN_ID}" ] || \
-             [ "${artifact_name}" != "${expected_artifact_name}" ] || \
-             [ "${artifact_digest}" != "${SOURCE_ARTIFACT_DIGEST}" ] || \
-             [ "${artifact_expired}" != "false" ]; then
-            echo "Source artifact metadata does not match the trusted build output." >&2
-            exit 1
+          else
+            test "$MODE" = resume
+            [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+            [[ "$SOURCE_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+            [[ "$SOURCE_ARTIFACT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
           fi
 
-          release_is_draft="$(gh release view "${TAG_NAME}" --json isDraft --jq .isDraft)"
-          release_is_prerelease="$(gh release view "${TAG_NAME}" --json isPrerelease --jq .isPrerelease)"
-          if [ "${release_is_draft}" != "false" ] || [ "${release_is_prerelease}" != "false" ]; then
-            echo "GitHub Release ${TAG_NAME} must be public and stable." >&2
-            exit 1
-          fi
+  validation:
+    needs: request
+    if: ${{ inputs.mode == 'new' }}
+    uses: ./.github/workflows/ci-validation.yml
+    with:
+      candidate: ${{ github.sha }}
+      profile: full
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          artifact-ids: ${{ inputs.source_artifact_id }}
-          github-token: ${{ github.token }}
-          run-id: ${{ inputs.source_run_id }}
-          path: source-dist
-      - name: Compare public release assets with the immutable source artifact
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          TAG_NAME: ${{ inputs.release_tag }}
-        run: |
-          set -euo pipefail
-          version="${TAG_NAME#v}"
-          expected_wheel="openpinch-${version}-py3-none-any.whl"
-          expected_sdist="openpinch-${version}.tar.gz"
-          expected_asset_names="$(printf '%s\n%s\n%s\n' SHA256SUMS "${expected_sdist}" "${expected_wheel}" | sort)"
-          release_asset_names="$(gh release view "${TAG_NAME}" --json assets --jq '.assets[].name' | sort)"
-          if [ "${release_asset_names}" != "${expected_asset_names}" ]; then
-            echo "Public release must contain exactly the expected three assets." >&2
-            exit 1
-          fi
-          source_count="$(find source-dist -maxdepth 1 -type f | wc -l | tr -d ' ')"
-          if [ "${source_count}" != "2" ]; then
-            echo "Immutable source artifact must contain exactly two distributions." >&2
-            exit 1
-          fi
-
-          mkdir dist
-          gh release download "${TAG_NAME}" --pattern "*.whl" --pattern "*.tar.gz" --dir dist
-          gh release download "${TAG_NAME}" --pattern SHA256SUMS --dir .
-          test -f "source-dist/${expected_wheel}"
-          test -f "source-dist/${expected_sdist}"
-          test -f "dist/${expected_wheel}"
-          test -f "dist/${expected_sdist}"
-
-          release_count="$(find dist -maxdepth 1 -type f | wc -l | tr -d ' ')"
-          if [ "${release_count}" != "2" ]; then
-            echo "Expected exactly one wheel and one source distribution." >&2
-            exit 1
-          fi
-          expected_names="$(printf '%s\n%s\n' "${expected_sdist}" "${expected_wheel}" | sort)"
-          checksum_names="$(awk '{print $2}' SHA256SUMS | sort)"
-          if [ "${checksum_names}" != "${expected_names}" ]; then
-            echo "SHA256SUMS does not describe the expected release artifacts." >&2
-            exit 1
-          fi
-          (cd dist && sha256sum --check ../SHA256SUMS)
-          cmp "source-dist/${expected_wheel}" "dist/${expected_wheel}"
-          cmp "source-dist/${expected_sdist}" "dist/${expected_sdist}"
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        id: release_artifact
-        with:
-          name: openpinch-release-dist-${{ github.run_id }}-${{ github.run_attempt }}
-          path: dist/*
-          if-no-files-found: error
-
-  preflight-pypi:
-    needs: validate-published-release
+  bundle:
+    if: ${{ always() && needs.request.result == 'success' && (needs.validation.result == 'success' || (inputs.mode == 'resume' && needs.validation.result == 'skipped')) }}
+    needs: [request, validation]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
+      actions: read
     outputs:
-      should_upload: ${{ steps.preflight.outputs.should_upload }}
+      artifact_id: ${{ steps.identity.outputs.artifact_id }}
+      artifact_digest: ${{ steps.identity.outputs.artifact_digest }}
+      run_id: ${{ steps.identity.outputs.run_id }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_ARTIFACT_ID: ${{ inputs.mode == 'new' && needs.validation.outputs.artifact_id || inputs.source_artifact_id }}
+      SOURCE_ARTIFACT_DIGEST: ${{ inputs.mode == 'new' && needs.validation.outputs.artifact_digest || inputs.source_artifact_digest }}
+      SOURCE_RUN_ID: ${{ inputs.mode == 'new' && github.run_id || inputs.source_run_id }}
+      VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          artifact-ids: ${{ needs.validate-published-release.outputs.artifact_id }}
-          path: dist
-      - name: Compare the candidate with PyPI
-        id: preflight
-        env:
-          TAG_NAME: ${{ inputs.release_tag }}
+          python-version: "3.14.2"
+      - run: python -m scripts.release_manifest download --directory bundle
+      - name: Verify complete source evidence and original bytes
         run: |
-          set -euo pipefail
-          version="${TAG_NAME#v}"
-          status="$(python scripts/check_package_index_release.py --index-url https://pypi.org/pypi --version "${version}" --dist-dir dist --allow-partial)"
-          if [ "${status}" = "complete" ]; then
-            echo "should_upload=false" >> "${GITHUB_OUTPUT}"
-          else
-            echo "should_upload=true" >> "${GITHUB_OUTPUT}"
-          fi
+          python -m scripts.release_manifest verify --directory bundle
+          python -c 'import json,os; m=json.load(open("bundle/release-manifest.json")); assert m["version"] == os.environ["VERSION"]; assert str(m["run_id"]) == os.environ["SOURCE_RUN_ID"]'
+      - id: identity
+        run: |
+          {
+            echo "artifact_id=$SOURCE_ARTIFACT_ID"
+            echo "artifact_digest=$SOURCE_ARTIFACT_DIGEST"
+            echo "run_id=$SOURCE_RUN_ID"
+          } >> "$GITHUB_OUTPUT"
+          echo "Recovery identity: run=$SOURCE_RUN_ID artifact=$SOURCE_ARTIFACT_ID digest=$SOURCE_ARTIFACT_DIGEST version=$VERSION" >> "$GITHUB_STEP_SUMMARY"
+
+  stage:
+    if: ${{ !cancelled() && needs.bundle.result == 'success' }}
+    needs: bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SOURCE_ARTIFACT_ID: ${{ needs.bundle.outputs.artifact_id }}
+      SOURCE_ARTIFACT_DIGEST: ${{ needs.bundle.outputs.artifact_digest }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.14.2"
+      - run: python -m scripts.release_manifest download --directory bundle
+      - run: python -m scripts.release_manifest stage --directory bundle
+
+  preflight-testpypi:
+    if: ${{ !cancelled() && needs.bundle.result == 'success' && needs.stage.result == 'success' }}
+    needs: [bundle, stage]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      status: ${{ steps.inspect.outputs.status }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SOURCE_ARTIFACT_ID: ${{ needs.bundle.outputs.artifact_id }}
+      SOURCE_ARTIFACT_DIGEST: ${{ needs.bundle.outputs.artifact_digest }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.14.2"
+      - run: python -m scripts.release_manifest download --directory bundle
+      - run: python -m scripts.release_manifest verify --directory bundle
+      - id: inspect
+        run: |
+          status="$(python scripts/check_package_index_release.py --index-url https://test.pypi.org/pypi --version "$VERSION" --dist-dir bundle --allow-partial)"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+  publish-testpypi:
+    if: ${{ !cancelled() && needs.bundle.result == 'success' && needs.preflight-testpypi.result == 'success' }}
+    needs: [bundle, preflight-testpypi]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SOURCE_ARTIFACT_ID: ${{ needs.bundle.outputs.artifact_id }}
+      SOURCE_ARTIFACT_DIGEST: ${{ needs.bundle.outputs.artifact_digest }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.14.2"
+      - run: python -m scripts.release_manifest download --directory bundle
+      - run: python -m scripts.release_manifest verify --directory bundle
+      - name: Prepare only verified distribution files
+        run: |
+          mkdir upload
+          cp bundle/*.whl bundle/*.tar.gz upload/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
+        if: ${{ needs.preflight-testpypi.outputs.status != 'complete' }}
+        with:
+          packages-dir: upload/
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+
+  verify-testpypi:
+    if: ${{ !cancelled() && needs.bundle.result == 'success' && needs.publish-testpypi.result == 'success' }}
+    needs: [bundle, publish-testpypi]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SOURCE_ARTIFACT_ID: ${{ needs.bundle.outputs.artifact_id }}
+      SOURCE_ARTIFACT_DIGEST: ${{ needs.bundle.outputs.artifact_digest }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.14.2"
+      - run: python -m scripts.release_manifest download --directory bundle
+      - run: python -m scripts.release_manifest verify --directory bundle
+      - run: python scripts/check_package_index_release.py --index-url https://test.pypi.org/pypi --version "$VERSION" --dist-dir bundle --require-complete
+
+  preflight-pypi:
+    if: ${{ !cancelled() && needs.bundle.result == 'success' && needs.verify-testpypi.result == 'success' }}
+    needs: [bundle, verify-testpypi]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      status: ${{ steps.inspect.outputs.status }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SOURCE_ARTIFACT_ID: ${{ needs.bundle.outputs.artifact_id }}
+      SOURCE_ARTIFACT_DIGEST: ${{ needs.bundle.outputs.artifact_digest }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.14.2"
+      - run: python -m scripts.release_manifest download --directory bundle
+      - run: python -m scripts.release_manifest verify --directory bundle
+      - id: inspect
+        run: |
+          status="$(python scripts/check_package_index_release.py --index-url https://pypi.org/pypi --version "$VERSION" --dist-dir bundle --allow-partial)"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
 
   publish-pypi:
-    needs: [validate-published-release, preflight-pypi]
+    if: ${{ !cancelled() && needs.bundle.result == 'success' && needs.preflight-pypi.result == 'success' }}
+    needs: [bundle, preflight-pypi]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
       name: pypi
       url: https://pypi.org/project/OpenPinch/
     permissions:
+      contents: read
+      actions: read
       id-token: write
-      contents: read
-    steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          artifact-ids: ${{ needs.validate-published-release.outputs.artifact_id }}
-          path: dist
-      - if: ${{ needs.preflight-pypi.outputs.should_upload == 'true' }}
-        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
-        with:
-          skip-existing: true
-
-  verify-pypi:
-    needs: [validate-published-release, publish-pypi]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SOURCE_ARTIFACT_ID: ${{ needs.bundle.outputs.artifact_id }}
+      SOURCE_ARTIFACT_DIGEST: ${{ needs.bundle.outputs.artifact_digest }}
+      VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          artifact-ids: ${{ needs.validate-published-release.outputs.artifact_id }}
-          path: dist
-      - name: Verify the published version on PyPI
-        env:
-          TAG_NAME: ${{ inputs.release_tag }}
+          python-version: "3.14.2"
+      - run: python -m scripts.release_manifest download --directory bundle
+      - run: python -m scripts.release_manifest verify --directory bundle
+      - name: Prepare only verified distribution files
         run: |
-          set -euo pipefail
-          version="${TAG_NAME#v}"
-          python scripts/check_package_index_release.py --index-url https://pypi.org/pypi --version "${version}" --dist-dir dist --require-complete
+          mkdir upload
+          cp bundle/*.whl bundle/*.tar.gz upload/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
+        if: ${{ needs.preflight-pypi.outputs.status != 'complete' }}
+        with:
+          packages-dir: upload/
+          skip-existing: true
+
+  verify-pypi:
+    if: ${{ !cancelled() && needs.bundle.result == 'success' && needs.publish-pypi.result == 'success' }}
+    needs: [bundle, publish-pypi]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SOURCE_ARTIFACT_ID: ${{ needs.bundle.outputs.artifact_id }}
+      SOURCE_ARTIFACT_DIGEST: ${{ needs.bundle.outputs.artifact_digest }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.14.2"
+      - run: python -m scripts.release_manifest download --directory bundle
+      - run: python -m scripts.release_manifest verify --directory bundle
+      - run: python scripts/check_package_index_release.py --index-url https://pypi.org/pypi --version "$VERSION" --dist-dir bundle --require-complete
+
+  finalize-release:
+    if: ${{ !cancelled() && needs.bundle.result == 'success' && needs.verify-pypi.result == 'success' }}
+    needs: [bundle, verify-pypi]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SOURCE_ARTIFACT_ID: ${{ needs.bundle.outputs.artifact_id }}
+      SOURCE_ARTIFACT_DIGEST: ${{ needs.bundle.outputs.artifact_digest }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.14.2"
+      - run: python -m scripts.release_manifest download --directory bundle
+      - run: python -m scripts.release_manifest finalize --directory bundle

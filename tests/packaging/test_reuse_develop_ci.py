@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import json
-import os
 import subprocess
-import textwrap
 from copy import deepcopy
 
 import pytest
@@ -13,7 +11,6 @@ from hypothesis import given, seed
 from hypothesis import strategies as st
 
 from scripts import reuse_develop_ci as reuse
-from tests.support.paths import REPOSITORY_ROOT
 
 SHA = "a" * 40
 REPOSITORY = "example/OpenPinch"
@@ -101,6 +98,31 @@ def test_duplicate_job_results_are_not_accepted():
     jobs = successful_jobs()
     jobs.append(deepcopy(jobs[0]))
     assert not reuse.successful_develop_run(successful_run(), jobs, SHA)
+
+
+def test_wrong_job_attempt_invalidates_reuse():
+    run = {**successful_run(), "run_attempt": 2}
+    jobs = [
+        {**job, "name": "validation / " + job["name"], "run_attempt": 2}
+        for job in successful_jobs()
+    ]
+    assert reuse.successful_develop_run(run, jobs, SHA)
+    jobs[0]["run_attempt"] = 1
+    assert not reuse.successful_develop_run(run, jobs, SHA)
+
+
+def test_excessive_pagination_is_not_complete_evidence(monkeypatch):
+    monkeypatch.setattr(
+        reuse.subprocess,
+        "run",
+        lambda command, **kwargs: subprocess.CompletedProcess(
+            command, 0, stdout=json.dumps([{"jobs": []}] * 101)
+        ),
+    )
+    with pytest.raises(ValueError, match="pagination"):
+        reuse.github_json(
+            "repos/example/OpenPinch/actions/runs/123/jobs", paginate=True
+        )
 
 
 def test_exact_source_and_paginated_successful_jobs_are_reused(monkeypatch):
@@ -200,59 +222,3 @@ def test_github_request_uses_pagination_and_bounded_timeout(monkeypatch):
     ) == [{"jobs": []}]
     assert calls[0][0][-2:] == ["--paginate", "--slurp"]
     assert calls[0][1]["timeout"] == 90
-
-
-@pytest.mark.parametrize("accepted_reuse", [False, True])
-@pytest.mark.parametrize(
-    "failed_job",
-    [
-        None,
-        "TEST_RESULT",
-        "DOCS_RESULT",
-        "PERFORMANCE_RESULT",
-        "SOLVER_RESULT",
-        "RELEASE_VERSION_RESULT",
-    ],
-)
-def test_pr_gate_requires_fresh_or_proved_reused_checks(accepted_reuse, failed_job):
-    workflow = (REPOSITORY_ROOT / ".github/workflows/ci-pull-request.yml").read_text()
-    gate = workflow.split("  pr-gate:", 1)[1]
-    script = textwrap.dedent(gate.split("        run: |\n", 1)[1])
-    environment = {
-        **os.environ,
-        "BASE_REF": "main",
-        "HEAD_REPO": REPOSITORY,
-        "REPOSITORY": REPOSITORY,
-        "REUSE_DEVELOP": str(accepted_reuse).lower(),
-        "TEST_RESULT": "success",
-        "BUMP_VERSION_RESULT": "success",
-        "RELEASE_VERSION_RESULT": "success",
-        "SOLVER_RESULT": "success",
-    }
-    for name in [
-        "DOCS_RESULT",
-        "OPTIONAL_RESULT",
-        "HPR_TESPY_RESULT",
-        "PERFORMANCE_RESULT",
-        "ARTIFACT_BUILD_RESULT",
-        "ARTIFACT_INSTALL_RESULT",
-        "ARTIFACT_TESPY_RESULT",
-    ]:
-        environment[name] = "skipped" if accepted_reuse else "success"
-    if failed_job:
-        environment[failed_job] = "failure"
-    result = subprocess.run(
-        ["bash", "-c", script], env=environment, capture_output=True
-    )
-    assert (result.returncode == 0) == (failed_job is None)
-
-
-def test_pr_gate_rejects_skipping_without_reuse_proof():
-    workflow = (REPOSITORY_ROOT / ".github/workflows/ci-pull-request.yml").read_text()
-    gate = workflow.split("  pr-gate:", 1)[1]
-    assert (
-        "needs.develop-validation.result == 'success' && needs.develop-validation.outputs.reuse == 'true'"
-        in gate
-    )
-    assert 'expected_shared_result="success"' in gate
-    assert 'if [ "${REUSE_DEVELOP}" = "true" ]; then' in gate

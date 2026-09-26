@@ -5,19 +5,47 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import re
+import ssl
 import sys
 import time
 from collections.abc import Callable, Mapping
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import BinaryIO
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 from urllib.request import Request, urlopen
 
 
 class ReleaseValidationError(ValueError):
     """Raised when published release files do not match local distributions."""
+
+
+class TransientIndexError(ReleaseValidationError):
+    """A retryable request failure, never evidence of an absent release."""
+
+    def __init__(self, message: str, retry_after: float = 0):
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+def retry_after_seconds(value: str | None) -> float:
+    """Parse Retry-After without allowing nonfinite or negative delays."""
+    if value is None:
+        return 0
+    try:
+        delay = float(value)
+    except ValueError:
+        try:
+            delay = (
+                parsedate_to_datetime(value) - datetime.now(timezone.utc)
+            ).total_seconds()
+        except ValueError, TypeError, OverflowError:
+            return 0
+    return max(0, delay) if math.isfinite(delay) else 0
 
 
 def _sha256(path: Path) -> str:
@@ -56,36 +84,39 @@ def _read_index_response(
     url: str,
     *,
     opener: Callable[..., BinaryIO],
-    attempts: int,
-    retry_delay: float,
+    timeout: float,
 ) -> Mapping[str, object] | None:
     request = Request(url, headers={"User-Agent": "OpenPinch-release-verifier/1"})
-    for attempt in range(1, attempts + 1):
-        try:
-            with opener(request, timeout=20.0) as response:
-                payload = json.load(response)
-            if not isinstance(payload, dict):
-                raise ReleaseValidationError("Package-index response is not an object.")
-            return payload
-        except HTTPError as exc:
-            if exc.code == 404:
-                return None
-            transient = exc.code in {408, 425, 429} or exc.code >= 500
-            if not transient or attempt == attempts:
-                raise ReleaseValidationError(
-                    f"Package-index request failed with HTTP {exc.code}."
-                ) from exc
-        except (TimeoutError, URLError) as exc:
-            if attempt == attempts:
-                raise ReleaseValidationError(
-                    f"Package-index request failed after {attempts} attempts: {exc}"
-                ) from exc
-        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-            raise ReleaseValidationError(
-                "Package-index response is not valid JSON."
+    try:
+        with opener(request, timeout=timeout) as response:
+            body = response.read(2_000_001)
+        if len(body) > 2_000_000:
+            raise ReleaseValidationError("Package-index response exceeds size limit.")
+        payload = json.loads(body)
+        if not isinstance(payload, dict):
+            raise ReleaseValidationError("Package-index response is not an object.")
+        return payload
+    except HTTPError as exc:
+        if exc.code == 404:
+            return None
+        if exc.code in {408, 425, 429} or 500 <= exc.code < 600:
+            raise TransientIndexError(
+                f"Package-index HTTP {exc.code}",
+                retry_after_seconds(exc.headers.get("Retry-After")),
             ) from exc
-        time.sleep(retry_delay)
-    raise AssertionError("unreachable package-index retry state")
+        raise ReleaseValidationError(f"Package-index HTTP {exc.code}") from exc
+    except (ssl.SSLError, URLError, TimeoutError, ConnectionError) as exc:
+        if isinstance(exc, ssl.SSLError) or isinstance(
+            getattr(exc, "reason", None), ssl.SSLError
+        ):
+            raise ReleaseValidationError(
+                "Package-index TLS verification failed."
+            ) from exc
+        raise TransientIndexError("Package-index transport unavailable.") from exc
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise ReleaseValidationError(
+            "Package-index response is not valid JSON."
+        ) from exc
 
 
 def inspect_release(
@@ -95,19 +126,30 @@ def inspect_release(
     version: str,
     expected_files: Mapping[str, str],
     opener: Callable[..., BinaryIO] = urlopen,
-    attempts: int = 5,
-    retry_delay: float = 2.0,
+    timeout: float = 20.0,
 ) -> str:
     """Return ``absent``, ``partial``, or ``complete`` for an exact release."""
+    parsed = urlsplit(index_url)
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ReleaseValidationError(
+            "Index URL must be HTTPS without credentials, query, or fragment."
+        )
     endpoint = (
         f"{index_url.rstrip('/')}/{quote(project, safe='')}/"
         f"{quote(version, safe='')}/json"
     )
+    print(f"Destination={parsed.hostname}; version={version}", file=sys.stderr)
     payload = _read_index_response(
         endpoint,
         opener=opener,
-        attempts=attempts,
-        retry_delay=retry_delay,
+        timeout=timeout,
     )
     if payload is None:
         return "absent"
@@ -151,25 +193,56 @@ def inspect_release(
         return "absent"
     if set(published) == set(expected_files):
         return "complete"
+    print(
+        f"Missing files: {sorted(set(expected_files) - set(published))}",
+        file=sys.stderr,
+    )
     return "partial"
 
 
 def wait_for_complete_release(
     *,
-    inspect: Callable[[], str],
-    attempts: int = 6,
+    inspect: Callable[[float], str],
+    budget: float = 300.0,
     retry_delay: float = 10.0,
     sleeper: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.monotonic,
+    require_complete: bool = True,
 ) -> str:
-    """Retry exact release inspection while an index propagates new files."""
-    if attempts < 1:
-        raise ValueError("attempts must be at least one")
-    for attempt in range(1, attempts + 1):
-        status = inspect()
-        if status == "complete" or attempt == attempts:
+    """One deadline owns all visibility and transport retries; no nested sleeps."""
+    if not math.isfinite(budget) or not 1 <= budget <= 600:
+        raise ValueError("budget must be finite and between 1 and 600 seconds")
+    if not math.isfinite(retry_delay) or retry_delay <= 0:
+        raise ValueError("retry_delay must be positive and finite")
+    started = clock()
+    deadline = started + budget
+    attempt = 0
+    status = "unobserved"
+    while (remaining := deadline - clock()) > 0:
+        attempt += 1
+        delay = retry_delay
+        try:
+            status = inspect(min(20.0, remaining))
+            if status not in {"absent", "partial", "complete"}:
+                raise ReleaseValidationError("Unknown index observation")
+        except TransientIndexError as exc:
+            status = f"transport exhaustion ({exc})"
+            delay = max(delay, exc.retry_after)
+        elapsed = clock() - started
+        print(
+            f"Attempt {attempt}; elapsed={elapsed:.1f}s; state={status}",
+            file=sys.stderr,
+        )
+        if clock() >= deadline:
+            break
+        if status == "complete" or (
+            not require_complete and status in {"absent", "partial"}
+        ):
             return status
-        sleeper(retry_delay)
-    raise AssertionError("unreachable package-index verification retry state")
+        sleeper(min(delay, max(0, deadline - clock())))
+    raise ReleaseValidationError(
+        f"Verification deadline exhausted after {budget:g}s; last state: {status}."
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -179,6 +252,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--project", default="OpenPinch")
     parser.add_argument("--version", required=True)
     parser.add_argument("--dist-dir", type=Path, default=Path("dist"))
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=None,
+        help="Total budget, 1-600 seconds (postflight 300; preflight 60).",
+    )
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--allow-partial", action="store_true")
     mode.add_argument("--require-complete", action="store_true")
@@ -195,25 +274,31 @@ def main(argv: list[str] | None = None) -> int:
             version=args.version,
         )
 
-        def inspect() -> str:
+        def inspect(timeout: float) -> str:
             return inspect_release(
                 index_url=args.index_url,
                 project=args.project,
                 version=args.version,
                 expected_files=expected,
                 opener=urlopen,
+                timeout=timeout,
             )
 
-        status = (
-            wait_for_complete_release(inspect=inspect)
-            if args.require_complete
-            else inspect()
+        print(
+            f"Verifying project={args.project} version={args.version}", file=sys.stderr
+        )
+        status = wait_for_complete_release(
+            inspect=inspect,
+            budget=args.timeout
+            if args.timeout is not None
+            else (300 if args.require_complete else 60),
+            require_complete=args.require_complete,
         )
         if args.require_complete and status != "complete":
             raise ReleaseValidationError(
                 f"Published release is {status}; expected a complete exact release."
             )
-    except (OSError, ReleaseValidationError) as exc:
+    except (OSError, ValueError) as exc:
         print(exc, file=sys.stderr)
         return 1
     print(status)

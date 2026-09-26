@@ -1,4 +1,13 @@
-# Performance Test Instructions - Test-Suite Runtime Reduction
+# Performance Test Instructions - Delivery Workflow
+
+## Delivery measurement boundary
+
+The numerical budgets and marker selectors below are unchanged. New delivery
+helpers use fake clocks and bounded generated inputs, not network timing.
+Compare hosted runs of the same profile and candidate class, separating
+queue/setup time, test time, and reused evidence. Local concurrent diagnostic
+runs are not evidence of a pipeline speedup. Historical measurements below
+belong to the earlier runtime-reduction change.
 
 ## Requirements
 
