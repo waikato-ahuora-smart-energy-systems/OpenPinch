@@ -37,35 +37,17 @@ provide core-runtime and wheel-install compatibility coverage.
 Release Process
 ---------------
 
-After normal review, a trusted coordinator opens a patch-bump PR into develop.
-Merge that PR before the reviewed develop-to-main PR. Main reuses verified
-unaffected review tests, runs fresh package checks and automatically publishes
-after validation succeeds. PR validation remains read-only; only the coordinator
-creates the version branch/PR. Version preparation, completed-version no-ops and
-same-artifact recovery are described in :doc:`releasing`.
-
-The shared validator owns ordinary branch coverage, docs, TESPy, performance,
-optional installs, and cross-platform artifact smoke. Main PRs, main pushes,
-and new releases additionally require solver validation. Ordinary coverage
-remains 95 percent. Exact compatible develop evidence may replace integration
-lanes; it never replaces main's solver requirement.
+``ci.yml`` owns branch coverage, docs, TESPy, performance, optional-install and
+cross-platform wheel smoke tests. Pull requests into ``main`` and every push to
+``main`` also run the solver tests. Branch coverage must stay at or above 95
+percent. ``release.yml`` publishes from ``main`` when the version is new; see
+:doc:`releasing`.
 
 Repository Controls
 -------------------
 
-Require ``OpenPinch PR Gate`` after its hosted check name has been verified.
-The temporary ``test`` compatibility check also requires the complete gate;
-remove it only after the new required-check configuration is active. Preserve
-existing review, strictness, and tag protections during migration. Remote
-settings changes require separate authorization and verification.
-
-PR description-only edits do not run expensive validation. They do not create
-new success evidence: reopen a ready PR or push a candidate change if a new
-complete gate is required. Base-branch edits trigger the appropriate profile.
-
-Retain the protected ``pypi`` environment and trusted-publisher configuration.
-Before activating explicit main-context publication, verify allowed refs and
-reviewer settings without weakening them to make a run pass.
+Require the ``CI OK`` status check on ``develop`` and ``main``. It is the
+single gate that summarises every other CI job.
 
 Alternative Direct Sphinx Build
 -------------------------------

@@ -1,0 +1,139 @@
+# Every push to main is validated with the full CI profile. If pyproject.toml
+# carries a version that has no v<version> tag yet, the exact files built by
+# that CI run are published to PyPI and attached to a new GitHub release.
+#
+# Re-running is safe: PyPI upload skips files that already exist, and a
+# missing, draft or incomplete GitHub release is created or completed. A
+# version counts as released only once its published release has both files.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
+  plan:
+    name: Plan release
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      publish: ${{ steps.plan.outputs.publish }}
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - id: plan
+        name: Decide whether this version is new
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$GITHUB_REF" = refs/heads/main || { echo "::error::Releases run from main only."; exit 1; }
+          version="$(python3 scripts/check_release_version.py)"
+          tags="$RUNNER_TEMP/tags.txt"
+          releases="$RUNNER_TEMP/releases.jsonl"
+          gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/v" --paginate --jq '.[].ref' > "$tags"
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate \
+            --jq '.[] | select(.draft | not) | {tag: .tag_name, assets: [.assets[].name]} | tojson' > "$releases"
+          tag_sha=""
+          if grep -qx "refs/tags/v$version" "$tags"; then
+            tag_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/refs/tags/v$version" --jq .sha)"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          python3 scripts/release_plan.py --version "$version" --tags-file "$tags" \
+            --releases-file "$releases" --tag-sha "$tag_sha" --head-sha "$GITHUB_SHA" \
+            2> >(tee -a "$GITHUB_STEP_SUMMARY" >&2) >> "$GITHUB_OUTPUT"
+
+  pypi:
+    name: Publish to PyPI
+    needs: plan
+    if: ${{ needs.plan.outputs.publish == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/project/OpenPinch/${{ needs.plan.outputs.version }}/
+    permissions:
+      id-token: write # trusted publishing; no API token is stored anywhere
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist
+          path: dist
+      - name: Files match the version being released
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          ls dist
+          test -f "dist/openpinch-$VERSION-py3-none-any.whl"
+          test -f "dist/openpinch-$VERSION.tar.gz"
+          test "$(find dist -type f | wc -l)" = 2
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          skip-existing: true
+
+  github-release:
+    name: Tag and GitHub release
+    needs: [plan, pypi]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist
+          path: dist
+      - name: Create or complete v${{ needs.plan.outputs.version }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          tag="v$VERSION"
+          # Drafts are included: this job's token can see them.
+          existing="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate \
+            --jq ".[] | select(.tag_name == \"$tag\") | {draft, target: .target_commitish} | tojson")"
+          count="$(grep -c . <<< "$existing" || true)"
+          if [ "$count" = 0 ]; then
+            # Creates the tag on the exact commit CI validated. gh uploads the
+            # assets to a draft and publishes it only once they are all there.
+            gh release create "$tag" dist/* --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --title "OpenPinch $tag" --generate-notes
+          elif [ "$count" = 1 ]; then
+            if [ "$(jq -r .draft <<< "$existing")" = true ] && [ "$(jq -r .target <<< "$existing")" != "$GITHUB_SHA" ]; then
+              echo "::error title=Release blocked::A draft $tag exists for another commit. Delete it or bump the version."
+              exit 1
+            fi
+            echo "Completing the existing $tag release."
+            gh release upload "$tag" dist/* --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false
+          else
+            echo "::error title=Release blocked::Found $count releases for $tag; keep one."
+            exit 1
+          fi
+      - name: Verify the published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" --json isDraft,assets \
+            --jq '[.isDraft, (.assets | map(.name) | sort | join(" "))] | @tsv' > "$RUNNER_TEMP/state"
+          expected="$(printf 'false\topenpinch-%s-py3-none-any.whl openpinch-%s.tar.gz' "$VERSION" "$VERSION")"
+          if ! grep -qxF "$expected" "$RUNNER_TEMP/state"; then
+            echo "::error title=Release incomplete::$(cat "$RUNNER_TEMP/state")"
+            exit 1
+          fi
+          echo "Released **v$VERSION** on PyPI and GitHub." >> "$GITHUB_STEP_SUMMARY"

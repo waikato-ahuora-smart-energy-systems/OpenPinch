@@ -17,11 +17,8 @@ PYTHON_VERSION = REPO_ROOT / ".python-version"
 PYTEST_INI = REPO_ROOT / "pytest.ini"
 UPDATE_TOOLCHAIN = REPO_ROOT / "scripts" / "update_toolchain.py"
 WORKFLOWS = [
-    REPO_ROOT / ".github" / "workflows" / "ci-develop.yml",
-    REPO_ROOT / ".github" / "workflows" / "ci-pull-request.yml",
-    REPO_ROOT / ".github" / "workflows" / "ci-publish.yml",
-    REPO_ROOT / ".github" / "workflows" / "ci-validation.yml",
-    REPO_ROOT / ".github" / "workflows" / "ci-main.yml",
+    REPO_ROOT / ".github" / "workflows" / "ci.yml",
+    REPO_ROOT / ".github" / "workflows" / "release.yml",
 ]
 UPLOAD_ARTIFACT_SHA = "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
 DOWNLOAD_ARTIFACT_SHA = "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"
@@ -294,15 +291,17 @@ def test_bumpversion_updates_lockfile_project_version():
 
 
 def test_ci_measures_branch_coverage_with_the_documented_hypothesis_seed():
-    for workflow in [REPO_ROOT / ".github/workflows/ci-validation.yml"]:
+    for workflow in [REPO_ROOT / ".github/workflows/ci.yml"]:
         text = workflow.read_text(encoding="utf-8")
         assert "coverage run --branch --source=OpenPinch" in text
-        assert "--hypothesis-seed=20260715" in text
+        assert 'HYPOTHESIS_SEED: "20260715"' in text
         assert "coverage report --fail-under=95" in text
 
 
 def test_every_external_action_is_pinned_to_an_immutable_commit():
-    action_ref = re.compile(r"^\s*(?:- )?uses: ([^\s]+)$", re.MULTILINE)
+    action_ref = re.compile(
+        r"^\s*(?:- )?uses: ([^\s]+)(?:\s+#.*)?$", re.MULTILINE
+    )
 
     for workflow_path in WORKFLOWS:
         workflow = workflow_path.read_text(encoding="utf-8")
