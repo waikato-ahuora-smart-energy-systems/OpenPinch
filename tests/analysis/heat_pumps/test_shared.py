@@ -640,3 +640,27 @@ def test_hpr_backend_result_derives_hot_and_cold_stream_views_from_combined_stre
     assert res.hpr_streams is hpr_streams
     assert len(res.hpr_hot_streams) == 1
     assert len(res.hpr_cold_streams) == 1
+
+
+def test_condensing_search_range_stays_below_the_refrigerant_critical_point():
+    # Ammonia's critical point is ~132.3 degC: condensing above it has no
+    # saturation state, so the search must not propose it (CI regression on
+    # notebooks 09/10, where every candidate failed in CoolProp's PQ flash).
+    args = SimpleNamespace(T_cold=np.array([200.0, 60.0]), refrigerant_ls=["ammonia"])
+    hot, cold = hp_shared.condensing_temperature_search_range(args)
+    assert cold == 60.0
+    assert hot == pytest.approx(
+        132.25 - hp_shared.SUBCRITICAL_CONDENSING_MARGIN_K, abs=0.1
+    )
+
+
+def test_condensing_search_range_is_unchanged_when_no_cap_applies():
+    within = SimpleNamespace(T_cold=np.array([120.0, 60.0]), refrigerant_ls=["water"])
+    assert hp_shared.condensing_temperature_search_range(within) == (120.0, 60.0)
+    unknown = SimpleNamespace(T_cold=np.array([200.0, 60.0]), refrigerant_ls=["?"])
+    assert hp_shared.condensing_temperature_search_range(unknown) == (200.0, 60.0)
+    # A cap below the whole sink range would leave nothing to search.
+    cold_sink = SimpleNamespace(
+        T_cold=np.array([300.0, 250.0]), refrigerant_ls=["ammonia"]
+    )
+    assert hp_shared.condensing_temperature_search_range(cold_sink) == (300.0, 250.0)

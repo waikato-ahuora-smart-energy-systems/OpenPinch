@@ -25,6 +25,7 @@ from ..common.encoding import (
 from ..common.layout import HPRoptVectorLayout
 from ..common.multi_vc_objective import _evaluate_multi_vc_objective
 from ..common.shared import (
+    condensing_temperature_search_range,
     evaluate_vapour_hpr_result,
     validate_vapour_hp_refrigerant_ls,
 )
@@ -120,8 +121,14 @@ def _get_parallel_hp_opt_setup(
         init_res.Q_amb_cold,
         max(args.Q_heat_max, args.Q_cool_max),
     )
-    x_cond = map_T_arr_to_x_arr(
-        init_res.T_cond, args.T_cold[0], args.T_cold[-1]
+    # The Carnot warm start knows nothing about critical points, so clip it
+    # into the refrigerant's subcritical condensing range.
+    x_cond = np.clip(
+        map_T_arr_to_x_arr(
+            init_res.T_cond, *condensing_temperature_search_range(args)
+        ),
+        0.0,
+        1.0,
     ).tolist()
     x_evap = map_T_arr_to_x_arr(
         init_res.T_evap[::-1], args.T_hot[-1], args.T_hot[0]
@@ -189,7 +196,7 @@ def _parse_parallel_hp_state_temperatures(
     )
     H_cold_with_amb = ambient.H_cold_with_residual_ambient(args)
     H_hot_with_amb = ambient.H_hot_with_residual_ambient(args)
-    T_cond = map_x_arr_to_T_arr(x_cond, args.T_cold[0], args.T_cold[-1])
+    T_cond = map_x_arr_to_T_arr(x_cond, *condensing_temperature_search_range(args))
     T_evap = map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0])
     dT_subcool = map_x_arr_to_DT_arr(x_subcool, T_cond, T_evap)
     Q_heat_base = (
