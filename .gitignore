@@ -252,3 +252,6 @@ aidlc-docs/inception/plans/*
 !aidlc-docs/construction/plans/exact-openhens-checkout-loading-functional-design-plan.md
 !aidlc-docs/construction/plans/exact-openhens-checkout-loading-code-generation-plan.md
 !aidlc-docs/construction/plans/current-documentation-drift-guards-code-generation-plan.md
+
+# Claude Code local settings and session data
+.claude/
