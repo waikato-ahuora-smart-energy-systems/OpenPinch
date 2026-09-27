@@ -331,20 +331,10 @@ def _solve_evolution_candidates(
             for spec in specs
         }
         for future in as_completed(futures):
-            spec = futures[future]
-            try:
-                candidate = future.result()
-            except Exception as exc:
-                logger.debug(
-                    "Discarding failed EVM %s branch %s rank %s: %s",
-                    spec.kind,
-                    spec.branch_index,
-                    spec.rank,
-                    exc,
-                )
-                continue
+            # _solve_evolution_candidate already converts failures to None.
+            candidate = future.result()
             if candidate is not None:
-                candidates.append((spec, candidate))
+                candidates.append((futures[future], candidate))
     return candidates
 
 
@@ -378,6 +368,7 @@ def _solve_evolution_candidate(
             spec.branch_index,
             spec.rank,
             exc,
+            exc_info=True,
         )
         return None
 

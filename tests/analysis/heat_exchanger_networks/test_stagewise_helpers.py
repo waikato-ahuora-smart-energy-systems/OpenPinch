@@ -863,12 +863,14 @@ def test_stagewise_candidate_spec_duplicate_and_parallel_solve_edges():
         signature=(),
     )
 
-    def solve_candidate(spec, print_output):
-        if spec.kind == "plus":
-            raise RuntimeError("failed branch")
+    def solve_plus(**kwargs):
+        raise RuntimeError("failed branch")
+
+    def solve_minus(**kwargs):
         return SimpleNamespace(mSuccess=1, TAC=90.0)
 
-    model._solve_evolution_candidate = solve_candidate
+    model._build_and_solve_n_plus_one_evolution = solve_plus
+    model._build_and_solve_n_minus_one_evolution = solve_minus
     solved = model._solve_evolution_candidates(
         [first, second],
         print_output=False,
