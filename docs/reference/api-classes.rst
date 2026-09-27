@@ -153,9 +153,11 @@ cycle configurations directly.
 
 .. automodule:: OpenPinch.analysis.heat_pumps.cycles.parallel_vapour_compression_cycles
    :members:
+   :inherited-members:
 
 .. automodule:: OpenPinch.analysis.heat_pumps.cycles.cascade_vapour_compression_cycle
    :members:
+   :inherited-members:
 
 .. automodule:: OpenPinch.analysis.heat_pumps.cycles.carnot_cycles
    :members:

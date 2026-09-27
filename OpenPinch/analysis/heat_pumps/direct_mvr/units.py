@@ -7,6 +7,10 @@ import numpy as np
 from ....domain.configuration import tol
 from ....domain.stream import Stream
 from ....domain.value import Value
+from ..common.units import to_degrees_celsius as to_degrees_celsius
+from ..common.units import to_kelvin as to_kelvin
+from ..common.units import to_kilopascal as to_kilopascal
+from ..common.units import value_at_index as value_at_index
 from .models import (
     DEFAULT_ENTHALPY_UNIT,
     DEFAULT_HEAT_FLOW_UNIT,
@@ -36,40 +40,8 @@ def stage_pressure_to_pascal(value: float, pressure_unit: str) -> float:
     return float(Value(value, pressure_unit).to("Pa").value)
 
 
-def value_at_index(
-    value,
-    index: int,
-    *,
-    unit: str | None = None,
-) -> float | None:
-    """Resolve one scalar or period-indexed Value-like magnitude."""
-    if value is None:
-        return None
-    try:
-        selected = value[index]
-    except Exception:
-        selected = value
-    if isinstance(selected, Value):
-        if unit is not None:
-            selected = selected.to(unit)
-        return float(selected.value)
-    return float(selected)
-
-
-def to_kelvin(temperature_celsius: float) -> float:
-    return float(Value(temperature_celsius, "degC").to("K").value)
-
-
-def to_degrees_celsius(temperature_kelvin: float) -> float:
-    return float(Value(temperature_kelvin, "K").to("degC").value)
-
-
 def to_pascal(pressure_kilopascal: float) -> float:
     return float(Value(pressure_kilopascal, "kPa").to("Pa").value)
-
-
-def to_kilopascal(pressure_pascal: float) -> float:
-    return float(Value(pressure_pascal, "Pa").to("kPa").value)
 
 
 def to_watt(power_kilowatt: float) -> float:
