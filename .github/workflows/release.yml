@@ -1,0 +1,109 @@
+# Every push to main is validated with the full CI profile. If pyproject.toml
+# carries a version that has no v<version> tag yet, the exact files built by
+# that CI run are published to PyPI and attached to a new GitHub release.
+#
+# Re-running is safe: PyPI upload skips files that already exist, and the
+# GitHub release is only created when it is missing.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
+  plan:
+    name: Plan release
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      publish: ${{ steps.plan.outputs.publish }}
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - id: plan
+        name: Is this version new?
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$GITHUB_REF" = refs/heads/main || { echo "::error::Releases run from main only."; exit 1; }
+          version="$(python3 scripts/check_release_version.py)"
+          taken="$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/v$version" --jq "map(select(.ref == \"refs/tags/v$version\")) | length")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ "$taken" = 0 ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "Releasing **v$version**." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "v$version is already released; nothing to publish." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  pypi:
+    name: Publish to PyPI
+    needs: plan
+    if: ${{ needs.plan.outputs.publish == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/project/OpenPinch/${{ needs.plan.outputs.version }}/
+    permissions:
+      id-token: write # trusted publishing; no API token is stored anywhere
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist
+          path: dist
+      - name: Files match the version being released
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          ls dist
+          test -f "dist/openpinch-$VERSION-py3-none-any.whl"
+          test -f "dist/openpinch-$VERSION.tar.gz"
+          test "$(find dist -type f | wc -l)" = 2
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          skip-existing: true
+
+  github-release:
+    name: Tag and GitHub release
+    needs: [plan, pypi]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist
+          path: dist
+      - name: Create v${{ needs.plan.outputs.version }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "Release v$VERSION already exists."
+            exit 0
+          fi
+          # Creates the v$VERSION tag on the exact commit that CI validated.
+          gh release create "v$VERSION" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "OpenPinch v$VERSION" \
+            --generate-notes
