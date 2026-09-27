@@ -5,7 +5,6 @@ from __future__ import annotations
 import ast
 import csv
 import json
-import shutil
 from pathlib import Path
 
 import nbformat
@@ -21,7 +20,6 @@ from OpenPinch.resources import (
     read_sample_case,
     sample_case_metadata,
 )
-from scripts import generate_tutorial_notebooks as notebook_generator
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = ROOT / "docs" / "_data" / "tutorial-coverage.csv"
@@ -338,45 +336,7 @@ def test_tutorial_review_preserves_notebook_invariants(name: str) -> None:
     assert [cell["id"] for cell in notebook["cells"]] == [
         f"cell-{index:02d}" for index in range(1, len(notebook["cells"]) + 1)
     ]
-    # Saved tutorials may retain valid execution evidence. The generator's
-    # fresh-output contract is checked independently below.
     nbformat.validate(notebook)
-
-
-def test_notebook_generator_is_repeatable_in_process(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(notebook_generator, "NOTEBOOK_DIR", tmp_path)
-
-    notebook_generator.main()
-    first = {path.name: path.read_bytes() for path in tmp_path.glob("*.ipynb")}
-    for name, payload in first.items():
-        notebook = json.loads(payload)
-        nbformat.validate(notebook)
-        for cell in notebook["cells"]:
-            if cell["cell_type"] == "code":
-                assert cell["execution_count"] is None, name
-                assert cell["outputs"] == [], name
-    notebook_generator.main()
-    second = {path.name: path.read_bytes() for path in tmp_path.glob("*.ipynb")}
-
-    assert sorted(first) == EXPECTED_NOTEBOOKS
-    assert second == first
-
-
-def test_notebook_generator_does_not_rewrite_current_notebooks(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    notebook_dir = ROOT / "OpenPinch" / "tutorials" / "notebooks"
-    for source in notebook_dir.glob("*.ipynb"):
-        shutil.copy2(source, tmp_path / source.name)
-    before = {path.name: path.read_bytes() for path in tmp_path.glob("*.ipynb")}
-    monkeypatch.setattr(notebook_generator, "NOTEBOOK_DIR", tmp_path)
-
-    notebook_generator.main()
-
-    after = {path.name: path.read_bytes() for path in tmp_path.glob("*.ipynb")}
-    assert after == before
 
 
 def test_every_code_cell_compiles_and_uses_only_public_package_imports(
@@ -524,24 +484,19 @@ def test_notebook_11_required_mvr_paths_are_explicit_and_bounded() -> None:
     assert "assert cascade.hpr_details.target_simulation_record.loops" in source
 
 
-def test_checked_in_notebooks_are_source_only_and_match_generator(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_checked_in_notebooks_are_the_expected_output_free_set() -> None:
+    # The .ipynb files are the source of truth: edit them in Jupyter and clear
+    # outputs before committing.
     notebook_dir = ROOT / "OpenPinch" / "tutorials" / "notebooks"
     # Run artifacts (e.g. openpinch-workspace.json) are git-ignored, and hatch
     # leaves ignored files out of builds, so only the notebook set is checked.
     packaged_notebooks = sorted(path.name for path in notebook_dir.glob("*.ipynb"))
     assert packaged_notebooks == sorted(EXPECTED_NOTEBOOKS)
 
-    monkeypatch.setattr(notebook_generator, "NOTEBOOK_DIR", tmp_path)
-    notebook_generator.main()
-
     for name in EXPECTED_NOTEBOOKS:
-        generated = _load_notebook(tmp_path / name)
-        checked_in = _load_notebook(notebook_dir / name)
-        assert _combined_source(checked_in) == _combined_source(generated), name
-        for cell in checked_in["cells"]:
+        notebook = _load_notebook(notebook_dir / name)
+        for cell in notebook["cells"]:
+            assert "attachments" not in cell, name
             if cell["cell_type"] == "code":
                 assert cell["execution_count"] is None, name
                 assert cell["outputs"] == [], name
