@@ -257,13 +257,14 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
     ):
         """Build and solve one minus-one topology evolution candidate."""
 
-        return _evolution._build_and_solve_n_minus_one_evolution(
+        return _evolution._build_and_solve_evolution(
             self,
+            "minus",
             print_output=print_output,
             unit=unit,
             prev_case=prev_case,
             position=position,
-            z_allowed_removed=z_allowed_removed,
+            z_allowed=z_allowed_removed,
             branch_label=branch_label,
         )
 
@@ -284,13 +285,14 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
     ):
         """Build and solve one plus-one topology evolution candidate."""
 
-        return _evolution._build_and_solve_n_plus_one_evolution(
+        return _evolution._build_and_solve_evolution(
             self,
+            "plus",
             print_output=print_output,
             unit=unit,
             prev_case=prev_case,
             position=position,
-            z_allowed_added=z_allowed_added,
+            z_allowed=z_allowed_added,
             branch_label=branch_label,
         )
 

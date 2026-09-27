@@ -955,3 +955,66 @@ def test_stagewise_post_process_and_verify_failure_edges(monkeypatch):
     monkeypatch.setattr(stagewise_verification, "_check_area_costs", lambda case: False)
 
     assert verify_model.verify() == (False, ["temperature", "cost", "area"])
+
+
+@pytest.mark.parametrize(
+    ("kind", "builder", "z_keyword"),
+    [
+        ("minus", "_build_and_solve_n_minus_one_evolution", "z_allowed_removed"),
+        ("plus", "_build_and_solve_n_plus_one_evolution", "z_allowed_added"),
+    ],
+)
+def test_evolution_child_uses_configured_evm_solver(
+    monkeypatch, kind, builder, z_keyword
+):
+    created: list[dict] = []
+
+    class _Cell:
+        def __init__(self):
+            self.VALUE = SimpleNamespace(value=None)
+
+    class _FakeChild:
+        def __init__(self, **kwargs):
+            created.append(kwargs)
+            self.Q_r = [[[_Cell()]]]
+            self.z = [[[_Cell()]]]
+            self.theta_1 = [[[_Cell()]]]
+            self.theta_2 = [[[_Cell()]]]
+            self.optimised = False
+
+        def optimise(self, *, print_output):
+            self.optimised = True
+
+    monkeypatch.setattr(
+        stagewise_evolution, "_stagewise_model_class", lambda: _FakeChild
+    )
+
+    owner = StageWiseModel.__new__(StageWiseModel)
+    owner.name = "root"
+    owner.solver = "couenne"
+    owner.solver_options = {"max_iter": 7}
+    owner._recovery_approach_temperature = lambda i, j: 5.0
+    prev_case = SimpleNamespace(
+        framework="ESM",
+        solver="apopt",
+        solver_arrays=object(),
+        stages=1,
+        dTmin=10.0,
+        min_dqda=0.0,
+        minimisation_goal="variable total cost",
+        non_isothermal_model=False,
+    )
+
+    child = getattr(owner, builder)(
+        print_output=False,
+        unit=0,
+        prev_case=prev_case,
+        position=(0, 0, 0),
+        **{z_keyword: [[[1]]]},
+    )
+
+    assert child.optimised
+    assert created[0]["solver"] == "couenne"
+    assert created[0]["solver_options"] == {"max_iter": 7}
+    assert created[0]["name"] == f"root-n_{kind} 1 evolution model 0"
+    assert child.z[0][0][0].VALUE.value == (0 if kind == "minus" else 1)

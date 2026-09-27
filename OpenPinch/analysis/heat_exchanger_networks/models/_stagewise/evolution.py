@@ -476,35 +476,44 @@ def get_n_minus_one_evolution(owner, print_output: bool, unit: int, prev_case):
     )
 
 
-def _build_and_solve_n_minus_one_evolution(
+def _build_and_solve_evolution(
     owner,
+    kind: Literal["minus", "plus"],
     *,
     print_output: bool,
     unit: int,
     prev_case,
     position: Sequence[int],
-    z_allowed_removed: list,
+    z_allowed: list,
     branch_label: str | None = None,
 ):
-    """Build and solve one minus-one topology evolution candidate."""
+    """Build and solve one minus-one or plus-one topology evolution candidate.
+
+    The child model is solved with the root EVM model's configured solver.
+    """
 
     i, j, k = (int(index) for index in position)
-    logger.debug("worst selected position i,j,k %s", [i, j, k])
     logger.debug(
-        "number in z_allowed_removed %s",
-        _count_allowed_matches(z_allowed_removed),
+        "%s position i,j,k %s",
+        "worst selected" if kind == "minus" else "best non-selected",
+        [i, j, k],
     )
-    model_minus_one = _stagewise_model_class()(
+    logger.debug(
+        "number in z_allowed_%s %s",
+        "removed" if kind == "minus" else "added",
+        _count_allowed_matches(z_allowed),
+    )
+    child = _stagewise_model_class()(
         name=(
-            f"{owner.name}-n_minus 1 evolution model "
+            f"{owner.name}-n_{kind} 1 evolution model "
             f"{branch_label if branch_label is not None else unit}"
         ),
         framework=prev_case.framework,
-        solver="ipopt-pyomo",
+        solver=owner.solver,
         solver_arrays=prev_case.solver_arrays,
         stages=prev_case.stages,
         dTmin=prev_case.dTmin,
-        z_restriction=[z_allowed_removed, None, None],
+        z_restriction=[z_allowed, None, None],
         min_dqda=prev_case.min_dqda,
         minimisation_goal=prev_case.minimisation_goal,
         non_isothermal_model=prev_case.non_isothermal_model,
@@ -513,14 +522,17 @@ def _build_and_solve_n_minus_one_evolution(
         solver_options=owner.solver_options,
     )
 
-    model_minus_one.Q_r[i][j][k].VALUE.value = 0.0
-    model_minus_one.z[i][j][k].VALUE.value = 0
-    approach = owner._recovery_approach_temperature(i, j)
-    model_minus_one.theta_1[i][j][k].VALUE.value = approach
-    model_minus_one.theta_2[i][j][k].VALUE.value = approach
+    if kind == "minus":
+        child.Q_r[i][j][k].VALUE.value = 0.0
+        child.z[i][j][k].VALUE.value = 0
+        approach = owner._recovery_approach_temperature(i, j)
+        child.theta_1[i][j][k].VALUE.value = approach
+        child.theta_2[i][j][k].VALUE.value = approach
+    else:
+        child.z[i][j][k].VALUE.value = 1
 
-    model_minus_one.optimise(print_output=print_output)
-    return model_minus_one
+    child.optimise(print_output=print_output)
+    return child
 
 
 def get_n_plus_one_evolution(owner, print_output: bool, unit: int, prev_case):
@@ -542,49 +554,6 @@ def get_n_plus_one_evolution(owner, print_output: bool, unit: int, prev_case):
         position=position,
         z_allowed_added=z_allowed_added,
     )
-
-
-def _build_and_solve_n_plus_one_evolution(
-    owner,
-    *,
-    print_output: bool,
-    unit: int,
-    prev_case,
-    position: Sequence[int],
-    z_allowed_added: list,
-    branch_label: str | None = None,
-):
-    """Build and solve one plus-one topology evolution candidate."""
-
-    i, j, k = (int(index) for index in position)
-    logger.debug("best non-selected position i,j,k %s", [i, j, k])
-    logger.debug(
-        "number in z_allowed_added %s",
-        _count_allowed_matches(z_allowed_added),
-    )
-    model_plus_one = _stagewise_model_class()(
-        name=(
-            f"{owner.name}-n_plus 1 evolution model "
-            f"{branch_label if branch_label is not None else unit}"
-        ),
-        framework=prev_case.framework,
-        solver="ipopt-pyomo",
-        solver_arrays=prev_case.solver_arrays,
-        stages=prev_case.stages,
-        dTmin=prev_case.dTmin,
-        z_restriction=[z_allowed_added, None, None],
-        min_dqda=prev_case.min_dqda,
-        minimisation_goal=prev_case.minimisation_goal,
-        non_isothermal_model=prev_case.non_isothermal_model,
-        integers=False,
-        tol=1e-3,
-        solver_options=owner.solver_options,
-    )
-
-    model_plus_one.z[i][j][k].VALUE.value = 1
-
-    model_plus_one.optimise(print_output=print_output)
-    return model_plus_one
 
 
 def _z_allowed_with_candidate(
