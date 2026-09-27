@@ -206,19 +206,6 @@ class PinchProblem:
             extract_func=extract_results,
         )
 
-    def _run_exergy_targeting_for_zone_and_subzones(
-        self,
-        *,
-        zone: "Zone",
-        service_func: Optional[ZoneService],
-        options: Optional[dict[str, Any]],
-    ) -> None:
-        _target_execution.run_exergy_targeting_for_zone_and_subzones(
-            zone=zone,
-            service_func=service_func,
-            options=options,
-        )
-
     def _execute_exergy_targeting(
         self,
         *,
@@ -248,31 +235,6 @@ class PinchProblem:
             self,
             application_zone,
             master_zone=master_zone,
-        )
-
-    def _attach_process_component_work_targets(
-        self,
-        zone: "Zone",
-        runtime_options: Optional[dict[str, Any]],
-    ) -> None:
-        _target_execution.attach_process_component_work_targets(
-            self,
-            zone,
-            runtime_options,
-        )
-
-    def _process_component_work_for_zone(
-        self,
-        zone: "Zone",
-        *,
-        period_id: str | None,
-        period_idx: int | None,
-    ) -> float:
-        return _target_execution.process_component_work_for_zone(
-            self,
-            zone,
-            period_id=period_id,
-            period_idx=period_idx,
         )
 
     def _walk_zone_tree(self, zone: "Zone"):
@@ -324,20 +286,6 @@ class PinchProblem:
             include_subzones=include_subzones,
         )
 
-    def _target_run_spec_for_summary(self) -> _TargetRunSpec:
-        return _period_aggregation.target_run_spec_for_summary(self)
-
-    def _period_options_for_replay(
-        self,
-        spec: _TargetRunSpec,
-        *,
-        period_id: str,
-    ) -> dict[str, Any]:
-        return _period_aggregation.period_options_for_replay(
-            spec,
-            period_id=period_id,
-        )
-
     def _target_outputs_for_recorded_periods(self) -> list[TargetOutput]:
         return _period_aggregation.target_outputs_for_recorded_periods(self)
 
@@ -352,9 +300,6 @@ class PinchProblem:
             period_id,
         )
 
-    def _period_weights_for_summary(self) -> list[float]:
-        return _period_aggregation.period_weights_for_summary(self)
-
     def _summary_results(
         self,
         *,
@@ -363,17 +308,6 @@ class PinchProblem:
         return _period_aggregation.summary_results(
             self,
             periods=periods,
-        )
-
-    def _resolve_runtime_period_options(
-        self,
-        options: Optional[dict[str, Any]],
-        *,
-        zone: "Zone",
-    ) -> tuple[dict[str, Any], str | None]:
-        return _target_execution.resolve_runtime_period_options(
-            options,
-            zone=zone,
         )
 
     def validate(self) -> TargetInput:

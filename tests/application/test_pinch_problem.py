@@ -31,6 +31,7 @@ from OpenPinch.application._problem.output.reporting import (
     format_res,
     locate_summary_row,
 )
+from OpenPinch.application._problem.targeting import execution as target_execution
 from OpenPinch.application.problem import PinchProblem
 from OpenPinch.contracts.input import TargetInput
 from OpenPinch.contracts.workspace import ValidationReport
@@ -987,8 +988,7 @@ def test_run_exergy_targeting_for_zone_and_subzones_is_post_order():
     root._subzones = {"Child": child}
     order = []
 
-    problem = PinchProblem()
-    problem._run_exergy_targeting_for_zone_and_subzones(
+    target_execution.run_exergy_targeting_for_zone_and_subzones(
         zone=root,
         service_func=lambda zone, args=None: order.append(zone.name),
         options={"period_id": "peak"},
@@ -1003,8 +1003,7 @@ def test_run_exergy_targeting_for_zone_and_subzones_drops_base_target_type_for_c
     root._subzones = {"Child": child}
     calls = []
 
-    problem = PinchProblem()
-    problem._run_exergy_targeting_for_zone_and_subzones(
+    target_execution.run_exergy_targeting_for_zone_and_subzones(
         zone=root,
         service_func=lambda zone, args=None: calls.append(
             (zone.name, dict(args or {}))
@@ -2789,9 +2788,9 @@ def test_execute_targeting_include_subzones_and_missing_target_paths(monkeypatch
     called = {}
 
     monkeypatch.setattr(
-        problem,
-        "_run_targeting_for_zone_and_subzones",
-        lambda **kwargs: called.update(kwargs),
+        target_execution,
+        "run_problem_targeting",
+        lambda _problem, **kwargs: called.update(kwargs),
     )
 
     out = problem._execute_targeting(
@@ -2877,7 +2876,7 @@ def test_subzone_targeting_execution_paths(monkeypatch):
     def service(zone, options):
         visited.append((zone.name, options.get("base_target_type")))
 
-    problem._run_exergy_targeting_for_zone_and_subzones(
+    target_execution.run_exergy_targeting_for_zone_and_subzones(
         zone=root,
         service_func=service,
         options={"base_target_type": "Direct Integration", "period_id": "0"},
@@ -2935,7 +2934,8 @@ def test_process_component_work_and_target_attachment_paths():
         "compressor": component,
     }
 
-    problem._attach_process_component_work_targets(
+    target_execution.attach_process_component_work_targets(
+        problem,
         zone,
         {"period_id": "0", "period_idx": 0},
     )
@@ -3015,9 +3015,9 @@ def test_cogeneration_and_exergy_include_subzones_execution_paths(monkeypatch):
     called = {}
 
     monkeypatch.setattr(
-        problem,
-        "_run_targeting_for_zone_and_subzones",
-        lambda **kwargs: called.setdefault("cogen", kwargs),
+        target_execution,
+        "run_problem_targeting",
+        lambda _problem, **kwargs: called.setdefault("cogen", kwargs),
     )
     assert (
         problem._execute_cogeneration_targeting(
@@ -3030,8 +3030,8 @@ def test_cogeneration_and_exergy_include_subzones_execution_paths(monkeypatch):
     assert called["cogen"]["zone"] is zone
 
     monkeypatch.setattr(
-        problem,
-        "_run_exergy_targeting_for_zone_and_subzones",
+        target_execution,
+        "run_exergy_targeting_for_zone_and_subzones",
         lambda **kwargs: called.setdefault("exergy", kwargs),
     )
     monkeypatch.setattr(mod, "extract_results", lambda zone, period_id=None: {})
