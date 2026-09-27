@@ -2043,7 +2043,7 @@ def test_validate_rejects_period_equal_temperatures_with_period_id(tmp_path: Pat
         PinchProblem().load(source=path)
 
     message = str(exc_info.value)
-    assert "Supply and target temperatures must differ for period_id '1'" in message
+    assert "Supply and target temperatures must differ for period_id 'peak'" in message
     assert "Stream 1 'H1'" in message
 
 
