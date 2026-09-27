@@ -12,6 +12,21 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Git hooks and GUI clients (VS Code, GitHub Desktop) often run without your
+# shell profile, so look for uv in its usual install locations too.
+if ! command -v uv > /dev/null; then
+  for dir in "$HOME/.local/bin" "$HOME/.cargo/bin" /opt/homebrew/bin /usr/local/bin; do
+    if [ -x "$dir/uv" ]; then
+      PATH="$dir:$PATH"
+      break
+    fi
+  done
+fi
+if [ "${1:-}" != "--linux" ] && ! command -v uv > /dev/null; then
+  echo "uv not found. Install it (https://docs.astral.sh/uv/) or add it to PATH." >&2
+  exit 2
+fi
+
 # --linux: rerun this script inside a Linux container, matching the CI runners.
 # Numerical results can differ slightly between macOS (arm64) and Linux (x86_64).
 if [ "${1:-}" = "--linux" ]; then
