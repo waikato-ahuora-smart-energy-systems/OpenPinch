@@ -535,23 +535,22 @@ def test_notebook_11_required_mvr_paths_are_explicit_and_bounded() -> None:
     assert "assert cascade.hpr_details.target_simulation_record.loops" in source
 
 
-def test_checked_in_hpr_notebooks_are_source_only_and_match_generator(
+def test_checked_in_notebooks_are_source_only_and_match_generator(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    notebook_dir = ROOT / "OpenPinch" / "tutorials" / "notebooks"
+    packaged_files = sorted(
+        path.name for path in notebook_dir.iterdir() if path.is_file()
+    )
+    assert packaged_files == sorted([*EXPECTED_NOTEBOOKS, "__init__.py"])
+
     monkeypatch.setattr(notebook_generator, "NOTEBOOK_DIR", tmp_path)
     notebook_generator.main()
 
-    for name in (
-        "08_carnot_heat_pump_and_refrigeration.ipynb",
-        "09_vapour_compression_and_brayton.ipynb",
-        "10_multiperiod_heat_pumps.ipynb",
-        "11_process_mvr_and_cascade.ipynb",
-    ):
+    for name in EXPECTED_NOTEBOOKS:
         generated = _load_notebook(tmp_path / name)
-        checked_in = _load_notebook(
-            ROOT / "OpenPinch" / "tutorials" / "notebooks" / name
-        )
+        checked_in = _load_notebook(notebook_dir / name)
         assert _combined_source(checked_in) == _combined_source(generated), name
         for cell in checked_in["cells"]:
             if cell["cell_type"] == "code":

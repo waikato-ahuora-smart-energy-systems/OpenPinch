@@ -80,6 +80,9 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+# Run artifacts written by the packaged tutorial notebooks (05, 18)
+OpenPinch/tutorials/notebooks/*.json
+openpinch-results/
 
 # IPython
 profile_default/
