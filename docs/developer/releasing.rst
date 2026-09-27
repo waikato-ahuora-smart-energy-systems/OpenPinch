@@ -63,12 +63,22 @@ nothing.
 When a release fails
 --------------------
 
-Open the failed **Release** run and choose **Re-run failed jobs**. Every step
-is safe to repeat: the PyPI upload skips files that already exist, and the
-GitHub release is only created if it is missing. Builds are reproducible
-(``SOURCE_DATE_EPOCH`` is the commit time), so a full re-run produces the same
-bytes. A version that reached PyPI can never be replaced; if its files are
-wrong, bump the version and release again.
+Open the failed **Release** run and choose **Re-run failed jobs** (or re-run
+the whole workflow). Every step is safe to repeat: the PyPI upload skips files
+that already exist, and a missing, draft or incomplete GitHub release is
+created or completed. A version only counts as released once its published
+GitHub release carries both files, so a half-finished release is resumed rather
+than skipped. Builds are reproducible (``SOURCE_DATE_EPOCH`` is the commit
+time), so a full re-run produces the same bytes. A version that reached PyPI can
+never be replaced; if its files are wrong, bump the version and release again.
+
+Release planning on ``main`` refuses to publish, and fails the run, when:
+
+- the version is lower than an existing ``vX.Y.Z`` tag (for example, a stale
+  pull request merged after a newer release), or
+- ``v<version>`` already exists on a different commit.
+
+Bump the version above the latest release and merge again.
 
 One-time repository settings
 ----------------------------

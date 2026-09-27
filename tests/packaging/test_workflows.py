@@ -66,6 +66,7 @@ def test_release_publishes_the_bytes_ci_built():
     jobs = release["jobs"]
     assert jobs["ci"]["uses"] == "./.github/workflows/ci.yml"
     assert jobs["plan"]["needs"] == "ci"
+    assert "scripts/release_plan.py" in runs(jobs["plan"])
 
     pypi = jobs["pypi"]
     assert pypi["environment"]["name"] == "pypi"
@@ -80,6 +81,9 @@ def test_release_publishes_the_bytes_ci_built():
     assert github_release["needs"] == ["plan", "pypi"]
     assert github_release["permissions"] == {"contents": "write"}
     assert '--target "$GITHUB_SHA"' in runs(github_release)
+    # An interrupted release is completed on re-run, then verified.
+    assert "--draft=false" in runs(github_release)
+    assert "gh release view" in runs(github_release)
 
 
 def test_no_job_keeps_checkout_credentials():
