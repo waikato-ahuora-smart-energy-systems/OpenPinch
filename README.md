@@ -129,22 +129,22 @@ Excel export, dashboards, and advanced targeting happen through Python.
 
 ## Testing
 
-Run the test suite locally:
+Run the same checks as CI on your own machine with one command:
 
 ```bash
-uv sync --frozen --group dev
-uv run --no-sync ruff check .
-uv run --no-sync coverage run --branch --source=OpenPinch -m pytest --hypothesis-seed=20260715 -m "not solver"
-uv run --no-sync coverage report --fail-under=95
-uv run --no-sync python scripts/build_docs.py
-uv run --no-sync python scripts/build_dist.py
+scripts/ci_local.sh          # lint, unit tests with 95% coverage, docs, build + wheel smoke test
+scripts/ci_local.sh quick    # lint + unit tests, stop at the first failure
+scripts/ci_local.sh all      # every lane, including TESPy, performance, solver and notebooks
+scripts/ci_local.sh solver   # any lane by name: lint unit docs tespy performance solver notebooks build
 ```
+
+It syncs the locked environment with `uv` first and prints a pass/fail summary per lane.
+The solver lane downloads the IDAES solver binaries on first use.
 
 Ubuntu runs the complete CI suite. Windows and macOS install the generated
 wheel and verify the core import, CLI, and packaged resources. Tests marked
 `solver` require external solver binaries; CI installs the IDAES extensions
-and runs them for pull requests into `main` and for every release. Run it locally with
-`uv run pytest -m solver` when the required binaries are available.
+and runs them for pull requests into `main` and for every release.
 
 ## Release Process
 
