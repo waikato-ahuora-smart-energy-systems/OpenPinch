@@ -19,13 +19,13 @@ _OPEN_HENS_METHOD_SEQUENCE = (
 )
 
 
-@dataclass(frozen=True, init=False)
+@dataclass(frozen=True, kw_only=True)
 class SynthesisWorkflowSettings:
     """Resolved synthesis controls read from a prepared OpenPinch problem."""
 
     run_id: str
     approach_temperatures: tuple[float, ...]
-    dt_cont_multipliers: tuple[float, ...] | None
+    dt_cont_multipliers: tuple[float, ...] | None = None
     derivative_thresholds: tuple[float, ...]
     stage_selection: tuple[int, ...]
     method_sequence: tuple[HeatExchangerNetworkDesignMethod, ...]
@@ -33,19 +33,19 @@ class SynthesisWorkflowSettings:
     solve_tolerance: float
     best_solutions_to_save: int
     max_parallel: int
-    synthesis_quality_tier: int
-    pdm_stage_pair_limit: int | None
-    tdm_parent_limit: int | None
-    stage_packing: StagePackingScope
-    evm_n_ad_branches: int | None
-    evm_n_rm_branches: int | None
-    user_dt_cont_multipliers: bool
+    synthesis_quality_tier: int = 1
+    pdm_stage_pair_limit: int | None = None
+    tdm_parent_limit: int | None = None
+    stage_packing: StagePackingScope = "auto"
+    evm_n_ad_branches: int | None = None
+    evm_n_rm_branches: int | None = None
+    user_dt_cont_multipliers: bool = False
     pdm_solver: str
     tdm_solver: str
     evm_solver: str
     pdm_solver_options: dict[str, Any]
     tdm_solver_options: dict[str, Any]
-    evm_solver_options: dict[str, Any]
+    evm_solver_options: dict[str, Any] | None = None
     problem_id: str | None = None
     workspace_variant: str | None = None
     period_id: str | None = None
@@ -53,69 +53,10 @@ class SynthesisWorkflowSettings:
         HeatExchangerNetworkDesignMethod.OpenHENS
     )
 
-    def __init__(
-        self,
-        *,
-        run_id: str,
-        approach_temperatures: tuple[float, ...],
-        dt_cont_multipliers: tuple[float, ...] | None = None,
-        derivative_thresholds: tuple[float, ...],
-        stage_selection: tuple[int, ...],
-        method_sequence: tuple[HeatExchangerNetworkDesignMethod, ...],
-        output_formats: tuple[str, ...],
-        solve_tolerance: float,
-        best_solutions_to_save: int,
-        max_parallel: int,
-        pdm_solver: str,
-        tdm_solver: str,
-        pdm_solver_options: dict[str, Any],
-        tdm_solver_options: dict[str, Any],
-        evm_solver: str,
-        evm_solver_options: dict[str, Any] | None = None,
-        synthesis_quality_tier: int = 1,
-        pdm_stage_pair_limit: int | None = None,
-        tdm_parent_limit: int | None = None,
-        stage_packing: StagePackingScope = "auto",
-        user_dt_cont_multipliers: bool = False,
-        evm_n_ad_branches: int | None = None,
-        evm_n_rm_branches: int | None = None,
-        problem_id: str | None = None,
-        workspace_variant: str | None = None,
-        period_id: str | None = None,
-        design_method: HeatExchangerNetworkDesignMethod = (
-            HeatExchangerNetworkDesignMethod.OpenHENS
-        ),
-    ) -> None:
-        for name, value in {
-            "run_id": run_id,
-            "approach_temperatures": approach_temperatures,
-            "dt_cont_multipliers": dt_cont_multipliers,
-            "derivative_thresholds": derivative_thresholds,
-            "stage_selection": stage_selection,
-            "method_sequence": method_sequence,
-            "output_formats": output_formats,
-            "solve_tolerance": solve_tolerance,
-            "best_solutions_to_save": best_solutions_to_save,
-            "max_parallel": max_parallel,
-            "synthesis_quality_tier": synthesis_quality_tier,
-            "pdm_stage_pair_limit": pdm_stage_pair_limit,
-            "tdm_parent_limit": tdm_parent_limit,
-            "stage_packing": stage_packing,
-            "evm_n_ad_branches": evm_n_ad_branches,
-            "evm_n_rm_branches": evm_n_rm_branches,
-            "user_dt_cont_multipliers": user_dt_cont_multipliers,
-            "pdm_solver": pdm_solver,
-            "tdm_solver": tdm_solver,
-            "evm_solver": evm_solver,
-            "pdm_solver_options": pdm_solver_options,
-            "tdm_solver_options": tdm_solver_options,
-            "evm_solver_options": dict(evm_solver_options or {}),
-            "problem_id": problem_id,
-            "workspace_variant": workspace_variant,
-            "period_id": period_id,
-            "design_method": design_method,
-        }.items():
-            object.__setattr__(self, name, value)
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self, "evm_solver_options", dict(self.evm_solver_options or {})
+        )
 
     def solver_for(self, method: HeatExchangerNetworkDesignMethod | None) -> str | None:
         """Return the configured solver name for one workflow method."""

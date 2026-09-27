@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 from ..solver.arrays import PreparedSolverArrays
 from ..solver.pinch_design_decomposition import PinchDesignDecomposition
+from ._base import costing as _costing
 from ._pinch_design import amalgamation as _amalgamation
 from ._pinch_design import equations as _equations
 from ._pinch_design import postprocess as _postprocess
@@ -128,7 +129,7 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
     def _weighted_numeric_average(self, values: Sequence[float]) -> float:
         """Delegate _weighted_numeric_average to its owner helper."""
 
-        return _postprocess._weighted_numeric_average(self, values)
+        return _costing._weighted_numeric_average(self, values)
 
     def amalgamate_networks(
         self, *, below_case: "PinchDecompModel", above_case: "PinchDecompModel"

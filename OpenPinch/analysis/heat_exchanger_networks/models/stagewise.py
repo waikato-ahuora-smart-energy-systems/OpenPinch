@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any, Literal
 
 from ..solver.arrays import PreparedSolverArrays
+from ._base import costing as _costing
 from ._stagewise import equations as _equations
 from ._stagewise import evolution as _evolution
 from ._stagewise import objectives as _objectives
@@ -354,7 +355,7 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
     def _weighted_numeric_average(self, values: Sequence[float]) -> float:
         """Delegate _weighted_numeric_average to its owner helper."""
 
-        return _postprocess._weighted_numeric_average(self, values)
+        return _costing._weighted_numeric_average(self, values)
 
     def get_lowest_benefit_HX(self) -> list[list[int]]:
         """Return the active exchanger with the lowest source net benefit."""
