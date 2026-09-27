@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from typing import Any, Optional
 
 import numpy as np
@@ -848,11 +849,40 @@ def _validate_utility_record_states(
         )
     )
 
-    t_supply = values.get("t_supply")
-    t_target = values.get("t_target")
-    if t_supply is None or t_target is None:
+    return issues
+
+
+def _validate_period_states(
+    value: Value | None,
+    *,
+    section: str,
+    record_index: int,
+    record_label: Optional[str],
+    field_name: str,
+    severity: str,
+    message: str,
+    reject: Callable[[float], bool],
+) -> list[ValidationIssue]:
+    """Return one issue per defined period magnitude for which ``reject`` holds."""
+    issues: list[ValidationIssue] = []
+    if value is None:
         return issues
 
+    for idx in range(len(value.period_values)):
+        magnitude = value[idx]
+        if magnitude is None or not reject(magnitude):
+            continue
+        issues.append(
+            _build_issue(
+                severity=severity,
+                section=section,
+                record_index=record_index,
+                record_label=record_label,
+                path_field=field_name,
+                field=field_name,
+                message=_with_period_suffix(message, idx),
+            )
+        )
     return issues
 
 
@@ -864,28 +894,16 @@ def _validate_value_finiteness(
     record_label: Optional[str],
     field_name: str,
 ) -> list[ValidationIssue]:
-    issues: list[ValidationIssue] = []
-    if value is None:
-        return issues
-
-    for idx in range(len(value.period_values)):
-        magnitude = value[idx]
-        if magnitude is None:
-            continue
-        if math.isfinite(magnitude):
-            continue
-        issues.append(
-            _build_issue(
-                severity="error",
-                section=section,
-                record_index=record_index,
-                record_label=record_label,
-                path_field=field_name,
-                field=field_name,
-                message=_with_period_suffix("Value must be finite.", idx),
-            )
-        )
-    return issues
+    return _validate_period_states(
+        value,
+        section=section,
+        record_index=record_index,
+        record_label=record_label,
+        field_name=field_name,
+        severity="error",
+        message="Value must be finite.",
+        reject=lambda magnitude: not math.isfinite(magnitude),
+    )
 
 
 def _validate_non_negative_states(
@@ -898,27 +916,16 @@ def _validate_non_negative_states(
     severity: str,
     message: str,
 ) -> list[ValidationIssue]:
-    issues: list[ValidationIssue] = []
-    if value is None:
-        return issues
-
-    for idx in range(len(value.period_values)):
-        magnitude = value[idx]
-        if magnitude is None or not math.isfinite(magnitude) or magnitude >= 0.0:
-            continue
-        issues.append(
-            _build_issue(
-                severity=severity,
-                section=section,
-                record_index=record_index,
-                record_label=record_label,
-                path_field=field_name,
-                field=field_name,
-                message=_with_period_suffix(message, idx),
-            )
-        )
-
-    return issues
+    return _validate_period_states(
+        value,
+        section=section,
+        record_index=record_index,
+        record_label=record_label,
+        field_name=field_name,
+        severity=severity,
+        message=message,
+        reject=lambda magnitude: math.isfinite(magnitude) and magnitude < 0.0,
+    )
 
 
 def _validate_positive_states(
@@ -931,27 +938,16 @@ def _validate_positive_states(
     severity: str,
     message: str,
 ) -> list[ValidationIssue]:
-    issues: list[ValidationIssue] = []
-    if value is None:
-        return issues
-
-    for idx in range(len(value.period_values)):
-        magnitude = value[idx]
-        if magnitude is None or not math.isfinite(magnitude) or magnitude > 0.0:
-            continue
-        issues.append(
-            _build_issue(
-                severity=severity,
-                section=section,
-                record_index=record_index,
-                record_label=record_label,
-                path_field=field_name,
-                field=field_name,
-                message=_with_period_suffix(message, idx),
-            )
-        )
-
-    return issues
+    return _validate_period_states(
+        value,
+        section=section,
+        record_index=record_index,
+        record_label=record_label,
+        field_name=field_name,
+        severity=severity,
+        message=message,
+        reject=lambda magnitude: math.isfinite(magnitude) and magnitude <= 0.0,
+    )
 
 
 def _build_issue(
