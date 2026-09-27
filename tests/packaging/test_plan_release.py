@@ -2,12 +2,13 @@
 
 import hashlib
 import json
+import subprocess
 import tempfile
 from copy import deepcopy
 from pathlib import Path
 
 import pytest
-from hypothesis import given, settings
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from scripts import plan_release as planner
@@ -70,6 +71,8 @@ def evidence(monkeypatch):
         "event": {"workflow_run": deepcopy(run)},
         "releases": [],
         "tag": False,
+        "bootstrap": "none",
+        "tag_ancestor": True,
         "index": ["absent", "absent"],
         "artifacts": artifacts,
         "bundles": bundles,
@@ -131,7 +134,24 @@ def evidence(monkeypatch):
             return ""
         if args[:3] == ("git", "tag", "--list"):
             return "v1.2.3" if state["tag"] else ""
+        if args[:2] == ("git", "ls-tree"):
+            ref = args[4]
+            if state["bootstrap"] == "none":
+                return ""
+            if ref == "a" * 40:
+                return (
+                    ""
+                    if state["bootstrap"] == "current-missing"
+                    else planner.COORDINATOR
+                )
+            return planner.COORDINATOR if state["bootstrap"] == "prior-has" else ""
+        if args[:2] == ("git", "rev-list"):
+            if state["bootstrap"] == "single-parent":
+                return f"{'a' * 40} {'d' * 40}"
+            return f"{'a' * 40} {'d' * 40} {'e' * 40}"
         if args[:2] == ("git", "merge-base"):
+            if args[3].startswith("refs/tags/") and not state["tag_ancestor"]:
+                raise subprocess.CalledProcessError(1, args)
             return ""
         if args[:3] == ("git", "cat-file", "-t"):
             return "tag"
@@ -191,6 +211,56 @@ def test_later_same_version_commit_verifies_original_before_noop(evidence, tmp_p
     assert result["action"] == "complete"
     assert evidence["downloads"] == [100, 90]
     assert evidence["index_hashes"] == [evidence["manifests"][90]["files"]] * 2
+
+
+def test_bootstrap_merge_with_historical_tag_skips_publication(evidence, tmp_path):
+    evidence["tag"] = True
+    evidence["bootstrap"] = "merge"
+    result = planner.plan(evidence["event"], tmp_path)
+    assert result == {
+        "action": "ignore",
+        "version": "1.2.3",
+        "reason": "Coordinator bootstrap retains the existing release version",
+    }
+    assert evidence["downloads"] == [100]
+
+
+@pytest.mark.parametrize(
+    "shape,ancestor",
+    [
+        ("none", True),
+        ("current-missing", True),
+        ("prior-has", True),
+        ("single-parent", True),
+        ("merge", False),
+    ],
+)
+def test_tag_collision_outside_proven_bootstrap_still_blocks(
+    evidence, tmp_path, shape, ancestor
+):
+    evidence["tag"] = True
+    evidence["bootstrap"] = shape
+    evidence["tag_ancestor"] = ancestor
+    with pytest.raises(ValueError, match="Version already tagged"):
+        planner.plan(evidence["event"], tmp_path)
+
+
+@given(
+    st.sampled_from(["none", "merge", "current-missing", "prior-has", "single-parent"]),
+    st.booleans(),
+)
+@settings(
+    max_examples=25,
+    suppress_health_check=[HealthCheck.function_scoped_fixture],
+)
+def test_bootstrap_predicate_matches_independent_history_oracle(
+    evidence, shape, ancestor
+):
+    evidence["bootstrap"] = shape
+    evidence["tag_ancestor"] = ancestor
+    assert planner.coordinator_bootstrap("a" * 40, "1.2.3") is (
+        shape == "merge" and ancestor
+    )
 
 
 @pytest.mark.parametrize(

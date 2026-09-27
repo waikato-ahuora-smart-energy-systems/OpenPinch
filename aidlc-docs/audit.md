@@ -10362,3 +10362,34 @@ Notebook #10 fails to solve with the error:
 **Context**: Plan steps 9-11 complete. PBT compliance recorded in implementation summary; disabled extensions skipped. Existing build/test commands retained. No runtime/performance requirement or new package build surface. Hosted activation remains separate.
 
 ---
+
+## Release Workflow Failure Investigation
+**Timestamp**: 2026-09-27T05:45:00Z
+**User Input**: "the workflow failed. investigate. "
+**AI Response**: "Inspected Release and Publish run 36285927036. CI Develop, PR Validation and CI Main succeeded. Release planning alone failed before publication because main retained version 0.6.10 while annotated tag v0.6.10 already points to older commit 2e743566. The bootstrap gate allowed the workflow installation by design, but automatic publication lacked a bootstrap non-publication outcome."
+**Context**: Read-only diagnosis. No rerun, release, package upload, tag mutation, code edit, commit or push. Existing collision guard is correct for ordinary releases.
+
+---
+
+## Bootstrap Publication Correction
+**Timestamp**: 2026-09-27T06:00:02Z
+**User Input**: "Fix it."
+**AI Response**: "Implemented a fail-closed bootstrap exemption: successful no-op publication only for a validated two-parent main merge that introduces the coordinator over a parent lacking it, with the occupied version tag proven to be an ancestor of that parent. Added concrete negative histories, a generated oracle and documentation. Complete verification is in progress."
+**Context**: Continuation of the approved automatic-release/version workflow. No user stories or new architecture required. PBT-01/03/05/07/08/09/10 applicable; PBT-02/04/06 N/A. Security/Resiliency disabled and skipped. No commit, push, workflow rerun, release, tag or package-index mutation authorized or performed.
+
+---
+
+## Bootstrap Publication Correction Verification Complete
+**Timestamp**: 2026-09-27T06:04:50Z
+**AI Response**: "Verified the fail-closed bootstrap correction against exact merged main c54c27e and tag v0.6.10. Complete packaging suite: 441 passed, 6 expected skips in 115.07 seconds with seed 20260715. Ruff, formatting and patch hygiene pass."
+**Context**: Code-generation follow-up steps 12-15 complete. Generated predicate oracle retained shrinking; function-scoped fixture health check is explicitly suppressed because each generated example fully overwrites the only two relevant fake-history fields and the predicate performs no state writes. PBT extension compliant; Security/Resiliency disabled. No workflow YAML changed. Changes remain local and uncommitted; no hosted rerun or external mutation.
+
+---
+
+## Bootstrap Publication Correction Commit Authorization
+**Timestamp**: 2026-09-27T06:05:30Z
+**User Input**: "Commit and push"
+**AI Response**: "Accepted authorization to commit the verified bootstrap publication correction on develop and push it to origin."
+**Context**: Scope is limited to the seven reviewed correction, test, documentation and AI-DLC tracking files. No merge, workflow rerun, release, tag or package-index mutation authorized.
+
+---

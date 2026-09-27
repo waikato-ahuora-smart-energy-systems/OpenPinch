@@ -33,6 +33,11 @@ Install the coordinator and validation changes together through normal review.
 Only a base predating the coordinator qualifies for the one-time bootstrap
 exception; there is no label or input that bypasses preparation afterward.
 No release is automatically repaired during bootstrap (including legacy 0.6.10).
+When the first normal two-parent main merge demonstrably introduces the
+coordinator over a parent that lacked it, and the existing version tag is an
+ancestor of that parent, automatic publication exits successfully without
+publishing. All other occupied-version states remain blocked. The next release
+must use the normal reviewed preparation flow and a new version.
 Repository policy must permit Actions to create PRs. GitHub may require a
 maintainer to approve bot-created PR workflow runs. Current aggregate review
 state must be ``APPROVED``; configure required reviews through separately

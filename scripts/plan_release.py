@@ -15,6 +15,7 @@ from scripts import release_manifest as release
 from scripts.check_package_index_release import inspect_release
 
 INDEXES = ("https://test.pypi.org/pypi", "https://pypi.org/pypi")
+COORDINATOR = ".github/workflows/ci-prepare-release.yml"
 
 
 def eligible_event(run: dict, repository: str) -> bool:
@@ -79,6 +80,34 @@ def require_stable(existing: dict) -> None:
         raise ValueError(
             "Existing release is not stable and complete; verified recovery required"
         )
+
+
+def coordinator_bootstrap(source: str, version: str) -> bool:
+    """Prove this main merge only installs the coordinator over an old release."""
+    if not release.SHA.fullmatch(source):
+        raise ValueError("Invalid bootstrap source identity")
+    current = release.command(
+        "git", "ls-tree", "-r", "--name-only", source, "--", COORDINATOR
+    )
+    parents = release.command("git", "rev-list", "--parents", "-n", "1", source).split()
+    # Limit the exception to a normal two-parent PR merge. This avoids guessing
+    # the previous main identity for squash/rebase histories after the fact.
+    if current != COORDINATOR or len(parents) != 3 or parents[0] != source:
+        return False
+    previous_main = parents[1]
+    if not release.SHA.fullmatch(previous_main):
+        raise ValueError("Invalid bootstrap parent identity")
+    if release.command(
+        "git", "ls-tree", "-r", "--name-only", previous_main, "--", COORDINATOR
+    ):
+        return False
+    try:
+        release.command(
+            "git", "merge-base", "--is-ancestor", f"refs/tags/v{version}", previous_main
+        )
+    except subprocess.CalledProcessError:
+        return False
+    return True
 
 
 def index_states(manifest: dict, directory: Path) -> list[str]:
@@ -194,6 +223,12 @@ def plan(event: dict, root: Path) -> dict:
             "reason": "Original stable release and both indexes verified",
         }
     if release.command("git", "tag", "--list", f"v{version}"):
+        if coordinator_bootstrap(manifest["source_sha"], version):
+            return {
+                "action": "ignore",
+                "version": version,
+                "reason": "Coordinator bootstrap retains the existing release version",
+            }
         raise ValueError("Version already tagged; verified recovery required")
     if index_states(manifest, directory) != ["absent", "absent"]:
         raise ValueError(

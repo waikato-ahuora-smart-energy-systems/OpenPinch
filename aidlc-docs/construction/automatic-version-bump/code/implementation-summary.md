@@ -55,4 +55,28 @@ seed 20260715; Ruff, formatting, actionlint and patch hygiene pass. No numerical
 code or package version changed. PBT-01/03/05/07/08/09/10 compliant;
 PBT-02/04/06 N/A (no new codec or state mutation). Disabled extensions skipped.
 P1/P2 assessment posted on PR 103; no new credentials or repository settings.
-Correction remains local and uncommitted; GitHub threads remain unresolved.
+The correction was committed as e184dad6, pushed and merged through PR 103.
+
+## Bootstrap publication correction
+
+Hosted Release and Publish run 36285927036 confirmed that main validation passed
+but the planner rejected 0.6.10 because its annotated tag already belongs to an
+older main ancestor. The bootstrap merge had intentionally retained 0.6.10.
+
+The planner now returns a successful non-publication decision only when all of
+these facts are proven from Git history: the validated source is a normal
+two-parent merge; it contains the coordinator workflow; its first (previous-main)
+parent does not; and the occupied annotated version tag is an ancestor of that
+parent. Missing, malformed, squash/rebase, reintroduction, divergent-tag and all
+ordinary collision histories continue to block verified recovery. No artifact,
+tag, GitHub release, TestPyPI or PyPI state is mutated by this path.
+
+Tests cover the live merge topology plus concrete negative histories and a
+generated independent predicate oracle with fixed seed and normal shrinking.
+The next release must use the reviewed preparation flow and a new version;
+legacy 0.6.10 remains untouched.
+
+Final verification: the predicate returned true for c54c27e with previous-main
+parent 2577e6e and existing v0.6.10; 441 packaging tests passed with 6 expected
+skips in 115.07 seconds using seed 20260715. Ruff, formatting and patch hygiene
+pass. The correction remains local and uncommitted.
