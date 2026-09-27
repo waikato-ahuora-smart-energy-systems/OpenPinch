@@ -540,10 +540,10 @@ def test_checked_in_notebooks_are_source_only_and_match_generator(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     notebook_dir = ROOT / "OpenPinch" / "tutorials" / "notebooks"
-    packaged_files = sorted(
-        path.name for path in notebook_dir.iterdir() if path.is_file()
-    )
-    assert packaged_files == sorted([*EXPECTED_NOTEBOOKS, "__init__.py"])
+    # Run artifacts (e.g. openpinch-workspace.json) are git-ignored, and hatch
+    # leaves ignored files out of builds, so only the notebook set is checked.
+    packaged_notebooks = sorted(path.name for path in notebook_dir.glob("*.ipynb"))
+    assert packaged_notebooks == sorted(EXPECTED_NOTEBOOKS)
 
     monkeypatch.setattr(notebook_generator, "NOTEBOOK_DIR", tmp_path)
     notebook_generator.main()
