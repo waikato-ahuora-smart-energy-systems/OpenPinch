@@ -2,6 +2,12 @@
 
 The class in this module wraps a TESPy network while exposing the shared
 OpenPinch heat pump cycle helper API.
+
+Experimental: this model is retained for planned future Brayton targeting
+work. It is not wired to a working public workflow (the Brayton target
+methods are declared unavailable and raise ``NotImplementedError``), is
+excluded from the published API reference, and may change or be removed
+without notice.
 """
 
 from __future__ import annotations

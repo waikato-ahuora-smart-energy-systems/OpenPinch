@@ -135,10 +135,18 @@ METHOD_CATALOG = MappingProxyType(
 )
 
 
+_UNAVAILABLE_DETAILS = MappingProxyType(
+    {
+        f"target.{name}": "Brayton targeting is unavailable pending solver repair."
+        for name in ("brayton_heat_pump", "brayton_refrigeration")
+    }
+)
+
+
 def require_available(method: str) -> AnalysisMethodSpec:
     spec = METHOD_CATALOG[method]
     if not spec.available:
-        raise NotImplementedError(
-            "Brayton targeting is unavailable pending solver repair."
-        )
+        message = f"Analysis method {method!r} is not available."
+        detail = _UNAVAILABLE_DETAILS.get(method)
+        raise NotImplementedError(f"{message} {detail}" if detail else message)
     return spec

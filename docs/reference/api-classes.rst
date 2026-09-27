@@ -168,8 +168,5 @@ cycle configurations directly.
 .. automodule:: OpenPinch.analysis.heat_pumps.cycles.vapour_compression_mvr_cascade
    :members:
 
-.. automodule:: OpenPinch.analysis.heat_pumps.cycles.brayton_heat_pump
-   :members:
-
 .. automodule:: OpenPinch.analysis.power.steam_turbine
    :members:

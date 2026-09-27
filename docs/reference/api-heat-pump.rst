@@ -179,11 +179,16 @@ Only the current internal cycle names are routed here, for example
 ``"Cascade Carnot cycles"``, ``"Parallel Carnot cycles"``, and
 ``"Parallel vapour compression cycles"``.
 
+.. note::
+
+   The Brayton targeting module and the Brayton cycle model are experimental.
+   They are kept for planned future work, are not wired to a working public
+   workflow (``brayton_heat_pump()`` and ``brayton_refrigeration()`` raise
+   ``NotImplementedError``), and are intentionally omitted from this
+   reference.
+
 .. automodule:: OpenPinch.analysis.heat_pumps.targeting
    :no-members:
-
-.. automodule:: OpenPinch.analysis.heat_pumps.targeting.brayton
-   :members:
 
 .. automodule:: OpenPinch.analysis.heat_pumps.targeting.cascade_vapour_compression
    :members:
