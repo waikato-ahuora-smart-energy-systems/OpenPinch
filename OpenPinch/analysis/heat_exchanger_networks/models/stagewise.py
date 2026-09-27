@@ -91,16 +91,6 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
 
         return _equations._set_multiperiod_stage_wise_superstructure(self)
 
-    def _set_multiperiod_isothermal_approach_equations(self) -> None:
-        """Build multiperiod isothermal approach equations."""
-
-        return _equations._set_multiperiod_isothermal_approach_equations(self)
-
-    def _set_multiperiod_non_isothermal_equations(self) -> None:
-        """Delegate _set_multiperiod_non_isothermal_equations to its owner helper."""
-
-        return _equations._set_multiperiod_non_isothermal_equations(self)
-
     def set_dqda_equations(self) -> None:
         """Apply the source TDM minimum dQ/dA restriction."""
 
@@ -112,13 +102,6 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         """Warm-start this model from a solved parent model."""
 
         return _warm_start.set_initial_values_for_variables(
-            self, init_solution, brackets=brackets
-        )
-
-    def _set_multiperiod_initial_values(self, init_solution, *, brackets: bool) -> None:
-        """Delegate _set_multiperiod_initial_values to its owner helper."""
-
-        return _warm_start._set_multiperiod_initial_values(
             self, init_solution, brackets=brackets
         )
 
@@ -215,18 +198,6 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         return _evolution._solve_evolution_candidates(
             self, specs, print_output=print_output, max_parallel=max_parallel
         )
-
-    def _solve_evolution_candidate(
-        self, spec: _EvolutionCandidateSpec, print_output: bool
-    ):
-        """Delegate _solve_evolution_candidate to its owner helper."""
-
-        return _evolution._solve_evolution_candidate(self, spec, print_output)
-
-    def _evolution_branch_label(self, spec: _EvolutionCandidateSpec) -> str:
-        """Delegate _evolution_branch_label to its owner helper."""
-
-        return _evolution._evolution_branch_label(self, spec)
 
     def _select_best_candidate(self, current_model, model_minus_one, model_plus_one):
         """Select the source plus/minus evolution candidate for the next step."""
@@ -328,21 +299,6 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         """Attach source StageWise objective expressions unchanged."""
 
         return _objectives.set_obj(self)
-
-    def _set_total_cost_objective(self) -> None:
-        """Delegate _set_total_cost_objective to its owner helper."""
-
-        return _objectives._set_total_cost_objective(self)
-
-    def _set_source_total_cost_objective(self) -> None:
-        """Delegate _set_source_total_cost_objective to its owner helper."""
-
-        return _objectives._set_source_total_cost_objective(self)
-
-    def _set_multiperiod_total_cost_objective(self) -> None:
-        """Delegate _set_multiperiod_total_cost_objective to its owner helper."""
-
-        return _objectives._set_multiperiod_total_cost_objective(self)
 
     def get_post_process(self) -> None:
         """Extract source post-process arrays after a successful solve."""

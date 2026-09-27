@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .._base import piecewise as _piecewise
+
 
 def set_obj(owner) -> None:
     """Attach source StageWise objective expressions unchanged."""
@@ -39,7 +41,8 @@ def set_obj(owner) -> None:
             )
         elif owner.minimisation_goal == "utility costs":
             hot_costs = [
-                owner._utility_cost_expression(
+                _piecewise._utility_cost_expression(
+                    owner,
                     "hot",
                     n,
                     owner.m.sum([owner.Q_h_by_period[n][j] for j in range(owner.J)]),
@@ -48,7 +51,8 @@ def set_obj(owner) -> None:
                 for n in range(owner.N_periods)
             ]
             cold_costs = [
-                owner._utility_cost_expression(
+                _piecewise._utility_cost_expression(
+                    owner,
                     "cold",
                     n,
                     owner.m.sum([owner.Q_c_by_period[n][i] for i in range(owner.I)]),
@@ -85,7 +89,7 @@ def set_obj(owner) -> None:
                 - owner.HU_target
             )
         elif owner.minimisation_goal in {"total cost", "variable total cost"}:
-            owner._set_total_cost_objective()
+            _set_total_cost_objective(owner)
         else:
             _raise_unsupported_goal(owner)
         return
@@ -100,13 +104,15 @@ def set_obj(owner) -> None:
             + owner.m.sum([owner.Q_c[i] for i in range(owner.I)])
         )
     elif owner.minimisation_goal == "utility costs":
-        hot_cost = owner._utility_cost_expression(
+        hot_cost = _piecewise._utility_cost_expression(
+            owner,
             "hot",
             0,
             owner.m.sum([owner.Q_h[j] for j in range(owner.J)]),
             name="hot_utility",
         )
-        cold_cost = owner._utility_cost_expression(
+        cold_cost = _piecewise._utility_cost_expression(
+            owner,
             "cold",
             0,
             owner.m.sum([owner.Q_c[i] for i in range(owner.I)]),
@@ -127,7 +133,7 @@ def set_obj(owner) -> None:
     elif owner.minimisation_goal == "dQ/dA obj":
         owner.m.Minimize(sum(owner.Q_h) - owner.HU_target)
     elif owner.minimisation_goal in {"total cost", "variable total cost"}:
-        owner._set_total_cost_objective()
+        _set_total_cost_objective(owner)
     else:
         _raise_unsupported_goal(owner)
 
@@ -140,14 +146,15 @@ def _raise_unsupported_goal(owner) -> None:
 
 def _set_total_cost_objective(owner) -> None:
     if getattr(owner, "N_periods", 1) == 1:
-        owner._set_source_total_cost_objective()
+        _set_source_total_cost_objective(owner)
         return
-    owner._set_multiperiod_total_cost_objective()
+    _set_multiperiod_total_cost_objective(owner)
 
 
 def _set_source_total_cost_objective(owner) -> None:
     owner.hu_cost_total = owner.m.Intermediate(
-        owner._utility_cost_expression(
+        _piecewise._utility_cost_expression(
+            owner,
             "hot",
             0,
             owner.m.sum([owner.Q_h[j] for j in range(owner.J)]),
@@ -156,7 +163,8 @@ def _set_source_total_cost_objective(owner) -> None:
         name="Hot utility cost",
     )
     owner.cu_cost_total = owner.m.Intermediate(
-        owner._utility_cost_expression(
+        _piecewise._utility_cost_expression(
+            owner,
             "cold",
             0,
             owner.m.sum([owner.Q_c[i] for i in range(owner.I)]),
@@ -306,7 +314,8 @@ def _set_source_total_cost_objective(owner) -> None:
 def _set_multiperiod_total_cost_objective(owner) -> None:
     owner.hu_cost_total_by_period = [
         owner.m.Intermediate(
-            owner._utility_cost_expression(
+            _piecewise._utility_cost_expression(
+                owner,
                 "hot",
                 n,
                 owner.m.sum([owner.Q_h_by_period[n][j] for j in range(owner.J)]),
@@ -318,7 +327,8 @@ def _set_multiperiod_total_cost_objective(owner) -> None:
     ]
     owner.cu_cost_total_by_period = [
         owner.m.Intermediate(
-            owner._utility_cost_expression(
+            _piecewise._utility_cost_expression(
+                owner,
                 "cold",
                 n,
                 owner.m.sum([owner.Q_c_by_period[n][i] for i in range(owner.I)]),

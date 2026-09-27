@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...indexing import build_index_grid
+from .._base import area as _area
 from .._base.costing import set_period_totals_and_costs
 from .._stagewise.verification import _value as _scalar_value
 from .preprocessing import (
@@ -116,7 +117,7 @@ def _get_multiperiod_post_process(owner) -> None:
         ),
         (owner.I, owner.J, owner.S),
     )
-    owner._apply_segment_recovery_areas(q_r)
+    _area._apply_segment_recovery_areas(owner, q_r)
 
     owner.LMTD_hu_by_period = build_index_grid(
         lambda n, j: owner._post_process_lmtd(
@@ -172,7 +173,7 @@ def _get_multiperiod_post_process(owner) -> None:
         ),
         (owner.N_periods, owner.I),
     )
-    owner._apply_segment_utility_areas(q_h, q_c)
+    _area._apply_segment_utility_areas(owner, q_h, q_c)
     owner.LMTD_hu = owner.LMTD_hu_by_period[0]
     owner.LMTD_cu = owner.LMTD_cu_by_period[0]
 

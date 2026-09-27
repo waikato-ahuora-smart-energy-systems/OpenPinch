@@ -320,14 +320,14 @@ def _solve_evolution_candidates(
         return [
             (spec, candidate)
             for spec in specs
-            if (candidate := owner._solve_evolution_candidate(spec, print_output))
+            if (candidate := _solve_evolution_candidate(owner, spec, print_output))
             is not None
         ]
 
     candidates: list[tuple[_EvolutionCandidateSpec, Any]] = []
     with ThreadPoolExecutor(max_workers=min(max_parallel, len(specs))) as pool:
         futures = {
-            pool.submit(owner._solve_evolution_candidate, spec, print_output): spec
+            pool.submit(_solve_evolution_candidate, owner, spec, print_output): spec
             for spec in specs
         }
         for future in as_completed(futures):
@@ -351,7 +351,7 @@ def _solve_evolution_candidate(
                 prev_case=spec.prev_case,
                 position=spec.position,
                 z_allowed_removed=spec.z_allowed,
-                branch_label=owner._evolution_branch_label(spec),
+                branch_label=_evolution_branch_label(owner, spec),
             )
         return owner._build_and_solve_n_plus_one_evolution(
             print_output=print_output,
@@ -359,7 +359,7 @@ def _solve_evolution_candidate(
             prev_case=spec.prev_case,
             position=spec.position,
             z_allowed_added=spec.z_allowed,
-            branch_label=owner._evolution_branch_label(spec),
+            branch_label=_evolution_branch_label(owner, spec),
         )
     except Exception as exc:
         logger.debug(

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from ...indexing import build_index_grid
+from .._base import approach as _approach
+from .._base import piecewise as _piecewise
 from .._base.superstructure import create_match_binaries, create_utility_duty_grids
 
 
@@ -68,7 +70,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
     owner.T_h = owner.T_h_by_period[0]
     owner.T_c = owner.T_c_by_period[0]
 
-    owner._set_piecewise_stage_heat_coordinates()
+    _piecewise._set_piecewise_stage_heat_coordinates(owner)
 
     for n in range(owner.N_periods):
         _ = [
@@ -114,7 +116,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                     == 0
                 )
                 if owner.z_i_active_period[n][i] > 0
-                and not owner._hot_parent_segmented(i)
+                and not _piecewise._hot_parent_segmented(owner, i)
                 else None
             )
             for k in range(owner.S)
@@ -129,7 +131,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                     == 0
                 )
                 if owner.z_j_active_period[n][j] > 0
-                and not owner._cold_parent_segmented(j)
+                and not _piecewise._cold_parent_segmented(owner, j)
                 else None
             )
             for k in range(owner.S)
@@ -172,7 +174,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                 for j in range(owner.J)
             ]
 
-    owner._set_multiperiod_utility_approach_equations()
+    _approach._set_multiperiod_utility_approach_equations(owner)
 
     M_ij_period = [
         [

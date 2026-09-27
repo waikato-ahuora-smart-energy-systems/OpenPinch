@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from .._base import area as _area
 from .._base.costing import set_period_totals_and_costs
 
 
@@ -228,7 +229,7 @@ def _get_multiperiod_post_process(owner) -> None:
         for n in range(owner.N_periods)
     ]
 
-    owner._apply_segment_utility_areas(q_h, q_c)
+    _area._apply_segment_utility_areas(owner, q_h, q_c)
 
     owner.LMTD_r = owner.LMTD_r_by_period[0]
     owner.LMTD_hu = owner.LMTD_hu_by_period[0]
@@ -243,7 +244,7 @@ def _get_multiperiod_post_process(owner) -> None:
         ]
         for i in range(owner.I)
     ]
-    owner._apply_segment_recovery_areas(q_r)
+    _area._apply_segment_recovery_areas(owner, q_r)
     owner.area_hu = [
         max(owner.area_hu_by_period[n][j] for n in range(owner.N_periods))
         for j in range(owner.J)
@@ -279,7 +280,8 @@ def _get_multiperiod_post_process(owner) -> None:
                     owner.dqda[i][j][k] = owner.U_r[i][j] * driving_force
                 else:
                     owner.dqda[i][j][k] = 0.0
-                exact_dqda = owner._segment_exact_dqda(
+                exact_dqda = _area._segment_exact_dqda(
+                    owner,
                     period_index=0,
                     hot_parent_index=i,
                     cold_parent_index=j,

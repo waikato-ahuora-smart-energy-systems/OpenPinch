@@ -27,7 +27,7 @@ def _utility_cost_expression(
 ):
     """Return the flat or exact piecewise utility-cost solver expression."""
     price_attr = "hu_cost_period" if side == "hot" else "cu_cost_period"
-    if not model._utility_is_segmented(side):
+    if not _utility_is_segmented(model, side):
         if hasattr(model, price_attr):
             price = getattr(model, price_attr)[period_index][0]
         else:
@@ -58,7 +58,8 @@ def _utility_cost_expression(
         name=f"{name}_cost",
     )
     model.m.Equation(coordinate == heat_duty)
-    model._register_piecewise_mapping(
+    _register_piecewise_mapping(
+        model,
         add_piecewise_cost_mapping(
             model.m,
             coordinate,
@@ -66,7 +67,7 @@ def _utility_cost_expression(
             profile,
             name=name,
             integer_capable=model.solver in {"apopt", "couenne"},
-        )
+        ),
     )
     return cost
 
@@ -80,7 +81,7 @@ def _utility_cost_value(
     """Return exact solved utility cost for reporting and verification."""
     duty = max(float(heat_duty), 0.0)
     price_attr = "hu_cost_period" if side == "hot" else "cu_cost_period"
-    if not model._utility_is_segmented(side):
+    if not _utility_is_segmented(model, side):
         return float(getattr(model, price_attr)[period_index][0]) * duty
 
     from ...solver.piecewise import profile_from_solver_arrays
@@ -123,8 +124,8 @@ def _set_piecewise_stage_heat_coordinates(model) -> None:
         model._segmented_cold_parents = np.zeros(model.J, dtype=bool)
         return
     arrays = model.solver_arrays.arrays
-    model._set_segmented_utility_capacity_constraints()
-    model._set_piecewise_utility_outlet_states()
+    _set_segmented_utility_capacity_constraints(model)
+    _set_piecewise_utility_outlet_states(model)
     model._segmented_hot_parents = (
         np.asarray(arrays.get("hot_segment_count", np.ones(model.I)), dtype=int) > 1
     )
@@ -178,7 +179,8 @@ def _set_piecewise_stage_heat_coordinates(model) -> None:
                     )
                 )
                 model.Q_coordinate_h_by_period[n][i][k] = coordinate
-                model._register_piecewise_mapping(
+                _register_piecewise_mapping(
+                    model,
                     add_piecewise_temperature_mapping(
                         model.m,
                         coordinate,
@@ -187,7 +189,7 @@ def _set_piecewise_stage_heat_coordinates(model) -> None:
                         name=f"TQ_H{i}_B{k}_period{n}",
                         integer_capable=integer_capable,
                         initial_segment=profile.segment_index_at_heat(initial_q),
-                    )
+                    ),
                 )
             model.m.Equations(
                 [
@@ -226,7 +228,8 @@ def _set_piecewise_stage_heat_coordinates(model) -> None:
                     )
                 )
                 model.Q_coordinate_c_by_period[n][j][k] = coordinate
-                model._register_piecewise_mapping(
+                _register_piecewise_mapping(
+                    model,
                     add_piecewise_temperature_mapping(
                         model.m,
                         coordinate,
@@ -235,7 +238,7 @@ def _set_piecewise_stage_heat_coordinates(model) -> None:
                         name=f"TQ_C{j}_B{k}_period{n}",
                         integer_capable=integer_capable,
                         initial_segment=profile.segment_index_at_heat(initial_q),
-                    )
+                    ),
                 )
             model.m.Equations(
                 [
@@ -253,7 +256,7 @@ def _set_segmented_utility_capacity_constraints(model) -> None:
     from ...solver.piecewise import profile_from_solver_arrays
 
     for n in range(model.N_periods):
-        if model._utility_is_segmented("hot"):
+        if _utility_is_segmented(model, "hot"):
             hot_profile = profile_from_solver_arrays(
                 model.solver_arrays,
                 side="hot_utility",
@@ -261,7 +264,7 @@ def _set_segmented_utility_capacity_constraints(model) -> None:
                 period_index=n,
             )
             model.m.Equation(sum(model.Q_h_by_period[n]) <= hot_profile.total_duty)
-        if model._utility_is_segmented("cold"):
+        if _utility_is_segmented(model, "cold"):
             cold_profile = profile_from_solver_arrays(
                 model.solver_arrays,
                 side="cold_utility",
@@ -298,7 +301,7 @@ def _set_piecewise_utility_outlet_states(model) -> None:
                 )
             )
             inlet_contribution = scalar_contribution
-            if model._utility_is_segmented(side):
+            if _utility_is_segmented(model, side):
                 profile = profile_from_solver_arrays(
                     model.solver_arrays,
                     side=f"{side}_utility",
@@ -311,7 +314,7 @@ def _set_piecewise_utility_outlet_states(model) -> None:
             solved_outlets = getattr(model, f"T_{side[0]}u_solved_out_by_period")[n]
             outlet_contributions = getattr(model, f"T_{side[0]}u_out_cont_by_period")[n]
             for match_index, load in enumerate(loads):
-                if not model._utility_is_segmented(side):
+                if not _utility_is_segmented(model, side):
                     solved_outlets.append(
                         model.T_hu_out_period[n][0]
                         if side == "hot"
@@ -358,7 +361,8 @@ def _set_piecewise_utility_outlet_states(model) -> None:
                 )
                 temperature_segment = profile.segment_index_at_heat(initial_duty)
                 contribution_segment = profile.contribution_index_at_heat(initial_duty)
-                model._register_piecewise_mapping(
+                _register_piecewise_mapping(
+                    model,
                     add_piecewise_temperature_mapping(
                         model.m,
                         coordinate,
@@ -367,9 +371,10 @@ def _set_piecewise_utility_outlet_states(model) -> None:
                         name=(f"TQ_{side}_utility_M{match_index}_period{n}"),
                         integer_capable=model.solver in {"apopt", "couenne"},
                         initial_segment=temperature_segment,
-                    )
+                    ),
                 )
-                model._register_piecewise_mapping(
+                _register_piecewise_mapping(
+                    model,
                     add_piecewise_temperature_contribution_mapping(
                         model.m,
                         coordinate,
@@ -377,7 +382,7 @@ def _set_piecewise_utility_outlet_states(model) -> None:
                         profile,
                         name=(f"dTQ_{side}_utility_M{match_index}_period{n}"),
                         initial_segment=contribution_segment,
-                    )
+                    ),
                 )
                 solved_outlets.append(solved_outlet)
                 outlet_contributions.append(outlet_contribution)
@@ -407,7 +412,7 @@ def _parent_profile_duty(
     target_temperature: float,
     aggregate_cp: float,
 ) -> float:
-    if not model._solver_parent_is_segmented(side, parent_index):
+    if not _solver_parent_is_segmented(model, side, parent_index):
         return abs(supply_temperature - target_temperature) * aggregate_cp
     from ...solver.piecewise import profile_from_solver_arrays
 
@@ -440,9 +445,9 @@ def _recovery_heat_upper_bound(
         - model._recovery_approach_temperature(hot_index, cold_index, period_index),
         0.0,
     )
-    if model._solver_parent_is_segmented(
-        "hot", hot_index
-    ) or model._solver_parent_is_segmented("cold", cold_index):
+    if _solver_parent_is_segmented(
+        model, "hot", hot_index
+    ) or _solver_parent_is_segmented(model, "cold", cold_index):
         return min(hot_total_duty, cold_total_duty) if temperature_span > 0 else 0.0
     return temperature_span * min(hot_cp, cold_cp)
 
@@ -486,7 +491,7 @@ def _set_piecewise_match_outlet_equations(model) -> None:
                     parent_index=i,
                     period_index=n,
                 ).clipped(model.T_h_in_period[n][i], model.T_h_out_period[n][i])
-                if model._hot_parent_segmented(i)
+                if _hot_parent_segmented(model, i)
                 else None
             )
             for j in range(model.J):
@@ -497,7 +502,7 @@ def _set_piecewise_match_outlet_equations(model) -> None:
                         parent_index=j,
                         period_index=n,
                     ).clipped(model.T_c_in_period[n][j], model.T_c_out_period[n][j])
-                    if model._cold_parent_segmented(j)
+                    if _cold_parent_segmented(model, j)
                     else None
                 )
                 for k in range(model.S):
@@ -516,7 +521,8 @@ def _set_piecewise_match_outlet_equations(model) -> None:
                             model.Q_r_by_period[n][i][j][k]
                             == model.X_by_period[n][i][j][k] * (q_out - q_in)
                         )
-                        model._register_piecewise_mapping(
+                        _register_piecewise_mapping(
+                            model,
                             add_piecewise_temperature_mapping(
                                 model.m,
                                 q_out,
@@ -527,7 +533,7 @@ def _set_piecewise_match_outlet_equations(model) -> None:
                                 initial_segment=hot_profile.segment_index_at_heat(
                                     hot_profile.total_duty * (k + 1) / max(model.S, 1)
                                 ),
-                            )
+                            ),
                         )
                     if cold_profile is not None:
                         q_in = model.Q_coordinate_c_by_period[n][j][k + 1]
@@ -544,7 +550,8 @@ def _set_piecewise_match_outlet_equations(model) -> None:
                             model.Q_r_by_period[n][i][j][k]
                             == model.Y_by_period[n][j][i][k] * (q_out - q_in)
                         )
-                        model._register_piecewise_mapping(
+                        _register_piecewise_mapping(
+                            model,
                             add_piecewise_temperature_mapping(
                                 model.m,
                                 q_out,
@@ -557,5 +564,5 @@ def _set_piecewise_match_outlet_equations(model) -> None:
                                     * (model.S - k)
                                     / max(model.S, 1)
                                 ),
-                            )
+                            ),
                         )
