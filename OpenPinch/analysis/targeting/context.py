@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+
 from ...domain.zone import Zone
 from ..numerics import get_period_index
 
@@ -90,3 +92,69 @@ def format_selected_period_suffix(args: dict | None) -> str:
     if args.get("period_idx") is not None:
         return f" for period_idx {int(args['period_idx'])}"
     return ""
+
+
+def normalize_base_target_type(
+    base_target_type: object | None,
+    supported: tuple[str, ...],
+    *,
+    service: str,
+) -> str | None:
+    """Validate an explicit base-target override against ``supported``.
+
+    ``service`` names the calling analysis in the error message, e.g.
+    ``"exergy"`` renders ``"Unsupported exergy base_target_type ..."``.
+    """
+    if base_target_type is None:
+        return None
+
+    normalized = str(base_target_type)
+    if normalized not in supported:
+        supported_text = ", ".join(supported)
+        raise ValueError(
+            f"Unsupported {service} base_target_type "
+            f"{normalized!r}. Supported types: {supported_text}."
+        )
+    return normalized
+
+
+def prepare_enrichment_run(
+    zone: Zone,
+    args: dict | None,
+    supported: tuple[str, ...],
+    *,
+    service: str,
+) -> tuple[dict, dict, str | None]:
+    """Validate args and record the selected period for a target-enrichment service.
+
+    Returns ``(runtime_args, compare_args, explicit_target_type)`` where
+    ``runtime_args`` carries the resolved period and ``compare_args`` is a copy of
+    the caller's args used to match existing targets.
+    """
+    apply_zone_config_overrides(zone, args)
+    runtime_args = dict(args or {})
+    explicit_target_type = normalize_base_target_type(
+        runtime_args.get("base_target_type"), supported, service=service
+    )
+    idx, sid = record_selected_period(zone, runtime_args)
+    runtime_args["period_idx"] = idx
+    if sid is not None:
+        runtime_args["period_id"] = sid
+    compare_args = dict(args or {}) if isinstance(args, dict) else {}
+    return runtime_args, compare_args, explicit_target_type
+
+
+def clone_target_with_zone_settings(target, zone: Zone, *, prefix: str):
+    """Deep-copy ``target`` (sharing its parent zone) and apply ``zone``'s config
+    values whose keys start with ``prefix``.
+    """
+    target = deepcopy(target, {id(target.parent_zone): target.parent_zone})
+    target.config._values.update(
+        {
+            key: value
+            for key, value in zone.config._values.items()
+            if key.startswith(prefix)
+        }
+    )
+    target.config._build_groups(target.config._values)
+    return target

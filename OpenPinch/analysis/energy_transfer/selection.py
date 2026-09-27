@@ -5,6 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 from ...domain.enums import TargetType
+from ..targeting.context import (
+    normalize_base_target_type as _normalize_base_target_type,
+)
 from ..targeting.context import target_matches_requested_period
 
 ENERGY_TRANSFER_TARGET_ORDER = (TargetType.II.value, TargetType.DI.value)
@@ -12,16 +15,9 @@ ENERGY_TRANSFER_TARGET_ORDER = (TargetType.II.value, TargetType.DI.value)
 
 def normalize_base_target_type(base_target_type: object | None) -> str | None:
     """Validate an explicit energy-transfer base-target override."""
-    if base_target_type is None:
-        return None
-    normalized = str(base_target_type)
-    if normalized not in ENERGY_TRANSFER_TARGET_ORDER:
-        supported = ", ".join(ENERGY_TRANSFER_TARGET_ORDER)
-        raise ValueError(
-            "Unsupported energy-transfer base_target_type "
-            f"{normalized!r}. Supported types: {supported}."
-        )
-    return normalized
+    return _normalize_base_target_type(
+        base_target_type, ENERGY_TRANSFER_TARGET_ORDER, service="energy-transfer"
+    )
 
 
 def candidate_order(zone, base_target_type: str | None) -> tuple[str, ...]:

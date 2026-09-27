@@ -9,6 +9,12 @@ from numbers import Real
 
 import numpy as np
 
+from ...contracts.heat_recovery_dt_min import (
+    _RECOVERY_ABSOLUTE_TOLERANCE as RECOVERY_ABSOLUTE_TOLERANCE,
+)
+from ...contracts.heat_recovery_dt_min import (
+    _RECOVERY_RELATIVE_TOLERANCE as RECOVERY_RELATIVE_TOLERANCE,
+)
 from ...contracts.heat_recovery_dt_min import HeatRecoveryDtMinStatus
 from ...domain.stream_collection import StreamCollection
 from ...domain.value import Value
@@ -19,8 +25,6 @@ from .cascade import (
 
 DT_MIN_TOLERANCE = 1e-6
 _BISECTION_WIDTH = DT_MIN_TOLERANCE / 2.0
-RECOVERY_ABSOLUTE_TOLERANCE = 1e-6
-RECOVERY_RELATIVE_TOLERANCE = 1e-9
 MAXIMUM_ITERATIONS = 100
 
 

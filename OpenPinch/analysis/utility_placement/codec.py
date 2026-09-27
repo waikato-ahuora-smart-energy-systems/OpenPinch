@@ -25,10 +25,13 @@ from OpenPinch.contracts.utility_placement import (
     UtilityTemplateSet,
 )
 
-from .bounds import build_initial_values, derive_effective_templates
+from .bounds import (
+    ABSOLUTE_ZERO_C,
+    build_initial_values,
+    derive_effective_templates,
+)
 from .errors import PlacementModelValidationError
 
-ABSOLUTE_ZERO_C = -273.15
 _SENSIBLE_START_FRACTIONS = (0.5, 0.2, 0.4, 0.6, 0.8)
 _SUPPLY_START_FRACTIONS = (0.0, 0.25, 0.5, 0.75, 1.0)
 
