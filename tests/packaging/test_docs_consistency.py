@@ -325,28 +325,26 @@ def test_docs_define_stability_and_optional_dependency_boundaries():
         assert phrase in combined
 
 
-def test_release_docs_match_automatic_publication() -> None:
+def test_release_docs_match_the_release_workflow() -> None:
     readme = _read(REPO_ROOT / "README.md")
     guide = _read(DOCS_ROOT / "developer" / "releasing.rst")
     for phrase in (
-        "TestPyPI",
-        "build artifact ID",
-        "source_artifact_digest",
+        "release.yml",
+        "CI OK",
+        "bump-version.yml",
+        "CI OK (main)",
+        "bump-my-version bump minor",
         "Re-run failed jobs",
-        "protected ``pypi`` environment",
-        "OpenPinch PR Gate",
-        "Legacy 0.6.10",
-        "partial",
+        "trusted publishing",
+        "``pypi``",
+        "SOURCE_DATE_EPOCH",
     ):
         assert phrase in guide
-    assert "automatic patch-bump" in readme
-    assert "reuses verified unaffected tests" in readme
-    assert "CI never changes the package version" not in guide
-    assert "version-only PR" in guide
-    assert "completed versions" in guide
-    assert "without rebuilding" in guide
-    assert "automatically advances" not in readme
-    assert "after pypi succeeds" in guide.lower()
+    assert "release.yml" in readme
+    assert "CI OK (main)" in readme
+    assert "bump-version.yml" in readme
+    for stale in ("TestPyPI", "Prepare Release", "OpenPinch PR Gate", "patch-bump PR"):
+        assert stale not in readme
 
 
 def test_docs_do_not_present_removed_cli_surfaces():

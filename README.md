@@ -1,6 +1,6 @@
 # OpenPinch
 
-[![CI Develop](https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch/actions/workflows/ci-develop.yml/badge.svg?branch=develop)](https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch/actions/workflows/ci-develop.yml)
+[![CI](https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch/actions/workflows/ci.yml)
 [![Documentation Status](https://readthedocs.org/projects/openpinch/badge/?version=latest)](https://openpinch.readthedocs.io/en/latest/)
 [![PyPI version](https://img.shields.io/pypi/v/openpinch.svg)](https://pypi.org/project/OpenPinch/)
 [![Python versions](https://img.shields.io/pypi/pyversions/openpinch.svg)](https://pypi.org/project/OpenPinch/)
@@ -142,26 +142,20 @@ uv run --no-sync python scripts/build_dist.py
 
 Ubuntu runs the complete CI suite. Windows and macOS install the generated
 wheel and verify the core import, CLI, and packaged resources. Tests marked
-`solver` require external solver binaries; the release workflow installs the
-IDAES extensions and runs this gate automatically. Run it locally with
+`solver` require external solver binaries; CI installs the IDAES extensions
+and runs them for pull requests into `main` and for every release. Run it locally with
 `uv run pytest -m solver` when the required binaries are available.
 
 ## Release Process
 
-After normal review and tests, **Prepare Release** opens an automatic patch-bump
-PR into `develop`. Merge it, then merge the reviewed `develop → main` PR.
-Main reuses verified unaffected tests and freshly checks the bumped package.
-**Release and Publish** promotes the validated candidate's
-immutable build artifact and manifest without rebuilding, verifies
-TestPyPI, verifies production PyPI through the protected `pypi` environment,
-and only then publishes the GitHub release. Completed versions are verified
-before a no-op; incomplete or conflicting versions stop for verified recovery.
-
-Recovery uses the original artifact ID, digest, and run; it never rebuilds or
-replaces a published version. See [Releasing](docs/developer/releasing.rst) for
-preparation, dispatch, recovery, and required-check migration instructions.
-Require **OpenPinch PR Gate** after observing that check on a real PR. The
-transitional `test` check also depends on the complete gate.
+The first merge into `develop` after a release automatically bumps the patch
+version (`bump-version.yml`); bump minor or major yourself with
+`uvx bump-my-version bump minor`. Merge the `develop → main` pull request once
+**CI OK (main)** is green. Every push to `main` runs the full CI suite; when the
+version has no `v<version>` tag yet, `release.yml` publishes the wheel and sdist
+that CI built to PyPI through the protected `pypi` environment, then creates
+the tag and GitHub release. See
+[Releasing](docs/developer/releasing.rst) for details and recovery.
 
 Build the documentation locally:
 

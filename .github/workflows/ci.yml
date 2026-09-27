@@ -1,0 +1,288 @@
+# One validation pipeline for every change.
+#
+#   pull_request -> develop : standard profile
+#   pull_request -> main    : full profile (+ solver tests, + version-bump check)
+#   push develop            : standard profile (post-merge health)
+#   workflow_call           : used by release.yml on every push to main (full)
+#
+# Branch rules require one check: "CI OK" on develop, "CI OK (main)" on main.
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  # github.workflow is the caller's name when called from release.yml, so the
+  # group never collides with the release workflow's own group.
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  UV_VERSION: "0.11.29"
+  HYPOTHESIS_SEED: "20260715"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --frozen --group dev
+      - name: Ruff
+        run: uv run --no-sync ruff check .
+      - name: Lockfile carries the project version
+        run: uv run --no-sync python scripts/check_lockfile_version.py
+      - name: Lint workflows
+        run: |
+          curl -fsSL --max-time 60 -o "$RUNNER_TEMP/actionlint.tgz" \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tgz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/actionlint.tgz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -color
+
+  tests:
+    name: Tests (${{ matrix.lane }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ matrix.timeout }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lane: unit
+            runner: ubuntu-latest
+            timeout: 45
+            sync: --group dev
+            markers: not solver and not tespy and not performance and not docs
+            coverage: true
+          - lane: docs
+            runner: ubuntu-latest
+            timeout: 20
+            sync: --group dev
+            markers: docs
+          - lane: tespy
+            runner: ubuntu-latest
+            timeout: 20
+            sync: --group dev --extra tespy
+            markers: tespy
+          - lane: performance
+            runner: ubuntu-latest
+            timeout: 20
+            sync: --group dev
+            markers: performance
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install locked environment
+        env:
+          SYNC_ARGS: ${{ matrix.sync }}
+        run: |
+          read -ra sync_args <<< "$SYNC_ARGS"
+          uv sync --frozen "${sync_args[@]}"
+      - name: Run pytest
+        env:
+          MARKERS: ${{ matrix.markers }}
+          COVERAGE: ${{ matrix.coverage && 'true' || 'false' }}
+          LANE: ${{ matrix.lane }}
+        run: |
+          args=(--hypothesis-seed="$HYPOTHESIS_SEED" -m "$MARKERS" --junitxml="reports/$LANE.xml" --durations=20)
+          if [ "$COVERAGE" = true ]; then
+            uv run --no-sync coverage run --branch --source=OpenPinch -m pytest "${args[@]}"
+            uv run --no-sync coverage report --fail-under=95
+          else
+            uv run --no-sync pytest "${args[@]}"
+          fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() }}
+        with:
+          name: reports-${{ matrix.lane }}
+          path: reports/
+          retention-days: 14
+          if-no-files-found: warn
+          overwrite: true
+
+  solver:
+    name: Tests (solver)
+    if: ${{ github.base_ref == 'main' || github.ref == 'refs/heads/main' }}
+    # IDAES solver binaries are built for 22.04.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --frozen --group dev
+      - name: Install IDAES solver binaries
+        run: uv run --no-sync idaes get-extensions
+      - name: Check couenne and ipopt are available
+        run: |
+          uv run --no-sync python - <<'PY'
+          import idaes  # noqa: F401  (puts the IDAES binaries on PATH)
+          from pyomo.environ import SolverFactory
+          missing = [s for s in ("couenne", "ipopt") if not SolverFactory(s).available(exception_flag=False)]
+          assert not missing, f"Unavailable solver binaries: {missing}"
+          PY
+      - run: uv run --no-sync pytest --hypothesis-seed="$HYPOTHESIS_SEED" -m solver --junitxml=reports/solver.xml --durations=20
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() }}
+        with:
+          name: reports-solver
+          path: reports/
+          retention-days: 14
+          if-no-files-found: warn
+          overwrite: true
+
+  version:
+    name: Version bump
+    # Only a PR into main must carry a new version; merging it is what releases.
+    if: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Version is higher than main and not yet released
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git show "origin/$BASE_REF:pyproject.toml" > "$RUNNER_TEMP/base-pyproject.toml"
+          version="$(python3 scripts/check_release_version.py --base-pyproject "$RUNNER_TEMP/base-pyproject.toml")" || {
+            echo "::error title=Version bump required::$version"
+            echo "Bump the version on develop (uv run bump-my-version bump patch) before merging to main." >&2
+            exit 1
+          }
+          taken="$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/v$version" --jq "map(select(.ref == \"refs/tags/v$version\")) | length")"
+          if [ "$taken" != 0 ]; then
+            echo "::error title=Version already released::v$version is already tagged; bump again."
+            exit 1
+          fi
+          echo "Merging this PR will release **v$version**." >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    name: Build distributions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+      - name: Build sdist and wheel
+        run: |
+          # Reproducible bytes: a re-run of the same commit builds identical files.
+          SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
+          export SOURCE_DATE_EPOCH
+          uv build --out-dir dist
+          ls -l dist
+          (cd dist && sha256sum -- * | tee -a "$GITHUB_STEP_SUMMARY")
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: true
+
+  smoke:
+    name: Install smoke (${{ matrix.surface }}, ${{ matrix.os }})
+    needs: build
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        surface: [core, dashboard, notebook, brayton_cycle, tespy, synthesis]
+        include:
+          - os: windows-latest
+            surface: core
+          - os: macos-latest
+            surface: core
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist
+          path: dist
+      - name: Install locked dependencies, then the built wheel (not the checkout)
+        env:
+          SURFACE: ${{ matrix.surface }}
+        run: |
+          extra=()
+          [ "$SURFACE" = core ] || extra=(--extra "$SURFACE")
+          uv sync --frozen --no-default-groups --no-install-project "${extra[@]}"
+          uv pip install --python .venv --no-deps dist/*.whl
+      - name: Smoke-test the installed surface
+        env:
+          SURFACE: ${{ matrix.surface }}
+        run: |
+          uv run --no-sync python scripts/optional_install_smoke.py "$SURFACE"
+          case "$SURFACE" in
+            core|tespy) uv run --no-sync python scripts/artifact_install_smoke.py --surface "$SURFACE" ;;
+          esac
+
+  ci-ok:
+    # A distinct name for main-bound runs: a push to develop and a PR from
+    # develop into main test the same commit, and main's branch rule must
+    # only be satisfied by the full profile.
+    name: ${{ (github.base_ref == 'main' || github.ref == 'refs/heads/main') && 'CI OK (main)' || 'CI OK' }}
+    if: ${{ always() }}
+    needs: [lint, tests, solver, version, build, smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Every required job passed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+          # Headed for (or already on) main: solver tests are mandatory.
+          FULL: ${{ github.base_ref == 'main' || github.ref == 'refs/heads/main' }}
+          PR_TO_MAIN: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' }}
+        run: |
+          echo "$RESULTS" | jq -r 'to_entries[] | "- \(.key): \(.value.result)"' | tee -a "$GITHUB_STEP_SUMMARY"
+          required='["lint","tests","build","smoke"]'
+          [ "$FULL" = true ] && required="$(jq -c '. + ["solver"]' <<< "$required")"
+          [ "$PR_TO_MAIN" = true ] && required="$(jq -c '. + ["version"]' <<< "$required")"
+          failed="$(jq -r --argjson req "$required" \
+            'to_entries | map(select((.key | IN($req[])) and .value.result != "success") | .key) | join(", ")' <<< "$RESULTS")"
+          if [ -n "$failed" ]; then
+            echo "::error title=CI failed::Not successful: $failed"
+            exit 1
+          fi

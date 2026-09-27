@@ -1,0 +1,81 @@
+# After each merge into develop, make sure develop carries the next patch
+# version. The bump happens once per release cycle: only while develop's
+# version still equals main's (i.e. the first merge after a release). A
+# manual minor/major bump on develop is left alone.
+#
+# The bot commit is pushed with GITHUB_TOKEN, which by design starts no new
+# workflow runs, so it cannot loop. If a develop -> main PR is already open,
+# close and reopen it (or push) so its checks run on the bumped commit.
+name: Bump version
+
+on:
+  push:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bump-version
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Bump patch version
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          ref: develop
+          fetch-depth: 0
+          # Needed to push the bump commit back to develop.
+          persist-credentials: true
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.11.29"
+      - name: Is develop still on main's version?
+        id: check
+        run: |
+          git show origin/main:pyproject.toml > "$RUNNER_TEMP/main-pyproject.toml"
+          current="$(python3 scripts/check_release_version.py)"
+          released="$(python3 scripts/check_release_version.py --pyproject "$RUNNER_TEMP/main-pyproject.toml")"
+          echo "develop=$current main=$released"
+          if [ "$current" = "$released" ]; then
+            echo "bump=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "bump=false" >> "$GITHUB_OUTPUT"
+            echo "develop is already on $current (main: $released); no bump needed." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Bump patch in pyproject.toml, uv.lock and .bumpversion.toml
+        if: ${{ steps.check.outputs.bump == 'true' }}
+        run: |
+          old="$(python3 scripts/check_release_version.py)"
+          # --frozen: change only the version, never re-resolve dependencies.
+          uv version --bump patch --frozen
+          new="$(python3 scripts/check_release_version.py)"
+          OLD="$old" NEW="$new" python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+          old, new = os.environ["OLD"], os.environ["NEW"]
+          edits = {
+              "uv.lock": r'(name = "openpinch"\nversion = ")' + re.escape(old) + '"',
+              ".bumpversion.toml": r'(current_version = ")' + re.escape(old) + '"',
+          }
+          for name, pattern in edits.items():
+              path = Path(name)
+              text, count = re.subn(pattern, lambda m: m[1] + new + '"', path.read_text())
+              assert count == 1, f"{name}: expected one version entry, found {count}"
+              path.write_text(text)
+          PY
+          python3 scripts/check_lockfile_version.py
+          # Only the three version files may change.
+          test -z "$(git status --porcelain -- . ':!pyproject.toml' ':!uv.lock' ':!.bumpversion.toml')"
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -am "Bump OpenPinch project version: $old → $new"
+          # Another merge may have landed meanwhile; rebase once and retry.
+          git push origin HEAD:develop || { git pull --rebase origin develop && git push origin HEAD:develop; }
+          echo "Bumped develop to **$new**; merging develop into main will release it." >> "$GITHUB_STEP_SUMMARY"

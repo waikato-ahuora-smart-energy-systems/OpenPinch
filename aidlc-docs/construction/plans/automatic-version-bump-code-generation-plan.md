@@ -42,9 +42,32 @@ ignored; newer actual, incomplete or ambiguous validation remains authoritative.
 
 Verification: 434 passed, 6 expected skips in 142.13 seconds; Hypothesis seed
 20260715. Ruff, formatting, actionlint and git diff --check pass. Review response
-posted to PR 103 (issuecomment-5850389548); threads remain unresolved. Local
-changes are not committed or pushed.
+posted to PR 103 (issuecomment-5850389548). The correction was committed as
+e184dad6, pushed, validated and merged to main by PR 103.
 
 PBT-01/03/05/07/08/09/10 apply to selection invariant and oracle (Hypothesis,
 seed 20260715, normal shrinking). PBT-02/04/06 N/A: no new codec, mutation or
 state machine. Security/Resiliency disabled and skipped. Plain Markdown only.
+
+## Bootstrap publication corrective follow-up
+
+Authorized by user "Fix it." after Release and Publish run 36285927036 failed
+safely on the pre-existing v0.6.10 tag. The correction must not weaken ordinary
+tag-collision recovery or publish/recover the legacy 0.6.10 release.
+
+- [x] 12. Prove the failure from hosted logs, merged version and annotated tag.
+- [x] 13. Add a bounded bootstrap-history predicate and return a successful
+  non-publication decision only for the exact coordinator-introduction merge.
+- [x] 14. Add concrete negative cases and a generated independent predicate
+  oracle; update release documentation.
+- [x] 15. Run the complete packaging suite and all relevant quality checks;
+  audit the final diff and record the result.
+
+Verification: the exact hosted merge topology returns true; 441 packaging tests
+passed with 6 expected skips in 115.07 seconds using Hypothesis seed 20260715.
+Ruff, formatting and patch hygiene pass. No workflow YAML changed. No commit,
+push, rerun, tag, release or package-index mutation was performed.
+
+PBT-01/03/05/07/08/09/10 apply to the bootstrap authorization predicate and
+generated history oracle. PBT-02/04/06 are N/A: no codec, write-side idempotence
+or mutable state machine changed. Security and Resiliency remain disabled.
