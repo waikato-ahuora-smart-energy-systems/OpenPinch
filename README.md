@@ -141,6 +141,16 @@ scripts/ci_local.sh solver   # any lane by name: lint unit docs tespy performanc
 It syncs the locked environment with `uv` first and prints a pass/fail summary per lane.
 The solver lane downloads the IDAES solver binaries on first use.
 
+To have this run automatically before every `git push`, enable the repository's
+hooks once per clone (skip a run with `git push --no-verify`):
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Before pushing work meant for `main`, also run `scripts/ci_local.sh all`, which adds the
+TESPy, performance, solver and notebook lanes that CI runs for pull requests into `main`.
+
 Ubuntu runs the complete CI suite. Windows and macOS install the generated
 wheel and verify the core import, CLI, and packaged resources. Tests marked
 `solver` require external solver binaries; CI installs the IDAES extensions

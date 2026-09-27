@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Runs the local CI before every push, so a PR only goes up once it passes.
+#   Enable once per clone:  git config core.hooksPath .githooks
+#   Skip in an emergency:   git push --no-verify
+#   Choose lanes:           OPENPINCH_PREPUSH_LANES="quick" git push
+#
+# Pushing develop or a branch meant for main? Run `scripts/ci_local.sh all`
+# first: it adds the TESPy, performance, solver and notebook lanes.
+set -euo pipefail
+read -ra lanes <<< "${OPENPINCH_PREPUSH_LANES:-}"
+exec "$(git rev-parse --show-toplevel)/scripts/ci_local.sh" ${lanes[@]+"${lanes[@]}"}
