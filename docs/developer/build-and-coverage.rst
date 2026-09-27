@@ -46,8 +46,9 @@ percent. ``release.yml`` publishes from ``main`` when the version is new; see
 Repository Controls
 -------------------
 
-Require the ``CI OK`` status check on ``develop`` and ``main``. It is the
-single gate that summarises every other CI job.
+Require the ``CI OK`` status check on ``develop`` and ``CI OK (main)`` on
+``main``. Each is the single gate that summarises every other CI job; the
+``(main)`` variant is only reported by full-profile runs.
 
 Alternative Direct Sphinx Build
 -------------------------------

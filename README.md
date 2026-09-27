@@ -148,11 +148,13 @@ and runs them for pull requests into `main` and for every release. Run it locall
 
 ## Release Process
 
-Bump the version on `develop` (`uvx bump-my-version bump patch`), then merge
-the `develop → main` pull request once **CI OK** is green. Every push to `main`
-runs the full CI suite; when the version has no `v<version>` tag yet,
-`release.yml` publishes the wheel and sdist that CI built to PyPI through the
-protected `pypi` environment, then creates the tag and GitHub release. See
+The first merge into `develop` after a release automatically bumps the patch
+version (`bump-version.yml`); bump minor or major yourself with
+`uvx bump-my-version bump minor`. Merge the `develop → main` pull request once
+**CI OK (main)** is green. Every push to `main` runs the full CI suite; when the
+version has no `v<version>` tag yet, `release.yml` publishes the wheel and sdist
+that CI built to PyPI through the protected `pypi` environment, then creates
+the tag and GitHub release. See
 [Releasing](docs/developer/releasing.rst) for details and recovery.
 
 Build the documentation locally:

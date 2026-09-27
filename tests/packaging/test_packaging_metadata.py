@@ -19,6 +19,7 @@ UPDATE_TOOLCHAIN = REPO_ROOT / "scripts" / "update_toolchain.py"
 WORKFLOWS = [
     REPO_ROOT / ".github" / "workflows" / "ci.yml",
     REPO_ROOT / ".github" / "workflows" / "release.yml",
+    REPO_ROOT / ".github" / "workflows" / "bump-version.yml",
 ]
 UPLOAD_ARTIFACT_SHA = "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
 DOWNLOAD_ARTIFACT_SHA = "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"

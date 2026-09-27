@@ -1,12 +1,19 @@
 Releasing
 =========
 
-OpenPinch has two GitHub Actions workflows:
+OpenPinch has three GitHub Actions workflows:
 
 ``ci.yml``
    Validates every change. It runs on pull requests into ``develop`` and
    ``main``, on pushes to ``develop``, on demand, and inside ``release.yml``.
-   Its final job, **CI OK**, is the only check branch rules need to require.
+   Its final job is the only check branch rules need to require: it reports
+   as **CI OK** for ``develop`` work and as **CI OK (main)** for pull requests
+   into ``main`` and pushes to ``main``, which run the full profile.
+
+``bump-version.yml``
+   Runs after every push to ``develop``. If ``develop`` still carries the same
+   version as ``main`` (the first merge after a release), it bumps the patch
+   number and commits the change to ``develop``.
 
 ``release.yml``
    Runs on every push to ``main``. It runs ``ci.yml`` with the full profile
@@ -42,20 +49,30 @@ Tests use Hypothesis seed ``20260715``. Python comes from ``.python-version``.
 Cutting a release
 -----------------
 
-1. On ``develop``, bump the version. This updates ``pyproject.toml``,
-   ``.bumpversion.toml`` and ``uv.lock`` together and commits the change:
+1. Merge pull requests into ``develop`` as usual. The first merge after a
+   release makes ``bump-version.yml`` commit the next patch version
+   (for example 0.6.10 → 0.6.11) to ``pyproject.toml``, ``uv.lock`` and
+   ``.bumpversion.toml``. Later merges keep that version. Pull before you
+   continue working on ``develop``.
+2. For a minor or major release instead, bump on ``develop`` yourself; the
+   workflow leaves a version that is already ahead of ``main`` alone:
 
    .. code-block:: bash
 
-      uvx bump-my-version bump patch   # or minor / major
+      uvx bump-my-version bump minor   # or major
 
-2. Open (or update) the ``develop`` → ``main`` pull request. Its
-   **Version bump** job fails until the version is higher than ``main``'s and
-   has no ``v<version>`` tag.
-3. Merge once **CI OK** is green. ``release.yml`` then re-validates the merged
-   commit, uploads the wheel and sdist to PyPI with trusted publishing, and
-   creates the ``v<version>`` tag and GitHub release with the same files
+3. Open the ``develop`` → ``main`` pull request. Its **Version bump** job
+   fails unless the version is higher than ``main``'s and has no
+   ``v<version>`` tag.
+4. Merge once **CI OK (main)** is green. ``release.yml`` then re-validates the
+   merged commit, uploads the wheel and sdist to PyPI with trusted publishing,
+   and creates the ``v<version>`` tag and GitHub release with the same files
    attached.
+
+The bump commit is pushed with the workflow token, which does not start new
+workflow runs. If a ``develop`` → ``main`` pull request is already open when
+the bump lands, close and reopen it (or push a commit) so its checks run on
+the bumped commit.
 
 A push to ``main`` whose version is already tagged runs CI only and publishes
 nothing.
@@ -83,12 +100,16 @@ Bump the version above the latest release and merge again.
 One-time repository settings
 ----------------------------
 
-- Branch rules for ``develop`` and ``main``: require the **CI OK** status
-  check. Remove the old required checks (``OpenPinch PR Gate``, ``test``).
+- Branch rule for ``develop``: require **CI OK**, and allow GitHub Actions to
+  push the version-bump commit (``develop`` is currently unprotected, which
+  works as is).
+- Branch rule for ``main``: require **CI OK (main)**. Remove the old required
+  checks (``OpenPinch PR Gate``, ``test``).
 - PyPI trusted publisher for ``OpenPinch``: set the workflow file to
   ``release.yml`` and the environment to ``pypi``. The old ``ci-publish.yml``
   publisher and the TestPyPI publisher are no longer used.
 - Environment ``pypi``: restrict deployments to the ``main`` branch.
-- If a pull request is retargeted from ``develop`` to ``main``, push a commit
-  or close and reopen it so the full profile runs. Title and description edits
-  do not re-run CI.
+- A pull request retargeted from ``develop`` to ``main`` has no
+  **CI OK (main)** check until its checks re-run, so it cannot merge early:
+  push a commit or close and reopen it. Title and description edits do not
+  re-run CI.
