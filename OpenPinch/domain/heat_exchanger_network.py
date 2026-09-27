@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import math
 from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from ._heat_exchanger import rules as _rules
 from .enums import HeatExchangerKind, HeatExchangerNetworkLabel
 from .heat_exchanger import HeatExchanger
 
@@ -55,11 +55,7 @@ class HeatExchangerNetwork(BaseModel):
     @field_validator("run_id", "task_id", "period_id", "method")
     @classmethod
     def _validate_optional_identity(cls, value: str | None) -> str | None:
-        if value is None:
-            return value
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError("network metadata identities must be non-empty strings")
-        return value.strip()
+        return _rules.optional_identity(value, _rules.NETWORK_IDENTITY_MESSAGE)
 
     @field_validator("stage_count")
     @classmethod
@@ -79,11 +75,9 @@ class HeatExchangerNetwork(BaseModel):
         cls,
         value: float | None,
     ) -> float | None:
-        if value is None:
-            return value
-        if not math.isfinite(value) or value < 0.0:
-            raise ValueError("network numeric values must be finite and non-negative")
-        return float(value)
+        return _rules.optional_non_negative_finite(
+            value, _rules.NETWORK_NUMERIC_MESSAGE
+        )
 
     @field_validator("summary_metrics")
     @classmethod
@@ -91,22 +85,14 @@ class HeatExchangerNetwork(BaseModel):
         cls,
         value: dict[str, float | int | str | bool | None],
     ) -> dict[str, float | int | str | bool | None]:
-        for metric_name, metric_value in value.items():
-            if not isinstance(metric_name, str) or not metric_name.strip():
-                raise ValueError("summary metric names must be non-empty strings")
-            if isinstance(metric_value, float) and not math.isfinite(metric_value):
-                raise ValueError("summary metric values must be finite")
+        _rules.check_summary_metrics(value)
         return value
 
     @model_validator(mode="after")
     def _validate_period_state_alignment(self) -> Self:
-        if not self.exchangers:
-            return self
-        ordered = self.exchangers[0].period_ids
-        if any(exchanger.period_ids != ordered for exchanger in self.exchangers[1:]):
-            raise ValueError(
-                "all exchangers in a network must use the same ordered period_ids"
-            )
+        _rules.check_period_alignment(
+            exchanger.period_ids for exchanger in self.exchangers
+        )
         return self
 
     @property
