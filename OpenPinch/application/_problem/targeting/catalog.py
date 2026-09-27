@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from types import MappingProxyType
+from typing import Any
 
 from ....domain.configuration_fields import USER_CONFIG_FIELD_SPECS
 from ....domain.enums import ZoneType
@@ -150,3 +152,38 @@ def require_available(method: str) -> AnalysisMethodSpec:
         detail = _UNAVAILABLE_DETAILS.get(method)
         raise NotImplementedError(f"{message} {detail}" if detail else message)
     return spec
+
+
+def catalog_method_names(surface: str) -> tuple[str, ...]:
+    """Return the catalogued method names on one accessor surface, in order."""
+    prefix = f"{surface}."
+    return tuple(
+        name.removeprefix(prefix) for name in METHOD_CATALOG if name.startswith(prefix)
+    )
+
+
+def install_catalog_forwarders(
+    cls: type,
+    *,
+    surface: str,
+    factory: Callable[[str], Callable[..., Any]],
+    exclude: Iterable[str] = (),
+) -> type:
+    """Add one ``**kwargs`` forwarder per catalogued ``surface`` method to ``cls``.
+
+    Methods ``cls`` defines explicitly (for example, those with keyword-only
+    signatures) are left untouched, as are the names in ``exclude``. Generated
+    methods are real class attributes with a proper ``__name__``,
+    ``__qualname__``, ``__module__`` and ``__doc__`` so they remain visible to
+    ``dir``, ``inspect`` and ``help``.
+    """
+    skipped = set(exclude)
+    for name in catalog_method_names(surface):
+        if name in skipped or name in cls.__dict__:
+            continue
+        method = factory(name)
+        method.__name__ = name
+        method.__qualname__ = f"{cls.__qualname__}.{name}"
+        method.__module__ = cls.__module__
+        setattr(cls, name, method)
+    return cls
