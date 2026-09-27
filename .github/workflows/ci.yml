@@ -5,7 +5,7 @@
 #   push develop            : standard profile (post-merge health)
 #   workflow_call           : used by release.yml on every push to main (full)
 #
-# "CI OK" is the only check branch rules need to require.
+# Branch rules require one check: "CI OK" on develop, "CI OK (main)" on main.
 name: CI
 
 on:
@@ -260,7 +260,10 @@ jobs:
           esac
 
   ci-ok:
-    name: CI OK
+    # A distinct name for main-bound runs: a push to develop and a PR from
+    # develop into main test the same commit, and main's branch rule must
+    # only be satisfied by the full profile.
+    name: ${{ (github.base_ref == 'main' || github.ref == 'refs/heads/main') && 'CI OK (main)' || 'CI OK' }}
     if: ${{ always() }}
     needs: [lint, tests, solver, version, build, smoke]
     runs-on: ubuntu-latest

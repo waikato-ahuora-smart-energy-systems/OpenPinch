@@ -331,7 +331,9 @@ def test_release_docs_match_the_release_workflow() -> None:
     for phrase in (
         "release.yml",
         "CI OK",
-        "bump-my-version bump patch",
+        "bump-version.yml",
+        "CI OK (main)",
+        "bump-my-version bump minor",
         "Re-run failed jobs",
         "trusted publishing",
         "``pypi``",
@@ -339,7 +341,8 @@ def test_release_docs_match_the_release_workflow() -> None:
     ):
         assert phrase in guide
     assert "release.yml" in readme
-    assert "CI OK" in readme
+    assert "CI OK (main)" in readme
+    assert "bump-version.yml" in readme
     for stale in ("TestPyPI", "Prepare Release", "OpenPinch PR Gate", "patch-bump PR"):
         assert stale not in readme
 
