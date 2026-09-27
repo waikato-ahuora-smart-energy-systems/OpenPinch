@@ -88,85 +88,11 @@ def compute_direct_heat_pump_or_refrigeration_target(
             is_direct=True,
             args=args,
         )
-
-    idx, period_id = get_period_index(period_ids=zone.period_ids, args=args)
-    is_refrigeration = not (is_heat_pumping)
-    base_target = zone.targets[TargetType.DI.value]
-    pt = deepcopy(base_target.pt)
-    target_load = resolve_hpr_target_load(
-        H_net_cold=pt[ProblemTableLabel.H_NET_COLD],
-        H_net_hot=pt[ProblemTableLabel.H_NET_HOT],
+    return _compute_single_period_hpr_target(
+        zone,
         is_heat_pumping=is_heat_pumping,
-        is_refrigeration=is_refrigeration,
-        config=zone.config,
-        period_id=period_id,
-        period_idx=idx,
-    )
-    if target_load < tol:
-        return None
-
-    res = _get_hpr_targets(
-        Q_hpr_target=target_load,
-        T_vals=pt[ProblemTableLabel.T],
-        H_hot=pt[ProblemTableLabel.H_NET_HOT],
-        H_cold=pt[ProblemTableLabel.H_NET_COLD],
-        config=zone.config,
-        is_heat_pumping=is_heat_pumping,
-        period_idx=idx,
-        simulation_backend=(args or {}).get("simulation_backend", "coolprop"),
-        search_budget=_hpr_search_budget(args),
-    )
-    pt = _calc_hpr_cascade(
-        pt=pt,
-        res=res,
-        is_T_vals_shifted=True,
-        is_heat_pumping=is_heat_pumping,
-        period_idx=idx,
-    )
-    general_results = {
-        "zone_name": zone.name,
-        "scope": zone.address,
-        "zone_type": zone.type,
-        "type": TargetType.DHP.value if is_heat_pumping else TargetType.DR.value,
-        "parent_zone": zone.parent_zone,
-        "config": zone.config,
-        "pt": pt,
-        "graphs": _get_hpr_graphs(
-            pt=pt,
-            is_direct=True,
-            is_heat_pumping=is_heat_pumping,
-        ),
-        "period_id": period_id,
-        "period_idx": idx,
-    }
-    hpr_results = _get_hpr_target_summary(res, zone, period_id=period_id)
-    util_results = _get_hpr_residual_utility_summary(
-        pt=pt,
-        base_target=base_target,
-        period_idx=idx,
         is_direct=True,
-        is_heat_pumping=is_heat_pumping,
-    )
-    model_cls = DirectHeatPumpTarget if is_heat_pumping else DirectRefrigerationTarget
-    profile = util_results.pop("residual_profile")
-    numerical = _hpr_numerical_records(
-        zone=zone,
-        base_target=base_target,
-        res=res,
-        profile=profile,
-        selected=target_load,
-        period_id=period_id,
-        period_idx=idx,
-        is_direct=True,
-        is_heat_pumping=is_heat_pumping,
-    )
-    general_results["graphs"] = _get_hpr_graphs(
-        pt=pt,
-        is_direct=True,
-        is_heat_pumping=is_heat_pumping,
-    )
-    return model_cls.model_validate(
-        general_results | hpr_results | util_results | numerical
+        args=args,
     )
 
 
@@ -183,23 +109,57 @@ def compute_indirect_heat_pump_or_refrigeration_target(
             is_direct=False,
             args=args,
         )
+    return _compute_single_period_hpr_target(
+        zone,
+        is_heat_pumping=is_heat_pumping,
+        is_direct=False,
+        args=args,
+    )
 
+
+################################################################################
+# Helper functions API
+################################################################################
+
+
+def _use_multiperiod_hpr_optimization(zone: Zone) -> bool:
+    return bool(getattr(zone.config.hpr, "multiperiod_optimization_enabled", False))
+
+
+def _compute_single_period_hpr_target(
+    zone: Zone,
+    *,
+    is_heat_pumping: bool,
+    is_direct: bool,
+    args: dict | None = None,
+) -> (
+    DirectHeatPumpTarget
+    | DirectRefrigerationTarget
+    | IndirectHeatPumpTarget
+    | IndirectRefrigerationTarget
+    | None
+):
     idx, period_id = get_period_index(period_ids=zone.period_ids, args=args)
     is_refrigeration = not (is_heat_pumping)
-    base_target = zone.targets[TargetType.II.value]
+    base_target = zone.targets[
+        TargetType.DI.value if is_direct else TargetType.II.value
+    ]
     pt = deepcopy(base_target.pt)
-    # Create problem table based on inverted utility streams
-    pt_ut_gen = get_process_heat_cascade(
-        hot_streams=zone.cold_utilities.get_hot_streams(invert_utility=True),
-        cold_streams=zone.hot_utilities.get_cold_streams(invert_utility=True),
-        is_shifted=True,
-        is_full_analysis=True,
-        period_idx=idx,
-    )
+    if is_direct:
+        pt_target = pt
+    else:
+        # Create problem table based on inverted utility streams
+        pt_target = get_process_heat_cascade(
+            hot_streams=zone.cold_utilities.get_hot_streams(invert_utility=True),
+            cold_streams=zone.hot_utilities.get_cold_streams(invert_utility=True),
+            is_shifted=True,
+            is_full_analysis=True,
+            period_idx=idx,
+        )
     # Perform heat pump and/or refrigeration targeting on the correct cascades
     target_load = resolve_hpr_target_load(
-        H_net_cold=pt_ut_gen[ProblemTableLabel.H_NET_COLD],
-        H_net_hot=pt_ut_gen[ProblemTableLabel.H_NET_HOT],
+        H_net_cold=pt_target[ProblemTableLabel.H_NET_COLD],
+        H_net_hot=pt_target[ProblemTableLabel.H_NET_HOT],
         is_heat_pumping=is_heat_pumping,
         is_refrigeration=is_refrigeration,
         config=zone.config,
@@ -211,9 +171,9 @@ def compute_indirect_heat_pump_or_refrigeration_target(
 
     res = _get_hpr_targets(
         Q_hpr_target=target_load,
-        T_vals=pt_ut_gen[ProblemTableLabel.T],
-        H_hot=pt_ut_gen[ProblemTableLabel.H_NET_HOT],
-        H_cold=pt_ut_gen[ProblemTableLabel.H_NET_COLD],
+        T_vals=pt_target[ProblemTableLabel.T],
+        H_hot=pt_target[ProblemTableLabel.H_NET_HOT],
+        H_cold=pt_target[ProblemTableLabel.H_NET_COLD],
         config=zone.config,
         is_heat_pumping=is_heat_pumping,
         period_idx=idx,
@@ -226,34 +186,19 @@ def compute_indirect_heat_pump_or_refrigeration_target(
         is_T_vals_shifted=True,
         is_heat_pumping=is_heat_pumping,
         period_idx=idx,
-        is_direct=False,
+        is_direct=is_direct,
     )
-    general_results = {
-        "zone_name": zone.name,
-        "scope": zone.address,
-        "zone_type": zone.type,
-        "type": TargetType.IHP.value if is_heat_pumping else TargetType.IR.value,
-        "parent_zone": zone.parent_zone,
-        "config": zone.config,
-        "pt": pt,
-        "graphs": _get_hpr_graphs(
-            pt=pt,
-            is_direct=False,
-            is_heat_pumping=is_heat_pumping,
-        ),
-        "period_id": period_id,
-        "period_idx": idx,
-    }
     hpr_results = _get_hpr_target_summary(res, zone, period_id=period_id)
     util_results = _get_hpr_residual_utility_summary(
         pt=pt,
         base_target=base_target,
         period_idx=idx,
-        is_direct=False,
+        is_direct=is_direct,
         is_heat_pumping=is_heat_pumping,
     )
-    model_cls = (
-        IndirectHeatPumpTarget if is_heat_pumping else IndirectRefrigerationTarget
+    model_cls = _hpr_target_model_cls(
+        is_direct=is_direct,
+        is_heat_pumping=is_heat_pumping,
     )
     profile = util_results.pop("residual_profile")
     numerical = _hpr_numerical_records(
@@ -264,26 +209,28 @@ def compute_indirect_heat_pump_or_refrigeration_target(
         selected=target_load,
         period_id=period_id,
         period_idx=idx,
-        is_direct=False,
+        is_direct=is_direct,
         is_heat_pumping=is_heat_pumping,
     )
-    general_results["graphs"] = _get_hpr_graphs(
-        pt=pt,
-        is_direct=False,
-        is_heat_pumping=is_heat_pumping,
-    )
+    general_results = {
+        "zone_name": zone.name,
+        "scope": zone.address,
+        "zone_type": zone.type,
+        "type": _hpr_target_type(is_direct=is_direct, is_heat_pumping=is_heat_pumping),
+        "parent_zone": zone.parent_zone,
+        "config": zone.config,
+        "pt": pt,
+        "graphs": _get_hpr_graphs(
+            pt=pt,
+            is_direct=is_direct,
+            is_heat_pumping=is_heat_pumping,
+        ),
+        "period_id": period_id,
+        "period_idx": idx,
+    }
     return model_cls.model_validate(
         general_results | hpr_results | util_results | numerical
     )
-
-
-################################################################################
-# Helper functions API
-################################################################################
-
-
-def _use_multiperiod_hpr_optimization(zone: Zone) -> bool:
-    return bool(getattr(zone.config.hpr, "multiperiod_optimization_enabled", False))
 
 
 def _compute_multiperiod_heat_pump_or_refrigeration_target(
