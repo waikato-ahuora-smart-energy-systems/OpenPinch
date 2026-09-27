@@ -16,6 +16,7 @@ from ..candidates import (
     _postprocess_candidates,
 )
 from ..execution import _collect_candidates_in_parallel
+from ._surrogate import as_seed_array, run_surrogate_loop
 
 
 def _get_bo_multiminima_in_parallel(
@@ -88,11 +89,7 @@ def _collect_bo_candidates(
     xi: float,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Collect candidate minima from multiple Bayesian-optimisation runs."""
-    x0_arr = None
-    if x0_ls is not None:
-        x0_arr = np.asarray(x0_ls, dtype=float)
-        if x0_arr.ndim == 1:
-            x0_arr = x0_arr.reshape(1, -1)
+    x0_arr = as_seed_array(x0_ls)
 
     run_fn = partial(
         _run_bo_single,
@@ -133,67 +130,8 @@ def _run_bo_single(
     xi: float,
 ) -> tuple[list[np.ndarray], list[float]]:
     """Execute one BO run and record improving incumbent candidates."""
-    rng = np.random.default_rng(seed + run)
-    bounds = np.asarray(bounds, dtype=float)
-    lb = bounds[:, 0]
-    ub = bounds[:, 1]
-    n_dim = lb.size
 
-    if np.allclose(ub, lb):
-        x_fixed = np.array(lb, dtype=float)
-        f_fixed = _evaluate_scalar_objective(func, x_fixed, args)
-        return [x_fixed], [f_fixed]
-
-    span = np.where(ub > lb, ub - lb, 1.0)
-
-    def to_unit(x):
-        return np.clip((x - lb) / span, 0.0, 1.0)
-
-    def from_unit(u):
-        return np.clip(lb + u * span, lb, ub)
-
-    x_seed = None
-    if x0_ls is not None and np.shape(x0_ls)[0] > 0:
-        x_seed = np.clip(np.array(x0_ls[run % np.shape(x0_ls)[0]], dtype=float), lb, ub)
-
-    n_init_eff = int(n_init) if n_init is not None else max(6, 2 * n_dim + 2)
-    n_init_eff = max(1, n_init_eff)
-    maxfevals = int(maxfevals) if maxfevals is not None else int(maxiter) + n_init_eff
-
-    X_unit = []
-    y = []
-    run_minima_x = []
-    run_minima_f = []
-    best_f = np.inf
-    best_u = None
-    eval_count = 0
-
-    def evaluate_and_store(u):
-        nonlocal best_f, best_u, eval_count
-        x = from_unit(u)
-        f = _evaluate_scalar_objective(func, x, args)
-        eval_count += 1
-        X_unit.append(np.array(u, dtype=float))
-        y.append(float(f))
-        if f < best_f:
-            best_f = float(f)
-            best_u = np.array(u, dtype=float)
-            run_minima_x.append(np.array(x, dtype=float))
-            run_minima_f.append(float(f))
-
-    if x_seed is not None and eval_count < maxfevals:
-        evaluate_and_store(to_unit(x_seed))
-
-    while len(X_unit) < n_init_eff and eval_count < maxfevals:
-        u = rng.uniform(0.0, 1.0, size=n_dim)
-        evaluate_and_store(u)
-
-    for _ in range(int(maxiter)):
-        if eval_count >= maxfevals or len(X_unit) == 0:
-            break
-
-        X_arr = np.asarray(X_unit, dtype=float)
-        y_arr = np.asarray(y, dtype=float)
+    def propose(iter_idx, X_arr, y_arr, rng, best_u, n_dim):
         try:
             model = _fit_bo_gp_model(
                 X=X_arr,
@@ -221,20 +159,21 @@ def _run_bo_single(
                     0.0,
                     1.0,
                 )
+        return u_next
 
-        evaluate_and_store(u_next)
-
-    if not run_minima_x and len(X_unit) > 0:
-        idx = int(np.argmin(y))
-        x_best = from_unit(np.asarray(X_unit[idx], dtype=float))
-        f_best = float(y[idx])
-        run_minima_x.append(np.array(x_best, dtype=float))
-        run_minima_f.append(float(f_best))
-    elif run_minima_x:
-        run_minima_x.append(np.array(run_minima_x[-1], dtype=float))
-        run_minima_f.append(float(run_minima_f[-1]))
-
-    return run_minima_x, run_minima_f
+    return run_surrogate_loop(
+        run,
+        func=func,
+        bounds=bounds,
+        x0_ls=x0_ls,
+        args=args,
+        maxiter=maxiter,
+        seed=seed,
+        maxfevals=maxfevals,
+        n_init=n_init,
+        propose=propose,
+        evaluate=_evaluate_scalar_objective,
+    )
 
 
 def _fit_bo_gp_model(

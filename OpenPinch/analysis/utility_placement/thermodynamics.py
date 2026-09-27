@@ -16,6 +16,7 @@ from OpenPinch.contracts.utility_placement import (
     ThermodynamicCostBreakdown,
     UtilityPlacementRequest,
 )
+from OpenPinch.domain.configuration import C_to_K
 
 from .allocation import AllocatedUtilityLevel, PlacementPeriodAllocation
 from .context import PlacementPeriodInput
@@ -134,15 +135,15 @@ def balanced_composite_entropy_generation(
         hot_terms.append(
             -_entropy_magnitude(
                 float(duty),
-                float(hot_first) + 273.15,
-                float(hot_second) + 273.15,
+                float(hot_first) + C_to_K,
+                float(hot_second) + C_to_K,
             )
         )
         cold_terms.append(
             _entropy_magnitude(
                 float(duty),
-                float(cold_first) + 273.15,
-                float(cold_second) + 273.15,
+                float(cold_first) + C_to_K,
+                float(cold_second) + C_to_K,
             )
         )
     hot_entropy = math.fsum(hot_terms)
