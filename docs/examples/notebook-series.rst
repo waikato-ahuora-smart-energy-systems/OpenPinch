@@ -76,18 +76,24 @@ Copy one notebook:
 Profiles
 --------
 
+Every notebook is executed by CI from a clean temporary directory. The
+profile decides which CI lane runs it:
+
 ``base``
-   Executes in routine CI from a clean temporary directory.
+   Runs in the routine unit lane.
 
 ``slow-hpr``
-   Requires the HPR model dependencies and a longer numerical run.
+   Requires the HPR model dependencies (``tespy`` extra) and a longer
+   numerical run; executed in the dedicated ``notebooks-hpr`` lane.
 
 ``solver``
-   Requires the HEN synthesis extras and an available solver.
+   Requires the HEN synthesis extras and an available solver; executed in the
+   solver job on changes bound for ``main``.
 
 ``interactive``
-   Includes explicit filesystem or dashboard side effects and is run only in a
-   guarded interactive environment.
+   Includes explicit filesystem or dashboard side effects. It runs in the unit
+   lane with the dashboard launch guarded while real plots and workbook
+   exports execute.
 
 The complete operation mapping and current profile policy are published in
 :doc:`tutorial-coverage-map`.

@@ -5,7 +5,6 @@ from __future__ import annotations
 import ast
 import csv
 import json
-import os
 import shutil
 from pathlib import Path
 
@@ -68,16 +67,6 @@ def _code_sources(notebook: dict) -> list[str]:
 
 def _combined_source(notebook: dict) -> str:
     return "\n".join(_code_sources(notebook))
-
-
-def _profile_notebook_names(profile: str) -> list[str]:
-    return sorted(
-        {
-            row["primary_tutorial"]
-            for row in _manifest_rows()
-            if row["execution_profile"] == profile
-        }
-    )
 
 
 def _execute_notebook(name: str, tmp_path: Path) -> None:
@@ -603,35 +592,48 @@ def test_manifest_operations_are_demonstrated_in_notebook_source(
             assert "workspace.cases(" in secondary_source
 
 
-@pytest.mark.parametrize(
-    "name",
-    _profile_notebook_names("base"),
-)
-def test_base_profile_notebook_executes(name: str, tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.chdir(tmp_path)
-    _execute_notebook(name, tmp_path)
+# Every packaged notebook executes in CI. Base and interactive notebooks run
+# in the unit lane; slow HPR notebooks run in their own `notebooks-hpr` lane
+# (`tespy and tutorial_profile`); HEN notebooks run in the main-bound solver job.
+_PROFILE_MARKS = {
+    "base": (),
+    "interactive": (),
+    "slow-hpr": (pytest.mark.tespy,),
+    "solver": (pytest.mark.solver,),
+}
 
 
-@pytest.mark.parametrize("name", _profile_notebook_names("slow-hpr"))
-def test_slow_hpr_notebook_executes(name: str, tmp_path: Path, monkeypatch) -> None:
-    enabled = set(filter(None, os.getenv("OPENPINCH_TUTORIAL_PROFILES", "").split(",")))
-    if "slow-hpr" not in enabled and "all" not in enabled:
-        pytest.skip("Set OPENPINCH_TUTORIAL_PROFILES=slow-hpr with the HPR extra.")
-
-    monkeypatch.chdir(tmp_path)
-    _execute_notebook(name, tmp_path)
-
-
-@pytest.mark.parametrize("profile", ["solver", "interactive"])
-def test_optional_profile_notebooks_execute(
-    profile: str, tmp_path: Path, monkeypatch
-) -> None:
-    enabled = set(filter(None, os.getenv("OPENPINCH_TUTORIAL_PROFILES", "").split(",")))
-    if profile not in enabled and "all" not in enabled:
-        pytest.skip(
-            f"Set OPENPINCH_TUTORIAL_PROFILES={profile} with its declared extras."
+def _notebook_execution_params() -> list:
+    profiles = {
+        row["primary_tutorial"]: row["execution_profile"] for row in _manifest_rows()
+    }
+    return [
+        pytest.param(
+            name,
+            profiles[name],
+            marks=(pytest.mark.tutorial_profile, *_PROFILE_MARKS[profiles[name]]),
+            id=name.removesuffix(".ipynb"),
         )
+        for name in EXPECTED_NOTEBOOKS
+    ]
 
+
+def test_every_notebook_has_one_execution_profile_with_ci_marks() -> None:
+    profiles: dict[str, set[str]] = {}
+    for row in _manifest_rows():
+        profiles.setdefault(row["primary_tutorial"], set()).add(
+            row["execution_profile"]
+        )
+    assert all(len(values) == 1 for values in profiles.values()), profiles
+    assert {value for values in profiles.values() for value in values} <= set(
+        _PROFILE_MARKS
+    )
+
+
+@pytest.mark.parametrize(("name", "profile"), _notebook_execution_params())
+def test_notebook_executes(
+    name: str, profile: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     if profile == "interactive":
         from OpenPinch import PinchProblem, PinchWorkspace
 
@@ -639,8 +641,7 @@ def test_optional_profile_notebooks_execute(
         monkeypatch.setattr(PinchWorkspace, "show_dashboard", lambda *_a, **_k: None)
 
     monkeypatch.chdir(tmp_path)
-    for name in _profile_notebook_names(profile):
-        _execute_notebook(name, tmp_path)
+    _execute_notebook(name, tmp_path)
 
 
 def test_packaged_resource_metadata_and_friendly_errors() -> None:
