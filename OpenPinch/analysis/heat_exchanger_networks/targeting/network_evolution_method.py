@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
-from time import perf_counter
 from typing import Sequence
 
 from ....contracts.synthesis.task import (
@@ -29,12 +27,8 @@ from ..execution.task_builders import (
     stage_count_from_network,
     topology_restrictions_from_network,
 )
-from ..results.assembly import SynthesisWorkflowResult, build_synthesis_result
-from .topology import (
-    canonical_stage_count,
-    canonical_topology_restrictions,
-    topology_restriction_signature,
-)
+from ..results.assembly import SynthesisWorkflowResult
+from ._stage import build_seeded_quality_tasks, run_single_method_workflow, run_stage
 
 
 def _execute_network_evolution_method_workflow(
@@ -45,24 +39,15 @@ def _execute_network_evolution_method_workflow(
     executor: SynthesisExecutor | None = None,
 ) -> SynthesisWorkflowResult:
     """Execute only the seeded evolution method and collect validated outputs."""
-    method_settings = replace(
+    return run_single_method_workflow(
         settings,
-        method_sequence=(HeatExchangerNetworkDesignMethod.NetworkEvolution,),
-        design_method=HeatExchangerNetworkDesignMethod.NetworkEvolution,
-    )
-    start = perf_counter()
-
-    tasks, outcomes = execute_seeded_network_evolution_method_stage(
-        problem=problem,
-        settings=method_settings,
-        seed_networks=seed_networks,
-        executor=executor,
-    )
-    return SynthesisWorkflowResult(
-        tasks=tasks,
-        outcomes=outcomes,
-        accepted_result=build_synthesis_result(method_settings, tasks, outcomes),
-        total_run_time=perf_counter() - start,
+        HeatExchangerNetworkDesignMethod.NetworkEvolution,
+        lambda method_settings: execute_seeded_network_evolution_method_stage(
+            problem=problem,
+            settings=method_settings,
+            seed_networks=seed_networks,
+            executor=executor,
+        ),
     )
 
 
@@ -75,17 +60,14 @@ def execute_network_evolution_method_stage(
     executor: SynthesisExecutor | None = None,
 ):
     """Build and execute one evolution stage from TDM parent outcomes."""
-    if executor is None:
-        executor = LocalSynthesisExecutor()
-
-    tasks = build_network_evolution_method_tasks(settings, tdm_outcomes)
-    outcomes = executor.execute(
-        tasks,
+    return run_stage(
+        build_network_evolution_method_tasks(settings, tdm_outcomes),
         problem=problem,
+        settings=settings,
+        executor=executor,
+        default_executor=LocalSynthesisExecutor,
         parent_outcomes=parent_outcomes,
-        max_parallel=settings.max_parallel,
     )
-    return tasks, outcomes
 
 
 def execute_seeded_network_evolution_method_stage(
@@ -96,17 +78,13 @@ def execute_seeded_network_evolution_method_stage(
     executor: SynthesisExecutor | None = None,
 ):
     """Build and execute one standalone seeded evolution stage."""
-    if executor is None:
-        executor = LocalSynthesisExecutor()
-
-    tasks = build_seeded_network_evolution_method_tasks(settings, seed_networks)
-    outcomes = executor.execute(
-        tasks,
+    return run_stage(
+        build_seeded_network_evolution_method_tasks(settings, seed_networks),
         problem=problem,
-        parent_outcomes={},
-        max_parallel=settings.max_parallel,
+        settings=settings,
+        executor=executor,
+        default_executor=LocalSynthesisExecutor,
     )
-    return tasks, outcomes
 
 
 def execute_network_evolution_method_from_pinch_design_stage(
@@ -118,20 +96,17 @@ def execute_network_evolution_method_from_pinch_design_stage(
     executor: SynthesisExecutor | None = None,
 ):
     """Build and execute evolution directly from successful PDM outcomes."""
-    if executor is None:
-        executor = LocalSynthesisExecutor()
-
-    tasks = build_network_evolution_method_tasks_from_pinch_design_method(
-        pdm_outcomes,
-        settings=settings,
-    )
-    outcomes = executor.execute(
-        tasks,
+    return run_stage(
+        build_network_evolution_method_tasks_from_pinch_design_method(
+            pdm_outcomes,
+            settings=settings,
+        ),
         problem=problem,
+        settings=settings,
+        executor=executor,
+        default_executor=LocalSynthesisExecutor,
         parent_outcomes=parent_outcomes,
-        max_parallel=settings.max_parallel,
     )
-    return tasks, outcomes
 
 
 def execute_direct_network_evolution_method_stage(
@@ -141,17 +116,13 @@ def execute_direct_network_evolution_method_stage(
     executor: SynthesisExecutor | None = None,
 ):
     """Build and execute evolution without PDM/TDM parent tasks."""
-    if executor is None:
-        executor = LocalSynthesisExecutor()
-
-    tasks = build_direct_network_evolution_method_tasks(settings)
-    outcomes = executor.execute(
-        tasks,
+    return run_stage(
+        build_direct_network_evolution_method_tasks(settings),
         problem=problem,
-        parent_outcomes={},
-        max_parallel=settings.max_parallel,
+        settings=settings,
+        executor=executor,
+        default_executor=LocalSynthesisExecutor,
     )
-    return tasks, outcomes
 
 
 def build_network_evolution_method_tasks(
@@ -380,36 +351,15 @@ def _build_seeded_quality_network_evolution_method_tasks(
     settings: SynthesisWorkflowSettings,
     seed_networks: Sequence[HeatExchangerNetwork],
 ) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:
-    tasks: list[HeatExchangerNetworkSynthesisTask] = []
-    seen: set[tuple[float, tuple[tuple[str, str, int], ...]]] = set()
-    for seed_index, network in enumerate(seed_networks):
-        restrictions = canonical_topology_restrictions(
-            topology_restrictions_from_network(
-                network,
-                downstream_method="network_evolution_method",
-            )
-        )
-        approach_temperature = approach_temperature_from_network(network, settings)
-        signature = topology_restriction_signature(restrictions)
-        key = (approach_temperature, signature)
-        if key in seen:
-            continue
-        seen.add(key)
-        tasks.append(
-            HeatExchangerNetworkSynthesisTask(
-                run_id=settings.run_id,
-                method="network_evolution_method",
-                approach_temperature=approach_temperature,
-                derivative_threshold=derivative_threshold_from_network(network),
-                stage_count=canonical_stage_count(restrictions),
-                problem_id=settings.problem_id,
-                workspace_variant=settings.workspace_variant,
-                period_id=settings.period_id,
-                seed_network_index=seed_index,
-                topology_restrictions=restrictions,
-            )
-        )
-    return tuple(tasks)
+    return build_seeded_quality_tasks(
+        settings,
+        seed_networks,
+        method="network_evolution_method",
+        derivative_thresholds=lambda network: (
+            derivative_threshold_from_network(network),
+        ),
+        distinct_thresholds=False,
+    )
 
 
 def build_direct_network_evolution_method_tasks(

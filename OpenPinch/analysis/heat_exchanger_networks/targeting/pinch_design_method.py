@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
-from time import perf_counter
-
 from ....contracts.synthesis.task import HeatExchangerNetworkSynthesisTask
 from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ..execution.executor import LocalSynthesisExecutor, SynthesisExecutor
@@ -14,7 +11,8 @@ from ..execution.pathways import (
     tier_pathways,
 )
 from ..execution.settings import SynthesisWorkflowSettings
-from ..results.assembly import SynthesisWorkflowResult, build_synthesis_result
+from ..results.assembly import SynthesisWorkflowResult
+from ._stage import run_single_method_workflow, run_stage
 
 _PDM_STAGE_PAIR_SWEEP = (
     (1, 2),
@@ -39,22 +37,14 @@ def _execute_pinch_design_method_workflow(
     executor: SynthesisExecutor | None = None,
 ) -> SynthesisWorkflowResult:
     """Execute only the PDM method and collect validated method outputs."""
-    method_settings = replace(
+    return run_single_method_workflow(
         settings,
-        method_sequence=(HeatExchangerNetworkDesignMethod.PinchDesign,),
-        design_method=HeatExchangerNetworkDesignMethod.PinchDesign,
-    )
-    start = perf_counter()
-    tasks, outcomes = execute_pinch_design_method_stage(
-        problem,
-        method_settings,
-        executor=executor,
-    )
-    return SynthesisWorkflowResult(
-        tasks=tasks,
-        outcomes=outcomes,
-        accepted_result=build_synthesis_result(method_settings, tasks, outcomes),
-        total_run_time=perf_counter() - start,
+        HeatExchangerNetworkDesignMethod.PinchDesign,
+        lambda method_settings: execute_pinch_design_method_stage(
+            problem,
+            method_settings,
+            executor=executor,
+        ),
     )
 
 
@@ -65,17 +55,13 @@ def execute_pinch_design_method_stage(
     executor: SynthesisExecutor | None = None,
 ):
     """Build and execute one pinch-design stage."""
-    if executor is None:
-        executor = LocalSynthesisExecutor()
-
-    tasks = build_pinch_design_method_tasks(settings, problem=problem)
-    outcomes = executor.execute(
-        tasks,
+    return run_stage(
+        build_pinch_design_method_tasks(settings, problem=problem),
         problem=problem,
-        parent_outcomes={},
-        max_parallel=settings.max_parallel,
+        settings=settings,
+        executor=executor,
+        default_executor=LocalSynthesisExecutor,
     )
-    return tasks, outcomes
 
 
 def build_pinch_design_method_tasks(
