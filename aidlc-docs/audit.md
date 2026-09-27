@@ -10179,3 +10179,186 @@ Notebook #10 fails to solve with the error:
 **Context**: An initial docs-only selection against test_docs_consistency.py selected no tests; corrected to test_docs_build.py and passed. PBT-01 through PBT-10 compliant through retained approved coverage plus generated rejection cases and finalization regressions; no shrinking disabled. Security and Resiliency extensions disabled and skipped. No push, merge, publication or remote review resolution performed.
 
 ---
+
+## Automatic Release Restoration - Investigation
+**Timestamp**: 2026-09-26T10:25:13Z
+**User Input**: "The PR tests passed but there was no auto release and pyipi"
+**AI Response**: "Confirmed PR 102 merged and CI Main passed. Publishing did not trigger because the approved overhaul selected manual initiation. Offered restoration of automatic publication versus retaining explicit releases."
+**Context**: Read-only GitHub and local workflow inspection; no publication attempted.
+
+---
+
+## Automatic Release Restoration - Requirements Clarification
+**Timestamp**: 2026-09-26T10:25:13Z
+**User Input**: "restore **automatic release and PyPI publishing after successful main validation**"
+**AI Response**: "Inspected the existing main validation and explicit publisher. Current version 0.6.10 already has a tag, so restoring a trigger alone would hit the duplicate-version guard. Recorded a targeted version-preparation question before implementing automatic source writes or deciding when publication should skip."
+**AI Prompt**: "Select version preparation in automatic-release-questions.md: publish reviewed versions automatically, automatically patch-bump every main merge, or specify another policy."
+**Context**: Resumed existing brownfield delivery workflow on clean develop. Existing architecture and delivery evidence reused; no new user stories. Requirements clarification gate pending. Property-Based Testing remains enabled; Security and Resiliency extensions remain disabled and skipped. Plain Markdown checked before creation. No workflow code, version, GitHub settings, package index or release state changed.
+
+---
+
+## Automatic Release Restoration - Requirements Complete
+**Timestamp**: 2026-09-26T10:27:15Z
+**User Input**: "A"
+**AI Response**: "Recorded option A: versions are prepared in reviewed commits; successful main validation automatically publishes new versions. Completed versions require verified completion before a no-op; partial or conflicting states require verified recovery. Finalized ten acceptance requirements while retaining immutable artifacts, full validation, bounded index verification, least privilege and manual recovery."
+**AI Prompt**: "Requirements Analysis Complete. Review automatic-release-requirements.md. Request Changes or Approve & Continue to Workflow Planning."
+**Context**: No additional version-policy ambiguity. Requirements approval is pending under the repository workflow. User stories remain skipped by user direction. PBT-01 through PBT-10 N/A to requirements-only artifacts; implementation obligations retained. Disabled Security and Resiliency extensions skipped. Plain Markdown validated; no code or external state changes.
+
+---
+
+## Automatic Release Restoration - Workflow Planning
+**Timestamp**: 2026-09-26T10:29:34Z
+**User Input**: "Approved"
+**AI Response**: "Recorded requirements approval and prepared the execution plan. Proposed reusing the exact main-validation bundle through the existing publishing workflow, verifying original completed releases before no-op decisions, blocking incomplete or conflicting state, and preventing parent cancellation of active publication. Retained manual recovery and all prior safeguards."
+**AI Prompt**: "Workflow Planning Complete. Review automatic-release-execution-plan.md. Approve & Continue to Code Generation planning, Request Changes, or Add Skipped Stages."
+**Context**: One existing delivery unit; reuse prior architecture and designs. Code Generation planning will specify the exact decision table, workflow interfaces and test obligations. PBT-01 through PBT-10 compliant as planning obligations, implementation evidence pending. Security and Resiliency disabled and skipped. Plain Markdown and text workflow representation checked before creation; no code, version or remote mutation performed.
+
+---
+
+## Automatic Release Restoration - Code Generation Planning
+**Timestamp**: 2026-09-26T10:31:49Z
+**User Input**: "Approved"
+**AI Response**: "Recorded workflow-plan approval and prepared eight implementation steps with exact script/test/workflow owners, state decisions, permissions, source-artifact verification and PBT obligations. Official PyPI documentation rules out the proposed reusable Trusted Publisher; amended the design to keep ci-publish.yml standalone with a guarded CI Main completion listener."
+**AI Prompt**: "Code-generation plan ready. Approve & Begin Code Generation, including the standalone listener compatibility amendment, or Request Changes."
+**Context**: Verified primary PyPI troubleshooting and GitHub event/artifact documentation. The listener must bind provenance to the triggering source run, not its own default-branch SHA; no source code from artifacts is executed. PBT-01 through PBT-10 covered in the plan, implementation pending. Security and Resiliency disabled and skipped. Markdown/table syntax checked before edits. No implementation, version change, commit, push, release dispatch or external mutation performed.
+
+---
+
+## Automatic Release Restoration - Approved Implementation
+**Timestamp**: 2026-09-26T10:41:27Z
+**User Input**: "Approved"
+**AI Response**: "Implemented the approved standalone completion listener, source-artifact planner and original-release completion checks. Baseline 86 tests passed; the first new test failed as expected before the planner existed. Extracted and reused source-proof verification, added strict event/API matching and no-mutation state classification, retained manual new/resume and both PR 102 corrections. Focused tests pass; full packaging and docs verification is running."
+**Context**: No version bump, commit, push, release dispatch or remote configuration change. Generated observation sequences test duplicate/idempotent checks and draft/partial/expired transitions against a completion oracle, with seed 20260926 and shrinking retained. Security and Resiliency remain disabled. Local source, workflow and documentation changes only.
+
+---
+
+## Automatic Release Restoration - Code Generation Complete
+**Timestamp**: 2026-09-26T10:45:56Z
+**AI Response**: "Completed the eight-step implementation. Final full packaging rerun: 314 passed, 6 expected skips in 72.02 seconds, including warning-strict Sphinx. Added 72 executable job-condition cases pass; workflow suite 102 passed in 1.28 seconds. Final planner/release suite 87 passed in 8.97 seconds. Ruff, formatting and actionlint with ShellCheck pass. All source/version/publication mutations remain local-only; no commit, push or release was performed."
+**AI Prompt**: "Code Generation Complete. Review the implementation summary. Request Changes or Continue to Next Stage for the formal Build and Test handoff."
+**Context**: Fixed the sole full-run failure, an RST heading underline, and renamed a reserved pytest parameter before final verification. PBT-01 through PBT-10 compliant with evidence in the implementation summary; disabled Security/Resiliency skipped. Existing publisher identity, manual recovery, 95-percent gate and numerical lanes preserved. Hosted workflow activation and OIDC remain unverified until deployment. Legacy 0.6.10 is intentionally blocked without original proof. The execution-plan directory is ignored by existing repository rules; flagged for any later authorized commit.
+
+---
+
+## Automatic Release Restoration - Build and Test
+**Timestamp**: 2026-09-26T11:26:13Z
+**User Input**: "Approved"
+**AI Response**: "Recorded Code Generation approval and updated reproducible build, unit, integration and performance instructions. Running the final combined packaging selection, including the 72 added job-condition cases, and repeating quality gates before completing the handoff."
+**Context**: Existing development environment reused; no dependency or version change. Numerical benchmarks remain unchanged and are not rerun for this delivery-only change. Hosted activation, trusted-publisher compatibility and real publication remain separate from local verification. No commit, push, merge, dispatch or remote settings mutation authorized by this stage approval.
+
+---
+
+## Automatic Release Restoration - Build and Test Complete
+**Timestamp**: 2026-09-26T11:28:45Z
+**AI Response**: "Final combined packaging suite passed: 386 tests, 6 expected skips in 84.71 seconds, including Sphinx and all added gate cases. Ruff, formatting, actionlint with ShellCheck, diff checks and version/lockfile consistency pass. Updated all five build/test instruction and summary files. Changes remain uncommitted and undeployed."
+**AI Prompt**: "Build and test instructions complete. Ready to proceed to Operations stage? Approve & Continue or Request Changes."
+**Context**: Operations is a placeholder, not deployment authorization. PBT-01 through PBT-10 compliant; disabled Security and Resiliency skipped. Version 0.6.10 unchanged; new reviewed version or separately authorized verified legacy recovery remains a deployment prerequisite. No package build/upload, live publishing, commit, push, merge or remote configuration changes performed in this stage.
+
+---
+
+## Automatic Release Restoration - Commit Handoff
+**Timestamp**: 2026-09-26T19:11:12Z
+**User Input**: "Commit"
+**AI Response**: "Inspected the working tree on develop and prepared a scoped local commit of the verified automatic-release implementation, tests and documentation, including the otherwise ignored execution plan. Prior combined verification: 386 passed, 6 expected skips. No unrelated changes identified."
+**Context**: Commit authorized. Operations placeholder closes without deployment. No push, merge, version bump, release dispatch or publisher configuration change is included. Existing extension decisions unchanged. Final patch/lint checks are repeated before staging.
+
+---
+
+## Automatic Version Bumps - Requirements Clarification
+**Timestamp**: 2026-09-26T19:15:31Z
+**User Input**: "Version bump should be automatic. "
+**AI Response**: "Recorded the changed policy and inspected the existing bump configuration. Automatic version preparation supersedes the earlier manual-version decision. The bumped commit must pass validation before publication; release retries must not allocate another version. Created one question to distinguish default patch increments from PR-label-driven major/minor selection."
+**AI Prompt**: "Select the bump rule in automatic-version-bump-questions.md: patch by default, PR-label driven, or another rule."
+**Context**: Existing committed implementation dc0bb5ac is preserved. Only planning records changed; no version bump, source automation change, commit, push or publication performed. PBT obligations retained; Security and Resiliency remain disabled. Plain Markdown validated before creation.
+
+---
+
+## Automatic Version Bumps - Requirements Complete
+**Timestamp**: 2026-09-26T19:16:29Z
+**User Input**: "A"
+**AI Response**: "Recorded patch-by-default selection. Finalized requirements for consistent committed version metadata, full validation of the bumped commit, exact-artifact publication, idempotent retries, concurrency/loop protection and preservation of explicit major/minor choices and branch protections."
+**AI Prompt**: "Requirements Analysis Complete. Review automatic-version-bump-requirements.md. Approve & Continue to Workflow Planning or Request Changes."
+**Context**: No implementation or live version bump performed. Source-write mechanism and any activation permissions must be resolved in planning. PBT-01 through PBT-10 N/A to requirements-only artifacts, downstream obligations retained. Security and Resiliency disabled and skipped. Plain Markdown checked before writing.
+
+---
+
+## Automatic Version Bumps - Workflow Planning
+**Timestamp**: 2026-09-26T19:18:25Z
+**User Input**: "Approve"
+**AI Response**: "Recorded requirements approval and prepared a protected-branch-compatible plan: automatically open a version-preparation PR, retain normal review/merge, validate the bumped main commit and publish its exact artifacts. Identified retry/race/loop safeguards and the current GitHub requirement to approve workflow runs on PRs created using GITHUB_TOKEN."
+**AI Prompt**: "Workflow Planning Complete. Review automatic-version-bump-execution-plan.md. Approve & Continue to Functional Design, Request Changes, or Add Skipped Stages. Plan approval includes the generated-PR review/merge path."
+**Context**: Consulted official GitHub workflow-trigger and branch-protection documentation. No credential or bypass assumption; repository PR-creation policy and optional unattended GitHub App activation remain explicit handoff boundaries. PBT planning obligations covered; implementation pending. Disabled Security/Resiliency skipped. Plain Markdown and text workflow representation validated. No code/version/remote mutation or new commit performed.
+
+---
+
+## Automatic Version Bumps - Review-First Flow Amendment
+**Timestamp**: 2026-09-26T19:25:04Z
+**User Input**: "**normal review → automatic patch-bump PR → merge → main validation (skip tests that already run in normal review) → automatic release publishing**."
+**AI Response**: "Revised requirements and plan to place normal review before version preparation and reuse verified unaffected test results on main. Inspected the existing exact-tree develop reuse helper and validation workflow; they require extension, not an unconditional skip. Fresh bumped-package build, metadata, installation and provenance checks remain required. Recorded the unresolved generated-PR target without assuming review transfer or automatic merge."
+**AI Prompt**: "Choose the generated bump PR target in automatic-version-bump-flow-questions.md: develop before the reviewed main PR merges, or a replacement release PR into main."
+**Context**: Planning-only amendment; no source implementation or remote writes. PBT-01 through PBT-10 are N/A to this plan-only revision; downstream obligations now include evidence-reuse invariants and stale-proof regressions. Security and Resiliency disabled and skipped. Plain Markdown validated before creation; no diagrams or embedded executable content. Final explanation: reuse proven unaffected tests, rerun affected or unproven tests, always verify newly built bumped artifacts. Await PR topology choice before finalizing plan.
+
+---
+
+## Automatic Version Bumps - Flow Recommendation
+**Timestamp**: 2026-09-26T19:27:13Z
+**User Input**: "Give a recommendataion"
+**AI Response**: "Recommended A: bump PR into develop, then merge the existing reviewed develop-to-main PR. This keeps version metadata synchronized and retains the reviewed PR. Reuse verified unaffected tests, always verify the rebuilt bumped package; two merges and potentially renewed approval are the trade-offs."
+**Context**: Retrospectively recorded preceding recommendation at the current logging time; no implementation or remote mutation.
+
+---
+
+## Automatic Version Bumps - Flow Choice Recorded
+**Timestamp**: 2026-09-26T19:27:13Z
+**User Input**: "A"
+**AI Response**: "Recorded develop as the bump-PR target and retained the existing develop-to-main PR. Updated requirements, execution plan and progress checkboxes. Plan retains verified review-test reuse, fresh bumped-package checks and existing branch protections."
+**AI Prompt**: "The revised execution plan is ready. Approve & Continue to Functional Design, request changes, or add skipped stages."
+**Context**: A answers the topology question, not the separate execution-plan approval. No code generation, commit, push or merge performed. PBT planning obligations retained; PBT-01 through PBT-10 implementation checks N/A to this documentation-only update. Security and Resiliency disabled and skipped. Plain Markdown validated before editing; patch whitespace check required.
+
+---
+
+## Automatic Version Bumps - Functional Design
+**Timestamp**: 2026-09-26T19:31:32Z
+**User Input**: "Approve"
+**AI Response**: "Approved execution plan recorded. Created functional design plan, business logic, business rules and domain entities for review-first develop-targeted preparation, lane-level evidence reuse, fresh package checks, protected manual merges and exact-artifact publication. Defined independent review-validation and merge-readiness gates to avoid preparation deadlock; bounded source/evidence verification, retry identity, stale-work rules, legacy policy compatibility and activation boundary."
+**AI Prompt**: "Functional Design Complete - automatic-version-bump. Review the functional design artifacts. Request Changes, or Continue to Next Stage to approve Functional Design and proceed to Code Generation planning."
+**Context**: Consulted current official GitHub event and reviewDecision references. PBT-01 compliant with component-specific properties; PBT-02 through PBT-10 implementation checks N/A at design stage, obligations documented. Security and Resiliency disabled and skipped. Plain Markdown and text sequence used; no complex diagrams or embedded code. Planning artifacts only, no source implementation, tests claimed, commits or external writes. Code Generation must audit version-sensitive test selection before allowing lane reuse.
+
+---
+
+## Automatic Version Bumps - Implementation Authorization and Execution
+**Timestamp**: 2026-09-26T19:53:07Z
+**User Input**: "Approve through code design and implementation. Then commit. "
+**AI Response**: "Accepted explicit approval through code planning, implementation, verification and local commit. Created the numbered code-generation plan and implemented reviewed develop-targeted version preparation, immutable retry identity, proof-backed test reuse, new package verification and independently verified publisher proof. Added concrete and property-based Git/API regressions and updated release/build documentation. No pushes, merges, remote settings or publication authorized or performed."
+**Context**: User's explicit through-stage approval supersedes intermediate pause points. PBT-01 through PBT-10 covered as mapped in implementation-summary.md; Security/Resiliency disabled and skipped. Refinements recorded: concrete original review proof instead of opaque reuse chains, fresh version-sensitive tests, merge-source field, and retained allocation with full validation after later changes. During verification fixed an RST heading and updated a stale documentation assertion. Investigated an existing I/O state-property timing-only failure (5.4 seconds initial, 0.55 seconds replay); removed its wall-clock deadline, retaining shrinking, bounded examples/sequences and outer job timeout. Final full-suite rerun pending; wheel/sdist build, metadata, Ruff and workflow lint pass. Commit remains pending successful final checks.
+
+---
+
+## Automatic Version Bumps - Build and Test Complete
+**Timestamp**: 2026-09-26T20:02:00Z
+**AI Response**: "Final complete packaging/docs suite passed: 424 passed, 6 expected skips in 126.90 seconds with seed 20260715. Ruff, formatting, actionlint/ShellCheck, metadata checks, wheel/sdist build and diff checks pass. Source changes remain limited to delivery automation; no numerical code or package version change. Ready for authorized local commit."
+**Context**: Read-only public GitHub checks confirmed job names and artifact identity and revealed empty historical PR associations; hardened proof and added regression. Added rebase-merge baseline regression using push.before and corrected the fake GitHub tree fixture to restore its temporary Git index. Latest final suite contains all fixes. PBT-01 through PBT-10 compliant; disabled Security/Resiliency skipped. Build/test instructions updated. Operations is an unexecuted deployment placeholder, not a reason to pause the user's explicit commit request. No remote writes performed.
+
+---
+
+## Automatic Version Bumps - Local Commit Complete
+**Timestamp**: 2026-09-26T20:02:04Z
+**AI Response**: "Created the authorized local develop commit for automatic reviewed patch preparation and verified CI reuse. Marked the final plan/state checkboxes complete and folded this completion record into the same new commit. No push, remote merge, settings change or publication performed."
+**Context**: Final verification: 424 passed, 6 expected skips; build/docs/lint checks pass. Hosted activation remains outstanding and separately authorized. The repository version remains 0.6.10.
+
+---
+
+## PR 103 Review Correction
+**Timestamp**: 2026-09-26T22:15:58Z
+**User Input**: "Go."
+**AI Response**: "Proceeding with the accepted P2 correction and regression checks. Retaining GITHUB_TOKEN for P1 based on current official GitHub documentation: bot PR opened/synchronize/reopened events create approval-required runs. Hosted activation remains unverified."
+**Context**: Continuation of approved delivery implementation, not a new development workflow. Bounded plan steps 9-11 cover explicit metadata-only marker, conservative evidence selection and example/property tests. No commit, push, merge, credentials or settings changes. PBT-01/03/05/07/08/09/10 applicable; PBT-02/04/06 N/A to read-only selection. Disabled Security and Resiliency skipped. Markdown validated; no diagrams introduced.
+
+---
+
+## PR 103 Correction Verification Complete
+**Timestamp**: 2026-09-26T22:19:00Z
+**AI Response**: "Fixed metadata-only review evidence selection locally with ten new test cases. Complete packaging suite: 434 passed, 6 expected skips in 142.13 seconds, seed 20260715. Ruff, formatting, actionlint and diff checks pass. Posted P1 clarification and P2 local status in PR 103 comment 5850389548; left threads unresolved. No commit or push."
+**Context**: Plan steps 9-11 complete. PBT compliance recorded in implementation summary; disabled extensions skipped. Existing build/test commands retained. No runtime/performance requirement or new package build surface. Hosted activation remains separate.
+
+---

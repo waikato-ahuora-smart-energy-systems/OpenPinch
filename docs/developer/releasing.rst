@@ -1,25 +1,95 @@
-Explicit Releases and Recovery
-==============================
+Automatic Releases and Recovery
+===============================
 
 Ordinary merges and release preparation
 ---------------------------------------------
 
 Develop and main pushes, and ready pull requests, run shared validation.
-Neither a normal main merge nor a PR label/title changes the package version
-or publishes distributions. Prepare a version increase in a normal branch,
-update ``pyproject.toml``, ``.bumpversion.toml``, and ``uv.lock`` together, and
-review the diff before committing. Existing bump-my-version configuration may
-be used with ``--no-tag``; the release workflow owns annotated tags.
+Normal review and tests run first on the existing ``develop`` to ``main`` PR.
+Once the current review is approved and its complete validation lanes pass,
+**Prepare Release** opens a version-only PR into ``develop``. The default is
+one patch increment; a reviewed explicit major/minor increase is preserved.
+The coordinator updates ``pyproject.toml``, ``.bumpversion.toml`` and ``uv.lock``
+and records the reviewed source/evidence identity. It never approves or merges.
 
-Run ``uv lock`` and ``uv run --no-sync python scripts/check_lockfile_version.py``
-after preparing the version. Merge only after the complete PR gate and existing
-review requirements pass. Source code changes are never made by PR validation.
+Merge the bump PR into develop, then merge the original updated PR into main.
+Renew review approval if branch protections require it. The complete main-PR
+gate deliberately waits for version preparation; this does not prevent the
+coordinator from recognizing successful review tests. PR validation remains
+read-only; source writes occur only in the trusted main-context coordinator.
 
-New release
------------
+Main reuses independently verified review evidence for unaffected expensive
+lanes and general tests. Packaging/version-sensitive tests, documentation,
+dependency-surface checks, builds and distribution-install matrices run fresh.
+Coverage remains enforced by the original full review run. Missing, expired,
+failed or incompatible evidence causes normal validation instead of unchecked
+skips. Workflow/policy changes cannot reuse evidence across the policy change.
+The publisher independently rechecks the evidence and the exact new artifacts.
+
+Activation and blocked preparation
+----------------------------------------
+
+Install the coordinator and validation changes together through normal review.
+Only a base predating the coordinator qualifies for the one-time bootstrap
+exception; there is no label or input that bypasses preparation afterward.
+No release is automatically repaired during bootstrap (including legacy 0.6.10).
+Repository policy must permit Actions to create PRs. GitHub may require a
+maintainer to approve bot-created PR workflow runs. Current aggregate review
+state must be ``APPROVED``; configure required reviews through separately
+authorized repository settings if it is unavailable. No personal token, GitHub
+App credential or protection bypass is installed by this implementation.
+
+The trusted coordinator reconciles after review notifications and PR validation,
+regardless of which finishes first. Manual **Prepare Release** reconciliation
+performs the same checks. Duplicate events reuse the existing branch/PR; an
+interrupted PR-create step can resume from its existing branch. A closed or
+conflicting preparation requires maintainer intervention. New changes before
+the bump merges invalidate that bump PR: close the stale PR, then reconcile
+the newly reviewed candidate. Never force-push over conflicting branch content.
+If changes arrive after the bump merges, retain its unpublished version and
+rerun normal validation when exact review equivalence no longer holds.
+
+Completed title/body-only edits are excluded from review-evidence selection
+only when the explicit metadata marker and planning job succeeded in the current
+run attempt, with no executed validation lanes. Newer failed, cancelled,
+incomplete or unclassified validation runs still block older evidence. Historical
+metadata runs without the marker require a fresh candidate validation. This
+does not make metadata-only events satisfy the merge gate.
+
+Preparation currently requires concrete full review-lane evidence, so the
+older develop-to-main aggregate-only optimization is disabled for this path.
+After preparation, verified reuse applies to updated PR, develop and main runs.
+
+Automatic new release
+---------------------
+
+After ``CI Main`` completes successfully, ``ci-publish.yml`` (Release and
+Publish) starts as a separate workflow. It verifies the source repository,
+main push, workflow path, commit, full validation evidence and original build
+artifact. It promotes those exact tested bytes without rebuilding or running
+validation again. The listener's checkout supplies trusted automation code;
+the original source run, not the listener's default-branch SHA, identifies the
+release candidate.
+
+A failed or cancelled main run cannot publish. Existing completed versions
+are verified against their original manifest, retained build artifact, tag,
+GitHub assets and both package indexes before a successful no-op is reported.
+A later same-version commit is not a new release and its newly built files
+are not substituted for the original release. Drafts, partial publication,
+prereleases, conflicts or missing/expired proof block automatic publication
+with recovery guidance. A tag alone does not establish completion.
+
+Because this completion proof requires the original CI artifact, automatic
+no-op verification also stops after that artifact expires. Prepare a reviewed
+new version or investigate the original evidence; do not bypass the proof.
+Legacy 0.6.10 artifacts predate this contract and require the separate recovery
+procedure below. Restoring automation does not repair that release implicitly.
+
+Manual new release
+------------------
 
 After publisher/environment compatibility has been verified, a maintainer
-deliberately runs ``ci-publish.yml`` (Explicit Release) on ``main`` with:
+may also run ``ci-publish.yml`` (Release and Publish) on ``main`` with:
 
 * ``mode``: ``new``
 * ``version``: the exact committed ``X.Y.Z`` version
@@ -70,7 +140,8 @@ of an expired artifact's trusted provenance. This implementation stops if the
 original immutable artifact/evidence cannot be verified. Preserve the source
 run and bundle before expiry; do not rebuild under the same version as fallback.
 
-Publishing is serialized across the repository. Active publication is not
+Automatic and manual publishing are serialized across the repository in the
+same non-cancelling workflow lock. Active publication is not
 cancelled by a newer request. Pending requests are not a guaranteed FIFO queue;
 resubmit a cancelled pending request explicitly if still required.
 

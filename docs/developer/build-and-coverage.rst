@@ -37,8 +37,11 @@ provide core-runtime and wheel-install compatibility coverage.
 Release Process
 ---------------
 
-Normal merges to ``main`` validate without publishing or changing versions.
-PR validation is read-only. Explicit release preparation, publication, and
+After normal review, a trusted coordinator opens a patch-bump PR into develop.
+Merge that PR before the reviewed develop-to-main PR. Main reuses verified
+unaffected review tests, runs fresh package checks and automatically publishes
+after validation succeeds. PR validation remains read-only; only the coordinator
+creates the version branch/PR. Version preparation, completed-version no-ops and
 same-artifact recovery are described in :doc:`releasing`.
 
 The shared validator owns ordinary branch coverage, docs, TESPy, performance,

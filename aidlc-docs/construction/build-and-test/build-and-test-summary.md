@@ -1,5 +1,60 @@
 # Build and Test Summary
 
+## Automatic Version Preparation - 2026-09-26
+
+- Final complete packaging/docs suite: 424 passed, 6 expected skips in
+  126.90 seconds, Hypothesis seed 20260715. Includes real temporary Git/fake API
+  preparation, stateful retry/interruption/closure, evidence oracles, publisher
+  reuse verification, empty GitHub PR association and rebase-merge baseline cases.
+- Repository-wide Ruff, changed-file formatting, actionlint with ShellCheck,
+  version/lock consistency and patch whitespace checks pass.
+- Wheel and sdist build successfully in a fresh temporary directory. Project
+  version remains 0.6.10. No upload or legacy release repair performed.
+- Fixed documentation heading/assertion regressions. Investigated and removed
+  a filesystem-state property's timing-only deadline; bounded example/sequence
+  counts, shrinking, fixed seed and CI job timeout remain enforced.
+- Read-only GitHub inspection of public run 36232834130 verified real job names
+  and artifact provenance fields and exposed empty pull_requests metadata.
+  Added regression and independent merge-parent proof for that case.
+- PBT-01 through PBT-10 compliant as mapped in the implementation summary.
+  Security/Resiliency extensions disabled. No application/numerical changes.
+- Local implementation verified. Hosted triggers, PR-creation permissions,
+  bot-run approval and real publication remain activation checks, not claimed
+  local successes. Commit authorized; no push, merge or deployment requested.
+
+## Automatic Release Restoration - 2026-09-26
+
+- Final combined packaging selection: 386 passed, 6 expected skips in
+  84.71 seconds with Hypothesis seed 20260926. Includes all 72 job-condition
+  combinations and the warning-strict Sphinx build in one invocation.
+- Ruff, changed-file formatting, actionlint 1.7.12 with ShellCheck 0.11.0,
+  and `git diff --check` pass. Project/lockfile version consistency passes.
+- Project version remains 0.6.10. No build tool, dependency, application
+  code, numerical budget, validation lane or coverage threshold changed.
+  No new release distribution was built or uploaded for this delivery-only
+  handoff. Historical distribution/coverage evidence below is not a fresh run.
+- Updated build, unit, integration and performance instructions document
+  reproducible local checks and the separately authorized hosted activation.
+- PBT-01 through PBT-10 compliant; evidence and case descriptions are in
+  `../automatic-release/code/implementation-summary.md`. Shrinking retained.
+  Security and Resiliency extensions disabled and skipped.
+- Local Build and Test complete. Changes remain uncommitted and undeployed.
+  Hosted event delivery, publisher/environment compatibility and actual
+  publication have not been verified by this local suite.
+- Next deployment prerequisite: reviewed merge of the automation, then a
+  reviewed new version or separately authorized legacy recovery. The existing
+  0.6.10 release is not overwritten or silently adopted.
+
+### Stage review
+
+A) Approve & Continue to the Operations placeholder (no deployment implied).
+
+B) Request Changes to the Build and Test handoff.
+
+X) Other (describe the requested direction).
+
+[Answer]:
+
 ## Delivery Workflow Overhaul - 2026-09-26
 
 - Complete ordinary lane: 3451 passed, 6 expected skips, 65 deselected in

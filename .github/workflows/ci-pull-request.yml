@@ -5,10 +5,19 @@ on:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, edited]
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: pr-${{ github.event.pull_request.number }}-${{ github.event.action == 'edited' && !github.event.changes.base && 'metadata' || 'candidate' }}
   cancel-in-progress: true
 jobs:
+  review-metadata-only:
+    if: ${{ github.event.action == 'edited' && !github.event.changes.base && !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - run: echo "Metadata-only event; not new review validation evidence."
+
   plan:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -23,7 +32,7 @@ jobs:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
           ref: ${{ github.sha }}
-          fetch-depth: 2
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
@@ -43,7 +52,9 @@ jobs:
     with:
       candidate: ${{ github.sha }}
       profile: ${{ needs.plan.outputs.profile }}
-      reuse-integration: ${{ needs.plan.outputs.reuse == 'true' }}
+      # Concrete review evidence is required for subsequent version-only reuse.
+      # Do not replace these lanes with an opaque earlier aggregate success.
+      reuse-integration: false
 
   pr-gate:
     name: OpenPinch PR Gate
@@ -51,8 +62,19 @@ jobs:
     needs: [plan, validation]
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions: {}
+    permissions:
+      contents: read
     steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.14.2"
+      - name: Require version preparation before main merge
+        run: python -m scripts.release_preparation gate
       - name: Require complete validation
         env:
           PLAN_RESULT: ${{ needs.plan.result }}

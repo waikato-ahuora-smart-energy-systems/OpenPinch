@@ -1,6 +1,32 @@
 # Build Instructions - Delivery Workflow
 
+## Automatic version preparation
+
+Use Python 3.14.2 and the existing locked dev environment. Check metadata with
+`python scripts/check_release_version.py` and
+`python scripts/check_lockfile_version.py`. Build with
+`python scripts/build_dist.py --output-dir <new-empty-temporary-directory>`;
+do not overwrite recovery distributions or upload this local verification build.
+Run Ruff on changed Python files and actionlint with ShellCheck on workflows.
+No application dependency or project version bump is part of this implementation.
+
 ## Delivery-specific validation
+
+For automatic-release restoration, application code and dependencies are
+unchanged. Reproduce local verification with the commands below; no release
+dispatch or local artifact upload is part of this test procedure.
+
+```bash
+uv run --no-sync ruff check scripts/plan_release.py scripts/release_manifest.py tests/packaging/test_plan_release.py tests/packaging/test_delivery_workflows.py tests/packaging/test_docs_consistency.py
+uv run --no-sync ruff format --check scripts/plan_release.py scripts/release_manifest.py tests/packaging/test_plan_release.py tests/packaging/test_delivery_workflows.py tests/packaging/test_docs_consistency.py
+actionlint
+git diff --check
+```
+
+Use actionlint 1.7.12 with ShellCheck installed. The automatic publisher is a
+standalone completion listener, not a reusable trusted-publisher workflow.
+Keep `ci-publish.yml` and the protected `pypi` environment unchanged in publisher
+configuration. A successful local build is not authorization to publish.
 
 The shared workflow is `.github/workflows/ci-validation.yml`; callers select
 integration or full profiles from `scripts/ci_policy.py`. Run pinned

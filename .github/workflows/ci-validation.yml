@@ -18,10 +18,29 @@ on:
         value: ${{ jobs.artifact-build.outputs.artifact_digest }}
 permissions:
   contents: read
+  actions: read
 env:
   PYTHON_VERSION: "3.14.2"
   UV_VERSION: "0.11.29"
 jobs:
+  review-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      reuse: ${{ steps.proof.outputs.reuse-review }}
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          ref: ${{ inputs.candidate }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.14.2"
+      - id: proof
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -m scripts.review_evidence
   policy:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -39,6 +58,7 @@ jobs:
       - id: matrix
         run: python -m scripts.ci_policy matrix >> "$GITHUB_OUTPUT"
   test:
+    needs: review-proof
     if: ${{ !inputs.reuse-integration }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -57,8 +77,13 @@ jobs:
       - run: uv sync --frozen --group dev
       - run: uv run --no-sync python scripts/check_lockfile_version.py
       - run: uv run --no-sync ruff check .
-      - run: uv run --no-sync coverage run --branch --source=OpenPinch -m pytest --hypothesis-seed=20260715 -m "$(uv run --no-sync python -m scripts.ci_policy selector --lane test)" --junitxml=reports/test.xml --durations=20
-      - run: uv run --no-sync coverage report --fail-under=95
+      - if: ${{ needs.review-proof.outputs.reuse != 'true' }}
+        run: uv run --no-sync coverage run --branch --source=OpenPinch -m pytest --hypothesis-seed=20260715 -m "$(uv run --no-sync python -m scripts.ci_policy selector --lane test)" --junitxml=reports/test.xml --durations=20
+      - if: ${{ needs.review-proof.outputs.reuse != 'true' }}
+        run: uv run --no-sync coverage report --fail-under=95
+      - name: Fresh version-sensitive regressions (other tests reuse review proof)
+        if: ${{ needs.review-proof.outputs.reuse == 'true' }}
+        run: uv run --no-sync pytest tests/packaging tests/contracts/test_hpr_performance_map_properties.py tests/analysis/heat_exchanger_networks/test_design_workflow.py --hypothesis-seed=20260715 -m "not docs" --junitxml=reports/test.xml --durations=20
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: ${{ always() }}
@@ -129,7 +154,8 @@ jobs:
       - run: uv run --no-sync python scripts/optional_install_smoke.py ${{ matrix.surface }}
 
   hpr-tespy-tests:
-    if: ${{ !inputs.reuse-integration }}
+    needs: review-proof
+    if: ${{ !inputs.reuse-integration && needs.review-proof.outputs.reuse != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -157,7 +183,8 @@ jobs:
           if-no-files-found: warn
 
   performance-tests:
-    if: ${{ !inputs.reuse-integration }}
+    needs: review-proof
+    if: ${{ !inputs.reuse-integration && needs.review-proof.outputs.reuse != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -185,8 +212,11 @@ jobs:
           if-no-files-found: warn
 
   artifact-build:
-    if: ${{ !inputs.reuse-integration }}
-    needs: [hpr-tespy-tests, performance-tests]
+    if: ${{ !cancelled() && !inputs.reuse-integration && needs.review-proof.result == 'success' && ((needs.hpr-tespy-tests.result == 'success' && needs.performance-tests.result == 'success') || (needs.review-proof.outputs.reuse == 'true' && needs.hpr-tespy-tests.result == 'skipped' && needs.performance-tests.result == 'skipped')) }}
+    needs: [review-proof, hpr-tespy-tests, performance-tests]
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REUSE_REVIEW: ${{ needs.review-proof.outputs.reuse }}
     outputs:
       artifact_id: ${{ steps.distribution.outputs.artifact-id }}
       artifact_digest: ${{ format('sha256:{0}', steps.distribution.outputs.artifact-digest) }}
@@ -197,6 +227,7 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ inputs.candidate }}
+          fetch-depth: 0
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -217,7 +248,7 @@ jobs:
           retention-days: 30
 
   artifact-install-smoke:
-    if: ${{ !inputs.reuse-integration }}
+    if: ${{ !cancelled() && !inputs.reuse-integration && needs.artifact-build.result == 'success' }}
     needs: [artifact-build, policy]
     timeout-minutes: 20
     strategy:
@@ -247,7 +278,7 @@ jobs:
       - run: uv run --no-sync python scripts/artifact_install_smoke.py --surface core
 
   artifact-install-tespy-smoke:
-    if: ${{ !inputs.reuse-integration }}
+    if: ${{ !cancelled() && !inputs.reuse-integration && needs.artifact-build.result == 'success' }}
     needs: artifact-build
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -272,7 +303,8 @@ jobs:
       - run: uv pip install --python .venv --no-deps --reinstall --no-index --find-links dist OpenPinch
       - run: uv run --no-sync python scripts/artifact_install_smoke.py --surface tespy
   solver-tests:
-    if: ${{ inputs.profile == 'full' }}
+    needs: review-proof
+    if: ${{ inputs.profile == 'full' && needs.review-proof.outputs.reuse != 'true' }}
     runs-on: ubuntu-22.04
     timeout-minutes: 120
     steps:
@@ -312,7 +344,8 @@ jobs:
           if-no-files-found: warn
 
   workflow-lint:
-    if: ${{ !inputs.reuse-integration }}
+    needs: review-proof
+    if: ${{ !inputs.reuse-integration && needs.review-proof.outputs.reuse != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -331,9 +364,9 @@ jobs:
           "$RUNNER_TEMP/actionlint" -color
 
   gate:
-    name: delivery-v1
+    name: ${{ needs.review-proof.outputs.reuse == 'true' && 'delivery-v2' || 'delivery-v1' }}
     if: ${{ always() }}
-    needs: [test, docs, optional-install-smoke, hpr-tespy-tests, performance-tests, artifact-build, artifact-install-smoke, artifact-install-tespy-smoke, solver-tests, workflow-lint]
+    needs: [review-proof, test, docs, optional-install-smoke, hpr-tespy-tests, performance-tests, artifact-build, artifact-install-smoke, artifact-install-tespy-smoke, solver-tests, workflow-lint]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -341,6 +374,7 @@ jobs:
         with:
           ref: ${{ inputs.candidate }}
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: "3.14.2"
@@ -349,6 +383,11 @@ jobs:
           LANE_RESULTS: ${{ toJSON(needs) }}
           PROFILE: ${{ inputs.profile }}
           REUSE_INTEGRATION: ${{ inputs.reuse-integration }}
+          REUSE_REVIEW: ${{ needs.review-proof.outputs.reuse }}
+          GH_TOKEN: ${{ github.token }}
         run: python -m scripts.ci_policy gate --profile "$PROFILE"
       - name: Identify evaluated source
         run: git rev-parse HEAD 'HEAD^{tree}' >> "$GITHUB_STEP_SUMMARY"
+      - name: Require prepared main source
+        if: ${{ github.ref == 'refs/heads/main' }}
+        run: python -m scripts.release_preparation gate

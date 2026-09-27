@@ -1,6 +1,49 @@
 # Integration Test Instructions - Delivery Workflow
 
+## Version-preparation integration
+
+The packaging suite uses temporary real Git objects and fake GitHub boundaries
+to exercise create, duplicate reconcile, partial PR-create recovery, closed PR
+and unrelated-source rejection. Review proof tests verify job/run/artifact/merge
+identity and publisher behavior for successful reuse versus failed required jobs.
+No remote source or package index is mutated by these tests.
+
+Hosted activation is separate: verify Actions PR creation policy, current review
+decision availability, bot PR-run approval, required complete gate, normal
+two-merge path and trusted-publisher configuration. Install workflows together;
+record the one-time bootstrap boundary and do not weaken branch protections.
+
 ## Delivery orchestration
+
+### Automatic-release acceptance scenarios
+
+- A successful same-repository main push uses its original validated bundle.
+- Failed/cancelled/unrelated events do not publish; invalid successful-run
+  evidence fails closed rather than being interpreted as absence.
+- A later same-version commit verifies the original release bytes before no-op.
+- Drafts, prereleases, partial indexes, expired/ambiguous evidence, tag-only
+  state and conflicting bytes stop with verified-recovery guidance.
+- Manual new/resume paths retain their original build and verification rules.
+- The bundle's actual boolean condition is exercised across 72 combinations
+  of mode, decision, request result and validation result.
+
+Run these scenarios with fake GitHub/index boundaries through
+`test_plan_release.py`, `test_release_manifest.py` and
+`test_delivery_workflows.py`, using seed `20260926`. No remote writes occur.
+
+### Hosted activation handoff (not performed locally)
+
+After an authorized commit/PR and reviewed merge, verify that `Release and
+Publish` starts from successful `CI Main` completion on the default branch.
+Check that the reported source run, commit and artifact match the validated
+candidate, and that TestPyPI verification precedes PyPI and GitHub finalization.
+Inspect trusted-publisher/environment compatibility without weakening existing
+protections. A real upload is irreversible and is not a diagnostic test.
+
+The committed version is still 0.6.10. Its existing legacy tag/release is not
+automatically adopted or repaired. Prepare a reviewed new version consistently
+in project metadata, bump configuration and lockfile, or separately authorize
+verified legacy recovery. Do not overwrite a distribution or move a tag.
 
 Run `tests/packaging/test_delivery_workflows.py` and
 `tests/packaging/test_release_manifest.py` with seed `20260715`. Required

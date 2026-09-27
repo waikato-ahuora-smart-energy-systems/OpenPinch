@@ -4,6 +4,7 @@ on:
     branches: ["develop"]
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: develop-${{ github.ref }}
   cancel-in-progress: true
