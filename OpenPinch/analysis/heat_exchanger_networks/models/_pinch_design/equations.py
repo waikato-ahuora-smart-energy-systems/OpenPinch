@@ -286,3 +286,8 @@ def set_obj(owner) -> None:
                 ]
             )
         )
+    else:
+        raise ValueError(
+            "Unsupported pinch-decomposition minimisation goal: "
+            f"{owner.minimisation_goal!r}."
+        )

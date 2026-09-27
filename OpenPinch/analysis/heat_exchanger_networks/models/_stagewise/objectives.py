@@ -86,11 +86,13 @@ def set_obj(owner) -> None:
             )
         elif owner.minimisation_goal in {"total cost", "variable total cost"}:
             owner._set_total_cost_objective()
+        else:
+            _raise_unsupported_goal(owner)
         return
 
     if owner.minimisation_goal == "hot utility":
         owner.m.Minimize(owner.m.sum([owner.Q_h[j] for j in range(owner.J)]))
-    if owner.minimisation_goal == "cold utility":
+    elif owner.minimisation_goal == "cold utility":
         owner.m.Minimize(owner.m.sum([owner.Q_c[i] for i in range(owner.I)]))
     elif owner.minimisation_goal == "total utility":
         owner.m.Minimize(
@@ -126,6 +128,14 @@ def set_obj(owner) -> None:
         owner.m.Minimize(sum(owner.Q_h) - owner.HU_target)
     elif owner.minimisation_goal in {"total cost", "variable total cost"}:
         owner._set_total_cost_objective()
+    else:
+        _raise_unsupported_goal(owner)
+
+
+def _raise_unsupported_goal(owner) -> None:
+    raise ValueError(
+        f"Unsupported StageWise minimisation goal: {owner.minimisation_goal!r}."
+    )
 
 
 def _set_total_cost_objective(owner) -> None:

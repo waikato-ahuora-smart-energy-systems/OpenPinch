@@ -519,6 +519,19 @@ def test_stagewise_single_state_objective_selection(goal, expected, method):
     assert recorded == [pytest.approx(expected)]
 
 
+@pytest.mark.parametrize(
+    "case_builder", [_single_state_objective_case, _multi_state_objective_case]
+)
+def test_stagewise_set_obj_rejects_unsupported_goal(case_builder):
+    model = case_builder("min units")
+
+    with pytest.raises(ValueError, match="Unsupported StageWise minimisation goal"):
+        model.set_obj()
+
+    assert model.m.minimised == []
+    assert model.m.maximised == []
+
+
 def test_stagewise_single_state_total_cost_objective_records_minimisation():
     model = _single_state_objective_case("total cost")
 
