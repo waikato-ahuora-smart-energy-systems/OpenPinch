@@ -136,7 +136,12 @@ scripts/ci_local.sh          # lint, unit tests with 95% coverage, docs, build +
 scripts/ci_local.sh quick    # lint + unit tests, stop at the first failure
 scripts/ci_local.sh all      # every lane, including TESPy, performance, solver and notebooks
 scripts/ci_local.sh solver   # any lane by name: lint unit docs tespy performance solver notebooks build
+scripts/ci_local.sh --linux notebooks  # run inside a Linux x86_64 container, like the CI runners (needs Docker)
 ```
+
+CI runs on Linux x86_64. Numerical searches (for example the heat pump notebooks) can
+behave slightly differently on macOS arm64, so use `--linux` to reproduce a CI-only failure;
+on Apple silicon it runs under emulation and is slower.
 
 It syncs the locked environment with `uv` first and prints a pass/fail summary per lane.
 The solver lane downloads the IDAES solver binaries on first use.

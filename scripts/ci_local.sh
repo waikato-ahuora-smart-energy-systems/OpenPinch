@@ -5,11 +5,28 @@
 #   scripts/ci_local.sh quick        # lint + unit tests, no coverage, stop at first failure
 #   scripts/ci_local.sh all          # every lane, including tespy, notebooks, performance, solver
 #   scripts/ci_local.sh unit solver  # any lanes by name
+#   scripts/ci_local.sh --linux all  # same, inside a Linux container like CI (needs Docker)
 #
 # Lanes: lint unit docs tespy performance solver notebooks build
 # Needs uv. The solver lane downloads the IDAES solver binaries on first use.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+# --linux: rerun this script inside a Linux container, matching the CI runners.
+# Numerical results can differ slightly between macOS (arm64) and Linux (x86_64).
+if [ "${1:-}" = "--linux" ]; then
+  shift
+  command -v docker > /dev/null || { echo "--linux needs Docker (e.g. Docker Desktop or colima)" >&2; exit 2; }
+  exec docker run --rm --platform linux/amd64 \
+    -v "$PWD":/src -w /src \
+    -v openpinch-ci-uv-cache:/root/.cache/uv \
+    -v openpinch-ci-idaes:/root/.idaes \
+    -e UV_PROJECT_ENVIRONMENT=/opt/venv -e SMOKE_ENV=/opt/venv-smoke \
+    -e UV_LINK_MODE=copy -e SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)" \
+    ghcr.io/astral-sh/uv:0.11.29-bookworm-slim \
+    bash scripts/ci_local.sh ${1+"$@"}
+fi
+SMOKE_ENV=${SMOKE_ENV:-.venv-smoke}
 
 SEED=20260715
 UNIT_MARKERS="not solver and not tespy and not performance and not docs"
@@ -60,11 +77,11 @@ lane_build() {
   # Build once, then install the wheel (not the checkout) into a separate
   # environment and smoke-test the core surface, as the CI smoke job does.
   rm -rf dist
-  SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)" uv build --out-dir dist
-  UV_PROJECT_ENVIRONMENT=.venv-smoke uv sync --frozen --no-default-groups --no-install-project
-  uv pip install --python .venv-smoke --no-deps --reinstall dist/*.whl
-  .venv-smoke/bin/python scripts/optional_install_smoke.py core
-  .venv-smoke/bin/python scripts/artifact_install_smoke.py --surface core
+  SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git log -1 --format=%ct)}" uv build --out-dir dist
+  UV_PROJECT_ENVIRONMENT="$SMOKE_ENV" uv sync --frozen --no-default-groups --no-install-project
+  uv pip install --python "$SMOKE_ENV" --no-deps --reinstall dist/*.whl
+  "$SMOKE_ENV/bin/python" scripts/optional_install_smoke.py core
+  "$SMOKE_ENV/bin/python" scripts/artifact_install_smoke.py --surface core
 }
 
 lanes=("$@")

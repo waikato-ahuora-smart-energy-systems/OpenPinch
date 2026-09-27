@@ -74,7 +74,17 @@ def _execute_notebook(name: str, tmp_path: Path) -> None:
         try:
             exec(compile(source, f"{name}:cell-{index}", "exec"), namespace)
         except Exception as error:
-            raise AssertionError(f"{name} failed in code cell {index}") from error
+            # Structured solver diagnostics (e.g. HPRTargetingError) explain
+            # *why* a cell failed; include them so CI logs are actionable.
+            diagnostics = getattr(error, "diagnostics", None)
+            detail = (
+                f": {error}\n{diagnostics.model_dump_json(indent=1)}"
+                if hasattr(diagnostics, "model_dump_json")
+                else f": {type(error).__name__}: {error}"
+            )
+            raise AssertionError(
+                f"{name} failed in code cell {index}{detail}"
+            ) from error
 
 
 def test_utility_placement_has_one_executable_thermodynamic_notebook() -> None:
