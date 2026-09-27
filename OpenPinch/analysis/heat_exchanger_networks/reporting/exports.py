@@ -6,22 +6,22 @@ import csv
 from pathlib import Path
 from typing import Any
 
-from ....application.problem import PinchProblem
 from ....contracts.synthesis.common import (
     HeatExchangerNetworkSynthesisExportRecord,
     HeatExchangerNetworkSynthesisManifest,
 )
+from ..prepared_problem import PreparedProblem
 
 
 def export_heat_exchanger_network_synthesis_results(
-    problem: PinchProblem,
+    problem: PreparedProblem,
     output_dir: str | Path,
     *,
     workspace_variant: str | None = None,
     period_id: str | None = None,
 ) -> HeatExchangerNetworkSynthesisManifest:
     """Write optional JSON/CSV views from one problem-owned design result."""
-    if not isinstance(problem, PinchProblem):
+    if not isinstance(problem, PreparedProblem):
         raise TypeError(
             "heat exchanger network synthesis exports require a live PinchProblem."
         )

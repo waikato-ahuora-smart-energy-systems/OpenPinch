@@ -18,11 +18,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from ....analysis.targeting.direct import (
     compute_direct_integration_targets,
 )
-from ....application.problem import PinchProblem
 from ....domain.configuration import tol
 from ....domain.stream import Stream
 from ....domain.zone import Zone
 from ..indexing import ordered_mapping_keys
+from ..prepared_problem import PreparedProblem
 from .arrays import (
     PreparedSolverArrays,
     _temperature_contribution,
@@ -200,7 +200,7 @@ class PinchDesignDecomposition(BaseModel):
 
 
 def build_pinch_design_decomposition(
-    problem: PinchProblem,
+    problem: PreparedProblem,
     dTmin: float,
     *,
     pinch_location: PinchLocation,
@@ -229,7 +229,7 @@ def build_pinch_design_decomposition(
 
 
 def _calculate_openpinch_targets(
-    problem: PinchProblem,
+    problem: PreparedProblem,
     *,
     dTmin: float,
 ) -> tuple[PinchDesignTarget, ...]:
@@ -262,7 +262,7 @@ def _calculate_openpinch_targets(
     return tuple(targets)
 
 
-def _zone_with_hen_dt_contribution(problem: PinchProblem, *, dTmin: float) -> Zone:
+def _zone_with_hen_dt_contribution(problem: PreparedProblem, *, dTmin: float) -> Zone:
     master_zone = problem.master_zone
     if master_zone is None:
         raise ValueError("PDM decomposition requires a prepared PinchProblem.")

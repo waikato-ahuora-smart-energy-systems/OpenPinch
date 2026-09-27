@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from ....application.problem import PinchProblem
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
+from ..prepared_problem import PreparedProblem
 from ..solver.arrays import SEGMENT_PROFILE_VERSION
 
 
 def resolve_seed_networks(
-    problem: PinchProblem,
+    problem: PreparedProblem,
     initial_networks: HeatExchangerNetwork | Sequence[HeatExchangerNetwork] | None,
     *,
     method_name: str,
@@ -46,7 +46,7 @@ def resolve_seed_networks(
     return (cached_design.network,)
 
 
-def _problem_has_segments(problem: PinchProblem) -> bool:
+def _problem_has_segments(problem: PreparedProblem) -> bool:
     zone = problem.master_zone
     return zone is not None and any(stream.has_segments for stream in zone.all_streams)
 
