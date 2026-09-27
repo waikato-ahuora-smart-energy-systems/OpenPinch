@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import math
 from enum import StrEnum
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from ..domain._validation import finite_float, non_empty_str
 from ..domain.analysis import AnalysisProvenance
 
 
@@ -69,45 +70,37 @@ def _strict_int(value: object) -> object:
     return value
 
 
+_FiniteInput = Annotated[float, finite_float(mode="before")]
+_Unit = Annotated[str, non_empty_str("unit must not be empty")]
+_Name = Annotated[str, non_empty_str("name must not be empty")]
+_PeriodId = Annotated[str, non_empty_str("period_id must not be empty")]
+_BaseTargetId = Annotated[str, non_empty_str("base_target_id must not be empty")]
+_DiagnosticText = Annotated[str, non_empty_str("diagnostic text must not be empty")]
+_TerminationText = Annotated[str, non_empty_str("termination text must not be empty")]
+_EnvelopePeriodValue = Annotated[
+    float,
+    finite_float(
+        ge=0.0, bound_message="period values must be non-negative", mode="before"
+    ),
+]
+_Tolerance = Annotated[
+    float, finite_float(ge=0.0, bound_message="tolerance must be non-negative")
+]
+
+
 class QuantityValue(_FrozenContract):
     """One finite magnitude with explicit unit metadata."""
 
-    value: float
-    unit: str
-
-    @field_validator("value", mode="before")
-    @classmethod
-    def _validate_value(cls, value: object) -> float:
-        return _finite_float(value)  # type: ignore[arg-type]
-
-    @field_validator("unit")
-    @classmethod
-    def _validate_unit(cls, value: str) -> str:
-        unit = value.strip()
-        if not unit:
-            raise ValueError("unit must not be empty")
-        return unit
+    value: _FiniteInput
+    unit: _Unit
 
 
 class QuantityInterval(_FrozenContract):
     """Finite inclusive bounds in one explicit unit."""
 
-    lower: float
-    upper: float
-    unit: str
-
-    @field_validator("lower", "upper", mode="before")
-    @classmethod
-    def _validate_bound(cls, value: object) -> float:
-        return _finite_float(value)  # type: ignore[arg-type]
-
-    @field_validator("unit")
-    @classmethod
-    def _validate_unit(cls, value: str) -> str:
-        unit = value.strip()
-        if not unit:
-            raise ValueError("unit must not be empty")
-        return unit
+    lower: _FiniteInput
+    upper: _FiniteInput
+    unit: _Unit
 
     @model_validator(mode="after")
     def _validate_order(self) -> Self:
@@ -119,19 +112,11 @@ class QuantityInterval(_FrozenContract):
 class PlacementTolerances(_FrozenContract):
     """Named numerical tolerances shared by all placement components."""
 
-    absolute: float = 1e-6
-    relative: float = 1e-9
-    bounds: float = 1e-6
-    coverage: float = 1e-6
-    ordering: float = 1e-6
-
-    @field_validator("absolute", "relative", "bounds", "coverage", "ordering")
-    @classmethod
-    def _validate_tolerance(cls, value: float) -> float:
-        result = _finite_float(value)
-        if result < 0.0:
-            raise ValueError("tolerance must be non-negative")
-        return result
+    absolute: _Tolerance = 1e-6
+    relative: _Tolerance = 1e-9
+    bounds: _Tolerance = 1e-6
+    coverage: _Tolerance = 1e-6
+    ordering: _Tolerance = 1e-6
 
 
 class PlacementUnitSystem(_FrozenContract):
@@ -155,8 +140,17 @@ class UtilityPlacementOptions(_FrozenContract):
         UtilityPlacementOptimisationMethod.CMA_ES
     )
     run_count: int = 1
-    cluster_tolerance: float = 0.01
-    local_method: str = "SLSQP"
+    cluster_tolerance: Annotated[
+        float,
+        finite_float(
+            ge=0.0,
+            bound_message="cluster_tolerance must be non-negative",
+            mode="before",
+        ),
+    ] = 0.01
+    local_method: Annotated[str, non_empty_str("local_method must not be empty")] = (
+        "SLSQP"
+    )
     backend_options: tuple[tuple[str, str | int | float | bool | None], ...] = ()
     minimum_separation: QuantityValue = Field(
         default_factory=lambda: QuantityValue(value=0.01, unit="delta_degC")
@@ -188,22 +182,6 @@ class UtilityPlacementOptions(_FrozenContract):
         if value <= 0:
             raise ValueError("limit must be positive")
         return value
-
-    @field_validator("cluster_tolerance", mode="before")
-    @classmethod
-    def _validate_cluster_tolerance(cls, value: object) -> float:
-        result = _finite_float(value)  # type: ignore[arg-type]
-        if result < 0.0:
-            raise ValueError("cluster_tolerance must be non-negative")
-        return result
-
-    @field_validator("local_method")
-    @classmethod
-    def _validate_local_method(cls, value: str) -> str:
-        normalized = value.strip()
-        if not normalized:
-            raise ValueError("local_method must not be empty")
-        return normalized
 
     @field_validator("backend_options", mode="before")
     @classmethod
@@ -247,7 +225,7 @@ class UtilityPlacementOptions(_FrozenContract):
 class UtilityLevelTemplate(_FrozenContract):
     """Caller-declared or generated utility-level specification."""
 
-    name: str
+    name: _Name
     side: UtilitySide
     kind: UtilityLevelKind
     placement_rank: int = 0
@@ -255,14 +233,6 @@ class UtilityLevelTemplate(_FrozenContract):
     fixed_span: QuantityValue | None = None
     span_bounds: QuantityInterval | None = None
     fluid: str | None = None
-
-    @field_validator("name")
-    @classmethod
-    def _validate_name(cls, value: str) -> str:
-        name = value.strip()
-        if not name:
-            raise ValueError("name must not be empty")
-        return name
 
     @field_validator("placement_rank", mode="before")
     @classmethod
@@ -281,31 +251,15 @@ class TemplateKey(_FrozenContract):
     """Stable side/name identity for one utility template."""
 
     side: UtilitySide
-    name: str
-
-    @field_validator("name")
-    @classmethod
-    def _validate_name(cls, value: str) -> str:
-        name = value.strip()
-        if not name:
-            raise ValueError("name must not be empty")
-        return name
+    name: _Name
 
 
 class UtilityDutyLimit(_FrozenContract):
     """Canonical period-aware upper bounds for one named utility level."""
 
-    name: str
+    name: _Name
     period_ids: tuple[str, ...]
     values: tuple[QuantityValue, ...]
-
-    @field_validator("name")
-    @classmethod
-    def _validate_name(cls, value: str) -> str:
-        name = value.strip()
-        if not name:
-            raise ValueError("name must not be empty")
-        return name
 
     @field_validator("period_ids")
     @classmethod
@@ -385,41 +339,17 @@ class PhysicalCoordinateBound(_FrozenContract):
 
     coordinate: CoordinateKey
     bounds: QuantityInterval
-    reason: str
-
-    @field_validator("reason")
-    @classmethod
-    def _validate_reason(cls, value: str) -> str:
-        reason = value.strip()
-        if not reason:
-            raise ValueError("reason must not be empty")
-        return reason
+    reason: Annotated[str, non_empty_str("reason must not be empty")]
 
 
 class PlacementPeriodEnvelope(_FrozenContract):
     """Complete coordinate bounds for one weighted period."""
 
-    period_id: str
-    weight: float
+    period_id: _PeriodId
+    weight: _EnvelopePeriodValue
     coordinate_bounds: tuple[PhysicalCoordinateBound, ...]
-    residual_hot_duty: float = 0.0
-    residual_cold_duty: float = 0.0
-
-    @field_validator("period_id")
-    @classmethod
-    def _validate_period_id(cls, value: str) -> str:
-        period_id = value.strip()
-        if not period_id:
-            raise ValueError("period_id must not be empty")
-        return period_id
-
-    @field_validator("weight", "residual_hot_duty", "residual_cold_duty", mode="before")
-    @classmethod
-    def _validate_weight(cls, value: object) -> float:
-        result = _finite_float(value)  # type: ignore[arg-type]
-        if result < 0.0:
-            raise ValueError("period values must be non-negative")
-        return result
+    residual_hot_duty: _EnvelopePeriodValue = 0.0
+    residual_cold_duty: _EnvelopePeriodValue = 0.0
 
 
 class PlacementFeasibilityEnvelope(_FrozenContract):
@@ -429,16 +359,8 @@ class PlacementFeasibilityEnvelope(_FrozenContract):
     minimum_separation: QuantityValue
     approach_limits: tuple[tuple[str, str], ...] = ()
     scope: UtilityPlacementBaseTarget
-    base_target_id: str
+    base_target_id: _BaseTargetId
     units: PlacementUnitSystem = Field(default_factory=PlacementUnitSystem)
-
-    @field_validator("base_target_id")
-    @classmethod
-    def _validate_target_id(cls, value: str) -> str:
-        target_id = value.strip()
-        if not target_id:
-            raise ValueError("base_target_id must not be empty")
-        return target_id
 
     @model_validator(mode="after")
     def _validate_periods(self) -> Self:
@@ -517,23 +439,15 @@ class DecodedPlacement(_FrozenContract):
 class CandidateDiagnostic(_FrozenContract):
     """Machine-readable ordinary candidate constraint failure."""
 
-    code: str
-    constraint: str
-    message: str
+    code: _DiagnosticText
+    constraint: _DiagnosticText
+    message: _DiagnosticText
     side: UtilitySide | None = None
     template_key: TemplateKey | None = None
     period_id: str | None = None
     measured: QuantityValue | None = None
     limit: QuantityValue | None = None
     details: tuple[tuple[str, str | int | float | bool | None], ...] = ()
-
-    @field_validator("code", "constraint", "message")
-    @classmethod
-    def _validate_text(cls, value: str) -> str:
-        normalized = value.strip()
-        if not normalized:
-            raise ValueError("diagnostic text must not be empty")
-        return normalized
 
 
 class CandidateVerification(_FrozenContract):
@@ -615,8 +529,11 @@ class ThermodynamicCostBreakdown(_FrozenContract):
 class PlacementPeriodResult(_FrozenContract):
     """Complete utility placement and objective breakdown for one period."""
 
-    period_id: str
-    weight: float
+    period_id: _PeriodId
+    weight: Annotated[
+        float,
+        finite_float(ge=0.0, bound_message="period weight must be non-negative"),
+    ]
     hot_levels: tuple[UtilityLevelPeriodResult, ...]
     cold_levels: tuple[UtilityLevelPeriodResult, ...]
     allocated_hot_duty: QuantityValue
@@ -633,22 +550,6 @@ class PlacementPeriodResult(_FrozenContract):
     )
     selected_objective: QuantityValue
     diagnostics: tuple[CandidateDiagnostic, ...] = ()
-
-    @field_validator("period_id")
-    @classmethod
-    def _validate_period_id(cls, value: str) -> str:
-        period_id = value.strip()
-        if not period_id:
-            raise ValueError("period_id must not be empty")
-        return period_id
-
-    @field_validator("weight")
-    @classmethod
-    def _validate_weight(cls, value: float) -> float:
-        result = _finite_float(value)
-        if result < 0.0:
-            raise ValueError("period weight must be non-negative")
-        return result
 
 
 class UtilityPlacementCandidate(_FrozenContract):
@@ -675,25 +576,17 @@ class UtilityPlacementCandidate(_FrozenContract):
 class PlacementTermination(_FrozenContract):
     """Backend-independent termination metadata."""
 
-    method: str
+    method: _TerminationText
     seed: int
-    status: str
-    code: str
-    message: str
+    status: _TerminationText
+    code: _TerminationText
+    message: _TerminationText
     iterations: int | None = None
     evaluations: int | None = None
     candidate_count: int
     feasible_candidate_count: int
     iteration_limit: int
     evaluation_limit: int
-
-    @field_validator("method", "status", "code", "message")
-    @classmethod
-    def _validate_text(cls, value: str) -> str:
-        normalized = value.strip()
-        if not normalized:
-            raise ValueError("termination text must not be empty")
-        return normalized
 
     @field_validator(
         "seed",
@@ -737,7 +630,7 @@ class UtilityPlacementResult(_FrozenContract):
     provenance: AnalysisProvenance | None = None
     request: UtilityPlacementRequest
     scope: UtilityPlacementBaseTarget
-    base_target_id: str
+    base_target_id: _BaseTargetId
     period_ids: tuple[str, ...]
     period_weights: tuple[float, ...]
     units: PlacementUnitSystem = Field(default_factory=PlacementUnitSystem)
@@ -745,14 +638,6 @@ class UtilityPlacementResult(_FrozenContract):
     alternatives: tuple[UtilityPlacementCandidate, ...] = ()
     termination: PlacementTermination
     diagnostics: tuple[CandidateDiagnostic, ...] = ()
-
-    @field_validator("base_target_id")
-    @classmethod
-    def _validate_target_id(cls, value: str) -> str:
-        target_id = value.strip()
-        if not target_id:
-            raise ValueError("base_target_id must not be empty")
-        return target_id
 
     @field_validator("period_ids")
     @classmethod

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import List, Optional, Self, Union
+from typing import Annotated, List, Optional, Self, Union
 
 from pydantic import (
     BaseModel,
@@ -15,12 +15,16 @@ from pydantic import (
 )
 
 from ..domain._heat_exchanger import rules as _hx_rules
+from ..domain._validation import non_empty_str
 from ..domain.configuration_fields import validate_configuration_options
 from ..domain.enums import FluidPhase, HeatExchangerKind, StreamID, StreamType
 from ..domain.hpr import HPRResidualSnapshot
 from .common import PeriodValueWithUnitAndIds, ScalarOrVU
 
 MaximumHeatFlowValue = Union[ScalarOrVU, PeriodValueWithUnitAndIds]
+_SegmentAreaIdentity = Annotated[
+    str, non_empty_str("segment area identities must not be empty")
+]
 
 
 class StreamSegmentSchema(BaseModel):
@@ -244,9 +248,9 @@ class HeatExchangerAreaSliceSchema(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    period: str
-    hot_segment_identity: str
-    cold_segment_identity: str
+    period: _SegmentAreaIdentity
+    hot_segment_identity: _SegmentAreaIdentity
+    cold_segment_identity: _SegmentAreaIdentity
     duty: float
     hot_inlet_temperature: float
     hot_outlet_temperature: float
@@ -257,14 +261,6 @@ class HeatExchangerAreaSliceSchema(BaseModel):
     overall_htc: float
     lmtd: float
     area: float
-
-    @field_validator("period", "hot_segment_identity", "cold_segment_identity")
-    @classmethod
-    def _validate_identity(cls, value: str) -> str:
-        text = str(value).strip()
-        if not text:
-            raise ValueError("segment area identities must not be empty")
-        return text
 
     @field_validator("duty", "hot_htc", "cold_htc", "overall_htc", "lmtd", "area")
     @classmethod
@@ -529,18 +525,10 @@ class PlantProfileDataSchema(BaseModel):
 class PlantProfileSchema(BaseModel):
     """Named plant heat-load profile retained with canonical problem input."""
 
-    name: str
+    name: Annotated[str, non_empty_str("plant profile name must be non-empty")]
     data: PlantProfileDataSchema
 
     model_config = ConfigDict(extra="forbid")
-
-    @field_validator("name")
-    @classmethod
-    def _validate_name(cls, value: str) -> str:
-        name = value.strip()
-        if not name:
-            raise ValueError("plant profile name must be non-empty")
-        return name
 
 
 class TargetInput(BaseModel):
