@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...indexing import build_index_grid
+from .._base.superstructure import create_match_binaries, create_utility_duty_grids
 
 
 def set_stage_wise_superstructure(owner) -> None:
@@ -39,38 +40,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
         ]
         for n in range(owner.N_periods)
     ]
-    owner.Q_c_by_period = [
-        [
-            (
-                owner.m.Var(
-                    value=0,
-                    ub=owner.Qtot_sh_period[n][i],
-                    lb=0.0,
-                    name=f"Q_H{i}_to_CU_period{n}",
-                )
-                if owner.z_cu_allowed[i] > 0
-                else owner.m.Param(value=0, name=f"Q_H{i}_to_CU_period{n}")
-            )
-            for i in range(owner.I)
-        ]
-        for n in range(owner.N_periods)
-    ]
-    owner.Q_h_by_period = [
-        [
-            (
-                owner.m.Var(
-                    value=0,
-                    ub=owner.Qtot_sc_period[n][j],
-                    lb=0.0,
-                    name=f"Q_HU_to_C{j}_period{n}",
-                )
-                if owner.z_hu_allowed[j] > 0
-                else owner.m.Param(value=0, name=f"Q_HU_to_C{j}_period{n}")
-            )
-            for j in range(owner.J)
-        ]
-        for n in range(owner.N_periods)
-    ]
+    create_utility_duty_grids(owner)
     owner.T_h_by_period = [
         [
             [
@@ -258,55 +228,8 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
             ]
         )
 
+    create_match_binaries(owner)
     if owner.integers:
-        owner.z = [
-            [
-                [
-                    (
-                        owner.m.Var(
-                            value=1,
-                            ub=1,
-                            lb=0,
-                            integer=True,
-                            name=f"z_H{i}_to_C{j}_at_S{k}",
-                        )
-                        if owner.z_allowed[i][j][k] > 0
-                        else owner.m.Param(value=0, name=f"z_H{i}_to_C{j}_at_S{k}")
-                    )
-                    for k in range(owner.S)
-                ]
-                for j in range(owner.J)
-            ]
-            for i in range(owner.I)
-        ]
-        owner.z_cu = [
-            (
-                owner.m.Var(
-                    value=1,
-                    ub=1,
-                    lb=0,
-                    integer=True,
-                    name=f"z_H{i}_to_CU",
-                )
-                if owner.z_cu_allowed[i] > 0
-                else owner.m.Param(value=0, name=f"z_H{i}_to_CU")
-            )
-            for i in range(owner.I)
-        ]
-        owner.z_hu = [
-            (
-                owner.m.Var(
-                    value=1,
-                    ub=1,
-                    lb=0,
-                    integer=True,
-                    name=f"z_HU_to_C{j}",
-                )
-                if owner.z_hu_allowed[j] > 0
-                else owner.m.Param(value=0, name=f"z_HU_to_C{j}")
-            )
-            for j in range(owner.J)
-        ]
         for n in range(owner.N_periods):
             _ = [
                 (
@@ -343,37 +266,6 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                 )
                 for j in range(owner.J)
             ]
-    else:
-        owner.z = [
-            [
-                [
-                    (
-                        owner.m.Param(value=1, name=f"z_H{i}_to_C{j}_at_S{k}")
-                        if owner.z_allowed[i][j][k] > 0
-                        else owner.m.Param(value=0, name=f"z_H{i}_to_C{j}_at_S{k}")
-                    )
-                    for k in range(owner.S)
-                ]
-                for j in range(owner.J)
-            ]
-            for i in range(owner.I)
-        ]
-        owner.z_hu = [
-            (
-                owner.m.Param(value=1, name=f"z_HU_to_C{j}")
-                if owner.z_hu_allowed[j] > 0
-                else owner.m.Param(value=0, name=f"z_HU_to_C{j}")
-            )
-            for j in range(owner.J)
-        ]
-        owner.z_cu = [
-            (
-                owner.m.Param(value=1, name=f"z_H{i}_to_CU")
-                if owner.z_cu_allowed[i] > 0
-                else owner.m.Param(value=0, name=f"z_H{i}_to_CU")
-            )
-            for i in range(owner.I)
-        ]
 
     owner._set_multiperiod_utility_approach_equations()
 
