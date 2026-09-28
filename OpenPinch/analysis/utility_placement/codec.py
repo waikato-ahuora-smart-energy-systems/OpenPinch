@@ -310,9 +310,7 @@ def verify_candidate(
                 for index, template in enumerate(model.templates.hot)
                 if template.kind is kind
             ]
-            family = tuple(
-                model.templates.hot[index] for index in family_indices
-            )
+            family = tuple(model.templates.hot[index] for index in family_indices)
             check_descending(
                 [hot_supplies[index] for index in family_indices],
                 family,
@@ -396,6 +394,14 @@ def decode_placement(
     verification = verify_candidate(model, point)
     if not verification.feasible:
         _raise_for_verification(verification)
+    return decode_verified_placement(model, point)
+
+
+def decode_verified_placement(
+    model: UtilityPlacementModel,
+    point: Sequence[float],
+) -> DecodedPlacement:
+    """Decode a point that :func:`verify_candidate` has already accepted."""
     normalized_point = tuple(
         0.0 if float(value) == 0.0 else float(value) for value in point
     )
@@ -699,9 +705,7 @@ def build_utility_placement_model(
                 previous_supply = supply
             if interleaved_feasible:
                 initial_points.append(
-                    tuple(
-                        interleaved_values[item.coordinate] for item in coordinates
-                    )
+                    tuple(interleaved_values[item.coordinate] for item in coordinates)
                 )
 
         spread_values = dict(initial_values)
@@ -847,6 +851,7 @@ __all__ = [
     "build_decision_coordinates",
     "build_utility_placement_model",
     "decode_placement",
+    "decode_verified_placement",
     "encode_placement",
     "verify_candidate",
     "verify_placement",
