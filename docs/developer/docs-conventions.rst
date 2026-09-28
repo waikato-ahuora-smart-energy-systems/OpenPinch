@@ -60,6 +60,9 @@ Docs Maintenance Expectations
 - Main-contract changes should ship with docs updates in the same change.
 - Changes to the protected contract must update both a task-oriented page and
   the curated API page for that contract.
+- The ``.ipynb`` files in ``OpenPinch/tutorials/notebooks`` are the source of
+  truth: edit them directly in Jupyter, keep the ``cell-NN`` cell ids, and
+  clear all outputs before committing. Ruff lints them like any other source.
 - New packaged notebooks or sample cases should be added to the examples pages.
 - New packaged notebooks or sample cases should update docs consistency tests
   that compare examples docs with ``OpenPinch.resources``.

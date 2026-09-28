@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import nullcontext
 from types import SimpleNamespace
 
@@ -272,7 +273,9 @@ def test_base_model_scalar_helpers_and_value_assignment():
     )
 
 
-def test_get_alpha_values_uses_cached_values_and_swallows_solver_failure(monkeypatch):
+def test_get_alpha_values_uses_cached_values_and_warns_on_solver_failure(
+    monkeypatch, caplog
+):
     model = _model()
     model.alpha = [1.0]
     assert model.get_alpha_values() == [1.0]
@@ -295,8 +298,15 @@ def test_get_alpha_values_uses_cached_values_and_swallows_solver_failure(monkeyp
         lambda **kwargs: calls.append(kwargs),
     )
 
-    assert model.get_alpha_values() == []
+    with caplog.at_level(logging.WARNING, logger=base_alpha.__name__):
+        assert model.get_alpha_values() == []
     assert calls == [{"m": failing_model, "postoptimisation": True}]
+    assert any(
+        record.levelno == logging.WARNING
+        and "alpha solve failed" in record.getMessage()
+        and record.exc_info is not None
+        for record in caplog.records
+    )
 
 
 @pytest.mark.parametrize("non_isothermal", [False, True])

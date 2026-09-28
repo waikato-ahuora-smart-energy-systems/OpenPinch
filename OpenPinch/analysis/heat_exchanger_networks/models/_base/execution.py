@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from ...solver import backend
+from . import piecewise as _piecewise
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ def optimise(model, print_output: bool) -> None:
         active_mapping_stable = (
             True
             if not piecewise_mappings
-            else not model._update_piecewise_active_segments()
+            else not _piecewise._update_piecewise_active_segments(model)
         )
         if active_mapping_stable:
             break

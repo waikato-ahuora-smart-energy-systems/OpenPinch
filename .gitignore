@@ -80,6 +80,9 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+# Run artifacts written by the packaged tutorial notebooks (05, 18)
+OpenPinch/tutorials/notebooks/*.json
+openpinch-results/
 
 # IPython
 profile_default/
@@ -249,3 +252,10 @@ aidlc-docs/inception/plans/*
 !aidlc-docs/construction/plans/exact-openhens-checkout-loading-functional-design-plan.md
 !aidlc-docs/construction/plans/exact-openhens-checkout-loading-code-generation-plan.md
 !aidlc-docs/construction/plans/current-documentation-drift-guards-code-generation-plan.md
+
+# Claude Code local settings and session data
+.claude/
+
+# Local CI runner (scripts/ci_local.sh)
+.venv-smoke/
+reports/

@@ -7,6 +7,8 @@ from typing import Any
 
 import numpy as np
 
+from . import piecewise as _piecewise
+
 
 def _set_minimum_approach_temperatures(model) -> None:
     """Derive pair-specific approach limits from stream contributions."""
@@ -147,7 +149,7 @@ def _utility_outlet_temperature_contribution(
         if side == "hot"
         else model.T_cu_cont_period[period_idx][0]
     )
-    if heat_duty is None or not model._utility_is_segmented(side):
+    if heat_duty is None or not _piecewise._utility_is_segmented(model, side):
         return float(scalar)
 
     from ...solver.piecewise import profile_from_solver_arrays
@@ -175,7 +177,7 @@ def _utility_solved_outlet_temperature(
         return getattr(model, f"T_{side[0]}u_solved_out_by_period")[period_idx][
             match_index
         ]
-    if heat_duty is None or not model._utility_is_segmented(side):
+    if heat_duty is None or not _piecewise._utility_is_segmented(model, side):
         return (
             model.T_hu_out_period[period_idx][0]
             if side == "hot"
@@ -202,7 +204,7 @@ def _utility_max_temperature_contribution(
         if side == "hot"
         else model.T_cu_cont_period[period_idx][0]
     )
-    if not model._utility_is_segmented(side):
+    if not _piecewise._utility_is_segmented(model, side):
         return float(scalar)
     values = model.solver_arrays.arrays[f"{side}_utility_segment_dt_cont_period"][
         period_idx, 0
@@ -215,12 +217,14 @@ def _set_multiperiod_utility_approach_equations(model) -> None:
     """Constrain both utility terminals with local segment contributions."""
     for n in range(model.N_periods):
         for j in range(model.J):
-            if model.z_hu_allowed[j] <= 0 or not model._utility_is_segmented("hot"):
+            if model.z_hu_allowed[j] <= 0 or not _piecewise._utility_is_segmented(
+                model, "hot"
+            ):
                 continue
             inlet_approach = model._hot_utility_inlet_approach_temperature(j, n)
             outlet_approach = model._hot_utility_outlet_approach_temperature(j, n)
             maximum_approach = (
-                model._utility_max_temperature_contribution("hot", n)
+                _utility_max_temperature_contribution(model, "hot", n)
                 + model.T_c_cont_period[n][j]
             )
             big_m = max(
@@ -250,13 +254,15 @@ def _set_multiperiod_utility_approach_equations(model) -> None:
             )
 
         for i in range(model.I):
-            if model.z_cu_allowed[i] <= 0 or not model._utility_is_segmented("cold"):
+            if model.z_cu_allowed[i] <= 0 or not _piecewise._utility_is_segmented(
+                model, "cold"
+            ):
                 continue
             inlet_approach = model._cold_utility_inlet_approach_temperature(i, n)
             outlet_approach = model._cold_utility_outlet_approach_temperature(i, n)
             maximum_approach = model.T_h_cont_period[n][
                 i
-            ] + model._utility_max_temperature_contribution("cold", n)
+            ] + _utility_max_temperature_contribution(model, "cold", n)
             big_m = max(
                 abs(model.T_h_in_period[n][i] - model.T_cu_out_period[n][0]),
                 abs(model.T_h_in_period[n][i] - model.T_cu_in_period[n][0]),

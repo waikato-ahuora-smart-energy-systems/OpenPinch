@@ -337,9 +337,55 @@ def test_finiteness_non_negative_and_period_suffix_helpers():
         message="Value must be non-negative.",
     )
 
+    # Without declared period ids, the positional index is the only label.
     assert finite_issues[0].message == "Value must be finite for period_id '1'."
     assert non_negative_issues[0].message == (
         "Value must be non-negative for period_id '2'."
     )
     assert semantics._period_suffix(None) == ""
     assert semantics._with_period_suffix("No period.", None) == "No period."
+
+    labelled_issues = semantics._validate_non_negative_states(
+        PeriodValues([None, float("inf"), -1.0, 0.0]),
+        section="streams",
+        record_index=0,
+        record_label="Stream 1",
+        field_name="heat_flow",
+        severity="error",
+        message="Value must be non-negative.",
+        period_ids=("base", "winter", "summer", "shutdown"),
+    )
+    assert labelled_issues[0].message == (
+        "Value must be non-negative for period_id 'summer'."
+    )
+
+
+def test_semantic_issues_report_declared_non_numeric_period_ids():
+    problem = TargetInput.model_validate(
+        {
+            "streams": [
+                {
+                    "zone": "Zone A",
+                    "name": "H1",
+                    "t_supply": {"values": [150.0, 140.0, 130.0], "unit": "degC"},
+                    "t_target": {"values": [60.0, 140.0, 50.0], "unit": "degC"},
+                    "heat_flow": {"values": [100.0, 90.0, -5.0], "unit": "kW"},
+                    "dt_cont": 10.0,
+                    "htc": 1.0,
+                }
+            ],
+            "utilities": [],
+            "options": {"PROBLEM_PERIOD_IDS": ["winter", "summer", "shutdown"]},
+        }
+    )
+
+    messages = [
+        issue.message for issue in semantics.semantic_issues(problem, context={})
+    ]
+
+    assert (
+        "Supply and target temperatures must differ for period_id 'summer'." in messages
+    )
+    assert "Value must be non-negative for period_id 'shutdown'." in messages
+    assert not any("period_id '1'" in message for message in messages)
+    assert not any("period_id '2'" in message for message in messages)

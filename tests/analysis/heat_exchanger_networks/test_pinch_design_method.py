@@ -2996,6 +2996,21 @@ def test_pinch_decomp_set_obj_covers_remaining_objective_modes(
     assert model.m.actions[-1][0] == expected_action
 
 
+@pytest.mark.parametrize(
+    "goal", ["utility costs", "total cost", "variable total cost", "dQ/dA obj"]
+)
+def test_pinch_decomp_set_obj_rejects_unsupported_goal(goal: str) -> None:
+    model = PinchDecompModel.__new__(PinchDecompModel)
+    model.m = _AlgebraModel()
+    model.minimisation_goal = goal
+    model.N_periods = 1
+
+    with pytest.raises(ValueError, match="Unsupported pinch-decomposition"):
+        model.set_obj()
+
+    assert model.m.actions == []
+
+
 def test_pinch_decomp_post_process_skips_failed_model_and_copy_helpers_cover_shapes() -> (
     None
 ):

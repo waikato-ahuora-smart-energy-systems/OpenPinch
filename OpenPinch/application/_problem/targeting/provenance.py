@@ -8,7 +8,7 @@ from dataclasses import asdict, is_dataclass
 from typing import Any
 
 from ....domain.analysis import AnalysisProvenance
-from .execution import walk_zone_tree
+from .execution import resolve_runtime_period_options, walk_zone_tree
 
 
 def _json_default(value):
@@ -124,7 +124,7 @@ def validate_base_target(problem, target, *, zone, period_id, options=None):
     selected, period_id = resolve_target_selection(
         problem, target, zone=zone, period_id=period_id, options=options
     )
-    runtime, sid = problem._resolve_runtime_period_options(
+    runtime, sid = resolve_runtime_period_options(
         {**dict(options or {}), **({"period_id": period_id} if period_id else {})},
         zone=selected,
     )

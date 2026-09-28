@@ -39,6 +39,8 @@ from ._shared.ambient_preallocation import (
 )
 
 __all__ = [
+    "SUBCRITICAL_CONDENSING_MARGIN_K",
+    "condensing_temperature_search_range",
     "calc_simulated_hpr_annualized_costs",
     "calc_carnot_heat_engine_eta",
     "calc_carnot_heat_pump_cop",
@@ -424,6 +426,40 @@ def calc_carnot_heat_engine_eta(
         0.0,
     )
     return eta.item() if eta.ndim == 0 else eta
+
+
+# Condensing temperatures within this margin of a refrigerant's critical
+# temperature have no usable saturation state (the cycle's pressure lookup
+# switches to the critical isochore there), so the search stays below it.
+SUBCRITICAL_CONDENSING_MARGIN_K = 2.0
+
+
+def condensing_temperature_search_range(
+    args: HeatPumpTargetInputs,
+) -> tuple[float, float]:
+    """Return the ``(hottest, coldest)`` condensing temperatures to search, in degC.
+
+    The range spans the heat-sink profile (``args.T_cold``) but is capped just
+    below the highest critical temperature among the candidate refrigerants:
+    a subcritical vapour-compression condenser cannot operate above it, and
+    every candidate there fails in CoolProp. Without the cap the search can
+    spend its whole budget in that infeasible region. The range is returned
+    unchanged for the TESPy backend (which solves its own cycle states), when
+    the refrigerants' critical points are unknown, or when the cap would leave
+    nothing to search.
+    """
+    t_hot, t_cold = float(args.T_cold[0]), float(args.T_cold[-1])
+    if getattr(args, "simulation_backend", "coolprop") == "tespy":
+        return t_hot, t_cold
+    try:
+        refrigerants = list(getattr(args, "refrigerant_ls", None) or ["water"])
+        t_crit = max(float(_coolprop.PropsSI("Tcrit", ref)) for ref in refrigerants)
+    except (ValueError, TypeError):
+        return t_hot, t_cold
+    ceiling = t_crit - 273.15 - SUBCRITICAL_CONDENSING_MARGIN_K
+    if not np.isfinite(ceiling) or ceiling <= t_cold or ceiling >= t_hot:
+        return t_hot, t_cold
+    return ceiling, t_cold
 
 
 def validate_vapour_hp_refrigerant_ls(

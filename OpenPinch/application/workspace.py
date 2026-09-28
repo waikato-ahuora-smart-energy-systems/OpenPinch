@@ -21,6 +21,7 @@ from ..contracts.workspace import (
     validate_workspace_case_name,
 )
 from ._problem.input.validation import build_validation_report
+from ._problem.targeting.catalog import install_catalog_forwarders
 from ._workspace import state as _workspace_state
 from ._workspace.case_inputs import (
     JsonDict,
@@ -73,9 +74,6 @@ class _CaseBatchTargetAccessor(_CaseBatchAccessor):
     def all_periods(self) -> "_CaseBatchAllPeriodsTargetAccessor":
         return _CaseBatchAllPeriodsTargetAccessor(self._batch, "target.all_periods")
 
-    def direct_heat_integration(self, **kwargs):
-        return self._run("direct_heat_integration", **kwargs)
-
     def heat_recovery_dt_min(
         self,
         *,
@@ -90,66 +88,9 @@ class _CaseBatchTargetAccessor(_CaseBatchAccessor):
             period_id=period_id,
         )
 
-    def indirect_heat_integration(self, **kwargs):
-        return self._run("indirect_heat_integration", **kwargs)
-
-    def total_site_heat_integration(self, **kwargs):
-        return self._run("total_site_heat_integration", **kwargs)
-
-    def all_heat_integration(self, **kwargs):
-        return self._run("all_heat_integration", **kwargs)
-
-    def heat_exchanger_area_and_cost(self, **kwargs):
-        return self._run("heat_exchanger_area_and_cost", **kwargs)
-
-    def carnot_heat_pump(self, **kwargs):
-        return self._run("carnot_heat_pump", **kwargs)
-
-    def carnot_refrigeration(self, **kwargs):
-        return self._run("carnot_refrigeration", **kwargs)
-
-    def vapour_compression_heat_pump(self, **kwargs):
-        return self._run("vapour_compression_heat_pump", **kwargs)
-
-    def vapour_compression_refrigeration(self, **kwargs):
-        return self._run("vapour_compression_refrigeration", **kwargs)
-
-    def brayton_heat_pump(self, **kwargs):
-        return self._run("brayton_heat_pump", **kwargs)
-
-    def brayton_refrigeration(self, **kwargs):
-        return self._run("brayton_refrigeration", **kwargs)
-
-    def mvr_heat_pump(self, **kwargs):
-        return self._run("mvr_heat_pump", **kwargs)
-
-    def cogeneration(self, **kwargs):
-        return self._run("cogeneration", **kwargs)
-
-    def sun_smith_cogeneration(self, **kwargs):
-        return self._run("sun_smith_cogeneration", **kwargs)
-
-    def varbanov_cogeneration(self, **kwargs):
-        return self._run("varbanov_cogeneration", **kwargs)
-
-    def isentropic_cogeneration(self, **kwargs):
-        return self._run("isentropic_cogeneration", **kwargs)
-
-    def exergy(self, **kwargs):
-        return self._run("exergy", **kwargs)
-
-    def energy_transfer(self, **kwargs):
-        return self._run("energy_transfer", **kwargs)
-
-    def utility_placement(self, **kwargs):
-        return self._run("utility_placement", **kwargs)
-
 
 class _CaseBatchAllPeriodsTargetAccessor(_CaseBatchAccessor):
     """Mirror supported all-period target workflows over selected cases."""
-
-    def direct_heat_integration(self, **kwargs):
-        return self._run("direct_heat_integration", **kwargs)
 
     def heat_recovery_dt_min(
         self,
@@ -165,78 +106,43 @@ class _CaseBatchAllPeriodsTargetAccessor(_CaseBatchAccessor):
             workers=workers,
         )
 
-    def indirect_heat_integration(self, **kwargs):
-        return self._run("indirect_heat_integration", **kwargs)
-
-    def total_site_heat_integration(self, **kwargs):
-        return self._run("total_site_heat_integration", **kwargs)
-
-    def all_heat_integration(self, **kwargs):
-        return self._run("all_heat_integration", **kwargs)
-
-    def heat_exchanger_area_and_cost(self, **kwargs):
-        return self._run("heat_exchanger_area_and_cost", **kwargs)
-
-    def carnot_heat_pump(self, **kwargs):
-        return self._run("carnot_heat_pump", **kwargs)
-
-    def carnot_refrigeration(self, **kwargs):
-        return self._run("carnot_refrigeration", **kwargs)
-
-    def vapour_compression_heat_pump(self, **kwargs):
-        return self._run("vapour_compression_heat_pump", **kwargs)
-
-    def vapour_compression_refrigeration(self, **kwargs):
-        return self._run("vapour_compression_refrigeration", **kwargs)
-
-    def mvr_heat_pump(self, **kwargs):
-        return self._run("mvr_heat_pump", **kwargs)
-
-    def cogeneration(self, **kwargs):
-        return self._run("cogeneration", **kwargs)
-
-    def sun_smith_cogeneration(self, **kwargs):
-        return self._run("sun_smith_cogeneration", **kwargs)
-
-    def varbanov_cogeneration(self, **kwargs):
-        return self._run("varbanov_cogeneration", **kwargs)
-
-    def isentropic_cogeneration(self, **kwargs):
-        return self._run("isentropic_cogeneration", **kwargs)
-
-    def exergy(self, **kwargs):
-        return self._run("exergy", **kwargs)
-
-    def energy_transfer(self, **kwargs):
-        return self._run("energy_transfer", **kwargs)
-
-    def utility_placement(self, **kwargs):
-        return self._run("utility_placement", **kwargs)
-
 
 class _CaseBatchDesignAccessor(_CaseBatchAccessor):
     """Mirror HEN design workflows over an ordered case selection."""
 
-    def heat_exchanger_network(self, **kwargs):
-        return self._run("heat_exchanger_network", **kwargs)
 
-    def enhanced_heat_exchanger_network(self, **kwargs):
-        return self._run("enhanced_heat_exchanger_network", **kwargs)
+def _case_batch_forwarder(method_name: str):
+    def forward(self, **kwargs) -> CaseBatchResult:
+        return self._run(method_name, **kwargs)
 
-    def multiperiod_heat_exchanger_network(self, **kwargs):
-        return self._run("multiperiod_heat_exchanger_network", **kwargs)
+    forward.__doc__ = (
+        f"Run ``{method_name}`` on every selected case.\n\n"
+        "Returns a :class:`CaseBatchResult` with per-case results and errors."
+    )
+    return forward
 
-    def open_hens(self, **kwargs):
-        return self._run("open_hens", **kwargs)
 
-    def pinch_design(self, **kwargs):
-        return self._run("pinch_design", **kwargs)
-
-    def thermal_derivative(self, **kwargs):
-        return self._run("thermal_derivative", **kwargs)
-
-    def network_evolution(self, **kwargs):
-        return self._run("network_evolution", **kwargs)
+install_catalog_forwarders(
+    _CaseBatchTargetAccessor,
+    surface="target",
+    factory=_case_batch_forwarder,
+    exclude=("hpr_performance_map",),
+)
+install_catalog_forwarders(
+    _CaseBatchAllPeriodsTargetAccessor,
+    surface="target",
+    factory=_case_batch_forwarder,
+    exclude=(
+        "brayton_heat_pump",
+        "brayton_refrigeration",
+        "hpr_performance_map",
+    ),
+)
+install_catalog_forwarders(
+    _CaseBatchDesignAccessor,
+    surface="design",
+    factory=_case_batch_forwarder,
+)
 
 
 class _CaseBatch:

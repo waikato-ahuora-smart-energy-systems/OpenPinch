@@ -12,6 +12,9 @@ import numpy as np
 import pytest
 
 import OpenPinch
+from OpenPinch.analysis.heat_exchanger_networks.prepared_problem import (
+    PreparedProblem,
+)
 from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
     problem_to_solver_arrays,
 )
@@ -597,3 +600,17 @@ def _single_state_array(payload, name: str) -> np.ndarray:
     values = payload.arrays[_current_array_name(name)]
     assert values.shape[0] == 1
     return values[0]
+
+
+def test_pinch_problem_satisfies_prepared_problem_protocol() -> None:
+    assert isinstance(PinchProblem(), PreparedProblem)
+    # Attributes are looked up statically, so an unloaded instance still matches
+    # and the adapters raise their own "not prepared" errors.
+    assert isinstance(PinchProblem.__new__(PinchProblem), PreparedProblem)
+    for value in (
+        {"raw": "payload"},
+        [{"Designation": "Hot"}],
+        TargetInput(streams=[]),
+        object(),
+    ):
+        assert not isinstance(value, PreparedProblem)

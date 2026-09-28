@@ -15,6 +15,7 @@ from ..candidates import (
     _postprocess_candidates,
 )
 from ..execution import _collect_candidates_in_parallel
+from ._surrogate import as_seed_array
 
 
 def _get_cma_multiminima_in_parallel(
@@ -98,11 +99,7 @@ def _collect_cma_candidates(
     tolfun: float,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Collect candidate minima from multiple CMA-ES runs."""
-    x0_arr = None
-    if x0_ls is not None:
-        x0_arr = np.asarray(x0_ls, dtype=float)
-        if x0_arr.ndim == 1:
-            x0_arr = x0_arr.reshape(1, -1)
+    x0_arr = as_seed_array(x0_ls)
 
     run_fn = partial(
         _run_cma_single,

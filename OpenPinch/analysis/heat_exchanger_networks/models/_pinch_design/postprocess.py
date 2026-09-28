@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-
 from ...indexing import build_index_grid
+from .._base import area as _area
+from .._base.costing import set_period_totals_and_costs
 from .._stagewise.verification import _value as _scalar_value
 from .preprocessing import (
     _active_period_flag,
@@ -117,7 +117,7 @@ def _get_multiperiod_post_process(owner) -> None:
         ),
         (owner.I, owner.J, owner.S),
     )
-    owner._apply_segment_recovery_areas(q_r)
+    _area._apply_segment_recovery_areas(owner, q_r)
 
     owner.LMTD_hu_by_period = build_index_grid(
         lambda n, j: owner._post_process_lmtd(
@@ -173,7 +173,7 @@ def _get_multiperiod_post_process(owner) -> None:
         ),
         (owner.N_periods, owner.I),
     )
-    owner._apply_segment_utility_areas(q_h, q_c)
+    _area._apply_segment_utility_areas(owner, q_h, q_c)
     owner.LMTD_hu = owner.LMTD_hu_by_period[0]
     owner.LMTD_cu = owner.LMTD_cu_by_period[0]
 
@@ -185,85 +185,10 @@ def _get_multiperiod_post_process(owner) -> None:
         lambda i: max(owner.area_cu_by_period[n][i] for n in range(owner.N_periods)),
         (owner.I,),
     )
-    owner.Q_hu_total_by_period = build_index_grid(
-        lambda n: sum(q_h[n]),
-        (owner.N_periods,),
-    )
-    owner.Q_cu_total_by_period = build_index_grid(
-        lambda n: sum(q_c[n]),
-        (owner.N_periods,),
-    )
-    owner.Q_r_total_by_period = build_index_grid(
-        lambda n: sum(
-            q_r[n][i][j][k]
-            for k in range(owner.S)
-            for j in range(owner.J)
-            for i in range(owner.I)
-        ),
-        (owner.N_periods,),
-    )
-    owner.Q_hu_total = owner._weighted_numeric_average(owner.Q_hu_total_by_period)
-    owner.Q_cu_total = owner._weighted_numeric_average(owner.Q_cu_total_by_period)
-    owner.Q_r_total = owner._weighted_numeric_average(owner.Q_r_total_by_period)
-    owner.operating_cost_by_period = [
-        owner._utility_cost_value("hot", n, owner.Q_hu_total_by_period[n])
-        + owner._utility_cost_value("cold", n, owner.Q_cu_total_by_period[n])
-        for n in range(owner.N_periods)
-    ]
-    owner.weighted_operating_cost_value = owner._weighted_numeric_average(
-        owner.operating_cost_by_period
-    )
-    owner.capital_cost_value = (
-        owner.unit_cost[0] * owner.n_units
-        + owner.A_coeff[0]
-        * sum(
-            owner.area_r[i][j][k] ** owner.A_exp[0]
-            for k in range(owner.S)
-            for j in range(owner.J)
-            for i in range(owner.I)
-        )
-        + owner.hu_coeff[0]
-        * sum(owner.area_hu[j] ** owner.hu_exp[0] for j in range(owner.J))
-        + owner.cu_coeff[0]
-        * sum(owner.area_cu[i] ** owner.cu_exp[0] for i in range(owner.I))
-    )
-    owner.hu_cost_total = owner._weighted_numeric_average(
-        [
-            owner._utility_cost_value("hot", n, owner.Q_hu_total_by_period[n])
-            for n in range(owner.N_periods)
-        ]
-    )
-    owner.cu_cost_total = owner._weighted_numeric_average(
-        [
-            owner._utility_cost_value("cold", n, owner.Q_cu_total_by_period[n])
-            for n in range(owner.N_periods)
-        ]
-    )
-    owner.recovery_area_cost_total = owner.A_coeff[0] * sum(
-        owner.area_r[i][j][k] ** owner.A_exp[0]
-        for k in range(owner.S)
-        for j in range(owner.J)
-        for i in range(owner.I)
-    )
-    owner.hu_area_cost_total = owner.hu_coeff[0] * sum(
-        owner.area_hu[j] ** owner.hu_exp[0] for j in range(owner.J)
-    )
-    owner.cu_area_cost_total = owner.cu_coeff[0] * sum(
-        owner.area_cu[i] ** owner.cu_exp[0] for i in range(owner.I)
-    )
+    set_period_totals_and_costs(owner, q_h, q_c, q_r)
     owner.TAC_model = owner.m.options.objfcnval
     owner.TAC = owner.capital_cost_value + owner.weighted_operating_cost_value
 
 
 def _active_binary_value(owner, value) -> float:
     return _scalar_value(value)
-
-
-def _weighted_numeric_average(owner, values: Sequence[float]) -> float:
-    return float(
-        sum(
-            float(owner.period_weights[n]) * float(values[n])
-            for n in range(owner.N_periods)
-        )
-        / owner.period_weight_sum
-    )

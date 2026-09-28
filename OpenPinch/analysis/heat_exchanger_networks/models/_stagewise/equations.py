@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from ...indexing import build_index_grid
+from .._base import approach as _approach
+from .._base import piecewise as _piecewise
+from .._base.superstructure import create_match_binaries, create_utility_duty_grids
 
 
 def set_stage_wise_superstructure(owner) -> None:
@@ -39,38 +42,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
         ]
         for n in range(owner.N_periods)
     ]
-    owner.Q_c_by_period = [
-        [
-            (
-                owner.m.Var(
-                    value=0,
-                    ub=owner.Qtot_sh_period[n][i],
-                    lb=0.0,
-                    name=f"Q_H{i}_to_CU_period{n}",
-                )
-                if owner.z_cu_allowed[i] > 0
-                else owner.m.Param(value=0, name=f"Q_H{i}_to_CU_period{n}")
-            )
-            for i in range(owner.I)
-        ]
-        for n in range(owner.N_periods)
-    ]
-    owner.Q_h_by_period = [
-        [
-            (
-                owner.m.Var(
-                    value=0,
-                    ub=owner.Qtot_sc_period[n][j],
-                    lb=0.0,
-                    name=f"Q_HU_to_C{j}_period{n}",
-                )
-                if owner.z_hu_allowed[j] > 0
-                else owner.m.Param(value=0, name=f"Q_HU_to_C{j}_period{n}")
-            )
-            for j in range(owner.J)
-        ]
-        for n in range(owner.N_periods)
-    ]
+    create_utility_duty_grids(owner)
     owner.T_h_by_period = [
         [
             [
@@ -202,7 +174,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
     owner.theta_1 = owner.theta_1_by_period[0]
     owner.theta_2 = owner.theta_2_by_period[0]
 
-    owner._set_piecewise_stage_heat_coordinates()
+    _piecewise._set_piecewise_stage_heat_coordinates(owner)
 
     for n in range(owner.N_periods):
         owner.m.Equations(
@@ -243,7 +215,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                 == 0
                 for k in range(owner.S)
                 for i in range(owner.I)
-                if not owner._hot_parent_segmented(i)
+                if not _piecewise._hot_parent_segmented(owner, i)
             ]
         )
         owner.m.Equations(
@@ -254,59 +226,12 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                 == 0
                 for k in range(owner.S)
                 for j in range(owner.J)
-                if not owner._cold_parent_segmented(j)
+                if not _piecewise._cold_parent_segmented(owner, j)
             ]
         )
 
+    create_match_binaries(owner)
     if owner.integers:
-        owner.z = [
-            [
-                [
-                    (
-                        owner.m.Var(
-                            value=1,
-                            ub=1,
-                            lb=0,
-                            integer=True,
-                            name=f"z_H{i}_to_C{j}_at_S{k}",
-                        )
-                        if owner.z_allowed[i][j][k] > 0
-                        else owner.m.Param(value=0, name=f"z_H{i}_to_C{j}_at_S{k}")
-                    )
-                    for k in range(owner.S)
-                ]
-                for j in range(owner.J)
-            ]
-            for i in range(owner.I)
-        ]
-        owner.z_cu = [
-            (
-                owner.m.Var(
-                    value=1,
-                    ub=1,
-                    lb=0,
-                    integer=True,
-                    name=f"z_H{i}_to_CU",
-                )
-                if owner.z_cu_allowed[i] > 0
-                else owner.m.Param(value=0, name=f"z_H{i}_to_CU")
-            )
-            for i in range(owner.I)
-        ]
-        owner.z_hu = [
-            (
-                owner.m.Var(
-                    value=1,
-                    ub=1,
-                    lb=0,
-                    integer=True,
-                    name=f"z_HU_to_C{j}",
-                )
-                if owner.z_hu_allowed[j] > 0
-                else owner.m.Param(value=0, name=f"z_HU_to_C{j}")
-            )
-            for j in range(owner.J)
-        ]
         for n in range(owner.N_periods):
             _ = [
                 (
@@ -343,44 +268,13 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                 )
                 for j in range(owner.J)
             ]
-    else:
-        owner.z = [
-            [
-                [
-                    (
-                        owner.m.Param(value=1, name=f"z_H{i}_to_C{j}_at_S{k}")
-                        if owner.z_allowed[i][j][k] > 0
-                        else owner.m.Param(value=0, name=f"z_H{i}_to_C{j}_at_S{k}")
-                    )
-                    for k in range(owner.S)
-                ]
-                for j in range(owner.J)
-            ]
-            for i in range(owner.I)
-        ]
-        owner.z_hu = [
-            (
-                owner.m.Param(value=1, name=f"z_HU_to_C{j}")
-                if owner.z_hu_allowed[j] > 0
-                else owner.m.Param(value=0, name=f"z_HU_to_C{j}")
-            )
-            for j in range(owner.J)
-        ]
-        owner.z_cu = [
-            (
-                owner.m.Param(value=1, name=f"z_H{i}_to_CU")
-                if owner.z_cu_allowed[i] > 0
-                else owner.m.Param(value=0, name=f"z_H{i}_to_CU")
-            )
-            for i in range(owner.I)
-        ]
 
-    owner._set_multiperiod_utility_approach_equations()
+    _approach._set_multiperiod_utility_approach_equations(owner)
 
     if owner.non_isothermal_model:
-        owner._set_multiperiod_non_isothermal_equations()
+        _set_multiperiod_non_isothermal_equations(owner)
     else:
-        owner._set_multiperiod_isothermal_approach_equations()
+        _set_multiperiod_isothermal_approach_equations(owner)
 
     owner.dqda = []
     owner.alpha = []
@@ -558,7 +452,7 @@ def _set_multiperiod_non_isothermal_equations(owner) -> None:
     owner.T_h_out_x = owner.T_h_out_x_by_period[0]
     owner.T_c_out_y = owner.T_c_out_y_by_period[0]
 
-    owner._set_piecewise_match_outlet_equations()
+    _piecewise._set_piecewise_match_outlet_equations(owner)
 
     for n in range(owner.N_periods):
         _ = [
@@ -607,7 +501,8 @@ def _set_multiperiod_non_isothermal_equations(owner) -> None:
                     )
                     == 0.0
                 )
-                if owner.z_allowed[i][j][k] > 0 and not owner._hot_parent_segmented(i)
+                if owner.z_allowed[i][j][k] > 0
+                and not _piecewise._hot_parent_segmented(owner, i)
                 else None
             )
             for k in range(owner.S)
@@ -626,7 +521,8 @@ def _set_multiperiod_non_isothermal_equations(owner) -> None:
                     )
                     == 0.0
                 )
-                if owner.z_allowed[i][j][k] > 0 and not owner._cold_parent_segmented(j)
+                if owner.z_allowed[i][j][k] > 0
+                and not _piecewise._cold_parent_segmented(owner, j)
                 else None
             )
             for k in range(owner.S)

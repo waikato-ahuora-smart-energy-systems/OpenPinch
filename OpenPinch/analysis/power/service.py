@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
+from functools import partial
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -11,9 +11,10 @@ from ...domain.configuration import T_CRIT, Configuration, tol
 from ...domain.enums import CogenerationTarget, TargetType
 from ..numerics import get_period_index
 from ..targeting.context import (
-    apply_zone_config_overrides,
+    clone_target_with_zone_settings,
     format_selected_period_suffix,
-    record_selected_period,
+    normalize_base_target_type,
+    prepare_enrichment_run,
     target_matches_requested_period,
 )
 from ..thermodynamics.water import psat_T
@@ -113,16 +114,9 @@ def run_power_cogeneration_service(
     cogeneration_func=get_power_cogeneration_above_pinch,
 ):
     """Post-process one compatible target in service preference order."""
-    apply_zone_config_overrides(zone, args)
-    runtime_args = dict(args or {})
-    explicit_target_type = _normalize_cogeneration_base_target_type(
-        runtime_args.get("base_target_type")
+    runtime_args, compare_args, explicit_target_type = prepare_enrichment_run(
+        zone, args, _COGENERATION_TARGET_ORDER, service="cogeneration"
     )
-    idx, sid = record_selected_period(zone, runtime_args)
-    runtime_args["period_idx"] = idx
-    if sid is not None:
-        runtime_args["period_id"] = sid
-    compare_args = dict(args or {}) if isinstance(args, dict) else {}
     zone._selected_cogeneration_target_type = None
 
     for target_type in _get_cogeneration_candidate_order(explicit_target_type):
@@ -142,15 +136,7 @@ def run_power_cogeneration_service(
                 )
             continue
 
-        target = deepcopy(target, {id(target.parent_zone): target.parent_zone})
-        target.config._values.update(
-            {
-                key: value
-                for key, value in zone.config._values.items()
-                if key.startswith("POWER_")
-            }
-        )
-        target.config._build_groups(target.config._values)
+        target = clone_target_with_zone_settings(target, zone, prefix="POWER_")
         cogeneration_func(target, args=runtime_args)
         zone.add_target(target, invalidate_dependents=False)
         zone._selected_cogeneration_target_type = target_type
@@ -163,21 +149,11 @@ def run_power_cogeneration_service(
     )
 
 
-def _normalize_cogeneration_base_target_type(
-    base_target_type: object | None,
-) -> str | None:
-    """Validate an explicit cogeneration base target override."""
-    if base_target_type is None:
-        return None
-
-    normalized = str(base_target_type)
-    if normalized not in _COGENERATION_TARGET_ORDER:
-        supported = ", ".join(_COGENERATION_TARGET_ORDER)
-        raise ValueError(
-            "Unsupported cogeneration base_target_type "
-            f"{normalized!r}. Supported types: {supported}."
-        )
-    return normalized
+_normalize_cogeneration_base_target_type = partial(
+    normalize_base_target_type,
+    supported=_COGENERATION_TARGET_ORDER,
+    service="cogeneration",
+)
 
 
 def _get_cogeneration_candidate_order(

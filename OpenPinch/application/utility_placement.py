@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
+from pint.errors import PintError
 
 from ..analysis.targeting.cascade import get_process_heat_cascade
 from ..analysis.targeting.direct import (
@@ -19,7 +20,6 @@ from ..analysis.targeting.direct import (
     _PreparedUtilityLoadProfile,
     _target_prepared_utility_load_profile_duties,
 )
-from ..analysis.targeting.grand_composite import get_seperated_gcc_heat_load_profiles
 from ..analysis.targeting.indirect import (
     _build_site_utility_profile,
     _match_utility_gen_and_use_at_same_level,
@@ -45,16 +45,19 @@ from ..analysis.utility_placement.normalization import (
     normalize_utility_placement_request,
     prepare_template_blueprints,
 )
+from ..analysis.utility_placement.profiles import (
+    _calibrate_profile,
+    _coordinate_bounds,
+    _finite_tuple,
+    _load_profiles,
+    _process_entropy_slices,
+)
 from ..analysis.utility_placement.service import optimise_utility_placement
 from ..contracts.input import UtilitySchema
 from ..contracts.units import standardise_input_value
 from ..contracts.utility_placement import (
     CandidateDiagnostic,
-    CoordinateKey,
-    DecisionField,
     DecodedPlacement,
-    PhysicalCoordinateBound,
-    QuantityInterval,
     QuantityValue,
     TemplateBlueprintSet,
     UtilityDutyLimit,
@@ -66,6 +69,7 @@ from ..contracts.utility_placement import (
     UtilitySide,
 )
 from ..domain._value.resolution import get_scalar_value
+from ..domain.configuration import C_to_K
 from ..domain.enums import ProblemTableLabel, StreamType, TargetType, ZoneType
 from ..domain.problem_table import ProblemTable
 from ..domain.stream import Stream
@@ -487,7 +491,7 @@ def _normalize_maximum_duties(
                 field_name="heat_flow",
                 config=config,
             )
-        except Exception as exc:
+        except (PintError, TypeError, ValueError) as exc:
             raise PlacementRequestValidationError(
                 code="invalid_maximum_duty_unit",
                 message=f"Maximum duty for '{name}' has an incompatible unit.",
@@ -577,112 +581,6 @@ def _period_selection(
     return selected
 
 
-def _finite_tuple(values) -> tuple[float, ...]:
-    return tuple(float(value) for value in values)
-
-
-def _load_profiles(
-    problem_table,
-    *,
-    net_label: ProblemTableLabel | None = None,
-) -> tuple[tuple[float, ...], tuple[float, ...]]:
-    if net_label is None:
-        hot = tuple(
-            abs(value)
-            for value in _finite_tuple(problem_table[ProblemTableLabel.H_NET_COLD])
-        )
-        cold = tuple(
-            abs(value)
-            for value in _finite_tuple(problem_table[ProblemTableLabel.H_NET_HOT])
-        )
-        if all(math.isfinite(value) for value in hot + cold):
-            return hot, cold
-        net = problem_table[ProblemTableLabel.H_NET_A]
-        if not all(math.isfinite(float(value)) for value in net):
-            net = problem_table[ProblemTableLabel.H_NET]
-    else:
-        net = problem_table[net_label]
-    updates = get_seperated_gcc_heat_load_profiles(
-        T_col=problem_table[ProblemTableLabel.T],
-        H_net=net,
-    )["updates"]
-    return (
-        tuple(
-            abs(value) for value in _finite_tuple(updates[ProblemTableLabel.H_NET_COLD])
-        ),
-        tuple(
-            abs(value) for value in _finite_tuple(updates[ProblemTableLabel.H_NET_HOT])
-        ),
-    )
-
-
-def _calibrate_profile(
-    profile: tuple[float, ...],
-    *,
-    residual_duty: float,
-) -> tuple[float, ...]:
-    """Match rounded problem-table coordinates to the exact target duty."""
-    peak = max(profile, default=0.0)
-    if peak == 0.0:
-        if residual_duty == 0.0:
-            return profile
-        raise PlacementContextError(
-            code="incomplete_load_profile",
-            message="Target load profile cannot represent the residual duty.",
-        )
-    factor = residual_duty / peak
-    return tuple(value * factor for value in profile)
-
-
-def _process_entropy_slices(zone, period_idx: int) -> tuple[ProcessEntropySlice, ...]:
-    """Extract real-temperature entropy inputs from physical process streams."""
-    slices: list[ProcessEntropySlice] = []
-    for side, streams in (
-        (UtilitySide.HOT, zone.hot_streams),
-        (UtilitySide.COLD, zone.cold_streams),
-    ):
-        for stream in streams:
-            if not stream.is_active:
-                continue
-            parts = stream.segments or (stream,)
-            for part in parts:
-                supply = get_scalar_value(
-                    part.supply_temperature,
-                    period_idx=period_idx,
-                )
-                target = get_scalar_value(
-                    part.target_temperature,
-                    period_idx=period_idx,
-                )
-                raw_duty = get_scalar_value(part.heat_flow, period_idx=period_idx)
-                if supply is None or target is None or raw_duty is None:
-                    raise PlacementContextError(
-                        code="incomplete_process_entropy_input",
-                        message=(
-                            "Process stream entropy input requires temperatures "
-                            "and duty."
-                        ),
-                        details=(("stream", stream.name),),
-                    )
-                duty = abs(float(raw_duty))
-                if duty == 0.0:
-                    continue
-                temperature_in = float(supply) + 273.15
-                temperature_out = float(target) + 273.15
-                span = abs(temperature_out - temperature_in)
-                slices.append(
-                    ProcessEntropySlice(
-                        interval_index=len(slices),
-                        side=side,
-                        temperature_in_kelvin=temperature_in,
-                        temperature_out_kelvin=temperature_out,
-                        available_duty=duty,
-                        heat_capacity_flow=duty / span if span > 0.0 else 0.0,
-                    )
-                )
-    return tuple(slices)
-
-
 def _snapshot_from_target(
     isolated: "PinchProblem",
     request: UtilityPlacementRequest,
@@ -748,100 +646,6 @@ def _snapshot_from_target(
         ),
     )
     return snapshot, residual_hot_duty, residual_cold_duty
-
-
-def _coordinate_bounds(
-    request: UtilityPlacementRequest,
-    blueprints: TemplateBlueprintSet,
-    temperatures: tuple[float, ...],
-    *,
-    hot_profile: tuple[float, ...] | None = None,
-    cold_profile: tuple[float, ...] | None = None,
-) -> tuple[PhysicalCoordinateBound, ...]:
-    def support(profile: tuple[float, ...] | None) -> tuple[float, ...]:
-        if profile is None:
-            return temperatures
-        if len(profile) != len(temperatures):
-            raise PlacementContextError(
-                code="profile_temperature_mismatch",
-                message="Residual profile and temperature coordinates must align.",
-            )
-        active = tuple(
-            temperature
-            for index, temperature in enumerate(temperatures)
-            if (index > 0 and abs(profile[index] - profile[index - 1]) > 1e-12)
-            or (
-                index < len(profile) - 1
-                and abs(profile[index] - profile[index + 1]) > 1e-12
-            )
-        )
-        return active or temperatures
-
-    separation = request.options.minimum_separation.value
-    level_count = request.isothermal_level_count + request.sensible_level_count
-    hottest = max(temperatures)
-    coldest = min(temperatures)
-    outward_margin = request.options.default_isothermal_span.value + separation * max(
-        level_count - 1, 0
-    )
-    hot_support = support(hot_profile)
-    cold_support = support(cold_profile)
-    hot_lower = min(hot_support)
-    hot_upper = max(hot_support) + outward_margin
-    cold_lower = max(-273.14, min(cold_support) - outward_margin)
-    cold_upper = max(cold_support)
-    paired_lower = min(hot_lower, cold_lower)
-    paired_upper = max(hot_upper, cold_upper)
-    maximum_span = max(
-        request.options.minimum_sensible_span.value,
-        hottest - coldest + outward_margin,
-    )
-    bounds: list[PhysicalCoordinateBound] = []
-    for blueprint in blueprints.all:
-        if request.uses_generated_pairs:
-            supply = QuantityInterval(
-                lower=paired_lower,
-                upper=paired_upper,
-                unit=request.units.absolute_temperature,
-            )
-        elif blueprint.key.side is UtilitySide.HOT:
-            supply = QuantityInterval(
-                lower=hot_lower,
-                upper=hot_upper,
-                unit=request.units.absolute_temperature,
-            )
-        else:
-            supply = QuantityInterval(
-                lower=cold_lower,
-                upper=cold_upper,
-                unit=request.units.absolute_temperature,
-            )
-        bounds.append(
-            PhysicalCoordinateBound(
-                coordinate=CoordinateKey(
-                    template_key=blueprint.key,
-                    field=DecisionField.SUPPLY_TEMPERATURE,
-                ),
-                bounds=supply,
-                reason="residual-profile temperature support",
-            )
-        )
-        if blueprint.kind is UtilityLevelKind.SENSIBLE:
-            bounds.append(
-                PhysicalCoordinateBound(
-                    coordinate=CoordinateKey(
-                        template_key=blueprint.key,
-                        field=DecisionField.TEMPERATURE_SPAN,
-                    ),
-                    bounds=QuantityInterval(
-                        lower=request.options.minimum_sensible_span.value,
-                        upper=maximum_span,
-                        unit=request.units.temperature_difference,
-                    ),
-                    reason="residual-profile sensible-span support",
-                )
-            )
-    return tuple(bounds)
 
 
 def _period_weight(problem: "PinchProblem", period_id: str) -> float:
@@ -1700,8 +1504,8 @@ def _residual_placement_snapshot(data):
         ProcessEntropySlice(
             interval_index=i,
             side=UtilitySide(s.side),
-            temperature_in_kelvin=s.supply_temperature + 273.15,
-            temperature_out_kelvin=s.target_temperature + 273.15,
+            temperature_in_kelvin=s.supply_temperature + C_to_K,
+            temperature_out_kelvin=s.target_temperature + C_to_K,
             available_duty=s.duty,
             heat_capacity_flow=s.duty / abs(s.supply_temperature - s.target_temperature)
             if s.supply_temperature != s.target_temperature

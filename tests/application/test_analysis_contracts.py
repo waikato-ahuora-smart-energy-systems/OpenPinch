@@ -63,6 +63,33 @@ def test_catalog_matches_live_target_and_design_methods():
         METHOD_CATALOG["new"] = None
 
 
+def test_require_available_names_the_requested_unavailable_method(monkeypatch):
+    from dataclasses import replace
+    from types import MappingProxyType
+
+    import OpenPinch.application._problem.targeting.catalog as catalog
+
+    with pytest.raises(NotImplementedError) as brayton:
+        catalog.require_available("target.brayton_refrigeration")
+    assert "'target.brayton_refrigeration'" in str(brayton.value)
+    assert "Brayton targeting is unavailable" in str(brayton.value)
+
+    unavailable = replace(
+        catalog.METHOD_CATALOG["target.carnot_heat_pump"], available=False
+    )
+    monkeypatch.setattr(
+        catalog,
+        "METHOD_CATALOG",
+        MappingProxyType(
+            {**catalog.METHOD_CATALOG, "target.carnot_heat_pump": unavailable}
+        ),
+    )
+    with pytest.raises(NotImplementedError) as other:
+        catalog.require_available("target.carnot_heat_pump")
+    assert "'target.carnot_heat_pump'" in str(other.value)
+    assert "Brayton" not in str(other.value)
+
+
 def test_nonthermal_result_has_family_report_adapter():
     from OpenPinch.presentation.reporting.adapters import adapt_analysis_result
 

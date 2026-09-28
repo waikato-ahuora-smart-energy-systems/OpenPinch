@@ -165,15 +165,15 @@ def run_problem_targeting(
 ) -> TargetOutput:
     """Run targeting against a prepared parent problem and cache the output."""
     if not isinstance(zone, Zone):
-        zone = problem._build_execution_master_zone()
-    runtime_options, sid = problem._resolve_runtime_period_options(options, zone=zone)
+        zone = build_execution_master_zone(problem)
+    runtime_options, sid = resolve_runtime_period_options(options, zone=zone)
     dispatch_func(
         zone=zone,
         direct_service_func=direct_service_func,
         indirect_service_func=indirect_service_func,
         args=runtime_options,
     )
-    problem._attach_process_component_work_targets(zone, runtime_options)
+    attach_process_component_work_targets(problem, zone, runtime_options)
     problem._results = TargetOutput.model_validate(extract_func(zone, period_id=sid))
     return problem._results
 
@@ -191,9 +191,9 @@ def execute_targeting(
     extract_func=extract_results,
 ) -> BaseTargetModel:
     """Execute one selected target family for a parent problem."""
-    master = problem._build_execution_master_zone()
-    runtime_options, sid = problem._resolve_runtime_period_options(options, zone=master)
-    zone = problem._resolve_target_zone(application_zone, master_zone=master)
+    master = build_execution_master_zone(problem)
+    runtime_options, sid = resolve_runtime_period_options(options, zone=master)
+    zone = resolve_target_zone(problem, application_zone, master_zone=master)
     if target_id != "Energy Transfer Analysis":
         parent = zone.parent_zone
         while isinstance(parent, Zone):
@@ -201,12 +201,14 @@ def execute_targeting(
             parent.graphs.clear()
             parent = parent.parent_zone
     if include_subzones:
-        problem._run_targeting_for_zone_and_subzones(
+        run_problem_targeting(
+            problem,
             zone=zone,
             direct_service_func=direct_service_func,
             indirect_service_func=indirect_service_func,
             options=runtime_options,
             sid=sid,
+            extract_func=extract_func,
         )
     else:
         with scratch_child_targets(zone):
@@ -214,7 +216,7 @@ def execute_targeting(
                 direct_service_func(zone, runtime_options)
             if indirect_service_func is not None:
                 indirect_service_func(zone, runtime_options)
-        problem._attach_process_component_work_targets(master, runtime_options)
+        attach_process_component_work_targets(problem, master, runtime_options)
         problem._results = TargetOutput.model_validate(
             extract_func(master, period_id=sid)
         )
@@ -245,21 +247,23 @@ def execute_cogeneration_targeting(
     extract_func=extract_results,
 ) -> BaseTargetModel:
     """Run cogeneration and return the runtime-selected target family."""
-    master = problem._build_execution_master_zone()
-    runtime_options, sid = problem._resolve_runtime_period_options(options, zone=master)
-    zone = problem._resolve_target_zone(application_zone, master_zone=master)
+    master = build_execution_master_zone(problem)
+    runtime_options, sid = resolve_runtime_period_options(options, zone=master)
+    zone = resolve_target_zone(problem, application_zone, master_zone=master)
     if include_subzones:
-        problem._run_targeting_for_zone_and_subzones(
+        run_problem_targeting(
+            problem,
             zone=zone,
             direct_service_func=service_func,
             options=runtime_options,
             sid=sid,
+            extract_func=extract_func,
         )
     else:
         with scratch_child_targets(zone):
             if service_func is not None:
                 service_func(zone, runtime_options)
-        problem._attach_process_component_work_targets(master, runtime_options)
+        attach_process_component_work_targets(problem, master, runtime_options)
         problem._results = TargetOutput.model_validate(
             extract_func(master, period_id=sid)
         )
@@ -307,18 +311,18 @@ def execute_exergy_targeting(
     extract_func=extract_results,
 ) -> BaseTargetModel:
     """Apply exergy targeting and return the runtime-selected target family."""
-    master = problem._build_execution_master_zone()
-    runtime_options, sid = problem._resolve_runtime_period_options(options, zone=master)
-    zone = problem._resolve_target_zone(application_zone, master_zone=master)
+    master = build_execution_master_zone(problem)
+    runtime_options, sid = resolve_runtime_period_options(options, zone=master)
+    zone = resolve_target_zone(problem, application_zone, master_zone=master)
     if include_subzones:
-        problem._run_exergy_targeting_for_zone_and_subzones(
+        run_exergy_targeting_for_zone_and_subzones(
             zone=zone,
             service_func=service_func,
             options=runtime_options,
         )
     elif service_func is not None:
         service_func(zone, runtime_options)
-    problem._attach_process_component_work_targets(master, runtime_options)
+    attach_process_component_work_targets(problem, master, runtime_options)
     problem._results = TargetOutput.model_validate(extract_func(master, period_id=sid))
     selected = getattr(zone, "_selected_exergy_target_type", None)
     if not isinstance(selected, str):

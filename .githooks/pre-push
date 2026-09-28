@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Runs the local CI before every push, so a PR only goes up once it passes.
+#   Enable once per clone:  git config core.hooksPath .githooks
+#   Skip in an emergency:   git push --no-verify
+#   Choose lanes:           OPENPINCH_PREPUSH_LANES="quick" git push
+#
+# Pushing develop or a branch meant for main? Run `scripts/ci_local.sh all`
+# first: it adds the TESPy, performance, solver and notebook lanes.
+#
+# Full output goes to reports/pre-push.log rather than the terminal: git GUI
+# clients (VS Code, GitHub Desktop) may close the hook's output early, which
+# would otherwise crash pytest with a BrokenPipeError.
+set -euo pipefail
+root="$(git rev-parse --show-toplevel)"
+mkdir -p "$root/reports"
+log="$root/reports/pre-push.log"
+read -ra lanes <<< "${OPENPINCH_PREPUSH_LANES:-}"
+echo "pre-push: running scripts/ci_local.sh ${lanes[*]:-(default lanes)}; log: reports/pre-push.log"
+if "$root/scripts/ci_local.sh" ${lanes[@]+"${lanes[@]}"} > "$log" 2>&1 < /dev/null; then
+  echo "pre-push: all checks passed"
+else
+  echo "pre-push: checks FAILED, push blocked. Last lines of reports/pre-push.log:" >&2
+  tail -n 40 "$log" >&2 || true
+  exit 1
+fi

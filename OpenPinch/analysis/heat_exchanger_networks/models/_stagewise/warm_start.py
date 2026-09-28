@@ -12,7 +12,7 @@ def set_initial_values_for_variables(
     """Warm-start this model from a solved parent model."""
 
     if getattr(owner, "N_periods", 1) > 1 and hasattr(owner, "Q_r_by_period"):
-        owner._set_multiperiod_initial_values(init_solution, brackets=brackets)
+        _set_multiperiod_initial_values(owner, init_solution, brackets=brackets)
         return
 
     for k in range(owner.S):

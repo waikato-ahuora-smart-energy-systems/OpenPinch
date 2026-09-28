@@ -1,4 +1,13 @@
-"""Brayton HP targeting."""
+"""Brayton HP targeting.
+
+Experimental: this module is retained for planned future work and is not wired
+to a working public workflow. ``problem.target.brayton_heat_pump()`` and
+``problem.target.brayton_refrigeration()`` are declared unavailable in the
+analysis-method catalog and raise ``NotImplementedError`` before any state is
+prepared, and :func:`optimise_brayton_heat_pump_placement` raises
+``NotImplementedError`` as well. The module is excluded from the published API
+reference and may change or be removed without notice.
+"""
 
 from typing import List, Tuple
 
@@ -29,25 +38,6 @@ def optimise_brayton_heat_pump_placement(
         "Brayton HPR targeting is currently unsupported pending contract "
         "and solver repair."
     )
-    # args.n_cond = args.n_evap = 1
-    # args.refrigerant_ls = ["air"]
-    # x0, bnds = _get_brayton_hp_opt_setup(args)
-
-    # opt = minimize(
-    #     fun=lambda x: _compute_brayton_hp_system_obj(x, args)["obj"],
-    #     x0=x0,
-    #     method="SLSQP",
-    #     bounds=bnds,
-    #     options={"disp": False, "maxiter": 1000},
-    #     tol=1e-7,
-    # )
-
-    # if not opt.success:
-    #     raise ValueError(f"Brayton heat pump targeting failed: {opt.message}")
-
-    # res = _compute_brayton_hp_system_obj(opt.x, args)
-    # res["success"] = opt.success
-    # return HeatPumpTargetOutputs.model_validate(res)
 
 
 def _get_brayton_hp_opt_setup(
@@ -148,7 +138,6 @@ def _compute_brayton_hp_system_obj(
     Q_cool = np.array([hp.Q_cool for hp in hp_list])
     cop = (args.Q_hpr_target - Q_ext) / (w_hpr + 1e-9)
     Q_amb = 0.0
-    # Q_amb = _calc_Q_amb(Q_cool.sum(), np.abs(args.H_hot[-1]), args.Q_amb_max)
     obj = calc_hpr_obj(
         work=w_hpr,
         Q_ext_heat=Q_ext,
@@ -198,11 +187,3 @@ def _build_simulated_hpr_streams(
             )
         )
     return hp_streams
-
-
-# def _calc_Q_amb(
-#     Q_evap_total: float,
-#     H_hot_limit: float,
-#     Q_amb_max: float,
-# ) -> float:
-#     return max(Q_evap_total - (H_hot_limit - Q_amb_max), 0.0)

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import html
 from collections.abc import Iterator, Mapping
+from importlib.resources import files
 
 from ...analysis.graphs.service import get_output_graph_data
 from ...domain.targets import BaseTargetModel
@@ -52,7 +54,7 @@ def render_streamlit_dashboard(
         f"""
         <div class="op-header">
             <div>
-                <div class="op-title">{resolved_title}</div>
+                <div class="op-title">{html.escape(resolved_title)}</div>
                 <div class="op-subtitle">
                     Energy targeting summary with composite curve visualisation
                 </div>
@@ -140,13 +142,13 @@ def render_streamlit_dashboard(
     for entry, utilities in ut_dict.items():
         st.sidebar.divider()
         st.sidebar.markdown(
-            f"<div class='op-utility-title'>{entry}</div>",
+            f"<div class='op-utility-title'>{html.escape(entry)}</div>",
             unsafe_allow_html=True,
         )
         if utilities:
             cards = "".join(
                 f'<div class="op-utility-card">'
-                f'<div class="op-utility-name">{u.name}</div>'
+                f'<div class="op-utility-name">{html.escape(str(u.name))}</div>'
                 f'<div class="op-utility-value">{u.heat_flow:,.0f}&nbsp;kW</div>'
                 f"</div>"
                 for u in utilities
@@ -184,8 +186,9 @@ def render_streamlit_dashboard(
             for idx, graph in enumerate(graph_set.graphs):
                 column = columns[idx % 2]
                 with column:
+                    title = html.escape(graph_names[idx])
                     st.markdown(
-                        f"<div class='op-card-title'>{graph_names[idx]}</div>",
+                        f"<div class='op-card-title'>{title}</div>",
                         unsafe_allow_html=True,
                     )
                     figure = build_plotly_figure(graph)
@@ -246,199 +249,9 @@ def render_streamlit_dashboard(
 
 
 def _apply_dashboard_theme(st) -> None:
-    st.markdown(
-        """
-        <style>
-            :root {
-                --op-bg: #f5f7fb;
-                --op-card: #ffffff;
-                --op-ink: #0f172a;
-                --op-muted: #64748b;
-                --op-border: rgba(148, 163, 184, 0.35);
-                --op-accent: #0ea5a4;
-                --op-accent-soft: rgba(14, 165, 164, 0.12);
-                --op-select-text: #262730;
-            }
+    st.markdown(f"<style>\n{_dashboard_css()}</style>", unsafe_allow_html=True)
 
-            .stApp {
-                background: linear-gradient(
-                    180deg,
-                    #f5f7fb 0%,
-                    #eef2f7 60%,
-                    #f8fafc 100%
-                );
-                color: var(--op-ink);
-                font-family: "IBM Plex Sans", "Inter", system-ui, sans-serif;
-            }
 
-            section[data-testid="stSidebar"] {
-                background-color: #0f172a;
-                color: #f8fafc;
-                border-right: 1px solid rgba(148, 163, 184, 0.2);
-            }
-
-            section[data-testid="stSidebar"] * {
-                color: #e2e8f0;
-            }
-
-            section[data-testid="stSidebar"] label {
-                color: #94a3b8 !important;
-            }
-
-            section[data-testid="stSidebar"] div[data-baseweb="select"] span {
-                color: var(--op-select-text) !important;
-            }
-
-            section[data-testid="stSidebar"] div[data-baseweb="select"] input {
-                color: var(--op-select-text) !important;
-            }
-
-            section[data-testid="stSidebar"] div[data-baseweb="select"] * {
-                color: var(--op-select-text) !important;
-            }
-
-            section[data-testid="stSidebar"] hr {
-                margin: 0.8rem 0;
-            }
-
-            div[data-baseweb="menu"] span {
-                color: var(--op-select-text) !important;
-            }
-
-            .op-header {
-                display: flex;
-                align-items: flex-end;
-                justify-content: space-between;
-                padding: 0.5rem 0 1rem;
-            }
-
-            .op-title {
-                font-size: 2rem;
-                font-weight: 600;
-                letter-spacing: -0.02em;
-                color: var(--op-ink);
-            }
-
-            .op-subtitle {
-                color: var(--op-muted);
-                font-size: 0.95rem;
-                margin-top: 0.2rem;
-            }
-
-            .op-metric-grid {
-                display: grid;
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-                gap: 0.45rem;
-                margin-top: 0.35rem;
-            }
-
-            .op-metric {
-                background: rgba(255, 255, 255, 0.08);
-                border: 1px solid rgba(148, 163, 184, 0.2);
-                border-radius: 12px;
-                padding: 0.45rem 0.6rem;
-            }
-
-            .op-metric-label {
-                font-size: 0.72rem;
-                letter-spacing: 0.06em;
-                text-transform: uppercase;
-                color: #94a3b8;
-                margin-bottom: 0.3rem;
-            }
-
-            .op-metric-value {
-                font-size: 1.1rem;
-                font-weight: 600;
-            }
-
-            .op-card-title {
-                font-size: 1rem;
-                font-weight: 600;
-                color: var(--op-ink);
-                margin-bottom: 0.3rem;
-                padding-left: 0.1rem;
-            }
-
-            .op-utility-title {
-                font-size: 0.72rem;
-                letter-spacing: 0.06em;
-                text-transform: uppercase;
-                color: #94a3b8;
-                margin-bottom: 0.45rem;
-            }
-
-            .op-utility-grid {
-                display: grid;
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-                gap: 0.6rem;
-            }
-
-            .op-utility-card {
-                background: rgba(255, 255, 255, 0.08);
-                border: 1px solid rgba(148, 163, 184, 0.2);
-                border-radius: 12px;
-                padding: 0.55rem 0.75rem;
-            }
-
-            .op-utility-name {
-                font-size: 0.9rem;
-                font-weight: 600;
-                color: #e2e8f0;
-            }
-
-            .op-utility-value {
-                font-size: 0.92rem;
-                color: #cbd5f5;
-            }
-
-            .op-utility-empty {
-                color: #94a3b8;
-                text-align: center;
-                font-size: 0.88rem;
-            }
-
-            div[data-testid="stPlotlyChart"] {
-                background: var(--op-card);
-                border: 1px solid var(--op-border);
-                border-radius: 14px;
-                padding: 0.75rem;
-                box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
-                overflow: hidden;
-            }
-
-            div[data-testid="stPlotlyChart"] > div {
-                width: 100% !important;
-            }
-
-            .stTabs [role="tab"] {
-                font-weight: 600;
-                letter-spacing: 0.01em;
-                color: var(--op-muted);
-            }
-
-            .stTabs [role="tab"][aria-selected="true"] {
-                color: var(--op-ink);
-                border-bottom: 2px solid var(--op-accent);
-            }
-
-            .stBadge {
-                background-color: var(--op-accent-soft) !important;
-                color: var(--op-ink) !important;
-                border: 1px solid rgba(14, 165, 164, 0.3);
-            }
-
-            div[data-testid="stDataFrame"] {
-                background: var(--op-card);
-                border: 1px solid var(--op-border);
-                border-radius: 12px;
-                padding: 0.4rem;
-            }
-
-            input, textarea {
-                border-radius: 10px !important;
-            }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+def _dashboard_css() -> str:
+    """Return the packaged dashboard stylesheet shipped beside this module."""
+    return files(__package__).joinpath("dashboard.css").read_text(encoding="utf-8")

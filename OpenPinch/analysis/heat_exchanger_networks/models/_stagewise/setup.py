@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from .._base import piecewise as _piecewise
+
 
 def set_preprocessing(owner) -> None:
     """Pre-process SynHEAT superstructure parameters for all states."""
@@ -16,7 +18,8 @@ def set_preprocessing(owner) -> None:
     owner.Qtot_sh_period = np.array(
         [
             [
-                owner._parent_profile_duty(
+                _piecewise._parent_profile_duty(
+                    owner,
                     "hot",
                     n,
                     i,
@@ -33,7 +36,8 @@ def set_preprocessing(owner) -> None:
     owner.Qtot_sc_period = np.array(
         [
             [
-                owner._parent_profile_duty(
+                _piecewise._parent_profile_duty(
+                    owner,
                     "cold",
                     n,
                     j,
@@ -92,7 +96,8 @@ def set_preprocessing(owner) -> None:
             [
                 [
                     max(
-                        owner._recovery_heat_upper_bound(
+                        _piecewise._recovery_heat_upper_bound(
+                            owner,
                             period_index=n,
                             hot_index=i,
                             cold_index=j,

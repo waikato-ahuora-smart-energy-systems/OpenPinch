@@ -42,11 +42,14 @@ class BaseHeatExchangerNetworkModel(ABC):
         min_dqda: float,
         minimisation_goal: Literal[
             "hot utility",
+            "cold utility",
             "total utility",
             "utility costs",
             "heat recovery",
             "total cost",
             "variable total cost",
+            "dQ/dA obj",
+            "min units",
         ],
         non_isothermal_model: bool,
         integers: bool,
@@ -127,54 +130,6 @@ class BaseHeatExchangerNetworkModel(ABC):
             fallback_delta=fallback_delta,
         )
 
-    def _apply_segment_recovery_areas(self, q_r) -> None:
-        "Replace aggregate-CP recovery areas with ordered local slice totals."
-        return _area._apply_segment_recovery_areas(self, q_r)
-
-    def _apply_segment_utility_areas(self, q_h, q_c) -> None:
-        "Use local process segments for hot- and cold-utility area totals."
-        return _area._apply_segment_utility_areas(self, q_h, q_c)
-
-    def _segment_exact_dqda(
-        self,
-        *,
-        period_index: int,
-        hot_parent_index: int,
-        cold_parent_index: int,
-        duty: float,
-        hot_inlet_temperature: float,
-        cold_inlet_temperature: float,
-    ) -> float | None:
-        "Return a local numerical dQ/dA from ordered segment-summed area."
-        return _area._segment_exact_dqda(
-            self,
-            period_index=period_index,
-            hot_parent_index=hot_parent_index,
-            cold_parent_index=cold_parent_index,
-            duty=duty,
-            hot_inlet_temperature=hot_inlet_temperature,
-            cold_inlet_temperature=cold_inlet_temperature,
-        )
-
-    def _register_piecewise_mapping(self, mapping) -> None:
-        return _piecewise._register_piecewise_mapping(self, mapping)
-
-    def _utility_is_segmented(self, side: str) -> bool:
-        return _piecewise._utility_is_segmented(self, side)
-
-    def _utility_cost_expression(
-        self,
-        side: str,
-        period_index: int,
-        heat_duty,
-        *,
-        name: str,
-    ):
-        "Return the flat or exact piecewise utility-cost solver expression."
-        return _piecewise._utility_cost_expression(
-            self, side, period_index, heat_duty, name=name
-        )
-
     def _utility_cost_value(
         self,
         side: str,
@@ -183,75 +138,6 @@ class BaseHeatExchangerNetworkModel(ABC):
     ) -> float:
         "Return exact solved utility cost for reporting and verification."
         return _piecewise._utility_cost_value(self, side, period_index, heat_duty)
-
-    def _update_piecewise_active_segments(self) -> bool:
-        return _piecewise._update_piecewise_active_segments(self)
-
-    def _set_piecewise_stage_heat_coordinates(self) -> None:
-        "Add parent cumulative-Q balances and ordered T(Q) mappings by period."
-        return _piecewise._set_piecewise_stage_heat_coordinates(self)
-
-    def _set_segmented_utility_capacity_constraints(self) -> None:
-        "Bound selected utility load by each explicit ordered profile."
-        return _piecewise._set_segmented_utility_capacity_constraints(self)
-
-    def _set_piecewise_utility_outlet_states(self) -> None:
-        "Map aggregate utility duty to outlet temperature and local ``dt_cont``."
-        return _piecewise._set_piecewise_utility_outlet_states(self)
-
-    def _hot_parent_segmented(self, index: int) -> bool:
-        return _piecewise._hot_parent_segmented(self, index)
-
-    def _cold_parent_segmented(self, index: int) -> bool:
-        return _piecewise._cold_parent_segmented(self, index)
-
-    def _solver_parent_is_segmented(self, side: str, index: int) -> bool:
-        return _piecewise._solver_parent_is_segmented(self, side, index)
-
-    def _parent_profile_duty(
-        self,
-        side: str,
-        period_index: int,
-        parent_index: int,
-        supply_temperature: float,
-        target_temperature: float,
-        aggregate_cp: float,
-    ) -> float:
-        return _piecewise._parent_profile_duty(
-            self,
-            side,
-            period_index,
-            parent_index,
-            supply_temperature,
-            target_temperature,
-            aggregate_cp,
-        )
-
-    def _recovery_heat_upper_bound(
-        self,
-        *,
-        period_index: int,
-        hot_index: int,
-        cold_index: int,
-        hot_total_duty: float,
-        cold_total_duty: float,
-        hot_cp: float,
-        cold_cp: float,
-    ) -> float:
-        return _piecewise._recovery_heat_upper_bound(
-            self,
-            period_index=period_index,
-            hot_index=hot_index,
-            cold_index=cold_index,
-            hot_total_duty=hot_total_duty,
-            cold_total_duty=cold_total_duty,
-            hot_cp=hot_cp,
-            cold_cp=cold_cp,
-        )
-
-    def _set_piecewise_match_outlet_equations(self) -> None:
-        "Map non-isothermal branch outlets through parent heat coordinates."
-        return _piecewise._set_piecewise_match_outlet_equations(self)
 
     def get_alpha_values(self) -> list:
         "Calculate source alpha flow-on values in a post-optimisation solve."
@@ -347,17 +233,6 @@ class BaseHeatExchangerNetworkModel(ABC):
         return _approach._utility_solved_outlet_temperature(
             self, side, period_idx, match_index, heat_duty
         )
-
-    def _utility_max_temperature_contribution(
-        self,
-        side: str,
-        period_idx: int,
-    ) -> float:
-        return _approach._utility_max_temperature_contribution(self, side, period_idx)
-
-    def _set_multiperiod_utility_approach_equations(self) -> None:
-        "Constrain both utility terminals with local segment contributions."
-        return _approach._set_multiperiod_utility_approach_equations(self)
 
     def _weighted_state_average(self, values: Sequence[Any]) -> Any:
         "Return ``sum_s(w_s * value_s) / sum_s(w_s)`` for GEKKO expressions."

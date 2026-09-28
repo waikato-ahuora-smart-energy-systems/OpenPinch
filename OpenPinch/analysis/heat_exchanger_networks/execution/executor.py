@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from concurrent.futures import ProcessPoolExecutor
 from typing import Any, Callable, Protocol, Sequence
 
@@ -14,6 +15,8 @@ from ..errors import WorkflowContractError
 from ..models.problem import InternalHeatExchangerNetworkProblem
 from ..solver.arrays import PreparedSolverArrays, problem_to_solver_arrays
 from .pathways import pathways_from_metadata, tier_evm_branch_breadth
+
+logger = logging.getLogger(__name__)
 
 
 def _process_pool(max_workers: int) -> ProcessPoolExecutor:
@@ -107,6 +110,12 @@ class LocalSynthesisExecutor:
                     )
                 )
             except Exception as exc:
+                logger.debug(
+                    "Failed to build HEN synthesis task %s: %s",
+                    task.task_id,
+                    exc,
+                    exc_info=True,
+                )
                 if task.task_id is not None:
                     failed[task.task_id] = _failed_task_outcome(task, str(exc))
 
@@ -346,6 +355,12 @@ def _solve_built_task(
             internal_problem,
         )
     except Exception as exc:
+        logger.debug(
+            "HEN synthesis task %s failed to solve: %s",
+            task.task_id,
+            exc,
+            exc_info=True,
+        )
         return task, _failed_task_outcome(task, str(exc)), None
 
 
@@ -375,6 +390,12 @@ def _build_and_solve_root_task(
             parent_outcomes={},
         )
     except Exception as exc:
+        logger.debug(
+            "Failed to build HEN synthesis root task %s: %s",
+            task.task_id,
+            exc,
+            exc_info=True,
+        )
         return task, _failed_task_outcome(task, str(exc)), None
     return _solve_built_task(
         (

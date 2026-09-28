@@ -50,6 +50,9 @@ from OpenPinch.analysis.heat_exchanger_networks.solver import (
     dependencies,
 )
 from OpenPinch.analysis.heat_exchanger_networks.targeting import (
+    _stage as targeting_stage,
+)
+from OpenPinch.analysis.heat_exchanger_networks.targeting import (
     network_evolution_method as evolution,
 )
 from OpenPinch.analysis.heat_exchanger_networks.targeting.topology import (
@@ -495,18 +498,22 @@ def test_network_evolution_task_edges(monkeypatch):
     }
 
     monkeypatch.setattr(
-        evolution, "topology_restrictions_from_network", lambda *_args, **_kwargs: ()
+        targeting_stage,
+        "topology_restrictions_from_network",
+        lambda *_args, **_kwargs: (),
     )
     monkeypatch.setattr(
-        evolution, "canonical_topology_restrictions", lambda restrictions: ()
+        targeting_stage, "canonical_topology_restrictions", lambda restrictions: ()
     )
     monkeypatch.setattr(
-        evolution, "approach_temperature_from_network", lambda *_args: 10.0
+        targeting_stage, "approach_temperature_from_network", lambda *_args: 10.0
     )
     monkeypatch.setattr(
-        evolution, "topology_restriction_signature", lambda _restrictions: ()
+        targeting_stage, "topology_restriction_signature", lambda _restrictions: ()
     )
-    monkeypatch.setattr(evolution, "canonical_stage_count", lambda _restrictions: 1)
+    monkeypatch.setattr(
+        targeting_stage, "canonical_stage_count", lambda _restrictions: 1
+    )
     monkeypatch.setattr(
         evolution, "derivative_threshold_from_network", lambda _network: None
     )

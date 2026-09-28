@@ -18,6 +18,7 @@ from OpenPinch.contracts.utility_placement import (
     UtilityTemplateBlueprint,
     UtilityTemplateSet,
 )
+from OpenPinch.domain.configuration import C_to_K
 
 from .errors import (
     EmptyPlacementFeasibleRegionError,
@@ -25,7 +26,7 @@ from .errors import (
     UtilityTemplateValidationError,
 )
 
-ABSOLUTE_ZERO_C = -273.15
+ABSOLUTE_ZERO_C = -C_to_K
 
 
 def _expected_coordinates(
