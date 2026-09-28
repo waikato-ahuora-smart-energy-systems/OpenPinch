@@ -10,7 +10,7 @@ from scipy.optimize import minimize_scalar
 from ....domain.configuration import tol
 from ....domain.stream_collection import StreamCollection
 from ..common._shared.streams import get_carnot_hpr_cycle_streams
-from ..common.encoding import require_stage_duty_allocation
+from ..common.encoding import DutyAllocationRequest
 from ..common.shared import (
     calc_carnot_heat_engine_eta,
     calc_carnot_heat_pump_cop,
@@ -112,10 +112,7 @@ class ParallelCarnotCycles:
         *,
         T_cond: np.ndarray,
         T_evap: np.ndarray,
-        Q_heat_base: float,
-        x_heat_split: np.ndarray,
-        Q_heat_available: np.ndarray,
-        Q_cool_available: np.ndarray,
+        duty_allocation: DutyAllocationRequest,
         eta_ii_hpr_carnot: float,
         eta_ii_he_carnot: float,
         args: Any,
@@ -124,14 +121,9 @@ class ParallelCarnotCycles:
         self._args = args
         self._T_cond = T_cond
         self._T_evap = T_evap
-        allocation = require_stage_duty_allocation(
-            Q_base=Q_heat_base,
-            x_split=x_heat_split,
-            Q_available=Q_heat_available,
-            duty_name="heat",
-        )
+        allocation = duty_allocation.heat.allocate("heat")
         Q_cond = allocation.Q_model
-        Q_cool_available = np.maximum(Q_cool_available, 0.0)
+        Q_cool_available = np.maximum(duty_allocation.cool.Q_available, 0.0)
         if self._T_cond.size != self._T_evap.size or Q_cond.size != self._T_cond.size:
             raise ValueError("Parallel Carnot stage arrays must have matching sizes.")
         if Q_cool_available.size != self._T_evap.size:
@@ -318,10 +310,7 @@ class CascadeCarnotCycle:
         *,
         T_cond: np.ndarray,
         T_evap: np.ndarray,
-        Q_heat_base: float,
-        x_heat_split: np.ndarray,
-        Q_heat_available: np.ndarray,
-        Q_cool_available: np.ndarray,
+        duty_allocation: DutyAllocationRequest,
         eta_ii_hpr_carnot: float,
         eta_ii_he_carnot: float,
         args: Any,
@@ -330,14 +319,9 @@ class CascadeCarnotCycle:
         self._args = args
         self._T_cond = T_cond
         self._T_evap = T_evap
-        heat_allocation = require_stage_duty_allocation(
-            Q_base=Q_heat_base,
-            x_split=x_heat_split,
-            Q_available=Q_heat_available,
-            duty_name="heat",
-        )
+        heat_allocation = duty_allocation.heat.allocate("heat")
         Q_cond = heat_allocation.Q_model
-        Q_evap = np.maximum(Q_cool_available, 0.0)
+        Q_evap = np.maximum(duty_allocation.cool.Q_available, 0.0)
         if Q_cond.size != self._T_cond.size or Q_evap.size != self._T_evap.size:
             raise ValueError("Cascade Carnot pool sizes are inconsistent.")
         self._penalty = heat_allocation.Q_excess

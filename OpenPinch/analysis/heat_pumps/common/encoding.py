@@ -1,13 +1,20 @@
 """Normalisation helpers for optimisation vectors used in HP targeting."""
 
-from dataclasses import dataclass
-from typing import Tuple
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Tuple
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from ....contracts.hpr import HPRParsedState
 
 __all__ = [
     "AMBIENT_X_BOUNDS",
     "DutyAllocation",
+    "DutyAllocationRequest",
+    "StageDutyRequest",
     "allocate_stage_duties",
     "decode_duty_splits",
     "encode_base_and_duty_splits",
@@ -119,6 +126,51 @@ def require_stage_duty_allocation(
         x_split,
         Q_available,
     )
+
+
+@dataclass(frozen=True)
+class StageDutyRequest:
+    """Base duty, split fractions and availability for one process side.
+
+    ``Q_base is None`` means no allocation is requested for this side.
+    """
+
+    Q_base: float | None = None
+    x_split: np.ndarray | None = None
+    Q_available: np.ndarray | None = None
+
+    def allocate(self, duty_name: str) -> DutyAllocation:
+        """Validate and allocate this side's stage duties."""
+        return require_stage_duty_allocation(
+            Q_base=self.Q_base,
+            x_split=self.x_split,
+            Q_available=self.Q_available,
+            duty_name=duty_name,
+        )
+
+
+@dataclass(frozen=True)
+class DutyAllocationRequest:
+    """Heat-side and cool-side duty-allocation inputs for a cycle solve."""
+
+    heat: StageDutyRequest = field(default_factory=StageDutyRequest)
+    cool: StageDutyRequest = field(default_factory=StageDutyRequest)
+
+    @classmethod
+    def from_state(cls, state: HPRParsedState) -> DutyAllocationRequest:
+        """Collect the duty-allocation fields of a parsed optimisation state."""
+        return cls(
+            heat=StageDutyRequest(
+                Q_base=state.Q_heat_base,
+                x_split=state.x_heat_split,
+                Q_available=state.Q_heat_available,
+            ),
+            cool=StageDutyRequest(
+                Q_base=state.Q_cool_base,
+                x_split=state.x_cool_split,
+                Q_available=state.Q_cool_available,
+            ),
+        )
 
 
 def map_x_arr_to_T_arr(

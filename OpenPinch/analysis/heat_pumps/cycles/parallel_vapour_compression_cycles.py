@@ -6,7 +6,7 @@ from typing import List, Optional
 
 import numpy as np
 
-from ..common.encoding import require_stage_duty_allocation
+from ..common.encoding import DutyAllocationRequest
 from ._multi_cycle_base import _MultiVapourCompressionCycleBase
 from .vapour_compression_cycle import VapourCompressionCycle
 
@@ -145,32 +145,17 @@ class ParallelVapourCompressionCycles(_MultiVapourCompressionCycleBase):
         n_cycles: int,
         Q_heat,
         Q_cool,
-        Q_heat_base: float | None,
-        x_heat_split,
-        Q_heat_available,
-        Q_cool_base: float | None,
-        x_cool_split,
-        Q_cool_available,
+        duty_allocation: DutyAllocationRequest,
         is_heat_pump: bool,
     ) -> tuple[np.ndarray, np.ndarray]:
         self._allocation_penalty = np.empty(0, dtype=float)
-        if is_heat_pump and Q_heat_base is not None:
-            allocation = require_stage_duty_allocation(
-                Q_base=Q_heat_base,
-                x_split=x_heat_split,
-                Q_available=Q_heat_available,
-                duty_name="heat",
-            )
+        if is_heat_pump and duty_allocation.heat.Q_base is not None:
+            allocation = duty_allocation.heat.allocate("heat")
             self._allocation_penalty = allocation.Q_excess
             return allocation.Q_model, self._normalize_Q_cool(Q_cool, n_cycles)
 
-        if (not is_heat_pump) and Q_cool_base is not None:
-            allocation = require_stage_duty_allocation(
-                Q_base=Q_cool_base,
-                x_split=x_cool_split,
-                Q_available=Q_cool_available,
-                duty_name="cool",
-            )
+        if (not is_heat_pump) and duty_allocation.cool.Q_base is not None:
+            allocation = duty_allocation.cool.allocate("cool")
             self._allocation_penalty = allocation.Q_excess
             return self._normalize_Q_heat(Q_heat, n_cycles), allocation.Q_model
 
@@ -221,12 +206,7 @@ class ParallelVapourCompressionCycles(_MultiVapourCompressionCycleBase):
         dT_ihx_gas_side: np.ndarray | float = 10.0,
         Q_heat: np.ndarray | float | None = None,
         Q_cool: np.ndarray | float | None = None,
-        Q_heat_base: float | None = None,
-        x_heat_split: np.ndarray | None = None,
-        Q_heat_available: np.ndarray | None = None,
-        Q_cool_base: float | None = None,
-        x_cool_split: np.ndarray | None = None,
-        Q_cool_available: np.ndarray | None = None,
+        duty_allocation: DutyAllocationRequest | None = None,
         is_heat_pump: bool = True,
     ) -> float:
         """
@@ -254,6 +234,9 @@ class ParallelVapourCompressionCycles(_MultiVapourCompressionCycleBase):
             Heat delivered to the process [W].
         Q_cool : np.ndarray | float | None, optional
             Cooling delivered to the process [W].
+        duty_allocation : DutyAllocationRequest, optional
+            Base-duty/split/availability inputs; the primary side's allocation
+            overrides ``Q_heat`` (heat pump) or ``Q_cool`` (refrigeration).
         is_heat_pump : bool, optional
             Flag to indicate if the cycle is in heat pump or refrigeration mode.
 
@@ -286,12 +269,7 @@ class ParallelVapourCompressionCycles(_MultiVapourCompressionCycleBase):
             n_cycles=self._num_cycles,
             Q_heat=Q_heat,
             Q_cool=Q_cool,
-            Q_heat_base=Q_heat_base,
-            x_heat_split=x_heat_split,
-            Q_heat_available=Q_heat_available,
-            Q_cool_base=Q_cool_base,
-            x_cool_split=x_cool_split,
-            Q_cool_available=Q_cool_available,
+            duty_allocation=duty_allocation or DutyAllocationRequest(),
             is_heat_pump=is_heat_pump,
         )
         refrigerant_all = self._normalize_refrigerant(refrigerant, self._num_cycles)

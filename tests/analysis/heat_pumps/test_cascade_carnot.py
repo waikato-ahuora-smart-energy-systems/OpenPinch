@@ -7,7 +7,11 @@ import OpenPinch.analysis.heat_pumps.common._shared.plotting as hp_plotting
 import OpenPinch.analysis.heat_pumps.cycles.carnot_cycles as hp_carnot_cycles
 import OpenPinch.analysis.heat_pumps.optimisation_adapter as hp_adapter
 import OpenPinch.analysis.heat_pumps.targeting.cascade_carnot as hp_cascade_carnot
-from OpenPinch.analysis.heat_pumps.common.encoding import encode_duty_splits
+from OpenPinch.analysis.heat_pumps.common.encoding import (
+    DutyAllocationRequest,
+    StageDutyRequest,
+    encode_duty_splits,
+)
 from OpenPinch.analysis.heat_pumps.common.shared import (
     compute_entropic_mean_temperature,
 )
@@ -37,10 +41,14 @@ def _solve_cascade_carnot_cycle(
     cycle.solve(
         T_cond=T_cond,
         T_evap=T_evap,
-        Q_heat_base=Q_heat_base,
-        x_heat_split=encode_duty_splits(Q_cond, Q_heat_base),
-        Q_heat_available=Q_cond,
-        Q_cool_available=Q_evap,
+        duty_allocation=DutyAllocationRequest(
+            heat=StageDutyRequest(
+                Q_base=Q_heat_base,
+                x_split=encode_duty_splits(Q_cond, Q_heat_base),
+                Q_available=Q_cond,
+            ),
+            cool=StageDutyRequest(Q_available=Q_evap),
+        ),
         eta_ii_hpr_carnot=args.eta_ii_hpr_carnot,
         eta_ii_he_carnot=args.eta_ii_he_carnot,
         args=args,
@@ -113,10 +121,12 @@ def test_cascade_carnot_rejects_inconsistent_pool_sizes():
         cycle.solve(
             T_cond=np.array([80.0]),
             T_evap=np.array([20.0]),
-            Q_heat_base=100.0,
-            x_heat_split=np.array([1.0]),
-            Q_heat_available=np.array([100.0]),
-            Q_cool_available=np.array([90.0, 80.0]),
+            duty_allocation=DutyAllocationRequest(
+                heat=StageDutyRequest(
+                    Q_base=100.0, x_split=np.array([1.0]), Q_available=np.array([100.0])
+                ),
+                cool=StageDutyRequest(Q_available=np.array([90.0, 80.0])),
+            ),
             eta_ii_hpr_carnot=args.eta_ii_hpr_carnot,
             eta_ii_he_carnot=args.eta_ii_he_carnot,
             args=args,

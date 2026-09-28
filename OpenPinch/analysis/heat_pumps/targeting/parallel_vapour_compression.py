@@ -15,6 +15,7 @@ from ..common._shared.ambient_preallocation import preallocate_direct_ambient_du
 from ..common._shared.streams import get_Q_vals_at_T_hpr_from_bckgrd_profile
 from ..common.encoding import (
     AMBIENT_X_BOUNDS,
+    DutyAllocationRequest,
     encode_base_and_duty_splits,
     map_Q_amb_to_x,
     map_T_arr_to_x_arr,
@@ -285,12 +286,7 @@ def _build_and_solve_parallel_cycles(
         eta_comp=args.eta_comp,
         refrigerant=args.refrigerant_ls,
         dT_ihx_gas_side=state_vars.dT_ihx_gas_side,
-        Q_heat_base=state_vars.Q_heat_base,
-        x_heat_split=state_vars.x_heat_split,
-        Q_heat_available=state_vars.Q_heat_available,
-        Q_cool_base=state_vars.Q_cool_base,
-        x_cool_split=state_vars.x_cool_split,
-        Q_cool_available=state_vars.Q_cool_available,
+        duty_allocation=DutyAllocationRequest.from_state(state_vars),
         is_heat_pump=is_heat_pumping,
     )
     return hp

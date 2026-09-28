@@ -6,6 +6,10 @@ import numpy as np
 import pytest
 
 import OpenPinch.analysis.heat_pumps.cycles.cascade_vapour_compression_cycle as cascade_mod
+from OpenPinch.analysis.heat_pumps.common.encoding import (
+    DutyAllocationRequest,
+    StageDutyRequest,
+)
 from OpenPinch.analysis.heat_pumps.cycles.cascade_vapour_compression_cycle import (
     CascadeVapourCompressionCycle,
 )
@@ -654,12 +658,16 @@ def test_cascade_allocate_process_duties_covers_heat_pump_and_refrigeration_mode
     Q_heat, Q_cool = hp._allocate_process_duties(
         Q_heat=None,
         Q_cool=np.array([2.0]),
-        Q_heat_base=100.0,
-        x_heat_split=np.array([0.6, 1.0]),
-        Q_heat_available=np.array([50.0, 30.0]),
-        Q_cool_base=20.0,
-        x_cool_split=np.array([1.0]),
-        Q_cool_available=np.array([10.0]),
+        duty_allocation=DutyAllocationRequest(
+            heat=StageDutyRequest(
+                Q_base=100.0,
+                x_split=np.array([0.6, 1.0]),
+                Q_available=np.array([50.0, 30.0]),
+            ),
+            cool=StageDutyRequest(
+                Q_base=20.0, x_split=np.array([1.0]), Q_available=np.array([10.0])
+            ),
+        ),
         is_heat_pump=True,
     )
 
@@ -670,12 +678,16 @@ def test_cascade_allocate_process_duties_covers_heat_pump_and_refrigeration_mode
     Q_heat, Q_cool = hp._allocate_process_duties(
         Q_heat=np.array([1.0]),
         Q_cool=None,
-        Q_heat_base=30.0,
-        x_heat_split=np.array([1.0]),
-        Q_heat_available=np.array([20.0]),
-        Q_cool_base=80.0,
-        x_cool_split=np.array([0.5, 1.0]),
-        Q_cool_available=np.array([30.0, 30.0]),
+        duty_allocation=DutyAllocationRequest(
+            heat=StageDutyRequest(
+                Q_base=30.0, x_split=np.array([1.0]), Q_available=np.array([20.0])
+            ),
+            cool=StageDutyRequest(
+                Q_base=80.0,
+                x_split=np.array([0.5, 1.0]),
+                Q_available=np.array([30.0, 30.0]),
+            ),
+        ),
         is_heat_pump=False,
     )
 
