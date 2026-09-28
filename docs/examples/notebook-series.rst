@@ -5,6 +5,13 @@ The packaged series teaches the public :class:`OpenPinch.PinchProblem` and
 :class:`OpenPinch.PinchWorkspace` experience. Code cells use package-root
 imports, contain no stored outputs, and declare one honest execution profile.
 
+Every notebook follows the same lifecycle: prepare the study, run one named
+engineering method, then inspect the cached results. Observation cells read
+results only and never launch analysis. Arguments on a method call apply to
+that analysis; stored configuration is only the fallback when an argument is
+omitted. The sample data ships with OpenPinch, so the notebooks run without path
+setup; read the named inputs and assumptions before substituting plant data.
+
 Core and Intermediate
 ---------------------
 
