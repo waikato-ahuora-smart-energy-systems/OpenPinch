@@ -149,12 +149,11 @@ def clone_target_with_zone_settings(target, zone: Zone, *, prefix: str):
     values whose keys start with ``prefix``.
     """
     target = deepcopy(target, {id(target.parent_zone): target.parent_zone})
-    target.config._values.update(
-        {
+    target.config.update_values(
+        **{
             key: value
             for key, value in zone.config._values.items()
             if key.startswith(prefix)
         }
     )
-    target.config._build_groups(target.config._values)
     return target

@@ -289,3 +289,29 @@ def test_small_capacity_ratio_approaches_the_zero_limit(arrangement):
     assert hx.HX_Eff(arrangement, 1.5, 1e-6) == pytest.approx(
         hx.HX_Eff(arrangement, 1.5, 0.0), abs=1e-5
     )
+
+
+@pytest.mark.parametrize("arrangement", [HX.CondEvap, HX.CF, HX.ShellTube])
+def test_calc_area_ue_treats_an_isothermal_utility_as_infinite_capacity(arrangement):
+    # Process stream 150 -> 100 degC against a utility at 50 degC: eff = 0.5.
+    area_ue = hx.CalcAreaUE(
+        arrangement, U=100, C_p=500, T_p1=150, T_p2=100, T_u1=50, T_u2=50, Passes=1
+    )
+    assert area_ue == pytest.approx(-math.log(0.5) * 500 / 100)
+
+
+def test_calc_area_ue_needs_unbounded_area_at_a_zero_approach():
+    # Outlet reaches the utility temperature: eff = 1.
+    assert (
+        hx.CalcAreaUE(
+            HX.CondEvap, U=100, C_p=500, T_p1=150, T_p2=50, T_u1=50, T_u2=50, Passes=1
+        )
+        == math.inf
+    )
+
+
+def test_calc_area_ue_rejects_an_outlet_beyond_the_utility_temperature():
+    with pytest.raises(ValueError, match="exceeds 1"):
+        hx.CalcAreaUE(
+            HX.CondEvap, U=100, C_p=500, T_p1=150, T_p2=40, T_u1=50, T_u2=50, Passes=1
+        )
