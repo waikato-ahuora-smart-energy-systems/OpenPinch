@@ -113,8 +113,7 @@ def temporary_zone_configuration(root, overrides: Mapping[str, Any] | None):
     try:
         for zone in zones:
             effective = deepcopy(zone.config)
-            effective._values.update(deepcopy(validated))
-            effective._build_groups(effective._values)
+            effective.update_values(**deepcopy(validated))
             zone.config = effective
         yield
     finally:

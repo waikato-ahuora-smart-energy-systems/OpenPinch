@@ -247,7 +247,30 @@ def test_configuration_groups_are_typed_dataclasses_matching_field_table():
             if spec.config_path[0] == group
         ]
 
-    with pytest.raises(dataclasses.FrozenInstanceError):
-        cfg.hpr.n_cond = 4
-    cfg.thermal.dt_cont = 7.0
+    for group, field in (("hpr", "n_cond"), ("thermal", "dt_cont")):
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            setattr(getattr(cfg, group), field, 4)
+
+
+def test_update_values_survives_group_rebuilds():
+    cfg = Configuration()
+    cfg.update_values(THERMAL_DT_CONT=7.0, PROBLEM_TOP_ZONE_NAME="Mill")
+
     assert cfg.thermal.dt_cont == 7.0
+    cfg._build_groups(cfg._values)
+    assert cfg.thermal.dt_cont == 7.0
+    assert cfg.problem.top_zone_name == "Mill"
+    with pytest.raises(KeyError, match="NOT_AN_OPTION"):
+        cfg.update_values(NOT_AN_OPTION=1)
+
+
+def test_update_values_does_not_keep_the_callers_objects():
+    cfg = Configuration()
+    refrigerants = ["water", "ammonia"]
+    cfg.update_values(HPR_REFRIGERANTS=refrigerants)
+
+    refrigerants.append("co2")
+    cfg.update_values(THERMAL_DT_CONT=7.0)
+
+    assert cfg._values["HPR_REFRIGERANTS"] == ["water", "ammonia"]
+    assert list(cfg.hpr.refrigerants) == ["water", "ammonia"]

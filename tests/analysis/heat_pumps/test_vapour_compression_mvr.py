@@ -1443,8 +1443,7 @@ def test_vc_mvr_config_schema_and_dispatch(monkeypatch):
             "HPR_MVR_ETA_COMP": 0.65,
         }
     )
-    config._values["HPR_TYPE"] = HeatPumpAndRefrigerationCycle.VapourCompMVR.value
-    config._build_groups(config._values)
+    config.update_values(HPR_TYPE=HeatPumpAndRefrigerationCycle.VapourCompMVR.value)
     args = construct_HPRTargetInputs(
         Q_hpr_target=10.0,
         T_vals=np.array([120.0, 80.0, 40.0]),

@@ -35,13 +35,13 @@ __all__ = [
 # single source of defaults and validation; these classes only declare each
 # group's attribute names and types statically so readers and type checkers
 # see them. ``_check_group_types`` fails at import if the two drift apart.
-# Groups that code assigns to after construction are mutable; the rest are
-# frozen.
-_mutable_group = dataclass(slots=True)
+# All groups are frozen: change settings with :meth:`Configuration.update_values`,
+# which updates the flat values and rebuilds the groups, so a later rebuild
+# cannot undo the change.
 _frozen_group = dataclass(frozen=True, slots=True)
 
 
-@_mutable_group
+@_frozen_group
 class ProblemConfig:
     """Problem shape: top zone and period definitions."""
 
@@ -95,7 +95,7 @@ class EnvironmentConfig:
     pressure: float
 
 
-@_mutable_group
+@_frozen_group
 class ThermalConfig:
     """Heat-transfer approach temperatures and coefficients."""
 
@@ -114,7 +114,7 @@ class DirectConfig:
     assisted_ht_dt: float
 
 
-@_mutable_group
+@_frozen_group
 class CostingConfig:
     """Utility, heat exchanger and HPR costing parameters."""
 
@@ -229,7 +229,7 @@ class ProcessMvrConfig:
     eta_motor: float
 
 
-@_mutable_group
+@_frozen_group
 class PowerConfig:
     """Power cogeneration (steam turbine) settings."""
 
@@ -416,6 +416,19 @@ class Configuration:
     def output_unit_overrides(self) -> dict[str, str]:
         """Return output unit overrides in the unit-system mapping format."""
         return output_unit_options_to_map(self._values)
+
+    def update_values(self, **values: Any) -> None:
+        """Set flat option values (e.g. ``COSTING_ANNUAL_OP_TIME=8760``) in place.
+
+        The flat values are the source the typed groups are built from, so the
+        change survives any later group rebuild. Values are deep-copied, so later
+        changes to the caller's objects do not leak in, and are not revalidated.
+        """
+        unknown = sorted(set(values) - set(CONFIG_FIELD_SPECS))
+        if unknown:
+            raise KeyError(f"Unknown configuration option(s): {', '.join(unknown)}")
+        self._values.update(deepcopy(values))
+        self._build_groups(self._values)
 
     def _build_groups(self, values: dict[str, Any]) -> None:
         """(Re)build the typed group objects from flat option ``values``."""

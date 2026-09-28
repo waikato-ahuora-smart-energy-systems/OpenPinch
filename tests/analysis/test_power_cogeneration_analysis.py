@@ -35,8 +35,7 @@ def _make_zone_config(
             "ENV_TEMPERATURE": 15.0,
         }
     )
-    config._values["POWER_TURB_MODEL"] = model
-    config._build_groups(config._values)
+    config.update_values(POWER_TURB_MODEL=model)
     return config
 
 
@@ -98,8 +97,7 @@ def test_prepare_turbine_parameters_reads_canonical_config_fields():
         mech_eff=0.85,
         is_high_p_cond_flash=True,
     )
-    cfg.power.turb_p_in = 42.0
-    cfg.power.turb_t_in = 365.0
+    cfg.update_values(POWER_TURB_P_IN=42.0, POWER_TURB_T_IN=365.0)
     params = pca._prepare_turbine_parameters(cfg)
 
     assert params == {

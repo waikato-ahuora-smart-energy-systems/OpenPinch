@@ -259,3 +259,6 @@ aidlc-docs/inception/plans/*
 # Local CI runner (scripts/ci_local.sh)
 .venv-smoke/
 reports/
+
+# Git bundles used to move commits between machines
+*.bundle
