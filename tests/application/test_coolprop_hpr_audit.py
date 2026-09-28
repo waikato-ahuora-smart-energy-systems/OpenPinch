@@ -32,7 +32,7 @@ def test_real_public_coolprop_target_and_budget(mode, utility, cascade, monkeypa
 
     monkeypatch.setattr(adapter, "run_hpr_candidate_search", measured_search)
     started = monotonic()
-    problem = PinchProblem("heat_pump_targeting.json")
+    problem = PinchProblem("basic_pinch.json")
     kwargs = dict(
         load_fraction=0.25,
         condensers=1,
@@ -72,7 +72,7 @@ def test_real_invalid_mvr_fluid_is_atomic_and_fails_before_search(monkeypatch):
         pytest.fail("invalid MVR fluid entered optimization")
 
     monkeypatch.setattr(adapter, "run_hpr_candidate_search", forbidden)
-    problem = PinchProblem("heat_pump_targeting.json")
+    problem = PinchProblem("basic_pinch.json")
     problem.target.direct_heat_integration()
     before = problem.results.model_dump_json()
     with pytest.raises(HPRTargetingError) as caught:
@@ -88,7 +88,7 @@ def test_real_invalid_mvr_fluid_is_atomic_and_fails_before_search(monkeypatch):
 
 @pytest.mark.parametrize("topology", ["cascade", "parallel", "mvr"])
 def test_real_public_multistage_records(topology):
-    problem = PinchProblem("heat_pump_targeting.json")
+    problem = PinchProblem("basic_pinch.json")
     kwargs = dict(
         load_fraction=0.25,
         condensers=2,

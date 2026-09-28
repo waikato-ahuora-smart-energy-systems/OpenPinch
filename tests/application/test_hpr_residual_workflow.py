@@ -16,7 +16,7 @@ from OpenPinch.domain.hpr import HPRResidualProfile
 
 @pytest.fixture(scope="module")
 def solved_hpr():
-    problem = PinchProblem("heat_pump_targeting.json", project_name="Heat Pump Study")
+    problem = PinchProblem("basic_pinch.json", project_name="Heat Pump Study")
     options = {"COSTING_HPR_PRICE_RATIO_COLD_TO_ELE": 0.1}
     kwargs = dict(
         load_fraction=0.25,
@@ -85,7 +85,7 @@ def test_residual_allocation_reconciles_and_placement_retains_basis(solved_hpr):
 
 def test_residual_rejects_foreign_modified_and_unsupported_analyses(solved_hpr):
     problem, hp, _ = solved_hpr
-    foreign = PinchProblem("heat_pump_targeting.json")
+    foreign = PinchProblem("basic_pinch.json")
     with pytest.raises(ValueError, match="foreign"):
         foreign.residual_utility(base_target=hp)
     changed = hp.model_copy(
@@ -176,7 +176,7 @@ def test_residual_profile_rejects_invalid_records(field, value):
 
 
 def test_zero_selected_service_returns_no_target():
-    problem = PinchProblem("heat_pump_targeting.json")
+    problem = PinchProblem("basic_pinch.json")
     assert problem.target.carnot_heat_pump(load_fraction=0.0) is None
     with pytest.raises(ValueError, match="unique"):
         problem.plot.grand_composite_curve_with_heat_pump()
@@ -188,7 +188,7 @@ def test_no_input_hpr_plot_has_clear_error():
 
 
 def test_segmented_utility_shape_survives_detachment():
-    source = PinchProblem("heat_pump_targeting.json").to_problem_json()
+    source = PinchProblem("basic_pinch.json").to_problem_json()
     source["utilities"][0] = {
         "name": "Segmented heating",
         "type": "Hot",
@@ -220,7 +220,7 @@ def test_segmented_utility_shape_survives_detachment():
 
 
 def test_indirect_refrigeration_ambient_balance_and_residual_placement():
-    problem = PinchProblem("heat_pump_targeting.json")
+    problem = PinchProblem("basic_pinch.json")
     target = problem.target.carnot_refrigeration(
         is_utility_refrigeration=True,
         load_fraction=0.25,

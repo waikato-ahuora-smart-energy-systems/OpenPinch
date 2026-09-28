@@ -30,11 +30,6 @@ Included Cases
 ``pulp_mill.json``
    Larger site-style example used in the packaged Total Site notebook.
 
-``heat_pump_targeting.json``
-   Compact HPR screening input data for direct Heat Pump experimentation,
-   including the current ``Parallel vapour compression cycles`` option,
-   without the larger multi-case notebook flow.
-
 ``chocolate_factory.json``
    Advanced direct-versus-indirect Carnot HPR and refrigeration example used in
    the packaged notebook workflow.
@@ -84,8 +79,7 @@ Choosing The Right Case
   indirect integration example.
 - Use ``zonal_site_multiperiod.json`` when the site answer needs seasonal or
   named-period comparison.
-- Use ``heat_pump_targeting.json`` when you want a smaller direct HPR
-  screening input data set.
+- Use ``basic_pinch.json`` when you want a small direct HPR screening case.
 - Use ``chocolate_factory.json`` when you want to study the advanced
   direct-versus-indirect HPR and refrigeration surface used by notebooks 08
   through 10.

@@ -11,7 +11,7 @@ Carnot Screening
 
    from OpenPinch import PinchProblem
 
-   problem = PinchProblem("heat_pump_targeting.json", project_name="HPR Study")
+   problem = PinchProblem("basic_pinch.json", project_name="HPR Study")
    heat_pump = problem.target.carnot_heat_pump(
        is_utility_heat_pump=False,
        is_cascade_cycle=True,

@@ -65,12 +65,6 @@ _SAMPLE_CASE_METADATA: dict[str, SampleCaseMetadata] = {
         description="Multiperiod refinery case for period-specific targeting.",
         topics=("multiperiod", "refinery"),
     ),
-    "heat_pump_targeting.json": SampleCaseMetadata(
-        name="heat_pump_targeting.json",
-        title="Heat Pump Targeting",
-        description="Focused case for direct and indirect heat-pump workflows.",
-        topics=("heat pump",),
-    ),
     "pulp_mill.json": SampleCaseMetadata(
         name="pulp_mill.json",
         title="Pulp Mill",
