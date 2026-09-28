@@ -254,3 +254,23 @@ def test_hx_ntu_numerical_raises_when_not_converging(monkeypatch):
     )
     with pytest.raises(ValueError, match="does not converge"):
         hx.HX_NTU_Numerical(HX.CrFUU, eff=0.5, c=0.5)
+
+
+@pytest.mark.parametrize("arrangement", list(HX))
+def test_arrangement_accepts_the_enum_or_its_value(arrangement):
+    assert hx.HX_Eff(arrangement, 1.5, 0.5) == pytest.approx(
+        hx.HX_Eff(arrangement.value, 1.5, 0.5)
+    )
+    assert hx.HX_NTU(arrangement, 0.5, 0.5) == pytest.approx(
+        hx.HX_NTU(arrangement.value, 0.5, 0.5)
+    )
+
+
+def test_shell_and_tube_matches_the_standard_correlation():
+    # One shell pass, 2n tube passes: eff = 2 / (1 + c + d coth(NTU d / 2)).
+    ntu, c = 1.0, 0.5
+    d = math.sqrt(1 + c**2)
+    expected = 2 / (1 + c + d * (1 + math.exp(-ntu * d)) / (1 - math.exp(-ntu * d)))
+    eff = hx.HX_Eff(HX.ShellTube, ntu, c)
+    assert eff == pytest.approx(expected)
+    assert hx.HX_NTU(HX.ShellTube, eff, c) == pytest.approx(ntu)

@@ -75,15 +75,30 @@ def compute_LMTD_from_ts(
     )
 
 
+def _arrangement(value) -> HX | None:
+    """Return the arrangement as a ``HeatExchangerTypes`` member (enum or its value)."""
+    if isinstance(value, HX):
+        return value
+    try:
+        return HX(value)
+    except ValueError:
+        return None
+
+
 def HX_Eff(Arrangement, Ntu, c, Passes=None, Rows=None, Cmin_Phase=None):
-    """Return heat exchanger effectiveness for the specified arrangement/NTU/c ratio."""
+    """Return heat exchanger effectiveness for the specified arrangement/NTU/c ratio.
+
+    ``Arrangement`` is a ``HeatExchangerTypes`` member or its string value; an
+    unknown arrangement is treated as counter flow.
+    """
     if Passes is None:
         Passes = 1
+    Arrangement = _arrangement(Arrangement)
 
     Ntu = Ntu / Passes
     if Ntu > 0 and c >= 0:
         # Counter Flow - Single Pass Effectiveness
-        if Arrangement == HX.CF.value:
+        if Arrangement is HX.CF:
             # test = c * math.exp(-Ntu * (1 - c))
             if c != 1 and c * math.exp(-Ntu * (1 - c)) != 1:
                 eff = (1 - math.exp(-Ntu * (1 - c))) / (
@@ -92,34 +107,34 @@ def HX_Eff(Arrangement, Ntu, c, Passes=None, Rows=None, Cmin_Phase=None):
             else:
                 eff = Ntu / (1 + Ntu)
         # Parallel Flow - Single Pass Effectiveness
-        elif Arrangement == HX.PF.value:
+        elif Arrangement is HX.PF:
             eff = (1 - math.exp(-Ntu * (1 + c))) / (1 + c)
         # Cross Flow - Both Streams Unmixed Effectiveness
-        elif Arrangement == HX.CrFUU:
+        elif Arrangement is HX.CrFUU:
             if Rows is None or Cmin_Phase is None:
                 eff = CrossflowUnmixedEff1(Ntu, c)
             else:
                 eff = CrossflowUnmixedEff2(Ntu, c, Rows, Cmin_Phase)
         # Cross Flow - Both Streams Mixed Effectiveness
-        elif Arrangement == HX.CrFMM:
+        elif Arrangement is HX.CrFMM:
             eff = (
                 1 / (1 - math.exp(-Ntu)) + c / (1 - math.exp(-Ntu * c)) - 1 / Ntu
             ) ** -1
         # Cross Flow - Stream Cmax Unmixed Effectiveness
-        elif Arrangement == HX.CrFMUmax:
+        elif Arrangement is HX.CrFMUmax:
             eff = 1 - math.exp(-1 / c * (1 - math.exp(-Ntu * c)))
         # Cross Flow - Stream Cmin Unmixed Effectiveness
-        elif Arrangement == HX.CrFMUmin:
+        elif Arrangement is HX.CrFMUmin:
             eff = 1 / c * (1 - math.exp(-c * (1 - math.exp(-Ntu))))
         # Shell and Tube - One Shell Pass; 2,4,6, etc., Tube Passes Effectiveness
-        elif Arrangement == HX.ShellTube.value:
+        elif Arrangement is HX.ShellTube:
             d = (1 + c**2) ** 0.5
-            eff = 2 / ((1 + c) + d**0.5 * Coth(Ntu * d / 2))
+            eff = 2 / ((1 + c) + d * Coth(Ntu * d / 2))
         # Condensing or Evaporating of One Fluid
-        elif Arrangement == HX.CondEvap:
+        elif Arrangement is HX.CondEvap:
             eff = 1 - math.exp(-Ntu)
         else:
-            eff = HX_Eff(HX.CF.value, Ntu, c, 1)
+            eff = HX_Eff(HX.CF, Ntu, c, 1)
     else:
         eff = 0
 
@@ -131,9 +146,14 @@ def HX_Eff(Arrangement, Ntu, c, Passes=None, Rows=None, Cmin_Phase=None):
 
 
 def HX_NTU(Arrangement, eff, c, Passes=None):
-    """Compute NTU for a target effectiveness and exchanger arrangement."""
+    """Compute NTU for a target effectiveness and exchanger arrangement.
+
+    ``Arrangement`` is a ``HeatExchangerTypes`` member or its string value; an
+    unknown arrangement returns ``-1``.
+    """
     if Passes is None:
         Passes = 1
+    Arrangement = _arrangement(Arrangement)
 
     if Passes > 1:
         Eff_p = MultiPassNTU(eff, c, Passes)
@@ -141,33 +161,33 @@ def HX_NTU(Arrangement, eff, c, Passes=None):
 
     if eff > 0 and eff < 1:
         # Counter Flow - Single Pass Effectiveness
-        if Arrangement == HX.CF.value:
+        if Arrangement is HX.CF:
             if c != 1:
                 Ntu = 1 / (1 - c) * math.log((1 - eff * c) / (1 - eff))
             else:
                 Ntu = eff / (1 - eff)
         # Parallel Flow - Single Pass Effectiveness
-        elif Arrangement == HX.PF.value:
+        elif Arrangement is HX.PF:
             Ntu = -math.log(1 - eff * (1 + c)) / (1 + c)
         # Cross Flow - Both Streams Unmixed NTU
-        elif Arrangement == HX.CrFUU:
+        elif Arrangement is HX.CrFUU:
             Ntu = HX_NTU_Numerical(Arrangement, eff, c)
         # Cross Flow - Both Streams Mixed NTU
-        elif Arrangement == HX.CrFMM:
+        elif Arrangement is HX.CrFMM:
             Ntu = HX_NTU_Numerical(Arrangement, eff, c)
         # Cross Flow - Stream Cmax Unmixed NTU
-        elif Arrangement == HX.CrFMUmax:
+        elif Arrangement is HX.CrFMUmax:
             Ntu = -1 / c * math.log(1 + c * math.log(1 - eff))
         # Cross Flow - Stream Cmin Unmixed NTU
-        elif Arrangement == HX.CrFMUmin:
+        elif Arrangement is HX.CrFMUmin:
             Ntu = -math.log(1 + 1 / c * math.log(1 - eff * c))
         # Shell and Tube - One Shell Pass; 2,4,6, etc., Tube Passes NTU
-        elif Arrangement == HX.ShellTube.value:
-            D1 = 1 + c - (1 + c**2) ** (1 / 4)
-            D2 = 1 + c + (1 + c**2) ** (1 / 4)
+        elif Arrangement is HX.ShellTube:
+            D1 = 1 + c - (1 + c**2) ** 0.5
+            D2 = 1 + c + (1 + c**2) ** 0.5
             Ntu = (1 + c**2) ** -0.5 * math.log((2 - eff * D1) / (2 - eff * D2))
         # Condensing or Evaporating of One Fluid
-        elif Arrangement == HX.CondEvap:
+        elif Arrangement is HX.CondEvap:
             Ntu = -math.log(1 - eff)
         else:
             Ntu = -1
