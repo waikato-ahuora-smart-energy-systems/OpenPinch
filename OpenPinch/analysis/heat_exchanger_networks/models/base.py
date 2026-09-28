@@ -11,7 +11,6 @@ from typing import Any, Literal
 from ..solver.arrays import PreparedSolverArrays
 from ._base import alpha as _alpha
 from ._base import approach as _approach
-from ._base import area as _area
 from ._base import execution as _execution
 from ._base import parameters as _parameters
 from ._base import piecewise as _piecewise
@@ -102,34 +101,6 @@ class BaseHeatExchangerNetworkModel(ABC):
     def get_post_process(self) -> None:
         """Extract solved arrays after a successful concrete solve."""
 
-    def _solver_value(self, value: Any) -> float:
-        return _execution._solver_value(self, value)
-
-    def _set_value(
-        self, variable: Any, value: float, *, brackets: bool = False
-    ) -> None:
-        "Assign GEKKO values while preserving source bound-clamping behavior."
-        return _execution._set_value(self, variable, value, brackets=brackets)
-
-    def _post_process_lmtd(
-        self,
-        delta_1: float,
-        delta_2: float,
-        active: float,
-        *,
-        formula_allowed: bool,
-        fallback_delta: float | None = None,
-    ) -> float:
-        """Return source-compatible post-process LMTD."""
-        return _area._post_process_lmtd(
-            self,
-            delta_1,
-            delta_2,
-            active,
-            formula_allowed=formula_allowed,
-            fallback_delta=fallback_delta,
-        )
-
     def _utility_cost_value(
         self,
         side: str,
@@ -162,67 +133,6 @@ class BaseHeatExchangerNetworkModel(ABC):
         "Populate model attributes from the OpenPinch private array adapter."
         return _parameters.get_model_parameters_from_solver_arrays(self)
 
-    def _normalise_state_arrays(self) -> None:
-        "Validate the explicit operating-period axis used by HEN models."
-        return _parameters._normalise_state_arrays(self)
-
-    def _set_minimum_approach_temperatures(self) -> None:
-        "Derive pair-specific approach limits from stream contributions."
-        return _approach._set_minimum_approach_temperatures(self)
-
-    def _recovery_approach_temperature(
-        self,
-        i: int,
-        j: int,
-        period_idx: int = 0,
-    ) -> float:
-        return _approach._recovery_approach_temperature(self, i, j, period_idx)
-
-    def _hot_utility_inlet_approach_temperature(
-        self,
-        j: int,
-        period_idx: int = 0,
-    ) -> float:
-        return _approach._hot_utility_inlet_approach_temperature(self, j, period_idx)
-
-    def _hot_utility_outlet_approach_temperature(
-        self,
-        j: int,
-        period_idx: int = 0,
-        heat_duty: float | None = None,
-    ):
-        return _approach._hot_utility_outlet_approach_temperature(
-            self, j, period_idx, heat_duty
-        )
-
-    def _cold_utility_inlet_approach_temperature(
-        self,
-        i: int,
-        period_idx: int = 0,
-    ) -> float:
-        return _approach._cold_utility_inlet_approach_temperature(self, i, period_idx)
-
-    def _cold_utility_outlet_approach_temperature(
-        self,
-        i: int,
-        period_idx: int = 0,
-        heat_duty: float | None = None,
-    ):
-        return _approach._cold_utility_outlet_approach_temperature(
-            self, i, period_idx, heat_duty
-        )
-
-    def _utility_outlet_temperature_contribution(
-        self,
-        side: str,
-        period_idx: int,
-        match_index: int,
-        heat_duty: float | None = None,
-    ):
-        return _approach._utility_outlet_temperature_contribution(
-            self, side, period_idx, match_index, heat_duty
-        )
-
     def _utility_solved_outlet_temperature(
         self,
         side: str,
@@ -233,10 +143,6 @@ class BaseHeatExchangerNetworkModel(ABC):
         return _approach._utility_solved_outlet_temperature(
             self, side, period_idx, match_index, heat_duty
         )
-
-    def _weighted_state_average(self, values: Sequence[Any]) -> Any:
-        "Return ``sum_s(w_s * value_s) / sum_s(w_s)`` for GEKKO expressions."
-        return _approach._weighted_state_average(self, values)
 
     def set_match_restrictions(self, restrictions) -> None:
         "Apply inherited topology restrictions in the source array shape."

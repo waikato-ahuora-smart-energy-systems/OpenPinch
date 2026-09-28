@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from ...indexing import build_index_grid
+from .._base import approach as _approach
 from .verification import _value
 
 logger = logging.getLogger(__name__)
@@ -61,7 +62,8 @@ def get_net_benefit_evolution(
     if no_improvement_patience is not None:
         no_improvement_patience = max(1, int(no_improvement_patience))
     if n_ad_branches == 1 and n_rm_branches == 1 and no_improvement_patience is None:
-        return owner._get_source_net_benefit_evolution(
+        return _get_source_net_benefit_evolution(
+            owner,
             print_output=print_output,
             max_depth=max_depth,
         )
@@ -76,7 +78,8 @@ def get_net_benefit_evolution(
             len(frontier),
             getattr(best_model, "TAC", None),
         )
-        specs = owner._evolution_candidate_specs(
+        specs = _evolution_candidate_specs(
+            owner,
             frontier,
             unit=unit,
             n_ad_branches=n_ad_branches,
@@ -86,7 +89,8 @@ def get_net_benefit_evolution(
             logger.debug("No evolution candidate topologies found.")
             break
 
-        solved_candidates = owner._solve_evolution_candidates(
+        solved_candidates = _solve_evolution_candidates(
+            owner,
             specs,
             print_output=print_output,
             max_parallel=max_parallel,
@@ -135,7 +139,7 @@ def get_net_benefit_evolution(
             )
 
     if best_model.mSuccess and best_model.TAC < owner.TAC:
-        owner._update_with_best_model(best_model)
+        _update_with_best_model(owner, best_model)
     else:
         logger.debug("No evolution improvement found over original model.")
     owner.m.cleanup()
@@ -169,7 +173,8 @@ def _get_source_net_benefit_evolution(
             unit=unit,
             prev_case=model,
         )
-        model = owner._select_source_best_candidate(
+        model = _select_source_best_candidate(
+            owner,
             model,
             model_minus_one,
             model_plus_one,
@@ -186,7 +191,7 @@ def _get_source_net_benefit_evolution(
             )
 
     if best_model.mSuccess and best_model.TAC < owner.TAC:
-        owner._update_with_best_model(best_model)
+        _update_with_best_model(owner, best_model)
     else:
         logger.debug("No improvement found over original model.")
     owner.m.cleanup()
@@ -237,7 +242,8 @@ def _evolution_candidate_specs(
             prev_case.get_lowest_benefit_HX_candidates(n_rm_branches),
             start=1,
         ):
-            spec = owner._evolution_candidate_spec(
+            spec = _evolution_candidate_spec(
+                owner,
                 kind="minus",
                 unit=unit,
                 branch_index=branch_index,
@@ -253,7 +259,8 @@ def _evolution_candidate_specs(
             prev_case.get_max_benefit_HX_candidates(n_ad_branches),
             start=1,
         ):
-            spec = owner._evolution_candidate_spec(
+            spec = _evolution_candidate_spec(
+                owner,
                 kind="plus",
                 unit=unit,
                 branch_index=branch_index,
@@ -283,12 +290,13 @@ def _evolution_candidate_spec(
     if len(position) != 3:
         return None
     candidate_position = tuple(int(index) for index in position)
-    z_allowed = owner._z_allowed_with_candidate(
+    z_allowed = _z_allowed_with_candidate(
+        owner,
         prev_case,
         position=candidate_position,
         value=z_value,
     )
-    signature = owner._topology_signature_from_z(z_allowed)
+    signature = _topology_signature_from_z(owner, z_allowed)
     if signature in seen_signatures:
         logger.debug(
             "Skipping duplicate EVM topology at depth %s from branch %s",
@@ -345,20 +353,24 @@ def _solve_evolution_candidate(
 ):
     try:
         if spec.kind == "minus":
-            return owner._build_and_solve_n_minus_one_evolution(
+            return _build_and_solve_evolution(
+                owner,
+                "minus",
                 print_output=print_output,
                 unit=spec.unit,
                 prev_case=spec.prev_case,
                 position=spec.position,
-                z_allowed_removed=spec.z_allowed,
+                z_allowed=spec.z_allowed,
                 branch_label=_evolution_branch_label(owner, spec),
             )
-        return owner._build_and_solve_n_plus_one_evolution(
+        return _build_and_solve_evolution(
+            owner,
+            "plus",
             print_output=print_output,
             unit=spec.unit,
             prev_case=spec.prev_case,
             position=spec.position,
-            z_allowed_added=spec.z_allowed,
+            z_allowed=spec.z_allowed,
             branch_label=_evolution_branch_label(owner, spec),
         )
     except Exception as exc:
@@ -453,17 +465,20 @@ def get_n_minus_one_evolution(owner, print_output: bool, unit: int, prev_case):
     if not candidates:
         return None
     position = tuple(candidates[0])
-    z_allowed_removed = owner._z_allowed_with_candidate(
+    z_allowed_removed = _z_allowed_with_candidate(
+        owner,
         prev_case,
         position=position,
         value=0,
     )
-    return owner._build_and_solve_n_minus_one_evolution(
+    return _build_and_solve_evolution(
+        owner,
+        "minus",
         print_output=print_output,
         unit=unit,
         prev_case=prev_case,
         position=position,
-        z_allowed_removed=z_allowed_removed,
+        z_allowed=z_allowed_removed,
     )
 
 
@@ -516,7 +531,7 @@ def _build_and_solve_evolution(
     if kind == "minus":
         child.Q_r[i][j][k].VALUE.value = 0.0
         child.z[i][j][k].VALUE.value = 0
-        approach = owner._recovery_approach_temperature(i, j)
+        approach = _approach._recovery_approach_temperature(owner, i, j)
         child.theta_1[i][j][k].VALUE.value = approach
         child.theta_2[i][j][k].VALUE.value = approach
     else:
@@ -533,17 +548,20 @@ def get_n_plus_one_evolution(owner, print_output: bool, unit: int, prev_case):
     if not candidates:
         return None
     position = tuple(candidates[0])
-    z_allowed_added = owner._z_allowed_with_candidate(
+    z_allowed_added = _z_allowed_with_candidate(
+        owner,
         prev_case,
         position=position,
         value=1,
     )
-    return owner._build_and_solve_n_plus_one_evolution(
+    return _build_and_solve_evolution(
+        owner,
+        "plus",
         print_output=print_output,
         unit=unit,
         prev_case=prev_case,
         position=position,
-        z_allowed_added=z_allowed_added,
+        z_allowed=z_allowed_added,
     )
 
 
@@ -556,7 +574,7 @@ def _z_allowed_with_candidate(
 ) -> list:
     z_allowed = copy.deepcopy(prev_case.z)
     i, j, k = (int(index) for index in position)
-    owner._set_recovery_binary_value(z_allowed, (i, j, k), value)
+    _set_recovery_binary_value(owner, z_allowed, (i, j, k), value)
     return z_allowed
 
 

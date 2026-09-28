@@ -78,7 +78,7 @@ def calculate_pinch(owner) -> None:
 def set_preprocessing(owner) -> None:
     """Pre-process PDM superstructure parameters."""
 
-    owner._set_multiperiod_preprocessing()
+    _set_multiperiod_preprocessing(owner)
 
 
 def _set_multiperiod_preprocessing(owner) -> None:

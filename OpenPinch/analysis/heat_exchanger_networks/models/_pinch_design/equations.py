@@ -185,7 +185,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                     abs(owner.T_h_out_period[n][i] - owner.T_c_in_period[n][j]),
                     abs(owner.T_h_out_period[n][i] - owner.T_c_out_period[n][j]),
                 )
-                + owner._recovery_approach_temperature(i, j, n)
+                + _approach._recovery_approach_temperature(owner, i, j, n)
                 for j in range(owner.J)
             ]
             for i in range(owner.I)
@@ -197,7 +197,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
             (
                 owner.m.Equation(
                     (owner.T_h_by_period[n][i][k] - owner.T_c_by_period[n][j][k])
-                    >= owner._recovery_approach_temperature(i, j, n)
+                    >= _approach._recovery_approach_temperature(owner, i, j, n)
                     - M_ij_period[n][i][j] * (1 - owner.z[i][j][k])
                 )
                 if owner.z_allowed[i][j][k] > 0
@@ -214,7 +214,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                         owner.T_h_by_period[n][i][k + 1]
                         - owner.T_c_by_period[n][j][k + 1]
                     )
-                    >= owner._recovery_approach_temperature(i, j, n)
+                    >= _approach._recovery_approach_temperature(owner, i, j, n)
                     - M_ij_period[n][i][j] * (1 - owner.z[i][j][k])
                 )
                 if owner.z_allowed[i][j][k] > 0
@@ -238,8 +238,8 @@ def set_obj(owner) -> None:
                 sum(owner.Q_h_by_period[n]) - owner.HU_target_by_period[n] >= 0.0
             )
         owner.m.Minimize(
-            owner._weighted_state_average(
-                [sum(owner.Q_h_by_period[n]) for n in range(owner.N_periods)]
+            _approach._weighted_state_average(
+                owner, [sum(owner.Q_h_by_period[n]) for n in range(owner.N_periods)]
             )
         )
     elif owner.minimisation_goal == "cold utility":
@@ -248,22 +248,24 @@ def set_obj(owner) -> None:
                 sum(owner.Q_c_by_period[n]) - owner.CU_target_by_period[n] >= 0.0
             )
         owner.m.Minimize(
-            owner._weighted_state_average(
-                [sum(owner.Q_c_by_period[n]) for n in range(owner.N_periods)]
+            _approach._weighted_state_average(
+                owner, [sum(owner.Q_c_by_period[n]) for n in range(owner.N_periods)]
             )
         )
     elif owner.minimisation_goal == "total utility":
         owner.m.Minimize(
-            owner._weighted_state_average(
+            _approach._weighted_state_average(
+                owner,
                 [
                     sum(owner.Q_h_by_period[n]) + sum(owner.Q_c_by_period[n])
                     for n in range(owner.N_periods)
-                ]
+                ],
             )
         )
     elif owner.minimisation_goal == "heat recovery":
         owner.m.Maximize(
-            owner._weighted_state_average(
+            _approach._weighted_state_average(
+                owner,
                 [
                     owner.m.sum(
                         [
@@ -274,7 +276,7 @@ def set_obj(owner) -> None:
                         ]
                     )
                     for n in range(owner.N_periods)
-                ]
+                ],
             )
         )
     elif owner.minimisation_goal == "min units":
