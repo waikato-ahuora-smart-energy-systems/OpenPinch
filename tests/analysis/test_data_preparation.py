@@ -2100,7 +2100,7 @@ def test_nested_path_with_whitespace_trimming():
 
 
 def test_invalid_config_missing_op_time(dummy_config):
-    dummy_config.costing.annual_op_time = 0
+    dummy_config.update_values(COSTING_ANNUAL_OP_TIME=0)
     out_config = _validate_config_data_completed(dummy_config)
     assert out_config.costing.annual_op_time > 0
     assert not hasattr(out_config, "COSTING_ANNUAL_OP_TIME")
@@ -2108,8 +2108,7 @@ def test_invalid_config_missing_op_time(dummy_config):
 
 
 def test_turbine_pressure_is_clamped_using_canonical_config_fields(dummy_config):
-    dummy_config.power.turbine_work_enabled = True
-    dummy_config.power.turb_p_in = 250.0
+    dummy_config.update_values(POWER_TURBINE_WORK_ENABLED=True, POWER_TURB_P_IN=250.0)
 
     out_config = _validate_config_data_completed(dummy_config)
 
@@ -2119,11 +2118,13 @@ def test_turbine_pressure_is_clamped_using_canonical_config_fields(dummy_config)
 
 
 def test_thermal_repairs_use_current_config_fields_without_legacy_attrs(dummy_config):
-    dummy_config.thermal.dt_phase_change = 0
-    dummy_config.thermal.dt_cont = -5.0
+    dummy_config.update_values(THERMAL_DT_PHASE_CHANGE=0, THERMAL_DT_CONT=-5.0)
 
     out_config = _validate_config_data_completed(dummy_config)
 
+    assert out_config.thermal.dt_phase_change == 0.01
+    # The repair is written to the flat values, so rebuilding keeps it.
+    out_config._build_groups(out_config._values)
     assert out_config.thermal.dt_phase_change == 0.01
     assert not hasattr(out_config, "THERMAL_DT_PHASE_CHANGE")
     assert out_config.thermal.dt_cont == 0.0

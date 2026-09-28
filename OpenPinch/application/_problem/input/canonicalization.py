@@ -58,8 +58,10 @@ def _build_zone_config(
 
     if isinstance(options, Configuration):
         config = copy.deepcopy(options)
-        config.problem.top_zone_name = top_zone_name
-        config.problem.top_zone_identifier = top_zone_identifier
+        config.update_values(
+            PROBLEM_TOP_ZONE_NAME=top_zone_name,
+            PROBLEM_TOP_ZONE_IDENTIFIER=top_zone_identifier,
+        )
         return config
 
     if isinstance(options, dict):
@@ -367,15 +369,18 @@ def _validate_utilities_passed_in(utilities: List[UtilitySchema]) -> list:
 
 def _validate_config_data_completed(config: Configuration) -> Configuration:
     """Validates that the configuration settings make logical sense."""
+    repairs: dict[str, float] = {}
     if (
         not isinstance(config.costing.annual_op_time, (int, float))
         or config.costing.annual_op_time == 0
     ):
-        config.costing.annual_op_time = 365 * 24
+        repairs["COSTING_ANNUAL_OP_TIME"] = 365 * 24
     if config.power.turbine_work_enabled and config.power.turb_p_in > 220:
-        config.power.turb_p_in = 200
+        repairs["POWER_TURB_P_IN"] = 200
     if config.thermal.dt_phase_change <= 0:
-        config.thermal.dt_phase_change = 0.01
+        repairs["THERMAL_DT_PHASE_CHANGE"] = 0.01
     if config.thermal.dt_cont < 0:
-        config.thermal.dt_cont = 0.0
+        repairs["THERMAL_DT_CONT"] = 0.0
+    if repairs:
+        config.update_values(**repairs)
     return config
