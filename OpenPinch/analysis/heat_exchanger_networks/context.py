@@ -4,26 +4,26 @@ from __future__ import annotations
 
 from typing import Any
 
-from ...application.problem import PinchProblem
 from ...contracts.output import TargetOutput
 from .execution.settings import (
     SynthesisWorkflowSettings,
     workflow_settings_from_problem,
 )
+from .prepared_problem import SynthesisProblem
 from .reporting.ranking import rank_unique_network_outcomes
 from .reporting.verification import verify_synthesis_result
 from .results.assembly import SynthesisWorkflowResult
 
 
 def prepare_service_context(
-    problem: PinchProblem,
+    problem: SynthesisProblem,
     *,
     options: dict[str, Any] | None,
     workspace_variant: str | None,
 ) -> tuple[TargetOutput, SynthesisWorkflowSettings]:
     """Validate the problem, resolve targets, and build HEN workflow settings."""
 
-    if not isinstance(problem, PinchProblem):
+    if not isinstance(problem, SynthesisProblem):
         raise TypeError(
             "heat_exchanger_network_synthesis_service requires a live PinchProblem."
         )
@@ -40,7 +40,7 @@ def prepare_service_context(
 
 
 def finalise_design_result(
-    problem: PinchProblem,
+    problem: SynthesisProblem,
     target_output: TargetOutput,
     workflow_result: SynthesisWorkflowResult,
 ):
@@ -70,7 +70,7 @@ def finalise_design_result(
 
 
 def ensure_target_results(
-    problem: PinchProblem,
+    problem: SynthesisProblem,
     runtime_options: dict[str, Any],
     period_id: str | None,
 ) -> TargetOutput:

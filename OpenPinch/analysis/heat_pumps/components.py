@@ -2,12 +2,28 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from ...application.problem import PinchProblem
     from ...domain.zone import Zone
+
+
+class ProcessComponentHost(Protocol):
+    """The ``PinchProblem`` members process components use.
+
+    Defined here so the analysis layer does not import the application layer.
+    """
+
+    _process_components: dict[str, ProcessComponent]
+
+    @property
+    def process_components(self) -> Mapping[str, ProcessComponent]: ...
+
+    def _invalidate_analysis(self) -> None: ...
+
+    def _require_prepared_root_zone(self) -> Zone: ...
 
 
 @dataclass
@@ -15,7 +31,7 @@ class ProcessComponent:
     """Base class for memory-only process components."""
 
     id: str
-    problem: "PinchProblem"
+    problem: ProcessComponentHost
     component_type: str
     active: bool = True
 

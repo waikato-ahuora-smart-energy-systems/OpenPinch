@@ -3,7 +3,7 @@
 from collections.abc import Callable
 from html import escape
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 import pandas as pd
 
@@ -11,20 +11,25 @@ from ...analysis.graphs.service import get_output_graph_data
 from ...domain.enums import GraphType
 from .plotly import build_plotly_figure
 
-if TYPE_CHECKING:
-    from ...application.problem import PinchProblem
-
 PathLike = Union[str, Path]
 GraphRecord = Dict[str, Any]
 GraphData = Dict[str, GraphRecord]
+HprGraphSelector = Callable[..., list[GraphRecord]]
 
 
 class _PlotAccessor:
     """Read-only graph inventory, selection, rendering, and export helpers."""
 
-    def __init__(self, problem: "PinchProblem") -> None:
-        """Bind the accessor to one solved or solveable :class:`PinchProblem`."""
+    def __init__(
+        self, problem: Any, *, select_hpr_graphs: HprGraphSelector | None = None
+    ) -> None:
+        """Bind the accessor to one solved or solveable ``PinchProblem``.
+
+        ``select_hpr_graphs(problem, *, target, mode, zone_name)`` returns the
+        graphs of a validated HPR target; the application layer supplies it.
+        """
         self._problem = problem
+        self._select_hpr_graphs = select_hpr_graphs
 
     def catalog(self) -> pd.DataFrame:
         """Return a table describing the available graph outputs."""
@@ -450,11 +455,11 @@ class _PlotAccessor:
     def _plot_hpr(
         self, *, target, mode, graph_type, zone_name, index, show, return_graph_data
     ):
-        from ...application.hpr_selection import select_hpr_graphs
-
+        if self._select_hpr_graphs is None:
+            raise RuntimeError("HPR plots need an accessor bound to a PinchProblem.")
         graphs = [
             g
-            for g in select_hpr_graphs(
+            for g in self._select_hpr_graphs(
                 self._problem, target=target, mode=mode, zone_name=zone_name
             )
             if g["type"] == graph_type.value

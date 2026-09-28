@@ -454,7 +454,7 @@ def condensing_temperature_search_range(
     try:
         refrigerants = list(getattr(args, "refrigerant_ls", None) or ["water"])
         t_crit = max(float(_coolprop.PropsSI("Tcrit", ref)) for ref in refrigerants)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return t_hot, t_cold
     ceiling = t_crit - 273.15 - SUBCRITICAL_CONDENSING_MARGIN_K
     if not np.isfinite(ceiling) or ceiling <= t_cold or ceiling >= t_hot:

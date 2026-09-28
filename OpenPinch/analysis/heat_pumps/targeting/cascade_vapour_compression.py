@@ -199,9 +199,7 @@ def _get_cascade_hp_opt_setup(
     # The Carnot warm start knows nothing about critical points, so clip it
     # into the refrigerant's subcritical condensing range.
     x_cond = np.clip(
-        map_T_arr_to_x_arr(
-            init_res.T_cond, *condensing_temperature_search_range(args)
-        ),
+        map_T_arr_to_x_arr(init_res.T_cond, *condensing_temperature_search_range(args)),
         0.0,
         1.0,
     ).tolist()
