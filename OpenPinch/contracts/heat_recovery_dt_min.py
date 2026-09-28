@@ -6,15 +6,19 @@ import math
 from decimal import Decimal
 from enum import StrEnum
 from numbers import Real
+from typing import Annotated
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
+from ..domain._validation import non_empty_str
 from ..domain.analysis import AnalysisProvenance
 from ..domain.value import Value
 
 _RECOVERY_ABSOLUTE_TOLERANCE = 1e-6
 _RECOVERY_RELATIVE_TOLERANCE = 1e-9
+
+_NonEmptyText = Annotated[str, non_empty_str("value must not be empty")]
 
 
 class _FrozenContract(BaseModel):
@@ -69,8 +73,8 @@ class HeatRecoveryDtMinResult(_FrozenContract):
     """Diagnostic result from process-level global dt_min inversion."""
 
     provenance: AnalysisProvenance | None = None
-    scope: str
-    period_id: str
+    scope: _NonEmptyText
+    period_id: _NonEmptyText
     dt_min: HeatRecoveryQuantity
     requested_heat_recovery: HeatRecoveryQuantity
     achieved_heat_recovery: HeatRecoveryQuantity
@@ -78,14 +82,6 @@ class HeatRecoveryDtMinResult(_FrozenContract):
     heat_recovery_residual: HeatRecoveryQuantity
     status: HeatRecoveryDtMinStatus
     iterations: int
-
-    @field_validator("scope", "period_id")
-    @classmethod
-    def _validate_nonempty_text(cls, value: str) -> str:
-        text = value.strip()
-        if not text:
-            raise ValueError("value must not be empty")
-        return text
 
     @field_validator("iterations", mode="before")
     @classmethod

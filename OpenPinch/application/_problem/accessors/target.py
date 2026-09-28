@@ -44,7 +44,7 @@ from ..arguments import (
     split_runtime_and_configuration_options,
     temporary_zone_configuration,
 )
-from ..targeting.catalog import require_available
+from ..targeting.catalog import install_catalog_forwarders, require_available
 from ..targeting.provenance import (
     resolve_hpr_residual_case,
     resolve_target_selection,
@@ -132,9 +132,6 @@ class _AllPeriodsTargetAccessor:
         problem._period_states = states
         return detached
 
-    def direct_heat_integration(self, *, workers: int = 1, **kwargs):
-        return self._run("direct_heat_integration", workers=workers, kwargs=kwargs)
-
     def heat_recovery_dt_min(
         self,
         *,
@@ -153,53 +150,6 @@ class _AllPeriodsTargetAccessor:
             workers=workers,
         )
 
-    def indirect_heat_integration(self, *, workers: int = 1, **kwargs):
-        return self._run("indirect_heat_integration", workers=workers, kwargs=kwargs)
-
-    def total_site_heat_integration(self, *, workers: int = 1, **kwargs):
-        return self._run("total_site_heat_integration", workers=workers, kwargs=kwargs)
-
-    def all_heat_integration(self, *, workers: int = 1, **kwargs):
-        return self._run("all_heat_integration", workers=workers, kwargs=kwargs)
-
-    def heat_exchanger_area_and_cost(self, *, workers: int = 1, **kwargs):
-        return self._run("heat_exchanger_area_and_cost", workers=workers, kwargs=kwargs)
-
-    def carnot_heat_pump(self, *, workers: int = 1, **kwargs):
-        return self._run("carnot_heat_pump", workers=workers, kwargs=kwargs)
-
-    def carnot_refrigeration(self, *, workers: int = 1, **kwargs):
-        return self._run("carnot_refrigeration", workers=workers, kwargs=kwargs)
-
-    def vapour_compression_heat_pump(self, *, workers: int = 1, **kwargs):
-        return self._run("vapour_compression_heat_pump", workers=workers, kwargs=kwargs)
-
-    def vapour_compression_refrigeration(self, *, workers: int = 1, **kwargs):
-        return self._run(
-            "vapour_compression_refrigeration", workers=workers, kwargs=kwargs
-        )
-
-    def mvr_heat_pump(self, *, workers: int = 1, **kwargs):
-        return self._run("mvr_heat_pump", workers=workers, kwargs=kwargs)
-
-    def cogeneration(self, *, workers: int = 1, **kwargs):
-        return self._run("cogeneration", workers=workers, kwargs=kwargs)
-
-    def sun_smith_cogeneration(self, *, workers: int = 1, **kwargs):
-        return self._run("sun_smith_cogeneration", workers=workers, kwargs=kwargs)
-
-    def varbanov_cogeneration(self, *, workers: int = 1, **kwargs):
-        return self._run("varbanov_cogeneration", workers=workers, kwargs=kwargs)
-
-    def isentropic_cogeneration(self, *, workers: int = 1, **kwargs):
-        return self._run("isentropic_cogeneration", workers=workers, kwargs=kwargs)
-
-    def exergy(self, *, workers: int = 1, **kwargs):
-        return self._run("exergy", workers=workers, kwargs=kwargs)
-
-    def energy_transfer(self, *, workers: int = 1, **kwargs):
-        return self._run("energy_transfer", workers=workers, kwargs=kwargs)
-
     def utility_placement(self, **kwargs):
         """Optimize one shared placement over every canonical period."""
         if kwargs.get("base_target") is not None:
@@ -211,6 +161,30 @@ class _AllPeriodsTargetAccessor:
             period_ids=tuple(self._target._problem.period_ids),
             **kwargs,
         )
+
+
+def _all_periods_forwarder(method_name: str):
+    def forward(self, *, workers: int = 1, **kwargs):
+        return self._run(method_name, workers=workers, kwargs=kwargs)
+
+    forward.__doc__ = (
+        f"Run ``problem.target.{method_name}`` once per canonical period.\n\n"
+        "Returns detached per-period outputs keyed by ``period_id``; "
+        "``workers`` sets how many periods are solved concurrently."
+    )
+    return forward
+
+
+install_catalog_forwarders(
+    _AllPeriodsTargetAccessor,
+    surface="target",
+    factory=_all_periods_forwarder,
+    exclude=(
+        "brayton_heat_pump",
+        "brayton_refrigeration",
+        "hpr_performance_map",
+    ),
+)
 
 
 class _TargetAccessor:

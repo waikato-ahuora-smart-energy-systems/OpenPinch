@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from ...indexing import build_index_grid
+from .._base import approach as _approach
+from .._base import piecewise as _piecewise
+from .._base.superstructure import create_match_binaries, create_utility_duty_grids
 
 
 def set_stage_wise_superstructure(owner) -> None:
@@ -28,32 +31,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
         ),
         (owner.N_periods, owner.I, owner.J, owner.S),
     )
-    owner.Q_c_by_period = build_index_grid(
-        lambda n, i: (
-            owner.m.Var(
-                value=0,
-                ub=owner.Qtot_sh_period[n][i],
-                lb=0.0,
-                name=f"Q_H{i}_to_CU_period{n}",
-            )
-            if owner.z_cu_allowed[i] > 0
-            else owner.m.Param(value=0, name=f"Q_H{i}_to_CU_period{n}")
-        ),
-        (owner.N_periods, owner.I),
-    )
-    owner.Q_h_by_period = build_index_grid(
-        lambda n, j: (
-            owner.m.Var(
-                value=0,
-                ub=owner.Qtot_sc_period[n][j],
-                lb=0.0,
-                name=f"Q_HU_to_C{j}_period{n}",
-            )
-            if owner.z_hu_allowed[j] > 0
-            else owner.m.Param(value=0, name=f"Q_HU_to_C{j}_period{n}")
-        ),
-        (owner.N_periods, owner.J),
-    )
+    create_utility_duty_grids(owner)
     owner.T_h_by_period = build_index_grid(
         lambda n, i, k: (
             owner.m.Var(
@@ -92,7 +70,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
     owner.T_h = owner.T_h_by_period[0]
     owner.T_c = owner.T_c_by_period[0]
 
-    owner._set_piecewise_stage_heat_coordinates()
+    _piecewise._set_piecewise_stage_heat_coordinates(owner)
 
     for n in range(owner.N_periods):
         _ = [
@@ -138,7 +116,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                     == 0
                 )
                 if owner.z_i_active_period[n][i] > 0
-                and not owner._hot_parent_segmented(i)
+                and not _piecewise._hot_parent_segmented(owner, i)
                 else None
             )
             for k in range(owner.S)
@@ -153,62 +131,15 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                     == 0
                 )
                 if owner.z_j_active_period[n][j] > 0
-                and not owner._cold_parent_segmented(j)
+                and not _piecewise._cold_parent_segmented(owner, j)
                 else None
             )
             for k in range(owner.S)
             for j in range(owner.J)
         ]
 
+    create_match_binaries(owner)
     if owner.integers:
-        owner.z = [
-            [
-                [
-                    (
-                        owner.m.Var(
-                            value=1,
-                            ub=1,
-                            lb=0,
-                            integer=True,
-                            name=f"z_H{i}_to_C{j}_at_S{k}",
-                        )
-                        if owner.z_allowed[i][j][k] > 0
-                        else owner.m.Param(value=0, name=f"z_H{i}_to_C{j}_at_S{k}")
-                    )
-                    for k in range(owner.S)
-                ]
-                for j in range(owner.J)
-            ]
-            for i in range(owner.I)
-        ]
-        owner.z_cu = [
-            (
-                owner.m.Var(
-                    value=1,
-                    ub=1,
-                    lb=0,
-                    integer=True,
-                    name=f"z_H{i}_to_CU",
-                )
-                if owner.z_cu_allowed[i] > 0
-                else owner.m.Param(value=0, name=f"z_H{i}_to_CU")
-            )
-            for i in range(owner.I)
-        ]
-        owner.z_hu = [
-            (
-                owner.m.Var(
-                    value=1,
-                    ub=1,
-                    lb=0,
-                    integer=True,
-                    name=f"z_HU_to_C{j}",
-                )
-                if owner.z_hu_allowed[j] > 0
-                else owner.m.Param(value=0, name=f"z_HU_to_C{j}")
-            )
-            for j in range(owner.J)
-        ]
         for n in range(owner.N_periods):
             _ = [
                 (
@@ -242,39 +173,8 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                 )
                 for j in range(owner.J)
             ]
-    else:
-        owner.z = [
-            [
-                [
-                    (
-                        owner.m.Param(value=1, name=f"z_H{i}_to_C{j}_at_S{k}")
-                        if owner.z_allowed[i][j][k] > 0
-                        else owner.m.Param(value=0, name=f"z_H{i}_to_C{j}_at_S{k}")
-                    )
-                    for k in range(owner.S)
-                ]
-                for j in range(owner.J)
-            ]
-            for i in range(owner.I)
-        ]
-        owner.z_hu = [
-            (
-                owner.m.Param(value=1, name=f"z_HU_to_C{j}")
-                if owner.z_hu_allowed[j] > 0
-                else owner.m.Param(value=0, name=f"z_HU_to_C{j}")
-            )
-            for j in range(owner.J)
-        ]
-        owner.z_cu = [
-            (
-                owner.m.Param(value=1, name=f"z_H{i}_to_CU")
-                if owner.z_cu_allowed[i] > 0
-                else owner.m.Param(value=0, name=f"z_H{i}_to_CU")
-            )
-            for i in range(owner.I)
-        ]
 
-    owner._set_multiperiod_utility_approach_equations()
+    _approach._set_multiperiod_utility_approach_equations(owner)
 
     M_ij_period = [
         [
@@ -387,4 +287,9 @@ def set_obj(owner) -> None:
                     for i in range(owner.I)
                 ]
             )
+        )
+    else:
+        raise ValueError(
+            "Unsupported pinch-decomposition minimisation goal: "
+            f"{owner.minimisation_goal!r}."
         )

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from enum import Enum
+from functools import partial
 from types import UnionType
 from typing import Any, List, get_args, get_origin
 
@@ -25,6 +27,9 @@ class ConfigurationFieldSpec:
     numeric_min: float | None = None
     numeric_max: float | None = None
     runtime_status: str = "supported"
+    validator: Callable[[str, Any], Any] | None = dataclass_field(
+        default=None, compare=False, repr=False
+    )
 
 
 @dataclass(frozen=True)
@@ -40,28 +45,178 @@ HENS_STAGE_PACKING_VALUES = frozenset({"auto", "none", "pdm", "tdm", "all"})
 HPR_LOAD_MODE_VALUES = frozenset({"fraction", "duty", "period_values"})
 _HENS_RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 
-_INPUT_UNIT_TARGETS = {
-    "INPUT_UNIT_TEMPERATURE": "degC",
-    "INPUT_UNIT_PRESSURE": "kPa",
-    "INPUT_UNIT_ENTHALPY": "kJ/kg",
-    "INPUT_UNIT_HEAT_FLOW": "kW",
-    "INPUT_UNIT_DELTA_T": "delta_degC",
-    "INPUT_UNIT_HTC": "kW/m^2/delta_degC",
-    "INPUT_UNIT_PRICE": "$/MWh",
-}
-_OUTPUT_UNIT_TARGETS = {
-    "OUTPUT_UNIT_HEAT_FLOW": "kW",
-    "OUTPUT_UNIT_TEMPERATURE": "degC",
-    "OUTPUT_UNIT_PERCENT": "%",
-    "OUTPUT_UNIT_UTILITY_COST": "$/h",
-    "OUTPUT_UNIT_WORK": "kW",
-    "OUTPUT_UNIT_AREA": "m^2",
-    "OUTPUT_UNIT_CAPITAL_COST": "$",
-    "OUTPUT_UNIT_ANNUAL_COST": "$/y",
-    "OUTPUT_UNIT_EXERGY": "kW",
-    "OUTPUT_UNIT_HPR_COP": "dimensionless",
-}
-_UNIT_TARGETS = _INPUT_UNIT_TARGETS | _OUTPUT_UNIT_TARGETS
+
+# Value validators referenced by the field table below.
+
+
+def _sequence(name: str, value: Any, *, allow_empty: bool) -> Sequence:
+    if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
+        raise ValueError(f"{name} must be provided as a list.")
+    if not allow_empty and not value:
+        raise ValueError(f"{name} must contain at least one value.")
+    return value
+
+
+def _positive_float_grid(name: str, value: Any) -> list[float]:
+    return [
+        _positive_float(name, item)
+        for item in _sequence(name, value, allow_empty=False)
+    ]
+
+
+def _optional_positive_float_grid(name: str, value: Any) -> list[float] | None:
+    if value is None:
+        return None
+    return _positive_float_grid(name, value)
+
+
+def _solver_options(name: str, value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError(f"{name} must be provided as a dict.")
+    options: dict[str, Any] = {}
+    for key, option_value in value.items():
+        option_name = str(key).strip()
+        if not option_name:
+            raise ValueError(f"{name} cannot contain empty option names.")
+        options[option_name] = option_value
+    return options
+
+
+def _float_mapping(
+    name: str,
+    value: Any,
+    *,
+    numeric_min: float | None,
+) -> dict[str, float]:
+    if not isinstance(value, dict):
+        raise ValueError(f"{name} must be provided as a dict.")
+    return {
+        str(key): _check_numeric_bounds(
+            name,
+            _float(name, item),
+            ConfigurationFieldSpec(
+                float,
+                None,
+                "hpr",
+                ("hpr", "load_period_values"),
+                numeric_min=numeric_min,
+            ),
+        )
+        for key, item in value.items()
+    }
+
+
+def _positive_unique_int_grid(name: str, value: Any) -> list[int]:
+    stages = [
+        _positive_int(name, item) for item in _sequence(name, value, allow_empty=False)
+    ]
+    if len(set(stages)) != len(stages):
+        raise ValueError(f"{name} values must be unique.")
+    return stages
+
+
+def _string_choice_grid(
+    name: str,
+    value: Any,
+    choices: frozenset[str],
+    *,
+    allow_empty: bool,
+) -> list[str]:
+    values = list(_sequence(name, value, allow_empty=allow_empty))
+    invalid = [
+        item for item in values if not isinstance(item, str) or item not in choices
+    ]
+    if invalid:
+        choices_text = ", ".join(sorted(choices))
+        raise ValueError(f"{name} values must be one of: {choices_text}.")
+    return values
+
+
+def _string_choice(name: str, value: Any, choices: frozenset[str]) -> str:
+    if not isinstance(value, str) or value not in choices:
+        choices_text = ", ".join(sorted(choices))
+        raise ValueError(f"{name} must be one of: {choices_text}.")
+    return value
+
+
+def _positive_float(name: str, value: Any) -> float:
+    numeric_value = _float(name, value)
+    if numeric_value <= 0.0:
+        raise ValueError(f"{name} must be a finite positive number.")
+    return numeric_value
+
+
+def _positive_int(name: str, value: Any) -> int:
+    numeric_value = _int(name, value)
+    if numeric_value <= 0:
+        raise ValueError(f"{name} must be a positive integer.")
+    return numeric_value
+
+
+def _positive_int_or_none(name: str, value: Any) -> int | None:
+    if value is None:
+        return None
+    return _positive_int(name, value)
+
+
+def _float(name: str, value: Any) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{name} must be a finite number.")
+    numeric_value = float(value)
+    if not math.isfinite(numeric_value):
+        raise ValueError(f"{name} must be a finite number.")
+    return numeric_value
+
+
+def _int(name: str, value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{name} must be an integer.")
+    return value
+
+
+def _check_numeric_bounds(
+    name: str,
+    value: float | int,
+    spec: ConfigurationFieldSpec,
+) -> Any:
+    if spec.numeric_min is not None and value < spec.numeric_min:
+        raise ValueError(f"{name} must be greater than or equal to {spec.numeric_min}.")
+    if spec.numeric_max is not None and value > spec.numeric_max:
+        raise ValueError(f"{name} must be less than or equal to {spec.numeric_max}.")
+    return value
+
+
+def _run_id(name: str, value: Any) -> str:
+    value = _non_empty_string(name, value)
+    if _HENS_RUN_ID_PATTERN.fullmatch(value) is None:
+        raise ValueError(
+            f"{name} must start with an alphanumeric character and contain only "
+            "letters, numbers, underscores, hyphens, or periods."
+        )
+    return value
+
+
+def _string(name: str, value: Any) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{name} must be a string.")
+    return value
+
+
+def _non_empty_string(name: str, value: Any) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{name} must be a non-empty string.")
+    return value.strip()
+
+
+def _unit_string(name: str, value: Any, target_unit: str) -> str:
+    text = _non_empty_string(name, value)
+    try:
+        from ..domain.value import Value
+
+        Value(1.0, text).to(target_unit)
+    except Exception as exc:
+        raise ValueError(f"{name} must be compatible with {target_unit}.") from exc
+    return text
 
 
 def _spec(
@@ -74,6 +229,7 @@ def _spec(
     numeric_min: float | None = None,
     numeric_max: float | None = None,
     runtime_status: str = "supported",
+    validator: Callable[[str, Any], Any] | None = None,
 ) -> ConfigurationFieldSpec:
     return ConfigurationFieldSpec(
         annotation=annotation,
@@ -84,6 +240,18 @@ def _spec(
         numeric_min=numeric_min,
         numeric_max=numeric_max,
         runtime_status=runtime_status,
+        validator=validator,
+    )
+
+
+def _unit_spec(default: str, group: str, field: str) -> ConfigurationFieldSpec:
+    """Return a unit-string field whose values must convert to ``default``."""
+    return _spec(
+        str,
+        default,
+        group,
+        field,
+        validator=partial(_unit_string, target_unit=default),
     )
 
 
@@ -96,23 +264,23 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "PROBLEM_PERIOD_WEIGHTS": _spec(List[float], [1.0], "problem", "period_weights", numeric_min=0.0),
 
     # Explicit input/output units.
-    "INPUT_UNIT_TEMPERATURE": _spec(str, "degC", "input_units", "temperature"),
-    "INPUT_UNIT_PRESSURE": _spec(str, "kPa", "input_units", "pressure"),
-    "INPUT_UNIT_ENTHALPY": _spec(str, "kJ/kg", "input_units", "enthalpy"),
-    "INPUT_UNIT_HEAT_FLOW": _spec(str, "kW", "input_units", "heat_flow"),
-    "INPUT_UNIT_DELTA_T": _spec(str, "delta_degC", "input_units", "delta_t"),
-    "INPUT_UNIT_HTC": _spec(str, "kW/m^2/delta_degC", "input_units", "htc"),
-    "INPUT_UNIT_PRICE": _spec(str, "$/MWh", "input_units", "price"),
-    "OUTPUT_UNIT_HEAT_FLOW": _spec(str, "kW", "output_units", "heat_flow"),
-    "OUTPUT_UNIT_TEMPERATURE": _spec(str, "degC", "output_units", "temperature"),
-    "OUTPUT_UNIT_PERCENT": _spec(str, "%", "output_units", "percent"),
-    "OUTPUT_UNIT_UTILITY_COST": _spec(str, "$/h", "output_units", "utility_cost"),
-    "OUTPUT_UNIT_WORK": _spec(str, "kW", "output_units", "work"),
-    "OUTPUT_UNIT_AREA": _spec(str, "m^2", "output_units", "area"),
-    "OUTPUT_UNIT_CAPITAL_COST": _spec(str, "$", "output_units", "capital_cost"),
-    "OUTPUT_UNIT_ANNUAL_COST": _spec(str, "$/y", "output_units", "annual_cost"),
-    "OUTPUT_UNIT_EXERGY": _spec(str, "kW", "output_units", "exergy"),
-    "OUTPUT_UNIT_HPR_COP": _spec(str, "dimensionless", "output_units", "hpr_cop"),
+    "INPUT_UNIT_TEMPERATURE": _unit_spec("degC", "input_units", "temperature"),
+    "INPUT_UNIT_PRESSURE": _unit_spec("kPa", "input_units", "pressure"),
+    "INPUT_UNIT_ENTHALPY": _unit_spec("kJ/kg", "input_units", "enthalpy"),
+    "INPUT_UNIT_HEAT_FLOW": _unit_spec("kW", "input_units", "heat_flow"),
+    "INPUT_UNIT_DELTA_T": _unit_spec("delta_degC", "input_units", "delta_t"),
+    "INPUT_UNIT_HTC": _unit_spec("kW/m^2/delta_degC", "input_units", "htc"),
+    "INPUT_UNIT_PRICE": _unit_spec("$/MWh", "input_units", "price"),
+    "OUTPUT_UNIT_HEAT_FLOW": _unit_spec("kW", "output_units", "heat_flow"),
+    "OUTPUT_UNIT_TEMPERATURE": _unit_spec("degC", "output_units", "temperature"),
+    "OUTPUT_UNIT_PERCENT": _unit_spec("%", "output_units", "percent"),
+    "OUTPUT_UNIT_UTILITY_COST": _unit_spec("$/h", "output_units", "utility_cost"),
+    "OUTPUT_UNIT_WORK": _unit_spec("kW", "output_units", "work"),
+    "OUTPUT_UNIT_AREA": _unit_spec("m^2", "output_units", "area"),
+    "OUTPUT_UNIT_CAPITAL_COST": _unit_spec("$", "output_units", "capital_cost"),
+    "OUTPUT_UNIT_ANNUAL_COST": _unit_spec("$/y", "output_units", "annual_cost"),
+    "OUTPUT_UNIT_EXERGY": _unit_spec("kW", "output_units", "exergy"),
+    "OUTPUT_UNIT_HPR_COP": _unit_spec("dimensionless", "output_units", "hpr_cop"),
 
     # General runtime controls.
     "REPORTING_DECIMAL_PLACES": _spec(int, 2, "reporting", "decimal_places", numeric_min=0.0),
@@ -147,35 +315,35 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "COSTING_HPR_HX_DUTY_COST_EXP": _spec(float, 1.0, "costing", "hpr_hx_duty_cost_exp", numeric_min=0.0),
 
     # HEN synthesis.
-    "HENS_APPROACH_TEMPERATURES": _spec(List[float], [14.0], "hens", "approach_temperatures"),
-    "HENS_DT_CONT_MULTIPLIERS": _spec(List[float] | None, None, "hens", "dt_cont_multipliers"),
-    "HENS_DERIVATIVE_THRESHOLDS": _spec(List[float], [0.5], "hens", "derivative_thresholds"),
+    "HENS_APPROACH_TEMPERATURES": _spec(List[float], [14.0], "hens", "approach_temperatures", validator=_positive_float_grid),
+    "HENS_DT_CONT_MULTIPLIERS": _spec(List[float] | None, None, "hens", "dt_cont_multipliers", validator=_optional_positive_float_grid),
+    "HENS_DERIVATIVE_THRESHOLDS": _spec(List[float], [0.5], "hens", "derivative_thresholds", validator=_positive_float_grid),
     "HENS_SYNTHESIS_QUALITY_TIER": _spec(int, 1, "hens", "synthesis_quality_tier", numeric_min=0.0, numeric_max=5.0),
     "HENS_PDM_STAGE_PAIR_LIMIT": _spec(int | None, None, "hens", "pdm_stage_pair_limit", numeric_min=0.0, numeric_max=12.0),
     "HENS_TDM_PARENT_LIMIT": _spec(int | None, None, "hens", "tdm_parent_limit", numeric_min=1.0),
-    "HENS_STAGE_PACKING": _spec(str, "auto", "hens", "stage_packing"),
-    "HENS_STAGE_SELECTION": _spec(List[int], [1, 2, 3], "hens", "stage_selection"),
-    "HENS_SOLVER_PDM": _spec(str, "couenne", "hens", "solver_pdm"),
-    "HENS_SOLVER_TDM": _spec(str, "couenne", "hens", "solver_tdm"),
-    "HENS_SOLVER_EVM": _spec(str, "ipopt-pyomo", "hens", "solver_evm"),
-    "HENS_SOLVER_OPTIONS_PDM": _spec(dict[str, Any], {}, "hens", "solver_options_pdm"),
-    "HENS_SOLVER_OPTIONS_TDM": _spec(dict[str, Any], {}, "hens", "solver_options_tdm"),
-    "HENS_SOLVER_OPTIONS_EVM": _spec(dict[str, Any], {}, "hens", "solver_options_evm"),
-    "HENS_SOLVE_TOLERANCE": _spec(float, 1e-3, "hens", "solve_tolerance", numeric_min=0.0),
-    "HENS_MAX_PARALLEL": _spec(int, 1, "hens", "max_parallel", numeric_min=1.0),
-    "HENS_EVM_N_AD_BRANCHES": _spec(int | None, None, "hens", "evm_n_ad_branches", numeric_min=1.0),
-    "HENS_EVM_N_RM_BRANCHES": _spec(int | None, None, "hens", "evm_n_rm_branches", numeric_min=1.0),
-    "HENS_LOG_LEVEL": _spec(str, "INFO", "hens", "log_level"),
-    "HENS_OUTPUT_FOLDER": _spec(str, "", "hens", "output_folder"),
-    "HENS_OUTPUT_FORMATS": _spec(List[str], [], "hens", "output_formats"),
-    "HENS_RUN_ID": _spec(str, "default", "hens", "run_id"),
-    "HENS_BEST_SOLUTIONS_TO_SAVE": _spec(int, 1, "hens", "best_solutions_to_save", numeric_min=1.0),
+    "HENS_STAGE_PACKING": _spec(str, "auto", "hens", "stage_packing", validator=partial(_string_choice, choices=HENS_STAGE_PACKING_VALUES)),
+    "HENS_STAGE_SELECTION": _spec(List[int], [1, 2, 3], "hens", "stage_selection", validator=_positive_unique_int_grid),
+    "HENS_SOLVER_PDM": _spec(str, "couenne", "hens", "solver_pdm", validator=_non_empty_string),
+    "HENS_SOLVER_TDM": _spec(str, "couenne", "hens", "solver_tdm", validator=_non_empty_string),
+    "HENS_SOLVER_EVM": _spec(str, "ipopt-pyomo", "hens", "solver_evm", validator=_non_empty_string),
+    "HENS_SOLVER_OPTIONS_PDM": _spec(dict[str, Any], {}, "hens", "solver_options_pdm", validator=_solver_options),
+    "HENS_SOLVER_OPTIONS_TDM": _spec(dict[str, Any], {}, "hens", "solver_options_tdm", validator=_solver_options),
+    "HENS_SOLVER_OPTIONS_EVM": _spec(dict[str, Any], {}, "hens", "solver_options_evm", validator=_solver_options),
+    "HENS_SOLVE_TOLERANCE": _spec(float, 1e-3, "hens", "solve_tolerance", numeric_min=0.0, validator=_positive_float),
+    "HENS_MAX_PARALLEL": _spec(int, 1, "hens", "max_parallel", numeric_min=1.0, validator=_positive_int),
+    "HENS_EVM_N_AD_BRANCHES": _spec(int | None, None, "hens", "evm_n_ad_branches", numeric_min=1.0, validator=_positive_int_or_none),
+    "HENS_EVM_N_RM_BRANCHES": _spec(int | None, None, "hens", "evm_n_rm_branches", numeric_min=1.0, validator=_positive_int_or_none),
+    "HENS_LOG_LEVEL": _spec(str, "INFO", "hens", "log_level", validator=_non_empty_string),
+    "HENS_OUTPUT_FOLDER": _spec(str, "", "hens", "output_folder", validator=_string),
+    "HENS_OUTPUT_FORMATS": _spec(List[str], [], "hens", "output_formats", validator=partial(_string_choice_grid, choices=HENS_OUTPUT_FORMAT_VALUES, allow_empty=True)),
+    "HENS_RUN_ID": _spec(str, "default", "hens", "run_id", validator=_run_id),
+    "HENS_BEST_SOLUTIONS_TO_SAVE": _spec(int, 1, "hens", "best_solutions_to_save", numeric_min=1.0, validator=_positive_int),
     # Heat pump and refrigeration.
     "HPR_TYPE": _spec(str, HeatPumpAndRefrigerationCycle.CascadeCarnot.value, "hpr", "type", enum_cls=HeatPumpAndRefrigerationCycle),
-    "HPR_LOAD_MODE": _spec(str, "fraction", "hpr", "load_mode"),
+    "HPR_LOAD_MODE": _spec(str, "fraction", "hpr", "load_mode", validator=partial(_string_choice, choices=HPR_LOAD_MODE_VALUES)),
     "HPR_LOAD_FRACTION": _spec(float, 1.0, "hpr", "load_fraction", numeric_min=0.0, numeric_max=1.0),
     "HPR_LOAD_DUTY": _spec(float | None, None, "hpr", "load_duty", numeric_min=0.0),
-    "HPR_LOAD_PERIOD_VALUES": _spec(dict[str, float], {}, "hpr", "load_period_values"),
+    "HPR_LOAD_PERIOD_VALUES": _spec(dict[str, float], {}, "hpr", "load_period_values", validator=partial(_float_mapping, numeric_min=0.0)),
     "HPR_MULTIPERIOD_OPTIMIZATION_ENABLED": _spec(bool, False, "hpr", "multiperiod_optimization_enabled"),
     "HPR_REFRIGERANTS": _spec(List[str], ["water", "ammonia"], "hpr", "refrigerants"),
     "HPR_REFRIGERANT_SORT_ENABLED": _spec(bool, True, "hpr", "refrigerant_sort_enabled"),
@@ -219,22 +387,6 @@ USER_CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     name: spec
     for name, spec in CONFIG_FIELD_SPECS.items()
     if name not in INTERNAL_METHOD_OPTION_KEYS
-}
-
-CONFIG_ENUMS: dict[str, type[Enum]] = {
-    name: spec.enum_cls
-    for name, spec in CONFIG_FIELD_SPECS.items()
-    if spec.enum_cls is not None
-}
-
-CONFIG_GROUPS: dict[str, set[str]] = {}
-for _field_name, _field_spec in CONFIG_FIELD_SPECS.items():
-    CONFIG_GROUPS.setdefault(_field_spec.group, set()).add(_field_name)
-
-CONFIG_MINIMUMS: dict[str, float] = {
-    name: spec.numeric_min
-    for name, spec in CONFIG_FIELD_SPECS.items()
-    if spec.numeric_min is not None
 }
 
 
@@ -317,61 +469,8 @@ def validate_configuration_option_value(name: str, value: Any) -> Any:
 
 def _validate_configuration_option_value(name: str, value: Any) -> Any:
     spec = CONFIG_FIELD_SPECS[name]
-    if name in _UNIT_TARGETS:
-        return _unit_string(name, value, _UNIT_TARGETS[name])
-    if name in {"HENS_APPROACH_TEMPERATURES", "HENS_DT_CONT_MULTIPLIERS"}:
-        if value is None and name == "HENS_DT_CONT_MULTIPLIERS":
-            return None
-        return _positive_float_grid(name, value)
-    if name == "HENS_DERIVATIVE_THRESHOLDS":
-        return _positive_float_grid(name, value)
-    if name == "HENS_STAGE_SELECTION":
-        return _positive_unique_int_grid(name, value)
-    if name == "HENS_OUTPUT_FORMATS":
-        return _string_choice_grid(
-            name,
-            value,
-            HENS_OUTPUT_FORMAT_VALUES,
-            allow_empty=True,
-        )
-    if name == "HENS_STAGE_PACKING":
-        return _string_choice(name, value, HENS_STAGE_PACKING_VALUES)
-    if name == "HENS_SOLVE_TOLERANCE":
-        return _positive_float(name, value)
-    if name in {
-        "HENS_MAX_PARALLEL",
-        "HENS_BEST_SOLUTIONS_TO_SAVE",
-    }:
-        return _positive_int(name, value)
-    if name in {
-        "HENS_EVM_N_AD_BRANCHES",
-        "HENS_EVM_N_RM_BRANCHES",
-    }:
-        return _positive_int_or_none(name, value)
-    if name == "HENS_RUN_ID":
-        return _run_id(name, value)
-    if name in {
-        "HENS_SOLVER_PDM",
-        "HENS_SOLVER_TDM",
-        "HENS_SOLVER_EVM",
-        "HENS_LOG_LEVEL",
-    }:
-        return _non_empty_string(name, value)
-    if name in {
-        "HENS_SOLVER_OPTIONS_PDM",
-        "HENS_SOLVER_OPTIONS_TDM",
-        "HENS_SOLVER_OPTIONS_EVM",
-    }:
-        return _solver_options(name, value)
-    if name == "HENS_OUTPUT_FOLDER":
-        if not isinstance(value, str):
-            raise ValueError(f"{name} must be a string.")
-        return value
-    if name == "HPR_LOAD_MODE":
-        return _string_choice(name, value, HPR_LOAD_MODE_VALUES)
-    if name == "HPR_LOAD_PERIOD_VALUES":
-        return _float_mapping(name, value, numeric_min=0.0)
-
+    if spec.validator is not None:
+        return spec.validator(name, value)
     if spec.enum_cls is not None:
         value = _enum_value(name, value, spec.enum_cls)
     return _coerce_annotation_value(name, value, spec)
@@ -537,161 +636,3 @@ def _validate_hpr_load_options(
         raise ValueError(
             "HPR_LOAD_DUTY cannot be supplied when HPR_LOAD_MODE is 'period_values'."
         )
-
-
-def _sequence(name: str, value: Any, *, allow_empty: bool) -> Sequence:
-    if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
-        raise ValueError(f"{name} must be provided as a list.")
-    if not allow_empty and not value:
-        raise ValueError(f"{name} must contain at least one value.")
-    return value
-
-
-def _positive_float_grid(name: str, value: Any) -> list[float]:
-    return [
-        _positive_float(name, item)
-        for item in _sequence(name, value, allow_empty=False)
-    ]
-
-
-def _solver_options(name: str, value: Any) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        raise ValueError(f"{name} must be provided as a dict.")
-    options: dict[str, Any] = {}
-    for key, option_value in value.items():
-        option_name = str(key).strip()
-        if not option_name:
-            raise ValueError(f"{name} cannot contain empty option names.")
-        options[option_name] = option_value
-    return options
-
-
-def _float_mapping(
-    name: str,
-    value: Any,
-    *,
-    numeric_min: float | None,
-) -> dict[str, float]:
-    if not isinstance(value, dict):
-        raise ValueError(f"{name} must be provided as a dict.")
-    return {
-        str(key): _check_numeric_bounds(
-            name,
-            _float(name, item),
-            ConfigurationFieldSpec(
-                float,
-                None,
-                "hpr",
-                ("hpr", "load_period_values"),
-                numeric_min=numeric_min,
-            ),
-        )
-        for key, item in value.items()
-    }
-
-
-def _positive_unique_int_grid(name: str, value: Any) -> list[int]:
-    stages = [
-        _positive_int(name, item) for item in _sequence(name, value, allow_empty=False)
-    ]
-    if len(set(stages)) != len(stages):
-        raise ValueError(f"{name} values must be unique.")
-    return stages
-
-
-def _string_choice_grid(
-    name: str,
-    value: Any,
-    choices: frozenset[str],
-    *,
-    allow_empty: bool,
-) -> list[str]:
-    values = list(_sequence(name, value, allow_empty=allow_empty))
-    invalid = [
-        item for item in values if not isinstance(item, str) or item not in choices
-    ]
-    if invalid:
-        choices_text = ", ".join(sorted(choices))
-        raise ValueError(f"{name} values must be one of: {choices_text}.")
-    return values
-
-
-def _string_choice(name: str, value: Any, choices: frozenset[str]) -> str:
-    if not isinstance(value, str) or value not in choices:
-        choices_text = ", ".join(sorted(choices))
-        raise ValueError(f"{name} must be one of: {choices_text}.")
-    return value
-
-
-def _positive_float(name: str, value: Any) -> float:
-    numeric_value = _float(name, value)
-    if numeric_value <= 0.0:
-        raise ValueError(f"{name} must be a finite positive number.")
-    return numeric_value
-
-
-def _positive_int(name: str, value: Any) -> int:
-    numeric_value = _int(name, value)
-    if numeric_value <= 0:
-        raise ValueError(f"{name} must be a positive integer.")
-    return numeric_value
-
-
-def _positive_int_or_none(name: str, value: Any) -> int | None:
-    if value is None:
-        return None
-    return _positive_int(name, value)
-
-
-def _float(name: str, value: Any) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise ValueError(f"{name} must be a finite number.")
-    numeric_value = float(value)
-    if not math.isfinite(numeric_value):
-        raise ValueError(f"{name} must be a finite number.")
-    return numeric_value
-
-
-def _int(name: str, value: Any) -> int:
-    if isinstance(value, bool) or not isinstance(value, int):
-        raise ValueError(f"{name} must be an integer.")
-    return value
-
-
-def _check_numeric_bounds(
-    name: str,
-    value: float | int,
-    spec: ConfigurationFieldSpec,
-) -> Any:
-    if spec.numeric_min is not None and value < spec.numeric_min:
-        raise ValueError(f"{name} must be greater than or equal to {spec.numeric_min}.")
-    if spec.numeric_max is not None and value > spec.numeric_max:
-        raise ValueError(f"{name} must be less than or equal to {spec.numeric_max}.")
-    return value
-
-
-def _run_id(name: str, value: Any) -> str:
-    value = _non_empty_string(name, value)
-    if _HENS_RUN_ID_PATTERN.fullmatch(value) is None:
-        raise ValueError(
-            f"{name} must start with an alphanumeric character and contain only "
-            "letters, numbers, underscores, hyphens, or periods."
-        )
-    return value
-
-
-def _non_empty_string(name: str, value: Any) -> str:
-    if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{name} must be a non-empty string.")
-    return value.strip()
-
-
-def _unit_string(name: str, value: Any, target_unit: str) -> str:
-    text = _non_empty_string(name, value)
-    try:
-        from ..domain.value import Value
-
-        Value(1.0, text).to(target_unit)
-    except Exception as exc:
-        raise ValueError(f"{name} must be compatible with {target_unit}.") from exc
-    return text

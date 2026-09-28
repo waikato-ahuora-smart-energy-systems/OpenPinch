@@ -67,17 +67,14 @@ def state_property_at_temperature_pressure(
             fluid,
         )
     except ValueError:
-        try:
-            saturation_temperature = PropsSI(
-                "T",
-                "P",
-                pressure_pascal,
-                "Q",
-                saturated_quality,
-                fluid,
-            )
-        except Exception:
-            raise
+        saturation_temperature = PropsSI(
+            "T",
+            "P",
+            pressure_pascal,
+            "Q",
+            saturated_quality,
+            fluid,
+        )
         if abs(temperature_kelvin - saturation_temperature) > 0.05:
             raise
         return PropsSI(

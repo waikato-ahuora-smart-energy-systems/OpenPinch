@@ -82,7 +82,14 @@ jobs:
             runner: ubuntu-latest
             timeout: 20
             sync: --group dev --extra tespy
-            markers: tespy
+            markers: tespy and not tutorial_profile
+          # The slow HPR tutorial notebooks take minutes each; they get their
+          # own lane so the tespy lane keeps a tight timeout.
+          - lane: notebooks-hpr
+            runner: ubuntu-latest
+            timeout: 90
+            sync: --group dev --extra tespy
+            markers: tespy and tutorial_profile
           - lane: performance
             runner: ubuntu-latest
             timeout: 20

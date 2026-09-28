@@ -5,8 +5,6 @@ from __future__ import annotations
 import ast
 import csv
 import json
-import os
-import shutil
 from pathlib import Path
 
 import nbformat
@@ -22,7 +20,6 @@ from OpenPinch.resources import (
     read_sample_case,
     sample_case_metadata,
 )
-from scripts import generate_tutorial_notebooks as notebook_generator
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = ROOT / "docs" / "_data" / "tutorial-coverage.csv"
@@ -70,16 +67,6 @@ def _combined_source(notebook: dict) -> str:
     return "\n".join(_code_sources(notebook))
 
 
-def _profile_notebook_names(profile: str) -> list[str]:
-    return sorted(
-        {
-            row["primary_tutorial"]
-            for row in _manifest_rows()
-            if row["execution_profile"] == profile
-        }
-    )
-
-
 def _execute_notebook(name: str, tmp_path: Path) -> None:
     namespace = {"__name__": "__main__"}
     notebook = _copied_notebook(tmp_path, name)
@@ -87,7 +74,17 @@ def _execute_notebook(name: str, tmp_path: Path) -> None:
         try:
             exec(compile(source, f"{name}:cell-{index}", "exec"), namespace)
         except Exception as error:
-            raise AssertionError(f"{name} failed in code cell {index}") from error
+            # Structured solver diagnostics (e.g. HPRTargetingError) explain
+            # *why* a cell failed; include them so CI logs are actionable.
+            diagnostics = getattr(error, "diagnostics", None)
+            detail = (
+                f": {error}\n{diagnostics.model_dump_json(indent=1)}"
+                if hasattr(diagnostics, "model_dump_json")
+                else f": {type(error).__name__}: {error}"
+            )
+            raise AssertionError(
+                f"{name} failed in code cell {index}{detail}"
+            ) from error
 
 
 def test_utility_placement_has_one_executable_thermodynamic_notebook() -> None:
@@ -349,45 +346,7 @@ def test_tutorial_review_preserves_notebook_invariants(name: str) -> None:
     assert [cell["id"] for cell in notebook["cells"]] == [
         f"cell-{index:02d}" for index in range(1, len(notebook["cells"]) + 1)
     ]
-    # Saved tutorials may retain valid execution evidence. The generator's
-    # fresh-output contract is checked independently below.
     nbformat.validate(notebook)
-
-
-def test_notebook_generator_is_repeatable_in_process(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(notebook_generator, "NOTEBOOK_DIR", tmp_path)
-
-    notebook_generator.main()
-    first = {path.name: path.read_bytes() for path in tmp_path.glob("*.ipynb")}
-    for name, payload in first.items():
-        notebook = json.loads(payload)
-        nbformat.validate(notebook)
-        for cell in notebook["cells"]:
-            if cell["cell_type"] == "code":
-                assert cell["execution_count"] is None, name
-                assert cell["outputs"] == [], name
-    notebook_generator.main()
-    second = {path.name: path.read_bytes() for path in tmp_path.glob("*.ipynb")}
-
-    assert sorted(first) == EXPECTED_NOTEBOOKS
-    assert second == first
-
-
-def test_notebook_generator_does_not_rewrite_current_notebooks(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    notebook_dir = ROOT / "OpenPinch" / "tutorials" / "notebooks"
-    for source in notebook_dir.glob("*.ipynb"):
-        shutil.copy2(source, tmp_path / source.name)
-    before = {path.name: path.read_bytes() for path in tmp_path.glob("*.ipynb")}
-    monkeypatch.setattr(notebook_generator, "NOTEBOOK_DIR", tmp_path)
-
-    notebook_generator.main()
-
-    after = {path.name: path.read_bytes() for path in tmp_path.glob("*.ipynb")}
-    assert after == before
 
 
 def test_every_code_cell_compiles_and_uses_only_public_package_imports(
@@ -535,25 +494,19 @@ def test_notebook_11_required_mvr_paths_are_explicit_and_bounded() -> None:
     assert "assert cascade.hpr_details.target_simulation_record.loops" in source
 
 
-def test_checked_in_hpr_notebooks_are_source_only_and_match_generator(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(notebook_generator, "NOTEBOOK_DIR", tmp_path)
-    notebook_generator.main()
+def test_checked_in_notebooks_are_the_expected_output_free_set() -> None:
+    # The .ipynb files are the source of truth: edit them in Jupyter and clear
+    # outputs before committing.
+    notebook_dir = ROOT / "OpenPinch" / "tutorials" / "notebooks"
+    # Run artifacts (e.g. openpinch-workspace.json) are git-ignored, and hatch
+    # leaves ignored files out of builds, so only the notebook set is checked.
+    packaged_notebooks = sorted(path.name for path in notebook_dir.glob("*.ipynb"))
+    assert packaged_notebooks == sorted(EXPECTED_NOTEBOOKS)
 
-    for name in (
-        "08_carnot_heat_pump_and_refrigeration.ipynb",
-        "09_vapour_compression_and_brayton.ipynb",
-        "10_multiperiod_heat_pumps.ipynb",
-        "11_process_mvr_and_cascade.ipynb",
-    ):
-        generated = _load_notebook(tmp_path / name)
-        checked_in = _load_notebook(
-            ROOT / "OpenPinch" / "tutorials" / "notebooks" / name
-        )
-        assert _combined_source(checked_in) == _combined_source(generated), name
-        for cell in checked_in["cells"]:
+    for name in EXPECTED_NOTEBOOKS:
+        notebook = _load_notebook(notebook_dir / name)
+        for cell in notebook["cells"]:
+            assert "attachments" not in cell, name
             if cell["cell_type"] == "code":
                 assert cell["execution_count"] is None, name
                 assert cell["outputs"] == [], name
@@ -604,35 +557,48 @@ def test_manifest_operations_are_demonstrated_in_notebook_source(
             assert "workspace.cases(" in secondary_source
 
 
-@pytest.mark.parametrize(
-    "name",
-    _profile_notebook_names("base"),
-)
-def test_base_profile_notebook_executes(name: str, tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.chdir(tmp_path)
-    _execute_notebook(name, tmp_path)
+# Every packaged notebook executes in CI. Base and interactive notebooks run
+# in the unit lane; slow HPR notebooks run in their own `notebooks-hpr` lane
+# (`tespy and tutorial_profile`); HEN notebooks run in the main-bound solver job.
+_PROFILE_MARKS = {
+    "base": (),
+    "interactive": (),
+    "slow-hpr": (pytest.mark.tespy,),
+    "solver": (pytest.mark.solver,),
+}
 
 
-@pytest.mark.parametrize("name", _profile_notebook_names("slow-hpr"))
-def test_slow_hpr_notebook_executes(name: str, tmp_path: Path, monkeypatch) -> None:
-    enabled = set(filter(None, os.getenv("OPENPINCH_TUTORIAL_PROFILES", "").split(",")))
-    if "slow-hpr" not in enabled and "all" not in enabled:
-        pytest.skip("Set OPENPINCH_TUTORIAL_PROFILES=slow-hpr with the HPR extra.")
-
-    monkeypatch.chdir(tmp_path)
-    _execute_notebook(name, tmp_path)
-
-
-@pytest.mark.parametrize("profile", ["solver", "interactive"])
-def test_optional_profile_notebooks_execute(
-    profile: str, tmp_path: Path, monkeypatch
-) -> None:
-    enabled = set(filter(None, os.getenv("OPENPINCH_TUTORIAL_PROFILES", "").split(",")))
-    if profile not in enabled and "all" not in enabled:
-        pytest.skip(
-            f"Set OPENPINCH_TUTORIAL_PROFILES={profile} with its declared extras."
+def _notebook_execution_params() -> list:
+    profiles = {
+        row["primary_tutorial"]: row["execution_profile"] for row in _manifest_rows()
+    }
+    return [
+        pytest.param(
+            name,
+            profiles[name],
+            marks=(pytest.mark.tutorial_profile, *_PROFILE_MARKS[profiles[name]]),
+            id=name.removesuffix(".ipynb"),
         )
+        for name in EXPECTED_NOTEBOOKS
+    ]
 
+
+def test_every_notebook_has_one_execution_profile_with_ci_marks() -> None:
+    profiles: dict[str, set[str]] = {}
+    for row in _manifest_rows():
+        profiles.setdefault(row["primary_tutorial"], set()).add(
+            row["execution_profile"]
+        )
+    assert all(len(values) == 1 for values in profiles.values()), profiles
+    assert {value for values in profiles.values() for value in values} <= set(
+        _PROFILE_MARKS
+    )
+
+
+@pytest.mark.parametrize(("name", "profile"), _notebook_execution_params())
+def test_notebook_executes(
+    name: str, profile: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     if profile == "interactive":
         from OpenPinch import PinchProblem, PinchWorkspace
 
@@ -640,8 +606,7 @@ def test_optional_profile_notebooks_execute(
         monkeypatch.setattr(PinchWorkspace, "show_dashboard", lambda *_a, **_k: None)
 
     monkeypatch.chdir(tmp_path)
-    for name in _profile_notebook_names(profile):
-        _execute_notebook(name, tmp_path)
+    _execute_notebook(name, tmp_path)
 
 
 def test_packaged_resource_metadata_and_friendly_errors() -> None:

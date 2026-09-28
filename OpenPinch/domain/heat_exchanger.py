@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import math
 from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ._heat_exchanger import area as _area
+from ._heat_exchanger import rules as _rules
 from ._heat_exchanger.area import HeatExchangerAreaSlice as _HeatExchangerAreaSlice
 from ._heat_exchanger.period_state import (
     HeatExchangerPeriodState as _HeatExchangerPeriodState,
@@ -48,13 +48,7 @@ class HeatExchanger(BaseModel):
     @field_validator("exchanger_id", "source_stream", "sink_stream")
     @classmethod
     def _validate_identity(cls, value: str | None) -> str | None:
-        if value is None:
-            return value
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError(
-                "stream and exchanger identities must be non-empty strings"
-            )
-        return value.strip()
+        return _rules.optional_identity(value, _rules.EXCHANGER_IDENTITY_MESSAGE)
 
     @field_validator("stage")
     @classmethod
@@ -69,55 +63,25 @@ class HeatExchanger(BaseModel):
     )
     @classmethod
     def _validate_non_negative_finite(cls, value: float | None) -> float | None:
-        if value is None:
-            return value
-        if not math.isfinite(value) or value < 0.0:
-            raise ValueError("numeric exchanger values must be finite and non-negative")
-        return float(value)
+        return _rules.optional_non_negative_finite(
+            value, _rules.EXCHANGER_NUMERIC_MESSAGE
+        )
 
     @model_validator(mode="after")
     def _validate_period_states(self) -> Self:
-        expected_indices = tuple(range(len(self.period_states)))
-        actual_indices = tuple(state.period_idx for state in self.period_states)
-        if actual_indices != expected_indices:
-            raise ValueError("period_states must be ordered by contiguous period_idx")
-        period_ids = tuple(state.period_id for state in self.period_states)
-        if len(set(period_ids)) != len(period_ids):
-            raise ValueError("period_states must use unique period_id values")
+        _rules.check_period_states(self.period_states)
         return self
 
     @model_validator(mode="after")
     def _validate_direction_semantics(self) -> Self:
-        if self.source_stream == self.sink_stream:
-            raise ValueError("source_stream and sink_stream must be distinct")
-
-        expected_roles = {
-            HeatExchangerKind.RECOVERY: (
-                StreamID.Process,
-                StreamID.Process,
-            ),
-            HeatExchangerKind.HOT_UTILITY: (
-                StreamID.Utility,
-                StreamID.Process,
-            ),
-            HeatExchangerKind.COLD_UTILITY: (
-                StreamID.Process,
-                StreamID.Utility,
-            ),
-        }
-        expected_source_role, expected_sink_role = expected_roles[self.kind]
-        if (
-            self.source_stream_role != expected_source_role
-            or self.sink_stream_role != expected_sink_role
-        ):
-            raise ValueError(
-                f"{self.kind.value} exchangers must link "
-                f"{expected_source_role.value} -> {expected_sink_role.value}"
-            )
-
-        if self.kind is HeatExchangerKind.RECOVERY and self.stage is None:
-            raise ValueError("recovery exchangers must include a synthesis stage")
-
+        _rules.check_direction_semantics(
+            kind=self.kind,
+            source_stream=self.source_stream,
+            sink_stream=self.sink_stream,
+            source_stream_role=self.source_stream_role,
+            sink_stream_role=self.sink_stream_role,
+            stage=self.stage,
+        )
         return self
 
     @model_validator(mode="after")

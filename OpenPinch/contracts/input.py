@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import List, Optional, Self, Union
+from typing import Annotated, List, Optional, Self, Union
 
 from pydantic import (
     BaseModel,
@@ -14,12 +14,17 @@ from pydantic import (
     model_validator,
 )
 
+from ..domain._heat_exchanger import rules as _hx_rules
+from ..domain._validation import non_empty_str
 from ..domain.configuration_fields import validate_configuration_options
 from ..domain.enums import FluidPhase, HeatExchangerKind, StreamID, StreamType
 from ..domain.hpr import HPRResidualSnapshot
 from .common import PeriodValueWithUnitAndIds, ScalarOrVU
 
 MaximumHeatFlowValue = Union[ScalarOrVU, PeriodValueWithUnitAndIds]
+_SegmentAreaIdentity = Annotated[
+    str, non_empty_str("segment area identities must not be empty")
+]
 
 
 class StreamSegmentSchema(BaseModel):
@@ -243,9 +248,9 @@ class HeatExchangerAreaSliceSchema(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    period: str
-    hot_segment_identity: str
-    cold_segment_identity: str
+    period: _SegmentAreaIdentity
+    hot_segment_identity: _SegmentAreaIdentity
+    cold_segment_identity: _SegmentAreaIdentity
     duty: float
     hot_inlet_temperature: float
     hot_outlet_temperature: float
@@ -256,14 +261,6 @@ class HeatExchangerAreaSliceSchema(BaseModel):
     overall_htc: float
     lmtd: float
     area: float
-
-    @field_validator("period", "hot_segment_identity", "cold_segment_identity")
-    @classmethod
-    def _validate_identity(cls, value: str) -> str:
-        text = str(value).strip()
-        if not text:
-            raise ValueError("segment area identities must not be empty")
-        return text
 
     @field_validator("duty", "hot_htc", "cold_htc", "overall_htc", "lmtd", "area")
     @classmethod
@@ -380,13 +377,7 @@ class HeatExchangerSchema(BaseModel):
     @field_validator("exchanger_id", "source_stream", "sink_stream")
     @classmethod
     def _validate_identity(cls, value: str | None) -> str | None:
-        if value is None:
-            return value
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError(
-                "stream and exchanger identities must be non-empty strings"
-            )
-        return value.strip()
+        return _hx_rules.optional_identity(value, _hx_rules.EXCHANGER_IDENTITY_MESSAGE)
 
     @field_validator("stage")
     @classmethod
@@ -398,44 +389,25 @@ class HeatExchangerSchema(BaseModel):
     @field_validator("area", "capital_cost")
     @classmethod
     def _validate_non_negative_finite(cls, value: float | None) -> float | None:
-        if value is None:
-            return value
-        if not math.isfinite(value) or value < 0.0:
-            raise ValueError("numeric exchanger values must be finite and non-negative")
-        return float(value)
+        return _hx_rules.optional_non_negative_finite(
+            value, _hx_rules.EXCHANGER_NUMERIC_MESSAGE
+        )
 
     @model_validator(mode="after")
     def _validate_period_states(self) -> Self:
-        expected_indices = tuple(range(len(self.period_states)))
-        actual_indices = tuple(state.period_idx for state in self.period_states)
-        if actual_indices != expected_indices:
-            raise ValueError("period_states must be ordered by contiguous period_idx")
-        period_ids = tuple(state.period_id for state in self.period_states)
-        if len(set(period_ids)) != len(period_ids):
-            raise ValueError("period_states must use unique period_id values")
+        _hx_rules.check_period_states(self.period_states)
         return self
 
     @model_validator(mode="after")
     def _validate_direction_semantics(self) -> Self:
-        if self.source_stream == self.sink_stream:
-            raise ValueError("source_stream and sink_stream must be distinct")
-
-        expected_roles = {
-            HeatExchangerKind.RECOVERY: (StreamID.Process, StreamID.Process),
-            HeatExchangerKind.HOT_UTILITY: (StreamID.Utility, StreamID.Process),
-            HeatExchangerKind.COLD_UTILITY: (StreamID.Process, StreamID.Utility),
-        }
-        expected_source_role, expected_sink_role = expected_roles[self.kind]
-        if (
-            self.source_stream_role != expected_source_role
-            or self.sink_stream_role != expected_sink_role
-        ):
-            raise ValueError(
-                f"{self.kind.value} exchangers must link "
-                f"{expected_source_role.value} -> {expected_sink_role.value}"
-            )
-        if self.kind is HeatExchangerKind.RECOVERY and self.stage is None:
-            raise ValueError("recovery exchangers must include a synthesis stage")
+        _hx_rules.check_direction_semantics(
+            kind=self.kind,
+            source_stream=self.source_stream,
+            sink_stream=self.sink_stream,
+            source_stream_role=self.source_stream_role,
+            sink_stream_role=self.sink_stream_role,
+            stage=self.stage,
+        )
         return self
 
     @model_validator(mode="after")
@@ -484,11 +456,7 @@ class HeatExchangerNetworkSchema(BaseModel):
     @field_validator("run_id", "task_id", "period_id", "method")
     @classmethod
     def _validate_optional_identity(cls, value: str | None) -> str | None:
-        if value is None:
-            return value
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError("network metadata identities must be non-empty strings")
-        return value.strip()
+        return _hx_rules.optional_identity(value, _hx_rules.NETWORK_IDENTITY_MESSAGE)
 
     @field_validator("stage_count")
     @classmethod
@@ -508,11 +476,9 @@ class HeatExchangerNetworkSchema(BaseModel):
         cls,
         value: float | None,
     ) -> float | None:
-        if value is None:
-            return value
-        if not math.isfinite(value) or value < 0.0:
-            raise ValueError("network numeric values must be finite and non-negative")
-        return float(value)
+        return _hx_rules.optional_non_negative_finite(
+            value, _hx_rules.NETWORK_NUMERIC_MESSAGE
+        )
 
     @field_validator("summary_metrics")
     @classmethod
@@ -520,24 +486,15 @@ class HeatExchangerNetworkSchema(BaseModel):
         cls,
         value: dict[str, float | int | str | bool | None],
     ) -> dict[str, float | int | str | bool | None]:
-        for metric_name, metric_value in value.items():
-            if not isinstance(metric_name, str) or not metric_name.strip():
-                raise ValueError("summary metric names must be non-empty strings")
-            if isinstance(metric_value, float) and not math.isfinite(metric_value):
-                raise ValueError("summary metric values must be finite")
+        _hx_rules.check_summary_metrics(value)
         return value
 
     @model_validator(mode="after")
     def _validate_period_state_alignment(self) -> Self:
-        if not self.exchangers:
-            return self
-        ordered = tuple(state.period_id for state in self.exchangers[0].period_states)
-        for exchanger in self.exchangers[1:]:
-            current = tuple(state.period_id for state in exchanger.period_states)
-            if current != ordered:
-                raise ValueError(
-                    "all exchangers in a network must use the same ordered period_ids"
-                )
+        _hx_rules.check_period_alignment(
+            tuple(state.period_id for state in exchanger.period_states)
+            for exchanger in self.exchangers
+        )
         return self
 
 
@@ -568,18 +525,10 @@ class PlantProfileDataSchema(BaseModel):
 class PlantProfileSchema(BaseModel):
     """Named plant heat-load profile retained with canonical problem input."""
 
-    name: str
+    name: Annotated[str, non_empty_str("plant profile name must be non-empty")]
     data: PlantProfileDataSchema
 
     model_config = ConfigDict(extra="forbid")
-
-    @field_validator("name")
-    @classmethod
-    def _validate_name(cls, value: str) -> str:
-        name = value.strip()
-        if not name:
-            raise ValueError("plant profile name must be non-empty")
-        return name
 
 
 class TargetInput(BaseModel):

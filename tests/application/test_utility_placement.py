@@ -14,6 +14,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from OpenPinch import PinchProblem, PinchWorkspace
+from OpenPinch.analysis.utility_placement import profiles as placement_profiles
 from OpenPinch.analysis.utility_placement.allocation import allocate_placement_period
 from OpenPinch.analysis.utility_placement.codec import (
     build_utility_placement_model,
@@ -492,12 +493,12 @@ def test_profile_extraction_recovers_from_non_finite_separated_columns(
         }
 
     monkeypatch.setattr(
-        placement_application,
+        placement_profiles,
         "get_seperated_gcc_heat_load_profiles",
         separated,
     )
 
-    assert placement_application._load_profiles(table) == (
+    assert placement_profiles._load_profiles(table) == (
         (3.0, 0.0),
         (0.0, 4.0),
     )

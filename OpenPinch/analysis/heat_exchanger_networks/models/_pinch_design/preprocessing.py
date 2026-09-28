@@ -7,6 +7,7 @@ from collections.abc import Iterable
 import numpy as np
 
 from ...indexing import build_index_grid
+from .._base import piecewise as _piecewise
 
 
 def _overall_heat_transfer_coefficient(left_htc: float, right_htc: float) -> float:
@@ -118,7 +119,8 @@ def _set_multiperiod_preprocessing(owner) -> None:
     owner.Qtot_sh_period = np.array(
         build_index_grid(
             lambda n, i: (
-                owner._parent_profile_duty(
+                _piecewise._parent_profile_duty(
+                    owner,
                     "hot",
                     n,
                     i,
@@ -136,7 +138,8 @@ def _set_multiperiod_preprocessing(owner) -> None:
     owner.Qtot_sc_period = np.array(
         build_index_grid(
             lambda n, j: (
-                owner._parent_profile_duty(
+                _piecewise._parent_profile_duty(
+                    owner,
                     "cold",
                     n,
                     j,
@@ -188,7 +191,8 @@ def _set_multiperiod_preprocessing(owner) -> None:
     owner.U_cu = owner.U_cu_period[0].copy()
     owner.Q_max_period = np.array(
         build_index_grid(
-            lambda n, i, j: owner._recovery_heat_upper_bound(
+            lambda n, i, j: _piecewise._recovery_heat_upper_bound(
+                owner,
                 period_index=n,
                 hot_index=i,
                 cold_index=j,

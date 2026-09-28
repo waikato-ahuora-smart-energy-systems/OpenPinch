@@ -6,6 +6,8 @@ import numpy as np
 
 from OpenPinch.analysis.heat_transfer import compute_LMTD_from_dts
 
+from . import piecewise as _piecewise
+
 
 def _post_process_lmtd(
     model,
@@ -121,10 +123,16 @@ def _apply_segment_utility_areas(model, q_h, q_c) -> None:
     if not hasattr(model, "solver_arrays"):
         return
     if not (
-        any(model._solver_parent_is_segmented("hot", i) for i in range(model.I))
-        or any(model._solver_parent_is_segmented("cold", j) for j in range(model.J))
-        or model._utility_is_segmented("hot")
-        or model._utility_is_segmented("cold")
+        any(
+            _piecewise._solver_parent_is_segmented(model, "hot", i)
+            for i in range(model.I)
+        )
+        or any(
+            _piecewise._solver_parent_is_segmented(model, "cold", j)
+            for j in range(model.J)
+        )
+        or _piecewise._utility_is_segmented(model, "hot")
+        or _piecewise._utility_is_segmented(model, "cold")
     ):
         return
     from ...solver.piecewise import (
@@ -146,8 +154,8 @@ def _apply_segment_utility_areas(model, q_h, q_c) -> None:
         for j in range(model.J):
             duty = float(q_h[n][j])
             if duty <= model.tol or not (
-                model._solver_parent_is_segmented("cold", j)
-                or model._utility_is_segmented("hot")
+                _piecewise._solver_parent_is_segmented(model, "cold", j)
+                or _piecewise._utility_is_segmented(model, "hot")
             ):
                 continue
             hot_utility_profile = (
@@ -157,7 +165,7 @@ def _apply_segment_utility_areas(model, q_h, q_c) -> None:
                     parent_index=0,
                     period_index=n,
                 )
-                if model._utility_is_segmented("hot")
+                if _piecewise._utility_is_segmented(model, "hot")
                 else utility_thermal_profile(
                     identity=hot_utility_identity,
                     inlet_temperature=model.T_hu_in_period[n][0],
@@ -190,8 +198,8 @@ def _apply_segment_utility_areas(model, q_h, q_c) -> None:
         for i in range(model.I):
             duty = float(q_c[n][i])
             if duty <= model.tol or not (
-                model._solver_parent_is_segmented("hot", i)
-                or model._utility_is_segmented("cold")
+                _piecewise._solver_parent_is_segmented(model, "hot", i)
+                or _piecewise._utility_is_segmented(model, "cold")
             ):
                 continue
             cold_utility_profile = (
@@ -201,7 +209,7 @@ def _apply_segment_utility_areas(model, q_h, q_c) -> None:
                     parent_index=0,
                     period_index=n,
                 )
-                if model._utility_is_segmented("cold")
+                if _piecewise._utility_is_segmented(model, "cold")
                 else utility_thermal_profile(
                     identity=cold_utility_identity,
                     inlet_temperature=model.T_cu_in_period[n][0],
@@ -244,8 +252,8 @@ def _segment_exact_dqda(
 ) -> float | None:
     """Return a local numerical dQ/dA from ordered segment-summed area."""
     if not (
-        model._solver_parent_is_segmented("hot", hot_parent_index)
-        or model._solver_parent_is_segmented("cold", cold_parent_index)
+        _piecewise._solver_parent_is_segmented(model, "hot", hot_parent_index)
+        or _piecewise._solver_parent_is_segmented(model, "cold", cold_parent_index)
     ):
         return None
 

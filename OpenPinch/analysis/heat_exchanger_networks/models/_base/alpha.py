@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from ...indexing import build_index_grid
 from ...solver import backend
+
+logger = logging.getLogger(__name__)
 
 
 def get_alpha_values(model) -> list:
@@ -22,7 +25,14 @@ def get_alpha_values(model) -> list:
         with backend.suppress_gekko_numpy_array_copy_deprecation():
             solver_model.solve(disp=False)
     except Exception:
-        pass
+        # Callers index alpha[i][j][k][0] for benefit ranking, so keep the
+        # unsolved initial values but make the failure visible.
+        logger.warning(
+            "Post-optimisation alpha solve failed for %s; alpha values are "
+            "unsolved initial guesses and benefit ranking may be unreliable.",
+            getattr(model, "name", "model"),
+            exc_info=True,
+        )
     return model.alpha
 
 

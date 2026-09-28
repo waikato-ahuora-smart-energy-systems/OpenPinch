@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Callable, Sequence
 from typing import Any, Optional
 
 import numpy as np
@@ -72,6 +73,7 @@ def semantic_issues(
     input_unit_config = input_unit_options_to_map(
         {name: spec.default for name, spec in CONFIG_FIELD_SPECS.items()} | options
     )
+    period_ids = _problem_period_ids(options)
 
     if len(problem_inputs.streams) == 0 and problem_inputs.residual_basis is None:
         issues.append(
@@ -100,6 +102,7 @@ def semantic_issues(
                 section="streams",
                 record_index=index,
                 record_label=label,
+                period_ids=period_ids,
             )
         )
         issues.extend(
@@ -130,6 +133,7 @@ def semantic_issues(
                 section="utilities",
                 record_index=index,
                 record_label=label,
+                period_ids=period_ids,
             )
         )
         issues.extend(
@@ -256,6 +260,7 @@ def _validate_stream_record_states(
     section: str,
     record_index: int,
     record_label: Optional[str],
+    period_ids: Sequence[str] | None = None,
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     for field_name in _STREAM_VALUE_FIELDS:
@@ -266,6 +271,7 @@ def _validate_stream_record_states(
                 record_index=record_index,
                 record_label=record_label,
                 field_name=field_name,
+                period_ids=period_ids,
             )
         )
     issues.extend(
@@ -277,6 +283,7 @@ def _validate_stream_record_states(
             field_name="heat_flow",
             severity="error",
             message="Value must be non-negative.",
+            period_ids=period_ids,
         )
     )
     issues.extend(
@@ -288,6 +295,7 @@ def _validate_stream_record_states(
             field_name="dt_cont",
             severity="warning",
             message="Value should be non-negative.",
+            period_ids=period_ids,
         )
     )
     issues.extend(
@@ -299,6 +307,7 @@ def _validate_stream_record_states(
             field_name="htc",
             severity="error",
             message="Value must be positive.",
+            period_ids=period_ids,
         )
     )
 
@@ -343,13 +352,16 @@ def _validate_stream_record_states(
                     message=_with_period_suffix(
                         "Supply and target temperatures must differ.",
                         idx,
+                        period_ids,
                     ),
                 )
             )
         elif t_supply_value > t_target_value:
-            classifications[StreamType.Hot.value].append(str(idx))
+            classifications[StreamType.Hot.value].append(_period_label(idx, period_ids))
         elif t_supply_value < t_target_value:
-            classifications[StreamType.Cold.value].append(str(idx))
+            classifications[StreamType.Cold.value].append(
+                _period_label(idx, period_ids)
+            )
 
     active_classes = {
         stream_type: period_group
@@ -810,6 +822,7 @@ def _validate_utility_record_states(
     section: str,
     record_index: int,
     record_label: Optional[str],
+    period_ids: Sequence[str] | None = None,
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     for field_name in _UTILITY_VALUE_FIELDS:
@@ -820,6 +833,7 @@ def _validate_utility_record_states(
                 record_index=record_index,
                 record_label=record_label,
                 field_name=field_name,
+                period_ids=period_ids,
             )
         )
 
@@ -833,6 +847,7 @@ def _validate_utility_record_states(
                 field_name=field_name,
                 severity="warning",
                 message="Value should be non-negative.",
+                period_ids=period_ids,
             )
         )
 
@@ -845,14 +860,45 @@ def _validate_utility_record_states(
             field_name="htc",
             severity="error",
             message="Value must be positive.",
+            period_ids=period_ids,
         )
     )
 
-    t_supply = values.get("t_supply")
-    t_target = values.get("t_target")
-    if t_supply is None or t_target is None:
+    return issues
+
+
+def _validate_period_states(
+    value: Value | None,
+    *,
+    section: str,
+    record_index: int,
+    record_label: Optional[str],
+    field_name: str,
+    severity: str,
+    message: str,
+    reject: Callable[[float], bool],
+    period_ids: Sequence[str] | None = None,
+) -> list[ValidationIssue]:
+    """Return one issue per defined period magnitude for which ``reject`` holds."""
+    issues: list[ValidationIssue] = []
+    if value is None:
         return issues
 
+    for idx in range(len(value.period_values)):
+        magnitude = value[idx]
+        if magnitude is None or not reject(magnitude):
+            continue
+        issues.append(
+            _build_issue(
+                severity=severity,
+                section=section,
+                record_index=record_index,
+                record_label=record_label,
+                path_field=field_name,
+                field=field_name,
+                message=_with_period_suffix(message, idx, period_ids),
+            )
+        )
     return issues
 
 
@@ -863,29 +909,19 @@ def _validate_value_finiteness(
     record_index: int,
     record_label: Optional[str],
     field_name: str,
+    period_ids: Sequence[str] | None = None,
 ) -> list[ValidationIssue]:
-    issues: list[ValidationIssue] = []
-    if value is None:
-        return issues
-
-    for idx in range(len(value.period_values)):
-        magnitude = value[idx]
-        if magnitude is None:
-            continue
-        if math.isfinite(magnitude):
-            continue
-        issues.append(
-            _build_issue(
-                severity="error",
-                section=section,
-                record_index=record_index,
-                record_label=record_label,
-                path_field=field_name,
-                field=field_name,
-                message=_with_period_suffix("Value must be finite.", idx),
-            )
-        )
-    return issues
+    return _validate_period_states(
+        value,
+        section=section,
+        record_index=record_index,
+        record_label=record_label,
+        field_name=field_name,
+        severity="error",
+        message="Value must be finite.",
+        reject=lambda magnitude: not math.isfinite(magnitude),
+        period_ids=period_ids,
+    )
 
 
 def _validate_non_negative_states(
@@ -897,28 +933,19 @@ def _validate_non_negative_states(
     field_name: str,
     severity: str,
     message: str,
+    period_ids: Sequence[str] | None = None,
 ) -> list[ValidationIssue]:
-    issues: list[ValidationIssue] = []
-    if value is None:
-        return issues
-
-    for idx in range(len(value.period_values)):
-        magnitude = value[idx]
-        if magnitude is None or not math.isfinite(magnitude) or magnitude >= 0.0:
-            continue
-        issues.append(
-            _build_issue(
-                severity=severity,
-                section=section,
-                record_index=record_index,
-                record_label=record_label,
-                path_field=field_name,
-                field=field_name,
-                message=_with_period_suffix(message, idx),
-            )
-        )
-
-    return issues
+    return _validate_period_states(
+        value,
+        section=section,
+        record_index=record_index,
+        record_label=record_label,
+        field_name=field_name,
+        severity=severity,
+        message=message,
+        reject=lambda magnitude: math.isfinite(magnitude) and magnitude < 0.0,
+        period_ids=period_ids,
+    )
 
 
 def _validate_positive_states(
@@ -930,28 +957,19 @@ def _validate_positive_states(
     field_name: str,
     severity: str,
     message: str,
+    period_ids: Sequence[str] | None = None,
 ) -> list[ValidationIssue]:
-    issues: list[ValidationIssue] = []
-    if value is None:
-        return issues
-
-    for idx in range(len(value.period_values)):
-        magnitude = value[idx]
-        if magnitude is None or not math.isfinite(magnitude) or magnitude > 0.0:
-            continue
-        issues.append(
-            _build_issue(
-                severity=severity,
-                section=section,
-                record_index=record_index,
-                record_label=record_label,
-                path_field=field_name,
-                field=field_name,
-                message=_with_period_suffix(message, idx),
-            )
-        )
-
-    return issues
+    return _validate_period_states(
+        value,
+        section=section,
+        record_index=record_index,
+        record_label=record_label,
+        field_name=field_name,
+        severity=severity,
+        message=message,
+        reject=lambda magnitude: math.isfinite(magnitude) and magnitude <= 0.0,
+        period_ids=period_ids,
+    )
 
 
 def _build_issue(
@@ -975,14 +993,33 @@ def _build_issue(
     )
 
 
+def _problem_period_ids(options: dict[str, Any]) -> tuple[str, ...] | None:
+    """Return the declared ``PROBLEM_PERIOD_IDS`` in period-index order, if any."""
+    raw = options.get("PROBLEM_PERIOD_IDS")
+    if not isinstance(raw, (list, tuple)):
+        return None
+    return tuple(str(period_id) for period_id in raw)
+
+
+def _period_label(idx: int, period_ids: Sequence[str] | None) -> str:
+    """Return the declared period id at ``idx``, falling back to the index."""
+    if period_ids is not None and 0 <= idx < len(period_ids):
+        return str(period_ids[idx])
+    return str(idx)
+
+
 def _period_suffix(period_id: str | None) -> str:
     if period_id is None:
         return ""
     return f" for period_id '{period_id}'"
 
 
-def _with_period_suffix(message: str, idx: int | None) -> str:
+def _with_period_suffix(
+    message: str,
+    idx: int | None,
+    period_ids: Sequence[str] | None = None,
+) -> str:
     if idx is None:
         return message
     trimmed = message[:-1] if message.endswith(".") else message
-    return trimmed + _period_suffix(idx) + "."
+    return trimmed + _period_suffix(_period_label(idx, period_ids)) + "."

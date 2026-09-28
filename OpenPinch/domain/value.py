@@ -7,7 +7,7 @@ from typing import Any
 
 import numpy as np
 from pint import UnitRegistry, set_application_registry
-from pint.errors import DimensionalityError
+from pint.errors import DimensionalityError, PintError
 
 from ._value import coercion as _value_coercion
 from ._value import units as _value_units
@@ -15,13 +15,16 @@ from ._value.coercion import is_bool_like as _is_bool_like
 from ._value.units import unit_object as _registry_unit_object
 
 ureg = UnitRegistry()
+# Pint reports definition/redefinition conflicts as ``PintError`` subclasses
+# (``DefinitionError``, ``RedefinitionError``, ``DefinitionSyntaxError``); a
+# conflict must never break import, so each definition is best-effort.
 try:
     ureg.define("USD = [currency]")
-except Exception:  # pragma: no cover - Pint may already know this unit.
+except PintError:  # pragma: no cover - Pint may already know this unit.
     pass
 try:
     ureg.define("NZD = [currency]")
-except Exception:  # pragma: no cover - Pint may already know this unit.
+except PintError:  # pragma: no cover - Pint may already know this unit.
     pass
 set_application_registry(ureg)
 Q_ = ureg.Quantity  # type: ignore

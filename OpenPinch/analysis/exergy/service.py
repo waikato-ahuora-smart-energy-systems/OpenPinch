@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from copy import deepcopy
+from functools import partial
 from typing import Any, Iterable
 
 import numpy as np
@@ -11,9 +11,10 @@ import numpy as np
 from ...domain.configuration import C_to_K, tol
 from ...domain.enums import GraphType, ProblemTableLabel, TargetType
 from ..targeting.context import (
-    apply_zone_config_overrides,
+    clone_target_with_zone_settings,
     format_selected_period_suffix,
-    record_selected_period,
+    normalize_base_target_type,
+    prepare_enrichment_run,
     target_matches_requested_period,
 )
 
@@ -276,16 +277,9 @@ def run_exergy_targeting_service(
     apply_func=apply_exergy_targeting,
 ):
     """Enrich the first compatible existing target family with exergy outputs."""
-    apply_zone_config_overrides(zone, args)
-    runtime_args = dict(args or {})
-    explicit_target_type = _normalize_exergy_base_target_type(
-        runtime_args.get("base_target_type")
+    runtime_args, compare_args, explicit_target_type = prepare_enrichment_run(
+        zone, args, _EXERGY_TARGET_ORDER, service="exergy"
     )
-    idx, sid = record_selected_period(zone, runtime_args)
-    runtime_args["period_idx"] = idx
-    if sid is not None:
-        runtime_args["period_id"] = sid
-    compare_args = dict(args or {}) if isinstance(args, dict) else {}
     zone._selected_exergy_target_type = None
 
     for target_type in _get_exergy_candidate_order(explicit_target_type):
@@ -306,15 +300,7 @@ def run_exergy_targeting_service(
             continue
 
         # Enrichment uses this invocation's settings, not the base run's settings.
-        target = deepcopy(target, {id(target.parent_zone): target.parent_zone})
-        target.config._values.update(
-            {
-                key: value
-                for key, value in zone.config._values.items()
-                if key.startswith("ENV_")
-            }
-        )
-        target.config._build_groups(target.config._values)
+        target = clone_target_with_zone_settings(target, zone, prefix="ENV_")
         zone.add_target(apply_func(target), invalidate_dependents=False)
         zone._selected_exergy_target_type = target_type
         return zone
@@ -332,21 +318,11 @@ def run_exergy_targeting_service(
 ################################################################################
 
 
-def _normalize_exergy_base_target_type(
-    base_target_type: object | None,
-) -> str | None:
-    """Validate an explicit exergy base target override."""
-    if base_target_type is None:
-        return None
-
-    normalized = str(base_target_type)
-    if normalized not in _EXERGY_TARGET_ORDER:
-        supported = ", ".join(_EXERGY_TARGET_ORDER)
-        raise ValueError(
-            "Unsupported exergy base_target_type "
-            f"{normalized!r}. Supported types: {supported}."
-        )
-    return normalized
+_normalize_exergy_base_target_type = partial(
+    normalize_base_target_type,
+    supported=_EXERGY_TARGET_ORDER,
+    service="exergy",
+)
 
 
 def _get_exergy_candidate_order(

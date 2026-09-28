@@ -23,7 +23,9 @@ from ..common.encoding import (
     map_x_to_Q_amb,
 )
 from ..common.layout import HPRoptVectorLayout
+from ..common.multi_vc_objective import _evaluate_multi_vc_objective
 from ..common.shared import (
+    condensing_temperature_search_range,
     evaluate_vapour_hpr_result,
     validate_vapour_hp_refrigerant_ls,
 )
@@ -119,8 +121,14 @@ def _get_parallel_hp_opt_setup(
         init_res.Q_amb_cold,
         max(args.Q_heat_max, args.Q_cool_max),
     )
-    x_cond = map_T_arr_to_x_arr(
-        init_res.T_cond, args.T_cold[0], args.T_cold[-1]
+    # The Carnot warm start knows nothing about critical points, so clip it
+    # into the refrigerant's subcritical condensing range.
+    x_cond = np.clip(
+        map_T_arr_to_x_arr(
+            init_res.T_cond, *condensing_temperature_search_range(args)
+        ),
+        0.0,
+        1.0,
     ).tolist()
     x_evap = map_T_arr_to_x_arr(
         init_res.T_evap[::-1], args.T_hot[-1], args.T_hot[0]
@@ -188,7 +196,7 @@ def _parse_parallel_hp_state_temperatures(
     )
     H_cold_with_amb = ambient.H_cold_with_residual_ambient(args)
     H_hot_with_amb = ambient.H_hot_with_residual_ambient(args)
-    T_cond = map_x_arr_to_T_arr(x_cond, args.T_cold[0], args.T_cold[-1])
+    T_cond = map_x_arr_to_T_arr(x_cond, *condensing_temperature_search_range(args))
     T_evap = map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0])
     dT_subcool = map_x_arr_to_DT_arr(x_subcool, T_cond, T_evap)
     Q_heat_base = (
@@ -245,96 +253,46 @@ def _compute_parallel_hp_system_obj(
     debug: bool = False,
     artifact_mode: HPREvaluationMode = HPREvaluationMode.FINAL,
 ) -> HPRBackendResult:
-    is_heat_pumping = getattr(args, "is_heat_pumping", True)
-    state_vars = _parse_parallel_hp_state_temperatures(x, args)
-    if not isinstance(state_vars, HPRParsedState):
-        state_vars = HPRParsedState.model_validate(state_vars)
-
-    T_diff = (
-        state_vars.T_cond - state_vars.dT_subcool - state_vars.T_evap - args.dtcont_hp
+    return _evaluate_multi_vc_objective(
+        x,
+        args,
+        parse_state=_parse_parallel_hp_state_temperatures,
+        build_and_solve=_build_and_solve_parallel_cycles,
+        topology_id=_parallel_topology_id,
+        label="Parallel",
+        evaluate_result=evaluate_vapour_hpr_result,
+        build_record=build_coolprop_target_simulation_record,
+        check_temperature_lift=True,
+        result_state_fields=("dT_superheat",),
+        debug=debug,
+        artifact_mode=artifact_mode,
     )
-    if T_diff.min() < 0:
-        return HPRBackendResult.failure(
-            reason="Invalid simulated vapour candidate with negative temperature lift.",
-            Q_amb_hot=state_vars.Q_amb_hot,
-            Q_amb_cold=state_vars.Q_amb_cold,
-        )
 
-    cycle_evaluated = False
-    try:
-        hp = ParallelVapourCompressionCycles()
-        hp.solve(
-            T_evap=state_vars.T_evap,
-            T_cond=state_vars.T_cond,
-            dtcont=args.dtcont_hp,
-            dT_subcool=state_vars.dT_subcool,
-            eta_comp=args.eta_comp,
-            refrigerant=args.refrigerant_ls,
-            dT_ihx_gas_side=state_vars.dT_ihx_gas_side,
-            Q_heat_base=state_vars.Q_heat_base,
-            x_heat_split=state_vars.x_heat_split,
-            Q_heat_available=state_vars.Q_heat_available,
-            Q_cool_base=state_vars.Q_cool_base,
-            x_cool_split=state_vars.x_cool_split,
-            Q_cool_available=state_vars.Q_cool_available,
-            is_heat_pump=is_heat_pumping,
-        )
-        if not hp.solved:
-            return HPRBackendResult.failure(
-                reason="Parallel vapour-compression cycle failed to solve.",
-                Q_amb_hot=state_vars.Q_amb_hot,
-                Q_amb_cold=state_vars.Q_amb_cold,
-            )
 
-        hpr_streams = hp.build_stream_collection(
-            include_cond=True,
-            include_evap=True,
-            is_process_stream=False,
-            dtcont=args.dtcont_hp,
-        )
-        cycle_evaluated = True
-        w_hpr = hp.work
-        primary_duty = hp.Q_heat_arr.sum() if is_heat_pumping else hp.Q_cool_arr.sum()
-        if not np.isfinite(primary_duty) or primary_duty <= 0.0:
-            return HPRBackendResult.failure(reason="Cycle delivers no useful duty.")
-        cop = primary_duty / w_hpr if w_hpr > 0 else 1.0
-        result = evaluate_vapour_hpr_result(
-            args=args,
-            state=state_vars,
-            work=w_hpr,
-            work_arr=hp.work_arr,
-            Q_heat=hp.Q_heat_arr,
-            Q_cool=hp.Q_cool_arr,
-            cop_h=cop,
-            hpr_streams=hpr_streams,
-            model=hp,
-            penalty_terms=[hp.penalty],
-            dT_subcool=state_vars.dT_subcool,
-            dT_superheat=state_vars.dT_superheat,
-            debug=debug,
-            artifact_mode=artifact_mode,
-        )
-        record = (
-            build_coolprop_target_simulation_record(
-                args=args,
-                state=state_vars,
-                cycle=hp,
-                topology_id=HPRTopologyIdentifier.PARALLEL_VAPOUR_COMPRESSION,
-            )
-            if artifact_mode is HPREvaluationMode.FINAL
-            else None
-        )
-        return result.with_updates(
-            simulation_backend=(
-                "coolprop" if artifact_mode is HPREvaluationMode.FINAL else None
-            ),
-            target_simulation_record=record,
-        )
-    except ValueError as exc:
-        if cycle_evaluated:
-            raise
-        return HPRBackendResult.failure(
-            reason=str(exc),
-            Q_amb_hot=state_vars.Q_amb_hot,
-            Q_amb_cold=state_vars.Q_amb_cold,
-        )
+def _parallel_topology_id(_args: HeatPumpTargetInputs) -> HPRTopologyIdentifier:
+    return HPRTopologyIdentifier.PARALLEL_VAPOUR_COMPRESSION
+
+
+def _build_and_solve_parallel_cycles(
+    state_vars: HPRParsedState,
+    args: HeatPumpTargetInputs,
+    is_heat_pumping: bool,
+) -> ParallelVapourCompressionCycles:
+    hp = ParallelVapourCompressionCycles()
+    hp.solve(
+        T_evap=state_vars.T_evap,
+        T_cond=state_vars.T_cond,
+        dtcont=args.dtcont_hp,
+        dT_subcool=state_vars.dT_subcool,
+        eta_comp=args.eta_comp,
+        refrigerant=args.refrigerant_ls,
+        dT_ihx_gas_side=state_vars.dT_ihx_gas_side,
+        Q_heat_base=state_vars.Q_heat_base,
+        x_heat_split=state_vars.x_heat_split,
+        Q_heat_available=state_vars.Q_heat_available,
+        Q_cool_base=state_vars.Q_cool_base,
+        x_cool_split=state_vars.x_cool_split,
+        Q_cool_available=state_vars.Q_cool_available,
+        is_heat_pump=is_heat_pumping,
+    )
+    return hp

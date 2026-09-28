@@ -46,15 +46,22 @@ Counting Rules
 Execution Profiles
 ------------------
 
-Run an optional profile only in an environment containing its declared extras:
+Every packaged notebook is executed by ``test_notebook_executes`` in
+``tests/packaging/test_notebooks.py``. Each notebook carries the
+``tutorial_profile`` marker plus the marker of the environment it needs:
+
+- ``base`` and ``interactive``: no extra marker; run in the unit lane.
+- ``slow-hpr``: ``tespy``; run in the ``notebooks-hpr`` lane.
+- ``solver``: ``solver``; run in the solver job.
+
+Run one profile locally with its declared extras installed, for example:
 
 .. code-block:: bash
 
-   OPENPINCH_TUTORIAL_PROFILES=slow-hpr uv run pytest \
-     tests/packaging/test_notebooks.py -k optional_profile
+   uv run pytest tests/packaging/test_notebooks.py -m "tespy and tutorial_profile"
 
-Use ``solver`` or ``interactive`` in place of ``slow-hpr``. The routine gate
-always executes every ``base`` notebook from a clean temporary directory.
+Use ``-m "solver and tutorial_profile"`` for the HEN notebooks, or
+``-k test_notebook_executes`` for the whole series.
 
 Release Verification Snapshot
 -----------------------------

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import replace
 from typing import Any
 
@@ -12,6 +12,7 @@ from ...domain.enums import HeatExchangerNetworkDesignMethod
 from ...domain.heat_exchanger_network import HeatExchangerNetwork
 from .context import finalise_design_result, prepare_service_context
 from .execution.executor import SynthesisExecutor
+from .results.assembly import SynthesisWorkflowResult
 from .results.seeds import resolve_seed_networks
 from .targeting.network_evolution_method import (
     _execute_network_evolution_method_workflow,
@@ -179,24 +180,16 @@ def heat_exchanger_network_thermal_derivative_method_service(
 ) -> HeatExchangerNetworkSynthesisResult:
     """Run only seeded TDM and update the problem cache."""
 
-    seed_networks = resolve_seed_networks(
+    return _run_seeded_method_service(
         problem,
-        initial_networks,
-        method_name="thermal_derivative_method",
-        cached_source_method="pinch_design_method",
-    )
-    target_output, settings = prepare_service_context(
-        problem,
+        initial_networks=initial_networks,
         options=options,
         workspace_variant=workspace_variant,
-    )
-    workflow_result = _execute_thermal_derivative_method_workflow(
-        problem,
-        settings,
-        seed_networks,
         executor=executor,
+        method_name="thermal_derivative_method",
+        cached_source_method="pinch_design_method",
+        run_workflow=_execute_thermal_derivative_method_workflow,
     )
-    return finalise_design_result(problem, target_output, workflow_result)
 
 
 def heat_exchanger_network_evolution_method_service(
@@ -209,18 +202,41 @@ def heat_exchanger_network_evolution_method_service(
 ) -> HeatExchangerNetworkSynthesisResult:
     """Run only seeded network evolution and update the problem cache."""
 
+    return _run_seeded_method_service(
+        problem,
+        initial_networks=initial_networks,
+        options=options,
+        workspace_variant=workspace_variant,
+        executor=executor,
+        method_name="network_evolution_method",
+        cached_source_method="thermal_derivative_method",
+        run_workflow=_execute_network_evolution_method_workflow,
+    )
+
+
+def _run_seeded_method_service(
+    problem: PinchProblem,
+    *,
+    initial_networks: SeedNetworks,
+    options: dict[str, Any] | None,
+    workspace_variant: str | None,
+    executor: SynthesisExecutor | None,
+    method_name: str,
+    cached_source_method: str,
+    run_workflow: Callable[..., SynthesisWorkflowResult],
+) -> HeatExchangerNetworkSynthesisResult:
     seed_networks = resolve_seed_networks(
         problem,
         initial_networks,
-        method_name="network_evolution_method",
-        cached_source_method="thermal_derivative_method",
+        method_name=method_name,
+        cached_source_method=cached_source_method,
     )
     target_output, settings = prepare_service_context(
         problem,
         options=options,
         workspace_variant=workspace_variant,
     )
-    workflow_result = _execute_network_evolution_method_workflow(
+    workflow_result = run_workflow(
         problem,
         settings,
         seed_networks,

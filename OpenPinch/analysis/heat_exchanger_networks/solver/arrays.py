@@ -7,13 +7,13 @@ from typing import Any
 
 import numpy as np
 
-from ....application.problem import PinchProblem
 from ....domain._stream.value_state import resolve_period_weights
 from ....domain.configuration import tol
 from ....domain.stream import Stream
 from ....domain.value import Value
 from ....domain.zone import Zone
 from ..indexing import ordered_mapping_keys
+from ..prepared_problem import PreparedProblem
 
 _PreparedItem = tuple[str, Stream, Any | None]
 SEGMENT_PROFILE_VERSION = 2
@@ -55,7 +55,7 @@ class PreparedSolverArrays:
 
 
 def problem_to_solver_arrays(
-    problem: PinchProblem,
+    problem: PreparedProblem,
     dTmin: float,
 ) -> PreparedSolverArrays:
     """Build the private solver-array data from a prepared ``PinchProblem``.
@@ -66,7 +66,7 @@ def problem_to_solver_arrays(
     and preparation.
     """
 
-    if not isinstance(problem, PinchProblem):
+    if not isinstance(problem, PreparedProblem):
         raise TypeError(
             "problem_to_solver_arrays requires a prepared PinchProblem; "
             f"got {type(problem).__name__}."
@@ -504,13 +504,13 @@ def _stream_heat_capacity_flowrate(
     return _value(stream.heat_capacity_flowrate, "kW/delta_degC", period_idx=period_idx)
 
 
-def _ordered_stream_items(problem: PinchProblem, items) -> list[_PreparedItem]:
+def _ordered_stream_items(problem: PreparedProblem, items) -> list[_PreparedItem]:
     item_list = list(items)
     input_streams = getattr(getattr(problem, "_validated_data", None), "streams", ())
     return _items_in_input_order(item_list, input_streams)
 
 
-def _ordered_utility_items(problem: PinchProblem, items) -> list[_PreparedItem]:
+def _ordered_utility_items(problem: PreparedProblem, items) -> list[_PreparedItem]:
     item_list = list(items)
     input_utilities = getattr(
         getattr(problem, "_validated_data", None), "utilities", ()

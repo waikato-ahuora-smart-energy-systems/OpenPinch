@@ -40,7 +40,7 @@ Contribution checklist
    snapshot isolation, worker equivalence, provenance, and JSON round trips.
    Preserve shrinking and repository seed ``20260715``. Exercise failures after
    a prior success and verify that the complete previous state survives.
-8. Update the capability matrix, tutorial generator and inventory, migration
+8. Update the capability matrix, tutorial notebooks and inventory, migration
    notes, and release notes together. Run Ruff, the configured branch-coverage
    suite, relevant real solver/TESPy gates, warning-strict Sphinx, notebook
    checks, and installed-artifact smoke tests.

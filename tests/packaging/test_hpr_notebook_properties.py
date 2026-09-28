@@ -1,4 +1,4 @@
-"""Properties for pure helpers embedded in generated HPR notebooks."""
+"""Properties for pure helpers embedded in the packaged HPR notebooks."""
 
 from __future__ import annotations
 

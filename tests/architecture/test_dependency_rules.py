@@ -39,13 +39,7 @@ LAYER_ALLOWED_ROOTS = {
 }
 LAYER_BOUNDARY_EXCEPTIONS = {
     "analysis/heat_exchanger_networks/context.py": {"application"},
-    "analysis/heat_exchanger_networks/reporting/exports.py": {"application"},
-    "analysis/heat_exchanger_networks/results/seeds.py": {"application"},
     "analysis/heat_exchanger_networks/service.py": {"application"},
-    "analysis/heat_exchanger_networks/solver/arrays.py": {"application"},
-    "analysis/heat_exchanger_networks/solver/pinch_design_decomposition.py": {
-        "application"
-    },
     "analysis/heat_pumps/components.py": {"application"},
     "analysis/heat_pumps/process_mvr.py": {"application"},
     "presentation/graphs/problem.py": {"application"},

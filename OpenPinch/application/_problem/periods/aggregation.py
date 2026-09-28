@@ -327,14 +327,12 @@ def _weighted_average_target(
     return type(first).model_validate(data)
 
 
-def _weighted_report_value(
+def _collect_report_values(
     targets: Sequence[TargetResults],
     attr_path: str,
-    weights: np.ndarray,
-    *,
-    allow_partial_missing: bool = False,
-) -> Value | float | None:
-    values = []
+) -> tuple[list[float], str | None, int]:
+    """Return ``(values, unit, missing)`` for the scalar report values of targets."""
+    values: list[float] = []
     unit = None
     missing = 0
     for target in targets:
@@ -345,7 +343,6 @@ def _weighted_report_value(
         )
         if value is None:
             missing += 1
-            values.append(None)
             continue
         if isinstance(value, list):
             raise ValueError(f"Cannot aggregate array-valued field {attr_path!r}.")
@@ -355,7 +352,17 @@ def _weighted_report_value(
             elif value_unit != unit:
                 value = Value(value, value_unit).to(unit).value
         values.append(float(value))
+    return values, unit, missing
 
+
+def _weighted_report_value(
+    targets: Sequence[TargetResults],
+    attr_path: str,
+    weights: np.ndarray,
+    *,
+    allow_partial_missing: bool = False,
+) -> Value | float | None:
+    values, unit, missing = _collect_report_values(targets, attr_path)
     if missing == len(targets):
         return None
     if missing:
@@ -370,27 +377,7 @@ def _max_report_value(
     targets: Sequence[TargetResults],
     attr_path: str,
 ) -> Value | float | None:
-    values = []
-    unit = None
-    missing = 0
-    for target in targets:
-        raw_value = _target_attr(target, attr_path)
-        value, value_unit = split_report_value(
-            raw_value,
-            period_idx=getattr(target, "period_idx", None),
-        )
-        if value is None:
-            missing += 1
-            continue
-        if isinstance(value, list):
-            raise ValueError(f"Cannot aggregate array-valued field {attr_path!r}.")
-        if value_unit is not None:
-            if unit is None:
-                unit = value_unit
-            elif value_unit != unit:
-                value = Value(value, value_unit).to(unit).value
-        values.append(float(value))
-
+    values, unit, missing = _collect_report_values(targets, attr_path)
     if missing == len(targets):
         return None
     if missing:

@@ -11,7 +11,7 @@ from typing import Any
 from ....domain.zone import Zone
 from ..arguments import split_runtime_and_configuration_options
 from .catalog import require_available
-from .execution import walk_zone_tree
+from .execution import resolve_runtime_period_options, walk_zone_tree
 from .provenance import resolve_target_selection, stamp_targets
 
 
@@ -47,7 +47,7 @@ class AnalysisExecutionContext:
         configuration.update(arguments.get("configuration") or {})
         if arguments.get("period_id") is not None:
             runtime["period_id"] = arguments["period_id"]
-        runtime, sid = isolated._resolve_runtime_period_options(runtime, zone=zone)
+        runtime, sid = resolve_runtime_period_options(runtime, zone=zone)
         return cls(
             isolated,
             zone.address,
