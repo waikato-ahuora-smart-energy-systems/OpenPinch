@@ -262,3 +262,15 @@ def test_update_values_survives_group_rebuilds():
     assert cfg.problem.top_zone_name == "Mill"
     with pytest.raises(KeyError, match="NOT_AN_OPTION"):
         cfg.update_values(NOT_AN_OPTION=1)
+
+
+def test_update_values_does_not_keep_the_callers_objects():
+    cfg = Configuration()
+    refrigerants = ["water", "ammonia"]
+    cfg.update_values(HPR_REFRIGERANTS=refrigerants)
+
+    refrigerants.append("co2")
+    cfg.update_values(THERMAL_DT_CONT=7.0)
+
+    assert cfg._values["HPR_REFRIGERANTS"] == ["water", "ammonia"]
+    assert list(cfg.hpr.refrigerants) == ["water", "ammonia"]

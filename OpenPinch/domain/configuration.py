@@ -421,12 +421,13 @@ class Configuration:
         """Set flat option values (e.g. ``COSTING_ANNUAL_OP_TIME=8760``) in place.
 
         The flat values are the source the typed groups are built from, so the
-        change survives any later group rebuild. Values are not revalidated.
+        change survives any later group rebuild. Values are deep-copied, so later
+        changes to the caller's objects do not leak in, and are not revalidated.
         """
         unknown = sorted(set(values) - set(CONFIG_FIELD_SPECS))
         if unknown:
             raise KeyError(f"Unknown configuration option(s): {', '.join(unknown)}")
-        self._values.update(values)
+        self._values.update(deepcopy(values))
         self._build_groups(self._values)
 
     def _build_groups(self, values: dict[str, Any]) -> None:
