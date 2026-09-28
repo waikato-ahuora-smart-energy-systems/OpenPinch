@@ -88,7 +88,9 @@ def build_thermal_derivative_method_tasks(
     """Fan successful PDM topologies out over derivative thresholds."""
     tasks: list[HeatExchangerNetworkSynthesisTask] = []
     for outcome in pdm_outcomes:
-        if not _successful_method(outcome, "pinch_design_method"):
+        if not _successful_method(
+            outcome, HeatExchangerNetworkDesignMethod.PinchDesign
+        ):
             continue
         pathways = pathways_from_metadata(outcome.task.metadata)
         tdm_pathways = tuple(pathway for pathway in pathways if pathway.uses_tdm)
@@ -96,15 +98,17 @@ def build_thermal_derivative_method_tasks(
             continue
         restrictions = required_topology_restrictions_from_outcome(
             outcome,
-            "thermal_derivative_method",
+            HeatExchangerNetworkDesignMethod.ThermalDerivative,
         )
-        stage_count = _required_stage_count(outcome, "thermal_derivative_method")
+        stage_count = _required_stage_count(
+            outcome, HeatExchangerNetworkDesignMethod.ThermalDerivative
+        )
         for derivative_threshold in settings.derivative_thresholds:
             metadata = pathway_metadata(tdm_pathways)
             tasks.append(
                 HeatExchangerNetworkSynthesisTask(
                     run_id=settings.run_id,
-                    method="thermal_derivative_method",
+                    method=HeatExchangerNetworkDesignMethod.ThermalDerivative,
                     approach_temperature=outcome.task.approach_temperature,
                     derivative_threshold=derivative_threshold,
                     stage_count=stage_count,
@@ -134,18 +138,18 @@ def build_seeded_thermal_derivative_method_tasks(
     for seed_index, network in enumerate(seed_networks):
         restrictions = topology_restrictions_from_network(
             network,
-            downstream_method="thermal_derivative_method",
+            downstream_method=HeatExchangerNetworkDesignMethod.ThermalDerivative,
         )
         stage_count = stage_count_from_network(
             network,
-            downstream_method="thermal_derivative_method",
+            downstream_method=HeatExchangerNetworkDesignMethod.ThermalDerivative,
         )
         approach_temperature = approach_temperature_from_network(network, settings)
         for derivative_threshold in settings.derivative_thresholds:
             tasks.append(
                 HeatExchangerNetworkSynthesisTask(
                     run_id=settings.run_id,
-                    method="thermal_derivative_method",
+                    method=HeatExchangerNetworkDesignMethod.ThermalDerivative,
                     approach_temperature=approach_temperature,
                     derivative_threshold=derivative_threshold,
                     stage_count=stage_count,
@@ -166,7 +170,7 @@ def _build_seeded_quality_thermal_derivative_method_tasks(
     return build_seeded_quality_tasks(
         settings,
         seed_networks,
-        method="thermal_derivative_method",
+        method=HeatExchangerNetworkDesignMethod.ThermalDerivative,
         derivative_thresholds=lambda _network: settings.quality_derivative_thresholds,
         distinct_thresholds=True,
     )

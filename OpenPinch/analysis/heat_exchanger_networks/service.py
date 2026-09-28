@@ -186,8 +186,8 @@ def heat_exchanger_network_thermal_derivative_method_service(
         options=options,
         workspace_variant=workspace_variant,
         executor=executor,
-        method_name="thermal_derivative_method",
-        cached_source_method="pinch_design_method",
+        method_name=HeatExchangerNetworkDesignMethod.ThermalDerivative,
+        cached_source_method=HeatExchangerNetworkDesignMethod.PinchDesign,
         run_workflow=_execute_thermal_derivative_method_workflow,
     )
 
@@ -208,8 +208,8 @@ def heat_exchanger_network_evolution_method_service(
         options=options,
         workspace_variant=workspace_variant,
         executor=executor,
-        method_name="network_evolution_method",
-        cached_source_method="thermal_derivative_method",
+        method_name=HeatExchangerNetworkDesignMethod.NetworkEvolution,
+        cached_source_method=HeatExchangerNetworkDesignMethod.ThermalDerivative,
         run_workflow=_execute_network_evolution_method_workflow,
     )
 
@@ -221,8 +221,8 @@ def _run_seeded_method_service(
     options: dict[str, Any] | None,
     workspace_variant: str | None,
     executor: SynthesisExecutor | None,
-    method_name: str,
-    cached_source_method: str,
+    method_name: HeatExchangerNetworkDesignMethod,
+    cached_source_method: HeatExchangerNetworkDesignMethod,
     run_workflow: Callable[..., SynthesisWorkflowResult],
 ) -> HeatExchangerNetworkSynthesisResult:
     seed_networks = resolve_seed_networks(

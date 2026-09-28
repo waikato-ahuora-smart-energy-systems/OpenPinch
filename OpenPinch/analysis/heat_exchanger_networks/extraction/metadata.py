@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ..indexing import ordered_mapping_keys
 from ..solver.arrays import PreparedSolverArrays
 
@@ -158,9 +159,9 @@ def _float_matrix(values: Any) -> list[list[float]]:
 
 def _result_method(method: str | None):
     return {
-        "PDM": "pinch_design_method",
-        "TDM": "thermal_derivative_method",
-        "ESM": "network_evolution_method",
+        "PDM": HeatExchangerNetworkDesignMethod.PinchDesign.value,
+        "TDM": HeatExchangerNetworkDesignMethod.ThermalDerivative.value,
+        "ESM": HeatExchangerNetworkDesignMethod.NetworkEvolution.value,
     }.get(method, method)
 
 

@@ -194,7 +194,8 @@ class LocalSynthesisExecutor:
         arrays = problem_to_solver_arrays(problem, dTmin)
         stage_selection = _pdm_stage_selection(problem, task)
         decompositions = None
-        if task.method == "pinch_design_method":
+        is_evolution = task.method == HeatExchangerNetworkDesignMethod.NetworkEvolution
+        if task.method == HeatExchangerNetworkDesignMethod.PinchDesign:
             from ..solver.pinch_design_decomposition import (
                 build_pinch_design_decomposition,
             )
@@ -227,8 +228,8 @@ class LocalSynthesisExecutor:
             ),
             z_restriction=_topology_restriction_values(task, arrays),
             minimisation_goal=_model_objective(task.method),
-            non_isothermal_model=task.method == "network_evolution_method",
-            integers=task.method != "network_evolution_method",
+            non_isothermal_model=is_evolution,
+            integers=not is_evolution,
             parent=parent_problem,
             tol=_solve_tolerance(problem),
             solver_options=_solver_options_for_task(problem, task),
@@ -271,14 +272,17 @@ class LocalSynthesisExecutor:
         factories = dict(self.model_factories or {})
         scope = _stage_packing_scope(problem)
         pdm_mode = str(task.settings.get("pdm_mode", ""))
-        if task.method == "pinch_design_method" and (
+        if task.method == HeatExchangerNetworkDesignMethod.PinchDesign and (
             pdm_mode == "compact" or (not pdm_mode and scope in {"pdm", "all"})
         ):
             factories.setdefault(
                 "pinch_design_method",
                 _stage_packed_pdm_factory(),
             )
-        if task.method == "thermal_derivative_method" and scope in {"tdm", "all"}:
+        if (
+            task.method == HeatExchangerNetworkDesignMethod.ThermalDerivative
+            and scope in {"tdm", "all"}
+        ):
             factories.setdefault("stagewise", _stage_packed_stagewise_factory())
         return factories or None
 
@@ -302,13 +306,14 @@ def _solve_built_task(
         task, internal_problem, print_output, model_factories, evolution_options = (
             worker_args
         )
+    is_evolution = task.method == HeatExchangerNetworkDesignMethod.NetworkEvolution
     try:
         solve_kwargs: dict[str, Any] = {
             "print_output": print_output,
-            "evolution": task.method == "network_evolution_method",
+            "evolution": is_evolution,
             "model_factories": model_factories,
         }
-        if task.method == "network_evolution_method" and evolution_options != {
+        if is_evolution and evolution_options != {
             "n_ad_branches": 1,
             "n_rm_branches": 1,
             "max_parallel": 1,
@@ -429,14 +434,14 @@ def _failed_task_outcome(
 
 def _model_framework(method: HeatExchangerNetworkDesignMethod) -> str:
     return {
-        "pinch_design_method": "PDM",
-        "thermal_derivative_method": "TDM",
-        "network_evolution_method": "ESM",
+        HeatExchangerNetworkDesignMethod.PinchDesign: "PDM",
+        HeatExchangerNetworkDesignMethod.ThermalDerivative: "TDM",
+        HeatExchangerNetworkDesignMethod.NetworkEvolution: "ESM",
     }[method]
 
 
 def _model_objective(method: HeatExchangerNetworkDesignMethod) -> str:
-    if method == "network_evolution_method":
+    if method == HeatExchangerNetworkDesignMethod.NetworkEvolution:
         return "variable total cost"
     return "hot utility"
 
@@ -444,15 +449,18 @@ def _model_objective(method: HeatExchangerNetworkDesignMethod) -> str:
 def _task_model_approach_temperature(
     task: HeatExchangerNetworkSynthesisTask,
 ) -> float:
-    if task.method in {"thermal_derivative_method", "network_evolution_method"}:
+    if task.method in {
+        HeatExchangerNetworkDesignMethod.ThermalDerivative,
+        HeatExchangerNetworkDesignMethod.NetworkEvolution,
+    }:
         return 0.1
     return float(task.approach_temperature)
 
 
 def _task_model_name(task: HeatExchangerNetworkSynthesisTask) -> str:
-    if task.method == "pinch_design_method":
+    if task.method == HeatExchangerNetworkDesignMethod.PinchDesign:
         return f"P-+--PDM-{task.approach_temperature}"
-    if task.method == "thermal_derivative_method":
+    if task.method == HeatExchangerNetworkDesignMethod.ThermalDerivative:
         stages = task.stage_count if task.stage_count is not None else "unknown"
         return f"P-S{stages}--TDM-{task.derivative_threshold}"
     stages = task.stage_count if task.stage_count is not None else "unknown"
@@ -461,9 +469,9 @@ def _task_model_name(task: HeatExchangerNetworkSynthesisTask) -> str:
 
 def _solver_for_task(problem, method: HeatExchangerNetworkDesignMethod) -> str:
     hens = problem.master_zone.config.hens
-    if method == "pinch_design_method":
+    if method == HeatExchangerNetworkDesignMethod.PinchDesign:
         return str(hens.solver_pdm)
-    if method == "thermal_derivative_method":
+    if method == HeatExchangerNetworkDesignMethod.ThermalDerivative:
         return str(hens.solver_tdm)
     return str(hens.solver_evm)
 
@@ -474,9 +482,9 @@ def _solver_options_for_task(
 ) -> dict[str, Any]:
     method = task.method
     hens = problem.master_zone.config.hens
-    if method == "pinch_design_method":
+    if method == HeatExchangerNetworkDesignMethod.PinchDesign:
         base_options = dict(hens.solver_options_pdm)
-    elif method == "thermal_derivative_method":
+    elif method == HeatExchangerNetworkDesignMethod.ThermalDerivative:
         base_options = dict(hens.solver_options_tdm)
     else:
         base_options = dict(hens.solver_options_evm)
