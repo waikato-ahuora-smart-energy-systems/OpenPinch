@@ -97,8 +97,12 @@ def HX_Eff(Arrangement, Ntu, c, Passes=None, Rows=None, Cmin_Phase=None):
 
     Ntu = Ntu / Passes
     if Ntu > 0 and c >= 0:
+        # c = 0: one stream has infinite capacity (phase change), and every
+        # arrangement reduces to the same limit.
+        if c == 0:
+            eff = 1 - math.exp(-Ntu)
         # Counter Flow - Single Pass Effectiveness
-        if Arrangement is HX.CF:
+        elif Arrangement is HX.CF:
             # test = c * math.exp(-Ntu * (1 - c))
             if c != 1 and c * math.exp(-Ntu * (1 - c)) != 1:
                 eff = (1 - math.exp(-Ntu * (1 - c))) / (
@@ -160,8 +164,11 @@ def HX_NTU(Arrangement, eff, c, Passes=None):
         eff = Eff_p
 
     if eff > 0 and eff < 1:
+        # c = 0: the phase-change limit shared by every arrangement.
+        if c == 0 and Arrangement is not None:
+            Ntu = -math.log(1 - eff)
         # Counter Flow - Single Pass Effectiveness
-        if Arrangement is HX.CF:
+        elif Arrangement is HX.CF:
             if c != 1:
                 Ntu = 1 / (1 - c) * math.log((1 - eff * c) / (1 - eff))
             else:

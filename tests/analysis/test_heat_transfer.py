@@ -274,3 +274,18 @@ def test_shell_and_tube_matches_the_standard_correlation():
     eff = hx.HX_Eff(HX.ShellTube, ntu, c)
     assert eff == pytest.approx(expected)
     assert hx.HX_NTU(HX.ShellTube, eff, c) == pytest.approx(ntu)
+
+
+@pytest.mark.parametrize("arrangement", list(HX))
+def test_zero_capacity_ratio_uses_the_phase_change_limit(arrangement):
+    # c = 0 (one stream condensing or evaporating): eff = 1 - exp(-NTU) for all
+    # arrangements, and NTU inverts it.
+    assert hx.HX_Eff(arrangement, 1.5, 0.0) == pytest.approx(1 - math.exp(-1.5))
+    assert hx.HX_NTU(arrangement, 1 - math.exp(-1.5), 0.0) == pytest.approx(1.5)
+
+
+@pytest.mark.parametrize("arrangement", [HX.CrFMM, HX.CrFMUmax, HX.CrFMUmin])
+def test_small_capacity_ratio_approaches_the_zero_limit(arrangement):
+    assert hx.HX_Eff(arrangement, 1.5, 1e-6) == pytest.approx(
+        hx.HX_Eff(arrangement, 1.5, 0.0), abs=1e-5
+    )
