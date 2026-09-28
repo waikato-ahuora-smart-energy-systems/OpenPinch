@@ -14,6 +14,7 @@ from OpenPinch.analysis.utility_placement import (
     prepare_template_blueprints,
     verify_candidate,
 )
+from OpenPinch.analysis.utility_placement.codec import decode_verified_placement
 from OpenPinch.analysis.utility_placement.errors import PlacementModelValidationError
 from OpenPinch.contracts.utility_placement import (
     CoordinateKey,
@@ -227,6 +228,12 @@ def test_invalid_points_return_diagnostics_and_strict_decode_rejects() -> None:
             decode_placement(model, point)
 
 
+def test_verified_decode_matches_the_strict_decode() -> None:
+    model = _model(isothermal_count=2, sensible_count=1)
+    for point in model.initial_points:
+        assert decode_verified_placement(model, point) == decode_placement(model, point)
+
+
 def test_every_generated_start_passes_independent_candidate_verifier() -> None:
     model = _model(isothermal_count=3, sensible_count=2)
 
@@ -262,9 +269,7 @@ def test_generated_utility_kinds_may_interleave_by_supply_temperature() -> None:
     too_close = (500.0, 300.0, 300.0, 1.0)
     verification = verify_candidate(model, too_close)
     assert not verification.feasible
-    assert {item.code for item in verification.diagnostics} == {
-        "ordering_violation"
-    }
+    assert {item.code for item in verification.diagnostics} == {"ordering_violation"}
 
 
 def test_fixed_coordinates_remain_in_vector_schema() -> None:

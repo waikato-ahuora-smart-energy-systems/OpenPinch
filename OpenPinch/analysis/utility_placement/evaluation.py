@@ -9,7 +9,7 @@ from threading import Lock
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from OpenPinch.analysis.utility_placement.codec import (
-    decode_placement,
+    decode_verified_placement,
     verify_candidate,
 )
 from OpenPinch.contracts.utility_placement import (
@@ -202,7 +202,7 @@ class PlacementEvaluationSession:
                 float(len(verification.diagnostics)),
             )
         else:
-            placement = decode_placement(self.model, key)
+            placement = decode_verified_placement(self.model, key)
             period_results: list[PlacementPeriodResult] = []
             thermo_values: list[float] = []
             fallback_penalties: list[float] = []

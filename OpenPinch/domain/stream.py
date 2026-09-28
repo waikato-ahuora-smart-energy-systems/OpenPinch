@@ -21,6 +21,49 @@ _TEMPERATURE_EQUAL_TOL = 1e-12
 MaybeVU = Any
 
 
+class _ValueField(property):
+    """Stream property backed by one stream-owned :class:`Value` attribute.
+
+    The getter returns the stored value, or a detached copy when ``copy`` is set.
+    Settable fields route assignment through :meth:`Stream.set_value_attr`, which
+    owns unit conversion, period handling, segment rules and derived updates.
+    """
+
+    def __init__(
+        self,
+        internal_name: str,
+        unit: str | None,
+        doc: str,
+        *,
+        settable: bool = False,
+        copy: bool = False,
+    ):
+        if copy:
+
+            def getter(stream: Stream) -> Optional[Value]:
+                return stream._copy_value(getattr(stream, internal_name))
+
+        else:
+
+            def getter(stream: Stream) -> Optional[Value]:
+                return getattr(stream, internal_name)
+
+        super().__init__(getter, self._set if settable else None, None, doc)
+        # A property subclass would otherwise report its class docstring.
+        self.__doc__ = doc
+        self.internal_name = internal_name
+        self.unit = unit
+        self.settable = settable
+        self.public_name: str | None = None
+
+    def __set_name__(self, owner: type, name: str) -> None:
+        super().__set_name__(owner, name)
+        self.public_name = name
+
+    def _set(self, stream: Stream, value: MaybeVU) -> None:
+        stream.set_value_attr(self.public_name, value)
+
+
 class Stream:
     """Generic thermal stream used for both process and utility duties.
 
@@ -31,75 +74,120 @@ class Stream:
     level aggregation.
     """
 
-    _VALUE_UNITS = {
-        "_t_supply": "degC",
-        "_t_target": "degC",
-        "_p_supply": "kPa",
-        "_p_target": "kPa",
-        "_h_supply": "kJ/kg",
-        "_h_target": "kJ/kg",
-        "_dt_cont": "delta_degC",
-        "_dt_cont_act": "delta_degC",
-        "_heat_flow": "kW",
-        "_maximum_heat_flow": "kW",
-        "_htc": "kW/m^2/delta_degC",
-        "_htr": "m^2*delta_degC/kW",
-        "_price": "$/MW/h",
-        "_cost": "$/h",
-        "_cp": "kW/delta_degC",
-        "_rcp_prod": "m^2",
-        "_t_min": "degC",
-        "_t_max": "degC",
-        "_t_min_star": "degC",
-        "_t_max_star": "degC",
-    }
-    _CORE_VALUE_ATTRS = (
-        "_t_supply",
-        "_t_target",
-        "_p_supply",
-        "_p_target",
-        "_h_supply",
-        "_h_target",
-        "_dt_cont",
-        "_heat_flow",
-        "_maximum_heat_flow",
-        "_htc",
-        "_price",
+    # === Value fields ===
+    # Each unit-bearing field is declared once; the lookup tables below derive
+    # from these declarations.
+
+    supply_temperature = _ValueField(
+        "_t_supply", "degC", "Supply temperature (e.g., degC).", settable=True
     )
-    _DERIVED_VALUE_ATTRS = (
+    target_temperature = _ValueField(
+        "_t_target", "degC", "Target temperature (e.g., degC).", settable=True
+    )
+    supply_pressure = _ValueField(
+        "_p_supply", "kPa", "Supply pressure (e.g., kPa).", settable=True
+    )
+    target_pressure = _ValueField(
+        "_p_target", "kPa", "Target pressure (e.g., kPa).", settable=True
+    )
+    supply_enthalpy = _ValueField(
+        "_h_supply", "kJ/kg", "Supply enthalpy (e.g., kJ/kg).", settable=True
+    )
+    target_enthalpy = _ValueField(
+        "_h_target", "kJ/kg", "Target enthalpy (e.g., kJ/kg).", settable=True
+    )
+    delta_t_contribution = _ValueField(
+        "_dt_cont",
+        "delta_degC",
+        "Preserved base delta-T contribution before any zone multiplier.",
+        settable=True,
+    )
+    heat_flow = _ValueField(
+        "_heat_flow",
+        "kW",
+        "Stream heat flow view over a scalar or multiperiod duty value.",
+        settable=True,
+    )
+    maximum_heat_flow = _ValueField(
+        "_maximum_heat_flow",
+        "kW",
+        "Optional scalar or period-aware upper bound on utility duty.",
+        settable=True,
+        copy=True,
+    )
+    heat_transfer_coefficient = _ValueField(
+        "_htc",
+        "kW/m^2/delta_degC",
+        "Heat transfer coefficient (e.g., kW/m^2/K).",
+        settable=True,
+    )
+    price = _ValueField(
+        "_price", "$/MW/h", "Unit energy price (e.g., $/MWh).", settable=True, copy=True
+    )
+    effective_delta_t_contribution = _ValueField(
         "_dt_cont_act",
+        "delta_degC",
+        "Effective delta-T contribution used in shifted-temperature calculations.",
+    )
+    minimum_temperature = _ValueField(
         "_t_min",
+        "degC",
+        "Minimum temperature (supply or target depending on hot/cold).",
+        copy=True,
+    )
+    maximum_temperature = _ValueField(
         "_t_max",
-        "_t_min_star",
-        "_t_max_star",
-        "_cp",
+        "degC",
+        "Maximum temperature (supply or target depending on hot/cold).",
+        copy=True,
+    )
+    shifted_minimum_temperature = _ValueField(
+        "_t_min_star", "degC", "Shifted minimum temperature.", copy=True
+    )
+    shifted_maximum_temperature = _ValueField(
+        "_t_max_star", "degC", "Shifted maximum temperature.", copy=True
+    )
+    heat_capacity_flowrate = _ValueField(
+        "_cp", "kW/delta_degC", "Heat capacity flowrate (e.g., kW/K).", copy=True
+    )
+    heat_transfer_resistance = _ValueField(
         "_htr",
-        "_cost",
+        "m^2*delta_degC/kW",
+        "Heat transfer resistance (e.g., m^2.K/kW).",
+        copy=True,
+    )
+    utility_cost = _ValueField("_cost", "$/h", "Utility cost (e.g., $/y).", copy=True)
+    resistance_capacity_product = _ValueField(
         "_rcp_prod",
+        "m^2",
+        "Resistance-capacity product (1/heat transfer rate).",
+        copy=True,
+    )
+    entropic_mean_temperature = _ValueField(
         "_t_entr_mean",
+        None,
+        "Entropic mean temperature of supply and target temperatures.",
+        copy=True,
+    )
+
+    _VALUE_FIELDS = {
+        name: field
+        for name, field in dict(locals()).items()
+        if isinstance(field, _ValueField)
+    }
+    _VALUE_UNITS = {
+        field.internal_name: field.unit
+        for field in _VALUE_FIELDS.values()
+        if field.unit is not None
+    }
+    _CORE_VALUE_ATTRS = tuple(
+        field.internal_name for field in _VALUE_FIELDS.values() if field.settable
+    )
+    _DERIVED_VALUE_ATTRS = tuple(
+        field.internal_name for field in _VALUE_FIELDS.values() if not field.settable
     )
     _PUBLIC_VALUE_ATTRS = {
-        "supply_temperature": "_t_supply",
-        "target_temperature": "_t_target",
-        "supply_pressure": "_p_supply",
-        "target_pressure": "_p_target",
-        "supply_enthalpy": "_h_supply",
-        "target_enthalpy": "_h_target",
-        "delta_t_contribution": "_dt_cont",
-        "heat_flow": "_heat_flow",
-        "maximum_heat_flow": "_maximum_heat_flow",
-        "heat_transfer_coefficient": "_htc",
-        "price": "_price",
-        "effective_delta_t_contribution": "_dt_cont_act",
-        "minimum_temperature": "_t_min",
-        "maximum_temperature": "_t_max",
-        "shifted_minimum_temperature": "_t_min_star",
-        "shifted_maximum_temperature": "_t_max_star",
-        "heat_capacity_flowrate": "_cp",
-        "heat_transfer_resistance": "_htr",
-        "utility_cost": "_cost",
-        "resistance_capacity_product": "_rcp_prod",
-        "entropic_mean_temperature": "_t_entr_mean",
+        name: field.internal_name for name, field in _VALUE_FIELDS.items()
     }
     _PUBLIC_ATTRS = {
         **_PUBLIC_VALUE_ATTRS,
@@ -168,6 +256,7 @@ class Stream:
         segments: list[object] | tuple[object, ...] | None = None,
     ):
         """Initialise a stream and infer hot/cold classification."""
+        arguments = locals()
         self._segments: tuple[_StreamSegment, ...] = ()
         self._segment_targeting_fractions: dict[int, tuple[float, ...]] = {}
         self._allow_targeting_segment_duties = False
@@ -187,51 +276,13 @@ class Stream:
         self._num_periods: int | None = None
         self._type: str | None = None
 
-        self._t_supply: Value | None = None
-        self._t_target: Value | None = None
-        self._p_supply: Value | None = None
-        self._p_target: Value | None = None
-        self._h_supply: Value | None = None
-        self._h_target: Value | None = None
-        self._dt_cont: Value | None = None
-        self._heat_flow: Value | None = None
-        self._maximum_heat_flow: Value | None = None
-        self._htc: Value | None = None
-        self._price: Value | None = None
-
-        self._dt_cont_act: Value | None = None
-        self._t_min: Value | None = None
-        self._t_max: Value | None = None
-        self._t_min_star: Value | None = None
-        self._t_max_star: Value | None = None
-        self._cp: Value | None = None
-        self._htr: Value | None = None
-        self._cost: Value | None = None
-        self._rcp_prod: Value | None = None
-
-        self.set_value_attr(
-            "supply_temperature", supply_temperature, update_derived=False
-        )
-        self.set_value_attr(
-            "target_temperature", target_temperature, update_derived=False
-        )
-        self.set_value_attr("supply_pressure", supply_pressure, update_derived=False)
-        self.set_value_attr("target_pressure", target_pressure, update_derived=False)
-        self.set_value_attr("supply_enthalpy", supply_enthalpy, update_derived=False)
-        self.set_value_attr("target_enthalpy", target_enthalpy, update_derived=False)
-        self.set_value_attr(
-            "delta_t_contribution", delta_t_contribution, update_derived=False
-        )
-        self.set_value_attr("heat_flow", heat_flow, update_derived=False)
-        self.set_value_attr(
-            "maximum_heat_flow", maximum_heat_flow, update_derived=False
-        )
-        self.set_value_attr(
-            "heat_transfer_coefficient",
-            heat_transfer_coefficient,
-            update_derived=False,
-        )
-        self.set_value_attr("price", price, update_derived=False)
+        for attr_name in (*self._CORE_VALUE_ATTRS, *self._DERIVED_VALUE_ATTRS):
+            setattr(self, attr_name, None)
+        for public_name, field in self._VALUE_FIELDS.items():
+            if field.settable:
+                self.set_value_attr(
+                    public_name, arguments[public_name], update_derived=False
+                )
         self._validate_num_periods()
         self._calculate_missing_properties()
         self.update_derived_properties()
@@ -320,74 +371,6 @@ class Stream:
         return self._weights
 
     @property
-    def supply_temperature(self) -> Optional[Value]:
-        """Supply temperature (e.g., degC)."""
-        return self._t_supply
-
-    @supply_temperature.setter
-    def supply_temperature(self, value):
-        self.set_value_attr("supply_temperature", value)
-
-    @property
-    def target_temperature(self) -> Optional[Value]:
-        """Target temperature (e.g., degC)."""
-        return self._t_target
-
-    @target_temperature.setter
-    def target_temperature(self, value):
-        self.set_value_attr("target_temperature", value)
-
-    @property
-    def supply_pressure(self) -> Optional[Value]:
-        """Supply pressure (e.g., kPa)."""
-        return self._p_supply
-
-    @supply_pressure.setter
-    def supply_pressure(self, value):
-        self.set_value_attr("supply_pressure", value)
-
-    @property
-    def target_pressure(self) -> Optional[Value]:
-        """Target pressure (e.g., kPa)."""
-        return self._p_target
-
-    @target_pressure.setter
-    def target_pressure(self, value):
-        self.set_value_attr("target_pressure", value)
-
-    @property
-    def supply_enthalpy(self) -> Optional[Value]:
-        """Supply enthalpy (e.g., kJ/kg)."""
-        return self._h_supply
-
-    @supply_enthalpy.setter
-    def supply_enthalpy(self, value):
-        self.set_value_attr("supply_enthalpy", value)
-
-    @property
-    def target_enthalpy(self) -> Optional[Value]:
-        """Target enthalpy (e.g., kJ/kg)."""
-        return self._h_target
-
-    @target_enthalpy.setter
-    def target_enthalpy(self, value):
-        self.set_value_attr("target_enthalpy", value)
-
-    @property
-    def delta_t_contribution(self) -> Value:
-        """Preserved base delta-T contribution before any zone multiplier."""
-        return self._dt_cont
-
-    @delta_t_contribution.setter
-    def delta_t_contribution(self, value):
-        self.set_value_attr("delta_t_contribution", value)
-
-    @property
-    def effective_delta_t_contribution(self) -> Value:
-        """Effective delta-T contribution used in shifted-temperature calculations."""
-        return self._dt_cont_act
-
-    @property
     def delta_t_contribution_multiplier(self) -> float:
         """Effective delta-T contribution used in shifted-temperature calculations."""
         return self._dt_cont_multiplier
@@ -420,62 +403,6 @@ class Stream:
         self._dt_cont_multiplier_locked = bool(value)
 
     @property
-    def heat_flow(self) -> Value:
-        """Stream heat flow view over a scalar or multiperiod duty value."""
-        return self._heat_flow
-
-    @heat_flow.setter
-    def heat_flow(self, value):
-        self.set_value_attr("heat_flow", value)
-
-    @property
-    def maximum_heat_flow(self) -> Value | None:
-        """Optional scalar or period-aware upper bound on utility duty."""
-        return self._copy_value(self._maximum_heat_flow)
-
-    @maximum_heat_flow.setter
-    def maximum_heat_flow(self, value):
-        self.set_value_attr("maximum_heat_flow", value)
-
-    @property
-    def heat_transfer_coefficient(self) -> Value:
-        """Heat transfer coefficient (e.g., kW/m^2/K)."""
-        return self._htc
-
-    @heat_transfer_coefficient.setter
-    def heat_transfer_coefficient(self, value):
-        self.set_value_attr("heat_transfer_coefficient", value)
-
-    @property
-    def heat_transfer_resistance(self) -> Optional[Value]:
-        """Heat transfer resistance (e.g., m^2.K/kW)."""
-        return self._copy_value(self._htr)
-
-    @property
-    def price(self) -> Value:
-        """Unit energy price (e.g., $/MWh)."""
-        return self._copy_value(self._price)
-
-    @price.setter
-    def price(self, value):
-        self.set_value_attr("price", value)
-
-    @property
-    def utility_cost(self) -> Optional[Value]:
-        """Utility cost (e.g., $/y)."""
-        return self._copy_value(self._cost)
-
-    @property
-    def heat_capacity_flowrate(self) -> Optional[Value]:
-        """Heat capacity flowrate (e.g., kW/K)."""
-        return self._copy_value(self._cp)
-
-    @property
-    def resistance_capacity_product(self) -> Optional[Value]:
-        """Resistance-capacity product (1/heat transfer rate)."""
-        return self._copy_value(self._rcp_prod)
-
-    @property
     def is_active(self) -> bool:
         """Whether the stream is active in analysis."""
         return self._active
@@ -488,33 +415,6 @@ class Stream:
             segment._active = self._active
             segment._bump_numeric_revision()
         self._bump_numeric_revision()
-
-    # === Computed Temperature Properties ===
-
-    @property
-    def minimum_temperature(self) -> Optional[Value]:
-        """Minimum temperature (supply or target depending on hot/cold)."""
-        return self._copy_value(self._t_min)
-
-    @property
-    def maximum_temperature(self) -> Optional[Value]:
-        """Maximum temperature (supply or target depending on hot/cold)."""
-        return self._copy_value(self._t_max)
-
-    @property
-    def shifted_minimum_temperature(self) -> Optional[Value]:
-        """Shifted minimum temperature."""
-        return self._copy_value(self._t_min_star)
-
-    @property
-    def shifted_maximum_temperature(self) -> Optional[Value]:
-        """Shifted maximum temperature."""
-        return self._copy_value(self._t_max_star)
-
-    @property
-    def entropic_mean_temperature(self) -> Optional[Value]:
-        """Entropic mean temperature of supply and target temperatures."""
-        return self._copy_value(self._t_entr_mean)
 
     # === Methods ===
 

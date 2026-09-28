@@ -8,7 +8,6 @@ from types import SimpleNamespace
 import pytest
 
 import OpenPinch.analysis.heat_exchanger_networks.models.problem as unit_problem
-import OpenPinch.analysis.heat_exchanger_networks.models.stagewise as stagewise
 from OpenPinch.analysis.heat_exchanger_networks import (
     service as entry,
 )
@@ -34,6 +33,9 @@ from OpenPinch.analysis.heat_exchanger_networks.execution.pathways import (
 )
 from OpenPinch.analysis.heat_exchanger_networks.models._stagewise import (
     verification as stagewise_verification,
+)
+from OpenPinch.analysis.heat_exchanger_networks.models._stagewise.evolution import (
+    _set_recovery_binary_value,
 )
 from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
     InternalHeatExchangerNetworkProblem,
@@ -686,11 +688,11 @@ def test_internal_problem_stage_reduction_transfers_nonisothermal_state_and_fall
 
 def test_stagewise_recovery_binary_and_scalar_value_fallbacks():
     z_values = [[[0]]]
-    stagewise.StageWiseModel._set_recovery_binary_value(None, z_values, (0, 0, 0), 1)
+    _set_recovery_binary_value(None, z_values, (0, 0, 0), 1)
     assert z_values == [[[1]]]
 
     z_values = [[[_IndexRejectingElement()]]]
-    stagewise.StageWiseModel._set_recovery_binary_value(None, z_values, (0, 0, 0), 1)
+    _set_recovery_binary_value(None, z_values, (0, 0, 0), 1)
     assert z_values == [[[1]]]
 
     assert stagewise_verification._value(7.5) == pytest.approx(7.5)

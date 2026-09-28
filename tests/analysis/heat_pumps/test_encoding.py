@@ -2,6 +2,8 @@ import numpy as np
 import pytest
 
 from OpenPinch.analysis.heat_pumps.common.encoding import (
+    DutyAllocationRequest,
+    StageDutyRequest,
     allocate_stage_duties,
     decode_duty_splits,
     encode_base_and_duty_splits,
@@ -16,6 +18,7 @@ from OpenPinch.analysis.heat_pumps.common.encoding import (
     map_x_to_Q_amb,
     require_stage_duty_allocation,
 )
+from OpenPinch.contracts.hpr import HPRParsedState
 
 
 def test_map_x_to_T_returns_expected_descending_temperatures():
@@ -162,3 +165,27 @@ def test_require_stage_duty_allocation_reports_missing_split_contract():
             Q_available=np.array([100.0]),
             duty_name="heat",
         )
+
+
+def test_duty_allocation_request_collects_parsed_state_fields():
+    state = HPRParsedState(
+        Q_heat_base=100.0,
+        x_heat_split=np.array([0.5, 1.0]),
+        Q_heat_available=np.array([100.0, 25.0]),
+        Q_cool_available=np.array([40.0]),
+    )
+
+    request = DutyAllocationRequest.from_state(state)
+
+    assert request.heat.Q_base == 100.0
+    assert request.heat.x_split is state.x_heat_split
+    assert request.heat.Q_available is state.Q_heat_available
+    assert request.cool.Q_base is None
+    assert request.cool.x_split is None
+    assert request.cool.Q_available is state.Q_cool_available
+    np.testing.assert_allclose(
+        request.heat.allocate("heat").Q_model, np.array([50.0, 25.0])
+    )
+    assert DutyAllocationRequest().heat == StageDutyRequest()
+    with pytest.raises(ValueError, match="Q_cool_base requires x_cool_split"):
+        request.cool.allocate("cool")

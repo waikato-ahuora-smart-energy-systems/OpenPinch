@@ -235,11 +235,12 @@ def test_parallel_refrigeration_objective_solves_refrigeration_mode(monkeypatch)
 
     assert captured["dtcont"] == pytest.approx(args.dtcont_hp)
     assert captured["is_heat_pump"] is False
-    assert captured["Q_heat_base"] is None
-    assert captured["Q_heat_available"] is None
-    assert captured["Q_cool_base"] == pytest.approx(80.0)
-    np.testing.assert_allclose(captured["x_cool_split"], np.array([1.0]))
-    np.testing.assert_allclose(captured["Q_cool_available"], np.array([80.0]))
+    duty = captured["duty_allocation"]
+    assert duty.heat.Q_base is None
+    assert duty.heat.Q_available is None
+    assert duty.cool.Q_base == pytest.approx(80.0)
+    np.testing.assert_allclose(duty.cool.x_split, np.array([1.0]))
+    np.testing.assert_allclose(duty.cool.Q_available, np.array([80.0]))
     assert out.cop_h == pytest.approx(4.0)
 
 

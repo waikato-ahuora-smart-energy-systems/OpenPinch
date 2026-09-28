@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from types import SimpleNamespace
-from typing import Any
+from dataclasses import dataclass, fields
+from types import SimpleNamespace, UnionType
+from typing import Any, Union, get_args, get_origin, get_type_hints
 
 from ._value.coercion import coerce_period_index
 from .configuration_fields import (
@@ -30,8 +31,172 @@ __all__ = [
 ]
 
 
-class _HprConfig(SimpleNamespace):
+# Typed views of the configuration groups. ``CONFIG_FIELD_SPECS`` stays the
+# single source of defaults and validation; these classes only declare each
+# group's attribute names and types statically so readers and type checkers
+# see them. ``_check_group_types`` fails at import if the two drift apart.
+# Groups that code assigns to after construction are mutable; the rest are
+# frozen.
+_mutable_group = dataclass(slots=True)
+_frozen_group = dataclass(frozen=True, slots=True)
+
+
+@_mutable_group
+class ProblemConfig:
+    """Problem shape: top zone and period definitions."""
+
+    top_zone_name: str
+    top_zone_identifier: str
+    period_ids: list[str]
+    period_weights: list[float]
+
+
+@_frozen_group
+class InputUnitsConfig:
+    """Units assumed for user-supplied input values."""
+
+    temperature: str
+    pressure: str
+    enthalpy: str
+    heat_flow: str
+    delta_t: str
+    htc: str
+    price: str
+
+
+@_frozen_group
+class OutputUnitsConfig:
+    """Units used when reporting results."""
+
+    heat_flow: str
+    temperature: str
+    percent: str
+    utility_cost: str
+    work: str
+    area: str
+    capital_cost: str
+    annual_cost: str
+    exergy: str
+    hpr_cop: str
+
+
+@_frozen_group
+class ReportingConfig:
+    """Result formatting settings."""
+
+    decimal_places: int
+
+
+@_frozen_group
+class EnvironmentConfig:
+    """Ambient (dead-state) conditions."""
+
+    temperature: float
+    pressure: float
+
+
+@_mutable_group
+class ThermalConfig:
+    """Heat-transfer approach temperatures and coefficients."""
+
+    dt_cont: float
+    dt_phase_change: float
+    htc: float
+
+
+@_frozen_group
+class DirectConfig:
+    """Direct integration settings."""
+
+    balanced_cc_enabled: bool
+    vertical_gcc_enabled: bool
+    assisted_ht_enabled: bool
+    assisted_ht_dt: float
+
+
+@_mutable_group
+class CostingConfig:
+    """Utility, heat exchanger and HPR costing parameters."""
+
+    utility_price: float
+    annual_op_time: float
+    hx_unit_cost: float
+    hx_area_coeff: float
+    hx_area_exp: float
+    discount_rate: float
+    service_life: float
+    hpr_ele_price: float
+    hpr_price_ratio_heat_to_ele: float
+    hpr_price_ratio_cold_to_ele: float
+    hpr_comp_fixed_cost: float
+    hpr_comp_variable_cost: float
+    hpr_comp_cost_exp: float
+    hpr_hx_duty_fixed_cost: float
+    hpr_hx_duty_variable_cost: float
+    hpr_hx_duty_cost_exp: float
+
+
+@_frozen_group
+class HensConfig:
+    """Heat exchanger network synthesis settings."""
+
+    approach_temperatures: list[float]
+    dt_cont_multipliers: list[float] | None
+    derivative_thresholds: list[float]
+    synthesis_quality_tier: int
+    pdm_stage_pair_limit: int | None
+    tdm_parent_limit: int | None
+    stage_packing: str
+    stage_selection: list[int]
+    solver_pdm: str
+    solver_tdm: str
+    solver_evm: str
+    solver_options_pdm: dict[str, Any]
+    solver_options_tdm: dict[str, Any]
+    solver_options_evm: dict[str, Any]
+    solve_tolerance: float
+    max_parallel: int
+    evm_n_ad_branches: int | None
+    evm_n_rm_branches: int | None
+    log_level: str
+    output_folder: str
+    output_formats: list[str]
+    run_id: str
+    best_solutions_to_save: int
+
+
+@_frozen_group
+class HprConfig:
     """HPR runtime settings plus derived backend-facing values."""
+
+    type: str
+    load_mode: str
+    load_fraction: float
+    load_duty: float | None
+    load_period_values: dict[str, float]
+    multiperiod_optimization_enabled: bool
+    refrigerants: list[str]
+    refrigerant_sort_enabled: bool
+    mvr_fluids: list[str]
+    mvr_count: int
+    mvr_eta_comp: float
+    mvr_eta_motor: float
+    n_cond: int
+    n_evap: int
+    eta_comp: float
+    eta_exp: float
+    eta_ii_carnot: float
+    he_eta_ii_carnot: float
+    integrated_expander_enabled: bool
+    dt_cont: float
+    dt_ihx: float
+    dt_cascade_hx: float
+    dt_env_cont: float
+    max_multistart: int
+    eta_penalty: float
+    rho_penalty: float
+    bb_minimiser: str
+    initialise_simulated_cycle: bool
 
     @staticmethod
     def _normalise_config_list(values, *, uppercase: bool = False) -> list[str]:
@@ -56,8 +221,96 @@ class _HprConfig(SimpleNamespace):
         return float(self.he_eta_ii_carnot) if self.integrated_expander_enabled else 0.0
 
 
+@_frozen_group
+class ProcessMvrConfig:
+    """Direct process MVR efficiencies."""
+
+    eta_comp: float
+    eta_motor: float
+
+
+@_mutable_group
+class PowerConfig:
+    """Power cogeneration (steam turbine) settings."""
+
+    turbine_work_enabled: bool
+    turb_t_in: float
+    turb_p_in: float
+    min_eff: float
+    load_fraction: float
+    eta_mech: float
+    turb_model: str
+    high_p_cond_flash_enabled: bool
+
+
+_GROUP_TYPES: dict[str, type] = {
+    "problem": ProblemConfig,
+    "input_units": InputUnitsConfig,
+    "output_units": OutputUnitsConfig,
+    "reporting": ReportingConfig,
+    "environment": EnvironmentConfig,
+    "thermal": ThermalConfig,
+    "direct": DirectConfig,
+    "costing": CostingConfig,
+    "hens": HensConfig,
+    "hpr": HprConfig,
+    "process_mvr": ProcessMvrConfig,
+    "power": PowerConfig,
+}
+
+
+def _canonical_annotation(annotation: Any) -> Any:
+    """Return a comparable form that treats ``List``/``list`` and unions alike."""
+    origin = get_origin(annotation)
+    if origin is None:
+        return annotation
+    if origin is UnionType:
+        origin = Union
+    return origin, tuple(_canonical_annotation(arg) for arg in get_args(annotation))
+
+
+def _check_group_types() -> None:
+    """Fail if the group classes disagree with ``CONFIG_FIELD_SPECS``."""
+    expected: dict[str, list[tuple[str, Any]]] = {}
+    for spec in CONFIG_FIELD_SPECS.values():
+        group, field = spec.config_path
+        expected.setdefault(group, []).append(
+            (field, _canonical_annotation(spec.annotation))
+        )
+    problems = sorted(set(expected) ^ set(_GROUP_TYPES))
+    for group in set(expected) & set(_GROUP_TYPES):
+        hints = get_type_hints(_GROUP_TYPES[group])
+        declared = [
+            (field.name, _canonical_annotation(hints[field.name]))
+            for field in fields(_GROUP_TYPES[group])
+        ]
+        if declared != expected[group]:
+            problems.append(group)
+    if problems:
+        raise TypeError(
+            "Configuration group classes do not match CONFIG_FIELD_SPECS for: "
+            + ", ".join(problems)
+        )
+
+
+_check_group_types()
+
+
 class Configuration:
     """Runtime configuration translated from flat user-facing option keys."""
+
+    problem: ProblemConfig
+    input_units: InputUnitsConfig
+    output_units: OutputUnitsConfig
+    reporting: ReportingConfig
+    environment: EnvironmentConfig
+    thermal: ThermalConfig
+    direct: DirectConfig
+    costing: CostingConfig
+    hens: HensConfig
+    hpr: HprConfig
+    process_mvr: ProcessMvrConfig
+    power: PowerConfig
 
     def __init__(
         self,
@@ -165,12 +418,10 @@ class Configuration:
         return output_unit_options_to_map(self._values)
 
     def _build_groups(self, values: dict[str, Any]) -> None:
-        groups: dict[str, SimpleNamespace] = {}
+        """(Re)build the typed group objects from flat option ``values``."""
+        group_values: dict[str, dict[str, Any]] = {group: {} for group in _GROUP_TYPES}
         for name, spec in CONFIG_FIELD_SPECS.items():
             group, field = spec.config_path
-            group_obj = groups.setdefault(
-                group, _HprConfig() if group == "hpr" else SimpleNamespace()
-            )
-            setattr(group_obj, field, deepcopy(values[name]))
-        for group, group_obj in groups.items():
-            setattr(self, group, group_obj)
+            group_values[group][field] = deepcopy(values[name])
+        for group, group_type in _GROUP_TYPES.items():
+            setattr(self, group, group_type(**group_values[group]))

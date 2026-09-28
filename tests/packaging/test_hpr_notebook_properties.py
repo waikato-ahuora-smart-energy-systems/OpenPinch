@@ -1,4 +1,4 @@
-"""Properties for pure helpers embedded in the packaged HPR notebooks."""
+"""Properties for the HPR summary helpers the packaged notebooks use."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ import math
 from pathlib import Path
 from types import SimpleNamespace
 
-import pytest
 from hypothesis import given, seed
 from hypothesis import strategies as st
 
@@ -19,6 +18,7 @@ from OpenPinch.contracts.hpr import (
     HPRSearchBudget,
     HPRTargetingError,
 )
+from OpenPinch.presentation.reporting.hpr import hpr_failure_summary, hpr_summary
 
 ROOT = Path(__file__).resolve().parents[2]
 NOTEBOOK_DIR = ROOT / "OpenPinch" / "tutorials" / "notebooks"
@@ -41,7 +41,11 @@ def _notebook_functions(notebook_name: str, function_names: tuple[str, ...]):
         notebook_name,
         function_names,
     )
-    namespace: dict[str, object] = {"HPRTargetingError": HPRTargetingError}
+    namespace: dict[str, object] = {
+        "HPRTargetingError": HPRTargetingError,
+        "hpr_failure_summary": hpr_failure_summary,
+        "hpr_summary": hpr_summary,
+    }
     exec(
         compile(
             ast.fix_missing_locations(ast.Module(body=functions, type_ignores=[])),
@@ -51,10 +55,6 @@ def _notebook_functions(notebook_name: str, function_names: tuple[str, ...]):
         namespace,
     )
     return namespace
-
-
-def _notebook_function(notebook_name: str, function_name: str):
-    return _notebook_functions(notebook_name, (function_name,))[function_name]
 
 
 @st.composite
@@ -97,13 +97,12 @@ def _failure_summaries(draw) -> HPRFailureSummary:
 
 @seed(20260715)
 @given(summary=_failure_summaries())
-def test_notebook_failure_summary_is_bounded_plain_json(
+def test_failure_summary_is_bounded_plain_json(
     summary: HPRFailureSummary,
 ) -> None:
-    summarize = _notebook_function(
-        "10_multiperiod_heat_pumps.ipynb", "summarize_hpr_failure"
+    result = hpr_failure_summary(
+        HPRTargetingError("bounded failure", diagnostics=summary)
     )
-    result = summarize(HPRTargetingError("bounded failure", diagnostics=summary))
     round_trip = json.loads(json.dumps(result))
 
     assert round_trip == result
@@ -113,15 +112,6 @@ def test_notebook_failure_summary_is_bounded_plain_json(
     assert len(result["diagnostics"]["representative_failures"]) <= 16
 
 
-@pytest.mark.parametrize(
-    "notebook_name",
-    [
-        "08_carnot_heat_pump_and_refrigeration.ipynb",
-        "09_vapour_compression_and_brayton.ipynb",
-        "10_multiperiod_heat_pumps.ipynb",
-        "11_process_mvr_and_cascade.ipynb",
-    ],
-)
 @seed(20260715)
 @given(
     period_ids=st.permutations(("turndown", "base", "peak")),
@@ -155,8 +145,7 @@ def test_notebook_failure_summary_is_bounded_plain_json(
     ),
     loop_count=st.integers(min_value=0, max_value=8),
 )
-def test_notebook_target_summaries_are_finite_plain_and_preserve_periods(
-    notebook_name: str,
+def test_target_summaries_are_finite_plain_and_preserve_periods(
     period_ids: list[str],
     design_vector: list[float],
     selected: float,
@@ -164,7 +153,6 @@ def test_notebook_target_summaries_are_finite_plain_and_preserve_periods(
     objective: float,
     loop_count: int,
 ) -> None:
-    summarize = _notebook_function(notebook_name, "summarize_hpr_target")
     weights = [1.0 / len(period_ids)] * len(period_ids)
     target = SimpleNamespace(
         hpr_cycle="single-stage",
@@ -179,9 +167,10 @@ def test_notebook_target_summaries_are_finite_plain_and_preserve_periods(
         ),
     )
 
-    result = summarize("generated target", target)
+    result = hpr_summary(target, "generated target")
 
     assert json.loads(json.dumps(result)) == result
+    assert result["name"] == "generated target"
     assert result["status"] == "feasible"
     assert result["period_ids"] == period_ids
     assert set(result["period_ids"]) == {"turndown", "base", "peak"}
@@ -203,11 +192,7 @@ def test_notebook_target_summaries_are_finite_plain_and_preserve_periods(
 def test_notebook_09_optional_status_vocabulary_is_distinct() -> None:
     namespace = _notebook_functions(
         "09_vapour_compression_and_brayton.ipynb",
-        (
-            "summarize_hpr_target",
-            "summarize_hpr_failure",
-            "screen_optional_hpr",
-        ),
+        ("screen_optional_hpr",),
     )
     screen = namespace["screen_optional_hpr"]
 

@@ -65,12 +65,6 @@ _SAMPLE_CASE_METADATA: dict[str, SampleCaseMetadata] = {
         description="Multiperiod refinery case for period-specific targeting.",
         topics=("multiperiod", "refinery"),
     ),
-    "heat_pump_targeting.json": SampleCaseMetadata(
-        name="heat_pump_targeting.json",
-        title="Heat Pump Targeting",
-        description="Focused case for direct and indirect heat-pump workflows.",
-        topics=("heat pump",),
-    ),
     "pulp_mill.json": SampleCaseMetadata(
         name="pulp_mill.json",
         title="Pulp Mill",
@@ -101,103 +95,6 @@ _SAMPLE_CASE_METADATA: dict[str, SampleCaseMetadata] = {
         description="Classic four-stream heat-exchanger-network synthesis benchmark.",
         topics=("synthesis", "benchmark"),
     ),
-}
-
-
-_NOTEBOOK_CATALOG = (
-    (
-        "01_first_solve_and_core_curves.ipynb",
-        "First Solve and Core Curves",
-        ("quickstart", "plots"),
-    ),
-    (
-        "02_focused_direct_and_total_site.ipynb",
-        "Focused Direct and Total Site",
-        ("direct", "total site"),
-    ),
-    ("03_multisegment_streams.ipynb", "Multi-Segment Streams", ("streams", "segments")),
-    (
-        "04_workspace_cases_and_scenarios.ipynb",
-        "Workspace Cases and Scenarios",
-        ("workspace", "cases"),
-    ),
-    (
-        "05_workspace_persistence.ipynb",
-        "Workspace Data and Persistence",
-        ("workspace", "persistence"),
-    ),
-    (
-        "06_multiperiod_heat_integration.ipynb",
-        "Multiperiod Heat Integration",
-        ("multiperiod", "targets"),
-    ),
-    (
-        "07_area_cost_and_exergy.ipynb",
-        "Area Cost and Exergy",
-        ("area", "cost", "exergy"),
-    ),
-    (
-        "08_carnot_heat_pump_and_refrigeration.ipynb",
-        "Carnot Heat Pump and Refrigeration",
-        ("heat pump", "refrigeration"),
-    ),
-    (
-        "09_vapour_compression_and_brayton.ipynb",
-        "Vapour Compression and Brayton HPR",
-        ("heat pump", "Brayton"),
-    ),
-    (
-        "10_multiperiod_heat_pumps.ipynb",
-        "Multiperiod Heat Pumps",
-        ("multiperiod", "heat pump"),
-    ),
-    (
-        "11_process_mvr_and_cascade.ipynb",
-        "Process MVR and VC Cascade",
-        ("MVR", "components"),
-    ),
-    ("12_cogeneration.ipynb", "Cogeneration", ("cogeneration",)),
-    (
-        "13_multiperiod_cogeneration.ipynb",
-        "Multiperiod Cogeneration",
-        ("multiperiod", "cogeneration"),
-    ),
-    ("14_energy_transfer.ipynb", "Energy Transfer", ("energy transfer", "plots")),
-    (
-        "15_hen_synthesis_and_selection.ipynb",
-        "HEN Synthesis and Selection",
-        ("HEN", "synthesis"),
-    ),
-    (
-        "16_advanced_hen_methods.ipynb",
-        "Advanced HEN Methods",
-        ("HEN", "advanced design"),
-    ),
-    (
-        "17_multiperiod_hen_synthesis.ipynb",
-        "Multiperiod HEN Synthesis",
-        ("multiperiod", "HEN"),
-    ),
-    (
-        "18_results_plots_reports_exports.ipynb",
-        "Results, Plots, Reports, and Exports",
-        ("results", "exports"),
-    ),
-    (
-        "19_utility_placement_optimisation.ipynb",
-        "Utility Placement Optimisation",
-        ("utility placement", "thermodynamic cost"),
-    ),
-)
-
-_NOTEBOOK_METADATA: dict[str, NotebookMetadata] = {
-    name: NotebookMetadata(
-        name=name,
-        title=title,
-        description=f"Process-engineer tutorial for {title.lower()}.",
-        topics=topics,
-    )
-    for name, title, topics in _NOTEBOOK_CATALOG
 }
 
 
@@ -261,21 +158,30 @@ def sample_case_metadata(name: str | None = None):
     ]
 
 
+def _notebook_metadata(name: str) -> NotebookMetadata:
+    """Read one notebook's ``metadata["openpinch"]`` block."""
+    notebook = json.loads(_NOTEBOOK_ROOT.joinpath(name).read_text(encoding="utf-8"))
+    meta = notebook.get("metadata", {}).get("openpinch", {})
+    title = meta.get("title")
+    if title is None:
+        return NotebookMetadata(name=name, title=Path(name).stem, description="")
+    return NotebookMetadata(
+        name=name,
+        title=title,
+        description=f"Process-engineer tutorial for {title.lower()}.",
+        topics=tuple(meta.get("topics", ())),
+    )
+
+
 def notebook_metadata(name: str | None = None):
-    """Return metadata for one or all packaged notebooks."""
+    """Return metadata for one or all packaged notebooks.
+
+    Each notebook's ``metadata["openpinch"]`` block is the single source for
+    its title, topics, level, expected runtime, execution profile and extras.
+    """
     if name is not None:
-        _resolve_resource(name, list_notebooks(), "notebook")
-        return _NOTEBOOK_METADATA.get(
-            name,
-            NotebookMetadata(name=name, title=Path(name).stem, description=""),
-        )
-    return [
-        _NOTEBOOK_METADATA.get(
-            item,
-            NotebookMetadata(name=item, title=Path(item).stem, description=""),
-        )
-        for item in list_notebooks()
-    ]
+        return _notebook_metadata(_resolve_resource(name, list_notebooks(), "notebook"))
+    return [_notebook_metadata(item) for item in list_notebooks()]
 
 
 def read_sample_case(name: str) -> str:

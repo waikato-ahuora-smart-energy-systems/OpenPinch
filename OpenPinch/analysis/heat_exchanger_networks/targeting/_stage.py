@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from time import perf_counter
-from typing import Callable, Literal, Sequence
+from typing import Callable, Sequence
 
 from ....contracts.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
@@ -83,7 +83,7 @@ def build_seeded_quality_tasks(
     settings: SynthesisWorkflowSettings,
     seed_networks: Sequence[HeatExchangerNetwork],
     *,
-    method: Literal["thermal_derivative_method", "network_evolution_method"],
+    method: HeatExchangerNetworkDesignMethod,
     derivative_thresholds: Callable[[HeatExchangerNetwork], Sequence[float | None]],
     distinct_thresholds: bool,
 ) -> tuple[HeatExchangerNetworkSynthesisTask, ...]:

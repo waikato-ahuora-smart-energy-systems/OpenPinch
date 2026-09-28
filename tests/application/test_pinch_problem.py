@@ -1522,12 +1522,11 @@ def test_plot_accessor_shortcuts_select_all_named_graph_types(monkeypatch):
             ],
         }
     }
-    monkeypatch.setattr(
-        "OpenPinch.application.hpr_selection.select_hpr_graphs",
-        lambda *args, **kwargs: payload["Plant/All"]["graphs"],
-    )
     problem = SimpleNamespace(_results=SimpleNamespace(graphs=payload))
-    accessor = _PlotAccessor(problem)
+    accessor = _PlotAccessor(
+        problem,
+        select_hpr_graphs=lambda *args, **kwargs: payload["Plant/All"]["graphs"],
+    )
 
     assert accessor.shifted_composite_curve(return_graph_data=True)["name"] == "SCC"
     assert accessor.balanced_composite_curve(return_graph_data=True)["name"] == "BCC"

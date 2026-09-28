@@ -87,7 +87,7 @@ def _build_pathway_pinch_design_method_tasks(
                 tasks.append(
                     HeatExchangerNetworkSynthesisTask(
                         run_id=settings.run_id,
-                        method="pinch_design_method",
+                        method=HeatExchangerNetworkDesignMethod.PinchDesign,
                         approach_temperature=approach_temperature,
                         problem_id=settings.problem_id,
                         workspace_variant=settings.workspace_variant,
@@ -107,7 +107,7 @@ def _build_pathway_pinch_design_method_tasks(
         tasks.append(
             HeatExchangerNetworkSynthesisTask(
                 run_id=settings.run_id,
-                method="pinch_design_method",
+                method=HeatExchangerNetworkDesignMethod.PinchDesign,
                 approach_temperature=approach_temperature,
                 problem_id=settings.problem_id,
                 workspace_variant=settings.workspace_variant,
@@ -143,7 +143,7 @@ def _with_quality_pdm_tasks(
         quality_tasks.append(
             HeatExchangerNetworkSynthesisTask(
                 run_id=settings.run_id,
-                method="pinch_design_method",
+                method=HeatExchangerNetworkDesignMethod.PinchDesign,
                 approach_temperature=approach_temperature,
                 problem_id=settings.problem_id,
                 workspace_variant=settings.workspace_variant,
@@ -169,7 +169,7 @@ def _with_quality_pdm_tasks(
         quality_tasks.append(
             HeatExchangerNetworkSynthesisTask(
                 run_id=settings.run_id,
-                method="pinch_design_method",
+                method=HeatExchangerNetworkDesignMethod.PinchDesign,
                 approach_temperature=stage_pair_temperature,
                 problem_id=settings.problem_id,
                 workspace_variant=settings.workspace_variant,

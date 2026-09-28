@@ -251,23 +251,6 @@ def _map_interval_resistances_to_tdf(
     return Rh + Rc
 
 
-def _count_crossing(
-    T_low: float,
-    T_high: float,
-    streams: StreamCollection,
-    idx: int | None = None,
-):
-    """Count process streams intersecting interval ``[T_low, T_high]``."""
-    return int(
-        _count_crossing_ranges(
-            np.asarray([T_low], dtype=float),
-            np.asarray([T_high], dtype=float),
-            streams,
-            idx=idx,
-        )
-    )
-
-
 def _count_crossing_ranges(
     T_low: np.ndarray,
     T_high: np.ndarray,
@@ -290,23 +273,6 @@ def _count_crossing_ranges(
     return sum(
         int(np.unique(numeric.parent_index[crossings[:, interval]]).size)
         for interval in range(crossings.shape[1])
-    )
-
-
-def _count_utility_range_container(
-    T_low: float,
-    T_high: float,
-    utilities: StreamCollection,
-    idx: int | None = None,
-):
-    """Count utility streams intersecting interval ``[T_low, T_high]``."""
-    return int(
-        _count_utility_range_containers(
-            np.asarray([T_low], dtype=float),
-            np.asarray([T_high], dtype=float),
-            utilities,
-            idx=idx,
-        )
     )
 
 

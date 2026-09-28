@@ -5,30 +5,18 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from copy import copy
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-import numpy as np
 from pint.errors import PintError
 
-from ..analysis.targeting.cascade import get_process_heat_cascade
 from ..analysis.targeting.direct import (
-    _create_net_hot_and_cold_stream_collections_for_site_analysis,
     _prepare_direct_integration_profile,
     _prepare_utility_load_profile,
     _PreparedDirectIntegrationProfile,
     _PreparedUtilityLoadProfile,
-    _target_prepared_utility_load_profile_duties,
-)
-from ..analysis.targeting.indirect import (
-    _build_site_utility_profile,
-    _match_utility_gen_and_use_at_same_level,
-    _shift_site_process_profiles,
 )
 from ..analysis.utility_placement.allocation import (
     AllocationAdapterResult,
-    _build_stream,
-    _fallback_stream,
 )
 from ..analysis.utility_placement.context import (
     PlacementPeriodInput,
@@ -52,11 +40,17 @@ from ..analysis.utility_placement.profiles import (
     _load_profiles,
     _process_entropy_slices,
 )
+from ..analysis.utility_placement.replay import (
+    PreparedAggregateComposite,
+    allocate_from_aggregate_profiles,
+    allocation_result,
+    build_aggregate_composite,
+    placement_utility_collections,
+)
 from ..analysis.utility_placement.service import optimise_utility_placement
 from ..contracts.input import UtilitySchema
 from ..contracts.units import standardise_input_value
 from ..contracts.utility_placement import (
-    CandidateDiagnostic,
     DecodedPlacement,
     QuantityValue,
     TemplateBlueprintSet,
@@ -72,8 +66,6 @@ from ..domain._value.resolution import get_scalar_value
 from ..domain.configuration import C_to_K
 from ..domain.enums import ProblemTableLabel, StreamType, TargetType, ZoneType
 from ..domain.problem_table import ProblemTable
-from ..domain.stream import Stream
-from ..domain.stream_collection import StreamCollection
 from ..domain.zone import Zone
 from ._problem.input.construction import _find_extreme_process_temperatures
 from ._problem.input.utilities import (
@@ -88,15 +80,6 @@ if TYPE_CHECKING:
     from .problem import PinchProblem
 
 _FALLBACK_TEMPERATURE_MARGIN = 50.0
-
-
-@dataclass(frozen=True)
-class _PreparedAggregateComposite:
-    """Invariant Total Site process composite for one selected period."""
-
-    temperatures: tuple[float, ...]
-    hot_composite: tuple[float, ...]
-    cold_composite: tuple[float, ...]
 
 
 def _clone_zone_tree_for_target_replay(
@@ -923,80 +906,16 @@ class _ExactTargetReplayAdapter:
 
     def _prepare_aggregate_composites(
         self,
-    ) -> dict[str, _PreparedAggregateComposite]:
+    ) -> dict[str, PreparedAggregateComposite]:
         if self.request.base_target is UtilityPlacementBaseTarget.DIRECT:
             return {}
-        composites = {}
-        for period_id in self.request.period_ids:
-            net_hot_streams = StreamCollection()
-            net_cold_streams = StreamCollection()
-            for address in self._aggregate_profile_addresses():
-                profile = self._prepared_aggregate_profiles[(period_id, address)]
-                temperatures = profile.pt[ProblemTableLabel.T]
-                maximum_temperature = float(np.max(temperatures))
-                minimum_temperature = float(np.min(temperatures))
-                hot_utility = StreamCollection(
-                    [
-                        Stream(
-                            name="Cached hot coverage",
-                            supply_temperature=maximum_temperature + 1.0,
-                            target_temperature=maximum_temperature,
-                            heat_flow=profile.hot_utility_target,
-                            delta_t_contribution=0.0,
-                            is_process_stream=False,
-                        )
-                    ]
-                )
-                cold_utility = StreamCollection(
-                    [
-                        Stream(
-                            name="Cached cold coverage",
-                            supply_temperature=minimum_temperature - 1.0,
-                            target_temperature=minimum_temperature,
-                            heat_flow=profile.cold_utility_target,
-                            delta_t_contribution=0.0,
-                            is_process_stream=False,
-                        )
-                    ]
-                )
-                child_hot, child_cold = (
-                    _create_net_hot_and_cold_stream_collections_for_site_analysis(
-                        T_vals=temperatures,
-                        H_vals=profile.pt[ProblemTableLabel.H_NET_A],
-                        hot_utilities=hot_utility,
-                        cold_utilities=cold_utility,
-                        idx=None,
-                    )
-                )
-                for key, stream in child_hot.items():
-                    net_hot_streams.add(
-                        stream,
-                        key=f"{address}.{key}",
-                    )
-                for key, stream in child_cold.items():
-                    net_cold_streams.add(
-                        stream,
-                        key=f"{address}.{key}",
-                    )
-
-            pt = get_process_heat_cascade(
-                hot_streams=net_hot_streams,
-                cold_streams=net_cold_streams,
-                is_shifted=True,
+        return {
+            period_id: build_aggregate_composite(
+                (address, self._prepared_aggregate_profiles[(period_id, address)])
+                for address in self._aggregate_profile_addresses()
             )
-            pt.update(
-                **_shift_site_process_profiles(
-                    T_col=pt[ProblemTableLabel.T],
-                    H_hot=pt[ProblemTableLabel.H_HOT],
-                    H_cold=pt[ProblemTableLabel.H_COLD],
-                )
-            )
-            composites[period_id] = _PreparedAggregateComposite(
-                temperatures=_finite_tuple(pt[ProblemTableLabel.T]),
-                hot_composite=_finite_tuple(pt[ProblemTableLabel.H_HOT]),
-                cold_composite=_finite_tuple(pt[ProblemTableLabel.H_COLD]),
-            )
-        return composites
+            for period_id in self.request.period_ids
+        }
 
     def _candidate_utility_collections(
         self,
@@ -1016,38 +935,6 @@ class _ExactTargetReplayAdapter:
             prepared.get_hot_utility_streams(),
             prepared.get_cold_utility_streams(),
         )
-
-    @staticmethod
-    def _placement_utility_collections(
-        period: PlacementPeriodInput,
-        placement: DecodedPlacement,
-    ) -> tuple[StreamCollection, StreamCollection]:
-        limits = dict(period.maximum_duties)
-        hot = StreamCollection(
-            [
-                *(
-                    _build_stream(
-                        level,
-                        maximum_duty=limits.get(level.template_key.name),
-                    )
-                    for level in placement.hot
-                ),
-                _fallback_stream(period, UtilitySide.HOT),
-            ]
-        )
-        cold = StreamCollection(
-            [
-                *(
-                    _build_stream(
-                        level,
-                        maximum_duty=limits.get(level.template_key.name),
-                    )
-                    for level in placement.cold
-                ),
-                _fallback_stream(period, UtilitySide.COLD),
-            ]
-        )
-        return hot, cold
 
     def _candidate_problem(
         self,
@@ -1101,82 +988,6 @@ class _ExactTargetReplayAdapter:
             indirect_service_func=indirect_heat_integration_service,
         )
 
-    def _allocation_result(
-        self,
-        *,
-        hot_utilities,
-        cold_utilities,
-        period_idx: int | None,
-        placement: DecodedPlacement,
-        required_hot: float,
-        required_cold: float,
-        snapshot: PlacementTargetSnapshot,
-    ) -> AllocationAdapterResult:
-        def duty(utility) -> float:
-            return float(get_scalar_value(utility.heat_flow, period_idx=period_idx))
-
-        def temperature(utility, attribute: str) -> float:
-            return float(
-                get_scalar_value(
-                    getattr(utility, attribute),
-                    period_idx=period_idx,
-                )
-            )
-
-        hot_by_name = {utility.name: utility for utility in hot_utilities}
-        cold_by_name = {utility.name: utility for utility in cold_utilities}
-        hot_names = {level.template_key.name for level in placement.hot}
-        cold_names = {level.template_key.name for level in placement.cold}
-        hot_fallbacks = tuple(
-            utility
-            for utility in hot_utilities
-            if utility.name not in hot_names and duty(utility) > 0.0
-        )
-        cold_fallbacks = tuple(
-            utility
-            for utility in cold_utilities
-            if utility.name not in cold_names and duty(utility) > 0.0
-        )
-
-        def fallback_values(utilities, default_name: str):
-            if not utilities:
-                return default_name, 0.0, None, None
-            first = utilities[0]
-            return (
-                first.name,
-                math.fsum(duty(utility) for utility in utilities),
-                temperature(first, "supply_temperature"),
-                temperature(first, "target_temperature"),
-            )
-
-        hot_fallback = fallback_values(hot_fallbacks, "HU")
-        cold_fallback = fallback_values(cold_fallbacks, "CU")
-        return AllocationAdapterResult(
-            hot_duties=tuple(
-                duty(hot_by_name[level.template_key.name])
-                if level.template_key.name in hot_by_name
-                else 0.0
-                for level in placement.hot
-            ),
-            cold_duties=tuple(
-                duty(cold_by_name[level.template_key.name])
-                if level.template_key.name in cold_by_name
-                else 0.0
-                for level in placement.cold
-            ),
-            hot_fallback_name=hot_fallback[0],
-            hot_fallback_duty=hot_fallback[1],
-            hot_fallback_supply_temperature=hot_fallback[2],
-            hot_fallback_target_temperature=hot_fallback[3],
-            cold_fallback_name=cold_fallback[0],
-            cold_fallback_duty=cold_fallback[1],
-            cold_fallback_supply_temperature=cold_fallback[2],
-            cold_fallback_target_temperature=cold_fallback[3],
-            required_hot_duty=required_hot,
-            required_cold_duty=required_cold,
-            target_snapshot=snapshot,
-        )
-
     def _allocate_exact_target_replay(
         self,
         period: PlacementPeriodInput,
@@ -1198,7 +1009,7 @@ class _ExactTargetReplayAdapter:
             target,
         )
         period_idx = isolated.period_ids[period.period_id]
-        return self._allocation_result(
+        return allocation_result(
             hot_utilities=target.hot_utilities,
             cold_utilities=target.cold_utilities,
             period_idx=period_idx,
@@ -1213,128 +1024,14 @@ class _ExactTargetReplayAdapter:
         period: PlacementPeriodInput,
         placement: DecodedPlacement,
     ) -> AllocationAdapterResult:
-        hot_base, cold_base = self._placement_utility_collections(period, placement)
-        period_idx = None
-        aggregate_hot = hot_base.copy(deep=True).set_common_stream_attribute(
-            "heat_flow",
-            0.0,
-            idx=period_idx,
-        )
-        aggregate_cold = cold_base.copy(deep=True).set_common_stream_attribute(
-            "heat_flow",
-            0.0,
-            idx=period_idx,
-        )
-        hot_totals = [0.0] * len(aggregate_hot)
-        cold_totals = [0.0] * len(aggregate_cold)
-
-        def duty(utility) -> float:
-            return float(get_scalar_value(utility.heat_flow, period_idx=period_idx))
-
-        try:
-            for address in self._aggregate_profile_addresses():
-                targeted_hot, targeted_cold = (
-                    _target_prepared_utility_load_profile_duties(
-                        self._prepared_aggregate_profiles[(period.period_id, address)],
-                        hot_utilities=hot_base,
-                        cold_utilities=cold_base,
-                        period_idx=period_idx,
-                    )
-                )
-                for totals, targeted in (
-                    (hot_totals, targeted_hot),
-                    (cold_totals, targeted_cold),
-                ):
-                    for index, utility_duty in enumerate(targeted):
-                        totals[index] += utility_duty
-
-            for aggregate, totals in (
-                (aggregate_hot, hot_totals),
-                (aggregate_cold, cold_totals),
-            ):
-                for utility, total in zip(aggregate, totals, strict=True):
-                    if total > 0.0:
-                        utility.set_value_attr_at_idx(
-                            "heat_flow",
-                            total,
-                            idx=period_idx,
-                        )
-
-            profile = _build_site_utility_profile(
-                hot_utilities=aggregate_hot,
-                cold_utilities=aggregate_cold,
-                is_shifted=False,
-                idx=period_idx,
-            )
-            net_utility = np.asarray(
-                profile["updates"][ProblemTableLabel.H_NET_UT],
-                dtype=float,
-            )
-            sugcc = ProblemTable(
-                {
-                    ProblemTableLabel.T: np.asarray(profile["T_col"], dtype=float),
-                    ProblemTableLabel.H_NET_UT: net_utility,
-                }
-            )
-            temperatures = np.asarray(sugcc[ProblemTableLabel.T], dtype=float)
-            net_utility = np.asarray(
-                sugcc[ProblemTableLabel.H_NET_UT],
-                dtype=float,
-            )
-            required_hot = float(net_utility[0])
-            required_cold = float(net_utility[-1])
-            hot_profile, cold_profile = _load_profiles(
-                sugcc,
-                net_label=ProblemTableLabel.H_NET_UT,
-            )
-            hot_profile = _calibrate_profile(
-                hot_profile,
-                residual_duty=required_hot,
-            )
-            cold_profile = _calibrate_profile(
-                cold_profile,
-                residual_duty=required_cold,
-            )
-            hot_pinch, cold_pinch, *_ = sugcc.pinch_idx(ProblemTableLabel.H_NET_UT)
-        except (ArithmeticError, ValueError) as exc:
-            return AllocationAdapterResult(
-                hot_duties=(0.0,) * len(placement.hot),
-                cold_duties=(0.0,) * len(placement.cold),
-                diagnostics=(
-                    CandidateDiagnostic(
-                        code="targeting_infeasible",
-                        constraint="utility_allocation",
-                        message=str(exc) or "Utility allocation is infeasible.",
-                        period_id=period.period_id,
-                    ),
-                ),
-            )
-
-        matched_hot, matched_cold = _match_utility_gen_and_use_at_same_level(
-            hot_utilities=aggregate_hot,
-            cold_utilities=aggregate_cold,
-            period_idx=period_idx,
-        )
-        composite = self._prepared_aggregate_composites[period.period_id]
-        snapshot = PlacementTargetSnapshot(
-            shifted_temperatures=tuple(float(value) for value in temperatures),
-            real_temperatures=composite.temperatures,
-            hot_load_profile=hot_profile,
-            cold_load_profile=cold_profile,
-            real_hot_composite=composite.hot_composite,
-            real_cold_composite=composite.cold_composite,
-            hot_pinch_index=int(hot_pinch),
-            cold_pinch_index=int(cold_pinch),
-            entropy_slices=period.snapshot.entropy_slices,
-        )
-        return self._allocation_result(
-            hot_utilities=matched_hot,
-            cold_utilities=matched_cold,
-            period_idx=period_idx,
-            placement=placement,
-            required_hot=required_hot,
-            required_cold=required_cold,
-            snapshot=snapshot,
+        return allocate_from_aggregate_profiles(
+            period,
+            placement,
+            (
+                self._prepared_aggregate_profiles[(period.period_id, address)]
+                for address in self._aggregate_profile_addresses()
+            ),
+            self._prepared_aggregate_composites[period.period_id],
         )
 
     def allocate(
@@ -1539,10 +1236,10 @@ class _ResidualAllocationAdapter(_ExactTargetReplayAdapter):
     def allocate(self, period, placement):
         from ..analysis.targeting.residual import allocate_residual_utilities
 
-        hot, cold = self._placement_utility_collections(period, placement)
+        hot, cold = placement_utility_collections(period, placement)
         hot, cold = allocate_residual_utilities(self.data, hot, cold)
         snapshot, required_hot, required_cold = _residual_placement_snapshot(self.data)
-        return self._allocation_result(
+        return allocation_result(
             hot_utilities=hot,
             cold_utilities=cold,
             period_idx=0,

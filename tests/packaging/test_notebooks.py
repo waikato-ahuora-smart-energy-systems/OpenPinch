@@ -5,6 +5,8 @@ from __future__ import annotations
 import ast
 import csv
 import json
+import re
+import tomllib
 from pathlib import Path
 
 import nbformat
@@ -34,6 +36,7 @@ ALLOWED_SPECIALIST_IMPORTS = frozenset(
     {
         "OpenPinch.contracts.hpr",
         "OpenPinch.contracts.hpr_performance_map",
+        "OpenPinch.presentation.reporting.hpr",
     }
 )
 
@@ -308,6 +311,42 @@ def test_notebooks_are_valid_nbformat_documents(tmp_path: Path) -> None:
             assert heading in markdown_text, (name, heading)
 
 
+def _openpinch_metadata(name: str) -> dict:
+    notebook = _load_notebook(ROOT / "OpenPinch" / "tutorials" / "notebooks" / name)
+    return notebook["metadata"]["openpinch"]
+
+
+def test_notebook_metadata_is_the_single_source_for_intro_and_docs() -> None:
+    extras = set(
+        tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"][
+            "optional-dependencies"
+        ]
+    )
+    series = (ROOT / "docs" / "examples" / "notebook-series.rst").read_text(
+        encoding="utf-8"
+    )
+    manifest_profiles = {
+        row["primary_tutorial"]: row["execution_profile"] for row in _manifest_rows()
+    }
+    for name in EXPECTED_NOTEBOOKS:
+        meta = _openpinch_metadata(name)
+        assert manifest_profiles[name] == meta["profile"], name
+        notebook = _load_notebook(ROOT / "OpenPinch" / "tutorials" / "notebooks" / name)
+        intro = "".join(notebook["cells"][0]["source"])
+        assert intro.startswith(f"# {meta['title']}\n"), name
+        assert f"**Level:** {meta['level']}" in intro, name
+        assert f"**Execution profile:** `{meta['profile']}`" in intro, name
+        assert f"**Expected runtime:** {meta['expected_runtime']}" in intro, name
+        assert set(meta["optional_extras"]) <= extras, name
+        for extra in meta["optional_extras"]:
+            assert f"`{extra}`" in intro, (name, extra)
+        assert notebook_metadata(name).title == meta["title"], name
+        entry = re.search(
+            rf"``{re.escape(name)}`` --.*?\(``([a-z-]+)``\)", series, re.S
+        )
+        assert entry is not None and entry.group(1) == meta["profile"], name
+
+
 def _assert_review_contract(name: str, notebook: dict) -> None:
     cells = notebook["cells"]
     review_indices = [
@@ -440,7 +479,7 @@ def test_notebook_09_required_coolprop_calls_fail_loudly_and_are_bounded() -> No
     assert source.count("screen_optional_hpr(") == 4
     assert '"optional dependency unavailable"' in source
     assert '"method unavailable"' in source
-    assert '"typed infeasible"' in source
+    assert "return hpr_failure_summary(error)" in source
     assert "except Exception" not in source
 
 
@@ -468,7 +507,7 @@ def test_notebook_10_uses_five_isolated_scalar_shared_designs() -> None:
     assert source.count(".target.mvr_heat_pump(") == 1
     assert 'EXPECTED_PERIODS = {"turndown", "base", "peak"}' in source
     assert "assert set(details.period_ids) == EXPECTED_PERIODS" in source
-    assert "summarize_hpr_failure" in source
+    assert "hpr_failure_summary(error)" in source
     assert "except HPRTargetingError as error" in source
     assert "except Exception" not in source
 

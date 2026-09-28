@@ -6,6 +6,10 @@ import numpy as np
 import pytest
 
 import OpenPinch.analysis.heat_pumps.cycles.parallel_vapour_compression_cycles as parallel_mod
+from OpenPinch.analysis.heat_pumps.common.encoding import (
+    DutyAllocationRequest,
+    StageDutyRequest,
+)
 from OpenPinch.analysis.heat_pumps.cycles.parallel_vapour_compression_cycles import (
     ParallelVapourCompressionCycles,
 )
@@ -57,12 +61,11 @@ def test_parallel_refrigeration_mode_allocates_cooling_base_duty():
         n_cycles=1,
         Q_heat=np.array([5.0]),
         Q_cool=None,
-        Q_heat_base=None,
-        x_heat_split=None,
-        Q_heat_available=None,
-        Q_cool_base=20.0,
-        x_cool_split=np.array([1.0]),
-        Q_cool_available=np.array([15.0]),
+        duty_allocation=DutyAllocationRequest(
+            cool=StageDutyRequest(
+                Q_base=20.0, x_split=np.array([1.0]), Q_available=np.array([15.0])
+            )
+        ),
         is_heat_pump=False,
     )
 
@@ -603,9 +606,13 @@ def test_parallel_solve_clips_base_split_duties_before_child_cycles(monkeypatch)
         T_cond=np.array([60.0, 55.0]),
         dtcont=0.0,
         refrigerant=["water"],
-        Q_heat_base=200.0,
-        x_heat_split=np.array([0.75, 1.0]),
-        Q_heat_available=np.array([100.0, 60.0]),
+        duty_allocation=DutyAllocationRequest(
+            heat=StageDutyRequest(
+                Q_base=200.0,
+                x_split=np.array([0.75, 1.0]),
+                Q_available=np.array([100.0, 60.0]),
+            )
+        ),
         Q_cool=np.array([None, None]),
         is_heat_pump=True,
     )

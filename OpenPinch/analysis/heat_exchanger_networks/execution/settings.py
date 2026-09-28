@@ -60,11 +60,11 @@ class SynthesisWorkflowSettings:
 
     def solver_for(self, method: HeatExchangerNetworkDesignMethod | None) -> str | None:
         """Return the configured solver name for one workflow method."""
-        if method == "pinch_design_method":
+        if method == HeatExchangerNetworkDesignMethod.PinchDesign:
             return self.pdm_solver
-        if method == "thermal_derivative_method":
+        if method == HeatExchangerNetworkDesignMethod.ThermalDerivative:
             return self.tdm_solver
-        if method == "network_evolution_method":
+        if method == HeatExchangerNetworkDesignMethod.NetworkEvolution:
             return self.evm_solver
         return None
 
@@ -72,11 +72,11 @@ class SynthesisWorkflowSettings:
         self, method: HeatExchangerNetworkDesignMethod | None
     ) -> dict[str, Any]:
         """Return user-provided solver options for one workflow method."""
-        if method == "pinch_design_method":
+        if method == HeatExchangerNetworkDesignMethod.PinchDesign:
             return dict(self.pdm_solver_options)
-        if method == "thermal_derivative_method":
+        if method == HeatExchangerNetworkDesignMethod.ThermalDerivative:
             return dict(self.tdm_solver_options)
-        if method == "network_evolution_method":
+        if method == HeatExchangerNetworkDesignMethod.NetworkEvolution:
             return dict(self.evm_solver_options)
         return {}
 

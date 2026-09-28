@@ -8,7 +8,7 @@ import numpy as np
 
 from ....domain.stream import Stream
 from ....domain.stream_collection import StreamCollection
-from ..common.encoding import require_stage_duty_allocation
+from ..common.encoding import DutyAllocationRequest
 from .mechanical_vapour_recompression_cycle import MechanicalVapourRecompressionCycle
 from .vapour_compression_cycle import VapourCompressionCycle
 
@@ -218,9 +218,7 @@ class VapourCompressionMvrCascade:
         Q_heat_vc: np.ndarray | None = None,
         mvr_source_split: float = 0.0,
         mvr_process_split: np.ndarray | float | None = None,
-        Q_heat_base: float | None = None,
-        x_heat_split: np.ndarray | None = None,
-        Q_heat_available: np.ndarray | None = None,
+        duty_allocation: DutyAllocationRequest | None = None,
         dT_subcool_vc: np.ndarray | float = 0.0,
         dT_subcool_mvr: np.ndarray | float = 0.0,
         dT_ihx_gas_side_vc: np.ndarray | float = 0.0,
@@ -232,7 +230,11 @@ class VapourCompressionMvrCascade:
         dt_cascade_hx: float = 0.0,
         dtcont: float = 0.0,
     ) -> float:
-        """Solve the VC+MVR cascade for serial MVR lift and split variables."""
+        """Solve the VC+MVR cascade for serial MVR lift and split variables.
+
+        A heat-side ``duty_allocation`` overrides ``Q_heat_vc``; its cool side
+        is ignored.
+        """
         self._solved = False
         self._vc_cycles = []
         self._mvr_cycles = []
@@ -241,19 +243,15 @@ class VapourCompressionMvrCascade:
 
         T_evap_vc = np.asarray(T_evap_vc, dtype=float).reshape(-1)
         T_cond_vc = np.asarray(T_cond_vc, dtype=float).reshape(-1)
-        if Q_heat_base is not None:
-            allocation = require_stage_duty_allocation(
-                Q_base=Q_heat_base,
-                x_split=x_heat_split,
-                Q_available=Q_heat_available,
-                duty_name="heat",
-            )
+        heat_duty = (duty_allocation or DutyAllocationRequest()).heat
+        if heat_duty.Q_base is not None:
+            allocation = heat_duty.allocate("heat")
             Q_heat_vc = allocation.Q_model
             self._penalty.extend(self._as_penalty_list(allocation.Q_excess))
         else:
             if Q_heat_vc is None:
                 raise ValueError(
-                    "Either Q_heat_vc or Q_heat_base/x_heat_split must be provided."
+                    "Either Q_heat_vc or a heat-side duty allocation must be provided."
                 )
             Q_heat_vc = np.asarray(Q_heat_vc, dtype=float).reshape(-1)
         dT_lift_mvr = np.asarray(dT_lift_mvr, dtype=float).reshape(-1)

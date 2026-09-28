@@ -91,7 +91,7 @@ def test_residual_rejects_ignored_topology_and_shared_hpr(solved_hpr, change):
 def test_residual_detachment_preserves_period_capacity_and_fluid_metadata(
     period_id, limit
 ):
-    source = PinchProblem("heat_pump_targeting.json").to_problem_json()
+    source = PinchProblem("basic_pinch.json").to_problem_json()
     source["options"].update(PROBLEM_PERIOD_IDS=["base", "peak"])
     utility = source["utilities"][0]
     utility.update(

@@ -37,13 +37,7 @@ LAYER_ALLOWED_ROOTS = {
     },
     "presentation": {"adapters", "analysis", "contracts", "domain", "presentation"},
 }
-LAYER_BOUNDARY_EXCEPTIONS = {
-    "analysis/heat_exchanger_networks/context.py": {"application"},
-    "analysis/heat_exchanger_networks/service.py": {"application"},
-    "analysis/heat_pumps/components.py": {"application"},
-    "analysis/heat_pumps/process_mvr.py": {"application"},
-    "presentation/graphs/problem.py": {"application"},
-}
+LAYER_BOUNDARY_EXCEPTIONS: dict[str, set[str]] = {}
 OWNER_PACKAGE_MARKERS = {
     "OpenPinch",
     *(f"OpenPinch.{owner}" for owner in LAYER_ALLOWED_ROOTS),
