@@ -1,12 +1,16 @@
 """Additional coverage tests for config and enum helpers."""
 
+import dataclasses
 import json
 
 import pytest
 
 import OpenPinch.domain.enums as enums
 from OpenPinch.domain.configuration import Configuration
-from OpenPinch.domain.configuration_fields import configuration_option_status
+from OpenPinch.domain.configuration_fields import (
+    CONFIG_FIELD_SPECS,
+    configuration_option_status,
+)
 from OpenPinch.domain.enums import HeatPumpAndRefrigerationCycle, TargetType, ZoneType
 from OpenPinch.presentation.configuration import configuration_options
 from tests.support.paths import FIXTURES_ROOT
@@ -228,3 +232,22 @@ def test_configuration_builds_two_layer_runtime_config_from_flat_options():
     assert not hasattr(cfg, "PROBLEM_TOP_ZONE_IDENTIFIER")
     assert not hasattr(cfg, "THERMAL_DT_CONT")
     assert not hasattr(cfg, "THERMAL_DT_PHASE_CHANGE")
+
+
+def test_configuration_groups_are_typed_dataclasses_matching_field_table():
+    cfg = Configuration()
+    groups = {spec.config_path[0] for spec in CONFIG_FIELD_SPECS.values()}
+
+    for group in groups:
+        group_obj = getattr(cfg, group)
+        assert dataclasses.is_dataclass(group_obj)
+        assert [field.name for field in dataclasses.fields(group_obj)] == [
+            spec.config_path[1]
+            for spec in CONFIG_FIELD_SPECS.values()
+            if spec.config_path[0] == group
+        ]
+
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        cfg.hpr.n_cond = 4
+    cfg.thermal.dt_cont = 7.0
+    assert cfg.thermal.dt_cont == 7.0
