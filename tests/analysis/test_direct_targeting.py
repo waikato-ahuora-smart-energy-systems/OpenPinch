@@ -18,12 +18,21 @@ from OpenPinch.analysis.targeting.direct import (
     build_area_cost_target_data,
     should_update_balanced_composite_curves,
 )
-from OpenPinch.analysis.targeting.utilities import _assign_utility
+from OpenPinch.analysis.targeting.utilities import (
+    _apply_utility_duties,
+    _calculate_assigned_utility_duties,
+)
 from OpenPinch.domain.configuration import tol
 from OpenPinch.domain.enums import GraphType, ProblemTableLabel, ZoneType
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream import Stream
 from OpenPinch.domain.stream_collection import StreamCollection
+
+
+def _assign_utility(**kwargs):
+    """Assign utility duties in place, as targeting does."""
+    duties = _calculate_assigned_utility_duties(**kwargs)
+    return _apply_utility_duties(kwargs["u_ls"], duties, idx=kwargs["idx"])
 
 
 def _prepared_profile_source(
@@ -109,12 +118,16 @@ def _cached_utility_duties(source: dict):
         zone,
         raw_profile,
     )
-    hot_utilities, cold_utilities = direct._target_prepared_utility_load_profile(
+    hot_utilities = deepcopy(zone.hot_utilities)
+    cold_utilities = deepcopy(zone.cold_utilities)
+    hot_duties, cold_duties = direct._target_prepared_utility_load_profile_duties(
         load_profile,
-        hot_utilities=deepcopy(zone.hot_utilities),
-        cold_utilities=deepcopy(zone.cold_utilities),
+        hot_utilities=hot_utilities,
+        cold_utilities=cold_utilities,
         period_idx=0,
     )
+    hot_utilities = _apply_utility_duties(hot_utilities, hot_duties, idx=0)
+    cold_utilities = _apply_utility_duties(cold_utilities, cold_duties, idx=0)
     fresh = direct.compute_direct_integration_targets(
         deepcopy(zone),
         {"period_id": "0"},

@@ -7,9 +7,7 @@ import pytest
 
 import OpenPinch.analysis.targeting.area_cost as area_targeting
 from OpenPinch.analysis.targeting.area_cost import (
-    _count_crossing,
     _count_crossing_ranges,
-    _count_utility_range_container,
     _count_utility_range_containers,
     _map_interval_resistances_to_tdf,
     get_area_targets,
@@ -314,8 +312,9 @@ def test_area_targeting_private_interval_helpers_cover_empty_and_scalar_paths():
         )
     )
 
-    assert _count_crossing(300.0, 400.0, streams) == 1
-    assert _count_utility_range_container(300.0, 400.0, utilities) == 1
+    one_interval = (np.asarray([300.0]), np.asarray([400.0]))
+    assert _count_crossing_ranges(*one_interval, streams) == 1
+    assert _count_utility_range_containers(*one_interval, utilities) == 1
     assert (
         _count_crossing_ranges(
             np.array([], dtype=float),

@@ -179,28 +179,6 @@ def _calculate_utility_duties_for_load_profiles(
     return hot_duties, cold_duties
 
 
-def _assign_utility(
-    T_vals: np.ndarray,
-    H_vals: np.ndarray,
-    u_ls: StreamCollection,
-    pinch_row: int,
-    is_hot_ut: bool,
-    is_real_temperatures: bool,
-    idx: int | None,
-) -> StreamCollection:
-    """Assigns utility heat duties based on vertical heat transfer across a pinch."""
-    duties = _calculate_assigned_utility_duties(
-        T_vals=T_vals,
-        H_vals=H_vals,
-        u_ls=u_ls,
-        pinch_row=pinch_row,
-        is_hot_ut=is_hot_ut,
-        is_real_temperatures=is_real_temperatures,
-        idx=idx,
-    )
-    return _apply_utility_duties(u_ls, duties, idx=idx)
-
-
 def _apply_utility_duties(
     utilities: StreamCollection,
     duties: tuple[float, ...],

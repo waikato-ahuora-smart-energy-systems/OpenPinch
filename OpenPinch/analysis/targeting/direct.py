@@ -36,7 +36,6 @@ from .grand_composite import (
 from .utilities import (
     _calculate_utility_duties_for_load_profiles,
     get_utility_targets,
-    target_utilities_for_load_profiles,
 )
 
 __all__ = ["compute_direct_integration_targets"]
@@ -231,41 +230,6 @@ def _prepare_utility_load_profile(
         cold_utility_target=float(
             prepared_profile.zonal_targets["cold_utility_target"]
         ),
-    )
-
-
-def _target_prepared_utility_load_profile(
-    prepared_profile: _PreparedUtilityLoadProfile,
-    *,
-    hot_utilities: StreamCollection,
-    cold_utilities: StreamCollection,
-    period_idx: int | None,
-) -> tuple[StreamCollection, StreamCollection]:
-    """Target fresh utilities after interpolating their candidate endpoints."""
-    pt = deepcopy(prepared_profile.pt)
-    _insert_utility_temperature_intervals(
-        pt,
-        hot_utilities + cold_utilities,
-        is_shifted=True,
-        period_idx=period_idx,
-    )
-    pt.update(
-        **get_seperated_gcc_heat_load_profiles(
-            T_col=pt[ProblemTableLabel.T],
-            H_net=pt[ProblemTableLabel.H_NET_A],
-            is_process_stream=True,
-        )
-    )
-    hot_pinch, cold_pinch, *_ = pt.pinch_idx(ProblemTableLabel.H_NET_A)
-    return target_utilities_for_load_profiles(
-        hot_utilities=hot_utilities,
-        cold_utilities=cold_utilities,
-        T_vals=pt[ProblemTableLabel.T],
-        H_net_cold=pt[ProblemTableLabel.H_NET_COLD],
-        H_net_hot=pt[ProblemTableLabel.H_NET_HOT],
-        pinch_idx=(hot_pinch, cold_pinch),
-        is_real_temperatures=False,
-        idx=period_idx,
     )
 
 
