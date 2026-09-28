@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from ...analysis.numerics import get_period_index
 from ...domain.stream import Stream
@@ -20,15 +20,12 @@ from ._process_mvr.selection import (
 )
 from ._process_mvr.state import _ProcessMVRStreamRecord
 from ._process_mvr.work import work_for_zone as calculate_work_for_zone
-from .components import ProcessComponent
+from .components import ProcessComponent, ProcessComponentHost
 from .direct_mvr.execution import coerce_positive_mvr_stage_count
 from .direct_mvr.models import (
     DirectGasMVRSettings,
     DirectGasMVRStageResult,
 )
-
-if TYPE_CHECKING:
-    from ...application.problem import PinchProblem
 
 
 @dataclass
@@ -105,7 +102,7 @@ class ProcessMVRComponent(ProcessComponent):
 
 
 def create_process_mvr_component(
-    problem: "PinchProblem",
+    problem: ProcessComponentHost,
     *,
     source_streams,
     mvr_id: str | None = None,
@@ -181,7 +178,9 @@ def create_process_mvr_component(
     return component
 
 
-def _resolve_component_id(problem: "PinchProblem", requested_id: str | None) -> str:
+def _resolve_component_id(
+    problem: ProcessComponentHost, requested_id: str | None
+) -> str:
     if requested_id:
         component_id = str(requested_id)
         if component_id in problem.process_components:

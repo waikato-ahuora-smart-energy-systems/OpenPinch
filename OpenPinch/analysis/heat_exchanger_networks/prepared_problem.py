@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from ...contracts.output import TargetOutput
@@ -28,4 +28,18 @@ class PreparedProblem(Protocol):
     def project_name(self) -> str: ...
 
 
-__all__ = ["PreparedProblem"]
+@runtime_checkable
+class SynthesisProblem(PreparedProblem, Protocol):
+    """A :class:`PreparedProblem` that HEN synthesis can also target and update.
+
+    The synthesis services run direct heat integration through ``target`` when
+    no targets are cached, and store the accepted design in ``_results``.
+    """
+
+    _results: TargetOutput | None
+
+    @property
+    def target(self) -> Any: ...
+
+
+__all__ = ["PreparedProblem", "SynthesisProblem"]

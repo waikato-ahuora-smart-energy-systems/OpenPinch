@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import inspect
+import json
 from pathlib import Path
 
 from OpenPinch import PinchProblem, PinchWorkspace
@@ -29,41 +30,17 @@ from OpenPinch.presentation.graphs.problem import _PlotAccessor
 ROOT = Path(__file__).resolve().parents[1]
 DESTINATION = ROOT / "docs" / "_data" / "tutorial-coverage.csv"
 
-NOTEBOOK_PROFILES = {
-    **{index: "base" for index in range(1, 8)},
-    8: "slow-hpr",
-    9: "slow-hpr",
-    10: "slow-hpr",
-    11: "slow-hpr",
-    12: "base",
-    13: "base",
-    14: "base",
-    15: "solver",
-    16: "solver",
-    17: "solver",
-    18: "interactive",
-    19: "base",
-}
+NOTEBOOK_DIR = ROOT / "OpenPinch" / "tutorials" / "notebooks"
+# Tutorial number -> file name and execution profile, read from each
+# notebook's metadata["openpinch"] block (the single source for both).
 NOTEBOOKS = {
-    1: "01_first_solve_and_core_curves.ipynb",
-    2: "02_focused_direct_and_total_site.ipynb",
-    3: "03_multisegment_streams.ipynb",
-    4: "04_workspace_cases_and_scenarios.ipynb",
-    5: "05_workspace_persistence.ipynb",
-    6: "06_multiperiod_heat_integration.ipynb",
-    7: "07_area_cost_and_exergy.ipynb",
-    8: "08_carnot_heat_pump_and_refrigeration.ipynb",
-    9: "09_vapour_compression_and_brayton.ipynb",
-    10: "10_multiperiod_heat_pumps.ipynb",
-    11: "11_process_mvr_and_cascade.ipynb",
-    12: "12_cogeneration.ipynb",
-    13: "13_multiperiod_cogeneration.ipynb",
-    14: "14_energy_transfer.ipynb",
-    15: "15_hen_synthesis_and_selection.ipynb",
-    16: "16_advanced_hen_methods.ipynb",
-    17: "17_multiperiod_hen_synthesis.ipynb",
-    18: "18_results_plots_reports_exports.ipynb",
-    19: "19_utility_placement_optimisation.ipynb",
+    int(path.name[:2]): path.name for path in sorted(NOTEBOOK_DIR.glob("*.ipynb"))
+}
+NOTEBOOK_PROFILES = {
+    number: json.loads((NOTEBOOK_DIR / name).read_text(encoding="utf-8"))["metadata"][
+        "openpinch"
+    ]["profile"]
+    for number, name in NOTEBOOKS.items()
 }
 
 TARGET_TUTORIALS = {

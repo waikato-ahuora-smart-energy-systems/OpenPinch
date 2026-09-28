@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from .._base import approach as _approach
 from .._base import piecewise as _piecewise
 
 
@@ -127,7 +128,7 @@ def set_preprocessing(owner) -> None:
                         abs(owner.T_h_out_period[n][i] - owner.T_c_in_period[n][j]),
                         abs(owner.T_h_out_period[n][i] - owner.T_c_out_period[n][j]),
                     )
-                    + owner._recovery_approach_temperature(i, j, n)
+                    + _approach._recovery_approach_temperature(owner, i, j, n)
                     for j in range(owner.J)
                 ]
                 for i in range(owner.I)

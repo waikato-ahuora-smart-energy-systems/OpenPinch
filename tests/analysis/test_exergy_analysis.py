@@ -40,10 +40,7 @@ def _make_problem_table(columns: dict) -> ProblemTable:
 
 
 def _base_config() -> Configuration:
-    config = Configuration()
-    config.environment.temperature = 15.0
-    config.thermal.dt_cont = 10.0
-    return config
+    return Configuration({"ENV_TEMPERATURE": 15.0, "THERMAL_DT_CONT": 10.0})
 
 
 def _di_problem_table() -> ProblemTable:

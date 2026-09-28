@@ -9,6 +9,7 @@ from ....contracts.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
+from ....domain.enums import HeatExchangerNetworkDesignMethod
 from .settings import SynthesisWorkflowSettings
 from .task_builders import _successful_method
 
@@ -21,7 +22,7 @@ def _can_skip_derivative_stage_for_missing_couenne(
     if settings.tdm_solver != "couenne" or not tdm_tasks or not tdm_outcomes:
         return False
     if any(
-        _successful_method(outcome, "thermal_derivative_method")
+        _successful_method(outcome, HeatExchangerNetworkDesignMethod.ThermalDerivative)
         for outcome in tdm_outcomes
     ):
         return False
@@ -36,7 +37,8 @@ def _can_skip_preliminary_stages_for_missing_couenne(
     if settings.pdm_solver != "couenne" or not pdm_tasks or not pdm_outcomes:
         return False
     if any(
-        _successful_method(outcome, "pinch_design_method") for outcome in pdm_outcomes
+        _successful_method(outcome, HeatExchangerNetworkDesignMethod.PinchDesign)
+        for outcome in pdm_outcomes
     ):
         return False
     return all(_missing_couenne_failure(outcome) for outcome in pdm_outcomes)
@@ -44,8 +46,8 @@ def _can_skip_preliminary_stages_for_missing_couenne(
 
 def _missing_couenne_failure(outcome: HeatExchangerNetworkSynthesisTaskOutcome) -> bool:
     if outcome.status == "success" or outcome.task.method not in {
-        "pinch_design_method",
-        "thermal_derivative_method",
+        HeatExchangerNetworkDesignMethod.PinchDesign,
+        HeatExchangerNetworkDesignMethod.ThermalDerivative,
     }:
         return False
     error = outcome.error or ""

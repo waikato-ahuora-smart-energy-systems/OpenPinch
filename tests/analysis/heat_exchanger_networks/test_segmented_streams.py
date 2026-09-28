@@ -10,6 +10,9 @@ from hypothesis import strategies as st
 from OpenPinch.analysis.heat_exchanger_networks.extraction.service import (
     extract_heat_exchanger_network,
 )
+from OpenPinch.analysis.heat_exchanger_networks.models._base.approach import (
+    _utility_outlet_temperature_contribution,
+)
 from OpenPinch.analysis.heat_exchanger_networks.models._stagewise.verification import (
     _check_area_costs,
 )
@@ -271,8 +274,8 @@ def test_flat_utility_dt_cont_keeps_scalar_contribution():
     model.T_hu_cont_period = arrays.arrays["T_hu_cont_period"]
     model.T_cu_cont_period = arrays.arrays["T_cu_cont_period"]
 
-    assert model._utility_outlet_temperature_contribution("hot", 0, 0, 25.0) == 5.0
-    assert model._utility_outlet_temperature_contribution("cold", 0, 0, 25.0) == 5.0
+    assert _utility_outlet_temperature_contribution(model, "hot", 0, 0, 25.0) == 5.0
+    assert _utility_outlet_temperature_contribution(model, "cold", 0, 0, 25.0) == 5.0
 
 
 def test_segmented_utility_dt_cont_mapping_is_built_into_stagewise_constraints():

@@ -93,7 +93,8 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                 [
                     (
                         owner.m.Var(
-                            value=owner._recovery_approach_temperature(
+                            value=_approach._recovery_approach_temperature(
+                                owner,
                                 i,
                                 j,
                                 n,
@@ -101,7 +102,8 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                             ub=abs(
                                 owner.T_h_in_period[n][i] - owner.T_c_in_period[n][j]
                             ),
-                            lb=owner._recovery_approach_temperature(
+                            lb=_approach._recovery_approach_temperature(
+                                owner,
                                 i,
                                 j,
                                 n,
@@ -110,7 +112,8 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                         )
                         if owner.z_allowed[i][j][k] > 0
                         else owner.m.Param(
-                            value=owner._recovery_approach_temperature(
+                            value=_approach._recovery_approach_temperature(
+                                owner,
                                 i,
                                 j,
                                 n,
@@ -132,7 +135,8 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                 [
                     (
                         owner.m.Var(
-                            value=owner._recovery_approach_temperature(
+                            value=_approach._recovery_approach_temperature(
+                                owner,
                                 i,
                                 j,
                                 n,
@@ -140,7 +144,8 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                             ub=abs(
                                 owner.T_h_in_period[n][i] - owner.T_c_in_period[n][j]
                             ),
-                            lb=owner._recovery_approach_temperature(
+                            lb=_approach._recovery_approach_temperature(
+                                owner,
                                 i,
                                 j,
                                 n,
@@ -149,7 +154,8 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                         )
                         if owner.z_allowed[i][j][k] > 0
                         else owner.m.Param(
-                            value=owner._recovery_approach_temperature(
+                            value=_approach._recovery_approach_temperature(
+                                owner,
                                 i,
                                 j,
                                 n,

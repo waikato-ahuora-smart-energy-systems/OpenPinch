@@ -15,5 +15,6 @@ class _PlotAccessorDescriptor:
         if obj is None:
             return self
         from ....presentation.graphs.problem import _PlotAccessor
+        from ...hpr_selection import select_hpr_graphs
 
-        return _PlotAccessor(obj)
+        return _PlotAccessor(obj, select_hpr_graphs=select_hpr_graphs)

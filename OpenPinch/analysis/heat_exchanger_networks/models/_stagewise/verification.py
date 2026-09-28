@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import math
 
+from .._base import costing as _costing
+
 
 def verify(owner) -> tuple[bool, list[str]]:
     """Run the source solution checks used by topology evolution."""
@@ -143,7 +145,8 @@ def _check_utility_costs(
         return float(prices[period_index][0]) * duty
 
     if hasattr(case, "Q_h_by_period"):
-        post_hot_utility = case._weighted_numeric_average(
+        post_hot_utility = _costing._weighted_numeric_average(
+            case,
             [
                 utility_cost(
                     "hot",
@@ -151,9 +154,10 @@ def _check_utility_costs(
                     sum(_value(case.Q_h_by_period[n][j]) for j in range(case.J)),
                 )
                 for n in range(case.N_periods)
-            ]
+            ],
         )
-        post_cold_utility = case._weighted_numeric_average(
+        post_cold_utility = _costing._weighted_numeric_average(
+            case,
             [
                 utility_cost(
                     "cold",
@@ -161,7 +165,7 @@ def _check_utility_costs(
                     sum(_value(case.Q_c_by_period[n][i]) for i in range(case.I)),
                 )
                 for n in range(case.N_periods)
-            ]
+            ],
         )
     else:
         hot_duty = sum(case.Q_h[j][0] for j in range(case.J))

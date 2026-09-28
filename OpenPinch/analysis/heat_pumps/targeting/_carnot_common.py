@@ -27,6 +27,7 @@ from ....contracts.hpr import (
 from ..common._shared.streams import get_Q_vals_at_T_hpr_from_bckgrd_profile
 from ..common.encoding import (
     AMBIENT_X_BOUNDS,
+    DutyAllocationRequest,
     encode_duty_splits,
     map_x_arr_to_T_arr,
     map_x_to_Q_amb,
@@ -159,10 +160,7 @@ def compute_carnot_objective(
     cycle.solve(
         T_cond=state_vars.T_cond,
         T_evap=state_vars.T_evap,
-        Q_heat_base=state_vars.Q_heat_base,
-        x_heat_split=state_vars.x_heat_split,
-        Q_heat_available=state_vars.Q_heat_available,
-        Q_cool_available=state_vars.Q_cool_available,
+        duty_allocation=DutyAllocationRequest.from_state(state_vars),
         eta_ii_hpr_carnot=args.eta_ii_hpr_carnot,
         eta_ii_he_carnot=args.eta_ii_he_carnot,
         args=args,

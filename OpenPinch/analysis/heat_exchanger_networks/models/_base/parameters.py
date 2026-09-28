@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from . import approach as _approach
+
 
 def set_blank_input_parameters(model) -> None:
     """Initialize the solver-array attributes expected by source equations."""
@@ -56,8 +58,8 @@ def get_model_parameters_from_solver_arrays(model) -> None:
 
     for name, values in model.solver_arrays.arrays.items():
         setattr(model, name, np.array(values, copy=True))
-    model._normalise_state_arrays()
-    model._set_minimum_approach_temperatures()
+    _normalise_state_arrays(model)
+    _approach._set_minimum_approach_temperatures(model)
 
 
 def _normalise_state_arrays(model) -> None:

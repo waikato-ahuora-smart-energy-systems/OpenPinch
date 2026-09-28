@@ -6,7 +6,11 @@ import pytest
 from OpenPinch.analysis.heat_pumps.common._shared.streams import (
     get_Q_vals_at_T_hpr_from_bckgrd_profile,
 )
-from OpenPinch.analysis.heat_pumps.common.encoding import encode_duty_splits
+from OpenPinch.analysis.heat_pumps.common.encoding import (
+    DutyAllocationRequest,
+    StageDutyRequest,
+    encode_duty_splits,
+)
 from OpenPinch.analysis.heat_pumps.cycles.carnot_cycles import ParallelCarnotCycles
 from OpenPinch.analysis.heat_pumps.targeting.parallel_carnot import (
     _compute_parallel_carnot_hp_opt_obj,
@@ -52,10 +56,14 @@ def test_parallel_carnot_cycle_positive_lift_uses_absolute_temperatures():
     cycle.solve(
         T_cond=np.array([80.0]),
         T_evap=np.array([20.0]),
-        Q_heat_base=float(Q_heat_available.sum()),
-        x_heat_split=encode_duty_splits(Q_heat_available, Q_heat_available.sum()),
-        Q_heat_available=Q_heat_available,
-        Q_cool_available=np.array([200.0]),
+        duty_allocation=DutyAllocationRequest(
+            heat=StageDutyRequest(
+                Q_base=float(Q_heat_available.sum()),
+                x_split=encode_duty_splits(Q_heat_available, Q_heat_available.sum()),
+                Q_available=Q_heat_available,
+            ),
+            cool=StageDutyRequest(Q_available=np.array([200.0])),
+        ),
         eta_ii_hpr_carnot=args.eta_ii_hpr_carnot,
         eta_ii_he_carnot=args.eta_ii_he_carnot,
         args=args,
@@ -86,10 +94,12 @@ def test_parallel_carnot_rejects_mismatched_stage_arrays():
         cycle.solve(
             T_cond=np.array([80.0]),
             T_evap=np.array([20.0, 10.0]),
-            Q_heat_base=100.0,
-            x_heat_split=np.array([1.0]),
-            Q_heat_available=np.array([100.0]),
-            Q_cool_available=np.array([100.0, 50.0]),
+            duty_allocation=DutyAllocationRequest(
+                heat=StageDutyRequest(
+                    Q_base=100.0, x_split=np.array([1.0]), Q_available=np.array([100.0])
+                ),
+                cool=StageDutyRequest(Q_available=np.array([100.0, 50.0])),
+            ),
             eta_ii_hpr_carnot=args.eta_ii_hpr_carnot,
             eta_ii_he_carnot=args.eta_ii_he_carnot,
             args=args,
@@ -98,10 +108,12 @@ def test_parallel_carnot_rejects_mismatched_stage_arrays():
         cycle.solve(
             T_cond=np.array([80.0]),
             T_evap=np.array([20.0]),
-            Q_heat_base=100.0,
-            x_heat_split=np.array([1.0]),
-            Q_heat_available=np.array([100.0]),
-            Q_cool_available=np.array([100.0, 50.0]),
+            duty_allocation=DutyAllocationRequest(
+                heat=StageDutyRequest(
+                    Q_base=100.0, x_split=np.array([1.0]), Q_available=np.array([100.0])
+                ),
+                cool=StageDutyRequest(Q_available=np.array([100.0, 50.0])),
+            ),
             eta_ii_hpr_carnot=args.eta_ii_hpr_carnot,
             eta_ii_he_carnot=args.eta_ii_he_carnot,
             args=args,
@@ -130,10 +142,14 @@ def test_parallel_carnot_cycle_uses_per_stage_pools():
     cycle.solve(
         T_cond=T_cond,
         T_evap=T_evap,
-        Q_heat_base=float(Q_heat_available.sum()),
-        x_heat_split=encode_duty_splits(Q_heat_available, Q_heat_available.sum()),
-        Q_heat_available=Q_heat_available,
-        Q_cool_available=Q_cool_available,
+        duty_allocation=DutyAllocationRequest(
+            heat=StageDutyRequest(
+                Q_base=float(Q_heat_available.sum()),
+                x_split=encode_duty_splits(Q_heat_available, Q_heat_available.sum()),
+                Q_available=Q_heat_available,
+            ),
+            cool=StageDutyRequest(Q_available=Q_cool_available),
+        ),
         eta_ii_hpr_carnot=args.eta_ii_hpr_carnot,
         eta_ii_he_carnot=args.eta_ii_he_carnot,
         args=args,

@@ -5,6 +5,13 @@ The packaged series teaches the public :class:`OpenPinch.PinchProblem` and
 :class:`OpenPinch.PinchWorkspace` experience. Code cells use package-root
 imports, contain no stored outputs, and declare one honest execution profile.
 
+Every notebook follows the same lifecycle: prepare the study, run one named
+engineering method, then inspect the cached results. Observation cells read
+results only and never launch analysis. Arguments on a method call apply to
+that analysis; stored configuration is only the fallback when an argument is
+omitted. The sample data ships with OpenPinch, so the notebooks run without path
+setup; read the named inputs and assumptions before substituting plant data.
+
 Core and Intermediate
 ---------------------
 
@@ -58,7 +65,7 @@ HEN Design and Publication
 19. ``19_utility_placement_optimisation.ipynb`` -- entropy-based placement of
     four temperature-coupled isothermal hot/cold utility levels (no sensible
     levels) at Process and Site scope, replacement in a new case, and standard
-    GCC and Total Site Profile plots (``base`` with ``plot``).
+    GCC and Total Site Profile plots (``base``).
 
 Copy the Series
 ---------------

@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import numpy as np
 
+from . import approach as _approach
+from . import execution as _execution
+
 
 def _register_piecewise_mapping(model, mapping) -> None:
     if mapping is not None:
@@ -102,7 +105,7 @@ def _utility_cost_value(
 def _update_piecewise_active_segments(model) -> bool:
     changed = False
     for mapping in model._piecewise_active_mappings:
-        coordinate = model._solver_value(mapping["heat_coordinate"])
+        coordinate = _execution._solver_value(model, mapping["heat_coordinate"])
         segment_index_at_heat = mapping.get(
             "segment_index_at_heat",
             mapping["profile"].segment_index_at_heat,
@@ -111,7 +114,9 @@ def _update_piecewise_active_segments(model) -> bool:
         if next_segment == mapping["active_segment"]:
             continue
         for index, selector in enumerate(mapping["selectors"]):
-            model._set_value(selector, 1.0 if index == next_segment else 0.0)
+            _execution._set_value(
+                model, selector, 1.0 if index == next_segment else 0.0
+            )
         mapping["active_segment"] = next_segment
         changed = True
     return changed
@@ -442,7 +447,9 @@ def _recovery_heat_upper_bound(
     temperature_span = max(
         model.T_h_in_period[period_index][hot_index]
         - model.T_c_in_period[period_index][cold_index]
-        - model._recovery_approach_temperature(hot_index, cold_index, period_index),
+        - _approach._recovery_approach_temperature(
+            model, hot_index, cold_index, period_index
+        ),
         0.0,
     )
     if _solver_parent_is_segmented(

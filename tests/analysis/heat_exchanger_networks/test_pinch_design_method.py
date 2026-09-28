@@ -49,6 +49,24 @@ from OpenPinch.analysis.heat_exchanger_networks.extraction import (
 from OpenPinch.analysis.heat_exchanger_networks.extraction.service import (
     extract_heat_exchanger_network,
 )
+from OpenPinch.analysis.heat_exchanger_networks.models._base import (
+    approach as base_approach,
+)
+from OpenPinch.analysis.heat_exchanger_networks.models._base.approach import (
+    _weighted_state_average,
+)
+from OpenPinch.analysis.heat_exchanger_networks.models._pinch_design.amalgamation import (
+    _copy_recovery_match,
+)
+from OpenPinch.analysis.heat_exchanger_networks.models._pinch_design.preprocessing import (
+    _set_multiperiod_preprocessing,
+)
+from OpenPinch.analysis.heat_exchanger_networks.models._stagewise import (
+    evolution as stagewise_evolution,
+)
+from OpenPinch.analysis.heat_exchanger_networks.models._stagewise.evolution import (
+    _select_best_candidate,
+)
 from OpenPinch.analysis.heat_exchanger_networks.models.pinch_decomposition import (
     PinchDecompModel,
 )
@@ -612,9 +630,9 @@ def test_stagewise_evolution_candidate_selection_and_match_ranking() -> None:
     minus = _CandidateModel(mSuccess=1, TAC=90.0)
     plus = _CandidateModel(mSuccess=1, TAC=80.0)
 
-    assert model._select_best_candidate(model, minus, plus) is plus
-    assert model._select_best_candidate(model, minus, failed) is minus
-    assert model._select_best_candidate(model, failed, failed) is None
+    assert _select_best_candidate(model, model, minus, plus) is plus
+    assert _select_best_candidate(model, model, minus, failed) is minus
+    assert _select_best_candidate(model, model, failed, failed) is None
 
     ranking_model = StageWiseModel.__new__(StageWiseModel)
     ranking_model.I = 1
@@ -645,7 +663,9 @@ def test_stagewise_evolution_candidate_selection_and_match_ranking() -> None:
     ]
 
 
-def test_stagewise_source_evolution_solves_one_add_and_one_remove_candidate() -> None:
+def test_stagewise_source_evolution_solves_one_add_and_one_remove_candidate(
+    monkeypatch,
+) -> None:
     model = _branching_root_model(
         rm_candidates=((0, 0, 0), (0, 0, 1)),
         add_candidates=((0, 0, 2), (0, 0, 3)),
@@ -668,8 +688,7 @@ def test_stagewise_source_evolution_solves_one_add_and_one_remove_candidate() ->
             z=kwargs["z_allowed_added"],
         )
 
-    model._build_and_solve_n_minus_one_evolution = solve_minus
-    model._build_and_solve_n_plus_one_evolution = solve_plus
+    _patch_evolution_children(monkeypatch, minus=solve_minus, plus=solve_plus)
 
     model.get_net_benefit_evolution(print_output=False, max_depth=1)
 
@@ -677,7 +696,9 @@ def test_stagewise_source_evolution_solves_one_add_and_one_remove_candidate() ->
     assert model.updated_with == "minus"
 
 
-def test_stagewise_evolution_branch_frontier_selects_best_global_tac() -> None:
+def test_stagewise_evolution_branch_frontier_selects_best_global_tac(
+    monkeypatch,
+) -> None:
     model = _branching_root_model(
         rm_candidates=((0, 0, 0), (0, 0, 1)),
         add_candidates=((0, 0, 2), (0, 0, 3)),
@@ -717,8 +738,7 @@ def test_stagewise_evolution_branch_frontier_selects_best_global_tac() -> None:
             z=kwargs["z_allowed_added"],
         )
 
-    model._build_and_solve_n_minus_one_evolution = solve_minus
-    model._build_and_solve_n_plus_one_evolution = solve_plus
+    _patch_evolution_children(monkeypatch, minus=solve_minus, plus=solve_plus)
 
     model.get_net_benefit_evolution(
         print_output=False,
@@ -737,7 +757,7 @@ def test_stagewise_evolution_branch_frontier_selects_best_global_tac() -> None:
     assert model.updated_with == "plus-branch-best"
 
 
-def test_stagewise_evolution_failed_child_does_not_stop_siblings() -> None:
+def test_stagewise_evolution_failed_child_does_not_stop_siblings(monkeypatch) -> None:
     model = _branching_root_model(
         rm_candidates=((0, 0, 0),),
         add_candidates=((0, 0, 2),),
@@ -756,8 +776,7 @@ def test_stagewise_evolution_failed_child_does_not_stop_siblings() -> None:
             z=kwargs["z_allowed_added"],
         )
 
-    model._build_and_solve_n_minus_one_evolution = solve_minus
-    model._build_and_solve_n_plus_one_evolution = solve_plus
+    _patch_evolution_children(monkeypatch, minus=solve_minus, plus=solve_plus)
 
     model.get_net_benefit_evolution(
         print_output=False,
@@ -989,7 +1008,7 @@ def test_stagewise_multiperiod_cost_objective_uses_shared_topology_and_area() ->
     assert hasattr(model, "area_r_shared")
     assert hasattr(model, "capital_cost_total")
     assert hasattr(model, "weighted_operating_cost")
-    assert model._weighted_state_average([10.0, 20.0]) == pytest.approx(17.5)
+    assert _weighted_state_average(model, [10.0, 20.0]) == pytest.approx(17.5)
 
 
 def test_internal_problem_loads_pdm_and_stagewise_with_parent_context() -> None:
@@ -2349,12 +2368,23 @@ def _branching_root_model(
     model.get_max_benefit_HX_candidates = lambda limit: [
         list(position) for position in add_candidates[:limit]
     ]
-    model._update_with_best_model = lambda best: setattr(
-        model,
-        "updated_with",
-        best.name,
-    )
     return model
+
+
+def _patch_evolution_children(monkeypatch, *, minus, plus) -> None:
+    """Route evolution child builds and the best-model update to test doubles."""
+
+    def build(owner, kind, *, z_allowed, **kwargs):
+        if kind == "minus":
+            return minus(**kwargs, z_allowed_removed=z_allowed)
+        return plus(**kwargs, z_allowed_added=z_allowed)
+
+    monkeypatch.setattr(stagewise_evolution, "_build_and_solve_evolution", build)
+    monkeypatch.setattr(
+        stagewise_evolution,
+        "_update_with_best_model",
+        lambda owner, best: setattr(owner, "updated_with", best.name),
+    )
 
 
 class _RecordingStageWise:
@@ -2874,9 +2904,9 @@ def test_pinch_decomp_calculate_pinch_keeps_period_targets_and_later_side_need()
     assert model.side_required is True
 
 
-def test_pinch_decomp_below_preprocessing_handles_inactive_streams_and_manual_stages() -> (
-    None
-):
+def test_pinch_decomp_below_preprocessing_handles_inactive_streams_and_manual_stages(
+    monkeypatch,
+) -> None:
     model = PinchDecompModel.__new__(PinchDecompModel)
     model.pinch_loc = "below"
     model.pinch_decomposition = SimpleNamespace(
@@ -2904,9 +2934,13 @@ def test_pinch_decomp_below_preprocessing_handles_inactive_streams_and_manual_st
     model.htc_hu_period = np.array([[5.0]])
     model.htc_cu_period = np.array([[6.0]])
     model.tol = 1e-6
-    model._recovery_approach_temperature = lambda i, j, n: 10.0
+    monkeypatch.setattr(
+        base_approach,
+        "_recovery_approach_temperature",
+        lambda model, i, j, n=0: 10.0,
+    )
 
-    model._set_multiperiod_preprocessing()
+    _set_multiperiod_preprocessing(model)
 
     assert model.S == 3
     assert model.K == 4
@@ -2920,7 +2954,9 @@ def test_pinch_decomp_below_preprocessing_handles_inactive_streams_and_manual_st
     assert model.z_cu_feasible == [1, 0]
 
 
-def test_pinch_decomp_non_integer_superstructure_builds_param_binaries() -> None:
+def test_pinch_decomp_non_integer_superstructure_builds_param_binaries(
+    monkeypatch,
+) -> None:
     model = PinchDecompModel.__new__(PinchDecompModel)
     model.m = _AlgebraModel()
     model.N_periods = 1
@@ -2954,7 +2990,11 @@ def test_pinch_decomp_non_integer_superstructure_builds_param_binaries() -> None
     model.T_cu_in_period = np.array([[280.0]])
     model.T_cu_out_period = np.array([[300.0]])
     model.dTmin = 10.0
-    model._recovery_approach_temperature = lambda i, j, n: 10.0
+    monkeypatch.setattr(
+        base_approach,
+        "_recovery_approach_temperature",
+        lambda model, i, j, n=0: 10.0,
+    )
 
     model._set_multiperiod_stage_wise_superstructure()
 
@@ -2989,7 +3029,8 @@ def test_pinch_decomp_set_obj_covers_remaining_objective_modes(
     model.Q_c_by_period = [[3.0]]
     model.Q_r_by_period = [[[[4.0]]]]
     model.z = [[[1.0]]]
-    model._weighted_state_average = lambda values: sum(values) / len(values)
+    model.period_weights = [1.0]
+    model.period_weight_sum = 1.0
 
     model.set_obj()
 
@@ -3036,7 +3077,7 @@ def test_pinch_decomp_post_process_skips_failed_model_and_copy_helpers_cover_sha
     )
     copier = PinchDecompModel.__new__(PinchDecompModel)
 
-    copier._copy_recovery_match(target, source, 0, 0, 0, 0)
+    _copy_recovery_match(copier, target, source, 0, 0, 0, 0)
 
     assert target.z[0][0][0][0] == 1.0
     assert target.Q_r_by_period[0][0][0][0][0] == 12.0
@@ -3067,7 +3108,7 @@ def test_pinch_decomp_post_process_skips_failed_model_and_copy_helpers_cover_sha
         T_c_out_y_by_period=[[[[_ValueCell(0.0)]]]],
     )
 
-    copier._copy_recovery_match(non_iso_target, non_iso_source, 0, 0, 0, 0)
+    _copy_recovery_match(copier, non_iso_target, non_iso_source, 0, 0, 0, 0)
 
     assert non_iso_target.Q_r_by_period[0][0][0][0][0] == 10.0
     assert non_iso_target.X_by_period[0][0][0][0][0] == 1.0

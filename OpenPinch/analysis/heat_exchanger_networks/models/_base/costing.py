@@ -19,17 +19,17 @@ def set_period_totals_and_costs(owner, q_h, q_c, q_r) -> None:
         )
         for n in range(owner.N_periods)
     ]
-    owner.Q_hu_total = owner._weighted_numeric_average(owner.Q_hu_total_by_period)
-    owner.Q_cu_total = owner._weighted_numeric_average(owner.Q_cu_total_by_period)
-    owner.Q_r_total = owner._weighted_numeric_average(owner.Q_r_total_by_period)
+    owner.Q_hu_total = _weighted_numeric_average(owner, owner.Q_hu_total_by_period)
+    owner.Q_cu_total = _weighted_numeric_average(owner, owner.Q_cu_total_by_period)
+    owner.Q_r_total = _weighted_numeric_average(owner, owner.Q_r_total_by_period)
 
     owner.operating_cost_by_period = [
         owner._utility_cost_value("hot", n, owner.Q_hu_total_by_period[n])
         + owner._utility_cost_value("cold", n, owner.Q_cu_total_by_period[n])
         for n in range(owner.N_periods)
     ]
-    owner.weighted_operating_cost_value = owner._weighted_numeric_average(
-        owner.operating_cost_by_period
+    owner.weighted_operating_cost_value = _weighted_numeric_average(
+        owner, owner.operating_cost_by_period
     )
     owner.capital_cost_value = (
         owner.unit_cost[0] * owner.n_units
@@ -45,17 +45,19 @@ def set_period_totals_and_costs(owner, q_h, q_c, q_r) -> None:
         + owner.cu_coeff[0]
         * sum(owner.area_cu[i] ** owner.cu_exp[0] for i in range(owner.I))
     )
-    owner.hu_cost_total = owner._weighted_numeric_average(
+    owner.hu_cost_total = _weighted_numeric_average(
+        owner,
         [
             owner._utility_cost_value("hot", n, owner.Q_hu_total_by_period[n])
             for n in range(owner.N_periods)
-        ]
+        ],
     )
-    owner.cu_cost_total = owner._weighted_numeric_average(
+    owner.cu_cost_total = _weighted_numeric_average(
+        owner,
         [
             owner._utility_cost_value("cold", n, owner.Q_cu_total_by_period[n])
             for n in range(owner.N_periods)
-        ]
+        ],
     )
     owner.recovery_area_cost_total = owner.A_coeff[0] * sum(
         owner.area_r[i][j][k] ** owner.A_exp[0]

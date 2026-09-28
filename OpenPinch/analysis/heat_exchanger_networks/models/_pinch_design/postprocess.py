@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...indexing import build_index_grid
+from .._base import approach as _approach
 from .._base import area as _area
 from .._base.costing import set_period_totals_and_costs
 from .._stagewise.verification import _value as _scalar_value
@@ -70,7 +71,7 @@ def _get_multiperiod_post_process(owner) -> None:
         n: int, i: int, j: int, hot_stage: int, cold_stage: int
     ) -> list[float]:
         if owner.z[i][j][cold_stage][0] <= 0:
-            return [owner._recovery_approach_temperature(i, j, n)]
+            return [_approach._recovery_approach_temperature(owner, i, j, n)]
         return [
             owner._active_binary_value(owner.T_h_by_period[n][i][hot_stage])
             - owner._active_binary_value(owner.T_c_by_period[n][j][hot_stage])
@@ -88,14 +89,15 @@ def _get_multiperiod_post_process(owner) -> None:
     owner.theta_2 = owner.theta_2_by_period[0]
 
     owner.LMTD_r_by_period = build_index_grid(
-        lambda n, i, j, k: owner._post_process_lmtd(
+        lambda n, i, j, k: _area._post_process_lmtd(
+            owner,
             owner.theta_1_by_period[n][i][j][k][0],
             owner.theta_2_by_period[n][i][j][k][0],
             owner.z[i][j][k][0],
             formula_allowed=_lmtd_formula_allowed(
                 owner.theta_1_by_period[n][i][j][k][0],
                 owner.theta_2_by_period[n][i][j][k][0],
-                owner._recovery_approach_temperature(i, j, n),
+                _approach._recovery_approach_temperature(owner, i, j, n),
                 owner.tol,
             ),
         ),
@@ -120,7 +122,8 @@ def _get_multiperiod_post_process(owner) -> None:
     _area._apply_segment_recovery_areas(owner, q_r)
 
     owner.LMTD_hu_by_period = build_index_grid(
-        lambda n, j: owner._post_process_lmtd(
+        lambda n, j: _area._post_process_lmtd(
+            owner,
             owner.T_hu_in_period[n][0] - owner.T_c_out_period[n][j],
             owner._utility_solved_outlet_temperature("hot", n, j, q_h[n][j])
             - owner._active_binary_value(owner.T_c_by_period[n][j][0]),
@@ -129,9 +132,11 @@ def _get_multiperiod_post_process(owner) -> None:
                 owner.T_hu_in_period[n][0] - owner.T_c_out_period[n][j],
                 owner._utility_solved_outlet_temperature("hot", n, j, q_h[n][j])
                 - owner._active_binary_value(owner.T_c_by_period[n][j][0]),
-                owner._hot_utility_inlet_approach_temperature(j, n),
+                _approach._hot_utility_inlet_approach_temperature(owner, j, n),
                 owner.tol,
-                owner._hot_utility_outlet_approach_temperature(j, n, q_h[n][j]),
+                _approach._hot_utility_outlet_approach_temperature(
+                    owner, j, n, q_h[n][j]
+                ),
             ),
         ),
         (owner.N_periods, owner.J),
@@ -147,7 +152,8 @@ def _get_multiperiod_post_process(owner) -> None:
     )
 
     owner.LMTD_cu_by_period = build_index_grid(
-        lambda n, i: owner._post_process_lmtd(
+        lambda n, i: _area._post_process_lmtd(
+            owner,
             owner._active_binary_value(owner.T_h_by_period[n][i][owner.S])
             - owner._utility_solved_outlet_temperature("cold", n, i, q_c[n][i]),
             owner.T_h_out_period[n][i] - owner.T_cu_in_period[n][0],
@@ -156,9 +162,11 @@ def _get_multiperiod_post_process(owner) -> None:
                 owner._active_binary_value(owner.T_h_by_period[n][i][owner.S])
                 - owner._utility_solved_outlet_temperature("cold", n, i, q_c[n][i]),
                 owner.T_h_out_period[n][i] - owner.T_cu_in_period[n][0],
-                owner._cold_utility_outlet_approach_temperature(i, n, q_c[n][i]),
+                _approach._cold_utility_outlet_approach_temperature(
+                    owner, i, n, q_c[n][i]
+                ),
                 owner.tol,
-                owner._cold_utility_inlet_approach_temperature(i, n),
+                _approach._cold_utility_inlet_approach_temperature(owner, i, n),
             ),
             fallback_delta=(owner.T_h_out_period[n][i] - owner.T_cu_in_period[n][0]),
         ),

@@ -14,6 +14,25 @@ from OpenPinch.analysis.heat_exchanger_networks.models._base import alpha as bas
 from OpenPinch.analysis.heat_exchanger_networks.models._base import (
     execution as base_execution,
 )
+from OpenPinch.analysis.heat_exchanger_networks.models._base.approach import (
+    _cold_utility_inlet_approach_temperature,
+    _cold_utility_outlet_approach_temperature,
+    _hot_utility_inlet_approach_temperature,
+    _hot_utility_outlet_approach_temperature,
+    _recovery_approach_temperature,
+    _set_minimum_approach_temperatures,
+    _weighted_state_average,
+)
+from OpenPinch.analysis.heat_exchanger_networks.models._base.area import (
+    _post_process_lmtd,
+)
+from OpenPinch.analysis.heat_exchanger_networks.models._base.execution import (
+    _set_value,
+    _solver_value,
+)
+from OpenPinch.analysis.heat_exchanger_networks.models._base.parameters import (
+    _normalise_state_arrays,
+)
 from OpenPinch.analysis.heat_exchanger_networks.solver import backend
 
 
@@ -236,26 +255,28 @@ def test_constructor_configures_backend_and_runs_concrete_setup(monkeypatch):
 def test_base_model_scalar_helpers_and_value_assignment():
     model = _model()
 
-    assert model._solver_value([3.5]) == pytest.approx(3.5)
-    assert model._solver_value(4.5) == pytest.approx(4.5)
+    assert _solver_value(model, [3.5]) == pytest.approx(3.5)
+    assert _solver_value(model, 4.5) == pytest.approx(4.5)
 
     variable = GKVariable(lower=0.0, upper=10.0)
-    model._set_value(variable, 99.0)
+    _set_value(model, variable, 99.0)
     assert variable.VALUE.value == pytest.approx(10.0)
-    model._set_value(variable, -99.0, brackets=True)
+    _set_value(model, variable, -99.0, brackets=True)
     assert variable.VALUE.value == [0.0]
 
     parameter = GKParameter()
-    model._set_value(parameter, 7.0, brackets=True)
+    _set_value(model, parameter, 7.0, brackets=True)
     assert parameter.VALUE.value == [7.0]
 
-    assert model._post_process_lmtd(
+    assert _post_process_lmtd(
+        model,
         20.0,
         10.0,
         0.5,
         formula_allowed=False,
     ) == pytest.approx(10.0)
-    assert model._post_process_lmtd(
+    assert _post_process_lmtd(
+        model,
         20.0,
         10.0,
         0.5,
@@ -263,7 +284,8 @@ def test_base_model_scalar_helpers_and_value_assignment():
         fallback_delta=8.0,
     ) == pytest.approx(4.0)
     assert (
-        model._post_process_lmtd(
+        _post_process_lmtd(
+            model,
             20.0,
             10.0,
             0.5,
@@ -370,27 +392,27 @@ def test_blank_and_solver_array_state_helpers_validate_static_arrays():
     assert model.dT_r_period.tolist() == [[[10.0]], [[12.0]]]
     assert model.dT_hu.tolist() == [8.0]
     assert model.dT_cu.tolist() == [7.0]
-    assert model._recovery_approach_temperature(0, 0, period_idx=1) == pytest.approx(
+    assert _recovery_approach_temperature(model, 0, 0, period_idx=1) == pytest.approx(
         12.0
     )
-    assert model._hot_utility_inlet_approach_temperature(
-        0, period_idx=1
+    assert _hot_utility_inlet_approach_temperature(
+        model, 0, period_idx=1
     ) == pytest.approx(10.0)
-    assert model._hot_utility_outlet_approach_temperature(
-        0, period_idx=1, heat_duty=1.0
+    assert _hot_utility_outlet_approach_temperature(
+        model, 0, period_idx=1, heat_duty=1.0
     ) == pytest.approx(10.0)
-    assert model._cold_utility_inlet_approach_temperature(
-        0, period_idx=1
+    assert _cold_utility_inlet_approach_temperature(
+        model, 0, period_idx=1
     ) == pytest.approx(9.0)
-    assert model._cold_utility_outlet_approach_temperature(
-        0, period_idx=1, heat_duty=1.0
+    assert _cold_utility_outlet_approach_temperature(
+        model, 0, period_idx=1, heat_duty=1.0
     ) == pytest.approx(9.0)
-    assert model._weighted_state_average([10.0, 30.0]) == pytest.approx(25.0)
+    assert _weighted_state_average(model, [10.0, 30.0]) == pytest.approx(25.0)
 
     fallback = _model()
-    assert fallback._recovery_approach_temperature(0, 0) == pytest.approx(10.0)
+    assert _recovery_approach_temperature(fallback, 0, 0) == pytest.approx(10.0)
     fallback.dT_r = np.array([[11.0]])
-    assert fallback._recovery_approach_temperature(0, 0) == pytest.approx(11.0)
+    assert _recovery_approach_temperature(fallback, 0, 0) == pytest.approx(11.0)
 
 
 @pytest.mark.parametrize(
@@ -435,7 +457,7 @@ def test_normalise_state_arrays_rejects_invalid_solver_arrays(arrays, message: s
         setattr(model, name, np.array(values, copy=True))
 
     with pytest.raises(ValueError, match=message):
-        model._normalise_state_arrays()
+        _normalise_state_arrays(model)
 
 
 def test_minimum_approach_temperatures_use_dTmin_when_utilities_are_absent():
@@ -446,7 +468,7 @@ def test_minimum_approach_temperatures_use_dTmin_when_utilities_are_absent():
     model.T_hu_cont_period = np.array([[]], dtype=object)
     model.T_cu_cont_period = np.array([[]], dtype=object)
 
-    model._set_minimum_approach_temperatures()
+    _set_minimum_approach_temperatures(model)
 
     assert model.dT_hu.tolist() == [11.0]
     assert model.dT_cu.tolist() == [9.0]

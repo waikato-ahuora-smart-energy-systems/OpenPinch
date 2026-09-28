@@ -120,10 +120,6 @@ def _assert_common_release_boundary(names: list[str], *, root_prefix: str = "") 
         for name in names
     )
     assert any(
-        name.endswith("OpenPinch/tutorials/sample_cases/heat_pump_targeting.json")
-        for name in names
-    )
-    assert any(
         name.endswith(
             "OpenPinch/tutorials/sample_cases/Four-stream-Yee-and-Grossmann-1990-1.json"
         )

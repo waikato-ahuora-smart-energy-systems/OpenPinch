@@ -7,7 +7,6 @@ from typing import Any, Literal
 
 from ..solver.arrays import PreparedSolverArrays
 from ..solver.pinch_design_decomposition import PinchDesignDecomposition
-from ._base import costing as _costing
 from ._pinch_design import amalgamation as _amalgamation
 from ._pinch_design import equations as _equations
 from ._pinch_design import postprocess as _postprocess
@@ -88,11 +87,6 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
 
         return _preprocessing.set_preprocessing(self)
 
-    def _set_multiperiod_preprocessing(self) -> None:
-        """Delegate _set_multiperiod_preprocessing to its owner helper."""
-
-        return _preprocessing._set_multiperiod_preprocessing(self)
-
     def set_stage_wise_superstructure(self) -> None:
         """Create PDM variables, constraints, and binaries."""
 
@@ -123,11 +117,6 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
 
         return _postprocess._active_binary_value(self, value)
 
-    def _weighted_numeric_average(self, values: Sequence[float]) -> float:
-        """Delegate _weighted_numeric_average to its owner helper."""
-
-        return _costing._weighted_numeric_average(self, values)
-
     def amalgamate_networks(
         self, *, below_case: "PinchDecompModel", above_case: "PinchDecompModel"
     ) -> StageWiseModel:
@@ -135,21 +124,6 @@ class PinchDecompModel(BaseHeatExchangerNetworkModel):
 
         return _amalgamation.amalgamate_networks(
             self, below_case=below_case, above_case=above_case
-        )
-
-    def _copy_recovery_match(
-        self,
-        target: StageWiseModel,
-        source: "PinchDecompModel",
-        i: int,
-        j: int,
-        source_stage: int,
-        target_stage: int,
-    ) -> None:
-        """Delegate _copy_recovery_match to its owner helper."""
-
-        return _amalgamation._copy_recovery_match(
-            self, target, source, i, j, source_stage, target_stage
         )
 
 

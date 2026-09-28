@@ -164,7 +164,7 @@ def test_utility_transfer_reorders_periods_and_retains_segments():
         == derived.to_problem_json()
     )
     with pytest.raises(ValueError, match="period"):
-        receiver.with_utilities_from(PinchProblem("heat_pump_targeting.json"))
+        receiver.with_utilities_from(PinchProblem("basic_pinch.json"))
     with pytest.raises(TypeError, match="PinchProblem"):
         receiver.with_utilities_from({})
 
@@ -315,13 +315,13 @@ def test_batch_and_thermal_override_guards(solved_hpr):
         problem.target.direct_heat_integration(
             base_target=hp, options={"THERMAL_DT_CONT": 5}
         )
-    workspace = PinchWorkspace(source="heat_pump_targeting.json")
+    workspace = PinchWorkspace(source="basic_pinch.json")
     with pytest.raises(ValueError, match="base_target"):
         workspace.cases(("baseline",)).target.all_heat_integration(base_target=hp)
 
 
 def test_hpr_shortcut_infers_child_zone_and_nondefault_period():
-    payload = PinchProblem("heat_pump_targeting.json").to_problem_json()
+    payload = PinchProblem("basic_pinch.json").to_problem_json()
     payload["options"]["PROBLEM_PERIOD_IDS"] = ["base", "peak"]
     problem = PinchProblem(payload)
     hp = problem.target.carnot_heat_pump(

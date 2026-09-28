@@ -6,7 +6,7 @@ from typing import List, Optional
 
 import numpy as np
 
-from ..common.encoding import require_stage_duty_allocation
+from ..common.encoding import DutyAllocationRequest
 from ._multi_cycle_base import _MultiVapourCompressionCycleBase
 from .vapour_compression_cycle import VapourCompressionCycle
 
@@ -241,31 +241,17 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
         *,
         Q_heat,
         Q_cool,
-        Q_heat_base: float | None,
-        x_heat_split,
-        Q_heat_available,
-        Q_cool_base: float | None,
-        x_cool_split,
-        Q_cool_available,
+        duty_allocation: DutyAllocationRequest,
         is_heat_pump: bool,
     ) -> tuple[np.ndarray | None, np.ndarray | None]:
         self._allocation_penalty = np.empty(0, dtype=float)
-        if is_heat_pump and Q_heat_base is not None:
-            heat_allocation = require_stage_duty_allocation(
-                Q_base=Q_heat_base,
-                x_split=x_heat_split,
-                Q_available=Q_heat_available,
-                duty_name="heat",
-            )
+        heat, cool = duty_allocation.heat, duty_allocation.cool
+        if is_heat_pump and heat.Q_base is not None:
+            heat_allocation = heat.allocate("heat")
             self._allocation_penalty = heat_allocation.Q_excess
             Q_cool_out = self._normalize_secondary_process_duty(Q_cool)
-            if Q_cool_base is not None:
-                cool_allocation = require_stage_duty_allocation(
-                    Q_base=Q_cool_base,
-                    x_split=x_cool_split,
-                    Q_available=Q_cool_available,
-                    duty_name="cool",
-                )
+            if cool.Q_base is not None:
+                cool_allocation = cool.allocate("cool")
                 self._allocation_penalty = np.concatenate(
                     [self._allocation_penalty, cool_allocation.Q_excess]
                 )
@@ -274,22 +260,12 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
                 )
             return heat_allocation.Q_model, Q_cool_out
 
-        if (not is_heat_pump) and Q_cool_base is not None:
-            cool_allocation = require_stage_duty_allocation(
-                Q_base=Q_cool_base,
-                x_split=x_cool_split,
-                Q_available=Q_cool_available,
-                duty_name="cool",
-            )
+        if (not is_heat_pump) and cool.Q_base is not None:
+            cool_allocation = cool.allocate("cool")
             self._allocation_penalty = cool_allocation.Q_excess
             Q_heat_out = Q_heat
-            if Q_heat_base is not None:
-                heat_allocation = require_stage_duty_allocation(
-                    Q_base=Q_heat_base,
-                    x_split=x_heat_split,
-                    Q_available=Q_heat_available,
-                    duty_name="heat",
-                )
+            if heat.Q_base is not None:
+                heat_allocation = heat.allocate("heat")
                 self._allocation_penalty = np.concatenate(
                     [self._allocation_penalty, heat_allocation.Q_excess]
                 )
@@ -317,12 +293,7 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
         dT_ihx_gas_side: np.ndarray | float = 10.0,
         Q_heat: np.ndarray = None,
         Q_cool: np.ndarray = None,
-        Q_heat_base: float | None = None,
-        x_heat_split: np.ndarray | None = None,
-        Q_heat_available: np.ndarray | None = None,
-        Q_cool_base: float | None = None,
-        x_cool_split: np.ndarray | None = None,
-        Q_cool_available: np.ndarray | None = None,
+        duty_allocation: DutyAllocationRequest | None = None,
         dt_cascade_hx: float = 1.0,
         is_heat_pump: bool = True,
     ) -> float:
@@ -351,6 +322,9 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
             Heat delivered to the process [W].
         Q_cool : np.ndarray, optional
             Cooling delivered to the process [W].
+        duty_allocation : DutyAllocationRequest, optional
+            Base-duty/split/availability inputs; a side with ``Q_base`` set
+            overrides ``Q_heat`` or ``Q_cool``.
         dt_cascade_hx : float, optional
             Temperature difference between condensing and evaporating
             temperatures in the cascade heat exchanger.
@@ -369,12 +343,7 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
         Q_heat, Q_cool = self._allocate_process_duties(
             Q_heat=Q_heat,
             Q_cool=Q_cool,
-            Q_heat_base=Q_heat_base,
-            x_heat_split=x_heat_split,
-            Q_heat_available=Q_heat_available,
-            Q_cool_base=Q_cool_base,
-            x_cool_split=x_cool_split,
-            Q_cool_available=Q_cool_available,
+            duty_allocation=duty_allocation or DutyAllocationRequest(),
             is_heat_pump=is_heat_pump,
         )
         self._dt_cascade_hx = dt_cascade_hx

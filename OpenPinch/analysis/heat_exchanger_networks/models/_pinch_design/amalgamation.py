@@ -53,7 +53,7 @@ def amalgamate_networks(
         for i in range(owner.I):
             for j in range(owner.J):
                 for k in range(above_case.S):
-                    owner._copy_recovery_match(amalgamated, above_case, i, j, k, k)
+                    _copy_recovery_match(owner, amalgamated, above_case, i, j, k, k)
         for i in range(owner.I):
             for k in range(above_case.K):
                 for n in range(amalgamated.N_periods):
@@ -95,7 +95,8 @@ def amalgamate_networks(
         for i in range(owner.I):
             for j in range(owner.J):
                 for k in range(above_case.S, amalgamated.S):
-                    owner._copy_recovery_match(
+                    _copy_recovery_match(
+                        owner,
                         amalgamated,
                         below_case,
                         i,

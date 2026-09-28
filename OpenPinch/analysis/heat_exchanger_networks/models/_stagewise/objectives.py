@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .._base import approach as _approach
 from .._base import piecewise as _piecewise
 
 
@@ -11,32 +12,35 @@ def set_obj(owner) -> None:
     if getattr(owner, "N_periods", 1) > 1:
         if owner.minimisation_goal == "hot utility":
             owner.m.Minimize(
-                owner._weighted_state_average(
+                _approach._weighted_state_average(
+                    owner,
                     [
                         owner.m.sum([owner.Q_h_by_period[n][j] for j in range(owner.J)])
                         for n in range(owner.N_periods)
-                    ]
+                    ],
                 )
             )
         elif owner.minimisation_goal == "cold utility":
             owner.m.Minimize(
-                owner._weighted_state_average(
+                _approach._weighted_state_average(
+                    owner,
                     [
                         owner.m.sum([owner.Q_c_by_period[n][i] for i in range(owner.I)])
                         for n in range(owner.N_periods)
-                    ]
+                    ],
                 )
             )
         elif owner.minimisation_goal == "total utility":
             owner.m.Minimize(
-                owner._weighted_state_average(
+                _approach._weighted_state_average(
+                    owner,
                     [
                         owner.m.sum([owner.Q_h_by_period[n][j] for j in range(owner.J)])
                         + owner.m.sum(
                             [owner.Q_c_by_period[n][i] for i in range(owner.I)]
                         )
                         for n in range(owner.N_periods)
-                    ]
+                    ],
                 )
             )
         elif owner.minimisation_goal == "utility costs":
@@ -61,13 +65,15 @@ def set_obj(owner) -> None:
                 for n in range(owner.N_periods)
             ]
             owner.m.Minimize(
-                owner._weighted_state_average(
-                    [hot_costs[n] + cold_costs[n] for n in range(owner.N_periods)]
+                _approach._weighted_state_average(
+                    owner,
+                    [hot_costs[n] + cold_costs[n] for n in range(owner.N_periods)],
                 )
             )
         elif owner.minimisation_goal == "heat recovery":
             owner.m.Maximize(
-                owner._weighted_state_average(
+                _approach._weighted_state_average(
+                    owner,
                     [
                         owner.m.sum(
                             [
@@ -78,13 +84,13 @@ def set_obj(owner) -> None:
                             ]
                         )
                         for n in range(owner.N_periods)
-                    ]
+                    ],
                 )
             )
         elif owner.minimisation_goal == "dQ/dA obj":
             owner.m.Minimize(
-                owner._weighted_state_average(
-                    [sum(owner.Q_h_by_period[n]) for n in range(owner.N_periods)]
+                _approach._weighted_state_average(
+                    owner, [sum(owner.Q_h_by_period[n]) for n in range(owner.N_periods)]
                 )
                 - owner.HU_target
             )
@@ -345,10 +351,14 @@ def _set_multiperiod_total_cost_objective(owner) -> None:
         )
         for n in range(owner.N_periods)
     ]
-    owner.hu_cost_total = owner._weighted_state_average(owner.hu_cost_total_by_period)
-    owner.cu_cost_total = owner._weighted_state_average(owner.cu_cost_total_by_period)
-    owner.weighted_operating_cost = owner._weighted_state_average(
-        owner.operating_cost_by_state_expr
+    owner.hu_cost_total = _approach._weighted_state_average(
+        owner, owner.hu_cost_total_by_period
+    )
+    owner.cu_cost_total = _approach._weighted_state_average(
+        owner, owner.cu_cost_total_by_period
+    )
+    owner.weighted_operating_cost = _approach._weighted_state_average(
+        owner, owner.operating_cost_by_state_expr
     )
 
     owner.area_r_shared = [

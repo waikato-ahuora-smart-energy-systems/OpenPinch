@@ -6,7 +6,6 @@ from collections.abc import Mapping, Sequence
 from typing import Any, Literal
 
 from ..solver.arrays import PreparedSolverArrays
-from ._base import costing as _costing
 from ._stagewise import equations as _equations
 from ._stagewise import evolution as _evolution
 from ._stagewise import objectives as _objectives
@@ -14,10 +13,6 @@ from ._stagewise import postprocess as _postprocess
 from ._stagewise import setup as _setup
 from ._stagewise import verification as _verification
 from ._stagewise import warm_start as _warm_start
-from ._stagewise.evolution import (
-    _EvolutionBranchState,
-    _EvolutionCandidateSpec,
-)
 from .base import BaseHeatExchangerNetworkModel
 
 
@@ -126,169 +121,15 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             no_improvement_patience,
         )
 
-    def _get_source_net_benefit_evolution(self, *, print_output: bool, max_depth: int):
-        """Run the original OpenHENS single-path add/remove evolution search."""
-
-        return _evolution._get_source_net_benefit_evolution(
-            self, print_output=print_output, max_depth=max_depth
-        )
-
-    def _select_source_best_candidate(
-        self, current_model, model_minus_one, model_plus_one
-    ):
-        """Select the next OpenHENS tier-1 evolution candidate by success and TAC."""
-
-        return _evolution._select_source_best_candidate(
-            self, current_model, model_minus_one, model_plus_one
-        )
-
-    def _evolution_candidate_specs(
-        self,
-        frontier: Sequence[_EvolutionBranchState],
-        *,
-        unit: int,
-        n_ad_branches: int,
-        n_rm_branches: int,
-    ) -> list[_EvolutionCandidateSpec]:
-        """Delegate _evolution_candidate_specs to its owner helper."""
-
-        return _evolution._evolution_candidate_specs(
-            self,
-            frontier,
-            unit=unit,
-            n_ad_branches=n_ad_branches,
-            n_rm_branches=n_rm_branches,
-        )
-
-    def _evolution_candidate_spec(
-        self,
-        *,
-        kind: Literal["minus", "plus"],
-        unit: int,
-        branch_index: int,
-        rank: int,
-        prev_case,
-        position: Sequence[int],
-        z_value: int,
-        seen_signatures: set[tuple[tuple[int, int, int], ...]],
-    ) -> _EvolutionCandidateSpec | None:
-        """Delegate _evolution_candidate_spec to its owner helper."""
-
-        return _evolution._evolution_candidate_spec(
-            self,
-            kind=kind,
-            unit=unit,
-            branch_index=branch_index,
-            rank=rank,
-            prev_case=prev_case,
-            position=position,
-            z_value=z_value,
-            seen_signatures=seen_signatures,
-        )
-
-    def _solve_evolution_candidates(
-        self,
-        specs: Sequence[_EvolutionCandidateSpec],
-        *,
-        print_output: bool,
-        max_parallel: int,
-    ) -> list[tuple[_EvolutionCandidateSpec, Any]]:
-        """Delegate _solve_evolution_candidates to its owner helper."""
-
-        return _evolution._solve_evolution_candidates(
-            self, specs, print_output=print_output, max_parallel=max_parallel
-        )
-
-    def _select_best_candidate(self, current_model, model_minus_one, model_plus_one):
-        """Select the source plus/minus evolution candidate for the next step."""
-
-        return _evolution._select_best_candidate(
-            self, current_model, model_minus_one, model_plus_one
-        )
-
-    def _update_with_best_model(self, best_model) -> None:
-        """Adopt the selected evolved topology while retaining this model object."""
-
-        return _evolution._update_with_best_model(self, best_model)
-
     def get_n_minus_one_evolution(self, print_output: bool, unit: int, prev_case):
         """Build and solve the source minus-one topology evolution candidate."""
 
         return _evolution.get_n_minus_one_evolution(self, print_output, unit, prev_case)
 
-    def _build_and_solve_n_minus_one_evolution(
-        self,
-        *,
-        print_output: bool,
-        unit: int,
-        prev_case,
-        position: Sequence[int],
-        z_allowed_removed: list,
-        branch_label: str | None = None,
-    ):
-        """Build and solve one minus-one topology evolution candidate."""
-
-        return _evolution._build_and_solve_evolution(
-            self,
-            "minus",
-            print_output=print_output,
-            unit=unit,
-            prev_case=prev_case,
-            position=position,
-            z_allowed=z_allowed_removed,
-            branch_label=branch_label,
-        )
-
     def get_n_plus_one_evolution(self, print_output: bool, unit: int, prev_case):
         """Build and solve the source plus-one topology evolution candidate."""
 
         return _evolution.get_n_plus_one_evolution(self, print_output, unit, prev_case)
-
-    def _build_and_solve_n_plus_one_evolution(
-        self,
-        *,
-        print_output: bool,
-        unit: int,
-        prev_case,
-        position: Sequence[int],
-        z_allowed_added: list,
-        branch_label: str | None = None,
-    ):
-        """Build and solve one plus-one topology evolution candidate."""
-
-        return _evolution._build_and_solve_evolution(
-            self,
-            "plus",
-            print_output=print_output,
-            unit=unit,
-            prev_case=prev_case,
-            position=position,
-            z_allowed=z_allowed_added,
-            branch_label=branch_label,
-        )
-
-    def _z_allowed_with_candidate(
-        self, prev_case, *, position: Sequence[int], value: int
-    ) -> list:
-        """Delegate _z_allowed_with_candidate to its owner helper."""
-
-        return _evolution._z_allowed_with_candidate(
-            self, prev_case, position=position, value=value
-        )
-
-    def _set_recovery_binary_value(
-        self, z_values: list, position: tuple[int, int, int], value: int
-    ) -> None:
-        """Delegate _set_recovery_binary_value to its owner helper."""
-
-        return _evolution._set_recovery_binary_value(self, z_values, position, value)
-
-    def _topology_signature_from_z(
-        self, z_values: Sequence[Sequence[Sequence[Any]]]
-    ) -> tuple[tuple[int, int, int], ...]:
-        """Delegate _topology_signature_from_z to its owner helper."""
-
-        return _evolution._topology_signature_from_z(self, z_values)
 
     def _active_binary_value(self, value) -> float:
         """Delegate _active_binary_value to its owner helper."""
@@ -309,11 +150,6 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         """Delegate _get_multiperiod_post_process to its owner helper."""
 
         return _postprocess._get_multiperiod_post_process(self)
-
-    def _weighted_numeric_average(self, values: Sequence[float]) -> float:
-        """Delegate _weighted_numeric_average to its owner helper."""
-
-        return _costing._weighted_numeric_average(self, values)
 
     def get_lowest_benefit_HX(self) -> list[list[int]]:
         """Return the active exchanger with the lowest source net benefit."""

@@ -50,9 +50,7 @@ def stream_entropy_change(
     delta = outlet_temperature_kelvin - inlet_temperature_kelvin
     scale = max(abs(inlet_temperature_kelvin), abs(outlet_temperature_kelvin))
     if abs(delta) <= 1e-12 * scale:
-        limit = duty / (
-            (inlet_temperature_kelvin + outlet_temperature_kelvin) / 2.0
-        )
+        limit = duty / ((inlet_temperature_kelvin + outlet_temperature_kelvin) / 2.0)
         return math.copysign(limit, delta) if delta != 0.0 else limit
     heat_capacity_flow = duty / abs(delta)
     return heat_capacity_flow * math.log1p(delta / inlet_temperature_kelvin)
@@ -279,8 +277,8 @@ def evaluate_thermodynamic_cost(
     allocation: PlacementPeriodAllocation,
 ) -> ThermodynamicCostBreakdown:
     """Evaluate physical entropy generation from balanced composite curves."""
-    hot_temperature, hot_heat, cold_temperature, cold_heat = (
-        _balanced_composite_curves(period, allocation)
+    hot_temperature, hot_heat, cold_temperature, cold_heat = _balanced_composite_curves(
+        period, allocation
     )
     _, _, generation = balanced_composite_entropy_generation(
         hot_temperatures_celsius=hot_temperature,

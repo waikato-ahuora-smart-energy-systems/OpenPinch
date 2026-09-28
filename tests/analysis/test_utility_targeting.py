@@ -14,7 +14,6 @@ from OpenPinch.analysis.targeting.grand_composite import (
 )
 from OpenPinch.analysis.targeting.utilities import (
     _apply_utility_duties,
-    _assign_utility,
     _calculate_assigned_utility_duties,
     _maximise_utility_duty,
     target_utilities_for_load_profiles,
@@ -37,6 +36,12 @@ from tests.support.paths import FIXTURES_ROOT
 UTILITY_FIXTURE_ROOT = FIXTURES_ROOT / "utility_targeting"
 
 """Tests for target_utilities_for_load_profiles."""
+
+
+def _assign_utility(**kwargs):
+    """Assign utility duties in place, as targeting does."""
+    duties = _calculate_assigned_utility_duties(**kwargs)
+    return _apply_utility_duties(kwargs["u_ls"], duties, idx=kwargs["idx"])
 
 
 def test_target_utilities_for_load_profiles_rejects_missing_required_utilities():
@@ -306,9 +311,9 @@ def test_zero_assignment_updates_only_the_selected_period() -> None:
         idx=1,
     )
 
-    assert targeted.get_stream_by_name("Named").heat_flow.period_values == pytest.approx(
-        [11.0, 0.0]
-    )
+    assert targeted.get_stream_by_name(
+        "Named"
+    ).heat_flow.period_values == pytest.approx([11.0, 0.0])
 
 
 @given(

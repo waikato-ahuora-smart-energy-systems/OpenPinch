@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 
+from . import execution as _execution
 from . import piecewise as _piecewise
 
 
@@ -93,7 +94,8 @@ def _hot_utility_outlet_approach_temperature(
     period_idx: int = 0,
     heat_duty: float | None = None,
 ):
-    contribution = model._utility_outlet_temperature_contribution(
+    contribution = _utility_outlet_temperature_contribution(
+        model,
         "hot",
         period_idx,
         match_index=j,
@@ -121,7 +123,8 @@ def _cold_utility_outlet_approach_temperature(
     period_idx: int = 0,
     heat_duty: float | None = None,
 ):
-    contribution = model._utility_outlet_temperature_contribution(
+    contribution = _utility_outlet_temperature_contribution(
+        model,
         "cold",
         period_idx,
         match_index=i,
@@ -221,8 +224,8 @@ def _set_multiperiod_utility_approach_equations(model) -> None:
                 model, "hot"
             ):
                 continue
-            inlet_approach = model._hot_utility_inlet_approach_temperature(j, n)
-            outlet_approach = model._hot_utility_outlet_approach_temperature(j, n)
+            inlet_approach = _hot_utility_inlet_approach_temperature(model, j, n)
+            outlet_approach = _hot_utility_outlet_approach_temperature(model, j, n)
             maximum_approach = (
                 _utility_max_temperature_contribution(model, "hot", n)
                 + model.T_c_cont_period[n][j]
@@ -236,7 +239,8 @@ def _set_multiperiod_utility_approach_equations(model) -> None:
             inlet_delta = model.T_hu_in_period[n][0] - model.T_c_out_period[n][j]
             if type(model.z_hu[j]).__name__ == "GKParameter":
                 if (
-                    model._solver_value(model.z_hu[j].VALUE.value) > model.tol
+                    _execution._solver_value(model, model.z_hu[j].VALUE.value)
+                    > model.tol
                     and inlet_delta + model.tol < inlet_approach
                 ):
                     raise ValueError(
@@ -258,8 +262,8 @@ def _set_multiperiod_utility_approach_equations(model) -> None:
                 model, "cold"
             ):
                 continue
-            inlet_approach = model._cold_utility_inlet_approach_temperature(i, n)
-            outlet_approach = model._cold_utility_outlet_approach_temperature(i, n)
+            inlet_approach = _cold_utility_inlet_approach_temperature(model, i, n)
+            outlet_approach = _cold_utility_outlet_approach_temperature(model, i, n)
             maximum_approach = model.T_h_cont_period[n][
                 i
             ] + _utility_max_temperature_contribution(model, "cold", n)
@@ -277,7 +281,8 @@ def _set_multiperiod_utility_approach_equations(model) -> None:
             inlet_delta = model.T_h_out_period[n][i] - model.T_cu_in_period[n][0]
             if type(model.z_cu[i]).__name__ == "GKParameter":
                 if (
-                    model._solver_value(model.z_cu[i].VALUE.value) > model.tol
+                    _execution._solver_value(model, model.z_cu[i].VALUE.value)
+                    > model.tol
                     and inlet_delta + model.tol < inlet_approach
                 ):
                     raise ValueError(

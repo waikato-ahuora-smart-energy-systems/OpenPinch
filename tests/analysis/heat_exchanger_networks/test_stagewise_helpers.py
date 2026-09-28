@@ -8,12 +8,20 @@ from types import SimpleNamespace
 
 import pytest
 
-import OpenPinch.analysis.heat_exchanger_networks.models.stagewise as stagewise
 from OpenPinch.analysis.heat_exchanger_networks.models._stagewise import (
     evolution as stagewise_evolution,
 )
 from OpenPinch.analysis.heat_exchanger_networks.models._stagewise import (
     verification as stagewise_verification,
+)
+from OpenPinch.analysis.heat_exchanger_networks.models._stagewise.evolution import (
+    _evolution_candidate_spec,
+    _get_source_net_benefit_evolution,
+    _select_best_candidate,
+    _select_source_best_candidate,
+    _set_recovery_binary_value,
+    _solve_evolution_candidates,
+    _update_with_best_model,
 )
 from OpenPinch.analysis.heat_exchanger_networks.models.stagewise import (
     StageWiseModel,
@@ -149,16 +157,7 @@ def _source_variables(values):
 
 def _case(name: str) -> SimpleNamespace:
     data = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))[name]
-    case = SimpleNamespace(**data)
-    if hasattr(case, "period_weights"):
-        case._weighted_numeric_average = lambda values: float(
-            sum(
-                float(case.period_weights[n]) * float(values[n])
-                for n in range(case.N_periods)
-            )
-            / case.period_weight_sum
-        )
-    return case
+    return SimpleNamespace(**data)
 
 
 def _single_state_objective_case(goal: str) -> StageWiseModel:
@@ -738,12 +737,14 @@ def _evolution_model(*, tac: float = 100.0, success: int = 1) -> StageWiseModel:
     return model
 
 
-def test_stagewise_evolution_skips_unsuccessful_and_empty_frontiers():
+def test_stagewise_evolution_skips_unsuccessful_and_empty_frontiers(monkeypatch):
     failed = _evolution_model(success=0)
     assert failed.get_net_benefit_evolution(print_output=False) is failed
 
     empty = _evolution_model()
-    empty._evolution_candidate_specs = lambda *args, **kwargs: []
+    monkeypatch.setattr(
+        stagewise_evolution, "_evolution_candidate_specs", lambda *args, **kwargs: []
+    )
 
     assert (
         empty.get_net_benefit_evolution(
@@ -755,9 +756,9 @@ def test_stagewise_evolution_skips_unsuccessful_and_empty_frontiers():
     assert empty._cleaned is True
 
 
-def test_stagewise_evolution_prunes_unusable_and_stale_candidates():
+def test_stagewise_evolution_prunes_unusable_and_stale_candidates(monkeypatch):
     model = _evolution_model(tac=100.0)
-    spec = stagewise._EvolutionCandidateSpec(
+    spec = stagewise_evolution._EvolutionCandidateSpec(
         kind="plus",
         unit=0,
         branch_index=0,
@@ -772,11 +773,16 @@ def test_stagewise_evolution_prunes_unusable_and_stale_candidates():
     stale.TAC = 150.0
     stale.name = "stale"
 
-    model._evolution_candidate_specs = lambda *args, **kwargs: [spec, spec]
-    model._solve_evolution_candidates = lambda *args, **kwargs: [
-        (spec, unusable),
-        (spec, stale),
-    ]
+    monkeypatch.setattr(
+        stagewise_evolution,
+        "_evolution_candidate_specs",
+        lambda *args, **kwargs: [spec, spec],
+    )
+    monkeypatch.setattr(
+        stagewise_evolution,
+        "_solve_evolution_candidates",
+        lambda *args, **kwargs: [(spec, unusable), (spec, stale)],
+    )
 
     assert (
         model.get_net_benefit_evolution(
@@ -795,25 +801,27 @@ def test_stagewise_source_evolution_and_candidate_selection_edges():
     model.get_n_plus_one_evolution = lambda **kwargs: None
 
     assert (
-        model._get_source_net_benefit_evolution(
+        _get_source_net_benefit_evolution(
+            model,
             print_output=False,
             max_depth=1,
         )
         is model
     )
-    assert model._select_source_best_candidate(model, None, None) is None
+    assert _select_source_best_candidate(model, model, None, None) is None
 
     minus = SimpleNamespace(mSuccess=1, TAC=80.0)
     plus = SimpleNamespace(mSuccess=0, TAC=70.0)
-    assert model._select_source_best_candidate(model, minus, plus) is minus
-    assert model._select_source_best_candidate(model, plus, minus) is minus
+    assert _select_source_best_candidate(model, model, minus, plus) is minus
+    assert _select_source_best_candidate(model, model, plus, minus) is minus
 
 
-def test_stagewise_candidate_spec_duplicate_and_parallel_solve_edges():
+def test_stagewise_candidate_spec_duplicate_and_parallel_solve_edges(monkeypatch):
     model = _evolution_model()
 
     assert (
-        model._evolution_candidate_spec(
+        _evolution_candidate_spec(
+            model,
             kind="plus",
             unit=0,
             branch_index=0,
@@ -826,10 +834,19 @@ def test_stagewise_candidate_spec_duplicate_and_parallel_solve_edges():
         is None
     )
 
-    model._z_allowed_with_candidate = lambda *args, **kwargs: [[[1]]]
-    model._topology_signature_from_z = lambda z_values: ((0, 0, 0),)
+    monkeypatch.setattr(
+        stagewise_evolution,
+        "_z_allowed_with_candidate",
+        lambda *args, **kwargs: [[[1]]],
+    )
+    monkeypatch.setattr(
+        stagewise_evolution,
+        "_topology_signature_from_z",
+        lambda owner, z_values: ((0, 0, 0),),
+    )
     assert (
-        model._evolution_candidate_spec(
+        _evolution_candidate_spec(
+            model,
             kind="plus",
             unit=0,
             branch_index=0,
@@ -842,7 +859,7 @@ def test_stagewise_candidate_spec_duplicate_and_parallel_solve_edges():
         is None
     )
 
-    first = stagewise._EvolutionCandidateSpec(
+    first = stagewise_evolution._EvolutionCandidateSpec(
         kind="plus",
         unit=0,
         branch_index=0,
@@ -852,7 +869,7 @@ def test_stagewise_candidate_spec_duplicate_and_parallel_solve_edges():
         z_allowed=[[[1]]],
         signature=((0, 0, 0),),
     )
-    second = stagewise._EvolutionCandidateSpec(
+    second = stagewise_evolution._EvolutionCandidateSpec(
         kind="minus",
         unit=0,
         branch_index=0,
@@ -863,15 +880,14 @@ def test_stagewise_candidate_spec_duplicate_and_parallel_solve_edges():
         signature=(),
     )
 
-    def solve_plus(**kwargs):
-        raise RuntimeError("failed branch")
-
-    def solve_minus(**kwargs):
+    def solve(owner, kind, **kwargs):
+        if kind == "plus":
+            raise RuntimeError("failed branch")
         return SimpleNamespace(mSuccess=1, TAC=90.0)
 
-    model._build_and_solve_n_plus_one_evolution = solve_plus
-    model._build_and_solve_n_minus_one_evolution = solve_minus
-    solved = model._solve_evolution_candidates(
+    monkeypatch.setattr(stagewise_evolution, "_build_and_solve_evolution", solve)
+    solved = _solve_evolution_candidates(
+        model,
         [first, second],
         print_output=False,
         max_parallel=2,
@@ -886,7 +902,7 @@ def test_stagewise_select_best_candidate_update_and_binary_value_edges(monkeypat
     plus.TAC = 90.0
     minus = _VerifiedCandidate(m_success=0)
 
-    assert model._select_best_candidate(model, minus, plus) is plus
+    assert _select_best_candidate(model, model, minus, plus) is plus
 
     target = StageWiseModel.__new__(StageWiseModel)
     target.I = 1
@@ -914,14 +930,14 @@ def test_stagewise_select_best_candidate_update_and_binary_value_edges(monkeypat
         cu_area_cost_total=11.0,
     )
 
-    target._update_with_best_model(best)
+    _update_with_best_model(target, best)
 
     assert target.alpha == [[[[0.1]]]]
     assert target.z_allowed == [[[1]]]
     assert calls == [("initial", True), ("post", None)]
 
     z_values = [[[[0]]]]
-    target._set_recovery_binary_value(z_values, (0, 0, 0), 1)
+    _set_recovery_binary_value(target, z_values, (0, 0, 0), 1)
     assert z_values[0][0][0] == [1]
 
     class ValueHolder:
@@ -929,7 +945,7 @@ def test_stagewise_select_best_candidate_update_and_binary_value_edges(monkeypat
             self.VALUE = SimpleNamespace(value=0)
 
     z_values = [[[ValueHolder()]]]
-    target._set_recovery_binary_value(z_values, (0, 0, 0), 1)
+    _set_recovery_binary_value(target, z_values, (0, 0, 0), 1)
     assert z_values[0][0][0].VALUE.value == 1
 
     class NoMutation:
@@ -937,7 +953,7 @@ def test_stagewise_select_best_candidate_update_and_binary_value_edges(monkeypat
             raise TypeError("immutable")
 
     z_values = [[[NoMutation()]]]
-    target._set_recovery_binary_value(z_values, (0, 0, 0), 1)
+    _set_recovery_binary_value(target, z_values, (0, 0, 0), 1)
     assert z_values[0][0][0] == 1
 
 
@@ -960,15 +976,10 @@ def test_stagewise_post_process_and_verify_failure_edges(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    ("kind", "builder", "z_keyword"),
-    [
-        ("minus", "_build_and_solve_n_minus_one_evolution", "z_allowed_removed"),
-        ("plus", "_build_and_solve_n_plus_one_evolution", "z_allowed_added"),
-    ],
+    "kind",
+    ["minus", "plus"],
 )
-def test_evolution_child_uses_configured_evm_solver(
-    monkeypatch, kind, builder, z_keyword
-):
+def test_evolution_child_uses_configured_evm_solver(monkeypatch, kind):
     created: list[dict] = []
 
     class _Cell:
@@ -995,7 +1006,11 @@ def test_evolution_child_uses_configured_evm_solver(
     owner.name = "root"
     owner.solver = "couenne"
     owner.solver_options = {"max_iter": 7}
-    owner._recovery_approach_temperature = lambda i, j: 5.0
+    monkeypatch.setattr(
+        stagewise_evolution._approach,
+        "_recovery_approach_temperature",
+        lambda owner, i, j: 5.0,
+    )
     prev_case = SimpleNamespace(
         framework="ESM",
         solver="apopt",
@@ -1007,12 +1022,14 @@ def test_evolution_child_uses_configured_evm_solver(
         non_isothermal_model=False,
     )
 
-    child = getattr(owner, builder)(
+    child = stagewise_evolution._build_and_solve_evolution(
+        owner,
+        kind,
         print_output=False,
         unit=0,
         prev_case=prev_case,
         position=(0, 0, 0),
-        **{z_keyword: [[[1]]]},
+        z_allowed=[[[1]]],
     )
 
     assert child.optimised
