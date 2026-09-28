@@ -204,28 +204,36 @@ def HX_NTU(Arrangement, eff, c, Passes=None):
     return Ntu * Passes
 
 
+def _checked_effectiveness(eff: float) -> float:
+    """Return ``eff`` or ``inf`` at the limit; reject effectiveness above one."""
+    if eff > 1.0 + 1e-9:
+        raise ValueError(
+            f"Effectiveness {eff:.6g} exceeds 1: the process outlet is beyond the "
+            "utility temperature, so no exchanger can deliver this duty."
+        )
+    return eff
+
+
 def CalcAreaUE(Arrangement, U, C_p, T_p1, T_p2, T_u1, T_u2, Passes):
     """Estimate the exchanger ``area * U`` product from duty and temperatures.
 
     An isothermal utility (``T_u1 == T_u2``, condensing or evaporating) has
-    infinite capacity, so the process stream is Cmin and ``c = 0``.
+    infinite capacity, so the process stream is Cmin and ``c = 0``. A duty that
+    needs unit effectiveness (a zero terminal approach) needs unbounded area and
+    returns ``inf``; one that needs more than unit effectiveness raises
+    ``ValueError``.
     """
     Q = C_p * abs(T_p1 - T_p2)
     if T_u1 == T_u2:
-        eff = Q / C_p / abs(T_p1 - T_u1)
-        Ntu = HX_NTU(Arrangement, eff, 0.0, Passes)
-        return Ntu * C_p / U
-    C_u = Q / abs(T_u1 - T_u2)
-    if C_p < C_u:
-        eff = Q / C_p / abs(T_p1 - T_u1)
-        c = C_p / C_u
-        Ntu = HX_NTU(Arrangement, eff, c, Passes)
-        return Ntu * C_p / U
+        C_min, c = C_p, 0.0
     else:
-        eff = Q / C_u / abs(T_p1 - T_u1)
-        c = C_u / C_p
-        Ntu = HX_NTU(Arrangement, eff, c, Passes)
-        return Ntu * C_u / U
+        C_u = Q / abs(T_u1 - T_u2)
+        C_min, c = (C_p, C_p / C_u) if C_p < C_u else (C_u, C_u / C_p)
+    eff = _checked_effectiveness(Q / C_min / abs(T_p1 - T_u1))
+    if eff >= 1.0 - 1e-9:
+        return math.inf
+    Ntu = HX_NTU(Arrangement, eff, c, Passes)
+    return Ntu * C_min / U
 
 
 def eNTU_slope_Numerical(Arrangement, Ntu, c, Passes):
