@@ -444,10 +444,13 @@ def condensing_temperature_search_range(
     a subcritical vapour-compression condenser cannot operate above it, and
     every candidate there fails in CoolProp. Without the cap the search can
     spend its whole budget in that infeasible region. The range is returned
-    unchanged when the refrigerants' critical points are unknown or the cap
-    would leave nothing to search.
+    unchanged for the TESPy backend (which solves its own cycle states), when
+    the refrigerants' critical points are unknown, or when the cap would leave
+    nothing to search.
     """
     t_hot, t_cold = float(args.T_cold[0]), float(args.T_cold[-1])
+    if getattr(args, "simulation_backend", "coolprop") == "tespy":
+        return t_hot, t_cold
     try:
         refrigerants = list(getattr(args, "refrigerant_ls", None) or ["water"])
         t_crit = max(float(_coolprop.PropsSI("Tcrit", ref)) for ref in refrigerants)

@@ -649,9 +649,8 @@ def test_condensing_search_range_stays_below_the_refrigerant_critical_point():
     args = SimpleNamespace(T_cold=np.array([200.0, 60.0]), refrigerant_ls=["ammonia"])
     hot, cold = hp_shared.condensing_temperature_search_range(args)
     assert cold == 60.0
-    assert hot == pytest.approx(
-        132.25 - hp_shared.SUBCRITICAL_CONDENSING_MARGIN_K, abs=0.1
-    )
+    t_crit = hp_shared._coolprop.PropsSI("Tcrit", "ammonia") - 273.15
+    assert hot == pytest.approx(t_crit - hp_shared.SUBCRITICAL_CONDENSING_MARGIN_K)
 
 
 def test_condensing_search_range_is_unchanged_when_no_cap_applies():
@@ -664,3 +663,10 @@ def test_condensing_search_range_is_unchanged_when_no_cap_applies():
         T_cold=np.array([300.0, 250.0]), refrigerant_ls=["ammonia"]
     )
     assert hp_shared.condensing_temperature_search_range(cold_sink) == (300.0, 250.0)
+    # TESPy solves its own cycle states, so its search keeps the full range.
+    tespy = SimpleNamespace(
+        T_cold=np.array([200.0, 60.0]),
+        refrigerant_ls=["ammonia"],
+        simulation_backend="tespy",
+    )
+    assert hp_shared.condensing_temperature_search_range(tespy) == (200.0, 60.0)
