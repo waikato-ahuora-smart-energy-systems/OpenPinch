@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import operator
 import warnings
 from collections.abc import Mapping
 from typing import Any, Optional
@@ -41,11 +40,14 @@ class _ValueField(property):
     ):
         if copy:
 
-            def getter(stream: Stream) -> Value | None:
+            def getter(stream: Stream) -> Optional[Value]:
                 return stream._copy_value(getattr(stream, internal_name))
 
         else:
-            getter = operator.attrgetter(internal_name)
+
+            def getter(stream: Stream) -> Optional[Value]:
+                return getattr(stream, internal_name)
+
         super().__init__(getter, self._set if settable else None, None, doc)
         # A property subclass would otherwise report its class docstring.
         self.__doc__ = doc
