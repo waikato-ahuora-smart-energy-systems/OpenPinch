@@ -5,6 +5,8 @@ from __future__ import annotations
 import ast
 import csv
 import json
+import re
+import tomllib
 from pathlib import Path
 
 import nbformat
@@ -307,6 +309,42 @@ def test_notebooks_are_valid_nbformat_documents(tmp_path: Path) -> None:
             "Adapt this template",
         ):
             assert heading in markdown_text, (name, heading)
+
+
+def _openpinch_metadata(name: str) -> dict:
+    notebook = _load_notebook(ROOT / "OpenPinch" / "tutorials" / "notebooks" / name)
+    return notebook["metadata"]["openpinch"]
+
+
+def test_notebook_metadata_is_the_single_source_for_intro_and_docs() -> None:
+    extras = set(
+        tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"][
+            "optional-dependencies"
+        ]
+    )
+    series = (ROOT / "docs" / "examples" / "notebook-series.rst").read_text(
+        encoding="utf-8"
+    )
+    manifest_profiles = {
+        row["primary_tutorial"]: row["execution_profile"] for row in _manifest_rows()
+    }
+    for name in EXPECTED_NOTEBOOKS:
+        meta = _openpinch_metadata(name)
+        assert manifest_profiles[name] == meta["profile"], name
+        notebook = _load_notebook(ROOT / "OpenPinch" / "tutorials" / "notebooks" / name)
+        intro = "".join(notebook["cells"][0]["source"])
+        assert intro.startswith(f"# {meta['title']}\n"), name
+        assert f"**Level:** {meta['level']}" in intro, name
+        assert f"**Execution profile:** `{meta['profile']}`" in intro, name
+        assert f"**Expected runtime:** {meta['expected_runtime']}" in intro, name
+        assert set(meta["optional_extras"]) <= extras, name
+        for extra in meta["optional_extras"]:
+            assert f"`{extra}`" in intro, (name, extra)
+        assert notebook_metadata(name).title == meta["title"], name
+        entry = re.search(
+            rf"``{re.escape(name)}`` --.*?\(``([a-z-]+)``\)", series, re.S
+        )
+        assert entry is not None and entry.group(1) == meta["profile"], name
 
 
 def _assert_review_contract(name: str, notebook: dict) -> None:

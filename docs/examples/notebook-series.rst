@@ -65,7 +65,7 @@ HEN Design and Publication
 19. ``19_utility_placement_optimisation.ipynb`` -- entropy-based placement of
     four temperature-coupled isothermal hot/cold utility levels (no sensible
     levels) at Process and Site scope, replacement in a new case, and standard
-    GCC and Total Site Profile plots (``base`` with ``plot``).
+    GCC and Total Site Profile plots (``base``).
 
 Copy the Series
 ---------------
