@@ -39,6 +39,9 @@ workbook for review or archiving.
 .. automodule:: OpenPinch.presentation.reporting.workbook
    :members:
 
+.. automodule:: OpenPinch.presentation.reporting.hpr
+   :members:
+
 Math, Optimisation, and Utility Helpers
 ---------------------------------------
 

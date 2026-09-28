@@ -34,6 +34,7 @@ ALLOWED_SPECIALIST_IMPORTS = frozenset(
     {
         "OpenPinch.contracts.hpr",
         "OpenPinch.contracts.hpr_performance_map",
+        "OpenPinch.presentation.reporting.hpr",
     }
 )
 
@@ -440,7 +441,7 @@ def test_notebook_09_required_coolprop_calls_fail_loudly_and_are_bounded() -> No
     assert source.count("screen_optional_hpr(") == 4
     assert '"optional dependency unavailable"' in source
     assert '"method unavailable"' in source
-    assert '"typed infeasible"' in source
+    assert "return hpr_failure_summary(error)" in source
     assert "except Exception" not in source
 
 
@@ -468,7 +469,7 @@ def test_notebook_10_uses_five_isolated_scalar_shared_designs() -> None:
     assert source.count(".target.mvr_heat_pump(") == 1
     assert 'EXPECTED_PERIODS = {"turndown", "base", "peak"}' in source
     assert "assert set(details.period_ids) == EXPECTED_PERIODS" in source
-    assert "summarize_hpr_failure" in source
+    assert "hpr_failure_summary(error)" in source
     assert "except HPRTargetingError as error" in source
     assert "except Exception" not in source
 
