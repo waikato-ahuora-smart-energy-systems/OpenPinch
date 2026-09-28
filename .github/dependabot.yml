@@ -9,3 +9,15 @@ updates:
     groups:
       actions:
         patterns: ["*"]
+
+  # Refreshes uv.lock so locked (mostly transitive) packages pick up fixes.
+  # Security updates, when enabled in the repository settings, open their own
+  # PRs as soon as an alert appears; this monthly run batches everything else.
+  - package-ecosystem: uv
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: monthly
+    groups:
+      locked-dependencies:
+        patterns: ["*"]

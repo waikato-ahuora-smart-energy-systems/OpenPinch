@@ -26,7 +26,12 @@ def test_only_the_pipeline_workflows_exist():
 
 def test_ci_triggers_and_single_required_check():
     ci = workflow("ci.yml")
-    assert set(ci["on"]) == {"pull_request", "push", "workflow_dispatch", "workflow_call"}
+    assert set(ci["on"]) == {
+        "pull_request",
+        "push",
+        "workflow_dispatch",
+        "workflow_call",
+    }
     assert ci["on"]["pull_request"]["branches"] == ["develop", "main"]
     assert ci["on"]["push"]["branches"] == ["develop"]
     # Metadata edits must never re-run (and so never re-report) the gate.
@@ -68,7 +73,12 @@ def test_every_ci_lane_is_present():
     assert markers["notebooks-hpr"] == "tespy and tutorial_profile"
     smoke = jobs["smoke"]["strategy"]["matrix"]
     assert set(smoke["surface"]) == {
-        "core", "dashboard", "notebook", "brayton_cycle", "tespy", "synthesis"
+        "core",
+        "dashboard",
+        "notebook",
+        "brayton_cycle",
+        "tespy",
+        "synthesis",
     }
     assert {row["os"] for row in smoke["include"]} == {"windows-latest", "macos-latest"}
     assert "SOURCE_DATE_EPOCH" in runs(jobs["build"])
@@ -125,3 +135,10 @@ def test_version_bump_runs_once_per_release_cycle():
     assert ".bumpversion.toml" in script
     assert "check_lockfile_version.py" in script
     assert "git push origin HEAD:develop" in script
+
+
+def test_dependabot_watches_actions_and_the_uv_lock_on_develop():
+    config = yaml.safe_load((WORKFLOW_DIR.parent / "dependabot.yml").read_text())
+    updates = {entry["package-ecosystem"]: entry for entry in config["updates"]}
+    assert set(updates) == {"github-actions", "uv"}
+    assert all(entry["target-branch"] == "develop" for entry in updates.values())
