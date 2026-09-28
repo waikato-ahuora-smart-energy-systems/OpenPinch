@@ -205,8 +205,16 @@ def HX_NTU(Arrangement, eff, c, Passes=None):
 
 
 def CalcAreaUE(Arrangement, U, C_p, T_p1, T_p2, T_u1, T_u2, Passes):
-    """Estimate the exchanger ``area * U`` product from duty and temperatures."""
+    """Estimate the exchanger ``area * U`` product from duty and temperatures.
+
+    An isothermal utility (``T_u1 == T_u2``, condensing or evaporating) has
+    infinite capacity, so the process stream is Cmin and ``c = 0``.
+    """
     Q = C_p * abs(T_p1 - T_p2)
+    if T_u1 == T_u2:
+        eff = Q / C_p / abs(T_p1 - T_u1)
+        Ntu = HX_NTU(Arrangement, eff, 0.0, Passes)
+        return Ntu * C_p / U
     C_u = Q / abs(T_u1 - T_u2)
     if C_p < C_u:
         eff = Q / C_p / abs(T_p1 - T_u1)
