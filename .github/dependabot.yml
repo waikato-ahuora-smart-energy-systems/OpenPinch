@@ -14,8 +14,11 @@ updates:
   # No target-branch: Dependabot security updates only use entries for the
   # default branch (develop), and open their own PRs as soon as an alert
   # appears. This monthly run batches everything else.
+  # lockfile-only: never widen the published ranges in pyproject.toml (such as
+  # pandas<3); raising a ceiling is a deliberate change with its own tests.
   - package-ecosystem: uv
     directory: /
+    versioning-strategy: lockfile-only
     schedule:
       interval: monthly
     groups:
