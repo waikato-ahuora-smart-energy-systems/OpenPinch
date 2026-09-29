@@ -5,6 +5,7 @@ import time
 import numpy as np
 import pytest
 
+import OpenPinch.optimisation.backends._multistart as bb_ms
 import OpenPinch.optimisation.backends.bayesian as bb_bo
 import OpenPinch.optimisation.backends.cma_es as bb_cma
 import OpenPinch.optimisation.backends.dual_annealing as bb_da
@@ -34,67 +35,6 @@ class _FakePool:
 def _quadratic(x, *args):
     x = np.asarray(x, dtype=float)
     return float(np.sum(x * x))
-
-
-def test_get_cma_multiminima_empty_collection(monkeypatch):
-    monkeypatch.setattr(
-        bb_cma,
-        "_collect_cma_candidates",
-        lambda **kwargs: (np.asarray([]), np.asarray([])),
-    )
-    xs, fs = bb_cma._get_cma_multiminima_in_parallel(
-        func=_quadratic,
-        bounds=((0.0, 1.0),),
-        n_runs=1,
-    )
-    assert xs.size == 0
-    assert fs.size == 0
-
-
-def test_get_cma_multiminima_empty_polish(monkeypatch):
-    monkeypatch.setattr(
-        bb_cma,
-        "_collect_cma_candidates",
-        lambda **kwargs: (np.asarray([[0.1], [0.2]]), np.asarray([1.0, 2.0])),
-    )
-    monkeypatch.setattr(bb_cma, "_cluster_candidates", lambda **kwargs: [0])
-    monkeypatch.setattr(
-        bb_cma,
-        "_polish_candidates",
-        lambda **kwargs: (np.asarray([]), np.asarray([])),
-    )
-    xs, fs = bb_cma._get_cma_multiminima_in_parallel(
-        func=_quadratic,
-        bounds=((0.0, 1.0),),
-        n_runs=1,
-    )
-    assert xs.size == 0
-    assert fs.size == 0
-
-
-def test_collect_cma_candidates_reshape_and_pool_path(monkeypatch):
-    monkeypatch.setattr(bb_cma, "ProcessPoolExecutor", _FakePool)
-    monkeypatch.setattr(
-        bb_cma,
-        "_run_cma_single",
-        lambda run, **kwargs: ([np.array([float(run)])], [float(run)]),
-    )
-    xs, fs = bb_cma._collect_cma_candidates(
-        func=_quadratic,
-        bounds=np.asarray([[0.0, 1.0]], dtype=float),
-        x0_ls=np.asarray([0.3]),
-        args=(),
-        n_runs=2,
-        maxiter=1,
-        seed=0,
-        maxfevals=5,
-        popsize=None,
-        sigma0=None,
-        tolx=1e-8,
-        tolfun=1e-10,
-    )
-    assert xs.shape == (2, 1)
-    assert fs.shape == (2,)
 
 
 def test_run_cma_single_fixed_bounds_branch():
@@ -224,38 +164,6 @@ def test_default_cma_sigma_and_evaluate_scalar_objective_args_path():
     assert out == 10.0
 
 
-def test_get_bo_multiminima_empty_paths(monkeypatch):
-    monkeypatch.setattr(
-        bb_bo,
-        "_collect_bo_candidates",
-        lambda **kwargs: (np.asarray([]), np.asarray([])),
-    )
-    xs0, fs0 = bb_bo._get_bo_multiminima_in_parallel(
-        func=_quadratic,
-        bounds=((0.0, 1.0),),
-        n_runs=1,
-    )
-    assert xs0.size == 0
-    assert fs0.size == 0
-
-    monkeypatch.setattr(
-        bb_bo,
-        "_collect_bo_candidates",
-        lambda **kwargs: (np.asarray([[0.2]]), np.asarray([1.0])),
-    )
-    monkeypatch.setattr(bb_bo, "_cluster_candidates", lambda **kwargs: [0])
-    monkeypatch.setattr(
-        bb_bo, "_polish_candidates", lambda **kwargs: (np.asarray([]), np.asarray([]))
-    )
-    xs1, fs1 = bb_bo._get_bo_multiminima_in_parallel(
-        func=_quadratic,
-        bounds=((0.0, 1.0),),
-        n_runs=1,
-    )
-    assert xs1.size == 0
-    assert fs1.size == 0
-
-
 def test_run_bo_single_uses_random_fallback_when_gp_fit_fails(monkeypatch):
     monkeypatch.setattr(
         bb_bo,
@@ -309,32 +217,6 @@ def test_run_bo_single_jitters_duplicate_proposals(monkeypatch):
 
     assert len(xs) >= 1
     assert len(fs) >= 1
-
-
-def test_collect_bo_candidates_reshape_and_pool_path(monkeypatch):
-    monkeypatch.setattr(bb_bo, "ProcessPoolExecutor", _FakePool)
-    monkeypatch.setattr(
-        bb_bo,
-        "_run_bo_single",
-        lambda run, **kwargs: ([np.array([float(run)])], [float(run)]),
-    )
-    xs, fs = bb_bo._collect_bo_candidates(
-        func=_quadratic,
-        bounds=np.asarray([[0.0, 1.0]], dtype=float),
-        x0_ls=np.asarray([0.4]),
-        args=(),
-        n_runs=2,
-        maxiter=1,
-        seed=0,
-        maxfevals=5,
-        n_init=1,
-        acq_candidates=32,
-        lengthscale=None,
-        noise=1e-8,
-        xi=1e-3,
-    )
-    assert xs.shape == (2, 1)
-    assert fs.shape == (2,)
 
 
 def test_run_bo_single_fixed_bounds_branch():
@@ -507,66 +389,6 @@ def test_predict_bo_gp_l_none_and_solve_failure(monkeypatch):
     assert var1.shape == (1,)
 
 
-def test_get_rbf_multiminima_empty_paths(monkeypatch):
-    monkeypatch.setattr(
-        bb_rbf,
-        "_collect_rbf_surrogate_candidates",
-        lambda **kwargs: (np.asarray([]), np.asarray([])),
-    )
-    xs0, fs0 = bb_rbf._get_rbf_surrogate_multiminima_in_parallel(
-        func=_quadratic,
-        bounds=((0.0, 1.0),),
-        n_runs=1,
-    )
-    assert xs0.size == 0
-    assert fs0.size == 0
-
-    monkeypatch.setattr(
-        bb_rbf,
-        "_collect_rbf_surrogate_candidates",
-        lambda **kwargs: (np.asarray([[0.2]]), np.asarray([1.0])),
-    )
-    monkeypatch.setattr(bb_rbf, "_cluster_candidates", lambda **kwargs: [0])
-    monkeypatch.setattr(
-        bb_rbf, "_polish_candidates", lambda **kwargs: (np.asarray([]), np.asarray([]))
-    )
-    xs1, fs1 = bb_rbf._get_rbf_surrogate_multiminima_in_parallel(
-        func=_quadratic,
-        bounds=((0.0, 1.0),),
-        n_runs=1,
-    )
-    assert xs1.size == 0
-    assert fs1.size == 0
-
-
-def test_collect_rbf_candidates_reshape_and_pool_path(monkeypatch):
-    monkeypatch.setattr(bb_rbf, "ProcessPoolExecutor", _FakePool)
-    monkeypatch.setattr(
-        bb_rbf,
-        "_run_rbf_surrogate_single",
-        lambda run, **kwargs: ([np.array([float(run)])], [float(run)]),
-    )
-    xs, fs = bb_rbf._collect_rbf_surrogate_candidates(
-        func=_quadratic,
-        bounds=np.asarray([[0.0, 1.0]], dtype=float),
-        x0_ls=np.asarray([0.4]),
-        args=(),
-        n_runs=2,
-        maxiter=1,
-        seed=0,
-        maxfevals=5,
-        n_init=1,
-        n_candidates=16,
-        kernel="cubic",
-        epsilon=1.0,
-        smoothing=1e-8,
-        degree=1,
-        distance_tol=1e-6,
-    )
-    assert xs.shape == (2, 1)
-    assert fs.shape == (2,)
-
-
 def test_run_rbf_single_fixed_bounds_branch():
     xs, fs = bb_rbf._run_rbf_surrogate_single(
         run=0,
@@ -687,31 +509,6 @@ def test_propose_rbf_candidate_uses_farthest_point_when_merit_pick_is_too_close(
     )
 
     np.testing.assert_allclose(out, np.asarray([0.9]))
-
-
-def test_collect_da_candidates_pool_success(monkeypatch):
-    monkeypatch.setattr(bb_da, "ProcessPoolExecutor", _FakePool)
-    monkeypatch.setattr(
-        bb_da,
-        "_run_da_single",
-        lambda run, **kwargs: ([np.array([float(run)])], [float(run)]),
-    )
-    xs, fs = bb_da._collect_da_candidates(
-        func=_quadratic,
-        bounds=((0.0, 1.0),),
-        x0_ls=None,
-        args=(),
-        n_runs=2,
-        maxiter=1,
-        seed=0,
-        initial_temp=10.0,
-        restart_temp_ratio=1e-3,
-        visit=2.0,
-        accept=-5.0,
-        maxfun=50,
-    )
-    assert xs.shape == (2, 1)
-    assert fs.shape == (2,)
 
 
 def test_cluster_candidates_zero_span_branch():
@@ -1018,3 +815,135 @@ def test_benchmark_dual_annealing_vs_cmaes_on_rippled_rosenbrock():
     assert cma["elapsed_s"] <= 5.0 * da["elapsed_s"] + 0.1
     assert bo["elapsed_s"] <= 200.0 * da["elapsed_s"] + 1.0
     assert rbf["elapsed_s"] <= 200.0 * da["elapsed_s"] + 1.0
+
+
+# Shared multistart plumbing, checked once per backend.
+
+_BACKENDS = {
+    "dual_annealing": (bb_da, "_get_da_multiminima_in_parallel", "_run_da_single"),
+    "cmaes": (bb_cma, "_get_cma_multiminima_in_parallel", "_run_cma_single"),
+    "bo": (bb_bo, "_get_bo_multiminima_in_parallel", "_run_bo_single"),
+    "rbf_surrogate": (
+        bb_rbf,
+        "_get_rbf_surrogate_multiminima_in_parallel",
+        "_run_rbf_surrogate_single",
+    ),
+}
+_RUN_OPTIONS = {
+    "dual_annealing": {
+        "maxiter",
+        "seed",
+        "initial_temp",
+        "restart_temp_ratio",
+        "visit",
+        "accept",
+        "maxfun",
+    },
+    "cmaes": {"maxiter", "seed", "maxfevals", "popsize", "sigma0", "tolx", "tolfun"},
+    "bo": {
+        "maxiter",
+        "seed",
+        "maxfevals",
+        "n_init",
+        "acq_candidates",
+        "lengthscale",
+        "noise",
+        "xi",
+    },
+    "rbf_surrogate": {
+        "maxiter",
+        "seed",
+        "maxfevals",
+        "n_init",
+        "n_candidates",
+        "kernel",
+        "epsilon",
+        "smoothing",
+        "degree",
+        "distance_tol",
+    },
+}
+
+
+@pytest.mark.parametrize("method", sorted(_BACKENDS))
+def test_backend_entry_forwards_its_options_to_each_run(monkeypatch, method):
+    module, entry, run_name = _BACKENDS[method]
+    calls = []
+
+    def fake_run(run, **kwargs):
+        calls.append((run, kwargs))
+        return [np.array([0.5])], [0.25]
+
+    monkeypatch.setattr(module, run_name, fake_run)
+    getattr(module, entry)(
+        func=_quadratic,
+        bounds=((0.0, 1.0),),
+        x0_ls=[0.3],
+        n_runs=1,
+        seed=5,
+        maxfun=77,
+        local_method="L-BFGS-B",
+    )
+
+    [(run, kwargs)] = calls
+    assert run == 0
+    assert set(kwargs) == {"func", "bounds", "x0_ls", "args"} | _RUN_OPTIONS[method]
+    assert kwargs["seed"] == 5
+    np.testing.assert_array_equal(kwargs["bounds"], [[0.0, 1.0]])
+    np.testing.assert_array_equal(kwargs["x0_ls"], [[0.3]])
+    if "maxfevals" in kwargs:
+        assert kwargs["maxfevals"] == 77  # falls back to maxfun
+
+
+@pytest.mark.parametrize("method", sorted(_BACKENDS))
+def test_backend_entry_returns_empty_when_runs_find_nothing(monkeypatch, method):
+    module, entry, _ = _BACKENDS[method]
+    monkeypatch.setattr(
+        bb_ms,
+        "collect_candidates",
+        lambda *args, **kwargs: (np.asarray([]), np.asarray([])),
+    )
+    xs, fs = getattr(module, entry)(func=_quadratic, bounds=((0.0, 1.0),), n_runs=1)
+    assert xs.size == 0
+    assert fs.size == 0
+
+
+@pytest.mark.parametrize("method", sorted(_BACKENDS))
+def test_backend_entry_returns_empty_when_polishing_keeps_nothing(monkeypatch, method):
+    module, entry, _ = _BACKENDS[method]
+    monkeypatch.setattr(
+        bb_ms,
+        "collect_candidates",
+        lambda *args, **kwargs: (np.asarray([[0.1], [0.2]]), np.asarray([1.0, 2.0])),
+    )
+    monkeypatch.setattr(bb_ms, "_cluster_candidates", lambda **kwargs: [0])
+    monkeypatch.setattr(
+        bb_ms,
+        "_polish_candidates",
+        lambda **kwargs: (np.asarray([]), np.asarray([])),
+    )
+    xs, fs = getattr(module, entry)(func=_quadratic, bounds=((0.0, 1.0),), n_runs=1)
+    assert xs.size == 0
+    assert fs.size == 0
+
+
+def test_collect_candidates_reshapes_seed_and_pools_runs(monkeypatch):
+    monkeypatch.setattr(bb_ms, "ProcessPoolExecutor", _FakePool)
+    seen = []
+
+    def fake_run(run, *, x0_ls, **kwargs):
+        seen.append(x0_ls)
+        return [np.array([float(run)])], [float(run)]
+
+    xs, fs = bb_ms.collect_candidates(
+        fake_run,
+        func=_quadratic,
+        bounds=np.asarray([[0.0, 1.0]], dtype=float),
+        x0_ls=np.asarray([0.4]),
+        args=(),
+        n_runs=2,
+        maxiter=1,
+    )
+    assert xs.shape == (2, 1)
+    np.testing.assert_array_equal(fs, [0.0, 1.0])
+    assert all(x0.shape == (1, 1) for x0 in seen)

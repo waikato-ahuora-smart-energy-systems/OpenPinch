@@ -1,20 +1,12 @@
 """Dual-annealing multi-start backend."""
 
 import os
-from concurrent.futures import ProcessPoolExecutor
-from concurrent.futures.process import BrokenProcessPool
-from functools import partial
 from typing import Callable
 
 import numpy as np
 from scipy.optimize import dual_annealing
 
-from ..candidates import (
-    _cluster_candidates,
-    _polish_candidates,
-    _postprocess_candidates,
-)
-from ..execution import _collect_candidates_in_parallel
+from ._multistart import run_multistart
 
 
 def _get_da_multiminima_in_parallel(
@@ -36,57 +28,17 @@ def _get_da_multiminima_in_parallel(
     local_method="SLSQP",
 ):
     """Return deduplicated local minima from multi-start dual annealing."""
-    bounds = np.asarray(bounds, dtype=float)
-    all_x, all_f = _collect_da_candidates(
-        func=func,
-        bounds=bounds,
-        x0_ls=x0_ls,
-        args=args,
-        n_runs=n_runs,
-        maxiter=maxiter,
-        seed=seed,
-        initial_temp=initial_temp,
-        restart_temp_ratio=restart_temp_ratio,
-        visit=visit,
-        accept=accept,
-        maxfun=maxfun,
-    )
-    return _postprocess_candidates(
-        func=func,
-        args=args,
-        bounds=bounds,
-        constraints=constraints,
-        all_x=all_x,
-        all_f=all_f,
-        cluster_tol=cluster_tol,
-        max_minima=max_minima,
-        local_method=local_method,
-        cluster_fn=_cluster_candidates,
-        polish_fn=_polish_candidates,
-    )
-
-
-def _collect_da_candidates(
-    func: Callable,
-    bounds: tuple,
-    x0_ls: np.ndarray,
-    args: dict,
-    n_runs: int,
-    maxiter: int,
-    seed: int,
-    initial_temp: float,
-    restart_temp_ratio: float,
-    visit: float,
-    accept: float,
-    maxfun: int,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Collect candidate minima from multiple dual-annealing runs."""
-    run_fn = partial(
+    return run_multistart(
         _run_da_single,
         func=func,
         bounds=bounds,
         x0_ls=x0_ls,
         args=args,
+        constraints=constraints,
+        n_runs=n_runs,
+        cluster_tol=cluster_tol,
+        max_minima=max_minima,
+        local_method=local_method,
         maxiter=maxiter,
         seed=seed,
         initial_temp=initial_temp,
@@ -94,12 +46,6 @@ def _collect_da_candidates(
         visit=visit,
         accept=accept,
         maxfun=maxfun,
-    )
-    return _collect_candidates_in_parallel(
-        run_fn=run_fn,
-        n_runs=n_runs,
-        pool_executor_cls=ProcessPoolExecutor,
-        broken_pool_exc=BrokenProcessPool,
     )
 
 
