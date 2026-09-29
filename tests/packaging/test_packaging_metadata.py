@@ -338,7 +338,7 @@ def test_core_dependencies_have_required_coolprop_floor_and_other_major_ceilings
     assert dependencies == [
         "numpy<3",
         "pint<1",
-        "pandas<3",
+        "pandas<4",
         "CoolProp>=8",
         "pydantic<3",
         "scipy<2",
