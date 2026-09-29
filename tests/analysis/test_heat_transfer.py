@@ -3,6 +3,8 @@
 import math
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 import OpenPinch.analysis.heat_transfer as hx
 from OpenPinch.analysis.heat_transfer import *
@@ -315,3 +317,51 @@ def test_calc_area_ue_rejects_an_outlet_beyond_the_utility_temperature():
         hx.CalcAreaUE(
             HX.CondEvap, U=100, C_p=500, T_p1=150, T_p2=40, T_u1=50, T_u2=50, Passes=1
         )
+
+
+def test_calc_area_ue_rejects_a_process_moving_away_from_the_utility():
+    # A 50 degC utility cannot heat the process from 100 to 125 degC ...
+    with pytest.raises(ValueError, match="toward the utility"):
+        hx.CalcAreaUE(
+            HX.CondEvap, U=100, C_p=500, T_p1=100, T_p2=125, T_u1=50, T_u2=50, Passes=1
+        )
+    # ... and a 150 degC utility cannot cool it from 100 to 75 degC.
+    with pytest.raises(ValueError, match="toward the utility"):
+        hx.CalcAreaUE(
+            HX.CondEvap, U=100, C_p=500, T_p1=100, T_p2=75, T_u1=150, T_u2=150, Passes=1
+        )
+
+
+_temperature = st.floats(min_value=-50.0, max_value=500.0, allow_nan=False)
+_positive = st.floats(min_value=1e-2, max_value=1e4, allow_nan=False)
+
+
+@settings(deadline=None, max_examples=200)
+@given(
+    T_p1=_temperature,
+    utility_offset=st.floats(min_value=1.0, max_value=300.0),
+    heating=st.booleans(),
+    fraction=st.floats(min_value=0.0, max_value=1.5),
+    C_p=_positive,
+    U=_positive,
+)
+def test_isothermal_area_invariants(T_p1, utility_offset, heating, fraction, C_p, U):
+    # Process moves from T_p1 toward an isothermal utility at T_u by `fraction` of
+    # the available difference: finite area below 1, unbounded at 1, rejected above.
+    T_u = T_p1 + utility_offset if heating else T_p1 - utility_offset
+    T_p2 = T_p1 + fraction * (T_u - T_p1)
+    eff = abs(T_p2 - T_p1) / abs(T_u - T_p1)
+    args = dict(U=U, C_p=C_p, T_p1=T_p1, T_p2=T_p2, T_u1=T_u, T_u2=T_u, Passes=1)
+    if eff > 1.0 + 1e-9:
+        with pytest.raises(ValueError, match="exceeds 1"):
+            hx.CalcAreaUE(HX.CondEvap, **args)
+    elif eff >= 1.0 - 1e-9:
+        assert hx.CalcAreaUE(HX.CondEvap, **args) == math.inf
+    else:
+        area_ue = hx.CalcAreaUE(HX.CondEvap, **args)
+        assert area_ue == pytest.approx(-math.log(1.0 - eff) * C_p / U, rel=1e-9)
+        assert area_ue >= 0.0
+        # Moving the other way from the same utility is infeasible.
+        if T_p2 != T_p1:
+            with pytest.raises(ValueError, match="toward the utility"):
+                hx.CalcAreaUE(HX.CondEvap, **{**args, "T_p2": T_p1 - (T_p2 - T_p1)})

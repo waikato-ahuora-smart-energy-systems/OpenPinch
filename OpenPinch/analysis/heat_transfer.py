@@ -220,10 +220,17 @@ def CalcAreaUE(Arrangement, U, C_p, T_p1, T_p2, T_u1, T_u2, Passes):
     An isothermal utility (``T_u1 == T_u2``, condensing or evaporating) has
     infinite capacity, so the process stream is Cmin and ``c = 0``. A duty that
     needs unit effectiveness (a zero terminal approach) needs unbounded area and
-    returns ``inf``; one that needs more than unit effectiveness raises
-    ``ValueError``.
+    returns ``inf``. Heat must flow from hot to cold: a process stream moving away
+    from the utility temperature, a utility changing in the same direction as the
+    process, or a duty needing more than unit effectiveness raises ``ValueError``.
     """
     Q = C_p * abs(T_p1 - T_p2)
+    process_change = T_p2 - T_p1
+    if process_change * (T_u1 - T_p1) < 0 or process_change * (T_u2 - T_u1) > 0:
+        raise ValueError(
+            "Infeasible exchange: the process stream must move toward the utility "
+            "inlet temperature and the utility must change in the opposite direction."
+        )
     if T_u1 == T_u2:
         C_min, c = C_p, 0.0
     else:
