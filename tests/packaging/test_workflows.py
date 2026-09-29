@@ -145,3 +145,5 @@ def test_dependabot_watches_actions_and_the_uv_lock():
     # Security updates only honour default-branch entries (develop is the
     # repository's default branch), so the uv entry must not set target-branch.
     assert "target-branch" not in updates["uv"]
+    # Version updates must not widen the dependency ranges users install with.
+    assert updates["uv"]["versioning-strategy"] == "lockfile-only"
