@@ -34,8 +34,15 @@ from ..optimisation_adapter import (
 )
 from ._shared import plotting as _plotting
 from ._shared import streams as _streams
-from ._shared.ambient_preallocation import (
-    preallocate_direct_ambient_duties as _preallocate_direct_ambient_duties,
+from ._shared.air import (
+    CascadeWithAir,
+    cascade_with_air,
+)
+from ._shared.air import (
+    ambient_sink_temperature as _ambient_sink_temperature,
+)
+from ._shared.air import (
+    ambient_source_temperature as _ambient_source_temperature,
 )
 
 __all__ = [
@@ -143,6 +150,30 @@ def calc_simulated_hpr_annualized_costs(
     )
 
 
+def _cascade_air_duties(
+    hot_streams: StreamCollection,
+    cold_streams: StreamCollection,
+    args: HeatPumpTargetInputs,
+    T_air_source: float,
+    T_air_sink: float,
+) -> CascadeWithAir:
+    """Cascade the streams and let free ambient air cover what it can."""
+    if not len(hot_streams) and not len(cold_streams):
+        return CascadeWithAir(0.0, 0.0, 0.0, 0.0)
+    pt = _cascade.get_process_heat_cascade(
+        hot_streams=hot_streams,
+        cold_streams=cold_streams,
+        is_shifted=True,
+        period_idx=args.period_idx,
+    )
+    return cascade_with_air(
+        np.asarray(pt[ProblemTableLabel.T], dtype=float),
+        np.asarray(pt[ProblemTableLabel.H_NET], dtype=float),
+        T_air_source=T_air_source,
+        T_air_sink=T_air_sink,
+    )
+
+
 def evaluate_carnot_hpr_result(
     *,
     args: HeatPumpTargetInputs,
@@ -164,33 +195,48 @@ def evaluate_carnot_hpr_result(
     artifact_mode: HPREvaluationMode = HPREvaluationMode.FINAL,
 ) -> HPRBackendResult:
     """Shared Carnot-family accounting, plotting, and result assembly."""
-    H_cold_with_amb = args.H_cold + args.z_amb_cold * state.Q_amb_cold
-    H_hot_with_amb = args.H_hot + args.z_amb_hot * state.Q_amb_hot
-
+    hpr_streams = _streams.get_carnot_hpr_cycle_streams(
+        state.T_cond,
+        Q_cond_total,
+        state.T_evap,
+        Q_evap_total,
+        args,
+    )
+    T_air_source = _ambient_source_temperature(args)
+    T_air_sink = _ambient_sink_temperature(args)
+    cond = _cascade_air_duties(
+        hpr_streams.get_hot_utility_streams(),
+        args.bckgrd_cold_streams,
+        args,
+        T_air_source,
+        T_air_sink,
+    )
+    evap = _cascade_air_duties(
+        args.bckgrd_hot_streams,
+        hpr_streams.get_cold_utility_streams(),
+        args,
+        T_air_source,
+        T_air_sink,
+    )
     Q_ext_heat, Q_ext_cold, penalty, obj = _build_hpr_accounting(
         work=float(w_net),
-        Q_ext_heat=np.abs(H_cold_with_amb[0]) - Q_cond_total.sum(),
-        Q_ext_cold=np.abs(H_hot_with_amb[-1]) - Q_evap_total.sum(),
+        Q_ext_heat=cond.Q_ext_top,
+        Q_ext_cold=evap.Q_ext_bottom,
         args=args,
-        penalty_terms=penalty_terms,
+        penalty_terms=[
+            *_normalise_hpr_penalty_terms(penalty_terms),
+            cond.Q_ext_bottom,
+            evap.Q_ext_top,
+        ],
         penalise_external_cold_when_refrigerating=True,
     )
-    hpr_streams = None
     debug_figure = None
-    if artifact_mode is HPREvaluationMode.FINAL:
-        hpr_streams = _streams.get_carnot_hpr_cycle_streams(
-            state.T_cond,
-            Q_cond_total,
-            state.T_evap,
-            Q_evap_total,
-            args,
-        )
     if debug and artifact_mode is HPREvaluationMode.FINAL:
         debug_figure = _plotting.plot_multi_hp_profiles_from_results(
             args.T_hot,
-            H_hot_with_amb,
+            args.H_hot,
             args.T_cold,
-            H_cold_with_amb,
+            args.H_cold,
             hpr_streams.get_hot_utility_streams(),
             hpr_streams.get_cold_utility_streams(),
             title=(
@@ -212,8 +258,8 @@ def evaluate_carnot_hpr_result(
         heat_recovery=heat_recovery,
         Q_ext_heat=Q_ext_heat,
         Q_ext_cold=Q_ext_cold,
-        Q_amb_hot=state.Q_amb_hot,
-        Q_amb_cold=state.Q_amb_cold,
+        Q_amb_hot=cond.Q_air_source + evap.Q_air_source,
+        Q_amb_cold=cond.Q_air_sink + evap.Q_air_sink,
         cop_h=cop_h,
         eta_he=eta_he,
         T_cond=state.T_cond,
@@ -248,54 +294,29 @@ def evaluate_vapour_hpr_result(
     artifact_mode: HPREvaluationMode = HPREvaluationMode.FINAL,
 ) -> HPRBackendResult:
     """Shared simulated-vapour accounting, plotting, and result assembly."""
-    ambient_prealloc = _preallocate_direct_ambient_duties(
-        args=args,
-        Q_amb_hot=state.Q_amb_hot,
-        Q_amb_cold=state.Q_amb_cold,
-    )
-    H_hot_with_amb = ambient_prealloc.H_hot_with_residual_ambient(args)
-    H_cold_with_amb = ambient_prealloc.H_cold_with_residual_ambient(args)
+    # Ambient air is a free utility in each cascade: it supplies heat below its
+    # source temperature and takes heat above its sink temperature, only as
+    # far as the cascade needs it.
+    T_air_source = _ambient_source_temperature(args)
+    T_air_sink = _ambient_sink_temperature(args)
 
     cond_hot_streams = hpr_streams.get_hot_utility_streams()
-    cond_cold_streams = (
-        ambient_prealloc.bckgrd_cold_streams
-        + _streams.get_ambient_air_stream(
-            Q_amb_cold=ambient_prealloc.Q_amb_cold_residual,
-            args=args,
-        )
+    cond_cold_streams = args.bckgrd_cold_streams
+    cond = _cascade_air_duties(
+        cond_hot_streams, cond_cold_streams, args, T_air_source, T_air_sink
     )
-    if len(cond_hot_streams) or len(cond_cold_streams):
-        pt_cond = _cascade.get_process_heat_cascade(
-            hot_streams=cond_hot_streams,
-            cold_streams=cond_cold_streams,
-            is_shifted=True,
-            period_idx=args.period_idx,
-        )
-        Q_ext_heat = float(pt_cond[ProblemTableLabel.H_NET][0])
-        cond_wrong_side = float(pt_cond[ProblemTableLabel.H_NET][-1])
-    else:
-        Q_ext_heat = 0.0
-        cond_wrong_side = 0.0
-    evap_hot_streams = (
-        ambient_prealloc.bckgrd_hot_streams
-        + _streams.get_ambient_air_stream(
-            Q_amb_hot=ambient_prealloc.Q_amb_hot_residual,
-            args=args,
-        )
-    )
+    Q_ext_heat = cond.Q_ext_top
+    cond_wrong_side = cond.Q_ext_bottom
+
+    evap_hot_streams = args.bckgrd_hot_streams
     evap_cold_streams = hpr_streams.get_cold_utility_streams()
-    if len(evap_hot_streams) or len(evap_cold_streams):
-        pt_evap = _cascade.get_process_heat_cascade(
-            hot_streams=evap_hot_streams,
-            cold_streams=evap_cold_streams,
-            is_shifted=True,
-            period_idx=args.period_idx,
-        )
-        Q_ext_cold = float(pt_evap[ProblemTableLabel.H_NET][-1])
-        evap_wrong_side = float(pt_evap[ProblemTableLabel.H_NET][0])
-    else:
-        Q_ext_cold = 0.0
-        evap_wrong_side = 0.0
+    evap = _cascade_air_duties(
+        evap_hot_streams, evap_cold_streams, args, T_air_source, T_air_sink
+    )
+    Q_ext_cold = evap.Q_ext_bottom
+    evap_wrong_side = evap.Q_ext_top
+    Q_amb_hot = cond.Q_air_source + evap.Q_air_source
+    Q_amb_cold = cond.Q_air_sink + evap.Q_air_sink
     hx_units = (
         len(cond_hot_streams)
         + len(cond_cold_streams)
@@ -327,10 +348,10 @@ def evaluate_vapour_hpr_result(
     debug_figure = None
     if debug and artifact_mode is HPREvaluationMode.FINAL:
         debug_figure = _plotting.plot_multi_hp_profiles_from_results(
-            ambient_prealloc.T_hot_residual,
-            H_hot_with_amb,
-            ambient_prealloc.T_cold_residual,
-            H_cold_with_amb,
+            args.T_hot,
+            args.H_hot,
+            args.T_cold,
+            args.H_cold,
             hpr_streams.get_hot_utility_streams(),
             hpr_streams.get_cold_utility_streams(),
             title=(
@@ -357,8 +378,8 @@ def evaluate_vapour_hpr_result(
             cost_accounting.hpr_heat_exchanger_capital_cost
         ),
         feasibility_penalty=penalty,
-        Q_amb_hot=state.Q_amb_hot,
-        Q_amb_cold=state.Q_amb_cold,
+        Q_amb_hot=Q_amb_hot,
+        Q_amb_cold=Q_amb_cold,
         cop_h=float(cop_h),
         T_cond=state.T_cond,
         T_evap=state.T_evap,

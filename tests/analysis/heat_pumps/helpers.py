@@ -5,6 +5,9 @@ from types import SimpleNamespace
 import numpy as np
 
 import OpenPinch.analysis.heat_pumps.service as hp
+from OpenPinch.analysis.heat_pumps.common.preprocessing import (
+    _create_stream_collection_of_background_profile,
+)
 from OpenPinch.domain.enums import HeatPumpAndRefrigerationCycle, ProblemTableLabel
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream import Stream
@@ -99,22 +102,6 @@ def _base_args(**overrides):
         "do_refrigerant_sort": False,
         "initialise_simulated_cycle": True,
         "allow_integrated_expander": True,
-        "bckgrd_hot_streams": _sc(
-            Stream(
-                name="H",
-                supply_temperature=120.0,
-                target_temperature=80.0,
-                heat_flow=50.0,
-            )
-        ),
-        "bckgrd_cold_streams": _sc(
-            Stream(
-                name="C",
-                supply_temperature=30.0,
-                target_temperature=60.0,
-                heat_flow=40.0,
-            )
-        ),
         "bb_minimiser": "rbf_surrogate",
         "eta_penalty": 0.001,
         "rho_penalty": 10.0,
@@ -124,6 +111,15 @@ def _base_args(**overrides):
     args.update(overrides)
     args.setdefault("Q_heat_max", float(args["H_cold"][0]))
     args.setdefault("Q_cool_max", float(-args["H_hot"][-1]))
+    # Background streams follow the profiles, as preprocessing builds them.
+    args.setdefault(
+        "bckgrd_hot_streams",
+        _create_stream_collection_of_background_profile(args["T_hot"], args["H_hot"]),
+    )
+    args.setdefault(
+        "bckgrd_cold_streams",
+        _create_stream_collection_of_background_profile(args["T_cold"], args["H_cold"]),
+    )
     return SimpleNamespace(**args)
 
 

@@ -11,19 +11,15 @@ from ....contracts.hpr import (
     HPRParsedState,
     HPRTopologyIdentifier,
 )
-from ..common._shared.ambient_preallocation import preallocate_direct_ambient_duties
 from ..common._shared.streams import get_Q_vals_at_T_hpr_from_bckgrd_profile
 from ..common.encoding import (
-    AMBIENT_X_BOUNDS,
     DutyAllocationRequest,
     decode_available_fractions,
     encode_available_fractions,
     limit_available_duty,
-    map_Q_amb_to_x,
     map_T_arr_to_x_arr,
     map_x_arr_to_DT_arr,
     map_x_arr_to_T_arr,
-    map_x_to_Q_amb,
 )
 from ..common.layout import HPRoptVectorLayout
 from ..common.multi_vc_objective import _evaluate_multi_vc_objective
@@ -101,7 +97,6 @@ def _get_parallel_hp_opt_setup(
     is_heat_pumping = getattr(args, "is_heat_pumping", True)
     layout = _parallel_layout(args)
     bnds = layout.build_bounds(
-        x_amb=AMBIENT_X_BOUNDS,
         x_cond=(0.0, 1.0),
         x_evap=(0.0, 1.0),
         x_subcool=(0.0, 1.0),
@@ -112,11 +107,6 @@ def _get_parallel_hp_opt_setup(
     if init_res is None:
         return None, bnds
 
-    x_amb = map_Q_amb_to_x(
-        init_res.Q_amb_hot,
-        init_res.Q_amb_cold,
-        max(args.Q_heat_max, args.Q_cool_max),
-    )
     # The Carnot warm start knows nothing about critical points, so clip it
     # into the refrigerant's subcritical condensing range.
     x_cond = np.clip(
@@ -131,7 +121,6 @@ def _get_parallel_hp_opt_setup(
     init_primary_duty = init_res.Q_cond if is_heat_pumping else init_res.Q_evap
     x_ihx = [0.0] * int(args.n_cond)
     pack_kwargs = {
-        "x_amb": x_amb,
         "x_cond": x_cond,
         "x_evap": x_evap,
         "x_subcool": x_subcool,
@@ -160,7 +149,6 @@ def _parse_parallel_hp_state_temperatures(
 ) -> HPRParsedState:
     is_heat_pumping = getattr(args, "is_heat_pumping", True)
     parts = _parallel_layout(args).unpack(x)
-    x_amb = parts["x_amb"]
     x_cond = parts["x_cond"]
     x_evap = parts["x_evap"]
     x_subcool = parts["x_subcool"]
@@ -168,14 +156,6 @@ def _parse_parallel_hp_state_temperatures(
     x_cool_split = parts["x_cool_split"]
     x_ihx = parts["x_ihx"]
 
-    Q_amb_hot, Q_amb_cold = map_x_to_Q_amb(x_amb, max(args.Q_heat_max, args.Q_cool_max))
-    ambient = preallocate_direct_ambient_duties(
-        args=args,
-        Q_amb_hot=Q_amb_hot,
-        Q_amb_cold=Q_amb_cold,
-    )
-    H_cold_with_amb = ambient.H_cold_with_residual_ambient(args)
-    H_hot_with_amb = ambient.H_hot_with_residual_ambient(args)
     T_cond = map_x_arr_to_T_arr(x_cond, *condensing_temperature_search_range(args))
     T_evap = map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0])
     dT_subcool = map_x_arr_to_DT_arr(x_subcool, T_cond, T_evap)
@@ -183,11 +163,11 @@ def _parse_parallel_hp_state_temperatures(
         limit_available_duty(
             get_Q_vals_at_T_hpr_from_bckgrd_profile(
                 T_cond,
-                ambient.T_cold_residual,
-                H_cold_with_amb,
+                args.T_cold,
+                args.H_cold,
                 is_cond=True,
             ),
-            ambient.Q_heat_capacity,
+            args.Q_heat_max,
         )
         if is_heat_pumping
         else None
@@ -198,11 +178,11 @@ def _parse_parallel_hp_state_temperatures(
         else limit_available_duty(
             get_Q_vals_at_T_hpr_from_bckgrd_profile(
                 T_evap,
-                ambient.T_hot_residual,
-                H_hot_with_amb,
+                args.T_hot,
+                args.H_hot,
                 is_cond=False,
             ),
-            ambient.Q_cool_capacity,
+            args.Q_cool_max,
         )
     )
     Q_heat_base = (
@@ -220,12 +200,6 @@ def _parse_parallel_hp_state_temperatures(
         T_cond=T_cond,
         dT_subcool=dT_subcool,
         T_evap=T_evap,
-        Q_amb_hot=Q_amb_hot,
-        Q_amb_cold=Q_amb_cold,
-        Q_amb_hot_direct=ambient.Q_amb_hot_direct,
-        Q_amb_cold_direct=ambient.Q_amb_cold_direct,
-        Q_amb_hot_residual=ambient.Q_amb_hot_residual,
-        Q_amb_cold_residual=ambient.Q_amb_cold_residual,
         dT_ihx_gas_side=dT_ihx_gas_side,
         Q_heat_base=Q_heat_base,
         Q_cool_base=Q_cool_base,

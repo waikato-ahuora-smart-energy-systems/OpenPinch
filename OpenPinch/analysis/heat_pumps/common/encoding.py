@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -11,7 +11,6 @@ if TYPE_CHECKING:
     from ....contracts.hpr import HPRParsedState
 
 __all__ = [
-    "AMBIENT_X_BOUNDS",
     "DutyAllocation",
     "DutyAllocationRequest",
     "StageDutyRequest",
@@ -25,13 +24,9 @@ __all__ = [
     "map_DT_arr_to_x_arr",
     "map_x_arr_to_Q_arr",
     "map_Q_arr_to_x_arr",
-    "map_x_to_Q_amb",
-    "map_Q_amb_to_x",
     "require_stage_duty_allocation",
 ]
 
-MAX_AMBIENT_X_ABS = 0.999
-AMBIENT_X_BOUNDS = (-MAX_AMBIENT_X_ABS, MAX_AMBIENT_X_ABS)
 
 
 @dataclass(frozen=True)
@@ -232,37 +227,3 @@ def map_Q_arr_to_x_arr(
 ) -> np.ndarray:
     """Normalise heat duties back into optimisation fractions."""
     return np.where(Q_max != 0, Q_arr / Q_max, 0.0)
-
-
-def map_x_to_Q_amb(
-    x: float,
-    scale: float,
-) -> Tuple[float, float]:
-    """Split one signed bounded ambient variable into hot and cold duties.
-
-    ``x`` is interpreted on the open interval ``(-1, 1)`` and decoded through
-    ``atanh`` so the mapping stays close to linear around zero while ambient
-    duties remain unbounded.
-    """
-    if scale <= 0.0:
-        return 0.0, 0.0
-
-    x_arr = np.asarray(x, dtype=float)
-    x_clip = np.clip(x_arr, -MAX_AMBIENT_X_ABS, MAX_AMBIENT_X_ABS)
-    q_signed = scale * np.arctanh(x_clip)
-    q_hot = np.maximum(-q_signed, 0.0)
-    q_cold = np.maximum(q_signed, 0.0)
-    return float(q_hot), float(q_cold)
-
-
-def map_Q_amb_to_x(
-    Q_amb_hot: float,
-    Q_amb_cold: float,
-    scale: float,
-) -> float:
-    """Encode ambient duties back into one bounded signed decision variable."""
-    if scale <= 0.0:
-        return 0.0
-
-    q_signed = float(Q_amb_cold) - float(Q_amb_hot)
-    return float(np.tanh(q_signed / scale))

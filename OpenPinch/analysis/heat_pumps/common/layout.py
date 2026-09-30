@@ -14,7 +14,6 @@ __all__ = ["HPRoptVectorLayout"]
 class HPRoptVectorLayout:
     """Canonical section layout for Heat Pump targeting optimisation vectors."""
 
-    n_amb: int = 1
     n_cond: int = 0
     n_evap: int = 0
     n_subcool: int = 0
@@ -23,7 +22,6 @@ class HPRoptVectorLayout:
     n_ihx: int = 0
     n_misc: int = 0
     _size: int = field(init=False, repr=False)
-    _amb_slice: slice = field(init=False, repr=False)
     _cond_slice: slice = field(init=False, repr=False)
     _evap_slice: slice = field(init=False, repr=False)
     _subcool_slice: slice = field(init=False, repr=False)
@@ -34,7 +32,6 @@ class HPRoptVectorLayout:
 
     def __post_init__(self) -> None:
         for name in (
-            "n_amb",
             "n_cond",
             "n_evap",
             "n_subcool",
@@ -48,7 +45,6 @@ class HPRoptVectorLayout:
 
         start = 0
         for section_name, count in (
-            ("amb", self.n_amb),
             ("cond", self.n_cond),
             ("evap", self.n_evap),
             ("subcool", self.n_subcool),
@@ -66,10 +62,6 @@ class HPRoptVectorLayout:
     @property
     def size(self) -> int:
         return self._size
-
-    @property
-    def amb_slice(self) -> slice:
-        return self._amb_slice
 
     @property
     def cond_slice(self) -> slice:
@@ -102,7 +94,6 @@ class HPRoptVectorLayout:
     def pack(
         self,
         *,
-        x_amb: float | Sequence[float] = 0.0,
         x_cond: Sequence[float] = (),
         x_evap: Sequence[float] = (),
         x_subcool: Sequence[float] = (),
@@ -113,7 +104,6 @@ class HPRoptVectorLayout:
     ) -> np.ndarray:
         """Pack named optimisation blocks into one canonical vector."""
         blocks = [
-            self._coerce_block("x_amb", x_amb, self.n_amb),
             self._coerce_block("x_cond", x_cond, self.n_cond),
             self._coerce_block("x_evap", x_evap, self.n_evap),
             self._coerce_block("x_subcool", x_subcool, self.n_subcool),
@@ -132,9 +122,7 @@ class HPRoptVectorLayout:
                 f"Expected optimisation vector of size {self.size}, got {vec.size}."
             )
 
-        amb = vec[self.amb_slice]
         return {
-            "x_amb": float(amb[0]) if amb.size else 0.0,
             "x_cond": vec[self.cond_slice],
             "x_evap": vec[self.evap_slice],
             "x_subcool": vec[self.subcool_slice],
@@ -147,7 +135,6 @@ class HPRoptVectorLayout:
     def build_bounds(
         self,
         *,
-        x_amb: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
         x_cond: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
         x_evap: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
         x_subcool: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
@@ -158,7 +145,6 @@ class HPRoptVectorLayout:
     ) -> list[tuple[float, float]]:
         """Expand per-section bounds into a flat bounds list."""
         bounds = []
-        bounds.extend(self._coerce_bounds("x_amb", x_amb, self.n_amb))
         bounds.extend(self._coerce_bounds("x_cond", x_cond, self.n_cond))
         bounds.extend(self._coerce_bounds("x_evap", x_evap, self.n_evap))
         bounds.extend(self._coerce_bounds("x_subcool", x_subcool, self.n_subcool))

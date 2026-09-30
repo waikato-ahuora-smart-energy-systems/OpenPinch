@@ -347,13 +347,14 @@ def test_parse_cascade_carnot_cycle_state_variables_returns_expected_profiles():
     )
 
     vars = _parse_cascade_carnot_cycle_state_variables(
-        np.array([0.5, 0.5, 0.5, 0.25, 0.5, 0.5, 1.0]), args
+        np.array([0.5, 0.5, 0.25, 0.5, 0.5, 1.0]), args
     )
 
     np.testing.assert_allclose(vars.T_cond, np.array([80.0, 60.0]), atol=0.01)
     np.testing.assert_allclose(vars.T_evap, np.array([105.0, 60.0]), atol=0.01)
+    # Air is placed by the cascade at evaluation, not decided by the vector.
     assert vars.Q_amb_hot == 0.0
-    assert vars.Q_amb_cold == pytest.approx(300.0 * np.arctanh(0.5), abs=0.01)
+    assert vars.Q_amb_cold == 0.0
     assert vars.Q_heat_base == pytest.approx(
         decode_available_fractions(vars.x_heat_split, vars.Q_heat_available).sum()
     )
@@ -377,14 +378,12 @@ def test_parse_cascade_carnot_cycle_state_variables_respects_cond_evap_split_siz
     )
 
     vars = _parse_cascade_carnot_cycle_state_variables(
-        np.array([-0.1, 0.2, 0.5, 0.8, 0.4, 1.0]), args
+        np.array([0.2, 0.5, 0.8, 0.4, 1.0]), args
     )
 
     assert vars.T_cond.shape == (1,)
     assert vars.T_evap.shape == (3,)
     assert np.all(np.diff(vars.T_evap) <= 0.0)
-    assert vars.Q_amb_hot == pytest.approx(300.0 * np.arctanh(0.1))
-    assert vars.Q_amb_cold == 0.0
 
 
 def test_cascade_carnot_optimiser_success_and_failure(monkeypatch):
@@ -441,7 +440,7 @@ def test_cascade_carnot_objective_debug_branch(monkeypatch):
     )
 
     out = hp_cascade_carnot._compute_cascade_carnot_cycle_obj(
-        np.array([0.2, 0.7, 0.0, 1.0]), args, debug=True
+        np.array([0.7, 0.0, 1.0]), args, debug=True
     )
 
     assert out.success is True

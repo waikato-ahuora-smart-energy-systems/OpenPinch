@@ -1278,7 +1278,7 @@ def test_vc_mvr_x0_bounds_parse_round_trip():
     x0, bnds = hp_vc_mvr._get_vc_mvr_opt_setup(init_res=init_res, args=args)
     state = hp_vc_mvr._parse_vc_mvr_state_variables(x0, args)
 
-    assert x0.shape == (17,)
+    assert x0.shape == (16,)
     assert len(bnds) == x0.shape[0]
     unpacked = hp_vc_mvr._unpack_vc_mvr_state(state, args)
     np.testing.assert_allclose(unpacked["T_cond_vc"], init_res.T_cond)
@@ -1305,9 +1305,6 @@ def test_vc_mvr_x0_bounds_parse_round_trip():
     )
     np.testing.assert_allclose(unpacked["T_evap_mvr"][1], unpacked["T_cond_mvr"][0])
     assert np.all(unpacked["dT_lift_mvr"] <= 20.0)
-    assert state.Q_amb_cold == pytest.approx(init_res.Q_amb_cold)
-    assert state.Q_amb_cold_direct == pytest.approx(init_res.Q_amb_cold)
-    assert state.Q_amb_cold_residual == pytest.approx(0.0)
 
 
 def test_vc_mvr_heat_duties_use_split_fractions():
@@ -1395,7 +1392,7 @@ def test_compute_vc_mvr_system_obj_real_cascade_smoke():
         eta_motor=0.95,
         initialise_simulated_cycle=False,
     )
-    x = np.array([0.0, 0.6, 0.1, 0.1, 0.1, 0.5, 0.0, 0.5, 0.5])
+    x = np.array([0.6, 0.1, 0.1, 0.1, 0.5, 0.0, 0.5, 0.5])
 
     out = hp_vc_mvr._compute_vc_mvr_system_obj(x, args, debug=True)
 

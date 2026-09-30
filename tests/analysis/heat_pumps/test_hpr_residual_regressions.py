@@ -84,8 +84,8 @@ def test_residual_rebase_matches_offset_independent_oracle(case):
     np.testing.assert_allclose(repeated, actual)
 
 
-@given(st.floats(min_value=0, max_value=0.95), st.floats(min_value=0, max_value=1))
-def test_heat_pump_ambient_sink_cannot_expand_selected_load(ambient, fraction):
+@given(st.floats(min_value=0, max_value=1))
+def test_heat_pump_load_is_never_expanded_by_ambient_air(fraction):
     from types import SimpleNamespace
 
     from OpenPinch.analysis.heat_pumps.common.layout import HPRoptVectorLayout
@@ -108,12 +108,13 @@ def test_heat_pump_ambient_sink_cannot_expand_selected_load(ambient, fraction):
     )
     layout = HPRoptVectorLayout(n_cond=1, n_evap=1, n_heat_split=1)
     point = layout.pack(
-        x_amb=ambient,
         x_cond=[0.0],
         x_evap=[0.0],
         x_heat_split=[fraction],
     )
     state = _parse_parallel_carnot_hp_state_variables(point, args)
+    # Air is never a heat-pump load, however much ambient capacity exists.
+    assert state.Q_heat_available.sum() <= args.Q_heat_max + 1e-9
     assert state.Q_heat_base == pytest.approx(100.0 * fraction)
 
 

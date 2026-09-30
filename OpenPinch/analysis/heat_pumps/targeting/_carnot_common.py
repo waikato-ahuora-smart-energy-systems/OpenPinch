@@ -26,12 +26,10 @@ from ....contracts.hpr import (
 )
 from ..common._shared.streams import get_Q_vals_at_T_hpr_from_bckgrd_profile
 from ..common.encoding import (
-    AMBIENT_X_BOUNDS,
     DutyAllocationRequest,
     decode_available_fractions,
     limit_available_duty,
     map_x_arr_to_T_arr,
-    map_x_to_Q_amb,
 )
 from ..common.layout import HPRoptVectorLayout
 
@@ -74,12 +72,10 @@ def carnot_opt_setup(
     layout = _carnot_layout(args)
     # Start every condenser stage at all the duty it can deliver.
     return layout.pack(
-        x_amb=0.0,
         x_cond=[0.0] * layout.n_cond,
         x_evap=[0.0] * layout.n_evap,
         x_heat_split=[1.0] * n_stages,
     ), layout.build_bounds(
-        x_amb=AMBIENT_X_BOUNDS,
         x_cond=(0.0, 1.0),
         x_evap=(0.0, 1.0),
         x_heat_split=(0.0, 1.0),
@@ -102,19 +98,22 @@ def parse_carnot_state_variables(
     parts = _carnot_layout(args).unpack(x)
     T_cond = map_x_arr_to_T_arr(parts["x_cond"], args.T_cold[0], args.T_cold[-1])
     T_evap = map_x_arr_to_T_arr(parts["x_evap"], args.T_hot[-1], args.T_hot[0])
-    Q_amb_hot, Q_amb_cold = map_x_to_Q_amb(
-        parts["x_amb"], max(args.Q_heat_max, args.Q_cool_max)
-    )
-    H_cold_with_amb = args.H_cold + args.z_amb_cold * Q_amb_cold
-    H_hot_with_amb = args.H_hot + args.z_amb_hot * Q_amb_hot
+    # Air can be a refrigerator's heat sink and a heat pump's heat source, but
+    # never a heat pump's load or a refrigerator's duty. Where it is a partner
+    # it adds generous availability; the cascade decides how much air is used.
+    air_allowance = float(args.Q_heat_max + args.Q_cool_max)
+    heat_air = 0.0 if args.is_heat_pumping else air_allowance
+    cool_air = air_allowance if args.is_heat_pumping else 0.0
+    H_cold_available = args.H_cold + args.z_amb_cold * heat_air
+    H_hot_available = args.H_hot + args.z_amb_hot * cool_air
     Q_heat_available = limit_available_duty(
         get_Q_vals_at_T_hpr_from_bckgrd_profile(
             T_cond,
             args.T_cold,
-            H_cold_with_amb,
+            H_cold_available,
             is_cond=True,
         ),
-        args.Q_heat_max + (0.0 if args.is_heat_pumping else Q_amb_cold),
+        args.Q_heat_max + heat_air,
     )
     Q_heat_base = float(
         decode_available_fractions(parts["x_heat_split"], Q_heat_available).sum()
@@ -122,14 +121,12 @@ def parse_carnot_state_variables(
     Q_cool_available = get_Q_vals_at_T_hpr_from_bckgrd_profile(
         T_evap,
         args.T_hot,
-        H_hot_with_amb,
+        H_hot_available,
         is_cond=False,
     )
     return HPRParsedState(
         T_cond=T_cond,
         T_evap=T_evap,
-        Q_amb_hot=Q_amb_hot,
-        Q_amb_cold=Q_amb_cold,
         Q_heat_base=Q_heat_base,
         x_heat_split=parts["x_heat_split"],
         Q_heat_available=Q_heat_available,

@@ -9,13 +9,11 @@ from OpenPinch.analysis.heat_pumps.common.encoding import (
     encode_available_fractions,
     limit_available_duty,
     map_DT_arr_to_x_arr,
-    map_Q_amb_to_x,
     map_Q_arr_to_x_arr,
     map_T_arr_to_x_arr,
     map_x_arr_to_DT_arr,
     map_x_arr_to_Q_arr,
     map_x_arr_to_T_arr,
-    map_x_to_Q_amb,
     require_stage_duty_allocation,
 )
 from OpenPinch.contracts.hpr import HPRParsedState
@@ -42,21 +40,6 @@ def test_map_x_to_T_output_is_monotonically_descending():
 
     assert result.size == x.size
     assert np.all(np.diff(result) <= 0.0)
-
-
-@pytest.mark.parametrize(
-    ("Q_amb_hot", "Q_amb_cold"),
-    [(0.0, 400.0), (150.0, 0.0), (0.0, 0.0)],
-)
-def test_ambient_mapping_round_trips_with_bounded_x(Q_amb_hot, Q_amb_cold):
-    scale = 200.0
-
-    x_amb = map_Q_amb_to_x(Q_amb_hot, Q_amb_cold, scale)
-    mapped_hot, mapped_cold = map_x_to_Q_amb(x_amb, scale)
-
-    assert abs(x_amb) < 1.0
-    assert mapped_hot == pytest.approx(Q_amb_hot)
-    assert mapped_cold == pytest.approx(Q_amb_cold)
 
 
 def test_duty_fractions_act_on_their_own_stage_only():
@@ -148,8 +131,6 @@ def test_linear_mapping_helpers_cover_zero_and_scalar_edges():
             map_Q_arr_to_x_arr(np.array([50.0, 100.0]), 0.0),
             np.array([0.0, 0.0]),
         )
-    assert map_x_to_Q_amb(0.5, 0.0) == (0.0, 0.0)
-    assert map_Q_amb_to_x(10.0, 20.0, 0.0) == 0.0
 
 
 def test_require_stage_duty_allocation_reports_missing_split_contract():

@@ -20,6 +20,30 @@ from OpenPinch.analysis.heat_pumps.targeting.parallel_carnot import (
 )
 
 
+def _with_cascade_inputs(args):
+    """Add the background streams and air temperatures the evaluator cascades."""
+    from OpenPinch.analysis.heat_pumps.common.preprocessing import (
+        _create_stream_collection_of_background_profile,
+    )
+
+    for name, value in (
+        ("T_env", 20.0),
+        ("dt_env_cont", 5.0),
+        ("dtcont_hp", 5.0),
+        ("dt_phase_change", 1.0),
+        ("period_idx", 0),
+    ):
+        if not hasattr(args, name):
+            setattr(args, name, value)
+    args.bckgrd_hot_streams = _create_stream_collection_of_background_profile(
+        args.T_hot, args.H_hot
+    )
+    args.bckgrd_cold_streams = _create_stream_collection_of_background_profile(
+        args.T_cold, args.H_cold
+    )
+    return args
+
+
 def test_parallel_carnot_unsolved_properties_and_empty_stream_collection():
     cycle = ParallelCarnotCycles()
 
@@ -192,7 +216,7 @@ def test_compute_parallel_carnot_objective_handles_mixed_lift_without_ambiguous_
     )
 
     res = _compute_parallel_carnot_hp_opt_obj(
-        np.array([0.0, 0.0, 0.0, 0.25, 0.25, 0.5, 1.0]), args
+        np.array([0.0, 0.0, 0.25, 0.25, 0.5, 1.0]), _with_cascade_inputs(args)
     )
 
     assert np.isfinite(res.obj)
@@ -222,13 +246,15 @@ def test_compute_parallel_carnot_utility_total_includes_residual_cold_utility():
         rho_penalty=10.0,
     )
 
-    res = _compute_parallel_carnot_hp_opt_obj(np.array([0.0, 0.5, 0.5, 1.0]), args)
+    res = _compute_parallel_carnot_hp_opt_obj(
+        np.array([0.5, 0.5, 1.0]), _with_cascade_inputs(args)
+    )
 
     assert res.Q_ext > 0.0
     assert np.isclose(res.utility_tot, res.w_net + res.Q_ext)
 
 
-def test_parse_parallel_carnot_state_variables_uses_bounded_ambient_mapping():
+def test_parse_parallel_carnot_state_variables_decodes_temperatures_and_duty():
     args = SimpleNamespace(
         n_cond=1,
         n_evap=1,
@@ -244,14 +270,15 @@ def test_parse_parallel_carnot_state_variables_uses_bounded_ambient_mapping():
     )
 
     vars = _parse_parallel_carnot_hp_state_variables(
-        np.array([0.5, 0.5, 0.5, 1.0]),
+        np.array([0.5, 0.5, 1.0]),
         args,
     )
 
     np.testing.assert_allclose(vars.T_cond, np.array([75.0]))
     np.testing.assert_allclose(vars.T_evap, np.array([65.0]))
+    # Air is placed by the cascade at evaluation, not decided by the vector.
     assert vars.Q_amb_hot == 0.0
-    assert np.isclose(vars.Q_amb_cold, 200.0 * np.arctanh(0.5))
+    assert vars.Q_amb_cold == 0.0
     assert vars.Q_heat_base == pytest.approx(
         decode_available_fractions(vars.x_heat_split, vars.Q_heat_available).sum()
     )
