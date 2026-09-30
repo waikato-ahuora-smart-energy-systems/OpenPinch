@@ -9,9 +9,10 @@ from copy import deepcopy
 import pytest
 
 from OpenPinch import PinchProblem
-from OpenPinch.contracts.hpr import HPRTargetingError
+from OpenPinch.contracts.hpr import HPRFailureCategory, HPRTargetingError
 from tests.e2e.cases import standard_problem_paths
 from tests.e2e.hpr_benchmark import (
+    HPR_HIGH_LIFT_SENTINEL_PROFILES,
     HPRBenchmarkAssignment,
     HPROutcomeKind,
     assert_atomic_outcome,
@@ -99,7 +100,17 @@ def _assert_sentinel_converged(
     selected_observations,
     maximum_evaluations: int,
 ) -> None:
-    """Require a strict-success sentinel to solve and show bounded convergence."""
+    """Require a strict-success sentinel to solve and show bounded convergence.
+
+    A high-lift sentinel may instead report that no heat pump pays.
+    """
+    if (
+        assignment.profile.profile_id in HPR_HIGH_LIFT_SENTINEL_PROFILES
+        and outcome.kind is HPROutcomeKind.TYPED_FAILURE
+        and set(outcome.error.diagnostics.category_counts)
+        == {HPRFailureCategory.NO_BENEFICIAL_HEAT_PUMP}
+    ):
+        return
     assert outcome.kind is HPROutcomeKind.SOLVED, (
         f"strict-success sentinel {assignment.parameter_id} returned "
         f"{outcome.kind.value}"
