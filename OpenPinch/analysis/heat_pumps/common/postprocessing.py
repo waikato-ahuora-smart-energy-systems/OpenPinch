@@ -35,6 +35,8 @@ def _get_hpr_residual_utility_summary(
         T_vals=pt[ProblemTableLabel.T],
         residual_net=residual_net,
     )
+    noise = _residual_noise_floor(utility_net)
+    utility_net = _snap_to_zero(utility_net, noise)
     hot_profile, cold_profile = _get_hpr_residual_load_profiles(
         pt=pt,
         T_vals=utility_T_vals,
@@ -42,6 +44,8 @@ def _get_hpr_residual_utility_summary(
         is_direct=is_direct,
         is_heat_pumping=is_heat_pumping,
     )
+    hot_profile = _snap_to_zero(hot_profile, noise)
+    cold_profile = _snap_to_zero(cold_profile, noise)
     hot_utilities, cold_utilities = _retarget_hpr_residual_utilities(
         T_vals=utility_T_vals,
         residual_net=utility_net,
@@ -111,6 +115,26 @@ def _get_hpr_residual_utility_summary(
             temperature_basis="shifted" if is_direct else "real",
         ),
     }
+
+
+# Residual loads are differences of cascades built from the process, the
+# heat pump and ambient streams, so they carry rounding error that grows with
+# the duties involved. Loads below this fraction of the largest are noise.
+_RESIDUAL_NOISE_FRACTION = 1e-7
+
+
+def _residual_noise_floor(net: np.ndarray) -> float:
+    """Return the load below which a residual value is rounding noise, in kW."""
+    values = np.abs(np.asarray(net, dtype=float))
+    scale = float(values.max()) if values.size else 0.0
+    return max(tol, _RESIDUAL_NOISE_FRACTION * scale)
+
+
+def _snap_to_zero(values: np.ndarray, noise: float) -> np.ndarray:
+    """Set residual values within ``noise`` of zero to exactly zero."""
+    values = np.asarray(values, dtype=float).copy()
+    values[np.abs(values) <= noise] = 0.0
+    return values
 
 
 def _deduplicate_residual_profile_rows(

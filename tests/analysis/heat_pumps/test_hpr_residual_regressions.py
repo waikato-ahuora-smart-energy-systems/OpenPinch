@@ -5,6 +5,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
+import OpenPinch.analysis.heat_pumps.common.postprocessing as hpr_postprocessing
 from OpenPinch.analysis.heat_pumps.common.postprocessing import (
     _deduplicate_residual_profile_rows,
     _get_hpr_residual_load_profiles,
@@ -143,3 +144,13 @@ def test_unused_low_grade_heat_has_no_heat_pump_feasibility_penalty(cold):
     assert penalty == 0.0
     assert objective == pytest.approx(0.3)
 
+
+def test_residual_rounding_noise_snaps_to_zero_relative_to_the_largest_load():
+    net = np.array([570.0, 107.0, 4.2e-6, -3.0e-6, 0.0])
+
+    noise = hpr_postprocessing._residual_noise_floor(net)
+    snapped = hpr_postprocessing._snap_to_zero(net, noise)
+
+    # 1e-7 of the 570 kW scale: a few micro-kW is noise, real loads remain.
+    assert noise == pytest.approx(5.7e-5)
+    np.testing.assert_array_equal(snapped, [570.0, 107.0, 0.0, 0.0, 0.0])
