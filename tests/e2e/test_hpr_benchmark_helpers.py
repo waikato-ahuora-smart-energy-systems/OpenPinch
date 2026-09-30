@@ -19,6 +19,7 @@ from tests.e2e.hpr_benchmark import (
     build_assignments,
     build_convergence_witness,
     classify_hpr_outcome,
+    format_search_trace,
     observe_hpr_search,
     profile_search_observations,
 )
@@ -291,3 +292,18 @@ def _targeting_error(*, evaluated_count: int = 0):
             warm_start_viable=False,
         ),
     )
+
+
+def test_search_trace_lists_environment_and_every_observation() -> None:
+    trace = format_search_trace(
+        (
+            SearchObservation(point=(1.0, 2.5), success=True, objective=3.0),
+            SearchObservation(point=(0.5, 2.0), success=False, objective=None),
+        )
+    )
+    lines = trace.splitlines()
+    assert lines[0].startswith("numeric environment: python ")
+    assert "numpy " in lines[0] and "scipy " in lines[0] and "CoolProp " in lines[0]
+    assert lines[1] == "search trace (2 observations):"
+    assert "success=True objective=3.0 point=(1.0, 2.5)" in lines[2]
+    assert "success=False objective=None point=(0.5, 2.0)" in lines[3]

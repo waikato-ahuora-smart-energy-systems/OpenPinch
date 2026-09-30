@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import pickle
+import platform
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from copy import deepcopy
@@ -439,6 +440,43 @@ def build_convergence_witness(
     )
 
 
+def _cpu_model() -> str:
+    """Return the CPU model name, which can change floating-point results."""
+    cpuinfo = Path("/proc/cpuinfo")
+    if cpuinfo.exists():
+        for line in cpuinfo.read_text().splitlines():
+            if line.startswith("model name"):
+                return line.split(":", 1)[1].strip()
+    return platform.processor() or "unknown"
+
+
+def format_search_trace(observations: Sequence[SearchObservation]) -> str:
+    """Return every observed search point plus the numeric environment, for CI logs.
+
+    Sentinel convergence depends on the exact floating-point path, so a failure
+    on CI is only diagnosable with the library versions and the full trace.
+    """
+    import CoolProp
+    import scipy
+
+    cpu = _cpu_model()
+    lines = [
+        "numeric environment: "
+        f"python {platform.python_version()}, numpy {np.__version__}, "
+        f"scipy {scipy.__version__}, CoolProp {CoolProp.__version__}, "
+        f"{platform.system()} {platform.machine()}, cpu {cpu}",
+        f"search trace ({len(observations)} observations):",
+    ]
+    for index, observation in enumerate(observations):
+        point = ", ".join(repr(float(value)) for value in observation.point)
+        lines.append(
+            f"  {index:3d} {observation.objective_name} "
+            f"success={observation.success} objective={observation.objective!r} "
+            f"point=({point})"
+        )
+    return "\n".join(lines)
+
+
 def assert_bounded_convergence(witness: ConvergenceWitness) -> None:
     """Require material real-search progress and best-observed selection."""
     assert witness.distinct_evaluations <= witness.maximum_evaluations, (
@@ -520,6 +558,7 @@ __all__ = [
     "build_assignments",
     "build_convergence_witness",
     "classify_hpr_outcome",
+    "format_search_trace",
     "is_sentinel_assignment",
     "observe_hpr_search",
     "prepare_hpr_baseline",

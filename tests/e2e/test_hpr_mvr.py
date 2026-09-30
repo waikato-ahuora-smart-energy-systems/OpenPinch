@@ -21,6 +21,7 @@ from tests.e2e.hpr_benchmark import (
     build_assignments,
     build_convergence_witness,
     classify_hpr_outcome,
+    format_search_trace,
     is_sentinel_assignment,
     observe_hpr_search,
     prepare_hpr_baseline,
@@ -91,7 +92,12 @@ def test_standard_problem_hpr_service_is_bounded_and_robust(
             selected_objective=float(outcome.target.hpr_details.obj),
             maximum_evaluations=maximum_evaluations,
         )
-        assert_bounded_convergence(witness)
+        try:
+            assert_bounded_convergence(witness)
+        except AssertionError as failure:
+            raise AssertionError(
+                f"{failure}\n{format_search_trace(observations)}"
+            ) from None
 
 
 def test_direct_process_mvr_and_downstream_targeting_succeed_end_to_end() -> None:
