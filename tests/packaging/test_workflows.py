@@ -137,8 +137,13 @@ def test_version_bump_runs_once_per_release_cycle():
     assert "git push origin HEAD:develop" in script
 
 
-def test_dependabot_watches_actions_and_the_uv_lock_on_develop():
+def test_dependabot_watches_actions_and_the_uv_lock():
     config = yaml.safe_load((WORKFLOW_DIR.parent / "dependabot.yml").read_text())
     updates = {entry["package-ecosystem"]: entry for entry in config["updates"]}
     assert set(updates) == {"github-actions", "uv"}
-    assert all(entry["target-branch"] == "develop" for entry in updates.values())
+    assert updates["github-actions"]["target-branch"] == "develop"
+    # Security updates only honour default-branch entries (develop is the
+    # repository's default branch), so the uv entry must not set target-branch.
+    assert "target-branch" not in updates["uv"]
+    # Version updates must not widen the dependency ranges users install with.
+    assert updates["uv"]["versioning-strategy"] == "lockfile-only"

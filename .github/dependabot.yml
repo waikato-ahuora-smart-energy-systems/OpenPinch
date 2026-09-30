@@ -11,11 +11,14 @@ updates:
         patterns: ["*"]
 
   # Refreshes uv.lock so locked (mostly transitive) packages pick up fixes.
-  # Security updates, when enabled in the repository settings, open their own
-  # PRs as soon as an alert appears; this monthly run batches everything else.
+  # No target-branch: Dependabot security updates only use entries for the
+  # default branch (develop), and open their own PRs as soon as an alert
+  # appears. This monthly run batches everything else.
+  # lockfile-only: never widen the published ranges in pyproject.toml (such as
+  # pandas<3); raising a ceiling is a deliberate change with its own tests.
   - package-ecosystem: uv
     directory: /
-    target-branch: develop
+    versioning-strategy: lockfile-only
     schedule:
       interval: monthly
     groups:

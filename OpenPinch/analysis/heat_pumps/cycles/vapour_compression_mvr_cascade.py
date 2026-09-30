@@ -244,10 +244,14 @@ class VapourCompressionMvrCascade:
         T_evap_vc = np.asarray(T_evap_vc, dtype=float).reshape(-1)
         T_cond_vc = np.asarray(T_cond_vc, dtype=float).reshape(-1)
         heat_duty = (duty_allocation or DutyAllocationRequest()).heat
+        # Duty requested beyond what the process can absorb is capped and
+        # penalised, as in the other VC cycles; it does not make the design
+        # infeasible.
+        allocation_penalty: list[float] = []
         if heat_duty.Q_base is not None:
             allocation = heat_duty.allocate("heat")
             Q_heat_vc = allocation.Q_model
-            self._penalty.extend(self._as_penalty_list(allocation.Q_excess))
+            allocation_penalty = self._as_penalty_list(allocation.Q_excess)
         else:
             if Q_heat_vc is None:
                 raise ValueError(
@@ -301,8 +305,9 @@ class VapourCompressionMvrCascade:
         penalties.append(max(float(mvr_source_split) - 1.0, 0.0) * self._max_work)
         penalties.extend(np.maximum(-process_split, 0.0) * self._max_work)
         penalties.extend(np.maximum(process_split - 1.0, 0.0) * self._max_work)
-        self._penalty.extend(self._as_penalty_list(penalties))
-        if any(penalty > 0.0 for penalty in self._penalty):
+        structural_penalty = self._as_penalty_list(penalties)
+        self._penalty = [*allocation_penalty, *structural_penalty]
+        if any(penalty > 0.0 for penalty in structural_penalty):
             self._max_work *= 1.0 + sum(self._penalty) / self._max_work
             return self._max_work
 
@@ -455,7 +460,9 @@ class VapourCompressionMvrCascade:
     ) -> tuple[np.ndarray, np.ndarray]:
         T_evap_mvr = np.empty_like(dT_lift_mvr, dtype=float)
         T_cond_mvr = np.empty_like(dT_lift_mvr, dtype=float)
-        T_evap_mvr[0] = vc_cycle.Ts[4] - 273.15 - dt_cascade_hx
+        # The MVR source evaporates against the top VC stage's condensing
+        # refrigerant, so it is limited by that stage's saturation temperature.
+        T_evap_mvr[0] = float(vc_cycle.T_cond_sat_liq) - dt_cascade_hx
         for j, lift in enumerate(dT_lift_mvr):
             T_cond_mvr[j] = T_evap_mvr[j] + lift
             if j + 1 < dT_lift_mvr.size:

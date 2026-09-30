@@ -12,14 +12,27 @@ ProposeFn = Callable[
 ]
 
 
-def as_seed_array(x0_ls) -> Optional[np.ndarray]:
-    """Return ``x0_ls`` as a 2D float array (one start per row), or ``None``."""
-    if x0_ls is None:
-        return None
-    x0_arr = np.asarray(x0_ls, dtype=float)
-    if x0_arr.ndim == 1:
-        x0_arr = x0_arr.reshape(1, -1)
-    return x0_arr
+def candidate_pool(
+    rng: np.random.Generator,
+    n_random: int,
+    n_dim: int,
+    best_u: Optional[np.ndarray],
+) -> np.ndarray:
+    """Return unit-box points to score for the next query.
+
+    ``n_random`` uniform points, then (when there is an incumbent) Gaussian
+    steps around it and the incumbent itself.
+    """
+    U = rng.uniform(0.0, 1.0, size=(n_random, n_dim))
+    if best_u is not None:
+        n_local = max(32, n_random // 8)
+        U_local = np.clip(
+            best_u + rng.normal(0.0, 0.08, size=(n_local, n_dim)),
+            0.0,
+            1.0,
+        )
+        U = np.vstack([U, U_local, best_u.reshape(1, -1)])
+    return U
 
 
 def run_surrogate_loop(

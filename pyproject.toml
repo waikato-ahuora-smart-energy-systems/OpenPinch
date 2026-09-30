@@ -29,12 +29,12 @@ name = "OpenPinch"
 dependencies=[
   "numpy<3",
   "pint<1",
-  "pandas<3",
+  "pandas<4",
   "CoolProp>=8",
   "pydantic<3",
   "scipy<2",
 ]
-version = "0.6.15"
+version = "0.6.16"
 authors = [
   { name="Tim Walmsley", email="tim.walmsley@waikato.ac.nz" },
 ]

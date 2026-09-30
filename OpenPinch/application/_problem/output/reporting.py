@@ -313,7 +313,7 @@ def compare_problem_summaries(
             change_row[column] = None
             change_row[unit_column] = None
 
-    return pd.DataFrame.from_dict(
+    comparison = pd.DataFrame.from_dict(
         {
             base_label: base_row_data,
             other_label: other_row_data,
@@ -322,6 +322,21 @@ def compare_problem_summaries(
         orient="index",
         columns=[*identity_columns, *row_columns],
     )
+    return _text_columns_as_objects(comparison)
+
+
+def _text_columns_as_objects(frame: pd.DataFrame) -> pd.DataFrame:
+    """Keep text columns as ``object`` so missing entries stay ``None``.
+
+    pandas 3 infers a string dtype for text columns and stores missing values
+    there as ``NaN``; pandas 2 kept ``object`` columns holding ``None``. This
+    keeps the frame the same on both.
+    """
+    for column in frame.columns:
+        series = frame[column]
+        if pd.api.types.is_string_dtype(series.dtype) and series.dtype != object:
+            frame[column] = series.astype(object).where(series.notna(), None)
+    return frame
 
 
 def build_graph_data(results: Any) -> Optional[dict[str, Any]]:

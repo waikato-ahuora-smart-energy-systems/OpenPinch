@@ -19,6 +19,7 @@ from tests.e2e.hpr_benchmark import (
     build_assignments,
     build_convergence_witness,
     classify_hpr_outcome,
+    format_search_trace,
     observe_hpr_search,
     profile_search_observations,
 )
@@ -291,3 +292,68 @@ def _targeting_error(*, evaluated_count: int = 0):
             warm_start_viable=False,
         ),
     )
+
+
+def test_search_trace_lists_environment_and_every_observation() -> None:
+    trace = format_search_trace(
+        (
+            SearchObservation(point=(1.0, 2.5), success=True, objective=3.0),
+            SearchObservation(point=(0.5, 2.0), success=False, objective=None),
+        )
+    )
+    lines = trace.splitlines()
+    assert lines[0].startswith("numeric environment: python ")
+    assert "numpy " in lines[0] and "scipy " in lines[0] and "CoolProp " in lines[0]
+    assert lines[1] == "search trace (2 observations):"
+    assert "success=True objective=3.0 point=(1.0, 2.5)" in lines[2]
+    assert "success=False objective=None point=(0.5, 2.0)" in lines[3]
+
+
+def test_convergence_ignores_a_strong_warm_start_when_measuring_progress() -> None:
+    witness = build_convergence_witness(
+        (
+            SearchObservation(
+                point=(0.0,), success=True, objective=5.0, warm_start=True
+            ),
+            SearchObservation(point=(1.0,), success=True, objective=12.0),
+            SearchObservation(point=(2.0,), success=True, objective=9.0),
+        ),
+        selected_objective=5.0,
+        maximum_evaluations=8,
+    )
+    assert witness.viable_objectives == (12.0, 9.0)
+    assert witness.first_viable_objective == 12.0
+    assert witness.improvement == 3.0
+    assert witness.warm_start_objective == 5.0
+    assert witness.best_observed_objective == 5.0
+    assert_bounded_convergence(witness)
+
+
+def test_convergence_rejects_a_result_worse_than_the_warm_start() -> None:
+    witness = build_convergence_witness(
+        (
+            SearchObservation(
+                point=(0.0,), success=True, objective=5.0, warm_start=True
+            ),
+            SearchObservation(point=(1.0,), success=True, objective=12.0),
+            SearchObservation(point=(2.0,), success=True, objective=9.0),
+        ),
+        selected_objective=9.0,
+        maximum_evaluations=8,
+    )
+    with pytest.raises(AssertionError, match="best observed|warm start"):
+        assert_bounded_convergence(witness)
+
+
+def test_convergence_requires_a_viable_point_sampled_by_the_search() -> None:
+    with pytest.raises(AssertionError, match="sampled by the search"):
+        build_convergence_witness(
+            (
+                SearchObservation(
+                    point=(0.0,), success=True, objective=5.0, warm_start=True
+                ),
+                SearchObservation(point=(1.0,), success=False, objective=None),
+            ),
+            selected_objective=5.0,
+            maximum_evaluations=8,
+        )

@@ -3378,3 +3378,23 @@ def test_output_helpers_cover_report_summary_and_formatting_edges():
     assert format_res(name="Utility", value=None) == "Utility: n/a"
     assert format_res(value=12.0) == "12.00"
     assert format_res(name="Utility", value=12.0) == "Utility: 12.00"
+
+
+def test_comparison_text_columns_keep_none_for_missing_values():
+    from OpenPinch.application._problem.output.reporting import (
+        _text_columns_as_objects,
+    )
+
+    # A string-dtype column (pandas 3's default for text) stores missing
+    # values as NA; the comparison frame returns them as None, as pandas 2 did.
+    frame = pd.DataFrame(
+        {
+            "unit": pd.array(["kW", None], dtype="string"),
+            "value": [1.0, 2.0],
+        }
+    )
+    result = _text_columns_as_objects(frame)
+
+    assert result["unit"].dtype == object
+    assert result["unit"].tolist() == ["kW", None]
+    assert result["value"].dtype == float
