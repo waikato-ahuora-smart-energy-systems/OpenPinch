@@ -405,7 +405,7 @@ class MechanicalVapourRecompressionCycle(VapourCompressionCycle):
         desuperheating = self._compute_liquid_injection_desuperheating(
             state1=state1,
             state3=state3,
-            state_injection_liq=state2,
+            state_injection_liq=state2_sat,
             liquid_injection=liquid_injection,
         )
         if desuperheating is None:
@@ -419,10 +419,10 @@ class MechanicalVapourRecompressionCycle(VapourCompressionCycle):
             state3.hmass() - state2_sat.hmass(),
             0.0,
         )
-        q_subcool_process = gas_mass_factor * max(
-            state2_sat.hmass() - state2.hmass(),
-            0.0,
-        )
+        # Injection liquid is recycled saturated condensate, drawn before the
+        # subcooler, so only the net condensate (one kg per kg of source
+        # vapour) is subcooled.
+        q_subcool_process = max(state2_sat.hmass() - state2.hmass(), 0.0)
         q_condense = q_latent_condense + q_subcool_process
         q_cond = q_desuperheat + q_condense
         q_shaft = state1.hmass() - state0.hmass()
@@ -526,9 +526,9 @@ class MechanicalVapourRecompressionCycle(VapourCompressionCycle):
     ) -> dict[str, float] | None:
         """Compute post-compression liquid-injection desuperheating.
 
-        The compressor work is based on the dry source-vapour mass flow. The
-        injected liquid is assumed to be drawn from the condenser outlet state
-        and evaporated after compression, removing discharge superheat and
+        The compressor work is based on the dry source-vapour mass flow. After
+        compression, saturated condensate at the discharge pressure is injected
+        and evaporated, desuperheating the discharge to saturated vapour and
         increasing the vapour mass available for process condensation or the
         next serial MVR stage.
         """

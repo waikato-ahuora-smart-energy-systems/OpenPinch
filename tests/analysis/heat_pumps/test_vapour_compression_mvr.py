@@ -462,8 +462,10 @@ def test_mvr_liquid_injection_changes_vapour_mass_and_external_desuperheat():
     assert injected.q_liquid_injection == pytest.approx(dry.q_desuperheat)
     assert injected.q_latent_condense > dry.q_latent_condense
     assert injected.Q_cond == pytest.approx(dry.Q_cond)
+    # Injection recycles saturated condensate, so only the source vapour
+    # leaves as subcooled product: the balance matches the dry stage.
     assert injected.Q_cond == pytest.approx(
-        injected.m_dot * (injected.Hs[3] - injected.Hs[2])
+        injected.source_m_dot * (injected.Hs[1] - injected.Hs[2])
     )
 
 
@@ -608,7 +610,7 @@ def test_mvr_source_heat_and_compressor_work_follow_enthalpy_balances():
     assert mvr.work == pytest.approx(mvr.shaft_work / mvr.eta_motor)
 
 
-def test_mvr_condenser_heat_uses_correct_mass_basis_with_and_without_injection():
+def test_mvr_condenser_heat_uses_source_mass_basis_with_and_without_injection():
     pytest.importorskip("CoolProp")
     dry = MechanicalVapourRecompressionCycle()
     injected = MechanicalVapourRecompressionCycle()
@@ -633,8 +635,10 @@ def test_mvr_condenser_heat_uses_correct_mass_basis_with_and_without_injection()
     assert dry.solved is True
     assert injected.solved is True
     assert dry.Q_cond == pytest.approx(dry.source_m_dot * (dry.Hs[1] - dry.Hs[2]))
+    # Injection recycles saturated condensate, so only the source vapour
+    # leaves as subcooled product: the balance matches the dry stage.
     assert injected.Q_cond == pytest.approx(
-        injected.m_dot * (injected.Hs[3] - injected.Hs[2])
+        injected.source_m_dot * (injected.Hs[1] - injected.Hs[2])
     )
 
 
@@ -761,7 +765,8 @@ def test_vc_mvr_cascade_routes_split_and_excludes_internal_streams():
     assert cascade.mvr_cycles[0].dT_subcool == pytest.approx(4.0)
     np.testing.assert_allclose(cascade.internal_heat, np.array([250.0, 0.0]))
     np.testing.assert_allclose(cascade.direct_vc_heat, np.array([750.0, 500.0]))
-    expected_mvr_evap_0 = cascade.vc_cycles[0].Ts[4] - 273.15 - 5.0
+    # Top VC stage condenses at 90 C; the MVR source evaporates 5 K below it.
+    expected_mvr_evap_0 = 90.0 - 5.0
     np.testing.assert_allclose(
         cascade.T_evap_mvr,
         np.array([expected_mvr_evap_0, expected_mvr_evap_0 + 15.0]),
@@ -1005,7 +1010,7 @@ def test_vc_mvr_cascade_propagates_unsolved_mvr_child_cycle(monkeypatch):
         solved = True
         work = 10.0
         penalty = None
-        Ts = [0.0, 0.0, 0.0, 0.0, 353.15]
+        T_cond_sat_liq = 80.0
 
         def solve(self, **kwargs):
             return self.work
@@ -1047,7 +1052,7 @@ def test_vc_mvr_cascade_negative_total_work_returns_penalty(monkeypatch):
         solved = True
         work = -20.0
         penalty = None
-        Ts = [0.0, 0.0, 0.0, 0.0, 353.15]
+        T_cond_sat_liq = 80.0
 
         def solve(self, **kwargs):
             return self.work

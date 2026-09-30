@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import pickle
+import platform
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from copy import deepcopy
@@ -355,6 +356,7 @@ class SearchObservation:
     success: bool
     objective: float | None
     objective_name: str | None = None
+    warm_start: bool = False
 
 
 def profile_search_observations(
@@ -383,6 +385,8 @@ class ConvergenceWitness:
     tolerance: float
     improvement: float
     selected_gap: float
+    warm_start_objective: float | None = None
+    warm_start_gap: float = 0.0
 
 
 def build_convergence_witness(
@@ -408,19 +412,31 @@ def build_convergence_witness(
             seen.add(point)
             distinct.append(observation)
 
+    def is_viable(observation: SearchObservation) -> bool:
+        return (
+            observation.success
+            and observation.objective is not None
+            and math.isfinite(float(observation.objective))
+        )
+
+    viable_all = tuple(float(o.objective) for o in distinct if is_viable(o))
+    if not viable_all:
+        raise AssertionError("Convergence requires at least one viable search point.")
+    # Progress is measured over points the search sampled itself; a good warm
+    # start must not count as the search's first viable point.
     viable = tuple(
-        float(observation.objective)
-        for observation in distinct
-        if observation.success
-        and observation.objective is not None
-        and math.isfinite(float(observation.objective))
+        float(o.objective) for o in distinct if is_viable(o) and not o.warm_start
     )
     if not viable:
-        raise AssertionError("Convergence requires at least one viable search point.")
+        raise AssertionError(
+            "Convergence requires at least one viable point sampled by the search."
+        )
+    warm = [float(o.objective) for o in distinct if is_viable(o) and o.warm_start]
+    warm_start_objective = min(warm) if warm else None
 
     incumbent: list[float] = []
     best = float("inf")
-    for objective in viable:
+    for objective in viable_all:
         best = min(best, objective)
         incumbent.append(best)
     first = viable[0]
@@ -434,9 +450,53 @@ def build_convergence_witness(
         best_observed_objective=best,
         selected_objective=selected,
         tolerance=tolerance,
-        improvement=first - best,
+        improvement=first - min(viable),
         selected_gap=abs(selected - best),
+        warm_start_objective=warm_start_objective,
+        warm_start_gap=(
+            0.0
+            if warm_start_objective is None
+            else max(selected - warm_start_objective, 0.0)
+        ),
     )
+
+
+def _cpu_model() -> str:
+    """Return the CPU model name, which can change floating-point results."""
+    cpuinfo = Path("/proc/cpuinfo")
+    if cpuinfo.exists():
+        for line in cpuinfo.read_text().splitlines():
+            if line.startswith("model name"):
+                return line.split(":", 1)[1].strip()
+    return platform.processor() or "unknown"
+
+
+def format_search_trace(observations: Sequence[SearchObservation]) -> str:
+    """Return every observed search point plus the numeric environment, for CI logs.
+
+    Sentinel convergence depends on the exact floating-point path, so a failure
+    on CI is only diagnosable with the library versions and the full trace.
+    """
+    import CoolProp
+    import scipy
+
+    cpu = _cpu_model()
+    lines = [
+        "numeric environment: "
+        f"python {platform.python_version()}, numpy {np.__version__}, "
+        f"scipy {scipy.__version__}, CoolProp {CoolProp.__version__}, "
+        f"{platform.system()} {platform.machine()}, cpu {cpu}",
+        f"search trace ({len(observations)} observations):",
+    ]
+    for index, observation in enumerate(observations):
+        point = ", ".join(repr(float(value)) for value in observation.point)
+        lines.append(
+            f"  {index:3d} {'W' if observation.warm_start else ' '} "
+            f"{observation.objective_name} "
+            f"success={observation.success} objective={observation.objective!r} "
+            f"point=({point})"
+        )
+    return "\n".join(lines)
 
 
 def assert_bounded_convergence(witness: ConvergenceWitness) -> None:
@@ -446,11 +506,16 @@ def assert_bounded_convergence(witness: ConvergenceWitness) -> None:
         f"{witness.distinct_evaluations} > {witness.maximum_evaluations}"
     )
     assert len(witness.viable_objectives) >= 2, (
-        "bounded convergence requires at least two distinct viable search points"
+        "bounded convergence requires at least two distinct viable points "
+        "sampled by the search"
     )
     assert witness.improvement > witness.tolerance, (
-        "search did not materially improve the first viable objective: "
+        "search did not materially improve on its first sampled viable objective: "
         f"improvement={witness.improvement}, tolerance={witness.tolerance}"
+    )
+    assert witness.warm_start_gap <= witness.tolerance, (
+        "selected final objective is worse than the warm start: "
+        f"gap={witness.warm_start_gap}, tolerance={witness.tolerance}"
     )
     assert all(
         later <= earlier
@@ -472,7 +537,14 @@ def observe_hpr_search() -> Iterator[list[SearchObservation]]:
     import OpenPinch.analysis.heat_pumps.optimisation_adapter as adapter
 
     original = adapter.evaluate_hpr_candidate
+    original_starts = adapter.normalise_initial_points
     observations: list[SearchObservation] = []
+    warm_points: set[tuple[float, ...]] = set()
+
+    def recorded_starts(*args, **kwargs):
+        starts = original_starts(*args, **kwargs)
+        warm_points.update(tuple(float(v) for v in start) for start in starts)
+        return starts
 
     def observed(*args, **kwargs):
         result = original(*args, **kwargs)
@@ -492,15 +564,18 @@ def observe_hpr_search() -> Iterator[list[SearchObservation]]:
                         else None
                     ),
                     objective_name=getattr(kwargs.get("objective"), "__name__", None),
+                    warm_start=point in warm_points,
                 )
             )
         return result
 
     adapter.evaluate_hpr_candidate = observed
+    adapter.normalise_initial_points = recorded_starts
     try:
         yield observations
     finally:
         adapter.evaluate_hpr_candidate = original
+        adapter.normalise_initial_points = original_starts
 
 
 __all__ = [
@@ -520,6 +595,7 @@ __all__ = [
     "build_assignments",
     "build_convergence_witness",
     "classify_hpr_outcome",
+    "format_search_trace",
     "is_sentinel_assignment",
     "observe_hpr_search",
     "prepare_hpr_baseline",

@@ -396,6 +396,8 @@ def run_hpr_candidate_search(
                 # deliberately suppresses exceptions. HPR must share its budget
                 # and propagate internal failures, so polish in this invocation.
                 for candidate in result.candidates:
+                    if not _can_finish_gradient(cached_scalar, budget, candidate.point):
+                        break
                     minimize(
                         cached_scalar,
                         candidate.point,
@@ -433,6 +435,21 @@ def run_hpr_candidate_search(
         ),
         diagnostics,
     )
+
+
+def _can_finish_gradient(
+    cached_scalar: _CachedHPRScalarObjective,
+    budget: HPRSearchBudget,
+    point: Sequence[float],
+) -> bool:
+    """Return whether the budget covers one SLSQP finite-difference gradient.
+
+    SLSQP estimates each gradient from the point plus one step per coordinate,
+    and needs at least one more evaluation to move. With fewer evaluations
+    left, a polish only spends the budget on probes and cannot improve.
+    """
+    remaining = budget.maximum_evaluations - len(cached_scalar.cache)
+    return remaining >= len(point) + 2
 
 
 def normalise_initial_points(
