@@ -139,6 +139,10 @@ class CostingConfig:
     hpr_cost_stage_share: float
     hpr_cost_temp_factor: float
     hpr_cost_temp_base: float
+    hpr_capital_recovery_enabled: bool
+    hpr_utility_capital_recovery_enabled: bool
+    hpr_hot_utility_capital_cost: float
+    hpr_refrigeration_capital_cost: float
 
 
 @_frozen_group

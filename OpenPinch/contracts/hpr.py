@@ -285,6 +285,10 @@ class HeatPumpTargetInputs(BaseModel):
     hpr_cost_stage_share: float
     hpr_cost_temp_factor: float
     hpr_cost_temp_base: float
+    hpr_capital_recovery: bool = True
+    utility_capital_recovery: bool = True
+    hot_utility_capital_cost: float = 0.0
+    refrigeration_capital_cost: float = 0.0
     is_heat_pumping: bool
     max_multi_start: int
     T_env: float
@@ -388,6 +392,7 @@ class SimulatedHPRAnnualizedCostAccounting(BaseModel):
     hpr_operating_cost: Value
     hpr_capital_cost: Value
     hpr_annualized_capital_cost: Value
+    hpr_utility_annualized_capital_cost: Value
     hpr_total_annualized_cost: Value
     feasibility_penalty: Value
 
@@ -456,6 +461,7 @@ class HPRBackendResult(BaseModel):
     hpr_capital_cost: Any = None
     hpr_annualized_capital_cost: Any = None
     hpr_total_annualized_cost: Any = None
+    hpr_utility_annualized_capital_cost: Any = None
     feasibility_penalty: float = 0.0
     Q_cooling_water: float = 0.0
     Q_refrigeration: float = 0.0

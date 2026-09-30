@@ -241,6 +241,52 @@ def test_simulated_hpr_annualized_costs_price_utilities_and_installed_capital():
     assert costs.feasibility_penalty.value == pytest.approx(200.0)
 
 
+def test_annualized_costs_credit_utility_capital_and_can_drop_capital_recovery():
+    kwargs = dict(
+        ele_price=100.0,
+        annual_op_time=1000.0,
+        heat_to_power_ratio=1.0,
+        refrigeration_to_power_ratio=0.5,
+        discount_rate=0.1,
+        serv_life=10.0,
+        hot_utility_capital_cost=100.0,
+        refrigeration_capital_cost=500.0,
+    )
+    crf = 0.1 * 1.1**10 / (1.1**10 - 1.0)
+
+    def costs(**flags):
+        return hp_shared.calc_simulated_hpr_annualized_costs(
+            work=10.0,
+            Q_ext_heat=8.0,
+            Q_cooling_water=0.0,
+            Q_refrigeration=2.0,
+            cost_units=[hp_shared.HPRCostUnit(Q_cap=1000.0, T_hot_max=150.0)],
+            penalty_power_equivalent=0.0,
+            args=_base_args(**kwargs, **flags),
+        )
+
+    both = costs()
+    # 8 kW of hot utility at $100/kW and 2 kW of refrigeration at $500/kW.
+    assert both.hpr_utility_annualized_capital_cost.value == pytest.approx(
+        1800.0 * crf
+    )
+    assert both.hpr_total_annualized_cost.value == pytest.approx(
+        both.hpr_operating_cost.value
+        + both.hpr_annualized_capital_cost.value
+        + both.hpr_utility_annualized_capital_cost.value
+    )
+
+    no_hp = costs(hpr_capital_recovery=False)
+    assert no_hp.hpr_capital_cost.value == pytest.approx(both.hpr_capital_cost.value)
+    assert no_hp.hpr_annualized_capital_cost.value == 0.0
+    assert no_hp.hpr_total_annualized_cost.value == pytest.approx(
+        both.hpr_total_annualized_cost.value - both.hpr_annualized_capital_cost.value
+    )
+
+    no_utility = costs(utility_capital_recovery=False)
+    assert no_utility.hpr_utility_annualized_capital_cost.value == 0.0
+
+
 def test_hpr_capital_cost_scales_with_size_stages_and_temperature():
     args = _base_args()
     unit = hp_shared.HPRCostUnit(Q_cap=2000.0, T_hot_max=200.0, n_closed=2, n_mvr=1)

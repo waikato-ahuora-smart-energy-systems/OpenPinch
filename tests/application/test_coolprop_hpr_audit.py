@@ -46,9 +46,10 @@ def test_real_public_coolprop_target_and_budget(mode, utility, cascade, monkeypa
         if mode == "refrigeration"
         else "is_utility_heat_pump"
     ] = utility
-    # Price heat at electricity parity so a utility heat pump found within
-    # this small search budget pays; at the 0.6 default it may not.
-    options = {"COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE": 1.0}
+    # A utility heat pump here lifts from about 5 C to the 260 C hot-utility
+    # level, where its capital does not pay back. Leave capital recovery out so
+    # the search still has a beneficial design to return.
+    options = {"COSTING_HPR_CAPITAL_RECOVERY_ENABLED": False}
     if mode == "mvr":
         kwargs["options"] = {**options, "HPR_REFRIGERANTS": ["Water"]}
         method = problem.target.mvr_heat_pump

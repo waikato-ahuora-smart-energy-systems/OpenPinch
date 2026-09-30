@@ -47,9 +47,9 @@ Heat pumps have no penalty requiring them to consume all low-grade heat.
 Refrigeration retains a feasibility term for unserved selected cooling.
 
 HPR utilities are priced relative to the HPR electricity price
-(``COSTING_HPR_ELE_PRICE``), not from utility stream prices:
+(``COSTING_HPR_ELE_PRICE``, default $100/MWh), not from utility stream prices:
 
-- External heating costs ``COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE`` (default 0.6).
+- External heating costs ``COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE`` (default 1.0).
 - Ambient air is free. It supplies and takes heat inside each HPR cascade, as
   far as its temperature allows.
 - Cooling water takes heat at ``COSTING_HPR_COOLING_WATER_TEMPERATURE``
@@ -81,7 +81,20 @@ USD), ``COSTING_HPR_INSTALLATION_FACTOR`` = 2.3, ``COSTING_HPR_COST_EXP`` = 0.7,
 ``COSTING_HPR_COST_FIXED_SHARE`` = 0.7, ``COSTING_HPR_COST_STAGE_SHARE`` = 0.3,
 ``COSTING_HPR_COST_TEMP_FACTOR`` = 0.4 and ``COSTING_HPR_COST_TEMP_BASE`` =
 75 °C. Capital is annualized with ``COSTING_DISCOUNT_RATE`` and
-``COSTING_SERVICE_LIFE``.
+``COSTING_SERVICE_LIFE``; set ``COSTING_HPR_CAPITAL_RECOVERY_ENABLED`` to
+``False`` to leave it out of the objective.
+
+The default utilities the design still needs carry installed capital too:
+``COSTING_HPR_HOT_UTILITY_CAPITAL_COST`` (default $100/kW of hot utility) and
+``COSTING_HPR_REFRIGERATION_CAPITAL_COST`` (default $500/kW of refrigeration),
+annualized the same way. A heat pump that displaces utility capacity is
+credited for it. Set ``COSTING_HPR_UTILITY_CAPITAL_RECOVERY_ENABLED`` to
+``False`` to leave it out.
+
+Heat pumps do not always pay, especially for high lifts. When the best valid
+design is no heat pump, targeting raises a typed "no beneficial heat pump"
+error. Turning capital recovery off or raising the heat price makes a heat
+pump more likely to pay.
 
 Use the same process/utility basis and stage counts when comparing modes.
 Select a solved target explicitly when inspecting several results::

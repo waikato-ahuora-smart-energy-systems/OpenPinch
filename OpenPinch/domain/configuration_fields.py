@@ -304,9 +304,9 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "COSTING_HX_AREA_EXP": _spec(float, 0.6, "costing", "hx_area_exp", numeric_min=0.0),
     "COSTING_DISCOUNT_RATE": _spec(float, 0.07, "costing", "discount_rate", numeric_min=0.0),
     "COSTING_SERVICE_LIFE": _spec(float, 20.0, "costing", "service_life", numeric_min=0.0),
-    "COSTING_HPR_ELE_PRICE": _spec(float, 200.0, "costing", "hpr_ele_price", numeric_min=0.0),
+    "COSTING_HPR_ELE_PRICE": _spec(float, 100.0, "costing", "hpr_ele_price", numeric_min=0.0),
     # HPR prices, relative to the electricity price.
-    "COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE": _spec(float, 0.6, "costing", "hpr_price_ratio_heat_to_ele", numeric_min=0.0),
+    "COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE": _spec(float, 1.0, "costing", "hpr_price_ratio_heat_to_ele", numeric_min=0.0),
     "COSTING_HPR_PRICE_RATIO_COOLING_WATER_TO_ELE": _spec(float, 0.025, "costing", "hpr_price_ratio_cooling_water_to_ele", numeric_min=0.0),
     # Default cold utilities: cooling water, then refrigeration below it.
     "COSTING_HPR_COOLING_WATER_TEMPERATURE": _spec(float, 25.0, "costing", "hpr_cooling_water_temperature"),
@@ -324,6 +324,12 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "COSTING_HPR_COST_STAGE_SHARE": _spec(float, 0.3, "costing", "hpr_cost_stage_share", numeric_min=0.0),
     "COSTING_HPR_COST_TEMP_FACTOR": _spec(float, 0.4, "costing", "hpr_cost_temp_factor", numeric_min=0.0),
     "COSTING_HPR_COST_TEMP_BASE": _spec(float, 75.0, "costing", "hpr_cost_temp_base"),
+    "COSTING_HPR_CAPITAL_RECOVERY_ENABLED": _spec(bool, True, "costing", "hpr_capital_recovery_enabled"),
+    # Installed capital of the default utilities the heat pump displaces, per
+    # kW of capacity, annualised with the same capital recovery factor.
+    "COSTING_HPR_UTILITY_CAPITAL_RECOVERY_ENABLED": _spec(bool, True, "costing", "hpr_utility_capital_recovery_enabled"),
+    "COSTING_HPR_HOT_UTILITY_CAPITAL_COST": _spec(float, 100.0, "costing", "hpr_hot_utility_capital_cost", numeric_min=0.0),
+    "COSTING_HPR_REFRIGERATION_CAPITAL_COST": _spec(float, 500.0, "costing", "hpr_refrigeration_capital_cost", numeric_min=0.0),
 
     # HEN synthesis.
     "HENS_APPROACH_TEMPERATURES": _spec(List[float], [14.0], "hens", "approach_temperatures", validator=_positive_float_grid),

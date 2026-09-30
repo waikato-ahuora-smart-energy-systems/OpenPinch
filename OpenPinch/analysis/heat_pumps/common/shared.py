@@ -174,7 +174,14 @@ def calc_simulated_hpr_annualized_costs(
     penalty_power_equivalent: float,
     args: HeatPumpTargetInputs,
 ) -> SimulatedHPRAnnualizedCostAccounting:
-    """Return unit-aware annualized cost accounting for simulated HPR candidates."""
+    """Return unit-aware annualized cost accounting for simulated HPR candidates.
+
+    The heat pump's installed capital is annualised unless
+    ``args.hpr_capital_recovery`` is off. The capital of the default hot
+    utility and refrigeration capacity the design still needs is annualised
+    too unless ``args.utility_capital_recovery`` is off, so a heat pump that
+    displaces utility capacity is credited for it.
+    """
     annual_hours = max(float(args.annual_op_time), 0.0)
     ele_price = max(float(args.ele_price), 0.0)
     heat_price = ele_price * max(float(args.heat_to_power_ratio), 0.0)
@@ -189,12 +196,26 @@ def calc_simulated_hpr_annualized_costs(
     ).to("$/y")
 
     capital_cost = calc_hpr_capital_cost(cost_units, args).to("$")
-    annualized_capital = compute_annual_capital_cost(
-        capital_cost,
-        args.discount_rate,
-        args.serv_life,
+    annualized_capital = (
+        compute_annual_capital_cost(capital_cost, args.discount_rate, args.serv_life)
+        if getattr(args, "hpr_capital_recovery", True)
+        else Value(0.0, "$/y")
     )
-    total_annualized = (operating_cost + annualized_capital).to("$/y")
+    utility_capital = Value(
+        max(float(Q_ext_heat), 0.0)
+        * max(float(getattr(args, "hot_utility_capital_cost", 0.0)), 0.0)
+        + max(float(Q_refrigeration), 0.0)
+        * max(float(getattr(args, "refrigeration_capital_cost", 0.0)), 0.0),
+        "$",
+    )
+    utility_annualized_capital = (
+        compute_annual_capital_cost(utility_capital, args.discount_rate, args.serv_life)
+        if getattr(args, "utility_capital_recovery", True)
+        else Value(0.0, "$/y")
+    )
+    total_annualized = (
+        operating_cost + annualized_capital + utility_annualized_capital
+    ).to("$/y")
     feasibility_penalty = compute_annual_energy_cost(
         penalty_power_equivalent,
         ele_price,
@@ -205,6 +226,7 @@ def calc_simulated_hpr_annualized_costs(
         hpr_operating_cost=operating_cost,
         hpr_capital_cost=capital_cost,
         hpr_annualized_capital_cost=annualized_capital,
+        hpr_utility_annualized_capital_cost=utility_annualized_capital,
         hpr_total_annualized_cost=total_annualized,
         feasibility_penalty=feasibility_penalty,
     )
@@ -447,6 +469,9 @@ def evaluate_vapour_hpr_result(
         hpr_operating_cost=cost_accounting.hpr_operating_cost,
         hpr_capital_cost=cost_accounting.hpr_capital_cost,
         hpr_annualized_capital_cost=cost_accounting.hpr_annualized_capital_cost,
+        hpr_utility_annualized_capital_cost=(
+            cost_accounting.hpr_utility_annualized_capital_cost
+        ),
         hpr_total_annualized_cost=cost_accounting.hpr_total_annualized_cost,
         feasibility_penalty=penalty,
         Q_amb_hot=Q_amb_hot,
