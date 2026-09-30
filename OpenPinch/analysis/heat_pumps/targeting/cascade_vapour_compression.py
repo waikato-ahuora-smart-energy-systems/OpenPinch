@@ -22,7 +22,9 @@ from ..common.encoding import (
     AMBIENT_X_BOUNDS,
     DutyAllocation,
     DutyAllocationRequest,
-    encode_base_and_duty_splits,
+    decode_available_fractions,
+    encode_available_fractions,
+    limit_available_duty,
     map_Q_amb_to_x,
     map_T_arr_to_x_arr,
     map_x_arr_to_DT_arr,
@@ -162,8 +164,6 @@ def _get_cascade_hp_opt_setup(
         n_cond=n_cond,
         n_evap=n_evap,
         n_subcool=n_cond,
-        n_heat_base=1 if n_heat else 0,
-        n_cool_base=1 if n_cool else 0,
         n_heat_split=n_heat,
         n_cool_split=n_cool,
         n_ihx=n_cond + n_evap - 1,
@@ -173,8 +173,6 @@ def _get_cascade_hp_opt_setup(
         x_cond=(0.0, 1.0),
         x_evap=(0.0, 1.0),
         x_subcool=(0.0, 1.0),
-        x_heat_base=(0.0, 1.0),
-        x_cool_base=(0.0, 1.0),
         x_heat_split=(0.0, 1.0),
         x_cool_split=(0.0, 1.0),
         x_ihx=(0.0, 0.0)
@@ -183,14 +181,6 @@ def _get_cascade_hp_opt_setup(
     )
     if init_res is None:
         return None, bnds
-
-    ambient = preallocate_direct_ambient_duties(
-        args=args,
-        Q_amb_hot=init_res.Q_amb_hot,
-        Q_amb_cold=init_res.Q_amb_cold,
-    )
-    Q_cool_ex = ambient.Q_cool_capacity
-    Q_heat_ex = ambient.Q_heat_capacity
 
     x_amb = map_Q_amb_to_x(
         init_res.Q_amb_hot,
@@ -209,14 +199,7 @@ def _get_cascade_hp_opt_setup(
     ).tolist()
     x_subcool = [0.0] * int(args.n_cond)
     init_heat = init_res.Q_cond if is_heat_pumping else init_res.Q_cond[:n_heat]
-    _, x_heat_base, x_heat_split = encode_base_and_duty_splits(init_heat, Q_heat_ex)
-    x_heat_split = x_heat_split.tolist()
     init_cool = init_res.Q_evap[:n_cool] if is_heat_pumping else init_res.Q_evap
-    _, x_cool_base, x_cool_split = encode_base_and_duty_splits(
-        init_cool,
-        Q_cool_ex,
-    )
-    x_cool_split = x_cool_split.tolist()
     x_ihx = [0.0] * (int(args.n_cond) + int(args.n_evap) - 1)
     pack_kwargs = {
         "x_amb": x_amb,
@@ -226,11 +209,20 @@ def _get_cascade_hp_opt_setup(
         "x_ihx": x_ihx,
     }
     if n_heat:
-        pack_kwargs["x_heat_base"] = [x_heat_base]
-        pack_kwargs["x_heat_split"] = x_heat_split
+        pack_kwargs["x_heat_split"] = np.ones(n_heat, dtype=float)
     if n_cool:
-        pack_kwargs["x_cool_base"] = [x_cool_base]
-        pack_kwargs["x_cool_split"] = x_cool_split
+        pack_kwargs["x_cool_split"] = np.ones(n_cool, dtype=float)
+    # Encode the seed duties against the availability at the seed's own
+    # temperatures, exactly as the search will decode them.
+    state = _parse_cascade_hp_state_variables(layout.pack(**pack_kwargs), args)
+    if n_heat:
+        pack_kwargs["x_heat_split"] = encode_available_fractions(
+            np.asarray(init_heat, dtype=float)[:n_heat], state.Q_heat_available
+        )
+    if n_cool:
+        pack_kwargs["x_cool_split"] = encode_available_fractions(
+            np.asarray(init_cool, dtype=float)[:n_cool], state.Q_cool_available
+        )
     return layout.pack(**pack_kwargs), bnds
 
 
@@ -250,8 +242,6 @@ def _parse_cascade_hp_state_variables(
         n_cond=n_cond,
         n_evap=n_evap,
         n_subcool=n_cond,
-        n_heat_base=1 if n_heat else 0,
-        n_cool_base=1 if n_cool else 0,
         n_heat_split=n_heat,
         n_cool_split=n_cool,
         n_ihx=n_cond + n_evap - 1,
@@ -260,8 +250,6 @@ def _parse_cascade_hp_state_variables(
     x_cond = parts["x_cond"]
     x_evap = parts["x_evap"]
     x_subcool = parts["x_subcool"]
-    x_heat_base = parts["x_heat_base"]
-    x_cool_base = parts["x_cool_base"]
     x_heat_split = parts["x_heat_split"]
     x_cool_split = parts["x_cool_split"]
     x_ihx = parts["x_ihx"]
@@ -277,25 +265,39 @@ def _parse_cascade_hp_state_variables(
     T_cond = map_x_arr_to_T_arr(x_cond, *condensing_temperature_search_range(args))
     T_evap = map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0])
     dT_subcool = map_x_arr_to_DT_arr(x_subcool, T_cond, args.T_cold[0])
-    Q_heat_base = float(x_heat_base[0]) * ambient.Q_heat_capacity if n_heat else None
-    Q_cool_base = float(x_cool_base[0]) * ambient.Q_cool_capacity if n_cool else None
     Q_heat_available = (
-        get_Q_vals_at_T_hpr_from_bckgrd_profile(
-            T_cond if is_heat_pumping else T_cond[:n_heat],
-            ambient.T_cold_residual,
-            H_cold_with_amb,
-            is_cond=True,
+        limit_available_duty(
+            get_Q_vals_at_T_hpr_from_bckgrd_profile(
+                T_cond if is_heat_pumping else T_cond[:n_heat],
+                ambient.T_cold_residual,
+                H_cold_with_amb,
+                is_cond=True,
+            ),
+            ambient.Q_heat_capacity,
         )
         if n_heat
         else None
     )
     Q_cool_available = (
-        get_Q_vals_at_T_hpr_from_bckgrd_profile(
-            T_evap[:n_cool] if is_heat_pumping else T_evap,
-            ambient.T_hot_residual,
-            H_hot_with_amb,
-            is_cond=False,
+        limit_available_duty(
+            get_Q_vals_at_T_hpr_from_bckgrd_profile(
+                T_evap[:n_cool] if is_heat_pumping else T_evap,
+                ambient.T_hot_residual,
+                H_hot_with_amb,
+                is_cond=False,
+            ),
+            ambient.Q_cool_capacity,
         )
+        if n_cool
+        else None
+    )
+    Q_heat_base = (
+        float(decode_available_fractions(x_heat_split, Q_heat_available).sum())
+        if n_heat
+        else None
+    )
+    Q_cool_base = (
+        float(decode_available_fractions(x_cool_split, Q_cool_available).sum())
         if n_cool
         else None
     )
@@ -453,7 +455,7 @@ def _compute_tespy_cascade_hp_system_obj(
         cop_h=evaluated.cop,
         hpr_streams=hpr_streams,
         model=None,
-        penalty_terms=allocation.Q_excess.tolist(),
+        penalty_terms=[],
         dT_subcool=state.dT_subcool,
         dT_superheat=np.array([request.superheat], dtype=float),
         debug=debug,
@@ -485,13 +487,11 @@ def _tespy_primary_duty_allocation(
 ) -> DutyAllocation:
     if args.is_heat_pumping:
         return require_stage_duty_allocation(
-            Q_base=float(state.Q_heat_base or 0.0),
             x_split=state.x_heat_split,
             Q_available=state.Q_heat_available,
             duty_name="heat",
         )
     return require_stage_duty_allocation(
-        Q_base=float(state.Q_cool_base or 0.0),
         x_split=state.x_cool_split,
         Q_available=state.Q_cool_available,
         duty_name="cool",

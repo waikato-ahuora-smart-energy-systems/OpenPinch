@@ -71,7 +71,6 @@ def test_parallel_refrigeration_mode_allocates_cooling_base_duty():
 
     np.testing.assert_allclose(q_heat, np.array([5.0]))
     np.testing.assert_allclose(q_cool, np.array([15.0]))
-    np.testing.assert_allclose(cycle._allocation_penalty, np.array([5.0]))
 
 
 def test_parallel_solve_with_defaults_should_work_for_multiple_units():
@@ -597,7 +596,7 @@ def test_parallel_solve_single_refrigerant_list_branch(monkeypatch):
     assert hp.solved
 
 
-def test_parallel_solve_clips_base_split_duties_before_child_cycles(monkeypatch):
+def test_parallel_solve_decodes_availability_fractions_before_child_cycles(monkeypatch):
     hp = ParallelVapourCompressionCycles()
     monkeypatch.setattr(parallel_mod, "VapourCompressionCycle", _DummyMultiCycle)
 
@@ -620,6 +619,8 @@ def test_parallel_solve_clips_base_split_duties_before_child_cycles(monkeypatch)
     assert hp.solved
     np.testing.assert_allclose(
         [cycle.Q_heat for cycle in hp.subcycles],
-        np.array([100.0, 50.0]),
+        np.array([75.0, 60.0]),
     )
-    assert hp.penalty == pytest.approx(51.0)
+    # Duties are fractions of availability, so there is no excess to
+    # penalise; only the dummy subcycles' own penalties remain.
+    assert hp.penalty == pytest.approx(1.0)

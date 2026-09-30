@@ -244,14 +244,11 @@ class VapourCompressionMvrCascade:
         T_evap_vc = np.asarray(T_evap_vc, dtype=float).reshape(-1)
         T_cond_vc = np.asarray(T_cond_vc, dtype=float).reshape(-1)
         heat_duty = (duty_allocation or DutyAllocationRequest()).heat
-        # Duty requested beyond what the process can absorb is capped and
-        # penalised, as in the other VC cycles; it does not make the design
-        # infeasible.
-        allocation_penalty: list[float] = []
+        # Duty requested beyond what the process can absorb is capped, as in
+        # the other VC cycles. The capped design is valid, so the excess is
+        # neither infeasible nor penalised.
         if heat_duty.Q_base is not None:
-            allocation = heat_duty.allocate("heat")
-            Q_heat_vc = allocation.Q_model
-            allocation_penalty = self._as_penalty_list(allocation.Q_excess)
+            Q_heat_vc = heat_duty.allocate("heat").Q_model
         else:
             if Q_heat_vc is None:
                 raise ValueError(
@@ -305,9 +302,8 @@ class VapourCompressionMvrCascade:
         penalties.append(max(float(mvr_source_split) - 1.0, 0.0) * self._max_work)
         penalties.extend(np.maximum(-process_split, 0.0) * self._max_work)
         penalties.extend(np.maximum(process_split - 1.0, 0.0) * self._max_work)
-        structural_penalty = self._as_penalty_list(penalties)
-        self._penalty = [*allocation_penalty, *structural_penalty]
-        if any(penalty > 0.0 for penalty in structural_penalty):
+        self._penalty = self._as_penalty_list(penalties)
+        if any(penalty > 0.0 for penalty in self._penalty):
             self._max_work *= 1.0 + sum(self._penalty) / self._max_work
             return self._max_work
 

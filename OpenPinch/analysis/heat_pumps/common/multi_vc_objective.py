@@ -18,6 +18,7 @@ from typing import Any
 import numpy as np
 
 from ....contracts.hpr import (
+    ZERO_USEFUL_DUTY_REASON,
     HeatPumpTargetInputs,
     HPRBackendResult,
     HPREvaluationMode,
@@ -92,8 +93,10 @@ def _evaluate_multi_vc_objective(
         cycle_evaluated = True
         w_hpr = hp.work
         primary_duty = hp.Q_heat_arr.sum() if is_heat_pumping else hp.Q_cool_arr.sum()
-        if not np.isfinite(primary_duty) or primary_duty <= 0.0:
-            return HPRBackendResult.failure(reason="Cycle delivers no useful duty.")
+        if not np.isfinite(primary_duty) or primary_duty < 0.0:
+            return HPRBackendResult.failure(reason="Cycle delivers negative duty.")
+        if primary_duty == 0.0 and artifact_mode is HPREvaluationMode.FINAL:
+            return HPRBackendResult.failure(reason=ZERO_USEFUL_DUTY_REASON)
         cop = primary_duty / w_hpr if w_hpr > 0 else 1.0
         result = evaluate_result(
             args=args,

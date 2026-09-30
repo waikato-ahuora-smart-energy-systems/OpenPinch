@@ -432,6 +432,15 @@ class HPRThermoArtifacts(BaseModel):
     debug_figure: Any = None
 
 
+ZERO_USEFUL_DUTY_REASON = "Candidate delivers zero useful duty (no heat pump)."
+"""Final-evaluation failure reason for a design equivalent to no heat pump.
+
+During the search a zero-duty design is valid: it carries no penalty and its
+cost is the external utility that supplies the heat instead. It is never
+returned as a final target.
+"""
+
+
 class HPRBackendResult(BaseModel):
     """Internal backend result before public schema validation."""
 
@@ -601,6 +610,7 @@ def _detach_hpr_output_value(value: Any) -> Any:
 
 
 __all__ = [
+    "ZERO_USEFUL_DUTY_REASON",
     "HPREvaluationMode",
     "HPRFailureCategory",
     "HPRFailureDiagnostic",

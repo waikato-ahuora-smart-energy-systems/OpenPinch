@@ -129,7 +129,9 @@ class ParallelCarnotCycles:
         if Q_cool_available.size != self._T_evap.size:
             raise ValueError("Q_cool_available must match Carnot stage count.")
 
-        self._penalty = allocation.Q_excess
+        # Duty above availability is capped (and stages scaled to their
+        # source below); capped designs are valid, so no stage is penalised.
+        self._penalty = np.zeros_like(Q_cond)
         self._Q_cond_he = np.zeros_like(Q_cond)
         self._Q_evap_he = np.zeros_like(Q_cond)
         Qc_hx = np.zeros_like(Q_cond)
@@ -186,10 +188,6 @@ class ParallelCarnotCycles:
 
             Q_available = Q_cool_available[i] - Q_allocated
             scale = 0.0 if Q_available < tol else min(Q_available / Q_stage, 1.0)
-            if scale < 1.0:
-                self._penalty = np.concatenate(
-                    [self._penalty, np.array([Q_stage - max(Q_available, 0.0)])]
-                )
             self._Q_cond_he[i] *= scale
             self._Q_evap_he[i] *= scale
             Qc_hx[i] *= scale
@@ -324,7 +322,8 @@ class CascadeCarnotCycle:
         Q_evap = np.maximum(duty_allocation.cool.Q_available, 0.0)
         if Q_cond.size != self._T_cond.size or Q_evap.size != self._T_evap.size:
             raise ValueError("Cascade Carnot pool sizes are inconsistent.")
-        self._penalty = heat_allocation.Q_excess
+        # Duty above availability is capped; the capped design is not penalised.
+        self._penalty = np.zeros_like(Q_cond)
 
         T_diff = np.subtract.outer(self._T_cond, self._T_evap)
         is_hp = T_diff > tol

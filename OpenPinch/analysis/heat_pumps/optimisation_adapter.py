@@ -14,6 +14,7 @@ from scipy.optimize import minimize
 
 from ...analysis.numerics import g_ineq_penalty
 from ...contracts.hpr import (
+    ZERO_USEFUL_DUTY_REASON,
     HeatPumpTargetInputs,
     HeatPumpTargetOutputs,
     HPRBackendResult,
@@ -206,10 +207,17 @@ def solve_hpr_placement(
             return translate_hpr_result(result, ambient_args=args)
         failures.append((len(failures), result))
 
+    no_heat_pump = bool(failures) and all(
+        result.failure_reason == ZERO_USEFUL_DUTY_REASON for _, result in failures
+    )
     raise_hpr_targeting_error(
         args=args,
         message=(
             "Heat pump and refrigeration targeting "
+            f"({args.hpr_type}) found no heat pump design that improves on the "
+            "baseline without one."
+            if no_heat_pump
+            else "Heat pump and refrigeration targeting "
             f"({args.hpr_type}) failed to return an optimal result."
         ),
         failures=failures,

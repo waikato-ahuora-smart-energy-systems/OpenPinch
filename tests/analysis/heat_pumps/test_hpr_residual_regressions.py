@@ -106,13 +106,12 @@ def test_heat_pump_ambient_sink_cannot_expand_selected_load(ambient, fraction):
         z_amb_cold=np.array([1.0, 0.0]),
         z_amb_hot=np.array([0.0, -1.0]),
     )
-    layout = HPRoptVectorLayout(n_cond=1, n_evap=1, n_heat_base=1, n_heat_split=1)
+    layout = HPRoptVectorLayout(n_cond=1, n_evap=1, n_heat_split=1)
     point = layout.pack(
         x_amb=ambient,
         x_cond=[0.0],
         x_evap=[0.0],
-        x_heat_base=[fraction],
-        x_heat_split=[1.0],
+        x_heat_split=[fraction],
     )
     state = _parse_parallel_carnot_hp_state_variables(point, args)
     assert state.Q_heat_base == pytest.approx(100.0 * fraction)

@@ -247,7 +247,7 @@ def test_final_record_validation_is_not_candidate_infeasibility(monkeypatch):
         eta_motor=0.95,
         initialise_simulated_cycle=False,
     )
-    point = np.array([0.0, 0.6, 0.1, 0.1, 0.1, 0.5, 0.5, 0.0, 0.5, 0.5])
+    point = np.array([0.0, 0.6, 0.1, 0.1, 0.1, 0.5, 0.0, 0.5, 0.5])
     with pytest.raises(ValueError, match="record contract defect"):
         target._compute_vc_mvr_system_obj(point, args)
 

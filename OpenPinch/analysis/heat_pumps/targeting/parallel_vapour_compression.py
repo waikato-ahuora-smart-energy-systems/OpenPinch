@@ -16,7 +16,9 @@ from ..common._shared.streams import get_Q_vals_at_T_hpr_from_bckgrd_profile
 from ..common.encoding import (
     AMBIENT_X_BOUNDS,
     DutyAllocationRequest,
-    encode_base_and_duty_splits,
+    decode_available_fractions,
+    encode_available_fractions,
+    limit_available_duty,
     map_Q_amb_to_x,
     map_T_arr_to_x_arr,
     map_x_arr_to_DT_arr,
@@ -78,44 +80,37 @@ def optimise_parallel_heat_pump_placement(
     )
 
 
+def _parallel_layout(args: HeatPumpTargetInputs) -> HPRoptVectorLayout:
+    """Vector layout: one availability fraction per unit on the primary side."""
+    is_heat_pumping = getattr(args, "is_heat_pumping", True)
+    n_units = int(args.n_cond)
+    return HPRoptVectorLayout(
+        n_cond=n_units,
+        n_evap=int(args.n_evap),
+        n_subcool=n_units,
+        n_heat_split=n_units if is_heat_pumping else 0,
+        n_cool_split=0 if is_heat_pumping else n_units,
+        n_ihx=n_units,
+    )
+
+
 def _get_parallel_hp_opt_setup(
     init_res: HPRBackendResult | None,
     args: HeatPumpTargetInputs,
 ) -> tuple[np.ndarray | None, list]:
     is_heat_pumping = getattr(args, "is_heat_pumping", True)
-    n_units = int(args.n_cond)
-    layout = HPRoptVectorLayout(
-        n_cond=n_units,
-        n_evap=int(args.n_evap),
-        n_subcool=n_units,
-        n_heat_base=1 if is_heat_pumping else 0,
-        n_cool_base=0 if is_heat_pumping else 1,
-        n_heat_split=n_units if is_heat_pumping else 0,
-        n_cool_split=0 if is_heat_pumping else n_units,
-        n_ihx=n_units,
-    )
+    layout = _parallel_layout(args)
     bnds = layout.build_bounds(
         x_amb=AMBIENT_X_BOUNDS,
         x_cond=(0.0, 1.0),
         x_evap=(0.0, 1.0),
         x_subcool=(0.0, 1.0),
-        x_heat_base=(0.0, 1.0),
-        x_cool_base=(0.0, 1.0),
         x_heat_split=(0.0, 1.0),
         x_cool_split=(0.0, 1.0),
         x_ihx=(0.0, 1.0),
     )
     if init_res is None:
         return None, bnds
-
-    ambient = preallocate_direct_ambient_duties(
-        args=args,
-        Q_amb_hot=init_res.Q_amb_hot,
-        Q_amb_cold=init_res.Q_amb_cold,
-    )
-    Q_primary_ex = (
-        ambient.Q_heat_capacity if is_heat_pumping else ambient.Q_cool_capacity
-    )
 
     x_amb = map_Q_amb_to_x(
         init_res.Q_amb_hot,
@@ -134,11 +129,6 @@ def _get_parallel_hp_opt_setup(
     ).tolist()
     x_subcool = [0.0] * int(args.n_cond)
     init_primary_duty = init_res.Q_cond if is_heat_pumping else init_res.Q_evap
-    _, x_primary_base, x_primary_split = encode_base_and_duty_splits(
-        init_primary_duty,
-        Q_primary_ex,
-    )
-    x_primary_split = x_primary_split.tolist()
     x_ihx = [0.0] * int(args.n_cond)
     pack_kwargs = {
         "x_amb": x_amb,
@@ -147,12 +137,15 @@ def _get_parallel_hp_opt_setup(
         "x_subcool": x_subcool,
         "x_ihx": x_ihx,
     }
-    if is_heat_pumping:
-        pack_kwargs["x_heat_base"] = [x_primary_base]
-        pack_kwargs["x_heat_split"] = x_primary_split
-    else:
-        pack_kwargs["x_cool_base"] = [x_primary_base]
-        pack_kwargs["x_cool_split"] = x_primary_split
+    split_key = "x_heat_split" if is_heat_pumping else "x_cool_split"
+    pack_kwargs[split_key] = np.ones(int(args.n_cond), dtype=float)
+    # Encode the seed duties against the availability at the seed's own
+    # temperatures, exactly as the search will decode them.
+    state = _parse_parallel_hp_state_temperatures(layout.pack(**pack_kwargs), args)
+    Q_available = state.Q_heat_available if is_heat_pumping else state.Q_cool_available
+    pack_kwargs[split_key] = encode_available_fractions(
+        np.asarray(init_primary_duty, dtype=float), Q_available
+    )
     return layout.pack(**pack_kwargs), bnds
 
 
@@ -166,23 +159,11 @@ def _parse_parallel_hp_state_temperatures(
     args: HeatPumpTargetInputs,
 ) -> HPRParsedState:
     is_heat_pumping = getattr(args, "is_heat_pumping", True)
-    n_units = int(args.n_cond)
-    parts = HPRoptVectorLayout(
-        n_cond=n_units,
-        n_evap=int(args.n_evap),
-        n_subcool=n_units,
-        n_heat_base=1 if is_heat_pumping else 0,
-        n_cool_base=0 if is_heat_pumping else 1,
-        n_heat_split=n_units if is_heat_pumping else 0,
-        n_cool_split=0 if is_heat_pumping else n_units,
-        n_ihx=n_units,
-    ).unpack(x)
+    parts = _parallel_layout(args).unpack(x)
     x_amb = parts["x_amb"]
     x_cond = parts["x_cond"]
     x_evap = parts["x_evap"]
     x_subcool = parts["x_subcool"]
-    x_heat_base = parts["x_heat_base"]
-    x_cool_base = parts["x_cool_base"]
     x_heat_split = parts["x_heat_split"]
     x_cool_split = parts["x_cool_split"]
     x_ihx = parts["x_ihx"]
@@ -198,18 +179,15 @@ def _parse_parallel_hp_state_temperatures(
     T_cond = map_x_arr_to_T_arr(x_cond, *condensing_temperature_search_range(args))
     T_evap = map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0])
     dT_subcool = map_x_arr_to_DT_arr(x_subcool, T_cond, T_evap)
-    Q_heat_base = (
-        float(x_heat_base[0]) * ambient.Q_heat_capacity if is_heat_pumping else None
-    )
-    Q_cool_base = (
-        None if is_heat_pumping else float(x_cool_base[0]) * ambient.Q_cool_capacity
-    )
     Q_heat_available = (
-        get_Q_vals_at_T_hpr_from_bckgrd_profile(
-            T_cond,
-            ambient.T_cold_residual,
-            H_cold_with_amb,
-            is_cond=True,
+        limit_available_duty(
+            get_Q_vals_at_T_hpr_from_bckgrd_profile(
+                T_cond,
+                ambient.T_cold_residual,
+                H_cold_with_amb,
+                is_cond=True,
+            ),
+            ambient.Q_heat_capacity,
         )
         if is_heat_pumping
         else None
@@ -217,12 +195,25 @@ def _parse_parallel_hp_state_temperatures(
     Q_cool_available = (
         None
         if is_heat_pumping
-        else get_Q_vals_at_T_hpr_from_bckgrd_profile(
-            T_evap,
-            ambient.T_hot_residual,
-            H_hot_with_amb,
-            is_cond=False,
+        else limit_available_duty(
+            get_Q_vals_at_T_hpr_from_bckgrd_profile(
+                T_evap,
+                ambient.T_hot_residual,
+                H_hot_with_amb,
+                is_cond=False,
+            ),
+            ambient.Q_cool_capacity,
         )
+    )
+    Q_heat_base = (
+        float(decode_available_fractions(x_heat_split, Q_heat_available).sum())
+        if is_heat_pumping
+        else None
+    )
+    Q_cool_base = (
+        None
+        if is_heat_pumping
+        else float(decode_available_fractions(x_cool_split, Q_cool_available).sum())
     )
     dT_ihx_gas_side = map_x_arr_to_DT_arr(x_ihx, T_cond, T_evap)
     return HPRParsedState(
