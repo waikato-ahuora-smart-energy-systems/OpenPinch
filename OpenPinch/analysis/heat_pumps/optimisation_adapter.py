@@ -206,10 +206,12 @@ def solve_hpr_placement(
         if result.success and np.isfinite(float(result.obj)):
             return translate_hpr_result(result, ambient_args=args)
         failures.append((len(failures), result))
+        if result.failure_reason == ZERO_USEFUL_DUTY_REASON:
+            # Candidates are ranked by objective: the best valid design is no
+            # heat pump, so a worse heat pump further down is not a target.
+            break
 
-    no_heat_pump = bool(failures) and all(
-        result.failure_reason == ZERO_USEFUL_DUTY_REASON for _, result in failures
-    )
+    no_heat_pump = _is_no_beneficial_heat_pump(failures)
     raise_hpr_targeting_error(
         args=args,
         message=(
@@ -248,11 +250,23 @@ def raise_hpr_targeting_error(
         )
         for index, result in tuple(failures)[:16]
     )
-    category = (
-        HPRFailureCategory.CANDIDATE_PHYSICAL_INFEASIBILITY
-        if failures
-        else HPRFailureCategory.NO_VIABLE_CANDIDATE
-    )
+    if _is_no_beneficial_heat_pump(failures):
+        category = HPRFailureCategory.NO_BENEFICIAL_HEAT_PUMP
+        index, result = tuple(failures)[-1]
+        representatives = (
+            *representatives[:15][: len(failures) - 1],
+            HPRFailureDiagnostic(
+                category=category,
+                reason_code="candidate.no_beneficial_heat_pump",
+                summary=_bounded_failure_summary(result.failure_reason),
+                candidate_index=index,
+                topology=topology,
+            ),
+        )
+    elif failures:
+        category = HPRFailureCategory.CANDIDATE_PHYSICAL_INFEASIBILITY
+    else:
+        category = HPRFailureCategory.NO_VIABLE_CANDIDATE
     diagnostics = HPRFailureSummary(
         simulation_backend=getattr(args, "simulation_backend", "coolprop"),
         cycle=str(args.hpr_type),
@@ -277,6 +291,13 @@ def raise_hpr_targeting_error(
             }
         )
     raise HPRTargetingError(message, diagnostics=diagnostics)
+
+
+def _is_no_beneficial_heat_pump(
+    failures: Sequence[tuple[int, HPRBackendResult]],
+) -> bool:
+    """Whether the best valid candidate was a zero-duty (no heat pump) design."""
+    return bool(failures) and failures[-1][1].failure_reason == ZERO_USEFUL_DUTY_REASON
 
 
 def _bounded_failure_summary(reason: str | None) -> str:

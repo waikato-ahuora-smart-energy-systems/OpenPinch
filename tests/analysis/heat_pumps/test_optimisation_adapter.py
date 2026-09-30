@@ -292,3 +292,61 @@ def test_solver_resolves_only_the_best_ranked_candidate():
 
     assert result.obj == pytest.approx(0.2)
     assert calls == [0.2]
+
+
+def _zero_duty_result() -> HPRBackendResult:
+    return HPRBackendResult.failure(reason=adapter.ZERO_USEFUL_DUTY_REASON)
+
+
+def _solve_ranked(objectives_by_point):
+    ranked = tuple(
+        OptimisationCandidate(objective=rank, point=(point,))
+        for rank, point in enumerate(objectives_by_point)
+    )
+    calls = []
+
+    def objective(point, _args, debug=False):
+        calls.append(float(point[0]))
+        return objectives_by_point[float(point[0])]()
+
+    def solve():
+        return adapter.solve_hpr_placement(
+            f_obj=objective,
+            x0_ls=None,
+            bnds=[(0.0, 1.0)],
+            args=_base_args(),
+            candidate_search=lambda **_kwargs: ranked,
+        )
+
+    return solve, calls
+
+
+def test_no_beneficial_heat_pump_when_the_best_valid_design_has_zero_duty():
+    solve, calls = _solve_ranked(
+        {
+            0.1: lambda: _result(0.1, success=False),
+            0.2: _zero_duty_result,
+            0.3: lambda: _result(0.3),
+        }
+    )
+
+    with pytest.raises(
+        adapter.HPRTargetingError, match="no heat pump design"
+    ) as caught:
+        solve()
+
+    diagnostics = caught.value.diagnostics
+    assert (
+        adapter.HPRFailureCategory.NO_BENEFICIAL_HEAT_PUMP
+        in diagnostics.category_counts
+    )
+    last = diagnostics.representative_failures[-1]
+    assert last.reason_code == "candidate.no_beneficial_heat_pump"
+    # The infeasible design is skipped; the worse heat pump is never returned.
+    assert calls == [0.1, 0.2]
+
+
+def test_heat_pump_ranked_above_zero_duty_is_returned():
+    solve, _ = _solve_ranked({0.1: lambda: _result(0.1), 0.2: _zero_duty_result})
+
+    assert solve().obj == pytest.approx(0.1)

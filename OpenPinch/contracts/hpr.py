@@ -27,6 +27,7 @@ class HPRFailureCategory(str, Enum):
     CANDIDATE_PHYSICAL_INFEASIBILITY = "candidate_physical_infeasibility"
     BUDGET_EXHAUSTION = "budget_exhaustion"
     NO_VIABLE_CANDIDATE = "no_viable_candidate"
+    NO_BENEFICIAL_HEAT_PUMP = "no_beneficial_heat_pump"
     DIRECT_MVR_REQUIRED_STATE = "direct_mvr_required_state"
     FATAL_INTERNAL_BOUNDARY = "fatal_internal_boundary"
 
