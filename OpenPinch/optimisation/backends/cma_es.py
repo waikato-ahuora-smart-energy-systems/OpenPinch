@@ -1,21 +1,12 @@
 """CMA-ES multi-start backend."""
 
 import os
-from concurrent.futures import ProcessPoolExecutor
-from concurrent.futures.process import BrokenProcessPool
-from functools import partial
 from typing import Callable, Optional
 
 import numpy as np
 
-from ..candidates import (
-    _cluster_candidates,
-    _evaluate_scalar_objective,
-    _polish_candidates,
-    _postprocess_candidates,
-)
-from ..execution import _collect_candidates_in_parallel
-from ._surrogate import as_seed_array
+from ..candidates import _evaluate_scalar_objective
+from ._multistart import run_multistart
 
 
 def _get_cma_multiminima_in_parallel(
@@ -52,15 +43,18 @@ def _get_cma_multiminima_in_parallel(
       DOI: 10.48550/arXiv.1604.00772
       Source: https://arxiv.org/abs/1604.00772
     """
-    bounds = np.asarray(bounds, dtype=float)
     effective_maxfevals = maxfevals if maxfevals is not None else maxfun
-
-    all_x, all_f = _collect_cma_candidates(
+    return run_multistart(
+        _run_cma_single,
         func=func,
         bounds=bounds,
         x0_ls=x0_ls,
         args=args,
+        constraints=constraints,
         n_runs=n_runs,
+        cluster_tol=cluster_tol,
+        max_minima=max_minima,
+        local_method=local_method,
         maxiter=maxiter,
         seed=seed,
         maxfevals=effective_maxfevals,
@@ -68,58 +62,6 @@ def _get_cma_multiminima_in_parallel(
         sigma0=sigma0,
         tolx=tolx,
         tolfun=tolfun,
-    )
-    return _postprocess_candidates(
-        func=func,
-        args=args,
-        bounds=bounds,
-        constraints=constraints,
-        all_x=all_x,
-        all_f=all_f,
-        cluster_tol=cluster_tol,
-        max_minima=max_minima,
-        local_method=local_method,
-        cluster_fn=_cluster_candidates,
-        polish_fn=_polish_candidates,
-    )
-
-
-def _collect_cma_candidates(
-    func: Callable,
-    bounds: np.ndarray,
-    x0_ls: Optional[np.ndarray],
-    args: tuple,
-    n_runs: int,
-    maxiter: int,
-    seed: int,
-    maxfevals: int,
-    popsize: Optional[int],
-    sigma0: Optional[float],
-    tolx: float,
-    tolfun: float,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Collect candidate minima from multiple CMA-ES runs."""
-    x0_arr = as_seed_array(x0_ls)
-
-    run_fn = partial(
-        _run_cma_single,
-        func=func,
-        bounds=bounds,
-        x0_ls=x0_arr,
-        args=args,
-        maxiter=maxiter,
-        seed=seed,
-        maxfevals=maxfevals,
-        popsize=popsize,
-        sigma0=sigma0,
-        tolx=tolx,
-        tolfun=tolfun,
-    )
-    return _collect_candidates_in_parallel(
-        run_fn=run_fn,
-        n_runs=n_runs,
-        pool_executor_cls=ProcessPoolExecutor,
-        broken_pool_exc=BrokenProcessPool,
     )
 
 

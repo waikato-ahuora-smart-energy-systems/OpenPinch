@@ -1,22 +1,14 @@
 """RBF-surrogate multi-start backend."""
 
 import os
-from concurrent.futures import ProcessPoolExecutor
-from concurrent.futures.process import BrokenProcessPool
-from functools import partial
 from typing import Callable, Optional
 
 import numpy as np
 from scipy.interpolate import RBFInterpolator
 
-from ..candidates import (
-    _cluster_candidates,
-    _evaluate_scalar_objective,
-    _polish_candidates,
-    _postprocess_candidates,
-)
-from ..execution import _collect_candidates_in_parallel
-from ._surrogate import as_seed_array, run_surrogate_loop
+from ..candidates import _evaluate_scalar_objective
+from ._multistart import run_multistart
+from ._surrogate import candidate_pool, run_surrogate_loop
 
 
 def _get_rbf_surrogate_multiminima_in_parallel(
@@ -42,15 +34,18 @@ def _get_rbf_surrogate_multiminima_in_parallel(
     local_method="SLSQP",
 ):
     """Return deduplicated local minima from multi-start RBF-surrogate search."""
-    bounds = np.asarray(bounds, dtype=float)
     effective_maxfevals = maxfevals if maxfevals is not None else maxfun
-
-    all_x, all_f = _collect_rbf_surrogate_candidates(
+    return run_multistart(
+        _run_rbf_surrogate_single,
         func=func,
         bounds=bounds,
         x0_ls=x0_ls,
         args=args,
+        constraints=constraints,
         n_runs=n_runs,
+        cluster_tol=cluster_tol,
+        max_minima=max_minima,
+        local_method=local_method,
         maxiter=maxiter,
         seed=seed,
         maxfevals=effective_maxfevals,
@@ -61,64 +56,6 @@ def _get_rbf_surrogate_multiminima_in_parallel(
         smoothing=smoothing,
         degree=degree,
         distance_tol=distance_tol,
-    )
-    return _postprocess_candidates(
-        func=func,
-        args=args,
-        bounds=bounds,
-        constraints=constraints,
-        all_x=all_x,
-        all_f=all_f,
-        cluster_tol=cluster_tol,
-        max_minima=max_minima,
-        local_method=local_method,
-        cluster_fn=_cluster_candidates,
-        polish_fn=_polish_candidates,
-    )
-
-
-def _collect_rbf_surrogate_candidates(
-    func: Callable,
-    bounds: np.ndarray,
-    x0_ls: Optional[np.ndarray],
-    args: tuple,
-    n_runs: int,
-    maxiter: int,
-    seed: int,
-    maxfevals: int,
-    n_init: Optional[int],
-    n_candidates: int,
-    kernel: str,
-    epsilon: float,
-    smoothing: float,
-    degree: int,
-    distance_tol: float,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Collect candidate minima from multiple RBF-surrogate runs."""
-    x0_arr = as_seed_array(x0_ls)
-
-    run_fn = partial(
-        _run_rbf_surrogate_single,
-        func=func,
-        bounds=bounds,
-        x0_ls=x0_arr,
-        args=args,
-        maxiter=maxiter,
-        seed=seed,
-        maxfevals=maxfevals,
-        n_init=n_init,
-        n_candidates=n_candidates,
-        kernel=kernel,
-        epsilon=epsilon,
-        smoothing=smoothing,
-        degree=degree,
-        distance_tol=distance_tol,
-    )
-    return _collect_candidates_in_parallel(
-        run_fn=run_fn,
-        n_runs=n_runs,
-        pool_executor_cls=ProcessPoolExecutor,
-        broken_pool_exc=BrokenProcessPool,
     )
 
 
@@ -215,16 +152,7 @@ def _propose_rbf_surrogate_candidate(
     distance_tol: float,
 ) -> np.ndarray:
     """Select next point from a merit function over random and local candidates."""
-    U = rng.uniform(0.0, 1.0, size=(n_candidates, n_dim))
-
-    if best_u is not None:
-        n_local = max(32, n_candidates // 8)
-        U_local = np.clip(
-            best_u + rng.normal(0.0, 0.08, size=(n_local, n_dim)),
-            0.0,
-            1.0,
-        )
-        U = np.vstack([U, U_local, best_u.reshape(1, -1)])
+    U = candidate_pool(rng, n_candidates, n_dim, best_u)
 
     dists = np.linalg.norm(U[:, np.newaxis, :] - X_obs[np.newaxis, :, :], axis=2)
     d_min = np.min(dists, axis=1)
