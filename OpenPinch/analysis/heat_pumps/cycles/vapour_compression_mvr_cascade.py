@@ -461,8 +461,15 @@ class VapourCompressionMvrCascade:
         T_evap_mvr = np.empty_like(dT_lift_mvr, dtype=float)
         T_cond_mvr = np.empty_like(dT_lift_mvr, dtype=float)
         # The MVR source evaporates against the top VC stage's condensing
-        # refrigerant, so it is limited by that stage's saturation temperature.
-        T_evap_mvr[0] = float(vc_cycle.T_cond_sat_liq) - dt_cascade_hx
+        # refrigerant, which gives up heat from its discharge down to state 4.
+        # That cold end is the saturation temperature unless the internal
+        # heat reaches into the subcooled liquid, in which case state 4 is
+        # colder and the MVR must evaporate lower to keep the approach.
+        T_vc_cold_end = min(
+            float(vc_cycle.T_cond_sat_liq),
+            float(vc_cycle.Ts[4]) - 273.15,
+        )
+        T_evap_mvr[0] = T_vc_cold_end - dt_cascade_hx
         for j, lift in enumerate(dT_lift_mvr):
             T_cond_mvr[j] = T_evap_mvr[j] + lift
             if j + 1 < dT_lift_mvr.size:

@@ -1011,6 +1011,7 @@ def test_vc_mvr_cascade_propagates_unsolved_mvr_child_cycle(monkeypatch):
         work = 10.0
         penalty = None
         T_cond_sat_liq = 80.0
+        Ts = (0.0, 0.0, 0.0, 0.0, 400.0)
 
         def solve(self, **kwargs):
             return self.work
@@ -1053,6 +1054,7 @@ def test_vc_mvr_cascade_negative_total_work_returns_penalty(monkeypatch):
         work = -20.0
         penalty = None
         T_cond_sat_liq = 80.0
+        Ts = (0.0, 0.0, 0.0, 0.0, 400.0)
 
         def solve(self, **kwargs):
             return self.work
@@ -1494,3 +1496,26 @@ def test_vc_mvr_config_schema_and_dispatch(monkeypatch):
     )
 
     assert out["success"] is True
+
+
+def test_mvr_evaporates_below_the_vc_cascade_outlet_when_it_is_subcooled():
+    # The MVR source takes the VC condenser heat from discharge down to
+    # state 4. Saturated there, it evaporates dt_cascade_hx below saturation;
+    # when the internal heat reaches into the subcooled liquid, state 4 is
+    # colder and the MVR must evaporate dt_cascade_hx below it instead.
+    def derive(T4_C):
+        vc = SimpleNamespace(
+            T_cond_sat_liq=80.0, Ts=(0.0, 0.0, 0.0, 0.0, T4_C + 273.15)
+        )
+        T_evap, T_cond = VapourCompressionMvrCascade._derive_mvr_temperatures(
+            vc_cycle=vc, dT_lift_mvr=np.array([10.0, 5.0]), dt_cascade_hx=2.0
+        )
+        return T_evap, T_cond
+
+    T_evap, T_cond = derive(80.0)
+    np.testing.assert_allclose(T_evap, [78.0, 88.0])
+    np.testing.assert_allclose(T_cond, [88.0, 93.0])
+
+    T_evap, T_cond = derive(72.0)
+    np.testing.assert_allclose(T_evap, [70.0, 80.0])
+    np.testing.assert_allclose(T_cond, [80.0, 85.0])
