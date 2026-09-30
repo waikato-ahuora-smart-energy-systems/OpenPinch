@@ -46,11 +46,18 @@ class DutyAllocation:
 
 
 def decode_duty_splits(x_split: np.ndarray, Q_base: float) -> np.ndarray:
-    """Decode stick-breaking split fractions into nonnegative stage duties."""
+    """Decode stick-breaking split fractions into nonnegative stage duties.
+
+    Each stage takes its fraction of the duty the earlier stages leave, and
+    the last stage takes the remainder, so the stage duties always sum to
+    ``Q_base``. The last fraction therefore has no effect; the base duty alone
+    sets the total.
+    """
     remaining = max(float(Q_base), 0.0)
-    Q_request = np.zeros_like(x_split, dtype=float)
-    for i, fraction in enumerate(np.clip(x_split, 0.0, 1.0)):
-        Q_request[i] = fraction * remaining
+    fractions = np.clip(np.asarray(x_split, dtype=float), 0.0, 1.0)
+    Q_request = np.zeros_like(fractions, dtype=float)
+    for i, fraction in enumerate(fractions):
+        Q_request[i] = remaining if i == fractions.size - 1 else fraction * remaining
         remaining -= Q_request[i]
     return Q_request
 

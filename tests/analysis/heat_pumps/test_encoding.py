@@ -65,6 +65,19 @@ def test_duty_split_decode_handles_zero_base():
     np.testing.assert_allclose(out, np.zeros(3))
 
 
+def test_duty_split_decode_allocates_the_whole_base_duty():
+    # Fractions that would strand duty under open-ended stick-breaking still
+    # allocate all of it: the last stage takes the remainder.
+    np.testing.assert_allclose(
+        decode_duty_splits(np.array([0.0, 0.0]), 100.0), np.array([0.0, 100.0])
+    )
+    np.testing.assert_allclose(
+        decode_duty_splits(np.array([0.25, 0.0, 0.0]), 80.0),
+        np.array([20.0, 0.0, 60.0]),
+    )
+    np.testing.assert_allclose(decode_duty_splits(np.array([0.3]), 50.0), [50.0])
+
+
 def test_duty_split_encode_decode_round_trip_for_exhausted_base():
     Q_request = np.array([40.0, 30.0, 30.0])
     Q_base = 100.0
