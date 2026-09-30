@@ -83,21 +83,33 @@ def test_standard_problem_hpr_service_is_bounded_and_robust(
         )
 
     if is_sentinel:
-        assert outcome.kind is HPROutcomeKind.SOLVED, (
-            f"strict-success sentinel {assignment.parameter_id} returned "
-            f"{outcome.kind.value}"
-        )
-        witness = build_convergence_witness(
-            selected_observations,
-            selected_objective=float(outcome.target.hpr_details.obj),
-            maximum_evaluations=maximum_evaluations,
-        )
         try:
-            assert_bounded_convergence(witness)
-        except AssertionError as failure:
+            _assert_sentinel_converged(
+                assignment, outcome, selected_observations, maximum_evaluations
+            )
+        except (AssertionError, ValueError) as failure:
             raise AssertionError(
                 f"{failure}\n{format_search_trace(observations)}"
-            ) from None
+            ) from failure
+
+
+def _assert_sentinel_converged(
+    assignment: HPRBenchmarkAssignment,
+    outcome,
+    selected_observations,
+    maximum_evaluations: int,
+) -> None:
+    """Require a strict-success sentinel to solve and show bounded convergence."""
+    assert outcome.kind is HPROutcomeKind.SOLVED, (
+        f"strict-success sentinel {assignment.parameter_id} returned "
+        f"{outcome.kind.value}"
+    )
+    witness = build_convergence_witness(
+        selected_observations,
+        selected_objective=float(outcome.target.hpr_details.obj),
+        maximum_evaluations=maximum_evaluations,
+    )
+    assert_bounded_convergence(witness)
 
 
 def test_direct_process_mvr_and_downstream_targeting_succeed_end_to_end() -> None:
