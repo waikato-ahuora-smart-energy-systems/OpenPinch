@@ -305,14 +305,25 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "COSTING_DISCOUNT_RATE": _spec(float, 0.07, "costing", "discount_rate", numeric_min=0.0),
     "COSTING_SERVICE_LIFE": _spec(float, 20.0, "costing", "service_life", numeric_min=0.0),
     "COSTING_HPR_ELE_PRICE": _spec(float, 200.0, "costing", "hpr_ele_price", numeric_min=0.0),
-    "COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE": _spec(float, 1.0, "costing", "hpr_price_ratio_heat_to_ele", numeric_min=0.0),
-    "COSTING_HPR_PRICE_RATIO_COLD_TO_ELE": _spec(float, 1.0, "costing", "hpr_price_ratio_cold_to_ele", numeric_min=0.0),
-    "COSTING_HPR_COMP_FIXED_COST": _spec(float, 0.0, "costing", "hpr_comp_fixed_cost", numeric_min=0.0),
-    "COSTING_HPR_COMP_VARIABLE_COST": _spec(float, 10000.0, "costing", "hpr_comp_variable_cost", numeric_min=0.0),
-    "COSTING_HPR_COMP_COST_EXP": _spec(float, 1.0, "costing", "hpr_comp_cost_exp", numeric_min=0.0),
-    "COSTING_HPR_HX_DUTY_FIXED_COST": _spec(float, 0.0, "costing", "hpr_hx_duty_fixed_cost", numeric_min=0.0),
-    "COSTING_HPR_HX_DUTY_VARIABLE_COST": _spec(float, 10000.0, "costing", "hpr_hx_duty_variable_cost", numeric_min=0.0),
-    "COSTING_HPR_HX_DUTY_COST_EXP": _spec(float, 1.0, "costing", "hpr_hx_duty_cost_exp", numeric_min=0.0),
+    # HPR prices, relative to the electricity price.
+    "COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE": _spec(float, 0.6, "costing", "hpr_price_ratio_heat_to_ele", numeric_min=0.0),
+    "COSTING_HPR_PRICE_RATIO_COOLING_WATER_TO_ELE": _spec(float, 0.025, "costing", "hpr_price_ratio_cooling_water_to_ele", numeric_min=0.0),
+    # Default cold utilities: cooling water, then refrigeration below it.
+    "COSTING_HPR_COOLING_WATER_TEMPERATURE": _spec(float, 25.0, "costing", "hpr_cooling_water_temperature"),
+    "COSTING_HPR_COOLING_WATER_DT_MIN": _spec(float, 5.0, "costing", "hpr_cooling_water_dt_min", numeric_min=0.0),
+    "COSTING_HPR_REFRIGERATION_ETA_II": _spec(float, 0.4, "costing", "hpr_refrigeration_eta_ii", numeric_min=0.0),
+    "COSTING_HPR_REFRIGERATION_DT": _spec(float, 5.0, "costing", "hpr_refrigeration_dt", numeric_min=0.0),
+    # Installed HPR capital: C = F_inst * C_eq * (Q_cap / 1 MW)^exp
+    #   * (fixed_share + stage_share * n_stages) * f_T,
+    # f_T = 1 + temp_factor * max(0, T_hot_max - temp_base) / 100 K.
+    # C_eq is fitted to the IEA HPT Project 68 cost data (2025 USD).
+    "COSTING_HPR_EQUIPMENT_COST": _spec(float, 485000.0, "costing", "hpr_equipment_cost", numeric_min=0.0),
+    "COSTING_HPR_INSTALLATION_FACTOR": _spec(float, 2.3, "costing", "hpr_installation_factor", numeric_min=0.0),
+    "COSTING_HPR_COST_EXP": _spec(float, 0.7, "costing", "hpr_cost_exp", numeric_min=0.0),
+    "COSTING_HPR_COST_FIXED_SHARE": _spec(float, 0.7, "costing", "hpr_cost_fixed_share", numeric_min=0.0),
+    "COSTING_HPR_COST_STAGE_SHARE": _spec(float, 0.3, "costing", "hpr_cost_stage_share", numeric_min=0.0),
+    "COSTING_HPR_COST_TEMP_FACTOR": _spec(float, 0.4, "costing", "hpr_cost_temp_factor", numeric_min=0.0),
+    "COSTING_HPR_COST_TEMP_BASE": _spec(float, 75.0, "costing", "hpr_cost_temp_base"),
 
     # HEN synthesis.
     "HENS_APPROACH_TEMPERATURES": _spec(List[float], [14.0], "hens", "approach_temperatures", validator=_positive_float_grid),

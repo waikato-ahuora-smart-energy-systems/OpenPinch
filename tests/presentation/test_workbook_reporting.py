@@ -225,10 +225,6 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
         "HPR Annualized Capital Cost (unit)",
         "HPR Total Annualized Cost (value)",
         "HPR Total Annualized Cost (unit)",
-        "HPR Compressor Capital Cost (value)",
-        "HPR Compressor Capital Cost (unit)",
-        "HPR Heat Exchanger Capital Cost (value)",
-        "HPR Heat Exchanger Capital Cost (unit)",
         # Utility columns come from names:
         "HP Steam (value)",
         "HP Steam (unit)",

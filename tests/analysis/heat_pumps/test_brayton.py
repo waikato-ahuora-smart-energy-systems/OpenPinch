@@ -81,7 +81,7 @@ def test_brayton_objective_builds_streams_and_scores_cascades(monkeypatch):
     args = _base_args(n_cond=1, n_evap=1)
     args.is_heat_pumping = True
     args.heat_to_power_ratio = 1.0
-    args.cold_to_power_ratio = 0.5
+    args.refrigeration_to_power_ratio = 0.5
     args.bckgrd_hot_streams = []
     args.bckgrd_cold_streams = []
 

@@ -24,6 +24,7 @@ from ..common.encoding import (
 )
 from ..common.layout import HPRoptVectorLayout
 from ..common.shared import (
+    HPRCostUnit,
     evaluate_vapour_hpr_result,
     validate_vapour_hp_refrigerant_ls,
 )
@@ -284,6 +285,14 @@ def _compute_vc_mvr_system_obj(
             model=hp,
             penalty_terms=hp.penalty,
             dT_subcool=solved_state.dT_subcool,
+            cost_units=[
+                HPRCostUnit(
+                    Q_cap=float(hp.Q_heat),
+                    T_hot_max=float(np.max(solved_state.T_cond)),
+                    n_closed=_num_vc_stages(args),
+                    n_mvr=_num_mvr_stages(args),
+                )
+            ],
             debug=debug,
             artifact_mode=artifact_mode,
         )

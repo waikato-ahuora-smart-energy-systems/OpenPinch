@@ -270,17 +270,21 @@ class HeatPumpTargetInputs(BaseModel):
     dt_cascade_hx: float
     dt_phase_change: float
     heat_to_power_ratio: float
-    cold_to_power_ratio: float
+    cooling_water_to_power_ratio: float
+    refrigeration_to_power_ratio: float
+    T_cooling_water: float
+    dt_cooling_water: float
     ele_price: float
     annual_op_time: float
     discount_rate: float
     serv_life: float
-    hpr_comp_fixed_cost: float
-    hpr_comp_variable_cost: float
-    hpr_comp_cost_exp: float
-    hpr_hx_fixed_cost: float
-    hpr_hx_variable_cost: float
-    hpr_hx_cost_exp: float
+    hpr_equipment_cost: float
+    hpr_installation_factor: float
+    hpr_cost_exp: float
+    hpr_cost_fixed_share: float
+    hpr_cost_stage_share: float
+    hpr_cost_temp_factor: float
+    hpr_cost_temp_base: float
     is_heat_pumping: bool
     max_multi_start: int
     T_env: float
@@ -344,8 +348,6 @@ class HeatPumpTargetOutputs(BaseModel):
     hpr_capital_cost: Optional[Any] = None
     hpr_annualized_capital_cost: Optional[Any] = None
     hpr_total_annualized_cost: Optional[Any] = None
-    hpr_compressor_capital_cost: Optional[Any] = None
-    hpr_heat_exchanger_capital_cost: Optional[Any] = None
     Q_amb_hot: float
     Q_amb_cold: float
     cop_h: Optional[float | list | np.ndarray] = None
@@ -387,8 +389,6 @@ class SimulatedHPRAnnualizedCostAccounting(BaseModel):
     hpr_capital_cost: Value
     hpr_annualized_capital_cost: Value
     hpr_total_annualized_cost: Value
-    hpr_compressor_capital_cost: Value
-    hpr_heat_exchanger_capital_cost: Value
     feasibility_penalty: Value
 
 
@@ -456,9 +456,9 @@ class HPRBackendResult(BaseModel):
     hpr_capital_cost: Any = None
     hpr_annualized_capital_cost: Any = None
     hpr_total_annualized_cost: Any = None
-    hpr_compressor_capital_cost: Any = None
-    hpr_heat_exchanger_capital_cost: Any = None
     feasibility_penalty: float = 0.0
+    Q_cooling_water: float = 0.0
+    Q_refrigeration: float = 0.0
     Q_amb_hot: float
     Q_amb_cold: float
     success: bool = True
@@ -533,8 +533,6 @@ class HPRBackendResult(BaseModel):
             "hpr_capital_cost": self.hpr_capital_cost,
             "hpr_annualized_capital_cost": self.hpr_annualized_capital_cost,
             "hpr_total_annualized_cost": self.hpr_total_annualized_cost,
-            "hpr_compressor_capital_cost": self.hpr_compressor_capital_cost,
-            "hpr_heat_exchanger_capital_cost": self.hpr_heat_exchanger_capital_cost,
             "Q_amb_hot": self.Q_amb_hot,
             "Q_amb_cold": self.Q_amb_cold,
             "cop_h": self.cop_h,

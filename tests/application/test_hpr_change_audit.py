@@ -110,7 +110,7 @@ def test_residual_detachment_preserves_period_capacity_and_fluid_metadata(
         condensers=1,
         evaporators=1,
         maximum_restarts=1,
-        options={"COSTING_HPR_PRICE_RATIO_COLD_TO_ELE": 0.1},
+        options={"COSTING_HPR_PRICE_RATIO_COOLING_WATER_TO_ELE": 0.1},
     )
     residual = problem.residual_utility(base_target=hp)
     copied = residual.hot_utilities.get_stream_by_name(utility["name"])

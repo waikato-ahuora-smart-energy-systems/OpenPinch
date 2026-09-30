@@ -81,3 +81,34 @@ def test_air_never_replaces_heat_that_only_passes_through():
     assert out.Q_air_source == pytest.approx(0.0)
     assert out.Q_air_sink == pytest.approx(0.0)
     assert (out.Q_ext_top, out.Q_ext_bottom) == pytest.approx((5.0, 1.0))
+
+
+def test_cooling_water_takes_nothing_when_colder_air_covers_the_heat():
+    # 100 kW is released between 50 C and 0 C. Air at a 10 C sink takes the
+    # 80 kW released above it, so cooling water at 30 C has nothing left and
+    # the 20 kW released below 10 C needs refrigeration.
+    T = np.array([100.0, 50.0, 0.0])
+    H = np.array([0.0, 0.0, 100.0])
+
+    out = cascade_with_air(
+        T, H, T_air_source=-50.0, T_air_sink=10.0, T_cooling_water=30.0
+    )
+
+    assert out.Q_air_sink == pytest.approx(80.0)
+    assert out.Q_cooling_water == pytest.approx(0.0)
+    assert out.Q_ext_bottom == pytest.approx(20.0)
+
+
+def test_cooling_water_takes_heat_below_warmer_air():
+    # On a hot day air only takes heat above 40 C (20 kW); cooling water at
+    # 30 C takes the next 20 kW and 60 kW is left for refrigeration.
+    T = np.array([100.0, 50.0, 0.0])
+    H = np.array([0.0, 0.0, 100.0])
+
+    out = cascade_with_air(
+        T, H, T_air_source=-50.0, T_air_sink=40.0, T_cooling_water=30.0
+    )
+
+    assert out.Q_air_sink == pytest.approx(20.0)
+    assert out.Q_cooling_water == pytest.approx(20.0)
+    assert out.Q_ext_bottom == pytest.approx(60.0)

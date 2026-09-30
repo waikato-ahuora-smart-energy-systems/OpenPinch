@@ -14,7 +14,10 @@ from ....domain.stream import Stream
 from ....domain.stream_collection import StreamCollection
 from ..performance_maps.targeting import normalize_hpr_simulation_backend
 
-__all__ = ["construct_HPRTargetInputs"]
+__all__ = [
+    "construct_HPRTargetInputs",
+    "default_refrigeration_to_power_ratio",
+]
 
 
 ################################################################################
@@ -83,12 +86,13 @@ def construct_HPRTargetInputs(
         simulation_backend=normalize_hpr_simulation_backend(simulation_backend),
         # Direct config pass-through.
         hpr_type=hpr.type,
-        hpr_comp_fixed_cost=costing.hpr_comp_fixed_cost,
-        hpr_comp_variable_cost=costing.hpr_comp_variable_cost,
-        hpr_comp_cost_exp=costing.hpr_comp_cost_exp,
-        hpr_hx_fixed_cost=costing.hpr_hx_duty_fixed_cost,
-        hpr_hx_variable_cost=costing.hpr_hx_duty_variable_cost,
-        hpr_hx_cost_exp=costing.hpr_hx_duty_cost_exp,
+        hpr_equipment_cost=costing.hpr_equipment_cost,
+        hpr_installation_factor=costing.hpr_installation_factor,
+        hpr_cost_exp=costing.hpr_cost_exp,
+        hpr_cost_fixed_share=costing.hpr_cost_fixed_share,
+        hpr_cost_stage_share=costing.hpr_cost_stage_share,
+        hpr_cost_temp_factor=costing.hpr_cost_temp_factor,
+        hpr_cost_temp_base=costing.hpr_cost_temp_base,
         n_cond=hpr.n_cond,
         n_evap=hpr.n_evap,
         n_mvr=hpr.mvr_count,
@@ -114,12 +118,42 @@ def construct_HPRTargetInputs(
         allow_integrated_expander=hpr.integrated_expander_enabled,
         initialise_simulated_cycle=hpr.initialise_simulated_cycle,
         heat_to_power_ratio=costing.hpr_price_ratio_heat_to_ele,
-        cold_to_power_ratio=costing.hpr_price_ratio_cold_to_ele,
+        cooling_water_to_power_ratio=costing.hpr_price_ratio_cooling_water_to_ele,
+        refrigeration_to_power_ratio=default_refrigeration_to_power_ratio(
+            T_min=float(np.min(T_vals)),
+            costing=costing,
+        ),
+        T_cooling_water=costing.hpr_cooling_water_temperature,
+        dt_cooling_water=costing.hpr_cooling_water_dt_min,
         ele_price=costing.hpr_ele_price,
         annual_op_time=costing.annual_op_time,
         discount_rate=costing.discount_rate,
         serv_life=costing.service_life,
     )
+
+
+def default_refrigeration_to_power_ratio(*, T_min: float, costing) -> float:
+    """Electricity per unit of heat removed by the default refrigeration utility.
+
+    The default refrigeration is crude and static for a problem: it
+    evaporates ``hpr_refrigeration_dt`` below the problem's minimum
+    temperature ``T_min`` (degC), rejects heat at the cooling-water level
+    (supply temperature plus its minimum approach), and runs at
+    ``hpr_refrigeration_eta_ii`` of the Carnot COP. It never costs less than
+    cooling water.
+    """
+    cw_ratio = max(float(costing.hpr_price_ratio_cooling_water_to_ele), 0.0)
+    T_evap = float(T_min) - float(costing.hpr_refrigeration_dt) + 273.15
+    T_cond = (
+        float(costing.hpr_cooling_water_temperature)
+        + float(costing.hpr_cooling_water_dt_min)
+        + 273.15
+    )
+    eta = float(costing.hpr_refrigeration_eta_ii)
+    if T_cond <= T_evap or T_evap <= 0.0 or eta <= 0.0:
+        return cw_ratio
+    cop = eta * T_evap / (T_cond - T_evap)
+    return max(1.0 / cop, cw_ratio)
 
 
 ################################################################################

@@ -41,8 +41,6 @@
     "hpr_capital_cost": 200.0,
     "hpr_annualized_capital_cost": 20.0,
     "hpr_total_annualized_cost": 120.0,
-    "hpr_compressor_capital_cost": 80.0,
-    "hpr_heat_exchanger_capital_cost": 120.0,
     "hpr_success": true
   }
 }

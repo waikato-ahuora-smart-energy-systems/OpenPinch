@@ -24,6 +24,7 @@ from ..common.encoding import (
 from ..common.layout import HPRoptVectorLayout
 from ..common.multi_vc_objective import _evaluate_multi_vc_objective
 from ..common.shared import (
+    HPRCostUnit,
     condensing_temperature_search_range,
     evaluate_vapour_hpr_result,
     validate_vapour_hp_refrigerant_ls,
@@ -228,9 +229,24 @@ def _compute_parallel_hp_system_obj(
         build_record=build_coolprop_target_simulation_record,
         check_temperature_lift=True,
         result_state_fields=("dT_superheat",),
+        cost_units=_parallel_cost_units,
         debug=debug,
         artifact_mode=artifact_mode,
     )
+
+
+def _parallel_cost_units(
+    state_vars: HPRParsedState,
+    hp: ParallelVapourCompressionCycles,
+) -> list[HPRCostUnit]:
+    """Each parallel cycle is its own single-stage machine."""
+    return [
+        HPRCostUnit(Q_cap=float(Q_cap), T_hot_max=float(T_cond))
+        for Q_cap, T_cond in zip(
+            np.asarray(hp.Q_heat_arr, dtype=float).ravel(),
+            np.asarray(state_vars.T_cond, dtype=float).ravel(),
+        )
+    ]
 
 
 def _parallel_topology_id(_args: HeatPumpTargetInputs) -> HPRTopologyIdentifier:

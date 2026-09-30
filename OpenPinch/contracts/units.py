@@ -128,16 +128,6 @@ OUTPUT_UNIT_RULES: dict[str, OutputUnitRule] = {
         "$/y",
         unit_groups=("annual_cost", "currency"),
     ),
-    "hpr_compressor_capital_cost": OutputUnitRule(
-        "$",
-        "$",
-        unit_groups=("capital_cost", "currency"),
-    ),
-    "hpr_heat_exchanger_capital_cost": OutputUnitRule(
-        "$",
-        "$",
-        unit_groups=("capital_cost", "currency"),
-    ),
 }
 
 __all__ = [

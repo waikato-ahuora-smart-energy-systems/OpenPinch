@@ -128,7 +128,8 @@ def test_unused_low_grade_heat_has_no_heat_pump_feasibility_penalty(cold):
         is_heat_pumping=True,
         Q_hpr_target=100.0,
         heat_to_power_ratio=1.0,
-        cold_to_power_ratio=0.0,
+        refrigeration_to_power_ratio=0.0,
+        cooling_water_to_power_ratio=0.0,
         eta_penalty=0.001,
         rho_penalty=10.0,
     )
@@ -141,3 +142,4 @@ def test_unused_low_grade_heat_has_no_heat_pump_feasibility_penalty(cold):
     )
     assert penalty == 0.0
     assert objective == pytest.approx(0.3)
+

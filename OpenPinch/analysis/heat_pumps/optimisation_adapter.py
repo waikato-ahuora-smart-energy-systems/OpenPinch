@@ -700,8 +700,6 @@ def aggregate_hpr_period_results(
     for field in (
         "hpr_capital_cost",
         "hpr_annualized_capital_cost",
-        "hpr_compressor_capital_cost",
-        "hpr_heat_exchanger_capital_cost",
     ):
         maximum = _aggregate_result_field(
             ordered,
@@ -740,10 +738,15 @@ def build_hpr_accounting(
     Q_ext_heat: float,
     Q_ext_cold: float,
     args: HeatPumpTargetInputs,
+    Q_cooling_water: float = 0.0,
     penalty_terms: object = None,
     penalise_external_cold_when_refrigerating: bool = False,
 ) -> tuple[float, float, float, float]:
-    """Standardise HPR utility, feasibility-penalty, and objective semantics."""
+    """Standardise HPR utility, feasibility-penalty, and objective semantics.
+
+    ``Q_ext_cold`` is the external cold met by refrigeration and
+    ``Q_cooling_water`` the part met by cooling water.
+    """
     positive_penalty_terms = np.maximum(
         np.asarray(normalise_hpr_penalty_terms(penalty_terms), dtype=float),
         0.0,
@@ -767,7 +770,7 @@ def build_hpr_accounting(
     ):
         penalty += float(
             g_ineq_penalty(
-                g=Q_ext_cold,
+                g=Q_ext_cold + Q_cooling_water,
                 rho=args.rho_penalty,
                 form=PenaltyForm.SQUARE,
             )
@@ -778,7 +781,9 @@ def build_hpr_accounting(
         Q_ext_cold=Q_ext_cold,
         Q_hpr_target=args.Q_hpr_target,
         heat_to_power_ratio=args.heat_to_power_ratio,
-        cold_to_power_ratio=args.cold_to_power_ratio,
+        cold_to_power_ratio=args.refrigeration_to_power_ratio,
+        Q_cooling_water=Q_cooling_water,
+        cooling_water_to_power_ratio=args.cooling_water_to_power_ratio,
         penalty=penalty,
     )
     return float(Q_ext_heat), float(Q_ext_cold), penalty, float(objective)
@@ -792,12 +797,15 @@ def calc_hpr_obj(
     heat_to_power_ratio: float = 1.0,
     cold_to_power_ratio: float = 0.0,
     penalty: float = 0.0,
+    Q_cooling_water: float = 0.0,
+    cooling_water_to_power_ratio: float = 0.0,
 ) -> float:
     """Return the scalar screening objective used by HPR placement solvers."""
     return (
         work
         + (Q_ext_heat * heat_to_power_ratio)
         + (Q_ext_cold * cold_to_power_ratio)
+        + (Q_cooling_water * cooling_water_to_power_ratio)
         + penalty
     ) / Q_hpr_target
 

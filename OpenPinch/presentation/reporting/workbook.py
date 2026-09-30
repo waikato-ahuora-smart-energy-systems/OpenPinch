@@ -243,16 +243,6 @@ def _make_summary_row(t) -> dict:
             getattr(t, "hpr_total_annualized_cost", None),
             period_idx=period_idx,
         ),
-        **_value_unit_columns(
-            "HPR Compressor Capital Cost",
-            getattr(t, "hpr_compressor_capital_cost", None),
-            period_idx=period_idx,
-        ),
-        **_value_unit_columns(
-            "HPR Heat Exchanger Capital Cost",
-            getattr(t, "hpr_heat_exchanger_capital_cost", None),
-            period_idx=period_idx,
-        ),
     }
 
     return base_columns | utility_columns | tail_columns

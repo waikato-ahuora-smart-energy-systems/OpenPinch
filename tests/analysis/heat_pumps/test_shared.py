@@ -206,34 +206,23 @@ def test_compute_utility_cost_skips_utilities_without_cost_data():
     )
 
 
-def test_simulated_hpr_annualized_costs_use_value_units_and_duty_based_hx_cost():
-    streams = _sc(
-        _stream("cond", 120.0, 100.0, 20.0, is_process_stream=False),
-        _stream("evap", 40.0, 60.0, 10.0, is_process_stream=False),
-    )
+def test_simulated_hpr_annualized_costs_price_utilities_and_installed_capital():
     args = _base_args(
         ele_price=100.0,
         annual_op_time=1000.0,
         heat_to_power_ratio=0.5,
-        cold_to_power_ratio=0.25,
-        hpr_comp_fixed_cost=100.0,
-        hpr_comp_variable_cost=10.0,
-        hpr_comp_cost_exp=1.0,
-        hpr_hx_fixed_cost=50.0,
-        hpr_hx_variable_cost=2.0,
-        hpr_hx_cost_exp=1.0,
+        cooling_water_to_power_ratio=0.025,
+        refrigeration_to_power_ratio=0.5,
         discount_rate=0.1,
         serv_life=10.0,
     )
 
     costs = hp_shared.calc_simulated_hpr_annualized_costs(
         work=10.0,
-        work_arr=np.array([6.0, 4.0]),
         Q_ext_heat=8.0,
-        Q_ext_cold=4.0,
-        hpr_streams=streams,
-        hx_units=len(streams.get_hot_utility_streams())
-        + len(streams.get_cold_utility_streams()),
+        Q_cooling_water=4.0,
+        Q_refrigeration=2.0,
+        cost_units=[hp_shared.HPRCostUnit(Q_cap=1000.0, T_hot_max=150.0)],
         penalty_power_equivalent=2.0,
         args=args,
     )
@@ -241,15 +230,62 @@ def test_simulated_hpr_annualized_costs_use_value_units_and_duty_based_hx_cost()
     assert isinstance(costs, SimulatedHPRAnnualizedCostAccounting)
     assert isinstance(costs.hpr_operating_cost, Value)
     assert costs.hpr_operating_cost.unit == "$/y"
-    assert costs.hpr_operating_cost.value == pytest.approx(1500.0)
-    assert costs.hpr_compressor_capital_cost.unit == "$"
-    assert costs.hpr_compressor_capital_cost.value == pytest.approx(300.0)
-    assert costs.hpr_heat_exchanger_capital_cost.unit == "$"
-    assert costs.hpr_heat_exchanger_capital_cost.value == pytest.approx(160.0)
-    assert costs.hpr_capital_cost.value == pytest.approx(460.0)
+    # 10 kW power + 8 kW heat at 0.5 + 4 kW cooling water at 0.025
+    # + 2 kW refrigeration at 0.5, at $100/MWh for 1000 h.
+    assert costs.hpr_operating_cost.value == pytest.approx(1510.0)
+    # 2.3 x $485k x (1 MW)^0.7 x (0.7 + 0.3) x (1 + 0.4 x 0.75)
+    assert costs.hpr_capital_cost.unit == "$"
+    assert costs.hpr_capital_cost.value == pytest.approx(2.3 * 485000.0 * 1.3)
     assert costs.hpr_total_annualized_cost.unit == "$/y"
     assert costs.feasibility_penalty.unit == "$/y"
     assert costs.feasibility_penalty.value == pytest.approx(200.0)
+
+
+def test_hpr_capital_cost_scales_with_size_stages_and_temperature():
+    args = _base_args()
+    unit = hp_shared.HPRCostUnit(Q_cap=2000.0, T_hot_max=200.0, n_closed=2, n_mvr=1)
+
+    cost = hp_shared.calc_hpr_capital_cost([unit], args)
+
+    expected = 2.3 * 485000.0 * 2.0**0.7 * (0.7 + 0.3 * 3) * (1.0 + 0.4 * 1.25)
+    assert cost.unit == "$"
+    assert cost.value == pytest.approx(expected)
+
+
+def test_hpr_capital_cost_sums_machines_and_ignores_idle_ones():
+    args = _base_args()
+    cool = hp_shared.HPRCostUnit(Q_cap=1000.0, T_hot_max=60.0)
+    idle = hp_shared.HPRCostUnit(Q_cap=0.0, T_hot_max=180.0)
+
+    one = hp_shared.calc_hpr_capital_cost([cool], args).value
+    both = hp_shared.calc_hpr_capital_cost([cool, cool, idle], args).value
+
+    # Below the 75 C base there is no temperature factor.
+    assert one == pytest.approx(2.3 * 485000.0)
+    assert both == pytest.approx(2.0 * one)
+
+
+def test_default_refrigeration_ratio_uses_carnot_cop_to_cooling_water():
+    costing = SimpleNamespace(
+        hpr_price_ratio_cooling_water_to_ele=0.025,
+        hpr_cooling_water_temperature=25.0,
+        hpr_cooling_water_dt_min=5.0,
+        hpr_refrigeration_eta_ii=0.4,
+        hpr_refrigeration_dt=5.0,
+    )
+
+    cold = hp_preprocessing.default_refrigeration_to_power_ratio(
+        T_min=-10.0, costing=costing
+    )
+    warm = hp_preprocessing.default_refrigeration_to_power_ratio(
+        T_min=50.0, costing=costing
+    )
+
+    # Evaporating at -15 C, rejecting at 30 C.
+    cop = 0.4 * 258.15 / 45.0
+    assert cold == pytest.approx(1.0 / cop)
+    # No refrigeration needed above the cooling-water level.
+    assert warm == pytest.approx(0.025)
 
 
 def test_cycle_penalty_ignores_missing_and_negative_terms():

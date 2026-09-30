@@ -230,7 +230,8 @@ def test_accounting_applies_refrigeration_penalty_and_scalar_objective():
         args=_base_args(
             is_heat_pumping=False,
             heat_to_power_ratio=0.0,
-            cold_to_power_ratio=0.0,
+            refrigeration_to_power_ratio=0.0,
+            cooling_water_to_power_ratio=0.0,
             eta_penalty=0.0,
             rho_penalty=2.0,
         ),

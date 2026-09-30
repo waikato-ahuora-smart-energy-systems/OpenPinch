@@ -331,7 +331,7 @@ def test_hpr_shortcut_infers_child_zone_and_nondefault_period():
         condensers=1,
         evaporators=1,
         maximum_restarts=1,
-        options={"COSTING_HPR_PRICE_RATIO_COLD_TO_ELE": 0.1},
+        options={"COSTING_HPR_PRICE_RATIO_COOLING_WATER_TO_ELE": 0.1},
     )
     inferred = problem.target.direct_heat_integration(base_target=hp)
     explicit = problem.target.direct_heat_integration(
