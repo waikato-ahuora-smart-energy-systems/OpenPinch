@@ -208,7 +208,6 @@ def _parse_vc_mvr_state_variables(
     x_mvr_process_split = misc[1 + n_mvr :]
     T_evap_mvr, T_cond_mvr = _derive_provisional_mvr_temperatures(
         T_cond_vc=T_cond_vc,
-        dT_subcool_vc=dT_subcool_vc,
         dT_lift_mvr=dT_lift_mvr,
         dt_cascade_hx=args.dt_cascade_hx,
     )
@@ -390,14 +389,13 @@ def _normalise_fluid_list(values) -> list[str]:
 def _derive_provisional_mvr_temperatures(
     *,
     T_cond_vc: np.ndarray,
-    dT_subcool_vc: np.ndarray,
     dT_lift_mvr: np.ndarray,
     dt_cascade_hx: float,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Provisional serial MVR temperatures before the VC profile is solved."""
     T_evap_mvr = np.empty_like(dT_lift_mvr, dtype=float)
     T_cond_mvr = np.empty_like(dT_lift_mvr, dtype=float)
-    T_evap_mvr[0] = T_cond_vc[0] - dT_subcool_vc[0] - float(dt_cascade_hx)
+    T_evap_mvr[0] = T_cond_vc[0] - float(dt_cascade_hx)
     for j, lift in enumerate(dT_lift_mvr):
         T_cond_mvr[j] = T_evap_mvr[j] + lift
         if j + 1 < dT_lift_mvr.size:
