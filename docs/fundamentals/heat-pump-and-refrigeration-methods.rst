@@ -146,11 +146,17 @@ temperature lift, and annualized cost. A thermodynamically feasible candidate
 is not automatically the lowest-cost retrofit; interpret HPR targets alongside
 the Grand Composite Curve and net-load profiles.
 
-Simulated-cycle integration accounting retains the model-specific compressor,
-expander, heat-exchanger, operating-cost, and annualized-capital contributions
-used by result summaries. Multiperiod summaries weight operating quantities and
-size shared equipment against the governing period rather than averaging away
-the peak design requirement.
+Simulated-cycle targets are ranked by annualized cost: electricity, external
+heating, cooling water and default refrigeration, the heat pump's installed
+capital, and the installed capital of the default utilities the design still
+needs. Heat-pump capital scales with heating capacity to the power 0.7, with
+the number of compression stages and with the delivery temperature above
+75 °C; its defaults are fitted to the IEA HPT Project 68 cost data. Heat pumps
+do not always pay, particularly at high lift. Multiperiod summaries weight
+operating quantities and size shared equipment, and the default-utility
+capacity, against the governing period rather than averaging away the peak
+design requirement. See :doc:`../guides/heat-pump-workflows` for the cost
+equation and its options.
 
 See :doc:`../guides/heat-pump-workflows` and notebooks 08 through 11 in
 :doc:`../examples/notebook-series`.
