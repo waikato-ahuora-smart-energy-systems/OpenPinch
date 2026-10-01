@@ -46,25 +46,15 @@ def test_six_profile_rotation_assigns_every_standard_problem_once() -> None:
     }
 
 
-def test_profile_search_limits_expand_only_mvr_convergence_sentinels() -> None:
-    profiles = {profile.profile_id: profile for profile in HPR_PROFILES}
-
+def test_profile_search_limits_expand_for_convergence_sentinels() -> None:
     for profile in HPR_PROFILES:
         assert profile.search_limits(sentinel=False) == (
             profile.maximum_evaluations,
             profile.maximum_search_observations,
         )
-
-    direct_mvr = profiles["direct-optimized-vc-mvr-heat-pump"]
-    utility_mvr = profiles["utility-optimized-vc-mvr-heat-pump"]
-    assert direct_mvr.search_limits(sentinel=True) == (48, 96)
-    assert utility_mvr.search_limits(sentinel=True) == (48, 96)
-
-    non_mvr = profiles["direct-cascade-vc-heat-pump"]
-    assert non_mvr.search_limits(sentinel=True) == (
-        non_mvr.maximum_evaluations,
-        non_mvr.maximum_search_observations,
-    )
+        # Every sentinel gets room to improve on its warm start; the ordinary
+        # budget of 12 evaluations often cannot.
+        assert profile.search_limits(sentinel=True) == (48, 96)
 
 
 @seed(20260715)

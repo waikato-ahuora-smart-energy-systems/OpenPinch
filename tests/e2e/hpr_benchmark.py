@@ -105,6 +105,8 @@ HPR_PROFILES = (
         is_utility=False,
         is_cascade_cycle=True,
         objective_name="_compute_cascade_hp_system_obj",
+        sentinel_maximum_evaluations=48,
+        sentinel_maximum_search_observations=96,
     ),
     HPRProfile(
         profile_id="utility-parallel-vc-heat-pump",
@@ -112,6 +114,8 @@ HPR_PROFILES = (
         is_utility=True,
         is_cascade_cycle=False,
         objective_name="_compute_parallel_hp_system_obj",
+        sentinel_maximum_evaluations=48,
+        sentinel_maximum_search_observations=96,
     ),
     HPRProfile(
         profile_id="direct-cascade-vc-refrigeration",
@@ -119,6 +123,8 @@ HPR_PROFILES = (
         is_utility=False,
         is_cascade_cycle=True,
         objective_name="_compute_cascade_hp_system_obj",
+        sentinel_maximum_evaluations=48,
+        sentinel_maximum_search_observations=96,
     ),
     HPRProfile(
         profile_id="utility-parallel-vc-refrigeration",
@@ -126,6 +132,8 @@ HPR_PROFILES = (
         is_utility=True,
         is_cascade_cycle=False,
         objective_name="_compute_parallel_hp_system_obj",
+        sentinel_maximum_evaluations=48,
+        sentinel_maximum_search_observations=96,
     ),
     HPRProfile(
         profile_id="direct-optimized-vc-mvr-heat-pump",
@@ -154,7 +162,7 @@ HPR_PROFILES = (
 HPR_SENTINEL_FILENAMES = {
     "direct-cascade-vc-heat-pump": "p_Perry et al.json",
     "utility-parallel-vc-heat-pump": "p_Martinez-Rodriguez (case study 1).json",
-    "direct-cascade-vc-refrigeration": "p_Ahmad (example 2).json",
+    "direct-cascade-vc-refrigeration": "p_Sun et al.json",
     "utility-parallel-vc-refrigeration": "p_Ahmad (example 3).json",
     "direct-optimized-vc-mvr-heat-pump": "p_Barbaro and Bagajewicz.json",
     "utility-optimized-vc-mvr-heat-pump": "p_Feng et al (case study 1).json",
