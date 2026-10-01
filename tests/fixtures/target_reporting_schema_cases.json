@@ -40,7 +40,8 @@
     "hpr_operating_cost": 100.0,
     "hpr_capital_cost": 200.0,
     "hpr_annualized_capital_cost": 20.0,
-    "hpr_total_annualized_cost": 120.0,
+    "hpr_utility_annualized_capital_cost": 5.0,
+    "hpr_total_annualized_cost": 125.0,
     "hpr_success": true
   }
 }

@@ -395,11 +395,19 @@ def _total_hpr_annualized_cost(data: Mapping[str, Any]) -> Value | float | None:
         raise ValueError(
             "Cannot recompute HPR total annualized cost from a partial cost breakdown."
         )
-    if isinstance(operating, Value) and isinstance(annualized_capital, Value):
-        return operating + annualized_capital
-    if isinstance(operating, Value) or isinstance(annualized_capital, Value):
+    # Default-utility capital is optional: older results do not carry it.
+    utility_capital = data.get("hpr_utility_annualized_capital_cost")
+    parts = [operating, annualized_capital]
+    if utility_capital is not None:
+        parts.append(utility_capital)
+    if all(isinstance(part, Value) for part in parts):
+        total = parts[0]
+        for part in parts[1:]:
+            total = total + part
+        return total
+    if any(isinstance(part, Value) for part in parts):
         raise ValueError("HPR annualized cost fields must use compatible units.")
-    return float(operating) + float(annualized_capital)
+    return float(sum(float(part) for part in parts))
 
 
 def _weighted_numeric_attr(

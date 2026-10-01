@@ -123,6 +123,11 @@ OUTPUT_UNIT_RULES: dict[str, OutputUnitRule] = {
         "$/y",
         unit_groups=("annual_cost", "currency"),
     ),
+    "hpr_utility_annualized_capital_cost": OutputUnitRule(
+        "$/y",
+        "$/y",
+        unit_groups=("annual_cost", "currency"),
+    ),
     "hpr_total_annualized_cost": OutputUnitRule(
         "$/y",
         "$/y",

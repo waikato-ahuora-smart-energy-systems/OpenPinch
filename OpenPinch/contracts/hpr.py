@@ -351,6 +351,7 @@ class HeatPumpTargetOutputs(BaseModel):
     hpr_operating_cost: Optional[Any] = None
     hpr_capital_cost: Optional[Any] = None
     hpr_annualized_capital_cost: Optional[Any] = None
+    hpr_utility_annualized_capital_cost: Optional[Any] = None
     hpr_total_annualized_cost: Optional[Any] = None
     Q_amb_hot: float
     Q_amb_cold: float
@@ -538,6 +539,9 @@ class HPRBackendResult(BaseModel):
             "hpr_operating_cost": self.hpr_operating_cost,
             "hpr_capital_cost": self.hpr_capital_cost,
             "hpr_annualized_capital_cost": self.hpr_annualized_capital_cost,
+            "hpr_utility_annualized_capital_cost": (
+                self.hpr_utility_annualized_capital_cost
+            ),
             "hpr_total_annualized_cost": self.hpr_total_annualized_cost,
             "Q_amb_hot": self.Q_amb_hot,
             "Q_amb_cold": self.Q_amb_cold,

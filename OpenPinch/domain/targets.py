@@ -257,6 +257,7 @@ class HeatPumpTargetBase(GraphBackedTarget, UtilitySummaryTarget):
     hpr_operating_cost: Any = None
     hpr_capital_cost: Any = None
     hpr_annualized_capital_cost: Any = None
+    hpr_utility_annualized_capital_cost: Any = None
     hpr_total_annualized_cost: Any = None
     hpr_success: bool
     hpr_hot_streams: StreamCollection

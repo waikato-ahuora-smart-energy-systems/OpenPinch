@@ -76,7 +76,8 @@ def _target(
         hpr_operating_cost=Value(qh * 20.0, "$/y"),
         hpr_capital_cost=Value(qh * 30.0, "$"),
         hpr_annualized_capital_cost=Value(qh * 4.0, "$/y"),
-        hpr_total_annualized_cost=Value(qh * 24.0, "$/y"),
+        hpr_utility_annualized_capital_cost=Value(qh * 1.0, "$/y"),
+        hpr_total_annualized_cost=Value(qh * 25.0, "$/y"),
         hpr_success=hpr_success,
     )
 
@@ -119,7 +120,8 @@ def test_weighted_average_output_aggregates_values_utilities_and_metadata():
     assert target.hpr_operating_cost.value == pytest.approx(500.0)
     assert target.hpr_capital_cost.value == pytest.approx(900.0)
     assert target.hpr_annualized_capital_cost.value == pytest.approx(120.0)
-    assert target.hpr_total_annualized_cost.value == pytest.approx(620.0)
+    assert target.hpr_utility_annualized_capital_cost.value == pytest.approx(30.0)
+    assert target.hpr_total_annualized_cost.value == pytest.approx(650.0)
     assert target.hpr_cycle == "Carnot"
     assert target.hpr_success is None
     assert {
@@ -160,7 +162,8 @@ def test_weighted_average_output_uses_peak_hpr_capital_and_weighted_operation():
     assert target.hpr_operating_cost.value == pytest.approx(650.0)
     assert target.hpr_capital_cost.value == pytest.approx(3000.0)
     assert target.hpr_annualized_capital_cost.value == pytest.approx(300.0)
-    assert target.hpr_total_annualized_cost.value == pytest.approx(950.0)
+    assert target.hpr_utility_annualized_capital_cost.value == pytest.approx(30.0)
+    assert target.hpr_total_annualized_cost.value == pytest.approx(980.0)
     assert target.Qh.value == pytest.approx(15.0)
 
 
