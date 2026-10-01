@@ -117,24 +117,27 @@ Shared Preprocessing and Optimisation Boundary
 
 The targeting parsers decode optimiser vectors into temperatures and stage
 duties. Each stage duty is an independent fraction, from zero to one, of the
-heat the process can exchange at that stage's temperature, so every vector is
-one distinct design and no duty is clipped. Leaf physical unit models receive
-only concrete model duties. Each backend then cascades the HPR streams against
-the background process: the condenser streams against the heat sinks and the
-evaporator streams against the heat sources. Ambient air is a free utility
-inside each cascade and takes or supplies heat only where its temperature
-allows. In the evaporator cascade, cooling water then takes what it can and
-the rest needs the default refrigeration utility. The cascade ends give the
-external utilities priced in the objective. Heat on the wrong side of a
+heat the process can exchange at that stage's temperature, so no duty is
+clipped and every stage with positive available duty responds to its own
+fraction. A stage with no available duty decodes to zero whatever its fraction,
+so its fraction is a flat direction for the optimiser. Leaf physical unit
+models receive only concrete model duties. Each backend then cascades the HPR
+streams against the background process: the condenser streams against the heat
+sinks and the evaporator streams against the heat sources. Ambient air is a
+free utility inside each cascade and takes or supplies heat only where its
+temperature allows. In the evaporator cascade, cooling water then takes what it
+can and the rest needs the default refrigeration utility. The cascade ends give
+the external utilities priced in the objective. Heat on the wrong side of a
 cascade, and cooling a refrigerator leaves unserved, are squared feasibility
-penalties. A zero-duty design is valid during the search; when it is the best
-valid design, targeting raises a typed "no beneficial heat pump" error. HPR
-objective and failure
-semantics are translated to the reusable optimiser only by
-``optimisation_adapter``; the generic optimiser has no heat-pump dependency.
-Optimiser identifiers are exact: ``dual_annealing``, ``cmaes``, ``bo``, and
-``rbf_surrogate``. Case changes, surrounding whitespace, and abbreviated or
-historical spellings are rejected.
+penalties. A zero-duty design is valid during the search. For the simulated
+vapour compression backends, including vapour compression with MVR, targeting
+raises a typed "no beneficial heat pump" error when a zero-duty design is the
+best valid design. Carnot targets do not: a zero-duty Carnot design is returned
+as a successful target. HPR objective and failure semantics are translated to
+the reusable optimiser only by ``optimisation_adapter``; the generic optimiser
+has no heat-pump dependency. Optimiser identifiers are exact:
+``dual_annealing``, ``cmaes``, ``bo``, and ``rbf_surrogate``. Case changes,
+surrounding whitespace, and abbreviated or historical spellings are rejected.
 
 .. automodule:: OpenPinch.analysis.heat_pumps.common
    :no-members:
