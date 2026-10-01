@@ -141,6 +141,43 @@ def _diagnostic(
     )
 
 
+def _supply_key(template: EffectiveUtilityTemplate) -> CoordinateKey:
+    return CoordinateKey(
+        template_key=template.key,
+        field=DecisionField.SUPPLY_TEMPERATURE,
+    )
+
+
+def _violated_bound(
+    value: float,
+    bounds: QuantityInterval,
+    tolerance: float,
+) -> float | None:
+    """Return the bound ``value`` lies beyond by more than ``tolerance``, if any."""
+    if value < bounds.lower - tolerance or value > bounds.upper + tolerance:
+        return bounds.lower if value < bounds.lower else bounds.upper
+    return None
+
+
+def _nonpositive_kelvin(
+    model: UtilityPlacementModel,
+    template: EffectiveUtilityTemplate,
+    supply: float,
+    other_end: float,
+) -> CandidateDiagnostic | None:
+    """Diagnose a level whose supply or other end is at or below absolute zero."""
+    if supply > ABSOLUTE_ZERO_C and other_end > ABSOLUTE_ZERO_C:
+        return None
+    return _diagnostic(
+        "nonpositive_kelvin",
+        "absolute_temperature",
+        "Supply and target temperatures must remain above absolute zero.",
+        coordinate=_coordinate_for(model, template, DecisionField.SUPPLY_TEMPERATURE),
+        measured=min(supply, other_end),
+        limit=ABSOLUTE_ZERO_C,
+    )
+
+
 def verify_candidate(
     model: UtilityPlacementModel,
     point: Sequence[float],
@@ -161,21 +198,14 @@ def verify_candidate(
                 ),
             ),
         )
+    tolerances = model.request.tolerances
     diagnostics: list[CandidateDiagnostic] = []
     values: dict[CoordinateKey, float] = {}
     for coordinate, raw_value in zip(model.coordinates, point, strict=True):
         try:
             value = float(raw_value)
         except TypeError, ValueError:
-            diagnostics.append(
-                _diagnostic(
-                    "non_finite_coordinate",
-                    "coordinate_finiteness",
-                    "Candidate coordinate must be a finite number.",
-                    coordinate=coordinate,
-                )
-            )
-            continue
+            value = math.nan
         if not math.isfinite(value):
             diagnostics.append(
                 _diagnostic(
@@ -187,15 +217,8 @@ def verify_candidate(
             )
             continue
         values[coordinate.coordinate] = 0.0 if value == 0.0 else value
-        if (
-            value < coordinate.bounds.lower - model.request.tolerances.bounds
-            or value > coordinate.bounds.upper + model.request.tolerances.bounds
-        ):
-            limit = (
-                coordinate.bounds.lower
-                if value < coordinate.bounds.lower
-                else coordinate.bounds.upper
-            )
+        limit = _violated_bound(value, coordinate.bounds, tolerances.bounds)
+        if limit is not None:
             diagnostics.append(
                 _diagnostic(
                     "coordinate_out_of_bounds",
@@ -217,7 +240,7 @@ def verify_candidate(
     ) -> None:
         for index in range(len(supplies) - 1):
             actual = supplies[index] - supplies[index + 1]
-            if actual < separation - model.request.tolerances.ordering:
+            if actual < separation - tolerances.ordering:
                 diagnostics.append(
                     _diagnostic(
                         "ordering_violation",
@@ -250,26 +273,14 @@ def verify_candidate(
             model.templates.cold,
             strict=True,
         ):
-            supply = values[
-                CoordinateKey(
-                    template_key=hot_template.key,
-                    field=DecisionField.SUPPLY_TEMPERATURE,
-                )
-            ]
-            span = _span_for(model, hot_template, values)
-            cold_supply = supply - span
+            supply = values[_supply_key(hot_template)]
+            cold_supply = supply - _span_for(model, hot_template, values)
             hot_supplies.append(supply)
             cold_supplies.append(cold_supply)
-            cold_bounds = cold_template.supply_bounds
-            if (
-                cold_supply < cold_bounds.lower - model.request.tolerances.bounds
-                or cold_supply > cold_bounds.upper + model.request.tolerances.bounds
-            ):
-                limit = (
-                    cold_bounds.lower
-                    if cold_supply < cold_bounds.lower
-                    else cold_bounds.upper
-                )
+            limit = _violated_bound(
+                cold_supply, cold_template.supply_bounds, tolerances.bounds
+            )
+            if limit is not None:
                 diagnostics.append(
                     _diagnostic(
                         "paired_endpoint_out_of_bounds",
@@ -284,24 +295,9 @@ def verify_candidate(
                         limit=limit,
                     )
                 )
-            if supply <= ABSOLUTE_ZERO_C or cold_supply <= ABSOLUTE_ZERO_C:
-                diagnostics.append(
-                    _diagnostic(
-                        "nonpositive_kelvin",
-                        "absolute_temperature",
-                        (
-                            "Supply and target temperatures must remain above "
-                            "absolute zero."
-                        ),
-                        coordinate=_coordinate_for(
-                            model,
-                            hot_template,
-                            DecisionField.SUPPLY_TEMPERATURE,
-                        ),
-                        measured=min(supply, cold_supply),
-                        limit=ABSOLUTE_ZERO_C,
-                    )
-                )
+            kelvin = _nonpositive_kelvin(model, hot_template, supply, cold_supply)
+            if kelvin is not None:
+                diagnostics.append(kelvin)
         for kind in UtilityLevelKind:
             family_indices = [
                 index
@@ -324,49 +320,21 @@ def verify_candidate(
             (UtilitySide.HOT, model.templates.hot),
             (UtilitySide.COLD, model.templates.cold),
         ):
-            supplies = [
-                values[
-                    CoordinateKey(
-                        template_key=template.key,
-                        field=DecisionField.SUPPLY_TEMPERATURE,
-                    )
-                ]
-                for template in templates
-            ]
+            supplies = [values[_supply_key(template)] for template in templates]
             ordered_supplies = supplies if side is UtilitySide.HOT else supplies[::-1]
             ordered_templates = (
                 templates if side is UtilitySide.HOT else templates[::-1]
             )
             check_descending(ordered_supplies, ordered_templates)
         for template in model.templates.all:
-            supply = values[
-                CoordinateKey(
-                    template_key=template.key,
-                    field=DecisionField.SUPPLY_TEMPERATURE,
-                )
-            ]
+            supply = values[_supply_key(template)]
             span = _span_for(model, template, values)
             target = (
                 supply - span if template.key.side is UtilitySide.HOT else supply + span
             )
-            if supply <= ABSOLUTE_ZERO_C or target <= ABSOLUTE_ZERO_C:
-                diagnostics.append(
-                    _diagnostic(
-                        "nonpositive_kelvin",
-                        "absolute_temperature",
-                        (
-                            "Supply and target temperatures must remain above "
-                            "absolute zero."
-                        ),
-                        coordinate=_coordinate_for(
-                            model,
-                            template,
-                            DecisionField.SUPPLY_TEMPERATURE,
-                        ),
-                        measured=min(supply, target),
-                        limit=ABSOLUTE_ZERO_C,
-                    )
-                )
+            kelvin = _nonpositive_kelvin(model, template, supply, target)
+            if kelvin is not None:
+                diagnostics.append(kelvin)
     return CandidateVerification(
         feasible=not diagnostics,
         diagnostics=tuple(diagnostics),
