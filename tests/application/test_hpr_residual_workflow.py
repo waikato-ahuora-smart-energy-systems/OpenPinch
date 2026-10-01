@@ -17,7 +17,7 @@ from OpenPinch.domain.hpr import HPRResidualProfile
 @pytest.fixture(scope="module")
 def solved_hpr():
     problem = PinchProblem("basic_pinch.json", project_name="Heat Pump Study")
-    options = {"COSTING_HPR_PRICE_RATIO_COLD_TO_ELE": 0.1}
+    options = {"COSTING_HPR_PRICE_RATIO_COOLING_WATER_TO_ELE": 0.1}
     kwargs = dict(
         load_fraction=0.25,
         condensers=1,
@@ -206,7 +206,7 @@ def test_segmented_utility_shape_survives_detachment():
         condensers=1,
         evaporators=1,
         maximum_restarts=1,
-        options={"COSTING_HPR_PRICE_RATIO_COLD_TO_ELE": 0.1},
+        options={"COSTING_HPR_PRICE_RATIO_COOLING_WATER_TO_ELE": 0.1},
     )
     residual = problem.residual_utility(base_target=hp)
     segmented = next(u for u in residual.hot_utilities if u.has_segments)
@@ -221,17 +221,19 @@ def test_segmented_utility_shape_survives_detachment():
 
 def test_indirect_refrigeration_ambient_balance_and_residual_placement():
     problem = PinchProblem("basic_pinch.json")
+    # At half load the condenser rejects more heat than the process can use,
+    # so ambient air takes the rest inside the cascade.
     target = problem.target.carnot_refrigeration(
         is_utility_refrigeration=True,
-        load_fraction=0.25,
+        load_fraction=0.5,
         condensers=1,
         evaporators=1,
         maximum_restarts=1,
-        options={"COSTING_HPR_PRICE_RATIO_COLD_TO_ELE": 0.1},
+        options={"COSTING_HPR_PRICE_RATIO_COOLING_WATER_TO_ELE": 0.1},
     )
     data = target.hpr_residual
     assert data.profile.temperature_basis == "real"
-    assert target.hpr_load.ambient_hot > 1.0
+    assert target.hpr_load.ambient_cold > 1.0
     residual = problem.residual_utility(base_target=target)
     allocated = residual.target.direct_heat_integration()
     physical_surplus = np.ptp(data.physical_hot_composite) - np.ptp(

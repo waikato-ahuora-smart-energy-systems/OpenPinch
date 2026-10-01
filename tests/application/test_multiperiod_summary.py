@@ -77,8 +77,6 @@ def _target(
         hpr_capital_cost=Value(qh * 30.0, "$"),
         hpr_annualized_capital_cost=Value(qh * 4.0, "$/y"),
         hpr_total_annualized_cost=Value(qh * 24.0, "$/y"),
-        hpr_compressor_capital_cost=Value(qh * 12.0, "$"),
-        hpr_heat_exchanger_capital_cost=Value(qh * 18.0, "$"),
         hpr_success=hpr_success,
     )
 
@@ -122,8 +120,6 @@ def test_weighted_average_output_aggregates_values_utilities_and_metadata():
     assert target.hpr_capital_cost.value == pytest.approx(900.0)
     assert target.hpr_annualized_capital_cost.value == pytest.approx(120.0)
     assert target.hpr_total_annualized_cost.value == pytest.approx(620.0)
-    assert target.hpr_compressor_capital_cost.value == pytest.approx(360.0)
-    assert target.hpr_heat_exchanger_capital_cost.value == pytest.approx(540.0)
     assert target.hpr_cycle == "Carnot"
     assert target.hpr_success is None
     assert {
@@ -141,8 +137,6 @@ def test_weighted_average_output_uses_peak_hpr_capital_and_weighted_operation():
             "hpr_capital_cost": Value(1000.0, "$"),
             "hpr_annualized_capital_cost": Value(100.0, "$/y"),
             "hpr_total_annualized_cost": Value(900.0, "$/y"),
-            "hpr_compressor_capital_cost": Value(600.0, "$"),
-            "hpr_heat_exchanger_capital_cost": Value(400.0, "$"),
         }
     )
     peak_target = _target(period_id="peak", qh=30.0).model_copy(
@@ -151,8 +145,6 @@ def test_weighted_average_output_uses_peak_hpr_capital_and_weighted_operation():
             "hpr_capital_cost": Value(3000.0, "$"),
             "hpr_annualized_capital_cost": Value(300.0, "$/y"),
             "hpr_total_annualized_cost": Value(500.0, "$/y"),
-            "hpr_compressor_capital_cost": Value(1800.0, "$"),
-            "hpr_heat_exchanger_capital_cost": Value(1200.0, "$"),
         }
     )
 
@@ -168,8 +160,6 @@ def test_weighted_average_output_uses_peak_hpr_capital_and_weighted_operation():
     assert target.hpr_operating_cost.value == pytest.approx(650.0)
     assert target.hpr_capital_cost.value == pytest.approx(3000.0)
     assert target.hpr_annualized_capital_cost.value == pytest.approx(300.0)
-    assert target.hpr_compressor_capital_cost.value == pytest.approx(1800.0)
-    assert target.hpr_heat_exchanger_capital_cost.value == pytest.approx(1200.0)
     assert target.hpr_total_annualized_cost.value == pytest.approx(950.0)
     assert target.Qh.value == pytest.approx(15.0)
 

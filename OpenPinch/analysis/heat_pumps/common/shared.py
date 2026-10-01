@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any
 
 import CoolProp.CoolProp as _coolprop
@@ -12,7 +14,6 @@ import OpenPinch.analysis.targeting.cascade as _cascade
 from ....analysis.economics import (
     compute_annual_capital_cost,
     compute_annual_energy_cost,
-    compute_capital_cost,
 )
 from ....analysis.numerics import g_ineq_penalty as _g_ineq_penalty
 from ....contracts.hpr import (
@@ -26,6 +27,7 @@ from ....contracts.hpr import (
 from ....domain.configuration import tol as _tol
 from ....domain.enums import PenaltyForm, ProblemTableLabel
 from ....domain.stream_collection import StreamCollection
+from ....domain.value import Value
 from ..optimisation_adapter import (
     build_hpr_accounting as _build_hpr_accounting,
 )
@@ -34,12 +36,24 @@ from ..optimisation_adapter import (
 )
 from ._shared import plotting as _plotting
 from ._shared import streams as _streams
-from ._shared.ambient_preallocation import (
-    preallocate_direct_ambient_duties as _preallocate_direct_ambient_duties,
+from ._shared.air import (
+    CascadeWithAir,
+    cascade_with_air,
+)
+from ._shared.air import (
+    ambient_sink_temperature as _ambient_sink_temperature,
+)
+from ._shared.air import (
+    ambient_source_temperature as _ambient_source_temperature,
+)
+from ._shared.air import (
+    cooling_water_sink_temperature as _cooling_water_sink_temperature,
 )
 
 __all__ = [
+    "HPRCostUnit",
     "SUBCRITICAL_CONDENSING_MARGIN_K",
+    "calc_hpr_capital_cost",
     "condensing_temperature_search_range",
     "calc_simulated_hpr_annualized_costs",
     "calc_carnot_heat_engine_eta",
@@ -72,60 +86,146 @@ def _cycle_penalty(
     )
 
 
+@dataclass(frozen=True)
+class HPRCostUnit:
+    """One heat-pump machine for capital costing.
+
+    ``Q_cap`` is its heating-side capacity in kW: all the heat it rejects
+    outside itself (condensing, desuperheating and subcooling), whether to
+    the process or to air. ``T_hot_max`` is the highest temperature at which
+    it delivers heat, in degC. ``n_closed`` and ``n_mvr`` count its closed
+    refrigerant and open MVR compression stages.
+    """
+
+    Q_cap: float
+    T_hot_max: float
+    n_closed: int = 1
+    n_mvr: int = 0
+
+
+def calc_hpr_capital_cost(
+    units: Sequence[HPRCostUnit],
+    args: HeatPumpTargetInputs,
+) -> Value:
+    """Return the installed capital cost of the heat-pump machines.
+
+    Each machine costs::
+
+        F_inst * C_eq * (Q_cap / 1 MW)^exp
+            * (fixed_share + stage_share * (n_closed + n_mvr)) * f_T
+
+    with ``f_T = 1 + temp_factor * max(0, T_hot_max - temp_base) / 100 K``.
+    The machines are costed separately and summed, and a machine with no
+    capacity costs nothing.
+    """
+    total = 0.0
+    for unit in units:
+        Q_mw = max(float(unit.Q_cap), 0.0) / 1000.0
+        if Q_mw <= 0.0:
+            continue
+        stage_factor = float(args.hpr_cost_fixed_share) + float(
+            args.hpr_cost_stage_share
+        ) * (int(unit.n_closed) + int(unit.n_mvr))
+        f_T = (
+            1.0
+            + float(args.hpr_cost_temp_factor)
+            * max(0.0, float(unit.T_hot_max) - float(args.hpr_cost_temp_base))
+            / 100.0
+        )
+        total += (
+            float(args.hpr_installation_factor)
+            * float(args.hpr_equipment_cost)
+            * Q_mw ** float(args.hpr_cost_exp)
+            * stage_factor
+            * f_T
+        )
+    return Value(total, "$")
+
+
+def _single_cost_unit(
+    state: HPRParsedState,
+    hpr_streams: StreamCollection,
+    work_arr: np.ndarray | None,
+    args: HeatPumpTargetInputs,
+) -> list[HPRCostUnit]:
+    """Treat all the stages as one machine (a cascade).
+
+    Each closed stage has its own compressor, so the stage count comes from
+    the solved stage works: a cascade with ``n_cond`` condenser and
+    ``n_evap`` evaporator levels has ``n_cond + n_evap - 1`` stages, more
+    than its ``n_cond`` condensing temperatures.
+    """
+    hot = hpr_streams.get_hot_utility_streams()
+    Q_cap = (
+        max(float(hot.sum_stream_attribute("heat_flow", idx=args.period_idx)), 0.0)
+        if len(hot)
+        else 0.0
+    )
+    T_cond = np.asarray(state.T_cond, dtype=float).ravel()
+    n_stages = (
+        np.asarray(work_arr, dtype=float).size if work_arr is not None else 0
+    ) or T_cond.size
+    return [
+        HPRCostUnit(
+            Q_cap=Q_cap,
+            T_hot_max=float(T_cond.max()) if T_cond.size else 0.0,
+            n_closed=max(int(n_stages), 1),
+        )
+    ]
+
+
 def calc_simulated_hpr_annualized_costs(
     *,
     work: float,
-    work_arr: np.ndarray | None,
     Q_ext_heat: float,
-    Q_ext_cold: float,
-    hpr_streams: StreamCollection,
-    hx_units: int,
+    Q_cooling_water: float,
+    Q_refrigeration: float,
+    cost_units: Sequence[HPRCostUnit],
     penalty_power_equivalent: float,
     args: HeatPumpTargetInputs,
 ) -> SimulatedHPRAnnualizedCostAccounting:
-    """Return unit-aware annualized cost accounting for simulated HPR candidates."""
+    """Return unit-aware annualized cost accounting for simulated HPR candidates.
+
+    The heat pump's installed capital is annualised unless
+    ``args.hpr_capital_recovery`` is off. The capital of the default hot
+    utility and refrigeration capacity the design still needs is annualised
+    too unless ``args.utility_capital_recovery`` is off, so a heat pump that
+    displaces utility capacity is credited for it.
+    """
     annual_hours = max(float(args.annual_op_time), 0.0)
     ele_price = max(float(args.ele_price), 0.0)
     heat_price = ele_price * max(float(args.heat_to_power_ratio), 0.0)
-    cold_price = ele_price * max(float(args.cold_to_power_ratio), 0.0)
+    cw_price = ele_price * max(float(args.cooling_water_to_power_ratio), 0.0)
+    ref_price = ele_price * max(float(args.refrigeration_to_power_ratio), 0.0)
 
     operating_cost = (
         compute_annual_energy_cost(work, ele_price, annual_hours)
         + compute_annual_energy_cost(Q_ext_heat, heat_price, annual_hours)
-        + compute_annual_energy_cost(Q_ext_cold, cold_price, annual_hours)
+        + compute_annual_energy_cost(Q_cooling_water, cw_price, annual_hours)
+        + compute_annual_energy_cost(Q_refrigeration, ref_price, annual_hours)
     ).to("$/y")
 
-    work_values = np.array([]) if work_arr is None else work_arr
-    compressor_capital = compute_capital_cost(
-        work,
-        max(int(np.count_nonzero(work_values > _tol)), 1),
-        args.hpr_comp_fixed_cost,
-        args.hpr_comp_variable_cost,
-        args.hpr_comp_cost_exp,
+    capital_cost = calc_hpr_capital_cost(cost_units, args).to("$")
+    annualized_capital = (
+        compute_annual_capital_cost(capital_cost, args.discount_rate, args.serv_life)
+        if getattr(args, "hpr_capital_recovery", True)
+        else Value(0.0, "$/y")
     )
-
-    hpr_hot_streams = hpr_streams.get_hot_utility_streams()
-    hpr_cold_streams = hpr_streams.get_cold_utility_streams()
-    hx_duty = sum(
-        max(float(streams.sum_stream_attribute("heat_flow", idx=args.period_idx)), 0.0)
-        for streams in (hpr_hot_streams, hpr_cold_streams)
-        if len(streams) > 0
+    utility_capital = Value(
+        max(float(Q_ext_heat), 0.0)
+        * max(float(getattr(args, "hot_utility_capital_cost", 0.0)), 0.0)
+        + max(float(Q_refrigeration), 0.0)
+        * max(float(getattr(args, "refrigeration_capital_cost", 0.0)), 0.0),
+        "$",
     )
-    hx_capital = compute_capital_cost(
-        hx_duty,
-        hx_units,
-        args.hpr_hx_fixed_cost,
-        args.hpr_hx_variable_cost,
-        args.hpr_hx_cost_exp,
+    utility_annualized_capital = (
+        compute_annual_capital_cost(utility_capital, args.discount_rate, args.serv_life)
+        if getattr(args, "utility_capital_recovery", True)
+        else Value(0.0, "$/y")
     )
-
-    capital_cost = (compressor_capital + hx_capital).to("$")
-    annualized_capital = compute_annual_capital_cost(
-        capital_cost,
-        args.discount_rate,
-        args.serv_life,
-    )
-    total_annualized = (operating_cost + annualized_capital).to("$/y")
+    total_annualized = (
+        operating_cost + annualized_capital + utility_annualized_capital
+    ).to("$/y")
     feasibility_penalty = compute_annual_energy_cost(
         penalty_power_equivalent,
         ele_price,
@@ -136,10 +236,35 @@ def calc_simulated_hpr_annualized_costs(
         hpr_operating_cost=operating_cost,
         hpr_capital_cost=capital_cost,
         hpr_annualized_capital_cost=annualized_capital,
+        hpr_utility_annualized_capital_cost=utility_annualized_capital,
         hpr_total_annualized_cost=total_annualized,
-        hpr_compressor_capital_cost=compressor_capital,
-        hpr_heat_exchanger_capital_cost=hx_capital,
         feasibility_penalty=feasibility_penalty,
+    )
+
+
+def _cascade_air_duties(
+    hot_streams: StreamCollection,
+    cold_streams: StreamCollection,
+    args: HeatPumpTargetInputs,
+    T_air_source: float,
+    T_air_sink: float,
+    T_cooling_water: float | None = None,
+) -> CascadeWithAir:
+    """Cascade the streams and let air, then any cooling water, cover what they can."""
+    if not len(hot_streams) and not len(cold_streams):
+        return CascadeWithAir(0.0, 0.0, 0.0, 0.0)
+    pt = _cascade.get_process_heat_cascade(
+        hot_streams=hot_streams,
+        cold_streams=cold_streams,
+        is_shifted=True,
+        period_idx=args.period_idx,
+    )
+    return cascade_with_air(
+        np.asarray(pt[ProblemTableLabel.T], dtype=float),
+        np.asarray(pt[ProblemTableLabel.H_NET], dtype=float),
+        T_air_source=T_air_source,
+        T_air_sink=T_air_sink,
+        T_cooling_water=T_cooling_water,
     )
 
 
@@ -164,33 +289,50 @@ def evaluate_carnot_hpr_result(
     artifact_mode: HPREvaluationMode = HPREvaluationMode.FINAL,
 ) -> HPRBackendResult:
     """Shared Carnot-family accounting, plotting, and result assembly."""
-    H_cold_with_amb = args.H_cold + args.z_amb_cold * state.Q_amb_cold
-    H_hot_with_amb = args.H_hot + args.z_amb_hot * state.Q_amb_hot
-
+    hpr_streams = _streams.get_carnot_hpr_cycle_streams(
+        state.T_cond,
+        Q_cond_total,
+        state.T_evap,
+        Q_evap_total,
+        args,
+    )
+    T_air_source = _ambient_source_temperature(args)
+    T_air_sink = _ambient_sink_temperature(args)
+    cond = _cascade_air_duties(
+        hpr_streams.get_hot_utility_streams(),
+        args.bckgrd_cold_streams,
+        args,
+        T_air_source,
+        T_air_sink,
+    )
+    evap = _cascade_air_duties(
+        args.bckgrd_hot_streams,
+        hpr_streams.get_cold_utility_streams(),
+        args,
+        T_air_source,
+        T_air_sink,
+        _cooling_water_sink_temperature(args),
+    )
     Q_ext_heat, Q_ext_cold, penalty, obj = _build_hpr_accounting(
         work=float(w_net),
-        Q_ext_heat=np.abs(H_cold_with_amb[0]) - Q_cond_total.sum(),
-        Q_ext_cold=np.abs(H_hot_with_amb[-1]) - Q_evap_total.sum(),
+        Q_ext_heat=cond.Q_ext_top,
+        Q_ext_cold=evap.Q_ext_bottom,
+        Q_cooling_water=evap.Q_cooling_water,
         args=args,
-        penalty_terms=penalty_terms,
+        penalty_terms=[
+            *_normalise_hpr_penalty_terms(penalty_terms),
+            cond.Q_ext_bottom,
+            evap.Q_ext_top,
+        ],
         penalise_external_cold_when_refrigerating=True,
     )
-    hpr_streams = None
     debug_figure = None
-    if artifact_mode is HPREvaluationMode.FINAL:
-        hpr_streams = _streams.get_carnot_hpr_cycle_streams(
-            state.T_cond,
-            Q_cond_total,
-            state.T_evap,
-            Q_evap_total,
-            args,
-        )
     if debug and artifact_mode is HPREvaluationMode.FINAL:
         debug_figure = _plotting.plot_multi_hp_profiles_from_results(
             args.T_hot,
-            H_hot_with_amb,
+            args.H_hot,
             args.T_cold,
-            H_cold_with_amb,
+            args.H_cold,
             hpr_streams.get_hot_utility_streams(),
             hpr_streams.get_cold_utility_streams(),
             title=(
@@ -205,15 +347,17 @@ def evaluate_carnot_hpr_result(
     return HPRBackendResult(
         obj=obj,
         feasibility_penalty=penalty,
-        utility_tot=float(w_net + Q_ext_heat + Q_ext_cold),
+        utility_tot=float(w_net + Q_ext_heat + Q_ext_cold + evap.Q_cooling_water),
         w_net=float(w_net),
         w_hpr=w_hpr,
         w_he=w_he,
         heat_recovery=heat_recovery,
         Q_ext_heat=Q_ext_heat,
-        Q_ext_cold=Q_ext_cold,
-        Q_amb_hot=state.Q_amb_hot,
-        Q_amb_cold=state.Q_amb_cold,
+        Q_ext_cold=Q_ext_cold + evap.Q_cooling_water,
+        Q_cooling_water=evap.Q_cooling_water,
+        Q_refrigeration=Q_ext_cold,
+        Q_amb_hot=cond.Q_air_source + evap.Q_air_source,
+        Q_amb_cold=cond.Q_air_sink + evap.Q_air_sink,
         cop_h=cop_h,
         eta_he=eta_he,
         T_cond=state.T_cond,
@@ -244,80 +388,67 @@ def evaluate_vapour_hpr_result(
     penalty_terms: list[float] | None = None,
     dT_subcool: np.ndarray | None = None,
     dT_superheat: np.ndarray | None = None,
+    cost_units: Sequence[HPRCostUnit] | None = None,
     debug: bool = False,
     artifact_mode: HPREvaluationMode = HPREvaluationMode.FINAL,
 ) -> HPRBackendResult:
-    """Shared simulated-vapour accounting, plotting, and result assembly."""
-    ambient_prealloc = _preallocate_direct_ambient_duties(
-        args=args,
-        Q_amb_hot=state.Q_amb_hot,
-        Q_amb_cold=state.Q_amb_cold,
-    )
-    H_hot_with_amb = ambient_prealloc.H_hot_with_residual_ambient(args)
-    H_cold_with_amb = ambient_prealloc.H_cold_with_residual_ambient(args)
+    """Shared simulated-vapour accounting, plotting, and result assembly.
+
+    ``cost_units`` lists the machines to cost; by default all the stages are
+    one machine.
+    """
+    # Ambient air is a free utility in each cascade: it supplies heat below its
+    # source temperature and takes heat above its sink temperature, only as
+    # far as the cascade needs it.
+    T_air_source = _ambient_source_temperature(args)
+    T_air_sink = _ambient_sink_temperature(args)
 
     cond_hot_streams = hpr_streams.get_hot_utility_streams()
-    cond_cold_streams = (
-        ambient_prealloc.bckgrd_cold_streams
-        + _streams.get_ambient_air_stream(
-            Q_amb_cold=ambient_prealloc.Q_amb_cold_residual,
-            args=args,
-        )
+    cond_cold_streams = args.bckgrd_cold_streams
+    cond = _cascade_air_duties(
+        cond_hot_streams, cond_cold_streams, args, T_air_source, T_air_sink
     )
-    if len(cond_hot_streams) or len(cond_cold_streams):
-        pt_cond = _cascade.get_process_heat_cascade(
-            hot_streams=cond_hot_streams,
-            cold_streams=cond_cold_streams,
-            is_shifted=True,
-            period_idx=args.period_idx,
-        )
-        Q_ext_heat = float(pt_cond[ProblemTableLabel.H_NET][0])
-        cond_wrong_side = float(pt_cond[ProblemTableLabel.H_NET][-1])
-    else:
-        Q_ext_heat = 0.0
-        cond_wrong_side = 0.0
-    evap_hot_streams = (
-        ambient_prealloc.bckgrd_hot_streams
-        + _streams.get_ambient_air_stream(
-            Q_amb_hot=ambient_prealloc.Q_amb_hot_residual,
-            args=args,
-        )
-    )
+    Q_ext_heat = cond.Q_ext_top
+    cond_wrong_side = cond.Q_ext_bottom
+
+    evap_hot_streams = args.bckgrd_hot_streams
     evap_cold_streams = hpr_streams.get_cold_utility_streams()
-    if len(evap_hot_streams) or len(evap_cold_streams):
-        pt_evap = _cascade.get_process_heat_cascade(
-            hot_streams=evap_hot_streams,
-            cold_streams=evap_cold_streams,
-            is_shifted=True,
-            period_idx=args.period_idx,
-        )
-        Q_ext_cold = float(pt_evap[ProblemTableLabel.H_NET][-1])
-        evap_wrong_side = float(pt_evap[ProblemTableLabel.H_NET][0])
-    else:
-        Q_ext_cold = 0.0
-        evap_wrong_side = 0.0
-    hx_units = (
-        len(cond_hot_streams)
-        + len(cond_cold_streams)
-        + len(evap_hot_streams)
-        + len(evap_cold_streams)
+    evap = _cascade_air_duties(
+        evap_hot_streams,
+        evap_cold_streams,
+        args,
+        T_air_source,
+        T_air_sink,
+        _cooling_water_sink_temperature(args),
     )
+    Q_cooling_water = evap.Q_cooling_water
+    Q_refrigeration = evap.Q_ext_bottom
+    Q_ext_cold = Q_cooling_water + Q_refrigeration
+    evap_wrong_side = evap.Q_ext_top
+    Q_amb_hot = cond.Q_air_source + evap.Q_air_source
+    Q_amb_cold = cond.Q_air_sink + evap.Q_air_sink
+    if cost_units is None:
+        cost_units = _single_cost_unit(state, hpr_streams, work_arr, args)
     all_penalty_terms = [
         *_normalise_hpr_penalty_terms(penalty_terms),
         cond_wrong_side,
         evap_wrong_side,
     ]
+    if not getattr(args, "is_heat_pumping", True):
+        # A refrigerator must serve the selected cooling: whatever cooling
+        # water or default refrigeration still has to remove is unserved,
+        # so a zero-duty refrigerator is never a valid design.
+        all_penalty_terms.append(Q_ext_cold)
     penalty_power_equivalent = _cycle_penalty(
         args=args,
         cycle_penalty_terms=all_penalty_terms,
     )
     cost_accounting = calc_simulated_hpr_annualized_costs(
         work=float(work),
-        work_arr=work_arr,
         Q_ext_heat=Q_ext_heat,
-        Q_ext_cold=Q_ext_cold,
-        hpr_streams=hpr_streams,
-        hx_units=hx_units,
+        Q_cooling_water=Q_cooling_water,
+        Q_refrigeration=Q_refrigeration,
+        cost_units=cost_units,
         penalty_power_equivalent=penalty_power_equivalent,
         args=args,
     )
@@ -327,10 +458,10 @@ def evaluate_vapour_hpr_result(
     debug_figure = None
     if debug and artifact_mode is HPREvaluationMode.FINAL:
         debug_figure = _plotting.plot_multi_hp_profiles_from_results(
-            ambient_prealloc.T_hot_residual,
-            H_hot_with_amb,
-            ambient_prealloc.T_cold_residual,
-            H_cold_with_amb,
+            args.T_hot,
+            args.H_hot,
+            args.T_cold,
+            args.H_cold,
             hpr_streams.get_hot_utility_streams(),
             hpr_streams.get_cold_utility_streams(),
             title=(
@@ -348,17 +479,18 @@ def evaluate_vapour_hpr_result(
         w_hpr=work_arr,
         Q_ext_heat=Q_ext_heat,
         Q_ext_cold=Q_ext_cold,
+        Q_cooling_water=Q_cooling_water,
+        Q_refrigeration=Q_refrigeration,
         hpr_operating_cost=cost_accounting.hpr_operating_cost,
         hpr_capital_cost=cost_accounting.hpr_capital_cost,
         hpr_annualized_capital_cost=cost_accounting.hpr_annualized_capital_cost,
-        hpr_total_annualized_cost=cost_accounting.hpr_total_annualized_cost,
-        hpr_compressor_capital_cost=cost_accounting.hpr_compressor_capital_cost,
-        hpr_heat_exchanger_capital_cost=(
-            cost_accounting.hpr_heat_exchanger_capital_cost
+        hpr_utility_annualized_capital_cost=(
+            cost_accounting.hpr_utility_annualized_capital_cost
         ),
+        hpr_total_annualized_cost=cost_accounting.hpr_total_annualized_cost,
         feasibility_penalty=penalty,
-        Q_amb_hot=state.Q_amb_hot,
-        Q_amb_cold=state.Q_amb_cold,
+        Q_amb_hot=Q_amb_hot,
+        Q_amb_cold=Q_amb_cold,
         cop_h=float(cop_h),
         T_cond=state.T_cond,
         T_evap=state.T_evap,

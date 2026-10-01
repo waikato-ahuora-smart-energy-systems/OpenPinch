@@ -760,8 +760,6 @@ def test_compute_direct_heat_pump_target_orchestrates_target_summary(
         hpr_capital_cost=9.0,
         hpr_annualized_capital_cost=10.0,
         hpr_total_annualized_cost=11.0,
-        hpr_compressor_capital_cost=12.0,
-        hpr_heat_exchanger_capital_cost=13.0,
         success=True,
         hpr_hot_streams=StreamCollection(),
         hpr_cold_streams=StreamCollection(),

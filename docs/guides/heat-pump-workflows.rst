@@ -44,15 +44,57 @@ Use ``load_duty`` for an absolute duty or ``period_loads`` for per-period duties
 instead of ``load_fraction``; these selectors are mutually exclusive.
 
 Heat pumps have no penalty requiring them to consume all low-grade heat.
-Refrigeration retains a feasibility term for unserved selected cooling. The
-Carnot objective uses electricity-equivalent price ratios in
-``COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE`` and
-``COSTING_HPR_PRICE_RATIO_COLD_TO_ELE``. These differ from utility stream prices.
-Both ratios default to 1.0; notebook 08 explicitly uses a positive cold ratio of
-0.1 to illustrate inexpensive cooling without changing global defaults. For a
-fixed candidate leaving 100 kW of cooling, this lowers the cooling-cost term
-from 100 to 10 kW electricity-equivalent; it adds no heat-pump feasibility
-penalty.
+Refrigeration retains a feasibility term for unserved selected cooling.
+
+HPR utilities are priced relative to the HPR electricity price
+(``COSTING_HPR_ELE_PRICE``, default $100/MWh), not from utility stream prices:
+
+- External heating costs ``COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE`` (default 1.0).
+- Ambient air is free. It supplies and takes heat inside each HPR cascade, as
+  far as its temperature allows.
+- Cooling water takes heat at ``COSTING_HPR_COOLING_WATER_TEMPERATURE``
+  (default 25 °C) plus ``COSTING_HPR_COOLING_WATER_DT_MIN`` (default 5 K) and
+  costs ``COSTING_HPR_PRICE_RATIO_COOLING_WATER_TO_ELE`` (default 0.025).
+- Cooling below cooling water uses a default refrigeration utility. It
+  evaporates ``COSTING_HPR_REFRIGERATION_DT`` (default 5 K) below the
+  problem's minimum temperature, rejects heat at the cooling-water level and
+  runs at ``COSTING_HPR_REFRIGERATION_ETA_II`` (default 0.4) of the Carnot
+  COP, so it costs electricity divided by that COP.
+
+Notebook 08 uses a cooling-water ratio of 0.1 to illustrate inexpensive
+cooling without changing global defaults.
+
+Simulated (vapour-compression) targets also include annualized capital. Each
+heat-pump machine costs::
+
+   C = F_inst * C_eq * (Q_cap / 1 MW)^exp
+       * (fixed_share + stage_share * (n_closed + n_mvr)) * f_T
+   f_T = 1 + temp_factor * max(0, T_hot_max - temp_base) / 100 K
+
+``Q_cap`` is the heat the machine rejects (heating side), ``n_closed`` and
+``n_mvr`` count its refrigerant and MVR stages, and ``T_hot_max`` is the
+highest temperature at which it delivers heat. Parallel cycles are costed as
+separate machines; cascades and VC+MVR systems as one. The defaults are
+``COSTING_HPR_EQUIPMENT_COST`` = 485,000 (equipment for 1 MW, one stage, at or
+below 75 °C; fitted to the IEA HPT Project 68 cost data and converted to 2025
+USD), ``COSTING_HPR_INSTALLATION_FACTOR`` = 2.3, ``COSTING_HPR_COST_EXP`` = 0.7,
+``COSTING_HPR_COST_FIXED_SHARE`` = 0.7, ``COSTING_HPR_COST_STAGE_SHARE`` = 0.3,
+``COSTING_HPR_COST_TEMP_FACTOR`` = 0.4 and ``COSTING_HPR_COST_TEMP_BASE`` =
+75 °C. Capital is annualized with ``COSTING_DISCOUNT_RATE`` and
+``COSTING_SERVICE_LIFE``; set ``COSTING_HPR_CAPITAL_RECOVERY_ENABLED`` to
+``False`` to leave it out of the objective.
+
+The default utilities the design still needs carry installed capital too:
+``COSTING_HPR_HOT_UTILITY_CAPITAL_COST`` (default $750/kW of hot utility) and
+``COSTING_HPR_REFRIGERATION_CAPITAL_COST`` (default $1500/kW of refrigeration),
+annualized the same way. A heat pump that displaces utility capacity is
+credited for it. Set ``COSTING_HPR_UTILITY_CAPITAL_RECOVERY_ENABLED`` to
+``False`` to leave it out.
+
+Heat pumps do not always pay, especially for high lifts. When the best valid
+design is no heat pump, targeting raises a typed "no beneficial heat pump"
+error. Turning capital recovery off or raising the heat price makes a heat
+pump more likely to pay.
 
 Use the same process/utility basis and stage counts when comparing modes.
 Select a solved target explicitly when inspecting several results::

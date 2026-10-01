@@ -7,7 +7,11 @@ import OpenPinch.analysis.heat_pumps.cycles.vapour_compression_mvr_cascade as vc
 import OpenPinch.analysis.heat_pumps.service as hp
 import OpenPinch.analysis.heat_pumps.targeting.vapour_compression_mvr as hp_vc_mvr
 import OpenPinch.analysis.targeting.cascade as target_cascade
-from OpenPinch.analysis.heat_pumps.common.encoding import decode_duty_splits
+from OpenPinch.analysis.heat_pumps.common.encoding import (
+    DutyAllocationRequest,
+    StageDutyRequest,
+    decode_available_fractions,
+)
 from OpenPinch.analysis.heat_pumps.common.preprocessing import (
     construct_HPRTargetInputs,
 )
@@ -1274,15 +1278,14 @@ def test_vc_mvr_x0_bounds_parse_round_trip():
     x0, bnds = hp_vc_mvr._get_vc_mvr_opt_setup(init_res=init_res, args=args)
     state = hp_vc_mvr._parse_vc_mvr_state_variables(x0, args)
 
-    assert x0.shape == (18,)
+    assert x0.shape == (16,)
     assert len(bnds) == x0.shape[0]
     unpacked = hp_vc_mvr._unpack_vc_mvr_state(state, args)
     np.testing.assert_allclose(unpacked["T_cond_vc"], init_res.T_cond)
     np.testing.assert_allclose(unpacked["T_evap_vc"], init_res.T_evap)
-    assert state.Q_heat_base == pytest.approx(init_res.Q_cond.sum())
     np.testing.assert_allclose(
-        decode_duty_splits(state.x_heat_split, state.Q_heat_base),
-        init_res.Q_cond,
+        decode_available_fractions(state.x_heat_split, state.Q_heat_available),
+        np.minimum(init_res.Q_cond, state.Q_heat_available),
     )
     assert state.Q_heat_available.shape == init_res.Q_cond.shape
     np.testing.assert_allclose(state.T_cond[:2], unpacked["T_cond_mvr"])
@@ -1298,13 +1301,10 @@ def test_vc_mvr_x0_bounds_parse_round_trip():
     assert unpacked["mvr_process_split"].shape == (1,)
     np.testing.assert_allclose(
         unpacked["T_evap_mvr"][0],
-        unpacked["T_cond_vc"][0] - unpacked["dT_subcool_vc"][0] - args.dt_cascade_hx,
+        unpacked["T_cond_vc"][0] - args.dt_cascade_hx,
     )
     np.testing.assert_allclose(unpacked["T_evap_mvr"][1], unpacked["T_cond_mvr"][0])
     assert np.all(unpacked["dT_lift_mvr"] <= 20.0)
-    assert state.Q_amb_cold == pytest.approx(init_res.Q_amb_cold)
-    assert state.Q_amb_cold_direct == pytest.approx(init_res.Q_amb_cold)
-    assert state.Q_amb_cold_residual == pytest.approx(0.0)
 
 
 def test_vc_mvr_heat_duties_use_split_fractions():
@@ -1312,7 +1312,9 @@ def test_vc_mvr_heat_duties_use_split_fractions():
     x = np.ones(hp_vc_mvr._vc_mvr_layout(args).size) * 0.5
     state = hp_vc_mvr._parse_vc_mvr_state_variables(x, args)
 
-    Q_heat_request = decode_duty_splits(state.x_heat_split, state.Q_heat_base)
+    Q_heat_request = decode_available_fractions(
+        state.x_heat_split, state.Q_heat_available
+    )
 
     assert Q_heat_request.sum() < args.Q_heat_max + state.Q_amb_cold
     np.testing.assert_allclose(
@@ -1390,7 +1392,7 @@ def test_compute_vc_mvr_system_obj_real_cascade_smoke():
         eta_motor=0.95,
         initialise_simulated_cycle=False,
     )
-    x = np.array([0.0, 0.6, 0.1, 0.1, 0.1, 0.5, 0.5, 0.0, 0.5, 0.5])
+    x = np.array([0.6, 0.1, 0.1, 0.1, 0.5, 0.0, 0.5, 0.5])
 
     out = hp_vc_mvr._compute_vc_mvr_system_obj(x, args, debug=True)
 
@@ -1519,3 +1521,32 @@ def test_mvr_evaporates_below_the_vc_cascade_outlet_when_it_is_subcooled():
     T_evap, T_cond = derive(72.0)
     np.testing.assert_allclose(T_evap, [70.0, 80.0])
     np.testing.assert_allclose(T_cond, [80.0, 85.0])
+
+
+def test_vc_mvr_cascade_duty_is_a_fraction_of_availability_without_penalty():
+    pytest.importorskip("CoolProp")
+    cascade = VapourCompressionMvrCascade()
+
+    cascade.solve(
+        T_evap_vc=np.array([20.0]),
+        T_cond_vc=np.array([90.0]),
+        dT_lift_mvr=np.array([15.0]),
+        duty_allocation=DutyAllocationRequest(
+            heat=StageDutyRequest(
+                Q_base=300.0,
+                x_split=np.array([0.75]),
+                Q_available=np.array([400.0]),
+            )
+        ),
+        mvr_source_split=0.25,
+        eta_comp=0.75,
+        eta_mvr_comp=0.75,
+        refrigerant=["R134A"],
+        mvr_fluid=["Water"],
+        dt_cascade_hx=5.0,
+    )
+
+    # 75% of the 400 kW the process can absorb: a valid design, no penalty.
+    assert cascade.solved is True
+    np.testing.assert_allclose(cascade.internal_heat + cascade.direct_vc_heat, [300.0])
+    assert sum(cascade.penalty) == pytest.approx(0.0)

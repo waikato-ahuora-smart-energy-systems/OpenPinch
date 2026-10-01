@@ -5,6 +5,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
+import OpenPinch.analysis.heat_pumps.common.postprocessing as hpr_postprocessing
 from OpenPinch.analysis.heat_pumps.common.postprocessing import (
     _deduplicate_residual_profile_rows,
     _get_hpr_residual_load_profiles,
@@ -84,8 +85,8 @@ def test_residual_rebase_matches_offset_independent_oracle(case):
     np.testing.assert_allclose(repeated, actual)
 
 
-@given(st.floats(min_value=0, max_value=0.95), st.floats(min_value=0, max_value=1))
-def test_heat_pump_ambient_sink_cannot_expand_selected_load(ambient, fraction):
+@given(st.floats(min_value=0, max_value=1))
+def test_heat_pump_load_is_never_expanded_by_ambient_air(fraction):
     from types import SimpleNamespace
 
     from OpenPinch.analysis.heat_pumps.common.layout import HPRoptVectorLayout
@@ -106,15 +107,15 @@ def test_heat_pump_ambient_sink_cannot_expand_selected_load(ambient, fraction):
         z_amb_cold=np.array([1.0, 0.0]),
         z_amb_hot=np.array([0.0, -1.0]),
     )
-    layout = HPRoptVectorLayout(n_cond=1, n_evap=1, n_heat_base=1, n_heat_split=1)
+    layout = HPRoptVectorLayout(n_cond=1, n_evap=1, n_heat_split=1)
     point = layout.pack(
-        x_amb=ambient,
         x_cond=[0.0],
         x_evap=[0.0],
-        x_heat_base=[fraction],
-        x_heat_split=[1.0],
+        x_heat_split=[fraction],
     )
     state = _parse_parallel_carnot_hp_state_variables(point, args)
+    # Air is never a heat-pump load, however much ambient capacity exists.
+    assert state.Q_heat_available.sum() <= args.Q_heat_max + 1e-9
     assert state.Q_heat_base == pytest.approx(100.0 * fraction)
 
 
@@ -128,7 +129,8 @@ def test_unused_low_grade_heat_has_no_heat_pump_feasibility_penalty(cold):
         is_heat_pumping=True,
         Q_hpr_target=100.0,
         heat_to_power_ratio=1.0,
-        cold_to_power_ratio=0.0,
+        refrigeration_to_power_ratio=0.0,
+        cooling_water_to_power_ratio=0.0,
         eta_penalty=0.001,
         rho_penalty=10.0,
     )
@@ -141,3 +143,14 @@ def test_unused_low_grade_heat_has_no_heat_pump_feasibility_penalty(cold):
     )
     assert penalty == 0.0
     assert objective == pytest.approx(0.3)
+
+
+def test_residual_rounding_noise_snaps_to_zero_relative_to_the_largest_load():
+    net = np.array([570.0, 107.0, 4.2e-6, -3.0e-6, 0.0])
+
+    noise = hpr_postprocessing._residual_noise_floor(net)
+    snapped = hpr_postprocessing._snap_to_zero(net, noise)
+
+    # 1e-7 of the 570 kW scale: a few micro-kW is noise, real loads remain.
+    assert noise == pytest.approx(5.7e-5)
+    np.testing.assert_array_equal(snapped, [570.0, 107.0, 0.0, 0.0, 0.0])

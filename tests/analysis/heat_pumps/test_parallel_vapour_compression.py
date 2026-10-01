@@ -6,7 +6,7 @@ import pytest
 
 import OpenPinch.analysis.heat_pumps.targeting.parallel_vapour_compression as hp_parallel_vapour
 import OpenPinch.analysis.targeting.cascade as target_cascade
-from OpenPinch.analysis.heat_pumps.common.encoding import decode_duty_splits
+from OpenPinch.analysis.heat_pumps.common.encoding import decode_available_fractions
 from OpenPinch.contracts.hpr import HPRParsedState
 
 from .helpers import (
@@ -48,7 +48,7 @@ def test_parallel_hp_x0_and_bounds_shapes_are_consistent():
 
     x0, bnds = hp_parallel_vapour._get_parallel_hp_opt_setup(init_results, args)
 
-    assert x0.shape == (12,)
+    assert x0.shape == (10,)
     assert len(bnds) == len(x0)
     assert np.all(
         (x0 >= np.array([b[0] for b in bnds])) & (x0 <= np.array([b[1] for b in bnds]))
@@ -72,16 +72,10 @@ def test_parallel_x0_round_trips_with_ambient_cooling_seed():
     )
     vars = hp_parallel_vapour._parse_parallel_hp_state_temperatures(x0, args)
 
-    assert abs(x0[0]) < 1.0
     np.testing.assert_allclose(vars.T_evap, init_res.T_evap)
-    assert vars.Q_amb_hot == pytest.approx(init_res.Q_amb_hot)
-    assert vars.Q_amb_cold == pytest.approx(init_res.Q_amb_cold)
-    assert vars.Q_amb_cold_direct == pytest.approx(init_res.Q_amb_cold)
-    assert vars.Q_amb_cold_residual == pytest.approx(0.0)
-    assert vars.Q_heat_base == pytest.approx(init_res.Q_cond.sum())
     np.testing.assert_allclose(
-        decode_duty_splits(vars.x_heat_split, vars.Q_heat_base),
-        init_res.Q_cond,
+        decode_available_fractions(vars.x_heat_split, vars.Q_heat_available),
+        np.minimum(init_res.Q_cond, vars.Q_heat_available),
     )
     assert vars.Q_heat_available.shape == init_res.Q_cond.shape
 
@@ -105,10 +99,9 @@ def test_parallel_refrigeration_maps_primary_duty_to_cooling():
 
     assert vars.Q_heat_base is None
     assert vars.Q_heat_available is None
-    assert vars.Q_cool_base == pytest.approx(init_res.Q_evap.sum())
     np.testing.assert_allclose(
-        decode_duty_splits(vars.x_cool_split, vars.Q_cool_base),
-        init_res.Q_evap,
+        decode_available_fractions(vars.x_cool_split, vars.Q_cool_available),
+        np.minimum(init_res.Q_evap, vars.Q_cool_available),
     )
 
 
@@ -126,17 +119,17 @@ def test_parallel_x0_bounds_parse_and_performance(monkeypatch):
         init_res=init_res,
         args=args,
     )
-    assert x0.shape[0] == 12
+    assert x0.shape[0] == 10
 
     monkeypatch.setattr(
         coolprop,
         "PropsSI",
         lambda prop, *_args: 420.0 if prop == "Tmin" else 422.0,
     )
-    assert len(bnds) == 12
+    assert len(bnds) == 10
 
     vars = hp_parallel_vapour._parse_parallel_hp_state_temperatures(
-        np.array([0.1] * 12), args
+        np.array([0.1] * 10), args
     )
     assert vars.T_cond.shape == (2,)
     assert vars.dT_subcool.shape == (2,)
@@ -144,10 +137,6 @@ def test_parallel_x0_bounds_parse_and_performance(monkeypatch):
     assert vars.Q_heat_available.shape == (2,)
     np.testing.assert_allclose(vars.T_evap, np.array([59.0, 50.0]))
     assert vars.dT_ihx_gas_side.shape == (2,)
-    assert vars.Q_amb_hot == pytest.approx(0.0)
-    assert vars.Q_amb_cold == pytest.approx(
-        max(args.Q_heat_max, args.Q_cool_max) * np.arctanh(0.1)
-    )
 
     monkeypatch.setattr(
         hp_parallel_vapour,
@@ -212,6 +201,7 @@ def test_parallel_refrigeration_objective_solves_refrigeration_mode(monkeypatch)
         work = 20.0
         work_arr = np.array([20.0])
         Q_heat_arr = np.array([100.0])
+        Q_cond_arr = np.array([100.0])
         Q_cool_arr = np.array([80.0])
         penalty = 0.0
 

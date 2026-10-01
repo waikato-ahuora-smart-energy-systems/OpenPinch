@@ -9,6 +9,7 @@ import pytest
 
 import OpenPinch.analysis.heat_pumps.service as hp_service
 import OpenPinch.analysis.heat_pumps.targeting.cascade_vapour_compression as cascade
+from OpenPinch.analysis.heat_pumps.common.layout import HPRoptVectorLayout
 from OpenPinch.analysis.heat_pumps.performance_maps.targeting import (
     HprTargetEvaluatorCoordinator,
     preflight_tespy_hpr_targeting,
@@ -26,9 +27,25 @@ from tests.analysis.heat_pumps.test_hpr_targeting_preflight import _target_args
 def _candidate(args) -> np.ndarray:
     _starts, bounds = cascade._get_cascade_hp_opt_setup(None, args)
     point = np.array([(lower + upper) / 2.0 for lower, upper in bounds])
-    point[0] = 0.0
     point[-1] = 0.0
     return point
+
+
+def _subcool_index(args) -> int:
+    n_heat, n_cool = cascade._cascade_process_control_counts(
+        n_cond=int(args.n_cond),
+        n_evap=int(args.n_evap),
+        is_heat_pumping=getattr(args, "is_heat_pumping", True),
+    )
+    layout = HPRoptVectorLayout(
+        n_cond=int(args.n_cond),
+        n_evap=int(args.n_evap),
+        n_subcool=int(args.n_cond),
+        n_heat_split=n_heat,
+        n_cool_split=n_cool,
+        n_ihx=int(args.n_cond) + int(args.n_evap) - 1,
+    )
+    return layout.subcool_slice.start
 
 
 def _prepared_args(**overrides):
@@ -156,10 +173,11 @@ def test_tespy_objective_values_determine_candidate_ranking_and_final_target(
     )
 
     def solve(*, f_obj: Callable, x0_ls, bnds, args):
+        subcool = _subcool_index(args)
         low_cop = _candidate(args)
-        low_cop[3] = 0.0
+        low_cop[subcool] = 0.0
         high_cop = low_cop.copy()
-        high_cop[3] = 0.5
+        high_cop[subcool] = 0.5
         results = [f_obj(point, args) for point in (low_cop, high_cop)]
         assert results[1].w_net < results[0].w_net
         assert results[1].obj < results[0].obj

@@ -152,13 +152,18 @@ HPR_PROFILES = (
 )
 
 HPR_SENTINEL_FILENAMES = {
-    "direct-cascade-vc-heat-pump": "p_Adjiman et al.json",
-    "utility-parallel-vc-heat-pump": "p_Ahmad (example 1).json",
+    "direct-cascade-vc-heat-pump": "p_Perry et al.json",
+    "utility-parallel-vc-heat-pump": "p_Martinez-Rodriguez (case study 1).json",
     "direct-cascade-vc-refrigeration": "p_Ahmad (example 2).json",
     "utility-parallel-vc-refrigeration": "p_Ahmad (example 3).json",
-    "direct-optimized-vc-mvr-heat-pump": "p_Pavao et al (example 1).json",
+    "direct-optimized-vc-mvr-heat-pump": "p_Barbaro and Bagajewicz.json",
     "utility-optimized-vc-mvr-heat-pump": "p_Feng et al (case study 1).json",
 }
+
+# A utility refrigerator must lift heat from below ambient to the hot-utility
+# level. At such lifts no heat pump may pay, so these sentinels accept the
+# typed "no beneficial heat pump" outcome as well as a solved target.
+HPR_HIGH_LIFT_SENTINEL_PROFILES = frozenset({"utility-parallel-vc-refrigeration"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -585,6 +590,7 @@ __all__ = [
     "HPROutcomeKind",
     "HPRProfile",
     "HPR_PROFILES",
+    "HPR_HIGH_LIFT_SENTINEL_PROFILES",
     "HPR_SENTINEL_FILENAMES",
     "ProblemStateSnapshot",
     "SearchObservation",

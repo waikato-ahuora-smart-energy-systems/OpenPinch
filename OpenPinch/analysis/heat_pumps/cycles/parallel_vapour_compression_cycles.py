@@ -148,15 +148,12 @@ class ParallelVapourCompressionCycles(_MultiVapourCompressionCycleBase):
         duty_allocation: DutyAllocationRequest,
         is_heat_pump: bool,
     ) -> tuple[np.ndarray, np.ndarray]:
-        self._allocation_penalty = np.empty(0, dtype=float)
         if is_heat_pump and duty_allocation.heat.Q_base is not None:
             allocation = duty_allocation.heat.allocate("heat")
-            self._allocation_penalty = allocation.Q_excess
             return allocation.Q_model, self._normalize_Q_cool(Q_cool, n_cycles)
 
         if (not is_heat_pump) and duty_allocation.cool.Q_base is not None:
             allocation = duty_allocation.cool.allocate("cool")
-            self._allocation_penalty = allocation.Q_excess
             return self._normalize_Q_heat(Q_heat, n_cycles), allocation.Q_model
 
         return (
@@ -247,7 +244,6 @@ class ParallelVapourCompressionCycles(_MultiVapourCompressionCycleBase):
         """
         self._solved = False
         self._subcycles = []
-        self._allocation_penalty = np.empty(0, dtype=float)
         self._dtcont = float(dtcont)
 
         T_evap_all, T_cond_all = self._normalize_temperature_arrays(T_evap, T_cond)

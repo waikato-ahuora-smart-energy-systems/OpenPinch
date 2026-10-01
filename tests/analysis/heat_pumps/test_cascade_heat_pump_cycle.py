@@ -671,9 +671,9 @@ def test_cascade_allocate_process_duties_covers_heat_pump_and_refrigeration_mode
         is_heat_pump=True,
     )
 
-    np.testing.assert_allclose(Q_heat, [50.0, 30.0])
+    # Each stage takes its fraction of its own availability.
+    np.testing.assert_allclose(Q_heat, [30.0, 30.0])
     np.testing.assert_allclose(Q_cool, [10.0, np.nan])
-    np.testing.assert_allclose(hp._allocation_penalty, [10.0, 10.0, 10.0])
 
     Q_heat, Q_cool = hp._allocate_process_duties(
         Q_heat=np.array([1.0]),
@@ -692,8 +692,7 @@ def test_cascade_allocate_process_duties_covers_heat_pump_and_refrigeration_mode
     )
 
     np.testing.assert_allclose(Q_heat, [20.0, np.nan])
-    np.testing.assert_allclose(Q_cool, [30.0, 30.0])
-    np.testing.assert_allclose(hp._allocation_penalty, [10.0, 10.0, 10.0])
+    np.testing.assert_allclose(Q_cool, [15.0, 30.0])
 
 
 def test_cascade_solve_invalid_temperature_with_nonnumeric_duty_uses_default_work():

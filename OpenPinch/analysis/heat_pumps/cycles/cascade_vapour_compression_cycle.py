@@ -244,17 +244,12 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
         duty_allocation: DutyAllocationRequest,
         is_heat_pump: bool,
     ) -> tuple[np.ndarray | None, np.ndarray | None]:
-        self._allocation_penalty = np.empty(0, dtype=float)
         heat, cool = duty_allocation.heat, duty_allocation.cool
         if is_heat_pump and heat.Q_base is not None:
             heat_allocation = heat.allocate("heat")
-            self._allocation_penalty = heat_allocation.Q_excess
             Q_cool_out = self._normalize_secondary_process_duty(Q_cool)
             if cool.Q_base is not None:
                 cool_allocation = cool.allocate("cool")
-                self._allocation_penalty = np.concatenate(
-                    [self._allocation_penalty, cool_allocation.Q_excess]
-                )
                 Q_cool_out = self._normalize_secondary_process_duty(
                     np.concatenate([cool_allocation.Q_model, np.array([np.nan])])
                 )
@@ -262,13 +257,9 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
 
         if (not is_heat_pump) and cool.Q_base is not None:
             cool_allocation = cool.allocate("cool")
-            self._allocation_penalty = cool_allocation.Q_excess
             Q_heat_out = Q_heat
             if heat.Q_base is not None:
                 heat_allocation = heat.allocate("heat")
-                self._allocation_penalty = np.concatenate(
-                    [self._allocation_penalty, heat_allocation.Q_excess]
-                )
                 Q_heat_out = self._normalize_secondary_process_duty(
                     np.concatenate([heat_allocation.Q_model, np.array([np.nan])])
                 )
@@ -338,7 +329,6 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
         """
         self._solved = False
         self._subcycles = []
-        self._allocation_penalty = np.empty(0, dtype=float)
         self._dtcont = float(dtcont)
         Q_heat, Q_cool = self._allocate_process_duties(
             Q_heat=Q_heat,

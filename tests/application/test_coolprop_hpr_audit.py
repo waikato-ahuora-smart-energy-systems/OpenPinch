@@ -46,11 +46,17 @@ def test_real_public_coolprop_target_and_budget(mode, utility, cascade, monkeypa
         if mode == "refrigeration"
         else "is_utility_heat_pump"
     ] = utility
+    # A utility heat pump here lifts from about 5 C to the 260 C hot-utility
+    # level, where its capital does not pay back. Leave capital recovery out so
+    # the search still has a beneficial design to return.
+    options = {"COSTING_HPR_CAPITAL_RECOVERY_ENABLED": False}
     if mode == "mvr":
-        kwargs["options"] = {"HPR_REFRIGERANTS": ["Water"]}
+        kwargs["options"] = {**options, "HPR_REFRIGERANTS": ["Water"]}
         method = problem.target.mvr_heat_pump
     else:
-        kwargs.update(refrigerants=["Water"], is_cascade_cycle=cascade)
+        kwargs.update(
+            refrigerants=["Water"], is_cascade_cycle=cascade, options=options
+        )
         method = getattr(problem.target, "vapour_compression_" + mode)
     target = method(**kwargs)
     assert target is not None
