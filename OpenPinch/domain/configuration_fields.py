@@ -328,8 +328,8 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     # Installed capital of the default utilities the heat pump displaces, per
     # kW of capacity, annualised with the same capital recovery factor.
     "COSTING_HPR_UTILITY_CAPITAL_RECOVERY_ENABLED": _spec(bool, True, "costing", "hpr_utility_capital_recovery_enabled"),
-    "COSTING_HPR_HOT_UTILITY_CAPITAL_COST": _spec(float, 100.0, "costing", "hpr_hot_utility_capital_cost", numeric_min=0.0),
-    "COSTING_HPR_REFRIGERATION_CAPITAL_COST": _spec(float, 500.0, "costing", "hpr_refrigeration_capital_cost", numeric_min=0.0),
+    "COSTING_HPR_HOT_UTILITY_CAPITAL_COST": _spec(float, 750.0, "costing", "hpr_hot_utility_capital_cost", numeric_min=0.0),
+    "COSTING_HPR_REFRIGERATION_CAPITAL_COST": _spec(float, 1500.0, "costing", "hpr_refrigeration_capital_cost", numeric_min=0.0),
 
     # HEN synthesis.
     "HENS_APPROACH_TEMPERATURES": _spec(List[float], [14.0], "hens", "approach_temperatures", validator=_positive_float_grid),

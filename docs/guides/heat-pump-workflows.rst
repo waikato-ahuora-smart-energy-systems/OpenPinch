@@ -85,8 +85,8 @@ USD), ``COSTING_HPR_INSTALLATION_FACTOR`` = 2.3, ``COSTING_HPR_COST_EXP`` = 0.7,
 ``False`` to leave it out of the objective.
 
 The default utilities the design still needs carry installed capital too:
-``COSTING_HPR_HOT_UTILITY_CAPITAL_COST`` (default $100/kW of hot utility) and
-``COSTING_HPR_REFRIGERATION_CAPITAL_COST`` (default $500/kW of refrigeration),
+``COSTING_HPR_HOT_UTILITY_CAPITAL_COST`` (default $750/kW of hot utility) and
+``COSTING_HPR_REFRIGERATION_CAPITAL_COST`` (default $1500/kW of refrigeration),
 annualized the same way. A heat pump that displaces utility capacity is
 credited for it. Set ``COSTING_HPR_UTILITY_CAPITAL_RECOVERY_ENABLED`` to
 ``False`` to leave it out.
