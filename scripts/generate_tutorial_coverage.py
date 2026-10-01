@@ -56,8 +56,6 @@ TARGET_TUTORIALS = {
     "carnot_refrigeration": 8,
     "vapour_compression_heat_pump": 9,
     "vapour_compression_refrigeration": 9,
-    "brayton_heat_pump": 9,
-    "brayton_refrigeration": 9,
     "mvr_heat_pump": 11,
     "cogeneration": 12,
     "sun_smith_cogeneration": 12,
@@ -87,6 +85,9 @@ ALL_PERIOD_TUTORIALS = {
     "isentropic_cogeneration": 13,
     "utility_placement": 19,
 }
+# Public methods still under development: no notebook demonstrates them.
+UNDER_DEVELOPMENT_METHODS = frozenset({"brayton_heat_pump", "brayton_refrigeration"})
+UNDER_DEVELOPMENT_STATUS = "unmapped; under development"
 DOCUMENTED_ALL_PERIOD_HPR_METHODS = frozenset(
     {
         "carnot_heat_pump",
@@ -409,6 +410,9 @@ def _rows() -> list[dict[str, str]]:
         )
     for owner_name, owner, prefix, tutorial_for in specifications:
         for name, value in _public_members(owner):
+            if name in UNDER_DEVELOPMENT_METHODS:
+                rows.append(_under_development_row(owner_name, prefix, name, value))
+                continue
             tutorial_number = tutorial_for(name)
             profile = NOTEBOOK_PROFILES[tutorial_number]
             classification = _classification(value)
@@ -432,9 +436,7 @@ def _rows() -> list[dict[str, str]]:
                         "interactive": "plot;excel;dashboard",
                     }[profile],
                     "coverage_status": (
-                        "mapped; runtime unsupported"
-                        if name.startswith("brayton_")
-                        else "mapped; documented independent replay"
+                        "mapped; documented independent replay"
                         if owner_name == "All-period target"
                         and name in DOCUMENTED_ALL_PERIOD_HPR_METHODS
                         else "mapped and executable"
@@ -443,6 +445,29 @@ def _rows() -> list[dict[str, str]]:
                 }
             )
     return rows
+
+
+def _under_development_row(
+    owner_name: str,
+    prefix: str,
+    name: str,
+    value: object,
+) -> dict[str, str]:
+    """Return the manifest row for a public method no notebook demonstrates."""
+    classification = _classification(value)
+    return {
+        "owner": owner_name,
+        "operation": f"{prefix}.{name}",
+        "classification": classification,
+        "semantic_mode": _mode(name, classification),
+        "primary_tutorial": "",
+        "secondary_tutorials": "",
+        "execution_profile": "n/a",
+        "optional_dependency": "n/a",
+        "coverage_status": UNDER_DEVELOPMENT_STATUS,
+        **_dimensions(owner_name, name, 0, "n/a"),
+        "execution_evidence": "none: under development",
+    }
 
 
 def main() -> None:
