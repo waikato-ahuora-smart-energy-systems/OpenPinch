@@ -211,18 +211,17 @@ def calc_simulated_hpr_annualized_costs(
         if getattr(args, "hpr_capital_recovery", True)
         else Value(0.0, "$/y")
     )
-    utility_capital = Value(
-        max(float(Q_ext_heat), 0.0)
-        * max(float(getattr(args, "hot_utility_capital_cost", 0.0)), 0.0)
-        + max(float(Q_refrigeration), 0.0)
-        * max(float(getattr(args, "refrigeration_capital_cost", 0.0)), 0.0),
-        "$",
+    # The hot utility and refrigeration plant are separate assets, each sized
+    # for its own peak, so they are annualised and reported separately.
+    hot_utility_annualized_capital = _annualized_utility_capital(
+        Q_ext_heat, getattr(args, "hot_utility_capital_cost", 0.0), args
+    )
+    refrigeration_annualized_capital = _annualized_utility_capital(
+        Q_refrigeration, getattr(args, "refrigeration_capital_cost", 0.0), args
     )
     utility_annualized_capital = (
-        compute_annual_capital_cost(utility_capital, args.discount_rate, args.serv_life)
-        if getattr(args, "utility_capital_recovery", True)
-        else Value(0.0, "$/y")
-    )
+        hot_utility_annualized_capital + refrigeration_annualized_capital
+    ).to("$/y")
     total_annualized = (
         operating_cost + annualized_capital + utility_annualized_capital
     ).to("$/y")
@@ -236,10 +235,29 @@ def calc_simulated_hpr_annualized_costs(
         hpr_operating_cost=operating_cost,
         hpr_capital_cost=capital_cost,
         hpr_annualized_capital_cost=annualized_capital,
+        hpr_hot_utility_annualized_capital_cost=hot_utility_annualized_capital,
+        hpr_refrigeration_annualized_capital_cost=refrigeration_annualized_capital,
         hpr_utility_annualized_capital_cost=utility_annualized_capital,
         hpr_total_annualized_cost=total_annualized,
         feasibility_penalty=feasibility_penalty,
     )
+
+
+def _annualized_utility_capital(
+    duty: float,
+    unit_capital_cost: float,
+    args: HeatPumpTargetInputs,
+) -> Value:
+    """Annualise the installed capital of one default-utility capacity."""
+    if not getattr(args, "utility_capital_recovery", True):
+        return Value(0.0, "$/y")
+    capital = Value(
+        max(float(duty), 0.0) * max(float(unit_capital_cost), 0.0),
+        "$",
+    )
+    return compute_annual_capital_cost(
+        capital, args.discount_rate, args.serv_life
+    ).to("$/y")
 
 
 def _cascade_air_duties(
@@ -484,6 +502,12 @@ def evaluate_vapour_hpr_result(
         hpr_operating_cost=cost_accounting.hpr_operating_cost,
         hpr_capital_cost=cost_accounting.hpr_capital_cost,
         hpr_annualized_capital_cost=cost_accounting.hpr_annualized_capital_cost,
+        hpr_hot_utility_annualized_capital_cost=(
+            cost_accounting.hpr_hot_utility_annualized_capital_cost
+        ),
+        hpr_refrigeration_annualized_capital_cost=(
+            cost_accounting.hpr_refrigeration_annualized_capital_cost
+        ),
         hpr_utility_annualized_capital_cost=(
             cost_accounting.hpr_utility_annualized_capital_cost
         ),

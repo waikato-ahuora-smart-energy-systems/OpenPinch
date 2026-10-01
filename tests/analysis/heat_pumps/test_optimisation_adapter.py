@@ -247,6 +247,39 @@ def test_shared_objective_includes_peak_utility_capital():
     assert weighted.hpr_total_annualized_cost.value == pytest.approx(objective)
 
 
+def test_shared_objective_sizes_each_utility_for_its_own_peak():
+    def costed(operating, hot_capital, refrigeration_capital):
+        return _result(0.0).with_updates(
+            hpr_operating_cost=Value(operating, "$/y"),
+            hpr_capital_cost=Value(500.0, "$"),
+            hpr_annualized_capital_cost=Value(50.0, "$/y"),
+            hpr_hot_utility_annualized_capital_cost=Value(hot_capital, "$/y"),
+            hpr_refrigeration_annualized_capital_cost=Value(
+                refrigeration_capital, "$/y"
+            ),
+            hpr_utility_annualized_capital_cost=Value(
+                hot_capital + refrigeration_capital, "$/y"
+            ),
+        )
+
+    # Hot-utility demand peaks in winter and refrigeration in summer; both
+    # plants must be sized for their own peak, not for the larger period total.
+    weighted, objective = adapter.aggregate_hpr_period_results(
+        {"winter": costed(100.0, 70.0, 10.0), "summer": costed(100.0, 20.0, 50.0)},
+        [1.0, 1.0],
+    )
+
+    assert weighted.hpr_hot_utility_annualized_capital_cost.value == pytest.approx(
+        70.0
+    )
+    assert weighted.hpr_refrigeration_annualized_capital_cost.value == (
+        pytest.approx(50.0)
+    )
+    assert weighted.hpr_utility_annualized_capital_cost.value == pytest.approx(120.0)
+    assert objective == pytest.approx(100.0 + 50.0 + 120.0)
+    assert weighted.hpr_total_annualized_cost.value == pytest.approx(objective)
+
+
 def test_accounting_applies_refrigeration_penalty_and_scalar_objective():
     external_heat, external_cold, penalty, objective = adapter.build_hpr_accounting(
         work=10.0,

@@ -301,12 +301,16 @@ def _weighted_average_target(
             data[field] = None
         elif field not in {
             "period_id",
+            "hpr_utility_annualized_capital_cost",
             "hpr_total_annualized_cost",
             "pinch_temp",
             "hot_utilities",
             "cold_utilities",
         }:
             raise ValueError(f"No derived aggregation implementation for {field!r}.")
+    data["hpr_utility_annualized_capital_cost"] = _hpr_utility_annualized_capital(
+        targets, data
+    )
     data["hpr_total_annualized_cost"] = _total_hpr_annualized_cost(data)
     data["pinch_temp"] = PinchTemp(
         cold_temp=_weighted_report_value(
@@ -384,6 +388,36 @@ def _max_report_value(
         raise ValueError(f"Cannot aggregate partially missing field {attr_path!r}.")
     maximum = max(values)
     return Value(maximum, unit) if unit is not None else maximum
+
+
+def _hpr_utility_annualized_capital(
+    targets: Sequence[TargetResults],
+    data: Mapping[str, Any],
+) -> Value | float | None:
+    """Sum each default utility's peak capital across periods.
+
+    The hot utility and the refrigeration plant are separate assets, each sized
+    for its own peak period, so their maxima are taken separately and added.
+    Results without the split fall back to the peak of the combined value.
+    """
+    parts = [
+        data.get(field)
+        for field in (
+            "hpr_hot_utility_annualized_capital_cost",
+            "hpr_refrigeration_annualized_capital_cost",
+        )
+    ]
+    parts = [part for part in parts if part is not None]
+    if not parts:
+        return _max_report_value(targets, "hpr_utility_annualized_capital_cost")
+    if all(isinstance(part, Value) for part in parts):
+        total = parts[0]
+        for part in parts[1:]:
+            total = total + part
+        return total
+    if any(isinstance(part, Value) for part in parts):
+        raise ValueError("HPR utility capital fields must use compatible units.")
+    return float(sum(float(part) for part in parts))
 
 
 def _total_hpr_annualized_cost(data: Mapping[str, Any]) -> Value | float | None:
