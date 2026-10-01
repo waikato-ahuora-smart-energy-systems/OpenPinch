@@ -120,15 +120,28 @@ def _base_args(**overrides):
     args.setdefault("Q_heat_max", float(args["H_cold"][0]))
     args.setdefault("Q_cool_max", float(-args["H_hot"][-1]))
     # Background streams follow the profiles, as preprocessing builds them.
+    # Tests that pass deliberately invalid profiles (mismatched or non-finite)
+    # get no background streams.
     args.setdefault(
-        "bckgrd_hot_streams",
-        _create_stream_collection_of_background_profile(args["T_hot"], args["H_hot"]),
+        "bckgrd_hot_streams", _background_streams(args["T_hot"], args["H_hot"])
     )
     args.setdefault(
-        "bckgrd_cold_streams",
-        _create_stream_collection_of_background_profile(args["T_cold"], args["H_cold"]),
+        "bckgrd_cold_streams", _background_streams(args["T_cold"], args["H_cold"])
     )
     return SimpleNamespace(**args)
+
+
+def _background_streams(T_vals, H_vals) -> StreamCollection:
+    T_vals = np.asarray(T_vals, dtype=float)
+    H_vals = np.asarray(H_vals, dtype=float)
+    if (
+        T_vals.size < 2
+        or T_vals.shape != H_vals.shape
+        or not np.isfinite(T_vals).all()
+        or not np.isfinite(H_vals).all()
+    ):
+        return StreamCollection()
+    return _create_stream_collection_of_background_profile(T_vals, H_vals)
 
 
 def _pt_with_hnet(h0, h1, *, h_hot=None, h_cold=None):
