@@ -47,14 +47,9 @@ def _exercise_tespy_public_target_and_map() -> None:
     from OpenPinch.resources import read_sample_case
 
     def bounded_candidate_search(*, f_obj, x0_ls, bnds, args):
-        point = np.array([(lower + upper) / 2.0 for lower, upper in bnds])
-        point[0] = 0.0
-        point[1] = 0.35
-        point[2] = 0.20
-        point[3] = 0.02
-        point[4] = 0.50
-        point[5] = 1.0
-        point[-1] = 0.0
+        # One condenser and one evaporator: [x_cond, x_evap, x_subcool,
+        # x_heat_split, x_ihx].
+        point = np.array([0.35, 0.20, 0.02, 0.50, 0.0])
         result = f_obj(point, args)
         if not result.success:
             raise AssertionError(

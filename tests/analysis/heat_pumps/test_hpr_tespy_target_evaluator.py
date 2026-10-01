@@ -245,10 +245,12 @@ def test_real_tespy_candidate_enters_existing_hpr_accounting_pipeline() -> None:
     coordinator = HprTargetEvaluatorCoordinator(evaluator)
     coordinator.open()
 
+    # One condenser and one evaporator: [x_cond, x_evap, x_subcool,
+    # x_heat_split, x_ihx].
     point = _candidate(args)
-    point[1] = 45.0 / 70.0
-    point[2] = 1.0
-    point[3] = 2.0 / 45.0
+    point[0] = 45.0 / 70.0
+    point[1] = 1.0
+    point[2] = 2.0 / 45.0
     result = cascade._compute_tespy_cascade_hp_system_obj(
         point,
         args,
@@ -329,14 +331,9 @@ def test_real_public_tespy_target_and_minimal_map_stay_within_smoke_budget(
     record_property,
 ) -> None:
     def bounded_candidate_search(*, f_obj, x0_ls, bnds, args):
-        point = np.array([(lower + upper) / 2.0 for lower, upper in bnds])
-        point[0] = 0.0
-        point[1] = 0.35
-        point[2] = 0.20
-        point[3] = 0.02
-        point[4] = 0.50
-        point[5] = 1.0
-        point[-1] = 0.0
+        # One condenser and one evaporator: [x_cond, x_evap, x_subcool,
+        # x_heat_split, x_ihx].
+        point = np.array([0.35, 0.20, 0.02, 0.50, 0.0])
         result = f_obj(point, args)
         assert result.success is True
         return translate_hpr_result(result, ambient_args=args)
