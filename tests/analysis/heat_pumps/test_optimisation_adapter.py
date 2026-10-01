@@ -9,6 +9,7 @@ import OpenPinch.analysis.heat_pumps.optimisation_adapter as adapter
 from OpenPinch.contracts.hpr import HPRBackendResult, HPRThermoArtifacts
 from OpenPinch.domain.enums import BB_Minimiser
 from OpenPinch.domain.stream_collection import StreamCollection
+from OpenPinch.domain.value import Value
 from OpenPinch.optimisation.errors import NoOptimisationCandidatesError
 from OpenPinch.optimisation.models import (
     OptimisationCandidate,
@@ -220,6 +221,30 @@ def test_fallback_shared_objective_is_weighted_when_costs_are_absent():
 
     assert objective == pytest.approx(17.5)
     assert weighted.obj == pytest.approx(17.5)
+
+
+def test_shared_objective_includes_peak_utility_capital():
+    def costed(operating, capital, utility_capital):
+        return _result(0.0).with_updates(
+            hpr_operating_cost=Value(operating, "$/y"),
+            hpr_capital_cost=Value(10.0 * capital, "$"),
+            hpr_annualized_capital_cost=Value(capital, "$/y"),
+            hpr_utility_annualized_capital_cost=Value(utility_capital, "$/y"),
+            hpr_total_annualized_cost=Value(
+                operating + capital + utility_capital, "$/y"
+            ),
+        )
+
+    weighted, objective = adapter.aggregate_hpr_period_results(
+        {"base": costed(100.0, 50.0, 30.0), "peak": costed(300.0, 50.0, 80.0)},
+        [3.0, 1.0],
+    )
+
+    # Operating cost is weighted; capital, utility capital included, is
+    # sized for the peak period.
+    assert weighted.hpr_utility_annualized_capital_cost.value == pytest.approx(80.0)
+    assert objective == pytest.approx(150.0 + 50.0 + 80.0)
+    assert weighted.hpr_total_annualized_cost.value == pytest.approx(objective)
 
 
 def test_accounting_applies_refrigeration_penalty_and_scalar_objective():

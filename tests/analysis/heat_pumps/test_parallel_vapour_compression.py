@@ -201,6 +201,7 @@ def test_parallel_refrigeration_objective_solves_refrigeration_mode(monkeypatch)
         work = 20.0
         work_arr = np.array([20.0])
         Q_heat_arr = np.array([100.0])
+        Q_cond_arr = np.array([100.0])
         Q_cool_arr = np.array([80.0])
         penalty = 0.0
 

@@ -267,9 +267,7 @@ def test_annualized_costs_credit_utility_capital_and_can_drop_capital_recovery()
 
     both = costs()
     # 8 kW of hot utility at $100/kW and 2 kW of refrigeration at $500/kW.
-    assert both.hpr_utility_annualized_capital_cost.value == pytest.approx(
-        1800.0 * crf
-    )
+    assert both.hpr_utility_annualized_capital_cost.value == pytest.approx(1800.0 * crf)
     assert both.hpr_total_annualized_cost.value == pytest.approx(
         both.hpr_operating_cost.value
         + both.hpr_annualized_capital_cost.value
@@ -356,6 +354,55 @@ def test_cycle_penalty_scores_only_cycle_terms():
     )
 
     assert penalty == pytest.approx(50.0)
+
+
+def test_vapour_refrigeration_penalises_unserved_cooling():
+    # 100 kW must be removed between 15 C and 5 C, below where air can take
+    # it, and no refrigerator serves it.
+    def evaluate(is_heat_pumping):
+        args = _base_args(
+            T_hot=np.array([15.0, 5.0]),
+            H_hot=np.array([0.0, -100.0]),
+            T_cold=np.array([95.0, 45.0]),
+            H_cold=np.array([0.0, 0.0]),
+            z_amb_hot=np.zeros(2),
+            z_amb_cold=np.zeros(2),
+            Q_heat_max=0.0,
+            Q_cool_max=100.0,
+            is_heat_pumping=is_heat_pumping,
+        )
+        return hp_shared.evaluate_vapour_hpr_result(
+            args=args,
+            state=HPRParsedState(Q_amb_hot=0.0, Q_amb_cold=0.0),
+            work=0.0,
+            work_arr=np.array([]),
+            Q_heat=np.array([]),
+            Q_cool=np.array([]),
+            cop_h=1.0,
+            hpr_streams=StreamCollection(),
+        )
+
+    refrigeration = evaluate(False)
+    heat_pump = evaluate(True)
+
+    assert refrigeration.Q_ext_cold == pytest.approx(100.0)
+    assert refrigeration.feasibility_penalty > 0.0
+    assert heat_pump.feasibility_penalty == pytest.approx(0.0)
+
+
+def test_cascade_cost_unit_counts_every_solved_stage():
+    args = _base_args()
+    streams = _sc(_stream("cond", 120.0, 100.0, 500.0, is_process_stream=False))
+    state = HPRParsedState(T_cond=np.array([110.0, 90.0]))
+
+    (unit,) = hp_shared._single_cost_unit(
+        state, streams, np.array([10.0, 8.0, 6.0]), args
+    )
+
+    # Two condenser levels and two evaporator levels: three stages.
+    assert unit.n_closed == 3
+    assert unit.Q_cap == pytest.approx(500.0)
+    assert unit.T_hot_max == pytest.approx(110.0)
 
 
 def test_vapour_evaluator_keeps_background_profiles_out_of_one_point_match():

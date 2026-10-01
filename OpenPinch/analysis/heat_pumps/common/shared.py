@@ -145,9 +145,16 @@ def calc_hpr_capital_cost(
 def _single_cost_unit(
     state: HPRParsedState,
     hpr_streams: StreamCollection,
+    work_arr: np.ndarray | None,
     args: HeatPumpTargetInputs,
 ) -> list[HPRCostUnit]:
-    """Treat all the stages as one machine (a cascade)."""
+    """Treat all the stages as one machine (a cascade).
+
+    Each closed stage has its own compressor, so the stage count comes from
+    the solved stage works: a cascade with ``n_cond`` condenser and
+    ``n_evap`` evaporator levels has ``n_cond + n_evap - 1`` stages, more
+    than its ``n_cond`` condensing temperatures.
+    """
     hot = hpr_streams.get_hot_utility_streams()
     Q_cap = (
         max(float(hot.sum_stream_attribute("heat_flow", idx=args.period_idx)), 0.0)
@@ -155,11 +162,14 @@ def _single_cost_unit(
         else 0.0
     )
     T_cond = np.asarray(state.T_cond, dtype=float).ravel()
+    n_stages = (
+        np.asarray(work_arr, dtype=float).size if work_arr is not None else 0
+    ) or T_cond.size
     return [
         HPRCostUnit(
             Q_cap=Q_cap,
             T_hot_max=float(T_cond.max()) if T_cond.size else 0.0,
-            n_closed=max(int(T_cond.size), 1),
+            n_closed=max(int(n_stages), 1),
         )
     ]
 
@@ -418,12 +428,17 @@ def evaluate_vapour_hpr_result(
     Q_amb_hot = cond.Q_air_source + evap.Q_air_source
     Q_amb_cold = cond.Q_air_sink + evap.Q_air_sink
     if cost_units is None:
-        cost_units = _single_cost_unit(state, hpr_streams, args)
+        cost_units = _single_cost_unit(state, hpr_streams, work_arr, args)
     all_penalty_terms = [
         *_normalise_hpr_penalty_terms(penalty_terms),
         cond_wrong_side,
         evap_wrong_side,
     ]
+    if not getattr(args, "is_heat_pumping", True):
+        # A refrigerator must serve the selected cooling: whatever cooling
+        # water or default refrigeration still has to remove is unserved,
+        # so a zero-duty refrigerator is never a valid design.
+        all_penalty_terms.append(Q_ext_cold)
     penalty_power_equivalent = _cycle_penalty(
         args=args,
         cycle_penalty_terms=all_penalty_terms,

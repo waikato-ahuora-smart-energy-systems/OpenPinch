@@ -239,11 +239,15 @@ def _parallel_cost_units(
     state_vars: HPRParsedState,
     hp: ParallelVapourCompressionCycles,
 ) -> list[HPRCostUnit]:
-    """Each parallel cycle is its own single-stage machine."""
+    """Each parallel cycle is its own single-stage machine.
+
+    Its capacity is all the heat its condenser rejects, which is also the
+    basis for a refrigerator, whose process heat is only a nominal value.
+    """
     return [
         HPRCostUnit(Q_cap=float(Q_cap), T_hot_max=float(T_cond))
         for Q_cap, T_cond in zip(
-            np.asarray(hp.Q_heat_arr, dtype=float).ravel(),
+            np.asarray(hp.Q_cond_arr, dtype=float).ravel(),
             np.asarray(state_vars.T_cond, dtype=float).ravel(),
         )
     ]

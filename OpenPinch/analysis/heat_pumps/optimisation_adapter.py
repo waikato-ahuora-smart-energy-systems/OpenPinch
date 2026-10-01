@@ -697,9 +697,11 @@ def aggregate_hpr_period_results(
         if weighted is not None:
             updates[field] = weighted
 
+    # Capacity is sized for the peak period, so capital takes the maximum.
     for field in (
         "hpr_capital_cost",
         "hpr_annualized_capital_cost",
+        "hpr_utility_annualized_capital_cost",
     ):
         maximum = _aggregate_result_field(
             ordered,
@@ -712,9 +714,13 @@ def aggregate_hpr_period_results(
 
     operating = updates.get("hpr_operating_cost")
     annualized_capital = updates.get("hpr_annualized_capital_cost")
+    utility_capital = updates.get("hpr_utility_annualized_capital_cost")
     if operating is not None and annualized_capital is not None:
         try:
-            updates["hpr_total_annualized_cost"] = operating + annualized_capital
+            total = operating + annualized_capital
+            if utility_capital is not None:
+                total = total + utility_capital
+            updates["hpr_total_annualized_cost"] = total
         except TypeError, ValueError:
             pass
     if "hpr_total_annualized_cost" not in updates:
@@ -938,10 +944,17 @@ def _shared_candidate_objective(
         weights=None,
         reducer="max",
     )
+    utility_capital = _aggregate_result_field(
+        results,
+        "hpr_utility_annualized_capital_cost",
+        weights=None,
+        reducer="max",
+    )
     return (
         _annual_cost_magnitude(operating)
         + float(penalty)
         + _annual_cost_magnitude(annualized_capital)
+        + (0.0 if utility_capital is None else _annual_cost_magnitude(utility_capital))
     )
 
 
