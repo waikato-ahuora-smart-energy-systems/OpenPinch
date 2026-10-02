@@ -211,6 +211,7 @@ def test_weighted_average_output_sizes_each_machine_for_its_own_peak():
                 "hpr_annualized_capital_cost": Value(sum(machine_annualized), "$/y"),
                 "hpr_machine_capital_costs": machine_capital,
                 "hpr_machine_annualized_capital_costs": machine_annualized,
+                "hpr_shared_design": True,
             }
         )
 
@@ -237,6 +238,42 @@ def test_weighted_average_output_sizes_each_machine_for_its_own_peak():
     assert target.hpr_annualized_capital_cost.value == pytest.approx(20.0)
 
 
+def test_independent_period_designs_use_the_peak_of_totals():
+    # Separately optimised periods may number their machines differently,
+    # so machine i is not the same unit in every period.
+    def costed(period_id, machine_capital, machine_annualized):
+        return _target(period_id=period_id, qh=10.0).model_copy(
+            update={
+                "hpr_operating_cost": Value(100.0, "$/y"),
+                "hpr_capital_cost": Value(sum(machine_capital), "$"),
+                "hpr_annualized_capital_cost": Value(sum(machine_annualized), "$/y"),
+                "hpr_machine_capital_costs": machine_capital,
+                "hpr_machine_annualized_capital_costs": machine_annualized,
+                "hpr_shared_design": False,
+            }
+        )
+
+    output = weighted_average_output(
+        [
+            TargetOutput(
+                name="Site",
+                period_id="winter",
+                targets=[costed("winter", (100.0, 10.0), (10.0, 1.0))],
+            ),
+            TargetOutput(
+                name="Site",
+                period_id="summer",
+                targets=[costed("summer", (10.0, 100.0), (1.0, 10.0))],
+            ),
+        ],
+        [1.0, 1.0],
+    )
+    target = output.targets[0]
+
+    assert target.hpr_machine_capital_costs is None
+    assert target.hpr_capital_cost.value == pytest.approx(110.0)
+
+
 def test_machine_peaks_keep_the_configured_cost_units():
     # Report fields are in a display unit (k$), the per-machine tuples in $.
     def costed(period_id, machine_capital, machine_annualized):
@@ -249,6 +286,7 @@ def test_machine_peaks_keep_the_configured_cost_units():
                 ),
                 "hpr_machine_capital_costs": machine_capital,
                 "hpr_machine_annualized_capital_costs": machine_annualized,
+                "hpr_shared_design": True,
             }
         )
 

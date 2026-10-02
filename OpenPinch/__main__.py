@@ -45,6 +45,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("."),
         help="Destination filepath or directory.",
     )
+    notebook_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite notebooks that already exist at the destination.",
+    )
     return parser
 
 
@@ -65,17 +70,35 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _notebook_command(args: argparse.Namespace) -> int:
+    force = bool(getattr(args, "force", False))
     if args.name is not None:
+        target = args.output / args.name if args.output.is_dir() else args.output
+        _refuse_overwrite([target], force=force)
         destination = copy_notebook(args.name, args.output)
         print(f"Copied notebook to {destination}")
         return 0
 
     output_dir = args.output
+    _refuse_overwrite([output_dir / name for name in list_notebooks()], force=force)
     output_dir.mkdir(parents=True, exist_ok=True)
     for name in list_notebooks():
         copy_notebook(name, output_dir / name)
     print(f"Copied {len(list_notebooks())} notebook(s) to {output_dir}")
     return 0
+
+
+def _refuse_overwrite(paths: list[Path], *, force: bool) -> None:
+    """Raise before copying when any destination exists, unless forced."""
+    if force:
+        return
+    existing = [path for path in paths if path.exists()]
+    if existing:
+        names = ", ".join(str(path) for path in existing[:5])
+        more = "" if len(existing) <= 5 else f" and {len(existing) - 5} more"
+        raise FileExistsError(
+            f"Notebook(s) already exist: {names}{more}. "
+            "Use --force to overwrite them."
+        )
 
 
 if __name__ == "__main__":

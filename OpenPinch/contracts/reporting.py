@@ -98,7 +98,7 @@ class TargetResults(_ReportModel):
         "period_id", "derived", None, representation="structured"
     )
     degree_of_integration: Value | None = report_field(
-        "degree_of_integration", "weighted_mean", None, representation="quantity"
+        "degree_of_integration", "derived", None, representation="quantity"
     )
     Qh: Value = report_field("Qh", "weighted_mean", representation="quantity")
     Qc: Value = report_field("Qc", "weighted_mean", representation="quantity")
@@ -131,16 +131,16 @@ class TargetResults(_ReportModel):
         "turbine_efficiency_target", "weighted_mean", None, representation="quantity"
     )
     area: Value | None = report_field(
-        "area", "weighted_mean", None, representation="quantity"
+        "area", "maximum", None, representation="quantity"
     )
     num_units: Optional[float] = report_field(
-        "num_units", "weighted_mean", None, representation="scalar"
+        "num_units", "maximum", None, representation="scalar"
     )
     capital_cost: Value | None = report_field(
-        "capital_cost", "weighted_mean", None, representation="quantity"
+        "capital_cost", "maximum", None, representation="quantity"
     )
     total_cost: Value | None = report_field(
-        "total_cost", "weighted_mean", None, representation="quantity"
+        "total_cost", "maximum", None, representation="quantity"
     )
     exergy_sources: Value | None = report_field(
         "exergy_sources", "weighted_mean", None, representation="quantity"
@@ -149,7 +149,7 @@ class TargetResults(_ReportModel):
         "exergy_sinks", "weighted_mean", None, representation="quantity"
     )
     ETE: Value | None = report_field(
-        "ETE", "weighted_mean", None, representation="quantity"
+        "ETE", "derived", None, representation="quantity"
     )
     exergy_req_min: Value | None = report_field(
         "exergy_req_min", "weighted_mean", None, representation="quantity"
@@ -182,10 +182,10 @@ class TargetResults(_ReportModel):
         "hpr_ambient_cold", "weighted_mean", None, representation="quantity"
     )
     hpr_cop: Value | None = report_field(
-        "hpr_cop", "weighted_mean", None, representation="quantity"
+        "hpr_cop", "derived", None, representation="quantity"
     )
     hpr_eta_he: Value | None = report_field(
-        "hpr_eta_he", "weighted_mean", None, representation="quantity"
+        "hpr_eta_he", "derived", None, representation="quantity"
     )
     hpr_operating_cost: Value | None = report_field(
         "hpr_operating_cost", "weighted_mean", None, representation="quantity"
@@ -230,8 +230,14 @@ class TargetResults(_ReportModel):
         None,
         representation="structured",
     )
+    # Across periods: True only when every period that ran succeeded.
     hpr_success: Optional[bool] = report_field(
-        "hpr_success", "consensus", None, representation="structured"
+        "hpr_success", "derived", None, representation="structured"
+    )
+    # True when every period comes from one shared multi-period design, so the
+    # same machine index is the same installed unit in every period.
+    hpr_shared_design: Optional[bool] = report_field(
+        "hpr_shared_design", "consensus", None, representation="structured"
     )
     hpr_hot_streams: Optional[StreamCollection] = report_field(
         "hpr_hot_streams", "consensus", None, representation="structured"

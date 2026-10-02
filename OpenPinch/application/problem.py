@@ -414,10 +414,18 @@ class PinchProblem:
             )
         )
 
+        # All-period results come from each period's own solved zones; the
+        # master zone only holds the last single-period run.
+        period_zones = (
+            {pid: state.root for pid, state in self._period_states.items()}
+            if include_periods and self._period_states
+            else None
+        )
         return export_target_summary_to_excel_with_units(
             target_response=results,
             master_zone=self._master_zone,
             out_dir=destination,
+            period_zones=period_zones,
         )
 
     def compare_to(
