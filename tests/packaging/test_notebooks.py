@@ -496,7 +496,10 @@ def test_notebook_10_uses_five_isolated_scalar_shared_designs() -> None:
 
     assert ".target.all_periods." not in source
     assert source.count("HPR_MULTIPERIOD_OPTIMIZATION_ENABLED") >= 1
-    assert source.count("= new_shared_problem()") == 6
+    # Refrigeration screens run on the sub-ambient dairy case.
+    assert source.count("= new_shared_problem()") == 4
+    assert source.count("= new_refrigeration_problem()") == 2
+    assert '"dairy_chilling_multiperiod.json"' in source
     assert source.count('period_id="base"') == 6
     assert source.count("maximum_restarts=1") == 6
     assert source.count("maximum_iterations=20") == 5

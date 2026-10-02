@@ -294,7 +294,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "ENV_PRESSURE": _spec(float, 101.0, "environment", "pressure", numeric_min=0.0),
     "THERMAL_DT_CONT": _spec(float, 5.0, "thermal", "dt_cont", numeric_min=0.0),
     "THERMAL_DT_PHASE_CHANGE": _spec(float, 0.01, "thermal", "dt_phase_change", numeric_min=0.0),
-    "THERMAL_HTC": _spec(float, 1.0, "thermal", "htc", numeric_min=0.0),
+    "THERMAL_HTC": _spec(float, 1.0, "thermal", "htc", numeric_min=0.0, positive=True),
 
     # Direct integration.
     "DIRECT_BALANCED_CC_ENABLED": _spec(bool, True, "direct", "balanced_cc_enabled"),

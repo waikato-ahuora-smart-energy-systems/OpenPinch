@@ -1,0 +1,289 @@
+{
+  "streams": [
+    {
+      "zone": "Dairy",
+      "name": "Raw milk chilling",
+      "t_supply": {
+        "value": 25,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 4,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "values": [
+          700,
+          1000,
+          1300
+        ],
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Dairy",
+      "name": "Ice-water return",
+      "t_supply": {
+        "value": 8,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 2,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "values": [
+          250,
+          400,
+          550
+        ],
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Dairy",
+      "name": "Pasteurised milk final cooling",
+      "t_supply": {
+        "value": 30,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 5,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "values": [
+          300,
+          450,
+          600
+        ],
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Dairy",
+      "name": "Condensate cooling",
+      "t_supply": {
+        "value": 70,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 30,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "values": [
+          150,
+          200,
+          250
+        ],
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Dairy",
+      "name": "CIP water heating",
+      "t_supply": {
+        "value": 15,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 75,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "values": [
+          400,
+          550,
+          700
+        ],
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Dairy",
+      "name": "Process hot water",
+      "t_supply": {
+        "value": 20,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 60,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "values": [
+          350,
+          500,
+          650
+        ],
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1,
+        "unit": "kW/m^2/degC"
+      }
+    },
+    {
+      "zone": "Dairy",
+      "name": "Pasteuriser top heating",
+      "t_supply": {
+        "value": 60,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 78,
+        "unit": "degC"
+      },
+      "heat_flow": {
+        "values": [
+          300,
+          450,
+          600
+        ],
+        "unit": "kW"
+      },
+      "dt_cont": {
+        "value": 2.5,
+        "unit": "degC"
+      },
+      "htc": {
+        "value": 1,
+        "unit": "kW/m^2/degC"
+      }
+    }
+  ],
+  "utilities": [
+    {
+      "name": "LP Steam",
+      "type": "Hot",
+      "t_supply": {
+        "value": 150,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 149.9,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 1,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 40,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    },
+    {
+      "name": "Cooling Water",
+      "type": "Cold",
+      "t_supply": {
+        "value": 20,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 25,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 1,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 5,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    },
+    {
+      "name": "Glycol",
+      "type": "Cold",
+      "t_supply": {
+        "value": -5,
+        "unit": "degC"
+      },
+      "t_target": {
+        "value": 0,
+        "unit": "degC"
+      },
+      "dt_cont": {
+        "value": 1,
+        "unit": "degC"
+      },
+      "price": {
+        "value": 60,
+        "unit": "$/MWh"
+      },
+      "htc": {
+        "value": 1,
+        "unit": "kW/m^2/degC"
+      },
+      "heat_flow": null
+    }
+  ],
+  "options": {
+    "PROBLEM_PERIOD_IDS": [
+      "turndown",
+      "base",
+      "peak"
+    ],
+    "PROBLEM_PERIOD_WEIGHTS": [
+      0.2,
+      0.6,
+      0.2
+    ]
+  }
+}

@@ -60,6 +60,10 @@ _UTILITY_OPTIONAL_VALUE_FIELDS = (
 )
 
 
+# Validated temperatures are in degC.
+_ABSOLUTE_ZERO_DEGC = -273.15
+
+
 def semantic_issues(
     problem_inputs: TargetInput,
     *,
@@ -525,6 +529,20 @@ def _validate_segmented_stream_states(
                     message="Segment temperatures must be finite.",
                 )
             )
+        elif np.any(supply < _ABSOLUTE_ZERO_DEGC) or np.any(
+            target < _ABSOLUTE_ZERO_DEGC
+        ):
+            issues.append(
+                _build_issue(
+                    severity="error",
+                    section=section,
+                    record_index=record_index,
+                    record_label=record_label,
+                    path_field=f"segments[{index}].t_supply",
+                    field=f"segments[{index}].t_supply/t_target",
+                    message="Segment temperature is below absolute zero.",
+                )
+            )
         if not np.isfinite(duty).all() or np.any(duty <= 0.0):
             issues.append(
                 _build_issue(
@@ -790,6 +808,18 @@ def _validate_temperature_heat_profile_states(
                     message="Profile heat and temperature values must be finite.",
                 )
             )
+        elif np.any(temperature < _ABSOLUTE_ZERO_DEGC):
+            issues.append(
+                _build_issue(
+                    severity="error",
+                    section=section,
+                    record_index=record_index,
+                    record_label=record_label,
+                    path_field=f"profile.points[{index}].temperature",
+                    field=f"profile.points[{index}].temperature",
+                    message="Profile temperature is below absolute zero.",
+                )
+            )
         if previous_heat is not None and previous_temperature is not None:
             heat_step = heat - previous_heat
             temperature_step = temperature - previous_temperature
@@ -942,7 +972,7 @@ def _validate_above_absolute_zero(
                 field_name=field_name,
                 severity="error",
                 message="Temperature is below absolute zero.",
-                reject=lambda magnitude: magnitude < -273.15,
+                reject=lambda magnitude: magnitude < _ABSOLUTE_ZERO_DEGC,
                 period_ids=period_ids,
             )
         )

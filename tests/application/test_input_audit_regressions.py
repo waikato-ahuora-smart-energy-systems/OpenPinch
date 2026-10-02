@@ -120,6 +120,37 @@ def test_temperatures_below_absolute_zero_are_rejected():
     )
 
 
+@pytest.mark.parametrize(
+    "thermal",
+    [
+        {
+            "segments": [
+                {"t_supply": 150.0, "t_target": 60.0, "heat_flow": 50.0},
+                {"t_supply": 60.0, "t_target": -300.0, "heat_flow": 50.0},
+            ]
+        },
+        {
+            "profile": {
+                "points": [
+                    {"temperature": 150.0, "cumulative_heat": 0.0},
+                    {"temperature": -300.0, "cumulative_heat": 100.0},
+                ]
+            }
+        },
+    ],
+    ids=["segments", "profile"],
+)
+def test_nested_temperatures_below_absolute_zero_are_rejected(thermal):
+    stream = {"zone": "Zone A", "name": "H1", "dt_cont": 10.0, "htc": 1.0}
+
+    messages = _messages({"streams": [stream | thermal], "utilities": []})
+
+    assert any(
+        severity == "error" and "below absolute zero" in message
+        for severity, message in messages
+    )
+
+
 def test_duplicate_stream_names_are_renamed_with_a_warning():
     messages = _messages(
         {"streams": [_stream(), _stream(t_supply=140.0)], "utilities": []}
@@ -190,6 +221,8 @@ def test_value_weights_are_validated_and_serialised():
         ({"COSTING_ANNUAL_OP_TIME": 0.0}, "greater than 0"),
         ({"POWER_ETA_MECH": 0.0}, "greater than 0"),
         ({"HPR_ETA_COMP": 0.0}, "greater than 0"),
+        # Utilities and streams without an htc inherit THERMAL_HTC.
+        ({"THERMAL_HTC": 0.0}, "greater than 0"),
     ],
 )
 def test_configuration_rejects_degenerate_values(options, message):
