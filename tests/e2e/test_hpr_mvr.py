@@ -57,7 +57,10 @@ def test_standard_problem_hpr_service_is_bounded_and_robust(
         try:
             target = getattr(problem.target, assignment.profile.service_name)(
                 **assignment.profile.invocation_kwargs(
-                    maximum_evaluations=maximum_evaluations
+                    maximum_evaluations=maximum_evaluations,
+                    maximum_iterations=assignment.profile.iteration_limit(
+                        sentinel=is_sentinel
+                    ),
                 )
             )
         except HPRTargetingError as caught:
@@ -114,6 +117,15 @@ def _assert_sentinel_converged(
     assert outcome.kind is HPROutcomeKind.SOLVED, (
         f"strict-success sentinel {assignment.parameter_id} returned "
         f"{outcome.kind.value}"
+    )
+    # A solved sentinel must be feasible: its objective is its cost, with no
+    # feasibility penalty on top.
+    details = outcome.target.hpr_details
+    objective = float(details.obj)
+    total_cost = float(details.hpr_total_annualized_cost.to("$/y").value)
+    assert objective - total_cost <= 1e-6 * max(abs(objective), 1.0), (
+        f"strict-success sentinel {assignment.parameter_id} carries a "
+        f"feasibility penalty of {objective - total_cost:.6g} $/y"
     )
     witness = build_convergence_witness(
         selected_observations,

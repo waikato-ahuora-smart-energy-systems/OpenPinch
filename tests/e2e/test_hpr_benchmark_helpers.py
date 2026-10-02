@@ -52,9 +52,16 @@ def test_profile_search_limits_expand_for_convergence_sentinels() -> None:
             profile.maximum_evaluations,
             profile.maximum_search_observations,
         )
+        assert profile.iteration_limit(sentinel=False) == profile.maximum_iterations
         # Every sentinel gets room to improve on its warm start; the ordinary
-        # budget of 12 evaluations often cannot.
-        assert profile.search_limits(sentinel=True) == (48, 96)
+        # budget of 12 evaluations often cannot. Direct refrigeration needs
+        # more to cross from zero duty to designs that pay.
+        if profile.profile_id == "direct-cascade-vc-refrigeration":
+            assert profile.search_limits(sentinel=True) == (192, 384)
+            assert profile.iteration_limit(sentinel=True) == 192
+        else:
+            assert profile.search_limits(sentinel=True) == (48, 96)
+            assert profile.iteration_limit(sentinel=True) == profile.maximum_iterations
 
 
 @seed(20260715)

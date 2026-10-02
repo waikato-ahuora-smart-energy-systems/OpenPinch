@@ -46,6 +46,7 @@ class HPRProfile:
     maximum_search_observations: int = 24
     sentinel_maximum_evaluations: int | None = None
     sentinel_maximum_search_observations: int | None = None
+    sentinel_maximum_iterations: int | None = None
     refrigerants: tuple[str, ...] = ("Water",)
     mvr_fluids: tuple[str, ...] = ("Water",)
     mvr_stages: int = 1
@@ -54,6 +55,7 @@ class HPRProfile:
         self,
         *,
         maximum_evaluations: int | None = None,
+        maximum_iterations: int | None = None,
     ) -> dict[str, Any]:
         """Build fresh explicit public kwargs without exposing mutable profile data."""
         kwargs: dict[str, Any] = {
@@ -61,7 +63,11 @@ class HPRProfile:
             "condensers": self.condensers,
             "evaporators": self.evaporators,
             "maximum_restarts": self.maximum_restarts,
-            "maximum_iterations": self.maximum_iterations,
+            "maximum_iterations": (
+                self.maximum_iterations
+                if maximum_iterations is None
+                else maximum_iterations
+            ),
             "maximum_evaluations": (
                 self.maximum_evaluations
                 if maximum_evaluations is None
@@ -97,6 +103,12 @@ class HPRProfile:
             or self.maximum_search_observations,
         )
 
+    def iteration_limit(self, *, sentinel: bool) -> int:
+        """Return the optimiser iteration cap for an ordinary or sentinel run."""
+        if not sentinel:
+            return self.maximum_iterations
+        return self.sentinel_maximum_iterations or self.maximum_iterations
+
 
 HPR_PROFILES = (
     HPRProfile(
@@ -123,8 +135,13 @@ HPR_PROFILES = (
         is_utility=False,
         is_cascade_cycle=True,
         objective_name="_compute_cascade_hp_system_obj",
-        sentinel_maximum_evaluations=48,
-        sentinel_maximum_search_observations=96,
+        # Refrigerator capital makes small designs dearer than none, so the
+        # search must cross from the zero-duty basin to large designs that
+        # pay. At 48 evaluations and 3 iterations it often stays at zero duty;
+        # at 192 of each it solved Sun et al. at all eight seed shifts.
+        sentinel_maximum_evaluations=192,
+        sentinel_maximum_search_observations=384,
+        sentinel_maximum_iterations=192,
     ),
     HPRProfile(
         profile_id="utility-parallel-vc-refrigeration",
