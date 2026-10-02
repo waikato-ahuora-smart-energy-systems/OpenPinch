@@ -1,10 +1,11 @@
 """Duty allocation for a user-defined heat exchanger network structure.
 
-The user builds a :class:`HeatExchangerNetwork` by hand: recovery exchangers
-with a source hot stream, a sink cold stream and a stage, plus any heaters and
-coolers. The structure is fixed and only the duty on each exchanger (and the
-split fractions where several exchangers share a stream in one stage) are
-optimised with the StageWise ESM NLP.
+The user fixes the network: recovery exchangers (hot stream, cold stream,
+stage) plus heaters and coolers. A stream may have several utility exchangers,
+one per utility and position, and a utility exchanger with a stage sits just
+after its stream leaves that stage (without one it sits at the stream end).
+Only exchanger duties and the split fractions of streams shared by several
+recovery matches in a stage are optimised.
 
 Objectives:
 
@@ -13,13 +14,20 @@ Objectives:
     each exchanger (a global value, per-exchanger values, or the stream
     temperature contributions when neither is given).
 ``"area"``
-    Minimise total heat-transfer area subject to a maximum hot and/or cold
-    utility duty.
+    Minimise the total of the exchangers' common areas subject to a maximum
+    hot and/or cold utility duty in every period. Each exchanger has one area
+    for all periods, at least what any period needs; a period needing less
+    runs with a bypass.
 ``"cost"``
-    Minimise total annual cost (annualised exchanger capital from the
-    ``COSTING_HX_*`` settings plus utility cost). Only feasibility is imposed:
-    a small positive approach (1 K by default) at both ends of every
+    Minimise total annual cost: exchanger capital on the common areas
+    (``COSTING_HX_*`` settings) plus utility cost. Only feasibility is
+    imposed: a small positive approach (1 K by default) at both ends of every
     exchanger.
+
+A listed exchanger that ends at zero duty in every period is removed, together
+with its approach constraint, and the problem is solved again until every
+remaining exchanger carries duty. Removed exchangers are named in the result's
+``summary_metrics["removed_exchangers"]``.
 """
 
 from __future__ import annotations
@@ -27,7 +35,6 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from functools import partial
 from typing import Any, Literal
 
 from ...contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
@@ -36,12 +43,24 @@ from ...contracts.synthesis.task import (
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
 from ...contracts.synthesis.topology import HeatExchangerNetworkTopologyRestriction
-from ...domain.enums import HeatExchangerKind, HeatExchangerNetworkDesignMethod
+from ...domain._heat_exchanger.period_state import HeatExchangerPeriodState
+from ...domain.enums import (
+    HeatExchangerKind,
+    HeatExchangerNetworkDesignMethod,
+    StreamID,
+)
 from ...domain.heat_exchanger import HeatExchanger
 from ...domain.heat_exchanger_network import HeatExchangerNetwork
 from .context import finalise_design_result, prepare_service_context
 from .execution.executor import SynthesisExecutor, _failed_task_outcome
 from .execution.settings import SynthesisWorkflowSettings
+from .models.fixed_structure import (
+    COOLER,
+    HEATER,
+    FixedStructureSpec,
+    RecoveryMatch,
+    UtilityMatch,
+)
 from .prepared_problem import SynthesisProblem
 from .targeting._stage import run_single_method_workflow, run_stage
 
@@ -56,9 +75,6 @@ DEFAULT_FEASIBILITY_APPROACH = 1.0
 """Minimum approach (K) imposed by the ``"cost"`` objective when none is given."""
 
 _METHOD = HeatExchangerNetworkDesignMethod.NetworkEvolution
-
-RecoveryKey = tuple[int, int, int]
-ExchangerKey = tuple[HeatExchangerKind, int, int, int | None]
 
 
 @dataclass(frozen=True)
@@ -145,38 +161,44 @@ def build_duty_optimisation_request(
 
 @dataclass(frozen=True)
 class FixedNetworkStructure:
-    """Solver-index view of a user network for the StageWise model."""
+    """Solver-index view of the user's exchangers for the fixed-structure model.
 
-    stage_count: int
-    hot_count: int
-    cold_count: int
-    recovery: tuple[RecoveryKey, ...]
-    heaters: tuple[int, ...]
-    coolers: tuple[int, ...]
-    exchanger_keys: tuple[ExchangerKey, ...]
-    recovery_approach: dict[RecoveryKey, float]
-    hot_utility_approach: dict[int, float]
-    cold_utility_approach: dict[int, float]
-    initial_recovery_duties: dict[RecoveryKey, float]
+    ``positions`` are indices into the network's allowed exchangers (those kept
+    in this solve); ``slots`` say where each one sits in ``spec``:
+    ``("recovery", r)`` or ``("utility", e)``.
+    """
 
-    def z_restriction(self) -> list:
-        """Return ``[recovery, heaters, coolers]`` in the model restriction shape."""
-        recovery = [
-            [[0 for _k in range(self.stage_count)] for _j in range(self.cold_count)]
-            for _i in range(self.hot_count)
+    spec: FixedStructureSpec
+    positions: tuple[int, ...]
+    slots: tuple[tuple[str, int], ...]
+
+    @property
+    def stage_count(self) -> int:
+        return self.spec.stage_count
+
+    def results(self, model) -> list:
+        """Return the solved exchanger results in ``positions`` order."""
+        return [
+            model.recovery_results[index]
+            if kind == "recovery"
+            else model.utility_results[index]
+            for kind, index in self.slots
         ]
-        for i, j, k in self.recovery:
-            recovery[i][j][k] = 1
-        heaters = [1 if j in self.heaters else 0 for j in range(self.cold_count)]
-        coolers = [1 if i in self.coolers else 0 for i in range(self.hot_count)]
-        return [recovery, heaters, coolers]
 
 
 def fixed_network_structure(
     request: DutyOptimisationRequest,
     axis_maps: Mapping[str, Mapping[str, int]],
+    *,
+    excluded: frozenset[int] = frozenset(),
+    warm_duties: Mapping[int, float] | None = None,
 ) -> FixedNetworkStructure:
-    """Map the user's exchangers onto solver indices and validate the layout."""
+    """Map the user's exchangers onto solver indices and validate the layout.
+
+    ``excluded`` lists allowed-exchanger positions removed after an earlier
+    solve left them at zero duty; ``warm_duties`` maps positions to starting
+    duties (defaults to the duties carried by the network itself).
+    """
 
     hot_axis = axis_maps["hot_process_streams"]
     cold_axis = axis_maps["cold_process_streams"]
@@ -185,139 +207,221 @@ def fixed_network_structure(
     exchangers = _structural_exchangers(request.network)
     stage_count = _stage_count(request.network, exchangers)
 
-    recovery: list[RecoveryKey] = []
-    heaters: list[int] = []
-    coolers: list[int] = []
-    keys: list[ExchangerKey] = []
-    recovery_approach: dict[RecoveryKey, float] = {}
-    hot_utility_approach: dict[int, float] = {}
-    cold_utility_approach: dict[int, float] = {}
-    initial_duties: dict[RecoveryKey, float] = {}
+    recovery: list[RecoveryMatch] = []
+    utilities: list[UtilityMatch] = []
+    positions: list[int] = []
+    slots: list[tuple[str, int]] = []
+    recovery_approach: dict[int, float] = {}
+    utility_approach: dict[int, float] = {}
+    recovery_duties: dict[int, float] = {}
+    utility_duties: dict[int, float] = {}
 
-    for exchanger in exchangers:
+    for position, exchanger in enumerate(exchangers):
+        if position in excluded:
+            continue
         label = _label(exchanger)
         approach = request.exchanger_approach_temperatures.get(
             exchanger.exchanger_id or ""
         )
+        duty = (
+            warm_duties.get(position)
+            if warm_duties is not None
+            else max(state.duty for state in exchanger.period_states)
+        )
         if exchanger.kind is HeatExchangerKind.RECOVERY:
-            i = _resolve_stream(exchanger.source_stream, hot_axis, "hot process", label)
-            j = _resolve_stream(exchanger.sink_stream, cold_axis, "cold process", label)
-            k = int(exchanger.stage) - 1
-            key: RecoveryKey = (i, j, k)
-            if key in recovery:
+            match = RecoveryMatch(
+                hot=_resolve_stream(
+                    exchanger.source_stream, hot_axis, "hot process", label
+                ),
+                cold=_resolve_stream(
+                    exchanger.sink_stream, cold_axis, "cold process", label
+                ),
+                stage=int(exchanger.stage) - 1,
+            )
+            if match in recovery:
                 raise ValueError(
                     f"{label} duplicates another recovery exchanger on the same "
                     "hot stream, cold stream and stage."
                 )
-            recovery.append(key)
-            keys.append((exchanger.kind, i, j, k))
+            index = len(recovery)
+            recovery.append(match)
+            slots.append(("recovery", index))
             if approach is not None:
-                recovery_approach[key] = approach
-            duty = max(state.duty for state in exchanger.period_states)
-            if duty > 0.0:
-                initial_duties[key] = duty
-        elif exchanger.kind is HeatExchangerKind.HOT_UTILITY:
-            _resolve_stream(
-                exchanger.source_stream, hot_utility_axis, "hot utility", label
-            )
-            j = _resolve_stream(exchanger.sink_stream, cold_axis, "cold process", label)
-            if j in heaters:
-                raise ValueError(
-                    f"{label} is a second heater on one cold stream; the "
-                    "stage-wise model allows one heater per cold stream."
-                )
-            heaters.append(j)
-            keys.append((exchanger.kind, 0, j, None))
-            if approach is not None:
-                hot_utility_approach[j] = approach
+                recovery_approach[index] = approach
+            if duty:
+                recovery_duties[index] = float(duty)
         else:
-            i = _resolve_stream(exchanger.source_stream, hot_axis, "hot process", label)
-            _resolve_stream(
-                exchanger.sink_stream, cold_utility_axis, "cold utility", label
-            )
-            if i in coolers:
-                raise ValueError(
-                    f"{label} is a second cooler on one hot stream; the "
-                    "stage-wise model allows one cooler per hot stream."
+            heater = exchanger.kind is HeatExchangerKind.HOT_UTILITY
+            if heater:
+                utility = _resolve_stream(
+                    exchanger.source_stream, hot_utility_axis, "hot utility", label
                 )
-            coolers.append(i)
-            keys.append((exchanger.kind, i, 0, None))
+                stream = _resolve_stream(
+                    exchanger.sink_stream, cold_axis, "cold process", label
+                )
+                default_stage = 1
+            else:
+                stream = _resolve_stream(
+                    exchanger.source_stream, hot_axis, "hot process", label
+                )
+                utility = _resolve_stream(
+                    exchanger.sink_stream, cold_utility_axis, "cold utility", label
+                )
+                default_stage = stage_count
+            stage = exchanger.stage if exchanger.stage is not None else default_stage
+            match = UtilityMatch(
+                side=HEATER if heater else COOLER,
+                stream=stream,
+                utility=utility,
+                after_stage=int(stage) - 1,
+            )
+            if match in utilities:
+                raise ValueError(
+                    f"{label} duplicates another exchanger with the same utility "
+                    "at the same position on the same stream."
+                )
+            index = len(utilities)
+            utilities.append(match)
+            slots.append(("utility", index))
             if approach is not None:
-                cold_utility_approach[i] = approach
+                utility_approach[index] = approach
+            if duty:
+                utility_duties[index] = float(duty)
+        positions.append(position)
 
-    _require_every_stream_served(hot_axis, cold_axis, recovery, heaters, coolers)
+    _require_every_stream_served(hot_axis, cold_axis, recovery, utilities)
     return FixedNetworkStructure(
-        stage_count=stage_count,
-        hot_count=len(hot_axis),
-        cold_count=len(cold_axis),
-        recovery=tuple(recovery),
-        heaters=tuple(heaters),
-        coolers=tuple(coolers),
-        exchanger_keys=tuple(keys),
-        recovery_approach=recovery_approach,
-        hot_utility_approach=hot_utility_approach,
-        cold_utility_approach=cold_utility_approach,
-        initial_recovery_duties=initial_duties,
+        spec=FixedStructureSpec(
+            stage_count=stage_count,
+            recovery=tuple(recovery),
+            utilities=tuple(utilities),
+            recovery_approach=recovery_approach,
+            utility_approach=utility_approach,
+            initial_recovery_duties=recovery_duties,
+            initial_utility_duties=utility_duties,
+        ),
+        positions=tuple(positions),
+        slots=tuple(slots),
     )
 
 
-def map_solution_to_network(
+def build_solution_network(
     request: DutyOptimisationRequest,
     structure: FixedNetworkStructure,
-    extracted: HeatExchangerNetwork,
+    model,
+    solver_arrays,
+    *,
+    run_id: str | None = None,
+    task_id: str | None = None,
+    removed: Sequence[str] = (),
 ) -> HeatExchangerNetwork:
-    """Return the solved network with only the user's exchangers and identities.
+    """Convert the solved fixed-structure model into a design network."""
 
-    ``extracted`` must include inactive exchangers so that zero-duty members of
-    the fixed structure are still reported.
-    """
+    axis_maps = solver_arrays.axis_maps
+    names = {axis: _axis_names(axis_maps[axis]) for axis in axis_maps}
+    period_ids = tuple(str(value) for value in solver_arrays.arrays["period_ids"])
+    user_exchangers = _structural_exchangers(request.network)
+    spec = structure.spec
 
-    axis_maps = extracted.solver_axis_metadata.get("axis_maps", {})
-    solved_by_key: dict[ExchangerKey, HeatExchanger] = {}
-    for exchanger in extracted.exchangers:
-        key = _solved_key(exchanger, axis_maps)
-        if key is not None:
-            solved_by_key[key] = exchanger
-
-    mapped: list[HeatExchanger] = []
-    for user_exchanger, key in zip(
-        _structural_exchangers(request.network), structure.exchanger_keys, strict=True
+    exchangers: list[HeatExchanger] = []
+    for position, (kind, index), result in zip(
+        structure.positions, structure.slots, structure.results(model), strict=True
     ):
-        solved = solved_by_key.get(key)
-        if solved is None:
-            raise ValueError(
-                f"solver result is missing {_label(user_exchanger)}; the fixed "
-                "structure was not preserved."
+        user = user_exchangers[position]
+        if kind == "recovery":
+            match = spec.recovery[index]
+            source = names["hot_process_streams"][match.hot]
+            sink = names["cold_process_streams"][match.cold]
+            exchanger_kind = HeatExchangerKind.RECOVERY
+            roles = (StreamID.Process, StreamID.Process)
+            stage: int | None = match.stage + 1
+            default_id = f"recovery:{source}->{sink}:S{stage}"
+        else:
+            match = spec.utilities[index]
+            stage = user.stage
+            if match.side == HEATER:
+                source = names["hot_utilities"][match.utility]
+                sink = names["cold_process_streams"][match.stream]
+                exchanger_kind = HeatExchangerKind.HOT_UTILITY
+                roles = (StreamID.Utility, StreamID.Process)
+                default_id = f"hot-utility:{source}->{sink}"
+            else:
+                source = names["hot_process_streams"][match.stream]
+                sink = names["cold_utilities"][match.utility]
+                exchanger_kind = HeatExchangerKind.COLD_UTILITY
+                roles = (StreamID.Process, StreamID.Utility)
+                default_id = f"cold-utility:{source}->{sink}"
+            if stage is not None:
+                default_id += f":S{stage}"
+        states = tuple(
+            HeatExchangerPeriodState(
+                period_id=period_ids[n],
+                period_idx=n,
+                duty=period.duty,
+                active=period.active,
+                approach_temperatures=tuple(max(0.0, t) for t in period.approach),
+                source_split_fraction=_fraction(period.source_split),
+                sink_split_fraction=_fraction(period.sink_split),
+                source_inlet_temperature=period.source_inlet,
+                source_outlet_temperature=period.source_outlet,
+                sink_inlet_temperature=period.sink_inlet,
+                sink_outlet_temperature=period.sink_outlet,
             )
-        update: dict[str, Any] = {}
-        if user_exchanger.exchanger_id is not None:
-            update["exchanger_id"] = user_exchanger.exchanger_id
-        mapped.append(solved.model_copy(update=update))
+            for n, period in enumerate(result.periods)
+        )
+        exchangers.append(
+            HeatExchanger(
+                exchanger_id=user.exchanger_id or default_id,
+                kind=exchanger_kind,
+                source_stream=source,
+                sink_stream=sink,
+                source_stream_role=roles[0],
+                sink_stream_role=roles[1],
+                stage=stage,
+                period_states=states,
+                area=result.area,
+                capital_cost=result.capital_cost,
+            )
+        )
 
-    total_area = sum(_exchanger_area(exchanger) for exchanger in mapped)
-    summary = dict(extracted.summary_metrics)
-    summary.update(_unit_counts(mapped))
-    summary.update(
-        {
-            "fixed_structure": True,
-            "duty_objective": request.objective,
-            "total_area": total_area,
-        }
-    )
+    summary: dict[str, float | int | str | bool | None] = {
+        "hot_utility_load": _weighted_load(model, exchangers, "hot"),
+        "cold_utility_load": _weighted_load(model, exchangers, "cold"),
+        "recovery_load": _weighted_load(model, exchangers, "recovery"),
+        **_unit_counts(exchangers),
+        "fixed_structure": True,
+        "duty_objective": request.objective,
+        "total_area": float(model.total_area),
+        "removed_exchanger_count": len(removed),
+        "removed_exchangers": ", ".join(removed),
+    }
     if request.min_approach_temperature is not None:
         summary["approach_temperature"] = float(request.min_approach_temperature)
-    objective_value = _objective_value(request.objective, mapped, extracted)
-    return extracted.model_copy(
-        update={
-            "exchangers": tuple(mapped),
-            "summary_metrics": summary,
-            "objective_value": objective_value,
-        }
+    network = HeatExchangerNetwork(
+        exchangers=tuple(exchangers),
+        run_id=run_id,
+        task_id=task_id,
+        method=_METHOD,
+        stage_count=spec.stage_count,
+        total_annual_cost=float(model.TAC),
+        utility_cost=float(model.utility_cost_value),
+        capital_cost=float(model.capital_cost_value),
+        summary_metrics=summary,
+        solver_axis_metadata={"axis_maps": axis_maps},
+        source_metadata=_source_metadata(model, solver_arrays),
+    )
+    return network.model_copy(
+        update={"objective_value": _objective_value(request.objective, network)}
     )
 
 
 class FixedStructureDutyExecutor:
-    """Executor that solves one fixed-structure duty-allocation task."""
+    """Executor that solves one fixed-structure duty-allocation task.
+
+    After each solve, a listed exchanger left at zero duty in every period is
+    removed (with its approach constraint) and the problem is solved again,
+    until every remaining exchanger carries duty.
+    """
 
     def __init__(
         self,
@@ -329,7 +433,7 @@ class FixedStructureDutyExecutor:
         self.request = request
         self.print_output = print_output
         self.model_factory = model_factory
-        self.problems_by_task_id: dict[str, Any] = {}
+        self.models_by_task_id: dict[str, Any] = {}
 
     def execute(
         self,
@@ -347,78 +451,81 @@ class FixedStructureDutyExecutor:
         task: HeatExchangerNetworkSynthesisTask,
         problem,
     ) -> HeatExchangerNetworkSynthesisTaskOutcome:
-        from .extraction.service import extract_heat_exchanger_network
-        from .models.fixed_structure import FixedStructureStageWiseModel
-        from .models.problem import InternalHeatExchangerNetworkProblem
+        from .models.fixed_structure import FixedStructureModel
         from .solver.arrays import problem_to_solver_arrays
 
         request = self.request
         hens = problem.master_zone.config.hens
+        factory = self.model_factory or FixedStructureModel
+        user_exchangers = _structural_exchangers(request.network)
+        excluded: set[int] = set()
+        removed: list[str] = []
+        warm: dict[int, float] | None = None
         try:
             arrays = problem_to_solver_arrays(problem, task.approach_temperature)
-            structure = fixed_network_structure(request, arrays.axis_maps)
-            factory = partial(
-                self.model_factory or FixedStructureStageWiseModel,
-                default_approach=request.min_approach_temperature,
-                recovery_approach=structure.recovery_approach,
-                hot_utility_approach=structure.hot_utility_approach,
-                cold_utility_approach=structure.cold_utility_approach,
-                max_hot_utility=request.max_hot_utility,
-                max_cold_utility=request.max_cold_utility,
-                initial_recovery_duties=structure.initial_recovery_duties,
-            )
-            internal = InternalHeatExchangerNetworkProblem(
-                solver_arrays=arrays,
-                name=f"fixed-structure-{request.objective}-S{structure.stage_count}",
-                framework="ESM",
-                solver=str(hens.solver_evm),
-                dTmin=float(task.approach_temperature),
-                z_restriction=structure.z_restriction(),
-                minimisation_goal=request.minimisation_goal,
-                non_isothermal_model=True,
-                integers=False,
-                tol=float(hens.solve_tolerance),
-                solver_options=dict(hens.solver_options_evm),
-                stages=structure.stage_count,
-                synthesis_task_id=task.task_id,
-            )
-            solved = internal.get_solution(
-                print_output=self.print_output,
-                evolution=False,
-                model_factories={"stagewise": factory},
-            )
-            if solved is None or getattr(solved, "mSuccess", 0) != 1:
-                reason = getattr(
-                    internal,
-                    "solution_failure_reason",
-                    _solver_failure(solved),
+            while True:
+                structure = fixed_network_structure(
+                    request,
+                    arrays.axis_maps,
+                    excluded=frozenset(excluded),
+                    warm_duties=warm,
                 )
-                return _failed_task_outcome(task, reason)
-            is_valid, reasons = solved.verify()
-            if not is_valid:
-                return _failed_task_outcome(
-                    task, "verification failed: " + ", ".join(map(str, reasons))
+                model = factory(
+                    name=f"fixed-structure-{request.objective}",
+                    solver=str(hens.solver_evm),
+                    solver_arrays=arrays,
+                    spec=structure.spec,
+                    minimisation_goal=request.minimisation_goal,
+                    default_approach=request.min_approach_temperature,
+                    max_hot_utility=request.max_hot_utility,
+                    max_cold_utility=request.max_cold_utility,
+                    tol=float(hens.solve_tolerance),
+                    solver_options=dict(hens.solver_options_evm),
                 )
-            extracted = extract_heat_exchanger_network(
-                solved,
+                model.optimise(print_output=self.print_output)
+                if getattr(model, "mSuccess", 0) != 1:
+                    reason = _solver_failure(model)
+                    if removed:
+                        reason += (
+                            " (after removing zero-duty exchangers: "
+                            + ", ".join(removed)
+                            + ")"
+                        )
+                    return _failed_task_outcome(task, reason)
+                results = structure.results(model)
+                idle = [
+                    (result.max_duty, position)
+                    for position, result in zip(structure.positions, results)
+                    if not result.active
+                ]
+                if not idle:
+                    break
+                _duty, position = min(idle)
+                excluded.add(position)
+                removed.append(_display_id(user_exchangers[position]))
+                warm = {
+                    position: result.max_duty
+                    for position, result in zip(structure.positions, results)
+                }
+            network = build_solution_network(
+                request,
+                structure,
+                model,
                 arrays,
                 run_id=task.run_id,
                 task_id=task.task_id,
-                method=_METHOD,
-                stage_count=structure.stage_count,
-                include_inactive=True,
+                removed=removed,
             )
-            network = map_solution_to_network(request, structure, extracted)
         except ValueError as exc:
             return _failed_task_outcome(task, str(exc))
         if task.task_id is not None:
-            self.problems_by_task_id[task.task_id] = internal
+            self.models_by_task_id[task.task_id] = model
         return HeatExchangerNetworkSynthesisTaskOutcome(
             task=task,
             status="success",
             network=network,
             objective_value=network.objective_value,
-            solver_status=_solver_status(internal),
+            solver_status=_solver_status(model),
         )
 
 
@@ -509,11 +616,7 @@ def _stage_count(
     network: HeatExchangerNetwork,
     exchangers: Sequence[HeatExchanger],
 ) -> int:
-    stages = [
-        int(exchanger.stage)
-        for exchanger in exchangers
-        if exchanger.kind is HeatExchangerKind.RECOVERY and exchanger.stage is not None
-    ]
+    stages = [int(e.stage) for e in exchangers if e.stage is not None]
     highest = max(stages, default=1)
     if network.stage_count is None:
         return highest
@@ -549,12 +652,15 @@ def _resolve_stream(
 def _require_every_stream_served(
     hot_axis: Mapping[str, int],
     cold_axis: Mapping[str, int],
-    recovery: Sequence[RecoveryKey],
-    heaters: Sequence[int],
-    coolers: Sequence[int],
+    recovery: Sequence[RecoveryMatch],
+    utilities: Sequence[UtilityMatch],
 ) -> None:
-    served_hot = {i for i, _j, _k in recovery} | set(coolers)
-    served_cold = {j for _i, j, _k in recovery} | set(heaters)
+    served_hot = {m.hot for m in recovery} | {
+        m.stream for m in utilities if m.side == COOLER
+    }
+    served_cold = {m.cold for m in recovery} | {
+        m.stream for m in utilities if m.side == HEATER
+    }
     missing = [name for name, i in hot_axis.items() if i not in served_hot] + [
         name for name, j in cold_axis.items() if j not in served_cold
     ]
@@ -632,24 +738,79 @@ def _label(exchanger: HeatExchanger) -> str:
     )
 
 
-def _solved_key(
-    exchanger: HeatExchanger,
-    axis_maps: Mapping[str, Mapping[str, int]],
-) -> ExchangerKey | None:
-    hot_axis = axis_maps.get("hot_process_streams", {})
-    cold_axis = axis_maps.get("cold_process_streams", {})
-    if exchanger.kind is HeatExchangerKind.RECOVERY:
-        if exchanger.stage is None:
-            return None
-        return (
-            exchanger.kind,
-            hot_axis[exchanger.source_stream],
-            cold_axis[exchanger.sink_stream],
-            int(exchanger.stage) - 1,
+def _display_id(exchanger: HeatExchanger) -> str:
+    if exchanger.exchanger_id is not None:
+        return exchanger.exchanger_id
+    stage = f":S{exchanger.stage}" if exchanger.stage is not None else ""
+    return f"{exchanger.source_stream}->{exchanger.sink_stream}{stage}"
+
+
+def _axis_names(axis: Mapping[str, int]) -> list[str]:
+    names = [""] * len(axis)
+    for name, index in axis.items():
+        names[index] = name
+    return names
+
+
+def _fraction(value: float | None) -> float | None:
+    if value is None:
+        return None
+    return min(1.0, max(0.0, float(value)))
+
+
+def _weighted_load(model, exchangers: Sequence[HeatExchanger], side: str) -> float:
+    kind = {
+        "hot": HeatExchangerKind.HOT_UTILITY,
+        "cold": HeatExchangerKind.COLD_UTILITY,
+        "recovery": HeatExchangerKind.RECOVERY,
+    }[side]
+    weights = [float(w) for w in model.period_weights]
+    total = sum(weights) or 1.0
+    return (
+        sum(
+            weights[state.period_idx] * state.duty
+            for exchanger in exchangers
+            if exchanger.kind is kind
+            for state in exchanger.period_states
         )
-    if exchanger.kind is HeatExchangerKind.HOT_UTILITY:
-        return (exchanger.kind, 0, cold_axis[exchanger.sink_stream], None)
-    return (exchanger.kind, hot_axis[exchanger.source_stream], 0, None)
+        / total
+    )
+
+
+def _source_metadata(model, solver_arrays) -> dict[str, Any]:
+    from .solver.arrays import SEGMENT_PROFILE_VERSION
+
+    arrays = solver_arrays.arrays
+
+    def first(name: str) -> list[float]:
+        return [float(v) for v in arrays[name][0]]
+
+    def by_period(name: str) -> list[list[float]]:
+        return [[float(v) for v in row] for row in arrays[name]]
+
+    recovery_limits = [
+        value for row in getattr(model, "recovery_dt", []) for value in row
+    ]
+    return {
+        "solver_model_class": type(model).__name__,
+        "solver_model_name": getattr(model, "name", None),
+        "solver_framework": "ESM",
+        "solver_non_isothermal_model": True,
+        "solver_dTmin": min(recovery_limits) if recovery_limits else None,
+        "segment_profile_version": SEGMENT_PROFILE_VERSION,
+        "hot_stream_heat_capacity_flowrates": first("f_h_period"),
+        "hot_stream_heat_capacity_flowrates_by_period": by_period("f_h_period"),
+        "cold_stream_heat_capacity_flowrates": first("f_c_period"),
+        "cold_stream_heat_capacity_flowrates_by_period": by_period("f_c_period"),
+        "hot_stream_heat_transfer_coefficients": first("htc_h_period"),
+        "cold_stream_heat_transfer_coefficients": first("htc_c_period"),
+        "hot_utility_heat_transfer_coefficients": first("htc_hu_period"),
+        "cold_utility_heat_transfer_coefficients": first("htc_cu_period"),
+        "hot_stream_supply_temperatures": first("T_h_in_period"),
+        "hot_stream_target_temperatures": first("T_h_out_period"),
+        "cold_stream_supply_temperatures": first("T_c_in_period"),
+        "cold_stream_target_temperatures": first("T_c_out_period"),
+    }
 
 
 def _unit_counts(exchangers: Sequence[HeatExchanger]) -> dict[str, int]:
@@ -669,38 +830,24 @@ def _unit_counts(exchangers: Sequence[HeatExchanger]) -> dict[str, int]:
     }
 
 
-def _exchanger_area(exchanger: HeatExchanger) -> float:
-    if exchanger.area is not None:
-        return float(exchanger.area)
-    if exchanger.segment_design_area is not None:
-        return float(exchanger.segment_design_area)
-    return 0.0
-
-
-def _objective_value(
-    objective: str,
-    exchangers: Sequence[HeatExchanger],
-    extracted: HeatExchangerNetwork,
-) -> float | None:
+def _objective_value(objective: str, network: HeatExchangerNetwork) -> float | None:
     if objective == "area":
-        return sum(_exchanger_area(exchanger) for exchanger in exchangers)
+        return float(network.summary_metrics["total_area"])
     if objective == "utility":
-        return sum(
-            max(state.duty for state in exchanger.period_states)
-            for exchanger in exchangers
-            if exchanger.kind is not HeatExchangerKind.RECOVERY
+        return float(network.summary_metrics["hot_utility_load"]) + float(
+            network.summary_metrics["cold_utility_load"]
         )
-    return extracted.total_annual_cost
+    return network.total_annual_cost
 
 
-def _solver_failure(solved: Any) -> str:
-    solver_run = getattr(solved, "solver_run", None)
+def _solver_failure(model: Any) -> str:
+    solver_run = getattr(model, "solver_run", None)
     reason = getattr(solver_run, "failure_reason", None)
     return str(reason or "solver did not return a successful duty allocation")
 
 
-def _solver_status(internal: Any) -> str:
-    solver_run = getattr(getattr(internal, "case", None), "solver_run", None)
+def _solver_status(model: Any) -> str:
+    solver_run = getattr(model, "solver_run", None)
     status = getattr(solver_run, "status", None)
     return "success" if status is None else str(status)
 
@@ -713,7 +860,7 @@ __all__ = [
     "FixedStructureDutyExecutor",
     "build_duty_optimisation_request",
     "duty_optimisation_task",
+    "build_solution_network",
     "fixed_network_structure",
     "heat_exchanger_network_duty_optimisation_service",
-    "map_solution_to_network",
 ]

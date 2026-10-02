@@ -14,6 +14,34 @@ from ._heat_exchanger.period_state import (
 from .enums import HeatExchangerKind, HeatExchangerNetworkLabel, StreamID
 from .heat_exchanger import HeatExchanger
 
+UtilityPlacement = str | tuple[str, str] | tuple[str, str, int]
+
+
+def _utility_placement(
+    entry: UtilityPlacement,
+    default_utility: str | None,
+    utility_argument: str,
+    list_name: str,
+) -> tuple[str, str, int | None]:
+    """Normalise a heater/cooler entry to ``(stream, utility, stage)``."""
+
+    if isinstance(entry, str):
+        if default_utility is None:
+            raise ValueError(
+                f"{utility_argument} is required when {list_name} name only a stream"
+            )
+        return entry, str(default_utility), None
+    values = tuple(entry)
+    if len(values) == 2:
+        return str(values[0]), str(values[1]), None
+    if len(values) == 3:
+        return str(values[0]), str(values[1]), int(values[2])
+    raise ValueError(
+        f"{list_name} entries must be a stream name, (stream, utility) or "
+        "(stream, utility, stage)"
+    )
+
+
 _DUTY_LABEL_KINDS = {
     HeatExchangerNetworkLabel.RECOVERY_DUTY: HeatExchangerKind.RECOVERY,
     HeatExchangerNetworkLabel.HOT_UTILITY_DUTY: HeatExchangerKind.HOT_UTILITY,
@@ -104,8 +132,8 @@ class HeatExchangerNetwork(BaseModel):
         cls,
         *,
         recovery: Iterable[tuple[str, str, int]],
-        heaters: Iterable[str] = (),
-        coolers: Iterable[str] = (),
+        heaters: Iterable[UtilityPlacement] = (),
+        coolers: Iterable[UtilityPlacement] = (),
         hot_utility: str | None = None,
         cold_utility: str | None = None,
         stage_count: int | None = None,
@@ -114,19 +142,24 @@ class HeatExchangerNetwork(BaseModel):
         """Build a zero-duty network structure from stream names.
 
         ``recovery`` lists ``(hot_stream, cold_stream, stage)`` matches with
-        one-based stages. ``heaters`` names cold streams served by
-        ``hot_utility`` and ``coolers`` names hot streams served by
-        ``cold_utility``. Exchanger ids follow the solver result convention:
+        one-based stages. ``heaters`` lists cold streams and ``coolers`` hot
+        streams; each entry is a stream name (served by ``hot_utility`` or
+        ``cold_utility`` at the stream end), ``(stream, utility)``, or
+        ``(stream, utility, stage)`` for an exchanger just after the stream
+        leaves that stage. Exchanger ids follow the solver result convention:
         ``recovery:<hot>-><cold>:S<stage>``, ``hot-utility:<utility>-><cold>``
-        and ``cold-utility:<hot>-><utility>``.
+        and ``cold-utility:<hot>-><utility>``, with ``:S<stage>`` appended to a
+        staged utility exchanger.
         """
 
-        heater_streams = tuple(heaters)
-        cooler_streams = tuple(coolers)
-        if heater_streams and hot_utility is None:
-            raise ValueError("hot_utility is required when heaters are listed")
-        if cooler_streams and cold_utility is None:
-            raise ValueError("cold_utility is required when coolers are listed")
+        heater_entries = [
+            _utility_placement(entry, hot_utility, "hot_utility", "heaters")
+            for entry in heaters
+        ]
+        cooler_entries = [
+            _utility_placement(entry, cold_utility, "cold_utility", "coolers")
+            for entry in coolers
+        ]
 
         def state() -> tuple[_HeatExchangerPeriodState, ...]:
             return (
@@ -134,6 +167,9 @@ class HeatExchangerNetwork(BaseModel):
                     period_id=period_id, period_idx=0, duty=0.0, active=False
                 ),
             )
+
+        def suffix(stage: int | None) -> str:
+            return "" if stage is None else f":S{stage}"
 
         exchangers = [
             HeatExchanger(
@@ -150,27 +186,29 @@ class HeatExchangerNetwork(BaseModel):
         ]
         exchangers.extend(
             HeatExchanger(
-                exchanger_id=f"hot-utility:{hot_utility}->{cold}",
+                exchanger_id=f"hot-utility:{utility}->{cold}{suffix(stage)}",
                 kind=HeatExchangerKind.HOT_UTILITY,
-                source_stream=str(hot_utility),
+                source_stream=utility,
                 sink_stream=cold,
                 source_stream_role=StreamID.Utility,
                 sink_stream_role=StreamID.Process,
+                stage=stage,
                 period_states=state(),
             )
-            for cold in heater_streams
+            for cold, utility, stage in heater_entries
         )
         exchangers.extend(
             HeatExchanger(
-                exchanger_id=f"cold-utility:{hot}->{cold_utility}",
+                exchanger_id=f"cold-utility:{hot}->{utility}{suffix(stage)}",
                 kind=HeatExchangerKind.COLD_UTILITY,
                 source_stream=hot,
-                sink_stream=str(cold_utility),
+                sink_stream=utility,
                 source_stream_role=StreamID.Process,
                 sink_stream_role=StreamID.Utility,
+                stage=stage,
                 period_states=state(),
             )
-            for hot in cooler_streams
+            for hot, utility, stage in cooler_entries
         )
         return cls(exchangers=tuple(exchangers), stage_count=stage_count)
 

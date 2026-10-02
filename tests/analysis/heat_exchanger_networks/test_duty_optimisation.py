@@ -16,13 +16,18 @@ from OpenPinch.analysis.heat_exchanger_networks.duty_optimisation import (
     duty_optimisation_task,
     fixed_network_structure,
     heat_exchanger_network_duty_optimisation_service,
-    map_solution_to_network,
 )
 from OpenPinch.analysis.heat_exchanger_networks.execution.fake_executor import (
     FakeSynthesisExecutor,
 )
 from OpenPinch.analysis.heat_exchanger_networks.models import (
     fixed_structure as fixed_model,
+)
+from OpenPinch.analysis.heat_exchanger_networks.models.fixed_structure import (
+    COOLER,
+    HEATER,
+    RecoveryMatch,
+    UtilityMatch,
 )
 from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
     MissingSynthesisDependencyError,
@@ -36,6 +41,7 @@ from OpenPinch.domain.enums import HeatExchangerKind, StreamID
 from OpenPinch.domain.heat_exchanger import HeatExchanger
 from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
 from tests.support.paths import FIXTURES_ROOT
+from tests.support.scipy_nlp import scipy_fixed_structure_model
 
 FOUR_STREAM_FIXTURE = (
     FIXTURES_ROOT / "openhens" / "Four-stream-Yee-and-Grossmann-1990-1.json"
@@ -225,18 +231,115 @@ def test_structure_maps_bare_stream_names_to_solver_indices() -> None:
     )
 
     structure = fixed_network_structure(request, AXIS_MAPS)
+    spec = structure.spec
 
-    assert structure.stage_count == 2
-    assert structure.recovery == ((0, 0, 0), (1, 0, 0), (0, 1, 1), (1, 1, 1))
-    assert structure.heaters == (0,)
-    assert structure.coolers == (0, 1)
-    assert structure.recovery_approach == {(1, 1, 1): 15.0}
-    assert structure.hot_utility_approach == {0: 25.0}
-    assert structure.cold_utility_approach == {1: 30.0}
-    recovery, heaters, coolers = structure.z_restriction()
-    assert recovery == [[[1, 0], [0, 1]], [[1, 0], [0, 1]]]
-    assert heaters == [1, 0]
-    assert coolers == [1, 1]
+    assert spec.stage_count == 2
+    assert spec.recovery == (
+        RecoveryMatch(0, 0, 0),
+        RecoveryMatch(1, 0, 0),
+        RecoveryMatch(0, 1, 1),
+        RecoveryMatch(1, 1, 1),
+    )
+    # Heaters default to the cold stream end (after stage 1), coolers to the
+    # hot stream end (after the last stage).
+    assert spec.utilities == (
+        UtilityMatch(HEATER, 0, 0, 0),
+        UtilityMatch(COOLER, 0, 0, 1),
+        UtilityMatch(COOLER, 1, 0, 1),
+    )
+    assert spec.recovery_approach == {3: 15.0}
+    assert spec.utility_approach == {0: 25.0, 2: 30.0}
+    assert structure.positions == tuple(range(7))
+    assert structure.slots == (
+        ("recovery", 0),
+        ("recovery", 1),
+        ("recovery", 2),
+        ("recovery", 3),
+        ("utility", 0),
+        ("utility", 1),
+        ("utility", 2),
+    )
+
+
+def _utility_exchanger(
+    kind: HeatExchangerKind,
+    source: str,
+    sink: str,
+    stage: int | None = None,
+    exchanger_id: str | None = None,
+) -> HeatExchanger:
+    heater = kind is HeatExchangerKind.HOT_UTILITY
+    return HeatExchanger(
+        exchanger_id=exchanger_id,
+        kind=kind,
+        source_stream=source,
+        sink_stream=sink,
+        source_stream_role=StreamID.Utility if heater else StreamID.Process,
+        sink_stream_role=StreamID.Process if heater else StreamID.Utility,
+        stage=stage,
+        period_states=(
+            HeatExchangerPeriodState(
+                period_id="0", period_idx=0, duty=0.0, active=False
+            ),
+        ),
+    )
+
+
+def _with(network: HeatExchangerNetwork, *extra: HeatExchanger) -> HeatExchangerNetwork:
+    return network.model_copy(update={"exchangers": network.exchangers + extra})
+
+
+TWO_UTILITY_AXIS_MAPS = {
+    **AXIS_MAPS,
+    "hot_utilities": {"Hot Utility.LPS": 0, "Hot Utility.HPS": 1},
+    "cold_utilities": {"Cold Utility.CW": 0, "Cold Utility.Refrigerant": 1},
+}
+
+
+def test_structure_places_several_utilities_and_mid_network_exchangers() -> None:
+    network = _with(
+        _four_stream_structure(),
+        _utility_exchanger(
+            HeatExchangerKind.HOT_UTILITY, "LPS", "Milk Concentrate", stage=2
+        ),
+        _utility_exchanger(HeatExchangerKind.HOT_UTILITY, "LPS", "Milk Concentrate"),
+        _utility_exchanger(HeatExchangerKind.COLD_UTILITY, "Raw Milk", "CW", stage=1),
+        _utility_exchanger(HeatExchangerKind.COLD_UTILITY, "Raw Milk", "Refrigerant"),
+    )
+
+    spec = fixed_network_structure(_request(network), TWO_UTILITY_AXIS_MAPS).spec
+
+    assert spec.utilities == (
+        UtilityMatch(HEATER, 0, 1, 0),  # HPS heater at the stream end
+        UtilityMatch(COOLER, 0, 0, 1),
+        UtilityMatch(COOLER, 1, 0, 1),
+        UtilityMatch(HEATER, 0, 0, 1),  # LPS heater after stage 2
+        UtilityMatch(HEATER, 0, 0, 0),  # LPS heater at the stream end
+        UtilityMatch(COOLER, 0, 0, 0),  # CW cooler after stage 1
+        UtilityMatch(COOLER, 0, 1, 1),  # refrigerant cooler at the stream end
+    )
+
+
+def test_structure_excludes_removed_positions_and_uses_warm_duties() -> None:
+    structure = fixed_network_structure(
+        _request(),
+        AXIS_MAPS,
+        excluded=frozenset({2, 5}),
+        warm_duties={0: 1200.0, 4: 300.0},
+    )
+
+    assert structure.positions == (0, 1, 3, 4, 6)
+    assert structure.spec.recovery == (
+        RecoveryMatch(0, 0, 0),
+        RecoveryMatch(1, 0, 0),
+        RecoveryMatch(1, 1, 1),
+    )
+    assert structure.spec.utilities == (
+        UtilityMatch(HEATER, 0, 0, 0),
+        UtilityMatch(COOLER, 1, 0, 1),
+    )
+    assert structure.spec.initial_recovery_duties == {0: 1200.0}
+    assert structure.spec.initial_utility_duties == {0: 300.0}
 
 
 def test_structure_uses_existing_duties_as_warm_start() -> None:
@@ -253,7 +356,7 @@ def test_structure_uses_existing_duties_as_warm_start() -> None:
 
     structure = fixed_network_structure(_request(network), AXIS_MAPS)
 
-    assert structure.initial_recovery_duties == {(0, 0, 0): 1200.0}
+    assert structure.spec.initial_recovery_duties == {0: 1200.0}
 
 
 def test_structure_accepts_qualified_stream_names() -> None:
@@ -267,7 +370,7 @@ def test_structure_accepts_qualified_stream_names() -> None:
 
     structure = fixed_network_structure(_request(network), AXIS_MAPS)
 
-    assert structure.recovery == ((0, 0, 0), (1, 1, 0))
+    assert structure.spec.recovery == (RecoveryMatch(0, 0, 0), RecoveryMatch(1, 1, 0))
 
 
 @pytest.mark.parametrize(
@@ -294,9 +397,12 @@ def test_structure_accepts_qualified_stream_names() -> None:
         ),
         (
             {"heaters": ("Milk Concentrate", "Milk Concentrate")},
-            "second heater",
+            "duplicates another exchanger with the same utility",
         ),
-        ({"coolers": ("Raw Milk", "Raw Milk", "HT Flash")}, "second cooler"),
+        (
+            {"coolers": ("Raw Milk", "Raw Milk", "HT Flash")},
+            "duplicates another exchanger with the same utility",
+        ),
         (
             {"recovery": (("Raw Milk", "Milk Concentrate", 1),), "coolers": ()},
             "no exchanger serves: Process A.HT Flash, Process A.CIP Water",
@@ -309,6 +415,16 @@ def test_structure_rejects_invalid_layouts(overrides, match) -> None:
         fixed_network_structure(
             _request(_four_stream_structure(**overrides)), AXIS_MAPS
         )
+
+
+def test_utility_stage_counts_towards_the_stage_count() -> None:
+    network = _with(
+        _four_stream_structure(stage_count=2),
+        _utility_exchanger(HeatExchangerKind.COLD_UTILITY, "Raw Milk", "CW", stage=3),
+    )
+
+    with pytest.raises(ValueError, match="placed in stage 3"):
+        fixed_network_structure(_request(network), AXIS_MAPS)
 
 
 def test_structure_rejects_ambiguous_bare_names() -> None:
@@ -339,334 +455,405 @@ def test_task_records_structure_and_request() -> None:
     assert duty_optimisation_task(_request(), settings).approach_temperature == 10.0
 
 
-# --- solution mapping --------------------------------------------------------
+# --- model helpers -----------------------------------------------------------
 
 
-def _state(duty: float, *, active: bool | None = None) -> HeatExchangerPeriodState:
-    return HeatExchangerPeriodState(
-        period_id="0",
-        period_idx=0,
-        duty=duty,
-        active=duty > 0.0 if active is None else active,
-        approach_temperatures=(12.0, 11.0),
-    )
-
-
-def _solved(kind, source, sink, stage, duty, area) -> HeatExchanger:
-    roles = {
-        HeatExchangerKind.RECOVERY: (StreamID.Process, StreamID.Process),
-        HeatExchangerKind.HOT_UTILITY: (StreamID.Utility, StreamID.Process),
-        HeatExchangerKind.COLD_UTILITY: (StreamID.Process, StreamID.Utility),
-    }[kind]
-    return HeatExchanger(
-        exchanger_id=f"solver-{source}-{sink}-{stage}",
-        kind=kind,
-        source_stream=source,
-        sink_stream=sink,
-        source_stream_role=roles[0],
-        sink_stream_role=roles[1],
-        stage=stage,
-        period_states=(_state(duty),),
-        area=area,
-    )
-
-
-def test_solution_mapping_keeps_listed_exchangers_and_user_ids() -> None:
-    request = _request(
-        network=_four_stream_structure(
-            recovery=(
-                ("Raw Milk", "Milk Concentrate", 1),
-                ("HT Flash", "CIP Water", 1),
-            ),
-        ),
-        min_approach_temperature=10.0,
-    )
-    structure = fixed_network_structure(request, AXIS_MAPS)
-    recovery = HeatExchangerKind.RECOVERY
-    extracted = HeatExchangerNetwork(
-        exchangers=(
-            _solved(
-                recovery,
-                "Process A.Raw Milk",
-                "Process A.Milk Concentrate",
-                1,
-                2000.0,
-                40.0,
-            ),
-            _solved(
-                recovery, "Process A.Raw Milk", "Process A.CIP Water", 1, 0.0, None
-            ),
-            _solved(
-                recovery, "Process A.HT Flash", "Process A.CIP Water", 1, 0.0, None
-            ),
-            _solved(
-                recovery,
-                "Process A.HT Flash",
-                "Process A.Milk Concentrate",
-                1,
-                0.0,
-                None,
-            ),
-            _solved(
-                HeatExchangerKind.HOT_UTILITY,
-                "Hot Utility.HPS",
-                "Process A.Milk Concentrate",
-                None,
-                1600.0,
-                10.0,
-            ),
-            _solved(
-                HeatExchangerKind.COLD_UTILITY,
-                "Process A.Raw Milk",
-                "Cold Utility.CW",
-                None,
-                800.0,
-                20.0,
-            ),
-            _solved(
-                HeatExchangerKind.COLD_UTILITY,
-                "Process A.HT Flash",
-                "Cold Utility.CW",
-                None,
-                4400.0,
-                60.0,
-            ),
-        ),
-        total_annual_cost=1234.0,
-        summary_metrics={"recovery_units": 4, "hot_utility_load": 1600.0},
-        solver_axis_metadata={"axis_maps": AXIS_MAPS},
-    )
-
-    network = map_solution_to_network(request, structure, extracted)
-
-    assert [exchanger.exchanger_id for exchanger in network.exchangers] == [
-        exchanger.exchanger_id for exchanger in request.network.exchangers
-    ]
-    zero_duty = network.exchangers[1]
-    assert zero_duty.source_stream == "Process A.HT Flash"
-    assert zero_duty.period_states[0].duty == 0.0
-    assert network.summary_metrics["recovery_units"] == 1
-    assert network.summary_metrics["total_units"] == 4
-    assert network.summary_metrics["total_area"] == pytest.approx(130.0)
-    assert network.summary_metrics["duty_objective"] == "utility"
-    assert network.summary_metrics["approach_temperature"] == 10.0
-    assert network.objective_value == pytest.approx(1600.0 + 800.0 + 4400.0)
-
-    area_request = _request(
-        network=request.network, objective="area", max_hot_utility=2000.0
-    )
-    assert map_solution_to_network(
-        area_request, structure, extracted
-    ).objective_value == pytest.approx(130.0)
-    cost_request = _request(network=request.network, objective="cost")
-    assert map_solution_to_network(
-        cost_request, structure, extracted
-    ).objective_value == pytest.approx(1234.0)
-
-
-def test_solution_mapping_fails_when_a_listed_exchanger_is_missing() -> None:
-    request = _request(
-        network=_four_stream_structure(
-            recovery=(("Raw Milk", "Milk Concentrate", 1), ("HT Flash", "CIP Water", 1))
-        )
-    )
-    structure = fixed_network_structure(request, AXIS_MAPS)
-    extracted = HeatExchangerNetwork(
-        exchangers=(),
-        solver_axis_metadata={"axis_maps": AXIS_MAPS},
-    )
-
-    with pytest.raises(ValueError, match="solver result is missing"):
-        map_solution_to_network(request, structure, extracted)
-
-
-# --- model helpers (no GEKKO) ------------------------------------------------
-
-
-class _RecordingModel:
-    def __init__(self) -> None:
-        self.equations: list = []
-        self.minimised: list = []
-        self.intermediates: list = []
-
-    def Equation(self, expression):
-        self.equations.append(expression)
-        return expression
-
-    def Minimize(self, expression):
-        self.minimised.append(expression)
-
-    def Intermediate(self, expression, *, name=None):
-        self.intermediates.append((name, expression))
-        return expression
-
-    def sum(self, values):
-        return sum(values)
-
-
-def _owner(**overrides) -> SimpleNamespace:
+def test_utility_series_order_and_stream_temperatures() -> None:
     owner = SimpleNamespace(
-        m=_RecordingModel(),
-        tol=1e-3,
-        N_periods=1,
-        I=1,
-        J=1,
-        S=1,
-        z_allowed=[[[1]]],
-        z_hu_allowed=[1],
-        z_cu_allowed=[1],
-        dT_r_period=np.full((1, 1, 1), 5.0),
-        dT_hu_period=np.full((1, 1), 5.0),
-        dT_cu_period=np.full((1, 1), 5.0),
-        default_approach=None,
-        recovery_approach={},
-        hot_utility_approach={},
-        cold_utility_approach={},
-        max_hot_utility=None,
-        max_cold_utility=None,
-        initial_recovery_duties={},
-        hot_names=np.array(["H1"]),
-        cold_names=np.array(["C1"]),
+        spec=fixed_model.FixedStructureSpec(
+            stage_count=2,
+            recovery=(),
+            utilities=(
+                UtilityMatch(HEATER, 0, 1, 0),  # HPS (600 K)
+                UtilityMatch(HEATER, 0, 0, 0),  # LPS (450 K) runs first
+                UtilityMatch(HEATER, 0, 0, 1),  # LPS between stages 2 and 1
+                UtilityMatch(COOLER, 0, 0, 1),  # CW (300 K)
+                UtilityMatch(COOLER, 0, 1, 1),  # refrigerant (250 K) runs last
+            ),
+        ),
+        T_hu_in_period=np.array([[450.0, 600.0]]),
+        T_cu_in_period=np.array([[300.0, 250.0]]),
+        f_c_period=np.array([[10.0]]),
+        f_h_period=np.array([[20.0]]),
+        tc_out=[[[400.0, 330.0]]],
+        th_out=[[[420.0, 380.0]]],
+        q_u=[[500.0, 200.0, 100.0, 400.0, 600.0]],
     )
-    for key, value in overrides.items():
-        setattr(owner, key, value)
-    return owner
+    owner.utility_chain = fixed_model.utility_chains(owner)
+
+    assert owner.utility_chain == {
+        (HEATER, 0, 0): [1, 0],
+        (HEATER, 0, 1): [2],
+        (COOLER, 0, 1): [3, 4],
+    }
+    temperatures = fixed_model.utility_stream_temperatures(owner, 0, float)
+    assert temperatures == [
+        (420.0, 470.0),  # HPS after LPS: 400 + 200/10 -> 420 -> 470
+        (400.0, 420.0),
+        (330.0, 340.0),
+        (380.0, 360.0),
+        (360.0, 330.0),
+    ]
 
 
-def test_approach_overrides_replace_contributions() -> None:
-    owner = _owner(
-        I=2,
-        J=1,
-        S=2,
-        dT_r_period=np.full((1, 2, 1), 5.0),
-        dT_hu_period=np.full((1, 1), 5.0),
-        dT_cu_period=np.full((1, 2), 5.0),
-        default_approach=10.0,
-        recovery_approach={(0, 0, 0): 12.0, (0, 0, 1): 15.0},
-        cold_utility_approach={1: 20.0},
+def test_exact_lmtd_and_chen_agree_closely() -> None:
+    assert fixed_model.exact_lmtd(20.0, 20.0) == 20.0
+    assert fixed_model.exact_lmtd(30.0, 10.0) == pytest.approx(20.0 / np.log(3.0))
+    assert fixed_model.exact_lmtd(0.0, 10.0) == 0.0
+    assert fixed_model.chen_lmtd(30.0, 10.0) == pytest.approx(
+        fixed_model.exact_lmtd(30.0, 10.0), rel=0.02
     )
-
-    fixed_model.apply_approach_overrides(owner)
-
-    assert owner.dT_r_period[0].tolist() == [[12.0], [10.0]]
-    assert owner.dT_hu_period[0].tolist() == [10.0]
-    assert owner.dT_cu_period[0].tolist() == [10.0, 20.0]
-    assert owner.dT_r.tolist() == [[12.0], [10.0]]
-
-
-def test_stricter_stage_approach_adds_explicit_theta_bounds() -> None:
-    owner = _owner(
-        S=2,
-        z_allowed=[[[1, 1]]],
-        dT_r_period=np.full((1, 1, 1), 12.0),
-        recovery_approach={(0, 0, 0): 12.0, (0, 0, 1): 15.0},
-        theta_1_by_period=[[[[13.0, 16.0]]]],
-        theta_2_by_period=[[[[13.0, 14.0]]]],
-    )
-
-    fixed_model.set_exchanger_approach_constraints(owner)
-
-    assert owner.m.equations == [True, False]
-
-
-def test_recovery_approach_definitions_tie_theta_to_end_differences() -> None:
-    owner = _owner(
-        non_isothermal_model=True,
-        T_h_by_period=[[[400.0, 350.0]]],
-        T_c_by_period=[[[380.0, 300.0]]],
-        T_c_out_y_by_period=[[[[385.0]]]],
-        T_h_out_x_by_period=[[[[340.0]]]],
-        theta_1_by_period=[[[[15.0]]]],
-        theta_2_by_period=[[[[40.0]]]],
-    )
-
-    fixed_model.set_recovery_approach_definitions(owner)
-
-    assert owner.m.equations == [True, True]
-
-
-def test_utility_approach_constraints_and_inlet_checks() -> None:
-    owner = _owner(
-        T_hu_in_period=np.array([[500.0]]),
-        T_hu_out_period=np.array([[480.0]]),
-        T_c_out_period=np.array([[490.0]]),
-        T_c_by_period=[[[470.0, 300.0]]],
-        T_cu_in_period=np.array([[290.0]]),
-        T_cu_out_period=np.array([[300.0]]),
-        T_h_out_period=np.array([[310.0]]),
-        T_h_by_period=[[[400.0, 320.0]]],
-    )
-
-    fixed_model.set_utility_approach_constraints(owner)
-
-    assert owner.m.equations == [True, True]
-
-    owner.dT_hu_period = np.full((1, 1), 20.0)
-    with pytest.raises(ValueError, match="Heater on cold stream C1"):
-        fixed_model.set_utility_approach_constraints(owner)
-
-    owner.dT_hu_period = np.full((1, 1), 5.0)
-    owner.dT_cu_period = np.full((1, 1), 25.0)
-    with pytest.raises(ValueError, match="Cooler on hot stream H1"):
-        fixed_model.set_utility_approach_constraints(owner)
-
-
-def test_utility_caps_skip_sides_without_utility_exchangers() -> None:
-    owner = _owner(
-        max_hot_utility=100.0,
-        max_cold_utility=50.0,
-        z_cu_allowed=[0],
-        Q_h_by_period=[[80.0]],
-        Q_c_by_period=[[0.0]],
-    )
-
-    fixed_model.set_utility_caps(owner)
-
-    assert owner.m.equations == [True]
-
-
-def test_total_area_objective_sums_listed_exchangers() -> None:
-    owner = _owner(
-        Q_r=[[[1000.0]]],
-        U_r=np.array([[0.5]]),
-        theta_1=[[[20.0]]],
-        theta_2=[[[10.0]]],
-        Q_h=[200.0],
-        U_hu=np.array([0.8]),
-        T_hu_in=np.array([500.0]),
-        T_hu_out=np.array([500.0]),
-        T_c_out=np.array([450.0]),
-        T_c=[[440.0, 300.0]],
-        Q_c=[300.0],
-        U_cu=np.array([0.4]),
-        T_h=[[400.0, 330.0]],
-        T_h_out=np.array([320.0]),
-        T_cu_in=np.array([290.0]),
-        T_cu_out=np.array([300.0]),
-    )
-
-    fixed_model.set_total_area_objective(owner)
-
-    def chen(a, b):
-        return (a * b * (a + b) / 2 + 1e-3) ** (1 / 3)
-
-    expected = (
-        1000.0 / (0.5 * chen(20.0, 10.0))
-        + 200.0 / (0.8 * chen(50.0, 60.0))
-        + 300.0 / (0.4 * chen(30.0, 30.0))
-    )
-    assert owner.m.minimised == [pytest.approx(expected)]
-    assert owner.total_area_expr == pytest.approx(expected)
-
-
-def test_total_area_objective_is_single_period() -> None:
-    with pytest.raises(ValueError, match="one operating period"):
-        fixed_model.set_total_area_objective(_owner(N_periods=2))
 
 
 def test_fixed_structure_model_rejects_other_goals_before_building() -> None:
     with pytest.raises(ValueError, match="supports minimisation goals"):
-        fixed_model.FixedStructureStageWiseModel(minimisation_goal="hot utility")
+        fixed_model.FixedStructureModel(
+            name="x",
+            solver="apopt",
+            solver_arrays=None,
+            spec=fixed_model.FixedStructureSpec(1, (), ()),
+            minimisation_goal="hot utility",
+        )
+
+
+# --- solved with the SciPy test backend (no GEKKO) ---------------------------
+
+
+def _small_payload(*, hot_cp=10.0, extra_hot_utility=None) -> dict:
+    payload = {
+        "streams": [
+            _stream("H1", hot_cp, 500.0, 300.0),
+            _stream("C1", 5.0, 450.0, 650.0),
+        ],
+        "utilities": [
+            _utility("HPS", "Hot", 700.0, 700.0, 80.0, 5.0),
+            _utility("CW", "Cold", 290.0, 310.0, 15.0, 1.0),
+        ],
+        "options": {
+            "COSTING_HX_AREA_COEFF": 150.0,
+            "COSTING_HX_AREA_EXP": 1.0,
+            "COSTING_HX_UNIT_COST": 5500.0,
+            "HENS_APPROACH_TEMPERATURES": [10.0],
+            "HENS_SOLVER_EVM": "ipopt-pyomo",
+            "HENS_SOLVE_TOLERANCE": 0.001,
+        },
+    }
+    if extra_hot_utility is not None:
+        payload["utilities"].insert(1, extra_hot_utility)
+    return payload
+
+
+def _stream(name, cp, supply, target) -> dict:
+    return {
+        "name": name,
+        "zone": "Site/Process A",
+        "heat_capacity_flowrate": {"unit": "kW/delta_degC", "value": cp},
+        "heat_flow": {"unit": "kW", "value": abs(cp * (target - supply))},
+        "htc": {"unit": "kW/m^2/K", "value": 1.0},
+        "t_supply": {"unit": "K", "value": supply},
+        "t_target": {"unit": "K", "value": target},
+    }
+
+
+def _utility(name, kind, supply, target, price, htc) -> dict:
+    return {
+        "name": name,
+        "type": kind,
+        "heat_flow": None,
+        "htc": {"unit": "kW/m^2/K", "value": htc},
+        "price": {"unit": "$/MWh", "value": price},
+        "t_supply": {"unit": "K", "value": supply},
+        "t_target": {"unit": "K", "value": target},
+    }
+
+
+SMALL_STRUCTURE = {
+    "recovery": [("H1", "C1", 1)],
+    "heaters": ["C1"],
+    "coolers": ["H1"],
+    "hot_utility": "HPS",
+}
+
+
+@pytest.fixture
+def scipy_backend(monkeypatch):
+    import OpenPinch.analysis.heat_exchanger_networks.duty_optimisation as module
+
+    factory = scipy_fixed_structure_model()
+    original = module.FixedStructureDutyExecutor
+    monkeypatch.setattr(
+        module,
+        "FixedStructureDutyExecutor",
+        lambda request: original(request, model_factory=factory),
+    )
+    return factory
+
+
+def _min_approach(network: HeatExchangerNetwork, kind=None) -> float:
+    return min(
+        approach
+        for exchanger in network.exchangers
+        if kind is None or exchanger.kind is kind
+        for state in exchanger.period_states
+        if state.active
+        for approach in state.approach_temperatures
+    )
+
+
+def test_small_case_objectives_are_feasible_and_consistent(scipy_backend) -> None:
+    problem = PinchProblem(_small_payload())
+
+    utility = problem.design.optimise_duties(
+        SMALL_STRUCTURE, objective="utility", min_approach_temperature=10.0
+    )
+    cost = problem.design.optimise_duties(SMALL_STRUCTURE, objective="cost")
+    area = problem.design.optimise_duties(
+        SMALL_STRUCTURE,
+        objective="area",
+        min_approach_temperature=10.0,
+        max_hot_utility=900.0,
+    )
+
+    # H1 at 500 K can heat C1 (450 K, CP 5) to 490 K with 10 K approach.
+    assert utility.total_heat_recovery == pytest.approx(200.0, abs=0.5)
+    assert utility.total_hot_utility == pytest.approx(800.0, abs=0.5)
+    assert _min_approach(utility.selected_network) >= 10.0 - 1e-3
+    # A 1 K approach lets recovery rise and must not cost more.
+    assert _min_approach(cost.selected_network) >= 1.0 - 1e-3
+    assert cost.selected_network.total_annual_cost <= (
+        utility.selected_network.total_annual_cost + 1.0
+    )
+    assert area.total_hot_utility <= 900.0 + 1e-3
+    assert area.selected_network.summary_metrics["total_area"] <= (
+        utility.selected_network.summary_metrics["total_area"] + 1e-3
+    )
+    for view in (utility, cost, area):
+        network = view.selected_network
+        assert network.total_annual_cost == pytest.approx(
+            network.utility_cost + network.capital_cost
+        )
+        assert network.summary_metrics["removed_exchangers"] == ""
+
+
+def test_two_hot_utilities_run_in_series_on_one_stream(scipy_backend) -> None:
+    lps = _utility("LPS", "Hot", 600.0, 600.0, 40.0, 5.0)
+    problem = PinchProblem(_small_payload(extra_hot_utility=lps))
+    network = _with(
+        HeatExchangerNetwork.from_structure(
+            recovery=[("H1", "C1", 1)],
+            heaters=["C1"],
+            coolers=["H1"],
+            hot_utility="HPS",
+            cold_utility="CW",
+        ),
+        _utility_exchanger(
+            HeatExchangerKind.HOT_UTILITY, "LPS", "C1", exchanger_id="lps"
+        ),
+    )
+
+    view = problem.design.optimise_duties(
+        network, objective="utility", min_approach_temperature=10.0
+    )
+
+    exchangers = {e.exchanger_id: e for e in view.selected_network.exchangers}
+    lps_state = exchangers["lps"].period_states[0]
+    hps_state = exchangers["hot-utility:HPS->C1"].period_states[0]
+    assert lps_state.active and hps_state.active
+    # LPS (colder) heats first; HPS finishes from where LPS stops.
+    assert lps_state.sink_outlet_temperature == pytest.approx(
+        hps_state.sink_inlet_temperature
+    )
+    assert lps_state.sink_outlet_temperature <= 600.0 - 10.0 + 1e-3
+    assert hps_state.sink_outlet_temperature == pytest.approx(650.0)
+    assert view.total_hot_utility == pytest.approx(800.0, abs=0.5)
+
+
+def test_multi_period_area_uses_one_common_area(scipy_backend) -> None:
+    payload = _small_payload()
+    hot = payload["streams"][0]
+    hot["heat_capacity_flowrate"] = {"unit": "kW/delta_degC", "values": [10.0, 8.0]}
+    hot["heat_flow"] = {"unit": "kW", "values": [2000.0, 1600.0]}
+    for record in payload["streams"][1:]:
+        for key in ("heat_capacity_flowrate", "heat_flow"):
+            record[key] = {
+                "unit": record[key]["unit"],
+                "values": [record[key]["value"]] * 2,
+            }
+    payload["options"].update(
+        {"PROBLEM_PERIOD_IDS": ["high", "low"], "PROBLEM_PERIOD_WEIGHTS": [0.5, 0.5]}
+    )
+    problem = PinchProblem(payload)
+    problem.target.all_periods.direct_heat_integration()
+
+    view = problem.design.optimise_duties(
+        {**SMALL_STRUCTURE, "hot_utility": "HPS"},
+        objective="area",
+        min_approach_temperature=10.0,
+        max_hot_utility=900.0,
+    )
+
+    network = view.selected_network
+    assert network.period_ids == ("high", "low")
+    cooler = next(
+        e for e in network.exchangers if e.kind is HeatExchangerKind.COLD_UTILITY
+    )
+    required = []
+    for state in cooler.period_states:
+        theta_1, theta_2 = state.approach_temperatures
+        lmtd = fixed_model.exact_lmtd(theta_1, theta_2)
+        required.append(state.duty / (0.5 * lmtd))
+    # One area serves both periods: the larger requirement; the other period
+    # runs with a bypass.
+    assert cooler.area == pytest.approx(max(required), rel=1e-6)
+    assert min(required) < cooler.area
+    for state in network.exchangers[1].period_states:
+        assert state.duty <= 900.0 + 1e-3
+
+
+class _ScriptedModel:
+    """Fake solved model: zero duty for the listed positions on each solve."""
+
+    calls: list = []
+    zero_by_call: list[set[int]] = []
+
+    def __init__(self, *, spec, **_kwargs) -> None:
+        self.spec = spec
+        self.period_weights = [1.0]
+        self.recovery_dt = [[1.0]]
+        self.name = "scripted"
+        self.solver_run = None
+        type(self).calls.append(spec)
+
+    def optimise(self, print_output=False) -> None:
+        call = len(type(self).calls) - 1
+        zero = type(self).zero_by_call[call]
+        self.mSuccess = 1
+
+        def result(index):
+            duty = 0.0 if index in zero else 100.0
+            period = fixed_model.ExchangerPeriodResult(
+                duty=duty,
+                active=duty > 0.0,
+                approach=(10.0, 10.0),
+                source_inlet=500.0,
+                source_outlet=490.0,
+                sink_inlet=400.0,
+                sink_outlet=410.0,
+                required_area=1.0,
+            )
+            return fixed_model.ExchangerResult([period], area=1.0, capital_cost=1.0)
+
+        count = len(self.spec.recovery)
+        self.recovery_results = [result(r) for r in range(count)]
+        self.utility_results = [
+            result(count + e) for e in range(len(self.spec.utilities))
+        ]
+        self.total_area = 1.0
+        self.TAC = 2.0
+        self.utility_cost_value = 1.0
+        self.capital_cost_value = 1.0
+
+
+def test_executor_removes_zero_duty_exchangers_and_resolves() -> None:
+    problem = _four_stream_problem()
+    problem.target.direct_heat_integration()
+    request = _request(min_approach_temperature=10.0)
+    task = duty_optimisation_task(
+        request,
+        SimpleNamespace(
+            run_id="run",
+            approach_temperatures=(10.0,),
+            problem_id=None,
+            workspace_variant=None,
+            period_id=None,
+        ),
+    )
+    _ScriptedModel.calls = []
+    # Solve 1: slot 2 (recovery Raw Milk -> CIP Water) idle; solve 2: the
+    # first cooler (slot 4 of the reduced spec) idle; solve 3: all carry duty.
+    _ScriptedModel.zero_by_call = [{2}, {4}, set()]
+
+    (outcome,) = FixedStructureDutyExecutor(
+        request, model_factory=_ScriptedModel
+    ).execute((task,), problem=problem, parent_outcomes={}, max_parallel=1)
+
+    assert outcome.status == "success", outcome.error
+    assert [
+        len(spec.recovery) + len(spec.utilities) for spec in _ScriptedModel.calls
+    ] == [7, 6, 5]
+    network = outcome.network
+    assert [e.exchanger_id for e in network.exchangers] == [
+        "recovery:Raw Milk->Milk Concentrate:S1",
+        "recovery:HT Flash->Milk Concentrate:S1",
+        "recovery:HT Flash->CIP Water:S2",
+        "hot-utility:HPS->Milk Concentrate",
+        "cold-utility:HT Flash->CW",
+    ]
+    assert network.summary_metrics["removed_exchangers"] == (
+        "recovery:Raw Milk->CIP Water:S2, cold-utility:Raw Milk->CW"
+    )
+    assert network.summary_metrics["removed_exchanger_count"] == 2
+    # The re-solve starts from the previous duties.
+    assert _ScriptedModel.calls[1].initial_recovery_duties == {
+        0: 100.0,
+        1: 100.0,
+        2: 100.0,
+    }
+
+
+def test_executor_reports_solver_failure_after_removals() -> None:
+    class Failing(_ScriptedModel):
+        def optimise(self, print_output=False):
+            if len(type(self).calls) == 2:
+                self.mSuccess = 0
+                self.solver_run = SimpleNamespace(
+                    failure_reason="infeasible", status=None
+                )
+                return
+            super().optimise(print_output)
+
+    problem = _four_stream_problem()
+    problem.target.direct_heat_integration()
+    request = _request()
+    task = duty_optimisation_task(
+        request,
+        SimpleNamespace(
+            run_id="run",
+            approach_temperatures=(10.0,),
+            problem_id=None,
+            workspace_variant=None,
+            period_id=None,
+        ),
+    )
+    Failing.calls = []
+    Failing.zero_by_call = [{0}]
+
+    (outcome,) = FixedStructureDutyExecutor(request, model_factory=Failing).execute(
+        (task,), problem=problem, parent_outcomes={}, max_parallel=1
+    )
+
+    assert outcome.status == "failed"
+    assert outcome.error == (
+        "infeasible (after removing zero-duty exchangers: "
+        "recovery:Raw Milk->Milk Concentrate:S1)"
+    )
+
+
+def test_four_stream_utility_objective_reaches_a_verified_network(
+    scipy_backend,
+) -> None:
+    view = _four_stream_problem().design.optimise_duties(
+        _four_stream_structure(), objective="utility", min_approach_temperature=10.0
+    )
+
+    network = view.selected_network
+    # Pinch target at 10 K: 450 kW hot utility, 2100 kW cold utility.
+    assert view.total_hot_utility >= 450.0 - 1.0
+    assert view.total_cold_utility - view.total_hot_utility == pytest.approx(
+        1650.0, abs=1.0
+    )
+    assert _min_approach(network) >= 10.0 - 1e-3
+    assert network.summary_metrics["fixed_structure"] is True
 
 
 # --- service wiring (fake executor) -----------------------------------------
@@ -744,7 +931,7 @@ def test_executor_reports_structure_errors_as_failed_outcomes() -> None:
     assert "'LPS' is not a hot utility stream" in outcome.error
 
 
-# --- live solver --------------------------------------------------------------
+# --- live solver (GEKKO) ------------------------------------------------------
 
 
 def _skip_without_live_solver() -> None:
@@ -782,13 +969,14 @@ def test_three_duty_objectives_on_four_stream_case() -> None:
     )
     utility_network = utility.selected_network
 
-    assert [exchanger.exchanger_id for exchanger in utility_network.exchangers] == [
-        exchanger.exchanger_id for exchanger in structure.exchangers
-    ]
-    # Hot streams carry 7200 kW and cold streams 5550 kW.
+    assert {e.exchanger_id for e in utility_network.exchangers} <= {
+        e.exchanger_id for e in structure.exchangers
+    }
+    # Hot streams carry 7200 kW and cold streams 5550 kW; target 450 kW hot.
     assert utility.total_cold_utility - utility.total_hot_utility == pytest.approx(
         1650.0, abs=1.0
     )
+    assert utility.total_hot_utility >= 450.0 - 1.0
     assert min(_recovery_approaches(utility_network)) >= 10.0 - 1e-2
 
     cap = 1.5 * utility.total_hot_utility + 100.0
@@ -814,23 +1002,21 @@ def test_three_duty_objectives_on_four_stream_case() -> None:
 @pytest.mark.solver
 def test_per_exchanger_minimum_approach_is_enforced() -> None:
     _skip_without_live_solver()
-    structure = _four_stream_structure()
     strict_id = "recovery:HT Flash->CIP Water:S2"
     problem = _four_stream_problem()
+    structure = {
+        "recovery": [
+            ("Raw Milk", "Milk Concentrate", 1),
+            ("HT Flash", "Milk Concentrate", 1),
+            ("Raw Milk", "CIP Water", 2),
+            ("HT Flash", "CIP Water", 2),
+        ],
+        "heaters": ["Milk Concentrate"],
+        "coolers": ["Raw Milk", "HT Flash"],
+    }
 
     uniform = problem.design.optimise_duties(
-        {
-            "recovery": [
-                ("Raw Milk", "Milk Concentrate", 1),
-                ("HT Flash", "Milk Concentrate", 1),
-                ("Raw Milk", "CIP Water", 2),
-                ("HT Flash", "CIP Water", 2),
-            ],
-            "heaters": ["Milk Concentrate"],
-            "coolers": ["Raw Milk", "HT Flash"],
-        },
-        objective="utility",
-        min_approach_temperature=10.0,
+        structure, objective="utility", min_approach_temperature=10.0
     )
     strict = problem.design.optimise_duties(
         structure,
@@ -841,6 +1027,36 @@ def test_per_exchanger_minimum_approach_is_enforced() -> None:
 
     assert min(_recovery_approaches(strict.selected_network, strict_id)) >= 40.0 - 1e-2
     assert strict.total_hot_utility >= uniform.total_hot_utility - 1.0
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+def test_live_solver_runs_cheaper_utility_first() -> None:
+    _skip_without_live_solver()
+    lps = _utility("LPS", "Hot", 600.0, 600.0, 40.0, 5.0)
+    problem = PinchProblem(_small_payload(extra_hot_utility=lps))
+    network = _with(
+        HeatExchangerNetwork.from_structure(
+            recovery=[("H1", "C1", 1)],
+            heaters=["C1"],
+            coolers=["H1"],
+            hot_utility="HPS",
+            cold_utility="CW",
+        ),
+        _utility_exchanger(
+            HeatExchangerKind.HOT_UTILITY, "LPS", "C1", exchanger_id="lps"
+        ),
+    )
+
+    view = problem.design.optimise_duties(network, objective="cost")
+
+    exchangers = {e.exchanger_id: e for e in view.selected_network.exchangers}
+    lps_state = exchangers["lps"].period_states[0]
+    assert lps_state.active
+    assert lps_state.sink_outlet_temperature <= 600.0 - 1.0 + 1e-2
+    assert view.total_hot_utility == pytest.approx(
+        1000.0 - view.total_heat_recovery, abs=1.0
+    )
 
 
 def _capture_request(monkeypatch) -> list:
@@ -913,3 +1129,71 @@ def test_accessor_needs_explicit_utility_when_ambiguous(monkeypatch) -> None:
 
     PinchProblem(payload).design.optimise_duties({**structure, "hot_utility": "LPS"})
     assert requests[0].network.exchangers[2].source_stream == "LPS"
+
+
+def test_utility_that_cannot_reach_its_stream_is_reported(scipy_backend) -> None:
+    cold_steam = _utility("LPS", "Hot", 455.0, 455.0, 40.0, 5.0)
+    problem = PinchProblem(_small_payload(extra_hot_utility=cold_steam))
+    network = _with(
+        HeatExchangerNetwork.from_structure(
+            recovery=[("H1", "C1", 1)],
+            heaters=["C1"],
+            coolers=["H1"],
+            hot_utility="HPS",
+            cold_utility="CW",
+        ),
+        _utility_exchanger(HeatExchangerKind.HOT_UTILITY, "LPS", "C1"),
+    )
+
+    with pytest.raises(Exception, match="heater using .*LPS on cold stream C1"):
+        problem.design.optimise_duties(
+            network, objective="utility", min_approach_temperature=10.0
+        )
+
+
+def test_from_structure_accepts_named_and_staged_utility_entries() -> None:
+    network = HeatExchangerNetwork.from_structure(
+        recovery=[("H1", "C1", 1), ("H1", "C1", 2)],
+        heaters=["C1", ("C1", "LPS", 2)],
+        coolers=[("H1", "CW"), ("H1", "Chilled", 2)],
+        hot_utility="HPS",
+    )
+
+    assert [(e.exchanger_id, e.stage) for e in network.exchangers[2:]] == [
+        ("hot-utility:HPS->C1", None),
+        ("hot-utility:LPS->C1:S2", 2),
+        ("cold-utility:H1->CW", None),
+        ("cold-utility:H1->Chilled:S2", 2),
+    ]
+    with pytest.raises(ValueError, match="cold_utility is required"):
+        HeatExchangerNetwork.from_structure(recovery=[], coolers=["H1"])
+    with pytest.raises(ValueError, match="entries must be a stream name"):
+        HeatExchangerNetwork.from_structure(recovery=[], heaters=[("C1",)])
+
+
+def test_accessor_structure_with_named_utilities_needs_no_default(
+    monkeypatch,
+) -> None:
+    requests = _capture_request(monkeypatch)
+    payload = json.loads(FOUR_STREAM_FIXTURE.read_text(encoding="utf-8"))
+    second = deepcopy(payload["utilities"][0])
+    second["name"] = "LPS"
+    payload["utilities"].append(second)
+
+    PinchProblem(payload).design.optimise_duties(
+        {
+            "recovery": [
+                ("Raw Milk", "Milk Concentrate", 1),
+                ("HT Flash", "CIP Water", 1),
+            ],
+            "heaters": [("CIP Water", "LPS"), ("CIP Water", "HPS")],
+            "coolers": ["HT Flash", "Raw Milk"],
+        }
+    )
+
+    heaters = [
+        e.exchanger_id
+        for e in requests[0].network.exchangers
+        if e.kind is HeatExchangerKind.HOT_UTILITY
+    ]
+    assert heaters == ["hot-utility:LPS->CIP Water", "hot-utility:HPS->CIP Water"]

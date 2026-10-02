@@ -375,9 +375,9 @@ class _DesignAccessor:
         coolers = tuple(structure.get("coolers", ()))
         hot_utility = structure.get("hot_utility")
         cold_utility = structure.get("cold_utility")
-        if heaters and hot_utility is None:
+        if hot_utility is None and any(isinstance(e, str) for e in heaters):
             hot_utility = self._only_utility("Hot")
-        if coolers and cold_utility is None:
+        if cold_utility is None and any(isinstance(e, str) for e in coolers):
             cold_utility = self._only_utility("Cold")
         return HeatExchangerNetwork.from_structure(
             recovery=tuple(structure["recovery"]),
@@ -420,32 +420,48 @@ class _DesignAccessor:
         """Optimise exchanger duties on a fixed, user-defined network structure.
 
         ``network`` lists every exchanger: recovery matches with a stage, plus
-        any heaters and coolers. Pass a ``HeatExchangerNetwork`` (for example a
+        heaters and coolers. Pass a ``HeatExchangerNetwork`` (for example a
         previous design's ``selected_network``) or a mapping::
 
             {
-                "recovery": [("H1", "C1", 1), ("H2", "C1", 1)],
-                "heaters": ["C1"],
-                "coolers": ["H1", "H2"],
+                "recovery": [("H1", "C1", 1), ("H2", "C1", 1), ("H1", "C2", 2)],
+                "heaters": ["C1", ("C2", "LP steam", 2)],
+                "coolers": ["H1", ("H2", "Cooling water"), ("H2", "Chilled water")],
             }
 
         Recovery entries are ``(hot_stream, cold_stream, stage)`` with
-        one-based stages; ``heaters`` names cold streams and ``coolers`` hot
-        streams. ``hot_utility``, ``cold_utility`` and ``stage_count`` keys
-        are optional; utilities default to the problem's only hot and cold
-        utility. The structure is kept as given; duties and stream split
-        fractions are optimised for one of three objectives:
+        one-based stages. A heater (cold stream) or cooler (hot stream) entry is
+        a stream name, ``(stream, utility)`` or ``(stream, utility, stage)``. A
+        stream may have several utility exchangers, one per utility and
+        position. Without a stage the exchanger sits at the stream end; with a
+        stage it sits just after the stream leaves that stage (a heater with
+        stage 2 heats the cold stream between stages 2 and 1). Exchangers at
+        the same position run in series, heaters from the coldest utility up,
+        coolers from the warmest down. Bare stream names use ``hot_utility`` /
+        ``cold_utility`` keys, defaulting to the problem's only hot and cold
+        utility; ``stage_count`` is optional.
+
+        Duties and stream split fractions are optimised for one of three
+        objectives; matches stay fixed:
 
         * ``"utility"``: minimise total utility use. Each exchanger keeps at
           least ``min_approach_temperature`` (or its entry in
           ``exchanger_approach_temperatures``; stream temperature
           contributions apply when neither is given) at both ends.
-        * ``"area"``: minimise total heat-transfer area with total utility
-          capped by ``max_hot_utility`` and/or ``max_cold_utility`` (kW).
-        * ``"cost"``: minimise total annual cost (annualised exchanger capital
-          from the ``COSTING_HX_*`` settings plus utility cost). Only a
+        * ``"area"``: minimise total heat-transfer area with utility capped by
+          ``max_hot_utility`` and/or ``max_cold_utility`` (kW, every period).
+          Each exchanger has one area shared by all operating periods: the
+          largest area any period needs. Periods needing less run with a
+          bypass, so every period's duties are achievable with that area.
+        * ``"cost"``: minimise total annual cost: exchanger capital on the
+          common areas (``COSTING_HX_*`` settings) plus utility cost. Only a
           positive approach is required at both ends of each exchanger,
           ``min_approach_temperature`` defaulting to 1 K.
+
+        An exchanger left at zero duty in every period is removed, with its
+        approach constraint, and the problem is solved again until every
+        remaining exchanger carries duty. The result names removed exchangers
+        in ``selected_network.summary_metrics["removed_exchangers"]``.
 
         Requires the optional synthesis dependencies (GEKKO and the configured
         ``HENS_SOLVER_EVM`` solver).
