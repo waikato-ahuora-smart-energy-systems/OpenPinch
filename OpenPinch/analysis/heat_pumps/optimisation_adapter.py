@@ -14,6 +14,7 @@ from scipy.optimize import minimize
 
 from ...analysis.numerics import g_ineq_penalty
 from ...contracts.hpr import (
+    ZERO_USEFUL_DUTY_REASON,
     HeatPumpTargetInputs,
     HeatPumpTargetOutputs,
     HPRBackendResult,
@@ -205,11 +206,20 @@ def solve_hpr_placement(
         if result.success and np.isfinite(float(result.obj)):
             return translate_hpr_result(result, ambient_args=args)
         failures.append((len(failures), result))
+        if result.failure_reason == ZERO_USEFUL_DUTY_REASON:
+            # Candidates are ranked by objective: the best valid design is no
+            # heat pump, so a worse heat pump further down is not a target.
+            break
 
+    no_heat_pump = _is_no_beneficial_heat_pump(failures)
     raise_hpr_targeting_error(
         args=args,
         message=(
             "Heat pump and refrigeration targeting "
+            f"({args.hpr_type}) found no heat pump design that improves on the "
+            "baseline without one."
+            if no_heat_pump
+            else "Heat pump and refrigeration targeting "
             f"({args.hpr_type}) failed to return an optimal result."
         ),
         failures=failures,
@@ -240,11 +250,23 @@ def raise_hpr_targeting_error(
         )
         for index, result in tuple(failures)[:16]
     )
-    category = (
-        HPRFailureCategory.CANDIDATE_PHYSICAL_INFEASIBILITY
-        if failures
-        else HPRFailureCategory.NO_VIABLE_CANDIDATE
-    )
+    if _is_no_beneficial_heat_pump(failures):
+        category = HPRFailureCategory.NO_BENEFICIAL_HEAT_PUMP
+        index, result = tuple(failures)[-1]
+        representatives = (
+            *representatives[:15][: len(failures) - 1],
+            HPRFailureDiagnostic(
+                category=category,
+                reason_code="candidate.no_beneficial_heat_pump",
+                summary=_bounded_failure_summary(result.failure_reason),
+                candidate_index=index,
+                topology=topology,
+            ),
+        )
+    elif failures:
+        category = HPRFailureCategory.CANDIDATE_PHYSICAL_INFEASIBILITY
+    else:
+        category = HPRFailureCategory.NO_VIABLE_CANDIDATE
     diagnostics = HPRFailureSummary(
         simulation_backend=getattr(args, "simulation_backend", "coolprop"),
         cycle=str(args.hpr_type),
@@ -269,6 +291,13 @@ def raise_hpr_targeting_error(
             }
         )
     raise HPRTargetingError(message, diagnostics=diagnostics)
+
+
+def _is_no_beneficial_heat_pump(
+    failures: Sequence[tuple[int, HPRBackendResult]],
+) -> bool:
+    """Whether the best valid candidate was a zero-duty (no heat pump) design."""
+    return bool(failures) and failures[-1][1].failure_reason == ZERO_USEFUL_DUTY_REASON
 
 
 def _bounded_failure_summary(reason: str | None) -> str:
@@ -668,11 +697,12 @@ def aggregate_hpr_period_results(
         if weighted is not None:
             updates[field] = weighted
 
+    # Capacity is sized for the peak period, so capital takes the maximum.
     for field in (
         "hpr_capital_cost",
         "hpr_annualized_capital_cost",
-        "hpr_compressor_capital_cost",
-        "hpr_heat_exchanger_capital_cost",
+        "hpr_hot_utility_annualized_capital_cost",
+        "hpr_refrigeration_annualized_capital_cost",
     ):
         maximum = _aggregate_result_field(
             ordered,
@@ -683,11 +713,18 @@ def aggregate_hpr_period_results(
         if maximum is not None:
             updates[field] = maximum
 
+    utility_capital = _peak_utility_capital(ordered)
+    if utility_capital is not None:
+        updates["hpr_utility_annualized_capital_cost"] = utility_capital
+
     operating = updates.get("hpr_operating_cost")
     annualized_capital = updates.get("hpr_annualized_capital_cost")
     if operating is not None and annualized_capital is not None:
         try:
-            updates["hpr_total_annualized_cost"] = operating + annualized_capital
+            total = operating + annualized_capital
+            if utility_capital is not None:
+                total = total + utility_capital
+            updates["hpr_total_annualized_cost"] = total
         except TypeError, ValueError:
             pass
     if "hpr_total_annualized_cost" not in updates:
@@ -711,10 +748,15 @@ def build_hpr_accounting(
     Q_ext_heat: float,
     Q_ext_cold: float,
     args: HeatPumpTargetInputs,
+    Q_cooling_water: float = 0.0,
     penalty_terms: object = None,
     penalise_external_cold_when_refrigerating: bool = False,
 ) -> tuple[float, float, float, float]:
-    """Standardise HPR utility, feasibility-penalty, and objective semantics."""
+    """Standardise HPR utility, feasibility-penalty, and objective semantics.
+
+    ``Q_ext_cold`` is the external cold met by refrigeration and
+    ``Q_cooling_water`` the part met by cooling water.
+    """
     positive_penalty_terms = np.maximum(
         np.asarray(normalise_hpr_penalty_terms(penalty_terms), dtype=float),
         0.0,
@@ -738,7 +780,7 @@ def build_hpr_accounting(
     ):
         penalty += float(
             g_ineq_penalty(
-                g=Q_ext_cold,
+                g=Q_ext_cold + Q_cooling_water,
                 rho=args.rho_penalty,
                 form=PenaltyForm.SQUARE,
             )
@@ -749,7 +791,9 @@ def build_hpr_accounting(
         Q_ext_cold=Q_ext_cold,
         Q_hpr_target=args.Q_hpr_target,
         heat_to_power_ratio=args.heat_to_power_ratio,
-        cold_to_power_ratio=args.cold_to_power_ratio,
+        cold_to_power_ratio=args.refrigeration_to_power_ratio,
+        Q_cooling_water=Q_cooling_water,
+        cooling_water_to_power_ratio=args.cooling_water_to_power_ratio,
         penalty=penalty,
     )
     return float(Q_ext_heat), float(Q_ext_cold), penalty, float(objective)
@@ -763,12 +807,15 @@ def calc_hpr_obj(
     heat_to_power_ratio: float = 1.0,
     cold_to_power_ratio: float = 0.0,
     penalty: float = 0.0,
+    Q_cooling_water: float = 0.0,
+    cooling_water_to_power_ratio: float = 0.0,
 ) -> float:
     """Return the scalar screening objective used by HPR placement solvers."""
     return (
         work
         + (Q_ext_heat * heat_to_power_ratio)
         + (Q_ext_cold * cold_to_power_ratio)
+        + (Q_cooling_water * cooling_water_to_power_ratio)
         + penalty
     ) / Q_hpr_target
 
@@ -901,11 +948,37 @@ def _shared_candidate_objective(
         weights=None,
         reducer="max",
     )
+    utility_capital = _peak_utility_capital(results)
     return (
         _annual_cost_magnitude(operating)
         + float(penalty)
         + _annual_cost_magnitude(annualized_capital)
+        + (0.0 if utility_capital is None else _annual_cost_magnitude(utility_capital))
     )
+
+
+def _peak_utility_capital(results: list[HPRBackendResult]) -> Any:
+    """Sum each default utility's peak annualized capital across periods.
+
+    The hot utility and the refrigeration plant are separate assets, each sized
+    for its own peak period, so their maxima are taken separately and added.
+    Results without the split fall back to the peak of the combined value.
+    """
+    parts = [
+        _aggregate_result_field(results, field, weights=None, reducer="max")
+        for field in (
+            "hpr_hot_utility_annualized_capital_cost",
+            "hpr_refrigeration_annualized_capital_cost",
+        )
+    ]
+    if any(part is None for part in parts):
+        return _aggregate_result_field(
+            results,
+            "hpr_utility_annualized_capital_cost",
+            weights=None,
+            reducer="max",
+        )
+    return parts[0] + parts[1]
 
 
 def _annual_cost_magnitude(value: Any) -> float:

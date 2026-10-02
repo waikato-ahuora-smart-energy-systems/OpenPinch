@@ -144,7 +144,7 @@ def _compute_brayton_hp_system_obj(
         Q_ext_cold=0.0,
         Q_hpr_target=args.Q_hpr_target,
         heat_to_power_ratio=args.heat_to_power_ratio,
-        cold_to_power_ratio=args.cold_to_power_ratio,
+        cold_to_power_ratio=args.refrigeration_to_power_ratio,
         penalty=c,
     )
 

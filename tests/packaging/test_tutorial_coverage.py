@@ -52,9 +52,16 @@ OWNERS = {
 }
 
 
+UNDER_DEVELOPMENT = "unmapped; under development"
+
+
 def _rows() -> list[dict[str, str]]:
     with MANIFEST.open(newline="", encoding="utf-8") as stream:
         return list(csv.DictReader(stream))
+
+
+def _mapped_rows() -> list[dict[str, str]]:
+    return [row for row in _rows() if row["coverage_status"] != UNDER_DEVELOPMENT]
 
 
 def _live_operations() -> dict[str, str]:
@@ -86,14 +93,13 @@ def test_manifest_exactly_matches_live_public_inventory() -> None:
     assert {row["coverage_status"] for row in rows} == {
         "mapped and executable",
         "mapped; documented independent replay",
-        "mapped; runtime unsupported",
+        UNDER_DEVELOPMENT,
     }
-    unsupported = {
-        row["operation"]
-        for row in rows
-        if row["coverage_status"] == "mapped; runtime unsupported"
+    # Methods still under development stay public but no notebook shows them.
+    under_development = {
+        row["operation"] for row in rows if row["coverage_status"] == UNDER_DEVELOPMENT
     }
-    assert unsupported == {
+    assert under_development == {
         "problem.target.brayton_heat_pump",
         "problem.target.brayton_refrigeration",
         "batch.target.brayton_heat_pump",
@@ -118,7 +124,7 @@ def test_manifest_has_complete_tutorial_and_profile_ownership() -> None:
         path.name
         for path in (ROOT / "OpenPinch" / "tutorials" / "notebooks").glob("*.ipynb")
     }
-    rows = _rows()
+    rows = _mapped_rows()
 
     assert {row["primary_tutorial"] for row in rows} == notebooks
     assert all(row["primary_tutorial"] in notebooks for row in rows)
@@ -166,6 +172,7 @@ def test_rtd_coverage_summary_matches_manifest_denominator() -> None:
         encoding="utf-8"
     )
     count = len(_rows())
+    mapped = len(_mapped_rows())
 
     assert f"**{count} operations**" in summary
-    assert f"**{count}/{count}, or 100 percent mapping coverage**" in summary
+    assert f"**{mapped}/{count} operations are mapped**" in summary

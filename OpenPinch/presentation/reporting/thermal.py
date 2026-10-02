@@ -72,17 +72,13 @@ def hpr_result(target, *, is_total=False):
                 target,
                 "hpr_annualized_capital_cost",
             ),
+            "hpr_utility_annualized_capital_cost": _metric(
+                target,
+                "hpr_utility_annualized_capital_cost",
+            ),
             "hpr_total_annualized_cost": _metric(
                 target,
                 "hpr_total_annualized_cost",
-            ),
-            "hpr_compressor_capital_cost": _metric(
-                target,
-                "hpr_compressor_capital_cost",
-            ),
-            "hpr_heat_exchanger_capital_cost": _metric(
-                target,
-                "hpr_heat_exchanger_capital_cost",
             ),
             "hpr_success": target.hpr_success,
             "hpr_hot_streams": target.hpr_hot_streams,

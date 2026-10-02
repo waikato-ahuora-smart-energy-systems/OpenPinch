@@ -123,20 +123,25 @@ OUTPUT_UNIT_RULES: dict[str, OutputUnitRule] = {
         "$/y",
         unit_groups=("annual_cost", "currency"),
     ),
-    "hpr_total_annualized_cost": OutputUnitRule(
+    "hpr_hot_utility_annualized_capital_cost": OutputUnitRule(
         "$/y",
         "$/y",
         unit_groups=("annual_cost", "currency"),
     ),
-    "hpr_compressor_capital_cost": OutputUnitRule(
-        "$",
-        "$",
-        unit_groups=("capital_cost", "currency"),
+    "hpr_refrigeration_annualized_capital_cost": OutputUnitRule(
+        "$/y",
+        "$/y",
+        unit_groups=("annual_cost", "currency"),
     ),
-    "hpr_heat_exchanger_capital_cost": OutputUnitRule(
-        "$",
-        "$",
-        unit_groups=("capital_cost", "currency"),
+    "hpr_utility_annualized_capital_cost": OutputUnitRule(
+        "$/y",
+        "$/y",
+        unit_groups=("annual_cost", "currency"),
+    ),
+    "hpr_total_annualized_cost": OutputUnitRule(
+        "$/y",
+        "$/y",
+        unit_groups=("annual_cost", "currency"),
     ),
 }
 

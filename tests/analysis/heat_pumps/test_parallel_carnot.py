@@ -9,7 +9,7 @@ from OpenPinch.analysis.heat_pumps.common._shared.streams import (
 from OpenPinch.analysis.heat_pumps.common.encoding import (
     DutyAllocationRequest,
     StageDutyRequest,
-    encode_duty_splits,
+    decode_available_fractions,
 )
 from OpenPinch.analysis.heat_pumps.cycles.carnot_cycles import ParallelCarnotCycles
 from OpenPinch.analysis.heat_pumps.targeting.parallel_carnot import (
@@ -18,6 +18,30 @@ from OpenPinch.analysis.heat_pumps.targeting.parallel_carnot import (
     _parse_parallel_carnot_hp_state_variables,
     optimise_parallel_carnot_heat_pump_placement,
 )
+
+
+def _with_cascade_inputs(args):
+    """Add the background streams and air temperatures the evaluator cascades."""
+    from OpenPinch.analysis.heat_pumps.common.preprocessing import (
+        _create_stream_collection_of_background_profile,
+    )
+
+    for name, value in (
+        ("T_env", 20.0),
+        ("dt_env_cont", 5.0),
+        ("dtcont_hp", 5.0),
+        ("dt_phase_change", 1.0),
+        ("period_idx", 0),
+    ):
+        if not hasattr(args, name):
+            setattr(args, name, value)
+    args.bckgrd_hot_streams = _create_stream_collection_of_background_profile(
+        args.T_hot, args.H_hot
+    )
+    args.bckgrd_cold_streams = _create_stream_collection_of_background_profile(
+        args.T_cold, args.H_cold
+    )
+    return args
 
 
 def test_parallel_carnot_unsolved_properties_and_empty_stream_collection():
@@ -59,7 +83,7 @@ def test_parallel_carnot_cycle_positive_lift_uses_absolute_temperatures():
         duty_allocation=DutyAllocationRequest(
             heat=StageDutyRequest(
                 Q_base=float(Q_heat_available.sum()),
-                x_split=encode_duty_splits(Q_heat_available, Q_heat_available.sum()),
+                x_split=np.ones_like(Q_heat_available),
                 Q_available=Q_heat_available,
             ),
             cool=StageDutyRequest(Q_available=np.array([200.0])),
@@ -145,7 +169,7 @@ def test_parallel_carnot_cycle_uses_per_stage_pools():
         duty_allocation=DutyAllocationRequest(
             heat=StageDutyRequest(
                 Q_base=float(Q_heat_available.sum()),
-                x_split=encode_duty_splits(Q_heat_available, Q_heat_available.sum()),
+                x_split=np.ones_like(Q_heat_available),
                 Q_available=Q_heat_available,
             ),
             cool=StageDutyRequest(Q_available=Q_cool_available),
@@ -185,14 +209,15 @@ def test_compute_parallel_carnot_objective_handles_mixed_lift_without_ambiguous_
         Q_heat_max=300.0,
         Q_cool_max=260.0,
         heat_to_power_ratio=1.0,
-        cold_to_power_ratio=0.0,
+        refrigeration_to_power_ratio=0.0,
+        cooling_water_to_power_ratio=0.0,
         eta_penalty=0.001,
         rho_penalty=10,
         allow_integrated_expander=False,
     )
 
     res = _compute_parallel_carnot_hp_opt_obj(
-        np.array([0.0, 0.0, 0.0, 0.25, 0.25, 1.0, 0.5, 1.0]), args
+        np.array([0.0, 0.0, 0.25, 0.25, 0.5, 1.0]), _with_cascade_inputs(args)
     )
 
     assert np.isfinite(res.obj)
@@ -217,18 +242,21 @@ def test_compute_parallel_carnot_utility_total_includes_residual_cold_utility():
         Q_heat_max=200.0,
         Q_cool_max=20.0,
         heat_to_power_ratio=1.0,
-        cold_to_power_ratio=1.0,
+        refrigeration_to_power_ratio=1.0,
+        cooling_water_to_power_ratio=0.0,
         eta_penalty=0.001,
         rho_penalty=10.0,
     )
 
-    res = _compute_parallel_carnot_hp_opt_obj(np.array([0.0, 0.5, 0.5, 1.0, 1.0]), args)
+    res = _compute_parallel_carnot_hp_opt_obj(
+        np.array([0.5, 0.5, 1.0]), _with_cascade_inputs(args)
+    )
 
     assert res.Q_ext > 0.0
     assert np.isclose(res.utility_tot, res.w_net + res.Q_ext)
 
 
-def test_parse_parallel_carnot_state_variables_uses_bounded_ambient_mapping():
+def test_parse_parallel_carnot_state_variables_decodes_temperatures_and_duty():
     args = SimpleNamespace(
         n_cond=1,
         n_evap=1,
@@ -244,15 +272,18 @@ def test_parse_parallel_carnot_state_variables_uses_bounded_ambient_mapping():
     )
 
     vars = _parse_parallel_carnot_hp_state_variables(
-        np.array([0.5, 0.5, 0.5, 1.0, 1.0]),
+        np.array([0.5, 0.5, 1.0]),
         args,
     )
 
     np.testing.assert_allclose(vars.T_cond, np.array([75.0]))
     np.testing.assert_allclose(vars.T_evap, np.array([65.0]))
+    # Air is placed by the cascade at evaluation, not decided by the vector.
     assert vars.Q_amb_hot == 0.0
-    assert np.isclose(vars.Q_amb_cold, 200.0 * np.arctanh(0.5))
-    assert vars.Q_heat_base == pytest.approx(200.0 + 200.0 * np.arctanh(0.5))
+    assert vars.Q_amb_cold == 0.0
+    assert vars.Q_heat_base == pytest.approx(
+        decode_available_fractions(vars.x_heat_split, vars.Q_heat_available).sum()
+    )
     np.testing.assert_allclose(vars.x_heat_split, np.array([1.0]))
 
 

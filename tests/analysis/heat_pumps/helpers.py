@@ -5,6 +5,9 @@ from types import SimpleNamespace
 import numpy as np
 
 import OpenPinch.analysis.heat_pumps.service as hp
+from OpenPinch.analysis.heat_pumps.common.preprocessing import (
+    _create_stream_collection_of_background_profile,
+)
 from OpenPinch.domain.enums import HeatPumpAndRefrigerationCycle, ProblemTableLabel
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream import Stream
@@ -78,17 +81,25 @@ def _base_args(**overrides):
         "dt_cascade_hx": 2.0,
         "dt_phase_change": 1.0,
         "heat_to_power_ratio": 1.0,
-        "cold_to_power_ratio": 0.0,
+        "cooling_water_to_power_ratio": 0.0,
+        "refrigeration_to_power_ratio": 0.0,
+        "T_cooling_water": 25.0,
+        "dt_cooling_water": 5.0,
         "ele_price": 200.0,
         "annual_op_time": 8300.0,
         "discount_rate": 0.07,
         "serv_life": 20.0,
-        "hpr_comp_fixed_cost": 0.0,
-        "hpr_comp_variable_cost": 10000.0,
-        "hpr_comp_cost_exp": 1.0,
-        "hpr_hx_fixed_cost": 0.0,
-        "hpr_hx_variable_cost": 10000.0,
-        "hpr_hx_cost_exp": 1.0,
+        "hpr_equipment_cost": 485000.0,
+        "hpr_installation_factor": 2.3,
+        "hpr_cost_exp": 0.7,
+        "hpr_cost_fixed_share": 0.7,
+        "hpr_cost_stage_share": 0.3,
+        "hpr_cost_temp_factor": 0.4,
+        "hpr_cost_temp_base": 75.0,
+        "hpr_capital_recovery": True,
+        "utility_capital_recovery": True,
+        "hot_utility_capital_cost": 0.0,
+        "refrigeration_capital_cost": 0.0,
         "is_heat_pumping": True,
         "max_multi_start": 2,
         "T_env": 20.0,
@@ -99,22 +110,6 @@ def _base_args(**overrides):
         "do_refrigerant_sort": False,
         "initialise_simulated_cycle": True,
         "allow_integrated_expander": True,
-        "bckgrd_hot_streams": _sc(
-            Stream(
-                name="H",
-                supply_temperature=120.0,
-                target_temperature=80.0,
-                heat_flow=50.0,
-            )
-        ),
-        "bckgrd_cold_streams": _sc(
-            Stream(
-                name="C",
-                supply_temperature=30.0,
-                target_temperature=60.0,
-                heat_flow=40.0,
-            )
-        ),
         "bb_minimiser": "rbf_surrogate",
         "eta_penalty": 0.001,
         "rho_penalty": 10.0,
@@ -124,7 +119,29 @@ def _base_args(**overrides):
     args.update(overrides)
     args.setdefault("Q_heat_max", float(args["H_cold"][0]))
     args.setdefault("Q_cool_max", float(-args["H_hot"][-1]))
+    # Background streams follow the profiles, as preprocessing builds them.
+    # Tests that pass deliberately invalid profiles (mismatched or non-finite)
+    # get no background streams.
+    args.setdefault(
+        "bckgrd_hot_streams", _background_streams(args["T_hot"], args["H_hot"])
+    )
+    args.setdefault(
+        "bckgrd_cold_streams", _background_streams(args["T_cold"], args["H_cold"])
+    )
     return SimpleNamespace(**args)
+
+
+def _background_streams(T_vals, H_vals) -> StreamCollection:
+    T_vals = np.asarray(T_vals, dtype=float)
+    H_vals = np.asarray(H_vals, dtype=float)
+    if (
+        T_vals.size < 2
+        or T_vals.shape != H_vals.shape
+        or not np.isfinite(T_vals).all()
+        or not np.isfinite(H_vals).all()
+    ):
+        return StreamCollection()
+    return _create_stream_collection_of_background_profile(T_vals, H_vals)
 
 
 def _pt_with_hnet(h0, h1, *, h_hot=None, h_cold=None):

@@ -127,13 +127,22 @@ class CostingConfig:
     service_life: float
     hpr_ele_price: float
     hpr_price_ratio_heat_to_ele: float
-    hpr_price_ratio_cold_to_ele: float
-    hpr_comp_fixed_cost: float
-    hpr_comp_variable_cost: float
-    hpr_comp_cost_exp: float
-    hpr_hx_duty_fixed_cost: float
-    hpr_hx_duty_variable_cost: float
-    hpr_hx_duty_cost_exp: float
+    hpr_price_ratio_cooling_water_to_ele: float
+    hpr_cooling_water_temperature: float
+    hpr_cooling_water_dt_min: float
+    hpr_refrigeration_eta_ii: float
+    hpr_refrigeration_dt: float
+    hpr_equipment_cost: float
+    hpr_installation_factor: float
+    hpr_cost_exp: float
+    hpr_cost_fixed_share: float
+    hpr_cost_stage_share: float
+    hpr_cost_temp_factor: float
+    hpr_cost_temp_base: float
+    hpr_capital_recovery_enabled: bool
+    hpr_utility_capital_recovery_enabled: bool
+    hpr_hot_utility_capital_cost: float
+    hpr_refrigeration_capital_cost: float
 
 
 @_frozen_group

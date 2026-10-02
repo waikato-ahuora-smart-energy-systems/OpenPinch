@@ -14,23 +14,17 @@ __all__ = ["HPRoptVectorLayout"]
 class HPRoptVectorLayout:
     """Canonical section layout for Heat Pump targeting optimisation vectors."""
 
-    n_amb: int = 1
     n_cond: int = 0
     n_evap: int = 0
     n_subcool: int = 0
-    n_heat_base: int = 0
-    n_cool_base: int = 0
     n_heat_split: int = 0
     n_cool_split: int = 0
     n_ihx: int = 0
     n_misc: int = 0
     _size: int = field(init=False, repr=False)
-    _amb_slice: slice = field(init=False, repr=False)
     _cond_slice: slice = field(init=False, repr=False)
     _evap_slice: slice = field(init=False, repr=False)
     _subcool_slice: slice = field(init=False, repr=False)
-    _heat_base_slice: slice = field(init=False, repr=False)
-    _cool_base_slice: slice = field(init=False, repr=False)
     _heat_split_slice: slice = field(init=False, repr=False)
     _cool_split_slice: slice = field(init=False, repr=False)
     _ihx_slice: slice = field(init=False, repr=False)
@@ -38,12 +32,9 @@ class HPRoptVectorLayout:
 
     def __post_init__(self) -> None:
         for name in (
-            "n_amb",
             "n_cond",
             "n_evap",
             "n_subcool",
-            "n_heat_base",
-            "n_cool_base",
             "n_heat_split",
             "n_cool_split",
             "n_ihx",
@@ -54,12 +45,9 @@ class HPRoptVectorLayout:
 
         start = 0
         for section_name, count in (
-            ("amb", self.n_amb),
             ("cond", self.n_cond),
             ("evap", self.n_evap),
             ("subcool", self.n_subcool),
-            ("heat_base", self.n_heat_base),
-            ("cool_base", self.n_cool_base),
             ("heat_split", self.n_heat_split),
             ("cool_split", self.n_cool_split),
             ("ihx", self.n_ihx),
@@ -76,10 +64,6 @@ class HPRoptVectorLayout:
         return self._size
 
     @property
-    def amb_slice(self) -> slice:
-        return self._amb_slice
-
-    @property
     def cond_slice(self) -> slice:
         return self._cond_slice
 
@@ -90,14 +74,6 @@ class HPRoptVectorLayout:
     @property
     def subcool_slice(self) -> slice:
         return self._subcool_slice
-
-    @property
-    def heat_base_slice(self) -> slice:
-        return self._heat_base_slice
-
-    @property
-    def cool_base_slice(self) -> slice:
-        return self._cool_base_slice
 
     @property
     def heat_split_slice(self) -> slice:
@@ -118,12 +94,9 @@ class HPRoptVectorLayout:
     def pack(
         self,
         *,
-        x_amb: float | Sequence[float] = 0.0,
         x_cond: Sequence[float] = (),
         x_evap: Sequence[float] = (),
         x_subcool: Sequence[float] = (),
-        x_heat_base: float | Sequence[float] = (),
-        x_cool_base: float | Sequence[float] = (),
         x_heat_split: Sequence[float] = (),
         x_cool_split: Sequence[float] = (),
         x_ihx: Sequence[float] = (),
@@ -131,12 +104,9 @@ class HPRoptVectorLayout:
     ) -> np.ndarray:
         """Pack named optimisation blocks into one canonical vector."""
         blocks = [
-            self._coerce_block("x_amb", x_amb, self.n_amb),
             self._coerce_block("x_cond", x_cond, self.n_cond),
             self._coerce_block("x_evap", x_evap, self.n_evap),
             self._coerce_block("x_subcool", x_subcool, self.n_subcool),
-            self._coerce_block("x_heat_base", x_heat_base, self.n_heat_base),
-            self._coerce_block("x_cool_base", x_cool_base, self.n_cool_base),
             self._coerce_block("x_heat_split", x_heat_split, self.n_heat_split),
             self._coerce_block("x_cool_split", x_cool_split, self.n_cool_split),
             self._coerce_block("x_ihx", x_ihx, self.n_ihx),
@@ -152,14 +122,10 @@ class HPRoptVectorLayout:
                 f"Expected optimisation vector of size {self.size}, got {vec.size}."
             )
 
-        amb = vec[self.amb_slice]
         return {
-            "x_amb": float(amb[0]) if amb.size else 0.0,
             "x_cond": vec[self.cond_slice],
             "x_evap": vec[self.evap_slice],
             "x_subcool": vec[self.subcool_slice],
-            "x_heat_base": vec[self.heat_base_slice],
-            "x_cool_base": vec[self.cool_base_slice],
             "x_heat_split": vec[self.heat_split_slice],
             "x_cool_split": vec[self.cool_split_slice],
             "x_ihx": vec[self.ihx_slice],
@@ -169,12 +135,9 @@ class HPRoptVectorLayout:
     def build_bounds(
         self,
         *,
-        x_amb: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
         x_cond: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
         x_evap: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
         x_subcool: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
-        x_heat_base: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
-        x_cool_base: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
         x_heat_split: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
         x_cool_split: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
         x_ihx: Sequence[float] | Sequence[Sequence[float]] = (0.0, 1.0),
@@ -182,12 +145,9 @@ class HPRoptVectorLayout:
     ) -> list[tuple[float, float]]:
         """Expand per-section bounds into a flat bounds list."""
         bounds = []
-        bounds.extend(self._coerce_bounds("x_amb", x_amb, self.n_amb))
         bounds.extend(self._coerce_bounds("x_cond", x_cond, self.n_cond))
         bounds.extend(self._coerce_bounds("x_evap", x_evap, self.n_evap))
         bounds.extend(self._coerce_bounds("x_subcool", x_subcool, self.n_subcool))
-        bounds.extend(self._coerce_bounds("x_heat_base", x_heat_base, self.n_heat_base))
-        bounds.extend(self._coerce_bounds("x_cool_base", x_cool_base, self.n_cool_base))
         bounds.extend(
             self._coerce_bounds("x_heat_split", x_heat_split, self.n_heat_split)
         )

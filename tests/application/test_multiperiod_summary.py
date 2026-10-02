@@ -76,9 +76,8 @@ def _target(
         hpr_operating_cost=Value(qh * 20.0, "$/y"),
         hpr_capital_cost=Value(qh * 30.0, "$"),
         hpr_annualized_capital_cost=Value(qh * 4.0, "$/y"),
-        hpr_total_annualized_cost=Value(qh * 24.0, "$/y"),
-        hpr_compressor_capital_cost=Value(qh * 12.0, "$"),
-        hpr_heat_exchanger_capital_cost=Value(qh * 18.0, "$"),
+        hpr_utility_annualized_capital_cost=Value(qh * 1.0, "$/y"),
+        hpr_total_annualized_cost=Value(qh * 25.0, "$/y"),
         hpr_success=hpr_success,
     )
 
@@ -121,9 +120,8 @@ def test_weighted_average_output_aggregates_values_utilities_and_metadata():
     assert target.hpr_operating_cost.value == pytest.approx(500.0)
     assert target.hpr_capital_cost.value == pytest.approx(900.0)
     assert target.hpr_annualized_capital_cost.value == pytest.approx(120.0)
-    assert target.hpr_total_annualized_cost.value == pytest.approx(620.0)
-    assert target.hpr_compressor_capital_cost.value == pytest.approx(360.0)
-    assert target.hpr_heat_exchanger_capital_cost.value == pytest.approx(540.0)
+    assert target.hpr_utility_annualized_capital_cost.value == pytest.approx(30.0)
+    assert target.hpr_total_annualized_cost.value == pytest.approx(650.0)
     assert target.hpr_cycle == "Carnot"
     assert target.hpr_success is None
     assert {
@@ -141,8 +139,6 @@ def test_weighted_average_output_uses_peak_hpr_capital_and_weighted_operation():
             "hpr_capital_cost": Value(1000.0, "$"),
             "hpr_annualized_capital_cost": Value(100.0, "$/y"),
             "hpr_total_annualized_cost": Value(900.0, "$/y"),
-            "hpr_compressor_capital_cost": Value(600.0, "$"),
-            "hpr_heat_exchanger_capital_cost": Value(400.0, "$"),
         }
     )
     peak_target = _target(period_id="peak", qh=30.0).model_copy(
@@ -151,8 +147,6 @@ def test_weighted_average_output_uses_peak_hpr_capital_and_weighted_operation():
             "hpr_capital_cost": Value(3000.0, "$"),
             "hpr_annualized_capital_cost": Value(300.0, "$/y"),
             "hpr_total_annualized_cost": Value(500.0, "$/y"),
-            "hpr_compressor_capital_cost": Value(1800.0, "$"),
-            "hpr_heat_exchanger_capital_cost": Value(1200.0, "$"),
         }
     )
 
@@ -168,10 +162,46 @@ def test_weighted_average_output_uses_peak_hpr_capital_and_weighted_operation():
     assert target.hpr_operating_cost.value == pytest.approx(650.0)
     assert target.hpr_capital_cost.value == pytest.approx(3000.0)
     assert target.hpr_annualized_capital_cost.value == pytest.approx(300.0)
-    assert target.hpr_compressor_capital_cost.value == pytest.approx(1800.0)
-    assert target.hpr_heat_exchanger_capital_cost.value == pytest.approx(1200.0)
-    assert target.hpr_total_annualized_cost.value == pytest.approx(950.0)
+    assert target.hpr_utility_annualized_capital_cost.value == pytest.approx(30.0)
+    assert target.hpr_total_annualized_cost.value == pytest.approx(980.0)
     assert target.Qh.value == pytest.approx(15.0)
+
+
+def test_weighted_average_output_sizes_each_utility_for_its_own_peak():
+    def costed(period_id, hot_capital, refrigeration_capital):
+        return _target(period_id=period_id, qh=10.0).model_copy(
+            update={
+                "hpr_operating_cost": Value(100.0, "$/y"),
+                "hpr_annualized_capital_cost": Value(50.0, "$/y"),
+                "hpr_hot_utility_annualized_capital_cost": Value(hot_capital, "$/y"),
+                "hpr_refrigeration_annualized_capital_cost": Value(
+                    refrigeration_capital, "$/y"
+                ),
+                "hpr_utility_annualized_capital_cost": Value(
+                    hot_capital + refrigeration_capital, "$/y"
+                ),
+            }
+        )
+
+    output = weighted_average_output(
+        [
+            TargetOutput(
+                name="Site", period_id="winter", targets=[costed("winter", 70.0, 10.0)]
+            ),
+            TargetOutput(
+                name="Site", period_id="summer", targets=[costed("summer", 20.0, 50.0)]
+            ),
+        ],
+        [1.0, 1.0],
+    )
+    target = output.targets[0]
+
+    assert target.hpr_hot_utility_annualized_capital_cost.value == pytest.approx(70.0)
+    assert target.hpr_refrigeration_annualized_capital_cost.value == pytest.approx(
+        50.0
+    )
+    assert target.hpr_utility_annualized_capital_cost.value == pytest.approx(120.0)
+    assert target.hpr_total_annualized_cost.value == pytest.approx(270.0)
 
 
 def test_weighted_average_output_rejects_partially_missing_numeric_fields():

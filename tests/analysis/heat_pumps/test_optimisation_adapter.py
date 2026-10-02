@@ -9,6 +9,7 @@ import OpenPinch.analysis.heat_pumps.optimisation_adapter as adapter
 from OpenPinch.contracts.hpr import HPRBackendResult, HPRThermoArtifacts
 from OpenPinch.domain.enums import BB_Minimiser
 from OpenPinch.domain.stream_collection import StreamCollection
+from OpenPinch.domain.value import Value
 from OpenPinch.optimisation.errors import NoOptimisationCandidatesError
 from OpenPinch.optimisation.models import (
     OptimisationCandidate,
@@ -222,6 +223,63 @@ def test_fallback_shared_objective_is_weighted_when_costs_are_absent():
     assert weighted.obj == pytest.approx(17.5)
 
 
+def test_shared_objective_includes_peak_utility_capital():
+    def costed(operating, capital, utility_capital):
+        return _result(0.0).with_updates(
+            hpr_operating_cost=Value(operating, "$/y"),
+            hpr_capital_cost=Value(10.0 * capital, "$"),
+            hpr_annualized_capital_cost=Value(capital, "$/y"),
+            hpr_utility_annualized_capital_cost=Value(utility_capital, "$/y"),
+            hpr_total_annualized_cost=Value(
+                operating + capital + utility_capital, "$/y"
+            ),
+        )
+
+    weighted, objective = adapter.aggregate_hpr_period_results(
+        {"base": costed(100.0, 50.0, 30.0), "peak": costed(300.0, 50.0, 80.0)},
+        [3.0, 1.0],
+    )
+
+    # Operating cost is weighted; capital, utility capital included, is
+    # sized for the peak period.
+    assert weighted.hpr_utility_annualized_capital_cost.value == pytest.approx(80.0)
+    assert objective == pytest.approx(150.0 + 50.0 + 80.0)
+    assert weighted.hpr_total_annualized_cost.value == pytest.approx(objective)
+
+
+def test_shared_objective_sizes_each_utility_for_its_own_peak():
+    def costed(operating, hot_capital, refrigeration_capital):
+        return _result(0.0).with_updates(
+            hpr_operating_cost=Value(operating, "$/y"),
+            hpr_capital_cost=Value(500.0, "$"),
+            hpr_annualized_capital_cost=Value(50.0, "$/y"),
+            hpr_hot_utility_annualized_capital_cost=Value(hot_capital, "$/y"),
+            hpr_refrigeration_annualized_capital_cost=Value(
+                refrigeration_capital, "$/y"
+            ),
+            hpr_utility_annualized_capital_cost=Value(
+                hot_capital + refrigeration_capital, "$/y"
+            ),
+        )
+
+    # Hot-utility demand peaks in winter and refrigeration in summer; both
+    # plants must be sized for their own peak, not for the larger period total.
+    weighted, objective = adapter.aggregate_hpr_period_results(
+        {"winter": costed(100.0, 70.0, 10.0), "summer": costed(100.0, 20.0, 50.0)},
+        [1.0, 1.0],
+    )
+
+    assert weighted.hpr_hot_utility_annualized_capital_cost.value == pytest.approx(
+        70.0
+    )
+    assert weighted.hpr_refrigeration_annualized_capital_cost.value == (
+        pytest.approx(50.0)
+    )
+    assert weighted.hpr_utility_annualized_capital_cost.value == pytest.approx(120.0)
+    assert objective == pytest.approx(100.0 + 50.0 + 120.0)
+    assert weighted.hpr_total_annualized_cost.value == pytest.approx(objective)
+
+
 def test_accounting_applies_refrigeration_penalty_and_scalar_objective():
     external_heat, external_cold, penalty, objective = adapter.build_hpr_accounting(
         work=10.0,
@@ -230,7 +288,8 @@ def test_accounting_applies_refrigeration_penalty_and_scalar_objective():
         args=_base_args(
             is_heat_pumping=False,
             heat_to_power_ratio=0.0,
-            cold_to_power_ratio=0.0,
+            refrigeration_to_power_ratio=0.0,
+            cooling_water_to_power_ratio=0.0,
             eta_penalty=0.0,
             rho_penalty=2.0,
         ),
@@ -292,3 +351,61 @@ def test_solver_resolves_only_the_best_ranked_candidate():
 
     assert result.obj == pytest.approx(0.2)
     assert calls == [0.2]
+
+
+def _zero_duty_result() -> HPRBackendResult:
+    return HPRBackendResult.failure(reason=adapter.ZERO_USEFUL_DUTY_REASON)
+
+
+def _solve_ranked(objectives_by_point):
+    ranked = tuple(
+        OptimisationCandidate(objective=rank, point=(point,))
+        for rank, point in enumerate(objectives_by_point)
+    )
+    calls = []
+
+    def objective(point, _args, debug=False):
+        calls.append(float(point[0]))
+        return objectives_by_point[float(point[0])]()
+
+    def solve():
+        return adapter.solve_hpr_placement(
+            f_obj=objective,
+            x0_ls=None,
+            bnds=[(0.0, 1.0)],
+            args=_base_args(),
+            candidate_search=lambda **_kwargs: ranked,
+        )
+
+    return solve, calls
+
+
+def test_no_beneficial_heat_pump_when_the_best_valid_design_has_zero_duty():
+    solve, calls = _solve_ranked(
+        {
+            0.1: lambda: _result(0.1, success=False),
+            0.2: _zero_duty_result,
+            0.3: lambda: _result(0.3),
+        }
+    )
+
+    with pytest.raises(
+        adapter.HPRTargetingError, match="no heat pump design"
+    ) as caught:
+        solve()
+
+    diagnostics = caught.value.diagnostics
+    assert (
+        adapter.HPRFailureCategory.NO_BENEFICIAL_HEAT_PUMP
+        in diagnostics.category_counts
+    )
+    last = diagnostics.representative_failures[-1]
+    assert last.reason_code == "candidate.no_beneficial_heat_pump"
+    # The infeasible design is skipped; the worse heat pump is never returned.
+    assert calls == [0.1, 0.2]
+
+
+def test_heat_pump_ranked_above_zero_duty_is_returned():
+    solve, _ = _solve_ranked({0.1: lambda: _result(0.1), 0.2: _zero_duty_result})
+
+    assert solve().obj == pytest.approx(0.1)

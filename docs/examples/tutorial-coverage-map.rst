@@ -8,8 +8,8 @@ The released public denominator contains **201 operations** across
 ``PinchProblem``, ``PinchWorkspace``, targeting, all-period targeting,
 components and returned component results, ordered case batches, HEN
 design/result views, and plotting. The canonical manifest maps every operation
-to an executable tutorial code cell:
-**201/201, or 100 percent mapping coverage**. Routine fake and guarded
+except those still under development to an executable tutorial code cell:
+**197/201 operations are mapped**. Routine fake and guarded
 real-engine pytest profiles provide
 additional evidence for the specialist target-owned HPR map operation.
 
@@ -20,10 +20,9 @@ is not reported as executed merely because its operations are mapped. The
 ``execution_evidence`` column distinguishes routine execution, opt-in profiles,
 and batch-delegation contracts.
 
-The two Brayton callables, and their batch mirrors, are mapped but explicitly
-marked ``runtime unsupported`` while the underlying solver contract is under
-repair. Tutorial 09 demonstrates handling that status as a screening outcome;
-the map does not misreport those callables as successful analyses.
+The two Brayton callables, and their batch mirrors, are marked
+``unmapped; under development``. They remain public but raise while the Brayton
+solver is under development, so no tutorial demonstrates them.
 
 Counting Rules
 --------------

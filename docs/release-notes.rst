@@ -4,6 +4,29 @@ Pre-Release Notes
 Unreleased
 ----------
 
+HPR cost model and search
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Simulated HPR targets now carry installed capital per machine:
+  ``C = F_inst * C_eq * (Q_cap / 1 MW)^0.7 * (0.7 + 0.3 * n_stages) * f_T``,
+  with ``C_eq`` = $485k fitted to the IEA HPT Project 68 cost data (2025 USD),
+  ``F_inst`` = 2.3 and a temperature factor above 75 °C. Parallel cycles are
+  separate machines; cascades and VC+MVR systems are one.
+- Electricity and heat default to $100/MWh. Ambient air is a free utility
+  inside each HPR cascade; cooling water (25 °C, 5 K approach) and a default
+  refrigeration utility (0.4 of the Carnot COP) cover the remaining cooling.
+- Default-utility capital ($750/kW of heating, $1500/kW of refrigeration) is
+  annualized into the objective. ``COSTING_HPR_CAPITAL_RECOVERY_ENABLED`` and
+  ``COSTING_HPR_UTILITY_CAPITAL_RECOVERY_ENABLED`` switch each part off.
+- Breaking: ``COSTING_HPR_COMP_*``, ``COSTING_HPR_HX_DUTY_*`` and
+  ``COSTING_HPR_PRICE_RATIO_COLD_TO_ELE`` are removed, and the
+  compressor/heat-exchanger capital split is gone from results.
+- Stage duties are independent fractions of the available duty, so the search
+  has no flat regions from clipped requests. A heat pump that does not pay
+  raises a typed "no beneficial heat pump" error.
+- Simulated refrigeration penalises unserved selected cooling, as the Carnot
+  path does.
+
 Analysis reliability and extensibility
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

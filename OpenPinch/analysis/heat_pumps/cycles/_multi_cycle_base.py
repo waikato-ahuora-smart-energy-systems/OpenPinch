@@ -25,7 +25,6 @@ class _MultiVapourCompressionCycleBase:
         # Default value used in piecewise approximation of non-linear T-h profiles.
         self._dt_diff_max: float = 0.5
         self._solved: bool = False
-        self._allocation_penalty = np.empty(0, dtype=float)
 
     @property
     def Q_evap(self) -> Optional[float]:
@@ -107,16 +106,18 @@ class _MultiVapourCompressionCycleBase:
 
     @property
     def penalty(self) -> Optional[float]:
-        """Total penalty for excessive subcooling."""
-        if self.solved:
-            cycle_penalty = sum(
-                float(np.asarray(cycle.penalty, dtype=float).sum())
-                for cycle in self._subcycles
-                if cycle.solved
-            )
-            return cycle_penalty + float(self._allocation_penalty.sum())
-        else:
-            return float(self._allocation_penalty.sum())
+        """Total penalty from the solved subcycles.
+
+        Stage duties are capped at what the process can absorb before solving,
+        so a request above that is not a violation and carries no penalty.
+        """
+        if not self.solved:
+            return 0.0
+        return sum(
+            float(np.asarray(cycle.penalty, dtype=float).sum())
+            for cycle in self._subcycles
+            if cycle.solved
+        )
 
     @property
     def dtcont(self) -> Optional[float]:

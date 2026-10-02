@@ -5,26 +5,26 @@ from __future__ import annotations
 import numpy as np
 
 from ....contracts.hpr import (
+    ZERO_USEFUL_DUTY_REASON,
     HeatPumpTargetInputs,
     HPRBackendResult,
     HPREvaluationMode,
     HPRParsedState,
     HPRTopologyIdentifier,
 )
-from ..common._shared.ambient_preallocation import preallocate_direct_ambient_duties
 from ..common._shared.streams import get_Q_vals_at_T_hpr_from_bckgrd_profile
 from ..common.encoding import (
-    AMBIENT_X_BOUNDS,
     DutyAllocationRequest,
-    encode_base_and_duty_splits,
-    map_Q_amb_to_x,
+    decode_available_fractions,
+    encode_available_fractions,
+    limit_available_duty,
     map_T_arr_to_x_arr,
     map_x_arr_to_DT_arr,
     map_x_arr_to_T_arr,
-    map_x_to_Q_amb,
 )
 from ..common.layout import HPRoptVectorLayout
 from ..common.shared import (
+    HPRCostUnit,
     evaluate_vapour_hpr_result,
     validate_vapour_hp_refrigerant_ls,
 )
@@ -100,7 +100,6 @@ def _vc_mvr_layout(args: HeatPumpTargetInputs) -> HPRoptVectorLayout:
         n_cond=n_vc,
         n_evap=n_vc,
         n_subcool=n_mvr + n_vc,
-        n_heat_base=1,
         n_heat_split=n_vc,
         n_ihx=n_vc,
         n_misc=1 + n_mvr + max(n_mvr - 1, 0),
@@ -113,11 +112,9 @@ def _get_vc_mvr_opt_setup(
 ) -> tuple[np.ndarray | None, list]:
     layout = _vc_mvr_layout(args)
     bnds = layout.build_bounds(
-        x_amb=AMBIENT_X_BOUNDS,
         x_cond=(0.0, 1.0),
         x_evap=(0.0, 1.0),
         x_subcool=(0.0, 1.0),
-        x_heat_base=(0.0, 1.0),
         x_heat_split=(0.0, 1.0),
         x_ihx=(0.0, 1.0),
         x_misc=(0.0, 1.0),
@@ -127,42 +124,32 @@ def _get_vc_mvr_opt_setup(
 
     n_vc = _num_vc_stages(args)
     n_mvr = _num_mvr_stages(args)
-    ambient = preallocate_direct_ambient_duties(
-        args=args,
-        Q_amb_hot=init_res.Q_amb_hot,
-        Q_amb_cold=init_res.Q_amb_cold,
-    )
-    Q_primary_ex = ambient.Q_heat_capacity
-    x_amb = map_Q_amb_to_x(
-        init_res.Q_amb_hot,
-        init_res.Q_amb_cold,
-        max(args.Q_heat_max, args.Q_cool_max),
-    )
     T_cond_seed = _fit_stage_array(init_res.T_cond, n_vc)
     T_evap_seed = _fit_stage_array(init_res.T_evap[::-1], n_vc)
     Q_heat_seed = _fit_stage_array(init_res.Q_cond, n_vc)
     x_cond = map_T_arr_to_x_arr(T_cond_seed, args.T_cold[0], args.T_cold[-1])
     x_evap = map_T_arr_to_x_arr(T_evap_seed, args.T_hot[-1], args.T_hot[0])
     x_subcool = np.zeros(n_mvr + n_vc, dtype=float)
-    _, x_heat_base, x_heat_split = encode_base_and_duty_splits(
-        Q_heat_seed,
-        Q_primary_ex,
-    )
     x_ihx = np.zeros(n_vc, dtype=float)
     x_mvr_source_split = np.array([0.5], dtype=float)
     x_mvr_lift = np.full(n_mvr, 0.5, dtype=float)
     x_mvr_process_split = np.zeros(max(n_mvr - 1, 0), dtype=float)
     x_misc = np.concatenate([x_mvr_source_split, x_mvr_lift, x_mvr_process_split])
-    return layout.pack(
-        x_amb=x_amb,
+    seed = dict(
         x_cond=x_cond,
         x_evap=x_evap,
         x_subcool=x_subcool,
-        x_heat_base=[x_heat_base],
-        x_heat_split=x_heat_split,
+        x_heat_split=np.ones(n_vc, dtype=float),
         x_ihx=x_ihx,
         x_misc=x_misc,
-    ), bnds
+    )
+    # Encode the seed duties against the availability at the seed's own
+    # condensing temperatures, exactly as the search will decode them.
+    Q_heat_available = _parse_vc_mvr_state_variables(
+        layout.pack(**seed), args
+    ).Q_heat_available
+    seed["x_heat_split"] = encode_available_fractions(Q_heat_seed, Q_heat_available)
+    return layout.pack(**seed), bnds
 
 
 def _parse_vc_mvr_state_variables(
@@ -171,10 +158,6 @@ def _parse_vc_mvr_state_variables(
 ) -> HPRParsedState:
     n_mvr = _num_mvr_stages(args)
     parts = _vc_mvr_layout(args).unpack(x)
-    Q_amb_hot, Q_amb_cold = map_x_to_Q_amb(
-        parts["x_amb"],
-        max(args.Q_heat_max, args.Q_cool_max),
-    )
     T_cond_vc = map_x_arr_to_T_arr(
         parts["x_cond"],
         args.T_cold[0],
@@ -185,18 +168,17 @@ def _parse_vc_mvr_state_variables(
         args.T_hot[-1],
         args.T_hot[0],
     )
-    ambient = preallocate_direct_ambient_duties(
-        args=args,
-        Q_amb_hot=Q_amb_hot,
-        Q_amb_cold=Q_amb_cold,
+    Q_heat_available = limit_available_duty(
+        get_Q_vals_at_T_hpr_from_bckgrd_profile(
+            T_cond_vc,
+            args.T_cold,
+            args.H_cold,
+            is_cond=True,
+        ),
+        args.Q_heat_max,
     )
-    H_cold_with_amb = ambient.H_cold_with_residual_ambient(args)
-    Q_heat_base = float(parts["x_heat_base"][0]) * ambient.Q_heat_capacity
-    Q_heat_available = get_Q_vals_at_T_hpr_from_bckgrd_profile(
-        T_cond_vc,
-        ambient.T_cold_residual,
-        H_cold_with_amb,
-        is_cond=True,
+    Q_heat_base = float(
+        decode_available_fractions(parts["x_heat_split"], Q_heat_available).sum()
     )
     x_subcool_mvr = parts["x_subcool"][:n_mvr]
     x_subcool_vc = parts["x_subcool"][n_mvr:]
@@ -217,12 +199,6 @@ def _parse_vc_mvr_state_variables(
         dT_subcool=np.concatenate([dT_subcool_mvr, dT_subcool_vc]),
         T_evap=np.concatenate([T_evap_mvr, T_evap_vc]),
         Q_cool=None,
-        Q_amb_hot=Q_amb_hot,
-        Q_amb_cold=Q_amb_cold,
-        Q_amb_hot_direct=ambient.Q_amb_hot_direct,
-        Q_amb_cold_direct=ambient.Q_amb_cold_direct,
-        Q_amb_hot_residual=ambient.Q_amb_hot_residual,
-        Q_amb_cold_residual=ambient.Q_amb_cold_residual,
         dT_ihx_gas_side=dT_ihx_gas_side,
         Q_heat_base=Q_heat_base,
         x_heat_split=parts["x_heat_split"],
@@ -291,8 +267,10 @@ def _compute_vc_mvr_system_obj(
         )
         cycle_evaluated = True
         w_hpr = hp.work
-        if not np.isfinite(hp.Q_heat) or hp.Q_heat <= 0.0:
-            return HPRBackendResult.failure(reason="Cycle delivers no useful duty.")
+        if not np.isfinite(hp.Q_heat) or hp.Q_heat < 0.0:
+            return HPRBackendResult.failure(reason="Cycle delivers negative duty.")
+        if hp.Q_heat == 0.0 and artifact_mode is HPREvaluationMode.FINAL:
+            return HPRBackendResult.failure(reason=ZERO_USEFUL_DUTY_REASON)
         cop = hp.Q_heat / w_hpr if w_hpr > 0 else 1.0
         Q_heat_ordered, Q_cool_ordered = _order_vc_mvr_result_duties(hp, args)
         result = evaluate_vapour_hpr_result(
@@ -307,6 +285,14 @@ def _compute_vc_mvr_system_obj(
             model=hp,
             penalty_terms=hp.penalty,
             dT_subcool=solved_state.dT_subcool,
+            cost_units=[
+                HPRCostUnit(
+                    Q_cap=float(hp.Q_heat),
+                    T_hot_max=float(np.max(solved_state.T_cond)),
+                    n_closed=_num_vc_stages(args),
+                    n_mvr=_num_mvr_stages(args),
+                )
+            ],
             debug=debug,
             artifact_mode=artifact_mode,
         )

@@ -3,7 +3,6 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-import OpenPinch.analysis.heat_pumps.common._shared.ambient_preallocation as hp_ambient
 import OpenPinch.analysis.heat_pumps.common._shared.plotting as hp_plotting
 import OpenPinch.analysis.heat_pumps.common._shared.streams as hp_streams
 import OpenPinch.analysis.heat_pumps.common.preprocessing as hp_preprocessing
@@ -192,50 +191,6 @@ def test_misc_heat_pump_helpers_and_stream_builders():
     assert len(amb_neg) == 1
 
 
-def test_ambient_preallocation_helpers_cover_zero_and_out_of_range_edges():
-    T_hot = np.array([120.0, 80.0, 40.0])
-    H_hot = np.array([0.0, -20.0, -40.0])
-    np.testing.assert_allclose(
-        hp_ambient._remove_direct_ambient_sink_from_hot_profile(
-            T_hot,
-            H_hot,
-            duty=0.0,
-            T_amb=80.0,
-        ),
-        (T_hot, H_hot),
-    )
-    np.testing.assert_allclose(
-        hp_ambient._remove_direct_ambient_sink_from_hot_profile(
-            T_hot,
-            np.array([40.0, 20.0, 0.0]),
-            duty=5.0,
-            T_amb=80.0,
-        ),
-        (T_hot, np.array([40.0, 20.0, 0.0])),
-    )
-
-    T_cold = np.array([120.0, 80.0, 40.0])
-    H_cold = np.array([0.0, -5.0, -10.0])
-    np.testing.assert_allclose(
-        hp_ambient._remove_direct_ambient_source_from_cold_profile(
-            T_cold,
-            H_cold,
-            duty=5.0,
-            T_amb=80.0,
-        ),
-        (T_cold, H_cold),
-    )
-
-    T_inserted, H_inserted = hp_ambient._insert_profile_temperatures(
-        T_hot,
-        H_hot,
-        200.0,
-        80.0,
-    )
-    np.testing.assert_allclose(T_inserted, T_hot)
-    np.testing.assert_allclose(H_inserted, H_hot)
-
-
 def test_compute_utility_cost_skips_utilities_without_cost_data():
     no_cost = _stream("free", 120.0, 80.0, 10.0, is_process_stream=False)
     priced = _stream("priced", 120.0, 80.0, 10.0, is_process_stream=False)
@@ -251,34 +206,23 @@ def test_compute_utility_cost_skips_utilities_without_cost_data():
     )
 
 
-def test_simulated_hpr_annualized_costs_use_value_units_and_duty_based_hx_cost():
-    streams = _sc(
-        _stream("cond", 120.0, 100.0, 20.0, is_process_stream=False),
-        _stream("evap", 40.0, 60.0, 10.0, is_process_stream=False),
-    )
+def test_simulated_hpr_annualized_costs_price_utilities_and_installed_capital():
     args = _base_args(
         ele_price=100.0,
         annual_op_time=1000.0,
         heat_to_power_ratio=0.5,
-        cold_to_power_ratio=0.25,
-        hpr_comp_fixed_cost=100.0,
-        hpr_comp_variable_cost=10.0,
-        hpr_comp_cost_exp=1.0,
-        hpr_hx_fixed_cost=50.0,
-        hpr_hx_variable_cost=2.0,
-        hpr_hx_cost_exp=1.0,
+        cooling_water_to_power_ratio=0.025,
+        refrigeration_to_power_ratio=0.5,
         discount_rate=0.1,
         serv_life=10.0,
     )
 
     costs = hp_shared.calc_simulated_hpr_annualized_costs(
         work=10.0,
-        work_arr=np.array([6.0, 4.0]),
         Q_ext_heat=8.0,
-        Q_ext_cold=4.0,
-        hpr_streams=streams,
-        hx_units=len(streams.get_hot_utility_streams())
-        + len(streams.get_cold_utility_streams()),
+        Q_cooling_water=4.0,
+        Q_refrigeration=2.0,
+        cost_units=[hp_shared.HPRCostUnit(Q_cap=1000.0, T_hot_max=150.0)],
         penalty_power_equivalent=2.0,
         args=args,
     )
@@ -286,15 +230,106 @@ def test_simulated_hpr_annualized_costs_use_value_units_and_duty_based_hx_cost()
     assert isinstance(costs, SimulatedHPRAnnualizedCostAccounting)
     assert isinstance(costs.hpr_operating_cost, Value)
     assert costs.hpr_operating_cost.unit == "$/y"
-    assert costs.hpr_operating_cost.value == pytest.approx(1500.0)
-    assert costs.hpr_compressor_capital_cost.unit == "$"
-    assert costs.hpr_compressor_capital_cost.value == pytest.approx(300.0)
-    assert costs.hpr_heat_exchanger_capital_cost.unit == "$"
-    assert costs.hpr_heat_exchanger_capital_cost.value == pytest.approx(160.0)
-    assert costs.hpr_capital_cost.value == pytest.approx(460.0)
+    # 10 kW power + 8 kW heat at 0.5 + 4 kW cooling water at 0.025
+    # + 2 kW refrigeration at 0.5, at $100/MWh for 1000 h.
+    assert costs.hpr_operating_cost.value == pytest.approx(1510.0)
+    # 2.3 x $485k x (1 MW)^0.7 x (0.7 + 0.3) x (1 + 0.4 x 0.75)
+    assert costs.hpr_capital_cost.unit == "$"
+    assert costs.hpr_capital_cost.value == pytest.approx(2.3 * 485000.0 * 1.3)
     assert costs.hpr_total_annualized_cost.unit == "$/y"
     assert costs.feasibility_penalty.unit == "$/y"
     assert costs.feasibility_penalty.value == pytest.approx(200.0)
+
+
+def test_annualized_costs_credit_utility_capital_and_can_drop_capital_recovery():
+    kwargs = dict(
+        ele_price=100.0,
+        annual_op_time=1000.0,
+        heat_to_power_ratio=1.0,
+        refrigeration_to_power_ratio=0.5,
+        discount_rate=0.1,
+        serv_life=10.0,
+        hot_utility_capital_cost=100.0,
+        refrigeration_capital_cost=500.0,
+    )
+    crf = 0.1 * 1.1**10 / (1.1**10 - 1.0)
+
+    def costs(**flags):
+        return hp_shared.calc_simulated_hpr_annualized_costs(
+            work=10.0,
+            Q_ext_heat=8.0,
+            Q_cooling_water=0.0,
+            Q_refrigeration=2.0,
+            cost_units=[hp_shared.HPRCostUnit(Q_cap=1000.0, T_hot_max=150.0)],
+            penalty_power_equivalent=0.0,
+            args=_base_args(**kwargs, **flags),
+        )
+
+    both = costs()
+    # 8 kW of hot utility at $100/kW and 2 kW of refrigeration at $500/kW.
+    assert both.hpr_utility_annualized_capital_cost.value == pytest.approx(1800.0 * crf)
+    assert both.hpr_total_annualized_cost.value == pytest.approx(
+        both.hpr_operating_cost.value
+        + both.hpr_annualized_capital_cost.value
+        + both.hpr_utility_annualized_capital_cost.value
+    )
+
+    no_hp = costs(hpr_capital_recovery=False)
+    assert no_hp.hpr_capital_cost.value == pytest.approx(both.hpr_capital_cost.value)
+    assert no_hp.hpr_annualized_capital_cost.value == 0.0
+    assert no_hp.hpr_total_annualized_cost.value == pytest.approx(
+        both.hpr_total_annualized_cost.value - both.hpr_annualized_capital_cost.value
+    )
+
+    no_utility = costs(utility_capital_recovery=False)
+    assert no_utility.hpr_utility_annualized_capital_cost.value == 0.0
+
+
+def test_hpr_capital_cost_scales_with_size_stages_and_temperature():
+    args = _base_args()
+    unit = hp_shared.HPRCostUnit(Q_cap=2000.0, T_hot_max=200.0, n_closed=2, n_mvr=1)
+
+    cost = hp_shared.calc_hpr_capital_cost([unit], args)
+
+    expected = 2.3 * 485000.0 * 2.0**0.7 * (0.7 + 0.3 * 3) * (1.0 + 0.4 * 1.25)
+    assert cost.unit == "$"
+    assert cost.value == pytest.approx(expected)
+
+
+def test_hpr_capital_cost_sums_machines_and_ignores_idle_ones():
+    args = _base_args()
+    cool = hp_shared.HPRCostUnit(Q_cap=1000.0, T_hot_max=60.0)
+    idle = hp_shared.HPRCostUnit(Q_cap=0.0, T_hot_max=180.0)
+
+    one = hp_shared.calc_hpr_capital_cost([cool], args).value
+    both = hp_shared.calc_hpr_capital_cost([cool, cool, idle], args).value
+
+    # Below the 75 C base there is no temperature factor.
+    assert one == pytest.approx(2.3 * 485000.0)
+    assert both == pytest.approx(2.0 * one)
+
+
+def test_default_refrigeration_ratio_uses_carnot_cop_to_cooling_water():
+    costing = SimpleNamespace(
+        hpr_price_ratio_cooling_water_to_ele=0.025,
+        hpr_cooling_water_temperature=25.0,
+        hpr_cooling_water_dt_min=5.0,
+        hpr_refrigeration_eta_ii=0.4,
+        hpr_refrigeration_dt=5.0,
+    )
+
+    cold = hp_preprocessing.default_refrigeration_to_power_ratio(
+        T_min=-10.0, costing=costing
+    )
+    warm = hp_preprocessing.default_refrigeration_to_power_ratio(
+        T_min=50.0, costing=costing
+    )
+
+    # Evaporating at -15 C, rejecting at 30 C.
+    cop = 0.4 * 258.15 / 45.0
+    assert cold == pytest.approx(1.0 / cop)
+    # No refrigeration needed above the cooling-water level.
+    assert warm == pytest.approx(0.025)
 
 
 def test_cycle_penalty_ignores_missing_and_negative_terms():
@@ -321,82 +356,53 @@ def test_cycle_penalty_scores_only_cycle_terms():
     assert penalty == pytest.approx(50.0)
 
 
-def test_direct_ambient_sink_preallocation_reduces_background_hot_profile():
+def test_vapour_refrigeration_penalises_unserved_cooling():
+    # 100 kW must be removed between 15 C and 5 C, below where air can take
+    # it, and no refrigerator serves it.
+    def evaluate(is_heat_pumping):
+        args = _base_args(
+            T_hot=np.array([15.0, 5.0]),
+            H_hot=np.array([0.0, -100.0]),
+            T_cold=np.array([95.0, 45.0]),
+            H_cold=np.array([0.0, 0.0]),
+            z_amb_hot=np.zeros(2),
+            z_amb_cold=np.zeros(2),
+            Q_heat_max=0.0,
+            Q_cool_max=100.0,
+            is_heat_pumping=is_heat_pumping,
+        )
+        return hp_shared.evaluate_vapour_hpr_result(
+            args=args,
+            state=HPRParsedState(Q_amb_hot=0.0, Q_amb_cold=0.0),
+            work=0.0,
+            work_arr=np.array([]),
+            Q_heat=np.array([]),
+            Q_cool=np.array([]),
+            cop_h=1.0,
+            hpr_streams=StreamCollection(),
+        )
+
+    refrigeration = evaluate(False)
+    heat_pump = evaluate(True)
+
+    assert refrigeration.Q_ext_cold == pytest.approx(100.0)
+    assert refrigeration.feasibility_penalty > 0.0
+    assert heat_pump.feasibility_penalty == pytest.approx(0.0)
+
+
+def test_cascade_cost_unit_counts_every_solved_stage():
     args = _base_args()
+    streams = _sc(_stream("cond", 120.0, 100.0, 500.0, is_process_stream=False))
+    state = HPRParsedState(T_cond=np.array([110.0, 90.0]))
 
-    ambient = hp_ambient.preallocate_direct_ambient_duties(
-        args=args,
-        Q_amb_hot=0.0,
-        Q_amb_cold=50.0,
+    (unit,) = hp_shared._single_cost_unit(
+        state, streams, np.array([10.0, 8.0, 6.0]), args
     )
 
-    assert ambient.Q_amb_cold_direct == pytest.approx(50.0)
-    assert ambient.Q_amb_cold_residual == pytest.approx(0.0)
-    np.testing.assert_allclose(
-        ambient.T_hot_residual,
-        np.array([140.0, 90.0, 71.25, 40.0]),
-    )
-    np.testing.assert_allclose(
-        ambient.H_hot_residual,
-        np.array([0.0, -80.0, -110.0, -110.0]),
-    )
-    np.testing.assert_allclose(ambient.T_cold_residual, args.T_cold)
-    np.testing.assert_allclose(ambient.H_cold_residual, args.H_cold)
-
-
-def test_direct_ambient_source_preallocation_reduces_background_cold_profile():
-    args = _base_args(T_env=90.0)
-
-    ambient = hp_ambient.preallocate_direct_ambient_duties(
-        args=args,
-        Q_amb_hot=50.0,
-        Q_amb_cold=0.0,
-    )
-
-    assert ambient.Q_amb_hot_direct == pytest.approx(50.0)
-    assert ambient.Q_amb_hot_residual == pytest.approx(0.0)
-    np.testing.assert_allclose(
-        ambient.T_cold_residual,
-        np.array([130.0, 90.0, 80.0, 55.0, 30.0]),
-    )
-    np.testing.assert_allclose(
-        ambient.H_cold_residual,
-        np.array([150.0, 70.0, 50.0, 0.0, 0.0]),
-    )
-    np.testing.assert_allclose(ambient.T_hot_residual, args.T_hot)
-    np.testing.assert_allclose(ambient.H_hot_residual, args.H_hot)
-
-
-def test_direct_ambient_preallocation_keeps_excess_as_residual():
-    args = _base_args()
-
-    ambient = hp_ambient.preallocate_direct_ambient_duties(
-        args=args,
-        Q_amb_hot=0.0,
-        Q_amb_cold=200.0,
-    )
-
-    assert ambient.Q_amb_cold_direct == pytest.approx(160.0)
-    assert ambient.Q_amb_cold_residual == pytest.approx(40.0)
-    np.testing.assert_allclose(ambient.T_hot_residual, args.T_hot)
-    np.testing.assert_allclose(ambient.H_hot_residual, np.zeros(3))
-
-
-def test_direct_ambient_preallocation_zero_duty_leaves_profiles_unchanged():
-    args = _base_args()
-
-    ambient = hp_ambient.preallocate_direct_ambient_duties(
-        args=args,
-        Q_amb_hot=0.0,
-        Q_amb_cold=0.0,
-    )
-
-    assert ambient.Q_amb_hot_direct == pytest.approx(0.0)
-    assert ambient.Q_amb_cold_direct == pytest.approx(0.0)
-    np.testing.assert_allclose(ambient.T_hot_residual, args.T_hot)
-    np.testing.assert_allclose(ambient.H_hot_residual, args.H_hot)
-    np.testing.assert_allclose(ambient.T_cold_residual, args.T_cold)
-    np.testing.assert_allclose(ambient.H_cold_residual, args.H_cold)
+    # Two condenser levels and two evaporator levels: three stages.
+    assert unit.n_closed == 3
+    assert unit.Q_cap == pytest.approx(500.0)
+    assert unit.T_hot_max == pytest.approx(110.0)
 
 
 def test_vapour_evaluator_keeps_background_profiles_out_of_one_point_match():
@@ -425,8 +431,11 @@ def test_vapour_evaluator_keeps_background_profiles_out_of_one_point_match():
         hpr_streams=StreamCollection(),
     )
 
+    # Cold streams above ambient still need external heat, while air takes the
+    # hot streams' heat above ambient for free.
     assert result.Q_ext_heat == pytest.approx(100.0)
-    assert result.Q_ext_cold == pytest.approx(100.0)
+    assert result.Q_ext_cold == pytest.approx(0.0)
+    assert result.Q_amb_cold == pytest.approx(100.0)
 
 
 def test_vapour_evaluator_penalises_hpr_self_match_without_one_point_cascade():
@@ -463,25 +472,23 @@ def test_vapour_evaluator_penalises_hpr_self_match_without_one_point_cascade():
     assert result.feasibility_penalty > 0.0
 
 
-def test_vapour_evaluator_counts_direct_ambient_sink_once():
+def test_vapour_evaluator_uses_air_only_where_the_cascade_can():
+    # Hot process heat: 100 kW released 100-50 C (above the 20 C air level)
+    # and 40 kW released 15-5 C (below it). Air takes only the first.
     args = _base_args(
-        T_hot=np.array([100.0, 50.0]),
-        H_hot=np.array([0.0, -100.0]),
+        T_hot=np.array([100.0, 50.0, 15.0, 5.0]),
+        H_hot=np.array([0.0, -100.0, -100.0, -140.0]),
         T_cold=np.array([95.0, 45.0]),
         H_cold=np.array([0.0, 0.0]),
-        z_amb_hot=np.zeros(2),
+        z_amb_hot=np.zeros(4),
         z_amb_cold=np.zeros(2),
         Q_heat_max=0.0,
-        Q_cool_max=100.0,
-        T_env=20.0,
+        Q_cool_max=140.0,
     )
 
     result = hp_shared.evaluate_vapour_hpr_result(
         args=args,
-        state=HPRParsedState(
-            Q_amb_hot=0.0,
-            Q_amb_cold=60.0,
-        ),
+        state=HPRParsedState(),
         work=0.0,
         work_arr=np.array([]),
         Q_heat=np.array([]),
@@ -490,8 +497,10 @@ def test_vapour_evaluator_counts_direct_ambient_sink_once():
         hpr_streams=StreamCollection(),
     )
 
-    assert result.Q_amb_cold == pytest.approx(60.0)
+    assert result.Q_amb_cold == pytest.approx(100.0)
     assert result.Q_ext_cold == pytest.approx(40.0)
+    assert result.Q_amb_hot == pytest.approx(0.0)
+    assert result.feasibility_penalty == pytest.approx(0.0)
 
 
 def test_carnot_debug_plot_uses_unmodified_background_profiles(monkeypatch):
@@ -524,7 +533,7 @@ def test_carnot_debug_plot_uses_unmodified_background_profiles(monkeypatch):
     assert result.artifacts.debug_figure == "figure"
 
 
-def test_vapour_debug_plot_uses_residual_profiles_after_direct_ambient(monkeypatch):
+def test_vapour_debug_plot_uses_the_background_profiles(monkeypatch):
     args = _base_args()
     seen = {}
 
@@ -552,7 +561,7 @@ def test_vapour_debug_plot_uses_residual_profiles_after_direct_ambient(monkeypat
     )
 
     assert result.artifacts.debug_figure == "figure"
-    assert len(seen["T_hot"]) > len(args.T_hot)
+    np.testing.assert_allclose(seen["T_hot"], args.T_hot)
 
 
 def test_vapour_evaluator_handles_empty_evaporator_side():
