@@ -47,7 +47,6 @@ from ..solver.piecewise import (
     profile_from_solver_arrays,
     utility_thermal_profile,
 )
-from ._base import execution as _execution
 from ._base import piecewise as _piecewise
 from .base import BaseHeatExchangerNetworkModel
 from .thermal_profiles import ThermalProfile, smooth_clip
@@ -1310,10 +1309,19 @@ def _sum(values):
 
 
 def _numeric(value: Any) -> float:
-    try:
-        return _execution._solver_value(None, value.value)
-    except AttributeError:
-        return float(value)
+    """Plain float from a number, a solver variable or a GEKKO Param.
+
+    GEKKO wraps a Param's value in ``GK_Value`` whose own ``.value`` may be a
+    scalar or a list, so unwrap ``.value`` until a number or sequence remains.
+    """
+
+    for _ in range(3):
+        if not hasattr(value, "value"):
+            break
+        value = value.value
+    if isinstance(value, list | tuple) or getattr(value, "ndim", 0):
+        return float(value[0])
+    return float(value)
 
 
 def exact_lmtd(theta_1: float, theta_2: float) -> float:

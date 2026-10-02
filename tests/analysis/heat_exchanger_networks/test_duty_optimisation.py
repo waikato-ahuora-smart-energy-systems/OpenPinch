@@ -1360,3 +1360,18 @@ def test_live_solver_area_with_a_stream_off_in_one_period() -> None:
     )
     assert heater.period_states[1].duty == pytest.approx(1000.0, abs=1.0)
     assert all(state.duty <= 1100.0 + 1e-3 for state in heater.period_states)
+
+
+def test_numeric_unwraps_gekko_param_values() -> None:
+    from OpenPinch.analysis.heat_exchanger_networks.models.fixed_structure import (
+        _numeric,
+    )
+
+    class _Wrapped:  # GEKKO Param: .value is a GK_Value holding a scalar
+        def __init__(self, value):
+            self.value = value
+
+    assert _numeric(_Wrapped(_Wrapped(100.0))) == 100.0
+    assert _numeric(_Wrapped([3.0])) == 3.0
+    assert _numeric(_Wrapped(_Wrapped([4.0, 5.0]))) == 4.0
+    assert _numeric(2.5) == 2.5
