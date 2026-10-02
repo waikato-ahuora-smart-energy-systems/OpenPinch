@@ -29,7 +29,14 @@ from OpenPinch.domain.enums import ProblemTableLabel
 
 from .context import ProcessEntropySlice
 from .errors import PlacementContextError
+from .units import (
+    INTERNAL_TEMPERATURE,
+    INTERNAL_TEMPERATURE_DIFFERENCE,
+)
 
+
+# Duties (kW) below this are rounding noise in calibration.
+_CALIBRATION_TOLERANCE = 1e-9
 
 def _finite_tuple(values) -> tuple[float, ...]:
     return tuple(float(value) for value in values)
@@ -76,10 +83,14 @@ def _calibrate_profile(
     residual_duty: float,
 ) -> tuple[float, ...]:
     """Match rounded problem-table coordinates to the exact target duty."""
+    # Snap rounding noise to zero and never scale to a negative duty.
+    if abs(residual_duty) <= _CALIBRATION_TOLERANCE:
+        residual_duty = 0.0
+    residual_duty = max(residual_duty, 0.0)
     peak = max(profile, default=0.0)
-    if peak == 0.0:
+    if peak <= _CALIBRATION_TOLERANCE:
         if residual_duty == 0.0:
-            return profile
+            return tuple(0.0 for _ in profile)
         raise PlacementContextError(
             code="incomplete_load_profile",
             message="Target load profile cannot represent the residual duty.",
@@ -190,19 +201,19 @@ def _coordinate_bounds(
             supply = QuantityInterval(
                 lower=paired_lower,
                 upper=paired_upper,
-                unit=request.units.absolute_temperature,
+                unit=INTERNAL_TEMPERATURE,
             )
         elif blueprint.key.side is UtilitySide.HOT:
             supply = QuantityInterval(
                 lower=hot_lower,
                 upper=hot_upper,
-                unit=request.units.absolute_temperature,
+                unit=INTERNAL_TEMPERATURE,
             )
         else:
             supply = QuantityInterval(
                 lower=cold_lower,
                 upper=cold_upper,
-                unit=request.units.absolute_temperature,
+                unit=INTERNAL_TEMPERATURE,
             )
         bounds.append(
             PhysicalCoordinateBound(
@@ -224,7 +235,7 @@ def _coordinate_bounds(
                     bounds=QuantityInterval(
                         lower=request.options.minimum_sensible_span.value,
                         upper=maximum_span,
-                        unit=request.units.temperature_difference,
+                        unit=INTERNAL_TEMPERATURE_DIFFERENCE,
                     ),
                     reason="residual-profile sensible-span support",
                 )

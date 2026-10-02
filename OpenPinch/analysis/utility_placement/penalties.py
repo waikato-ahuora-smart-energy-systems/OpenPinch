@@ -16,8 +16,13 @@ def g_penalty(
     cold_fallback_duty: float,
     required_hot_duty: float,
     required_cold_duty: float,
+    coverage_tolerance: float = 0.0,
 ) -> float:
-    """Return the canonical squared default-utility duty penalty."""
+    """Return the canonical squared default-utility duty penalty.
+
+    Duties at or below ``coverage_tolerance`` (kW) count as zero, so rounding
+    noise is not penalised like an unserved megawatt.
+    """
     values = (
         hot_fallback_duty,
         cold_fallback_duty,
@@ -27,11 +32,13 @@ def g_penalty(
     if any(not math.isfinite(value) or value < 0.0 for value in values):
         raise ValueError("g_penalty duties must be finite and non-negative")
 
+    tolerance = max(float(coverage_tolerance), 0.0)
+
     def residual(fallback: float, required: float) -> float:
-        if required == 0.0:
-            if fallback != 0.0:
-                raise ValueError("fallback duty requires positive residual duty")
+        if fallback <= tolerance:
             return 0.0
+        if required <= tolerance:
+            raise ValueError("fallback duty requires positive residual duty")
         return fallback / required
 
     return float(

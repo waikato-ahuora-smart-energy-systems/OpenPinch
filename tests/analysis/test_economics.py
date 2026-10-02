@@ -43,15 +43,14 @@ def test_crf_short_term():
     assert math.isclose(result, expected, rel_tol=1e-9)
 
 
-def test_crf_zero_interest_raises():
-    """Zero interest should raise ZeroDivisionError."""
-    with pytest.raises(ZeroDivisionError):
-        compute_capital_recovery_factor(0.0, 10)
+def test_crf_zero_interest_is_straight_line():
+    """A zero rate recovers the capital evenly: 1 / n."""
+    assert compute_capital_recovery_factor(0.0, 10) == pytest.approx(0.1)
 
 
 def test_crf_zero_years_raises():
-    """Zero years should raise ZeroDivisionError."""
-    with pytest.raises(ZeroDivisionError):
+    """A service life must be positive."""
+    with pytest.raises(ValueError, match="service life"):
         compute_capital_recovery_factor(0.08, 0)
 
 
@@ -87,12 +86,29 @@ def test_compute_annual_capital_cost_matches_crf_product():
     assert result.value == pytest.approx(expected)
 
 
-def test_compute_annual_capital_cost_clamps_nonpositive_economic_inputs():
-    result = compute_annual_capital_cost(Value(50000.0, "$"), 0.0, 0.0)
+def test_compute_annual_capital_cost_rejects_out_of_range_inputs():
+    # No silent clamping: configuration requires rate >= 0 and life >= 1.
+    with pytest.raises(ValueError, match="service life"):
+        compute_annual_capital_cost(Value(50000.0, "$"), 0.07, 0.5)
+    with pytest.raises(ValueError, match="discount rate"):
+        compute_annual_capital_cost(Value(50000.0, "$"), -0.01, 10.0)
 
-    expected = 50000.0 * compute_capital_recovery_factor(1e-6, 1.0)
-    assert result.unit == "$/y"
-    assert result.value == pytest.approx(expected)
+
+def test_compute_annual_capital_cost_at_zero_rate_is_straight_line():
+    result = compute_annual_capital_cost(Value(50000.0, "$"), 0.0, 10.0)
+
+    assert result.value == pytest.approx(5000.0)
+
+
+@pytest.mark.parametrize(
+    "options",
+    [{"COSTING_DISCOUNT_RATE": -0.01}, {"COSTING_SERVICE_LIFE": 0.5}],
+)
+def test_configuration_rejects_out_of_range_annualisation(options):
+    from OpenPinch.domain.configuration_fields import validate_configuration_options
+
+    with pytest.raises(ValueError):
+        validate_configuration_options(options)
 
 
 def test_compute_annual_energy_cost_converts_kw_hours_and_mwh_price():

@@ -24,6 +24,7 @@ from OpenPinch.contracts.utility_placement import (
 
 from .errors import PlacementContextError
 from .normalization import convert_placement_value
+from .units import INTERNAL_TEMPERATURE, INTERNAL_TEMPERATURE_DIFFERENCE
 
 
 class _FrozenContext(BaseModel):
@@ -315,15 +316,15 @@ def build_utility_placement_context(
 
     minimum_separation = convert_placement_value(
         request.options.minimum_separation,
-        canonical_unit=request.units.temperature_difference,
-        default_unit=request.units.temperature_difference,
+        canonical_unit=INTERNAL_TEMPERATURE_DIFFERENCE,
+        default_unit=INTERNAL_TEMPERATURE_DIFFERENCE,
         field_path="options.minimum_separation",
     )
     envelope = PlacementFeasibilityEnvelope(
         periods=tuple(envelope_periods),
         minimum_separation=QuantityValue(
             value=minimum_separation,
-            unit=request.units.temperature_difference,
+            unit=INTERNAL_TEMPERATURE_DIFFERENCE,
         ),
         scope=scope,
         base_target_id=base_target_id,

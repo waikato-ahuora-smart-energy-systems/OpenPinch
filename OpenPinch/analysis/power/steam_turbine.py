@@ -33,15 +33,30 @@ def _apply_efficiency_limits(
     return work, efficiency
 
 
+# Water's liquid-vapour saturation range, degC: the triple point and the
+# critical point. Saturation lookups fail outside it.
+_T_TRIPLE = 0.01
+_T_CRITICAL = 373.946
+_P_CRITICAL = 220.64  # bar
+_MASS_BALANCE_MAX_ITERATIONS = 50
+
+
 def _segment_enthalpy(
     h_prev: float,
     work: float,
     mass_flow: float,
-    mech_eff: float,
+    mech_eff: float | None = None,
 ) -> float:
-    if mass_flow <= tol or mech_eff <= tol:
+    """Return the steam outlet enthalpy after the model's fluid work.
+
+    The turbine models give the work done by the steam. Mechanical losses
+    derate only the shaft work (``fluid work * mech_eff``); they do not change
+    the steam's expansion, so ``mech_eff`` is not used here.
+    """
+    del mech_eff
+    if mass_flow <= tol:
         return h_prev
-    return h_prev - work / (mass_flow * mech_eff)
+    return h_prev - work / mass_flow
 
 
 def _predict_stage_work(
@@ -256,7 +271,7 @@ def _work_SunModel(P_in, h_in, P_out, h_sat, m, m_max, dh_is, n_mech, t_type=1):
     W_int = c0 / A0 * (m_max * dh_is - b0)
     n = (1 + c0) / A0 * (dh_is - b0 / m_max)
     w_act = n * m - W_int
-    h_out = h_in - w_act / (n_mech * m)
+    h_out = h_in - w_act / m  # fluid work; mechanical losses act on the shaft
 
     if h_out <= h_sat + tol and t_type_key == "BPST":
         w_act = _work_SunModel(P_in, h_in, P_out, h_sat, m, m_max, dh_is, n_mech, "CT")
@@ -302,7 +317,7 @@ def _work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size=1, t_type=1):
             P_in, h_in, P_out, h_sat, m, dh_is, n_mech, ">2MW", t_type_key
         )
 
-    h_out = h_in - w_max / (n_mech * m)
+    h_out = h_in - w_max / m  # fluid work; mechanical losses act on the shaft
     if h_out <= h_sat + tol and t_type_key == "BPST":
         w_max = _work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size_key, "CT")
 
@@ -478,6 +493,14 @@ class MultiStageSteamTurbine:
         P_in: float,
         params: dict,
     ) -> dict:
+        # Extraction stages condense, so they must lie in water's saturation
+        # range; the inlet itself may be supercritical.
+        in_range = (stage_temperatures > _T_TRIPLE) & (
+            stage_temperatures < _T_CRITICAL
+        )
+        stage_temperatures = stage_temperatures[in_range]
+        stage_heat_flows = stage_heat_flows[in_range]
+        source_indices = source_indices[in_range]
         stage_pressures = np.asarray(
             [psat_T(T_stage) for T_stage in stage_temperatures], dtype=float
         )
@@ -506,8 +529,11 @@ class MultiStageSteamTurbine:
         eff_k = [0.0]
         dh_is_k = [0.0]
         h_out = [h_inlet]
-        h_tar = [hL_p(P_in)]
-        h_sat = [hV_p(P_in)]
+        # A supercritical inlet has no saturated states; index 0 is never a
+        # condensing stage, so the inlet enthalpy stands in.
+        supercritical = P_in >= _P_CRITICAL
+        h_tar = [h_inlet if supercritical else hL_p(P_in)]
+        h_sat = [h_inlet if supercritical else hV_p(P_in)]
         stage_T = [T_in]
         stage_idx = [-1]
         m_in_est = 0.0
@@ -555,12 +581,17 @@ class MultiStageSteamTurbine:
         }
         state = _TurbineState(params, data)
 
+        # Iterate the extraction mass balance to tolerance, with a cap.
         iterations = 0
-        while True:
+        converged = False
+        while iterations < _MASS_BALANCE_MAX_ITERATIONS:
             previous_m_in = state.m_in_est
             _iterate_turbine_state(state)
             iterations += 1
-            if abs(previous_m_in - state.m_in_est) < tol or iterations >= 3:
+            if abs(previous_m_in - state.m_in_est) <= tol * max(
+                1.0, abs(state.m_in_est)
+            ):
+                converged = True
                 break
 
         stages = []
@@ -582,21 +613,25 @@ class MultiStageSteamTurbine:
                     condensate_enthalpy=state.h_tar[j],
                     saturation_enthalpy=state.h_sat[j],
                     dh_isentropic=state.dh_is_k[j],
-                    work_actual=state.w_k[j],
+                    work_actual=state.w_k[j] * state.n_mech,
                     work_isentropic=state.w_isen_k[j],
                     isentropic_efficiency=state.eff_k[j],
                     turbine_model=state.model,
                 )
             )
 
-        total_work = float(sum(state.w_k))
+        fluid_work = float(sum(state.w_k))
+        total_work = fluid_work * state.n_mech  # shaft work
         total_isentropic_work = float(sum(state.w_isen_k))
+        # The isentropic (steam-side) efficiency; mechanical losses excluded.
         overall_efficiency = (
-            total_work / total_isentropic_work if total_isentropic_work > tol else 0.0
+            fluid_work / total_isentropic_work if total_isentropic_work > tol else 0.0
         )
 
         return {
             "mode": "above_pinch",
+            "converged": converged,
+            "mass_balance_iterations": iterations,
             "turbine_model": state.model,
             "load_frac": state.load_frac,
             "mech_eff": state.n_mech,
@@ -625,8 +660,18 @@ class MultiStageSteamTurbine:
         T_sink: float,
         params: dict,
     ) -> dict:
+        diagnostics: list[str] = []
+        if not _T_TRIPLE <= T_sink < _T_CRITICAL:
+            clamped = min(max(T_sink, _T_TRIPLE), _T_CRITICAL - 1.0)
+            diagnostics.append(
+                f"Sink temperature {T_sink:g} degC is outside water's saturation "
+                f"range; condensing at {clamped:g} degC instead."
+            )
+            T_sink = clamped
         P_sink = psat_T(T_sink)
-        viable = stage_temperatures > T_sink + tol
+        viable = (stage_temperatures > T_sink + tol) & (
+            stage_temperatures < _T_CRITICAL
+        )
         if not viable.any():
             return self._empty_result(
                 mode="below_pinch",
@@ -645,6 +690,7 @@ class MultiStageSteamTurbine:
 
         stages = []
         total_work = 0.0
+        total_fluid_work = 0.0
         total_isentropic_work = 0.0
         total_mass_flow = 0.0
 
@@ -693,21 +739,25 @@ class MultiStageSteamTurbine:
                 condensate_enthalpy=float(h_sink_liq),
                 saturation_enthalpy=float(h_sink_sat),
                 dh_isentropic=float(dh_is),
-                work_actual=float(w_act),
+                work_actual=float(w_act * params["mech_eff"]),
                 work_isentropic=float(w_is),
                 isentropic_efficiency=float(eff),
                 turbine_model=params["model"],
             )
             stages.append(stage)
-            total_work += w_act
+            total_work += w_act * params["mech_eff"]  # shaft work
+            total_fluid_work += w_act
             total_isentropic_work += w_is
             total_mass_flow += m_stage
 
         overall_efficiency = (
-            total_work / total_isentropic_work if total_isentropic_work > tol else 0.0
+            total_fluid_work / total_isentropic_work
+            if total_isentropic_work > tol
+            else 0.0
         )
         return {
             "mode": "below_pinch",
+            "diagnostics": diagnostics,
             "turbine_model": params["model"],
             "load_frac": params["load_frac"],
             "mech_eff": params["mech_eff"],

@@ -309,7 +309,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "COSTING_HX_AREA_COEFF": _spec(float, 10000.0, "costing", "hx_area_coeff", numeric_min=0.0),
     "COSTING_HX_AREA_EXP": _spec(float, 0.6, "costing", "hx_area_exp", numeric_min=0.0),
     "COSTING_DISCOUNT_RATE": _spec(float, 0.07, "costing", "discount_rate", numeric_min=0.0),
-    "COSTING_SERVICE_LIFE": _spec(float, 20.0, "costing", "service_life", numeric_min=0.0),
+    "COSTING_SERVICE_LIFE": _spec(float, 20.0, "costing", "service_life", numeric_min=1.0),
     "COSTING_HPR_ELE_PRICE": _spec(float, 100.0, "costing", "hpr_ele_price", numeric_min=0.0),
     # HPR prices, relative to the electricity price.
     "COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE": _spec(float, 1.0, "costing", "hpr_price_ratio_heat_to_ele", numeric_min=0.0),

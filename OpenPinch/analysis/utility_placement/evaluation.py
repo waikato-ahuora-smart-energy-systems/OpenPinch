@@ -32,6 +32,7 @@ from .penalties import (
     penalized_feasible_objective_scalar,
 )
 from .thermodynamics import evaluate_thermodynamic_cost, stream_entropy_change
+from .units import INTERNAL_TEMPERATURE, INTERNAL_TEMPERATURE_DIFFERENCE
 
 
 class PlacementEvaluation(BaseModel):
@@ -61,14 +62,14 @@ def _public_level(level, request: UtilityPlacementRequest) -> UtilityLevelPeriod
         kind=level.kind,
         placement_rank=level.placement_rank,
         supply_temperature=QuantityValue(
-            value=level.supply_temperature, unit=units.absolute_temperature
+            value=level.supply_temperature, unit=INTERNAL_TEMPERATURE
         ),
         target_temperature=QuantityValue(
-            value=level.target_temperature, unit=units.absolute_temperature
+            value=level.target_temperature, unit=INTERNAL_TEMPERATURE
         ),
         temperature_span=QuantityValue(
             value=abs(level.target_temperature - level.supply_temperature),
-            unit=units.temperature_difference,
+            unit=INTERNAL_TEMPERATURE_DIFFERENCE,
         ),
         allocated_duty=QuantityValue(value=level.allocated_duty, unit=units.heat_flow),
         maximum_duty=(
@@ -230,6 +231,7 @@ class PlacementEvaluationSession:
                     cold_fallback_duty=allocation.cold_fallback_duty,
                     required_hot_duty=allocation.required_hot_duty,
                     required_cold_duty=allocation.required_cold_duty,
+                    coverage_tolerance=self.request.tolerances.coverage,
                 )
                 fallback_penalties.append(fallback_penalty)
 
@@ -242,9 +244,13 @@ class PlacementEvaluationSession:
                         allocation=allocation,
                     )
                 except PlacementThermodynamicError as exc:
+                    # Candidate-specific failures reject one candidate; anything
+                    # else is a defect worth surfacing.
                     if exc.code not in {
                         "invalid_balanced_composite",
                         "negative_entropy_generation",
+                        "zero_utility_temperature_span",
+                        "nonpositive_kelvin",
                     }:
                         raise
                     failure_diagnostics.append(
