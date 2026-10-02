@@ -314,10 +314,14 @@ def _complete_utility_data(
         dt_cont_arr = dt_cont.period_values
 
         effective_dt_cont_arr = dt_cont_arr * float(dt_cont_multiplier)
+        # A capped utility may not cover the whole duty, so it never replaces
+        # the default; any shortfall then goes to the default HU/CU.
+        uncapped = not _has_finite_heat_flow_cap(utility, config)
 
         if (
             utility.type in [StreamType.Hot.value, StreamType.Both.value]
             and utility.active
+            and uncapped
             and (
                 np.min(np.minimum(t_supply_arr, t_target_arr) - effective_dt_cont_arr)
                 >= hu_t_min - thermal.dt_phase_change
@@ -327,6 +331,7 @@ def _complete_utility_data(
         if (
             utility.type in [StreamType.Cold.value, StreamType.Both.value]
             and utility.active
+            and uncapped
             and (
                 np.max(np.maximum(t_supply_arr, t_target_arr) + effective_dt_cont_arr)
                 <= cu_t_max + thermal.dt_phase_change
@@ -334,6 +339,14 @@ def _complete_utility_data(
         ):
             add_default_cu = False
     return utilities, add_default_hu, add_default_cu
+
+
+def _has_finite_heat_flow_cap(utility: UtilitySchema, config: Configuration) -> bool:
+    """Return whether ``maximum_heat_flow`` caps the utility in any period."""
+    cap = _standardise_maximum_heat_flow(utility.maximum_heat_flow, config)
+    if cap is None:
+        return False
+    return bool(np.isfinite(np.asarray(cap.period_values, dtype=float)).any())
 
 
 def _add_default_utilities(

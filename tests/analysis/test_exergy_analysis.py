@@ -186,7 +186,7 @@ def test_build_exergy_gcc_curve_splits_segments_that_cross_ambient():
         temperatures=[60.0, 20.0, -10.0],
         heat_loads=[0.0, 15.0, 28.0],
         t_env=15.0,
-        dt_cont_half=0.0,
+        dt_cont_shift=0.0,
     )
 
     assert 0.0 in payload[ProblemTableLabel.T.value]
@@ -206,7 +206,7 @@ def test_build_exergy_gcc_curve_handles_zero_negative_and_single_point_segments(
         temperatures=[100.0, 60.0, 20.0, -20.0],
         heat_loads=[0.0, 20.0, 5.0, 5.0],
         t_env=15.0,
-        dt_cont_half=5.0,
+        dt_cont_shift=5.0,
     )
     assert len(sign_change[ProblemTableLabel.T.value]) > 4
     assert min(sign_change[ProblemTableLabel.X_GCC.value]) == pytest.approx(0.0)
@@ -311,7 +311,7 @@ def test_exergy_target_selection_and_column_helpers_cover_edge_cases():
             gcc_series=None,
             branches=[],
             t_env=15.0,
-            dt_cont_half=0.0,
+            dt_cont_shift=0.0,
         )
         is None
     )

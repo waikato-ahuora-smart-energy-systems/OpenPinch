@@ -49,8 +49,18 @@ also uses it as the reference for its dTmin sweep: in each tier of
 ``HENS_APPROACH_TEMPERATURES`` every stream's contribution is scaled by
 dTmin / (2 · ``THERMAL_DT_CONT``), so a stream at the default contributes
 exactly dTmin / 2. A utility without a ``price`` uses
-``COSTING_UTILITY_PRICE``, the price of the default utilities. Configuration does
-not contain target-method selectors; the descriptive ``problem.target.*`` or
+``COSTING_UTILITY_PRICE``, the price of the default utilities.
+
+A negative ``dt_cont`` is allowed, with a validation warning, as a deliberate
+modelling choice. It lets the real composite curves cross, so the degree of
+integration can exceed 1, and area targeting reports infinite area and capital
+cost (with a warning) instead of failing. A zero approach (``THERMAL_DT_CONT``
+of 0 or a zero ``dt_cont_multiplier``) gives infinite area in the same way.
+Streams whose supply and target temperatures differ by less than
+``THERMAL_DT_PHASE_CHANGE`` are widened to that span, with the same duty, so
+they are never lost between temperature intervals.
+
+Configuration does not contain target-method selectors; the descriptive ``problem.target.*`` or
 ``problem.design.*`` callable selects the analysis.
 
 Configuration

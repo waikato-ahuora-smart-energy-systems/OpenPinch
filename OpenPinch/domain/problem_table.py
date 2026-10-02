@@ -334,7 +334,11 @@ class ProblemTable:
         n = h_net.size
 
         abs_arr = np.abs(h_net)
-        zeros_mask = abs_arr < tol
+        # Scale-relative zero test, so a secondary pinch at MW scale (a
+        # rounding error of more than tol kW) is still found.
+        finite = abs_arr[np.isfinite(abs_arr)]
+        scale = float(finite.max()) if finite.size else 0.0
+        zeros_mask = abs_arr < max(tol, 1e-9 * scale)
 
         has_zero = np.any(zeros_mask)
         all_zero = np.all(zeros_mask)

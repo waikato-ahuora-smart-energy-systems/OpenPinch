@@ -63,9 +63,14 @@ def build_exergy_gcc_curve(
     temperatures: Iterable[float],
     heat_loads: Iterable[float],
     t_env: float,
-    dt_cont_half: float = 0.0,
+    dt_cont_shift: float = 0.0,
 ) -> dict[str, list[float]]:
-    """Transform one GCC-like curve into an exergetic GCC output."""
+    """Transform one GCC-like curve into an exergetic GCC output.
+
+    The GCC is on shifted temperatures. Each interval is put back on real
+    temperatures by ``dt_cont_shift``: up for hot-dominated (surplus) intervals,
+    down for cold-dominated ones.
+    """
     t_vals = _to_float_array(temperatures)
     h_vals = _to_float_array(heat_loads)
     _validate_curve_lengths(t_vals, h_vals)
@@ -84,9 +89,9 @@ def build_exergy_gcc_curve(
 
         cp_net = float((h_vals[i] - h_vals[i - 1]) / delta_t)
         if cp_net > tol:
-            offset = abs(dt_cont_half)
+            offset = abs(dt_cont_shift)
         elif cp_net < -tol:
-            offset = -abs(dt_cont_half)
+            offset = -abs(dt_cont_shift)
         else:
             offset = 0.0
 
@@ -143,8 +148,14 @@ def build_exergy_nlp_curves(
     temperatures: Iterable[float],
     branches: Iterable[tuple[str, Iterable[float]]],
     t_env: float,
+    dt_cont_shift: float = 0.0,
 ) -> dict[str, Any]:
-    """Build aggregated exergy surplus/deficit curves from NLP-like branches."""
+    """Build aggregated exergy surplus/deficit curves from NLP-like branches.
+
+    Branches are on shifted temperatures; hot branches move up and cold
+    branches down by ``dt_cont_shift``, so the curves use real temperatures,
+    as the exergetic GCC does.
+    """
     t_vals = _to_float_array(temperatures)
     branch_specs = [
         (kind, _to_float_array(values))
@@ -166,12 +177,21 @@ def build_exergy_nlp_curves(
     for _, values in branch_specs:
         _validate_curve_lengths(t_vals, values)
 
-    split_t = _insert_breaks(t_vals.tolist(), [t_env])
+    shift = abs(float(dt_cont_shift))
+
+    def real_temperatures(kind: str) -> np.ndarray:
+        return t_vals + shift if kind == "hot" else t_vals - shift
+
+    real_grids = [real_temperatures(kind) for kind, _ in branch_specs]
+    union = np.unique(np.concatenate([t_vals, *real_grids]))[::-1]
+    if shift <= tol:
+        union = t_vals
+    split_t = _insert_breaks(union.tolist(), [t_env])
     t_grid = np.asarray(split_t, dtype=float)
     tex_grid = _build_exergy_temperature_grid(t_grid, t_env)
     interpolated = [
-        (kind, _interpolate_profile(t_vals, values, t_grid))
-        for kind, values in branch_specs
+        (kind, _interpolate_profile(real_t, values, t_grid))
+        for (kind, values), real_t in zip(branch_specs, real_grids)
     ]
 
     source_increments: list[float] = []
@@ -183,6 +203,10 @@ def build_exergy_nlp_curves(
         t_upper = float(t_grid[i - 1])
         t_lower = float(t_grid[i])
         delta_t = t_upper - t_lower
+        if abs(delta_t) <= tol:
+            source_increments.append(0.0)
+            sink_increments.append(0.0)
+            continue
 
         tex_upper = float(tex_grid[i - 1])
         tex_lower = float(tex_grid[i])
@@ -234,9 +258,15 @@ def build_exergy_nlp_curves(
     }
 
 
-def apply_exergy_targeting(target: Any) -> Any:
-    """Enrich one existing target with exergy graphs and scalar metrics."""
-    spec = _resolve_target_exergy_spec(target)
+def apply_exergy_targeting(target: Any, *, dt_cont_multiplier: float = 1.0) -> Any:
+    """Enrich one existing target with exergy graphs and scalar metrics.
+
+    Exergy uses real temperatures. The shifted GCC and NLP curves are un-shifted
+    by ``THERMAL_DT_CONT`` times the zone's ``dt_cont_multiplier``, the
+    contribution of a stream at the default. Streams with their own
+    ``dt_cont`` are un-shifted by that same representative value.
+    """
+    spec = _resolve_target_exergy_spec(target, dt_cont_multiplier=dt_cont_multiplier)
     if spec is None:
         return target
 
@@ -244,12 +274,13 @@ def apply_exergy_targeting(target: Any) -> Any:
         temperatures=spec["temperatures"],
         heat_loads=spec["gcc_series"],
         t_env=spec["t_env"],
-        dt_cont_half=spec["dt_cont_half"],
+        dt_cont_shift=spec["dt_cont_shift"],
     )
     nlp_output = build_exergy_nlp_curves(
         temperatures=spec["temperatures"],
         branches=spec["branches"],
         t_env=spec["t_env"],
+        dt_cont_shift=spec["dt_cont_shift"],
     )
 
     target.graphs[GraphType.GCC_X.value] = gcc_output
@@ -301,7 +332,12 @@ def run_exergy_targeting_service(
 
         # Enrichment uses this invocation's settings, not the base run's settings.
         target = clone_target_with_zone_settings(target, zone, prefix="ENV_")
-        zone.add_target(apply_func(target), invalidate_dependents=False)
+        enriched = (
+            apply_func(target, dt_cont_multiplier=float(zone.dt_cont_multiplier))
+            if apply_func is apply_exergy_targeting
+            else apply_func(target)
+        )
+        zone.add_target(enriched, invalidate_dependents=False)
         zone._selected_exergy_target_type = target_type
         return zone
 
@@ -334,13 +370,17 @@ def _get_exergy_candidate_order(
     return _EXERGY_TARGET_ORDER
 
 
-def _resolve_target_exergy_spec(target: Any) -> dict[str, Any] | None:
+def _resolve_target_exergy_spec(
+    target: Any, *, dt_cont_multiplier: float = 1.0
+) -> dict[str, Any] | None:
     target_type = getattr(target, "type", None)
     config = getattr(target, "config", None)
     environment = getattr(config, "environment", None)
     thermal = getattr(config, "thermal", None)
     t_env = float(getattr(environment, "temperature", 15.0))
-    dt_cont_half = abs(float(getattr(thermal, "dt_cont", 0.0))) / 2
+    dt_cont_shift = abs(float(getattr(thermal, "dt_cont", 0.0))) * float(
+        dt_cont_multiplier
+    )
 
     if target_type == TargetType.DI.value:
         pt = getattr(target, "pt", None)
@@ -361,7 +401,7 @@ def _resolve_target_exergy_spec(target: Any) -> dict[str, Any] | None:
                 ("cold", _optional_column(pt, ProblemTableLabel.H_NET_COLD)),
             ],
             t_env=t_env,
-            dt_cont_half=dt_cont_half,
+            dt_cont_shift=dt_cont_shift,
         )
 
     if target_type == TargetType.II.value:
@@ -376,7 +416,7 @@ def _resolve_target_exergy_spec(target: Any) -> dict[str, Any] | None:
                 ("cold", _optional_column(pt, ProblemTableLabel.H_COLD_UT)),
             ],
             t_env=t_env,
-            dt_cont_half=dt_cont_half,
+            dt_cont_shift=dt_cont_shift,
         )
 
     if target_type == TargetType.DHP.value:
@@ -397,7 +437,7 @@ def _resolve_target_exergy_spec(target: Any) -> dict[str, Any] | None:
                 ("cold", _optional_column(pt, ProblemTableLabel.H_COLD_HP)),
             ],
             t_env=t_env,
-            dt_cont_half=dt_cont_half,
+            dt_cont_shift=dt_cont_shift,
         )
 
     if target_type == TargetType.IHP.value:
@@ -416,7 +456,7 @@ def _resolve_target_exergy_spec(target: Any) -> dict[str, Any] | None:
                 ("cold", _optional_column(pt, ProblemTableLabel.H_COLD_HP)),
             ],
             t_env=t_env,
-            dt_cont_half=dt_cont_half,
+            dt_cont_shift=dt_cont_shift,
         )
 
     return None
@@ -428,7 +468,7 @@ def _make_target_spec(
     gcc_series,
     branches,
     t_env: float,
-    dt_cont_half: float,
+    dt_cont_shift: float,
 ) -> dict[str, Any] | None:
     if gcc_series is None:
         return None
@@ -442,7 +482,7 @@ def _make_target_spec(
         "gcc_series": _to_float_array(gcc_series),
         "branches": usable_branches,
         "t_env": float(t_env),
-        "dt_cont_half": float(dt_cont_half),
+        "dt_cont_shift": float(dt_cont_shift),
     }
 
 

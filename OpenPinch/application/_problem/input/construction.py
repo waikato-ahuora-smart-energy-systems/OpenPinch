@@ -13,6 +13,7 @@ from ....domain.configuration import tol
 from ....domain.enums import StreamType
 from ....domain.stream import Stream
 from ....domain.stream_collection import StreamCollection
+from ....domain.value import Value
 from ....domain.zone import Zone
 from . import canonicalization as _canonicalization
 from .segments import _create_segmented_process_stream
@@ -197,18 +198,24 @@ def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
     if stream.segments is not None or stream.profile is not None:
         return _create_segmented_process_stream(stream, zone)
     _validate_stream_temperatures(stream, zone.config)
-    stream_obj = Stream(
-        name=stream.name,
-        supply_temperature=standardise_input_value(
-            stream.t_supply,
-            field_name="t_supply",
-            config=zone.config,
-        ),
-        target_temperature=standardise_input_value(
+    supply_temperature = standardise_input_value(
+        stream.t_supply,
+        field_name="t_supply",
+        config=zone.config,
+    )
+    target_temperature = _widen_near_isothermal_target(
+        supply_temperature,
+        standardise_input_value(
             stream.t_target,
             field_name="t_target",
             config=zone.config,
         ),
+        minimum_span=zone.config.thermal.dt_phase_change,
+    )
+    stream_obj = Stream(
+        name=stream.name,
+        supply_temperature=supply_temperature,
+        target_temperature=target_temperature,
         supply_pressure=standardise_input_value(
             stream.p_supply,
             field_name="p_supply",
@@ -250,6 +257,33 @@ def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
         fluid_phase=stream.fluid_phase,
     )
     return stream_obj
+
+
+def _widen_near_isothermal_target(
+    supply: Value, target: Value, *, minimum_span: float
+) -> Value:
+    """Widen a stream's temperature span to at least ``minimum_span``.
+
+    A near-isothermal stream (e.g. condensing steam) narrower than the problem
+    table's interval tolerance would drop out of every interval and lose its
+    duty. Its target moves away from the supply to ``minimum_span``
+    (``THERMAL_DT_PHASE_CHANGE``); the duty is unchanged.
+    """
+    if minimum_span <= 0.0:
+        return target
+    supply_values = np.asarray(supply.period_values, dtype=float)
+    target_values = np.asarray(target.period_values, dtype=float)
+    supply_values, target_values = np.broadcast_arrays(supply_values, target_values)
+    delta = target_values - supply_values
+    narrow = np.isfinite(delta) & (np.abs(delta) > 0.0) & (np.abs(delta) < minimum_span)
+    if not narrow.any():
+        return target
+    widened = target_values.copy()
+    widened[narrow] = supply_values[narrow] + np.sign(delta[narrow]) * minimum_span
+    unit = target.to_dict()["unit"]
+    if widened.size == 1:
+        return Value({"value": float(widened[0]), "unit": unit})
+    return Value({"values": widened.tolist(), "unit": unit})
 
 
 def _build_process_stream_key(zone_path: str, stream_obj: Stream) -> str:
