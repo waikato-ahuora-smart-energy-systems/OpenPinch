@@ -708,7 +708,9 @@ def test_cascade_solve_invalid_temperature_with_nonnumeric_duty_uses_default_wor
     )
 
     assert hp.solved is False
-    assert work == pytest.approx(10.0)
+    # Default work 1 x (1 + violation); the violation is the 10 K inversion
+    # plus the 1 K cascade approach the condenser must keep.
+    assert work == pytest.approx(1.0 * (1.0 + 10.0 + 1.0))
 
 
 def test_cascade_solve_refrigerant_singleton_list_branch(monkeypatch):

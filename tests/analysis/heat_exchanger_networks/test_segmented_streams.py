@@ -519,10 +519,12 @@ def test_pdm_targeting_applies_hen_dtmin_to_every_expanded_segment(monkeypatch):
         observed["t_max_star"],
         [195.0, 145.0, 105.0, 155.0],
     )
+    # The source streams keep their THERMAL_DT_CONT default; only the detached
+    # targeting zone is rescaled to the HEN dTmin.
     for stream in problem.master_zone.process_streams:
-        assert float(stream.delta_t_contribution.to("delta_degC").value) == 0.0
+        assert float(stream.delta_t_contribution.to("delta_degC").value) == 5.0
         assert all(
-            float(segment.delta_t_contribution.to("delta_degC").value) == 0.0
+            float(segment.delta_t_contribution.to("delta_degC").value) == 5.0
             for segment in stream.segments
         )
 
@@ -551,10 +553,13 @@ def test_pdm_preserves_effective_contributions_per_segment_and_period():
 
     pdm_decomposition._apply_hen_dt_cont_convention(zone, dTmin=14.0)
 
+    # Effective contributions (2, 18) scale by dTmin / (2 * THERMAL_DT_CONT)
+    # = 14 / 10; contributions at or below tol fall back to dTmin / 2.
     assert zone.dt_cont_multiplier == 1.0
+    assert zone.config.thermal.dt_cont == pytest.approx(7.0)
     np.testing.assert_allclose(
         stream.segments[0].delta_t_contribution.to("delta_degC").period_values,
-        [2.0, 18.0],
+        [2.8, 25.2],
     )
     np.testing.assert_allclose(
         stream.segments[1].delta_t_contribution.to("delta_degC").period_values,
@@ -562,7 +567,7 @@ def test_pdm_preserves_effective_contributions_per_segment_and_period():
     )
     np.testing.assert_allclose(
         stream.delta_t_contribution.to("delta_degC").period_values,
-        [2.0, 18.0],
+        [2.8, 25.2],
     )
 
 
@@ -594,11 +599,12 @@ def test_pdm_fallback_matches_arrays_and_is_idempotent_for_segments(stream, dTmi
     destination.add(stream)
 
     zone.dt_cont_multiplier = 2.0
-    expected = np.where(
-        np.asarray(original) * 2.0 > tol, np.asarray(original) * 2.0, minimum
-    )
+    reference = zone.config.thermal.dt_cont
+    effective = np.asarray(original) * 2.0
+    scaled = effective * dTmin / (2.0 * reference)
+    expected = np.where(scaled > tol, scaled, minimum)
     from_arrays = [
-        _temperature_contribution(segment, dTmin)
+        _temperature_contribution(segment, dTmin, reference_dt_cont=reference)
         for segment in next(iter(zone.process_streams)).segments
     ]
     np.testing.assert_allclose(from_arrays, expected)

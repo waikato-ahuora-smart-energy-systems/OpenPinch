@@ -73,16 +73,21 @@ def _run_bo_single(
     """Execute one BO run and record improving incumbent candidates."""
 
     def propose(iter_idx, X_arr, y_arr, rng, best_u, n_dim):
+        # One NaN or inf objective must not poison the model: fit and take the
+        # incumbent over the finite observations only.
+        finite = np.isfinite(np.asarray(y_arr, dtype=float))
         try:
+            if not finite.any():
+                raise ValueError("no finite objective values to model")
             model = _fit_bo_gp_model(
-                X=X_arr,
-                y=y_arr,
+                X=X_arr[finite],
+                y=y_arr[finite],
                 lengthscale=lengthscale,
                 noise=noise,
             )
             u_next = _propose_bo_candidate(
                 model=model,
-                best_f=float(np.min(y_arr)),
+                best_f=float(np.min(y_arr[finite])),
                 rng=rng,
                 acq_candidates=acq_candidates,
                 n_dim=n_dim,

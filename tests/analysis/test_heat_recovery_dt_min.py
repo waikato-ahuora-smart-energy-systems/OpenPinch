@@ -368,21 +368,23 @@ def test_solver_rejects_recovery_above_thermodynamic_limit() -> None:
             period_idx=0,
         )
 
-    with pytest.raises(ValueError, match="exceeds the thermodynamic limit"):
-        solve_heat_recovery_dt_min(
-            zone.hot_streams,
-            zone.cold_streams,
-            requested_heat_recovery=100.0 + 5e-7,
-            period_idx=0,
-        )
 
-    with pytest.raises(ValueError, match="exceeds the thermodynamic limit"):
-        solve_heat_recovery_dt_min(
-            zone.hot_streams,
-            zone.cold_streams,
-            requested_heat_recovery=np.nextafter(100.0, np.inf),
-            period_idx=0,
-        )
+@pytest.mark.parametrize("requested", [100.0 + 5e-7, np.nextafter(100.0, np.inf)])
+def test_request_within_tolerance_of_the_limit_returns_the_limit(requested) -> None:
+    # Asking for exactly the reported maximum can land a rounding error above
+    # it; that is the thermodynamic limit, not an error.
+    problem = _two_stream_problem()
+    zone = problem._master_zone
+
+    result = solve_heat_recovery_dt_min(
+        zone.hot_streams,
+        zone.cold_streams,
+        requested_heat_recovery=requested,
+        period_idx=0,
+    )
+
+    assert result.status is HeatRecoveryDtMinStatus.AT_THERMODYNAMIC_LIMIT
+    assert result.dt_min == pytest.approx(50.0, abs=1e-6)
 
 
 def test_solver_clamps_only_tolerance_sized_recovery_excursions(monkeypatch) -> None:

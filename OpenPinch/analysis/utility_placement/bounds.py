@@ -25,6 +25,10 @@ from .errors import (
     PlacementModelValidationError,
     UtilityTemplateValidationError,
 )
+from .units import (
+    INTERNAL_TEMPERATURE,
+    INTERNAL_TEMPERATURE_DIFFERENCE,
+)
 
 ABSOLUTE_ZERO_C = -C_to_K
 
@@ -174,7 +178,7 @@ def _build_effective_template(
     supply_bounds = _intersection(
         supply_key,
         supply_period_bounds,
-        expected_unit=request.units.absolute_temperature,
+        expected_unit=INTERNAL_TEMPERATURE,
         caller_bounds=blueprint.supply_bounds,
         tolerance=request.tolerances.bounds,
     )
@@ -189,7 +193,7 @@ def _build_effective_template(
         span_bounds = _intersection(
             span_key,
             span_period_bounds,
-            expected_unit=request.units.temperature_difference,
+            expected_unit=INTERNAL_TEMPERATURE_DIFFERENCE,
             caller_bounds=blueprint.span_bounds,
             tolerance=request.tolerances.bounds,
         )
@@ -413,7 +417,7 @@ def derive_effective_templates(
     envelope: PlacementFeasibilityEnvelope,
 ) -> UtilityTemplateSet:
     """Intersect all period bounds and propagate physical side ordering."""
-    if envelope.minimum_separation.unit != request.units.temperature_difference:
+    if envelope.minimum_separation.unit != INTERNAL_TEMPERATURE_DIFFERENCE:
         raise PlacementModelValidationError(
             code="noncanonical_separation_unit",
             message="Minimum separation must use the canonical difference unit.",

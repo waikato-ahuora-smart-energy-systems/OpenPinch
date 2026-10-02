@@ -158,12 +158,14 @@ def create_heat_surplus_deficit_table(
             "interval": float(index),
             **{name: _clean_value(value) for name, value in zip(names, values)},
         }
+        # Interval heat is the change in H_NET down the interval
+        # (-dT * CP_NET): positive where hot streams dominate, a surplus.
         total = float(np.sum(values)) if values.size else 0.0
         row.update(
             {
                 "total_delta_hnet": _clean_value(total),
-                "heat_surplus": _clean_value(max(-total, 0.0)),
-                "heat_deficit": _clean_value(max(total, 0.0)),
+                "heat_surplus": _clean_value(max(total, 0.0)),
+                "heat_deficit": _clean_value(max(-total, 0.0)),
             }
         )
         rows.append(row)

@@ -14,8 +14,7 @@ def case_for_name(workspace, name: Optional[str]):
     resolved_name = resolve_case_name(workspace, name)
     cached = workspace._case_cache.get(resolved_name)
     if cached is not None:
-        if workspace.project_name:
-            cached.project_name = workspace.project_name
+        # Reassigning the name here would invalidate the cached results.
         return cached
 
     case_input = deepcopy(workspace._case_inputs[resolved_name])

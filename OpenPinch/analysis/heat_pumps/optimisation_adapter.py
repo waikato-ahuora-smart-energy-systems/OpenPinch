@@ -12,7 +12,6 @@ from typing import Any
 import numpy as np
 from scipy.optimize import minimize
 
-from ...analysis.numerics import g_ineq_penalty
 from ...contracts.hpr import (
     ZERO_USEFUL_DUTY_REASON,
     HeatPumpTargetInputs,
@@ -30,7 +29,7 @@ from ...contracts.hpr import (
     HPRTopologyIdentifier,
     MultiPeriodHPRTargetInputs,
 )
-from ...domain.enums import HeatPumpAndRefrigerationCycle, PenaltyForm
+from ...domain.enums import HeatPumpAndRefrigerationCycle
 from ...domain.stream_collection import StreamCollection
 from ...domain.value import Value
 from ...optimisation.errors import NoOptimisationCandidatesError
@@ -713,6 +712,16 @@ def aggregate_hpr_period_results(
         if maximum is not None:
             updates[field] = maximum
 
+    machine_peaks = _peak_machine_capital(ordered)
+    if machine_peaks is not None:
+        machine_capital, machine_annualized_capital = machine_peaks
+        updates["hpr_machine_capital_costs"] = machine_capital
+        updates["hpr_machine_annualized_capital_costs"] = machine_annualized_capital
+        updates["hpr_capital_cost"] = Value(sum(machine_capital), "$")
+        updates["hpr_annualized_capital_cost"] = Value(
+            sum(machine_annualized_capital), "$/y"
+        )
+
     utility_capital = _peak_utility_capital(ordered)
     if utility_capital is not None:
         updates["hpr_utility_annualized_capital_cost"] = utility_capital
@@ -742,6 +751,20 @@ def aggregate_hpr_period_results(
     return ordered[0].with_updates(**updates), shared_objective
 
 
+def relative_feasibility_penalty(relative_violations, *, rho: float) -> float:
+    """Return the dimensionless exact penalty rho * sum(r + r^2) over r > 0.
+
+    ``r`` is each violation as a fraction of Q_hpr_target. The linear part makes
+    the penalty exact: every unit of violation costs rho times the no-heat-pump
+    cost of serving it, so a design never gains by leaving part of its duty
+    unserved. The quadratic part steepens large violations for the search.
+    """
+    r = np.maximum(np.asarray(relative_violations, dtype=float).ravel(), 0.0)
+    if not r.size:
+        return 0.0
+    return float(rho) * float(np.sum(r + r**2))
+
+
 def build_hpr_accounting(
     *,
     work: float,
@@ -751,40 +774,44 @@ def build_hpr_accounting(
     Q_cooling_water: float = 0.0,
     penalty_terms: object = None,
     penalise_external_cold_when_refrigerating: bool = False,
+    refrigeration_allowance: float = 0.0,
 ) -> tuple[float, float, float, float]:
     """Standardise HPR utility, feasibility-penalty, and objective semantics.
 
     ``Q_ext_cold`` is the external cold met by refrigeration and
     ``Q_cooling_water`` the part met by cooling water.
     """
+    # Violations are relative to the targeted duty; the dimensionless penalty
+    # is priced in power-equivalent units at the targeted service's no-heat-
+    # pump value (Q_hpr_target x its price ratio, at least x1), matching the
+    # power-equivalent objective below. It does not vanish with a zero ratio.
+    duty_scale = max(abs(float(args.Q_hpr_target)), 1.0)
+    is_heat_pumping = getattr(args, "is_heat_pumping", True)
+    service_ratio = (
+        float(args.heat_to_power_ratio)
+        if is_heat_pumping
+        else float(args.refrigeration_to_power_ratio)
+    )
+    power_scale = duty_scale * max(service_ratio, 1.0)
     positive_penalty_terms = np.maximum(
         np.asarray(normalise_hpr_penalty_terms(penalty_terms), dtype=float),
         0.0,
     )
-    penalty = (
-        float(
-            g_ineq_penalty(
-                positive_penalty_terms,
-                eta=args.eta_penalty,
-                rho=args.rho_penalty,
-                form=PenaltyForm.SQUARE,
-            )
+    if penalise_external_cold_when_refrigerating and not is_heat_pumping:
+        # Only default refrigeration beyond the untargeted rest's own need is
+        # unserved; cooling water and air are free sinks.
+        positive_penalty_terms = np.append(
+            positive_penalty_terms,
+            max(Q_ext_cold - float(refrigeration_allowance), 0.0),
         )
+    penalty = (
+        relative_feasibility_penalty(
+            positive_penalty_terms / duty_scale, rho=args.rho_penalty
+        )
+        * power_scale
         if positive_penalty_terms.size
         else 0.0
     )
-    if penalise_external_cold_when_refrigerating and not getattr(
-        args,
-        "is_heat_pumping",
-        True,
-    ):
-        penalty += float(
-            g_ineq_penalty(
-                g=Q_ext_cold + Q_cooling_water,
-                rho=args.rho_penalty,
-                form=PenaltyForm.SQUARE,
-            )
-        )
     objective = calc_hpr_obj(
         work=work,
         Q_ext_heat=Q_ext_heat,
@@ -942,11 +969,16 @@ def _shared_candidate_objective(
         weights=weights,
         reducer="weighted",
     )
-    annualized_capital = _aggregate_result_field(
-        results,
-        "hpr_annualized_capital_cost",
-        weights=None,
-        reducer="max",
+    machine_peaks = _peak_machine_capital(results)
+    annualized_capital = (
+        Value(sum(machine_peaks[1]), "$/y")
+        if machine_peaks is not None
+        else _aggregate_result_field(
+            results,
+            "hpr_annualized_capital_cost",
+            weights=None,
+            reducer="max",
+        )
     )
     utility_capital = _peak_utility_capital(results)
     return (
@@ -954,6 +986,29 @@ def _shared_candidate_objective(
         + float(penalty)
         + _annual_cost_magnitude(annualized_capital)
         + (0.0 if utility_capital is None else _annual_cost_magnitude(utility_capital))
+    )
+
+
+def _peak_machine_capital(
+    results: list[HPRBackendResult],
+) -> tuple[tuple[float, ...], tuple[float, ...]] | None:
+    """Size each heat-pump machine for its own peak period.
+
+    A shared design keeps the same machines in every period, but parallel
+    machines can peak in different periods. Taking the peak of the period
+    totals would undersize them, so each machine's capital and annualized
+    capital take their own maximum. Returns ``None`` when a result lacks the
+    per-machine breakdown or the machine counts differ.
+    """
+    capital = [result.hpr_machine_capital_costs for result in results]
+    annualized = [result.hpr_machine_annualized_capital_costs for result in results]
+    if any(not value for value in (*capital, *annualized)):
+        return None
+    if len({len(value) for value in (*capital, *annualized)}) != 1:
+        return None
+    return (
+        tuple(float(value) for value in np.max(np.asarray(capital), axis=0)),
+        tuple(float(value) for value in np.max(np.asarray(annualized), axis=0)),
     )
 
 
@@ -994,6 +1049,7 @@ __all__ = [
     "evaluate_hpr_candidate",
     "normalise_initial_points",
     "normalise_hpr_penalty_terms",
+    "relative_feasibility_penalty",
     "raise_hpr_targeting_error",
     "run_hpr_candidate_search",
     "solve_hpr_placement",

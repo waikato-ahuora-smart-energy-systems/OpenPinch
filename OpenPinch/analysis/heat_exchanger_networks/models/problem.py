@@ -85,6 +85,7 @@ class InternalHeatExchangerNetworkProblem:
         evolution_n_rm_branches: int = 1,
         evolution_max_parallel: int = 1,
         evolution_no_improvement_patience: int | None = None,
+        evolution_beam_width: int = 4,
         model_factories: Mapping[str, Any] | None = None,
     ) -> Any:
         """Load, solve, and return the private solved model for this task."""
@@ -104,6 +105,7 @@ class InternalHeatExchangerNetworkProblem:
                     n_rm_branches=evolution_n_rm_branches,
                     max_parallel=evolution_max_parallel,
                     no_improvement_patience=evolution_no_improvement_patience,
+                    beam_width=evolution_beam_width,
                 )
                 if evolved is not None:
                     self.case = evolved

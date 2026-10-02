@@ -107,6 +107,7 @@ enter through ``PinchProblem.design``:
    problem.design.heat_exchanger_network()
    problem.design.multiperiod_heat_exchanger_network()
    problem.design.network_evolution((existing_network,))
+   problem.design.optimise_duties(network, objective="cost")
 
 The internal service entry point owns method dispatch and final result caching.
 It dispatches to the same direct services exposed by the design accessor.

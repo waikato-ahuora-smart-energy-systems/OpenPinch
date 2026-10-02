@@ -300,9 +300,7 @@ def test_ci_measures_branch_coverage_with_the_documented_hypothesis_seed():
 
 
 def test_every_external_action_is_pinned_to_an_immutable_commit():
-    action_ref = re.compile(
-        r"^\s*(?:- )?uses: ([^\s]+)(?:\s+#.*)?$", re.MULTILINE
-    )
+    action_ref = re.compile(r"^\s*(?:- )?uses: ([^\s]+)(?:\s+#.*)?$", re.MULTILINE)
 
     for workflow_path in WORKFLOWS:
         workflow = workflow_path.read_text(encoding="utf-8")

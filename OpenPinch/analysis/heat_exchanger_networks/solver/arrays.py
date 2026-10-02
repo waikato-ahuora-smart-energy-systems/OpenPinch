@@ -107,14 +107,18 @@ def problem_to_solver_arrays(
         period_weights=period_weights,
         zone=zone,
     )
-    arrays.update(_segment_profile_arrays("hot", hot_items, num_periods, dTmin))
-    arrays.update(_segment_profile_arrays("cold", cold_items, num_periods, dTmin))
-    arrays.update(
-        _segment_profile_arrays("hot_utility", hot_utility_items, num_periods, dTmin)
-    )
-    arrays.update(
-        _segment_profile_arrays("cold_utility", cold_utility_items, num_periods, dTmin)
-    )
+    reference_dt_cont = config.thermal.dt_cont
+    for prefix, items in (
+        ("hot", hot_items),
+        ("cold", cold_items),
+        ("hot_utility", hot_utility_items),
+        ("cold_utility", cold_utility_items),
+    ):
+        arrays.update(
+            _segment_profile_arrays(
+                prefix, items, num_periods, dTmin, reference_dt_cont
+            )
+        )
 
     axis_maps = {
         "cold_process_streams": {
@@ -159,6 +163,7 @@ def problem_to_solver_arrays(
             "HENS_MAX_PARALLEL": hens.max_parallel,
             "HENS_EVM_N_AD_BRANCHES": hens.evm_n_ad_branches,
             "HENS_EVM_N_RM_BRANCHES": hens.evm_n_rm_branches,
+            "HENS_EVM_BEAM_WIDTH": hens.evm_beam_width,
             "HENS_OUTPUT_FOLDER": hens.output_folder,
             "HENS_OUTPUT_FORMATS": list(hens.output_formats),
             "HENS_RUN_ID": hens.run_id,
@@ -204,8 +209,9 @@ def problem_to_solver_arrays(
             "heat_transfer_coefficient": "kW/m^2/K",
             "temperature": "K",
             "temperature_contribution": (
-                "K, using effective_delta_t_contribution directly; "
-                "dTmin / 2 is the fallback for missing values or values <= tol"
+                "K, effective_delta_t_contribution scaled by "
+                "dTmin / (2 * THERMAL_DT_CONT); dTmin / 2 is the fallback for "
+                "missing values or values <= tol"
             ),
             "utility_price": (
                 "numeric UtilitySchema.price passed through for OpenHENS "
@@ -251,7 +257,12 @@ def _solver_array_mapping(
         return getter
 
     def temperature_contribution(stream: Stream, _record, n: int) -> float:
-        return _temperature_contribution(stream, dTmin, period_idx=n)
+        return _temperature_contribution(
+            stream,
+            dTmin,
+            period_idx=n,
+            reference_dt_cont=zone.config.thermal.dt_cont,
+        )
 
     def utility_solver_target(stream: Stream, _record, n: int) -> float:
         return _utility_solver_target(stream, zone, period_idx=n)
@@ -327,6 +338,7 @@ def _segment_profile_arrays(
     items: list[_PreparedItem],
     num_periods: int,
     dTmin: float,
+    reference_dt_cont: float | None = None,
 ) -> dict[str, np.ndarray]:
     """Build padded segment tensors while keeping the solver parent axes intact."""
     segment_rows = [_segments_for_solver(stream) for _, stream, _ in items]
@@ -388,6 +400,7 @@ def _segment_profile_arrays(
                         segment,
                         dTmin,
                         period_idx=period_index,
+                        reference_dt_cont=reference_dt_cont,
                     )
                 )
         cumulative_duties[:, parent_index, 1:] = np.cumsum(
@@ -459,13 +472,25 @@ def _temperature_contribution(
     dTmin: float,
     *,
     period_idx: int = 0,
+    reference_dt_cont: float | None = None,
 ) -> float:
+    """Return a stream's temperature contribution for one dTmin tier.
+
+    With ``reference_dt_cont`` (THERMAL_DT_CONT), every contribution is scaled
+    by ``dTmin / (2 * reference_dt_cont)``, so a stream at the default
+    contribution gets exactly dTmin / 2 and the others keep their ratio to it
+    across the sweep. A contribution that is zero after scaling falls back to
+    dTmin / 2. Testing after scaling keeps the policy idempotent: applying it
+    again with ``reference_dt_cont = dTmin / 2`` returns the same values.
+    """
     contribution = _value(
         stream.effective_delta_t_contribution, "delta_degC", period_idx=period_idx
     )
-    if contribution > tol:
-        return contribution
-    return float(dTmin) / 2.0
+    if reference_dt_cont is not None and reference_dt_cont > tol:
+        contribution = contribution * float(dTmin) / (2.0 * float(reference_dt_cont))
+    if contribution <= tol:
+        return float(dTmin) / 2.0
+    return contribution
 
 
 def _utility_solver_target(

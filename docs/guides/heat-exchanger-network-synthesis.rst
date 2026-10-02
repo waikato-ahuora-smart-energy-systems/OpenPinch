@@ -58,6 +58,95 @@ For multiple operating periods, call
 ``problem.design.multiperiod_heat_exchanger_network(...)`` after explicit
 all-period targeting.
 
+Duty Allocation on a Fixed Network
+----------------------------------
+
+When the network structure is already decided, define it by hand and let
+OpenPinch allocate the duties. List recovery matches as
+``(hot_stream, cold_stream, stage)`` with one-based stages, heaters by cold
+stream and coolers by hot stream. A ``HeatExchangerNetwork``, such as a
+previous design's ``selected_network``, is accepted in place of the mapping.
+
+.. code-block:: python
+
+   structure = {
+       "recovery": [
+           ("Raw Milk", "Milk Concentrate", 1),
+           ("HT Flash", "Milk Concentrate", 1),
+           ("Raw Milk", "CIP Water", 2),
+           ("HT Flash", "CIP Water", 2),
+       ],
+       "heaters": ["Milk Concentrate"],
+       "coolers": ["Raw Milk", "HT Flash"],
+   }
+
+   min_utility = problem.design.optimise_duties(
+       structure, objective="utility", min_approach_temperature=10.0
+   )
+   min_area = problem.design.optimise_duties(
+       structure,
+       objective="area",
+       max_hot_utility=1.5 * min_utility.total_hot_utility,
+   )
+   min_cost = problem.design.optimise_duties(structure, objective="cost")
+
+``optimise_duties`` keeps the matches and solves a non-isothermal stage-wise
+model in which only duties and stream split fractions change.
+
+Utility exchangers
+   A heater or cooler entry is a stream name, ``(stream, utility)`` or
+   ``(stream, utility, stage)``. Bare names use the ``hot_utility`` /
+   ``cold_utility`` keys, which default to the problem's only hot and cold
+   utility. A stream may have several utility exchangers, one per utility and
+   position. Without a stage an exchanger sits at the stream end; with a stage
+   it sits just after the stream leaves that stage, so ``("C2", "LPS", 2)``
+   heats C2 between stages 2 and 1 and ``("H1", "CW", 1)`` cools H1 between
+   stages 1 and 2. Exchangers at one position run in series: heaters from the
+   coldest utility up, coolers from the warmest down. Each utility uses its own
+   temperatures, heat-transfer coefficient and price.
+
+``"utility"``
+   Minimise total utility duty. Each exchanger keeps at least
+   ``min_approach_temperature`` at both ends. Per-exchanger values in
+   ``exchanger_approach_temperatures`` (keyed by ``exchanger_id``) override it.
+   With neither, the stream temperature contributions set each limit.
+``"area"``
+   Minimise the total heat-transfer area with utility capped by
+   ``max_hot_utility`` and/or ``max_cold_utility`` (kW, in every period). At
+   least one cap is required. Each exchanger has one area shared by all
+   operating periods: the largest area any period needs (exact LMTD). A period
+   that needs less runs with a bypass, so its duties are achievable with that
+   common area. Approach limits work as for ``"utility"``.
+``"cost"``
+   Minimise total annual cost: capital from the ``COSTING_HX_*`` settings on
+   the common areas plus utility cost, weighted over periods. Only a positive
+   approach is required at both ends of every exchanger;
+   ``min_approach_temperature`` defaults to 1 K.
+
+Zero-duty exchangers
+   Every listed exchanger carries its approach constraint even at zero duty.
+   When a solve leaves an exchanger at zero duty in every period, it is
+   removed with that constraint and the problem is solved again, one
+   exchanger at a time, until all remaining exchangers carry duty.
+   ``selected_network.summary_metrics["removed_exchangers"]`` names them.
+
+Segmented streams and utilities
+   Streams with segments keep their piecewise temperature-heat profile: each
+   segment has its own heat capacity, film coefficient and temperature
+   contribution. The minimum approach is enforced at both ends of every
+   exchanger and at every segment boundary inside it, and areas are summed
+   over duty-aligned slices (``segment_area_contributions``). A segmented
+   utility keeps its temperature profile and segment prices; its flow scales
+   with use. Its profile shape comes from targeting, so it needs a targeted
+   duty. Without a given approach, each side's largest segment contribution
+   sets the limit. Segment kinks are rounded over 0.05 K in the solver.
+
+Every process stream needs at least one exchanger. A utility that cannot meet
+its approach against its stream at any duty is reported before solving. The
+solver is ``HENS_SOLVER_EVM`` unless ``solver`` is passed. The network grid
+draws each utility exchanger where it sits: at the stream end or on the
+stage boundary it follows, with exchangers in series side by side.
+
 Serialized Network Input
 ------------------------
 

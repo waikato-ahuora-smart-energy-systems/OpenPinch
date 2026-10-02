@@ -28,9 +28,10 @@ from ..common.encoding import (
     map_x_arr_to_T_arr,
     require_stage_duty_allocation,
 )
-from ..common.layout import HPRoptVectorLayout
+from ..common.layout import HPRoptVectorLayout, clip_to_bounds
 from ..common.multi_vc_objective import _evaluate_multi_vc_objective
 from ..common.shared import (
+    cap_stage_condensing_temperatures,
     condensing_temperature_search_range,
     evaluate_vapour_hpr_result,
     validate_vapour_hp_refrigerant_ls,
@@ -212,7 +213,7 @@ def _get_cascade_hp_opt_setup(
         pack_kwargs["x_cool_split"] = encode_available_fractions(
             np.asarray(init_cool, dtype=float)[:n_cool], state.Q_cool_available
         )
-    return layout.pack(**pack_kwargs), bnds
+    return clip_to_bounds(layout.pack(**pack_kwargs), bnds), bnds
 
 
 def _parse_cascade_hp_state_variables(
@@ -242,7 +243,9 @@ def _parse_cascade_hp_state_variables(
     x_cool_split = parts["x_cool_split"]
     x_ihx = parts["x_ihx"]
 
-    T_cond = map_x_arr_to_T_arr(x_cond, *condensing_temperature_search_range(args))
+    T_cond = cap_stage_condensing_temperatures(
+        map_x_arr_to_T_arr(x_cond, *condensing_temperature_search_range(args)), args
+    )
     T_evap = map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0])
     dT_subcool = map_x_arr_to_DT_arr(x_subcool, T_cond, args.T_cold[0])
     Q_heat_available = (
@@ -521,7 +524,9 @@ def _add_profile_streams(
                 supply_temperature=(high_temperature if is_hot else low_temperature),
                 target_temperature=(low_temperature if is_hot else high_temperature),
                 heat_flow=segment_duty,
-                delta_t_contribution=float(args.dtcont_hp),
+                # HPR_DT_CONT is applied once, to the background profiles;
+                # cycle streams carry none of their own, as Carnot streams.
+                delta_t_contribution=0.0,
                 is_process_stream=False,
             )
         )

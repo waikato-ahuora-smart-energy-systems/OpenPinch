@@ -227,15 +227,15 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
         "HPR Utility Annualized Capital Cost (unit)",
         "HPR Total Annualized Cost (value)",
         "HPR Total Annualized Cost (unit)",
-        # Utility columns come from names:
-        "HP Steam (value)",
-        "HP Steam (unit)",
-        "Cooling Water (value)",
-        "Cooling Water (unit)",
-        "MP Steam (value)",
-        "MP Steam (unit)",
-        "Chilled Water (value)",
-        "Chilled Water (unit)",
+        # Utility columns are the side (HU or CU) and the name:
+        "HU: HP Steam (value)",
+        "HU: HP Steam (unit)",
+        "CU: Cooling Water (value)",
+        "CU: Cooling Water (unit)",
+        "HU: MP Steam (value)",
+        "HU: MP Steam (unit)",
+        "CU: Chilled Water (value)",
+        "CU: Chilled Water (unit)",
     }
     assert expected_cols.issubset(set(df.columns))
 
@@ -245,10 +245,10 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
     assert base["Cold Pinch (unit)"] == "degC"
     assert pytest.approx(base["Qh (value)"]) == 100.0
     assert base["Qh (unit)"] == "kW"
-    assert pytest.approx(base["HP Steam (value)"]) == 75.0
-    assert base["HP Steam (unit)"] == "kW"
-    assert pytest.approx(base["Cooling Water (value)"]) == 60.0
-    assert base["Cooling Water (unit)"] == "kW"
+    assert pytest.approx(base["HU: HP Steam (value)"]) == 75.0
+    assert base["HU: HP Steam (unit)"] == "kW"
+    assert pytest.approx(base["CU: Cooling Water (value)"]) == 60.0
+    assert base["CU: Cooling Water (unit)"] == "kW"
     assert int(base["Num Units"]) == 7
     assert pytest.approx(base["Capital Cost (value)"]) == 111.0
     assert base["Capital Cost (unit)"] == "$"
@@ -257,10 +257,10 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
 
     # Row for "Alt A"
     alt = df.loc[df["Scope"] == "Alt A"].iloc[0]
-    assert pytest.approx(alt["MP Steam (value)"]) == 55.0
-    assert alt["MP Steam (unit)"] == "kW"
-    assert pytest.approx(alt["Chilled Water (value)"]) == 30.0
-    assert alt["Chilled Water (unit)"] == "kW"
+    assert pytest.approx(alt["HU: MP Steam (value)"]) == 55.0
+    assert alt["HU: MP Steam (unit)"] == "kW"
+    assert pytest.approx(alt["CU: Chilled Water (value)"]) == 30.0
+    assert alt["CU: Chilled Water (unit)"] == "kW"
 
 
 def test_export_writes_problem_tables_for_all_zones(tmp_path: Path):

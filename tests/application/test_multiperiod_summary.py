@@ -114,7 +114,8 @@ def test_weighted_average_output_aggregates_values_utilities_and_metadata():
     assert target.work_target.value == pytest.approx(2.5)
     assert target.process_component_work_target.value == pytest.approx(1.25)
     assert target.area.value == pytest.approx(100.0)
-    assert target.capital_cost.value == pytest.approx(2500.0)
+    # Equipment is sized for the peak period, not the average.
+    assert target.capital_cost.value == pytest.approx(3000.0)
     assert target.exergy_sources.value == pytest.approx(20.0)
     assert target.hpr_work.value == pytest.approx(2.5)
     assert target.hpr_operating_cost.value == pytest.approx(500.0)
@@ -123,7 +124,8 @@ def test_weighted_average_output_aggregates_values_utilities_and_metadata():
     assert target.hpr_utility_annualized_capital_cost.value == pytest.approx(30.0)
     assert target.hpr_total_annualized_cost.value == pytest.approx(650.0)
     assert target.hpr_cycle == "Carnot"
-    assert target.hpr_success is None
+    # One failed period means the multi-period design did not succeed.
+    assert target.hpr_success is False
     assert {
         utility.name: utility.heat_flow.value for utility in target.hot_utilities
     } == {
@@ -197,11 +199,120 @@ def test_weighted_average_output_sizes_each_utility_for_its_own_peak():
     target = output.targets[0]
 
     assert target.hpr_hot_utility_annualized_capital_cost.value == pytest.approx(70.0)
-    assert target.hpr_refrigeration_annualized_capital_cost.value == pytest.approx(
-        50.0
-    )
+    assert target.hpr_refrigeration_annualized_capital_cost.value == pytest.approx(50.0)
     assert target.hpr_utility_annualized_capital_cost.value == pytest.approx(120.0)
     assert target.hpr_total_annualized_cost.value == pytest.approx(270.0)
+
+
+def test_weighted_average_output_sizes_each_machine_for_its_own_peak():
+    def costed(period_id, machine_capital, machine_annualized):
+        return _target(period_id=period_id, qh=10.0).model_copy(
+            update={
+                "hpr_operating_cost": Value(100.0, "$/y"),
+                "hpr_capital_cost": Value(sum(machine_capital), "$"),
+                "hpr_annualized_capital_cost": Value(sum(machine_annualized), "$/y"),
+                "hpr_machine_capital_costs": machine_capital,
+                "hpr_machine_annualized_capital_costs": machine_annualized,
+                "hpr_shared_design": True,
+            }
+        )
+
+    # Parallel machine A peaks in winter and machine B in summer.
+    output = weighted_average_output(
+        [
+            TargetOutput(
+                name="Site",
+                period_id="winter",
+                targets=[costed("winter", (100.0, 10.0), (10.0, 1.0))],
+            ),
+            TargetOutput(
+                name="Site",
+                period_id="summer",
+                targets=[costed("summer", (10.0, 100.0), (1.0, 10.0))],
+            ),
+        ],
+        [1.0, 1.0],
+    )
+    target = output.targets[0]
+
+    assert target.hpr_machine_capital_costs == (100.0, 100.0)
+    assert target.hpr_capital_cost.value == pytest.approx(200.0)
+    assert target.hpr_annualized_capital_cost.value == pytest.approx(20.0)
+
+
+def test_independent_period_designs_use_the_peak_of_totals():
+    # Separately optimised periods may number their machines differently,
+    # so machine i is not the same unit in every period.
+    def costed(period_id, machine_capital, machine_annualized):
+        return _target(period_id=period_id, qh=10.0).model_copy(
+            update={
+                "hpr_operating_cost": Value(100.0, "$/y"),
+                "hpr_capital_cost": Value(sum(machine_capital), "$"),
+                "hpr_annualized_capital_cost": Value(sum(machine_annualized), "$/y"),
+                "hpr_machine_capital_costs": machine_capital,
+                "hpr_machine_annualized_capital_costs": machine_annualized,
+                "hpr_shared_design": False,
+            }
+        )
+
+    output = weighted_average_output(
+        [
+            TargetOutput(
+                name="Site",
+                period_id="winter",
+                targets=[costed("winter", (100.0, 10.0), (10.0, 1.0))],
+            ),
+            TargetOutput(
+                name="Site",
+                period_id="summer",
+                targets=[costed("summer", (10.0, 100.0), (1.0, 10.0))],
+            ),
+        ],
+        [1.0, 1.0],
+    )
+    target = output.targets[0]
+
+    assert target.hpr_machine_capital_costs is None
+    assert target.hpr_capital_cost.value == pytest.approx(110.0)
+
+
+def test_machine_peaks_keep_the_configured_cost_units():
+    # Report fields are in a display unit (k$), the per-machine tuples in $.
+    def costed(period_id, machine_capital, machine_annualized):
+        return _target(period_id=period_id, qh=10.0).model_copy(
+            update={
+                "hpr_operating_cost": Value(0.1, "k$/y"),
+                "hpr_capital_cost": Value(sum(machine_capital) / 1000.0, "k$"),
+                "hpr_annualized_capital_cost": Value(
+                    sum(machine_annualized) / 1000.0, "k$/y"
+                ),
+                "hpr_machine_capital_costs": machine_capital,
+                "hpr_machine_annualized_capital_costs": machine_annualized,
+                "hpr_shared_design": True,
+            }
+        )
+
+    output = weighted_average_output(
+        [
+            TargetOutput(
+                name="Site",
+                period_id="winter",
+                targets=[costed("winter", (100.0, 10.0), (10.0, 1.0))],
+            ),
+            TargetOutput(
+                name="Site",
+                period_id="summer",
+                targets=[costed("summer", (10.0, 100.0), (1.0, 10.0))],
+            ),
+        ],
+        [1.0, 1.0],
+    )
+    target = output.targets[0]
+
+    assert target.hpr_capital_cost.value == pytest.approx(0.2)
+    assert target.hpr_capital_cost.to("$").value == pytest.approx(200.0)
+    assert target.hpr_annualized_capital_cost.value == pytest.approx(0.02)
+    assert target.hpr_annualized_capital_cost.to("$/y").value == pytest.approx(20.0)
 
 
 def test_weighted_average_output_rejects_partially_missing_numeric_fields():

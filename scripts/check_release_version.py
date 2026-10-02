@@ -21,9 +21,7 @@ def read_project_version(pyproject: Path) -> str:
     with pyproject.open("rb") as handle:
         version = str(tomllib.load(handle)["project"]["version"])
     if RELEASE_VERSION_PATTERN.fullmatch(version) is None:
-        raise ValueError(
-            f"Project version {version!r} must use the exact form X.Y.Z."
-        )
+        raise ValueError(f"Project version {version!r} must use the exact form X.Y.Z.")
     return version
 
 

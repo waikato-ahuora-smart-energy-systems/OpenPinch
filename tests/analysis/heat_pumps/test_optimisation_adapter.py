@@ -269,15 +269,38 @@ def test_shared_objective_sizes_each_utility_for_its_own_peak():
         [1.0, 1.0],
     )
 
-    assert weighted.hpr_hot_utility_annualized_capital_cost.value == pytest.approx(
-        70.0
-    )
+    assert weighted.hpr_hot_utility_annualized_capital_cost.value == pytest.approx(70.0)
     assert weighted.hpr_refrigeration_annualized_capital_cost.value == (
         pytest.approx(50.0)
     )
     assert weighted.hpr_utility_annualized_capital_cost.value == pytest.approx(120.0)
     assert objective == pytest.approx(100.0 + 50.0 + 120.0)
     assert weighted.hpr_total_annualized_cost.value == pytest.approx(objective)
+
+
+def test_shared_objective_sizes_each_machine_for_its_own_peak():
+    def costed(machine_capital, machine_annualized):
+        return _result(0.0).with_updates(
+            hpr_operating_cost=Value(100.0, "$/y"),
+            hpr_capital_cost=Value(sum(machine_capital), "$"),
+            hpr_annualized_capital_cost=Value(sum(machine_annualized), "$/y"),
+            hpr_machine_capital_costs=machine_capital,
+            hpr_machine_annualized_capital_costs=machine_annualized,
+        )
+
+    # Parallel machine A peaks in winter and machine B in summer.
+    weighted, objective = adapter.aggregate_hpr_period_results(
+        {
+            "winter": costed((100.0, 10.0), (10.0, 1.0)),
+            "summer": costed((10.0, 100.0), (1.0, 10.0)),
+        },
+        [1.0, 1.0],
+    )
+
+    assert weighted.hpr_machine_capital_costs == (100.0, 100.0)
+    assert weighted.hpr_capital_cost.value == pytest.approx(200.0)
+    assert weighted.hpr_annualized_capital_cost.value == pytest.approx(20.0)
+    assert objective == pytest.approx(100.0 + 20.0)
 
 
 def test_accounting_applies_refrigeration_penalty_and_scalar_objective():
@@ -298,8 +321,10 @@ def test_accounting_applies_refrigeration_penalty_and_scalar_objective():
 
     assert external_heat == pytest.approx(0.0)
     assert external_cold == pytest.approx(5.0)
-    assert penalty == pytest.approx(50.0)
-    assert objective == pytest.approx((10.0 + 50.0) / 200.0)
+    # rho * (r + r^2) with r = 5 / 200, priced at 200 kW x max(ratio, 1).
+    r = 5.0 / 200.0
+    assert penalty == pytest.approx(2.0 * (r + r**2) * 200.0)
+    assert objective == pytest.approx((10.0 + penalty) / 200.0)
     assert adapter.calc_hpr_obj(
         10.0,
         5.0,

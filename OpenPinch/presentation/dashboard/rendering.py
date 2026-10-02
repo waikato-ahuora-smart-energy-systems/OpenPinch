@@ -8,6 +8,7 @@ from importlib.resources import files
 
 from ...analysis.graphs.service import get_output_graph_data
 from ...domain.targets import BaseTargetModel
+from ...domain.value import Value
 from ...domain.zone import Zone
 from ..graphs.plotly import build_plotly_figure
 from ..reporting.problem_table import problem_table_frame
@@ -17,7 +18,11 @@ from .state import _DashboardGraphSet
 
 
 def _collect_targets(zone: Zone) -> dict[str, BaseTargetModel]:
-    """Flattens all energy targets beneath ``zone`` keyed by their display name."""
+    """Flatten all energy targets beneath ``zone`` keyed by a unique label.
+
+    The label is the target name; a name used in more than one zone gets the
+    zone address appended, so no target hides another.
+    """
 
     def _iter(current: Zone) -> Iterator[tuple[str, BaseTargetModel]]:
         for _, target in current.targets.items():
@@ -27,7 +32,24 @@ def _collect_targets(zone: Zone) -> dict[str, BaseTargetModel]:
         for subzone in current.subzones.values():
             yield from _iter(subzone)
 
-    return dict(_iter(zone))
+    collected: dict[str, BaseTargetModel] = {}
+    for name, target in _iter(zone):
+        label = name
+        if label in collected:
+            label = f"{name} ({getattr(target, 'scope', None) or id(target)})"
+        collected[label] = target
+    return collected
+
+
+def _display(value, *, canonical: str, unit: str, fmt: str) -> str:
+    """Format a metric in the configured output unit, or "n/a" when absent."""
+    if value is None:
+        return "n/a"
+    try:
+        magnitude = float(Value(float(value), canonical).to(unit).value)
+    except Exception:
+        magnitude, unit = float(value), canonical
+    return f"{magnitude:{fmt}}&nbsp;{html.escape(str(unit))}"
 
 
 def render_streamlit_dashboard(
@@ -86,6 +108,21 @@ def render_streamlit_dashboard(
         key=f"target_select_{base_key}",
     )
     target = targets[selected_target_name]
+    units = getattr(getattr(zone, "config", None), "output_units", None)
+    temperature_unit = getattr(units, "temperature", "degC")
+    heat_flow_unit = getattr(units, "heat_flow", "kW")
+    degree_of_int = getattr(target, "degree_of_int", None)
+    shown = {
+        attr: _display(getattr(target, attr, None), canonical=canon, unit=unit, fmt=fmt)
+        for attr, canon, unit, fmt in (
+            ("cold_pinch", "degC", temperature_unit, ".1f"),
+            ("hot_pinch", "degC", temperature_unit, ".1f"),
+            ("hot_utility_target", "kW", heat_flow_unit, ",.0f"),
+            ("cold_utility_target", "kW", heat_flow_unit, ",.0f"),
+            ("heat_recovery_target", "kW", heat_flow_unit, ",.0f"),
+        )
+    }
+    degree_text = "n/a" if degree_of_int is None else f"{degree_of_int:.0%}"
 
     st.sidebar.divider()
     st.sidebar.write("Targets")
@@ -99,36 +136,36 @@ def render_streamlit_dashboard(
             <div class="op-metric">
                 <div class="op-metric-label">Cold pinch</div>
                 <div class="op-metric-value">
-                    {target.cold_pinch:.1f}&nbsp;\N{DEGREE SIGN}C
+                    {shown["cold_pinch"]}
                 </div>
             </div>
             <div class="op-metric">
                 <div class="op-metric-label">Hot pinch</div>
                 <div class="op-metric-value">
-                    {target.hot_pinch:.1f}&nbsp;\N{DEGREE SIGN}C
+                    {shown["hot_pinch"]}
                 </div>
             </div>
             <div class="op-metric">
                 <div class="op-metric-label">Hot utility</div>
                 <div class="op-metric-value">
-                    {target.hot_utility_target:,.0f}&nbsp;kW
+                    {shown["hot_utility_target"]}
                 </div>
             </div>
             <div class="op-metric">
                 <div class="op-metric-label">Cold utility</div>
                 <div class="op-metric-value">
-                    {target.cold_utility_target:,.0f}&nbsp;kW
+                    {shown["cold_utility_target"]}
                 </div>
             </div>
             <div class="op-metric">
                 <div class="op-metric-label">Heat recovery</div>
                 <div class="op-metric-value">
-                    {target.heat_recovery_target:,.0f}&nbsp;kW
+                    {shown["heat_recovery_target"]}
                 </div>
             </div>
             <div class="op-metric">
                 <div class="op-metric-label">Degree of integration</div>
-                <div class="op-metric-value">{target.degree_of_int:.0%}</div>
+                <div class="op-metric-value">{degree_text}</div>
             </div>
         </div>
         """,
@@ -174,7 +211,7 @@ def render_streamlit_dashboard(
     )
 
     with tabs[0]:
-        graph_set = graph_sets.get(selected_target_name)
+        graph_set = graph_sets.get(target.name)
         if graph_set is None or not graph_set.graphs:
             st.info("No graphs available for this target.")
         else:

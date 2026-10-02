@@ -42,6 +42,7 @@ def render_table_export(
     with pd.ExcelWriter(buffer, engine=engine_name) as writer:
         frame.to_excel(writer, index=False, sheet_name="Problem Table")
     try:
+        Path(destination).parent.mkdir(parents=True, exist_ok=True)
         Path(destination).write_bytes(buffer.getvalue())
     except OSError as exc:
         streamlit.error(f"Failed to save file: {exc}")

@@ -428,10 +428,12 @@ def _create_net_hot_and_cold_stream_collections_for_site_analysis(
         # If no utility is needed, there is no net streams for indirect integration.
         return net_hot_streams, net_cold_streams
 
+    if len(T_vals) < 2:
+        # A single-row table has no intervals and so no net streams.
+        return net_hot_streams, net_cold_streams
     if delta_vals(T_vals).min() < tol:
         raise ValueError("Infeasible temperature interval detected in _store_TSP_data")
 
-    T_vals = T_vals
     dh_vals = delta_vals(H_vals)
 
     hu_idx = _initialise_utility_index(hot_utilities_seq, hot_remaining)

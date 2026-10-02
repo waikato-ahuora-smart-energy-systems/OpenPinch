@@ -4,6 +4,23 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat exchanger network synthesis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Exchanger areas use the true log-mean temperature difference whenever both
+  ends are positive, including an end at its minimum approach. OpenHENS fell
+  back to one end there, which misstated area (for ends of 10 and 50 K, 2.5
+  times too high) and with it TAC and ranking. Results now differ from
+  OpenHENS for matches at the pinch.
+- Each recovery match is checked against its own required approach (the sum of
+  its streams' contributions), not the global dTmin.
+- An infeasible task outcome is marked failed and kept for diagnostics instead
+  of aborting the synthesis; a utility-only network no longer stops TDM/EVM
+  task building.
+- Branched network evolution keeps at most ``HENS_EVM_BEAM_WIDTH`` (default 4)
+  branches per depth, never solves a topology twice, and gives the same network
+  in parallel and serial runs.
+
 HPR cost model and search
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -26,6 +43,26 @@ HPR cost model and search
   raises a typed "no beneficial heat pump" error.
 - Simulated refrigeration penalises unserved selected cooling, as the Carnot
   path does.
+
+HEN duty allocation on a fixed structure
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``problem.design.optimise_duties(structure, objective=...)`` allocates duty
+  on a user-defined network (recovery matches by stage plus heaters and
+  coolers, given as a mapping or a ``HeatExchangerNetwork``) with fixed
+  matches and free stream splits. Objectives: ``"utility"`` (minimum approach
+  per exchanger), ``"area"`` (common area across periods under hot and/or
+  cold utility caps) and ``"cost"`` (total annual cost, 1 K feasibility
+  approach).
+- A stream can have several utility exchangers, one per utility and position,
+  placed at the stream end or between stages.
+- Exchangers left at zero duty are removed one at a time and the problem is
+  re-solved; the result lists them.
+- Segmented streams and utilities are supported: piecewise profiles, the
+  minimum approach at every segment boundary inside an exchanger, and areas
+  from duty-aligned slices.
+- The network grid draws every utility exchanger at its own position (stream
+  end or stage boundary) instead of merging a stream's utility exchangers.
 
 Analysis reliability and extensibility
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

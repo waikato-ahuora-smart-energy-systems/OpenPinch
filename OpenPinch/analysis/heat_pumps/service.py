@@ -392,7 +392,13 @@ def _get_hpr_target_summary(
         ),
         "hpr_utility_annualized_capital_cost": res.hpr_utility_annualized_capital_cost,
         "hpr_total_annualized_cost": res.hpr_total_annualized_cost,
+        "hpr_machine_capital_costs": getattr(res, "hpr_machine_capital_costs", None),
+        "hpr_machine_annualized_capital_costs": getattr(
+            res, "hpr_machine_annualized_capital_costs", None
+        ),
         "hpr_success": res.success,
+        # A shared multi-period solve records the periods it was designed for.
+        "hpr_shared_design": bool(getattr(res, "period_ids", None)),
         "hpr_hot_streams": res.hpr_hot_streams,
         "hpr_cold_streams": res.hpr_cold_streams,
         "hpr_details": res,

@@ -16,10 +16,13 @@ from OpenPinch.analysis.heat_pumps._multiperiod.state import (
 )
 from OpenPinch.application.problem import PinchProblem
 from OpenPinch.contracts.hpr import (
+    ZERO_USEFUL_DUTY_REASON,
     HeatPumpTargetInputs,
     HeatPumpTargetOutputs,
     HPRBackendResult,
+    HPRFailureCategory,
     HPRPeriodCase,
+    HPRTargetingError,
     HPRThermoArtifacts,
     MultiPeriodHPRTargetInputs,
 )
@@ -755,3 +758,69 @@ def test_weighted_hpr_summary_uses_shared_design_period_evaluations(monkeypatch)
     assert len(hpr_rows) == 1
     assert hpr_rows.iloc[0]["Period ID"] == "weighted_average"
     assert hpr_rows.iloc[0]["HPR Utility Total (value)"] == pytest.approx(25.0)
+
+
+def _two_period_args() -> MultiPeriodHPRTargetInputs:
+    return MultiPeriodHPRTargetInputs(
+        period_cases=[
+            HPRPeriodCase(
+                period_id=f"p{idx}",
+                period_idx=idx,
+                weight=1.0,
+                args=_input_args(period_idx=idx),
+            )
+            for idx in (0, 1)
+        ],
+        selected_period_id="p0",
+        selected_period_idx=0,
+        hpr_type=HeatPumpAndRefrigerationCycle.CascadeCarnot.value,
+        max_multi_start=1,
+        bb_minimiser="rbf_surrogate",
+    )
+
+
+def test_shared_zero_duty_design_raises_no_beneficial_heat_pump(monkeypatch):
+    # The zero-duty design ranks first; a worse heat pump ranks second.
+    monkeypatch.setattr(
+        hp_execution,
+        "run_hpr_candidate_search",
+        lambda **_kwargs: (
+            OptimisationCandidate(objective=1.0, point=(0.0,)),
+            OptimisationCandidate(objective=2.0, point=(1.0,)),
+        ),
+    )
+
+    def objective(x, args, debug=False):
+        if float(x[0]) == 0.0:
+            return HPRBackendResult.failure(reason=ZERO_USEFUL_DUTY_REASON)
+        return _backend_result(obj=2.0, utility_tot=1.0, period_idx=args.period_idx)
+
+    with pytest.raises(HPRTargetingError, match="no heat pump design") as caught:
+        hp_execution.solve_hpr_multiperiod_placement(
+            f_obj=objective,
+            x0_ls=None,
+            bnds=[(0.0, 1.0)],
+            args=_two_period_args(),
+        )
+
+    assert (
+        HPRFailureCategory.NO_BENEFICIAL_HEAT_PUMP
+        in caught.value.diagnostics.category_counts
+    )
+
+
+def test_shared_design_idle_in_one_period_is_not_no_heat_pump():
+    def objective(x, args, debug=False):
+        if args.period_idx == 1:
+            return HPRBackendResult.failure(reason=ZERO_USEFUL_DUTY_REASON)
+        return _backend_result(obj=2.0, utility_tot=1.0, period_idx=args.period_idx)
+
+    result = hp_aggregation.evaluate_multiperiod_candidate(
+        np.array([1.0]),
+        _two_period_args(),
+        period_objective=objective,
+    )
+
+    assert not result.success
+    assert result.failure_reason != ZERO_USEFUL_DUTY_REASON
+    assert "['p1']" in result.failure_reason

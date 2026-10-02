@@ -99,6 +99,21 @@ def network_structure_signature(
     return tuple(sorted(links))
 
 
+def outcome_ranking_key(
+    outcome: "HeatExchangerNetworkSynthesisTaskOutcome",
+) -> tuple[float, str]:
+    """Return the one key used both to accept and to rank outcomes.
+
+    Lowest objective first; ties go to the task id, so the choice never
+    depends on the order in which tasks finished.
+    """
+    objective = outcome.objective_value
+    return (
+        float("inf") if objective is None else float(objective),
+        outcome.task.task_id or "",
+    )
+
+
 def _ranked_candidate_outcomes(
     result: "HeatExchangerNetworkSynthesisResult",
 ) -> tuple["HeatExchangerNetworkSynthesisTaskOutcome", ...]:
@@ -116,15 +131,13 @@ def _ranked_candidate_outcomes(
     return tuple(
         sorted(
             accepted_method or candidates,
-            key=lambda outcome: (
-                outcome.objective_value,
-                outcome.task.task_id or "",
-            ),
+            key=outcome_ranking_key,
         )
     )
 
 
 __all__ = [
     "network_structure_signature",
+    "outcome_ranking_key",
     "rank_unique_network_outcomes",
 ]

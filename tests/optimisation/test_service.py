@@ -139,7 +139,10 @@ def test_candidate_result_preserves_and_orders_finite_backend_values(
     )
 
     with patch.object(optimisation_service, "_resolve_backend", return_value=backend):
-        result = run_multistart_minimisation(problem, options={"n_runs": 1})
+        # max_minima=None keeps every candidate; by default only 4 are kept.
+        result = run_multistart_minimisation(
+            problem, options={"n_runs": 1, "max_minima": None}
+        )
 
     assert len(result.candidates) == len(points)
     assert [candidate.objective for candidate in result.candidates] == sorted(
@@ -321,7 +324,9 @@ def test_feasibility_tolerance_can_be_tightened_without_reaching_backend(
         backend_options = kwargs
         return np.asarray([[0.5000005]]), np.asarray([0.0])
 
-    monkeypatch.setattr(optimisation_service, "_resolve_backend", lambda _method: backend)
+    monkeypatch.setattr(
+        optimisation_service, "_resolve_backend", lambda _method: backend
+    )
     problem = OptimisationProblem(
         objective=lambda x: float((x[0] - 0.5) ** 2),
         bounds=((0.0, 1.0),),

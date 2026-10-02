@@ -372,7 +372,9 @@ def assert_strict_success_contract(target: object, problem: object) -> None:
 
 def prepare_hpr_baseline(problem: object, profile: HPRProfile) -> None:
     """Materialize the public prerequisite target before the HPR transaction."""
-    if profile.is_utility:
+    # Indirect targeting needs subzones; utility HPR on a single zone builds
+    # its own indirect basis, so a direct target is the prerequisite there.
+    if profile.is_utility and problem.master_zone.subzones:
         problem.target.indirect_heat_integration()
     else:
         problem.target.direct_heat_integration()

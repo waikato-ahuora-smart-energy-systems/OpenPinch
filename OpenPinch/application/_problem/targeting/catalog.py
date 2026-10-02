@@ -129,6 +129,7 @@ METHOD_CATALOG = MappingProxyType(
                 "multiperiod_heat_exchanger_network",
                 "network_evolution",
                 "open_hens",
+                "optimise_duties",
                 "pinch_design",
                 "thermal_derivative",
             )

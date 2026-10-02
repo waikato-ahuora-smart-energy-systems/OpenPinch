@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import warnings
 from collections.abc import Mapping
 from typing import Any, Optional
@@ -267,7 +268,17 @@ class Stream:
         self._fluid_phase = self._normalise_fluid_phase(fluid_phase)
         self._active = True
         self._dt_cont_multiplier_locked = False
-        self._dt_cont_multiplier = float(delta_t_contribution_multiplier or 1.0)
+        # 0 is a valid multiplier (no shift); only a missing one defaults to 1.
+        multiplier = (
+            1.0
+            if delta_t_contribution_multiplier is None
+            else float(delta_t_contribution_multiplier)
+        )
+        if not math.isfinite(multiplier) or multiplier < 0.0:
+            raise ValueError(
+                "delta_t_contribution_multiplier must be finite and non-negative."
+            )
+        self._dt_cont_multiplier = multiplier
         self._numeric_revision = 0
 
         self._period_ids: dict[str, int] | None = None

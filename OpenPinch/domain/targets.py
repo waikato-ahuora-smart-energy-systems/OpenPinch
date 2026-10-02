@@ -261,7 +261,10 @@ class HeatPumpTargetBase(GraphBackedTarget, UtilitySummaryTarget):
     hpr_refrigeration_annualized_capital_cost: Any = None
     hpr_utility_annualized_capital_cost: Any = None
     hpr_total_annualized_cost: Any = None
+    hpr_machine_capital_costs: tuple[float, ...] | None = None
+    hpr_machine_annualized_capital_costs: tuple[float, ...] | None = None
     hpr_success: bool
+    hpr_shared_design: bool | None = None
     hpr_hot_streams: StreamCollection
     hpr_cold_streams: StreamCollection
     hpr_details: Any

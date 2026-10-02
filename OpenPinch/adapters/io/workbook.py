@@ -23,6 +23,9 @@ from .tabular import (
 __all__ = ["get_problem_from_excel", "get_results_from_excel"]
 
 
+_TEXT_COLUMNS = frozenset({"name", "zone", "type"})
+
+
 def get_problem_from_excel(excel_file, output_json=None):
     """Read workbook stream/utility sheets and return OpenPinch problem JSON."""
     try:
@@ -114,8 +117,13 @@ def _parse_sheet_with_units(
 
     units_map = dict(zip(col_names, col_units))
     if sheet_name != "Summary":
-        keep = ["t_supply", "t_target", "heat_flow", "dt_cont", "htc"]
-        units_map = {key: units_map[key] for key in keep if key in units_map}
+        # Keep every numeric column's unit (price included), as the CSV reader
+        # does; text columns carry no unit.
+        units_map = {
+            key: unit
+            for key, unit in units_map.items()
+            if key not in _TEXT_COLUMNS and isinstance(unit, str) and unit.strip()
+        }
 
     if sheet_name == "Summary":
         return _write_targets_to_dict_and_list(df_data, units_map, project_name)

@@ -36,6 +36,7 @@ from ..targeting.indirect import (
 )
 from .allocation import AllocationAdapterResult, _build_stream, _fallback_stream
 from .context import PlacementPeriodInput, PlacementTargetSnapshot
+from .errors import PlacementContextError
 from .profiles import _calibrate_profile, _finite_tuple, _load_profiles
 
 
@@ -320,7 +321,8 @@ def allocate_from_aggregate_profiles(
             residual_duty=required_cold,
         )
         hot_pinch, cold_pinch, *_ = sugcc.pinch_idx(ProblemTableLabel.H_NET_UT)
-    except (ArithmeticError, ValueError) as exc:
+    except (ArithmeticError, ValueError, PlacementContextError) as exc:
+        # A calibration failure rejects this candidate, not the whole run.
         return AllocationAdapterResult(
             hot_duties=(0.0,) * len(placement.hot),
             cold_duties=(0.0,) * len(placement.cold),

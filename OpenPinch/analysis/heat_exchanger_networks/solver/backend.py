@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import threading
 import time
 import warnings
 from collections.abc import Mapping, Sequence
@@ -306,6 +307,12 @@ def _write_solver_option_file(
     return str(option_path)
 
 
+# The working directory is process-wide. Pyomo solvers read their option file
+# from it, so solves that need it are serialised: parallel evolution threads
+# would otherwise change it under one another.
+_WORKING_DIRECTORY_LOCK = threading.RLock()
+
+
 @contextmanager
 def _solver_working_directory(model: Any, extension: str | int | None):
     option_file = getattr(model, "_openpinch_solver_option_file", None)
@@ -313,9 +320,10 @@ def _solver_working_directory(model: Any, extension: str | int | None):
         yield
         return
 
-    previous = Path.cwd()
-    os.chdir(Path(option_file).parent)
-    try:
-        yield
-    finally:
-        os.chdir(previous)
+    with _WORKING_DIRECTORY_LOCK:
+        previous = Path.cwd()
+        os.chdir(Path(option_file).parent)
+        try:
+            yield
+        finally:
+            os.chdir(previous)

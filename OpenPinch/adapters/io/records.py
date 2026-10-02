@@ -1,5 +1,7 @@
 """Input normalisation helpers shared by Excel/CSV/JSON ingestion paths."""
 
+import warnings
+
 import pandas as pd
 
 __all__ = ["validate_stream_data", "validate_utility_data"]
@@ -18,11 +20,19 @@ def validate_stream_data(sd: pd.DataFrame):
     def _normalize_label(value, prefix: str):
         if value is None or pd.isna(value):
             return value
-        text = str(value).strip()
+        original = _label_text(value)
+        text = original
         if "." in text:
             text = text.replace(".", "-")
         if text.isdigit():
             text = f"{prefix}{text}"
+        if text != original:
+            warnings.warn(
+                f"Name {original!r} was changed to {text!r}: dots become dashes "
+                "and numeric names get a prefix.",
+                UserWarning,
+                stacklevel=4,
+            )
         return text
 
     def _is_missing(value) -> bool:
@@ -66,6 +76,12 @@ def validate_stream_data(sd: pd.DataFrame):
                     next_default_name_idx += 1
                 record["name"] = f"{default_stream_prefix}{next_default_name_idx}"
                 next_default_name_idx += 1
+                warnings.warn(
+                    f"A stream in zone {record['zone']!r} has no name; it was "
+                    f"named {record['name']!r}.",
+                    UserWarning,
+                    stacklevel=3,
+                )
             else:
                 record["name"] = _normalize_label(name, default_stream_prefix)
 
@@ -95,6 +111,12 @@ def validate_utility_data(ud: pd.DataFrame):
         if ud.empty:
             return ud
         if "name" in ud.columns:
+            ud = ud.copy()
+            ud["name"] = ud["name"].map(
+                lambda value: (
+                    value if value is None or pd.isna(value) else _label_text(value)
+                )
+            )
             name_series = ud["name"]
             valid = ~name_series.isna()
             if valid.any():
@@ -112,5 +134,13 @@ def validate_utility_data(ud: pd.DataFrame):
             continue
         if isinstance(name, str) and not name.strip():
             continue
+        record = {**record, "name": _label_text(name)}
         append(record)
     return cleaned
+
+
+def _label_text(value) -> str:
+    """Return a name as text; spreadsheets give numeric names as numbers."""
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value).strip()

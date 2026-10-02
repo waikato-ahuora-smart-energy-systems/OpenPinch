@@ -302,6 +302,10 @@ class HeatPumpTargetInputs(BaseModel):
     allow_integrated_expander: bool
     bckgrd_hot_streams: StreamCollection
     bckgrd_cold_streams: StreamCollection
+    # Refrigeration only: the cooling warmer than the targeted coldest
+    # Q_hpr_target, and the default refrigeration it needs on its own.
+    untargeted_cooling_streams: StreamCollection | None = None
+    refrigeration_allowance: float | None = None
     bb_minimiser: str
     eta_penalty: float
     rho_penalty: float
@@ -355,6 +359,8 @@ class HeatPumpTargetOutputs(BaseModel):
     hpr_refrigeration_annualized_capital_cost: Optional[Any] = None
     hpr_utility_annualized_capital_cost: Optional[Any] = None
     hpr_total_annualized_cost: Optional[Any] = None
+    hpr_machine_capital_costs: Optional[tuple[float, ...]] = None
+    hpr_machine_annualized_capital_costs: Optional[tuple[float, ...]] = None
     Q_amb_hot: float
     Q_amb_cold: float
     cop_h: Optional[float | list | np.ndarray] = None
@@ -400,6 +406,10 @@ class SimulatedHPRAnnualizedCostAccounting(BaseModel):
     hpr_utility_annualized_capital_cost: Value
     hpr_total_annualized_cost: Value
     feasibility_penalty: Value
+    # Per machine, in $ and $/y, so multiperiod designs can size each machine
+    # for its own peak period.
+    hpr_machine_capital_costs: tuple[float, ...] = ()
+    hpr_machine_annualized_capital_costs: tuple[float, ...] = ()
 
 
 class HPRParsedState(BaseModel):
@@ -469,6 +479,8 @@ class HPRBackendResult(BaseModel):
     hpr_hot_utility_annualized_capital_cost: Any = None
     hpr_refrigeration_annualized_capital_cost: Any = None
     hpr_utility_annualized_capital_cost: Any = None
+    hpr_machine_capital_costs: tuple[float, ...] | None = None
+    hpr_machine_annualized_capital_costs: tuple[float, ...] | None = None
     feasibility_penalty: float = 0.0
     Q_cooling_water: float = 0.0
     Q_refrigeration: float = 0.0
@@ -555,6 +567,10 @@ class HPRBackendResult(BaseModel):
                 self.hpr_utility_annualized_capital_cost
             ),
             "hpr_total_annualized_cost": self.hpr_total_annualized_cost,
+            "hpr_machine_capital_costs": self.hpr_machine_capital_costs,
+            "hpr_machine_annualized_capital_costs": (
+                self.hpr_machine_annualized_capital_costs
+            ),
             "Q_amb_hot": self.Q_amb_hot,
             "Q_amb_cold": self.Q_amb_cold,
             "cop_h": self.cop_h,

@@ -37,7 +37,11 @@ def test_period_value_stores_only_ordered_magnitudes():
     )
 
     np.testing.assert_allclose(value.period_values, np.array([10.0, 4.0]))
-    assert value.to_dict() == {"values": [10.0, 4.0], "unit": "kW"}
+    assert value.to_dict() == {
+        "values": [10.0, 4.0],
+        "unit": "kW",
+        "weights": [0.25, 0.75],
+    }
 
 
 def test_period_value_requires_explicit_summary_for_scalar_face():
@@ -338,3 +342,12 @@ def test_value_serialisation_handles_nan_and_from_dict_validation():
     )
     with pytest.raises(TypeError, match="data must be a mapping"):
         Value.from_dict([1.0])
+
+
+@pytest.mark.parametrize("unit", ["k$/y", "k$/yr", "M$/y"])
+def test_prefixed_annual_cost_units_parse(unit):
+    value = Value(2.0, unit)
+
+    scale = 1e6 if unit.startswith("M") else 1e3
+    assert value.to("$/y").value == pytest.approx(2.0 * scale)
+    assert Value(2000.0, "$").to("k$").value == pytest.approx(2.0)

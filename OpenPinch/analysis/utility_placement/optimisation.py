@@ -26,6 +26,35 @@ from .evaluation import PlacementEvaluation, PlacementEvaluationSession
 OptimisationRunner = Callable[..., OptimisationResult]
 
 
+def _coordinate_processing_order(model) -> list[int]:
+    """Return coordinate indices with supply temperatures in declaration order.
+
+    Supply ordering is chained down each side's templates as they were
+    declared, which is also the order the verifier checks. Coordinates may be
+    listed in another order, so they are not simply taken as listed.
+    """
+    declared = {
+        template.key: index for index, template in enumerate(model.templates.all)
+    }
+    coordinates = list(model.coordinates)
+
+    def sort_key(index: int):
+        key = coordinates[index].coordinate
+        is_supply = key.field.value == "supply_temperature"
+        rank = declared.get(key.template_key, len(declared))
+        # Supply temperatures first, by declaration; the rest keep their place.
+        return (0, rank, index) if is_supply else (1, 0, index)
+
+    return sorted(range(len(coordinates)), key=sort_key)
+
+
+def _supply_family(model, key, kinds):
+    side = key.template_key.side
+    if model.request.uses_generated_pairs:
+        return (side, kinds[key.template_key])
+    return side
+
+
 def _optimizer_point_to_physical(
     session: PlacementEvaluationSession,
     point,
@@ -33,24 +62,24 @@ def _optimizer_point_to_physical(
     """Decode bounded optimizer coordinates with structural supply ordering."""
     model = session.model
     separation = model.envelope.minimum_separation.value
+    kinds = {template.key: template.kind for template in model.templates.all}
+    coordinates = list(model.coordinates)
+    raw = list(point)
+    if len(raw) != len(coordinates):
+        raise ValueError("Optimizer point length does not match the coordinates.")
     values: dict[object, float] = {}
     previous_supply: dict[object, float] = {}
-    kinds = {template.key: template.kind for template in model.templates.all}
-    for coordinate, raw_value in zip(model.coordinates, point, strict=True):
-        fraction = min(max(float(raw_value), 0.0), 1.0)
+    for index in _coordinate_processing_order(model):
+        coordinate = coordinates[index]
+        fraction = min(max(float(raw[index]), 0.0), 1.0)
         key = coordinate.coordinate
         lower = coordinate.bounds.lower
         upper = coordinate.bounds.upper
         if key.field.value == "supply_temperature":
-            side = key.template_key.side
-            family = (
-                (side, kinds[key.template_key])
-                if model.request.uses_generated_pairs
-                else side
-            )
+            family = _supply_family(model, key, kinds)
             previous = previous_supply.get(family)
             if previous is not None:
-                if side.value == "hot":
+                if key.template_key.side.value == "hot":
                     upper = min(upper, previous - separation)
                 elif not model.request.uses_generated_pairs:
                     lower = max(lower, previous + separation)
@@ -59,7 +88,7 @@ def _optimizer_point_to_physical(
         else:
             value = lower + fraction * (upper - lower)
         values[key] = value
-    return tuple(values[item.coordinate] for item in model.coordinates)
+    return tuple(values[item.coordinate] for item in coordinates)
 
 
 def _physical_point_to_optimizer(
@@ -69,32 +98,32 @@ def _physical_point_to_optimizer(
     """Encode physical coordinates into the bounded structural search space."""
     model = session.model
     separation = model.envelope.minimum_separation.value
-    previous_supply: dict[object, float] = {}
     kinds = {template.key: template.kind for template in model.templates.all}
-    result: list[float] = []
-    for coordinate, raw_value in zip(model.coordinates, point, strict=True):
-        value = float(raw_value)
+    coordinates = list(model.coordinates)
+    raw = [float(value) for value in point]
+    if len(raw) != len(coordinates):
+        raise ValueError("Physical point length does not match the coordinates.")
+    fractions = [0.0] * len(coordinates)
+    previous_supply: dict[object, float] = {}
+    for index in _coordinate_processing_order(model):
+        coordinate = coordinates[index]
+        value = raw[index]
         key = coordinate.coordinate
         lower = coordinate.bounds.lower
         upper = coordinate.bounds.upper
         if key.field.value == "supply_temperature":
-            side = key.template_key.side
-            family = (
-                (side, kinds[key.template_key])
-                if model.request.uses_generated_pairs
-                else side
-            )
+            family = _supply_family(model, key, kinds)
             previous = previous_supply.get(family)
             if previous is not None:
-                if side.value == "hot":
+                if key.template_key.side.value == "hot":
                     upper = min(upper, previous - separation)
                 elif not model.request.uses_generated_pairs:
                     lower = max(lower, previous + separation)
             previous_supply[family] = value
         width = upper - lower
         fraction = (value - lower) / width if width > 0.0 else 0.0
-        result.append(min(max(fraction, 0.0), 1.0))
-    return tuple(result)
+        fractions[index] = min(max(fraction, 0.0), 1.0)
+    return tuple(fractions)
 
 
 def _bounded_session_objective(

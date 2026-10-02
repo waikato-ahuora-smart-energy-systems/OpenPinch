@@ -40,8 +40,9 @@ Core and Intermediate
    plain-data export, required CoolProp refrigeration, and explicit optional TESPy
    mixtures (``slow-hpr``).
 10. ``10_multiperiod_heat_pumps.ipynb`` -- five separate bounded shared-design
-    optimizations across ``turndown``, ``base``, and ``peak``, plus one optional
-    advanced cascade screen (``slow-hpr``).
+    optimizations across ``turndown``, ``base``, and ``peak`` (refrigeration on
+    the sub-ambient dairy case), plus one optional advanced cascade screen
+    (``slow-hpr``).
 11. ``11_process_mvr_and_cascade.ipynb`` -- direct process-MVR stage/work
     evidence and a required bounded one-stage CoolProp VC+MVR target
     (``slow-hpr``).

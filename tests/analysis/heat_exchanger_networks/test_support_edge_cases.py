@@ -477,6 +477,8 @@ def test_network_evolution_task_edges(monkeypatch):
         evolution, "required_topology_restrictions_from_outcome", lambda *_args: ()
     )
     monkeypatch.setattr(evolution, "_required_stage_count", lambda *_args: 1)
+    # The empty fake network stands in for a refinable topology here.
+    monkeypatch.setattr(evolution, "is_utility_only_outcome", lambda _outcome: False)
     standard_tasks = evolution.build_network_evolution_method_tasks(
         settings,
         (

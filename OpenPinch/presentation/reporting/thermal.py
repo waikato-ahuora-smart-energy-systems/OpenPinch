@@ -72,6 +72,14 @@ def hpr_result(target, *, is_total=False):
                 target,
                 "hpr_annualized_capital_cost",
             ),
+            "hpr_hot_utility_annualized_capital_cost": _metric(
+                target,
+                "hpr_hot_utility_annualized_capital_cost",
+            ),
+            "hpr_refrigeration_annualized_capital_cost": _metric(
+                target,
+                "hpr_refrigeration_annualized_capital_cost",
+            ),
             "hpr_utility_annualized_capital_cost": _metric(
                 target,
                 "hpr_utility_annualized_capital_cost",
@@ -80,7 +88,14 @@ def hpr_result(target, *, is_total=False):
                 target,
                 "hpr_total_annualized_cost",
             ),
+            "hpr_machine_capital_costs": getattr(
+                target, "hpr_machine_capital_costs", None
+            ),
+            "hpr_machine_annualized_capital_costs": getattr(
+                target, "hpr_machine_annualized_capital_costs", None
+            ),
             "hpr_success": target.hpr_success,
+            "hpr_shared_design": getattr(target, "hpr_shared_design", None),
             "hpr_hot_streams": target.hpr_hot_streams,
             "hpr_cold_streams": target.hpr_cold_streams,
         }

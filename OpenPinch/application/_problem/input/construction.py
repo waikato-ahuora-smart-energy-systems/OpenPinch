@@ -13,6 +13,7 @@ from ....domain.configuration import tol
 from ....domain.enums import StreamType
 from ....domain.stream import Stream
 from ....domain.stream_collection import StreamCollection
+from ....domain.value import Value
 from ....domain.zone import Zone
 from . import canonicalization as _canonicalization
 from .segments import _create_segmented_process_stream
@@ -98,6 +99,12 @@ def _build_prepared_stream_collection(
     process_zone_paths: Dict[str, str] = {}
 
     for stream_schema in streams:
+        if stream_schema.dt_cont is None:
+            # A stream without its own dt_cont uses THERMAL_DT_CONT, as
+            # utilities do.
+            stream_schema = stream_schema.model_copy(
+                update={"dt_cont": master_zone.config.thermal.dt_cont}
+            )
         zone = master_zone.get_subzone(stream_schema.zone)
         if zone is None:
             raise ValueError(
@@ -170,10 +177,15 @@ def _assign_process_streams_to_subzones(
     return master_zone
 
 
-def _validate_stream_temperatures(stream: StreamSchema):
+def _validate_stream_temperatures(stream: StreamSchema, config=None):
     """Validate that supply and target temperatures align with stream type."""
-    t_supply = resolve_value_array(stream.t_supply)
-    t_target = resolve_value_array(stream.t_target)
+    # Compare in canonical units: 100 K and 100 degC are different temperatures.
+    t_supply = standardise_input_value(
+        stream.t_supply, field_name="t_supply", config=config
+    ).period_values
+    t_target = standardise_input_value(
+        stream.t_target, field_name="t_target", config=config
+    ).period_values
     heat_flow = resolve_value_array(stream.heat_flow)
     if np.all((abs(t_supply - t_target) < tol) * (heat_flow != 0.0)):
         raise ValueError(
@@ -185,19 +197,25 @@ def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
     """Create a process :class:`Stream` from one validated schema record."""
     if stream.segments is not None or stream.profile is not None:
         return _create_segmented_process_stream(stream, zone)
-    _validate_stream_temperatures(stream)
-    stream_obj = Stream(
-        name=stream.name,
-        supply_temperature=standardise_input_value(
-            stream.t_supply,
-            field_name="t_supply",
-            config=zone.config,
-        ),
-        target_temperature=standardise_input_value(
+    _validate_stream_temperatures(stream, zone.config)
+    supply_temperature = standardise_input_value(
+        stream.t_supply,
+        field_name="t_supply",
+        config=zone.config,
+    )
+    target_temperature = _widen_near_isothermal_target(
+        supply_temperature,
+        standardise_input_value(
             stream.t_target,
             field_name="t_target",
             config=zone.config,
         ),
+        minimum_span=zone.config.thermal.dt_phase_change,
+    )
+    stream_obj = Stream(
+        name=stream.name,
+        supply_temperature=supply_temperature,
+        target_temperature=target_temperature,
         supply_pressure=standardise_input_value(
             stream.p_supply,
             field_name="p_supply",
@@ -239,6 +257,33 @@ def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
         fluid_phase=stream.fluid_phase,
     )
     return stream_obj
+
+
+def _widen_near_isothermal_target(
+    supply: Value, target: Value, *, minimum_span: float
+) -> Value:
+    """Widen a stream's temperature span to at least ``minimum_span``.
+
+    A near-isothermal stream (e.g. condensing steam) narrower than the problem
+    table's interval tolerance would drop out of every interval and lose its
+    duty. Its target moves away from the supply to ``minimum_span``
+    (``THERMAL_DT_PHASE_CHANGE``); the duty is unchanged.
+    """
+    if minimum_span <= 0.0:
+        return target
+    supply_values = np.asarray(supply.period_values, dtype=float)
+    target_values = np.asarray(target.period_values, dtype=float)
+    supply_values, target_values = np.broadcast_arrays(supply_values, target_values)
+    delta = target_values - supply_values
+    narrow = np.isfinite(delta) & (np.abs(delta) > 0.0) & (np.abs(delta) < minimum_span)
+    if not narrow.any():
+        return target
+    widened = target_values.copy()
+    widened[narrow] = supply_values[narrow] + np.sign(delta[narrow]) * minimum_span
+    unit = target.to_dict()["unit"]
+    if widened.size == 1:
+        return Value({"value": float(widened[0]), "unit": unit})
+    return Value({"values": widened.tolist(), "unit": unit})
 
 
 def _build_process_stream_key(zone_path: str, stream_obj: Stream) -> str:

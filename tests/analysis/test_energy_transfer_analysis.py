@@ -56,10 +56,12 @@ from OpenPinch.domain.problem_table import ProblemTable
 
 
 def _sample_problem_table() -> ProblemTable:
+    # Consistent with the problem table: CP_NET = CP_cold - CP_hot and
+    # H_NET = H_NET[0] - cumsum(dT * CP_NET). The top interval is hot-dominated.
     return ProblemTable(
         {
             ProblemTableLabel.T: [200.0, 150.0, 100.0],
-            ProblemTableLabel.CP_NET: [0.0, 1.0, -1.2],
+            ProblemTableLabel.CP_NET: [0.0, -1.0, 1.2],
             ProblemTableLabel.H_NET: [15.0, 65.0, 5.0],
         }
     )
@@ -82,16 +84,16 @@ def test_create_heat_surplus_deficit_table_reports_operation_delta_hnet():
             "interval": 1.0,
             "Process": 50.0,
             "total_delta_hnet": 50.0,
-            "heat_surplus": 0.0,
-            "heat_deficit": 50.0,
+            "heat_surplus": 50.0,
+            "heat_deficit": 0.0,
         },
         {
             "temperature": 100.0,
             "interval": 2.0,
             "Process": -60.0,
             "total_delta_hnet": -60.0,
-            "heat_surplus": 60.0,
-            "heat_deficit": 0.0,
+            "heat_surplus": 0.0,
+            "heat_deficit": 60.0,
         },
     ]
 
@@ -339,3 +341,60 @@ def test_energy_transfer_target_naming_modes_and_problem_table_guards():
     assert _has_problem_table_values(invalid_pt, ProblemTableLabel.H_NET) is False
     nan_pt = ProblemTable({ProblemTableLabel.H_NET: [np.nan, np.nan]})
     assert _has_problem_table_values(nan_pt, ProblemTableLabel.H_NET) is False
+
+
+def test_cp_net_and_interpolation_branches_give_the_same_cascade():
+    with_cp = _sample_problem_table()
+    without_cp = ProblemTable(
+        {
+            ProblemTableLabel.T: [200.0, 150.0, 100.0],
+            ProblemTableLabel.H_NET: [15.0, 65.0, 5.0],
+        }
+    )
+    temperatures = np.array([200.0, 175.0, 150.0, 100.0])
+
+    results = [
+        _transpose_operation_cascades(
+            [{"name": "Process", "mode": "R", "pt": table}], temperatures
+        )
+        for table in (with_cp, without_cp)
+    ]
+
+    np.testing.assert_allclose(results[0][2], results[1][2])
+    np.testing.assert_allclose(results[0][3], results[1][3])
+    np.testing.assert_allclose(results[0][2], [[25.0, 25.0, -60.0]])
+
+
+def test_real_problem_table_labels_hot_dominated_interval_as_surplus():
+    from OpenPinch.analysis.targeting.cascade import get_process_heat_cascade
+    from OpenPinch.domain.stream import Stream
+    from OpenPinch.domain.stream_collection import StreamCollection
+
+    hot = StreamCollection()
+    hot.add(
+        Stream(
+            "H1", supply_temperature=200.0, target_temperature=150.0, heat_flow=100.0
+        )
+    )
+    cold = StreamCollection()
+    cold.add(
+        Stream("C1", supply_temperature=50.0, target_temperature=100.0, heat_flow=60.0)
+    )
+    pt = get_process_heat_cascade(hot_streams=hot, cold_streams=cold, is_shifted=False)
+
+    for table in (
+        pt,
+        ProblemTable(
+            {
+                ProblemTableLabel.T: pt[ProblemTableLabel.T],
+                ProblemTableLabel.H_NET: pt[ProblemTableLabel.H_NET],
+            }
+        ),
+    ):
+        rows = create_heat_surplus_deficit_table(table)
+        by_temperature = {row["temperature"]: row for row in rows}
+        # 200 -> 150 is hot only (surplus); 100 -> 50 is cold only (deficit).
+        assert by_temperature[150.0]["heat_surplus"] == pytest.approx(100.0)
+        assert by_temperature[150.0]["heat_deficit"] == pytest.approx(0.0)
+        assert by_temperature[50.0]["heat_deficit"] == pytest.approx(60.0)
+        assert by_temperature[50.0]["heat_surplus"] == pytest.approx(0.0)

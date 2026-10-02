@@ -108,6 +108,7 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
         n_rm_branches: int = 1,
         max_parallel: int = 1,
         no_improvement_patience: int | None = None,
+        beam_width: int = 4,
     ):
         """Evolve topology using branched add/remove net-benefit heuristics."""
 
@@ -119,6 +120,7 @@ class StageWiseModel(BaseHeatExchangerNetworkModel):
             n_rm_branches,
             max_parallel,
             no_improvement_patience,
+            beam_width=beam_width,
         )
 
     def get_n_minus_one_evolution(self, print_output: bool, unit: int, prev_case):

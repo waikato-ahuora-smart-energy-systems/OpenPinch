@@ -32,6 +32,10 @@ from .bounds import (
 )
 from .errors import PlacementModelValidationError
 from .start_points import generate_start_points
+from .units import (
+    INTERNAL_TEMPERATURE,
+    INTERNAL_TEMPERATURE_DIFFERENCE,
+)
 
 
 def build_decision_coordinates(
@@ -393,15 +397,15 @@ def decode_verified_placement(
             placement_rank=template.placement_rank,
             supply_temperature=QuantityValue(
                 value=supply,
-                unit=model.request.units.absolute_temperature,
+                unit=INTERNAL_TEMPERATURE,
             ),
             target_temperature=QuantityValue(
                 value=target,
-                unit=model.request.units.absolute_temperature,
+                unit=INTERNAL_TEMPERATURE,
             ),
             temperature_span=QuantityValue(
                 value=span,
-                unit=model.request.units.temperature_difference,
+                unit=INTERNAL_TEMPERATURE_DIFFERENCE,
             ),
         )
 

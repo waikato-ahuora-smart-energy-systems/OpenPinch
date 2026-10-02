@@ -21,9 +21,18 @@ __all__ = [
 
 
 def compute_capital_recovery_factor(interest_rate: float, years: int) -> float:
-    """Calculate the capital recovery factor, also called annualisation."""
-    i = interest_rate
-    n = years
+    """Calculate the capital recovery factor, also called annualisation.
+
+    A zero rate gives straight-line recovery, 1 / n.
+    """
+    i = float(interest_rate)
+    n = float(years)
+    if not n > 0.0:
+        raise ValueError("The service life must be positive.")
+    if not i > -1.0:
+        raise ValueError("The discount rate must be greater than -1.")
+    if abs(i) < 1e-12:
+        return 1.0 / n
     return i * (1 + i) ** n / ((1 + i) ** n - 1)
 
 
@@ -70,8 +79,15 @@ def compute_annual_capital_cost(
     capital = Value(capital_cost, "$").to("$").value
     if capital <= tol:
         return Value(0.0, "$/y")
-    discount_rate = max(float(discount_rate), tol)
-    service_life = max(float(service_life), 1.0)
+    # Out-of-range inputs are rejected by configuration validation (rate >= 0,
+    # life >= 1 year), not silently clamped here.
+    discount_rate = float(discount_rate)
+    service_life = float(service_life)
+    if discount_rate < 0.0 or service_life < 1.0:
+        raise ValueError(
+            "Annualisation needs a discount rate >= 0 and a service life >= 1 "
+            f"year; got {discount_rate:g} and {service_life:g}."
+        )
     return Value(
         capital * compute_capital_recovery_factor(discount_rate, service_life),
         "$/y",

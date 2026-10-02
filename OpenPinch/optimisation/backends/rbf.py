@@ -126,6 +126,10 @@ def _fit_rbf_surrogate_model(
     """Fit an RBF interpolant surrogate, returning ``None`` when ill-conditioned."""
     X = np.asarray(X, dtype=float)
     y = np.asarray(y, dtype=float)
+    # Fit only finite observations; a non-finite value would spoil the
+    # interpolant and turn the search into random sampling.
+    finite = np.isfinite(y)
+    X, y = X[finite], y[finite]
     if X.shape[0] < 2:
         return None
     try:

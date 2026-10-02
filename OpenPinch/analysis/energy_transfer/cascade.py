@@ -75,7 +75,9 @@ def transpose_operation_cascades(
         cp_values = cp_net[1:] if cp_net.size > 1 else np.array([], dtype=float)
         if cp_values.size:
             interval_cp[has_interval] = cp_values[source_indices[has_interval]]
-        interval_heat[row] = delta_t * interval_cp
+        # Same sign as the interpolation branch and the problem table
+        # (H_NET = -cumsum(dT * CP_NET)): a positive interval is a surplus.
+        interval_heat[row] = -delta_t * interval_cp
         cascades[row, 1:] = cascades[row, 0] + np.cumsum(interval_heat[row])
     return names, modes, _clean_array(interval_heat), _clean_array(cascades)
 

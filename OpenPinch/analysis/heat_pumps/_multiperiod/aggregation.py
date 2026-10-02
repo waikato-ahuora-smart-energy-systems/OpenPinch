@@ -7,6 +7,7 @@ from collections.abc import Callable, Sequence
 import numpy as np
 
 from ....contracts.hpr import (
+    ZERO_USEFUL_DUTY_REASON,
     HPRBackendResult,
     HPREvaluationMode,
     HPRPeriodCase,
@@ -31,6 +32,7 @@ def evaluate_multiperiod_candidate(
         return HPRBackendResult.failure(reason="No period cases were prepared.")
 
     period_outputs: dict[str, HPRBackendResult] = {}
+    zero_duty_failure: HPRBackendResult | None = None
     for case in args.period_cases:
         result = evaluate_hpr_candidate(
             objective=period_objective,
@@ -39,6 +41,11 @@ def evaluate_multiperiod_candidate(
             debug=debug,
             artifact_mode=artifact_mode,
         )
+        if result.failure_reason == ZERO_USEFUL_DUTY_REASON:
+            # Keep evaluating: the shared design is "no heat pump" only when it
+            # delivers zero useful duty in every period.
+            zero_duty_failure = zero_duty_failure or result
+            continue
         if not result.success or not np.isfinite(float(result.obj)):
             reason = result.failure_reason or "candidate failed"
             return HPRBackendResult.failure(
@@ -47,6 +54,26 @@ def evaluate_multiperiod_candidate(
                 Q_amb_cold=result.Q_amb_cold,
             )
         period_outputs[str(case.period_id)] = result
+
+    if zero_duty_failure is not None:
+        if not period_outputs:
+            # Preserve the sentinel unwrapped so the solver can stop and
+            # report the typed "no beneficial heat pump" outcome.
+            return HPRBackendResult.failure(
+                reason=ZERO_USEFUL_DUTY_REASON,
+                Q_amb_hot=zero_duty_failure.Q_amb_hot,
+                Q_amb_cold=zero_duty_failure.Q_amb_cold,
+            )
+        idle_periods = [
+            str(case.period_id)
+            for case in args.period_cases
+            if str(case.period_id) not in period_outputs
+        ]
+        return HPRBackendResult.failure(
+            reason=(f"HPR periods {idle_periods!r} failed: {ZERO_USEFUL_DUTY_REASON}"),
+            Q_amb_hot=zero_duty_failure.Q_amb_hot,
+            Q_amb_cold=zero_duty_failure.Q_amb_cold,
+        )
 
     weights = np.asarray([case.weight for case in args.period_cases], dtype=float)
     weighted, shared_objective = aggregate_hpr_period_results(
