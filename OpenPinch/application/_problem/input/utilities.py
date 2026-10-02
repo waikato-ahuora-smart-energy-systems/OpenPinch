@@ -8,6 +8,7 @@ from typing import List, Tuple
 
 import numpy as np
 
+from ....analysis.targeting.utilities import mark_default_utility
 from ....contracts.input import UtilitySchema
 from ....contracts.units import standardise_input_value
 from ....domain._stream.value_state import resolve_period_weights
@@ -91,6 +92,16 @@ def _get_hot_and_cold_utilities(
         dt_cont_multiplier=dt_cont_multiplier,
         config=config,
     )
+    # Mark the defaults this preparation added (never a user utility that is
+    # merely named HU or CU), so targeting uses them only as a backup.
+    for added, collection, name in (
+        (add_default_hu, hot_utilities, "HU"),
+        (add_default_cu, cold_utilities, "CU"),
+    ):
+        if added:
+            for stream in collection:
+                if stream.name == name:
+                    mark_default_utility(stream)
     prepared = hot_utilities + cold_utilities
     period_ids = {
         str(period_id): index

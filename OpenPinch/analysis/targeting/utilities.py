@@ -143,9 +143,17 @@ def target_utilities_for_load_profiles(
 # Unmet utility demand (kW) below this is rounding, not a shortfall.
 _UNMET_DEMAND_ABS_TOL = 1e-3
 
-# Names given to the default utilities added during input preparation.
-DEFAULT_HOT_UTILITY_NAME = "HU"
-DEFAULT_COLD_UTILITY_NAME = "CU"
+_DEFAULT_UTILITY_FLAG = "_is_default_utility"
+
+
+def mark_default_utility(stream) -> None:
+    """Flag ``stream`` as a default HU/CU added during input preparation."""
+    setattr(stream, _DEFAULT_UTILITY_FLAG, True)
+
+
+def is_default_utility(stream) -> bool:
+    """Return whether ``stream`` is a default HU/CU (a backup utility)."""
+    return bool(getattr(stream, _DEFAULT_UTILITY_FLAG, False))
 
 
 def _warn_on_unmet_utility_demand(
@@ -295,16 +303,16 @@ def _calculate_assigned_utility_duties(
     # Use the least valuable utility first: the coldest hot utility and the
     # hottest cold utility, by shifted level in this period. The collection's
     # own order compares whole multi-period values and can differ from this.
-    # The default HU/CU is a backup for what the given utilities cannot supply
-    # (for example because of maximum_heat_flow caps), so it always goes last.
-    default_name = DEFAULT_HOT_UTILITY_NAME if is_hot_ut else DEFAULT_COLD_UTILITY_NAME
+    # A default HU/CU added during input preparation is a backup for what the
+    # given utilities cannot supply (for example because of maximum_heat_flow
+    # caps), so it always goes last. A user utility named HU/CU is not one.
     collection_order = (
         range(len(utilities) - 1, -1, -1) if is_hot_ut else range(len(utilities))
     )
     indices = sorted(
         collection_order,
         key=lambda i: (
-            utilities[i].name == default_name,
+            is_default_utility(utilities[i]),
             *(
                 (levels[i][0], levels[i][1])
                 if is_hot_ut

@@ -324,3 +324,20 @@ def test_exergy_curves_unshift_each_interval_by_its_own_contribution():
     assert unknown["source_total"] == pytest.approx(
         build_exergy_nlp_curves(**kwargs)["source_total"]
     )
+
+
+def test_only_an_added_default_utility_is_treated_as_the_backup():
+    from OpenPinch.analysis.targeting.utilities import is_default_utility
+
+    # A capped Steam utility gets a default HU added behind it.
+    capped = PinchProblem(
+        _single_zone_payload(maximum_heat_flow=50.0), project_name="Site"
+    )
+    added = {u.name: is_default_utility(u) for u in capped.master_zone.hot_utilities}
+    assert added == {"Steam": False, "HU": True}
+
+    # A user utility that is merely named HU is an ordinary utility.
+    payload = _single_zone_payload()
+    payload["utilities"][0]["name"] = "HU"
+    named = PinchProblem(payload, project_name="Site")
+    assert [is_default_utility(u) for u in named.master_zone.hot_utilities] == [False]
