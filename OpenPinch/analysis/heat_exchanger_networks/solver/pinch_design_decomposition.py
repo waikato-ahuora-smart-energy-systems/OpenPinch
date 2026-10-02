@@ -279,7 +279,10 @@ def _apply_hen_dt_cont_convention(zone: Zone, *, dTmin: float) -> None:
     for stream in zone.all_streams:
         parts = stream.segments if stream.has_segments else (stream,)
         contributions = [
-            _stream_dt_cont_with_fallback(part, dTmin=dTmin) for part in parts
+            _stream_dt_cont_with_fallback(
+                part, dTmin=dTmin, reference_dt_cont=zone.config.thermal.dt_cont
+            )
+            for part in parts
         ]
         prepared.append(
             (stream, contributions, stream.delta_t_contribution_multiplier_locked)
@@ -302,11 +305,17 @@ def _apply_hen_dt_cont_convention(zone: Zone, *, dTmin: float) -> None:
             stream.delta_t_contribution = contributions[0]
         stream.delta_t_contribution_multiplier_locked = locked
 
+    # The baked values are already at the dTmin scale. Record that scale as the
+    # zone's reference so applying the convention again leaves them unchanged.
+    # The zone (and its config) is a detached copy, so the source is untouched.
+    zone.config.update_values(THERMAL_DT_CONT=float(dTmin) / 2.0)
+
 
 def _stream_dt_cont_with_fallback(
     stream: Stream,
     *,
     dTmin: float,
+    reference_dt_cont: float | None = None,
 ) -> dict[str, float | list[float] | str]:
     """Use the solver-array contribution policy for each effective period."""
     current = getattr(stream, "effective_delta_t_contribution", None)
@@ -314,7 +323,12 @@ def _stream_dt_cont_with_fallback(
         return {"value": float(dTmin) / 2.0, "unit": "delta_degC"}
 
     values = [
-        _temperature_contribution(stream, dTmin, period_idx=period_index)
+        _temperature_contribution(
+            stream,
+            dTmin,
+            period_idx=period_index,
+            reference_dt_cont=reference_dt_cont,
+        )
         for period_index in range(current.num_periods)
     ]
     if len(values) > 1:
@@ -434,8 +448,9 @@ def _build_decomposition(
             "utility_targets": "kW",
         },
         dt_cont_convention=(
-            "Copied stream and explicit segment dt_cont values preserve prepared "
-            "effective contributions above tol, with dTmin / 2 as fallback. "
+            "Copied stream and explicit segment dt_cont values are the prepared "
+            "effective contributions scaled by dTmin / (2 * THERMAL_DT_CONT), "
+            "with dTmin / 2 as fallback. "
             "The copied zone dt_cont_multiplier is then set to 1.0."
         ),
     )

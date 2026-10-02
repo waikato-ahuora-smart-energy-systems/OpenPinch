@@ -321,7 +321,9 @@ def test_feasibility_tolerance_can_be_tightened_without_reaching_backend(
         backend_options = kwargs
         return np.asarray([[0.5000005]]), np.asarray([0.0])
 
-    monkeypatch.setattr(optimisation_service, "_resolve_backend", lambda _method: backend)
+    monkeypatch.setattr(
+        optimisation_service, "_resolve_backend", lambda _method: backend
+    )
     problem = OptimisationProblem(
         objective=lambda x: float((x[0] - 0.5) ** 2),
         bounds=((0.0, 1.0),),

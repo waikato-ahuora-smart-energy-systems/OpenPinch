@@ -256,6 +256,9 @@ aidlc-docs/inception/plans/*
 # Claude Code local settings and session data
 .claude/
 
+# Claude (Cowork) session outputs
+Claude outputs/
+
 # Local CI runner (scripts/ci_local.sh)
 .venv-smoke/
 reports/

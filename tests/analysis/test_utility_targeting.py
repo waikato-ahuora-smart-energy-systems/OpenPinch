@@ -209,6 +209,9 @@ def test_problem_targeting_supports_documented_segmented_utility() -> None:
                 {
                     "name": "Steam profile",
                     "type": "Hot",
+                    # Explicit zero: the THERMAL_DT_CONT default would shift the
+                    # 160 degC outlet below the cold stream's shifted target.
+                    "dt_cont": 0.0,
                     "segments": [
                         {
                             "t_supply": 250.0,

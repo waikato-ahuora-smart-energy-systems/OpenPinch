@@ -44,13 +44,11 @@ class Value:
         """Create a scalar or multiperiod value from data and optional unit."""
         quantity, weights = self._coerce_input(data, unit)
         self._set_storage(quantity)
-        self._weights = (
-            None
-            if weights is None
-            else np.array(weights, dtype=float, copy=True).reshape(-1)
+        # Weights are kept as given (they are passive), but validated the same
+        # way whatever the input form.
+        self._weights = _value_units.validate_weights(
+            weights, expected_len=self.num_periods
         )
-        if self._weights is not None and self._weights.size != self.num_periods:
-            raise ValueError("weights length must match the number of periods.")
         self._read_only_reason: str | None = None
 
     @property
@@ -494,10 +492,14 @@ class Value:
     def to_dict(self):
         """Serialise the value into a JSON-friendly dictionary."""
         if self._is_period_valued():
-            return {
+            data = {
                 "values": self.period_values.tolist(),
                 "unit": self._serialise_units(self._quantity.units),
             }
+            # Keep weights, so a save and load gives the same period model.
+            if self._weights is not None:
+                data["weights"] = self._weights.tolist()
+            return data
         if np.isnan(self.value):
             return {
                 "value": None,

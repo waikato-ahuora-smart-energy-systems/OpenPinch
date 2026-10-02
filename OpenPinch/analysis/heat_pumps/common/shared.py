@@ -54,6 +54,7 @@ __all__ = [
     "HPRCostUnit",
     "SUBCRITICAL_CONDENSING_MARGIN_K",
     "calc_hpr_capital_cost",
+    "calc_hpr_machine_capital_costs",
     "condensing_temperature_search_range",
     "calc_simulated_hpr_annualized_costs",
     "calc_carnot_heat_engine_eta",
@@ -109,19 +110,31 @@ def calc_hpr_capital_cost(
 ) -> Value:
     """Return the installed capital cost of the heat-pump machines.
 
+    This is the sum of :func:`calc_hpr_machine_capital_costs`.
+    """
+    return Value(sum(calc_hpr_machine_capital_costs(units, args)), "$")
+
+
+def calc_hpr_machine_capital_costs(
+    units: Sequence[HPRCostUnit],
+    args: HeatPumpTargetInputs,
+) -> tuple[float, ...]:
+    """Return the installed capital cost of each heat-pump machine, in $.
+
     Each machine costs::
 
         F_inst * C_eq * (Q_cap / 1 MW)^exp
             * (fixed_share + stage_share * (n_closed + n_mvr)) * f_T
 
     with ``f_T = 1 + temp_factor * max(0, T_hot_max - temp_base) / 100 K``.
-    The machines are costed separately and summed, and a machine with no
-    capacity costs nothing.
+    The machines are costed separately, and a machine with no capacity costs
+    nothing.
     """
-    total = 0.0
+    costs = []
     for unit in units:
         Q_mw = max(float(unit.Q_cap), 0.0) / 1000.0
         if Q_mw <= 0.0:
+            costs.append(0.0)
             continue
         stage_factor = float(args.hpr_cost_fixed_share) + float(
             args.hpr_cost_stage_share
@@ -132,14 +145,14 @@ def calc_hpr_capital_cost(
             * max(0.0, float(unit.T_hot_max) - float(args.hpr_cost_temp_base))
             / 100.0
         )
-        total += (
+        costs.append(
             float(args.hpr_installation_factor)
             * float(args.hpr_equipment_cost)
             * Q_mw ** float(args.hpr_cost_exp)
             * stage_factor
             * f_T
         )
-    return Value(total, "$")
+    return tuple(costs)
 
 
 def _single_cost_unit(
@@ -205,12 +218,21 @@ def calc_simulated_hpr_annualized_costs(
         + compute_annual_energy_cost(Q_refrigeration, ref_price, annual_hours)
     ).to("$/y")
 
-    capital_cost = calc_hpr_capital_cost(cost_units, args).to("$")
-    annualized_capital = (
-        compute_annual_capital_cost(capital_cost, args.discount_rate, args.serv_life)
+    machine_capital = calc_hpr_machine_capital_costs(cost_units, args)
+    machine_annualized_capital = tuple(
+        float(
+            compute_annual_capital_cost(
+                Value(capital, "$"), args.discount_rate, args.serv_life
+            )
+            .to("$/y")
+            .value
+        )
         if getattr(args, "hpr_capital_recovery", True)
-        else Value(0.0, "$/y")
+        else 0.0
+        for capital in machine_capital
     )
+    capital_cost = Value(sum(machine_capital), "$")
+    annualized_capital = Value(sum(machine_annualized_capital), "$/y")
     # The hot utility and refrigeration plant are separate assets, each sized
     # for its own peak, so they are annualised and reported separately.
     hot_utility_annualized_capital = _annualized_utility_capital(
@@ -240,6 +262,8 @@ def calc_simulated_hpr_annualized_costs(
         hpr_utility_annualized_capital_cost=utility_annualized_capital,
         hpr_total_annualized_cost=total_annualized,
         feasibility_penalty=feasibility_penalty,
+        hpr_machine_capital_costs=machine_capital,
+        hpr_machine_annualized_capital_costs=machine_annualized_capital,
     )
 
 
@@ -255,9 +279,9 @@ def _annualized_utility_capital(
         max(float(duty), 0.0) * max(float(unit_capital_cost), 0.0),
         "$",
     )
-    return compute_annual_capital_cost(
-        capital, args.discount_rate, args.serv_life
-    ).to("$/y")
+    return compute_annual_capital_cost(capital, args.discount_rate, args.serv_life).to(
+        "$/y"
+    )
 
 
 def _cascade_air_duties(
@@ -502,6 +526,10 @@ def evaluate_vapour_hpr_result(
         hpr_operating_cost=cost_accounting.hpr_operating_cost,
         hpr_capital_cost=cost_accounting.hpr_capital_cost,
         hpr_annualized_capital_cost=cost_accounting.hpr_annualized_capital_cost,
+        hpr_machine_capital_costs=cost_accounting.hpr_machine_capital_costs,
+        hpr_machine_annualized_capital_costs=(
+            cost_accounting.hpr_machine_annualized_capital_costs
+        ),
         hpr_hot_utility_annualized_capital_cost=(
             cost_accounting.hpr_hot_utility_annualized_capital_cost
         ),

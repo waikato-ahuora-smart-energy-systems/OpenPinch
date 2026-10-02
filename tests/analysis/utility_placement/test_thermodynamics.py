@@ -142,7 +142,13 @@ def test_balanced_composite_entropy_rejects_unbalanced_curves() -> None:
     [
         ((), (), (), (), "cannot be empty"),
         ((200.0, 100.0), (float("nan"), 0.0), (100.0, 50.0), (1.0, 0.0), "finite"),
-        (((200.0, 100.0),), ((1.0, 0.0),), (100.0, 50.0), (1.0, 0.0), "one-dimensional"),
+        (
+            ((200.0, 100.0),),
+            ((1.0, 0.0),),
+            (100.0, 50.0),
+            (1.0, 0.0),
+            "one-dimensional",
+        ),
     ],
 )
 def test_balanced_composite_entropy_rejects_malformed_curves(
@@ -351,9 +357,7 @@ def test_period_thermodynamic_breakdown_uses_balanced_composite_curve() -> None:
 
     expected = 2.0 * math.log(350.0 / 300.0) - math.log(500.0 / 400.0)
     assert result.total_entropy_generation.value == pytest.approx(expected)
-    assert result.process_entropy.value == pytest.approx(
-        2.0 * math.log(350.0 / 300.0)
-    )
+    assert result.process_entropy.value == pytest.approx(2.0 * math.log(350.0 / 300.0))
     assert result.utility_entropy.value == pytest.approx(-math.log(500.0 / 400.0))
     assert result.utility_entropy.value + result.process_entropy.value == (
         pytest.approx(result.total_entropy_generation.value)

@@ -147,7 +147,10 @@ def _parse_csv_with_units(
                 return value
         return value
 
-    df_data = df_data.map(to_number_maybe)
+    # Names stay text, so "007" keeps its leading zeros.
+    text_columns = [name for name in ("zone", "name", "type") if name in df_data]
+    numeric_columns = [name for name in df_data.columns if name not in text_columns]
+    df_data[numeric_columns] = df_data[numeric_columns].map(to_number_maybe)
     units_map = dict(zip(col_names, col_units))
     if kind == "Summary":
         return _write_targets_to_dict_and_list(df_data, units_map, project_name)

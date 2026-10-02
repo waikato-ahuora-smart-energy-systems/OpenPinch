@@ -1292,7 +1292,7 @@ def test_phase_change_utility_with_null_target_is_completed_near_supply_temperat
     assert float(cold_hps.target_temperature[0]) == pytest.approx(280.0)
 
 
-def test_process_stream_with_null_dt_cont_defaults_to_zero():
+def test_process_stream_with_null_dt_cont_defaults_to_thermal_dt_cont():
     streams = [
         StreamSchema.model_validate(
             {
@@ -1310,8 +1310,9 @@ def test_process_stream_with_null_dt_cont_defaults_to_zero():
     site = prepare_problem(streams=streams)
     hot_a = next(stream for stream in site.hot_streams if stream.name == "HotA")
 
-    assert float(hot_a.delta_t_contribution[0]) == pytest.approx(0.0)
-    assert float(hot_a.effective_delta_t_contribution[0]) == pytest.approx(0.0)
+    # A null dt_cont uses THERMAL_DT_CONT (default 5.0).
+    assert float(hot_a.delta_t_contribution[0]) == pytest.approx(5.0)
+    assert float(hot_a.effective_delta_t_contribution[0]) == pytest.approx(5.0)
 
 
 def test_period_process_extrema_use_all_periods_for_default_hot_utility():

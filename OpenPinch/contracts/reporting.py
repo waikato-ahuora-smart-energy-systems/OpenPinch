@@ -218,6 +218,18 @@ class TargetResults(_ReportModel):
     hpr_total_annualized_cost: Value | None = report_field(
         "hpr_total_annualized_cost", "derived", None, representation="structured"
     )
+    # Installed and annualized capital of each heat-pump machine, in $ and $/y.
+    # Across periods each machine takes its own peak, and the HPR capital
+    # fields become the sum of those peaks.
+    hpr_machine_capital_costs: tuple[float, ...] | None = report_field(
+        "hpr_machine_capital_costs", "derived", None, representation="structured"
+    )
+    hpr_machine_annualized_capital_costs: tuple[float, ...] | None = report_field(
+        "hpr_machine_annualized_capital_costs",
+        "derived",
+        None,
+        representation="structured",
+    )
     hpr_success: Optional[bool] = report_field(
         "hpr_success", "consensus", None, representation="structured"
     )

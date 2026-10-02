@@ -37,7 +37,12 @@ def test_public_accessor_accepts_only_thermodynamic_placement_inputs() -> None:
 
 
 def test_placement_specific_monetary_modules_are_absent() -> None:
-    package = Path(__file__).resolve().parents[3] / "OpenPinch" / "analysis" / "utility_placement"
+    package = (
+        Path(__file__).resolve().parents[3]
+        / "OpenPinch"
+        / "analysis"
+        / "utility_placement"
+    )
 
     assert not (package / "economics.py").exists()
     assert not (package / "cogeneration.py").exists()

@@ -73,23 +73,43 @@ but must not truncate or replace that canonical grid.
 ```python
 class PlotAccessor:
     def grand_composite_curve_with_heat_pump(
-        self, *, target=None, zone_name=None, index=0,
-        show=False, return_graph_data=False,
+        self,
+        *,
+        target=None,
+        zone_name=None,
+        index=0,
+        show=False,
+        return_graph_data=False,
     ): ...
 
     def net_load_profiles_with_heat_pump(
-        self, *, target=None, zone_name=None, index=0,
-        show=False, return_graph_data=False,
+        self,
+        *,
+        target=None,
+        zone_name=None,
+        index=0,
+        show=False,
+        return_graph_data=False,
     ): ...
 
     def grand_composite_curve_with_refrigeration(
-        self, *, target=None, zone_name=None, index=0,
-        show=False, return_graph_data=False,
+        self,
+        *,
+        target=None,
+        zone_name=None,
+        index=0,
+        show=False,
+        return_graph_data=False,
     ): ...
 
     def net_load_profiles_with_refrigeration(
-        self, *, target=None, zone_name=None, index=0,
-        show=False, return_graph_data=False,
+        self,
+        *,
+        target=None,
+        zone_name=None,
+        index=0,
+        show=False,
+        return_graph_data=False,
     ): ...
 ```
 
