@@ -35,10 +35,10 @@ Core and Intermediate
 8. ``08_carnot_heat_pump_and_refrigeration.ipynb`` -- bounded one-stage Carnot
    heat-pump and refrigeration targets, plots, and residual utility placement
    (``slow-hpr``).
-9. ``09_vapour_compression_and_brayton.ipynb`` -- comprehensive simulated
+9. ``09_vapour_compression.ipynb`` -- comprehensive simulated
    vapour-compression targeting, detached winning records, target-owned performance maps,
-   plain-data export, required CoolProp refrigeration, explicit optional TESPy
-   mixtures, and optional Brayton comparisons (``slow-hpr``).
+   plain-data export, required CoolProp refrigeration, and explicit optional TESPy
+   mixtures (``slow-hpr``).
 10. ``10_multiperiod_heat_pumps.ipynb`` -- five separate bounded shared-design
     optimizations across ``turndown``, ``base``, and ``peak``, plus one optional
     advanced cascade screen (``slow-hpr``).

@@ -88,8 +88,13 @@ The default utilities the design still needs carry installed capital too:
 ``COSTING_HPR_HOT_UTILITY_CAPITAL_COST`` (default $750/kW of hot utility) and
 ``COSTING_HPR_REFRIGERATION_CAPITAL_COST`` (default $1500/kW of refrigeration),
 annualized the same way. A heat pump that displaces utility capacity is
-credited for it. Set ``COSTING_HPR_UTILITY_CAPITAL_RECOVERY_ENABLED`` to
-``False`` to leave it out.
+credited for it. Results report it as ``hpr_utility_annualized_capital_cost``,
+alongside ``hpr_annualized_capital_cost`` for the heat pump, and split it into
+``hpr_hot_utility_annualized_capital_cost`` and
+``hpr_refrigeration_annualized_capital_cost``. Across periods each utility is
+sized for its own peak period, and the utility capital is the sum of those two
+peaks. Set ``COSTING_HPR_UTILITY_CAPITAL_RECOVERY_ENABLED`` to ``False`` to
+leave it out.
 
 Heat pumps do not always pay, especially for high lifts. When the best valid
 design is no heat pump, targeting raises a typed "no beneficial heat pump"
@@ -180,17 +185,15 @@ Simulated Models
        condensers=1,
        evaporators=1,
    )
-   brayton = problem.target.brayton_heat_pump(load_fraction=0.25)
    mvr_cascade = problem.target.mvr_heat_pump(load_fraction=0.25)
 
-Refrigeration uses ``vapour_compression_refrigeration()`` or
-``brayton_refrigeration()``. Model-specific callables expose only arguments that
-make sense for that model.
+Refrigeration uses ``vapour_compression_refrigeration()``. Model-specific
+callables expose only arguments that make sense for that model.
 
-The named Brayton callables are part of the public workflow vocabulary, but the
-current runtime raises ``NotImplementedError`` while the Brayton solver path is
-being repaired. Tutorial 09 demonstrates a guarded screening pattern that reports
-this limitation without interrupting the rest of a comparative study.
+The named Brayton callables, ``brayton_heat_pump()`` and
+``brayton_refrigeration()``, are under development. They raise
+``NotImplementedError`` until the Brayton solver is complete, and no tutorial
+uses them yet.
 
 Set ``is_cascade_cycle=False`` for Parallel vapour compression cycles. Use the
 separate ``mvr_heat_pump()`` method for Vapour compression with MVR cascade;
@@ -354,6 +357,6 @@ See notebooks 08 through 11 in :doc:`../examples/notebook-series`.
 
 The corresponding packaged files are
 ``08_carnot_heat_pump_and_refrigeration.ipynb``,
-``09_vapour_compression_and_brayton.ipynb``,
+``09_vapour_compression.ipynb``,
 ``10_multiperiod_heat_pumps.ipynb``, and
 ``11_process_mvr_and_cascade.ipynb``.

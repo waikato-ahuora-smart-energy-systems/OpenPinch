@@ -42,8 +42,16 @@ ALLOWED_SPECIALIST_IMPORTS = frozenset(
 
 
 def _manifest_rows() -> list[dict[str, str]]:
+    """Return the manifest rows a notebook demonstrates.
+
+    Public methods still under development have no tutorial and are left out.
+    """
     with MANIFEST.open(newline="", encoding="utf-8") as stream:
-        return list(csv.DictReader(stream))
+        return [
+            row
+            for row in csv.DictReader(stream)
+            if row["coverage_status"] != "unmapped; under development"
+        ]
 
 
 EXPECTED_NOTEBOOKS = sorted({row["primary_tutorial"] for row in _manifest_rows()})
@@ -420,7 +428,7 @@ def test_notebook_09_demonstrates_comprehensive_hpr_target_to_map() -> None:
         / "OpenPinch"
         / "tutorials"
         / "notebooks"
-        / "09_vapour_compression_and_brayton.ipynb"
+        / "09_vapour_compression.ipynb"
     )
     source = _combined_source(notebook)
 
@@ -464,19 +472,20 @@ def test_notebook_09_required_coolprop_calls_fail_loudly_and_are_bounded() -> No
         / "OpenPinch"
         / "tutorials"
         / "notebooks"
-        / "09_vapour_compression_and_brayton.ipynb"
+        / "09_vapour_compression.ipynb"
     )
     source = _combined_source(notebook)
 
     assert "coolprop_target = problem.target.vapour_compression_heat_pump(" in source
     assert (
-        "vc_refrigeration = problem.target.vapour_compression_refrigeration(" in source
+        "vc_refrigeration = refrigeration_problem.target."
+        "vapour_compression_refrigeration(" in source
     )
     assert "assert coolprop_target.hpr_success" in source
     assert "assert vc_refrigeration.hpr_success" in source
-    assert source.count("maximum_iterations=20") == 5
-    assert source.count("maximum_evaluations=50") == 5
-    assert source.count("screen_optional_hpr(") == 4
+    assert source.count("maximum_iterations=20") == 3
+    assert source.count("maximum_evaluations=50") == 3
+    assert source.count("screen_optional_hpr(") == 2
     assert '"optional dependency unavailable"' in source
     assert '"method unavailable"' in source
     assert "return hpr_failure_summary(error)" in source

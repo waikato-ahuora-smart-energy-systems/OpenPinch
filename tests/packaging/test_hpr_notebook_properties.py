@@ -191,7 +191,7 @@ def test_target_summaries_are_finite_plain_and_preserve_periods(
 
 def test_notebook_09_optional_status_vocabulary_is_distinct() -> None:
     namespace = _notebook_functions(
-        "09_vapour_compression_and_brayton.ipynb",
+        "09_vapour_compression.ipynb",
         ("screen_optional_hpr",),
     )
     screen = namespace["screen_optional_hpr"]

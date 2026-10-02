@@ -223,6 +223,8 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
         "HPR Capital Cost (unit)",
         "HPR Annualized Capital Cost (value)",
         "HPR Annualized Capital Cost (unit)",
+        "HPR Utility Annualized Capital Cost (value)",
+        "HPR Utility Annualized Capital Cost (unit)",
         "HPR Total Annualized Cost (value)",
         "HPR Total Annualized Cost (unit)",
         # Utility columns come from names:

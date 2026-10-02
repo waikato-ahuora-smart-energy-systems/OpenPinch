@@ -239,6 +239,11 @@ def _make_summary_row(t) -> dict:
             period_idx=period_idx,
         ),
         **_value_unit_columns(
+            "HPR Utility Annualized Capital Cost",
+            getattr(t, "hpr_utility_annualized_capital_cost", None),
+            period_idx=period_idx,
+        ),
+        **_value_unit_columns(
             "HPR Total Annualized Cost",
             getattr(t, "hpr_total_annualized_cost", None),
             period_idx=period_idx,

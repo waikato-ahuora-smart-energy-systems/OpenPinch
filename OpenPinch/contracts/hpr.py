@@ -351,6 +351,9 @@ class HeatPumpTargetOutputs(BaseModel):
     hpr_operating_cost: Optional[Any] = None
     hpr_capital_cost: Optional[Any] = None
     hpr_annualized_capital_cost: Optional[Any] = None
+    hpr_hot_utility_annualized_capital_cost: Optional[Any] = None
+    hpr_refrigeration_annualized_capital_cost: Optional[Any] = None
+    hpr_utility_annualized_capital_cost: Optional[Any] = None
     hpr_total_annualized_cost: Optional[Any] = None
     Q_amb_hot: float
     Q_amb_cold: float
@@ -392,6 +395,8 @@ class SimulatedHPRAnnualizedCostAccounting(BaseModel):
     hpr_operating_cost: Value
     hpr_capital_cost: Value
     hpr_annualized_capital_cost: Value
+    hpr_hot_utility_annualized_capital_cost: Value
+    hpr_refrigeration_annualized_capital_cost: Value
     hpr_utility_annualized_capital_cost: Value
     hpr_total_annualized_cost: Value
     feasibility_penalty: Value
@@ -461,6 +466,8 @@ class HPRBackendResult(BaseModel):
     hpr_capital_cost: Any = None
     hpr_annualized_capital_cost: Any = None
     hpr_total_annualized_cost: Any = None
+    hpr_hot_utility_annualized_capital_cost: Any = None
+    hpr_refrigeration_annualized_capital_cost: Any = None
     hpr_utility_annualized_capital_cost: Any = None
     feasibility_penalty: float = 0.0
     Q_cooling_water: float = 0.0
@@ -538,6 +545,15 @@ class HPRBackendResult(BaseModel):
             "hpr_operating_cost": self.hpr_operating_cost,
             "hpr_capital_cost": self.hpr_capital_cost,
             "hpr_annualized_capital_cost": self.hpr_annualized_capital_cost,
+            "hpr_hot_utility_annualized_capital_cost": (
+                self.hpr_hot_utility_annualized_capital_cost
+            ),
+            "hpr_refrigeration_annualized_capital_cost": (
+                self.hpr_refrigeration_annualized_capital_cost
+            ),
+            "hpr_utility_annualized_capital_cost": (
+                self.hpr_utility_annualized_capital_cost
+            ),
             "hpr_total_annualized_cost": self.hpr_total_annualized_cost,
             "Q_amb_hot": self.Q_amb_hot,
             "Q_amb_cold": self.Q_amb_cold,

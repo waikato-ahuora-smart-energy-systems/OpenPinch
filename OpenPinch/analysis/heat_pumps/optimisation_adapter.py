@@ -701,7 +701,8 @@ def aggregate_hpr_period_results(
     for field in (
         "hpr_capital_cost",
         "hpr_annualized_capital_cost",
-        "hpr_utility_annualized_capital_cost",
+        "hpr_hot_utility_annualized_capital_cost",
+        "hpr_refrigeration_annualized_capital_cost",
     ):
         maximum = _aggregate_result_field(
             ordered,
@@ -712,9 +713,12 @@ def aggregate_hpr_period_results(
         if maximum is not None:
             updates[field] = maximum
 
+    utility_capital = _peak_utility_capital(ordered)
+    if utility_capital is not None:
+        updates["hpr_utility_annualized_capital_cost"] = utility_capital
+
     operating = updates.get("hpr_operating_cost")
     annualized_capital = updates.get("hpr_annualized_capital_cost")
-    utility_capital = updates.get("hpr_utility_annualized_capital_cost")
     if operating is not None and annualized_capital is not None:
         try:
             total = operating + annualized_capital
@@ -944,18 +948,37 @@ def _shared_candidate_objective(
         weights=None,
         reducer="max",
     )
-    utility_capital = _aggregate_result_field(
-        results,
-        "hpr_utility_annualized_capital_cost",
-        weights=None,
-        reducer="max",
-    )
+    utility_capital = _peak_utility_capital(results)
     return (
         _annual_cost_magnitude(operating)
         + float(penalty)
         + _annual_cost_magnitude(annualized_capital)
         + (0.0 if utility_capital is None else _annual_cost_magnitude(utility_capital))
     )
+
+
+def _peak_utility_capital(results: list[HPRBackendResult]) -> Any:
+    """Sum each default utility's peak annualized capital across periods.
+
+    The hot utility and the refrigeration plant are separate assets, each sized
+    for its own peak period, so their maxima are taken separately and added.
+    Results without the split fall back to the peak of the combined value.
+    """
+    parts = [
+        _aggregate_result_field(results, field, weights=None, reducer="max")
+        for field in (
+            "hpr_hot_utility_annualized_capital_cost",
+            "hpr_refrigeration_annualized_capital_cost",
+        )
+    ]
+    if any(part is None for part in parts):
+        return _aggregate_result_field(
+            results,
+            "hpr_utility_annualized_capital_cost",
+            weights=None,
+            reducer="max",
+        )
+    return parts[0] + parts[1]
 
 
 def _annual_cost_magnitude(value: Any) -> float:

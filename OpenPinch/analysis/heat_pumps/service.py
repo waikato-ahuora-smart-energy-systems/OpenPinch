@@ -384,6 +384,13 @@ def _get_hpr_target_summary(
         "hpr_operating_cost": res.hpr_operating_cost,
         "hpr_capital_cost": res.hpr_capital_cost,
         "hpr_annualized_capital_cost": res.hpr_annualized_capital_cost,
+        "hpr_hot_utility_annualized_capital_cost": (
+            res.hpr_hot_utility_annualized_capital_cost
+        ),
+        "hpr_refrigeration_annualized_capital_cost": (
+            res.hpr_refrigeration_annualized_capital_cost
+        ),
+        "hpr_utility_annualized_capital_cost": res.hpr_utility_annualized_capital_cost,
         "hpr_total_annualized_cost": res.hpr_total_annualized_cost,
         "hpr_success": res.success,
         "hpr_hot_streams": res.hpr_hot_streams,
