@@ -61,6 +61,7 @@ __all__ = [
     "condensing_temperature_search_range",
     "calc_simulated_hpr_annualized_costs",
     "hpr_penalty_cost_scale",
+    "refrigeration_allowance",
     "calc_carnot_heat_engine_eta",
     "calc_carnot_heat_pump_cop",
     "compute_entropic_mean_temperature",
@@ -336,6 +337,39 @@ def _annualized_utility_capital(
     )
 
 
+def refrigeration_allowance(args: HeatPumpTargetInputs) -> float:
+    """Return the default refrigeration the untargeted cooling needs on its own.
+
+    With a load fraction below 1, refrigeration targets the coldest part of the
+    cooling. The warmer rest may itself need some default refrigeration (when
+    it is below the cooling-water level); that is not a shortfall of the
+    design, so it is not penalised. Computed once and stored on ``args``.
+    """
+    if getattr(args, "is_heat_pumping", True):
+        return 0.0
+    cached = getattr(args, "refrigeration_allowance", None)
+    if cached is not None:
+        return float(cached)
+    streams = getattr(args, "untargeted_cooling_streams", None)
+    allowance = 0.0
+    if streams is not None and len(streams):
+        allowance = float(
+            _cascade_air_duties(
+                streams,
+                StreamCollection(),
+                args,
+                _ambient_source_temperature(args),
+                _ambient_sink_temperature(args),
+                _cooling_water_sink_temperature(args),
+            ).Q_ext_bottom
+        )
+    try:
+        args.refrigeration_allowance = allowance
+    except AttributeError, TypeError, ValueError:
+        pass
+    return allowance
+
+
 def _cascade_air_duties(
     hot_streams: StreamCollection,
     cold_streams: StreamCollection,
@@ -419,6 +453,7 @@ def evaluate_carnot_hpr_result(
             evap.Q_ext_top,
         ],
         penalise_external_cold_when_refrigerating=True,
+        refrigeration_allowance=refrigeration_allowance(args),
     )
     debug_figure = None
     if debug and artifact_mode is HPREvaluationMode.FINAL:
@@ -529,10 +564,13 @@ def evaluate_vapour_hpr_result(
         evap_wrong_side,
     ]
     if not getattr(args, "is_heat_pumping", True):
-        # A refrigerator must serve the selected cooling: whatever cooling
-        # water or default refrigeration still has to remove is unserved,
-        # so a zero-duty refrigerator is never a valid design.
-        all_penalty_terms.append(Q_ext_cold)
+        # A refrigerator must serve the targeted coldest cooling. Cooling water
+        # and air take the warmer rest for free; only default refrigeration
+        # beyond what that rest needs on its own is unserved, so a zero-duty
+        # refrigerator is never a valid design.
+        all_penalty_terms.append(
+            max(Q_refrigeration - refrigeration_allowance(args), 0.0)
+        )
     penalty_weight = _cycle_penalty(
         args=args,
         cycle_penalty_terms=all_penalty_terms,

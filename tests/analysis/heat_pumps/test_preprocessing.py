@@ -56,6 +56,7 @@ def test_get_reduced_bckgrd_cascade_till_Q_target_handles_zero_target_without_in
 
 
 def test_get_reduced_bckgrd_cascade_till_Q_target_refrigeration_interpolates():
+    # Refrigeration targets the coldest 120 kW: from 75 degC down to 30 degC.
     T_hot = np.array([120.0, 90.0, 60.0, 30.0])
     H_hot = np.array([0.0, -80.0, -160.0, -240.0])
 
@@ -63,8 +64,21 @@ def test_get_reduced_bckgrd_cascade_till_Q_target_refrigeration_interpolates():
         120.0, T_hot.copy(), H_hot.copy(), is_cold=False
     )
 
-    np.testing.assert_allclose(T_out, np.array([120.0, 90.0, 75.0]))
-    np.testing.assert_allclose(H_out, np.array([0.0, -80.0, -120.0]))
+    np.testing.assert_allclose(T_out, np.array([75.0, 60.0, 30.0]))
+    np.testing.assert_allclose(H_out, np.array([0.0, -40.0, -120.0]))
+
+
+def test_refrigeration_profile_split_keeps_the_warmer_rest():
+    T_hot = np.array([120.0, 90.0, 60.0, 30.0])
+    H_hot = np.array([0.0, -80.0, -160.0, -240.0])
+
+    (T_out, H_out), (T_rest, H_rest) = hp_pre._split_cooling_profile_at_coldest_Q_target(
+        120.0, T_hot, H_hot
+    )
+
+    np.testing.assert_allclose(T_out, [75.0, 60.0, 30.0])
+    np.testing.assert_allclose(T_rest, [120.0, 90.0, 75.0])
+    np.testing.assert_allclose(H_rest, [0.0, -80.0, -120.0])
 
 
 def test_get_reduced_bckgrd_cascade_till_Q_target_refrigeration_edges():
@@ -116,7 +130,7 @@ def test_prepare_hpr_background_profile_trims_and_builds_stream_collection():
         }
     )
 
-    T_out, H_out, z_amb, streams = hp_pre._prepare_hpr_background_profile(
+    T_out, H_out, z_amb, streams, untargeted = hp_pre._prepare_hpr_background_profile(
         Q_hpr_target=150.0,
         T_vals=np.array([120.0, 100.0, 80.0]),
         H_vals=np.array([200.0, 150.0, 0.0]),
@@ -128,6 +142,7 @@ def test_prepare_hpr_background_profile_trims_and_builds_stream_collection():
     assert np.max(H_out) <= 150.0
     assert z_amb.shape == T_out.shape
     assert isinstance(streams, StreamCollection)
+    assert untargeted is None  # only the refrigeration source side has a rest
 
 
 def test_construct_hpr_target_inputs_carries_penalty_options_from_config():

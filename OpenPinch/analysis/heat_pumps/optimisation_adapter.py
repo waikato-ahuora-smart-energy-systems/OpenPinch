@@ -761,6 +761,7 @@ def build_hpr_accounting(
     Q_cooling_water: float = 0.0,
     penalty_terms: object = None,
     penalise_external_cold_when_refrigerating: bool = False,
+    refrigeration_allowance: float = 0.0,
 ) -> tuple[float, float, float, float]:
     """Standardise HPR utility, feasibility-penalty, and objective semantics.
 
@@ -784,8 +785,11 @@ def build_hpr_accounting(
         0.0,
     )
     if penalise_external_cold_when_refrigerating and not is_heat_pumping:
+        # Only default refrigeration beyond the untargeted rest's own need is
+        # unserved; cooling water and air are free sinks.
         positive_penalty_terms = np.append(
-            positive_penalty_terms, max(Q_ext_cold + Q_cooling_water, 0.0)
+            positive_penalty_terms,
+            max(Q_ext_cold - float(refrigeration_allowance), 0.0),
         )
     penalty = (
         float(
