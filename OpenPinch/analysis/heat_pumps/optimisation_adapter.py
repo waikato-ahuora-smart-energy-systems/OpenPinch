@@ -713,6 +713,16 @@ def aggregate_hpr_period_results(
         if maximum is not None:
             updates[field] = maximum
 
+    machine_peaks = _peak_machine_capital(ordered)
+    if machine_peaks is not None:
+        machine_capital, machine_annualized_capital = machine_peaks
+        updates["hpr_machine_capital_costs"] = machine_capital
+        updates["hpr_machine_annualized_capital_costs"] = machine_annualized_capital
+        updates["hpr_capital_cost"] = Value(sum(machine_capital), "$")
+        updates["hpr_annualized_capital_cost"] = Value(
+            sum(machine_annualized_capital), "$/y"
+        )
+
     utility_capital = _peak_utility_capital(ordered)
     if utility_capital is not None:
         updates["hpr_utility_annualized_capital_cost"] = utility_capital
@@ -942,11 +952,16 @@ def _shared_candidate_objective(
         weights=weights,
         reducer="weighted",
     )
-    annualized_capital = _aggregate_result_field(
-        results,
-        "hpr_annualized_capital_cost",
-        weights=None,
-        reducer="max",
+    machine_peaks = _peak_machine_capital(results)
+    annualized_capital = (
+        Value(sum(machine_peaks[1]), "$/y")
+        if machine_peaks is not None
+        else _aggregate_result_field(
+            results,
+            "hpr_annualized_capital_cost",
+            weights=None,
+            reducer="max",
+        )
     )
     utility_capital = _peak_utility_capital(results)
     return (
@@ -954,6 +969,29 @@ def _shared_candidate_objective(
         + float(penalty)
         + _annual_cost_magnitude(annualized_capital)
         + (0.0 if utility_capital is None else _annual_cost_magnitude(utility_capital))
+    )
+
+
+def _peak_machine_capital(
+    results: list[HPRBackendResult],
+) -> tuple[tuple[float, ...], tuple[float, ...]] | None:
+    """Size each heat-pump machine for its own peak period.
+
+    A shared design keeps the same machines in every period, but parallel
+    machines can peak in different periods. Taking the peak of the period
+    totals would undersize them, so each machine's capital and annualized
+    capital take their own maximum. Returns ``None`` when a result lacks the
+    per-machine breakdown or the machine counts differ.
+    """
+    capital = [result.hpr_machine_capital_costs for result in results]
+    annualized = [result.hpr_machine_annualized_capital_costs for result in results]
+    if any(not value for value in (*capital, *annualized)):
+        return None
+    if len({len(value) for value in (*capital, *annualized)}) != 1:
+        return None
+    return (
+        tuple(float(value) for value in np.max(np.asarray(capital), axis=0)),
+        tuple(float(value) for value in np.max(np.asarray(annualized), axis=0)),
     )
 
 

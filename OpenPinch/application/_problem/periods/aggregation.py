@@ -302,6 +302,8 @@ def _weighted_average_target(
         elif field not in {
             "period_id",
             "hpr_utility_annualized_capital_cost",
+            "hpr_machine_capital_costs",
+            "hpr_machine_annualized_capital_costs",
             "hpr_total_annualized_cost",
             "pinch_temp",
             "hot_utilities",
@@ -311,6 +313,7 @@ def _weighted_average_target(
     data["hpr_utility_annualized_capital_cost"] = _hpr_utility_annualized_capital(
         targets, data
     )
+    _apply_peak_machine_capital(targets, data)
     data["hpr_total_annualized_cost"] = _total_hpr_annualized_cost(data)
     data["pinch_temp"] = PinchTemp(
         cold_temp=_weighted_report_value(
@@ -388,6 +391,36 @@ def _max_report_value(
         raise ValueError(f"Cannot aggregate partially missing field {attr_path!r}.")
     maximum = max(values)
     return Value(maximum, unit) if unit is not None else maximum
+
+
+def _apply_peak_machine_capital(
+    targets: Sequence[TargetResults],
+    data: dict[str, Any],
+) -> None:
+    """Size each heat-pump machine for its own peak period.
+
+    Parallel machines can peak in different periods, so the peak of the period
+    totals would undersize them. When every period carries the per-machine
+    breakdown, each machine takes its own maximum and the HPR capital fields
+    become the sum of those peaks; otherwise they keep the peak of the totals.
+    """
+    capital = [getattr(target, "hpr_machine_capital_costs", None) for target in targets]
+    annualized = [
+        getattr(target, "hpr_machine_annualized_capital_costs", None)
+        for target in targets
+    ]
+    if any(not value for value in (*capital, *annualized)) or (
+        len({len(value) for value in (*capital, *annualized)}) != 1
+    ):
+        data["hpr_machine_capital_costs"] = None
+        data["hpr_machine_annualized_capital_costs"] = None
+        return
+    peak_capital = tuple(float(v) for v in np.max(np.asarray(capital), axis=0))
+    peak_annualized = tuple(float(v) for v in np.max(np.asarray(annualized), axis=0))
+    data["hpr_machine_capital_costs"] = peak_capital
+    data["hpr_machine_annualized_capital_costs"] = peak_annualized
+    data["hpr_capital_cost"] = Value(sum(peak_capital), "$")
+    data["hpr_annualized_capital_cost"] = Value(sum(peak_annualized), "$/y")
 
 
 def _hpr_utility_annualized_capital(

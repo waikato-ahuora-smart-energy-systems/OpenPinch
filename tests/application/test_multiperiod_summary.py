@@ -204,6 +204,41 @@ def test_weighted_average_output_sizes_each_utility_for_its_own_peak():
     assert target.hpr_total_annualized_cost.value == pytest.approx(270.0)
 
 
+def test_weighted_average_output_sizes_each_machine_for_its_own_peak():
+    def costed(period_id, machine_capital, machine_annualized):
+        return _target(period_id=period_id, qh=10.0).model_copy(
+            update={
+                "hpr_operating_cost": Value(100.0, "$/y"),
+                "hpr_capital_cost": Value(sum(machine_capital), "$"),
+                "hpr_annualized_capital_cost": Value(sum(machine_annualized), "$/y"),
+                "hpr_machine_capital_costs": machine_capital,
+                "hpr_machine_annualized_capital_costs": machine_annualized,
+            }
+        )
+
+    # Parallel machine A peaks in winter and machine B in summer.
+    output = weighted_average_output(
+        [
+            TargetOutput(
+                name="Site",
+                period_id="winter",
+                targets=[costed("winter", (100.0, 10.0), (10.0, 1.0))],
+            ),
+            TargetOutput(
+                name="Site",
+                period_id="summer",
+                targets=[costed("summer", (10.0, 100.0), (1.0, 10.0))],
+            ),
+        ],
+        [1.0, 1.0],
+    )
+    target = output.targets[0]
+
+    assert target.hpr_machine_capital_costs == (100.0, 100.0)
+    assert target.hpr_capital_cost.value == pytest.approx(200.0)
+    assert target.hpr_annualized_capital_cost.value == pytest.approx(20.0)
+
+
 def test_weighted_average_output_rejects_partially_missing_numeric_fields():
     base = TargetOutput(
         name="Site",
