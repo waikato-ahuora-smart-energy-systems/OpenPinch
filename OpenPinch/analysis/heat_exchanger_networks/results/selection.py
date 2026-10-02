@@ -49,7 +49,8 @@ def select_network(
         return result
 
     selected = ranked[solution_rank - 1]
-    result.ranked_networks = ranked
+    # ranked_networks keeps every outcome: replacing it with the de-duplicated
+    # ranking would change what a later selection can choose from.
     result.network = network
     result.task_id = selected.task.task_id
     result.solver_status = selected.solver_status

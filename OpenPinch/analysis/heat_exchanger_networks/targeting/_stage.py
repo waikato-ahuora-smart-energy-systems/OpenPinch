@@ -18,7 +18,11 @@ from ..execution.task_builders import (
     approach_temperature_from_network,
     topology_restrictions_from_network,
 )
-from ..results.assembly import SynthesisWorkflowResult, build_synthesis_result
+from ..results.assembly import (
+    SynthesisWorkflowResult,
+    build_synthesis_result,
+    demote_infeasible_outcomes,
+)
 from .topology import (
     canonical_stage_count,
     canonical_topology_restrictions,
@@ -71,6 +75,7 @@ def run_single_method_workflow(
     )
     start = perf_counter()
     tasks, outcomes = run_method_stage(method_settings)
+    outcomes = demote_infeasible_outcomes(outcomes)
     return SynthesisWorkflowResult(
         tasks=tasks,
         outcomes=outcomes,

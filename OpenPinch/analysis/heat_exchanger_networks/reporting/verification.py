@@ -211,8 +211,17 @@ def _check_minimum_approach(
     network: HeatExchangerNetwork,
     period_id: str,
 ) -> list[str]:
-    d_tmin = _optional_float(network.source_metadata.get("solver_dTmin"))
-    if d_tmin is None:
+    """Check each recovery match against its own required approach.
+
+    The solver requires each pair (i, j) to keep its own approach dT_r, the
+    sum of the two streams' contributions, not the global dTmin. A network
+    with a low-dt_cont stream at its own approach is valid; a pair below its
+    own approach is not, even when that is above dTmin.
+    """
+    metadata = network.source_metadata
+    d_tmin = _optional_float(metadata.get("solver_dTmin"))
+    required = _pair_minimum_approaches(network, period_id)
+    if d_tmin is None and not required:
         return []
 
     failures: list[str] = []
@@ -220,15 +229,43 @@ def _check_minimum_approach(
         state = exchanger.state(period_id)
         if not state.active or exchanger.kind is not HeatExchangerKind.RECOVERY:
             continue
+        limit = required.get((exchanger.source_stream, exchanger.sink_stream), d_tmin)
+        if limit is None:
+            continue
         approaches = state.approach_temperatures
         if not approaches:
             approaches = _recovery_terminal_approaches(state)
-        if approaches and min(approaches) + _TEMPERATURE_ABS_TOL < d_tmin:
+        if approaches and min(approaches) + _TEMPERATURE_ABS_TOL < limit:
             failures.append(
                 f"{exchanger.exchanger_id or exchanger.kind.value} minimum "
-                f"approach {min(approaches):.6g} is below dTmin {d_tmin:.6g}"
+                f"approach {min(approaches):.6g} is below its required "
+                f"approach {limit:.6g}"
             )
     return failures
+
+
+def _pair_minimum_approaches(
+    network: HeatExchangerNetwork,
+    period_id: str,
+) -> dict[tuple[str, str], float]:
+    """Return each (hot, cold) stream pair's required approach for one period."""
+    by_period = network.source_metadata.get("recovery_minimum_approach_by_period")
+    if not isinstance(by_period, list | tuple) or not by_period:
+        return {}
+    try:
+        period_idx = network.period_ids.index(period_id)
+    except ValueError:
+        period_idx = 0
+    matrix = by_period[min(period_idx, len(by_period) - 1)]
+    hot_order = _stream_order(network, "hot_process_streams")
+    cold_order = _stream_order(network, "cold_process_streams")
+    pairs: dict[tuple[str, str], float] = {}
+    for i, hot in enumerate(hot_order):
+        row = matrix[i] if i < len(matrix) else []
+        for j, cold in enumerate(cold_order):
+            if j < len(row):
+                pairs[(hot, cold)] = float(row[j])
+    return pairs
 
 
 def _check_exchanger_duty_balances(

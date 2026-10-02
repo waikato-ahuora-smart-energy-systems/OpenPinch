@@ -301,6 +301,7 @@ def _solve_built_task(
             "n_rm_branches": 1,
             "max_parallel": 1,
             "no_improvement_patience": None,
+            "beam_width": 4,
         }
     else:
         task, internal_problem, print_output, model_factories, evolution_options = (
@@ -318,6 +319,7 @@ def _solve_built_task(
             "n_rm_branches": 1,
             "max_parallel": 1,
             "no_improvement_patience": None,
+            "beam_width": 4,
         }:
             solve_kwargs.update(
                 {
@@ -327,6 +329,7 @@ def _solve_built_task(
                     "evolution_no_improvement_patience": evolution_options[
                         "no_improvement_patience"
                     ],
+                    "evolution_beam_width": evolution_options.get("beam_width", 4),
                 }
             )
         solved = internal_problem.get_solution(**solve_kwargs)
@@ -539,6 +542,7 @@ def _evolution_options(
                 pathway_options.get("no_improvement_patience"),
             )
         ),
+        "beam_width": max(1, int(getattr(hens, "evm_beam_width", 4) or 4)),
     }
 
 

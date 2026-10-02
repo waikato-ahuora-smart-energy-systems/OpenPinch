@@ -75,6 +75,9 @@ _METHOD_OPTION_NAMES = {
 }
 
 
+# Basins requested from a backend per candidate finally kept.
+_BACKEND_MINIMA_FACTOR = 4
+
 def run_multistart_minimisation(
     problem: OptimisationProblem,
     *,
@@ -92,6 +95,14 @@ def run_multistart_minimisation(
     _validate_options(method, backend_kwargs)
 
     backend = _resolve_backend(method)
+    # Ask for more basins than kept: non-finite and infeasible candidates are
+    # dropped first, and only then is the list cut to max_minima.
+    requested_minima = backend_kwargs.get("max_minima")
+    if requested_minima is not None:
+        backend_kwargs = {
+            **backend_kwargs,
+            "max_minima": _BACKEND_MINIMA_FACTOR * int(requested_minima),
+        }
     points, objectives = backend(
         func=problem.objective,
         bounds=bounds,
@@ -110,6 +121,8 @@ def run_multistart_minimisation(
             tolerance=feasibility_tolerance,
         )
     )
+    if requested_minima is not None:
+        candidates = candidates[: int(requested_minima)]
     if not candidates:
         raise NoOptimisationCandidatesError(
             f"{method.value} completed without a finite feasible candidate."
@@ -250,9 +263,8 @@ def _normalise_candidates(
     for point, objective in zip(points, objectives, strict=True):
         objective = float(objective)
         if not math.isfinite(objective) or not np.isfinite(point).all():
-            raise InvalidObjectiveValueError(
-                "The backend returned a non-finite point or objective."
-            )
+            # One failed evaluation is not a failed run: skip it.
+            continue
         candidates.append(
             OptimisationCandidate(
                 objective=objective,

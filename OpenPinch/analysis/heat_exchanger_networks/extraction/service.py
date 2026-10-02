@@ -30,6 +30,14 @@ from .recovery import _recovery_exchangers
 from .utility import _cold_utility_exchangers, _hot_utility_exchangers
 
 
+
+
+def _float_tensor(values) -> list[list[list[float]]]:
+    """Return a [period][row][column] array as nested float lists."""
+    if values is None:
+        return []
+    return [_float_matrix(matrix) for matrix in values]
+
 def extract_heat_exchanger_network(
     solved_model: Any,
     solver_arrays: PreparedSolverArrays,
@@ -128,6 +136,11 @@ def extract_heat_exchanger_network(
                 getattr(solved_model, "non_isothermal_model", False)
             ),
             "solver_dTmin": _optional_float(getattr(solved_model, "dTmin", None)),
+            # Each recovery pair's own minimum approach (hot + cold stream
+            # contributions), by period: [period][hot][cold].
+            "recovery_minimum_approach_by_period": _float_tensor(
+                getattr(solved_model, "dT_r_period", None)
+            ),
             "segment_profile_version": SEGMENT_PROFILE_VERSION,
             "operating_periods": _operating_state_metadata(solved_model),
             "hot_stream_heat_capacity_flowrates": _float_list(

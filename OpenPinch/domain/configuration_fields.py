@@ -356,6 +356,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HENS_MAX_PARALLEL": _spec(int, 1, "hens", "max_parallel", numeric_min=1.0, validator=_positive_int),
     "HENS_EVM_N_AD_BRANCHES": _spec(int | None, None, "hens", "evm_n_ad_branches", numeric_min=1.0, validator=_positive_int_or_none),
     "HENS_EVM_N_RM_BRANCHES": _spec(int | None, None, "hens", "evm_n_rm_branches", numeric_min=1.0, validator=_positive_int_or_none),
+    "HENS_EVM_BEAM_WIDTH": _spec(int, 4, "hens", "evm_beam_width", numeric_min=1.0, validator=_positive_int),
     "HENS_LOG_LEVEL": _spec(str, "INFO", "hens", "log_level", validator=_non_empty_string),
     "HENS_OUTPUT_FOLDER": _spec(str, "", "hens", "output_folder", validator=_string),
     "HENS_OUTPUT_FORMATS": _spec(List[str], [], "hens", "output_formats", validator=partial(_string_choice_grid, choices=HENS_OUTPUT_FORMAT_VALUES, allow_empty=True)),

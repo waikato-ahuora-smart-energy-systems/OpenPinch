@@ -268,31 +268,30 @@ def test_base_model_scalar_helpers_and_value_assignment():
     _set_value(model, parameter, 7.0, brackets=True)
     assert parameter.VALUE.value == [7.0]
 
+    # Both ends positive: the true log-mean, whatever the old gate said.
+    log_mean_20_10 = 10.0 / np.log(2.0)
+    for allowed in (False, True):
+        assert _post_process_lmtd(
+            model, 20.0, 10.0, 0.5, formula_allowed=allowed
+        ) == pytest.approx(0.5 * log_mean_20_10)
+    # Equal ends give the arithmetic mean; an inactive match gives 0.
     assert _post_process_lmtd(
-        model,
-        20.0,
-        10.0,
-        0.5,
-        formula_allowed=False,
-    ) == pytest.approx(10.0)
+        model, 12.0, 12.0, 1.0, formula_allowed=True
+    ) == pytest.approx(12.0)
+    assert _post_process_lmtd(model, 20.0, 10.0, 0.0, formula_allowed=True) == 0.0
+    # A non-positive end on an active match keeps the finite fallback.
     assert _post_process_lmtd(
-        model,
-        20.0,
-        10.0,
-        0.5,
-        formula_allowed=False,
-        fallback_delta=8.0,
+        model, 0.0, 10.0, 0.5, formula_allowed=False, fallback_delta=8.0
     ) == pytest.approx(4.0)
-    assert (
-        _post_process_lmtd(
-            model,
-            20.0,
-            10.0,
-            0.5,
-            formula_allowed=True,
-        )
-        > 0.0
-    )
+
+
+@pytest.mark.parametrize("ends", [(10.0, 50.0), (50.0, 10.0)])
+def test_post_process_lmtd_uses_the_log_mean_at_the_approach_bound(ends):
+    model = SimpleNamespace(tol=1e-6)
+
+    lmtd = _post_process_lmtd(model, *ends, 1.0, formula_allowed=False)
+
+    assert lmtd == pytest.approx(24.853, abs=1e-3)
 
 
 def test_get_alpha_values_uses_cached_values_and_warns_on_solver_failure(

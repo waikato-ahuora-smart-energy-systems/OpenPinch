@@ -14,7 +14,11 @@ from ..execution.fallbacks import (
 )
 from ..execution.settings import SynthesisWorkflowSettings
 from ..execution.task_builders import _outcome_map
-from ..results.assembly import SynthesisWorkflowResult, build_synthesis_result
+from ..results.assembly import (
+    SynthesisWorkflowResult,
+    build_synthesis_result,
+    demote_infeasible_outcomes,
+)
 from .network_evolution_method import (
     execute_direct_network_evolution_method_stage,
     execute_network_evolution_method_from_pinch_design_stage,
@@ -125,7 +129,7 @@ def execute_open_hens_method(
         )
 
     tasks = tuple(pdm_tasks + tdm_tasks + esm_tasks)
-    outcomes = tuple(pdm_outcomes + tdm_outcomes + esm_outcomes)
+    outcomes = demote_infeasible_outcomes(pdm_outcomes + tdm_outcomes + esm_outcomes)
     return SynthesisWorkflowResult(
         tasks=tasks,
         outcomes=outcomes,

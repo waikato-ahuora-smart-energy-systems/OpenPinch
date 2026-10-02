@@ -12,6 +12,27 @@ from ..errors import WorkflowContractError
 from .settings import SynthesisWorkflowSettings
 
 
+def has_recovery_topology(
+    outcome: HeatExchangerNetworkSynthesisTaskOutcome,
+) -> bool:
+    """Return whether an outcome has recovery matches to seed later methods.
+
+    A utility-only network (no active staged recovery exchanger) cannot seed
+    TDM or evolution tasks. It stays a final candidate instead of aborting the
+    task fan-out for every outcome.
+    """
+    network = outcome.network
+    if network is None:
+        return False
+    return any(
+        exchanger.kind is HeatExchangerKind.RECOVERY
+        and exchanger.match_allowed
+        and exchanger.stage is not None
+        and any(state.active for state in exchanger.period_states)
+        for exchanger in network.exchangers
+    )
+
+
 def required_topology_restrictions_from_outcome(
     outcome: HeatExchangerNetworkSynthesisTaskOutcome,
     downstream_method: HeatExchangerNetworkDesignMethod,
@@ -153,6 +174,7 @@ def _outcome_map(
 __all__ = [
     "approach_temperature_from_network",
     "derivative_threshold_from_network",
+    "has_recovery_topology",
     "required_topology_restrictions_from_outcome",
     "stage_count_from_network",
     "topology_restrictions_from_network",

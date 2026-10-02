@@ -167,6 +167,7 @@ class HensConfig:
     max_parallel: int
     evm_n_ad_branches: int | None
     evm_n_rm_branches: int | None
+    evm_beam_width: int
     log_level: str
     output_folder: str
     output_formats: list[str]

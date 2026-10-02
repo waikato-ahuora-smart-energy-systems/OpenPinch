@@ -4,6 +4,23 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat exchanger network synthesis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Exchanger areas use the true log-mean temperature difference whenever both
+  ends are positive, including an end at its minimum approach. OpenHENS fell
+  back to one end there, which misstated area (for ends of 10 and 50 K, 2.5
+  times too high) and with it TAC and ranking. Results now differ from
+  OpenHENS for matches at the pinch.
+- Each recovery match is checked against its own required approach (the sum of
+  its streams' contributions), not the global dTmin.
+- An infeasible task outcome is marked failed and kept for diagnostics instead
+  of aborting the synthesis; a utility-only network no longer stops TDM/EVM
+  task building.
+- Branched network evolution keeps at most ``HENS_EVM_BEAM_WIDTH`` (default 4)
+  branches per depth, never solves a topology twice, and gives the same network
+  in parallel and serial runs.
+
 HPR cost model and search
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 

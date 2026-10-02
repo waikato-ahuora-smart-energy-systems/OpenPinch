@@ -425,7 +425,15 @@ class HeatExchangerNetwork(BaseModel):
         total = 0.0
         for exchanger in self.exchangers:
             state = exchanger.state(resolved_period_id)
-            if active_only and not state.active:
+            # Duty belongs to the period; area and cost belong to the installed
+            # exchanger, which counts if it runs in any period.
+            if active_only and attribute == "duty" and not state.active:
+                continue
+            if (
+                active_only
+                and attribute != "duty"
+                and not any(item.active for item in exchanger.period_states)
+            ):
                 continue
             if expected_kind is not None and exchanger.kind is not expected_kind:
                 continue
