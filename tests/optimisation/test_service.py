@@ -139,7 +139,10 @@ def test_candidate_result_preserves_and_orders_finite_backend_values(
     )
 
     with patch.object(optimisation_service, "_resolve_backend", return_value=backend):
-        result = run_multistart_minimisation(problem, options={"n_runs": 1})
+        # max_minima=None keeps every candidate; by default only 4 are kept.
+        result = run_multistart_minimisation(
+            problem, options={"n_runs": 1, "max_minima": None}
+        )
 
     assert len(result.candidates) == len(points)
     assert [candidate.objective for candidate in result.candidates] == sorted(

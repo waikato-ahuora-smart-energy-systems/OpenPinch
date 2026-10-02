@@ -78,6 +78,7 @@ _METHOD_OPTION_NAMES = {
 # Basins requested from a backend per candidate finally kept.
 _BACKEND_MINIMA_FACTOR = 4
 
+
 def run_multistart_minimisation(
     problem: OptimisationProblem,
     *,
@@ -270,6 +271,10 @@ def _normalise_candidates(
                 objective=objective,
                 point=tuple(float(value) for value in point),
             )
+        )
+    if not candidates:
+        raise InvalidObjectiveValueError(
+            "The backend returned only non-finite points or objectives."
         )
     return tuple(sorted(candidates))
 

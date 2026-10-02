@@ -752,7 +752,8 @@ def test_stagewise_evolution_branch_frontier_selects_best_global_tac(
         "0-b0-minus2",
         "0-b0-plus1",
         "0-b0-plus2",
-        "1-b2-plus1",
+        # The frontier is sorted by TAC, so plus1 (90) is branch 1 after minus2.
+        "1-b1-plus1",
     ]
     assert model.updated_with == "plus-branch-best"
 
@@ -1569,7 +1570,8 @@ def test_lmtd_replacement_uses_endpoint_lmtd_for_active_units(model_cls) -> None
     else:
         recovery_lmtd = [
             _source_openhens_lmtd(70.0, 40.0, 1.0, formula_allowed=True),
-            _source_openhens_lmtd(70.0, 20.0, 1.0, formula_allowed=False),
+            # True log-mean even where OpenHENS fell back to delta_1.
+            _source_openhens_lmtd(70.0, 20.0, 1.0, formula_allowed=True),
         ]
     hot_utility_lmtd = _source_openhens_lmtd(
         220.0,

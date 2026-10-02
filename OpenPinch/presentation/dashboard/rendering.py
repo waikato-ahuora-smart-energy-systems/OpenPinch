@@ -136,31 +136,31 @@ def render_streamlit_dashboard(
             <div class="op-metric">
                 <div class="op-metric-label">Cold pinch</div>
                 <div class="op-metric-value">
-                    {shown['cold_pinch']}
+                    {shown["cold_pinch"]}
                 </div>
             </div>
             <div class="op-metric">
                 <div class="op-metric-label">Hot pinch</div>
                 <div class="op-metric-value">
-                    {shown['hot_pinch']}
+                    {shown["hot_pinch"]}
                 </div>
             </div>
             <div class="op-metric">
                 <div class="op-metric-label">Hot utility</div>
                 <div class="op-metric-value">
-                    {shown['hot_utility_target']}
+                    {shown["hot_utility_target"]}
                 </div>
             </div>
             <div class="op-metric">
                 <div class="op-metric-label">Cold utility</div>
                 <div class="op-metric-value">
-                    {shown['cold_utility_target']}
+                    {shown["cold_utility_target"]}
                 </div>
             </div>
             <div class="op-metric">
                 <div class="op-metric-label">Heat recovery</div>
                 <div class="op-metric-value">
-                    {shown['heat_recovery_target']}
+                    {shown["heat_recovery_target"]}
                 </div>
             </div>
             <div class="op-metric">

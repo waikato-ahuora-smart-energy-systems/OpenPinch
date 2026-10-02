@@ -172,9 +172,7 @@ def _parse_vc_mvr_state_variables(
     n_mvr = _num_mvr_stages(args)
     parts = _vc_mvr_layout(args).unpack(x)
     T_cond_vc = cap_stage_condensing_temperatures(
-        map_x_arr_to_T_arr(
-            parts["x_cond"], *condensing_temperature_search_range(args)
-        ),
+        map_x_arr_to_T_arr(parts["x_cond"], *condensing_temperature_search_range(args)),
         args,
     )
     T_evap_vc = map_x_arr_to_T_arr(
@@ -331,10 +329,8 @@ def _compute_vc_mvr_system_obj(
         )
     except ValueError as exc:
         if cycle_evaluated:
-            if artifact_mode is HPREvaluationMode.FINAL:
-                return HPRBackendResult.failure(
-                    reason=f"VC+MVR cycle post-processing failed: {exc}"
-                )
+            # A post-solve error is a contract defect, not an infeasible
+            # candidate, so it surfaces in every mode.
             raise
         if debug:
             # Debug mode reports the failure but must not change the outcome.

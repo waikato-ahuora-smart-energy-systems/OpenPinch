@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any, Optional
 
 import pandas as pd
@@ -201,6 +202,8 @@ def build_problem_report(
         validation=validation,
         targets=[
             target.model_copy(deep=True)
+            if callable(getattr(target, "model_copy", None))
+            else deepcopy(target)
             for target in list(getattr(results, "targets", []) or [])
         ],
         metrics=build_report_metrics(results) if results is not None else [],

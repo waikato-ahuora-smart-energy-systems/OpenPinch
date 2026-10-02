@@ -140,6 +140,14 @@ def target_utilities_for_load_profiles(
     return hot_utilities, cold_utilities
 
 
+# Unmet utility demand (kW) below this is rounding, not a shortfall.
+_UNMET_DEMAND_ABS_TOL = 1e-3
+
+# Names given to the default utilities added during input preparation.
+DEFAULT_HOT_UTILITY_NAME = "HU"
+DEFAULT_COLD_UTILITY_NAME = "CU"
+
+
 def _warn_on_unmet_utility_demand(
     *,
     hot_required: float,
@@ -163,7 +171,8 @@ def _warn_on_unmet_utility_demand(
             for utility in utilities
         )
         shortfall = required - assigned
-        if shortfall > max(tol, 1e-6 * required):
+        # Ignore numerical residue: below 1 W, or a millionth of the target.
+        if shortfall > max(tol, _UNMET_DEMAND_ABS_TOL, 1e-6 * required):
             warnings.warn(
                 f"The {label} utilities meet {assigned:.6g} of the {required:.6g} "
                 f"{label} utility target; {shortfall:.6g} is unmet. Add a "
@@ -286,15 +295,21 @@ def _calculate_assigned_utility_duties(
     # Use the least valuable utility first: the coldest hot utility and the
     # hottest cold utility, by shifted level in this period. The collection's
     # own order compares whole multi-period values and can differ from this.
+    # The default HU/CU is a backup for what the given utilities cannot supply
+    # (for example because of maximum_heat_flow caps), so it always goes last.
+    default_name = DEFAULT_HOT_UTILITY_NAME if is_hot_ut else DEFAULT_COLD_UTILITY_NAME
     collection_order = (
         range(len(utilities) - 1, -1, -1) if is_hot_ut else range(len(utilities))
     )
     indices = sorted(
         collection_order,
         key=lambda i: (
-            (levels[i][0], levels[i][1])
-            if is_hot_ut
-            else (-levels[i][0], -levels[i][1])
+            utilities[i].name == default_name,
+            *(
+                (levels[i][0], levels[i][1])
+                if is_hot_ut
+                else (-levels[i][0], -levels[i][1])
+            ),
         ),
     )
     Q_assigned = 0.0

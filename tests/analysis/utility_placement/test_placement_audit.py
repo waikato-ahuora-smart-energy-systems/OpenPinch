@@ -58,9 +58,7 @@ def test_results_are_reported_in_the_request_units():
     supply = QuantityValue(value=25.0, unit="degC")
     span = QuantityValue(value=10.0, unit="delta_degC")
 
-    kelvin = convert_to_request_units(
-        (supply, span), absolute="K", difference="K"
-    )
+    kelvin = convert_to_request_units((supply, span), absolute="K", difference="K")
 
     assert kelvin[0].unit == "K"
     assert kelvin[0].value == pytest.approx(298.15)

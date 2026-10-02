@@ -223,7 +223,7 @@ def test_simulated_hpr_annualized_costs_price_utilities_and_installed_capital():
         Q_cooling_water=4.0,
         Q_refrigeration=2.0,
         cost_units=[hp_shared.HPRCostUnit(Q_cap=1000.0, T_hot_max=150.0)],
-        penalty_power_equivalent=2.0,
+        penalty_weight=2.0,
         args=args,
     )
 
@@ -238,7 +238,10 @@ def test_simulated_hpr_annualized_costs_price_utilities_and_installed_capital():
     assert costs.hpr_capital_cost.value == pytest.approx(2.3 * 485000.0 * 1.3)
     assert costs.hpr_total_annualized_cost.unit == "$/y"
     assert costs.feasibility_penalty.unit == "$/y"
-    assert costs.feasibility_penalty.value == pytest.approx(200.0)
+    # The weight prices at the no-heat-pump cost of Q_hpr_target: 200 kW of
+    # hot utility at 0.5 x $100/MWh for 1000 h (no utility capital here).
+    assert hp_shared.hpr_penalty_cost_scale(args) == pytest.approx(10000.0)
+    assert costs.feasibility_penalty.value == pytest.approx(2.0 * 10000.0)
 
 
 def test_annualized_costs_credit_utility_capital_and_can_drop_capital_recovery():
@@ -261,7 +264,7 @@ def test_annualized_costs_credit_utility_capital_and_can_drop_capital_recovery()
             Q_cooling_water=0.0,
             Q_refrigeration=2.0,
             cost_units=[hp_shared.HPRCostUnit(Q_cap=1000.0, T_hot_max=150.0)],
-            penalty_power_equivalent=0.0,
+            penalty_weight=0.0,
             args=_base_args(**kwargs, **flags),
         )
 
@@ -353,7 +356,9 @@ def test_cycle_penalty_scores_only_cycle_terms():
         cycle_penalty_terms=[3.0, -10.0, 4.0],
     )
 
-    assert penalty == pytest.approx(50.0)
+    # rho * sum(r + r^2), r = g / Q_hpr_target, over the positive terms only.
+    relative = (3.0 / 200.0, 4.0 / 200.0)
+    assert penalty == pytest.approx(2.0 * sum(r + r**2 for r in relative))
 
 
 def test_vapour_refrigeration_penalises_unserved_cooling():

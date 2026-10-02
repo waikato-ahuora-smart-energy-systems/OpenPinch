@@ -15,7 +15,6 @@ from ....analysis.economics import (
     compute_annual_capital_cost,
     compute_annual_energy_cost,
 )
-from ....analysis.numerics import g_ineq_penalty as _g_ineq_penalty
 from ....contracts.hpr import (
     HeatPumpTargetInputs,
     HPRBackendResult,
@@ -25,7 +24,7 @@ from ....contracts.hpr import (
     SimulatedHPRAnnualizedCostAccounting,
 )
 from ....domain.configuration import tol as _tol
-from ....domain.enums import PenaltyForm, ProblemTableLabel
+from ....domain.enums import ProblemTableLabel
 from ....domain.stream_collection import StreamCollection
 from ....domain.value import Value
 from ..optimisation_adapter import (
@@ -33,6 +32,9 @@ from ..optimisation_adapter import (
 )
 from ..optimisation_adapter import (
     normalise_hpr_penalty_terms as _normalise_hpr_penalty_terms,
+)
+from ..optimisation_adapter import (
+    relative_feasibility_penalty as _relative_feasibility_penalty,
 )
 from ._shared import plotting as _plotting
 from ._shared import streams as _streams
@@ -76,10 +78,11 @@ def _cycle_penalty(
     args: HeatPumpTargetInputs,
     cycle_penalty_terms: list[float] | None = None,
 ) -> float:
-    """Return the dimensionless penalty rho * sum((g / Q_hpr_target)^2).
+    """Return the dimensionless exact penalty rho * sum(r + r^2), r = g / Q_target.
 
     Violations are relative to the targeted duty, so the penalty is the same
-    for a 10 kW and a 10 MW problem with the same relative shortfall.
+    for a 10 kW and a 10 MW problem with the same relative shortfall. The
+    linear part keeps it exact: leaving duty unserved never pays.
     """
     cycle_terms = np.maximum(
         np.asarray(_normalise_hpr_penalty_terms(cycle_penalty_terms), dtype=float),
@@ -87,13 +90,9 @@ def _cycle_penalty(
     )
     if not cycle_terms.size:
         return 0.0
-    return float(
-        _g_ineq_penalty(
-            cycle_terms / _penalty_duty_scale(args),
-            eta=float(getattr(args, "eta_penalty", 0.01)),
-            rho=float(getattr(args, "rho_penalty", 10.0)),
-            form=PenaltyForm.SQUARE,
-        )
+    return _relative_feasibility_penalty(
+        cycle_terms / _penalty_duty_scale(args),
+        rho=float(getattr(args, "rho_penalty", 10.0)),
     )
 
 
@@ -125,8 +124,9 @@ def hpr_penalty_cost_scale(args: HeatPumpTargetInputs) -> float:
     unit_capital = float(
         getattr(
             args,
-            "hot_utility_capital_cost" if is_heat_pumping else
-            "refrigeration_capital_cost",
+            "hot_utility_capital_cost"
+            if is_heat_pumping
+            else "refrigeration_capital_cost",
             0.0,
         )
         or 0.0
@@ -758,7 +758,8 @@ def cap_stage_condensing_temperatures(
     highest critical temperature among the refrigerants. A stage with a
     lower-Tcrit refrigerant (R134a beside water, say) could still be decoded
     above its own critical point, where every candidate fails. Stage ``i`` uses
-    ``args.refrigerant_ls[i]``; the result keeps the stages in descending order.
+    ``args.refrigerant_ls[i]`` and keeps that pairing; the result is
+    non-increasing (a capped stage pulls the colder stages down with it).
     """
     T_cond = np.asarray(T_cond, dtype=float)
     if getattr(args, "simulation_backend", "coolprop") == "tespy":
@@ -774,8 +775,13 @@ def cap_stage_condensing_temperatures(
         except ValueError, TypeError:
             continue
         ceilings[index] = t_crit - SUBCRITICAL_CONDENSING_MARGIN_K
+    # Cap in stage order without re-sorting, so each temperature stays with its
+    # own refrigerant: a stage is at most its ceiling and at most the stage
+    # above it, keeping the stages in descending order.
     capped = np.minimum(T_cond, ceilings)
-    return np.sort(capped)[::-1]
+    for index in range(1, capped.size):
+        capped[index] = min(capped[index], capped[index - 1])
+    return capped
 
 
 def validate_vapour_hp_refrigerant_ls(

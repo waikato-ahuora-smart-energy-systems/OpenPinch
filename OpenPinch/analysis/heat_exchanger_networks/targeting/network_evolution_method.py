@@ -23,7 +23,7 @@ from ..execution.task_builders import (
     _successful_method,
     approach_temperature_from_network,
     derivative_threshold_from_network,
-    has_recovery_topology,
+    is_utility_only_outcome,
     required_topology_restrictions_from_outcome,
     stage_count_from_network,
     topology_restrictions_from_network,
@@ -137,7 +137,7 @@ def build_network_evolution_method_tasks(
             outcome, HeatExchangerNetworkDesignMethod.ThermalDerivative
         ):
             continue
-        if not has_recovery_topology(outcome):
+        if is_utility_only_outcome(outcome):
             continue  # utility-only: a final candidate, nothing to refine
         pathways = pathways_from_metadata(outcome.task.metadata)
         restrictions = required_topology_restrictions_from_outcome(
@@ -226,7 +226,7 @@ def build_network_evolution_method_tasks_from_pinch_design_method(
             outcome, HeatExchangerNetworkDesignMethod.PinchDesign
         ):
             continue
-        if not has_recovery_topology(outcome):
+        if is_utility_only_outcome(outcome):
             continue  # utility-only: a final candidate, nothing to refine
         pathways = tuple(
             pathway

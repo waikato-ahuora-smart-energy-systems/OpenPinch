@@ -321,8 +321,10 @@ def test_accounting_applies_refrigeration_penalty_and_scalar_objective():
 
     assert external_heat == pytest.approx(0.0)
     assert external_cold == pytest.approx(5.0)
-    assert penalty == pytest.approx(50.0)
-    assert objective == pytest.approx((10.0 + 50.0) / 200.0)
+    # rho * (r + r^2) with r = 5 / 200, priced at 200 kW x max(ratio, 1).
+    r = 5.0 / 200.0
+    assert penalty == pytest.approx(2.0 * (r + r**2) * 200.0)
+    assert objective == pytest.approx((10.0 + penalty) / 200.0)
     assert adapter.calc_hpr_obj(
         10.0,
         5.0,

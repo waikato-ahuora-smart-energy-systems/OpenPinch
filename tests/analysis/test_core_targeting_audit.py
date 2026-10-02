@@ -9,8 +9,13 @@ import pytest
 
 from OpenPinch import PinchProblem
 from OpenPinch.analysis.targeting.utilities import _warn_on_unmet_utility_demand
+from OpenPinch.application._problem.targeting.execution import (
+    _require_subzones_for_indirect_target,
+)
+from OpenPinch.domain.enums import TargetType
 from OpenPinch.domain.stream import Stream
 from OpenPinch.domain.stream_collection import StreamCollection
+from OpenPinch.domain.zone import Zone
 
 
 def _single_zone_payload(**utility_overrides) -> dict:
@@ -38,10 +43,12 @@ def _single_zone_payload(**utility_overrides) -> dict:
 
 
 def test_indirect_targeting_on_a_single_zone_points_to_direct_targeting():
-    problem = PinchProblem(_single_zone_payload(), project_name="Site")
-
+    # Stream-derived zone trees always give each stream an operation subzone,
+    # so a zone without subzones is checked directly.
     with pytest.raises(ValueError, match="has no subzones"):
-        problem.target.indirect_heat_integration()
+        _require_subzones_for_indirect_target(Zone(name="Leaf"), TargetType.II.value)
+
+    _require_subzones_for_indirect_target(Zone(name="Leaf"), TargetType.DI.value)
 
 
 def test_indirect_targeting_on_a_site_with_subzones_still_runs():
@@ -289,3 +296,31 @@ def test_single_row_table_gives_no_net_streams():
     )
 
     assert len(net_hot) == 0 and len(net_cold) == 0
+
+
+def test_exergy_curves_unshift_each_interval_by_its_own_contribution():
+    from OpenPinch.analysis.exergy.service import (
+        build_exergy_nlp_curves,
+        compute_exergetic_temperature,
+    )
+
+    # A 1 kW/K hot branch from 120 to 80 degC shifted, whose streams have a
+    # 10 K contribution while THERMAL_DT_CONT is 5 K: real 130 to 90 degC.
+    kwargs = {
+        "temperatures": [120.0, 80.0],
+        "branches": [("hot", [0.0, 40.0])],
+        "t_env": 15.0,
+        "dt_cont_shift": 5.0,
+    }
+
+    own = build_exergy_nlp_curves(**kwargs, hot_shifts=[10.0])
+    unknown = build_exergy_nlp_curves(**kwargs, hot_shifts=[float("nan")])
+
+    expected = compute_exergetic_temperature(
+        130.0, T_ref_in_C=15.0
+    ) - compute_exergetic_temperature(90.0, T_ref_in_C=15.0)
+    assert own["source_total"] == pytest.approx(expected)
+    # Without stream data the global contribution is used.
+    assert unknown["source_total"] == pytest.approx(
+        build_exergy_nlp_curves(**kwargs)["source_total"]
+    )

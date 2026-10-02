@@ -495,9 +495,7 @@ class MultiStageSteamTurbine:
     ) -> dict:
         # Extraction stages condense, so they must lie in water's saturation
         # range; the inlet itself may be supercritical.
-        in_range = (stage_temperatures > _T_TRIPLE) & (
-            stage_temperatures < _T_CRITICAL
-        )
+        in_range = (stage_temperatures > _T_TRIPLE) & (stage_temperatures < _T_CRITICAL)
         stage_temperatures = stage_temperatures[in_range]
         stage_heat_flows = stage_heat_flows[in_range]
         source_indices = source_indices[in_range]

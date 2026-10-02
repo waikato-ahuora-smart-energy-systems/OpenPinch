@@ -80,11 +80,12 @@ def test_no_overlap_streams_are_skipped():
     assert all(m == 0 for m in CP_cold)
 
 
-def test_export_writes_to_results_dir_and_uses_filename_stem():
+def test_export_writes_to_working_dir_and_uses_filename_stem(tmp_path, monkeypatch):
     table = ProblemTable({ProblemTableLabel.T: [100], ProblemTableLabel.H_NET: [50]})
     unique_name = f"problem_table_test_{uuid.uuid4().hex}"
-    expected_dir = Path(__file__).resolve().parents[2] / "results"
-    output_path = export_problem_table(table, unique_name)
+    monkeypatch.chdir(tmp_path)
+    expected_dir = Path.cwd()
+    output_path = export_problem_table(table, f"{unique_name}.csv")
 
     try:
         assert output_path.parent == expected_dir

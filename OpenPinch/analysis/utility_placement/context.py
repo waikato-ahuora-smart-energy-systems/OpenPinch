@@ -24,7 +24,7 @@ from OpenPinch.contracts.utility_placement import (
 
 from .errors import PlacementContextError
 from .normalization import convert_placement_value
-from .units import INTERNAL_TEMPERATURE, INTERNAL_TEMPERATURE_DIFFERENCE
+from .units import INTERNAL_TEMPERATURE_DIFFERENCE
 
 
 class _FrozenContext(BaseModel):

@@ -523,7 +523,7 @@ def test_failed_workflow_reports_task_errors() -> None:
         )
 
 
-def test_successful_infeasible_outcome_reports_model_contract_issue() -> None:
+def test_successful_infeasible_outcome_is_demoted_with_its_reason() -> None:
     problem = _small_problem()
     settings = workflow_settings_from_problem(problem)
     pdm_tasks = build_pinch_design_method_tasks(settings)
@@ -544,11 +544,17 @@ def test_successful_infeasible_outcome_reports_model_contract_issue() -> None:
         }
     )
 
+    # The infeasible outcome is demoted to failed rather than aborting the run;
+    # with no feasible outcome left, selection reports why.
+    others = [
+        outcome.model_copy(update={"status": "failed", "error": "not solved"})
+        for outcome in outcomes[1:]
+    ]
     with pytest.raises(
         WorkflowContractError,
-        match="solver-success heat exchanger network task failed post-solve",
+        match="post-solve feasibility check failed",
     ):
-        build_synthesis_result(settings, pdm_tasks, outcomes)
+        build_synthesis_result(settings, pdm_tasks, [outcomes[0], *others])
 
 
 def test_synthesis_task_ids_are_deterministic_and_serializable() -> None:
@@ -585,8 +591,9 @@ def test_downstream_topology_restrictions_are_required() -> None:
 
     with pytest.raises(WorkflowContractError, match="without a HeatExchangerNetwork"):
         build_thermal_derivative_method_tasks(settings, [missing_network])
-    with pytest.raises(WorkflowContractError, match="topology restrictions"):
-        build_thermal_derivative_method_tasks(settings, [empty_network])
+    # A network without recovery matches is utility-only: a final candidate
+    # with nothing for TDM to refine, not a contract error.
+    assert build_thermal_derivative_method_tasks(settings, [empty_network]) == ()
 
 
 def test_fake_outcomes_serialize_without_live_solver_objects() -> None:

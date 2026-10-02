@@ -48,6 +48,10 @@ from ..analysis.utility_placement.replay import (
     placement_utility_collections,
 )
 from ..analysis.utility_placement.service import optimise_utility_placement
+from ..analysis.utility_placement.units import (
+    INTERNAL_TEMPERATURE,
+    INTERNAL_TEMPERATURE_DIFFERENCE,
+)
 from ..contracts.input import UtilitySchema
 from ..contracts.units import standardise_input_value
 from ..contracts.utility_placement import (
@@ -74,10 +78,6 @@ from ._problem.input.utilities import (
 from .targeting import (
     direct_heat_integration_service,
     indirect_heat_integration_service,
-)
-from ..analysis.utility_placement.units import (
-    INTERNAL_TEMPERATURE,
-    INTERNAL_TEMPERATURE_DIFFERENCE,
 )
 
 if TYPE_CHECKING:

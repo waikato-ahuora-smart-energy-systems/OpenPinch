@@ -29,7 +29,9 @@ def _args(streams, **overrides) -> SimpleNamespace:
 def _cooling(name, supply, target, duty) -> StreamCollection:
     streams = StreamCollection()
     streams.add(
-        Stream(name, supply_temperature=supply, target_temperature=target, heat_flow=duty)
+        Stream(
+            name, supply_temperature=supply, target_temperature=target, heat_flow=duty
+        )
     )
     return streams
 

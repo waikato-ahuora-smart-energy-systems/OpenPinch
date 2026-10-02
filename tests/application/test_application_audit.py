@@ -56,7 +56,10 @@ def test_zero_load_period_counts_as_no_heat_pump():
     winter = TargetOutput(
         name="Site",
         period_id="winter",
-        targets=[_row(period_id="winter"), _hpr_row(period_id="winter", work=10.0, cop=4.0)],
+        targets=[
+            _row(period_id="winter"),
+            _hpr_row(period_id="winter", work=10.0, cop=4.0),
+        ],
     )
     summer = TargetOutput(  # no HPR row: the HPR load was zero
         name="Site", period_id="summer", targets=[_row(period_id="summer")]

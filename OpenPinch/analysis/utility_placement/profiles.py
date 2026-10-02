@@ -34,9 +34,9 @@ from .units import (
     INTERNAL_TEMPERATURE_DIFFERENCE,
 )
 
-
 # Duties (kW) below this are rounding noise in calibration.
 _CALIBRATION_TOLERANCE = 1e-9
+
 
 def _finite_tuple(values) -> tuple[float, ...]:
     return tuple(float(value) for value in values)

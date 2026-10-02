@@ -33,6 +33,17 @@ def has_recovery_topology(
     )
 
 
+def is_utility_only_outcome(
+    outcome: HeatExchangerNetworkSynthesisTaskOutcome,
+) -> bool:
+    """Return whether an outcome has a network with no recovery matches.
+
+    A success without any network is a contract error, not utility-only, so
+    the downstream builders still reject it.
+    """
+    return outcome.network is not None and not has_recovery_topology(outcome)
+
+
 def required_topology_restrictions_from_outcome(
     outcome: HeatExchangerNetworkSynthesisTaskOutcome,
     downstream_method: HeatExchangerNetworkDesignMethod,
@@ -175,6 +186,7 @@ __all__ = [
     "approach_temperature_from_network",
     "derivative_threshold_from_network",
     "has_recovery_topology",
+    "is_utility_only_outcome",
     "required_topology_restrictions_from_outcome",
     "stage_count_from_network",
     "topology_restrictions_from_network",

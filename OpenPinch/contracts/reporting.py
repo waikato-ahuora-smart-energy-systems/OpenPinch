@@ -148,9 +148,7 @@ class TargetResults(_ReportModel):
     exergy_sinks: Value | None = report_field(
         "exergy_sinks", "weighted_mean", None, representation="quantity"
     )
-    ETE: Value | None = report_field(
-        "ETE", "derived", None, representation="quantity"
-    )
+    ETE: Value | None = report_field("ETE", "derived", None, representation="quantity")
     exergy_req_min: Value | None = report_field(
         "exergy_req_min", "weighted_mean", None, representation="quantity"
     )

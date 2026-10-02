@@ -16,7 +16,6 @@ from OpenPinch.analysis.heat_pumps.cycles.cascade_vapour_compression_cycle impor
     CascadeVapourCompressionCycle,
 )
 
-
 # 3.2 Subcritical caps per stage
 
 
@@ -32,6 +31,21 @@ def test_each_stage_is_capped_below_its_own_critical_temperature():
     # 2 K below its critical point.
     assert capped[0] == pytest.approx(150.0)
     assert capped[1] == pytest.approx(99.06, abs=0.1)
+
+
+def test_capping_keeps_each_temperature_with_its_own_refrigerant():
+    pytest.importorskip("CoolProp")
+    # Unsorted refrigerants: R134a (Tcrit 101 degC) above water.
+    args = SimpleNamespace(
+        refrigerant_ls=["R134a", "water"], simulation_backend="coolprop"
+    )
+
+    capped = cap_stage_condensing_temperatures(np.array([200.0, 150.0]), args)
+
+    # Re-sorting would hand 150 degC to R134a; instead R134a's stage is capped
+    # and the colder water stage follows it down to stay in descending order.
+    assert capped[0] == pytest.approx(99.06, abs=0.1)
+    assert capped[1] == pytest.approx(capped[0])
 
 
 def test_tespy_stages_are_not_capped():

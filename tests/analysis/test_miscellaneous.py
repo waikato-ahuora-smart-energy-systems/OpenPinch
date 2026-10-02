@@ -46,15 +46,14 @@ def test_crf_short_term():
     assert math.isclose(result, expected, rel_tol=1e-9)
 
 
-def test_crf_zero_interest_raises():
-    """Zero interest should raise ZeroDivisionError."""
-    with pytest.raises(ZeroDivisionError):
-        compute_capital_recovery_factor(0.0, 10)
+def test_crf_zero_interest_is_straight_line():
+    """At zero interest the capital is recovered evenly: 1 / n."""
+    assert compute_capital_recovery_factor(0.0, 10) == pytest.approx(0.1)
 
 
 def test_crf_zero_years_raises():
-    """Zero years should raise ZeroDivisionError."""
-    with pytest.raises(ZeroDivisionError):
+    """A service life must be positive."""
+    with pytest.raises(ValueError, match="service life"):
         compute_capital_recovery_factor(0.08, 0)
 
 

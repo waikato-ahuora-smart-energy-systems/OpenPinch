@@ -139,12 +139,8 @@ def _evaluate_multi_vc_objective(
         )
     except ValueError as exc:
         if cycle_evaluated:
-            # A post-solve error in the final pass is a typed failure for the
-            # caller; during the search it is a bug worth surfacing.
-            if artifact_mode is HPREvaluationMode.FINAL:
-                return HPRBackendResult.failure(
-                    reason=f"{label} cycle post-processing failed: {exc}",
-                )
+            # A post-solve error is a contract defect, not an infeasible
+            # candidate, so it surfaces in every mode.
             raise
         return HPRBackendResult.failure(
             reason=str(exc),

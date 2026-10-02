@@ -72,8 +72,8 @@ def test_refrigeration_profile_split_keeps_the_warmer_rest():
     T_hot = np.array([120.0, 90.0, 60.0, 30.0])
     H_hot = np.array([0.0, -80.0, -160.0, -240.0])
 
-    (T_out, H_out), (T_rest, H_rest) = hp_pre._split_cooling_profile_at_coldest_Q_target(
-        120.0, T_hot, H_hot
+    (T_out, H_out), (T_rest, H_rest) = (
+        hp_pre._split_cooling_profile_at_coldest_Q_target(120.0, T_hot, H_hot)
     )
 
     np.testing.assert_allclose(T_out, [75.0, 60.0, 30.0])

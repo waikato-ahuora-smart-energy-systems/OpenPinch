@@ -96,8 +96,7 @@ def _refuse_overwrite(paths: list[Path], *, force: bool) -> None:
         names = ", ".join(str(path) for path in existing[:5])
         more = "" if len(existing) <= 5 else f" and {len(existing) - 5} more"
         raise FileExistsError(
-            f"Notebook(s) already exist: {names}{more}. "
-            "Use --force to overwrite them."
+            f"Notebook(s) already exist: {names}{more}. Use --force to overwrite them."
         )
 
 

@@ -155,7 +155,7 @@ def summary_results(
                 "workflow before requesting results."
             )
         # A copy, so editing a returned report never changes the cached one.
-        return problem._results.model_copy(deep=True)
+        return _deep_copy(problem._results)
 
     outputs = list(problem._period_results.values())
     if not outputs:
@@ -167,13 +167,21 @@ def summary_results(
     return output_for_period_mode(outputs, weights, periods=periods)
 
 
+def _deep_copy(value: Any) -> Any:
+    """Return a deep copy of a pydantic model or any other object."""
+    copier = getattr(value, "model_copy", None)
+    if callable(copier):
+        return copier(deep=True)
+    return deepcopy(value)
+
+
 def combine_period_outputs(outputs: Sequence[TargetOutput]) -> TargetOutput:
     """Return one output with period-specific target rows concatenated."""
     ordered_outputs = list(outputs)
     if not ordered_outputs:
         raise ValueError("At least one period output is required.")
     targets = [
-        target.model_copy(deep=True)
+        _deep_copy(target)
         for output in ordered_outputs
         for target in list(getattr(output, "targets", []) or [])
     ]
@@ -416,7 +424,9 @@ def _weighted_average_target(
     data["hpr_eta_he"] = _ratio_of_totals(
         targets, "hpr_eta_he", "hpr_work", weights, basis_is_numerator=True
     )
-    ran = [t.hpr_success for t in targets if getattr(t, "hpr_success", None) is not None]
+    ran = [
+        t.hpr_success for t in targets if getattr(t, "hpr_success", None) is not None
+    ]
     data["hpr_success"] = all(ran) if ran else None
     data["hpr_utility_annualized_capital_cost"] = _hpr_utility_annualized_capital(
         targets, data
@@ -573,8 +583,10 @@ def _apply_peak_machine_capital(
         for target in targets
     ]
     shared = all(getattr(target, "hpr_shared_design", None) for target in targets)
-    if (not shared) or any(not value for value in (*capital, *annualized)) or (
-        len({len(value) for value in (*capital, *annualized)}) != 1
+    if (
+        (not shared)
+        or any(not value for value in (*capital, *annualized))
+        or (len({len(value) for value in (*capital, *annualized)}) != 1)
     ):
         data["hpr_machine_capital_costs"] = None
         data["hpr_machine_annualized_capital_costs"] = None

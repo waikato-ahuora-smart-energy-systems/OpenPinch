@@ -114,7 +114,8 @@ def test_weighted_average_output_aggregates_values_utilities_and_metadata():
     assert target.work_target.value == pytest.approx(2.5)
     assert target.process_component_work_target.value == pytest.approx(1.25)
     assert target.area.value == pytest.approx(100.0)
-    assert target.capital_cost.value == pytest.approx(2500.0)
+    # Equipment is sized for the peak period, not the average.
+    assert target.capital_cost.value == pytest.approx(3000.0)
     assert target.exergy_sources.value == pytest.approx(20.0)
     assert target.hpr_work.value == pytest.approx(2.5)
     assert target.hpr_operating_cost.value == pytest.approx(500.0)
@@ -123,7 +124,8 @@ def test_weighted_average_output_aggregates_values_utilities_and_metadata():
     assert target.hpr_utility_annualized_capital_cost.value == pytest.approx(30.0)
     assert target.hpr_total_annualized_cost.value == pytest.approx(650.0)
     assert target.hpr_cycle == "Carnot"
-    assert target.hpr_success is None
+    # One failed period means the multi-period design did not succeed.
+    assert target.hpr_success is False
     assert {
         utility.name: utility.heat_flow.value for utility in target.hot_utilities
     } == {

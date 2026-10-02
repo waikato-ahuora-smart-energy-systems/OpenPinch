@@ -64,16 +64,23 @@ def build_exergy_gcc_curve(
     heat_loads: Iterable[float],
     t_env: float,
     dt_cont_shift: float = 0.0,
+    hot_shifts: Iterable[float] | None = None,
+    cold_shifts: Iterable[float] | None = None,
 ) -> dict[str, list[float]]:
     """Transform one GCC-like curve into an exergetic GCC output.
 
     The GCC is on shifted temperatures. Each interval is put back on real
-    temperatures by ``dt_cont_shift``: up for hot-dominated (surplus) intervals,
-    down for cold-dominated ones.
+    temperatures: up by its hot shift for hot-dominated (surplus) intervals,
+    down by its cold shift for cold-dominated ones. ``hot_shifts`` and
+    ``cold_shifts`` give one shift per interval (the CP-weighted contribution of
+    the streams in it); ``dt_cont_shift`` is used where they are absent or NaN.
     """
     t_vals = _to_float_array(temperatures)
     h_vals = _to_float_array(heat_loads)
     _validate_curve_lengths(t_vals, h_vals)
+    n_intervals = max(len(t_vals) - 1, 0)
+    hot_offsets = _interval_shifts(hot_shifts, n_intervals, dt_cont_shift)
+    cold_offsets = _interval_shifts(cold_shifts, n_intervals, dt_cont_shift)
 
     t_ex_vals: list[float] = []
     x_vals: list[float] = []
@@ -89,9 +96,9 @@ def build_exergy_gcc_curve(
 
         cp_net = float((h_vals[i] - h_vals[i - 1]) / delta_t)
         if cp_net > tol:
-            offset = abs(dt_cont_shift)
+            offset = float(hot_offsets[i - 1])
         elif cp_net < -tol:
-            offset = -abs(dt_cont_shift)
+            offset = -float(cold_offsets[i - 1])
         else:
             offset = 0.0
 
@@ -149,12 +156,16 @@ def build_exergy_nlp_curves(
     branches: Iterable[tuple[str, Iterable[float]]],
     t_env: float,
     dt_cont_shift: float = 0.0,
+    hot_shifts: Iterable[float] | None = None,
+    cold_shifts: Iterable[float] | None = None,
 ) -> dict[str, Any]:
     """Build aggregated exergy surplus/deficit curves from NLP-like branches.
 
-    Branches are on shifted temperatures; hot branches move up and cold
-    branches down by ``dt_cont_shift``, so the curves use real temperatures,
-    as the exergetic GCC does.
+    Branches are on shifted temperatures. Each branch interval moves to real
+    temperatures on its own (hot up by its hot shift, cold down by its cold
+    shift, as for the exergetic GCC) and keeps its heat capacity flow there.
+    Intervals with different shifts may then overlap on real temperatures,
+    which is physical: their streams overlap too.
     """
     t_vals = _to_float_array(temperatures)
     branch_specs = [
@@ -177,22 +188,33 @@ def build_exergy_nlp_curves(
     for _, values in branch_specs:
         _validate_curve_lengths(t_vals, values)
 
-    shift = abs(float(dt_cont_shift))
+    n_intervals = max(len(t_vals) - 1, 0)
+    hot_offsets = _interval_shifts(hot_shifts, n_intervals, dt_cont_shift)
+    cold_offsets = _interval_shifts(cold_shifts, n_intervals, dt_cont_shift)
 
-    def real_temperatures(kind: str) -> np.ndarray:
-        return t_vals + shift if kind == "hot" else t_vals - shift
+    # (is_hot, real upper, real lower, |CP|) for every branch interval.
+    segments: list[tuple[bool, float, float, float]] = []
+    for kind, values in branch_specs:
+        is_hot = kind == "hot"
+        for k in range(n_intervals):
+            delta_t = float(t_vals[k] - t_vals[k + 1])
+            if abs(delta_t) <= tol:
+                continue
+            cp = float((values[k + 1] - values[k]) / delta_t)
+            if not math.isfinite(cp) or abs(cp) <= tol:
+                continue
+            offset = float(hot_offsets[k]) if is_hot else -float(cold_offsets[k])
+            upper, lower = sorted(
+                (float(t_vals[k]) + offset, float(t_vals[k + 1]) + offset),
+                reverse=True,
+            )
+            segments.append((is_hot, upper, lower, abs(cp)))
 
-    real_grids = [real_temperatures(kind) for kind, _ in branch_specs]
-    union = np.unique(np.concatenate([t_vals, *real_grids]))[::-1]
-    if shift <= tol:
-        union = t_vals
+    ends = [point for _, upper, lower, _ in segments for point in (upper, lower)]
+    union = np.unique(np.concatenate([t_vals, np.asarray(ends, dtype=float)]))[::-1]
     split_t = _insert_breaks(union.tolist(), [t_env])
     t_grid = np.asarray(split_t, dtype=float)
     tex_grid = _build_exergy_temperature_grid(t_grid, t_env)
-    interpolated = [
-        (kind, _interpolate_profile(real_t, values, t_grid))
-        for (kind, values), real_t in zip(branch_specs, real_grids)
-    ]
 
     source_increments: list[float] = []
     sink_increments: list[float] = []
@@ -208,22 +230,18 @@ def build_exergy_nlp_curves(
             sink_increments.append(0.0)
             continue
 
-        tex_upper = float(tex_grid[i - 1])
-        tex_lower = float(tex_grid[i])
+        tex_span = abs(float(tex_grid[i - 1]) - float(tex_grid[i]))
         is_above_ambient = ((t_upper + t_lower) / 2.0) >= t_env
         source_inc = 0.0
         sink_inc = 0.0
 
-        for kind, values in interpolated:
-            cp = float((values[i] - values[i - 1]) / delta_t)
-            exergy_increment = abs(cp * (tex_upper - tex_lower))
+        for is_hot, upper, lower, cp in segments:
+            if upper < t_upper - tol or lower > t_lower + tol:
+                continue
+            exergy_increment = cp * tex_span
             if exergy_increment <= tol:
                 continue
-
-            is_hot_branch = kind == "hot"
-            if (is_hot_branch and is_above_ambient) or (
-                not is_hot_branch and not is_above_ambient
-            ):
+            if is_hot == is_above_ambient:
                 source_inc += exergy_increment
             else:
                 sink_inc += exergy_increment
@@ -261,10 +279,12 @@ def build_exergy_nlp_curves(
 def apply_exergy_targeting(target: Any, *, dt_cont_multiplier: float = 1.0) -> Any:
     """Enrich one existing target with exergy graphs and scalar metrics.
 
-    Exergy uses real temperatures. The shifted GCC and NLP curves are un-shifted
-    by ``THERMAL_DT_CONT`` times the zone's ``dt_cont_multiplier``, the
-    contribution of a stream at the default. Streams with their own
-    ``dt_cont`` are un-shifted by that same representative value.
+    Exergy uses real temperatures. Each interval of the shifted GCC and NLP
+    curves is un-shifted by the CP-weighted contribution of the target zone's
+    streams and utilities in it, so streams with their own ``dt_cont`` are
+    un-shifted by what they were shifted by. Where no stream data covers an
+    interval, ``THERMAL_DT_CONT`` times the zone's ``dt_cont_multiplier`` is
+    used.
     """
     spec = _resolve_target_exergy_spec(target, dt_cont_multiplier=dt_cont_multiplier)
     if spec is None:
@@ -275,12 +295,16 @@ def apply_exergy_targeting(target: Any, *, dt_cont_multiplier: float = 1.0) -> A
         heat_loads=spec["gcc_series"],
         t_env=spec["t_env"],
         dt_cont_shift=spec["dt_cont_shift"],
+        hot_shifts=spec.get("hot_shifts"),
+        cold_shifts=spec.get("cold_shifts"),
     )
     nlp_output = build_exergy_nlp_curves(
         temperatures=spec["temperatures"],
         branches=spec["branches"],
         t_env=spec["t_env"],
         dt_cont_shift=spec["dt_cont_shift"],
+        hot_shifts=spec.get("hot_shifts"),
+        cold_shifts=spec.get("cold_shifts"),
     )
 
     target.graphs[GraphType.GCC_X.value] = gcc_output
@@ -381,6 +405,7 @@ def _resolve_target_exergy_spec(
     dt_cont_shift = abs(float(getattr(thermal, "dt_cont", 0.0))) * float(
         dt_cont_multiplier
     )
+    stream_shifts = _zone_stream_shift_sources(target)
 
     if target_type == TargetType.DI.value:
         pt = getattr(target, "pt", None)
@@ -402,6 +427,7 @@ def _resolve_target_exergy_spec(
             ],
             t_env=t_env,
             dt_cont_shift=dt_cont_shift,
+            stream_shifts=stream_shifts,
         )
 
     if target_type == TargetType.II.value:
@@ -417,6 +443,7 @@ def _resolve_target_exergy_spec(
             ],
             t_env=t_env,
             dt_cont_shift=dt_cont_shift,
+            stream_shifts=stream_shifts,
         )
 
     if target_type == TargetType.DHP.value:
@@ -438,6 +465,7 @@ def _resolve_target_exergy_spec(
             ],
             t_env=t_env,
             dt_cont_shift=dt_cont_shift,
+            stream_shifts=stream_shifts,
         )
 
     if target_type == TargetType.IHP.value:
@@ -457,9 +485,23 @@ def _resolve_target_exergy_spec(
             ],
             t_env=t_env,
             dt_cont_shift=dt_cont_shift,
+            stream_shifts=stream_shifts,
         )
 
     return None
+
+
+def _zone_stream_shift_sources(target: Any) -> tuple[list, list, int | None] | None:
+    """Return the hot and cold streams (with utilities) behind ``target``."""
+    zone = getattr(target, "parent_zone", None)
+    if zone is None:
+        return None
+    try:
+        hot = [*zone.hot_streams, *zone.hot_utilities]
+        cold = [*zone.cold_streams, *zone.cold_utilities]
+    except AttributeError, TypeError:
+        return None
+    return hot, cold, getattr(target, "period_idx", None)
 
 
 def _make_target_spec(
@@ -469,6 +511,7 @@ def _make_target_spec(
     branches,
     t_env: float,
     dt_cont_shift: float,
+    stream_shifts: tuple[list, list, int | None] | None = None,
 ) -> dict[str, Any] | None:
     if gcc_series is None:
         return None
@@ -477,12 +520,22 @@ def _make_target_spec(
         for kind, values in branches
         if values is not None and _should_use_series(values)
     ]
+    t_vals = _to_float_array(temperatures)
+    hot_shifts = cold_shifts = None
+    if stream_shifts is not None:
+        # Each stream's own contribution, CP-weighted per interval, so streams
+        # with their own dt_cont are un-shifted by what they were shifted by.
+        hot_streams, cold_streams, period_idx = stream_shifts
+        hot_shifts = _stream_interval_shifts(t_vals, hot_streams, period_idx)
+        cold_shifts = _stream_interval_shifts(t_vals, cold_streams, period_idx)
     return {
-        "temperatures": _to_float_array(temperatures),
+        "temperatures": t_vals,
         "gcc_series": _to_float_array(gcc_series),
         "branches": usable_branches,
         "t_env": float(t_env),
         "dt_cont_shift": float(dt_cont_shift),
+        "hot_shifts": hot_shifts,
+        "cold_shifts": cold_shifts,
     }
 
 
@@ -521,6 +574,68 @@ def _should_use_series(values: Iterable[float]) -> bool:
     if finite.size == 0:
         return False
     return bool(np.any(np.abs(finite) > tol))
+
+
+def _interval_shifts(
+    shifts: Iterable[float] | None, n_intervals: int, default: float
+) -> np.ndarray:
+    """Return one non-negative shift per interval, ``default`` where unknown."""
+    output = np.full(n_intervals, abs(float(default)), dtype=float)
+    if shifts is None:
+        return output
+    values = np.asarray(list(shifts), dtype=float).ravel()
+    if values.size != n_intervals:
+        raise ValueError("Interval shifts must have one value per interval.")
+    known = np.isfinite(values)
+    output[known] = np.abs(values[known])
+    return output
+
+
+def _stream_interval_shifts(
+    temperatures: np.ndarray,
+    streams: Iterable[Any],
+    period_idx: int | None,
+) -> np.ndarray:
+    """Return each shifted interval's CP-weighted delta-T contribution.
+
+    A stream (or each segment of a segmented stream) counts in the intervals
+    its shifted range covers. Intervals no stream covers are NaN.
+    """
+    from ...domain.stream_collection import StreamCollection
+
+    t_vals = np.asarray(temperatures, dtype=float)
+    n_intervals = max(t_vals.size - 1, 0)
+    weighted = np.zeros(n_intervals, dtype=float)
+    weights = np.zeros(n_intervals, dtype=float)
+    if not n_intervals:
+        return weighted
+    mid = 0.5 * (t_vals[:-1] + t_vals[1:])
+
+    def value(item, name: str) -> float:
+        return float(StreamCollection._value_at_idx(getattr(item, name), period_idx))
+
+    for stream in streams or ():
+        if not getattr(stream, "is_active", True):
+            continue
+        parts = stream.segments if getattr(stream, "has_segments", False) else ()
+        for part in parts or (stream,):
+            try:
+                low = value(part, "shifted_minimum_temperature")
+                high = value(part, "shifted_maximum_temperature")
+                cp = value(part, "heat_capacity_flowrate")
+                shift = abs(value(part, "effective_delta_t_contribution"))
+            except AttributeError, IndexError, TypeError, ValueError:
+                continue
+            if not all(map(math.isfinite, (low, high, cp, shift))) or cp <= tol:
+                continue
+            inside = (mid > low - tol) & (mid < high + tol)
+            weighted[inside] += cp * shift
+            weights[inside] += cp
+
+    shifts = np.full(n_intervals, np.nan, dtype=float)
+    covered = weights > tol
+    shifts[covered] = weighted[covered] / weights[covered]
+    return shifts
 
 
 def _insert_breaks(

@@ -30,13 +30,12 @@ from .recovery import _recovery_exchangers
 from .utility import _cold_utility_exchangers, _hot_utility_exchangers
 
 
-
-
 def _float_tensor(values) -> list[list[list[float]]]:
     """Return a [period][row][column] array as nested float lists."""
     if values is None:
         return []
     return [_float_matrix(matrix) for matrix in values]
+
 
 def extract_heat_exchanger_network(
     solved_model: Any,

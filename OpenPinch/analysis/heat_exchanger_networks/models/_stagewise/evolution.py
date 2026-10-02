@@ -77,9 +77,10 @@ def get_net_benefit_evolution(
             max_depth=max_depth,
         )
     beam_width = max(1, int(beam_width))
-    seen_signatures: set[tuple[tuple[int, int, int], ...]] = {
-        _topology_signature_from_z(owner, owner.z_allowed)
-    }
+    seen_signatures: set[tuple[tuple[int, int, int], ...]] = set()
+    initial_z = getattr(owner, "z_allowed", None)
+    if initial_z is not None:
+        seen_signatures.add(_topology_signature_from_z(owner, initial_z))
     frontier = [_EvolutionBranchState(model=owner, best_tac=float(owner.TAC))]
     best_model = owner
 
@@ -370,9 +371,7 @@ def _solve_evolution_candidates(
                 candidates.append((futures[future], candidate))
     # Completion order is arbitrary; process in spec order so parallel and
     # serial runs make the same choices.
-    candidates.sort(
-        key=lambda item: (item[0].branch_index, item[0].kind, item[0].rank)
-    )
+    candidates.sort(key=lambda item: (item[0].branch_index, item[0].kind, item[0].rank))
     return candidates
 
 

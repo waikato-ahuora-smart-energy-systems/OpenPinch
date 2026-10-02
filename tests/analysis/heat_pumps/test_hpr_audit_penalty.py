@@ -30,14 +30,17 @@ def _args(**overrides) -> SimpleNamespace:
     return SimpleNamespace(**(values | overrides))
 
 
-def test_penalty_scales_with_the_square_of_the_relative_violation():
+def test_penalty_is_exact_in_the_relative_violation():
     args = _args()
 
+    tenth = _cycle_penalty(args=args, cycle_penalty_terms=[100.0])
     one_megawatt = _cycle_penalty(args=args, cycle_penalty_terms=[1000.0])
     thirty_megawatts = _cycle_penalty(args=args, cycle_penalty_terms=[30000.0])
 
-    assert one_megawatt == pytest.approx(10.0)  # rho * (1000 / 1000)^2
-    assert thirty_megawatts == pytest.approx(900.0 * one_megawatt)
+    # rho * (r + r^2): the linear part keeps small shortfalls from being cheap.
+    assert tenth == pytest.approx(10.0 * (0.1 + 0.01))
+    assert one_megawatt == pytest.approx(10.0 * (1.0 + 1.0))
+    assert thirty_megawatts == pytest.approx(10.0 * (30.0 + 900.0))
 
 
 def test_penalty_is_the_same_for_any_problem_size_at_the_same_relative_shortfall():

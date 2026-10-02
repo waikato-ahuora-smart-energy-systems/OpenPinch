@@ -12,7 +12,6 @@ from typing import Any
 import numpy as np
 from scipy.optimize import minimize
 
-from ...analysis.numerics import g_ineq_penalty
 from ...contracts.hpr import (
     ZERO_USEFUL_DUTY_REASON,
     HeatPumpTargetInputs,
@@ -30,7 +29,7 @@ from ...contracts.hpr import (
     HPRTopologyIdentifier,
     MultiPeriodHPRTargetInputs,
 )
-from ...domain.enums import HeatPumpAndRefrigerationCycle, PenaltyForm
+from ...domain.enums import HeatPumpAndRefrigerationCycle
 from ...domain.stream_collection import StreamCollection
 from ...domain.value import Value
 from ...optimisation.errors import NoOptimisationCandidatesError
@@ -752,6 +751,20 @@ def aggregate_hpr_period_results(
     return ordered[0].with_updates(**updates), shared_objective
 
 
+def relative_feasibility_penalty(relative_violations, *, rho: float) -> float:
+    """Return the dimensionless exact penalty rho * sum(r + r^2) over r > 0.
+
+    ``r`` is each violation as a fraction of Q_hpr_target. The linear part makes
+    the penalty exact: every unit of violation costs rho times the no-heat-pump
+    cost of serving it, so a design never gains by leaving part of its duty
+    unserved. The quadratic part steepens large violations for the search.
+    """
+    r = np.maximum(np.asarray(relative_violations, dtype=float).ravel(), 0.0)
+    if not r.size:
+        return 0.0
+    return float(rho) * float(np.sum(r + r**2))
+
+
 def build_hpr_accounting(
     *,
     work: float,
@@ -792,13 +805,8 @@ def build_hpr_accounting(
             max(Q_ext_cold - float(refrigeration_allowance), 0.0),
         )
     penalty = (
-        float(
-            g_ineq_penalty(
-                positive_penalty_terms / duty_scale,
-                eta=args.eta_penalty,
-                rho=args.rho_penalty,
-                form=PenaltyForm.SQUARE,
-            )
+        relative_feasibility_penalty(
+            positive_penalty_terms / duty_scale, rho=args.rho_penalty
         )
         * power_scale
         if positive_penalty_terms.size
@@ -1041,6 +1049,7 @@ __all__ = [
     "evaluate_hpr_candidate",
     "normalise_initial_points",
     "normalise_hpr_penalty_terms",
+    "relative_feasibility_penalty",
     "raise_hpr_targeting_error",
     "run_hpr_candidate_search",
     "solve_hpr_placement",

@@ -392,6 +392,7 @@ def test_result_ranks_stage_shifted_networks_as_duplicate_structures() -> None:
 
 def test_result_selects_ranked_network() -> None:
     result = _result()
+    ranked = result.ranked_networks
 
     assert (
         select_network(
@@ -408,7 +409,8 @@ def test_result_selects_ranked_network() -> None:
     assert result.network.run_id == "accepted-second"
     assert result.task_id == "esm-second"
     assert result.method == "network_evolution_method"
-    assert len(result.ranked_networks) == 2
+    # Selection reads the ranking; it no longer replaces it.
+    assert result.ranked_networks == ranked
 
 
 def test_network_feasibility_checks_cost_and_heat_balance() -> None:
@@ -969,8 +971,10 @@ def test_ranked_network_selection_skips_infeasible_low_tac_candidate() -> None:
 
     assert result.network.run_id == "feasible"
     assert result.task_id == "feasible"
+    # The infeasible candidate stays in the ranking for diagnostics.
     assert [outcome.network.run_id for outcome in result.ranked_networks] == [
-        "feasible"
+        "low-tac-infeasible",
+        "feasible",
     ]
 
 
