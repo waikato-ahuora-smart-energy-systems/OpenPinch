@@ -197,9 +197,7 @@ def test_weighted_average_output_sizes_each_utility_for_its_own_peak():
     target = output.targets[0]
 
     assert target.hpr_hot_utility_annualized_capital_cost.value == pytest.approx(70.0)
-    assert target.hpr_refrigeration_annualized_capital_cost.value == pytest.approx(
-        50.0
-    )
+    assert target.hpr_refrigeration_annualized_capital_cost.value == pytest.approx(50.0)
     assert target.hpr_utility_annualized_capital_cost.value == pytest.approx(120.0)
     assert target.hpr_total_annualized_cost.value == pytest.approx(270.0)
 

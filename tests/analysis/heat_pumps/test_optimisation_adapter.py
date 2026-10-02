@@ -269,9 +269,7 @@ def test_shared_objective_sizes_each_utility_for_its_own_peak():
         [1.0, 1.0],
     )
 
-    assert weighted.hpr_hot_utility_annualized_capital_cost.value == pytest.approx(
-        70.0
-    )
+    assert weighted.hpr_hot_utility_annualized_capital_cost.value == pytest.approx(70.0)
     assert weighted.hpr_refrigeration_annualized_capital_cost.value == (
         pytest.approx(50.0)
     )

@@ -19,9 +19,9 @@
 Each notebook defines or spells out the public budget values at the call site:
 
 ```python
-maximum_restarts=1,
-maximum_iterations=20,
-maximum_evaluations=50,
+maximum_restarts = (1,)
+maximum_iterations = (20,)
+maximum_evaluations = (50,)
 ```
 
 Notebook 11 may retain `maximum_iterations=3`, but its evaluation limit is

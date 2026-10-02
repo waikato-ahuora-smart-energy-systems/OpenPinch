@@ -28,7 +28,6 @@ __all__ = [
 ]
 
 
-
 @dataclass(frozen=True)
 class DutyAllocation:
     """Stage duties decoded as fractions of each stage's available duty."""

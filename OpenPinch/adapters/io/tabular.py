@@ -56,9 +56,8 @@ def get_column_names_and_units(df_full, sheet_name, row_units=1):
     col_units = [
         s.replace("°", "deg") if isinstance(s, str) else None for s in col_units
     ]
-    col_units = [
-        s.replace("2", "^2") if isinstance(s, str) else None for s in col_units
-    ]
+    # Exponents such as "m2" are handled by the unit normaliser, which only
+    # treats a "2" after a letter as a power; a blind replace broke "kW/m^2/K".
     return col_names, col_units
 
 

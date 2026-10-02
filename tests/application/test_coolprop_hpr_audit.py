@@ -54,9 +54,7 @@ def test_real_public_coolprop_target_and_budget(mode, utility, cascade, monkeypa
         kwargs["options"] = {**options, "HPR_REFRIGERANTS": ["Water"]}
         method = problem.target.mvr_heat_pump
     else:
-        kwargs.update(
-            refrigerants=["Water"], is_cascade_cycle=cascade, options=options
-        )
+        kwargs.update(refrigerants=["Water"], is_cascade_cycle=cascade, options=options)
         method = getattr(problem.target, "vapour_compression_" + mode)
     target = method(**kwargs)
     assert target is not None

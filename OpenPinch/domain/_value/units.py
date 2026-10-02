@@ -73,14 +73,29 @@ def same_dimensionality(quantity, unit: str, *, quantity_factory, registry) -> b
         return False
 
 
-def normalise_weights(weights, *, expected_len: int) -> np.ndarray | None:
-    """Validate and normalize optional passive period weights."""
+def validate_weights(weights, *, expected_len: int) -> np.ndarray | None:
+    """Return a validated copy of optional passive period weights.
+
+    The rules match the problem's period weights (``resolve_period_weights``):
+    finite, non-negative, and with a positive sum.
+    """
     if weights is None:
         return None
-    values = np.asarray(weights, dtype=float).reshape(-1)
+    values = np.array(weights, dtype=float, copy=True).reshape(-1)
     if values.size != expected_len:
         raise ValueError("weights length must match the number of periods.")
-    total = float(values.sum())
-    if total > 0.0:
-        values = values / total
+    if not np.isfinite(values).all():
+        raise ValueError("Period weights must be finite.")
+    if (values < 0.0).any():
+        raise ValueError("Period weights must be non-negative.")
+    if float(values.sum()) <= 0.0:
+        raise ValueError("Period weights must have a positive sum.")
     return values
+
+
+def normalise_weights(weights, *, expected_len: int) -> np.ndarray | None:
+    """Validate and normalize optional passive period weights."""
+    values = validate_weights(weights, expected_len=expected_len)
+    if values is None:
+        return None
+    return values / float(values.sum())

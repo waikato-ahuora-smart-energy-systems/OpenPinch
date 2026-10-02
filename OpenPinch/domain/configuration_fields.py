@@ -26,6 +26,8 @@ class ConfigurationFieldSpec:
     enum_cls: type[Enum] | None = None
     numeric_min: float | None = None
     numeric_max: float | None = None
+    # When true, the value must be strictly greater than zero.
+    positive: bool = False
     runtime_status: str = "supported"
     validator: Callable[[str, Any], Any] | None = dataclass_field(
         default=None, compare=False, repr=False
@@ -179,6 +181,8 @@ def _check_numeric_bounds(
     value: float | int,
     spec: ConfigurationFieldSpec,
 ) -> Any:
+    if spec.positive and value <= 0:
+        raise ValueError(f"{name} must be greater than 0.")
     if spec.numeric_min is not None and value < spec.numeric_min:
         raise ValueError(f"{name} must be greater than or equal to {spec.numeric_min}.")
     if spec.numeric_max is not None and value > spec.numeric_max:
@@ -228,6 +232,7 @@ def _spec(
     enum_cls: type[Enum] | None = None,
     numeric_min: float | None = None,
     numeric_max: float | None = None,
+    positive: bool = False,
     runtime_status: str = "supported",
     validator: Callable[[str, Any], Any] | None = None,
 ) -> ConfigurationFieldSpec:
@@ -239,6 +244,7 @@ def _spec(
         enum_cls=enum_cls,
         numeric_min=numeric_min,
         numeric_max=numeric_max,
+        positive=positive,
         runtime_status=runtime_status,
         validator=validator,
     )
@@ -288,7 +294,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "ENV_PRESSURE": _spec(float, 101.0, "environment", "pressure", numeric_min=0.0),
     "THERMAL_DT_CONT": _spec(float, 5.0, "thermal", "dt_cont", numeric_min=0.0),
     "THERMAL_DT_PHASE_CHANGE": _spec(float, 0.01, "thermal", "dt_phase_change", numeric_min=0.0),
-    "THERMAL_HTC": _spec(float, 1.0, "thermal", "htc", numeric_min=0.0),
+    "THERMAL_HTC": _spec(float, 1.0, "thermal", "htc", numeric_min=0.0, positive=True),
 
     # Direct integration.
     "DIRECT_BALANCED_CC_ENABLED": _spec(bool, True, "direct", "balanced_cc_enabled"),
@@ -298,7 +304,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
 
     # Costing and economics.
     "COSTING_UTILITY_PRICE": _spec(float, 100.0, "costing", "utility_price", numeric_min=0.0),
-    "COSTING_ANNUAL_OP_TIME": _spec(float, 8300.0, "costing", "annual_op_time", numeric_min=0.0),
+    "COSTING_ANNUAL_OP_TIME": _spec(float, 8300.0, "costing", "annual_op_time", numeric_min=0.0, positive=True),
     "COSTING_HX_UNIT_COST": _spec(float, 0.0, "costing", "hx_unit_cost", numeric_min=0.0),
     "COSTING_HX_AREA_COEFF": _spec(float, 10000.0, "costing", "hx_area_coeff", numeric_min=0.0),
     "COSTING_HX_AREA_EXP": _spec(float, 0.6, "costing", "hx_area_exp", numeric_min=0.0),
@@ -311,7 +317,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     # Default cold utilities: cooling water, then refrigeration below it.
     "COSTING_HPR_COOLING_WATER_TEMPERATURE": _spec(float, 25.0, "costing", "hpr_cooling_water_temperature"),
     "COSTING_HPR_COOLING_WATER_DT_MIN": _spec(float, 5.0, "costing", "hpr_cooling_water_dt_min", numeric_min=0.0),
-    "COSTING_HPR_REFRIGERATION_ETA_II": _spec(float, 0.4, "costing", "hpr_refrigeration_eta_ii", numeric_min=0.0),
+    "COSTING_HPR_REFRIGERATION_ETA_II": _spec(float, 0.4, "costing", "hpr_refrigeration_eta_ii", numeric_min=0.0, positive=True),
     "COSTING_HPR_REFRIGERATION_DT": _spec(float, 5.0, "costing", "hpr_refrigeration_dt", numeric_min=0.0),
     # Installed HPR capital: C = F_inst * C_eq * (Q_cap / 1 MW)^exp
     #   * (fixed_share + stage_share * n_stages) * f_T,
@@ -366,13 +372,13 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HPR_REFRIGERANT_SORT_ENABLED": _spec(bool, True, "hpr", "refrigerant_sort_enabled"),
     "HPR_MVR_FLUIDS": _spec(List[str], ["Water"], "hpr", "mvr_fluids"),
     "HPR_MVR_COUNT": _spec(int, 1, "hpr", "mvr_count", numeric_min=1.0),
-    "HPR_MVR_ETA_COMP": _spec(float, 0.7, "hpr", "mvr_eta_comp", numeric_min=0.0, numeric_max=1.0),
-    "HPR_MVR_ETA_MOTOR": _spec(float, 0.95, "hpr", "mvr_eta_motor", numeric_min=0.0, numeric_max=1.0),
+    "HPR_MVR_ETA_COMP": _spec(float, 0.7, "hpr", "mvr_eta_comp", numeric_min=0.0, numeric_max=1.0, positive=True),
+    "HPR_MVR_ETA_MOTOR": _spec(float, 0.95, "hpr", "mvr_eta_motor", numeric_min=0.0, numeric_max=1.0, positive=True),
     "HPR_N_COND": _spec(int, 3, "hpr", "n_cond", numeric_min=0.0),
     "HPR_N_EVAP": _spec(int, 2, "hpr", "n_evap", numeric_min=0.0),
-    "HPR_ETA_COMP": _spec(float, 0.7, "hpr", "eta_comp", numeric_min=0.0, numeric_max=1.0),
+    "HPR_ETA_COMP": _spec(float, 0.7, "hpr", "eta_comp", numeric_min=0.0, numeric_max=1.0, positive=True),
     "HPR_ETA_EXP": _spec(float, 0.7, "hpr", "eta_exp", numeric_min=0.0, numeric_max=1.0),
-    "HPR_ETA_II_CARNOT": _spec(float, 0.5, "hpr", "eta_ii_carnot", numeric_min=0.0, numeric_max=1.0),
+    "HPR_ETA_II_CARNOT": _spec(float, 0.5, "hpr", "eta_ii_carnot", numeric_min=0.0, numeric_max=1.0, positive=True),
     "HPR_HE_ETA_II_CARNOT": _spec(float, 0.5, "hpr", "he_eta_ii_carnot", numeric_min=0.0, numeric_max=1.0),
     "HPR_INTEGRATED_EXPANDER_ENABLED": _spec(bool, False, "hpr", "integrated_expander_enabled"),
     "HPR_DT_CONT": _spec(float, 0.0, "hpr", "dt_cont", numeric_min=0.0),
@@ -386,14 +392,14 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HPR_INITIALISE_SIMULATED_CYCLE": _spec(bool, True, "hpr", "initialise_simulated_cycle"),
 
     # Direct process MVR and power cogeneration.
-    "PROCESS_MVR_ETA_COMP": _spec(float, 0.7, "process_mvr", "eta_comp", numeric_min=0.0, numeric_max=1.0),
-    "PROCESS_MVR_ETA_MOTOR": _spec(float, 0.95, "process_mvr", "eta_motor", numeric_min=0.0, numeric_max=1.0),
+    "PROCESS_MVR_ETA_COMP": _spec(float, 0.7, "process_mvr", "eta_comp", numeric_min=0.0, numeric_max=1.0, positive=True),
+    "PROCESS_MVR_ETA_MOTOR": _spec(float, 0.95, "process_mvr", "eta_motor", numeric_min=0.0, numeric_max=1.0, positive=True),
     "POWER_TURBINE_WORK_ENABLED": _spec(bool, False, "power", "turbine_work_enabled"),
     "POWER_TURB_T_IN": _spec(float, 450.0, "power", "turb_t_in"),
     "POWER_TURB_P_IN": _spec(float, 90.0, "power", "turb_p_in", numeric_min=0.0),
     "POWER_MIN_EFF": _spec(float, 0.1, "power", "min_eff", numeric_min=0.0),
     "POWER_LOAD_FRACTION": _spec(float, 1.0, "power", "load_fraction", numeric_min=0.0),
-    "POWER_ETA_MECH": _spec(float, 1.0, "power", "eta_mech", numeric_min=0.0),
+    "POWER_ETA_MECH": _spec(float, 1.0, "power", "eta_mech", numeric_min=0.0, positive=True),
     "POWER_TURB_MODEL": _spec(str, TurbineModel.MEDINA_FLORES.value, "power", "turb_model", enum_cls=TurbineModel),
     "POWER_HIGH_P_COND_FLASH_ENABLED": _spec(bool, False, "power", "high_p_cond_flash_enabled"),
 }
@@ -474,7 +480,28 @@ def _validate_configuration_options(
         name: spec.default for name, spec in CONFIG_FIELD_SPECS.items()
     } | validated
     _validate_hpr_load_options(effective_options, provided_keys=set(validated))
+    _validate_period_options(effective_options)
     return validated
+
+
+def _validate_period_options(options: dict) -> None:
+    """Require unique, non-empty period ids and no more weights than periods."""
+    period_ids = [str(item) for item in options["PROBLEM_PERIOD_IDS"]]
+    if not period_ids:
+        raise ValueError("PROBLEM_PERIOD_IDS must list at least one period.")
+    if any(not period_id.strip() for period_id in period_ids):
+        raise ValueError("PROBLEM_PERIOD_IDS must not contain empty ids.")
+    duplicates = sorted({item for item in period_ids if period_ids.count(item) > 1})
+    if duplicates:
+        raise ValueError(
+            f"PROBLEM_PERIOD_IDS must be unique; repeated: {', '.join(duplicates)}."
+        )
+    weights = options["PROBLEM_PERIOD_WEIGHTS"]
+    if len(weights) > len(period_ids):
+        raise ValueError(
+            f"PROBLEM_PERIOD_WEIGHTS has {len(weights)} values for "
+            f"{len(period_ids)} periods."
+        )
 
 
 def validate_configuration_option_value(name: str, value: Any) -> Any:
@@ -551,6 +578,7 @@ def _coerce_annotation_value(
                 enum_cls=None,
                 numeric_min=spec.numeric_min,
                 numeric_max=spec.numeric_max,
+                positive=spec.positive,
                 runtime_status=spec.runtime_status,
             ),
         )

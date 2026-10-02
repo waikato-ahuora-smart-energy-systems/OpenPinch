@@ -92,8 +92,8 @@ class ValueCoercion:
             quantity = normalised_data._quantity
             weights = normalised_data.weights
         elif isinstance(normalised_data, Mapping):
+            # Fall through so a mapping's own unit is converted to ``unit``.
             quantity, weights = self._coerce_mapping_input(normalised_data, unit)
-            return quantity, weights
         elif hasattr(normalised_data, "units"):
             quantity = normalised_data
             weights = None
@@ -102,7 +102,6 @@ class ValueCoercion:
             weights = None
         elif is_value_with_unit(normalised_data):
             quantity, weights = self._coerce_object_with_unit(normalised_data, unit)
-            return quantity, weights
         elif normalised_data is None:
             quantity = self._quantity_from_scalar(0.0, unit)
             weights = None
@@ -209,13 +208,31 @@ class ValueCoercion:
         try:
             return copied.to(unit_obj)
         except DimensionalityError, TypeError, ValueError:
-            if self._quantity_is_dimensionless(copied) or self._same_dimensionality(
-                copied, resolved_unit
-            ):
+            if self._quantity_is_dimensionless(copied):
                 return self._quantity_factory(
                     np.asarray(copied.magnitude, dtype=float).reshape(-1), unit_obj
                 )
+            if self._same_dimensionality(copied, resolved_unit):
+                # Offset and difference temperature units (degF vs delta_degC)
+                # can't convert directly. Convert as differences, so the scale
+                # is right, then label with the requested unit.
+                target = self._as_difference(self._quantity_factory(1.0, unit_obj))
+                magnitude = self._as_difference(copied).to(target.units).magnitude
+                return self._quantity_factory(
+                    np.asarray(magnitude, dtype=float).reshape(-1), unit_obj
+                )
             raise
+
+    def _as_difference(self, quantity):
+        """Return ``quantity`` in the difference form of its unit, if it has one."""
+        name = str(quantity.units)
+        if name.startswith("delta_"):
+            return quantity
+        try:
+            delta_unit = self._unit_from_normalised(f"delta_{name}")
+        except AttributeError, TypeError, ValueError:
+            return quantity
+        return self._quantity_factory(quantity.magnitude, delta_unit)
 
     def _coerce_magnitude_array(
         self,

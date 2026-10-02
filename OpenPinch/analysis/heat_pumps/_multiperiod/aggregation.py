@@ -70,9 +70,7 @@ def evaluate_multiperiod_candidate(
             if str(case.period_id) not in period_outputs
         ]
         return HPRBackendResult.failure(
-            reason=(
-                f"HPR periods {idle_periods!r} failed: {ZERO_USEFUL_DUTY_REASON}"
-            ),
+            reason=(f"HPR periods {idle_periods!r} failed: {ZERO_USEFUL_DUTY_REASON}"),
             Q_amb_hot=zero_duty_failure.Q_amb_hot,
             Q_amb_cold=zero_duty_failure.Q_amb_cold,
         )

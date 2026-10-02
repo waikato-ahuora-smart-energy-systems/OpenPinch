@@ -298,7 +298,8 @@ def _complete_utility_data(
             config=config,
         )
         if _value_is_missing(price_value):
-            utility.price = config.costing.utility_price * config.costing.annual_op_time
+            # Same as the default utilities: a price in $/MWh, not $/y.
+            utility.price = config.costing.utility_price
 
         htc_value = standardise_input_value(
             utility.htc,
