@@ -41,6 +41,11 @@ HEN duty allocation on a fixed structure
   placed at the stream end or between stages.
 - Exchangers left at zero duty are removed one at a time and the problem is
   re-solved; the result lists them.
+- Segmented streams and utilities are supported: piecewise profiles, the
+  minimum approach at every segment boundary inside an exchanger, and areas
+  from duty-aligned slices.
+- The network grid draws every utility exchanger at its own position (stream
+  end or stage boundary) instead of merging a stream's utility exchangers.
 
 Analysis reliability and extensibility
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

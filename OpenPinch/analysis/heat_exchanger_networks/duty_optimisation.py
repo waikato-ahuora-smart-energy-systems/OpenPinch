@@ -369,6 +369,7 @@ def build_solution_network(
             )
             for n, period in enumerate(result.periods)
         )
+        slices = tuple(s for period in result.periods for s in period.slices)
         exchangers.append(
             HeatExchanger(
                 exchanger_id=user.exchanger_id or default_id,
@@ -379,8 +380,9 @@ def build_solution_network(
                 sink_stream_role=roles[1],
                 stage=stage,
                 period_states=states,
-                area=result.area,
+                area=None if slices else result.area,
                 capital_cost=result.capital_cost,
+                segment_area_contributions=slices,
             )
         )
 
@@ -777,6 +779,13 @@ def _weighted_load(model, exchangers: Sequence[HeatExchanger], side: str) -> flo
     )
 
 
+def _profile_totals(model, attribute: str) -> list[float] | None:
+    profiles = getattr(model, attribute, None)
+    if not profiles:
+        return None
+    return [float(profile.total) for profile in profiles[0]]
+
+
 def _source_metadata(model, solver_arrays) -> dict[str, Any]:
     from .solver.arrays import SEGMENT_PROFILE_VERSION
 
@@ -810,6 +819,8 @@ def _source_metadata(model, solver_arrays) -> dict[str, Any]:
         "hot_stream_target_temperatures": first("T_h_out_period"),
         "cold_stream_supply_temperatures": first("T_c_in_period"),
         "cold_stream_target_temperatures": first("T_c_out_period"),
+        "hot_stream_total_duties": _profile_totals(model, "hot_profiles"),
+        "cold_stream_total_duties": _profile_totals(model, "cold_profiles"),
     }
 
 

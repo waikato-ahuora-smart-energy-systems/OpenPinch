@@ -458,7 +458,7 @@ def test_task_records_structure_and_request() -> None:
 # --- model helpers -----------------------------------------------------------
 
 
-def test_utility_series_order_and_stream_temperatures() -> None:
+def test_utility_series_order() -> None:
     owner = SimpleNamespace(
         spec=fixed_model.FixedStructureSpec(
             stage_count=2,
@@ -473,27 +473,13 @@ def test_utility_series_order_and_stream_temperatures() -> None:
         ),
         T_hu_in_period=np.array([[450.0, 600.0]]),
         T_cu_in_period=np.array([[300.0, 250.0]]),
-        f_c_period=np.array([[10.0]]),
-        f_h_period=np.array([[20.0]]),
-        tc_out=[[[400.0, 330.0]]],
-        th_out=[[[420.0, 380.0]]],
-        q_u=[[500.0, 200.0, 100.0, 400.0, 600.0]],
     )
-    owner.utility_chain = fixed_model.utility_chains(owner)
 
-    assert owner.utility_chain == {
+    assert fixed_model.utility_chains(owner) == {
         (HEATER, 0, 0): [1, 0],
         (HEATER, 0, 1): [2],
         (COOLER, 0, 1): [3, 4],
     }
-    temperatures = fixed_model.utility_stream_temperatures(owner, 0, float)
-    assert temperatures == [
-        (420.0, 470.0),  # HPS after LPS: 400 + 200/10 -> 420 -> 470
-        (400.0, 420.0),
-        (330.0, 340.0),
-        (380.0, 360.0),
-        (360.0, 330.0),
-    ]
 
 
 def test_exact_lmtd_and_chen_agree_closely() -> None:
@@ -1059,6 +1045,20 @@ def test_live_solver_runs_cheaper_utility_first() -> None:
     )
 
 
+@pytest.mark.synthesis
+@pytest.mark.solver
+def test_live_solver_enforces_approach_at_segment_boundaries() -> None:
+    _skip_without_live_solver()
+
+    view = _segmented().design.optimise_duties(
+        SEGMENTED_STRUCTURE, objective="utility", min_approach_temperature=30.0
+    )
+
+    recovery = view.selected_network.exchangers[0]
+    assert view.total_heat_recovery == pytest.approx(140.0, abs=0.5)
+    assert min(_slice_approaches(recovery)) >= 30.0 - 0.1
+
+
 def _capture_request(monkeypatch) -> list:
     import OpenPinch.analysis.heat_exchanger_networks.duty_optimisation as module
 
@@ -1197,3 +1197,92 @@ def test_accessor_structure_with_named_utilities_needs_no_default(
         if e.kind is HeatExchangerKind.HOT_UTILITY
     ]
     assert heaters == ["hot-utility:LPS->CIP Water", "hot-utility:HPS->CIP Water"]
+
+
+# --- segmented streams and utilities ------------------------------------------
+
+SEGMENTED_STRUCTURE = {
+    "recovery": [("Hot parent", "Cold parent", 1)],
+    "heaters": ["Cold parent"],
+    "coolers": ["Hot parent"],
+}
+
+
+def _segmented(**kwargs) -> PinchProblem:
+    from tests.analysis.heat_exchanger_networks.test_segmented_streams import (
+        _segmented_problem,
+    )
+
+    return _segmented_problem(**kwargs)
+
+
+def _slice_approaches(exchanger: HeatExchanger) -> list[float]:
+    return [
+        delta
+        for item in exchanger.segment_area_contributions
+        for delta in (
+            item.hot_inlet_temperature - item.cold_outlet_temperature,
+            item.hot_outlet_temperature - item.cold_inlet_temperature,
+        )
+    ]
+
+
+def test_segmented_streams_respect_the_approach_inside_the_exchanger(
+    scipy_backend,
+) -> None:
+    # Hot 200 -> 150 (CP 1) -> 100 (CP 2); cold 50 -> 100 (CP 1) -> 150 (CP 2).
+    # Both ends keep 50 K at full recovery (150 kW), but the segment kinks
+    # pinch inside the exchanger: 30 K everywhere allows only 140 kW.
+    view = _segmented().design.optimise_duties(
+        SEGMENTED_STRUCTURE, objective="utility", min_approach_temperature=30.0
+    )
+
+    network = view.selected_network
+    recovery = network.exchangers[0]
+    assert view.total_heat_recovery == pytest.approx(140.0, abs=0.5)
+    assert view.total_hot_utility == pytest.approx(10.0, abs=0.5)
+    assert recovery.segment_area_contributions
+    assert min(_slice_approaches(recovery)) >= 30.0 - 0.1
+    assert recovery.area == pytest.approx(
+        sum(s.area for s in recovery.segment_area_contributions)
+    )
+
+
+def test_segmented_streams_without_a_binding_kink_recover_fully(scipy_backend) -> None:
+    view = _segmented().design.optimise_duties(
+        SEGMENTED_STRUCTURE, objective="utility", min_approach_temperature=10.0
+    )
+
+    network = view.selected_network
+    assert view.total_heat_recovery == pytest.approx(150.0, abs=0.5)
+    # Heater and cooler are idle, so both are removed and the case re-solved.
+    assert network.summary_metrics["removed_exchanger_count"] == 2
+    assert [e.kind for e in network.exchangers] == [HeatExchangerKind.RECOVERY]
+
+
+def test_segmented_utility_draws_from_its_profile(scipy_backend) -> None:
+    # HU: 250 -> 225 C at 20 $/MWh, then 225 -> 200 C at 80; the larger cold
+    # load (50 -> 100 C CP 1, 100 -> 150 C CP 3) needs hot utility.
+    view = _segmented(
+        segmented_utility=True, cold_second_duty=150.0
+    ).design.optimise_duties(
+        SEGMENTED_STRUCTURE, objective="utility", min_approach_temperature=30.0
+    )
+
+    network = view.selected_network
+    heater = next(
+        e for e in network.exchangers if e.kind is HeatExchangerKind.HOT_UTILITY
+    )
+    state = heater.period_states[0]
+    assert state.active
+    assert state.source_inlet_temperature == pytest.approx(523.15)
+    assert 473.15 - 1e-6 <= state.source_outlet_temperature <= 523.15
+    assert state.source_split_fraction is None
+    assert view.total_heat_recovery == pytest.approx(140.0, abs=0.5)
+    assert state.duty == pytest.approx(60.0, abs=0.5)
+    assert network.utility_cost > 0.0
+    assert heater.segment_area_contributions
+    assert min(_slice_approaches(heater)) >= 30.0 - 0.1
+    assert network.total_annual_cost == pytest.approx(
+        network.utility_cost + network.capital_cost
+    )

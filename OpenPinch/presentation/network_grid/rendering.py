@@ -86,14 +86,17 @@ class _PlotlyGridRenderer:
             for match in grid_model.recovery_matches
             if match.stage is not None and match.stage in self.stage_index
         }
-        self.hot_utility_by_cold_index = {
-            self.cold_index[match.sink_stream]: match
-            for match in grid_model.hot_utility_matches
-        }
-        self.cold_utility_by_hot_index = {
-            self.hot_index[match.source_stream]: match
-            for match in grid_model.cold_utility_matches
-        }
+        self.hot_utilities_by_cold_index: dict[int, list[GridDiagramMatch]] = {}
+        for match in grid_model.hot_utility_matches:
+            self.hot_utilities_by_cold_index.setdefault(
+                self.cold_index[match.sink_stream], []
+            ).append(match)
+        self.cold_utilities_by_hot_index: dict[int, list[GridDiagramMatch]] = {}
+        for match in grid_model.cold_utility_matches:
+            self.cold_utilities_by_hot_index.setdefault(
+                self.hot_index[match.source_stream], []
+            ).append(match)
+        self.utility_x_by_match: dict[int, float] = {}
 
         self.x_start = _LAYOUT_X_MIN
         self.size_of_font = 18
@@ -126,6 +129,7 @@ class _PlotlyGridRenderer:
         self.fig = self.go.Figure()
         self.ax = _PlotlyAxes(self.fig, self.go)
         self.draw_streams()
+        self._place_utility_matches()
         self.draw_branches()
         self.draw_recovery_matches()
         self.draw_utility_match()
@@ -145,10 +149,10 @@ class _PlotlyGridRenderer:
             for i in range(self.I)
         ]
         self.CU_matches = [
-            1 if i in self.cold_utility_by_hot_index else 0 for i in range(self.I)
+            len(self.cold_utilities_by_hot_index.get(i, ())) for i in range(self.I)
         ]
         self.HU_matches = [
-            1 if j in self.hot_utility_by_cold_index else 0 for j in range(self.J)
+            len(self.hot_utilities_by_cold_index.get(j, ())) for j in range(self.J)
         ]
 
     def _calculate_spacing(self) -> None:
@@ -179,12 +183,33 @@ class _PlotlyGridRenderer:
         self.branch_spacing = self.stream_spacing
         self.x_finish = _LAYOUT_X_MAX
         self.utility_length = 1.0 / (2 * (self.S + 1))
-        self.stage_start = self.x_start + self.utility_length
-        self.stage_finish = self.x_finish - self.utility_length
+        # Widen an end band when several utility exchangers sit there in series.
+        heater_band = self.utility_length * self._end_utility_slots(heaters=True)
+        cooler_band = self.utility_length * self._end_utility_slots(heaters=False)
+        self.stage_start = self.x_start + heater_band
+        self.stage_finish = self.x_finish - cooler_band
         self.recovery_length = self.stage_finish - self.stage_start
         total_matches = max(1, sum(self.stage_count))
         self.match_spacing = self.recovery_length / total_matches
         self.match_start = self.match_spacing
+
+    def _end_utility_slots(self, *, heaters: bool) -> float:
+        groups = (
+            self.hot_utilities_by_cold_index
+            if heaters
+            else self.cold_utilities_by_hot_index
+        )
+        stages = self.grid_model.stages
+        largest = 1
+        for matches in groups.values():
+            at_end = sum(
+                1
+                for match in matches
+                if match.stage is None
+                or (match.stage <= stages[0] if heaters else match.stage >= stages[-1])
+            )
+            largest = max(largest, at_end)
+        return min(1.0 + 0.6 * (largest - 1), 2.5)
 
     def _lane_count(self) -> int:
         lane_count = 0
@@ -488,10 +513,10 @@ class _PlotlyGridRenderer:
             for i in range(self.I)
             if self.recovery_match[i][cold_index][k] > 0
         ]
-        if cold_index in self.hot_utility_by_cold_index:
-            positions.append(
-                hot_utility_x(self, self.hot_utility_by_cold_index[cold_index])
-            )
+        positions.extend(
+            hot_utility_x(self, match)
+            for match in self.hot_utilities_by_cold_index.get(cold_index, ())
+        )
         return sorted(set(positions))
 
     def _hot_stream_unit_x_positions(self, hot_index: int) -> list[float]:
@@ -501,10 +526,10 @@ class _PlotlyGridRenderer:
             for j in range(self.J)
             if self.recovery_match[hot_index][j][k] > 0
         ]
-        if hot_index in self.cold_utility_by_hot_index:
-            positions.append(
-                cold_utility_x(self, self.cold_utility_by_hot_index[hot_index])
-            )
+        positions.extend(
+            cold_utility_x(self, match)
+            for match in self.cold_utilities_by_hot_index.get(hot_index, ())
+        )
         return sorted(set(positions))
 
     def draw_recovery_matches(self) -> None:
@@ -589,86 +614,144 @@ class _PlotlyGridRenderer:
                             hot_match_x + cold_match_x
                         ) / 2.0
 
+    def _place_utility_matches(self) -> None:
+        """Give every utility exchanger an x-position on its stream.
+
+        End exchangers share the utility band at the stream end; one placed
+        after a stage sits on that stage boundary. Exchangers at one position
+        are spread in series order along the stream's flow direction (cold
+        streams flow right to left, hot streams left to right).
+        """
+
+        first_stage, last_stage = self.grid_model.stages[0], self.grid_model.stages[-1]
+        width = 0.8 * self.match_spacing
+        for matches in self.hot_utilities_by_cold_index.values():
+            groups: dict[int | None, list[GridDiagramMatch]] = {}
+            for match in matches:
+                stage = match.stage
+                boundary = (
+                    None
+                    if stage is None
+                    or stage <= first_stage
+                    or stage not in self.stage_index
+                    else self.stage_index[stage]
+                )
+                groups.setdefault(boundary, []).append(match)
+            for boundary, members in groups.items():
+                members.sort(key=_heater_series_key)
+                count = len(members)
+                for position, match in enumerate(members):
+                    fraction = (position + 1) / (count + 1)
+                    if boundary is None:
+                        x = (
+                            self.stage_start
+                            - (self.stage_start - self.x_start) * fraction
+                        )
+                    else:
+                        x = self.stage_boundaries[boundary] + width * (0.5 - fraction)
+                    self.utility_x_by_match[id(match)] = x
+        for matches in self.cold_utilities_by_hot_index.values():
+            groups = {}
+            for match in matches:
+                stage = match.stage
+                boundary = (
+                    None
+                    if stage is None
+                    or stage >= last_stage
+                    or stage not in self.stage_index
+                    else self.stage_index[stage] + 1
+                )
+                groups.setdefault(boundary, []).append(match)
+            for boundary, members in groups.items():
+                members.sort(key=_cooler_series_key)
+                count = len(members)
+                for position, match in enumerate(members):
+                    fraction = (position + 1) / (count + 1)
+                    if boundary is None:
+                        end = self.stage_boundaries[-1]
+                        x = end + (self.x_finish - end) * fraction
+                    else:
+                        x = self.stage_boundaries[boundary] + width * (fraction - 0.5)
+                    self.utility_x_by_match[id(match)] = x
+
     def draw_utility_match(self) -> None:
         self.match_HU_x = self.x_start + (self.stage_start - self.x_start) / 2
         for j in range(self.J):
-            if self.HU_matches[j] > 0:
-                match = self.hot_utility_by_cold_index[j]
-                match_hu_x = hot_utility_x(self, match)
-                utility_hx = _PlotlyLine(
-                    (match_hu_x, match_hu_x),
-                    (self.cold_y_coords[-1 - j], self.cold_y_coords[-1 - j]),
-                    lw=self.stream_line_width,
-                    color=_HOT_UTILITY_COLOR,
-                    marker=".",
-                    markersize=self.match_radius,
-                    markerfacecolor=_HOT_UTILITY_COLOR,
-                    markeredgecolor=_HOT_UTILITY_COLOR,
-                    markeredgewidth=1.0,
-                )
-                self.ax.add_line(utility_hx)
-                register_exchanger_artist(self, utility_hx, match)
-                register_stream_match_position(
-                    self,
-                    match.sink_stream,
-                    match_hu_x,
-                    self.cold_y_coords[-1 - j],
+            for match in self.hot_utilities_by_cold_index.get(j, ()):
+                self._draw_utility(
                     match,
-                )
-                add_label(
-                    self,
-                    match_hu_x,
-                    self.cold_y_coords[-1 - j],
-                    short_stream_name(match.source_stream),
+                    x=hot_utility_x(self, match),
+                    y=self.cold_y_coords[-1 - j],
+                    stream=match.sink_stream,
+                    label=match.source_stream,
                     color=_HOT_UTILITY_COLOR,
-                    fontsize=self.duty_font_size,
-                    ha="center",
-                    va="bottom",
-                    xytext=(0, font_points(self, self.duty_font_size, 0.95)),
-                    bgcolor=_LABEL_BACKGROUND_COLOR,
-                    borderpad=1,
                 )
 
         self.match_CU_x = (
             self.stage_boundaries[-1] + (self.x_finish - self.stage_boundaries[-1]) / 2
         )
         for i in range(self.I):
-            if self.CU_matches[i] > 0:
-                match = self.cold_utility_by_hot_index[i]
-                match_cu_x = cold_utility_x(self, match)
-                utility_hx = _PlotlyLine(
-                    (match_cu_x, match_cu_x),
-                    (self.hot_y_coords[-1 - i], self.hot_y_coords[-1 - i]),
-                    lw=self.stream_line_width,
-                    color=_COLD_UTILITY_COLOR,
-                    marker=".",
-                    markersize=self.match_radius,
-                    markerfacecolor=_COLD_UTILITY_COLOR,
-                    markeredgecolor=_COLD_UTILITY_COLOR,
-                    markeredgewidth=1.0,
-                )
-                self.ax.add_line(utility_hx)
-                register_exchanger_artist(self, utility_hx, match)
-                register_stream_match_position(
-                    self,
-                    match.source_stream,
-                    match_cu_x,
-                    self.hot_y_coords[-1 - i],
+            for match in self.cold_utilities_by_hot_index.get(i, ()):
+                self._draw_utility(
                     match,
-                )
-                add_label(
-                    self,
-                    match_cu_x,
-                    self.hot_y_coords[-1 - i],
-                    short_stream_name(match.sink_stream),
+                    x=cold_utility_x(self, match),
+                    y=self.hot_y_coords[-1 - i],
+                    stream=match.source_stream,
+                    label=match.sink_stream,
                     color=_COLD_UTILITY_COLOR,
-                    fontsize=self.duty_font_size,
-                    ha="center",
-                    va="bottom",
-                    xytext=(0, font_points(self, self.duty_font_size, 0.95)),
-                    bgcolor=_LABEL_BACKGROUND_COLOR,
-                    borderpad=1,
                 )
+
+    def _draw_utility(
+        self,
+        match: GridDiagramMatch,
+        *,
+        x: float,
+        y: float,
+        stream: str,
+        label: str,
+        color: str,
+    ) -> None:
+        utility_hx = _PlotlyLine(
+            (x, x),
+            (y, y),
+            lw=self.stream_line_width,
+            color=color,
+            marker=".",
+            markersize=self.match_radius,
+            markerfacecolor=color,
+            markeredgecolor=color,
+            markeredgewidth=1.0,
+        )
+        self.ax.add_line(utility_hx)
+        register_exchanger_artist(self, utility_hx, match)
+        register_stream_match_position(self, stream, x, y, match)
+        add_label(
+            self,
+            x,
+            y,
+            short_stream_name(label),
+            color=color,
+            fontsize=self.duty_font_size,
+            ha="center",
+            va="bottom",
+            xytext=(0, font_points(self, self.duty_font_size, 0.95)),
+            bgcolor=_LABEL_BACKGROUND_COLOR,
+            borderpad=1,
+        )
+
+
+def _heater_series_key(match: GridDiagramMatch) -> float:
+    """First in series heats the coldest stream: lowest sink inlet first."""
+
+    value = match.state.sink_inlet_temperature
+    return float("inf") if value is None else float(value)
+
+
+def _cooler_series_key(match: GridDiagramMatch) -> float:
+    """First in series cools the hottest stream: highest source inlet first."""
+
+    value = match.state.source_inlet_temperature
+    return float("inf") if value is None else -float(value)
 
 
 __all__ = ["_PlotlyGridRenderer"]

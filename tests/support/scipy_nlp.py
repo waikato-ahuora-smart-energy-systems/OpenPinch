@@ -133,7 +133,7 @@ class ScipyModel:
     def Minimize(self, expression):
         self.objective = _wrap(expression)
 
-    def solve(self, *, maxiter: int = 1000) -> bool:
+    def solve(self, *, maxiter: int = 1000, polish: bool = False) -> bool:
         x0 = np.array([v.value[0] for v in self.variables], dtype=float)
         lower = np.array(
             [-np.inf if v.lower is None else v.lower for v in self.variables], float
@@ -162,16 +162,29 @@ class ScipyModel:
             constraints=constraints,
             options={"maxiter": maxiter, "ftol": 1e-12},
         )
-        if not _feasible(self.constraints, unscaled(result.x)):
-            result = _trust_constr(
-                lambda z: self.objective(unscaled(z)) / objective_scale,
-                result.x if np.all(np.isfinite(result.x)) else x0 / scale,
-                lower / scale,
-                upper / scale,
-                self.constraints,
-                unscaled,
-                maxiter,
-            )
+        # SLSQP can stall on the rounded segment kinks; polish with
+        # trust-constr from its point and keep the better feasible answer.
+        start = result.x if np.all(np.isfinite(result.x)) else x0 / scale
+        if not polish and _feasible(self.constraints, unscaled(result.x)):
+            return self._finish(result, unscaled)
+        polished = _trust_constr(
+            lambda z: self.objective(unscaled(z)) / objective_scale,
+            start,
+            lower / scale,
+            upper / scale,
+            self.constraints,
+            unscaled,
+            maxiter // 2,
+        )
+        if _feasible(self.constraints, unscaled(polished.x)) and (
+            not _feasible(self.constraints, unscaled(result.x))
+            or self.objective(unscaled(polished.x))
+            < self.objective(unscaled(result.x)) - 1e-9
+        ):
+            result = polished
+        return self._finish(result, unscaled)
+
+    def _finish(self, result, unscaled) -> bool:
         x = unscaled(result.x)
         for variable, value in zip(self.variables, x):
             variable.value = [float(value)]
@@ -232,7 +245,7 @@ def _trust_constr(objective, z0, lower, upper, constraints, unscaled, maxiter):
             method="trust-constr",
             bounds=Bounds(lower, upper),
             constraints=nonlinear,
-            options={"maxiter": 3 * maxiter, "xtol": 1e-10, "gtol": 1e-8},
+            options={"maxiter": maxiter, "xtol": 1e-9, "gtol": 1e-7},
         )
 
 
@@ -250,7 +263,18 @@ def scipy_fixed_structure_model():
             self.solver_run = None
 
         def optimise(self, print_output: bool = False) -> None:
-            self.mSuccess = 1 if self.m.solve() else 0
+            kinked = any(
+                profile is not None and profile.segmented
+                for rows in (
+                    self.hot_profiles,
+                    self.cold_profiles,
+                    self.hot_utility_profiles,
+                    self.cold_utility_profiles,
+                )
+                for row in rows
+                for profile in row
+            )
+            self.mSuccess = 1 if self.m.solve(polish=kinked) else 0
             if self.mSuccess:
                 self.get_post_process()
 

@@ -130,12 +130,22 @@ Zero-duty exchangers
    exchanger at a time, until all remaining exchangers carry duty.
    ``selected_network.summary_metrics["removed_exchangers"]`` names them.
 
+Segmented streams and utilities
+   Streams with segments keep their piecewise temperature-heat profile: each
+   segment has its own heat capacity, film coefficient and temperature
+   contribution. The minimum approach is enforced at both ends of every
+   exchanger and at every segment boundary inside it, and areas are summed
+   over duty-aligned slices (``segment_area_contributions``). A segmented
+   utility keeps its temperature profile and segment prices; its flow scales
+   with use. Its profile shape comes from targeting, so it needs a targeted
+   duty. Without a given approach, each side's largest segment contribution
+   sets the limit. Segment kinks are rounded over 0.05 K in the solver.
+
 Every process stream needs at least one exchanger. A utility that cannot meet
-its approach against its stream at any duty is reported before solving.
-Streams and utilities must have constant heat capacity (no segmented
-profiles). The solver is ``HENS_SOLVER_EVM`` unless ``solver`` is passed. The
-network grid still draws a stream's utility exchangers as one exchanger at the
-stream end.
+its approach against its stream at any duty is reported before solving. The
+solver is ``HENS_SOLVER_EVM`` unless ``solver`` is passed. The network grid
+draws each utility exchanger where it sits: at the stream end or on the
+stage boundary it follows, with exchangers in series side by side.
 
 Serialized Network Input
 ------------------------

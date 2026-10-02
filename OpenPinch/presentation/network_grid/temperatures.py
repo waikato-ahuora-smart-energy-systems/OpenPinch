@@ -227,6 +227,9 @@ def hot_utility_x(renderer: Any, match: GridDiagramMatch) -> float:
                 match.state.sink_outlet_temperature,
             ),
         )
+    placed = getattr(renderer, "utility_x_by_match", {}).get(id(match))
+    if placed is not None:
+        return placed
     return renderer.x_start + (renderer.stage_start - renderer.x_start) / 2
 
 
@@ -240,6 +243,9 @@ def cold_utility_x(renderer: Any, match: GridDiagramMatch) -> float:
                 match.state.source_outlet_temperature,
             ),
         )
+    placed = getattr(renderer, "utility_x_by_match", {}).get(id(match))
+    if placed is not None:
+        return placed
     return (
         renderer.stage_boundaries[-1]
         + (renderer.x_finish - renderer.stage_boundaries[-1]) / 2
