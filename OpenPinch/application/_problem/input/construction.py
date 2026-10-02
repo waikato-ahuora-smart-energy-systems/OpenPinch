@@ -98,6 +98,12 @@ def _build_prepared_stream_collection(
     process_zone_paths: Dict[str, str] = {}
 
     for stream_schema in streams:
+        if stream_schema.dt_cont is None:
+            # A stream without its own dt_cont uses THERMAL_DT_CONT, as
+            # utilities do.
+            stream_schema = stream_schema.model_copy(
+                update={"dt_cont": master_zone.config.thermal.dt_cont}
+            )
         zone = master_zone.get_subzone(stream_schema.zone)
         if zone is None:
             raise ValueError(
@@ -170,10 +176,15 @@ def _assign_process_streams_to_subzones(
     return master_zone
 
 
-def _validate_stream_temperatures(stream: StreamSchema):
+def _validate_stream_temperatures(stream: StreamSchema, config=None):
     """Validate that supply and target temperatures align with stream type."""
-    t_supply = resolve_value_array(stream.t_supply)
-    t_target = resolve_value_array(stream.t_target)
+    # Compare in canonical units: 100 K and 100 degC are different temperatures.
+    t_supply = standardise_input_value(
+        stream.t_supply, field_name="t_supply", config=config
+    ).period_values
+    t_target = standardise_input_value(
+        stream.t_target, field_name="t_target", config=config
+    ).period_values
     heat_flow = resolve_value_array(stream.heat_flow)
     if np.all((abs(t_supply - t_target) < tol) * (heat_flow != 0.0)):
         raise ValueError(
@@ -185,7 +196,7 @@ def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
     """Create a process :class:`Stream` from one validated schema record."""
     if stream.segments is not None or stream.profile is not None:
         return _create_segmented_process_stream(stream, zone)
-    _validate_stream_temperatures(stream)
+    _validate_stream_temperatures(stream, zone.config)
     stream_obj = Stream(
         name=stream.name,
         supply_temperature=standardise_input_value(

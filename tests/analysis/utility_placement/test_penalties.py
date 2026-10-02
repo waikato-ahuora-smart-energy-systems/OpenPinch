@@ -25,12 +25,15 @@ def test_g_penalty_is_squared_and_dimensionless() -> None:
         required_hot_duty=100.0,
         required_cold_duty=50.0,
     ) == pytest.approx(80.0)
-    assert penalties.g_penalty(
-        hot_fallback_duty=0.0,
-        cold_fallback_duty=0.0,
-        required_hot_duty=0.0,
-        required_cold_duty=0.0,
-    ) == 0.0
+    assert (
+        penalties.g_penalty(
+            hot_fallback_duty=0.0,
+            cold_fallback_duty=0.0,
+            required_hot_duty=0.0,
+            required_cold_duty=0.0,
+        )
+        == 0.0
+    )
 
 
 @pytest.mark.parametrize("scale", [0.1, 1.0, 10.0, 1_000.0])

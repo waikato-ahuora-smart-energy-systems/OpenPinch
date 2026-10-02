@@ -22,6 +22,33 @@ from ..domain.hpr import HPRResidualSnapshot
 from .common import PeriodValueWithUnitAndIds, ScalarOrVU
 
 MaximumHeatFlowValue = Union[ScalarOrVU, PeriodValueWithUnitAndIds]
+
+
+def _is_missing_value(value) -> bool:
+    """Whether a raw value is absent: None, NaN, or a value object without data.
+
+    A blank CSV cell arrives as NaN and a JSON ``{"value": null}`` as a value
+    object whose magnitude is None; both mean the field was not given.
+    """
+    if value is None:
+        return True
+    if isinstance(value, float):
+        return math.isnan(value)
+    if hasattr(value, "model_dump"):
+        value = value.model_dump(mode="python")
+    if isinstance(value, dict):
+        if value.get("values") is not None:
+            return all(
+                item is None or (isinstance(item, float) and math.isnan(item))
+                for item in value["values"]
+            )
+        magnitude = value.get("value")
+        return magnitude is None or (
+            isinstance(magnitude, float) and math.isnan(magnitude)
+        )
+    return False
+
+
 _SegmentAreaIdentity = Annotated[
     str, non_empty_str("segment area identities must not be empty")
 ]
@@ -98,7 +125,8 @@ class StreamSchema(BaseModel):
     h_target: Optional[ScalarOrVU] = None
     heat_flow: Optional[ScalarOrVU] = None
     heat_capacity_flowrate: Optional[ScalarOrVU] = None
-    dt_cont: Optional[ScalarOrVU] = 0.0
+    # None means THERMAL_DT_CONT, filled in when the problem is built.
+    dt_cont: Optional[ScalarOrVU] = None
     htc: Optional[ScalarOrVU] = 1.0
     fluid_name: Optional[str] = None
     fluid_phase: Optional[FluidPhase] = None
@@ -126,6 +154,13 @@ class StreamSchema(BaseModel):
         text = str(value).strip()
         return FluidPhase.from_code_or_description(value) if text else None
 
+    @field_validator("dt_cont", "htc", mode="before")
+    @classmethod
+    def _missing_stream_property_to_none(cls, value):
+        # A null value object or blank cell means "not given". Stream
+        # construction fills None with the default, as for an absent field.
+        return None if _is_missing_value(value) else value
+
     @field_validator("t_supply", "t_target", "heat_flow")
     @classmethod
     def _require_ordinary_thermal_fields(
@@ -137,7 +172,7 @@ class StreamSchema(BaseModel):
             info.data.get("segments") is not None
             or info.data.get("profile") is not None
         )
-        if value is None and not has_nested:
+        if _is_missing_value(value) and not has_nested:
             raise ValueError(f"Ordinary streams require {info.field_name}.")
         return value
 
@@ -170,9 +205,12 @@ class UtilitySchema(BaseModel):
     h_target: Optional[ScalarOrVU] = None
     heat_flow: Optional[ScalarOrVU] = None
     maximum_heat_flow: Optional[MaximumHeatFlowValue] = None
-    dt_cont: Optional[ScalarOrVU] = 0.0
-    htc: Optional[ScalarOrVU] = 1.0
-    price: Optional[ScalarOrVU] = 1.0
+    # None means THERMAL_DT_CONT and THERMAL_HTC, as for process streams;
+    # both are filled in when the problem is built.
+    dt_cont: Optional[ScalarOrVU] = None
+    htc: Optional[ScalarOrVU] = None
+    # None means COSTING_UTILITY_PRICE, filled in when the problem is built.
+    price: Optional[ScalarOrVU] = None
     fluid_name: Optional[str] = None
     fluid_phase: Optional[FluidPhase] = None
     active: bool = True

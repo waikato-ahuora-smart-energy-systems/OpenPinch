@@ -19,6 +19,10 @@ Included Cases
    Named-period derivative of the crude preheat train for real multiperiod direct
    targeting and cross-period comparison.
 
+``dairy_chilling_multiperiod.json``
+   Illustrative named-period dairy with milk and ice-water chilling below
+   ambient and low-temperature heating, for multiperiod refrigeration screens.
+
 ``zonal_site.json``
    Hierarchical site-style case for multi-zone and aggregated Total Site
    workflows.
@@ -75,14 +79,15 @@ Choosing The Right Case
 - Use ``crude_preheat_train.json`` for process-only sensitivity studies.
 - Use ``crude_preheat_train_multiperiod.json`` when the same process needs named
   operating periods such as turndown, base, and peak.
+- Use ``dairy_chilling_multiperiod.json`` for multiperiod refrigeration, which
+  needs cooling below ambient.
 - Use ``zonal_site.json`` or ``pulp_mill.json`` when you need a real site-style
   indirect integration example.
 - Use ``zonal_site_multiperiod.json`` when the site answer needs seasonal or
   named-period comparison.
 - Use ``basic_pinch.json`` when you want a small direct HPR screening case.
 - Use ``chocolate_factory.json`` when you want to study the advanced
-  direct-versus-indirect HPR and refrigeration surface used by notebooks 08
-  through 10.
+  direct-versus-indirect HPR and refrigeration surface used by notebook 09.
 - Use ``process_mvr.json`` for the pressure-defined process MVR component
   workflow in notebook 11.
 - Use ``Four-stream-Yee-and-Grossmann-1990-1.json`` when you want the converted

@@ -204,9 +204,7 @@ def test_heat_pump_results_include_unit_aware_hpr_metrics(factory):
     _assert_scalar_payload(results.hpr_operating_cost, 1000.0, "$/y")
     _assert_scalar_payload(results.hpr_capital_cost, 5000.0, "$")
     _assert_scalar_payload(results.hpr_annualized_capital_cost, 600.0, "$/y")
-    _assert_scalar_payload(
-        results.hpr_hot_utility_annualized_capital_cost, 30.0, "$/y"
-    )
+    _assert_scalar_payload(results.hpr_hot_utility_annualized_capital_cost, 30.0, "$/y")
     _assert_scalar_payload(
         results.hpr_refrigeration_annualized_capital_cost, 20.0, "$/y"
     )
