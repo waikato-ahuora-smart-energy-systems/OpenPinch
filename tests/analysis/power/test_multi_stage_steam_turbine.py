@@ -312,3 +312,66 @@ def test_turbine_below_pinch_skips_stage_without_boiler_enthalpy(monkeypatch):
 
     assert result["stages"] == []
     assert result["total_work"] == 0.0
+
+
+# Audit area 6: mechanical efficiency, supercritical inlets, edge cases.
+
+
+def test_mechanical_efficiency_derates_shaft_work_only(monkeypatch):
+    _patch_steam_properties(monkeypatch)
+
+    def solve(mech_eff):
+        turbine = MultiStageSteamTurbine()
+        _total, details = turbine.solve(
+            np.array([180.0, 165.0]),
+            np.array([120.0, 80.0]),
+            mode="above_pinch",
+            T_in=300.0,
+            P_in=20.0,
+            model="Fixed Isentropic Turbine",
+            min_eff=0.7,
+            mech_eff=mech_eff,
+        )
+        return details
+
+    full = solve(1.0)
+    half = solve(0.5)
+
+    assert half["total_work"] == pytest.approx(0.5 * full["total_work"])
+    for a, b in zip(full["stages"], half["stages"]):
+        assert a["enthalpy_out"] == pytest.approx(b["enthalpy_out"])
+    assert full["converged"] is True
+
+
+def test_supercritical_inlet_is_supported():
+    turbine = MultiStageSteamTurbine()
+
+    total_work, details = turbine.solve(
+        np.array([250.0, 180.0]),
+        np.array([500.0, 300.0]),
+        mode="above_pinch",
+        T_in=600.0,
+        P_in=250.0,
+        model="Fixed Isentropic Turbine",
+        min_eff=0.7,
+    )
+
+    assert total_work > 0.0
+    assert len(details["stages"]) == 2
+
+
+def test_sub_freezing_sink_is_clamped_not_a_crash():
+    turbine = MultiStageSteamTurbine()
+
+    total_work, details = turbine.solve(
+        np.array([120.0]),
+        np.array([100.0]),
+        mode="below_pinch",
+        T_sink=-5.0,
+        model="Fixed Isentropic Turbine",
+        min_eff=0.7,
+    )
+
+    assert total_work >= 0.0
+    assert details["diagnostics"]
+    assert details["sink_temperature"] == pytest.approx(0.01)

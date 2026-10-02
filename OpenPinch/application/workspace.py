@@ -288,7 +288,10 @@ class PinchWorkspace:
             workspace_project_name=self.project_name,
         )
 
-        self.project_name = resolved_project_name
+        # The first case names the workspace; later loads rename it only when
+        # asked to, since renaming would drop every cached case's results.
+        if project_name is not None or not self._case_inputs:
+            self.project_name = resolved_project_name
         self._case_inputs[name] = case_input
         self._invalidate_case_state(name)
 
@@ -380,20 +383,31 @@ class PinchWorkspace:
         replace_options: bool = False,
         dt_cont_multiplier: float | None = None,
         activate: bool = False,
+        overwrite: bool = False,
     ) -> PinchProblem:
-        """Create and return an unsolved named scenario."""
+        """Create and return an unsolved named scenario.
+
+        An existing case name raises unless ``overwrite=True``. The scenario is
+        built and validated before it is registered, so a failing option leaves
+        no half-made case behind.
+        """
+        resolved_name = validate_workspace_case_name(name)
+        if resolved_name in self._case_inputs and not overwrite:
+            raise ValueError(
+                f"Case name already exists: {resolved_name!r}. "
+                "Pass overwrite=True to replace it."
+            )
         source_name = base or self.baseline_name
-        case = self._create_case_from_base(
-            source_name=source_name,
-            new_name=name,
-            activate=activate,
+        draft = PinchProblem(
+            source=self.to_problem_json(case_name=source_name),
+            project_name=self.project_name or "Site",
         )
         if options:
-            case.update_options(options, replace=replace_options)
+            draft.update_options(options, replace=replace_options)
         if dt_cont_multiplier is not None:
-            case.set_dt_cont_multiplier(dt_cont_multiplier)
-        self._sync_case_input(name)
-        return self.case(name)
+            draft.set_dt_cont_multiplier(dt_cont_multiplier)
+        self.load(draft.to_problem_json(), case_name=resolved_name, activate=activate)
+        return self.case(resolved_name)
 
     def to_problem_json(
         self,

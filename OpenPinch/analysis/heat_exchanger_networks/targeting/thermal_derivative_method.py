@@ -17,6 +17,7 @@ from ..execution.task_builders import (
     _required_stage_count,
     _successful_method,
     approach_temperature_from_network,
+    is_utility_only_outcome,
     required_topology_restrictions_from_outcome,
     stage_count_from_network,
     topology_restrictions_from_network,
@@ -92,6 +93,8 @@ def build_thermal_derivative_method_tasks(
             outcome, HeatExchangerNetworkDesignMethod.PinchDesign
         ):
             continue
+        if is_utility_only_outcome(outcome):
+            continue  # utility-only: a final candidate, nothing to refine
         pathways = pathways_from_metadata(outcome.task.metadata)
         tdm_pathways = tuple(pathway for pathway in pathways if pathway.uses_tdm)
         if pathways and not tdm_pathways:

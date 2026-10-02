@@ -42,7 +42,7 @@ def build_synthesis_result(
     outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
 ) -> HeatExchangerNetworkSynthesisResult:
     """Convert accepted task outcomes into the canonical design data."""
-    _assert_successful_outcomes_feasible(outcomes)
+    outcomes = demote_infeasible_outcomes(outcomes)
     accepted = _accepted_outcome(outcomes)
     if accepted.network is None:
         raise WorkflowContractError(
@@ -142,14 +142,9 @@ def _accepted_outcome(
             if outcome.status == "success" and outcome.task.method == method
         ]
         if candidates:
-            return min(
-                candidates,
-                key=lambda outcome: (
-                    float("inf")
-                    if outcome.objective_value is None
-                    else outcome.objective_value
-                ),
-            )
+            from ..reporting.ranking import outcome_ranking_key
+
+            return min(candidates, key=outcome_ranking_key)
     detail = _failed_outcome_summary(outcomes)
     message = "heat exchanger network synthesis produced no successful task outcomes."
     if detail:
@@ -157,23 +152,32 @@ def _accepted_outcome(
     raise WorkflowContractError(message)
 
 
-def _assert_successful_outcomes_feasible(
+def demote_infeasible_outcomes(
     outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
-) -> None:
-    infeasible = [
-        (outcome, failures)
-        for outcome in outcomes
-        if outcome.status == "success"
-        and (failures := verify_network_feasibility(outcome.network))
-    ]
-    if not infeasible:
-        return
+) -> tuple[HeatExchangerNetworkSynthesisTaskOutcome, ...]:
+    """Mark solver successes that fail post-solve feasibility checks as failed.
 
-    raise WorkflowContractError(
-        "solver-success heat exchanger network task failed post-solve "
-        "feasibility checks, which indicates a solver model or extraction "
-        "contract issue. Details: " + _infeasible_outcome_summary(infeasible)
-    )
+    One infeasible outcome no longer aborts the synthesis: it keeps its network
+    and reasons for diagnostics, and the result is selected from the feasible
+    outcomes. Selection raises only when none is left.
+    """
+    demoted = []
+    for outcome in outcomes:
+        failures = (
+            verify_network_feasibility(outcome.network)
+            if outcome.status == "success"
+            else ()
+        )
+        if failures:
+            reasons = "; ".join(failures[:3])
+            outcome = outcome.model_copy(
+                update={
+                    "status": "failed",
+                    "error": f"post-solve feasibility check failed: {reasons}",
+                }
+            )
+        demoted.append(outcome)
+    return tuple(demoted)
 
 
 def _failed_outcome_summary(
@@ -214,4 +218,8 @@ def _infeasible_outcome_summary(
     return "; ".join(summaries)
 
 
-__all__ = ["SynthesisWorkflowResult", "build_synthesis_result"]
+__all__ = [
+    "SynthesisWorkflowResult",
+    "build_synthesis_result",
+    "demote_infeasible_outcomes",
+]

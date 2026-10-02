@@ -40,7 +40,8 @@ def export_problem_table(
     if table.data is None:
         raise ValueError("Cannot export an uninitialised ProblemTable.")
     if output_dir is None:
-        output_dir = Path(__file__).resolve().parents[3] / "results"
+        # The working directory, never a folder inside the installed package.
+        output_dir = Path.cwd()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     name = Path(filename).stem or "problem_table"

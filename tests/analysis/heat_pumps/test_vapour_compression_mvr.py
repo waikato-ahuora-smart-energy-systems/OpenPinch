@@ -1267,7 +1267,9 @@ def test_vc_mvr_x0_bounds_parse_round_trip():
         eta_motor=0.95,
     )
     init_res = SimpleNamespace(
-        T_cond=np.array([120.0, 90.0]),
+        # Below R134a's subcritical ceiling (Tcrit 101.06 C less 2 K), so the
+        # seed survives the condensing-temperature cap unchanged.
+        T_cond=np.array([95.0, 85.0]),
         Q_cond=np.array([120.0, 80.0]),
         T_evap=np.array([70.0, 50.0]),
         Q_evap=np.array([90.0, 60.0]),

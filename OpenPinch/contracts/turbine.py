@@ -37,6 +37,11 @@ class TurbineSolveResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     mode: str
+    # Above pinch: whether the extraction mass balance met its tolerance
+    # within the iteration cap.
+    converged: bool = True
+    mass_balance_iterations: Optional[int] = None
+    diagnostics: List[str] = Field(default_factory=list)
     turbine_model: str
     load_frac: float
     mech_eff: float

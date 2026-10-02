@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import Tuple
 
 import numpy as np
@@ -59,6 +60,13 @@ def get_utility_targets(
             H_net_hot=pt[ProblemTableLabel.H_NET_HOT],
             pinch_idx=pt.pinch_idx(ProblemTableLabel.H_NET_A),
             is_real_temperatures=False,
+            idx=idx,
+        )
+        _warn_on_unmet_utility_demand(
+            hot_required=abs(float(pt[ProblemTableLabel.H_NET_COLD][0])),
+            cold_required=abs(float(pt[ProblemTableLabel.H_NET_HOT][-1])),
+            hot_utilities=hot_utilities,
+            cold_utilities=cold_utilities,
             idx=idx,
         )
 
@@ -130,6 +138,56 @@ def target_utilities_for_load_profiles(
     hot_utilities = _apply_utility_duties(hot_utilities, hot_duties, idx=idx)
     cold_utilities = _apply_utility_duties(cold_utilities, cold_duties, idx=idx)
     return hot_utilities, cold_utilities
+
+
+# Unmet utility demand (kW) below this is rounding, not a shortfall.
+_UNMET_DEMAND_ABS_TOL = 1e-3
+
+_DEFAULT_UTILITY_FLAG = "_is_default_utility"
+
+
+def mark_default_utility(stream) -> None:
+    """Flag ``stream`` as a default HU/CU added during input preparation."""
+    setattr(stream, _DEFAULT_UTILITY_FLAG, True)
+
+
+def is_default_utility(stream) -> bool:
+    """Return whether ``stream`` is a default HU/CU (a backup utility)."""
+    return bool(getattr(stream, _DEFAULT_UTILITY_FLAG, False))
+
+
+def _warn_on_unmet_utility_demand(
+    *,
+    hot_required: float,
+    cold_required: float,
+    hot_utilities: StreamCollection,
+    cold_utilities: StreamCollection,
+    idx: int | None,
+) -> None:
+    """Warn when the assigned utility duty falls short of the target.
+
+    A shortfall means the utilities given cannot meet the demand, for example
+    because of ``maximum_heat_flow`` caps or a fixed segmented profile. The
+    reported utility totals and costs then understate the target.
+    """
+    for label, required, utilities in (
+        ("hot", hot_required, hot_utilities),
+        ("cold", cold_required, cold_utilities),
+    ):
+        assigned = sum(
+            float(StreamCollection._value_at_idx(utility.heat_flow, idx))
+            for utility in utilities
+        )
+        shortfall = required - assigned
+        # Ignore numerical residue: below 1 W, or a millionth of the target.
+        if shortfall > max(tol, _UNMET_DEMAND_ABS_TOL, 1e-6 * required):
+            warnings.warn(
+                f"The {label} utilities meet {assigned:.6g} of the {required:.6g} "
+                f"{label} utility target; {shortfall:.6g} is unmet. Add a "
+                f"{label} utility or raise its maximum_heat_flow.",
+                UserWarning,
+                stacklevel=2,
+            )
 
 
 def _calculate_utility_duties_for_load_profiles(
@@ -232,18 +290,40 @@ def _calculate_assigned_utility_duties(
 
     utilities = tuple(u_ls)
     duties = [0.0] * len(utilities)
-    indices = range(len(utilities) - 1, -1, -1) if is_hot_ut else range(len(utilities))
-    Q_assigned = 0.0
-    for utility_index in indices:
-        u = utilities[utility_index]
+    levels = []
+    for u in utilities:
         if is_real_temperatures:
             t_lo, t_hi = u.minimum_temperature, u.maximum_temperature
         else:
             t_lo, t_hi = u.shifted_minimum_temperature, u.shifted_maximum_temperature
         if is_hot_ut:
-            Ts, Tt = float(t_hi[idx]), float(t_lo[idx])
+            levels.append((float(t_hi[idx]), float(t_lo[idx])))
         else:
-            Ts, Tt = float(t_lo[idx]), float(t_hi[idx])
+            levels.append((float(t_lo[idx]), float(t_hi[idx])))
+    # Use the least valuable utility first: the coldest hot utility and the
+    # hottest cold utility, by shifted level in this period. The collection's
+    # own order compares whole multi-period values and can differ from this.
+    # A default HU/CU added during input preparation is a backup for what the
+    # given utilities cannot supply (for example because of maximum_heat_flow
+    # caps), so it always goes last. A user utility named HU/CU is not one.
+    collection_order = (
+        range(len(utilities) - 1, -1, -1) if is_hot_ut else range(len(utilities))
+    )
+    indices = sorted(
+        collection_order,
+        key=lambda i: (
+            is_default_utility(utilities[i]),
+            *(
+                (levels[i][0], levels[i][1])
+                if is_hot_ut
+                else (-levels[i][0], -levels[i][1])
+            ),
+        ),
+    )
+    Q_assigned = 0.0
+    for utility_index in indices:
+        u = utilities[utility_index]
+        Ts, Tt = levels[utility_index]
 
         Q_ut_max = _maximise_utility_duty(
             T_segment,

@@ -120,13 +120,41 @@ class PlacementTolerances(_FrozenContract):
 
 
 class PlacementUnitSystem(_FrozenContract):
-    """Canonical unit labels; conversion remains analysis-owned."""
+    """Units of a placement request's inputs and results.
+
+    The analysis itself runs in degC and delta_degC; temperatures are converted
+    on entry and reported back in these units.
+    """
 
     absolute_temperature: str = "degC"
     temperature_difference: str = "delta_degC"
     heat_flow: str = "kW"
     entropy: str = "kW/K"
     exergy: str = "kW"
+
+    @field_validator("absolute_temperature")
+    @classmethod
+    def _validate_absolute_temperature(cls, value: str) -> str:
+        _require_convertible(value, "degC", "absolute_temperature")
+        return value
+
+    @field_validator("temperature_difference")
+    @classmethod
+    def _validate_temperature_difference(cls, value: str) -> str:
+        _require_convertible(value, "delta_degC", "temperature_difference")
+        return value
+
+
+def _require_convertible(unit: str, reference: str, field: str) -> None:
+    from ..domain.value import Value
+
+    try:
+        Value(1.0, unit).to(reference)
+    except Exception as exc:
+        raise ValueError(
+            f"{field} must be a temperature unit convertible to {reference}; "
+            f"got {unit!r}."
+        ) from exc
 
 
 class UtilityPlacementOptions(_FrozenContract):

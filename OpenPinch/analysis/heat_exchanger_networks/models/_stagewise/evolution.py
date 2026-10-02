@@ -33,6 +33,7 @@ class _EvolutionBranchState:
     model: Any
     best_tac: float
     stale_depths: int = 0
+    signature: tuple[tuple[int, int, int], ...] = ()
 
 
 def _stagewise_model_class():
@@ -49,8 +50,16 @@ def get_net_benefit_evolution(
     n_rm_branches: int = 1,
     max_parallel: int = 1,
     no_improvement_patience: int | None = None,
+    *,
+    beam_width: int = 4,
 ):
-    """Evolve topology using branched add/remove net-benefit heuristics."""
+    """Evolve topology using branched add/remove net-benefit heuristics.
+
+    Each depth keeps at most ``beam_width`` branches, the best by TAC (ties
+    broken on the topology signature), and a topology is solved at most once
+    over the whole run, so the solve count is bounded by the beam width rather
+    than growing towards (add + remove branches) ** depth.
+    """
 
     if owner.mSuccess != 1:
         logger.warning("Initial model was not successful; skipping evolution.")
@@ -67,6 +76,11 @@ def get_net_benefit_evolution(
             print_output=print_output,
             max_depth=max_depth,
         )
+    beam_width = max(1, int(beam_width))
+    seen_signatures: set[tuple[tuple[int, int, int], ...]] = set()
+    initial_z = getattr(owner, "z_allowed", None)
+    if initial_z is not None:
+        seen_signatures.add(_topology_signature_from_z(owner, initial_z))
     frontier = [_EvolutionBranchState(model=owner, best_tac=float(owner.TAC))]
     best_model = owner
 
@@ -84,6 +98,7 @@ def get_net_benefit_evolution(
             unit=unit,
             n_ad_branches=n_ad_branches,
             n_rm_branches=n_rm_branches,
+            seen_signatures=seen_signatures,
         )
         if not specs:
             logger.debug("No evolution candidate topologies found.")
@@ -106,12 +121,14 @@ def get_net_benefit_evolution(
                     model=candidate,
                     best_tac=candidate_tac,
                     stale_depths=0,
+                    signature=spec.signature,
                 )
             else:
                 branch_period = _EvolutionBranchState(
                     model=candidate,
                     best_tac=parent_period.best_tac,
                     stale_depths=parent_period.stale_depths + 1,
+                    signature=spec.signature,
                 )
             if (
                 no_improvement_patience is not None
@@ -126,7 +143,12 @@ def get_net_benefit_evolution(
             next_frontier.append(branch_period)
             if candidate.TAC < best_model.TAC:
                 best_model = candidate
-        frontier = next_frontier
+        # Keep the best branches by TAC, ties broken on topology signature, so
+        # the frontier never grows past the beam width.
+        next_frontier.sort(
+            key=lambda branch: (float(branch.model.TAC), branch.signature)
+        )
+        frontier = next_frontier[:beam_width]
         if not frontier:
             logger.debug("No viable evolution model found.")
             break
@@ -207,8 +229,9 @@ def _select_source_best_candidate(
     """Select the next OpenHENS tier-1 evolution candidate by success and TAC."""
 
     del current_model
-    minus_success = bool(getattr(model_minus_one, "mSuccess", 0))
-    plus_success = bool(getattr(model_plus_one, "mSuccess", 0))
+    # The same check as the branched search: solved and verified.
+    minus_success = _is_usable_evolution_candidate(model_minus_one)
+    plus_success = _is_usable_evolution_candidate(model_plus_one)
     if not minus_success and not plus_success:
         return None
     if minus_success and not plus_success:
@@ -233,9 +256,12 @@ def _evolution_candidate_specs(
     unit: int,
     n_ad_branches: int,
     n_rm_branches: int,
+    seen_signatures: set[tuple[tuple[int, int, int], ...]] | None = None,
 ) -> list[_EvolutionCandidateSpec]:
+    """Return candidate topologies not yet seen in this run."""
     specs: list[_EvolutionCandidateSpec] = []
-    seen_signatures: set[tuple[tuple[int, int, int], ...]] = set()
+    if seen_signatures is None:
+        seen_signatures = set()
     for branch_index, branch_period in enumerate(frontier):
         prev_case = branch_period.model
         for rank, position in enumerate(
@@ -343,6 +369,9 @@ def _solve_evolution_candidates(
             candidate = future.result()
             if candidate is not None:
                 candidates.append((futures[future], candidate))
+    # Completion order is arbitrary; process in spec order so parallel and
+    # serial runs make the same choices.
+    candidates.sort(key=lambda item: (item[0].branch_index, item[0].kind, item[0].rank))
     return candidates
 
 
@@ -420,7 +449,16 @@ def _select_best_candidate(
 def _update_with_best_model(owner, best_model) -> None:
     """Adopt the selected evolved topology while retaining this model object."""
 
-    best_model.verify()
+    verify = getattr(best_model, "verify", None)
+    if callable(verify):
+        is_valid, reasons = verify()
+        if not is_valid:
+            logger.debug(
+                "Not adopting evolved topology %s: %s",
+                getattr(best_model, "name", None),
+                ", ".join(reasons),
+            )
+            return
     owner.alpha = build_index_grid(
         lambda i, j, k: best_model.alpha[i][j][k],
         (owner.I, owner.J, owner.S),

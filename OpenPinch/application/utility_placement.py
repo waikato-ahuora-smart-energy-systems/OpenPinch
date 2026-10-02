@@ -48,6 +48,10 @@ from ..analysis.utility_placement.replay import (
     placement_utility_collections,
 )
 from ..analysis.utility_placement.service import optimise_utility_placement
+from ..analysis.utility_placement.units import (
+    INTERNAL_TEMPERATURE,
+    INTERNAL_TEMPERATURE_DIFFERENCE,
+)
 from ..contracts.input import UtilitySchema
 from ..contracts.units import standardise_input_value
 from ..contracts.utility_placement import (
@@ -775,7 +779,7 @@ def _candidate_utility_input(
                     **({"maximum_heat_flow": limit} if limit is not None else {}),
                     "dt_cont": {
                         "value": 0.0,
-                        "unit": request.units.temperature_difference,
+                        "unit": INTERNAL_TEMPERATURE_DIFFERENCE,
                     },
                     "htc": {"value": 1.0, "unit": "kW/m^2/delta_degC"},
                 }
@@ -808,16 +812,16 @@ def _candidate_utility_input(
                 "type": utility_type,
                 "t_supply": {
                     "value": supply,
-                    "unit": request.units.absolute_temperature,
+                    "unit": INTERNAL_TEMPERATURE,
                 },
                 "t_target": {
                     "value": target,
-                    "unit": request.units.absolute_temperature,
+                    "unit": INTERNAL_TEMPERATURE,
                 },
                 "heat_flow": {"value": 0.0, "unit": request.units.heat_flow},
                 "dt_cont": {
                     "value": 0.0,
-                    "unit": request.units.temperature_difference,
+                    "unit": INTERNAL_TEMPERATURE_DIFFERENCE,
                 },
                 "htc": {"value": 1.0, "unit": "kW/m^2/delta_degC"},
             }

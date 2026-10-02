@@ -66,6 +66,8 @@ def get_additional_GCCs(
         )
         actual_h_net = pt[ProblemTableLabel.H_NET_V]
 
+    # The vertical (H_NET_V) and assisted (H_NET_AI) GCCs keep their own
+    # columns. With both on, the assisted GCC sets the utility target.
     if do_assisted_ht_calc:
         pt.update(
             **get_GCC_with_partial_pockets(

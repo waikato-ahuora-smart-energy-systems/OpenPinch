@@ -154,7 +154,8 @@ def summary_results(
                 "No target analysis is available. Run a problem.target.<method>() "
                 "workflow before requesting results."
             )
-        return problem._results
+        # A copy, so editing a returned report never changes the cached one.
+        return _deep_copy(problem._results)
 
     outputs = list(problem._period_results.values())
     if not outputs:
@@ -166,13 +167,21 @@ def summary_results(
     return output_for_period_mode(outputs, weights, periods=periods)
 
 
+def _deep_copy(value: Any) -> Any:
+    """Return a deep copy of a pydantic model or any other object."""
+    copier = getattr(value, "model_copy", None)
+    if callable(copier):
+        return copier(deep=True)
+    return deepcopy(value)
+
+
 def combine_period_outputs(outputs: Sequence[TargetOutput]) -> TargetOutput:
     """Return one output with period-specific target rows concatenated."""
     ordered_outputs = list(outputs)
     if not ordered_outputs:
         raise ValueError("At least one period output is required.")
     targets = [
-        target
+        _deep_copy(target)
         for output in ordered_outputs
         for target in list(getattr(output, "targets", []) or [])
     ]
@@ -229,11 +238,98 @@ def _normalise_weights(weights: Sequence[float], *, expected_len: int) -> np.nda
     )
 
 
+_HPR_TARGET_METHODS = frozenset({"Heat Pump", "Refrigeration"})
+_HPR_ZERO_NONE_FIELDS = (
+    "hpr_cop",
+    "hpr_eta_he",
+    "hpr_success",
+    "hpr_target_simulation_record",
+    "hpr_hot_streams",
+    "hpr_cold_streams",
+)
+
+
+def _fill_zero_load_hpr_rows(
+    outputs: Sequence[TargetOutput],
+) -> list[TargetOutput]:
+    """Add a no-heat-pump row for each period whose HPR load was zero.
+
+    A period whose HPR load is below the tolerance produces no HPR row, which
+    would break every weighted summary. Its row is the period's own base
+    (heat-exchange) row relabelled as the HPR row, with zero HPR duty, work
+    and cost, so the period counts as running no heat pump.
+    """
+    templates: dict[tuple, TargetResults] = {}
+    for output in outputs:
+        for target in output.targets:
+            if target.target_method in _HPR_TARGET_METHODS:
+                templates.setdefault(_target_key(target), target)
+    if not templates:
+        return list(outputs)
+
+    filled = []
+    for output in outputs:
+        present = {_target_key(target) for target in output.targets}
+        additions = []
+        for key, template in templates.items():
+            if key in present:
+                continue
+            base = next(
+                (
+                    target
+                    for target in output.targets
+                    if target.scope == template.scope
+                    and target.zone_type == template.zone_type
+                    and target.integration_type == template.integration_type
+                    and target.target_method not in _HPR_TARGET_METHODS
+                ),
+                None,
+            )
+            if base is not None:
+                additions.append(_zero_load_hpr_row(base, template))
+        if additions:
+            output = output.model_copy(
+                update={"targets": [*output.targets, *additions]}
+            )
+        filled.append(output)
+    return filled
+
+
+def _zero_load_hpr_row(base: TargetResults, template: TargetResults) -> TargetResults:
+    data = base.model_dump(mode="python")
+    for field in (
+        "integration_type",
+        "target_method",
+        "row_type",
+        "hpr_cycle",
+        "hpr_simulation_backend",
+        "hpr_shared_design",
+    ):
+        data[field] = getattr(template, field, None)
+    metadata = {"hpr_cycle", "hpr_simulation_backend", "hpr_shared_design"}
+    for field in type(template).model_fields:
+        if not field.startswith("hpr_") or field in metadata:
+            continue
+        value = getattr(template, field, None)
+        if field in _HPR_ZERO_NONE_FIELDS:
+            data[field] = None
+        elif isinstance(value, Value):
+            data[field] = Value({"value": 0.0, "unit": value.to_dict()["unit"]})
+        elif isinstance(value, tuple):
+            data[field] = tuple(0.0 for _ in value)
+        elif isinstance(value, (int, float)) and not isinstance(value, bool):
+            data[field] = 0.0
+        else:
+            data[field] = None
+    return type(template).model_validate(data)
+
+
 def _aligned_target_groups(
     outputs: Sequence[TargetOutput],
 ) -> list[list[TargetResults]]:
     if not outputs:
         raise ValueError("At least one period output is required.")
+    outputs = _fill_zero_load_hpr_rows(outputs)
 
     first_targets = list(outputs[0].targets)
     first_keys = [_target_key(target) for target in first_targets]
@@ -301,6 +397,11 @@ def _weighted_average_target(
             data[field] = None
         elif field not in {
             "period_id",
+            "degree_of_integration",
+            "ETE",
+            "hpr_cop",
+            "hpr_eta_he",
+            "hpr_success",
             "hpr_utility_annualized_capital_cost",
             "hpr_machine_capital_costs",
             "hpr_machine_annualized_capital_costs",
@@ -310,6 +411,23 @@ def _weighted_average_target(
             "cold_utilities",
         }:
             raise ValueError(f"No derived aggregation implementation for {field!r}.")
+    # Ratios over a year are ratios of totals, not averages of ratios.
+    data["degree_of_integration"] = _ratio_of_totals(
+        targets, "degree_of_integration", "Qr", weights, basis_is_numerator=True
+    )
+    data["ETE"] = _ratio_of_totals(
+        targets, "ETE", "exergy_sources", weights, basis_is_numerator=False
+    )
+    data["hpr_cop"] = _ratio_of_totals(
+        targets, "hpr_cop", "hpr_work", weights, basis_is_numerator=False
+    )
+    data["hpr_eta_he"] = _ratio_of_totals(
+        targets, "hpr_eta_he", "hpr_work", weights, basis_is_numerator=True
+    )
+    ran = [
+        t.hpr_success for t in targets if getattr(t, "hpr_success", None) is not None
+    ]
+    data["hpr_success"] = all(ran) if ran else None
     data["hpr_utility_annualized_capital_cost"] = _hpr_utility_annualized_capital(
         targets, data
     )
@@ -393,6 +511,59 @@ def _max_report_value(
     return Value(maximum, unit) if unit is not None else maximum
 
 
+def _ratio_of_totals(
+    targets: Sequence[TargetResults],
+    ratio_field: str,
+    basis_field: str,
+    weights: np.ndarray,
+    *,
+    basis_is_numerator: bool,
+) -> Value | float | None:
+    """Aggregate a ratio as weighted total numerator over total denominator.
+
+    ``basis_field`` is the numerator (``basis_is_numerator``) or denominator of
+    the ratio, e.g. COP = Q / W with basis ``hpr_work`` as denominator, so the
+    seasonal COP is sum(w * COP * W) / sum(w * W). Periods without the ratio
+    contribute nothing. Falls back to the weighted mean when the totals are 0.
+    """
+    numerator = denominator = 0.0
+    unit = None
+    ratios: list[tuple[float, float]] = []
+    for target, weight in zip(targets, weights):
+        period_idx = getattr(target, "period_idx", None)
+        ratio, ratio_unit = split_report_value(
+            _target_attr(target, ratio_field), period_idx=period_idx
+        )
+        basis, _basis_unit = split_report_value(
+            _target_attr(target, basis_field), period_idx=period_idx
+        )
+        if ratio is None or isinstance(ratio, list):
+            continue
+        unit = unit or ratio_unit
+        ratios.append((float(ratio), float(weight)))
+        if basis is None or isinstance(basis, list):
+            continue
+        ratio, basis = float(ratio), abs(float(basis))
+        if basis_is_numerator:
+            numerator += weight * basis
+            denominator += weight * basis / ratio if abs(ratio) > 0.0 else 0.0
+        else:
+            numerator += weight * ratio * basis
+            denominator += weight * basis
+    if not ratios:
+        return None
+    if denominator > 0.0:
+        value = numerator / denominator
+    else:
+        total_weight = sum(weight for _ratio, weight in ratios)
+        value = (
+            sum(ratio * weight for ratio, weight in ratios) / total_weight
+            if total_weight > 0.0
+            else ratios[0][0]
+        )
+    return Value(value, unit) if unit is not None else value
+
+
 def _apply_peak_machine_capital(
     targets: Sequence[TargetResults],
     data: dict[str, Any],
@@ -400,17 +571,22 @@ def _apply_peak_machine_capital(
     """Size each heat-pump machine for its own peak period.
 
     Parallel machines can peak in different periods, so the peak of the period
-    totals would undersize them. When every period carries the per-machine
-    breakdown, each machine takes its own maximum and the HPR capital fields
-    become the sum of those peaks; otherwise they keep the peak of the totals.
+    totals would undersize them. When every period comes from one shared design
+    and carries the per-machine breakdown, each machine takes its own maximum
+    and the HPR capital fields become the sum of those peaks. Independently
+    optimised periods may number their machines differently, so they keep the
+    peak of the totals.
     """
     capital = [getattr(target, "hpr_machine_capital_costs", None) for target in targets]
     annualized = [
         getattr(target, "hpr_machine_annualized_capital_costs", None)
         for target in targets
     ]
-    if any(not value for value in (*capital, *annualized)) or (
-        len({len(value) for value in (*capital, *annualized)}) != 1
+    shared = all(getattr(target, "hpr_shared_design", None) for target in targets)
+    if (
+        (not shared)
+        or any(not value for value in (*capital, *annualized))
+        or (len({len(value) for value in (*capital, *annualized)}) != 1)
     ):
         data["hpr_machine_capital_costs"] = None
         data["hpr_machine_annualized_capital_costs"] = None

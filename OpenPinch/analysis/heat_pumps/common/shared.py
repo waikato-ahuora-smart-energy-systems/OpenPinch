@@ -15,7 +15,6 @@ from ....analysis.economics import (
     compute_annual_capital_cost,
     compute_annual_energy_cost,
 )
-from ....analysis.numerics import g_ineq_penalty as _g_ineq_penalty
 from ....contracts.hpr import (
     HeatPumpTargetInputs,
     HPRBackendResult,
@@ -25,7 +24,7 @@ from ....contracts.hpr import (
     SimulatedHPRAnnualizedCostAccounting,
 )
 from ....domain.configuration import tol as _tol
-from ....domain.enums import PenaltyForm, ProblemTableLabel
+from ....domain.enums import ProblemTableLabel
 from ....domain.stream_collection import StreamCollection
 from ....domain.value import Value
 from ..optimisation_adapter import (
@@ -33,6 +32,9 @@ from ..optimisation_adapter import (
 )
 from ..optimisation_adapter import (
     normalise_hpr_penalty_terms as _normalise_hpr_penalty_terms,
+)
+from ..optimisation_adapter import (
+    relative_feasibility_penalty as _relative_feasibility_penalty,
 )
 from ._shared import plotting as _plotting
 from ._shared import streams as _streams
@@ -55,8 +57,13 @@ __all__ = [
     "SUBCRITICAL_CONDENSING_MARGIN_K",
     "calc_hpr_capital_cost",
     "calc_hpr_machine_capital_costs",
+    "NEGLIGIBLE_USEFUL_DUTY_FRACTION",
+    "cap_stage_condensing_temperatures",
+    "is_negligible_useful_duty",
     "condensing_temperature_search_range",
     "calc_simulated_hpr_annualized_costs",
+    "hpr_penalty_cost_scale",
+    "refrigeration_allowance",
     "calc_carnot_heat_engine_eta",
     "calc_carnot_heat_pump_cop",
     "compute_entropic_mean_temperature",
@@ -71,20 +78,66 @@ def _cycle_penalty(
     args: HeatPumpTargetInputs,
     cycle_penalty_terms: list[float] | None = None,
 ) -> float:
+    """Return the dimensionless exact penalty rho * sum(r + r^2), r = g / Q_target.
+
+    Violations are relative to the targeted duty, so the penalty is the same
+    for a 10 kW and a 10 MW problem with the same relative shortfall. The
+    linear part keeps it exact: leaving duty unserved never pays.
+    """
     cycle_terms = np.maximum(
         np.asarray(_normalise_hpr_penalty_terms(cycle_penalty_terms), dtype=float),
         0.0,
     )
     if not cycle_terms.size:
         return 0.0
-    return float(
-        _g_ineq_penalty(
-            cycle_terms,
-            eta=float(getattr(args, "eta_penalty", 0.01)),
-            rho=float(getattr(args, "rho_penalty", 10.0)),
-            form=PenaltyForm.SQUARE,
-        )
+    return _relative_feasibility_penalty(
+        cycle_terms / _penalty_duty_scale(args),
+        rho=float(getattr(args, "rho_penalty", 10.0)),
     )
+
+
+def _penalty_duty_scale(args: HeatPumpTargetInputs) -> float:
+    """Return the duty (kW) that violations are measured against."""
+    return max(abs(float(getattr(args, "Q_hpr_target", 0.0) or 0.0)), 1.0)
+
+
+def hpr_penalty_cost_scale(args: HeatPumpTargetInputs) -> float:
+    """Return the annual cost ($/y) that prices the feasibility penalty.
+
+    This is what serving ``Q_hpr_target`` costs with no heat pump: the default
+    hot utility (heat pumping) or default refrigeration, operating cost plus
+    annualised capital. The capital part keeps the penalty in force when the
+    electricity price or operating hours are zero. It is never below 1 $/y.
+    """
+    duty = _penalty_duty_scale(args)
+    is_heat_pumping = getattr(args, "is_heat_pumping", True)
+    ratio = (
+        float(getattr(args, "heat_to_power_ratio", 0.0))
+        if is_heat_pumping
+        else float(getattr(args, "refrigeration_to_power_ratio", 0.0))
+    )
+    operating = compute_annual_energy_cost(
+        duty,
+        max(float(getattr(args, "ele_price", 0.0)), 0.0) * max(ratio, 0.0),
+        max(float(getattr(args, "annual_op_time", 0.0)), 0.0),
+    )
+    unit_capital = float(
+        getattr(
+            args,
+            "hot_utility_capital_cost"
+            if is_heat_pumping
+            else "refrigeration_capital_cost",
+            0.0,
+        )
+        or 0.0
+    )
+    capital = compute_annual_capital_cost(
+        Value(duty * max(unit_capital, 0.0), "$"),
+        getattr(args, "discount_rate", 0.05),
+        getattr(args, "serv_life", 20.0),
+    )
+    total = float(operating.to("$/y").value) + float(capital.to("$/y").value)
+    return max(total, 1.0)
 
 
 @dataclass(frozen=True)
@@ -194,7 +247,7 @@ def calc_simulated_hpr_annualized_costs(
     Q_cooling_water: float,
     Q_refrigeration: float,
     cost_units: Sequence[HPRCostUnit],
-    penalty_power_equivalent: float,
+    penalty_weight: float,
     args: HeatPumpTargetInputs,
 ) -> SimulatedHPRAnnualizedCostAccounting:
     """Return unit-aware annualized cost accounting for simulated HPR candidates.
@@ -247,10 +300,10 @@ def calc_simulated_hpr_annualized_costs(
     total_annualized = (
         operating_cost + annualized_capital + utility_annualized_capital
     ).to("$/y")
-    feasibility_penalty = compute_annual_energy_cost(
-        penalty_power_equivalent,
-        ele_price,
-        annual_hours,
+    # The dimensionless penalty is priced at the no-heat-pump annual cost of
+    # the targeted service, so it is in $/y on the same scale as real costs.
+    feasibility_penalty = Value(
+        float(penalty_weight) * hpr_penalty_cost_scale(args), "$/y"
     )
 
     return SimulatedHPRAnnualizedCostAccounting(
@@ -282,6 +335,39 @@ def _annualized_utility_capital(
     return compute_annual_capital_cost(capital, args.discount_rate, args.serv_life).to(
         "$/y"
     )
+
+
+def refrigeration_allowance(args: HeatPumpTargetInputs) -> float:
+    """Return the default refrigeration the untargeted cooling needs on its own.
+
+    With a load fraction below 1, refrigeration targets the coldest part of the
+    cooling. The warmer rest may itself need some default refrigeration (when
+    it is below the cooling-water level); that is not a shortfall of the
+    design, so it is not penalised. Computed once and stored on ``args``.
+    """
+    if getattr(args, "is_heat_pumping", True):
+        return 0.0
+    cached = getattr(args, "refrigeration_allowance", None)
+    if cached is not None:
+        return float(cached)
+    streams = getattr(args, "untargeted_cooling_streams", None)
+    allowance = 0.0
+    if streams is not None and len(streams):
+        allowance = float(
+            _cascade_air_duties(
+                streams,
+                StreamCollection(),
+                args,
+                _ambient_source_temperature(args),
+                _ambient_sink_temperature(args),
+                _cooling_water_sink_temperature(args),
+            ).Q_ext_bottom
+        )
+    try:
+        args.refrigeration_allowance = allowance
+    except AttributeError, TypeError, ValueError:
+        pass
+    return allowance
 
 
 def _cascade_air_duties(
@@ -367,6 +453,7 @@ def evaluate_carnot_hpr_result(
             evap.Q_ext_top,
         ],
         penalise_external_cold_when_refrigerating=True,
+        refrigeration_allowance=refrigeration_allowance(args),
     )
     debug_figure = None
     if debug and artifact_mode is HPREvaluationMode.FINAL:
@@ -477,11 +564,14 @@ def evaluate_vapour_hpr_result(
         evap_wrong_side,
     ]
     if not getattr(args, "is_heat_pumping", True):
-        # A refrigerator must serve the selected cooling: whatever cooling
-        # water or default refrigeration still has to remove is unserved,
-        # so a zero-duty refrigerator is never a valid design.
-        all_penalty_terms.append(Q_ext_cold)
-    penalty_power_equivalent = _cycle_penalty(
+        # A refrigerator must serve the targeted coldest cooling. Cooling water
+        # and air take the warmer rest for free; only default refrigeration
+        # beyond what that rest needs on its own is unserved, so a zero-duty
+        # refrigerator is never a valid design.
+        all_penalty_terms.append(
+            max(Q_refrigeration - refrigeration_allowance(args), 0.0)
+        )
+    penalty_weight = _cycle_penalty(
         args=args,
         cycle_penalty_terms=all_penalty_terms,
     )
@@ -491,7 +581,7 @@ def evaluate_vapour_hpr_result(
         Q_cooling_water=Q_cooling_water,
         Q_refrigeration=Q_refrigeration,
         cost_units=cost_units,
-        penalty_power_equivalent=penalty_power_equivalent,
+        penalty_weight=penalty_weight,
         args=args,
     )
     penalty = float(cost_accounting.feasibility_penalty.to("$/y").value)
@@ -644,6 +734,54 @@ def condensing_temperature_search_range(
     if not np.isfinite(ceiling) or ceiling <= t_cold or ceiling >= t_hot:
         return t_hot, t_cold
     return ceiling, t_cold
+
+
+# A design whose useful duty is below this fraction of Q_hpr_target is treated
+# as no heat pump, so targeting reports "no beneficial heat pump" instead of
+# returning a vanishing design.
+NEGLIGIBLE_USEFUL_DUTY_FRACTION = 1e-3
+
+
+def is_negligible_useful_duty(duty: float, args: HeatPumpTargetInputs) -> bool:
+    """Return whether ``duty`` is too small to count as a heat pump."""
+    target = abs(float(getattr(args, "Q_hpr_target", 0.0) or 0.0))
+    return float(duty) <= NEGLIGIBLE_USEFUL_DUTY_FRACTION * target
+
+
+def cap_stage_condensing_temperatures(
+    T_cond: np.ndarray,
+    args: HeatPumpTargetInputs,
+) -> np.ndarray:
+    """Cap each stage's condensing temperature below its own refrigerant's Tcrit.
+
+    ``condensing_temperature_search_range`` caps the whole search at the
+    highest critical temperature among the refrigerants. A stage with a
+    lower-Tcrit refrigerant (R134a beside water, say) could still be decoded
+    above its own critical point, where every candidate fails. Stage ``i`` uses
+    ``args.refrigerant_ls[i]`` and keeps that pairing; the result is
+    non-increasing (a capped stage pulls the colder stages down with it).
+    """
+    T_cond = np.asarray(T_cond, dtype=float)
+    if getattr(args, "simulation_backend", "coolprop") == "tespy":
+        return T_cond
+    refrigerants = list(getattr(args, "refrigerant_ls", None) or [])
+    if not refrigerants:
+        return T_cond
+    ceilings = np.full(T_cond.shape, np.inf)
+    for index in range(T_cond.size):
+        refrigerant = refrigerants[min(index, len(refrigerants) - 1)]
+        try:
+            t_crit = float(_coolprop.PropsSI("Tcrit", refrigerant)) - 273.15
+        except ValueError, TypeError:
+            continue
+        ceilings[index] = t_crit - SUBCRITICAL_CONDENSING_MARGIN_K
+    # Cap in stage order without re-sorting, so each temperature stays with its
+    # own refrigerant: a stage is at most its ceiling and at most the stage
+    # above it, keeping the stages in descending order.
+    capped = np.minimum(T_cond, ceilings)
+    for index in range(1, capped.size):
+        capped[index] = min(capped[index], capped[index - 1])
+    return capped
 
 
 def validate_vapour_hp_refrigerant_ls(

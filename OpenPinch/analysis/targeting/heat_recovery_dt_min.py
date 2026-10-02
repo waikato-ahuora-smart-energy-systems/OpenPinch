@@ -229,8 +229,10 @@ def solve_heat_recovery_dt_min(
         limit = 0.0
     if limit < 0.0:
         raise RuntimeError("Thermodynamic heat-recovery limit was negative.")
-    if requested > limit:
+    if requested > limit + limit_tolerance:
         raise HeatRecoveryLimitError(requested, limit)
+    # A request for the reported maximum may sit a rounding error above it.
+    requested = min(requested, limit)
     at_thermodynamic_limit = abs(requested - limit) <= limit_tolerance
     if at_thermodynamic_limit and limit == 0.0:
         return _solution(

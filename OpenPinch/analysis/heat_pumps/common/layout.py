@@ -7,7 +7,7 @@ from typing import Any, Sequence
 
 import numpy as np
 
-__all__ = ["HPRoptVectorLayout"]
+__all__ = ["HPRoptVectorLayout", "clip_to_bounds"]
 
 
 @dataclass(frozen=True)
@@ -193,3 +193,19 @@ class HPRoptVectorLayout:
                 f"{name} bounds must have size {size}, got {len(bounds_ls)}."
             )
         return bounds_ls
+
+
+def clip_to_bounds(
+    x: Sequence[float] | np.ndarray,
+    bounds: Sequence[tuple[float, float]],
+) -> np.ndarray:
+    """Clip an encoded seed into its bounds.
+
+    Encoding a warm start can land a float rounding error outside ``[lo, hi]``
+    (e.g. ``-1e-17`` or ``1 + 1e-16``), which the optimiser rejects with
+    "initial points must be within bounds" and aborts targeting.
+    """
+    values = np.asarray(x, dtype=float)
+    lower = np.asarray([bound[0] for bound in bounds], dtype=float)
+    upper = np.asarray([bound[1] for bound in bounds], dtype=float)
+    return np.clip(values, lower, upper)

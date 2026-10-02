@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 
 from ...domain._problem_table.types import ProblemTableUpdateKwargs
@@ -154,19 +156,33 @@ def get_area_targets(
     Tc, Hc = clean_composite_curve_ends(T_vals, H_cold_bal)
 
     tdf = get_temperature_driving_forces(Th, Hh, Tc, Hc)
-    dt_lm_i = compute_LMTD_from_dts(
-        tdf["delta_T1"],
-        tdf["delta_T2"],
-    )
-    Q_i: np.ndarray = tdf["dh_vals"]
+    Q_i: np.ndarray = np.asarray(tdf["dh_vals"], dtype=float)
+    delta_T1 = np.asarray(tdf["delta_T1"], dtype=float)
+    delta_T2 = np.asarray(tdf["delta_T2"], dtype=float)
+    # A zero or negative approach (THERMAL_DT_CONT = 0, a zero multiplier or a
+    # negative dt_cont) needs infinite area. Report that, not an error, so the
+    # energy targets still come back.
+    no_driving_force = (delta_T1.round(6) <= 0.0) | (delta_T2.round(6) <= 0.0)
+    if np.any(no_driving_force & (Q_i > tol)):
+        warnings.warn(
+            "The balanced composite curves touch or cross (zero or negative "
+            "approach temperature), so the area and capital cost targets are "
+            "infinite. Use a positive THERMAL_DT_CONT for area targeting.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return float("inf")
+    keep = ~no_driving_force
+    Q_i = Q_i[keep]
+    dt_lm_i = compute_LMTD_from_dts(delta_T1[keep], delta_T2[keep])
     R_i = _map_interval_resistances_to_tdf(
         T_vals,
         R_hot_bal,
         R_cold_bal,
-        tdf["t_h1"],
-        tdf["t_h2"],
-        tdf["t_c1"],
-        tdf["t_c2"],
+        np.asarray(tdf["t_h1"])[keep],
+        np.asarray(tdf["t_h2"])[keep],
+        np.asarray(tdf["t_c1"])[keep],
+        np.asarray(tdf["t_c2"])[keep],
     )
     with np.errstate(divide="ignore", invalid="ignore"):
         U_i = np.where(R_i > tol, 1.0 / R_i, 1.0)

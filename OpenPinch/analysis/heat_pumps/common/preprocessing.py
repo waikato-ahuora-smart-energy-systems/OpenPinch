@@ -48,7 +48,7 @@ def construct_HPRTargetInputs(
         T_vals, hpr.dt_cont
     )
 
-    T_hot, H_hot, z_amb_hot, s_hot = _prepare_hpr_background_profile(
+    T_hot, H_hot, z_amb_hot, s_hot, s_hot_untargeted = _prepare_hpr_background_profile(
         Q_hpr_target=Q_hpr_target,
         T_vals=T_hot,
         H_vals=H_hot,
@@ -56,7 +56,7 @@ def construct_HPRTargetInputs(
         is_heat_pumping=is_heat_pumping,
         is_cold=False,
     )
-    T_cold, H_cold, z_amb_cold, s_cold = _prepare_hpr_background_profile(
+    T_cold, H_cold, z_amb_cold, s_cold, _ = _prepare_hpr_background_profile(
         Q_hpr_target=Q_hpr_target,
         T_vals=T_cold,
         H_vals=H_cold,
@@ -80,6 +80,7 @@ def construct_HPRTargetInputs(
         z_amb_cold=z_amb_cold,
         bckgrd_hot_streams=s_hot,
         bckgrd_cold_streams=s_cold,
+        untargeted_cooling_streams=s_hot_untargeted,
         is_heat_pumping=bool(is_heat_pumping),
         debug=debug,
         period_idx=period_idx,
@@ -174,12 +175,26 @@ def _prepare_hpr_background_profile(
     is_heat_pumping: bool,
     is_cold: bool,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, StreamCollection]:
-    should_trim_to_target = ((is_cold) and (is_heat_pumping)) or (
-        (not is_cold) and (not is_heat_pumping)
-    )
-    if should_trim_to_target:
+    is_refrigeration_source = (not is_cold) and (not is_heat_pumping)
+    background_streams = None
+    untargeted_streams = None
+    if is_cold and is_heat_pumping:
         T_vals, H_vals = _get_reduced_bckgrd_cascade_till_Q_target(
             Q_hpr_target, T_vals, H_vals, is_cold=is_cold
+        )
+    elif is_refrigeration_source:
+        # The refrigerator searches over the coldest Q_hpr_target of the
+        # cooling, but is evaluated against the full cooling profile: the
+        # warmer rest goes to cooling water and air, and any default
+        # refrigeration that rest needs on its own is allowed for.
+        background_streams = _background_streams(T_vals, H_vals, config)
+        (T_vals, H_vals), rest = _split_cooling_profile_at_coldest_Q_target(
+            Q_hpr_target, T_vals, H_vals
+        )
+        untargeted_streams = (
+            StreamCollection()
+            if rest is None
+            else _background_streams(rest[0], rest[1] - rest[1][0], config)
         )
 
     T_vals, H_vals, z_amb = _get_simplified_bckgrd_cascade_and_z_amb(
@@ -188,12 +203,24 @@ def _prepare_hpr_background_profile(
         config=config,
         is_cold=is_cold,
     )
-    return (
-        T_vals,
-        H_vals,
-        z_amb,
-        _create_stream_collection_of_background_profile(T_vals, H_vals),
+    if background_streams is None:
+        background_streams = _create_stream_collection_of_background_profile(
+            T_vals, H_vals
+        )
+    return T_vals, H_vals, z_amb, background_streams, untargeted_streams
+
+
+def _background_streams(
+    T_vals: np.ndarray, H_vals: np.ndarray, config: Configuration
+) -> StreamCollection:
+    """Build background streams for an evaporator-side cooling profile."""
+    T_vals, H_vals, _z_amb = _get_simplified_bckgrd_cascade_and_z_amb(
+        T_vals=np.asarray(T_vals, dtype=float).copy(),
+        H_vals=np.asarray(H_vals, dtype=float).copy(),
+        config=config,
+        is_cold=False,
     )
+    return _create_stream_collection_of_background_profile(T_vals, H_vals)
 
 
 def _create_stream_collection_of_background_profile(
@@ -258,17 +285,49 @@ def _get_reduced_bckgrd_cascade_till_Q_target(
         H_vals[i] = Q_hpr_target
         return T_vals[i:], H_vals[i:]
 
-    if -H_vals[-1] < Q_hpr_target:
-        return T_vals, H_vals
-
-    i = np.searchsorted(-H_vals, Q_hpr_target, side="left")
-    if i == 0:
-        raise ValueError("Target for refrigeration cannot be zero.")
-    T_vals[i] = linear_interpolation(
-        -Q_hpr_target, H_vals[i], H_vals[i - 1], T_vals[i], T_vals[i - 1]
+    targeted, _untargeted = _split_cooling_profile_at_coldest_Q_target(
+        Q_hpr_target, T_vals, H_vals
     )
-    H_vals[i] = -Q_hpr_target
-    return T_vals[: i + 1], H_vals[: i + 1]
+    return targeted
+
+
+def _split_cooling_profile_at_coldest_Q_target(
+    Q_hpr_target: float,
+    T_vals: np.ndarray,
+    H_vals: np.ndarray,
+) -> tuple[tuple[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray] | None]:
+    """Split a cooling profile into its coldest ``Q_hpr_target`` and the rest.
+
+    ``T_vals`` descends from the pinch and ``H_vals`` falls from 0 to minus the
+    total cooling. Refrigeration targets the coldest cooling, which only
+    refrigeration can serve; the warmer rest is left to cooling water and air.
+    Returns ``((T, H), rest)`` with the targeted ``H`` re-based to start at 0,
+    and ``rest`` ``None`` when the target covers the whole profile.
+    """
+    T_vals = np.asarray(T_vals, dtype=float).copy()
+    H_vals = np.asarray(H_vals, dtype=float).copy()
+    total = -float(H_vals[-1])
+    if total <= Q_hpr_target:
+        return (T_vals, H_vals), None
+    if Q_hpr_target <= tol:
+        raise ValueError("Target for refrigeration cannot be zero.")
+
+    H_cut = H_vals[-1] + Q_hpr_target  # cooling above this level is untargeted
+    # First index whose cumulative cooling reaches past the cut.
+    i = int(np.searchsorted(-H_vals, -H_cut, side="right"))
+    i = min(max(i, 1), H_vals.size - 1)
+    T_cut = linear_interpolation(
+        H_cut, H_vals[i - 1], H_vals[i], T_vals[i - 1], T_vals[i]
+    )
+    targeted_T = np.concatenate([[T_cut], T_vals[i:]])
+    targeted_H = np.concatenate([[H_cut], H_vals[i:]]) - H_cut
+    rest_T = np.concatenate([T_vals[:i], [T_cut]])
+    rest_H = np.concatenate([H_vals[:i], [H_cut]])
+    keep = np.r_[True, np.abs(np.diff(targeted_T)) > tol]
+    targeted_T, targeted_H = targeted_T[keep], targeted_H[keep]
+    keep = np.r_[np.abs(np.diff(rest_T)) > tol, True]
+    rest_T, rest_H = rest_T[keep], rest_H[keep]
+    return (targeted_T, targeted_H), (rest_T, rest_H)
 
 
 def _get_z_ambient(

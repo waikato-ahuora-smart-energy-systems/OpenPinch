@@ -139,7 +139,11 @@ def test_penalty_accounting_matches_positive_scalar_oracle(values) -> None:
         penalty_terms=values,
     )
 
-    assert penalty == pytest.approx(2.0 * sum(max(value, 0.0) ** 2 for value in values))
+    # Violations are relative to Q_hpr_target (200 kW), penalised exactly as
+    # rho * sum(r + r^2) and priced at 200 kW x max(ratio, 1).
+    scale = 200.0
+    relative = [max(value, 0.0) / scale for value in values]
+    assert penalty == pytest.approx(2.0 * sum(r + r**2 for r in relative) * scale)
     if not values:
         assert penalty == 0.0
 
@@ -153,7 +157,9 @@ def test_shared_accounting_accepts_rectangular_penalty_terms() -> None:
         penalty_terms=np.array([[1.0, 2.0], [3.0, 4.0]]),
     )
 
-    assert penalty == pytest.approx(2.0 * sum(value**2 for value in (1, 2, 3, 4)))
+    scale = 200.0  # Q_hpr_target x max(heat_to_power_ratio, 1)
+    relative = [value / scale for value in (1, 2, 3, 4)]
+    assert penalty == pytest.approx(2.0 * sum(r + r**2 for r in relative) * scale)
     assert np.isfinite(objective)
 
 

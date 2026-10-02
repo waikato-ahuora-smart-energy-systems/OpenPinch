@@ -309,7 +309,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "COSTING_HX_AREA_COEFF": _spec(float, 10000.0, "costing", "hx_area_coeff", numeric_min=0.0),
     "COSTING_HX_AREA_EXP": _spec(float, 0.6, "costing", "hx_area_exp", numeric_min=0.0),
     "COSTING_DISCOUNT_RATE": _spec(float, 0.07, "costing", "discount_rate", numeric_min=0.0),
-    "COSTING_SERVICE_LIFE": _spec(float, 20.0, "costing", "service_life", numeric_min=0.0),
+    "COSTING_SERVICE_LIFE": _spec(float, 20.0, "costing", "service_life", numeric_min=1.0),
     "COSTING_HPR_ELE_PRICE": _spec(float, 100.0, "costing", "hpr_ele_price", numeric_min=0.0),
     # HPR prices, relative to the electricity price.
     "COSTING_HPR_PRICE_RATIO_HEAT_TO_ELE": _spec(float, 1.0, "costing", "hpr_price_ratio_heat_to_ele", numeric_min=0.0),
@@ -356,6 +356,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HENS_MAX_PARALLEL": _spec(int, 1, "hens", "max_parallel", numeric_min=1.0, validator=_positive_int),
     "HENS_EVM_N_AD_BRANCHES": _spec(int | None, None, "hens", "evm_n_ad_branches", numeric_min=1.0, validator=_positive_int_or_none),
     "HENS_EVM_N_RM_BRANCHES": _spec(int | None, None, "hens", "evm_n_rm_branches", numeric_min=1.0, validator=_positive_int_or_none),
+    "HENS_EVM_BEAM_WIDTH": _spec(int, 4, "hens", "evm_beam_width", numeric_min=1.0, validator=_positive_int),
     "HENS_LOG_LEVEL": _spec(str, "INFO", "hens", "log_level", validator=_non_empty_string),
     "HENS_OUTPUT_FOLDER": _spec(str, "", "hens", "output_folder", validator=_string),
     "HENS_OUTPUT_FORMATS": _spec(List[str], [], "hens", "output_formats", validator=partial(_string_choice_grid, choices=HENS_OUTPUT_FORMAT_VALUES, allow_empty=True)),

@@ -34,7 +34,9 @@ def clean_composite_curve_ends(
     """Remove redundant constant-enthalpy points from curve ends."""
     y_vals = np.asarray(y_vals)
     x_vals = np.asarray(x_vals)
-    if np.all(np.isclose(x_vals, 0.0, atol=tol)) or np.abs(x_vals.var()) < tol:
+    # Compare the duty range with tol (variance is in kW^2, so a small curve
+    # with a real duty would vanish).
+    if x_vals.size == 0 or np.ptp(x_vals) <= tol:
         return np.array([]), np.array([])
     start_mask = ~np.isclose(x_vals, x_vals[0] * np.ones(len(x_vals)), atol=tol)
     end_mask = ~np.isclose(x_vals, x_vals[-1] * np.ones(len(x_vals)), atol=tol)

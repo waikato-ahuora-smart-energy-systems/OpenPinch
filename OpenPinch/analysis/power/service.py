@@ -238,6 +238,10 @@ def _preprocess_utilities(
             if abs(t_supply - t_target) < 1.0 + tol
             else t_target + dt_cont_act * 2
         )
+        # A stage condenses steam, so it must lie in water's saturation range
+        # (a hot-oil utility shifted above the critical point is skipped).
+        if not 0.01 < T_stage < T_CRIT:
+            continue
         if turbine_params["P_in"] + tol < psat_T(T_stage):
             continue
 

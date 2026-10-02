@@ -28,6 +28,10 @@ from .errors import (
     UtilityPlacementUnitError,
     UtilityTemplateValidationError,
 )
+from .units import (
+    INTERNAL_TEMPERATURE,
+    INTERNAL_TEMPERATURE_DIFFERENCE,
+)
 
 ConversionAdapter = Callable[..., float]
 
@@ -141,7 +145,7 @@ def _normalize_option_quantities(
     request: UtilityPlacementRequest,
 ) -> UtilityPlacementRequest:
     options = request.options
-    canonical_unit = request.units.temperature_difference
+    canonical_unit = INTERNAL_TEMPERATURE_DIFFERENCE
     updates = {
         field_name: QuantityValue(
             value=convert_placement_value(
@@ -274,19 +278,19 @@ def _normalize_template(
     prefix = f"{template.side.value}_templates.{placement_rank}"
     supply_bounds = _normalize_interval(
         template.supply_bounds,
-        canonical_unit=request.units.absolute_temperature,
+        canonical_unit=INTERNAL_TEMPERATURE,
         field_path=f"{prefix}.supply_bounds",
         convert_value=convert_value,
     )
     fixed_span = _normalize_quantity(
         template.fixed_span,
-        canonical_unit=request.units.temperature_difference,
+        canonical_unit=INTERNAL_TEMPERATURE_DIFFERENCE,
         field_path=f"{prefix}.fixed_span",
         convert_value=convert_value,
     )
     span_bounds = _normalize_interval(
         template.span_bounds,
-        canonical_unit=request.units.temperature_difference,
+        canonical_unit=INTERNAL_TEMPERATURE_DIFFERENCE,
         field_path=f"{prefix}.span_bounds",
         convert_value=convert_value,
     )
@@ -299,7 +303,7 @@ def _normalize_template(
             )
         fixed_span = fixed_span or QuantityValue(
             value=request.options.default_isothermal_span.value,
-            unit=request.units.temperature_difference,
+            unit=INTERNAL_TEMPERATURE_DIFFERENCE,
         )
         if fixed_span.value <= 0.0:
             raise UtilityTemplateValidationError(

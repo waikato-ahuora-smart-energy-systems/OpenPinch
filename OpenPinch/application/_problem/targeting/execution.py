@@ -194,6 +194,7 @@ def execute_targeting(
     master = build_execution_master_zone(problem)
     runtime_options, sid = resolve_runtime_period_options(options, zone=master)
     zone = resolve_target_zone(problem, application_zone, master_zone=master)
+    _require_subzones_for_indirect_target(zone, target_id)
     if target_id != "Energy Transfer Analysis":
         parent = zone.parent_zone
         while isinstance(parent, Zone):
@@ -234,6 +235,26 @@ def execute_targeting(
         raise RuntimeError(
             f"Targeting did not produce target {target_id!r} for zone {zone.name!r}."
         ) from exc
+
+
+# Utility heat pumps and refrigeration (IHP, IR) also build an indirect
+# target, but are valid on a single zone, so only these two are checked.
+_INDIRECT_TARGET_IDS = frozenset({TargetType.SA.value, TargetType.II.value})
+
+
+def _require_subzones_for_indirect_target(zone: Zone, target_id: str) -> None:
+    """Reject indirect (Total Site) targeting on a zone with no subzones.
+
+    Indirect targeting integrates subzones through utilities. On a single zone
+    it has nothing to integrate and would report zero utility and no pinch.
+    """
+    if target_id in _INDIRECT_TARGET_IDS and not zone.subzones:
+        raise ValueError(
+            f"Zone {zone.name!r} has no subzones, so indirect (Total Site) "
+            "targeting has nothing to integrate. Use direct heat integration "
+            "(target.direct_heat_integration()) for a single zone, or the "
+            "direct heat pump and refrigeration methods."
+        )
 
 
 def execute_cogeneration_targeting(

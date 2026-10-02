@@ -63,20 +63,41 @@ def _run_da_single(
     accept: float,
     maxfun: int,
 ) -> tuple[list[np.ndarray], list[float]]:
-    """Execute one dual-annealing run and record callback minima."""
+    """Execute one dual-annealing run and record callback minima.
+
+    Coordinates with fixed bounds (lower == upper) are held at that value and
+    only the free ones are annealed: scipy rejects zero-width bounds.
+    """
     run_minima_x = []
     run_minima_f = []
     x0 = x0_ls[run % np.shape(x0_ls)[0]] if x0_ls is not None else None
 
+    bounds_array = np.asarray(bounds, dtype=float)
+    fixed = bounds_array[:, 0] >= bounds_array[:, 1]
+    template = bounds_array[:, 0].copy()
+    free = ~fixed
+
+    def expand(x_free) -> np.ndarray:
+        full = template.copy()
+        full[free] = np.asarray(x_free, dtype=float)
+        return full
+
+    if not free.any():
+        value = float(func(template.copy(), *tuple(args or ())))
+        return [template.copy()], [value]
+
+    def free_func(x_free, *func_args):
+        return func(expand(x_free), *func_args)
+
     def callback(x, f, context):
-        run_minima_x.append(np.array(x, dtype=float))
+        run_minima_x.append(expand(x))
         run_minima_f.append(float(f))
         return False
 
     res = dual_annealing(
-        func=func,
-        x0=x0,
-        bounds=bounds,
+        func=free_func,
+        x0=None if x0 is None else np.asarray(x0, dtype=float)[free],
+        bounds=bounds_array[free],
         args=args,
         maxiter=maxiter,
         initial_temp=initial_temp,
@@ -89,6 +110,6 @@ def _run_da_single(
         callback=callback,
     )
 
-    run_minima_x.append(np.array(res.x, dtype=float))
+    run_minima_x.append(expand(res.x))
     run_minima_f.append(float(res.fun))
     return run_minima_x, run_minima_f

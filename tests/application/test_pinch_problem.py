@@ -229,11 +229,12 @@ def test_export_calls_writer_with_results(monkeypatch, tmp_path: Path):
 
     called = {}
 
-    def fake_writer(target_response, master_zone, out_dir):
+    def fake_writer(target_response, master_zone, out_dir, period_zones=None):
         called["kwargs"] = {
             "target_response": target_response,
             "master_zone": master_zone,
             "out_dir": out_dir,
+            "period_zones": period_zones,
         }
         output_path = Path(out_dir) / "targets.xlsx"
         # we don't actually write, just return a path

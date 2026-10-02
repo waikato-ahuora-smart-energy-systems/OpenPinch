@@ -16,6 +16,7 @@ from .codec import build_utility_placement_model, decode_placement
 from .context import UtilityPlacementContext
 from .evaluation import PlacementEvaluation, PlacementEvaluationSession
 from .optimisation import OptimisationRunner, coordinate_optimisation
+from .units import convert_to_request_units
 
 
 def _candidate(
@@ -68,8 +69,13 @@ def optimise_utility_placement(
         allocation_adapter=allocation_adapter,
     )
     outcome = coordinate_optimisation(session=session, runner=runner)
+    # The analysis runs in degC; report temperatures in the request's units.
     candidates = tuple(
-        _candidate(evaluation, request=request, model=model)
+        convert_to_request_units(
+            _candidate(evaluation, request=request, model=model),
+            absolute=request.units.absolute_temperature,
+            difference=request.units.temperature_difference,
+        )
         for evaluation in outcome.evaluations
     )
     return UtilityPlacementResult(
