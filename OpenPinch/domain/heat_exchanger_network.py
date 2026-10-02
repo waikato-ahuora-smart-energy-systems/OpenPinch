@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ._heat_exchanger import rules as _rules
-from .enums import HeatExchangerKind, HeatExchangerNetworkLabel
+from ._heat_exchanger.period_state import (
+    HeatExchangerPeriodState as _HeatExchangerPeriodState,
+)
+from .enums import HeatExchangerKind, HeatExchangerNetworkLabel, StreamID
 from .heat_exchanger import HeatExchanger
 
 _DUTY_LABEL_KINDS = {
@@ -94,6 +98,81 @@ class HeatExchangerNetwork(BaseModel):
             exchanger.period_ids for exchanger in self.exchangers
         )
         return self
+
+    @classmethod
+    def from_structure(
+        cls,
+        *,
+        recovery: Iterable[tuple[str, str, int]],
+        heaters: Iterable[str] = (),
+        coolers: Iterable[str] = (),
+        hot_utility: str | None = None,
+        cold_utility: str | None = None,
+        stage_count: int | None = None,
+        period_id: str = "0",
+    ) -> Self:
+        """Build a zero-duty network structure from stream names.
+
+        ``recovery`` lists ``(hot_stream, cold_stream, stage)`` matches with
+        one-based stages. ``heaters`` names cold streams served by
+        ``hot_utility`` and ``coolers`` names hot streams served by
+        ``cold_utility``. Exchanger ids follow the solver result convention:
+        ``recovery:<hot>-><cold>:S<stage>``, ``hot-utility:<utility>-><cold>``
+        and ``cold-utility:<hot>-><utility>``.
+        """
+
+        heater_streams = tuple(heaters)
+        cooler_streams = tuple(coolers)
+        if heater_streams and hot_utility is None:
+            raise ValueError("hot_utility is required when heaters are listed")
+        if cooler_streams and cold_utility is None:
+            raise ValueError("cold_utility is required when coolers are listed")
+
+        def state() -> tuple[_HeatExchangerPeriodState, ...]:
+            return (
+                _HeatExchangerPeriodState(
+                    period_id=period_id, period_idx=0, duty=0.0, active=False
+                ),
+            )
+
+        exchangers = [
+            HeatExchanger(
+                exchanger_id=f"recovery:{hot}->{cold}:S{int(stage)}",
+                kind=HeatExchangerKind.RECOVERY,
+                source_stream=hot,
+                sink_stream=cold,
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Process,
+                stage=int(stage),
+                period_states=state(),
+            )
+            for hot, cold, stage in recovery
+        ]
+        exchangers.extend(
+            HeatExchanger(
+                exchanger_id=f"hot-utility:{hot_utility}->{cold}",
+                kind=HeatExchangerKind.HOT_UTILITY,
+                source_stream=str(hot_utility),
+                sink_stream=cold,
+                source_stream_role=StreamID.Utility,
+                sink_stream_role=StreamID.Process,
+                period_states=state(),
+            )
+            for cold in heater_streams
+        )
+        exchangers.extend(
+            HeatExchanger(
+                exchanger_id=f"cold-utility:{hot}->{cold_utility}",
+                kind=HeatExchangerKind.COLD_UTILITY,
+                source_stream=hot,
+                sink_stream=str(cold_utility),
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Utility,
+                period_states=state(),
+            )
+            for hot in cooler_streams
+        )
+        return cls(exchangers=tuple(exchangers), stage_count=stage_count)
 
     @property
     def period_ids(self) -> tuple[str, ...]:

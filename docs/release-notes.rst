@@ -27,6 +27,17 @@ HPR cost model and search
 - Simulated refrigeration penalises unserved selected cooling, as the Carnot
   path does.
 
+HEN duty allocation on a fixed structure
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``problem.design.optimise_duties(structure, objective=...)`` allocates duty
+  on a user-defined network (recovery matches by stage, heaters and coolers,
+  given as a mapping or a ``HeatExchangerNetwork``) with the stage-wise model:
+  fixed matches, free stream splits. Objectives:
+  ``"utility"`` (minimum approach per exchanger), ``"area"`` (maximum hot
+  and/or cold utility) and ``"cost"`` (total annual cost, 1 K feasibility
+  approach).
+
 Analysis reliability and extensibility
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

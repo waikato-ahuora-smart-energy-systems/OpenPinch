@@ -350,6 +350,133 @@ class _DesignAccessor:
             workspace_variant=None,
         )
 
+    _STRUCTURE_KEYS = frozenset(
+        {"recovery", "heaters", "coolers", "hot_utility", "cold_utility", "stage_count"}
+    )
+
+    def _network_from_structure(
+        self, structure: Mapping[str, Any]
+    ) -> "HeatExchangerNetwork":
+        from ....domain.heat_exchanger_network import HeatExchangerNetwork
+
+        unknown = sorted(
+            str(key) for key in structure if key not in self._STRUCTURE_KEYS
+        )
+        if unknown:
+            raise ValueError(
+                "network structure accepts recovery, heaters, coolers, "
+                "hot_utility, cold_utility and stage_count; got "
+                + ", ".join(unknown)
+                + "."
+            )
+        if "recovery" not in structure:
+            raise ValueError("network structure needs a 'recovery' list.")
+        heaters = tuple(structure.get("heaters", ()))
+        coolers = tuple(structure.get("coolers", ()))
+        hot_utility = structure.get("hot_utility")
+        cold_utility = structure.get("cold_utility")
+        if heaters and hot_utility is None:
+            hot_utility = self._only_utility("Hot")
+        if coolers and cold_utility is None:
+            cold_utility = self._only_utility("Cold")
+        return HeatExchangerNetwork.from_structure(
+            recovery=tuple(structure["recovery"]),
+            heaters=heaters,
+            coolers=coolers,
+            hot_utility=hot_utility,
+            cold_utility=cold_utility,
+            stage_count=structure.get("stage_count"),
+        )
+
+    def _only_utility(self, kind: str) -> str:
+        data = self._problem._validated_data
+        names = [
+            utility.name
+            for utility in getattr(data, "utilities", None) or ()
+            if getattr(utility.type, "value", utility.type) == kind
+        ]
+        if len(names) != 1:
+            side = kind.lower()
+            raise ValueError(
+                f"pass {side}_utility explicitly; the problem defines "
+                f"{len(names)} {side} utilities."
+            )
+        return names[0]
+
+    def optimise_duties(
+        self,
+        network: "HeatExchangerNetwork | Mapping[str, Any]",
+        *,
+        objective: str = "utility",
+        min_approach_temperature: float | None = None,
+        exchanger_approach_temperatures: Mapping[str, float] | None = None,
+        max_hot_utility: float | None = None,
+        max_cold_utility: float | None = None,
+        options: Mapping[str, Any] | None = None,
+        period_id: str | None = None,
+        solver=None,
+        solve_tolerance=None,
+    ) -> HeatExchangerNetworkDesignView:
+        """Optimise exchanger duties on a fixed, user-defined network structure.
+
+        ``network`` lists every exchanger: recovery matches with a stage, plus
+        any heaters and coolers. Pass a ``HeatExchangerNetwork`` (for example a
+        previous design's ``selected_network``) or a mapping::
+
+            {
+                "recovery": [("H1", "C1", 1), ("H2", "C1", 1)],
+                "heaters": ["C1"],
+                "coolers": ["H1", "H2"],
+            }
+
+        Recovery entries are ``(hot_stream, cold_stream, stage)`` with
+        one-based stages; ``heaters`` names cold streams and ``coolers`` hot
+        streams. ``hot_utility``, ``cold_utility`` and ``stage_count`` keys
+        are optional; utilities default to the problem's only hot and cold
+        utility. The structure is kept as given; duties and stream split
+        fractions are optimised for one of three objectives:
+
+        * ``"utility"``: minimise total utility use. Each exchanger keeps at
+          least ``min_approach_temperature`` (or its entry in
+          ``exchanger_approach_temperatures``; stream temperature
+          contributions apply when neither is given) at both ends.
+        * ``"area"``: minimise total heat-transfer area with total utility
+          capped by ``max_hot_utility`` and/or ``max_cold_utility`` (kW).
+        * ``"cost"``: minimise total annual cost (annualised exchanger capital
+          from the ``COSTING_HX_*`` settings plus utility cost). Only a
+          positive approach is required at both ends of each exchanger,
+          ``min_approach_temperature`` defaulting to 1 K.
+
+        Requires the optional synthesis dependencies (GEKKO and the configured
+        ``HENS_SOLVER_EVM`` solver).
+        """
+        from ....analysis.heat_exchanger_networks.duty_optimisation import (
+            heat_exchanger_network_duty_optimisation_service,
+        )
+
+        if isinstance(network, Mapping):
+            network = self._network_from_structure(network)
+        runtime, configuration = self._arguments(
+            options=options,
+            period_id=period_id,
+            solve_tolerance=solve_tolerance,
+        )
+        if solver is not None:
+            configuration["HENS_SOLVER_EVM"] = solver
+        return self._run(
+            heat_exchanger_network_duty_optimisation_service,
+            surface="optimise_duties",
+            runtime=runtime,
+            configuration=configuration,
+            network=network,
+            objective=objective,
+            min_approach_temperature=min_approach_temperature,
+            exchanger_approach_temperatures=exchanger_approach_temperatures,
+            max_hot_utility=max_hot_utility,
+            max_cold_utility=max_cold_utility,
+            workspace_variant=None,
+        )
+
     def multiperiod_heat_exchanger_network(self, **kwargs):
         """Synthesize one shared HEN after explicit all-period targeting."""
         if not self._problem.period_results:

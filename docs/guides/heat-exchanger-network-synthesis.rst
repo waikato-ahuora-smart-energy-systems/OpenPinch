@@ -58,6 +58,67 @@ For multiple operating periods, call
 ``problem.design.multiperiod_heat_exchanger_network(...)`` after explicit
 all-period targeting.
 
+Duty Allocation on a Fixed Network
+----------------------------------
+
+When the network structure is already decided, define it by hand and let
+OpenPinch allocate the duties. List recovery matches as
+``(hot_stream, cold_stream, stage)`` with one-based stages, heaters by cold
+stream and coolers by hot stream. Utility names default to the problem's only
+hot and cold utility; add ``hot_utility``, ``cold_utility`` or ``stage_count``
+keys to override them. A ``HeatExchangerNetwork``, such as a previous design's
+``selected_network``, is accepted in place of the mapping.
+
+.. code-block:: python
+
+   structure = {
+       "recovery": [
+           ("Raw Milk", "Milk Concentrate", 1),
+           ("HT Flash", "Milk Concentrate", 1),
+           ("Raw Milk", "CIP Water", 2),
+           ("HT Flash", "CIP Water", 2),
+       ],
+       "heaters": ["Milk Concentrate"],
+       "coolers": ["Raw Milk", "HT Flash"],
+   }
+
+   min_utility = problem.design.optimise_duties(
+       structure, objective="utility", min_approach_temperature=10.0
+   )
+   min_area = problem.design.optimise_duties(
+       structure,
+       objective="area",
+       max_hot_utility=1.5 * min_utility.total_hot_utility,
+   )
+   min_cost = problem.design.optimise_duties(structure, objective="cost")
+
+``optimise_duties`` keeps every listed exchanger and solves the stage-wise
+model with fixed matches and free stream splits, so only duties and split
+fractions change. Exchangers that end at zero duty are still reported, marked
+inactive.
+
+``"utility"``
+   Minimise total utility use. Each exchanger keeps at least
+   ``min_approach_temperature`` at both ends. Per-exchanger values in
+   ``exchanger_approach_temperatures`` (keyed by ``exchanger_id``) override it.
+   With neither, the stream temperature contributions set each match's limit.
+``"area"``
+   Minimise total heat-transfer area with total utility capped by
+   ``max_hot_utility`` and/or ``max_cold_utility`` (kW). At least one cap is
+   required. Approach limits work as for ``"utility"``.
+``"cost"``
+   Minimise total annual cost: annualised exchanger capital from the
+   ``COSTING_HX_*`` settings plus utility cost. Only a positive approach is
+   required at both ends of every exchanger; ``min_approach_temperature``
+   defaults to 1 K.
+
+The stage-wise model allows one heater per cold stream and one cooler per hot
+stream, and every process stream needs at least one exchanger. Stream names
+may be given without their zone prefix when unambiguous. The ``"area"``
+objective optimises one operating period; pass ``period_id`` for a
+multiperiod problem. The solver is ``HENS_SOLVER_EVM`` unless ``solver`` is
+passed.
+
 Serialized Network Input
 ------------------------
 
