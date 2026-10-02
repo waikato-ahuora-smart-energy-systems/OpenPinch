@@ -1286,3 +1286,77 @@ def test_segmented_utility_draws_from_its_profile(scipy_backend) -> None:
     assert network.total_annual_cost == pytest.approx(
         network.utility_cost + network.capital_cost
     )
+
+
+def _off_period_problem() -> PinchProblem:
+    payload = _small_payload()
+    hot = payload["streams"][0]
+    hot["heat_capacity_flowrate"] = {"unit": "kW/delta_degC", "values": [10.0, 0.0]}
+    hot["heat_flow"] = {"unit": "kW", "values": [2000.0, 0.0]}
+    for record in payload["streams"][1:]:
+        for key in ("heat_capacity_flowrate", "heat_flow"):
+            record[key] = {
+                "unit": record[key]["unit"],
+                "values": [record[key]["value"]] * 2,
+            }
+    payload["options"].update(
+        {"PROBLEM_PERIOD_IDS": ["on", "off"], "PROBLEM_PERIOD_WEIGHTS": [0.5, 0.5]}
+    )
+    problem = PinchProblem(payload)
+    problem.target.all_periods.direct_heat_integration()
+    return problem
+
+
+def test_stream_off_in_one_period_keeps_a_shared_design(scipy_backend) -> None:
+    view = _off_period_problem().design.optimise_duties(
+        SMALL_STRUCTURE, objective="utility", min_approach_temperature=10.0
+    )
+
+    duties = {
+        e.exchanger_id: [state.duty for state in e.period_states]
+        for e in view.selected_network.exchangers
+    }
+    # H1 is off in the second period: no recovery or cooling there, and the
+    # heater carries all of C1. Nothing is removed: each exchanger works in
+    # some period.
+    assert duties["recovery:H1->C1:S1"] == [pytest.approx(200.0, abs=0.5), 0.0]
+    assert duties["hot-utility:HPS->C1"][1] == pytest.approx(1000.0, abs=0.5)
+    assert duties["cold-utility:H1->CW"][1] == 0.0
+    assert view.selected_network.summary_metrics["removed_exchanger_count"] == 0
+
+
+def test_profile_without_flow_stays_at_supply() -> None:
+    from OpenPinch.analysis.heat_exchanger_networks.models.thermal_profiles import (
+        ThermalProfile,
+    )
+
+    off = ThermalProfile.single("hot", "H1", 500.0, 300.0, 0.0, 1.0)
+    on = ThermalProfile.single("cold", "C1", 300.0, 400.0, 2.0, 1.0)
+
+    assert off.total == 0.0
+    assert off.temperature_at(0.0) == 500.0
+    assert off.temperature_at(50.0) == 500.0
+    assert off.heat(400.0, smooth=False) == 0.0
+    assert on.temperature_at(100.0) == pytest.approx(350.0)
+    assert on.temperature_at(-20.0) == pytest.approx(290.0)
+
+
+@pytest.mark.synthesis
+@pytest.mark.solver
+def test_live_solver_area_with_a_stream_off_in_one_period() -> None:
+    _skip_without_live_solver()
+
+    view = _off_period_problem().design.optimise_duties(
+        SMALL_STRUCTURE,
+        objective="area",
+        min_approach_temperature=10.0,
+        max_hot_utility=1100.0,
+    )
+
+    network = view.selected_network
+    assert network.period_ids == ("on", "off")
+    heater = next(
+        e for e in network.exchangers if e.kind is HeatExchangerKind.HOT_UTILITY
+    )
+    assert heater.period_states[1].duty == pytest.approx(1000.0, abs=1.0)
+    assert all(state.duty <= 1100.0 + 1e-3 for state in heater.period_states)

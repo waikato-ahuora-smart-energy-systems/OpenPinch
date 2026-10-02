@@ -315,14 +315,18 @@ def prepare_fixed_structure(owner) -> None:
 
 
 def _stream_profile(owner, side: str, n: int, index: int) -> ThermalProfile:
-    if _piecewise._solver_parent_is_segmented(owner, side, index):
+    """Stream profile for one period; a stream that is off has zero flow."""
+
+    prefix = "h" if side == "hot" else "c"
+    if _piecewise._solver_parent_is_segmented(owner, side, index) and _has_duty(
+        owner, side, n, index
+    ):
         return ThermalProfile.from_piecewise(
             side,
             profile_from_solver_arrays(
                 owner.solver_arrays, side=side, parent_index=index, period_index=n
             ),
         )
-    prefix = "h" if side == "hot" else "c"
     names = owner.hot_names if side == "hot" else owner.cold_names
     return ThermalProfile.single(
         side,
@@ -333,6 +337,15 @@ def _stream_profile(owner, side: str, n: int, index: int) -> ThermalProfile:
         float(getattr(owner, f"htc_{prefix}_period")[n][index]),
         float(getattr(owner, f"T_{prefix}_cont_period")[n][index]),
     )
+
+
+def _has_duty(owner, side: str, n: int, index: int) -> bool:
+    """Whether a segmented stream carries heat in period ``n`` (it may be off)."""
+
+    duties = owner.solver_arrays.arrays.get(f"{side}_segment_duty_period")
+    if duties is None:
+        return True
+    return float(sum(duties[n][index])) > 0.0
 
 
 def _utility_profile(owner, side: str, n: int, index: int) -> ThermalProfile | None:
@@ -360,6 +373,22 @@ def _utility_profile(owner, side: str, n: int, index: int) -> ThermalProfile | N
             "temperature range."
         ) from exc
     return ThermalProfile.from_piecewise(side, profile)
+
+
+def _off(profile: ThermalProfile) -> bool:
+    return profile.total <= 0.0
+
+
+def _recovery_off(owner, n: int, match: RecoveryMatch) -> bool:
+    return _off(owner.hot_profiles[n][match.hot]) or _off(
+        owner.cold_profiles[n][match.cold]
+    )
+
+
+def stream_off(owner, n: int, match: UtilityMatch) -> bool:
+    """Whether the process stream of a utility exchanger is off in period n."""
+
+    return _off(stream_profile(owner, n, match))
 
 
 def stream_profile(owner, n: int, match: UtilityMatch) -> ThermalProfile:
@@ -408,7 +437,11 @@ def utility_side_temperatures(owner, n: int, e: int) -> tuple[float, float]:
 
 
 def _overall(first: float, second: float) -> float:
-    return 1.0 / (1.0 / float(first) + 1.0 / float(second))
+    """Series film resistance; a missing coefficient (stream off) counts as 1."""
+
+    first = float(first) if float(first) > 0.0 else 1.0
+    second = float(second) if float(second) > 0.0 else 1.0
+    return 1.0 / (1.0 / first + 1.0 / second)
 
 
 def _approach_limit(owner, override: float | None, contribution: float) -> float:
@@ -727,15 +760,22 @@ def build_fixed_structure_equations(owner) -> None:
 
 def _period_variables(owner, n: int, start: Mapping[str, Any]) -> None:
     spec = owner.spec
+    # A stream that is off in a period carries no duty there: its exchangers'
+    # duties are fixed at zero and its heat balances are skipped, which keeps
+    # the period's equations free of empty or duplicated rows.
     owner.q_r.append(
         [
-            owner._var(f"qr{r}p{n}", start["q_r"][r], 0.0, _q_max(owner, n, m))
+            owner._param(f"qr{r}p{n}", 0.0)
+            if _recovery_off(owner, n, m)
+            else owner._var(f"qr{r}p{n}", start["q_r"][r], 0.0, _q_max(owner, n, m))
             for r, m in enumerate(spec.recovery)
         ]
     )
     owner.q_u.append(
         [
-            owner._var(
+            owner._param(f"qu{e}p{n}", 0.0)
+            if stream_off(owner, n, m)
+            else owner._var(
                 f"qu{e}p{n}",
                 start["q_u"][e],
                 0.0,
@@ -828,11 +868,12 @@ def _stream_balances(owner, n: int) -> None:
     for i in range(owner.I):
         profile = owner.hot_profiles[n][i]
         for k in range(owner.S):
-            owner._equal(
-                profile.heat(owner.th_out[n][i][k])
-                - profile.heat(owner.th_in[n][i][k]),
-                _sum([q_r[r] for r in owner.hot_matches_at[(i, k)]]),
-            )
+            if not _off(profile):
+                owner._equal(
+                    profile.heat(owner.th_out[n][i][k])
+                    - profile.heat(owner.th_in[n][i][k]),
+                    _sum([q_r[r] for r in owner.hot_matches_at[(i, k)]]),
+                )
             _close_stream_link(
                 owner,
                 profile,
@@ -844,11 +885,12 @@ def _stream_balances(owner, n: int) -> None:
     for j in range(owner.J):
         profile = owner.cold_profiles[n][j]
         for k in range(owner.S):
-            owner._equal(
-                profile.heat(owner.tc_out[n][j][k])
-                - profile.heat(owner.tc_in[n][j][k]),
-                _sum([q_r[r] for r in owner.cold_matches_at[(j, k)]]),
-            )
+            if not _off(profile):
+                owner._equal(
+                    profile.heat(owner.tc_out[n][j][k])
+                    - profile.heat(owner.tc_in[n][j][k]),
+                    _sum([q_r[r] for r in owner.cold_matches_at[(j, k)]]),
+                )
             _close_stream_link(
                 owner,
                 profile,
@@ -873,7 +915,8 @@ def _close_stream_link(
     current = leaving
     for e in chain:
         outlet = owner.utility_out[n][e]
-        owner._equal(profile.heat(outlet) - profile.heat(current), owner.q_u[n][e])
+        if not _off(profile):
+            owner._equal(profile.heat(outlet) - profile.heat(current), owner.q_u[n][e])
         current = outlet
     if not chain and not implied:
         owner._equal(current, downstream)
@@ -924,18 +967,21 @@ def _recovery_equations(owner, n: int, start: Mapping[str, Any]) -> None:
         q = owner.q_r[n][r]
         th_in = owner.th_in[n][i][k]
         tc_in = owner.tc_in[n][j][k]
-        owner._equal(q, x * (hot.heat(t_hx) - hot.heat(th_in)))
-        owner._equal(q, y * (cold.heat(t_cy) - cold.heat(tc_in)))
+        if not _off(hot):
+            owner._equal(q, x * (hot.heat(t_hx) - hot.heat(th_in)))
+        if not _off(cold):
+            owner._equal(q, y * (cold.heat(t_cy) - cold.heat(tc_in)))
         owner._equal(theta_1, th_in - t_cy)
         owner._equal(theta_2, t_hx - tc_in)
-        _interior_approaches(
-            owner,
-            f"r{r}p{n}",
-            (hot, x, th_in, t_hx),
-            (cold, y, tc_in, t_cy),
-            q,
-            dt,
-        )
+        if not _recovery_off(owner, n, match):
+            _interior_approaches(
+                owner,
+                f"r{r}p{n}",
+                (hot, x, th_in, t_hx),
+                (cold, y, tc_in, t_cy),
+                q,
+                dt,
+            )
         x_row.append(x)
         y_row.append(y)
         hx_row.append(t_hx)
@@ -1024,7 +1070,9 @@ def _utility_equations(owner, n: int, start: Mapping[str, Any]) -> None:
         theta_2 = owner._var(f"tu2{e}p{n}", max(dt, start_ends[1]), dt, None)
         owner._equal(theta_1, hot_end)
         owner._equal(theta_2, cold_end)
-        if own is not None:
+        if stream_off(owner, n, match):
+            pass
+        elif own is not None:
             utility_side = (own, fraction, util_in, util_outlet)
             stream_side = (profile, 1.0, stream_in, stream_out)
             hot_side, cold_side = (
@@ -1085,8 +1133,16 @@ def _linear_utility_interior(
 
 
 def _utility_caps(owner, n: int) -> None:
-    heaters = [e for e, m in enumerate(owner.spec.utilities) if m.side == HEATER]
-    coolers = [e for e, m in enumerate(owner.spec.utilities) if m.side == COOLER]
+    heaters = [
+        e
+        for e, m in enumerate(owner.spec.utilities)
+        if m.side == HEATER and not stream_off(owner, n, m)
+    ]
+    coolers = [
+        e
+        for e, m in enumerate(owner.spec.utilities)
+        if m.side == COOLER and not stream_off(owner, n, m)
+    ]
     if owner.max_hot_utility is not None and heaters:
         owner._at_least(
             float(owner.max_hot_utility), _sum([owner.q_u[n][e] for e in heaters])

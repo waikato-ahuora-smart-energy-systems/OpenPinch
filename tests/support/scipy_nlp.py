@@ -274,7 +274,8 @@ def scipy_fixed_structure_model():
                 for row in rows
                 for profile in row
             )
-            self.mSuccess = 1 if self.m.solve(polish=kinked) else 0
+            polish = kinked or self.N_periods > 1
+            self.mSuccess = 1 if self.m.solve(polish=polish) else 0
             if self.mSuccess:
                 self.get_post_process()
 

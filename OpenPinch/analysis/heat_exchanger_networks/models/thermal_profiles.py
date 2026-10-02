@@ -197,15 +197,25 @@ class ThermalProfile:
         return float(value)
 
     def temperature_at(self, heat: float) -> float:
-        """Exact inverse of ``heat`` with linear extrapolation at both ends."""
+        """Exact inverse of ``heat`` with linear extrapolation at both ends.
+
+        Segments without flow (a stream that is off in a period) carry no
+        heat, so they are skipped; a profile without any flow stays at its
+        supply temperature.
+        """
 
         heat = float(heat)
         sign = -1.0 if self.side == "hot" else 1.0
+        flowing = [k for k, cp in enumerate(self.cp) if cp > 0.0]
+        if not flowing:
+            return self.supply
         if heat <= 0.0:
-            return self.supply + sign * heat / self.cp[0]
+            first = flowing[0]
+            return self.t_in[first] + sign * heat / self.cp[first]
         cumulative = 0.0
-        for k, duty in enumerate(self.duties):
-            if heat <= cumulative + duty or k == len(self.duties) - 1:
+        for k in flowing:
+            duty = self.duties[k]
+            if heat <= cumulative + duty or k == flowing[-1]:
                 return self.t_in[k] + sign * (heat - cumulative) / self.cp[k]
             cumulative += duty
         return self.target  # pragma: no cover - loop always returns
