@@ -60,6 +60,7 @@ __all__ = [
     "is_negligible_useful_duty",
     "condensing_temperature_search_range",
     "calc_simulated_hpr_annualized_costs",
+    "hpr_penalty_cost_scale",
     "calc_carnot_heat_engine_eta",
     "calc_carnot_heat_pump_cop",
     "compute_entropic_mean_temperature",
@@ -74,6 +75,11 @@ def _cycle_penalty(
     args: HeatPumpTargetInputs,
     cycle_penalty_terms: list[float] | None = None,
 ) -> float:
+    """Return the dimensionless penalty rho * sum((g / Q_hpr_target)^2).
+
+    Violations are relative to the targeted duty, so the penalty is the same
+    for a 10 kW and a 10 MW problem with the same relative shortfall.
+    """
     cycle_terms = np.maximum(
         np.asarray(_normalise_hpr_penalty_terms(cycle_penalty_terms), dtype=float),
         0.0,
@@ -82,12 +88,55 @@ def _cycle_penalty(
         return 0.0
     return float(
         _g_ineq_penalty(
-            cycle_terms,
+            cycle_terms / _penalty_duty_scale(args),
             eta=float(getattr(args, "eta_penalty", 0.01)),
             rho=float(getattr(args, "rho_penalty", 10.0)),
             form=PenaltyForm.SQUARE,
         )
     )
+
+
+def _penalty_duty_scale(args: HeatPumpTargetInputs) -> float:
+    """Return the duty (kW) that violations are measured against."""
+    return max(abs(float(getattr(args, "Q_hpr_target", 0.0) or 0.0)), 1.0)
+
+
+def hpr_penalty_cost_scale(args: HeatPumpTargetInputs) -> float:
+    """Return the annual cost ($/y) that prices the feasibility penalty.
+
+    This is what serving ``Q_hpr_target`` costs with no heat pump: the default
+    hot utility (heat pumping) or default refrigeration, operating cost plus
+    annualised capital. The capital part keeps the penalty in force when the
+    electricity price or operating hours are zero. It is never below 1 $/y.
+    """
+    duty = _penalty_duty_scale(args)
+    is_heat_pumping = getattr(args, "is_heat_pumping", True)
+    ratio = (
+        float(getattr(args, "heat_to_power_ratio", 0.0))
+        if is_heat_pumping
+        else float(getattr(args, "refrigeration_to_power_ratio", 0.0))
+    )
+    operating = compute_annual_energy_cost(
+        duty,
+        max(float(getattr(args, "ele_price", 0.0)), 0.0) * max(ratio, 0.0),
+        max(float(getattr(args, "annual_op_time", 0.0)), 0.0),
+    )
+    unit_capital = float(
+        getattr(
+            args,
+            "hot_utility_capital_cost" if is_heat_pumping else
+            "refrigeration_capital_cost",
+            0.0,
+        )
+        or 0.0
+    )
+    capital = compute_annual_capital_cost(
+        Value(duty * max(unit_capital, 0.0), "$"),
+        getattr(args, "discount_rate", 0.05),
+        getattr(args, "serv_life", 20.0),
+    )
+    total = float(operating.to("$/y").value) + float(capital.to("$/y").value)
+    return max(total, 1.0)
 
 
 @dataclass(frozen=True)
@@ -197,7 +246,7 @@ def calc_simulated_hpr_annualized_costs(
     Q_cooling_water: float,
     Q_refrigeration: float,
     cost_units: Sequence[HPRCostUnit],
-    penalty_power_equivalent: float,
+    penalty_weight: float,
     args: HeatPumpTargetInputs,
 ) -> SimulatedHPRAnnualizedCostAccounting:
     """Return unit-aware annualized cost accounting for simulated HPR candidates.
@@ -250,10 +299,10 @@ def calc_simulated_hpr_annualized_costs(
     total_annualized = (
         operating_cost + annualized_capital + utility_annualized_capital
     ).to("$/y")
-    feasibility_penalty = compute_annual_energy_cost(
-        penalty_power_equivalent,
-        ele_price,
-        annual_hours,
+    # The dimensionless penalty is priced at the no-heat-pump annual cost of
+    # the targeted service, so it is in $/y on the same scale as real costs.
+    feasibility_penalty = Value(
+        float(penalty_weight) * hpr_penalty_cost_scale(args), "$/y"
     )
 
     return SimulatedHPRAnnualizedCostAccounting(
@@ -484,7 +533,7 @@ def evaluate_vapour_hpr_result(
         # water or default refrigeration still has to remove is unserved,
         # so a zero-duty refrigerator is never a valid design.
         all_penalty_terms.append(Q_ext_cold)
-    penalty_power_equivalent = _cycle_penalty(
+    penalty_weight = _cycle_penalty(
         args=args,
         cycle_penalty_terms=all_penalty_terms,
     )
@@ -494,7 +543,7 @@ def evaluate_vapour_hpr_result(
         Q_cooling_water=Q_cooling_water,
         Q_refrigeration=Q_refrigeration,
         cost_units=cost_units,
-        penalty_power_equivalent=penalty_power_equivalent,
+        penalty_weight=penalty_weight,
         args=args,
     )
     penalty = float(cost_accounting.feasibility_penalty.to("$/y").value)

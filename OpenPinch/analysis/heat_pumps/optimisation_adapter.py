@@ -767,34 +767,39 @@ def build_hpr_accounting(
     ``Q_ext_cold`` is the external cold met by refrigeration and
     ``Q_cooling_water`` the part met by cooling water.
     """
+    # Violations are relative to the targeted duty; the dimensionless penalty
+    # is priced in power-equivalent units at the targeted service's no-heat-
+    # pump value (Q_hpr_target x its price ratio, at least x1), matching the
+    # power-equivalent objective below. It does not vanish with a zero ratio.
+    duty_scale = max(abs(float(args.Q_hpr_target)), 1.0)
+    is_heat_pumping = getattr(args, "is_heat_pumping", True)
+    service_ratio = (
+        float(args.heat_to_power_ratio)
+        if is_heat_pumping
+        else float(args.refrigeration_to_power_ratio)
+    )
+    power_scale = duty_scale * max(service_ratio, 1.0)
     positive_penalty_terms = np.maximum(
         np.asarray(normalise_hpr_penalty_terms(penalty_terms), dtype=float),
         0.0,
     )
+    if penalise_external_cold_when_refrigerating and not is_heat_pumping:
+        positive_penalty_terms = np.append(
+            positive_penalty_terms, max(Q_ext_cold + Q_cooling_water, 0.0)
+        )
     penalty = (
         float(
             g_ineq_penalty(
-                positive_penalty_terms,
+                positive_penalty_terms / duty_scale,
                 eta=args.eta_penalty,
                 rho=args.rho_penalty,
                 form=PenaltyForm.SQUARE,
             )
         )
+        * power_scale
         if positive_penalty_terms.size
         else 0.0
     )
-    if penalise_external_cold_when_refrigerating and not getattr(
-        args,
-        "is_heat_pumping",
-        True,
-    ):
-        penalty += float(
-            g_ineq_penalty(
-                g=Q_ext_cold + Q_cooling_water,
-                rho=args.rho_penalty,
-                form=PenaltyForm.SQUARE,
-            )
-        )
     objective = calc_hpr_obj(
         work=work,
         Q_ext_heat=Q_ext_heat,
