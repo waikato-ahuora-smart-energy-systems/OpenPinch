@@ -8,11 +8,13 @@ from typing import Callable
 import numpy as np
 
 from ....contracts.hpr import (
+    ZERO_USEFUL_DUTY_REASON,
     HeatPumpTargetOutputs,
     HPRBackendResult,
     MultiPeriodHPRTargetInputs,
 )
 from ..optimisation_adapter import (
+    _is_no_beneficial_heat_pump,
     evaluate_hpr_candidate,
     normalise_initial_points,
     raise_hpr_targeting_error,
@@ -103,11 +105,20 @@ def solve_hpr_multiperiod_placement(
         if result.success and np.isfinite(float(result.obj)):
             return translate_hpr_result(result, ambient_args=selected_case.args)
         failures.append((len(failures), result))
+        if result.failure_reason == ZERO_USEFUL_DUTY_REASON:
+            # Candidates are ranked by shared objective: the best valid design
+            # is no heat pump in any period, so a worse heat pump is no target.
+            break
 
+    no_heat_pump = _is_no_beneficial_heat_pump(failures)
     raise_hpr_targeting_error(
         args=args,
         message=(
             "Multi-period heat pump and refrigeration targeting "
+            f"({args.hpr_type}) found no heat pump design that improves on the "
+            "baseline without one."
+            if no_heat_pump
+            else "Multi-period heat pump and refrigeration targeting "
             f"({args.hpr_type}) failed to return an optimal result."
         ),
         failures=failures,

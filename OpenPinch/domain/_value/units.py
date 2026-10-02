@@ -18,6 +18,8 @@ def normalise_unit_text(unit: str | None) -> str | None:
         return "dimensionless"
     if text in {"USD/y", "USD/yr", "USD/year"}:
         return "USD/year"
+    # Per-year rates with a prefix or other numerator, such as k$/y.
+    text = re.sub(r"/(?:y|yr)$", "/year", text)
     if text in {"C", "°C"}:
         return "degC"
     if text == "degK":
