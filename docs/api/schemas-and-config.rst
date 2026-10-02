@@ -41,7 +41,15 @@ enum choices, numeric bounds, and config paths:
 
 Common options include ``THERMAL_DT_CONT`` for minimum contribution
 temperature, ``OUTPUT_UNIT_*`` fields for report units, and numerical
-``HPR_*`` fields for heat-pump and refrigeration workflows. Configuration does
+``HPR_*`` fields for heat-pump and refrigeration workflows.
+
+``THERMAL_DT_CONT`` is the ``dt_cont`` of any process stream or utility that
+doesn't give its own (an absent, null or blank value). Heat exchanger network synthesis
+also uses it as the reference for its dTmin sweep: in each tier of
+``HENS_APPROACH_TEMPERATURES`` every stream's contribution is scaled by
+dTmin / (2 · ``THERMAL_DT_CONT``), so a stream at the default contributes
+exactly dTmin / 2. A utility without a ``price`` uses
+``COSTING_UTILITY_PRICE``, the price of the default utilities. Configuration does
 not contain target-method selectors; the descriptive ``problem.target.*`` or
 ``problem.design.*`` callable selects the analysis.
 

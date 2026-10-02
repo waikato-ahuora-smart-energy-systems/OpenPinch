@@ -424,11 +424,7 @@ def test_every_code_cell_compiles_and_uses_only_public_package_imports(
 
 def test_notebook_09_demonstrates_comprehensive_hpr_target_to_map() -> None:
     notebook = _load_notebook(
-        ROOT
-        / "OpenPinch"
-        / "tutorials"
-        / "notebooks"
-        / "09_vapour_compression.ipynb"
+        ROOT / "OpenPinch" / "tutorials" / "notebooks" / "09_vapour_compression.ipynb"
     )
     source = _combined_source(notebook)
 
@@ -468,11 +464,7 @@ def test_notebook_08_hpr_calls_are_explicitly_bounded() -> None:
 
 def test_notebook_09_required_coolprop_calls_fail_loudly_and_are_bounded() -> None:
     notebook = _load_notebook(
-        ROOT
-        / "OpenPinch"
-        / "tutorials"
-        / "notebooks"
-        / "09_vapour_compression.ipynb"
+        ROOT / "OpenPinch" / "tutorials" / "notebooks" / "09_vapour_compression.ipynb"
     )
     source = _combined_source(notebook)
 

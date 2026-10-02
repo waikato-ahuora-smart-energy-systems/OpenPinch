@@ -37,7 +37,11 @@ def test_period_value_stores_only_ordered_magnitudes():
     )
 
     np.testing.assert_allclose(value.period_values, np.array([10.0, 4.0]))
-    assert value.to_dict() == {"values": [10.0, 4.0], "unit": "kW"}
+    assert value.to_dict() == {
+        "values": [10.0, 4.0],
+        "unit": "kW",
+        "weights": [0.25, 0.75],
+    }
 
 
 def test_period_value_requires_explicit_summary_for_scalar_face():

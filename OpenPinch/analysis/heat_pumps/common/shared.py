@@ -279,9 +279,9 @@ def _annualized_utility_capital(
         max(float(duty), 0.0) * max(float(unit_capital_cost), 0.0),
         "$",
     )
-    return compute_annual_capital_cost(
-        capital, args.discount_rate, args.serv_life
-    ).to("$/y")
+    return compute_annual_capital_cost(capital, args.discount_rate, args.serv_life).to(
+        "$/y"
+    )
 
 
 def _cascade_air_duties(

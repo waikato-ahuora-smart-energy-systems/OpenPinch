@@ -360,10 +360,12 @@ def test_adapter_scales_explicit_dt_cont_by_active_multiplier() -> None:
 
     payload = problem_to_solver_arrays(problem, 20.0)
 
-    np.testing.assert_allclose(_single_state_array(payload, "T_h_cont"), [6.0])
-    np.testing.assert_allclose(_single_state_array(payload, "T_c_cont"), [8.0])
-    np.testing.assert_allclose(_single_state_array(payload, "T_hu_cont"), [2.0])
-    np.testing.assert_allclose(_single_state_array(payload, "T_cu_cont"), [4.0])
+    # Effective contributions (3, 4, 1, 2 times the multiplier 2) are scaled by
+    # dTmin / (2 * THERMAL_DT_CONT) = 20 / 10.
+    np.testing.assert_allclose(_single_state_array(payload, "T_h_cont"), [12.0])
+    np.testing.assert_allclose(_single_state_array(payload, "T_c_cont"), [16.0])
+    np.testing.assert_allclose(_single_state_array(payload, "T_hu_cont"), [4.0])
+    np.testing.assert_allclose(_single_state_array(payload, "T_cu_cont"), [8.0])
 
 
 def test_adapter_converts_absolute_temperatures_to_kelvin_for_solver_arrays() -> None:

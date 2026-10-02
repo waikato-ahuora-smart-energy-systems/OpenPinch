@@ -73,6 +73,8 @@ _METHOD_OPTION_NAMES = {
         }
     ),
 }
+
+
 def run_multistart_minimisation(
     problem: OptimisationProblem,
     *,

@@ -84,8 +84,27 @@ def semantic_issues(
             )
         )
 
+    seen_stream_names: set[tuple[str, str]] = set()
     for index, stream in enumerate(problem_inputs.streams):
         label = validation_record_label("streams", index, context)
+        stream_key = (str(stream.zone), str(stream.name))
+        if stream_key in seen_stream_names:
+            issues.append(
+                _build_issue(
+                    severity="warning",
+                    section="streams",
+                    record_index=index,
+                    record_label=label,
+                    path_field="name",
+                    field="name",
+                    message=(
+                        f"Stream name {stream.name!r} is used more than once in "
+                        f"zone {stream.zone!r}; this stream will be renamed with "
+                        "a numeric suffix."
+                    ),
+                )
+            )
+        seen_stream_names.add(stream_key)
         stream_values, stream_value_issues = _coerce_validation_values(
             stream,
             section="streams",
@@ -310,10 +329,28 @@ def _validate_stream_record_states(
             period_ids=period_ids,
         )
     )
+    issues.extend(
+        _validate_above_absolute_zero(
+            values,
+            section=section,
+            record_index=record_index,
+            record_label=record_label,
+            period_ids=period_ids,
+        )
+    )
+
+    length_issues = _validate_period_lengths(
+        values,
+        section=section,
+        record_index=record_index,
+        record_label=record_label,
+        period_ids=period_ids,
+    )
+    issues.extend(length_issues)
 
     t_supply = values.get("t_supply")
     t_target = values.get("t_target")
-    if t_supply is None or t_target is None:
+    if t_supply is None or t_target is None or length_issues:
         return issues
 
     classifications: dict[str, list[str]] = {
@@ -415,6 +452,10 @@ def _validate_segmented_stream_states(
                     raw_value = stream.htc
                 if field_name == "dt_cont" and raw_value is None:
                     raw_value = stream.dt_cont
+                # Unset values take defaults when the problem is built; use
+                # neutral stand-ins so the segment checks still run.
+                if raw_value is None and field_name in {"htc", "dt_cont"}:
+                    raw_value = 1.0 if field_name == "htc" else 0.0
                 values.append(
                     standardise_input_value(
                         raw_value,
@@ -824,7 +865,13 @@ def _validate_utility_record_states(
     record_label: Optional[str],
     period_ids: Sequence[str] | None = None,
 ) -> list[ValidationIssue]:
-    issues: list[ValidationIssue] = []
+    issues: list[ValidationIssue] = _validate_period_lengths(
+        values,
+        section=section,
+        record_index=record_index,
+        record_label=record_label,
+        period_ids=period_ids,
+    )
     for field_name in _UTILITY_VALUE_FIELDS:
         issues.extend(
             _validate_value_finiteness(
@@ -863,7 +910,93 @@ def _validate_utility_record_states(
             period_ids=period_ids,
         )
     )
+    issues.extend(
+        _validate_above_absolute_zero(
+            values,
+            section=section,
+            record_index=record_index,
+            record_label=record_label,
+            period_ids=period_ids,
+        )
+    )
+    return issues
 
+
+def _validate_above_absolute_zero(
+    values: dict[str, Value | None],
+    *,
+    section: str,
+    record_index: int,
+    record_label: Optional[str],
+    period_ids: Sequence[str] | None,
+) -> list[ValidationIssue]:
+    """Reject temperatures below absolute zero (values are in degC here)."""
+    issues: list[ValidationIssue] = []
+    for field_name in ("t_supply", "t_target"):
+        issues.extend(
+            _validate_period_states(
+                values.get(field_name),
+                section=section,
+                record_index=record_index,
+                record_label=record_label,
+                field_name=field_name,
+                severity="error",
+                message="Temperature is below absolute zero.",
+                reject=lambda magnitude: magnitude < -273.15,
+                period_ids=period_ids,
+            )
+        )
+    return issues
+
+
+def _validate_period_lengths(
+    values: dict[str, Value | None],
+    *,
+    section: str,
+    record_index: int,
+    record_label: Optional[str],
+    period_ids: Sequence[str] | None,
+) -> list[ValidationIssue]:
+    """Require a record's per-period arrays to agree on the number of periods.
+
+    A value is either one number for every period or one per period. With
+    ``PROBLEM_PERIOD_IDS`` declared, that is its length; otherwise all of the
+    record's multi-period values must share one length. Any other mix would
+    silently change the problem's period model or index out of range.
+    """
+    lengths = {
+        field_name: len(value)
+        for field_name, value in values.items()
+        if isinstance(value, Value) and len(value) > 1
+    }
+    if period_ids:
+        expected = len(period_ids)
+    elif lengths:
+        expected = max(set(lengths.values()), key=list(lengths.values()).count)
+    else:
+        return []
+    issues: list[ValidationIssue] = []
+    for field_name, count in lengths.items():
+        if count == expected:
+            continue
+        message = (
+            f"Has {count} period values, but PROBLEM_PERIOD_IDS declares "
+            f"{expected} periods."
+            if period_ids
+            else f"Has {count} period values, but other values of this record "
+            f"have {expected}."
+        )
+        issues.append(
+            _build_issue(
+                severity="error",
+                section=section,
+                record_index=record_index,
+                record_label=record_label,
+                path_field=field_name,
+                field=field_name,
+                message=message,
+            )
+        )
     return issues
 
 
