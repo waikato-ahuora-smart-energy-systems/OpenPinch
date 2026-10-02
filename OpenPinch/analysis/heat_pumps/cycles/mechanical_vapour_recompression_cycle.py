@@ -654,7 +654,9 @@ class MechanicalVapourRecompressionCycle(VapourCompressionCycle):
                 profile=profile,
                 heat_scale=mass_flow,
                 is_hot_stream=is_hot_profile,
-                delta_t_contribution=self._dtcont,
+                # HPR_DT_CONT is applied once, to the background profiles;
+                # cycle streams carry none of their own, as Carnot streams.
+                delta_t_contribution=0.0,
             )
         )
         return sc

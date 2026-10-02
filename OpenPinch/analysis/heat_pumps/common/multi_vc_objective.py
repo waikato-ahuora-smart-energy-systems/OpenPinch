@@ -25,6 +25,7 @@ from ....contracts.hpr import (
     HPRParsedState,
     HPRTopologyIdentifier,
 )
+from .shared import is_negligible_useful_duty
 
 __all__ = ["_evaluate_multi_vc_objective"]
 
@@ -97,7 +98,10 @@ def _evaluate_multi_vc_objective(
         primary_duty = hp.Q_heat_arr.sum() if is_heat_pumping else hp.Q_cool_arr.sum()
         if not np.isfinite(primary_duty) or primary_duty < 0.0:
             return HPRBackendResult.failure(reason="Cycle delivers negative duty.")
-        if primary_duty == 0.0 and artifact_mode is HPREvaluationMode.FINAL:
+        if (
+            is_negligible_useful_duty(primary_duty, args)
+            and artifact_mode is HPREvaluationMode.FINAL
+        ):
             return HPRBackendResult.failure(reason=ZERO_USEFUL_DUTY_REASON)
         cop = primary_duty / w_hpr if w_hpr > 0 else 1.0
         result = evaluate_result(
@@ -135,6 +139,12 @@ def _evaluate_multi_vc_objective(
         )
     except ValueError as exc:
         if cycle_evaluated:
+            # A post-solve error in the final pass is a typed failure for the
+            # caller; during the search it is a bug worth surfacing.
+            if artifact_mode is HPREvaluationMode.FINAL:
+                return HPRBackendResult.failure(
+                    reason=f"{label} cycle post-processing failed: {exc}",
+                )
             raise
         return HPRBackendResult.failure(
             reason=str(exc),

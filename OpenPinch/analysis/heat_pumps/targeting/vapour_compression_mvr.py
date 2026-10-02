@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 
 from ....contracts.hpr import (
@@ -22,10 +24,13 @@ from ..common.encoding import (
     map_x_arr_to_DT_arr,
     map_x_arr_to_T_arr,
 )
-from ..common.layout import HPRoptVectorLayout
+from ..common.layout import HPRoptVectorLayout, clip_to_bounds
 from ..common.shared import (
     HPRCostUnit,
+    cap_stage_condensing_temperatures,
+    condensing_temperature_search_range,
     evaluate_vapour_hpr_result,
+    is_negligible_useful_duty,
     validate_vapour_hp_refrigerant_ls,
 )
 from ..cycles.vapour_compression_mvr_cascade import VapourCompressionMvrCascade
@@ -49,6 +54,9 @@ __all__ = [
 ]
 
 MAX_MVR_STAGE_LIFT = 20.0
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def optimise_vapour_compression_mvr_heat_pump_placement(
@@ -127,7 +135,12 @@ def _get_vc_mvr_opt_setup(
     T_cond_seed = _fit_stage_array(init_res.T_cond, n_vc)
     T_evap_seed = _fit_stage_array(init_res.T_evap[::-1], n_vc)
     Q_heat_seed = _fit_stage_array(init_res.Q_cond, n_vc)
-    x_cond = map_T_arr_to_x_arr(T_cond_seed, args.T_cold[0], args.T_cold[-1])
+    # Seed and decode against the same subcritical range as cascade/parallel.
+    x_cond = np.clip(
+        map_T_arr_to_x_arr(T_cond_seed, *condensing_temperature_search_range(args)),
+        0.0,
+        1.0,
+    )
     x_evap = map_T_arr_to_x_arr(T_evap_seed, args.T_hot[-1], args.T_hot[0])
     x_subcool = np.zeros(n_mvr + n_vc, dtype=float)
     x_ihx = np.zeros(n_vc, dtype=float)
@@ -149,7 +162,7 @@ def _get_vc_mvr_opt_setup(
         layout.pack(**seed), args
     ).Q_heat_available
     seed["x_heat_split"] = encode_available_fractions(Q_heat_seed, Q_heat_available)
-    return layout.pack(**seed), bnds
+    return clip_to_bounds(layout.pack(**seed), bnds), bnds
 
 
 def _parse_vc_mvr_state_variables(
@@ -158,10 +171,11 @@ def _parse_vc_mvr_state_variables(
 ) -> HPRParsedState:
     n_mvr = _num_mvr_stages(args)
     parts = _vc_mvr_layout(args).unpack(x)
-    T_cond_vc = map_x_arr_to_T_arr(
-        parts["x_cond"],
-        args.T_cold[0],
-        args.T_cold[-1],
+    T_cond_vc = cap_stage_condensing_temperatures(
+        map_x_arr_to_T_arr(
+            parts["x_cond"], *condensing_temperature_search_range(args)
+        ),
+        args,
     )
     T_evap_vc = map_x_arr_to_T_arr(
         parts["x_evap"],
@@ -269,7 +283,10 @@ def _compute_vc_mvr_system_obj(
         w_hpr = hp.work
         if not np.isfinite(hp.Q_heat) or hp.Q_heat < 0.0:
             return HPRBackendResult.failure(reason="Cycle delivers negative duty.")
-        if hp.Q_heat == 0.0 and artifact_mode is HPREvaluationMode.FINAL:
+        if (
+            is_negligible_useful_duty(hp.Q_heat, args)
+            and artifact_mode is HPREvaluationMode.FINAL
+        ):
             return HPRBackendResult.failure(reason=ZERO_USEFUL_DUTY_REASON)
         cop = hp.Q_heat / w_hpr if w_hpr > 0 else 1.0
         Q_heat_ordered, Q_cool_ordered = _order_vc_mvr_result_duties(hp, args)
@@ -313,8 +330,15 @@ def _compute_vc_mvr_system_obj(
             target_simulation_record=record,
         )
     except ValueError as exc:
-        if debug or cycle_evaluated:
+        if cycle_evaluated:
+            if artifact_mode is HPREvaluationMode.FINAL:
+                return HPRBackendResult.failure(
+                    reason=f"VC+MVR cycle post-processing failed: {exc}"
+                )
             raise
+        if debug:
+            # Debug mode reports the failure but must not change the outcome.
+            _LOGGER.debug("VC+MVR candidate failed: %s", exc)
         parsed = _unpack_vc_mvr_state(state_vars, args)
         fallback_work = max(float(state_vars.Q_heat_base or 0.0), 1.0)
         return _finite_failed_vc_mvr_result(

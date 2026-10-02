@@ -439,7 +439,9 @@ class VapourCompressionMvrCascade:
                         supply_temperature=self._T_evap_mvr[0],
                         target_temperature=self._T_evap_mvr[0] + 0.01,
                         heat_flow=heat_flow,
-                        delta_t_contribution=dtcont,
+                        # HPR_DT_CONT is applied once, to the background profiles;
+                        # cycle streams carry none of their own, as Carnot streams.
+                        delta_t_contribution=0.0,
                     )
                 )
         for stream in streams:

@@ -21,10 +21,11 @@ from ..common.encoding import (
     map_x_arr_to_DT_arr,
     map_x_arr_to_T_arr,
 )
-from ..common.layout import HPRoptVectorLayout
+from ..common.layout import HPRoptVectorLayout, clip_to_bounds
 from ..common.multi_vc_objective import _evaluate_multi_vc_objective
 from ..common.shared import (
     HPRCostUnit,
+    cap_stage_condensing_temperatures,
     condensing_temperature_search_range,
     evaluate_vapour_hpr_result,
     validate_vapour_hp_refrigerant_ls,
@@ -136,7 +137,7 @@ def _get_parallel_hp_opt_setup(
     pack_kwargs[split_key] = encode_available_fractions(
         np.asarray(init_primary_duty, dtype=float), Q_available
     )
-    return layout.pack(**pack_kwargs), bnds
+    return clip_to_bounds(layout.pack(**pack_kwargs), bnds), bnds
 
 
 ################################################################################
@@ -157,7 +158,9 @@ def _parse_parallel_hp_state_temperatures(
     x_cool_split = parts["x_cool_split"]
     x_ihx = parts["x_ihx"]
 
-    T_cond = map_x_arr_to_T_arr(x_cond, *condensing_temperature_search_range(args))
+    T_cond = cap_stage_condensing_temperatures(
+        map_x_arr_to_T_arr(x_cond, *condensing_temperature_search_range(args)), args
+    )
     T_evap = map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0])
     dT_subcool = map_x_arr_to_DT_arr(x_subcool, T_cond, T_evap)
     Q_heat_available = (

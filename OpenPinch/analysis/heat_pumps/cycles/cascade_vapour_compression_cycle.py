@@ -205,7 +205,8 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
         self, T_cond: np.ndarray, T_evap: np.ndarray
     ) -> float:
         return (
-            np.min([T_cond.min() - T_evap.max() + self._dt_cascade_hx, 0.0])
+            # Every condenser must sit dt_cascade_hx above every evaporator.
+            np.min([T_cond.min() - T_evap.max() - self._dt_cascade_hx, 0.0])
             + np.min([(T_cond - np.roll(T_cond, 1))[:-1].sum(), 0.0])
             + np.min([(T_evap - np.roll(T_evap, 1))[:-1].sum(), 0.0])
         ) * -1

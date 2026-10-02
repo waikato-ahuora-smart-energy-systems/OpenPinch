@@ -55,6 +55,9 @@ __all__ = [
     "SUBCRITICAL_CONDENSING_MARGIN_K",
     "calc_hpr_capital_cost",
     "calc_hpr_machine_capital_costs",
+    "NEGLIGIBLE_USEFUL_DUTY_FRACTION",
+    "cap_stage_condensing_temperatures",
+    "is_negligible_useful_duty",
     "condensing_temperature_search_range",
     "calc_simulated_hpr_annualized_costs",
     "calc_carnot_heat_engine_eta",
@@ -644,6 +647,48 @@ def condensing_temperature_search_range(
     if not np.isfinite(ceiling) or ceiling <= t_cold or ceiling >= t_hot:
         return t_hot, t_cold
     return ceiling, t_cold
+
+
+# A design whose useful duty is below this fraction of Q_hpr_target is treated
+# as no heat pump, so targeting reports "no beneficial heat pump" instead of
+# returning a vanishing design.
+NEGLIGIBLE_USEFUL_DUTY_FRACTION = 1e-3
+
+
+def is_negligible_useful_duty(duty: float, args: HeatPumpTargetInputs) -> bool:
+    """Return whether ``duty`` is too small to count as a heat pump."""
+    target = abs(float(getattr(args, "Q_hpr_target", 0.0) or 0.0))
+    return float(duty) <= NEGLIGIBLE_USEFUL_DUTY_FRACTION * target
+
+
+def cap_stage_condensing_temperatures(
+    T_cond: np.ndarray,
+    args: HeatPumpTargetInputs,
+) -> np.ndarray:
+    """Cap each stage's condensing temperature below its own refrigerant's Tcrit.
+
+    ``condensing_temperature_search_range`` caps the whole search at the
+    highest critical temperature among the refrigerants. A stage with a
+    lower-Tcrit refrigerant (R134a beside water, say) could still be decoded
+    above its own critical point, where every candidate fails. Stage ``i`` uses
+    ``args.refrigerant_ls[i]``; the result keeps the stages in descending order.
+    """
+    T_cond = np.asarray(T_cond, dtype=float)
+    if getattr(args, "simulation_backend", "coolprop") == "tespy":
+        return T_cond
+    refrigerants = list(getattr(args, "refrigerant_ls", None) or [])
+    if not refrigerants:
+        return T_cond
+    ceilings = np.full(T_cond.shape, np.inf)
+    for index in range(T_cond.size):
+        refrigerant = refrigerants[min(index, len(refrigerants) - 1)]
+        try:
+            t_crit = float(_coolprop.PropsSI("Tcrit", refrigerant)) - 273.15
+        except ValueError, TypeError:
+            continue
+        ceilings[index] = t_crit - SUBCRITICAL_CONDENSING_MARGIN_K
+    capped = np.minimum(T_cond, ceilings)
+    return np.sort(capped)[::-1]
 
 
 def validate_vapour_hp_refrigerant_ls(
