@@ -25,5 +25,6 @@ design.enhanced_heat_exchanger_network,Site; Process Zone; Unit Operation,specia
 design.multiperiod_heat_exchanger_network,Site; Process Zone; Unit Operation,shared,direct_heat_integration,hen,available
 design.network_evolution,Site; Process Zone; Unit Operation,specialized,direct_heat_integration,hen,available
 design.open_hens,Site; Process Zone; Unit Operation,specialized,direct_heat_integration,hen,available
+design.optimise_duties,Site; Process Zone; Unit Operation,specialized,direct_heat_integration,hen,available
 design.pinch_design,Site; Process Zone; Unit Operation,specialized,direct_heat_integration,hen,available
 design.thermal_derivative,Site; Process Zone; Unit Operation,specialized,direct_heat_integration,hen,available

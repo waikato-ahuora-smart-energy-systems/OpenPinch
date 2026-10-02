@@ -84,8 +84,7 @@ def add_duty_labels(renderer: Any) -> None:
                 )
 
     for cold_index in range(renderer.J):
-        match = renderer.hot_utility_by_cold_index.get(cold_index)
-        if match is not None:
+        for match in renderer.hot_utilities_by_cold_index.get(cold_index, ()):
             add_label(
                 renderer,
                 hot_utility_x(renderer, match),
@@ -101,8 +100,7 @@ def add_duty_labels(renderer: Any) -> None:
             )
 
     for hot_index in range(renderer.I):
-        match = renderer.cold_utility_by_hot_index.get(hot_index)
-        if match is not None:
+        for match in renderer.cold_utilities_by_hot_index.get(hot_index, ()):
             add_label(
                 renderer,
                 cold_utility_x(renderer, match),

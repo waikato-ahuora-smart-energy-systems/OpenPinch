@@ -24,8 +24,10 @@ def build_grid_model(
     hot_streams: list[str] = []
     cold_streams: list[str] = []
     recovery_by_key: OrderedDict[tuple[str, str, int], GridDiagramMatch] = OrderedDict()
-    hot_utility_by_cold_stream: OrderedDict[str, GridDiagramMatch] = OrderedDict()
-    cold_utility_by_hot_stream: OrderedDict[str, GridDiagramMatch] = OrderedDict()
+    # One match per stream, utility and position: a stream can have several
+    # utility exchangers, at its end or between stages.
+    hot_utility_by_cold_stream: OrderedDict[Any, GridDiagramMatch] = OrderedDict()
+    cold_utility_by_hot_stream: OrderedDict[Any, GridDiagramMatch] = OrderedDict()
     seen_recovery_stages: set[int] = set()
     duty_threshold = _relative_duty_threshold(
         network,
@@ -55,7 +57,7 @@ def build_grid_model(
             _append_unique(cold_streams, exchanger.sink_stream)
             _add_or_accumulate(
                 hot_utility_by_cold_stream,
-                key=exchanger.sink_stream,
+                key=(exchanger.sink_stream, exchanger.source_stream, exchanger.stage),
                 exchanger=exchanger,
                 period_id=resolved_period_id,
             )
@@ -63,7 +65,7 @@ def build_grid_model(
             _append_unique(hot_streams, exchanger.source_stream)
             _add_or_accumulate(
                 cold_utility_by_hot_stream,
-                key=exchanger.source_stream,
+                key=(exchanger.source_stream, exchanger.sink_stream, exchanger.stage),
                 exchanger=exchanger,
                 period_id=resolved_period_id,
             )

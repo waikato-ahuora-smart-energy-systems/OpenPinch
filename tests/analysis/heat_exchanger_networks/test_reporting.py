@@ -87,9 +87,7 @@ def test_grid_model_recovers_process_topology_and_branches() -> None:
     assert grid_model.branch_counts[("C1", 3)] == 2
 
 
-def test_grid_model_skips_unstaged_recovery_and_accumulates_duplicate_utilities() -> (
-    None
-):
+def test_grid_model_skips_unstaged_recovery_and_keeps_each_utility() -> None:
     unstaged_recovery = _recovery("unstaged", "H1", "C1", 1, 50.0).model_copy(
         update={"stage": None}
     )
@@ -108,7 +106,97 @@ def test_grid_model_skips_unstaged_recovery_and_accumulates_duplicate_utilities(
 
     assert grid_model.stages == (1,)
     assert grid_model.recovery_matches == ()
-    assert grid_model.hot_utility_matches[0].duty == pytest.approx(125.0)
+    assert [match.duty for match in grid_model.hot_utility_matches] == [
+        pytest.approx(100.0),
+        pytest.approx(25.0),
+    ]
+
+
+def test_grid_model_accumulates_only_the_same_utility_position() -> None:
+    network = HeatExchangerNetwork.model_construct(
+        exchangers=(
+            _hot_utility("HU1", "C1", 100.0),
+            _hot_utility("HU1", "C1", 25.0),
+        ),
+        run_id="duplicate",
+        method="network_evolution_method",
+        stage_count=None,
+    )
+
+    grid_model = build_grid_model(network)
+
+    assert [match.duty for match in grid_model.hot_utility_matches] == [
+        pytest.approx(125.0)
+    ]
+
+
+def _placed_utility(kind, source, sink, stage, inlet, outlet, duty=50.0):
+    heater = kind is HeatExchangerKind.HOT_UTILITY
+    temperatures = (
+        {"sink_inlet_temperature": inlet, "sink_outlet_temperature": outlet}
+        if heater
+        else {"source_inlet_temperature": inlet, "source_outlet_temperature": outlet}
+    )
+    return HeatExchanger(
+        exchanger_id=f"{source}->{sink}:{stage}",
+        kind=kind,
+        source_stream=source,
+        sink_stream=sink,
+        source_stream_role=StreamID.Utility if heater else StreamID.Process,
+        sink_stream_role=StreamID.Process if heater else StreamID.Utility,
+        stage=stage,
+        period_states=(_period_state(duty=duty, **temperatures),),
+        area=10.0,
+    )
+
+
+def test_grid_places_series_and_mid_network_utility_exchangers() -> None:
+    go = pytest.importorskip("plotly.graph_objects")
+    hot = HeatExchangerKind.HOT_UTILITY
+    cold = HeatExchangerKind.COLD_UTILITY
+    network = HeatExchangerNetwork(
+        exchangers=(
+            _recovery("E1", "H1", "C1", 1, 500.0),
+            _recovery("E2", "H1", "C1", 2, 400.0),
+            _recovery("E3", "H1", "C1", 3, 300.0),
+            # Two heaters in series at the C1 end: LPS (first) then HPS.
+            _placed_utility(hot, "HPS", "C1", None, 420.0, 450.0),
+            _placed_utility(hot, "LPS", "C1", None, 400.0, 420.0),
+            # A heater between stages 3 and 2 and a cooler between 1 and 2.
+            _placed_utility(hot, "LPS", "C1", 3, 350.0, 360.0),
+            _placed_utility(cold, "H1", "CW", 1, 520.0, 510.0),
+            _placed_utility(cold, "H1", "CW", None, 400.0, 380.0),
+        ),
+        run_id="placed",
+        method="network_evolution_method",
+        stage_count=3,
+    )
+
+    renderer = _PlotlyGridRenderer(
+        build_grid_model(network), graph_objects=go, temperature_scaled=False
+    )
+
+    def x(exchanger_id: str) -> float:
+        match = next(
+            m
+            for m in renderer.grid_model.hot_utility_matches
+            + renderer.grid_model.cold_utility_matches
+            if m.exchanger.exchanger_id == exchanger_id
+        )
+        return renderer.utility_x_by_match[id(match)]
+
+    boundaries = renderer.stage_boundaries
+    # End heaters share the band left of stage 1; the cold stream (flowing
+    # right to left) meets LPS first.
+    assert renderer.x_start < x("HPS->C1:None") < x("LPS->C1:None") < boundaries[0]
+    # The staged heater sits on the boundary between stages 2 and 3.
+    assert x("LPS->C1:3") == pytest.approx(boundaries[2])
+    # The staged cooler sits between stages 1 and 2; the end cooler is right
+    # of the last stage.
+    assert x("H1->CW:1") == pytest.approx(boundaries[1])
+    assert boundaries[-1] < x("H1->CW:None") < renderer.x_finish
+    assert renderer.HU_matches == [3]
+    assert renderer.CU_matches == [2]
 
 
 def test_grid_diagram_service_accepts_one_network() -> None:
