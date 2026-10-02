@@ -419,8 +419,21 @@ def _apply_peak_machine_capital(
     peak_annualized = tuple(float(v) for v in np.max(np.asarray(annualized), axis=0))
     data["hpr_machine_capital_costs"] = peak_capital
     data["hpr_machine_annualized_capital_costs"] = peak_annualized
-    data["hpr_capital_cost"] = Value(sum(peak_capital), "$")
-    data["hpr_annualized_capital_cost"] = Value(sum(peak_annualized), "$/y")
+    # The per-machine tuples are canonical $ and $/y; the target fields may
+    # already be in a configured display unit, such as k$, so keep theirs.
+    data["hpr_capital_cost"] = _in_unit_of(
+        Value(sum(peak_capital), "$"), data.get("hpr_capital_cost")
+    )
+    data["hpr_annualized_capital_cost"] = _in_unit_of(
+        Value(sum(peak_annualized), "$/y"), data.get("hpr_annualized_capital_cost")
+    )
+
+
+def _in_unit_of(value: Value, reference: Any) -> Value:
+    """Return ``value`` in the unit of ``reference`` when that is a ``Value``."""
+    if isinstance(reference, Value):
+        return value.to(reference.unit)
+    return value
 
 
 def _hpr_utility_annualized_capital(
