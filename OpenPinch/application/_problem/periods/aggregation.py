@@ -421,8 +421,10 @@ def _weighted_average_target(
     data["hpr_cop"] = _ratio_of_totals(
         targets, "hpr_cop", "hpr_work", weights, basis_is_numerator=False
     )
+    # eta_he is heat-engine work over its condenser heat; the rows carry
+    # neither (hpr_work is the net cycle work), so take the weighted mean.
     data["hpr_eta_he"] = _ratio_of_totals(
-        targets, "hpr_eta_he", "hpr_work", weights, basis_is_numerator=True
+        targets, "hpr_eta_he", None, weights, basis_is_numerator=True
     )
     ran = [
         t.hpr_success for t in targets if getattr(t, "hpr_success", None) is not None
@@ -514,7 +516,7 @@ def _max_report_value(
 def _ratio_of_totals(
     targets: Sequence[TargetResults],
     ratio_field: str,
-    basis_field: str,
+    basis_field: str | None,
     weights: np.ndarray,
     *,
     basis_is_numerator: bool,
@@ -524,7 +526,8 @@ def _ratio_of_totals(
     ``basis_field`` is the numerator (``basis_is_numerator``) or denominator of
     the ratio, e.g. COP = Q / W with basis ``hpr_work`` as denominator, so the
     seasonal COP is sum(w * COP * W) / sum(w * W). Periods without the ratio
-    contribute nothing. Falls back to the weighted mean when the totals are 0.
+    contribute nothing. Falls back to the weighted mean when the totals are 0
+    or there is no ``basis_field``.
     """
     numerator = denominator = 0.0
     unit = None
@@ -534,9 +537,11 @@ def _ratio_of_totals(
         ratio, ratio_unit = split_report_value(
             _target_attr(target, ratio_field), period_idx=period_idx
         )
-        basis, _basis_unit = split_report_value(
-            _target_attr(target, basis_field), period_idx=period_idx
-        )
+        basis = None
+        if basis_field is not None:
+            basis, _basis_unit = split_report_value(
+                _target_attr(target, basis_field), period_idx=period_idx
+            )
         if ratio is None or isinstance(ratio, list):
             continue
         unit = unit or ratio_unit

@@ -11,8 +11,10 @@ from ....contracts.hpr import (
     HPRBackendResult,
     HPREvaluationMode,
     HPRPeriodCase,
+    HPRThermoArtifacts,
     MultiPeriodHPRTargetInputs,
 )
+from ....domain.stream_collection import StreamCollection
 from ..optimisation_adapter import (
     aggregate_hpr_period_results,
     evaluate_hpr_candidate,
@@ -32,6 +34,7 @@ def evaluate_multiperiod_candidate(
         return HPRBackendResult.failure(reason="No period cases were prepared.")
 
     period_outputs: dict[str, HPRBackendResult] = {}
+    idle_cases: list[HPRPeriodCase] = []
     zero_duty_failure: HPRBackendResult | None = None
     for case in args.period_cases:
         result = evaluate_hpr_candidate(
@@ -45,35 +48,41 @@ def evaluate_multiperiod_candidate(
             # Keep evaluating: the shared design is "no heat pump" only when it
             # delivers zero useful duty in every period.
             zero_duty_failure = zero_duty_failure or result
+            idle_cases.append(case)
             continue
-        if not result.success or not np.isfinite(float(result.obj)):
-            reason = result.failure_reason or "candidate failed"
-            return HPRBackendResult.failure(
-                reason=f"HPR period {case.period_id!r} failed: {reason}",
-                Q_amb_hot=result.Q_amb_hot,
-                Q_amb_cold=result.Q_amb_cold,
-            )
+        failure = _period_failure(case, result)
+        if failure is not None:
+            return failure
         period_outputs[str(case.period_id)] = result
 
-    if zero_duty_failure is not None:
-        if not period_outputs:
-            # Preserve the sentinel unwrapped so the solver can stop and
-            # report the typed "no beneficial heat pump" outcome.
-            return HPRBackendResult.failure(
-                reason=ZERO_USEFUL_DUTY_REASON,
-                Q_amb_hot=zero_duty_failure.Q_amb_hot,
-                Q_amb_cold=zero_duty_failure.Q_amb_cold,
-            )
-        idle_periods = [
-            str(case.period_id)
-            for case in args.period_cases
-            if str(case.period_id) not in period_outputs
-        ]
+    if zero_duty_failure is not None and not period_outputs:
+        # Preserve the sentinel unwrapped so the solver can stop and report
+        # the typed "no beneficial heat pump" outcome.
         return HPRBackendResult.failure(
-            reason=(f"HPR periods {idle_periods!r} failed: {ZERO_USEFUL_DUTY_REASON}"),
+            reason=ZERO_USEFUL_DUTY_REASON,
             Q_amb_hot=zero_duty_failure.Q_amb_hot,
             Q_amb_cold=zero_duty_failure.Q_amb_cold,
         )
+    for case in idle_cases:
+        # An installed heat pump can be off in a period (an off season or a
+        # zero load). The final pass reports that as zero useful duty; the
+        # search-mode accounting prices the period with the machine idle.
+        result = evaluate_hpr_candidate(
+            objective=period_objective,
+            point=point,
+            args=case.args,
+            debug=debug,
+            artifact_mode=HPREvaluationMode.SEARCH,
+        )
+        failure = _period_failure(case, result)
+        if failure is not None:
+            return failure
+        period_outputs[str(case.period_id)] = _as_idle_period(result)
+    # Keep the period order of the prepared cases.
+    period_outputs = {
+        str(case.period_id): period_outputs[str(case.period_id)]
+        for case in args.period_cases
+    }
 
     weights = np.asarray([case.weight for case in args.period_cases], dtype=float)
     weighted, shared_objective = aggregate_hpr_period_results(
@@ -88,6 +97,35 @@ def evaluate_multiperiod_candidate(
         design_vector=np.asarray(point, dtype=float),
         period_ids=[str(case.period_id) for case in args.period_cases],
         period_weights=[float(case.weight) for case in args.period_cases],
+    )
+
+
+def _as_idle_period(result: HPRBackendResult) -> HPRBackendResult:
+    """Give an idle period's search-mode result the artifacts of an off machine.
+
+    Search mode strips artifacts, but an idle period can be the selected one
+    and its result is then translated as the public target, which needs the
+    HPR and ambient stream collections. A machine that is off has no streams.
+    """
+    return result.with_updates(
+        artifacts=HPRThermoArtifacts(hpr_streams=StreamCollection()),
+        amb_streams=(
+            result.amb_streams if result.amb_streams is not None else StreamCollection()
+        ),
+    )
+
+
+def _period_failure(
+    case: HPRPeriodCase, result: HPRBackendResult
+) -> HPRBackendResult | None:
+    """Return the shared-design failure for one failed period, else ``None``."""
+    if result.success and np.isfinite(float(result.obj)):
+        return None
+    reason = result.failure_reason or "candidate failed"
+    return HPRBackendResult.failure(
+        reason=f"HPR period {case.period_id!r} failed: {reason}",
+        Q_amb_hot=result.Q_amb_hot,
+        Q_amb_cold=result.Q_amb_cold,
     )
 
 
