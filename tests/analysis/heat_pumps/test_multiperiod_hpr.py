@@ -20,6 +20,7 @@ from OpenPinch.contracts.hpr import (
     HeatPumpTargetInputs,
     HeatPumpTargetOutputs,
     HPRBackendResult,
+    HPREvaluationMode,
     HPRFailureCategory,
     HPRPeriodCase,
     HPRTargetingError,
@@ -809,7 +810,29 @@ def test_shared_zero_duty_design_raises_no_beneficial_heat_pump(monkeypatch):
     )
 
 
-def test_shared_design_idle_in_one_period_is_not_no_heat_pump():
+def test_shared_design_idle_in_one_period_is_off_there_not_rejected():
+    modes = []
+
+    def objective(x, args, debug=False, artifact_mode=HPREvaluationMode.FINAL):
+        modes.append((args.period_idx, artifact_mode))
+        if args.period_idx == 1 and artifact_mode is HPREvaluationMode.FINAL:
+            return HPRBackendResult.failure(reason=ZERO_USEFUL_DUTY_REASON)
+        return _backend_result(obj=2.0, utility_tot=1.0, period_idx=args.period_idx)
+
+    result = hp_aggregation.evaluate_multiperiod_candidate(
+        np.array([1.0]),
+        _two_period_args(),
+        period_objective=objective,
+    )
+
+    # The installed heat pump is off in p1: that period is priced with the
+    # machine idle (search-mode accounting) and the shared design stands.
+    assert result.success
+    assert list(result.period_outputs) == ["p0", "p1"]
+    assert (1, HPREvaluationMode.SEARCH) in modes
+
+
+def test_shared_design_fails_when_an_idle_period_cannot_be_priced():
     def objective(x, args, debug=False):
         if args.period_idx == 1:
             return HPRBackendResult.failure(reason=ZERO_USEFUL_DUTY_REASON)
@@ -823,4 +846,4 @@ def test_shared_design_idle_in_one_period_is_not_no_heat_pump():
 
     assert not result.success
     assert result.failure_reason != ZERO_USEFUL_DUTY_REASON
-    assert "['p1']" in result.failure_reason
+    assert "'p1'" in result.failure_reason
