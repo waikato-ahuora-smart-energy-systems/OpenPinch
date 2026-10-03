@@ -11,8 +11,10 @@ from ....contracts.hpr import (
     HPRBackendResult,
     HPREvaluationMode,
     HPRPeriodCase,
+    HPRThermoArtifacts,
     MultiPeriodHPRTargetInputs,
 )
+from ....domain.stream_collection import StreamCollection
 from ..optimisation_adapter import (
     aggregate_hpr_period_results,
     evaluate_hpr_candidate,
@@ -75,7 +77,7 @@ def evaluate_multiperiod_candidate(
         failure = _period_failure(case, result)
         if failure is not None:
             return failure
-        period_outputs[str(case.period_id)] = result
+        period_outputs[str(case.period_id)] = _as_idle_period(result)
     # Keep the period order of the prepared cases.
     period_outputs = {
         str(case.period_id): period_outputs[str(case.period_id)]
@@ -95,6 +97,21 @@ def evaluate_multiperiod_candidate(
         design_vector=np.asarray(point, dtype=float),
         period_ids=[str(case.period_id) for case in args.period_cases],
         period_weights=[float(case.weight) for case in args.period_cases],
+    )
+
+
+def _as_idle_period(result: HPRBackendResult) -> HPRBackendResult:
+    """Give an idle period's search-mode result the artifacts of an off machine.
+
+    Search mode strips artifacts, but an idle period can be the selected one
+    and its result is then translated as the public target, which needs the
+    HPR and ambient stream collections. A machine that is off has no streams.
+    """
+    return result.with_updates(
+        artifacts=HPRThermoArtifacts(hpr_streams=StreamCollection()),
+        amb_streams=(
+            result.amb_streams if result.amb_streams is not None else StreamCollection()
+        ),
     )
 
 
