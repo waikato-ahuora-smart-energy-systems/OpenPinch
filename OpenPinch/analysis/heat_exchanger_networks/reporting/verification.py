@@ -85,6 +85,9 @@ def verify_network_feasibility(
         failures.extend(_check_area_consistency(network, period_id))
     if len(period_ids) <= 1:
         failures.extend(_check_stream_heat_balances(network))
+    else:
+        for period_id in period_ids:
+            failures.extend(_check_stream_heat_balances(network, period_id))
     return tuple(failures)
 
 
@@ -342,53 +345,48 @@ def _check_exchanger_duty_balances(
     return failures
 
 
-def _check_stream_heat_balances(network: HeatExchangerNetwork) -> list[str]:
+def _check_stream_heat_balances(
+    network: HeatExchangerNetwork,
+    period_id: str | None = None,
+) -> list[str]:
+    """Check each process stream's heat load against its exchanger duties.
+
+    With ``period_id``, the check uses that period's stream data and duties.
+    Networks without per-period stream data (saved before it was exported)
+    are not checked per period: the single-period values would not match.
+    """
     metadata = network.source_metadata
-    hot_cp = _stream_value_map(
-        network,
-        "hot_process_streams",
-        metadata.get("hot_stream_heat_capacity_flowrates"),
-    )
-    cold_cp = _stream_value_map(
-        network,
-        "cold_process_streams",
-        metadata.get("cold_stream_heat_capacity_flowrates"),
-    )
-    hot_total_duties = _stream_value_map(
-        network,
-        "hot_process_streams",
-        metadata.get("hot_stream_total_duties"),
-    )
-    cold_total_duties = _stream_value_map(
-        network,
-        "cold_process_streams",
-        metadata.get("cold_stream_total_duties"),
-    )
+    if period_id is None:
+        period_idx = None
+    else:
+        period_idx = network.period_ids.index(period_id)
+
+    def values(axis_name: str, key: str) -> dict[str, float]:
+        if period_idx is None:
+            return _stream_value_map(network, axis_name, metadata.get(key))
+        by_period = metadata.get(f"{key}_by_period")
+        if not isinstance(by_period, list | tuple) or period_idx >= len(by_period):
+            return {}
+        return _stream_value_map(network, axis_name, by_period[period_idx])
+
+    hot_cp = values("hot_process_streams", "hot_stream_heat_capacity_flowrates")
+    cold_cp = values("cold_process_streams", "cold_stream_heat_capacity_flowrates")
+    hot_total_duties = values("hot_process_streams", "hot_stream_total_duties")
+    cold_total_duties = values("cold_process_streams", "cold_stream_total_duties")
+    hot_supply = values("hot_process_streams", "hot_stream_supply_temperatures")
+    hot_target = values("hot_process_streams", "hot_stream_target_temperatures")
+    cold_supply = values("cold_process_streams", "cold_stream_supply_temperatures")
+    cold_target = values("cold_process_streams", "cold_stream_target_temperatures")
+    if period_idx is not None and not (
+        hot_total_duties or cold_total_duties or hot_supply or cold_supply
+    ):
+        # No per-period loads or temperatures to check against.
+        return []
     if not hot_cp and not cold_cp and not hot_total_duties and not cold_total_duties:
         return []
 
+    suffix = "" if period_id is None else f" in period {period_id!r}"
     failures: list[str] = []
-    hot_supply = _stream_value_map(
-        network,
-        "hot_process_streams",
-        metadata.get("hot_stream_supply_temperatures"),
-    )
-    hot_target = _stream_value_map(
-        network,
-        "hot_process_streams",
-        metadata.get("hot_stream_target_temperatures"),
-    )
-    cold_supply = _stream_value_map(
-        network,
-        "cold_process_streams",
-        metadata.get("cold_stream_supply_temperatures"),
-    )
-    cold_target = _stream_value_map(
-        network,
-        "cold_process_streams",
-        metadata.get("cold_stream_target_temperatures"),
-    )
-
     for stream in hot_cp.keys() | hot_total_duties.keys():
         expected = hot_total_duties.get(stream)
         if expected is None:
@@ -401,11 +399,16 @@ def _check_stream_heat_balances(network: HeatExchangerNetwork) -> list[str]:
         observed = network.total_duty(
             stream=stream,
             kind=HeatExchangerKind.RECOVERY,
-        ) + network.total_duty(stream=stream, kind=HeatExchangerKind.COLD_UTILITY)
+            period_id=period_id,
+        ) + network.total_duty(
+            stream=stream,
+            kind=HeatExchangerKind.COLD_UTILITY,
+            period_id=period_id,
+        )
         if not _close(expected, observed, abs_tol=_DUTY_ABS_TOL):
             failures.append(
                 f"hot stream {stream} heat removed {observed:.6g} does not "
-                f"match required heat load {expected:.6g}"
+                f"match required heat load {expected:.6g}{suffix}"
             )
 
     for stream in cold_cp.keys() | cold_total_duties.keys():
@@ -420,11 +423,16 @@ def _check_stream_heat_balances(network: HeatExchangerNetwork) -> list[str]:
         observed = network.total_duty(
             stream=stream,
             kind=HeatExchangerKind.RECOVERY,
-        ) + network.total_duty(stream=stream, kind=HeatExchangerKind.HOT_UTILITY)
+            period_id=period_id,
+        ) + network.total_duty(
+            stream=stream,
+            kind=HeatExchangerKind.HOT_UTILITY,
+            period_id=period_id,
+        )
         if not _close(expected, observed, abs_tol=_DUTY_ABS_TOL):
             failures.append(
                 f"cold stream {stream} heat added {observed:.6g} does not "
-                f"match required heat load {expected:.6g}"
+                f"match required heat load {expected:.6g}{suffix}"
             )
     return failures
 

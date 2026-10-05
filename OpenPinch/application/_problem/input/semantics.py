@@ -88,11 +88,15 @@ def semantic_issues(
             )
         )
 
+    # Repeated names are common in published data (one stream given in
+    # segments) and are renamed either way, so they are reported only in
+    # debug mode.
+    report_repeated_names = bool(options.get("REPORTING_DEBUG_ENABLED", False))
     seen_stream_names: set[tuple[str, str]] = set()
     for index, stream in enumerate(problem_inputs.streams):
         label = validation_record_label("streams", index, context)
         stream_key = (str(stream.zone), str(stream.name))
-        if stream_key in seen_stream_names:
+        if report_repeated_names and stream_key in seen_stream_names:
             issues.append(
                 _build_issue(
                     severity="warning",

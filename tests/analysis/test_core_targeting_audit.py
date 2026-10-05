@@ -341,3 +341,77 @@ def test_only_an_added_default_utility_is_treated_as_the_backup():
     payload["utilities"][0]["name"] = "HU"
     named = PinchProblem(payload, project_name="Site")
     assert [is_default_utility(u) for u in named.master_zone.hot_utilities] == [False]
+
+
+def test_exergy_curves_already_on_real_temperatures_are_not_moved():
+    from OpenPinch.analysis.exergy.service import (
+        build_exergy_gcc_curve,
+        build_exergy_nlp_curves,
+    )
+
+    # A Total Site utility profile is on real temperatures: a 5 K default
+    # contribution must not move it.
+    gcc = {"temperatures": [30.0, 0.0], "heat_loads": [0.0, 30.0], "t_env": 15.0}
+    real = build_exergy_gcc_curve(**gcc, dt_cont_shift=5.0, is_real_temperature=True)
+    assert real == build_exergy_gcc_curve(**gcc)
+
+    nlp = {"temperatures": [12.0, 2.0], "t_env": 15.0, "dt_cont_shift": 5.0}
+    real_branch = build_exergy_nlp_curves(**nlp, branches=[("hot", [0.0, 10.0], True)])
+    shifted_branch = build_exergy_nlp_curves(**nlp, branches=[("hot", [0.0, 10.0])])
+    # 12 to 2 degC is below the 15 degC ambient; un-shifted it is not a source.
+    assert real_branch["source_total"] == pytest.approx(0.0)
+    assert shifted_branch["source_total"] > 0.0
+
+
+@pytest.mark.parametrize(
+    ("target_type", "gcc_is_real", "real_columns"),
+    [
+        (TargetType.DI.value, False, set()),
+        (TargetType.II.value, True, {"H_HOT_UT", "H_COLD_UT"}),
+        (TargetType.DHP.value, False, {"H_HOT_HP", "H_COLD_HP"}),
+        (
+            TargetType.IHP.value,
+            True,
+            {"H_HOT_UT", "H_COLD_UT", "H_HOT_HP", "H_COLD_HP"},
+        ),
+    ],
+)
+def test_exergy_spec_marks_curves_built_on_real_temperatures(
+    target_type, gcc_is_real, real_columns
+):
+    from types import SimpleNamespace
+
+    from OpenPinch.analysis.exergy.service import _resolve_target_exergy_spec
+    from OpenPinch.domain.enums import ProblemTableLabel
+
+    columns = (
+        "H_NET",
+        "H_NET_A",
+        "H_NET_UT",
+        "H_NET_W_AIR",
+        "H_NET_HP",
+        "H_NET_HOT",
+        "H_NET_COLD",
+        "H_HOT_UT",
+        "H_COLD_UT",
+        "H_HOT_HP",
+        "H_COLD_HP",
+    )
+    # Each column gets its own distinct profile so branches can be identified.
+    pt = {ProblemTableLabel.T: np.array([100.0, 50.0, 0.0])}
+    for offset, name in enumerate(columns, start=1):
+        pt[ProblemTableLabel[name]] = np.array([0.0, float(offset), 2.0 * offset])
+    target = SimpleNamespace(type=target_type, pt=pt, config=None)
+
+    spec = _resolve_target_exergy_spec(target)
+
+    assert spec["gcc_is_real"] is gcc_is_real
+    marked = {
+        name
+        for name in columns
+        for branch in spec["branches"]
+        if len(branch) > 2
+        and branch[2]
+        and np.array_equal(branch[1], pt[ProblemTableLabel[name]])
+    }
+    assert marked == real_columns

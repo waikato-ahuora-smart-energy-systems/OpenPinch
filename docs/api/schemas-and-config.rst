@@ -60,6 +60,11 @@ Streams whose supply and target temperatures differ by less than
 ``THERMAL_DT_PHASE_CHANGE`` are widened to that span, with the same duty, so
 they are never lost between temperature intervals.
 
+Streams that share a name within a zone are renamed with a numeric suffix
+(``_1``, ``_2``). This is reported as a validation warning only when
+``REPORTING_DEBUG_ENABLED`` is true; it is off by default because published
+data often gives one stream as several same-named segments.
+
 Configuration does not contain target-method selectors; the descriptive ``problem.target.*`` or
 ``problem.design.*`` callable selects the analysis.
 

@@ -184,6 +184,26 @@ def extract_heat_exchanger_network(
             "cold_stream_total_duties": _segment_parent_total_duties(
                 solver_arrays, "cold"
             ),
+            # The same stream data per operating period ([period][stream]), so
+            # multi-period networks are checked against each period's loads.
+            "hot_stream_supply_temperatures_by_period": _period_matrix(
+                solved_model, solver_arrays, "T_h_in_period"
+            ),
+            "hot_stream_target_temperatures_by_period": _period_matrix(
+                solved_model, solver_arrays, "T_h_out_period"
+            ),
+            "cold_stream_supply_temperatures_by_period": _period_matrix(
+                solved_model, solver_arrays, "T_c_in_period"
+            ),
+            "cold_stream_target_temperatures_by_period": _period_matrix(
+                solved_model, solver_arrays, "T_c_out_period"
+            ),
+            "hot_stream_total_duties_by_period": _segment_parent_total_duties_by_period(
+                solver_arrays, "hot"
+            ),
+            "cold_stream_total_duties_by_period": (
+                _segment_parent_total_duties_by_period(solver_arrays, "cold")
+            ),
             "hot_stage_boundary_temperatures": _boundary_temperature_matrix(
                 getattr(solved_model, "T_h", None),
                 rows=len(hot_streams),
@@ -206,6 +226,28 @@ def _segment_parent_total_duties(
     if values is None:
         return []
     return np.sum(np.asarray(values, dtype=float)[0], axis=1).tolist()
+
+
+def _period_matrix(
+    solved_model: Any,
+    solver_arrays: PreparedSolverArrays,
+    name: str,
+) -> list[list[float]]:
+    """Return a solver [period][stream] array from the model or its inputs."""
+    values = getattr(solved_model, name, None)
+    if values is None:
+        values = solver_arrays.arrays.get(name)
+    return _float_matrix(values) if values is not None else []
+
+
+def _segment_parent_total_duties_by_period(
+    solver_arrays: PreparedSolverArrays,
+    side: str,
+) -> list[list[float]]:
+    values = solver_arrays.arrays.get(f"{side}_segment_duty_period")
+    if values is None:
+        return []
+    return np.sum(np.asarray(values, dtype=float), axis=2).tolist()
 
 
 def extract_network_synthesis_result(

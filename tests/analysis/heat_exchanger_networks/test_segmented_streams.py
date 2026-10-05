@@ -68,6 +68,15 @@ def _profile(prefix: str, *, hot: bool) -> PiecewiseThermalProfile:
     )
 
 
+# Price times duty and capital pass through unscaled (1000 h/y, CRF = 1), so
+# the expected costs below are the segment prices times the duties.
+UNIT_COST_BASIS = {
+    "COSTING_ANNUAL_OP_TIME": 1000.0,
+    "COSTING_DISCOUNT_RATE": 0.0,
+    "COSTING_SERVICE_LIFE": 1.0,
+}
+
+
 def _segmented_problem(
     *,
     cold_second_duty: float = 100.0,
@@ -184,6 +193,7 @@ def _segmented_problem(
                 hot_utility,
                 cold_utility,
             ],
+            "options": dict(UNIT_COST_BASIS),
         },
         project_name="Site",
     )
@@ -399,6 +409,7 @@ def test_multiperiod_segmented_utility_cost_profiles_keep_stable_identities():
                 },
             ],
             "options": {
+                **UNIT_COST_BASIS,
                 "PROBLEM_PERIOD_IDS": ["base", "peak"],
                 "PROBLEM_PERIOD_WEIGHTS": [1.0, 3.0],
             },
