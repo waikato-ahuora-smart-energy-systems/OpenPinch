@@ -245,6 +245,12 @@ def convert_case_to_target_input(
         "streams": streams,
         "utilities": utilities,
         "options": {
+            # OpenHENS benchmarks quote utility prices in $/kW/y and exchanger
+            # costs in $/y. At 1000 h/y a $/MWh price is $/kW/y, and a zero
+            # discount rate over one year leaves capital unannualised.
+            "COSTING_ANNUAL_OP_TIME": 1000.0,
+            "COSTING_DISCOUNT_RATE": 0.0,
+            "COSTING_SERVICE_LIFE": 1.0,
             "COSTING_HX_AREA_EXP": exchange.area_exponent,
             "COSTING_HX_UNIT_COST": exchange.unit_cost,
             "HENS_APPROACH_TEMPERATURES": OPENHENS_DT_GRID,

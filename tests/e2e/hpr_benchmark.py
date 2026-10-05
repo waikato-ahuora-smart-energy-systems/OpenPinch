@@ -137,8 +137,10 @@ HPR_PROFILES = (
         objective_name="_compute_cascade_hp_system_obj",
         # Refrigerator capital makes small designs dearer than none, so the
         # search must cross from the zero-duty basin to large designs that
-        # pay. At 48 evaluations and 3 iterations it often stays at zero duty;
-        # at 192 of each it solved Sun et al. at all eight seed shifts.
+        # pay. At 48 evaluations and 3 iterations it often stays at zero duty.
+        # At 192 of each, Gundersen et al. solves feasibly (zero penalty, 2.8-4
+        # MW of cooling) at all eight seed shifts; Sun et al. left a penalty at
+        # three of them under the exact feasibility penalty (Oct 2026 screen).
         sentinel_maximum_evaluations=192,
         sentinel_maximum_search_observations=384,
         sentinel_maximum_iterations=192,
@@ -149,6 +151,10 @@ HPR_PROFILES = (
         is_utility=True,
         is_cascade_cycle=False,
         objective_name="_compute_parallel_hp_system_obj",
+        # Ahmad (example 3) solves feasibly at all eight seed shifts with the
+        # default 3 iterations (Oct 2026 screen), within 0.1% of the
+        # 96-iteration optimum, once each refrigerator places all its
+        # condenser heat.
         sentinel_maximum_evaluations=48,
         sentinel_maximum_search_observations=96,
     ),
@@ -179,7 +185,7 @@ HPR_PROFILES = (
 HPR_SENTINEL_FILENAMES = {
     "direct-cascade-vc-heat-pump": "p_Perry et al.json",
     "utility-parallel-vc-heat-pump": "p_Martinez-Rodriguez (case study 1).json",
-    "direct-cascade-vc-refrigeration": "p_Sun et al.json",
+    "direct-cascade-vc-refrigeration": "p_Gundersen et al.json",
     "utility-parallel-vc-refrigeration": "p_Ahmad (example 3).json",
     "direct-optimized-vc-mvr-heat-pump": "p_Barbaro and Bagajewicz.json",
     "utility-optimized-vc-mvr-heat-pump": "p_Feng et al (case study 1).json",

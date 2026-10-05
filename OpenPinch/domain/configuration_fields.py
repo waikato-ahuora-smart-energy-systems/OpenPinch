@@ -290,6 +290,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
 
     # General runtime controls.
     "REPORTING_DECIMAL_PLACES": _spec(int, 2, "reporting", "decimal_places", numeric_min=0.0),
+    "REPORTING_DEBUG_ENABLED": _spec(bool, False, "reporting", "debug_enabled"),
     "ENV_TEMPERATURE": _spec(float, 15.0, "environment", "temperature"),
     "ENV_PRESSURE": _spec(float, 101.0, "environment", "pressure", numeric_min=0.0),
     "THERMAL_DT_CONT": _spec(float, 5.0, "thermal", "dt_cont", numeric_min=0.0),

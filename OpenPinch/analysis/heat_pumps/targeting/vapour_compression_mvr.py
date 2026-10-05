@@ -31,6 +31,7 @@ from ..common.shared import (
     condensing_temperature_search_range,
     evaluate_vapour_hpr_result,
     is_negligible_useful_duty,
+    post_solve_error,
     validate_vapour_hp_refrigerant_ls,
 )
 from ..cycles.vapour_compression_mvr_cascade import VapourCompressionMvrCascade
@@ -330,8 +331,8 @@ def _compute_vc_mvr_system_obj(
     except ValueError as exc:
         if cycle_evaluated:
             # A post-solve error is a contract defect, not an infeasible
-            # candidate, so it surfaces in every mode.
-            raise
+            # candidate, so it surfaces in every mode, naming where it arose.
+            raise post_solve_error("VC+MVR", x, artifact_mode, exc) from exc
         if debug:
             # Debug mode reports the failure but must not change the outcome.
             _LOGGER.debug("VC+MVR candidate failed: %s", exc)

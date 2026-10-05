@@ -25,7 +25,7 @@ from ....contracts.hpr import (
     HPRParsedState,
     HPRTopologyIdentifier,
 )
-from .shared import is_negligible_useful_duty
+from .shared import is_negligible_useful_duty, post_solve_error
 
 __all__ = ["_evaluate_multi_vc_objective"]
 
@@ -140,8 +140,8 @@ def _evaluate_multi_vc_objective(
     except ValueError as exc:
         if cycle_evaluated:
             # A post-solve error is a contract defect, not an infeasible
-            # candidate, so it surfaces in every mode.
-            raise
+            # candidate, so it surfaces in every mode, naming where it arose.
+            raise post_solve_error(label, x, artifact_mode, exc) from exc
         return HPRBackendResult.failure(
             reason=str(exc),
             Q_amb_hot=state_vars.Q_amb_hot,

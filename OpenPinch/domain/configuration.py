@@ -85,6 +85,7 @@ class ReportingConfig:
     """Result formatting settings."""
 
     decimal_places: int
+    debug_enabled: bool
 
 
 @_frozen_group

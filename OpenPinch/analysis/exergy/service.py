@@ -66,21 +66,27 @@ def build_exergy_gcc_curve(
     dt_cont_shift: float = 0.0,
     hot_shifts: Iterable[float] | None = None,
     cold_shifts: Iterable[float] | None = None,
+    is_real_temperature: bool = False,
 ) -> dict[str, list[float]]:
     """Transform one GCC-like curve into an exergetic GCC output.
 
-    The GCC is on shifted temperatures. Each interval is put back on real
-    temperatures: up by its hot shift for hot-dominated (surplus) intervals,
-    down by its cold shift for cold-dominated ones. ``hot_shifts`` and
+    A GCC on shifted temperatures is put back on real temperatures interval by
+    interval: up by its hot shift for hot-dominated (surplus) intervals, down
+    by its cold shift for cold-dominated ones. ``hot_shifts`` and
     ``cold_shifts`` give one shift per interval (the CP-weighted contribution of
     the streams in it); ``dt_cont_shift`` is used where they are absent or NaN.
+    A curve already on real temperatures (``is_real_temperature``, e.g. a
+    Total Site utility profile) is not moved.
     """
     t_vals = _to_float_array(temperatures)
     h_vals = _to_float_array(heat_loads)
     _validate_curve_lengths(t_vals, h_vals)
     n_intervals = max(len(t_vals) - 1, 0)
-    hot_offsets = _interval_shifts(hot_shifts, n_intervals, dt_cont_shift)
-    cold_offsets = _interval_shifts(cold_shifts, n_intervals, dt_cont_shift)
+    if is_real_temperature:
+        hot_offsets = cold_offsets = np.zeros(n_intervals, dtype=float)
+    else:
+        hot_offsets = _interval_shifts(hot_shifts, n_intervals, dt_cont_shift)
+        cold_offsets = _interval_shifts(cold_shifts, n_intervals, dt_cont_shift)
 
     t_ex_vals: list[float] = []
     x_vals: list[float] = []
@@ -153,7 +159,7 @@ def build_exergy_gcc_curve(
 def build_exergy_nlp_curves(
     *,
     temperatures: Iterable[float],
-    branches: Iterable[tuple[str, Iterable[float]]],
+    branches: Iterable[tuple],
     t_env: float,
     dt_cont_shift: float = 0.0,
     hot_shifts: Iterable[float] | None = None,
@@ -161,17 +167,19 @@ def build_exergy_nlp_curves(
 ) -> dict[str, Any]:
     """Build aggregated exergy surplus/deficit curves from NLP-like branches.
 
-    Branches are on shifted temperatures. Each branch interval moves to real
-    temperatures on its own (hot up by its hot shift, cold down by its cold
-    shift, as for the exergetic GCC) and keeps its heat capacity flow there.
-    Intervals with different shifts may then overlap on real temperatures,
-    which is physical: their streams overlap too.
+    Each branch is ``(kind, values)`` or ``(kind, values, is_real)``. A branch
+    on shifted temperatures moves to real temperatures interval by interval
+    (hot up by its hot shift, cold down by its cold shift, as for the exergetic
+    GCC) and keeps its heat capacity flow there. Intervals with different
+    shifts may then overlap on real temperatures, which is physical: their
+    streams overlap too. A branch already on real temperatures (``is_real``,
+    e.g. a Total Site utility profile or heat-pump streams) is not moved.
     """
     t_vals = _to_float_array(temperatures)
     branch_specs = [
-        (kind, _to_float_array(values))
-        for kind, values in branches
-        if _should_use_series(values)
+        (branch[0], _to_float_array(branch[1]), bool(branch[2:3] and branch[2]))
+        for branch in branches
+        if _should_use_series(branch[1])
     ]
     if not branch_specs:
         zeros = np.zeros_like(t_vals, dtype=float)
@@ -185,7 +193,7 @@ def build_exergy_nlp_curves(
             "sink_total": 0.0,
         }
 
-    for _, values in branch_specs:
+    for _, values, _is_real in branch_specs:
         _validate_curve_lengths(t_vals, values)
 
     n_intervals = max(len(t_vals) - 1, 0)
@@ -194,7 +202,7 @@ def build_exergy_nlp_curves(
 
     # (is_hot, real upper, real lower, |CP|) for every branch interval.
     segments: list[tuple[bool, float, float, float]] = []
-    for kind, values in branch_specs:
+    for kind, values, is_real in branch_specs:
         is_hot = kind == "hot"
         for k in range(n_intervals):
             delta_t = float(t_vals[k] - t_vals[k + 1])
@@ -203,7 +211,12 @@ def build_exergy_nlp_curves(
             cp = float((values[k + 1] - values[k]) / delta_t)
             if not math.isfinite(cp) or abs(cp) <= tol:
                 continue
-            offset = float(hot_offsets[k]) if is_hot else -float(cold_offsets[k])
+            if is_real:
+                offset = 0.0
+            elif is_hot:
+                offset = float(hot_offsets[k])
+            else:
+                offset = -float(cold_offsets[k])
             upper, lower = sorted(
                 (float(t_vals[k]) + offset, float(t_vals[k + 1]) + offset),
                 reverse=True,
@@ -279,12 +292,15 @@ def build_exergy_nlp_curves(
 def apply_exergy_targeting(target: Any, *, dt_cont_multiplier: float = 1.0) -> Any:
     """Enrich one existing target with exergy graphs and scalar metrics.
 
-    Exergy uses real temperatures. Each interval of the shifted GCC and NLP
-    curves is un-shifted by the CP-weighted contribution of the target zone's
-    streams and utilities in it, so streams with their own ``dt_cont`` are
-    un-shifted by what they were shifted by. Where no stream data covers an
-    interval, ``THERMAL_DT_CONT`` times the zone's ``dt_cont_multiplier`` is
-    used.
+    Exergy uses real temperatures. Each interval of a shifted GCC or NLP curve
+    is un-shifted by the CP-weighted contribution of the target zone's streams
+    and utilities in it, so streams with their own ``dt_cont`` are un-shifted by
+    what they were shifted by. Where no stream data covers an interval,
+    ``THERMAL_DT_CONT`` times the zone's ``dt_cont_multiplier`` is used.
+
+    Curves already on real temperatures are not moved: the Total Site utility
+    profiles (indirect and indirect heat-pump targets) and heat-pump stream
+    columns, whose streams carry no temperature contribution.
     """
     spec = _resolve_target_exergy_spec(target, dt_cont_multiplier=dt_cont_multiplier)
     if spec is None:
@@ -297,6 +313,7 @@ def apply_exergy_targeting(target: Any, *, dt_cont_multiplier: float = 1.0) -> A
         dt_cont_shift=spec["dt_cont_shift"],
         hot_shifts=spec.get("hot_shifts"),
         cold_shifts=spec.get("cold_shifts"),
+        is_real_temperature=spec.get("gcc_is_real", False),
     )
     nlp_output = build_exergy_nlp_curves(
         temperatures=spec["temperatures"],
@@ -437,9 +454,11 @@ def _resolve_target_exergy_spec(
         return _make_target_spec(
             temperatures=pt[ProblemTableLabel.T],
             gcc_series=_first_available_column(pt, [ProblemTableLabel.H_NET_UT]),
+            # The site utility profiles are built on real utility temperatures.
+            gcc_is_real=True,
             branches=[
-                ("hot", _optional_column(pt, ProblemTableLabel.H_HOT_UT)),
-                ("cold", _optional_column(pt, ProblemTableLabel.H_COLD_UT)),
+                ("hot", _optional_column(pt, ProblemTableLabel.H_HOT_UT), True),
+                ("cold", _optional_column(pt, ProblemTableLabel.H_COLD_UT), True),
             ],
             t_env=t_env,
             dt_cont_shift=dt_cont_shift,
@@ -460,8 +479,10 @@ def _resolve_target_exergy_spec(
                 ("cold", _optional_column(pt, ProblemTableLabel.H_NET_COLD)),
                 ("hot", _optional_column(pt, ProblemTableLabel.H_HOT_UT)),
                 ("cold", _optional_column(pt, ProblemTableLabel.H_COLD_UT)),
-                ("hot", _optional_column(pt, ProblemTableLabel.H_HOT_HP)),
-                ("cold", _optional_column(pt, ProblemTableLabel.H_COLD_HP)),
+                # Heat-pump streams carry no temperature contribution, so
+                # their columns are already on real temperatures.
+                ("hot", _optional_column(pt, ProblemTableLabel.H_HOT_HP), True),
+                ("cold", _optional_column(pt, ProblemTableLabel.H_COLD_HP), True),
             ],
             t_env=t_env,
             dt_cont_shift=dt_cont_shift,
@@ -477,11 +498,14 @@ def _resolve_target_exergy_spec(
             gcc_series=_first_available_column(
                 pt, [ProblemTableLabel.H_NET_UT, ProblemTableLabel.H_NET_HP]
             ),
+            # Built on the Total Site utility profiles plus heat-pump streams
+            # with no temperature contribution: all on real temperatures.
+            gcc_is_real=True,
             branches=[
-                ("hot", _optional_column(pt, ProblemTableLabel.H_HOT_UT)),
-                ("cold", _optional_column(pt, ProblemTableLabel.H_COLD_UT)),
-                ("hot", _optional_column(pt, ProblemTableLabel.H_HOT_HP)),
-                ("cold", _optional_column(pt, ProblemTableLabel.H_COLD_HP)),
+                ("hot", _optional_column(pt, ProblemTableLabel.H_HOT_UT), True),
+                ("cold", _optional_column(pt, ProblemTableLabel.H_COLD_UT), True),
+                ("hot", _optional_column(pt, ProblemTableLabel.H_HOT_HP), True),
+                ("cold", _optional_column(pt, ProblemTableLabel.H_COLD_HP), True),
             ],
             t_env=t_env,
             dt_cont_shift=dt_cont_shift,
@@ -512,13 +536,14 @@ def _make_target_spec(
     t_env: float,
     dt_cont_shift: float,
     stream_shifts: tuple[list, list, int | None] | None = None,
+    gcc_is_real: bool = False,
 ) -> dict[str, Any] | None:
     if gcc_series is None:
         return None
     usable_branches = [
-        (kind, values)
-        for kind, values in branches
-        if values is not None and _should_use_series(values)
+        tuple(branch)
+        for branch in branches
+        if branch[1] is not None and _should_use_series(branch[1])
     ]
     t_vals = _to_float_array(temperatures)
     hot_shifts = cold_shifts = None
@@ -534,6 +559,7 @@ def _make_target_spec(
         "branches": usable_branches,
         "t_env": float(t_env),
         "dt_cont_shift": float(dt_cont_shift),
+        "gcc_is_real": bool(gcc_is_real),
         "hot_shifts": hot_shifts,
         "cold_shifts": cold_shifts,
     }

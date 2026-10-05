@@ -1163,6 +1163,10 @@ def _single_state_no_sweep_payload() -> dict:
             },
         ],
         "options": {
+            # Yee and Grossmann (1990) costs: $/kW/y prices and $/y exchangers.
+            "COSTING_ANNUAL_OP_TIME": 1000.0,
+            "COSTING_DISCOUNT_RATE": 0.0,
+            "COSTING_SERVICE_LIFE": 1.0,
             "COSTING_HX_AREA_COEFF": 150.0,
             "COSTING_HX_AREA_EXP": 1.0,
             "COSTING_HX_UNIT_COST": 5500.0,

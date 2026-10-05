@@ -118,8 +118,13 @@ Utility exchangers
    that needs less runs with a bypass, so its duties are achievable with that
    common area. Approach limits work as for ``"utility"``.
 ``"cost"``
-   Minimise total annual cost: capital from the ``COSTING_HX_*`` settings on
-   the common areas plus utility cost, weighted over periods. Only a positive
+   Minimise total annual cost ($/y): capital from the ``COSTING_HX_*``
+   settings on the common areas, annualised with the capital recovery factor
+   (``COSTING_DISCOUNT_RATE``, ``COSTING_SERVICE_LIFE``), plus utility price
+   times duty over ``COSTING_ANNUAL_OP_TIME``, weighted over periods. All HEN
+   synthesis methods cost networks this way. For benchmark data quoted in
+   $/kW/y and $/y, set 1000 h/y, a zero discount rate and a one-year life.
+   Only a positive
    approach is required at both ends of every exchanger;
    ``min_approach_temperature`` defaults to 1 K.
 
