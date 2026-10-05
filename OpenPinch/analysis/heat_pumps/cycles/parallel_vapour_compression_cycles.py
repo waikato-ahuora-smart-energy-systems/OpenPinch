@@ -75,11 +75,15 @@ class ParallelVapourCompressionCycles(_MultiVapourCompressionCycleBase):
         Q_heat,
         n_cycles: int,
     ) -> np.ndarray:
-        if Q_heat is None:
-            arr = np.array([1.0], dtype=float)
-        else:
-            arr = self._as_1d_numeric_array(Q_heat, default=np.nan)
+        """Return one process heat duty per cycle, ``None`` where unset.
 
+        Each subcycle settles an unset duty: a heat pump solves for a unit
+        duty and a refrigerator sends all its condenser heat to the process.
+        """
+        if Q_heat is None:
+            return np.array([None] * n_cycles, dtype=object)
+
+        arr = self._as_1d_numeric_array(Q_heat, default=np.nan)
         if arr.size == n_cycles:
             arr_out = arr
         elif arr.size == 1:
@@ -89,11 +93,10 @@ class ParallelVapourCompressionCycles(_MultiVapourCompressionCycleBase):
                 "Incompatible Q_heat input for solving a parallel heat pump system."
             )
 
-        nan_mask = np.isnan(arr_out)
-        if np.any(nan_mask):
-            arr_out = np.where(nan_mask, 1.0, arr_out)
-
-        return arr_out
+        return np.array(
+            [None if np.isnan(value) else float(value) for value in arr_out],
+            dtype=object,
+        )
 
     def _normalize_Q_cool(
         self,

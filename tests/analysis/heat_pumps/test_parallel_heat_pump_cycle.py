@@ -69,7 +69,7 @@ def test_parallel_refrigeration_mode_allocates_cooling_base_duty():
         is_heat_pump=False,
     )
 
-    np.testing.assert_allclose(q_heat, np.array([5.0]))
+    assert q_heat.tolist() == [5.0]
     np.testing.assert_allclose(q_cool, np.array([15.0]))
 
 
@@ -501,8 +501,9 @@ def test_parallel_property_sweep_and_normalization_branches():
     with pytest.raises(ValueError, match="x must be scalar"):
         cycle._normalize_per_cycle_array(np.array([1.0, 2.0, 3.0]), 2, name="x")
 
-    assert cycle._normalize_Q_heat(None, 2).tolist() == [1.0, 1.0]
-    assert cycle._normalize_Q_heat(np.array([np.nan, 2.0]), 2).tolist() == [1.0, 2.0]
+    assert cycle._normalize_Q_heat(None, 2).tolist() == [None, None]
+    assert cycle._normalize_Q_heat(np.array([np.nan, 2.0]), 2).tolist() == [None, 2.0]
+    assert cycle._normalize_Q_heat(np.array([5.0]), 2).tolist() == [5.0, 5.0]
     with pytest.raises(ValueError):
         cycle._normalize_Q_heat(np.array([1.0, 2.0, 3.0]), 2)
 
@@ -624,3 +625,29 @@ def test_parallel_solve_decodes_availability_fractions_before_child_cycles(monke
     # Duties are fractions of availability, so there is no excess to
     # penalise; only the dummy subcycles' own penalties remain.
     assert hp.penalty == pytest.approx(1.0)
+
+
+def test_parallel_refrigerator_without_heat_duty_sends_all_condenser_heat_to_process():
+    """An unset heat duty is the whole condenser, not a 1 kW placeholder."""
+    cycle = ParallelVapourCompressionCycles()
+    cycle.solve(
+        T_evap=np.array([-10.0, -15.0]),
+        T_cond=np.array([35.0, 30.0]),
+        dtcont=0.0,
+        refrigerant=["R134a", "R134a"],
+        eta_comp=0.75,
+        Q_cool=np.array([600.0, 400.0]),
+        is_heat_pump=False,
+    )
+
+    assert cycle.solved
+    for stage in cycle.subcycles:
+        assert np.isclose(stage.Q_heat, stage.Q_cond, rtol=1e-9)
+        assert np.isclose(stage.Q_cas_heat, 0.0, atol=1e-9)
+
+    streams = cycle.build_stream_collection(include_cond=True, include_evap=True)
+    assert np.isclose(
+        sum(s.heat_flow for s in streams.get_hot_streams()),
+        cycle.Q_cond,
+        rtol=1e-7,
+    )

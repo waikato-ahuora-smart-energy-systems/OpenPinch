@@ -14,6 +14,17 @@ Heat exchanger network synthesis
   OpenHENS for matches at the pinch.
 - Each recovery match is checked against its own required approach (the sum of
   its streams' contributions), not the global dTmin.
+- HEN synthesis costs are annual, as in area targeting and HPR targeting:
+  utility cost is price ($/MWh) times duty over ``COSTING_ANNUAL_OP_TIME``, and
+  ``COSTING_HX_*`` exchanger capital is annualised with the capital recovery
+  factor. Previously prices were used as $/kW/y and capital as $/y, so default
+  HEN TACs and the networks chosen change. The OpenHENS benchmark fixtures,
+  which quote $/kW/y and $/y, set 1000 h/y, a zero discount rate and a
+  one-year life, which reproduces their published costs.
+- Multi-period networks export each stream's supply and target temperatures
+  and heat load per period, and verification checks every stream's heat
+  balance in every period. Multi-period networks saved without that data skip
+  the stream heat-balance check, as before.
 - An infeasible task outcome is marked failed and kept for diagnostics instead
   of aborting the synthesis; a utility-only network no longer stops TDM/EVM
   task building.
@@ -43,6 +54,10 @@ HPR cost model and search
   raises a typed "no beneficial heat pump" error.
 - Simulated refrigeration penalises unserved selected cooling, as the Carnot
   path does.
+- Parallel vapour-compression refrigerators send all their condenser heat to
+  the process or ambient air, as cascades already did. Each cycle used to place
+  only a 1 kW placeholder, so the rest of its heat was rejected at any
+  condensing temperature for free.
 
 HEN duty allocation on a fixed structure
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -67,6 +82,9 @@ HEN duty allocation on a fixed structure
 Analysis reliability and extensibility
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- New ``REPORTING_DEBUG_ENABLED`` option (default false). Repeated stream
+  names within a zone are still renamed ``_1``, ``_2``, but the warning is
+  reported only in debug mode.
 - Made golden HPR contract fixture provenance independent of the installed
   release, preventing automatic version bumps from making fixtures stale.
   Calculated performance maps continue to record their runtime versions.

@@ -244,8 +244,8 @@ def _parallel_cost_units(
 ) -> list[HPRCostUnit]:
     """Each parallel cycle is its own single-stage machine.
 
-    Its capacity is all the heat its condenser rejects, which is also the
-    basis for a refrigerator, whose process heat is only a nominal value.
+    Its capacity is all the heat its condenser rejects, for a heat pump and a
+    refrigerator alike.
     """
     return [
         HPRCostUnit(Q_cap=float(Q_cap), T_hot_max=float(T_cond))

@@ -248,8 +248,13 @@ def test_final_record_validation_is_not_candidate_infeasibility(monkeypatch):
         initialise_simulated_cycle=False,
     )
     point = np.array([0.6, 0.1, 0.1, 0.1, 0.5, 0.0, 0.5, 0.5])
-    with pytest.raises(ValueError, match="record contract defect"):
+    with pytest.raises(ValueError, match="record contract defect") as caught:
         target._compute_vc_mvr_system_obj(point, args)
+
+    # The error names where it arose and keeps the original as its cause.
+    assert "VC+MVR post-processing failed after the cycle solved" in str(caught.value)
+    assert "final evaluation" in str(caught.value)
+    assert str(caught.value.__cause__) == "record contract defect"
 
 
 def test_direct_mvr_second_stage_failure_leaves_problem_unchanged(monkeypatch):

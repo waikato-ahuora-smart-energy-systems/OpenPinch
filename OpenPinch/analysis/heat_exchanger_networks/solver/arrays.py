@@ -12,11 +12,28 @@ from ....domain.configuration import tol
 from ....domain.stream import Stream
 from ....domain.value import Value
 from ....domain.zone import Zone
+from ...economics import compute_capital_recovery_factor
 from ..indexing import ordered_mapping_keys
 from ..prepared_problem import PreparedProblem
 
 _PreparedItem = tuple[str, Stream, Any | None]
 SEGMENT_PROFILE_VERSION = 2
+
+
+def annual_cost_scales(costing: Any) -> tuple[float, float]:
+    """Return the factors that put HEN costs on a $/y basis.
+
+    The first turns a price in $/MWh times a duty in kW into $/y over
+    ``COSTING_ANNUAL_OP_TIME``; the second annualises installed exchanger
+    capital (``COSTING_HX_*``, in $) with the capital recovery factor, as area
+    targeting does. Benchmark problems quoted in $/kW/y and $/y set 1000 h/y,
+    a zero discount rate and a one-year life, so both factors are 1.
+    """
+    price_scale = float(costing.annual_op_time) / 1000.0
+    capital_scale = compute_capital_recovery_factor(
+        costing.discount_rate, costing.service_life
+    )
+    return price_scale, float(capital_scale)
 
 
 @dataclass(frozen=True)
@@ -116,7 +133,12 @@ def problem_to_solver_arrays(
     ):
         arrays.update(
             _segment_profile_arrays(
-                prefix, items, num_periods, dTmin, reference_dt_cont
+                prefix,
+                items,
+                num_periods,
+                dTmin,
+                reference_dt_cont,
+                price_scale=annual_cost_scales(costing)[0],
             )
         )
 
@@ -183,6 +205,9 @@ def problem_to_solver_arrays(
                 "COSTING_HX_AREA_COEFF": costing.hx_area_coeff,
                 "COSTING_HX_AREA_EXP": costing.hx_area_exp,
                 "COSTING_HX_UNIT_COST": costing.hx_unit_cost,
+                "COSTING_ANNUAL_OP_TIME": costing.annual_op_time,
+                "COSTING_DISCOUNT_RATE": costing.discount_rate,
+                "COSTING_SERVICE_LIFE": costing.service_life,
             },
         },
         preparation={
@@ -202,8 +227,9 @@ def problem_to_solver_arrays(
         },
         unit_conventions={
             "cost_coefficients": (
-                "OpenPinch costing config: COSTING_HX_UNIT_COST, "
-                "COSTING_HX_AREA_COEFF, COSTING_HX_AREA_EXP"
+                "$/y: installed COSTING_HX_UNIT_COST and COSTING_HX_AREA_COEFF "
+                "times the capital recovery factor (COSTING_DISCOUNT_RATE, "
+                "COSTING_SERVICE_LIFE); COSTING_HX_AREA_EXP unchanged"
             ),
             "heat_capacity_flowrate": "kW/K",
             "heat_transfer_coefficient": "kW/m^2/K",
@@ -214,8 +240,8 @@ def problem_to_solver_arrays(
                 "missing values or values <= tol"
             ),
             "utility_price": (
-                "numeric UtilitySchema.price passed through for OpenHENS "
-                "annual cost equations"
+                "$/kW/y: price in $/MWh times COSTING_ANNUAL_OP_TIME / 1000, "
+                "so price times duty (kW) is $/y"
             ),
         },
         utility_identities={
@@ -256,6 +282,14 @@ def _solver_array_mapping(
 
         return getter
 
+    price_scale, capital_scale = annual_cost_scales(costing)
+
+    def annual_price(stream: Stream, _record, n: int) -> float:
+        return _value(stream.price, price_unit, period_idx=n) * price_scale
+
+    area_coeff = float(costing.hx_area_coeff) * capital_scale
+    unit_cost = float(costing.hx_unit_cost) * capital_scale
+
     def temperature_contribution(stream: Stream, _record, n: int) -> float:
         return _temperature_contribution(
             stream,
@@ -274,7 +308,7 @@ def _solver_array_mapping(
     hu = hot_utility_items
 
     return {
-        "A_coeff": _float_array([costing.hx_area_coeff]),
+        "A_coeff": _float_array([area_coeff]),
         "A_exp": _float_array([costing.hx_area_exp]),
         "period_ids": _str_array(period_ids),
         "period_weights": _float_array(period_weights),
@@ -302,15 +336,15 @@ def _solver_array_mapping(
         ),
         "T_hu_out_period": period_values(hot_utility_items, utility_solver_target),
         "T_hu_cont_period": period_values(hot_utility_items, temperature_contribution),
-        "c_cost_period": period_values(cold_items, stream_attr("price", price_unit)),
+        "c_cost_period": period_values(cold_items, annual_price),
         "cold_names": _str_array(stream.name for _, stream, _ in cold_items),
-        "cu_coeff": _float_array([costing.hx_area_coeff]),
-        "cu_cost_period": period_values(cu, stream_attr("price", price_unit)),
+        "cu_coeff": _float_array([area_coeff]),
+        "cu_cost_period": period_values(cu, annual_price),
         "cu_exp": _float_array([costing.hx_area_exp]),
-        "cu_unit_cost": _float_array([costing.hx_unit_cost]),
+        "cu_unit_cost": _float_array([unit_cost]),
         "f_c_period": period_values(cold_items, heat_capacity_flowrate),
         "f_h_period": period_values(hot_items, heat_capacity_flowrate),
-        "h_cost_period": period_values(hot_items, stream_attr("price", price_unit)),
+        "h_cost_period": period_values(hot_items, annual_price),
         "hot_names": _str_array(stream.name for _, stream, _ in hot_items),
         "htc_c_period": period_values(
             cold_items, stream_attr("heat_transfer_coefficient", htc_unit)
@@ -324,11 +358,11 @@ def _solver_array_mapping(
         "htc_hu_period": period_values(
             hot_utility_items, stream_attr("heat_transfer_coefficient", htc_unit)
         ),
-        "hu_coeff": _float_array([costing.hx_area_coeff]),
-        "hu_cost_period": period_values(hu, stream_attr("price", price_unit)),
+        "hu_coeff": _float_array([area_coeff]),
+        "hu_cost_period": period_values(hu, annual_price),
         "hu_exp": _float_array([costing.hx_area_exp]),
-        "hu_unit_cost": _float_array([costing.hx_unit_cost]),
-        "unit_cost": _float_array([costing.hx_unit_cost]),
+        "hu_unit_cost": _float_array([unit_cost]),
+        "unit_cost": _float_array([unit_cost]),
     }
 # fmt: on
 
@@ -339,8 +373,13 @@ def _segment_profile_arrays(
     num_periods: int,
     dTmin: float,
     reference_dt_cont: float | None = None,
+    *,
+    price_scale: float = 1.0,
 ) -> dict[str, np.ndarray]:
-    """Build padded segment tensors while keeping the solver parent axes intact."""
+    """Build padded segment tensors while keeping the solver parent axes intact.
+
+    Segment prices are scaled by ``price_scale`` so price times duty is $/y.
+    """
     segment_rows = [_segments_for_solver(stream) for _, stream, _ in items]
     max_segments = max(len(row) for row in segment_rows)
     shape = (num_periods, len(items), max_segments)
@@ -390,10 +429,9 @@ def _segment_profile_arrays(
                     "kW/m^2/delta_degC",
                     period_idx=period_index,
                 )
-                prices[period_index, parent_index, segment_index] = _value(
-                    segment.price,
-                    "$/MW/h",
-                    period_idx=period_index,
+                prices[period_index, parent_index, segment_index] = (
+                    _value(segment.price, "$/MW/h", period_idx=period_index)
+                    * price_scale
                 )
                 temperature_contributions[period_index, parent_index, segment_index] = (
                     _temperature_contribution(

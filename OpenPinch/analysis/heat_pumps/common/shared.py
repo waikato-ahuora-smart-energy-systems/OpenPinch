@@ -70,6 +70,7 @@ __all__ = [
     "evaluate_carnot_hpr_result",
     "evaluate_vapour_hpr_result",
     "validate_vapour_hp_refrigerant_ls",
+    "post_solve_error",
 ]
 
 
@@ -706,6 +707,26 @@ def calc_carnot_heat_engine_eta(
 # temperature have no usable saturation state (the cycle's pressure lookup
 # switches to the critical isochore there), so the search stays below it.
 SUBCRITICAL_CONDENSING_MARGIN_K = 2.0
+
+
+def post_solve_error(
+    label: str,
+    point: np.ndarray,
+    artifact_mode: HPREvaluationMode,
+    error: Exception,
+) -> ValueError:
+    """Return a ``ValueError`` naming where a post-solve failure arose.
+
+    Errors after a cycle has solved (cost accounting, streams, the simulation
+    record) are code defects, not infeasible candidates, so they are raised
+    rather than ranked as failures: a failure would silently hand the target
+    to the next-best candidate. The original error is chained as the cause.
+    """
+    values = ", ".join(f"{float(value):.6g}" for value in np.ravel(point))
+    return ValueError(
+        f"{label} post-processing failed after the cycle solved "
+        f"({artifact_mode.value} evaluation, design vector [{values}]): {error}"
+    )
 
 
 def condensing_temperature_search_range(

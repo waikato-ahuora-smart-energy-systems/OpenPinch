@@ -151,15 +151,27 @@ def test_nested_temperatures_below_absolute_zero_are_rejected(thermal):
     )
 
 
-def test_duplicate_stream_names_are_renamed_with_a_warning():
+def test_duplicate_stream_names_are_reported_in_debug_mode():
     messages = _messages(
-        {"streams": [_stream(), _stream(t_supply=140.0)], "utilities": []}
+        {
+            "streams": [_stream(), _stream(t_supply=140.0)],
+            "utilities": [],
+            "options": {"REPORTING_DEBUG_ENABLED": True},
+        }
     )
 
     assert any(
         severity == "warning" and "used more than once" in message
         for severity, message in messages
     )
+
+
+def test_duplicate_stream_names_are_silent_by_default():
+    messages = _messages(
+        {"streams": [_stream(), _stream(t_supply=140.0)], "utilities": []}
+    )
+
+    assert not any("used more than once" in message for _, message in messages)
 
 
 def test_construction_compares_stream_temperatures_in_canonical_units():

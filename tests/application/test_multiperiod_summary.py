@@ -124,6 +124,8 @@ def test_weighted_average_output_aggregates_values_utilities_and_metadata():
     assert target.hpr_utility_annualized_capital_cost.value == pytest.approx(30.0)
     assert target.hpr_total_annualized_cost.value == pytest.approx(650.0)
     assert target.hpr_cycle == "Carnot"
+    # Heat-engine efficiency has no basis on the rows: weighted mean of 21 and 23.
+    assert target.hpr_eta_he.value == pytest.approx((21.0 + 3.0 * 23.0) / 4.0)
     # One failed period means the multi-period design did not succeed.
     assert target.hpr_success is False
     assert {
