@@ -169,11 +169,11 @@ def test_hen_costs_are_annualised_like_area_targeting():
 
     import numpy as np
 
-    from OpenPinch.application.problem import PinchProblem
     from OpenPinch.analysis.economics import compute_capital_recovery_factor
     from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
         problem_to_solver_arrays,
     )
+    from OpenPinch.application.problem import PinchProblem
     from tests.support.paths import FIXTURES_ROOT
 
     fixture = FIXTURES_ROOT / "openhens" / "Four-stream-Yee-and-Grossmann-1990-1.json"
