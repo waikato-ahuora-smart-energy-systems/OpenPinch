@@ -68,6 +68,7 @@ def get_utility_targets(
             hot_utilities=hot_utilities,
             cold_utilities=cold_utilities,
             idx=idx,
+            scale=_process_duty_scale(pt),
         )
 
     pt.update(
@@ -156,6 +157,17 @@ def is_default_utility(stream) -> bool:
     return bool(getattr(stream, _DEFAULT_UTILITY_FLAG, False))
 
 
+def _process_duty_scale(pt: ProblemTable) -> float:
+    """Largest hot or cold composite duty of the table, in kW (0 if absent)."""
+    scale = 0.0
+    for label in (ProblemTableLabel.H_HOT, ProblemTableLabel.H_COLD):
+        if label.value in pt.columns:
+            values = np.abs(np.asarray(pt[label], dtype=float))
+            if values.size and np.isfinite(values).any():
+                scale = max(scale, float(np.nanmax(values)))
+    return scale
+
+
 def _warn_on_unmet_utility_demand(
     *,
     hot_required: float,
@@ -163,12 +175,15 @@ def _warn_on_unmet_utility_demand(
     hot_utilities: StreamCollection,
     cold_utilities: StreamCollection,
     idx: int | None,
+    scale: float = 0.0,
 ) -> None:
     """Warn when the assigned utility duty falls short of the target.
 
     A shortfall means the utilities given cannot meet the demand, for example
     because of ``maximum_heat_flow`` caps or a fixed segmented profile. The
-    reported utility totals and costs then understate the target.
+    reported utility totals and costs then understate the target. ``scale``
+    is the size of the problem (kW): a residue far below it, left by the
+    cascade arithmetic, is not a shortfall.
     """
     for label, required, utilities in (
         ("hot", hot_required, hot_utilities),
@@ -179,8 +194,11 @@ def _warn_on_unmet_utility_demand(
             for utility in utilities
         )
         shortfall = required - assigned
-        # Ignore numerical residue: below 1 W, or a millionth of the target.
-        if shortfall > max(tol, _UNMET_DEMAND_ABS_TOL, 1e-6 * required):
+        # Ignore numerical residue: below 1 W, or a millionth of the target or
+        # of the problem's duty.
+        if shortfall > max(
+            tol, _UNMET_DEMAND_ABS_TOL, 1e-6 * max(required, float(scale))
+        ):
             warnings.warn(
                 f"The {label} utilities meet {assigned:.6g} of the {required:.6g} "
                 f"{label} utility target; {shortfall:.6g} is unmet. Add a "

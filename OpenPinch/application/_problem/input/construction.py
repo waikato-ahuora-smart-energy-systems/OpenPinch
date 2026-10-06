@@ -61,6 +61,13 @@ def prepare_problem(
         zone_tree=zone_tree,
         config=master_zone.config,
     )
+    # Zone multipliers must be set before the streams are built: each stream
+    # takes its zone's multiplier, and the default utilities are placed from
+    # the shifted process temperatures.
+    master_zone = _canonicalization._apply_zone_dt_cont_multiplier(
+        parent_zone=master_zone,
+        zone_tree=zone_tree,
+    )
     prepared_streams, process_zone_paths = _build_prepared_stream_collection(
         master_zone=master_zone,
         streams=sorted(streams, key=lambda stream: stream.name),
@@ -136,6 +143,7 @@ def _build_prepared_stream_collection(
         cu_t_max=cu_t_max,
         config=master_zone.config,
         dt_cont_multiplier=master_zone.dt_cont_multiplier,
+        placement_multiplier=_largest_dt_cont_multiplier(master_zone),
     )
     prepared_streams = process_streams + utility_streams
     return prepared_streams, process_zone_paths
@@ -289,6 +297,19 @@ def _widen_near_isothermal_target(
 def _build_process_stream_key(zone_path: str, stream_obj: Stream) -> str:
     """Build a stable canonical key for one prepared process stream."""
     return ".".join([zone_path, stream_obj.name])
+
+
+def _largest_dt_cont_multiplier(zone: Zone) -> float:
+    """Largest ``dt_cont`` multiplier in ``zone`` and its subzones.
+
+    Every zone gets its own copy of the utilities, shifted by that zone's
+    multiplier, so the default utilities are placed for the largest one; in
+    every other zone they then sit beyond the process temperatures.
+    """
+    return max(
+        [float(zone.dt_cont_multiplier)]
+        + [_largest_dt_cont_multiplier(sub) for sub in zone.subzones.values()]
+    )
 
 
 def _find_extreme_process_temperatures(

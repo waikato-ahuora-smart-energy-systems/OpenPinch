@@ -62,14 +62,25 @@ def _get_hot_and_cold_utilities(
     cu_t_max: float,
     config: Configuration,
     dt_cont_multiplier: float = 1.0,
+    placement_multiplier: float | None = None,
 ) -> StreamCollection:
-    """Extract all utility data into class instances."""
+    """Extract all utility data into class instances.
+
+    ``hu_t_min`` and ``cu_t_max`` are shifted process temperatures.
+    ``placement_multiplier`` (default ``dt_cont_multiplier``) is the largest
+    multiplier any zone applies to the utilities: the default utilities are
+    placed so that, shifted by it, they still reach those temperatures, and a
+    user utility replaces a default only if it does too.
+    """
+    placement = (
+        dt_cont_multiplier if placement_multiplier is None else placement_multiplier
+    )
     utilities_filled, add_default_hu, add_default_cu = _complete_utility_data(
         deepcopy(list(utilities)),
         config=config,
         hu_t_min=hu_t_min,
         cu_t_max=cu_t_max,
-        dt_cont_multiplier=dt_cont_multiplier,
+        dt_cont_multiplier=placement,
     )
     utilities_with_defaults = _add_default_utilities(
         utilities=utilities_filled,
@@ -78,7 +89,7 @@ def _get_hot_and_cold_utilities(
         add_default_cu=add_default_cu,
         hu_t_min=hu_t_min,
         cu_t_max=cu_t_max,
-        dt_cont_multiplier=dt_cont_multiplier,
+        dt_cont_multiplier=placement,
     )
     hot_utilities, utilities_left = _create_utilities_list(
         utilities=utilities_with_defaults,

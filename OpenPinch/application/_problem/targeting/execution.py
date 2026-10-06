@@ -229,8 +229,9 @@ def execute_targeting(
             TargetType.IHP.value,
             TargetType.DR.value,
             TargetType.IR.value,
+            TargetType.DORC.value,
         }:
-            # A zero selected/available service produces no HPR target.
+            # A zero selected/available service produces no HPR or ORC target.
             return None
         raise RuntimeError(
             f"Targeting did not produce target {target_id!r} for zone {zone.name!r}."

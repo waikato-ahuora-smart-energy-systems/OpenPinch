@@ -4,6 +4,41 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Organic Rankine cycle targeting
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- New ``problem.target.carnot_orc`` (under development, not yet in the
+  tutorials): parallel ORC units on the process surplus below the pinch, with
+  each unit's power a second-law fraction (``ORC_ETA_II_CARNOT``) of its
+  Carnot power. The search minimises the total annual cost change: ORC
+  capital annualised with the capital recovery factor, less the power valued
+  at ``COSTING_ORC_ELE_PRICE``, plus the change in cooling at
+  ``COSTING_ORC_COOLING_PRICE``. Hot utility is unchanged and cold utility
+  falls by the heat the ORC takes. Results are ``DirectOrcTarget`` objects
+  (``TargetType.DORC``).
+- ORC capital is ``F_inst * C_eq * (W_net / 1 MW)^n`` per unit, defaulting to
+  about $3,000/kW installed at 1 MW (2025 USD) with n = 0.75, set from the US
+  EPA (2021), Lemmens (2016) and Tartiere and Astolfi (2017) data; treat it
+  as +/-30 %. The ORC has its own ``ORC_*`` and ``COSTING_ORC_*`` settings and
+  shares nothing with heat pump targeting.
+- New ``problem.target.organic_rankine_cycle`` (also under development): each
+  unit is a subcritical CoolProp Rankine cycle with pump, preheating
+  evaporator, optional superheat (``ORC_MAX_SUPERHEAT``), turbine
+  (``ORC_ETA_TURBINE``), optional recuperator (``ORC_RECUPERATOR_ENABLED``)
+  and condenser. Each fluid in ``ORC_FLUIDS`` (R1233zd(E), R1234ze(E),
+  isopentane, n-pentane, toluene) is searched in turn from the Carnot design,
+  evaporating at least 5 K below its critical temperature; the cheapest is
+  kept. Sloped evaporator profiles are fitted under the GCC exactly.
+- ORC results (net power, heat in, condenser duty, thermal efficiency,
+  capital, power value, cooling and total annual cost change, fluid and
+  per-unit design) appear in ``problem.results`` and the workbook. Across
+  periods, thermal efficiency is total power over total heat and capital is
+  the peak.
+- ORC targets carry two graphs, plotted with
+  ``problem.plot.grand_composite_curve_with_orc`` (the GCC before and after
+  the ORC evaporators) and ``problem.plot.net_load_profiles_with_orc`` (the
+  process net loads with the evaporators as a cold utility profile).
+
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -82,6 +117,14 @@ HEN duty allocation on a fixed structure
 Analysis reliability and extensibility
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Default hot and cold utilities now cover the whole demand in every zone
+  when zones have different ``dt_cont`` multipliers. They were placed for the
+  root zone's multiplier and before the zone multipliers were applied, so a
+  zone with a larger multiplier left part of its duty unmet (for example 100
+  of 300 kW). They are now placed for the largest multiplier in the tree.
+- The unmet-utility warning ignores residues below a millionth of the
+  problem's process duty, so cascade rounding no longer reports a few watts
+  as unmet.
 - New ``REPORTING_DEBUG_ENABLED`` option (default false). Repeated stream
   names within a zone are still renamed ``_1``, ``_2``, but the warning is
   reported only in debug mode.

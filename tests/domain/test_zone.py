@@ -1,5 +1,7 @@
 """Regression tests for the zone classes."""
 
+import warnings
+
 import pytest
 
 from OpenPinch.domain.configuration import Configuration
@@ -107,7 +109,10 @@ def test_property_setters_getters(dummy_zone: Zone):
     dummy_zone.ETE = 0.75
     assert dummy_zone.ETE == 0.75
 
-    with pytest.warns(UserWarning, match="empty stream collection"):
+    # A zone without streams takes a multiplier silently: zones get theirs
+    # before their streams are built.
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
         dummy_zone.dt_cont_multiplier = 1.5
     assert dummy_zone.dt_cont_multiplier == 1.5
 

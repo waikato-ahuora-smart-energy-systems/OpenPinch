@@ -314,6 +314,41 @@ class IndirectRefrigerationTarget(HeatPumpTargetBase):
     analysis_method = TargetMethod.Refrigeration.value
 
 
+class DirectOrcTarget(GraphBackedTarget, UtilitySummaryTarget):
+    """Organic Rankine cycle on a zone's process surplus below the pinch.
+
+    The utility fields are the residual utilities with the ORC in place. The
+    ``orc_*`` fields describe the design: per-unit tuples run hottest unit
+    first; temperatures are in degC, duties and power in kW, capital in $ and
+    annual costs in $/y (a negative total means the ORC pays).
+    """
+
+    target_types = (TargetType.DORC.value,)
+    prerequisite_target_types = (TargetType.DI.value,)
+    integration_route = IntegrationType.Process.value
+    analysis_method = TargetMethod.OrganicRankineCycle.value
+
+    pt: ProblemTable
+    orc_model: Literal["carnot", "simulated"] = "carnot"
+    orc_fluid: Optional[str] = None
+    orc_superheat: tuple[float, ...] = ()
+    orc_n_stages: int
+    orc_evaporating_temperatures: tuple[float, ...]
+    orc_condensing_temperature: float
+    orc_stage_heat_in: tuple[float, ...]
+    orc_stage_net_power: tuple[float, ...]
+    orc_heat_in: float
+    orc_condenser_duty: float
+    orc_net_power: float
+    orc_thermal_efficiency: float
+    orc_machine_capital_costs: tuple[float, ...]
+    orc_capital_cost: float
+    orc_annualized_capital_cost: float
+    orc_power_value: float
+    orc_cooling_cost_change: float
+    orc_total_annualized_cost_change: float
+
+
 AnyTargetModel = (
     DirectIntegrationTarget
     | SubzoneAggregateTarget
@@ -323,6 +358,7 @@ AnyTargetModel = (
     | IndirectHeatPumpTarget
     | DirectRefrigerationTarget
     | IndirectRefrigerationTarget
+    | DirectOrcTarget
 )
 
 
@@ -331,6 +367,7 @@ __all__ = [
     "BaseTargetModel",
     "DirectHeatPumpTarget",
     "DirectIntegrationTarget",
+    "DirectOrcTarget",
     "DirectRefrigerationTarget",
     "EnergyTransferTarget",
     "HeatPumpTargetBase",
@@ -354,6 +391,7 @@ _TARGET_FAMILIES = MappingProxyType(
             IndirectHeatPumpTarget,
             DirectRefrigerationTarget,
             IndirectRefrigerationTarget,
+            DirectOrcTarget,
         )
         for target_type in family.target_types
     }

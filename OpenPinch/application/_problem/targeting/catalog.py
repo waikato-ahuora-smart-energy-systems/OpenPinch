@@ -89,6 +89,10 @@ METHOD_CATALOG = MappingProxyType(
             for name in ("brayton_heat_pump", "brayton_refrigeration")
         },
         **{
+            f"target.{name}": _spec(prerequisites=("direct_heat_integration",))
+            for name in ("carnot_orc", "organic_rankine_cycle")
+        },
+        **{
             f"target.{name}": _spec(
                 scopes=AGGREGATE_SCOPES + (ZoneType.O.value,),
                 prerequisites=("compatible_thermal_target",),

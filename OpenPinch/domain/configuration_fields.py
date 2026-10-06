@@ -337,6 +337,14 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "COSTING_HPR_UTILITY_CAPITAL_RECOVERY_ENABLED": _spec(bool, True, "costing", "hpr_utility_capital_recovery_enabled"),
     "COSTING_HPR_HOT_UTILITY_CAPITAL_COST": _spec(float, 750.0, "costing", "hpr_hot_utility_capital_cost", numeric_min=0.0),
     "COSTING_HPR_REFRIGERATION_CAPITAL_COST": _spec(float, 1500.0, "costing", "hpr_refrigeration_capital_cost", numeric_min=0.0),
+    # ORC prices and installed capital: C = F_inst * C_eq * (W_net / 1 MW)^exp
+    # per unit, about $3,000/kW installed at 1 MW (2025 USD, +/-30 %).
+    "COSTING_ORC_ELE_PRICE": _spec(float, 100.0, "costing", "orc_ele_price", numeric_min=0.0),
+    "COSTING_ORC_COOLING_PRICE": _spec(float, 2.5, "costing", "orc_cooling_price", numeric_min=0.0),
+    "COSTING_ORC_EQUIPMENT_COST": _spec(float, 2.3e6, "costing", "orc_equipment_cost", numeric_min=0.0),
+    "COSTING_ORC_INSTALLATION_FACTOR": _spec(float, 1.3, "costing", "orc_installation_factor", numeric_min=0.0),
+    "COSTING_ORC_COST_EXP": _spec(float, 0.75, "costing", "orc_cost_exp", numeric_min=0.0),
+    "COSTING_ORC_CAPITAL_RECOVERY_ENABLED": _spec(bool, True, "costing", "orc_capital_recovery_enabled"),
 
     # HEN synthesis.
     "HENS_APPROACH_TEMPERATURES": _spec(List[float], [14.0], "hens", "approach_temperatures", validator=_positive_float_grid),
@@ -393,6 +401,24 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HPR_BB_MINIMISER": _spec(str, BB_Minimiser.CMAES.value, "hpr", "bb_minimiser", enum_cls=BB_Minimiser),
     "HPR_INITIALISE_SIMULATED_CYCLE": _spec(bool, True, "hpr", "initialise_simulated_cycle"),
 
+    # Organic Rankine cycle (ORC) on the surplus below the pinch.
+    "ORC_MODEL": _spec(str, "carnot", "orc", "model", validator=partial(_string_choice, choices=frozenset({"carnot", "simulated"}))),
+    "ORC_N_STAGES": _spec(int, 1, "orc", "n_stages", numeric_min=1.0),
+    "ORC_ETA_II_CARNOT": _spec(float, 0.5, "orc", "eta_ii_carnot", numeric_min=0.0, numeric_max=1.0, positive=True),
+    "ORC_DT_CONT": _spec(float, 5.0, "orc", "dt_cont", numeric_min=0.0),
+    "ORC_T_COND": _spec(float, 30.0, "orc", "t_cond"),
+    "ORC_MIN_LIFT": _spec(float, 10.0, "orc", "min_lift", numeric_min=0.0),
+    "ORC_LOAD_FRACTION": _spec(float, 1.0, "orc", "load_fraction", numeric_min=0.0, numeric_max=1.0),
+    "ORC_MAX_MULTISTART": _spec(int, 5, "orc", "max_multistart", numeric_min=1.0),
+    "ORC_BB_MINIMISER": _spec(str, BB_Minimiser.DA.value, "orc", "bb_minimiser", enum_cls=BB_Minimiser),
+    # Simulated (CoolProp) cycle.
+    "ORC_FLUIDS": _spec(List[str], ["R1233zd(E)", "R1234ze(E)", "Isopentane", "n-Pentane", "Toluene"], "orc", "fluids"),
+    "ORC_ETA_TURBINE": _spec(float, 0.8, "orc", "eta_turbine", numeric_min=0.0, numeric_max=1.0, positive=True),
+    "ORC_ETA_PUMP": _spec(float, 0.7, "orc", "eta_pump", numeric_min=0.0, numeric_max=1.0, positive=True),
+    "ORC_MAX_SUPERHEAT": _spec(float, 20.0, "orc", "max_superheat", numeric_min=0.0),
+    "ORC_RECUPERATOR_ENABLED": _spec(bool, False, "orc", "recuperator_enabled"),
+    "ORC_DT_RECUPERATOR": _spec(float, 10.0, "orc", "dt_recuperator", numeric_min=0.0),
+
     # Direct process MVR and power cogeneration.
     "PROCESS_MVR_ETA_COMP": _spec(float, 0.7, "process_mvr", "eta_comp", numeric_min=0.0, numeric_max=1.0, positive=True),
     "PROCESS_MVR_ETA_MOTOR": _spec(float, 0.95, "process_mvr", "eta_motor", numeric_min=0.0, numeric_max=1.0, positive=True),
@@ -407,7 +433,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
 }
 # fmt: on
 
-INTERNAL_METHOD_OPTION_KEYS = frozenset({"HPR_TYPE", "POWER_TURB_MODEL"})
+INTERNAL_METHOD_OPTION_KEYS = frozenset({"HPR_TYPE", "ORC_MODEL", "POWER_TURB_MODEL"})
 USER_CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     name: spec
     for name, spec in CONFIG_FIELD_SPECS.items()

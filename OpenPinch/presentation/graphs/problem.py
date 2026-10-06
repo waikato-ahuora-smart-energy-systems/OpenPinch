@@ -243,6 +243,8 @@ class _PlotAccessor:
             "net_load_profiles_with_heat_pump": GraphType.NLP_HP,
             "grand_composite_curve_with_refrigeration": GraphType.GCC_RFRG,
             "net_load_profiles_with_refrigeration": GraphType.NLP_RFRG,
+            "grand_composite_curve_with_orc": GraphType.GCC_ORC,
+            "net_load_profiles_with_orc": GraphType.NLP_ORC,
             "exergetic_net_load_profiles": GraphType.NLP_X,
             "total_site_profiles": GraphType.TSP,
             "site_utility_grand_composite_curve": GraphType.SUGCC,
@@ -472,6 +474,48 @@ class _PlotAccessor:
                 raise ValueError("show=True requires a Plotly figure.")
             return graph
         return self._build_graph_figure(graph, show=show)
+
+    def grand_composite_curve_with_orc(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        index: int = 0,
+        show: bool = False,
+        return_graph_data: bool = False,
+    ):
+        """Return the GCC before and after the ORC evaporators.
+
+        Needs a solved ``problem.target.carnot_orc`` or
+        ``problem.target.organic_rankine_cycle`` result.
+        """
+        return self._plot_graph(
+            zone_name=zone_name,
+            graph_type=GraphType.GCC_ORC,
+            index=index,
+            show=show,
+            return_graph_data=return_graph_data,
+        )
+
+    def net_load_profiles_with_orc(
+        self,
+        *,
+        zone_name: Optional[str] = None,
+        index: int = 0,
+        show: bool = False,
+        return_graph_data: bool = False,
+    ):
+        """Return the process net loads with the ORC evaporators as a sink.
+
+        Needs a solved ``problem.target.carnot_orc`` or
+        ``problem.target.organic_rankine_cycle`` result.
+        """
+        return self._plot_graph(
+            zone_name=zone_name,
+            graph_type=GraphType.NLP_ORC,
+            index=index,
+            show=show,
+            return_graph_data=return_graph_data,
+        )
 
     def exergetic_net_load_profiles(
         self,

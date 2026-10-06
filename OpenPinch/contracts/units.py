@@ -143,6 +143,41 @@ OUTPUT_UNIT_RULES: dict[str, OutputUnitRule] = {
         "$/y",
         unit_groups=("annual_cost", "currency"),
     ),
+    "orc_net_power": OutputUnitRule(
+        "kW", "kW", unit_groups=("work_target", "heat_flow")
+    ),
+    "orc_heat_in": OutputUnitRule("kW", "kW", unit_groups=("heat_flow",)),
+    "orc_condenser_duty": OutputUnitRule("kW", "kW", unit_groups=("heat_flow",)),
+    "orc_thermal_efficiency": OutputUnitRule(
+        "dimensionless",
+        "%",
+        unit_groups=("percent", "fraction"),
+    ),
+    "orc_capital_cost": OutputUnitRule(
+        "$",
+        "$",
+        unit_groups=("capital_cost", "currency"),
+    ),
+    "orc_annualized_capital_cost": OutputUnitRule(
+        "$/y",
+        "$/y",
+        unit_groups=("annual_cost", "currency"),
+    ),
+    "orc_power_value": OutputUnitRule(
+        "$/y",
+        "$/y",
+        unit_groups=("annual_cost", "currency"),
+    ),
+    "orc_cooling_cost_change": OutputUnitRule(
+        "$/y",
+        "$/y",
+        unit_groups=("annual_cost", "currency"),
+    ),
+    "orc_total_annualized_cost_change": OutputUnitRule(
+        "$/y",
+        "$/y",
+        unit_groups=("annual_cost", "currency"),
+    ),
 }
 
 __all__ = [

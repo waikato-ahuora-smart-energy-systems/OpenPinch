@@ -104,6 +104,16 @@ def test_manifest_exactly_matches_live_public_inventory() -> None:
         "problem.target.brayton_refrigeration",
         "batch.target.brayton_heat_pump",
         "batch.target.brayton_refrigeration",
+        "problem.target.carnot_orc",
+        "problem.target.all_periods.carnot_orc",
+        "batch.target.carnot_orc",
+        "batch.target.all_periods.carnot_orc",
+        "problem.target.organic_rankine_cycle",
+        "problem.target.all_periods.organic_rankine_cycle",
+        "batch.target.organic_rankine_cycle",
+        "batch.target.all_periods.organic_rankine_cycle",
+        "problem.plot.grand_composite_curve_with_orc",
+        "problem.plot.net_load_profiles_with_orc",
     }
     documented_replays = {
         row["operation"]

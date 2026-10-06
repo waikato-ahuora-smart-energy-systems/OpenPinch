@@ -32,6 +32,7 @@ from ...targeting import (
     area_cost_targeting_service,
     direct_heat_integration_service,
     direct_heat_pump_service,
+    direct_orc_service,
     direct_refrigeration_service,
     energy_transfer_analysis_service,
     exergy_targeting_service,
@@ -909,6 +910,159 @@ class _TargetAccessor:
             maximum_restarts=maximum_restarts,
             maximum_iterations=maximum_iterations,
             maximum_evaluations=maximum_evaluations,
+        )
+
+    def _orc(
+        self,
+        *,
+        surface: str,
+        model: str,
+        zone,
+        include_subzones,
+        period_id,
+        options,
+        configuration: dict[str, Any],
+        maximum_iterations,
+    ):
+        require_available(f"target.{surface}")
+        runtime_options = dict(options or {})
+        configuration = {"ORC_MODEL": model, **configuration}
+        if maximum_iterations is not None:
+            if int(maximum_iterations) < 1:
+                raise ValueError("maximum_iterations must be at least 1.")
+            runtime_options["maximum_iterations"] = int(maximum_iterations)
+        return self._execute(
+            surface=surface,
+            target_id=TargetType.DORC.value,
+            zone=zone,
+            options=runtime_options,
+            configuration=configuration,
+            include_subzones=include_subzones,
+            period_id=period_id,
+            direct_service=direct_orc_service,
+        )
+
+    @staticmethod
+    def _orc_configuration(**values) -> dict[str, Any]:
+        keys = {
+            "stages": "ORC_N_STAGES",
+            "second_law_efficiency": "ORC_ETA_II_CARNOT",
+            "condensing_temperature": "ORC_T_COND",
+            "minimum_lift": "ORC_MIN_LIFT",
+            "minimum_approach_temperature": "ORC_DT_CONT",
+            "load_fraction": "ORC_LOAD_FRACTION",
+            "maximum_restarts": "ORC_MAX_MULTISTART",
+            "fluids": "ORC_FLUIDS",
+            "turbine_efficiency": "ORC_ETA_TURBINE",
+            "pump_efficiency": "ORC_ETA_PUMP",
+            "maximum_superheat": "ORC_MAX_SUPERHEAT",
+            "recuperator": "ORC_RECUPERATOR_ENABLED",
+            "recuperator_approach_temperature": "ORC_DT_RECUPERATOR",
+        }
+        configuration: dict[str, Any] = {}
+        for name, value in values.items():
+            if name == "fluids" and isinstance(value, str):
+                value = [value]
+            _set_if_not_none(configuration, keys[name], value)
+        return configuration
+
+    def carnot_orc(
+        self,
+        *,
+        zone=None,
+        include_subzones=False,
+        period_id=None,
+        options=None,
+        stages=None,
+        second_law_efficiency=None,
+        condensing_temperature=None,
+        minimum_lift=None,
+        minimum_approach_temperature=None,
+        load_fraction=None,
+        maximum_restarts=None,
+        maximum_iterations=None,
+    ):
+        """Target an organic Rankine cycle on the surplus below the pinch.
+
+        Parallel ORC units (``stages``, default 1) take heat from the
+        process's grand composite curve below the pinch and condense at
+        ``condensing_temperature`` (degC). Each unit's power is
+        ``second_law_efficiency`` times its Carnot power. The design
+        minimises the total annual cost change: annualised ORC capital, less
+        the value of the power, plus the change in cooling. Hot utility is
+        unchanged. Returns ``None`` when there is no surplus below the pinch.
+        """
+        return self._orc(
+            surface="carnot_orc",
+            model="carnot",
+            zone=zone,
+            include_subzones=include_subzones,
+            period_id=period_id,
+            options=options,
+            configuration=self._orc_configuration(
+                stages=stages,
+                second_law_efficiency=second_law_efficiency,
+                condensing_temperature=condensing_temperature,
+                minimum_lift=minimum_lift,
+                minimum_approach_temperature=minimum_approach_temperature,
+                load_fraction=load_fraction,
+                maximum_restarts=maximum_restarts,
+            ),
+            maximum_iterations=maximum_iterations,
+        )
+
+    def organic_rankine_cycle(
+        self,
+        *,
+        zone=None,
+        include_subzones=False,
+        period_id=None,
+        options=None,
+        fluids=None,
+        stages=None,
+        turbine_efficiency=None,
+        pump_efficiency=None,
+        maximum_superheat=None,
+        recuperator=None,
+        recuperator_approach_temperature=None,
+        condensing_temperature=None,
+        minimum_lift=None,
+        minimum_approach_temperature=None,
+        load_fraction=None,
+        maximum_restarts=None,
+        maximum_iterations=None,
+    ):
+        """Target a simulated (CoolProp) ORC on the surplus below the pinch.
+
+        Like :meth:`carnot_orc`, but each unit is a subcritical Rankine cycle
+        with a pump, an evaporator that preheats, evaporates and optionally
+        superheats, a turbine, an optional ``recuperator`` and a condenser.
+        Each of ``fluids`` (default ``ORC_FLUIDS``) is searched in turn, all
+        units using it, starting from the Carnot design, and the cheapest is
+        kept. Evaporation stays 5 K below the fluid's critical temperature.
+        """
+        return self._orc(
+            surface="organic_rankine_cycle",
+            model="simulated",
+            zone=zone,
+            include_subzones=include_subzones,
+            period_id=period_id,
+            options=options,
+            configuration=self._orc_configuration(
+                fluids=fluids,
+                stages=stages,
+                turbine_efficiency=turbine_efficiency,
+                pump_efficiency=pump_efficiency,
+                maximum_superheat=maximum_superheat,
+                recuperator=recuperator,
+                recuperator_approach_temperature=recuperator_approach_temperature,
+                condensing_temperature=condensing_temperature,
+                minimum_lift=minimum_lift,
+                minimum_approach_temperature=minimum_approach_temperature,
+                load_fraction=load_fraction,
+                maximum_restarts=maximum_restarts,
+            ),
+            maximum_iterations=maximum_iterations,
         )
 
     def heat_exchanger_area_and_cost(

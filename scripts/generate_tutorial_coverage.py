@@ -86,7 +86,16 @@ ALL_PERIOD_TUTORIALS = {
     "utility_placement": 19,
 }
 # Public methods still under development: no notebook demonstrates them.
-UNDER_DEVELOPMENT_METHODS = frozenset({"brayton_heat_pump", "brayton_refrigeration"})
+UNDER_DEVELOPMENT_METHODS = frozenset(
+    {
+        "brayton_heat_pump",
+        "brayton_refrigeration",
+        "carnot_orc",
+        "organic_rankine_cycle",
+        "grand_composite_curve_with_orc",
+        "net_load_profiles_with_orc",
+    }
+)
 UNDER_DEVELOPMENT_STATUS = "unmapped; under development"
 DOCUMENTED_ALL_PERIOD_HPR_METHODS = frozenset(
     {
@@ -105,6 +114,7 @@ DESIGN_TUTORIALS = {
     "pinch_design": 16,
     "thermal_derivative": 16,
     "network_evolution": 16,
+    "optimise_duties": 16,
 }
 PLOT_TUTORIALS = {
     "catalog": 1,

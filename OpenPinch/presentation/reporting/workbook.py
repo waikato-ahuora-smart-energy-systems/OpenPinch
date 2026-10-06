@@ -280,6 +280,32 @@ def _make_summary_row(t) -> dict:
             getattr(t, "hpr_total_annualized_cost", None),
             period_idx=period_idx,
         ),
+        "ORC Model": getattr(t, "orc_model", None),
+        "ORC Fluid": getattr(t, "orc_fluid", None),
+        **{
+            column: value
+            for label, field in (
+                ("ORC Net Power", "orc_net_power"),
+                ("ORC Heat In", "orc_heat_in"),
+                ("ORC Condenser Duty", "orc_condenser_duty"),
+                ("ORC Thermal Efficiency", "orc_thermal_efficiency"),
+                ("ORC Capital Cost", "orc_capital_cost"),
+                ("ORC Annualized Capital Cost", "orc_annualized_capital_cost"),
+                ("ORC Power Value", "orc_power_value"),
+                ("ORC Cooling Cost Change", "orc_cooling_cost_change"),
+                (
+                    "ORC Total Annualized Cost Change",
+                    "orc_total_annualized_cost_change",
+                ),
+            )
+            for column, value in _value_unit_columns(
+                label, getattr(t, field, None), period_idx=period_idx
+            ).items()
+        },
+        "ORC Evaporating Temperatures (degC)": _joined(
+            getattr(t, "orc_evaporating_temperatures", None)
+        ),
+        "ORC Unit Net Power (kW)": _joined(getattr(t, "orc_stage_net_power", None)),
     }
 
     return base_columns | utility_columns | tail_columns

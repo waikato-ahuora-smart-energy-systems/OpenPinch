@@ -50,6 +50,7 @@ class TargetType(Enum):
     IHP = "Indirect Heat Pump"
     DR = "Direct Refrigeration"
     IR = "Indirect Refrigeration"
+    DORC = "Direct ORC"
 
     def __str__(self):
         return self.value
@@ -70,6 +71,7 @@ class TargetMethod(str, Enum):
     HeatPump = "Heat Pump"
     Refrigeration = "Refrigeration"
     EnergyTransfer = "Energy Transfer"
+    OrganicRankineCycle = "Organic Rankine Cycle"
 
 
 class HeatExchangerTypes(Enum):
@@ -223,6 +225,7 @@ class ProblemTableLabel(Enum):
     H_NET_HP = "H(net)-heat pump"
     H_NET_RFRG = "H(net)-refrigeration"
     H_NET_W_AIR = "H(net)-with air"
+    H_NET_ORC = "H(net)-ORC"
 
     H_HOT_UT = "H(hot)-utility"
     H_COLD_UT = "H(cold)-utility"
@@ -233,6 +236,7 @@ class ProblemTableLabel(Enum):
 
     H_HOT_HP = "H(hot)-hp_ut"
     H_COLD_HP = "H(cold)-hp_ut"
+    H_COLD_ORC = "H(cold)-ORC"
     H_NET_HOT_AFTR_HP = "H(hot)-net_after_hp"
     H_NET_COLD_AFTR_HP = "H(cold)-net_after_hp"
     H_NET_HOT_UT_AFTR_HP = "H(hot)-net_utility_after_hp"
@@ -322,6 +326,8 @@ class GraphType(Enum):
     NLP_HP = "Net Load Profiles with Heat Pump"
     GCC_RFRG = "Grand Composite Curve with Refrigeration"
     NLP_RFRG = "Net Load Profiles with Refrigeration"
+    GCC_ORC = "Grand Composite Curve with ORC"
+    NLP_ORC = "Net Load Profiles with ORC"
     NLP = "Net Load Profiles"
     ETD = "Energy Transfer Diagram"
     TSP = "Total Site Profiles"
