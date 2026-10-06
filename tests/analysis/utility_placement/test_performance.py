@@ -23,6 +23,7 @@ from OpenPinch.contracts.utility_placement import (
     QuantityValue,
     UtilityLevelKind,
 )
+from tests.analysis.utility_placement._timing import time_budget
 
 
 def _representative_case(period_count: int = 100):
@@ -96,7 +97,7 @@ def test_representative_bound_reduction_p95_is_within_unit_budget() -> None:
         assert len(result.all) == 40
 
     p95 = statistics.quantiles(durations, n=20)[18]
-    assert p95 <= 0.150
+    assert p95 <= time_budget(0.150)
 
 
 def test_representative_complete_pure_model_p95_is_within_250_ms() -> None:
@@ -111,7 +112,7 @@ def test_representative_complete_pure_model_p95_is_within_250_ms() -> None:
         assert verification.feasible
 
     p95 = statistics.quantiles(durations, n=20)[18]
-    assert p95 <= 0.250
+    assert p95 <= time_budget(0.250)
 
 
 def test_bound_reduction_scales_linearly_with_period_coordinate_count() -> None:
