@@ -14,6 +14,7 @@ evaporator starts at ``2r`` and the condenser at ``4r``.
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -35,12 +36,25 @@ class OrcCycleError(ValueError):
     """The cycle cannot be solved for these temperatures and fluid."""
 
 
-@lru_cache(maxsize=None)
-def _state(fluid: str):
-    """One CoolProp ``AbstractState`` per fluid and process (not picklable)."""
-    from ...domain.fluids import build_coolprop_abstract_state
+_THREAD_STATES = threading.local()
 
-    return build_coolprop_abstract_state(fluid)
+
+def _state(fluid: str):
+    """One CoolProp ``AbstractState`` per fluid and thread.
+
+    A state is mutable: each lookup calls ``update()`` and then reads several
+    properties, so threads solving periods in parallel must not share one.
+    States cannot be pickled either.
+    """
+    states = getattr(_THREAD_STATES, "states", None)
+    if states is None:
+        states = _THREAD_STATES.states = {}
+    state = states.get(fluid)
+    if state is None:
+        from ...domain.fluids import build_coolprop_abstract_state
+
+        state = states[fluid] = build_coolprop_abstract_state(fluid)
+    return state
 
 
 @lru_cache(maxsize=None)
