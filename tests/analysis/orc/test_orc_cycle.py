@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
 import numpy as np
 import pytest
 
@@ -9,6 +12,7 @@ pytest.importorskip("CoolProp")
 
 from OpenPinch.analysis.orc.cycle import (  # noqa: E402
     OrcCycleError,
+    _state,
     critical_temperature,
     solve_orc_cycle,
 )
@@ -59,6 +63,37 @@ def test_evaporation_near_the_critical_point_is_rejected():
 
     with pytest.raises(OrcCycleError, match="subcritical"):
         solve_orc_cycle("R1234ze(E)", T_evap=T_crit - 1.0, T_cond=30.0)
+
+
+def test_each_thread_has_its_own_coolprop_state():
+    states = {}
+
+    def record(name):
+        states[name] = (_state("Isopentane"), _state("Isopentane"))
+
+    threads = [threading.Thread(target=record, args=(i,)) for i in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    (a1, a2), (b1, b2) = states[0], states[1]
+    assert a1 is a2
+    assert b1 is b2
+    assert a1 is not b1
+
+
+def test_parallel_cycle_solves_match_serial_solves():
+    T_evaps = [float(T) for T in np.linspace(70.0, 150.0, 17)]
+
+    def solve(T_evap):
+        cycle = solve_orc_cycle("Isopentane", T_evap=T_evap, T_cond=30.0)
+        return cycle.w_net, cycle.q_in
+
+    serial = [solve(T) for T in T_evaps]
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        for _ in range(5):
+            assert list(pool.map(solve, T_evaps)) == serial
 
 
 def test_evaporator_profile_runs_from_turbine_inlet_to_pump_outlet():

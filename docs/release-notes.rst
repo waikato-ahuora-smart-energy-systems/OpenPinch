@@ -38,6 +38,9 @@ Organic Rankine cycle targeting
   ``problem.plot.grand_composite_curve_with_orc`` (the GCC before and after
   the ORC evaporators) and ``problem.plot.net_load_profiles_with_orc`` (the
   process net loads with the evaporators as a cold utility profile).
+- Simulated ORC cycles keep one CoolProp state per fluid and thread, so
+  ``all_periods.organic_rankine_cycle(workers=...)`` no longer lets parallel
+  period solves overwrite each other's fluid state mid-calculation.
 
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
