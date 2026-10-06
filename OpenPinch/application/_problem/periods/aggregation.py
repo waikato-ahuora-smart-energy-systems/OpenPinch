@@ -406,6 +406,8 @@ def _weighted_average_target(
             "hpr_machine_capital_costs",
             "hpr_machine_annualized_capital_costs",
             "hpr_total_annualized_cost",
+            "orc_thermal_efficiency",
+            "orc_total_annualized_cost_change",
             "pinch_temp",
             "hot_utilities",
             "cold_utilities",
@@ -435,6 +437,14 @@ def _weighted_average_target(
     )
     _apply_peak_machine_capital(targets, data)
     data["hpr_total_annualized_cost"] = _total_hpr_annualized_cost(data)
+    data["orc_thermal_efficiency"] = _ratio_of_totals(
+        targets,
+        "orc_thermal_efficiency",
+        "orc_heat_in",
+        weights,
+        basis_is_numerator=False,
+    )
+    data["orc_total_annualized_cost_change"] = _total_orc_annualized_cost_change(data)
     data["pinch_temp"] = PinchTemp(
         cold_temp=_weighted_report_value(
             targets,
@@ -645,6 +655,29 @@ def _hpr_utility_annualized_capital(
     if any(isinstance(part, Value) for part in parts):
         raise ValueError("HPR utility capital fields must use compatible units.")
     return float(sum(float(part) for part in parts))
+
+
+def _total_orc_annualized_cost_change(
+    data: Mapping[str, Any],
+) -> Value | float | None:
+    """Peak annualised ORC capital, less mean power value, plus mean cooling."""
+    parts = (
+        data.get("orc_annualized_capital_cost"),
+        data.get("orc_power_value"),
+        data.get("orc_cooling_cost_change"),
+    )
+    if all(part is None for part in parts):
+        return None
+    if any(part is None for part in parts):
+        raise ValueError(
+            "Cannot recompute the ORC annual cost change from a partial breakdown."
+        )
+    capital, power, cooling = parts
+    if all(isinstance(part, Value) for part in parts):
+        return capital - power + cooling
+    if any(isinstance(part, Value) for part in parts):
+        raise ValueError("ORC annual cost fields must use compatible units.")
+    return float(capital) - float(power) + float(cooling)
 
 
 def _total_hpr_annualized_cost(data: Mapping[str, Any]) -> Value | float | None:

@@ -329,7 +329,9 @@ class DirectOrcTarget(GraphBackedTarget, UtilitySummaryTarget):
     analysis_method = TargetMethod.OrganicRankineCycle.value
 
     pt: ProblemTable
-    orc_model: Literal["carnot"] = "carnot"
+    orc_model: Literal["carnot", "simulated"] = "carnot"
+    orc_fluid: Optional[str] = None
+    orc_superheat: tuple[float, ...] = ()
     orc_n_stages: int
     orc_evaporating_temperatures: tuple[float, ...]
     orc_condensing_temperature: float

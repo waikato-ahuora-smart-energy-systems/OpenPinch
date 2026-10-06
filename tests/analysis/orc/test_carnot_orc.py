@@ -194,3 +194,33 @@ def test_residual_gcc_loses_each_units_heat_below_its_evaporator():
     assert at(100.0) == pytest.approx(2000.0 - 500.0)
     assert at(20.0) == pytest.approx(4000.0 - 800.0)
     assert np.all(np.diff(T) <= 0.0)
+
+
+def test_sloped_sink_capacity_is_set_by_its_tightest_temperature():
+    source = _source()
+    # A sink taking half its heat from 140 to 100 degC and half from 100 to
+    # 60 degC. The cascade has 400 kW at 140, 2000 at 100 and 3000 at 60.
+    T_profile = np.array([140.0, 100.0, 60.0])
+    share = np.array([0.0, 0.5, 1.0])
+
+    duty = source.max_sink_duty(T_profile, share)
+
+    # At 100 degC half the duty must fit in 2000 kW; at 60 all of it in 3000.
+    assert duty == pytest.approx(min(2000.0 / 0.5, 3000.0))
+
+
+def test_sloped_sink_capacity_accounts_for_units_already_placed():
+    source = _source()
+    step = (np.array([120.0, 119.99]), np.array([0.0, 1.0]), 500.0)
+
+    duty = source.max_sink_duty(
+        np.array([100.0, 99.99]), np.array([0.0, 1.0]), taken=(step,)
+    )
+
+    assert duty == pytest.approx(source.heat_at(99.99) - 500.0, rel=1e-6)
+
+
+def test_a_sink_above_the_pinch_gets_nothing():
+    source = _source()
+
+    assert source.max_sink_duty(np.array([160.0, 100.0]), np.array([0.0, 1.0])) == 0.0

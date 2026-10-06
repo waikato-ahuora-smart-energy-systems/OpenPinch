@@ -402,6 +402,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HPR_INITIALISE_SIMULATED_CYCLE": _spec(bool, True, "hpr", "initialise_simulated_cycle"),
 
     # Organic Rankine cycle (ORC) on the surplus below the pinch.
+    "ORC_MODEL": _spec(str, "carnot", "orc", "model", validator=partial(_string_choice, choices=frozenset({"carnot", "simulated"}))),
     "ORC_N_STAGES": _spec(int, 1, "orc", "n_stages", numeric_min=1.0),
     "ORC_ETA_II_CARNOT": _spec(float, 0.5, "orc", "eta_ii_carnot", numeric_min=0.0, numeric_max=1.0, positive=True),
     "ORC_DT_CONT": _spec(float, 5.0, "orc", "dt_cont", numeric_min=0.0),
@@ -410,6 +411,13 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "ORC_LOAD_FRACTION": _spec(float, 1.0, "orc", "load_fraction", numeric_min=0.0, numeric_max=1.0),
     "ORC_MAX_MULTISTART": _spec(int, 5, "orc", "max_multistart", numeric_min=1.0),
     "ORC_BB_MINIMISER": _spec(str, BB_Minimiser.DA.value, "orc", "bb_minimiser", enum_cls=BB_Minimiser),
+    # Simulated (CoolProp) cycle.
+    "ORC_FLUIDS": _spec(List[str], ["R1233zd(E)", "R1234ze(E)", "Isopentane", "n-Pentane", "Toluene"], "orc", "fluids"),
+    "ORC_ETA_TURBINE": _spec(float, 0.8, "orc", "eta_turbine", numeric_min=0.0, numeric_max=1.0, positive=True),
+    "ORC_ETA_PUMP": _spec(float, 0.7, "orc", "eta_pump", numeric_min=0.0, numeric_max=1.0, positive=True),
+    "ORC_MAX_SUPERHEAT": _spec(float, 20.0, "orc", "max_superheat", numeric_min=0.0),
+    "ORC_RECUPERATOR_ENABLED": _spec(bool, False, "orc", "recuperator_enabled"),
+    "ORC_DT_RECUPERATOR": _spec(float, 10.0, "orc", "dt_recuperator", numeric_min=0.0),
 
     # Direct process MVR and power cogeneration.
     "PROCESS_MVR_ETA_COMP": _spec(float, 0.7, "process_mvr", "eta_comp", numeric_min=0.0, numeric_max=1.0, positive=True),
@@ -425,7 +433,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
 }
 # fmt: on
 
-INTERNAL_METHOD_OPTION_KEYS = frozenset({"HPR_TYPE", "POWER_TURB_MODEL"})
+INTERNAL_METHOD_OPTION_KEYS = frozenset({"HPR_TYPE", "ORC_MODEL", "POWER_TURB_MODEL"})
 USER_CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     name: spec
     for name, spec in CONFIG_FIELD_SPECS.items()

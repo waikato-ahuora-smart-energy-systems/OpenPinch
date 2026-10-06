@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-__all__ = ["OrcHeatSource", "orc_heat_source_from_gcc"]
+__all__ = ["OrcHeatSource", "orc_heat_source_from_gcc", "share_at"]
 
 
 @dataclass(frozen=True)
@@ -60,6 +60,43 @@ class OrcHeatSource:
         below = self.H[self.T <= T_s]
         at = self.heat_at(max(T_s, self.T_min))
         return float(min(at, below.min())) if below.size else at
+
+    def max_sink_duty(
+        self,
+        T_profile: np.ndarray,
+        share: np.ndarray,
+        taken: tuple[tuple[np.ndarray, np.ndarray, float], ...] = (),
+    ) -> float:
+        """Most heat a sink with this profile can take without hot utility.
+
+        ``T_profile`` is the sink's shifted temperatures (falling) and
+        ``share`` the fraction of its heat taken at or above each (0 at the
+        hottest, 1 at the coldest). ``taken`` lists sinks already placed as
+        ``(T_profile, share, duty)``. Both the cascade and the shares are
+        linear in T between breakpoints, so checking the breakpoints is exact.
+        """
+        T_profile = np.asarray(T_profile, dtype=float)
+        share = np.asarray(share, dtype=float)
+        if T_profile.size == 0 or float(T_profile[0]) > self.T_pinch + 1e-9:
+            return 0.0
+        grids = [self.T, T_profile, *(np.asarray(t[0], dtype=float) for t in taken)]
+        grid = np.unique(np.concatenate(grids))
+        grid = grid[grid <= self.T_pinch]
+        available = np.array([self.heat_at(t) for t in grid])
+        for T_j, share_j, duty_j in taken:
+            available -= duty_j * share_at(grid, T_j, share_j)
+        unit = share_at(grid, T_profile, share)
+        mask = unit > 1e-12
+        if not np.any(mask):
+            return 0.0
+        return float(max(np.min(available[mask] / unit[mask]), 0.0))
+
+
+def share_at(T: np.ndarray, T_profile: np.ndarray, share: np.ndarray) -> np.ndarray:
+    """Share of a sink's heat taken at or above each temperature in ``T``."""
+    T_profile = np.asarray(T_profile, dtype=float)
+    share = np.asarray(share, dtype=float)
+    return np.interp(T, T_profile[::-1], share[::-1], left=1.0, right=0.0)
 
 
 def orc_heat_source_from_gcc(

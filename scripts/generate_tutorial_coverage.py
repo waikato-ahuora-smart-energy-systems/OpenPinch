@@ -87,7 +87,12 @@ ALL_PERIOD_TUTORIALS = {
 }
 # Public methods still under development: no notebook demonstrates them.
 UNDER_DEVELOPMENT_METHODS = frozenset(
-    {"brayton_heat_pump", "brayton_refrigeration", "carnot_orc"}
+    {
+        "brayton_heat_pump",
+        "brayton_refrigeration",
+        "carnot_orc",
+        "organic_rankine_cycle",
+    }
 )
 UNDER_DEVELOPMENT_STATUS = "unmapped; under development"
 DOCUMENTED_ALL_PERIOD_HPR_METHODS = frozenset(

@@ -21,6 +21,19 @@ Organic Rankine cycle targeting
   EPA (2021), Lemmens (2016) and Tartiere and Astolfi (2017) data; treat it
   as +/-30 %. The ORC has its own ``ORC_*`` and ``COSTING_ORC_*`` settings and
   shares nothing with heat pump targeting.
+- New ``problem.target.organic_rankine_cycle`` (also under development): each
+  unit is a subcritical CoolProp Rankine cycle with pump, preheating
+  evaporator, optional superheat (``ORC_MAX_SUPERHEAT``), turbine
+  (``ORC_ETA_TURBINE``), optional recuperator (``ORC_RECUPERATOR_ENABLED``)
+  and condenser. Each fluid in ``ORC_FLUIDS`` (R1233zd(E), R1234ze(E),
+  isopentane, n-pentane, toluene) is searched in turn from the Carnot design,
+  evaporating at least 5 K below its critical temperature; the cheapest is
+  kept. Sloped evaporator profiles are fitted under the GCC exactly.
+- ORC results (net power, heat in, condenser duty, thermal efficiency,
+  capital, power value, cooling and total annual cost change, fluid and
+  per-unit design) appear in ``problem.results`` and the workbook. Across
+  periods, thermal efficiency is total power over total heat and capital is
+  the peak.
 
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

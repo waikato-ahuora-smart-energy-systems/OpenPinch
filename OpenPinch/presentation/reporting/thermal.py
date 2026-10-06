@@ -11,6 +11,7 @@ from ...domain.stream_collection import StreamCollection
 from ...domain.targets import (
     BaseTargetModel,
     DirectIntegrationTarget,
+    DirectOrcTarget,
     HeatPumpTargetBase,
     IndirectIntegrationTarget,
     UtilitySummaryTarget,
@@ -187,9 +188,36 @@ def _heat_utilities(
     ]
 
 
+def orc_result(target, *, is_total=False):
+    result = _utility_summary_result(target, is_total=is_total)
+    return result.model_copy(
+        update={
+            "orc_model": target.orc_model,
+            "orc_fluid": target.orc_fluid,
+            "orc_net_power": _metric(target, "orc_net_power"),
+            "orc_heat_in": _metric(target, "orc_heat_in"),
+            "orc_condenser_duty": _metric(target, "orc_condenser_duty"),
+            "orc_thermal_efficiency": _metric(target, "orc_thermal_efficiency"),
+            "orc_capital_cost": _metric(target, "orc_capital_cost"),
+            "orc_annualized_capital_cost": _metric(
+                target, "orc_annualized_capital_cost"
+            ),
+            "orc_power_value": _metric(target, "orc_power_value"),
+            "orc_cooling_cost_change": _metric(target, "orc_cooling_cost_change"),
+            "orc_total_annualized_cost_change": _metric(
+                target, "orc_total_annualized_cost_change"
+            ),
+            "orc_evaporating_temperatures": target.orc_evaporating_temperatures,
+            "orc_condensing_temperature": target.orc_condensing_temperature,
+            "orc_stage_net_power": target.orc_stage_net_power,
+        }
+    )
+
+
 THERMAL_RESULT_ADAPTERS = {
     UtilitySummaryTarget: _utility_summary_result,
     DirectIntegrationTarget: direct_result,
     IndirectIntegrationTarget: indirect_result,
     HeatPumpTargetBase: hpr_result,
+    DirectOrcTarget: orc_result,
 }

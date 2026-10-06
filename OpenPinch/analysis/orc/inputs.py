@@ -33,6 +33,18 @@ class OrcTargetInputs:
     bb_minimiser: str = "dual_annealing"
     maximum_iterations: int = 300
     seed: int = 0
+    # Simulated (CoolProp) cycle only.
+    fluids: tuple[str, ...] = (
+        "R1233zd(E)",
+        "R1234ze(E)",
+        "Isopentane",
+        "n-Pentane",
+        "Toluene",
+    )
+    eta_turbine: float = 0.8
+    eta_pump: float = 0.7
+    max_superheat: float = 20.0
+    dt_recuperator: float | None = None
 
     def __post_init__(self) -> None:
         if int(self.n_stages) < 1:
@@ -41,7 +53,15 @@ class OrcTargetInputs:
             raise ValueError("The ORC second-law efficiency must be in (0, 1].")
         if not 0.0 <= float(self.load_fraction) <= 1.0:
             raise ValueError("The ORC load fraction must be in [0, 1].")
-        for name in ("dt_cont", "min_lift", "dt_phase_change", "annual_hours"):
+        if not self.fluids:
+            raise ValueError("The ORC needs at least one working fluid.")
+        for name in (
+            "dt_cont",
+            "min_lift",
+            "dt_phase_change",
+            "annual_hours",
+            "max_superheat",
+        ):
             if float(getattr(self, name)) < 0.0:
                 raise ValueError(f"{name} must not be negative.")
 

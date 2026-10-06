@@ -242,6 +242,7 @@ class HprConfig:
 class OrcConfig:
     """Organic Rankine cycle (ORC) targeting settings."""
 
+    model: str
     n_stages: int
     eta_ii_carnot: float
     dt_cont: float
@@ -250,6 +251,12 @@ class OrcConfig:
     load_fraction: float
     max_multistart: int
     bb_minimiser: str
+    fluids: list[str]
+    eta_turbine: float
+    eta_pump: float
+    max_superheat: float
+    recuperator_enabled: bool
+    dt_recuperator: float
 
 
 @_frozen_group

@@ -243,6 +243,55 @@ class TargetResults(_ReportModel):
     hpr_cold_streams: Optional[StreamCollection] = report_field(
         "hpr_cold_streams", "consensus", None, representation="structured"
     )
+    orc_model: Optional[str] = report_field(
+        "orc_model", "consensus", None, representation="structured"
+    )
+    orc_fluid: Optional[str] = report_field(
+        "orc_fluid", "consensus", None, representation="structured"
+    )
+    orc_net_power: Value | None = report_field(
+        "orc_net_power", "weighted_mean", None, representation="quantity"
+    )
+    orc_heat_in: Value | None = report_field(
+        "orc_heat_in", "weighted_mean", None, representation="quantity"
+    )
+    orc_condenser_duty: Value | None = report_field(
+        "orc_condenser_duty", "weighted_mean", None, representation="quantity"
+    )
+    # Across periods: total net power over total heat taken in.
+    orc_thermal_efficiency: Value | None = report_field(
+        "orc_thermal_efficiency", "derived", None, representation="quantity"
+    )
+    orc_capital_cost: Value | None = report_field(
+        "orc_capital_cost", "maximum", None, representation="quantity"
+    )
+    orc_annualized_capital_cost: Value | None = report_field(
+        "orc_annualized_capital_cost", "maximum", None, representation="quantity"
+    )
+    orc_power_value: Value | None = report_field(
+        "orc_power_value", "weighted_mean", None, representation="quantity"
+    )
+    orc_cooling_cost_change: Value | None = report_field(
+        "orc_cooling_cost_change", "weighted_mean", None, representation="quantity"
+    )
+    # Across periods: peak annualised capital, less mean power value, plus
+    # mean cooling cost change.
+    orc_total_annualized_cost_change: Value | None = report_field(
+        "orc_total_annualized_cost_change",
+        "derived",
+        None,
+        representation="quantity",
+    )
+    # Per-unit design values, hottest unit first; each period has its own.
+    orc_evaporating_temperatures: tuple[float, ...] | None = report_field(
+        "orc_evaporating_temperatures", "exclude", None, representation="structured"
+    )
+    orc_condensing_temperature: Optional[float] = report_field(
+        "orc_condensing_temperature", "consensus", None, representation="scalar"
+    )
+    orc_stage_net_power: tuple[float, ...] | None = report_field(
+        "orc_stage_net_power", "exclude", None, representation="structured"
+    )
 
     @field_validator(
         "degree_of_integration",
@@ -275,6 +324,15 @@ class TargetResults(_ReportModel):
         "hpr_refrigeration_annualized_capital_cost",
         "hpr_utility_annualized_capital_cost",
         "hpr_total_annualized_cost",
+        "orc_net_power",
+        "orc_heat_in",
+        "orc_condenser_duty",
+        "orc_thermal_efficiency",
+        "orc_capital_cost",
+        "orc_annualized_capital_cost",
+        "orc_power_value",
+        "orc_cooling_cost_change",
+        "orc_total_annualized_cost_change",
         mode="before",
     )
     @classmethod

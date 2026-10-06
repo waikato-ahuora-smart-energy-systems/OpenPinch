@@ -29,11 +29,11 @@ from ..targeting.utilities import (
 )
 from .carnot import OrcDesign
 from .inputs import OrcTargetInputs
-from .profile import orc_heat_source_from_gcc
+from .profile import orc_heat_source_from_gcc, share_at
 from .search import OrcSearchResult, OrcTargetingError, optimise_carnot_orc
+from .simulated import optimise_simulated_orc
 
 __all__ = [
-    "OrcTargetingError",
     "compute_direct_orc_target",
     "orc_target_inputs",
 ]
@@ -70,6 +70,11 @@ def orc_target_inputs(
         max_multistart=int(orc.max_multistart),
         bb_minimiser=str(orc.bb_minimiser),
         maximum_iterations=int(runtime.get("maximum_iterations", 300)),
+        fluids=tuple(str(fluid) for fluid in orc.fluids),
+        eta_turbine=float(orc.eta_turbine),
+        eta_pump=float(orc.eta_pump),
+        max_superheat=float(orc.max_superheat),
+        dt_recuperator=(float(orc.dt_recuperator) if orc.recuperator_enabled else None),
     )
 
 
@@ -77,10 +82,12 @@ def compute_direct_orc_target(
     zone: Zone,
     args: dict | None = None,
 ) -> DirectOrcTarget | None:
-    """Target a Carnot ORC on one zone's direct-integration surplus.
+    """Target an ORC on one zone's direct-integration surplus.
 
-    Returns ``None`` when the zone has no surplus below the pinch. Raises
-    ``OrcTargetingError`` when the surplus is too cold or no ORC pays.
+    ``ORC_MODEL``, set by the calling method, selects ``"carnot"`` or
+    ``"simulated"``; the simulated search starts from the Carnot design. Returns ``None`` when
+    the zone has no surplus below the pinch. Raises ``OrcTargetingError``
+    when the surplus is too cold or no ORC pays.
     """
     idx, period_id = get_period_index(period_ids=zone.period_ids, args=args)
     base_target = zone.targets[TargetType.DI.value]
@@ -93,7 +100,17 @@ def compute_direct_orc_target(
     if source is None:
         return None
     inputs = orc_target_inputs(zone.config, args)
-    result = optimise_carnot_orc(source, inputs)
+    model = str(zone.config.orc.model)
+    if model == "carnot":
+        result = optimise_carnot_orc(source, inputs)
+    elif model == "simulated":
+        try:
+            carnot = optimise_carnot_orc(source, inputs)
+        except OrcTargetingError:
+            carnot = None
+        result = optimise_simulated_orc(source, inputs, carnot=carnot)
+    else:
+        raise ValueError(f"Unknown ORC model {model!r}.")
     utilities = _residual_utility_summary(
         pt=pt,
         base_target=base_target,
@@ -113,15 +130,17 @@ def compute_direct_orc_target(
             "period_id": period_id,
             "period_idx": idx,
             **utilities,
-            **_orc_summary(result),
+            **_orc_summary(result, model=model),
         }
     )
 
 
-def _orc_summary(result: OrcSearchResult) -> dict:
+def _orc_summary(result: OrcSearchResult, *, model: str) -> dict:
     design, costs = result.design, result.costs
     return {
-        "orc_model": "carnot",
+        "orc_model": model,
+        "orc_fluid": design.fluid,
+        "orc_superheat": design.superheat,
         "orc_n_stages": len(design.Q_in),
         "orc_evaporating_temperatures": design.T_evap,
         "orc_condensing_temperature": design.T_cond,
@@ -148,17 +167,18 @@ def orc_residual_gcc(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return the GCC with the ORC evaporators as sinks, on shifted T.
 
-    Each evaporator takes its heat linearly over ``dt_phase_change`` below
-    its shifted temperature, so the cascade falls by that heat at every
-    temperature below it.
+    Each evaporator takes its heat along its profile, so the cascade falls by
+    the heat taken at or above each temperature. Designs without profiles
+    take each unit's heat over ``dt_phase_change`` below its temperature.
     """
+    profiles = design.profiles or tuple(
+        ((T_s, T_s - dt_phase_change), (0.0, 1.0)) for T_s in design.T_evap_shifted
+    )
     T = np.asarray(T_vals, dtype=float)
     H = np.asarray(H_net, dtype=float)
-    extra = []
-    for T_s in design.T_evap_shifted:
-        extra.extend((T_s, T_s - dt_phase_change))
+    extra = [t for T_profile, _ in profiles for t in T_profile]
     new_T = np.array(
-        [t for t in extra if not np.any(np.abs(T - t) <= tol)], dtype=float
+        sorted({t for t in extra if not np.any(np.abs(T - t) <= tol)}), dtype=float
     )
     grid = np.concatenate([T, new_T])
     order = np.argsort(-grid, kind="stable")
@@ -166,12 +186,8 @@ def orc_residual_gcc(
     # Original rows keep their values; inserted rows are interpolated.
     ascending = np.argsort(T, kind="stable")
     values = np.concatenate([H, np.interp(new_T, T[ascending], H[ascending])])[order]
-    for T_s, Q in zip(design.T_evap_shifted, design.Q_in, strict=True):
-        if dt_phase_change > 0.0:
-            share = np.clip((T_s - grid) / dt_phase_change, 0.0, 1.0)
-        else:
-            share = (grid < T_s).astype(float)
-        values = values - Q * share
+    for (T_profile, share), Q in zip(profiles, design.Q_in, strict=True):
+        values = values - Q * share_at(grid, np.asarray(T_profile), np.asarray(share))
     return grid, values
 
 

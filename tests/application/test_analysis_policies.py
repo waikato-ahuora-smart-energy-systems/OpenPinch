@@ -100,6 +100,17 @@ def test_each_declared_numeric_metric_obeys_its_policy():
             )
             setattr(a, other, Value(1.0, spec.unit))
             setattr(b, other, Value(1.0, spec.unit))
+        # So is the ORC annual cost change.
+        orc_parts = (
+            "orc_annualized_capital_cost",
+            "orc_power_value",
+            "orc_cooling_cost_change",
+        )
+        if name in orc_parts:
+            for other in orc_parts:
+                if other != name:
+                    setattr(a, other, Value(1.0, spec.unit))
+                    setattr(b, other, Value(1.0, spec.unit))
         row = weighted_average_output(
             [TargetOutput(targets=[a]), TargetOutput(targets=[b])], [1, 3]
         ).targets[0]

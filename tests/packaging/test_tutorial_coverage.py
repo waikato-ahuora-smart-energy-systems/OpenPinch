@@ -108,6 +108,10 @@ def test_manifest_exactly_matches_live_public_inventory() -> None:
         "problem.target.all_periods.carnot_orc",
         "batch.target.carnot_orc",
         "batch.target.all_periods.carnot_orc",
+        "problem.target.organic_rankine_cycle",
+        "problem.target.all_periods.organic_rankine_cycle",
+        "batch.target.organic_rankine_cycle",
+        "batch.target.all_periods.organic_rankine_cycle",
     }
     documented_replays = {
         row["operation"]

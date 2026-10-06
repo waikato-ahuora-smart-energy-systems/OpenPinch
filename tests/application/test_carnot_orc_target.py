@@ -108,3 +108,55 @@ def test_an_orc_that_does_not_pay_is_reported():
             options={"COSTING_ORC_EQUIPMENT_COST": 1e12},
             maximum_iterations=20,
         )
+
+
+def test_orc_results_are_reported_with_units():
+    problem = _problem()
+    target = problem.target.carnot_orc(maximum_iterations=50)
+
+    rows = [
+        row
+        for row in problem.results.targets
+        if row.target_method == "Organic Rankine Cycle"
+    ]
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.orc_model == "carnot"
+    assert row.orc_net_power.unit == "kW"
+    assert row.orc_net_power.value == pytest.approx(target.orc_net_power)
+    assert row.orc_thermal_efficiency.unit == "%"
+    assert row.orc_thermal_efficiency.value == pytest.approx(
+        100.0 * target.orc_thermal_efficiency
+    )
+    assert row.orc_total_annualized_cost_change.unit == "$/y"
+    assert row.orc_evaporating_temperatures == target.orc_evaporating_temperatures
+    assert row.Qc.value == pytest.approx(target.cold_utility_target)
+
+
+def test_simulated_orc_reports_its_fluid_and_beats_no_orc():
+    pytest.importorskip("CoolProp")
+    problem = _problem()
+    base = problem.target.direct_heat_integration()
+
+    target = problem.target.organic_rankine_cycle(
+        fluids=["Isopentane"],
+        stages=1,
+        maximum_restarts=2,
+        maximum_iterations=40,
+    )
+
+    assert target.orc_model == "simulated"
+    assert target.orc_fluid == "Isopentane"
+    assert target.orc_net_power > 0.0
+    assert target.orc_total_annualized_cost_change < 0.0
+    assert target.hot_utility_target == pytest.approx(base.hot_utility_target)
+    assert target.cold_utility_target == pytest.approx(
+        base.cold_utility_target - target.orc_heat_in, rel=1e-8, abs=1e-6
+    )
+    row = next(
+        row
+        for row in problem.results.targets
+        if row.target_method == "Organic Rankine Cycle"
+    )
+    assert row.orc_fluid == "Isopentane"

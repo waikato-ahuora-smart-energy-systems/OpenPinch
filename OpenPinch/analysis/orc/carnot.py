@@ -24,7 +24,8 @@ class OrcDesign:
 
     Temperatures are in degC. ``T_evap_shifted`` is the hot end of each
     evaporator on the problem table's shifted scale; ``T_evap`` is the real
-    evaporating temperature, taken at the evaporator's cold end.
+    evaporating temperature (for the Carnot model, at the evaporator's cold
+    end). ``fluid`` and ``superheat`` are set by the simulated model.
     """
 
     T_evap_shifted: tuple[float, ...]
@@ -32,6 +33,11 @@ class OrcDesign:
     T_cond: float
     Q_in: tuple[float, ...]
     W_net: tuple[float, ...]
+    fluid: str | None = None
+    superheat: tuple[float, ...] = ()
+    # Each unit's evaporator as (shifted temperatures falling, share of its
+    # heat taken at or above each); empty means a step at T_evap_shifted.
+    profiles: tuple[tuple[tuple[float, ...], tuple[float, ...]], ...] = ()
 
     @property
     def Q_in_total(self) -> float:
@@ -118,6 +124,7 @@ def carnot_orc_design(
         T_cond=float(inputs.T_cond),
         Q_in=tuple(float(q) for q in Q_arr),
         W_net=tuple(float(w) for w in W),
+        profiles=tuple(((float(t), float(t - dt_pc)), (0.0, 1.0)) for t in T_s_arr),
     )
 
 
