@@ -7,10 +7,13 @@ from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 pytest.importorskip("CoolProp")
 
 from OpenPinch.analysis.orc.cycle import (  # noqa: E402
+    CRITICAL_MARGIN,
     OrcCycleError,
     _state,
     critical_temperature,
@@ -83,17 +86,64 @@ def test_each_thread_has_its_own_coolprop_state():
     assert a1 is not b1
 
 
-def test_parallel_cycle_solves_match_serial_solves():
-    T_evaps = [float(T) for T in np.linspace(70.0, 150.0, 17)]
+def _cycle_outcome(case: dict) -> tuple:
+    """Everything a solve reports for ``case``, including its error."""
+    try:
+        cycle = solve_orc_cycle(**case)
+    except OrcCycleError as exc:
+        return ("error", str(exc))
+    return (
+        cycle.w_net,
+        cycle.q_in,
+        cycle.q_out,
+        cycle.h3,
+        cycle.T3,
+        cycle.turbine_exit_quality,
+    )
 
-    def solve(T_evap):
-        cycle = solve_orc_cycle("Isopentane", T_evap=T_evap, T_cond=30.0)
-        return cycle.w_net, cycle.q_in
 
-    serial = [solve(T) for T in T_evaps]
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        for _ in range(5):
-            assert list(pool.map(solve, T_evaps)) == serial
+def _parallel_outcomes(cases: list[dict], workers: int = 8) -> list[tuple]:
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        return list(pool.map(_cycle_outcome, cases))
+
+
+@st.composite
+def _cycle_case(draw) -> dict:
+    fluid = draw(st.sampled_from(OrcTargetInputs().fluids))
+    T_cond = draw(st.floats(min_value=20.0, max_value=50.0))
+    T_evap_max = critical_temperature(fluid) - CRITICAL_MARGIN
+    T_evap = draw(st.floats(min_value=T_cond + 10.0, max_value=T_evap_max))
+    return {
+        "fluid": fluid,
+        "T_evap": T_evap,
+        "T_cond": T_cond,
+        "superheat": draw(st.sampled_from([0.0, 5.0, 20.0])),
+        "eta_turbine": draw(st.floats(min_value=0.6, max_value=0.9)),
+        "eta_pump": draw(st.floats(min_value=0.5, max_value=0.8)),
+        "dt_recuperator": draw(st.sampled_from([None, 5.0, 15.0])),
+    }
+
+
+@settings(max_examples=40, derandomize=True, deadline=None)
+@given(cases=st.lists(_cycle_case(), min_size=2, max_size=12))
+def test_parallel_cycle_solves_match_serial_solves(cases):
+    # Each case is solved alone first: the serial result is the oracle.
+    serial = [_cycle_outcome(case) for case in cases]
+    # Repeat the batch so several threads solve different fluids and
+    # temperatures at once.
+    assert _parallel_outcomes(cases * 4) == serial * 4
+
+
+def test_parallel_isopentane_sweep_matches_serial_solves():
+    # Regression: with one CoolProp state per process, threads overwrote
+    # each other's state between update() and the property reads.
+    cases = [
+        {"fluid": "Isopentane", "T_evap": float(T), "T_cond": 30.0}
+        for T in np.linspace(70.0, 150.0, 17)
+    ]
+    serial = [_cycle_outcome(case) for case in cases]
+    for _ in range(5):
+        assert _parallel_outcomes(cases) == serial
 
 
 def test_evaporator_profile_runs_from_turbine_inlet_to_pump_outlet():
