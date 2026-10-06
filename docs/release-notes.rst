@@ -34,6 +34,10 @@ Organic Rankine cycle targeting
   per-unit design) appear in ``problem.results`` and the workbook. Across
   periods, thermal efficiency is total power over total heat and capital is
   the peak.
+- ORC targets carry two graphs, plotted with
+  ``problem.plot.grand_composite_curve_with_orc`` (the GCC before and after
+  the ORC evaporators) and ``problem.plot.net_load_profiles_with_orc`` (the
+  process net loads with the evaporators as a cold utility profile).
 
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

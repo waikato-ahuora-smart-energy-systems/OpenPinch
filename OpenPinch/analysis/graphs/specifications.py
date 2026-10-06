@@ -180,6 +180,27 @@ REFRIGERATION_GRAPH_SPECS = (
     ),
 )
 
+ORC_GRAPH_SPECS = (
+    _GraphBuildSpec(
+        graph_type=GraphType.NLP_ORC,
+        label="Net Load Profiles with ORC",
+        builder="composite",
+        value_fields=(
+            ProblemTableLabel.H_NET_HOT,
+            ProblemTableLabel.H_NET_COLD,
+            ProblemTableLabel.H_COLD_ORC,
+        ),
+        stream_types=(StreamLoc.HotS, StreamLoc.ColdS, StreamLoc.ColdU),
+    ),
+    _GraphBuildSpec(
+        graph_type=GraphType.GCC_ORC,
+        label="Grand Composite Curve with ORC",
+        builder="gcc",
+        value_fields=(ProblemTableLabel.H_NET_A, ProblemTableLabel.H_NET_ORC),
+        utility_profile_flags=(False, False),
+    ),
+)
+
 GRAPH_BUILD_SPECS = (
     *REFRIGERATION_GRAPH_SPECS,
     COMPOSITE_GRAPH_SPECS[0],
@@ -194,5 +215,6 @@ GRAPH_BUILD_SPECS = (
     COMPOSITE_GRAPH_SPECS[6],
     GCC_GRAPH_SPECS[3],
     GCC_GRAPH_SPECS[4],
+    *ORC_GRAPH_SPECS,
     ENERGY_TRANSFER_GRAPH_SPECS[0],
 )

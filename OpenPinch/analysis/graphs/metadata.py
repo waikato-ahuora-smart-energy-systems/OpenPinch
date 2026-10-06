@@ -88,6 +88,15 @@ GRAPH_SERIES_META: dict[str, _GraphSeriesMeta] = {
         description="Heat Pump Evaporator",
         composite_title="Heat Pump Evaporator",
     ),
+    ProblemTableLabel.H_NET_ORC.value: _GraphSeriesMeta(
+        label="GCC with ORC",
+        description="Grand Composite Curve with the ORC evaporators",
+    ),
+    ProblemTableLabel.H_COLD_ORC.value: _GraphSeriesMeta(
+        label="ORC Evaporator",
+        description="ORC Evaporator",
+        composite_title="ORC Evaporator",
+    ),
     ProblemTableLabel.X_GCC.value: _GraphSeriesMeta(
         label="GCC_X",
         description="Exergetic Grand Composite Curve",

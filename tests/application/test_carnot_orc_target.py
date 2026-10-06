@@ -160,3 +160,30 @@ def test_simulated_orc_reports_its_fluid_and_beats_no_orc():
         if row.target_method == "Organic Rankine Cycle"
     )
     assert row.orc_fluid == "Isopentane"
+
+
+def test_orc_graphs_show_the_gcc_and_net_loads_with_the_orc():
+    from OpenPinch.domain.enums import GraphType, ProblemTableLabel
+
+    problem = _problem()
+    target = problem.target.carnot_orc(stages=2, maximum_iterations=50)
+
+    gcc = target.graphs[GraphType.GCC_ORC.value]
+    nlp = target.graphs[GraphType.NLP_ORC.value]
+    # The ORC lowers the cascade by exactly the heat it takes, all of it below
+    # its hottest evaporator, and none of it above the pinch.
+    drop = gcc[ProblemTableLabel.H_NET_A] - gcc[ProblemTableLabel.H_NET_ORC]
+    assert drop.max() == pytest.approx(target.orc_heat_in)
+    assert drop.min() == pytest.approx(0.0, abs=1e-9)
+    assert gcc[ProblemTableLabel.H_NET_ORC].min() >= -1e-6
+    evaporators = nlp[ProblemTableLabel.H_COLD_ORC]
+    assert evaporators.max() == pytest.approx(0.0, abs=1e-9)
+    assert evaporators.min() == pytest.approx(-target.orc_heat_in)
+
+    for plot, kind in (
+        (problem.plot.grand_composite_curve_with_orc, GraphType.GCC_ORC),
+        (problem.plot.net_load_profiles_with_orc, GraphType.NLP_ORC),
+    ):
+        graph = plot(return_graph_data=True)
+        assert graph["type"] == kind.value
+        assert graph["segments"]

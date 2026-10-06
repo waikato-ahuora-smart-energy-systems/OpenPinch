@@ -92,6 +92,8 @@ UNDER_DEVELOPMENT_METHODS = frozenset(
         "brayton_refrigeration",
         "carnot_orc",
         "organic_rankine_cycle",
+        "grand_composite_curve_with_orc",
+        "net_load_profiles_with_orc",
     }
 )
 UNDER_DEVELOPMENT_STATUS = "unmapped; under development"

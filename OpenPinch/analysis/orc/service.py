@@ -13,7 +13,7 @@ from copy import deepcopy
 import numpy as np
 
 from ...domain.configuration import Configuration, tol
-from ...domain.enums import ProblemTableLabel, TargetType
+from ...domain.enums import GraphType, ProblemTableLabel, TargetType
 from ...domain.problem_table import ProblemTable
 from ...domain.targets import DirectOrcTarget
 from ...domain.zone import Zone
@@ -85,9 +85,9 @@ def compute_direct_orc_target(
     """Target an ORC on one zone's direct-integration surplus.
 
     ``ORC_MODEL``, set by the calling method, selects ``"carnot"`` or
-    ``"simulated"``; the simulated search starts from the Carnot design. Returns ``None`` when
-    the zone has no surplus below the pinch. Raises ``OrcTargetingError``
-    when the surplus is too cold or no ORC pays.
+    ``"simulated"``; the simulated search starts from the Carnot design.
+    Returns ``None`` when the zone has no surplus below the pinch. Raises
+    ``OrcTargetingError`` when the surplus is too cold or no ORC pays.
     """
     idx, period_id = get_period_index(period_ids=zone.period_ids, args=args)
     base_target = zone.targets[TargetType.DI.value]
@@ -127,6 +127,7 @@ def compute_direct_orc_target(
             "parent_zone": zone.parent_zone,
             "config": zone.config,
             "pt": pt,
+            "graphs": orc_graphs(pt, result.design, inputs.dt_phase_change),
             "period_id": period_id,
             "period_idx": idx,
             **utilities,
@@ -159,6 +160,47 @@ def _orc_summary(result: OrcSearchResult, *, model: str) -> dict:
     }
 
 
+def _orc_profiles(design: OrcDesign, dt_phase_change: float):
+    """Each unit's evaporator profile; a step where the design has none."""
+    return design.profiles or tuple(
+        ((T_s, T_s - dt_phase_change), (0.0, 1.0)) for T_s in design.T_evap_shifted
+    )
+
+
+def _orc_columns(
+    T_vals: np.ndarray,
+    columns: dict,
+    design: OrcDesign,
+    dt_phase_change: float,
+) -> tuple[np.ndarray, dict, np.ndarray]:
+    """Put ``columns`` on the problem table grid plus the evaporator points.
+
+    Returns the falling grid, the columns on it (original rows keep their
+    values; inserted rows are interpolated) and the heat the ORC takes at or
+    above each grid temperature.
+    """
+    profiles = _orc_profiles(design, dt_phase_change)
+    T = np.asarray(T_vals, dtype=float)
+    extra = [t for T_profile, _ in profiles for t in T_profile]
+    new_T = np.array(
+        sorted({t for t in extra if not np.any(np.abs(T - t) <= tol)}), dtype=float
+    )
+    grid = np.concatenate([T, new_T])
+    order = np.argsort(-grid, kind="stable")
+    grid = grid[order]
+    ascending = np.argsort(T, kind="stable")
+    projected = {}
+    for label, values in columns.items():
+        values = np.asarray(values, dtype=float)
+        projected[label] = np.concatenate(
+            [values, np.interp(new_T, T[ascending], values[ascending])]
+        )[order]
+    taken = np.zeros_like(grid)
+    for (T_profile, share), Q in zip(profiles, design.Q_in, strict=True):
+        taken = taken + Q * share_at(grid, np.asarray(T_profile), np.asarray(share))
+    return grid, projected, taken
+
+
 def orc_residual_gcc(
     T_vals: np.ndarray,
     H_net: np.ndarray,
@@ -171,24 +213,50 @@ def orc_residual_gcc(
     the heat taken at or above each temperature. Designs without profiles
     take each unit's heat over ``dt_phase_change`` below its temperature.
     """
-    profiles = design.profiles or tuple(
-        ((T_s, T_s - dt_phase_change), (0.0, 1.0)) for T_s in design.T_evap_shifted
+    grid, columns, taken = _orc_columns(T_vals, {"H": H_net}, design, dt_phase_change)
+    return grid, columns["H"] - taken
+
+
+def orc_graphs(
+    pt: ProblemTable,
+    design: OrcDesign,
+    dt_phase_change: float,
+) -> dict:
+    """Return the GCC and net load profile tables with the ORC in place.
+
+    The GCC graph shows the process GCC and the GCC after the ORC
+    evaporators. The net load graph shows the process surplus and deficit
+    with the ORC evaporators as a cold utility profile.
+    """
+    labels = (
+        ProblemTableLabel.H_NET_A,
+        ProblemTableLabel.H_NET_HOT,
+        ProblemTableLabel.H_NET_COLD,
     )
-    T = np.asarray(T_vals, dtype=float)
-    H = np.asarray(H_net, dtype=float)
-    extra = [t for T_profile, _ in profiles for t in T_profile]
-    new_T = np.array(
-        sorted({t for t in extra if not np.any(np.abs(T - t) <= tol)}), dtype=float
+    available = {label: pt[label] for label in labels if label.value in pt.columns}
+    grid, columns, taken = _orc_columns(
+        pt[ProblemTableLabel.T], available, design, dt_phase_change
     )
-    grid = np.concatenate([T, new_T])
-    order = np.argsort(-grid, kind="stable")
-    grid = grid[order]
-    # Original rows keep their values; inserted rows are interpolated.
-    ascending = np.argsort(T, kind="stable")
-    values = np.concatenate([H, np.interp(new_T, T[ascending], H[ascending])])[order]
-    for (T_profile, share), Q in zip(profiles, design.Q_in, strict=True):
-        values = values - Q * share_at(grid, np.asarray(T_profile), np.asarray(share))
-    return grid, values
+    graphs = {}
+    if ProblemTableLabel.H_NET_A in columns:
+        graphs[GraphType.GCC_ORC.value] = ProblemTable(
+            {
+                ProblemTableLabel.T: grid,
+                ProblemTableLabel.H_NET_A: columns[ProblemTableLabel.H_NET_A],
+                ProblemTableLabel.H_NET_ORC: columns[ProblemTableLabel.H_NET_A] - taken,
+            }
+        )
+    if {ProblemTableLabel.H_NET_HOT, ProblemTableLabel.H_NET_COLD} <= columns.keys():
+        graphs[GraphType.NLP_ORC.value] = ProblemTable(
+            {
+                ProblemTableLabel.T: grid,
+                ProblemTableLabel.H_NET_HOT: columns[ProblemTableLabel.H_NET_HOT],
+                ProblemTableLabel.H_NET_COLD: columns[ProblemTableLabel.H_NET_COLD],
+                # Cold utility profiles run from 0 at the top to minus the duty.
+                ProblemTableLabel.H_COLD_ORC: -taken,
+            }
+        )
+    return graphs
 
 
 def _residual_utility_summary(
