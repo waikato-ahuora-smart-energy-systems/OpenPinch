@@ -117,6 +117,14 @@ HEN duty allocation on a fixed structure
 Analysis reliability and extensibility
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Default hot and cold utilities now cover the whole demand in every zone
+  when zones have different ``dt_cont`` multipliers. They were placed for the
+  root zone's multiplier and before the zone multipliers were applied, so a
+  zone with a larger multiplier left part of its duty unmet (for example 100
+  of 300 kW). They are now placed for the largest multiplier in the tree.
+- The unmet-utility warning ignores residues below a millionth of the
+  problem's process duty, so cascade rounding no longer reports a few watts
+  as unmet.
 - New ``REPORTING_DEBUG_ENABLED`` option (default false). Repeated stream
   names within a zone are still renamed ``_1``, ``_2``, but the warning is
   reported only in debug mode.
