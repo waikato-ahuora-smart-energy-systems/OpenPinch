@@ -99,6 +99,29 @@ def test_unmet_utility_demand_is_reported():
         )
 
 
+def test_cascade_residue_far_below_the_problem_duty_is_not_reported():
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        _warn_on_unmet_utility_demand(
+            hot_required=0.0,
+            cold_required=0.02,
+            hot_utilities=StreamCollection(),
+            cold_utilities=StreamCollection(),
+            idx=0,
+            scale=50_000.0,
+        )
+
+    with pytest.warns(UserWarning, match="is unmet"):
+        _warn_on_unmet_utility_demand(
+            hot_required=0.0,
+            cold_required=200.0,
+            hot_utilities=StreamCollection(),
+            cold_utilities=StreamCollection(),
+            idx=0,
+            scale=50_000.0,
+        )
+
+
 # 2.4 Near-isothermal streams
 
 

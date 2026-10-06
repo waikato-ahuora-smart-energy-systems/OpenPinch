@@ -1913,7 +1913,8 @@ def test_apply_zone_dt_cont_multiplier_skips_missing_child_zone():
 
     messages = [str(warning.message) for warning in caught]
     assert any("Subzone 'MissingChild' not found." in message for message in messages)
-    assert any("empty stream collection" in message for message in messages)
+    # Zones without streams take a multiplier silently.
+    assert not any("empty stream collection" in message for message in messages)
     assert out is parent_zone
     assert parent_zone.dt_cont_multiplier == pytest.approx(1.0)
 
@@ -1939,7 +1940,9 @@ def test_apply_zone_dt_cont_multiplier_applies_existing_child_zone():
         ],
     )
 
-    with pytest.warns(UserWarning, match="empty stream collection"):
+    # Zones without streams take a multiplier silently.
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
         out = _apply_zone_dt_cont_multiplier(parent_zone, zone_tree)
 
     assert out is parent_zone

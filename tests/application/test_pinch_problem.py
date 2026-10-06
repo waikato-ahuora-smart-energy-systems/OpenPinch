@@ -4,6 +4,7 @@ import json
 
 # import types
 import sys
+import warnings
 from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
@@ -308,7 +309,10 @@ def test_load_json_normalises_missing_zone_and_name(tmp_path: Path):
     p.write_text(json.dumps(payload), encoding="utf-8")
 
     obj = PinchProblem()
-    with pytest.raises(ValueError):
+    with (
+        pytest.warns(UserWarning, match="has no name"),
+        pytest.raises(ValueError),
+    ):
         obj.load(p)
 
 
@@ -2191,6 +2195,45 @@ def test_set_dt_cont_multiplier_rebuilds_default_utilities_and_net_streams():
     assert float(cold_utility.effective_delta_t_contribution) == pytest.approx(
         dt_cont * 3.0
     )
+
+
+def test_default_cold_utility_meets_the_whole_duty_in_every_zone():
+    # The default CU is shared by zones with different dt_cont multipliers,
+    # so it must reach the coldest shifted process temperature in each.
+    payload = {
+        "streams": [
+            {
+                "zone": "Site/AreaA",
+                "name": "HotA",
+                "t_supply": 180.0,
+                "t_target": 120.0,
+                "heat_flow": 300.0,
+                "dt_cont": 5.0,
+                "htc": 1.0,
+            }
+        ],
+        "utilities": [],
+        "zone_tree": {
+            "name": "Site",
+            "type": "Site",
+            "children": [{"name": "AreaA", "type": "Process Zone"}],
+        },
+        "options": {},
+    }
+
+    for multiplier in (None, 3.0, 0.5):
+        problem = PinchProblem(source=payload, project_name="Site")
+        if multiplier is not None:
+            problem.set_dt_cont_multiplier(multiplier, zone_name="AreaA")
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            problem.target.all_heat_integration()
+        for zone in (problem.master_zone, problem.master_zone.get_subzone("AreaA")):
+            target = zone.targets["Direct Integration"]
+            assert target.cold_utility_target == pytest.approx(300.0)
+            assert sum(
+                float(u.heat_flow.value) for u in target.cold_utilities
+            ) == pytest.approx(300.0)
 
 
 def test_set_dt_cont_multiplier_below_one_rebuilds_default_utilities_and_net_streams():

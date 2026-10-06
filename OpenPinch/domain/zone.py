@@ -167,9 +167,12 @@ class Zone:
             if not (zone._lock_dt_cont_multiplier):
                 zone.dt_cont_multiplier = value
         self._dt_cont_multiplier = float(value)
-        self.all_streams.set_common_stream_attribute(
-            "delta_t_contribution_multiplier", value
-        )
+        # Zones get their multipliers before their streams are built.
+        streams = self.all_streams
+        if len(streams):
+            streams.set_common_stream_attribute(
+                "delta_t_contribution_multiplier", value
+            )
         self._targets.clear()
 
     @property
