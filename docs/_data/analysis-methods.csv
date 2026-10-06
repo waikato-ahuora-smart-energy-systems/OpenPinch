@@ -12,6 +12,7 @@ target.vapour_compression_refrigeration,Region; Community; Site; Process Zone; U
 target.mvr_heat_pump,Region; Community; Site; Process Zone; Unit Operation,independent,direct_heat_integration; indirect_heat_integration,thermal,available
 target.brayton_heat_pump,Site; Process Zone; Unit Operation,unsupported,none,thermal,unavailable
 target.brayton_refrigeration,Site; Process Zone; Unit Operation,unsupported,none,thermal,unavailable
+target.carnot_orc,Site; Process Zone; Unit Operation,independent,direct_heat_integration,thermal,available
 target.cogeneration,Region; Community; Site; Process Zone; Unit Operation,independent,compatible_thermal_target,thermal,available
 target.sun_smith_cogeneration,Region; Community; Site; Process Zone; Unit Operation,independent,compatible_thermal_target,thermal,available
 target.varbanov_cogeneration,Region; Community; Site; Process Zone; Unit Operation,independent,compatible_thermal_target,thermal,available

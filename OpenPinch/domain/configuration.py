@@ -117,7 +117,7 @@ class DirectConfig:
 
 @_frozen_group
 class CostingConfig:
-    """Utility, heat exchanger and HPR costing parameters."""
+    """Utility, heat exchanger, HPR and ORC costing parameters."""
 
     utility_price: float
     annual_op_time: float
@@ -144,6 +144,12 @@ class CostingConfig:
     hpr_utility_capital_recovery_enabled: bool
     hpr_hot_utility_capital_cost: float
     hpr_refrigeration_capital_cost: float
+    orc_ele_price: float
+    orc_cooling_price: float
+    orc_equipment_cost: float
+    orc_installation_factor: float
+    orc_cost_exp: float
+    orc_capital_recovery_enabled: bool
 
 
 @_frozen_group
@@ -233,6 +239,20 @@ class HprConfig:
 
 
 @_frozen_group
+class OrcConfig:
+    """Organic Rankine cycle (ORC) targeting settings."""
+
+    n_stages: int
+    eta_ii_carnot: float
+    dt_cont: float
+    t_cond: float
+    min_lift: float
+    load_fraction: float
+    max_multistart: int
+    bb_minimiser: str
+
+
+@_frozen_group
 class ProcessMvrConfig:
     """Direct process MVR efficiencies."""
 
@@ -265,6 +285,7 @@ _GROUP_TYPES: dict[str, type] = {
     "costing": CostingConfig,
     "hens": HensConfig,
     "hpr": HprConfig,
+    "orc": OrcConfig,
     "process_mvr": ProcessMvrConfig,
     "power": PowerConfig,
 }
@@ -320,6 +341,7 @@ class Configuration:
     costing: CostingConfig
     hens: HensConfig
     hpr: HprConfig
+    orc: OrcConfig
     process_mvr: ProcessMvrConfig
     power: PowerConfig
 

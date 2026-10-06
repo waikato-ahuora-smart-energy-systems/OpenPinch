@@ -12,6 +12,7 @@ from ..analysis.heat_pumps.service import (
     compute_direct_heat_pump_or_refrigeration_target,
     compute_indirect_heat_pump_or_refrigeration_target,
 )
+from ..analysis.orc.service import compute_direct_orc_target
 from ..analysis.power.service import (
     get_power_cogeneration_above_pinch,
     run_power_cogeneration_service,
@@ -40,6 +41,7 @@ __all__ = [
     "indirect_heat_pump_service",
     "direct_refrigeration_service",
     "indirect_refrigeration_service",
+    "direct_orc_service",
     "power_cogeneration_service",
     "area_cost_targeting_service",
     "energy_transfer_analysis_service",
@@ -201,6 +203,25 @@ def indirect_refrigeration_service(zone: Zone, args: dict | None = None) -> Zone
     )
     if target is None:
         zone.targets.pop(TargetType.IR.value, None)
+    else:
+        zone.add_target(target)
+    return zone
+
+
+def direct_orc_service(zone: Zone, args: dict | None = None) -> Zone:
+    """Run ORC targeting after ensuring a base DI target exists."""
+    apply_zone_config_overrides(zone, args)
+    record_selected_period(zone, args)
+    if not target_matches_requested_period(
+        zone.targets.get(TargetType.DI.value),
+        args=args,
+        period_ids=zone.period_ids,
+        config=zone.config,
+    ):
+        direct_heat_integration_service(zone, args)
+    target = compute_direct_orc_target(zone, args)
+    if target is None:
+        zone.targets.pop(TargetType.DORC.value, None)
     else:
         zone.add_target(target)
     return zone

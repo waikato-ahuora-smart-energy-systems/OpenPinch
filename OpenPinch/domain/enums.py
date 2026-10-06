@@ -50,6 +50,7 @@ class TargetType(Enum):
     IHP = "Indirect Heat Pump"
     DR = "Direct Refrigeration"
     IR = "Indirect Refrigeration"
+    DORC = "Direct ORC"
 
     def __str__(self):
         return self.value
@@ -70,6 +71,7 @@ class TargetMethod(str, Enum):
     HeatPump = "Heat Pump"
     Refrigeration = "Refrigeration"
     EnergyTransfer = "Energy Transfer"
+    OrganicRankineCycle = "Organic Rankine Cycle"
 
 
 class HeatExchangerTypes(Enum):

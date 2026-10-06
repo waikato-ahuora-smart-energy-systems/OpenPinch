@@ -104,6 +104,10 @@ def test_manifest_exactly_matches_live_public_inventory() -> None:
         "problem.target.brayton_refrigeration",
         "batch.target.brayton_heat_pump",
         "batch.target.brayton_refrigeration",
+        "problem.target.carnot_orc",
+        "problem.target.all_periods.carnot_orc",
+        "batch.target.carnot_orc",
+        "batch.target.all_periods.carnot_orc",
     }
     documented_replays = {
         row["operation"]

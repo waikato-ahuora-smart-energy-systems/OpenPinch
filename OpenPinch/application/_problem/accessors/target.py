@@ -32,6 +32,7 @@ from ...targeting import (
     area_cost_targeting_service,
     direct_heat_integration_service,
     direct_heat_pump_service,
+    direct_orc_service,
     direct_refrigeration_service,
     energy_transfer_analysis_service,
     exergy_targeting_service,
@@ -909,6 +910,60 @@ class _TargetAccessor:
             maximum_restarts=maximum_restarts,
             maximum_iterations=maximum_iterations,
             maximum_evaluations=maximum_evaluations,
+        )
+
+    def carnot_orc(
+        self,
+        *,
+        zone=None,
+        include_subzones=False,
+        period_id=None,
+        options=None,
+        stages=None,
+        second_law_efficiency=None,
+        condensing_temperature=None,
+        minimum_lift=None,
+        minimum_approach_temperature=None,
+        load_fraction=None,
+        maximum_restarts=None,
+        maximum_iterations=None,
+    ):
+        """Target an organic Rankine cycle on the surplus below the pinch.
+
+        Parallel ORC units (``stages``, default 1) take heat from the
+        process's grand composite curve below the pinch and condense at
+        ``condensing_temperature`` (degC). Each unit's power is
+        ``second_law_efficiency`` times its Carnot power. The design
+        minimises the total annual cost change: annualised ORC capital, less
+        the value of the power, plus the change in cooling. Hot utility is
+        unchanged. Returns ``None`` when there is no surplus below the pinch.
+        """
+        require_available("target.carnot_orc")
+        configuration: dict[str, Any] = {}
+        for key, value in (
+            ("ORC_N_STAGES", stages),
+            ("ORC_ETA_II_CARNOT", second_law_efficiency),
+            ("ORC_T_COND", condensing_temperature),
+            ("ORC_MIN_LIFT", minimum_lift),
+            ("ORC_DT_CONT", minimum_approach_temperature),
+            ("ORC_LOAD_FRACTION", load_fraction),
+            ("ORC_MAX_MULTISTART", maximum_restarts),
+        ):
+            _set_if_not_none(configuration, key, value)
+        runtime_options = dict(options or {})
+        if maximum_iterations is not None:
+            if int(maximum_iterations) < 1:
+                raise ValueError("maximum_iterations must be at least 1.")
+            runtime_options["maximum_iterations"] = int(maximum_iterations)
+        return self._execute(
+            surface="carnot_orc",
+            target_id=TargetType.DORC.value,
+            zone=zone,
+            options=runtime_options,
+            configuration=configuration,
+            include_subzones=include_subzones,
+            period_id=period_id,
+            direct_service=direct_orc_service,
         )
 
     def heat_exchanger_area_and_cost(

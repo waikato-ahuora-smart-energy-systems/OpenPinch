@@ -4,6 +4,24 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Organic Rankine cycle targeting
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- New ``problem.target.carnot_orc`` (under development, not yet in the
+  tutorials): parallel ORC units on the process surplus below the pinch, with
+  each unit's power a second-law fraction (``ORC_ETA_II_CARNOT``) of its
+  Carnot power. The search minimises the total annual cost change: ORC
+  capital annualised with the capital recovery factor, less the power valued
+  at ``COSTING_ORC_ELE_PRICE``, plus the change in cooling at
+  ``COSTING_ORC_COOLING_PRICE``. Hot utility is unchanged and cold utility
+  falls by the heat the ORC takes. Results are ``DirectOrcTarget`` objects
+  (``TargetType.DORC``).
+- ORC capital is ``F_inst * C_eq * (W_net / 1 MW)^n`` per unit, defaulting to
+  about $3,000/kW installed at 1 MW (2025 USD) with n = 0.75, set from the US
+  EPA (2021), Lemmens (2016) and Tartiere and Astolfi (2017) data; treat it
+  as +/-30 %. The ORC has its own ``ORC_*`` and ``COSTING_ORC_*`` settings and
+  shares nothing with heat pump targeting.
+
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -17,6 +17,7 @@ EXPECTED_TARGET_METHODS = {
     "brayton_heat_pump",
     "brayton_refrigeration",
     "carnot_heat_pump",
+    "carnot_orc",
     "carnot_refrigeration",
     "cogeneration",
     "direct_heat_integration",
