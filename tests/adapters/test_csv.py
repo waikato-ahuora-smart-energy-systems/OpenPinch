@@ -178,8 +178,15 @@ def test_parse_csv_with_units_drops_extra_columns(monkeypatch):
         row_data=2,
     )
 
-    assert len(captured["df"].columns) == 9
-    assert "index" in captured["df"].columns
+    assert list(captured["df"].columns) == [
+        "zone",
+        "name",
+        "t_supply",
+        "t_target",
+        "heat_flow",
+        "dt_cont",
+        "htc",
+    ]
 
 
 def test_parse_csv_with_units_rejects_empty_dataframe(monkeypatch):
@@ -202,11 +209,13 @@ def test_tabular_helpers_reject_unknown_sheet_and_invalid_pinch_temperature():
         _tabular_input._parse_temp_pinch("1;2;3")
 
 
-def test_parse_csv_with_units_pads_missing_columns_and_converts_blanks(monkeypatch):
+def test_parse_csv_with_units_leaves_missing_columns_absent_and_converts_blanks(
+    monkeypatch,
+):
     rows = [
-        ["ignored"] * 7,
-        [None, None, "degC", "degC", "kW", "K", "kW/mK"],
-        ["Zone A", "H1", "  ", 60, 100, 10, 0.5],
+        ["ignored"] * 5,
+        [None, None, "degC", "degC", "kW"],
+        ["Zone A", "H1", "  ", 60, 100],
     ]
     captured = {}
 
@@ -224,10 +233,10 @@ def test_parse_csv_with_units_pads_missing_columns_and_converts_blanks(monkeypat
     )
 
     df = captured["df"]
-    assert len(df.columns) == 9
+    # Absent dt_cont/htc columns must not be padded (a 0 would override the
+    # configured defaults); the input contract fills them in.
+    assert list(df.columns) == ["zone", "name", "t_supply", "t_target", "heat_flow"]
     assert df.iloc[0]["t_supply"] is None
-    assert df.iloc[0]["loc"] == 0
-    assert df.iloc[0]["index"] == 0
 
 
 def test_get_problem_from_csv_reports_short_stream_csv(tmp_path: Path):

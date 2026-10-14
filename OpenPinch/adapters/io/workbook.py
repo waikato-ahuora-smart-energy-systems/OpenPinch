@@ -111,9 +111,9 @@ def _parse_sheet_with_units(
 
     for index in range(len(df_data.columns), len(col_names), -1):
         df_data = df_data.drop(columns=index - 1)
+    # Columns the table leaves out stay absent so the input contract applies
+    # its defaults; padding them with 0 forced dt_cont and htc to zero.
     df_data.columns = col_names[: len(df_data.columns)]
-    for index in range(len(df_data.columns), len(col_names)):
-        df_data[col_names[index]] = 0
 
     units_map = dict(zip(col_names, col_units))
     if sheet_name != "Summary":

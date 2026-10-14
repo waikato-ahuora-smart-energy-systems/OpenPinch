@@ -10393,3 +10393,11 @@ Notebook #10 fails to solve with the error:
 **Context**: Scope is limited to the seven reviewed correction, test, documentation and AI-DLC tracking files. No merge, workflow rerun, release, tag or package-index mutation authorized.
 
 ---
+
+## Tabular Ingestion Regression Fix
+**Timestamp**: 2026-10-15T00:00:00Z
+**User Input**: "In OpenPinch, loading any Excel workbook or CSV problem source fails: OpenPinch/adapters/io/tabular.py:22-24 names Stream Data columns 8/9 `loc` and `index`, and adapters/io/workbook.py:116 and adapters/io/csv.py:135 pad missing columns with 0, but StreamSchema (OpenPinch/contracts/input.py:138, extra=\"forbid\") has no such fields. Repro: `PinchProblem(source=\"examples/OpenPinchWkbs/Adjiman et al.xlsb\")` -> \"field 'loc' - Extra inputs are not permitted\". Likely regressed in commit b8e786ee. Fix it (drop loc/index or stop padding them; check git history for intent), and add a regression test that loads every bundled examples/OpenPinchWkbs workbook (report the one with '%' in dt_cont separately) plus a minimal 7-column CSV directory. Also fix streamlit_app.py:24, which calls the non-callable `problem.target()` accessor — use the appropriate accessor method and make its test exercise the real class. Run ruff and the unit test lane. Done = examples load, tests pass, branch ready for a PR to develop." (delegated from a parent audit session)
+**AI Response**: "Removed loc/index from the Stream Data column names (19ab2296 dropped them from the input contract and sample JSON on purpose) and stopped padding absent tabular columns with 0, so schema defaults apply. streamlit_app.py now calls problem.target.all_heat_integration(); its tests use the real PinchProblem. Added tests/application/test_tabular_example_sources.py loading every bundled workbook, a 7-column and a 5-column CSV directory; Bjork and Pettersson.xlsb (literal '%' in Utility Data dt_cont) is asserted to fail with the non-numeric-cell error."
+**Context**: Simple brownfield bug fix within existing component boundaries; inception design stages, user stories and units skipped. Workflow approval gates not run because the request came from a delegating session with an explicit definition of done.
+
+---
