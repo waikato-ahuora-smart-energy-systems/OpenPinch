@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from .._base import alpha as _alpha
 from .._base import approach as _approach
 from .._base import area as _area
 from .._base.costing import set_period_totals_and_costs
@@ -307,7 +308,9 @@ def _get_multiperiod_post_process(owner) -> None:
                 )
                 if exact_dqda is not None:
                     owner.dqda[i][j][k] = exact_dqda
-    owner.alpha = owner.get_alpha_values()
+    alpha = owner.get_alpha_values()
+    # A failed alpha solve is not cached; rank with neutral alpha instead.
+    owner.alpha = alpha if alpha is not None else []
     owner.dtacda = [
         [[None for _k in range(owner.S)] for _j in range(owner.J)]
         for _i in range(owner.I)
@@ -329,7 +332,10 @@ def _get_multiperiod_post_process(owner) -> None:
                     ) - (owner.A_coeff[0] * owner.A_exp[0])
     owner.alpha_dqda = [
         [
-            [owner.alpha[i][j][k][0] * owner.dqda[i][j][k] for k in range(owner.S)]
+            [
+                _alpha.alpha_value(owner, i, j, k) * owner.dqda[i][j][k]
+                for k in range(owner.S)
+            ]
             for j in range(owner.J)
         ]
         for i in range(owner.I)
@@ -360,9 +366,11 @@ def get_lowest_benefit_HX_candidates(owner, limit: int) -> list[list[int]]:
         for j in range(owner.J):
             for i in range(owner.I):
                 if owner._active_binary_value(owner.z[i][j][k]) > owner.tol:
-                    owner.net_benefit[i][j][k] = owner.Q_r[i][j][k][0] * owner.alpha[i][
-                        j
-                    ][k][0] * (owner.hu_cost[0] + owner.cu_cost[0]) - (
+                    owner.net_benefit[i][j][k] = owner.Q_r[i][j][k][
+                        0
+                    ] * _alpha.alpha_value(owner, i, j, k) * (
+                        owner.hu_cost[0] + owner.cu_cost[0]
+                    ) - (
                         owner.unit_cost[0]
                         + owner.A_coeff[0] * (owner.area_r[i][j][k] ** owner.A_exp[0])
                     )

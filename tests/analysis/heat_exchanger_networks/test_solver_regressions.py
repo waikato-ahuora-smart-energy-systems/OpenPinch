@@ -332,6 +332,25 @@ def test_four_stream_live_solver_corrected_warm_start_branch_is_feasible() -> No
 
 
 @pytest.mark.solver
+def test_default_design_removes_every_gekko_run_directory(
+    monkeypatch, tmp_path
+) -> None:
+    pytest.importorskip("gekko")
+    import tempfile
+
+    # GEKKO creates one mkdtemp run directory per model: main solves, PDM
+    # sides, amalgamated and reduced cases, evolution candidates, alpha side
+    # models. None should outlive the design.
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    problem = PinchProblem(source=FIXTURE_ROOT / f"{FOUR_STREAM}.json")
+
+    design = problem.design.heat_exchanger_network(max_parallel=1)
+
+    assert design.selected_network.exchangers
+    assert sorted(path.name for path in tmp_path.glob("*gk_model*")) == []
+
+
+@pytest.mark.solver
 @pytest.mark.parametrize("case_id", [FOUR_STREAM])
 def test_marked_solver_baseline_matches_checked_in_summary(case_id: str) -> None:
     _assert_live_solver_case_matches_checked_in_summary(case_id)

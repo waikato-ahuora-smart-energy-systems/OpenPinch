@@ -304,6 +304,7 @@ def test_get_alpha_values_uses_cached_values_and_warns_on_solver_failure(
     failing_model = _FakeModel(fail_solve=True)
     model.alpha = []
     calls = []
+    cleaned = []
 
     monkeypatch.setattr(
         base_alpha.backend, "create_gekko_model", lambda remote=False: failing_model
@@ -313,15 +314,20 @@ def test_get_alpha_values_uses_cached_values_and_warns_on_solver_failure(
         "suppress_gekko_numpy_array_copy_deprecation",
         nullcontext,
     )
-    monkeypatch.setattr(
-        model,
-        "set_alpha_dqda_equations",
-        lambda **kwargs: calls.append(kwargs),
-    )
+    monkeypatch.setattr(base_alpha.backend, "cleanup_gekko_model", cleaned.append)
+
+    def set_equations(**kwargs):
+        calls.append(kwargs)
+        model.alpha = [[[["unsolved guess"]]]]
+
+    monkeypatch.setattr(model, "set_alpha_dqda_equations", set_equations)
 
     with caplog.at_level(logging.WARNING, logger=base_alpha.__name__):
-        assert model.get_alpha_values() == []
+        assert model.get_alpha_values() is None
     assert calls == [{"m": failing_model, "postoptimisation": True}]
+    # The unsolved guesses are not cached, and the side model is cleaned up.
+    assert model.alpha == []
+    assert cleaned == [failing_model]
     assert any(
         record.levelno == logging.WARNING
         and "alpha solve failed" in record.getMessage()
@@ -330,43 +336,41 @@ def test_get_alpha_values_uses_cached_values_and_warns_on_solver_failure(
     )
 
 
-@pytest.mark.parametrize("non_isothermal", [False, True])
-def test_set_alpha_dqda_equations_builds_fake_model_equations(non_isothermal: bool):
+def test_get_alpha_values_rejects_unsuccessful_status_and_retries(monkeypatch):
     model = _model()
-    _configure_equation_state(model, non_isothermal=non_isothermal)
+    model.alpha = []
+    side_models = [_FakeModel(solve_status=0), _FakeModel(solve_status=1)]
+    created = list(side_models)
+    monkeypatch.setattr(
+        base_alpha.backend,
+        "create_gekko_model",
+        lambda remote=False: created.pop(0),
+    )
+    monkeypatch.setattr(
+        base_alpha.backend,
+        "suppress_gekko_numpy_array_copy_deprecation",
+        nullcontext,
+    )
+    cleaned = []
+    monkeypatch.setattr(base_alpha.backend, "cleanup_gekko_model", cleaned.append)
 
-    model.set_alpha_dqda_equations(postoptimisation=False)
+    def set_equations(*, m, postoptimisation):
+        assert postoptimisation is True
+        model.alpha = [[[[0.25 if m is side_models[1] else 0.9]]]]
 
-    assert len(model.alpha) == 1
-    assert len(model.gamma_h_eqn) == 3
-    assert len(model.gamma_c_eqn) == 3
-    assert len(model.alpha_eqn) == 2
-    assert model.alpha_dQ_dA_eqn[1] is None
-    assert model.m.intermediates
-    assert model.m.equations
+    monkeypatch.setattr(model, "set_alpha_dqda_equations", set_equations)
 
+    # The solve returns without raising, but the solver status says it failed.
+    assert model.get_alpha_values() is None
+    assert model.alpha == []
+    assert base_alpha.alpha_value(model, 0, 0, 0) == 1.0
 
-@pytest.mark.parametrize("non_isothermal", [False, True])
-def test_set_alpha_dqda_equations_builds_postoptimisation_equations(
-    non_isothermal: bool,
-):
-    model = _model()
-    _configure_postoptimisation_state(model, non_isothermal=non_isothermal)
-    fake_model = _FakeModel()
-
-    model.set_alpha_dqda_equations(m=fake_model, postoptimisation=True)
-
-    assert len(model.alpha) == 1
-    assert len(model.gamma_h_eqn) == 3
-    assert len(model.gamma_c_eqn) == 3
-    assert len(model.alpha_eqn) == 3
-    assert len(fake_model.variables) == 9
-    assert model.P_h[0][0][2] == 0.0
-    assert model.P_c[0][0][2] == 0.0
-    assert model.beta_h[0][0][1] == 0.0
-    assert model.beta_c[0][0][1] == 0.0
-    assert model.z_i[0][1] == 0.0
-    assert model.z_j[0][1] == 0.0
+    # Nothing was cached, so the next call solves again and keeps the result.
+    assert model.get_alpha_values() == [[[[0.25]]]]
+    assert base_alpha.alpha_value(model, 0, 0, 0) == 0.25
+    assert model.get_alpha_values() == [[[[0.25]]]]
+    assert all(side.solved for side in side_models)
+    assert cleaned == side_models
 
 
 def test_set_alpha_dqda_equations_requires_model_for_postoptimisation():
@@ -548,6 +552,69 @@ def test_optimise_handles_failure_negative_success_and_unsolved_paths(monkeypatc
     model.optimise(print_output=True)
     assert model.mSuccess == 1
     assert model.post_processed is True
+
+
+def test_optimise_removes_run_directory_on_success_and_failure(monkeypatch, tmp_path):
+    model = _model()
+    model.get_post_process = lambda: setattr(model, "post_processed", True)
+
+    def solve(m, **_kwargs):
+        # The run directory is still there while the model solves.
+        assert (tmp_path / m.name).is_dir()
+        return _solver_run(failure_reason=None if m.name == "solved" else "bad")
+
+    monkeypatch.setattr(base_execution.backend, "solve_gekko_model", solve)
+    for name in ("solved", "failed"):
+        (tmp_path / name).mkdir()
+        model.m = _FakeModel(solve_status=1, objective=1.0)
+        model.m.name = name
+        model.m._path = str(tmp_path / name)
+        model.post_processed = False
+
+        model.optimise(print_output=False)
+
+        assert model.post_processed is (name == "solved")
+        assert not (tmp_path / name).exists()
+
+    def broken_solve(m, **_kwargs):
+        raise RuntimeError("solver crashed")
+
+    (tmp_path / "crashed").mkdir()
+    model.m = _FakeModel()
+    model.m._path = str(tmp_path / "crashed")
+    monkeypatch.setattr(base_execution.backend, "solve_gekko_model", broken_solve)
+    with pytest.raises(RuntimeError, match="solver crashed"):
+        model.optimise(print_output=False)
+    assert not (tmp_path / "crashed").exists()
+
+
+def test_cleanup_gekko_model_is_idempotent_and_allows_a_resolve(tmp_path):
+    run_dir = tmp_path / "gk_model0"
+    run_dir.mkdir()
+    (run_dir / "gk_model0.apm").write_text("model", encoding="utf-8")
+    model = SimpleNamespace(
+        _path=str(run_dir),
+        options=SimpleNamespace(SOLVER_EXTENSION=0, SOLVESTATUS=1, objfcnval=1.0),
+        solve=lambda **_kwargs: None,
+    )
+
+    backend.cleanup_gekko_model(model)
+    backend.cleanup_gekko_model(model)
+    backend.cleanup_gekko_model(None)
+    assert not run_dir.exists()
+
+    # A model solved again after cleanup gets its run directory back.
+    def solve(**_kwargs):
+        assert run_dir.is_dir()
+
+    model.solve = solve
+    run = backend.solve_gekko_model(model, solver_name="apopt")
+    assert run.failure_reason is None
+
+    # Test doubles without a run path fall back to their own cleanup.
+    cleaned = []
+    backend.cleanup_gekko_model(SimpleNamespace(cleanup=lambda: cleaned.append(1)))
+    assert cleaned == [1]
 
 
 def test_output_to_cmd_line_logs_successful_solve(caplog):

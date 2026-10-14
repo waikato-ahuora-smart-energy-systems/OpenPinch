@@ -9,6 +9,9 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+from OpenPinch.analysis.heat_exchanger_networks import (
+    duty_optimisation as duty_module,
+)
 from OpenPinch.analysis.heat_exchanger_networks.duty_optimisation import (
     DEFAULT_FEASIBILITY_APPROACH,
     FixedStructureDutyExecutor,
@@ -740,7 +743,23 @@ class _ScriptedModel:
         self.capital_cost_value = 1.0
 
 
-def test_executor_removes_zero_duty_exchangers_and_resolves() -> None:
+def _scripted_task(request):
+    return duty_optimisation_task(
+        request,
+        SimpleNamespace(
+            run_id="run",
+            approach_temperatures=(10.0,),
+            problem_id=None,
+            workspace_variant=None,
+            period_id=None,
+        ),
+    )
+
+
+def test_executor_removes_zero_duty_exchangers_and_resolves(monkeypatch) -> None:
+    # The scripted temperatures are not a consistent network; this test is
+    # about the removal loop, so accept whatever it reports.
+    monkeypatch.setattr(duty_module, "verify_solution", lambda *_args: ())
     problem = _four_stream_problem()
     problem.target.direct_heat_integration()
     request = _request(min_approach_temperature=10.0)
@@ -785,6 +804,80 @@ def test_executor_removes_zero_duty_exchangers_and_resolves() -> None:
         1: 100.0,
         2: 100.0,
     }
+
+
+def test_executor_reports_verification_failure_instead_of_success(
+    monkeypatch,
+) -> None:
+    seen = []
+
+    def reject(structure, model, network):
+        seen.append(network)
+        return ("E1 approach 0.5 is below its required approach 10",)
+
+    monkeypatch.setattr(duty_module, "verify_solution", reject)
+    problem = _four_stream_problem()
+    problem.target.direct_heat_integration()
+    request = _request(min_approach_temperature=10.0)
+    _ScriptedModel.calls = []
+    _ScriptedModel.zero_by_call = [set()]
+    executor = FixedStructureDutyExecutor(request, model_factory=_ScriptedModel)
+
+    (outcome,) = executor.execute(
+        (_scripted_task(request),),
+        problem=problem,
+        parent_outcomes={},
+        max_parallel=1,
+    )
+
+    assert len(seen) == 1
+    assert outcome.status == "failed"
+    assert outcome.network is None
+    assert outcome.error == (
+        "verification failed: E1 approach 0.5 is below its required approach 10"
+    )
+    assert executor.models_by_task_id == {}
+
+
+def test_verify_solution_checks_each_exchanger_against_its_own_approach(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(duty_module, "verify_network_feasibility", lambda _n: ())
+
+    def result(approach):
+        period = fixed_model.ExchangerPeriodResult(
+            duty=100.0,
+            active=True,
+            approach=approach,
+            source_inlet=500.0,
+            source_outlet=490.0,
+            sink_inlet=400.0,
+            sink_outlet=410.0,
+            required_area=1.0,
+        )
+        return fixed_model.ExchangerResult([period], area=1.0, capital_cost=1.0)
+
+    model = SimpleNamespace(
+        recovery_results=[result((12.0, 15.0)), result((9.0, 30.0))],
+        utility_results=[result((4.0, 20.0))],
+        # Per-match limits differ: the second match needs 10 K, the first 5 K.
+        recovery_dt=[[5.0, 10.0]],
+        utility_dt=[[5.0]],
+    )
+    structure = SimpleNamespace(
+        slots=(("recovery", 0), ("recovery", 1), ("utility", 0)),
+        results=lambda m: [*m.recovery_results, *m.utility_results],
+    )
+    network = SimpleNamespace(
+        exchangers=[SimpleNamespace(exchanger_id=f"E{n}") for n in range(3)]
+    )
+
+    failures = duty_module.verify_solution(structure, model, network)
+
+    assert failures == (
+        "E1 approach 9 is below its required approach 10 in period 0",
+        "E2 approach 4 is below its required approach 5 in period 0",
+    )
 
 
 def test_executor_reports_solver_failure_after_removals() -> None:
