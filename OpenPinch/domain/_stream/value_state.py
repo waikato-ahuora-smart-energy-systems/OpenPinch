@@ -80,42 +80,49 @@ def resolve_period_weights(
 ) -> np.ndarray:
     """Return the canonical non-negative weight vector for ``period_ids``.
 
-    Missing trailing values default to one. Excess, non-finite, negative, and
-    all-zero vectors are rejected so every consumer sees the same period model.
+    A single value weights every period equally. Otherwise every period needs a
+    weight: a partial list or mapping is rejected, naming the periods without
+    one, because padding (e.g. hours per year with 1) silently drops periods.
+    Excess, non-finite, negative, and all-zero vectors are also rejected so
+    every consumer sees the same period model.
     """
-    expected_len = (
-        len(period_ids) if hasattr(period_ids, "__len__") else len(list(period_ids))
-    )
+    ordered_period_ids = [str(item) for item in period_ids]
+    expected_len = len(ordered_period_ids)
     if expected_len <= 0:
         raise ValueError("At least one operating period is required.")
     if weights is None:
         resolved = np.ones(expected_len, dtype=float)
     else:
         if isinstance(weights, Mapping):
-            ordered_period_ids = list(period_ids)
-            unknown_ids = set(weights) - set(ordered_period_ids)
+            by_id = {str(key): value for key, value in weights.items()}
+            unknown_ids = set(by_id) - set(ordered_period_ids)
             if unknown_ids:
-                unknown = ", ".join(sorted(str(item) for item in unknown_ids))
+                unknown = ", ".join(sorted(unknown_ids))
                 raise ValueError(f"Unknown period weight id(s): {unknown}.")
-            supplied_values = []
-            missing_seen = False
-            for period_id in ordered_period_ids:
-                if period_id not in weights:
-                    missing_seen = True
-                    continue
-                if missing_seen:
-                    raise ValueError("Missing period weights must be trailing.")
-                supplied_values.append(weights[period_id])
-            supplied = np.asarray(supplied_values, dtype=float).reshape(-1)
+            _reject_missing_period_weights(
+                [
+                    period_id
+                    for period_id in ordered_period_ids
+                    if period_id not in by_id
+                ]
+            )
+            resolved = np.asarray(
+                [by_id[period_id] for period_id in ordered_period_ids], dtype=float
+            )
         else:
             supplied = np.asarray(weights, dtype=float).reshape(-1)
-        if supplied.size > expected_len:
-            raise ValueError(
-                f"Expected at most {expected_len} period weight(s), "
-                f"got {supplied.size}."
-            )
-        resolved = np.ones(expected_len, dtype=float)
-        resolved[: supplied.size] = supplied
+            if supplied.size > expected_len:
+                raise ValueError(
+                    f"Expected at most {expected_len} period weight(s), "
+                    f"got {supplied.size}."
+                )
+            if supplied.size == 0:
+                resolved = np.ones(expected_len, dtype=float)
+            elif supplied.size == 1:
+                resolved = np.full(expected_len, supplied[0], dtype=float)
+            else:
+                _reject_missing_period_weights(ordered_period_ids[supplied.size :])
+                resolved = supplied.astype(float)
     if not np.isfinite(resolved).all():
         raise ValueError("Period weights must be finite.")
     if np.any(resolved < 0.0):
@@ -123,6 +130,15 @@ def resolve_period_weights(
     if float(resolved.sum()) <= 0.0:
         raise ValueError("At least one period weight must be positive.")
     return resolved
+
+
+def _reject_missing_period_weights(missing_ids: list[str]) -> None:
+    if missing_ids:
+        raise ValueError(
+            "Period weights are missing for period(s): "
+            f"{', '.join(missing_ids)}. Give a weight for every period, or a "
+            "single weight to weight all periods equally."
+        )
 
 
 def is_period_value_data(value: Mapping) -> bool:

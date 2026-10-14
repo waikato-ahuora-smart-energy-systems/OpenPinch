@@ -204,12 +204,13 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
     def _validate_T_cond_and_evap(
         self, T_cond: np.ndarray, T_evap: np.ndarray
     ) -> float:
-        return (
-            # Every condenser must sit dt_cascade_hx above every evaporator.
-            np.min([T_cond.min() - T_evap.max() - self._dt_cascade_hx, 0.0])
-            + np.min([(T_cond - np.roll(T_cond, 1))[:-1].sum(), 0.0])
-            + np.min([(T_evap - np.roll(T_evap, 1))[:-1].sum(), 0.0])
-        ) * -1
+        # Every condenser must sit dt_cascade_hx above every evaporator.
+        overlap = np.min([T_cond.min() - T_evap.max() - self._dt_cascade_hx, 0.0])
+        # Stages run hottest first; penalise every adjacent pair out of order,
+        # not just the net change across the cascade.
+        cond_order = np.minimum(T_cond[:-1] - T_cond[1:], 0.0).sum()
+        evap_order = np.minimum(T_evap[:-1] - T_evap[1:], 0.0).sum()
+        return -(overlap + cond_order + evap_order)
 
     def _normalize_secondary_process_duty(self, duty=None) -> np.ndarray | None:
         if duty is None:

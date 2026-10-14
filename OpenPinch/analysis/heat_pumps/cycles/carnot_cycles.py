@@ -389,7 +389,7 @@ class CascadeCarnotCycle:
             i_c, i_e = self._get_unique_idx(is_on)
             Qc_pool_sum, Qe_pool_sum = Qc_pool[i_c].sum(), Qe_pool[i_e].sum()
             if Qc_pool_sum * Qe_pool_sum > tol:
-                if 1 > eta_ii_he_carnot > 0:
+                if 1 >= eta_ii_he_carnot > 0:
                     T_h = compute_entropic_mean_temperature(
                         self._T_evap[i_e],
                         Qe_pool[i_e],
@@ -420,7 +420,7 @@ class CascadeCarnotCycle:
         if np.any(is_on):
             i_c, i_e = self._get_unique_idx(is_on)
             Qc_pool_sum, Qe_pool_sum = Qc_pool[i_c].sum(), Qe_pool[i_e].sum()
-            if (Qc_pool_sum * Qe_pool_sum > tol) and (1 > eta_ii_hpr_carnot >= 0):
+            if (Qc_pool_sum * Qe_pool_sum > tol) and (1 >= eta_ii_hpr_carnot >= 0):
                 T_h = compute_entropic_mean_temperature(
                     self._T_cond[i_c],
                     Qc_pool[i_c],

@@ -513,7 +513,7 @@ def _validate_configuration_options(
 
 
 def _validate_period_options(options: dict) -> None:
-    """Require unique, non-empty period ids and no more weights than periods."""
+    """Require unique, non-empty period ids and one weight or one per period."""
     period_ids = [str(item) for item in options["PROBLEM_PERIOD_IDS"]]
     if not period_ids:
         raise ValueError("PROBLEM_PERIOD_IDS must list at least one period.")
@@ -529,6 +529,15 @@ def _validate_period_options(options: dict) -> None:
         raise ValueError(
             f"PROBLEM_PERIOD_WEIGHTS has {len(weights)} values for "
             f"{len(period_ids)} periods."
+        )
+    if 1 < len(weights) < len(period_ids):
+        # One weight means equal weighting; a partial list is a mistake that
+        # padding would hide (e.g. hours per year padded with 1).
+        missing = ", ".join(period_ids[len(weights) :])
+        raise ValueError(
+            f"PROBLEM_PERIOD_WEIGHTS is missing weights for period(s): {missing}. "
+            "Give a weight for every period, or a single weight to weight all "
+            "periods equally."
         )
 
 

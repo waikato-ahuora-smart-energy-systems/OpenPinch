@@ -123,11 +123,19 @@ def test_derived_stream_fields_are_read_only():
     assert float(stream.heat_capacity_flowrate) == pytest.approx(50.0)
 
 
-def test_period_weight_resolution_pads_missing_values_and_rejects_invalid_shapes():
+def test_period_weight_resolution_broadcasts_one_value_and_rejects_invalid_shapes():
     np.testing.assert_allclose(
         resolve_period_weights(["base", "peak", "idle"], [0.25]),
-        [0.25, 1.0, 1.0],
+        [0.25, 0.25, 0.25],
     )
+    np.testing.assert_allclose(
+        resolve_period_weights(["base", "peak", "idle"], None), [1.0, 1.0, 1.0]
+    )
+
+    with pytest.raises(ValueError, match="missing for period\\(s\\): idle"):
+        resolve_period_weights(["base", "peak", "idle"], [6000.0, 2000.0])
+    with pytest.raises(ValueError, match="missing for period\\(s\\): peak, idle"):
+        resolve_period_weights(["base", "peak", "idle"], {"base": 6000.0})
 
     with pytest.raises(ValueError, match="at most 2"):
         resolve_period_weights(["base", "peak"], [1.0, 2.0, 3.0])

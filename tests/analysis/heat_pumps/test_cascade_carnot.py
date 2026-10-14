@@ -236,13 +236,14 @@ def test_cascade_carnot_cycle_zero_lift_returns_no_useful_work():
     np.testing.assert_allclose(cycle.Q_evap, Q_evap, atol=0.01)
 
 
-def test_cascade_carnot_cycle_negative_lift_generates_work():
+@pytest.mark.parametrize("eta_he", [0.5, 1.0])
+def test_cascade_carnot_cycle_negative_lift_generates_work(eta_he):
     T_cond = np.array([30.0])
     Q_cond = np.array([100.0])
     T_evap = np.array([60.0])
     Q_evap = np.array([120.0])
     args, _, _ = _build_cascade_carnot_profiles(
-        T_cond, Q_cond, T_evap, Q_evap, eta_hp=0.5, eta_he=0.5
+        T_cond, Q_cond, T_evap, Q_evap, eta_hp=0.5, eta_he=eta_he
     )
 
     cycle = _solve_cascade_carnot_cycle(T_cond, Q_cond, T_evap, Q_evap, args)
@@ -445,3 +446,31 @@ def test_cascade_carnot_objective_debug_branch(monkeypatch):
 
     assert out.success is True
     assert called["plot"] == 1
+
+
+def test_cascade_carnot_cycle_matches_parallel_at_ideal_efficiency():
+    # eta_ii = 1 is a valid (ideal) setting and must not switch the cycle off.
+    request = DutyAllocationRequest(
+        heat=StageDutyRequest(
+            Q_base=1.0, x_split=np.array([1.0]), Q_available=np.array([1000.0])
+        ),
+        cool=StageDutyRequest(
+            Q_base=1.0, x_split=np.array([1.0]), Q_available=np.array([5000.0])
+        ),
+    )
+    solve_kwargs = dict(
+        T_cond=np.array([80.0]),
+        T_evap=np.array([20.0]),
+        duty_allocation=request,
+        eta_ii_hpr_carnot=1.0,
+        eta_ii_he_carnot=0.0,
+        args=None,
+    )
+
+    cascade = CascadeCarnotCycle()
+    cascade_work = cascade.solve(**solve_kwargs)
+    parallel_work = hp_carnot_cycles.ParallelCarnotCycles().solve(**solve_kwargs)
+
+    assert cascade_work > 0.0
+    assert cascade_work == pytest.approx(parallel_work)
+    np.testing.assert_allclose(cascade.Q_cond, [1000.0])

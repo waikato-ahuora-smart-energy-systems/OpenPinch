@@ -435,6 +435,28 @@ def test_parse_options_sheet_empty_after_filter_returns_empty_dict(tmp_path: Pat
     assert wkbook_to_json._parse_options_sheet(xlsx) == {}
 
 
+def test_parse_options_sheet_blank_sheet_returns_empty_dict(tmp_path: Path):
+    xlsx = tmp_path / "options_blank.xlsx"
+    with pd.ExcelWriter(xlsx, engine="openpyxl") as writer:
+        pd.DataFrame().to_excel(writer, sheet_name="Options", index=False)
+
+    assert wkbook_to_json._parse_options_sheet(xlsx) == {}
+
+
+def test_parse_options_sheet_single_column_raises_value_error(tmp_path: Path):
+    xlsx = tmp_path / "options_one_column.xlsx"
+    with pd.ExcelWriter(xlsx, engine="openpyxl") as writer:
+        pd.DataFrame([["THERMAL_DT_CONT"], ["THERMAL_HTC"]]).to_excel(
+            writer,
+            sheet_name="Options",
+            header=None,
+            index=False,
+        )
+
+    with pytest.raises(ValueError, match="column A .* column B"):
+        wkbook_to_json._parse_options_sheet(xlsx)
+
+
 def test_parse_options_sheet_to_python_none_and_item_exception_paths(monkeypatch):
     class _BadItem:
         def item(self):

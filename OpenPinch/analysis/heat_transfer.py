@@ -283,7 +283,7 @@ def CrossflowUnmixedEff1(Ntu, c):
     Sum_Pn = 0
     for i in range(1, 21):
         Pn = 0
-        for j in range(1, i):
+        for j in range(1, i + 1):
             Pn = Pn + c**i / math.factorial(i + 1) * (i - j + 1) / math.factorial(
                 j
             ) * Ntu ** (i + j)

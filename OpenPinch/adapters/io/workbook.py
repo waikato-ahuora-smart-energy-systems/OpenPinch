@@ -140,6 +140,13 @@ def _parse_options_sheet(
             return {}
         df_full = pd.read_excel(workbook, sheet_name=sheet_name, header=None)
 
+    if df_full.empty:
+        return {}
+    if df_full.shape[1] < 2:
+        raise ValueError(
+            f"The {sheet_name} sheet needs option names in column A and their "
+            "values in column B."
+        )
     col0 = df_full.iloc[:, 0]
     col1 = df_full.iloc[:, 1]
     df_full = df_full.loc[col1.notna() & ~col0.astype(str).str.startswith("###")]

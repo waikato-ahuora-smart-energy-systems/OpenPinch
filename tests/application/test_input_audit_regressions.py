@@ -230,6 +230,13 @@ def test_value_weights_are_validated_and_serialised():
             {"PROBLEM_PERIOD_IDS": ["a"], "PROBLEM_PERIOD_WEIGHTS": [0.5, 0.5]},
             "2 values for 1 periods",
         ),
+        (
+            {
+                "PROBLEM_PERIOD_IDS": ["winter", "summer", "shutdown"],
+                "PROBLEM_PERIOD_WEIGHTS": [6000.0, 2000.0],
+            },
+            "missing weights for period\\(s\\): shutdown",
+        ),
         ({"COSTING_ANNUAL_OP_TIME": 0.0}, "greater than 0"),
         ({"POWER_ETA_MECH": 0.0}, "greater than 0"),
         ({"HPR_ETA_COMP": 0.0}, "greater than 0"),

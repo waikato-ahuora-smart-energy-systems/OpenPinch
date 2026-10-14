@@ -100,6 +100,31 @@ Options and exports
 - A failed Excel export to an explicit ``.xlsx`` path leaves any existing file
   in place. The workbook is written to a temporary sibling and moved into
   place only once complete; previously a failure deleted the existing file.
+- ``PROBLEM_PERIOD_WEIGHTS`` (and per-value ``weights``) need either one
+  weight, which weights every period equally, or one weight per period. A
+  partial list now raises a ``ValueError`` naming the periods without a weight.
+  Missing weights used to be filled with 1, so hour-based weights such as
+  ``[6000, 2000]`` for three periods left the third with almost no weight, and
+  a single weight such as ``[6000]`` became ``[6000, 1, 1]``. This replaces
+  the earlier policy of padding omitted trailing weights with ``1.0``.
+- A workbook Options sheet with only one column raises a clear
+  ``ValueError`` instead of an ``IndexError``; a blank Options sheet is
+  ignored.
+
+Analysis corrections
+~~~~~~~~~~~~~~~~~~~~
+
+- The cross-flow (both streams unmixed) effectiveness series in
+  ``HX_Eff``, ``HX_NTU`` and ``CalcAreaUE`` included one term too few, which
+  overstated effectiveness (0.556 instead of 0.476 at NTU = 1, C = 1) and
+  understated area.
+- Cascade Carnot heat pumps and heat engines accept a second-law efficiency of
+  exactly 1. The cascade heat pump previously returned zero duty, reported as
+  solved, and the heat engine was treated as plain heat recovery.
+- Cascade vapour-compression cycles check that every pair of adjacent
+  condenser and evaporator temperatures is in order, hottest stage first. Only
+  the net change across the cascade was checked, so a stage out of order in the
+  middle passed without penalty.
 
 HPR cost model and search
 ~~~~~~~~~~~~~~~~~~~~~~~~~
