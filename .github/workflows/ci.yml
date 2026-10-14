@@ -75,6 +75,14 @@ jobs:
             sync: --group dev
             markers: not solver and not tespy and not performance and not docs
             coverage: true
+          # Runtime dependencies at the floors in pyproject.toml, so the
+          # lower bounds are tested and not just declared.
+          - lane: floors
+            runner: ubuntu-latest
+            timeout: 45
+            sync: --group dev
+            markers: not solver and not tespy and not performance and not docs
+            floors: true
           - lane: docs
             runner: ubuntu-latest
             timeout: 20
@@ -111,6 +119,12 @@ jobs:
         run: |
           read -ra sync_args <<< "$SYNC_ARGS"
           uv sync --frozen "${sync_args[@]}"
+      - name: Install the lowest allowed runtime dependencies
+        if: ${{ matrix.floors }}
+        run: |
+          uv pip install --python .venv --resolution lowest-direct \
+            --only-binary :all: -r pyproject.toml
+          uv pip list --python .venv | grep -iE '^(numpy|pint|pandas|coolprop|pydantic|scipy) '
       - name: Run pytest
         env:
           MARKERS: ${{ matrix.markers }}

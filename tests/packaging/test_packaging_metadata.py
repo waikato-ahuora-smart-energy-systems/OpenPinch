@@ -116,7 +116,7 @@ def test_hpr_runtime_requires_coolprop_8_and_dev_retains_tespy_floor():
         if _dependency_name(dependency) == "tespy"
     ]
 
-    assert coolprop_entries == ["CoolProp>=8"]
+    assert coolprop_entries == ["CoolProp>=8,<9"]
     assert tespy_dev_entries == [TESPY_REQUIREMENT]
 
 
@@ -332,14 +332,16 @@ def test_installed_wheel_smoke_uses_only_the_root_workflow_contract():
     assert "hpr_performance_map" in smoke
 
 
-def test_core_dependencies_have_required_coolprop_floor_and_other_major_ceilings():
+def test_core_dependencies_have_tested_floors_and_major_ceilings():
     dependencies = _read_pyproject()["project"]["dependencies"]
 
+    # Floors: oldest releases with Python 3.14 wheels that pass the suite (CI
+    # "floors" lane). Ceilings: the next major version.
     assert dependencies == [
-        "numpy<3",
-        "pint<1",
-        "pandas<4",
-        "CoolProp>=8",
-        "pydantic<3",
-        "scipy<2",
+        "numpy>=2.3.2,<3",
+        "pint>=0.24.4,<1",
+        "pandas>=2.3.3,<4",
+        "CoolProp>=8,<9",
+        "pydantic>=2.12,<3",
+        "scipy>=1.16.1,<2",
     ]

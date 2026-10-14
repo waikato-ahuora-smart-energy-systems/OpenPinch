@@ -102,6 +102,12 @@ Heat exchanger network synthesis
 Options and exports
 ~~~~~~~~~~~~~~~~~~~
 
+- Runtime dependencies declare tested floors: ``numpy>=2.3.2``,
+  ``pint>=0.24.4``, ``pandas>=2.3.3``, ``pydantic>=2.12``, ``scipy>=1.16.1``,
+  and ``CoolProp`` gains a ``<9`` ceiling. These are the oldest releases with
+  Python 3.14 wheels that pass the test suite; pandas 2.3 and 3.0 are both
+  supported. A new CI lane runs the unit tests at exactly these floors.
+
 - Passing a load-time default (``THERMAL_DT_CONT``, ``THERMAL_DT_PHASE_CHANGE``,
   ``THERMAL_HTC``, ``COSTING_UTILITY_PRICE``, ``INPUT_UNIT_*`` or
   ``PROBLEM_*``) in a single ``target.*`` or ``design.*`` call's ``options``

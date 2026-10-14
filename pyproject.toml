@@ -26,13 +26,15 @@ exclude = [
 packages = ["OpenPinch"]
 [project]
 name = "OpenPinch"
+# Floors are the oldest releases with Python 3.14 wheels that pass the test
+# suite; CI's "floors" lane installs exactly these.
 dependencies=[
-  "numpy<3",
-  "pint<1",
-  "pandas<4",
-  "CoolProp>=8",
-  "pydantic<3",
-  "scipy<2",
+  "numpy>=2.3.2,<3",
+  "pint>=0.24.4,<1",
+  "pandas>=2.3.3,<4",
+  "CoolProp>=8,<9",
+  "pydantic>=2.12,<3",
+  "scipy>=1.16.1,<2",
 ]
 version = "0.6.21"
 authors = [
