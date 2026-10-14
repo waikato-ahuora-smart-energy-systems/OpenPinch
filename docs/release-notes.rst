@@ -87,6 +87,17 @@ Heat exchanger network synthesis
   the pinch and broke the larger approaches.
 - A problem with no possible heat recovery returns its utility-only network
   instead of failing with a division by zero in stage reduction.
+- Solved networks are checked before they count as a success: every match
+  against its own required approach, every exchanger's duty balance and every
+  stream's heat balance to target. Duty optimisation also checks each
+  exchanger's terminal approaches. A network that fails is reported as a failed
+  task (``verification failed: ...``) instead of a success; solver tolerances
+  are unchanged.
+- A failed post-optimisation alpha solve is no longer cached: it is retried,
+  and evolution ranks matches with a neutral alpha meanwhile.
+- GEKKO run directories are removed once each model's results are read. A
+  single default design run used to leave 25 or more behind in the temporary
+  directory.
 
 Options and exports
 ~~~~~~~~~~~~~~~~~~~
@@ -113,6 +124,17 @@ Options and exports
 
 Analysis corrections
 ~~~~~~~~~~~~~~~~~~~~
+
+- Multi-start optimisation runs serially when the objective cannot be pickled
+  (a lambda or closure) instead of crashing, and an error raised by the
+  objective surfaces at once instead of triggering a serial rerun of every
+  task. Polishing tolerates only numerical failures (``ValueError``,
+  ``ArithmeticError``, ``LinAlgError``); other errors propagate.
+- Utility placement's ``evaluation_limit`` is a global budget shared across
+  runs and worker processes, and ``PlacementTermination.evaluations`` counts
+  every worker's evaluations. ``status`` is ``"evaluation_limit_reached"``
+  when the budget ran out. Each worker previously had the full limit, and
+  only the parent's evaluations were counted.
 
 - The cross-flow (both streams unmixed) effectiveness series in
   ``HX_Eff``, ``HX_NTU`` and ``CalcAreaUE`` included one term too few, which
