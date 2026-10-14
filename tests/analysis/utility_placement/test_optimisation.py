@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import pickle
 from dataclasses import dataclass
 
 import pytest
 
+import OpenPinch.optimisation.execution as execution
 from OpenPinch.analysis.utility_placement.evaluation import (
     PlacementEvaluation,
     PlacementEvaluationSession,
@@ -15,6 +17,7 @@ from OpenPinch.analysis.utility_placement.optimisation import (
     _physical_point_to_optimizer,
     coordinate_optimisation,
 )
+from OpenPinch.contracts.utility_placement import UtilityPlacementOptimisationMethod
 from OpenPinch.optimisation.models import (
     OptimisationCandidate,
     OptimisationMethod,
@@ -273,3 +276,107 @@ def test_tiny_real_dual_annealing_regression() -> None:
     )
     assert outcome.evaluations
     assert all(evaluation.feasible for evaluation in outcome.evaluations)
+
+
+def _session_with(**options) -> PlacementEvaluationSession:
+    request, context, model = _case()
+    request = request.model_copy(
+        update={"options": request.options.model_copy(update=options)}
+    )
+    return PlacementEvaluationSession(
+        request=request,
+        context=context,
+        model=model,
+        allocation_adapter=_Adapter(),
+    )
+
+
+def test_task_sessions_split_the_remaining_budget_deterministically() -> None:
+    session = _session_with(evaluation_limit=10)
+
+    shares = [session.task_session(index, 3).evaluation_budget for index in range(3)]
+    assert shares == [4, 3, 3]
+
+    task = session.task_session(0, 1)
+    for point in session.model.initial_points:
+        task.evaluate(point)
+    session.merge_task_reports([task.task_report()])
+
+    assert session.evaluation_count == task.evaluation_count > 0
+    remaining = 10 - session.evaluation_count
+    shares = [session.task_session(index, 4).evaluation_budget for index in range(4)]
+    assert sum(shares) == remaining
+
+
+def test_task_session_budget_survives_pickling_and_reports_exhaustion() -> None:
+    session = _session_with(evaluation_limit=10)
+    task = pickle.loads(pickle.dumps(session.task_session(0, 10)))
+    points = list(dict.fromkeys(session.model.initial_points))
+    assert len(points) >= 2
+
+    first = task.evaluate(points[0])
+    second = task.evaluate(points[1])
+
+    assert task.evaluation_budget == 1
+    assert first.feasible
+    assert not second.feasible
+    assert second.diagnostics[0].code == "evaluation_budget_exhausted"
+    session.merge_task_reports([task.task_report()])
+    assert session.budget_exhausted
+    assert session.evaluation_count == 1
+    assert dict(session.diagnostic_counts)["evaluation_budget_exhausted"] == 1
+
+
+def _run_dual_annealing(monkeypatch, *, pooled: bool):
+    if not pooled:
+        monkeypatch.setattr(execution, "_is_picklable", lambda obj: False)
+    session = _session_with(
+        method=UtilityPlacementOptimisationMethod.DUAL_ANNEALING,
+        iteration_limit=50,
+        evaluation_limit=12,
+        run_count=3,
+        candidate_limit=3,
+    )
+    outcome = coordinate_optimisation(session=session)
+    monkeypatch.undo()
+    return session, outcome
+
+
+def test_evaluation_limit_is_global_across_runs_and_workers(monkeypatch) -> None:
+    session, outcome = _run_dual_annealing(monkeypatch, pooled=True)
+    limit = session.request.options.evaluation_limit
+
+    # Optimiser runs and polish tasks share one budget; only the parent's
+    # canonical replay of the final candidates comes on top.
+    assert session.evaluation_count <= limit
+    assert outcome.termination.evaluations <= (
+        limit + outcome.termination.candidate_count
+    )
+    assert outcome.termination.status == "evaluation_limit_reached"
+    assert outcome.termination.evaluation_limit == limit
+
+
+def test_pooled_and_serial_runs_spend_the_same_budget(monkeypatch) -> None:
+    pooled_session, pooled = _run_dual_annealing(monkeypatch, pooled=True)
+    serial_session, serial = _run_dual_annealing(monkeypatch, pooled=False)
+
+    assert pooled_session.evaluation_count == serial_session.evaluation_count
+    assert pooled.termination == serial.termination
+    assert [item.coordinates for item in pooled.evaluations] == [
+        item.coordinates for item in serial.evaluations
+    ]
+
+
+def test_generous_budget_reports_complete() -> None:
+    session = _session_with(
+        method=UtilityPlacementOptimisationMethod.DUAL_ANNEALING,
+        iteration_limit=1,
+        evaluation_limit=10_000,
+        run_count=1,
+        candidate_limit=2,
+    )
+
+    outcome = coordinate_optimisation(session=session)
+
+    assert outcome.termination.status == "complete"
+    assert not session.budget_exhausted
