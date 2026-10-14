@@ -107,7 +107,7 @@ def is_finite_integer(value) -> bool:
     """Return whether a value can represent one finite integer."""
     try:
         numeric_value = float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return False
     return bool(np.isfinite(numeric_value) and numeric_value.is_integer())
 

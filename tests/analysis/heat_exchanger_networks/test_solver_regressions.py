@@ -1104,7 +1104,7 @@ def _live_solver_environment_available() -> bool:
             package="pyomo",
             purpose="HENS-11 live solver regression coverage",
         )
-    except MissingSynthesisDependencyError, MissingSynthesisSolverError:
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
         return False
     return True
 

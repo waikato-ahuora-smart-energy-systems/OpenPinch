@@ -7,7 +7,6 @@ import math
 import subprocess
 import sys
 import threading
-import time
 import warnings
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
@@ -1142,6 +1141,10 @@ def test_local_executor_honours_max_parallel_for_stage_tasks(monkeypatch) -> Non
     active_count = 0
     max_active_count = 0
     lock = threading.Lock()
+    # Each task waits here for the other, so two parallel tasks are always
+    # active together however long task setup takes; serial execution times
+    # out and leaves max_active_count at 1.
+    both_running = threading.Barrier(2, timeout=10)
 
     def fake_get_solution(
         self, *, print_output=True, evolution=None, model_factories=None
@@ -1152,7 +1155,10 @@ def test_local_executor_honours_max_parallel_for_stage_tasks(monkeypatch) -> Non
             active_count += 1
             max_active_count = max(max_active_count, active_count)
         try:
-            time.sleep(0.05)
+            try:
+                both_running.wait()
+            except threading.BrokenBarrierError:
+                pass
             self.case = _SolvedCase()
             self.case.S = self.stages or 3
             self.case.stages = self.case.S

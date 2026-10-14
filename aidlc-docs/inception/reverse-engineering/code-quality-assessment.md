@@ -67,6 +67,7 @@ This is a reverse-engineering quality assessment, not a dedicated security audit
 ### Medium-High: Supported Python range is exceptionally narrow
 
 - **Evidence**: package metadata requires Python `>=3.14.2`, CI uses only 3.14.2, and Ruff/Black target Python 3.14.
+- **Status (2026-10-15)**: resolved. `requires-python` is `>=3.12`, CI runs the unit lane on 3.12 and 3.13 as well as 3.14.2, and Ruff/Black target Python 3.12.
 - **Why it matters**: the package excludes the large installed base on earlier supported Python releases and does not test future minor versions separately.
 - **Risk**: reduced adoption, harder integration into scientific environments, and pressure to upgrade all compiled numerical dependencies simultaneously.
 

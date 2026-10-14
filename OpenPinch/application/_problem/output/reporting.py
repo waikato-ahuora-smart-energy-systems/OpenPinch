@@ -315,7 +315,7 @@ def compare_problem_summaries(
             other_value = Value(other_row.get(column), other_unit).to(base_unit)
             change_row[column] = float(other_value) - float(base_value)
             change_row[unit_column] = base_unit
-        except DimensionalityError, TypeError, ValueError:
+        except (DimensionalityError, TypeError, ValueError):
             change_row[column] = None
             change_row[unit_column] = None
 

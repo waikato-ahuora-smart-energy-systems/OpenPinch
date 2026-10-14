@@ -762,7 +762,7 @@ def _close(
 def _finite(value) -> bool:
     try:
         return math.isfinite(float(value))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return False
 
 
@@ -771,7 +771,7 @@ def _optional_float(value) -> float | None:
         return None
     try:
         return float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 

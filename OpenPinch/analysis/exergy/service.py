@@ -523,7 +523,7 @@ def _zone_stream_shift_sources(target: Any) -> tuple[list, list, int | None] | N
     try:
         hot = [*zone.hot_streams, *zone.hot_utilities]
         cold = [*zone.cold_streams, *zone.cold_utilities]
-    except AttributeError, TypeError:
+    except (AttributeError, TypeError):
         return None
     return hot, cold, getattr(target, "period_idx", None)
 
@@ -568,7 +568,7 @@ def _make_target_spec(
 def _optional_column(table: Any, column_key) -> np.ndarray | None:
     try:
         values = np.asarray(table[column_key], dtype=float)
-    except KeyError, TypeError, ValueError:
+    except (KeyError, TypeError, ValueError):
         return None
     if values.size == 0 or np.all(~np.isfinite(values)):
         return None
@@ -650,7 +650,7 @@ def _stream_interval_shifts(
                 high = value(part, "shifted_maximum_temperature")
                 cp = value(part, "heat_capacity_flowrate")
                 shift = abs(value(part, "effective_delta_t_contribution"))
-            except AttributeError, IndexError, TypeError, ValueError:
+            except (AttributeError, IndexError, TypeError, ValueError):
                 continue
             if not all(map(math.isfinite, (low, high, cp, shift))) or cp <= tol:
                 continue

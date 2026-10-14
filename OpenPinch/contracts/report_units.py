@@ -44,7 +44,7 @@ def _is_numeric_array_like(value: Any) -> bool:
         return False
     try:
         np.asarray(value, dtype=float).reshape(-1)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return False
     return True
 
@@ -169,5 +169,5 @@ def split_report_value(
 
     try:
         return _resolve_scalar_value(value, period_idx=period_idx), unit
-    except KeyError, TypeError, ValueError:
+    except (KeyError, TypeError, ValueError):
         return None, unit

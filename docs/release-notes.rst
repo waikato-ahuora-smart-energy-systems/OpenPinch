@@ -102,6 +102,11 @@ Heat exchanger network synthesis
 Options and exports
 ~~~~~~~~~~~~~~~~~~~
 
+- Python 3.12 and 3.13 are supported again (``requires-python >=3.12``, was
+  ``>=3.14.2``). The only incompatibility was Python 3.14's unparenthesised
+  ``except A, B:`` syntax, now written ``except (A, B):``. CI runs the unit
+  tests on 3.12 and 3.13 as well as the development version (3.14.2).
+
 - Runtime dependencies declare tested floors: ``numpy>=2.3.2``,
   ``pint>=0.24.4``, ``pandas>=2.3.3``, ``pydantic>=2.12``, ``scipy>=1.16.1``,
   and ``CoolProp`` gains a ``<9`` ceiling. These are the oldest releases with

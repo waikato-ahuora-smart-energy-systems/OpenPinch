@@ -425,7 +425,7 @@ def _value(value) -> float:
         return float(value)
     try:
         return float(value[0])
-    except TypeError, IndexError, KeyError:
+    except (TypeError, IndexError, KeyError):
         pass
     for attr in ("VALUE", "value"):
         if not hasattr(value, attr):
@@ -433,13 +433,13 @@ def _value(value) -> float:
         raw = getattr(value, attr)
         try:
             return float(raw[0])
-        except TypeError, IndexError, KeyError:
+        except (TypeError, IndexError, KeyError):
             pass
         raw_value = getattr(raw, "value", raw)
         if isinstance(raw_value, int | float):
             return float(raw_value)
         try:
             return float(raw_value[0])
-        except TypeError, IndexError, KeyError:
+        except (TypeError, IndexError, KeyError):
             return float(raw_value)
     return float(value)

@@ -36,7 +36,8 @@ python -m pip install "openpinch[tespy]"          # TESPy HPR targeting and perf
 python -m pip install "openpinch[full]"          # all optional surfaces, including synthesis
 ```
 
-OpenPinch currently requires Python `>=3.14.2`.
+OpenPinch supports Python 3.12, 3.13 and 3.14 (`>=3.12`); development uses
+the version in `.python-version`.
 
 Both `synthesis` and `full` install the IDAES/Pyomo synthesis stack. Complete
 the IDAES installation before running solver-backed workflows:

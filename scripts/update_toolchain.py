@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import subprocess
-import tomllib
 from pathlib import Path
 from shutil import which
 
@@ -15,16 +14,16 @@ def _run(cmd: list[str], *, cwd: Path) -> None:
 
 
 def _read_python_version(repo_root: Path) -> str:
-    """Read the pinned Python version from ``pyproject.toml``."""
-    with (repo_root / "pyproject.toml").open("rb") as handle:
-        data = tomllib.load(handle)
+    """Read the development Python version pinned in ``.python-version``.
 
-    requires_python = data["project"]["requires-python"]
-    if not requires_python.startswith(">="):
-        raise ValueError(
-            "Expected project.requires-python to start with '>=' for toolchain sync."
-        )
-    return requires_python.removeprefix(">=")
+    ``project.requires-python`` is the oldest supported version, which CI tests
+    separately; development, the lockfile refresh and the default CI lanes use
+    this pinned interpreter.
+    """
+    version = (repo_root / ".python-version").read_text(encoding="utf-8").strip()
+    if not version:
+        raise ValueError("Expected .python-version to name a Python version.")
+    return version
 
 
 def _python_minor_from_version(version: str) -> str:
@@ -36,7 +35,7 @@ def _python_minor_from_version(version: str) -> str:
 
 
 def _read_python_minor(repo_root: Path) -> str:
-    """Read the Python minor selector from ``pyproject.toml``."""
+    """Read the Python minor selector from ``.python-version``."""
     return _python_minor_from_version(_read_python_version(repo_root))
 
 

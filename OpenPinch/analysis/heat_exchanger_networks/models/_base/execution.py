@@ -139,7 +139,7 @@ def setup_model(model) -> None:
 def _solver_value(model, value: Any) -> float:
     try:
         return float(value[0])
-    except TypeError, IndexError, KeyError:
+    except (TypeError, IndexError, KeyError):
         return float(value)
 
 

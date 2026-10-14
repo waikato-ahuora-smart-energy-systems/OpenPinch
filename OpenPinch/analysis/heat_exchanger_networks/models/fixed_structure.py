@@ -1584,7 +1584,7 @@ def _utility_name(owner, side: str, index: int) -> str:
 def _safe_name(names, index: int, default: str) -> str:
     try:
         return str(names[index])
-    except TypeError, IndexError:
+    except (TypeError, IndexError):
         return default
 
 

@@ -7,6 +7,8 @@ import runpy
 import subprocess
 import tomllib
 
+import yaml
+
 from tests.support.paths import REPOSITORY_ROOT
 
 REPO_ROOT = REPOSITORY_ROOT
@@ -208,8 +210,27 @@ def test_jsonschema_is_a_development_only_contract_verifier():
 
 def test_requires_python_matches_python_version_files_and_ci():
     minimum_version = _minimum_python_version()
+    development_version = PYTHON_VERSION.read_text(encoding="utf-8").strip()
 
-    assert minimum_version == PYTHON_VERSION.read_text(encoding="utf-8").strip()
+    def as_tuple(version: str) -> tuple[int, ...]:
+        return tuple(int(part) for part in version.split("."))
+
+    # .python-version pins the development interpreter; requires-python is the
+    # oldest supported one. CI runs the unit lane on every minor in between.
+    assert as_tuple(minimum_version) <= as_tuple(development_version)
+    ci = yaml.safe_load((REPO_ROOT / ".github/workflows/ci.yml").read_text())
+    lane_pythons = {
+        row["python"]
+        for row in ci["jobs"]["tests"]["strategy"]["matrix"]["include"]
+        if "python" in row
+    }
+    lowest_minor, development_minor = (
+        as_tuple(minimum_version)[1],
+        as_tuple(development_version)[1],
+    )
+    assert lane_pythons == {
+        f"3.{minor}" for minor in range(lowest_minor, development_minor)
+    }
 
     update_toolchain = UPDATE_TOOLCHAIN.read_text(encoding="utf-8")
     assert "_read_python_minor" in update_toolchain
@@ -235,8 +256,9 @@ def test_update_toolchain_uses_minor_selector_for_python_install():
 def test_requires_python_classifier_matches_minimum_version():
     project = _read_pyproject()["project"]
 
-    assert project["requires-python"] == ">=3.14.2"
-    assert "Programming Language :: Python :: 3.14" in project["classifiers"]
+    assert project["requires-python"] == ">=3.12"
+    for minor in ("3.12", "3.13", "3.14"):
+        assert f"Programming Language :: Python :: {minor}" in project["classifiers"]
 
 
 def test_pytest_marker_policy_declares_optional_and_solver_tiers():

@@ -75,6 +75,20 @@ jobs:
             sync: --group dev
             markers: not solver and not tespy and not performance and not docs
             coverage: true
+          # The oldest supported Pythons (requires-python >= 3.12); the other
+          # lanes use .python-version.
+          - lane: unit-py312
+            runner: ubuntu-latest
+            timeout: 45
+            sync: --group dev
+            markers: not solver and not tespy and not performance and not docs
+            python: "3.12"
+          - lane: unit-py313
+            runner: ubuntu-latest
+            timeout: 45
+            sync: --group dev
+            markers: not solver and not tespy and not performance and not docs
+            python: "3.13"
           # Runtime dependencies at the floors in pyproject.toml, so the
           # lower bounds are tested and not just declared.
           - lane: floors
@@ -116,8 +130,10 @@ jobs:
       - name: Install locked environment
         env:
           SYNC_ARGS: ${{ matrix.sync }}
+          PYTHON: ${{ matrix.python }}
         run: |
           read -ra sync_args <<< "$SYNC_ARGS"
+          [ -z "$PYTHON" ] || sync_args+=(--python "$PYTHON")
           uv sync --frozen "${sync_args[@]}"
       - name: Install the lowest allowed runtime dependencies
         if: ${{ matrix.floors }}
