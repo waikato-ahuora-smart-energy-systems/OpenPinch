@@ -281,7 +281,9 @@ def test_cascade_rejects_mismatched_per_stage_input_lengths(bad_kwargs):
         cycle.solve(**base)
 
 
-def test_cascade_solve_with_defaults_returns_unsolved_for_nonphysical_stage():
+def test_cascade_solve_with_defaults_gives_positive_work_in_every_stage():
+    # The default 10 K IHX once compressed from a mismatched (h, s) pair and
+    # gave the top stage negative work; every stage must now need power.
     cycle = CascadeVapourCompressionCycle()
     work = cycle.solve(
         T_evap=np.array([20.0, 0.0]),
@@ -291,8 +293,9 @@ def test_cascade_solve_with_defaults_returns_unsolved_for_nonphysical_stage():
         refrigerant="R134a",
     )
     assert cycle.num_cycles == 3
-    assert cycle.solved is False
-    assert work > 0.0
+    assert cycle.solved is True
+    assert np.all(cycle.work_arr > 0.0)
+    assert work == pytest.approx(cycle.work_arr.sum())
 
 
 def test_cascade_q_cool_last_nan_is_allowed_and_maps_to_q_evap():
