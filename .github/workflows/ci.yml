@@ -49,6 +49,8 @@ jobs:
       - run: uv sync --frozen --group dev
       - name: Ruff
         run: uv run --no-sync ruff check .
+      - name: Ruff format
+        run: uv run --no-sync ruff format --check .
       - name: Lockfile carries the project version
         run: uv run --no-sync python scripts/check_lockfile_version.py
       - name: Lint workflows
@@ -266,13 +268,33 @@ jobs:
             core|tespy) uv run --no-sync python scripts/artifact_install_smoke.py --surface "$SURFACE" ;;
           esac
 
+  audit:
+    name: Dependency audit
+    # Informational: listed in the CI OK summary but not required, so a newly
+    # published advisory does not block unrelated merges.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ env.UV_VERSION }}
+      - name: Audit every locked package against known advisories
+        run: |
+          uv export --frozen --all-groups --all-extras --no-emit-project \
+            --format requirements-txt -o "$RUNNER_TEMP/requirements.txt"
+          uvx --from pip-audit==2.9.0 pip-audit --disable-pip --require-hashes \
+            -r "$RUNNER_TEMP/requirements.txt"
+
   ci-ok:
     # A distinct name for main-bound runs: a push to develop and a PR from
     # develop into main test the same commit, and main's branch rule must
     # only be satisfied by the full profile.
     name: ${{ (github.base_ref == 'main' || github.ref == 'refs/heads/main') && 'CI OK (main)' || 'CI OK' }}
     if: ${{ always() }}
-    needs: [lint, tests, solver, version, build, smoke]
+    needs: [lint, tests, solver, version, build, smoke, audit]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:

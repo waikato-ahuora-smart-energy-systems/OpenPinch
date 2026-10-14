@@ -1206,6 +1206,10 @@ dev = [
     { name = "tespy" },
     { name = "wakepy" },
 ]
+docs = [
+    { name = "sphinx" },
+    { name = "sphinx-rtd-theme" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -1275,6 +1279,10 @@ dev = [
     { name = "streamlit" },
     { name = "tespy", specifier = ">=0.10.1.post2" },
     { name = "wakepy", specifier = ">=1.0.0" },
+]
+docs = [
+    { name = "sphinx", specifier = ">=9.1.0" },
+    { name = "sphinx-rtd-theme", specifier = ">=3.1.0" },
 ]
 
 [[package]]
