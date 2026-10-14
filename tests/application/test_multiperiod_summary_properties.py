@@ -80,20 +80,12 @@ def test_weighted_summary_is_invariant_to_weight_scale(case):
 @seed(20260715)
 @settings(max_examples=50, deadline=None)
 @given(case=aligned_period_outputs())
-def test_optional_pinch_diagnostics_have_explicit_partial_missing_policy(case):
+def test_weighted_row_never_reports_a_pinch_temperature(case):
     weighted = weighted_average_output(case.outputs, case.weights)
     cold_pinch = weighted.targets[0].pinch_temp.cold_temp
 
-    if all(case.cold_pinch_present):
-        assert cold_pinch is not None
-        cold_values = tuple(
-            90.0 + hot_utility / 100.0 for hot_utility in case.primary_hot_utility
-        )
-        tolerance = max(1.0, max(cold_values)) * 1e-12
-        assert min(cold_values) - tolerance <= cold_pinch.value
-        assert cold_pinch.value <= max(cold_values) + tolerance
-    else:
-        assert cold_pinch is None
+    # The weighted-average row never reports a pinch; period rows carry theirs.
+    assert cold_pinch is None
 
     combined = combine_period_outputs(case.outputs)
     assert [target.period_id for target in combined.targets] == [

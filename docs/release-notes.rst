@@ -122,6 +122,12 @@ Options and exports
   "notebooks/")``) treat a destination ending in a path separator as a
   directory and create it. A directory that did not exist yet became a file
   named ``notebooks``.
+- The multiperiod weighted-average row no longer reports a pinch temperature.
+  A weighted mean of the period pinches is not a temperature any period
+  pinches at; each period row still has its own. Ratio rows (degree of
+  integration, ETE, COP, ORC efficiency) convert every period to the first
+  period's units before summing, and warn when a period has a ratio but no
+  basis and is left out of the ratio of totals.
 - A workbook Options sheet with only one column raises a clear
   ``ValueError`` instead of an ``IndexError``; a blank Options sheet is
   ignored.
