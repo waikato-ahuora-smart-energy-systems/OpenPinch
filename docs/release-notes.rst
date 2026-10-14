@@ -118,6 +118,10 @@ Options and exports
   ``[6000, 2000]`` for three periods left the third with almost no weight, and
   a single weight such as ``[6000]`` became ``[6000, 1, 1]``. This replaces
   the earlier policy of padding omitted trailing weights with ``1.0``.
+- ``openpinch notebook -o notebooks/`` (and ``copy_notebook(name,
+  "notebooks/")``) treat a destination ending in a path separator as a
+  directory and create it. A directory that did not exist yet became a file
+  named ``notebooks``.
 - A workbook Options sheet with only one column raises a clear
   ``ValueError`` instead of an ``IndexError``; a blank Options sheet is
   ignored.
@@ -143,6 +147,12 @@ Analysis corrections
 - Cascade Carnot heat pumps and heat engines accept a second-law efficiency of
   exactly 1. The cascade heat pump previously returned zero duty, reported as
   solved, and the heat engine was treated as plain heat recovery.
+- ``compute_LMTD_from_ts`` accepts arrays (one exchanger per element); it
+  raised "truth value of an array is ambiguous".
+- Steam turbine work is capped at the isentropic work. An extrapolated
+  correlation could report an isentropic efficiency above 1.
+- The ``water.h_ps`` and ``water.s_ph`` docstrings give entropy in J/kg/K,
+  the units the functions actually use; they said kJ/kg/K.
 - Cascade vapour-compression cycles check that every pair of adjacent
   condenser and evaporator temperatures is in order, hottest stage first. Only
   the net change across the cascade was checked, so a stage out of order in the

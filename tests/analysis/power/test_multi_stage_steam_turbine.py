@@ -136,6 +136,9 @@ def test_turbine_rejects_bad_inputs(monkeypatch):
 
 def test_turbine_core_helpers_cover_limit_and_model_branches():
     assert turbine_mod._apply_efficiency_limits(10.0, 0.0, 0.3) == (0.0, 0.3)
+    # An over-predicting correlation is capped at the isentropic work.
+    assert turbine_mod._apply_efficiency_limits(120.0, 100.0, 0.3) == (100.0, 1.0)
+    assert turbine_mod._apply_efficiency_limits(80.0, 100.0, 0.3) == (80.0, 0.8)
     assert turbine_mod._segment_enthalpy(3_000.0, 100.0, 0.0, 0.9) == 3_000.0
     assert (
         turbine_mod._predict_stage_work(

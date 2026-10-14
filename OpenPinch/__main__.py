@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from .resources import (
+    _names_directory,
     copy_notebook,
     list_notebooks,
 )
@@ -41,8 +42,9 @@ def build_parser() -> argparse.ArgumentParser:
     notebook_parser.add_argument(
         "-o",
         "--output",
-        type=Path,
-        default=Path("."),
+        # Kept as a string: Path() would drop the trailing separator that
+        # marks a directory that does not exist yet ("-o notebooks/").
+        default=".",
         help="Destination filepath or directory.",
     )
     notebook_parser.add_argument(
@@ -72,13 +74,14 @@ def main(argv: list[str] | None = None) -> int:
 def _notebook_command(args: argparse.Namespace) -> int:
     force = bool(getattr(args, "force", False))
     if args.name is not None:
-        target = args.output / args.name if args.output.is_dir() else args.output
+        output = Path(args.output)
+        target = output / args.name if _names_directory(args.output) else output
         _refuse_overwrite([target], force=force)
         destination = copy_notebook(args.name, args.output)
         print(f"Copied notebook to {destination}")
         return 0
 
-    output_dir = args.output
+    output_dir = Path(args.output)
     _refuse_overwrite([output_dir / name for name in list_notebooks()], force=force)
     output_dir.mkdir(parents=True, exist_ok=True)
     for name in list_notebooks():

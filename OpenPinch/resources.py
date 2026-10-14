@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
@@ -209,15 +210,28 @@ def copy_sample_case(name: str, destination: str | Path) -> Path:
 
 
 def copy_notebook(name: str, destination: str | Path) -> Path:
-    """Copy a packaged notebook to ``destination``."""
+    """Copy a packaged notebook to ``destination``.
+
+    ``destination`` is a directory when it exists as one or ends with a path
+    separator (``"notebooks/"``); the directory is created if needed.
+    Otherwise it is the file path to write.
+    """
     resolved = _resolve_resource(name, list_notebooks(), "notebook")
     source = _NOTEBOOK_ROOT.joinpath(resolved)
     dest_path = Path(destination)
-    if dest_path.is_dir():
+    if _names_directory(destination):
         dest_path = dest_path / resolved
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     dest_path.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
     return dest_path
+
+
+def _names_directory(destination: str | Path) -> bool:
+    """Return whether ``destination`` names a directory rather than a file."""
+    # Path() drops a trailing separator, so check the raw string first.
+    text = os.fspath(destination)
+    separators = (os.sep, os.altsep) if os.altsep else (os.sep,)
+    return text.endswith(separators) or Path(text).is_dir()
 
 
 def _resolve_resource(name: str, available: list[str], resource_type: str) -> str:

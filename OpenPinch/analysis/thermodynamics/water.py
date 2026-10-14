@@ -60,7 +60,7 @@ def h_pT(P, T):
 
 
 def h_ps(P, s):
-    """Specific enthalpy (kJ/kg) at pressure ``P`` (bar) and entropy ``s`` (kJ/kg/K)."""
+    """Specific enthalpy (kJ/kg) at pressure ``P`` (bar) and entropy ``s`` (J/kg/K)."""
     P = toSIunit_p(P)
     s = toSIunit_s(s)
     h = PropsSI("H", "P", P, "S", s, FLUID)
@@ -68,7 +68,7 @@ def h_ps(P, s):
 
 
 def s_ph(P, H):
-    """Specific entropy (kJ/kg/K) at pressure ``P`` (bar) and enthalpy ``H`` (kJ/kg)."""
+    """Specific entropy (J/kg/K) at pressure ``P`` (bar) and enthalpy ``H`` (kJ/kg)."""
     P = toSIunit_p(P)
     H = toSIunit_h(H)
     s = PropsSI("S", "H", H, "P", P, FLUID)
@@ -118,10 +118,10 @@ def fromSIunit_h(Ins):
 
 
 def toSIunit_s(Ins):
-    """Identity conversion for entropy; maintained for API symmetry."""
+    """Identity conversion: entropy is already in SI units (J/kg/K) here."""
     return Ins
 
 
 def fromSIunit_s(Ins):
-    """Identity conversion for entropy; maintained for API symmetry."""
+    """Identity conversion: entropy is reported in SI units (J/kg/K) here."""
     return Ins

@@ -2,6 +2,7 @@
 
 import math
 
+import numpy as np
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -62,6 +63,22 @@ def test_lmtd_hot_fluid_heats_up_invalid():
 def test_lmtd_cold_fluid_cools_down_invalid():
     with pytest.raises(ValueError, match="Cold fluid must heat up"):
         compute_LMTD_from_ts(150, 100, 80, 60)
+
+
+def test_lmtd_from_temperatures_accepts_arrays():
+    result = compute_LMTD_from_ts(
+        [150.0, 120.0], [100.0, 90.0], [50.0, 40.0], [80.0, 60.0]
+    )
+
+    np.testing.assert_allclose(
+        result,
+        [
+            compute_LMTD_from_ts(150.0, 100.0, 50.0, 80.0),
+            compute_LMTD_from_ts(120.0, 90.0, 40.0, 60.0),
+        ],
+    )
+    with pytest.raises(ValueError, match="Hot fluid must cool down"):
+        compute_LMTD_from_ts([150.0, 80.0], [100.0, 90.0], [50.0, 40.0], [80.0, 60.0])
 
 
 def test_Coth():

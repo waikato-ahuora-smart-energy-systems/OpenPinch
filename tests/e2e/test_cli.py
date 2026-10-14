@@ -55,6 +55,18 @@ def test_notebook_command_copies_named_notebook_to_existing_directory(
     assert (destination / notebook_name).exists()
 
 
+def test_notebook_command_creates_missing_directory_given_trailing_separator(
+    tmp_path: Path, capsys
+):
+    destination = tmp_path / "new" / "notebooks"
+    notebook_name = list_notebooks()[0]
+
+    assert cli.main(["notebook", "--name", notebook_name, "-o", f"{destination}/"]) == 0
+
+    assert destination.is_dir()
+    assert (destination / notebook_name).is_file()
+
+
 def test_notebook_command_copies_named_notebook_to_explicit_file(
     tmp_path: Path, capsys
 ):
