@@ -62,8 +62,9 @@ dashboard = [
   "openpyxl",
   "pyxlsb",
 ]
+# Kept as an alias of the tespy extra for existing installs.
 brayton_cycle = [
-  "tespy>=0.10.1.post2",
+  "OpenPinch[tespy]",
 ]
 tespy = [
   "tespy>=0.10.1.post2",

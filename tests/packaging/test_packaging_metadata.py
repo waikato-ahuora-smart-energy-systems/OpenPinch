@@ -99,7 +99,7 @@ def test_dashboard_brayton_and_tespy_extras_are_declared():
         "openpyxl",
         "pyxlsb",
     ]
-    assert optional_deps["brayton_cycle"] == [TESPY_REQUIREMENT]
+    assert optional_deps["brayton_cycle"] == ["OpenPinch[tespy]"]
     assert optional_deps["tespy"] == [TESPY_REQUIREMENT]
 
 
@@ -159,6 +159,8 @@ def test_full_extra_aggregates_every_optional_runtime_surface_without_duplicates
         for extra_name, dependencies in optional_deps.items()
         if extra_name != "full"
         for dep in dependencies
+        # Self-references (OpenPinch[tespy]) alias another extra.
+        if _dependency_name(dep) != "openpinch"
     }
 
     assert set(full_names) == expected_names
