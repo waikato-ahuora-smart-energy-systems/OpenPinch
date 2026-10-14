@@ -12,8 +12,19 @@ logger = logging.getLogger(__name__)
 
 
 def optimise(model, print_output: bool) -> None:
-    """Solve the concrete model and extract plain result data on success."""
+    """Solve the concrete model and extract plain result data on success.
 
+    The GEKKO run directory is removed afterwards: post-processing has read
+    the solved values onto the model's variables by then.
+    """
+
+    try:
+        _solve_and_post_process(model, print_output)
+    finally:
+        cleanup_model(model)
+
+
+def _solve_and_post_process(model, print_output: bool) -> None:
     total_solve_time = 0.0
     piecewise_mappings = getattr(model, "_piecewise_active_mappings", [])
     active_mapping_stable = not piecewise_mappings or getattr(model, "integers", False)
@@ -105,6 +116,12 @@ def optimise(model, print_output: bool) -> None:
         model.get_post_process()
         if print_output:
             model.output_to_cmd_line()
+
+
+def cleanup_model(model) -> None:
+    """Remove the model's GEKKO run directory; safe to call more than once."""
+
+    backend.cleanup_gekko_model(getattr(model, "m", None))
 
 
 def setup_model(model) -> None:

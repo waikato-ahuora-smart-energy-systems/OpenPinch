@@ -62,6 +62,7 @@ from .models.fixed_structure import (
     UtilityMatch,
 )
 from .prepared_problem import SynthesisProblem
+from .reporting.verification import _TEMPERATURE_ABS_TOL, verify_network_feasibility
 from .targeting._stage import run_single_method_workflow, run_stage
 
 DutyObjective = Literal["utility", "area", "cost"]
@@ -518,8 +519,13 @@ class FixedStructureDutyExecutor:
                 task_id=task.task_id,
                 removed=removed,
             )
+            failures = verify_solution(structure, model, network)
         except ValueError as exc:
             return _failed_task_outcome(task, str(exc))
+        if failures:
+            return _failed_task_outcome(
+                task, "verification failed: " + "; ".join(failures)
+            )
         if task.task_id is not None:
             self.models_by_task_id[task.task_id] = model
         return HeatExchangerNetworkSynthesisTaskOutcome(
@@ -529,6 +535,39 @@ class FixedStructureDutyExecutor:
             objective_value=network.objective_value,
             solver_status=_solver_status(model),
         )
+
+
+def verify_solution(
+    structure: FixedNetworkStructure,
+    model,
+    network: HeatExchangerNetwork,
+) -> tuple[str, ...]:
+    """Return why a solved duty allocation is not an acceptable design.
+
+    The solver accepts loosely converged points, so the solution is checked
+    against each exchanger's own required approach (the network metadata only
+    carries the smallest one) and then the reporting-layer feasibility checks
+    (exchanger and stream heat balances to target temperatures).
+    """
+
+    failures: list[str] = []
+    for exchanger, (kind, index), result in zip(
+        network.exchangers, structure.slots, structure.results(model), strict=True
+    ):
+        limits = model.recovery_dt if kind == "recovery" else model.utility_dt
+        for n, period in enumerate(result.periods):
+            if not period.active or not period.approach:
+                continue
+            approach = min(period.approach)
+            required = float(limits[n][index])
+            if approach + _TEMPERATURE_ABS_TOL < required:
+                failures.append(
+                    f"{exchanger.exchanger_id} approach "
+                    f"{approach:.6g} is below its required approach "
+                    f"{required:.6g} in period {n}"
+                )
+    failures.extend(verify_network_feasibility(network))
+    return tuple(failures)
 
 
 def duty_optimisation_task(

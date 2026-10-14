@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import threading
 import time
 import warnings
@@ -64,6 +65,28 @@ def create_gekko_model(*, remote: bool = False) -> Any:
         purpose="GEKKO heat exchanger network equation model construction",
     )
     return gekko.GEKKO(remote=remote)
+
+
+def cleanup_gekko_model(model: Any) -> None:
+    """Remove a GEKKO model's temporary run directory, once.
+
+    Solved values stay on the model's variables, so this is safe once the
+    results have been read. Repeat calls and models whose directory is
+    already gone are no-ops (GEKKO's own ``cleanup`` prints when the
+    directory is missing).
+    """
+
+    if model is None:
+        return
+    path = getattr(model, "_path", None)
+    if isinstance(path, (str, os.PathLike)):
+        if os.path.isdir(path):
+            shutil.rmtree(path, ignore_errors=True)
+            model._openpinch_cleaned_up = True
+        return
+    cleanup = getattr(model, "cleanup", None)
+    if callable(cleanup):
+        cleanup()
 
 
 def require_solver_backend(solver_name: str) -> None:
@@ -183,6 +206,7 @@ def solve_gekko_model(
     """Run a configured GEKKO model and normalize solver-specific failures."""
 
     extension = getattr(model.options, "SOLVER_EXTENSION", None)
+    _restore_run_directory(model)
     start = time.time()
     failure_reason = None
     try:
@@ -305,6 +329,21 @@ def _write_solver_option_file(
     model._openpinch_solver_options = dict(options)
     model._openpinch_solver_option_file = str(option_path)
     return str(option_path)
+
+
+def _restore_run_directory(model: Any) -> None:
+    """Recreate a cleaned-up run directory so a model can be solved again."""
+
+    if not getattr(model, "_openpinch_cleaned_up", False):
+        return
+    path = model._path
+    if os.path.isdir(path):
+        return
+    os.makedirs(path, exist_ok=True)
+    options = getattr(model, "_openpinch_solver_options", None)
+    option_file = getattr(model, "_openpinch_solver_option_file", None)
+    if options and option_file is not None:
+        _write_solver_option_file(model, Path(option_file).name, options)
 
 
 # The working directory is process-wide. Pyomo solvers read their option file
