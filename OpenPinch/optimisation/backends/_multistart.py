@@ -49,7 +49,6 @@ def collect_candidates(
     """
     run_fn = partial(
         run_single,
-        func=func,
         bounds=bounds,
         x0_ls=as_seed_array(x0_ls),
         args=args,
@@ -60,6 +59,7 @@ def collect_candidates(
         n_runs=n_runs,
         pool_executor_cls=ProcessPoolExecutor,
         broken_pool_exc=BrokenProcessPool,
+        func=func,
     )
 
 

@@ -1,5 +1,6 @@
 """Candidate ranking, clustering, and polishing for scalar optimisation."""
 
+import logging
 import os
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
@@ -8,6 +9,14 @@ from typing import Callable, Optional
 
 import numpy as np
 from scipy.optimize import minimize
+
+from .execution import _run_objective_tasks
+
+logger = logging.getLogger(__name__)
+
+# Numerical failures a local solve may raise for an awkward start point. Any
+# other exception is a defect in the objective, constraints, or caller.
+_POLISH_SOLVER_ERRORS = (ValueError, ArithmeticError, np.linalg.LinAlgError)
 
 __all__ = [
     "_cluster_candidates",
@@ -50,7 +59,14 @@ def _polish_single_candidate(
             bounds=bounds_arg,
             constraints=constraints,
         )
-    except Exception:
+    except _POLISH_SOLVER_ERRORS as exc:
+        logger.warning(
+            "Local %s polish failed from candidate %d (%s: %s); keeping it unpolished.",
+            local_method,
+            idx,
+            type(exc).__name__,
+            exc,
+        )
         return np.array(x0, dtype=float), f0
 
     f_loc = float(res_loc.fun)
@@ -123,7 +139,6 @@ def _polish_candidates(
         _polish_single_candidate,
         all_x=all_x,
         all_f=all_f,
-        func=func,
         args=args,
         local_method=local_method,
         bounds_arg=bounds_arg,
@@ -133,14 +148,14 @@ def _polish_candidates(
     n_tasks = len(basin_reps_idx)
     n_workers = min(n_tasks, max(1, os.cpu_count()))
 
-    if n_workers == 1:
-        results = list(map(worker_fn, basin_reps_idx))
-    else:
-        try:
-            with ProcessPoolExecutor(max_workers=n_workers) as pool:
-                results = list(pool.map(worker_fn, basin_reps_idx))
-        except PermissionError, OSError, RuntimeError, BrokenProcessPool:
-            results = list(map(worker_fn, basin_reps_idx))
+    results = _run_objective_tasks(
+        worker_fn,
+        basin_reps_idx,
+        func=func,
+        max_workers=n_workers,
+        pool_executor_cls=ProcessPoolExecutor,
+        broken_pool_exc=BrokenProcessPool,
+    )
 
     polished_x = np.asarray([x for x, _ in results], dtype=float)
     polished_f = np.asarray([f for _, f in results], dtype=float)

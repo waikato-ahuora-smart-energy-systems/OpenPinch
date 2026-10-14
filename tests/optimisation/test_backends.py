@@ -598,7 +598,7 @@ def test_polish_single_candidate_keeps_seed_when_minimize_raises(monkeypatch):
     monkeypatch.setattr(
         bb_common,
         "minimize",
-        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("solver failed")),
+        lambda **kwargs: (_ for _ in ()).throw(ValueError("solver failed")),
     )
 
     x, f = bb_common._polish_single_candidate(
