@@ -11,31 +11,11 @@ from types import SimpleNamespace
 import pytest
 
 import OpenPinch.application.problem as problem_module
+import OpenPinch.presentation.dashboard.rendering as dashboard_rendering
 from tests.support.paths import REPOSITORY_ROOT
 
 REPO_ROOT = REPOSITORY_ROOT
-
-
-class _DummyPinchProblem:
-    created = []
-
-    def __init__(self, *args, **kwargs):
-        self.args = args
-        self.kwargs = kwargs
-        self.calls = []
-        _DummyPinchProblem.created.append(self)
-
-    def load(self, path):
-        self.calls.append(("load", str(path)))
-
-    def target(self):
-        self.calls.append(("target", None))
-
-    def export_excel(self, path):
-        self.calls.append(("export_excel", str(path)))
-
-    def show_dashboard(self):
-        self.calls.append(("show_dashboard", None))
+_STREAMLIT_SMALL_CASE = REPO_ROOT / "examples" / "OpenPinchWkbs" / "Adjiman et al.xlsb"
 
 
 class _FakeStreamlit:
@@ -51,10 +31,6 @@ class _FakeStreamlit:
 
     def stop(self):
         raise self.stop_exc
-
-
-def _clear_dummy():
-    _DummyPinchProblem.created.clear()
 
 
 def test_build_dist_script_help_executes(monkeypatch):
@@ -145,16 +121,12 @@ def test_optional_install_smoke_script_help_executes(monkeypatch):
 def test_streamlit_module_helper_functions(monkeypatch):
     fake_st = _FakeStreamlit()
     monkeypatch.setitem(sys.modules, "streamlit", fake_st)
-    monkeypatch.setattr(problem_module, "PinchProblem", _DummyPinchProblem)
 
     ns = runpy.run_path(str(REPO_ROOT / "streamlit_app.py"))
 
-    _clear_dummy()
-    problem = ns["_load_problem"]("dummy-path")
-    assert isinstance(problem, _DummyPinchProblem)
-    assert problem.args == ()
-    assert problem.kwargs == {"source": "dummy-path"}
-    assert problem.calls == [("target", None)]
+    problem = ns["_load_problem"](str(_STREAMLIT_SMALL_CASE))
+    assert isinstance(problem, problem_module.PinchProblem)
+    assert problem.results is not None
 
     ns["validate_problem_path"](SimpleNamespace(exists=lambda: True))
     assert fake_st.errors == []
@@ -173,14 +145,20 @@ def test_streamlit_validate_problem_path_stops_when_missing(monkeypatch):
 
 
 def test_streamlit_app_main_block_executes(monkeypatch):
-    _clear_dummy()
     fake_st = _FakeStreamlit()
     monkeypatch.setitem(sys.modules, "streamlit", fake_st)
-    monkeypatch.setattr(problem_module, "PinchProblem", _DummyPinchProblem)
-    monkeypatch.setattr(Path, "exists", lambda self: True)
+    rendered = []
+    monkeypatch.setattr(
+        dashboard_rendering,
+        "render_streamlit_dashboard",
+        lambda zone, **kwargs: rendered.append((zone, kwargs)),
+    )
+    monkeypatch.chdir(REPO_ROOT)
 
     runpy.run_path(str(REPO_ROOT / "streamlit_app.py"), run_name="__main__")
 
-    assert len(_DummyPinchProblem.created) == 1
-    calls = _DummyPinchProblem.created[0].calls
-    assert calls == [("target", None), ("show_dashboard", None)]
+    assert fake_st.errors == []
+    assert len(rendered) == 1
+    zone, kwargs = rendered[0]
+    assert zone is not None
+    assert kwargs["graph_data"]

@@ -34,10 +34,9 @@ def _write_test_workbook(path: Path):
             "kW",  # heat_flow
             "K",  # dt_cont
             "kW/mK",  # htc  (avoid '2' so the simple replace doesn't mutate it)
-            None,  # loc (string)
-            None,  # index (int but without unit string -> stored raw)
+            None,  # trailing column the reader ignores
         ]
-        stream_data = [["Zone A", "H1", 150.0, 60.0, 100.0, 10.0, 0.5, "IN", 1]]
+        stream_data = [["Zone A", "H1", 150.0, 60.0, 100.0, 10.0, 0.5, "note"]]
         df_stream = pd.DataFrame(
             [["names-ignored"] * len(stream_units), stream_units] + stream_data
         )
@@ -152,8 +151,16 @@ def test_get_problem_from_excel_happy_path(tmp_path: Path):
     assert s["t_supply"]["value"] == 150.0 and s["t_supply"]["unit"] == "degC"
     assert s["t_target"]["value"] == 60.0 and s["t_target"]["unit"] == "degC"
     assert s["heat_flow"]["value"] == 100.0 and s["heat_flow"]["unit"] == "kW"
-    # Field with no unit string is stored raw (not a dict)
-    assert s["index"] == 1
+    # Columns past htc are not part of the stream contract and are dropped
+    assert set(s) == {
+        "zone",
+        "name",
+        "t_supply",
+        "t_target",
+        "heat_flow",
+        "dt_cont",
+        "htc",
+    }
 
     # Utilities preserved similarly
     u0 = out["utilities"][0]
@@ -336,8 +343,8 @@ def test_get_problem_from_excel_writes_json(tmp_path: Path, capsys):
 def test_get_column_names_and_units_pads_units_for_short_stream_sheet():
     df = pd.DataFrame([["ignored"] * 5, [None] * 5])
     names, units = wkbook_to_json._get_column_names_and_units(df, "Stream Data")
-    assert len(names) == 9
-    assert len(units) == 9
+    assert len(names) == 7
+    assert len(units) == 7
 
 
 def test_parse_sheet_with_units_handles_extra_and_missing_columns(monkeypatch):
@@ -374,22 +381,27 @@ def test_parse_sheet_with_units_handles_extra_and_missing_columns(monkeypatch):
         wkbook_to_json.pd, "read_excel", lambda *args, **kwargs: extra_df.copy()
     )
     wkbook_to_json._parse_sheet_with_units("dummy.xlsx", sheet_name="Stream Data")
-    assert len(captured["df"].columns) == 9
+    assert len(captured["df"].columns) == 7
 
     missing_df = pd.DataFrame(
         [
-            ["ignored"] * 7,
-            [None, None, "degC", "degC", "kW", "K", "kW/mK"],
-            ["Zone A", "H1", 150, 60, 100, 10, 0.5],
+            ["ignored"] * 5,
+            [None, None, "degC", "degC", "kW"],
+            ["Zone A", "H1", 150, 60, 100],
         ]
     )
     monkeypatch.setattr(
         wkbook_to_json.pd, "read_excel", lambda *args, **kwargs: missing_df.copy()
     )
     wkbook_to_json._parse_sheet_with_units("dummy.xlsx", sheet_name="Stream Data")
-    assert len(captured["df"].columns) == 9
-    assert captured["df"].iloc[0]["loc"] == 0
-    assert captured["df"].iloc[0]["index"] == 0
+    # Missing dt_cont/htc columns stay absent rather than being padded with 0.
+    assert list(captured["df"].columns) == [
+        "zone",
+        "name",
+        "t_supply",
+        "t_target",
+        "heat_flow",
+    ]
 
 
 def test_parse_options_sheet_filters_comments_and_numpy_scalars(tmp_path: Path):

@@ -42,6 +42,18 @@ Organic Rankine cycle targeting
   ``all_periods.organic_rankine_cycle(workers=...)`` no longer lets parallel
   period solves overwrite each other's fluid state mid-calculation.
 
+Excel and CSV inputs
+~~~~~~~~~~~~~~~~~~~~
+
+- Workbooks and CSV directories load again. The reader still added ``loc``
+  and ``index`` stream columns, which the stream input contract no longer
+  accepts, so every tabular source failed validation.
+- Stream and utility columns missing from a sheet or CSV are left out, so the
+  configured defaults apply. They were filled with 0, which set a missing
+  ``dt_cont`` or ``htc`` to zero.
+- ``streamlit_app.py`` runs ``problem.target.all_heat_integration()`` before
+  opening the dashboard; it called the target accessor as a function.
+
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
