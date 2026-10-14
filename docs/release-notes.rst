@@ -104,6 +104,12 @@ Options and exports
 HPR cost model and search
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Vapour-compression cycles with an internal heat exchanger (IHX) compress
+  from the IHX outlet state. The compressor used the IHX-outlet enthalpy with
+  the evaporator-outlet entropy, which understated its work so heating COP
+  rose with IHX duty and could exceed the Carnot limit. Simulated VC,
+  parallel, cascade and VC-MVR results change, and the search no longer
+  favours large IHX duties.
 - Simulated HPR targets now carry installed capital per machine:
   ``C = F_inst * C_eq * (Q_cap / 1 MW)^0.7 * (0.7 + 0.3 * n_stages) * f_T``,
   with ``C_eq`` = $485k fitted to the IEA HPT Project 68 cost data (2025 USD),
