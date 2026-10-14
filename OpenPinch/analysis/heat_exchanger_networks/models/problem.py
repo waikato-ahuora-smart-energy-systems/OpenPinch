@@ -340,6 +340,9 @@ class InternalHeatExchangerNetworkProblem:
             for j in range(case.J)
             for k in range(case.S)
         )
+        if q_total <= 0.0:
+            # No recovery to apportion: keep the stage layout unchanged.
+            return list(range(case.S))
         q_per_stage = [
             sum(case.Q_r[i][j][k][0] for i in range(case.I) for j in range(case.J))
             for k in range(case.S)

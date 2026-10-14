@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import tempfile
 from contextlib import suppress
 from datetime import datetime
 from itertools import count
@@ -70,11 +71,22 @@ def export_target_summary_to_excel_with_units(
         project_name=getattr(target_response, "name", "Project"),
         out_dir=out_dir,
     )
+    # An explicit file name may already hold the user's workbook; only a path
+    # this call reserved is ours to remove on failure.
+    owns_out_path = not _is_explicit_workbook_path(out_dir)
+
+    # Write to a sibling scratch file and move it into place only once the
+    # workbook is complete, so a failed export never clobbers ``out_path``.
+    descriptor, scratch_name = tempfile.mkstemp(
+        prefix=f".{out_path.stem}.", suffix=".partial.xlsx", dir=out_path.parent
+    )
+    os.close(descriptor)
+    scratch_path = Path(scratch_name)
 
     writer: pd.ExcelWriter | None = None
     completed = False
     try:
-        writer = pd.ExcelWriter(out_path, engine="openpyxl")
+        writer = pd.ExcelWriter(scratch_path, engine="openpyxl")
         xw = writer
         _write_summary_sheet(df_summary, xw)
         if period_zones:
@@ -86,13 +98,16 @@ def export_target_summary_to_excel_with_units(
         else:
             _write_problem_tables(master_zone, xw)
         writer.close()
+        os.replace(scratch_path, out_path)
         completed = True
     finally:
         if not completed:
             if writer is not None:
                 with suppress(Exception):
                     writer._handles.close()
-            out_path.unlink(missing_ok=True)
+            scratch_path.unlink(missing_ok=True)
+            if owns_out_path:
+                out_path.unlink(missing_ok=True)
 
     return out_path
 
@@ -340,10 +355,14 @@ def _utility_columns(
     return columns
 
 
+def _is_explicit_workbook_path(out_dir: str | Path) -> bool:
+    return Path(out_dir).suffix.lower() == ".xlsx"
+
+
 def _reserve_workbook_path(project_name: str, out_dir: str | Path) -> Path:
     """Atomically reserve a unique workbook path for one export invocation."""
     requested = Path(out_dir)
-    if requested.suffix.lower() == ".xlsx":
+    if _is_explicit_workbook_path(requested):
         # An explicit workbook file name is written as given.
         requested.parent.mkdir(parents=True, exist_ok=True)
         return requested

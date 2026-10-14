@@ -69,6 +69,25 @@ Heat exchanger network synthesis
 - Branched network evolution keeps at most ``HENS_EVM_BEAM_WIDTH`` (default 4)
   branches per depth, never solves a topology twice, and gives the same network
   in parallel and serial runs.
+- The pinch design method splits each stream at the pinch plus (hot) or minus
+  (cold) its own temperature contribution, not dTmin / 2 for every stream.
+  With mixed ``dt_cont`` values the two sides previously moved heat across
+  the pinch and broke the larger approaches.
+- A problem with no possible heat recovery returns its utility-only network
+  instead of failing with a division by zero in stage reduction.
+
+Options and exports
+~~~~~~~~~~~~~~~~~~~
+
+- Passing a load-time default (``THERMAL_DT_CONT``, ``THERMAL_DT_PHASE_CHANGE``,
+  ``THERMAL_HTC``, ``COSTING_UTILITY_PRICE``, ``INPUT_UNIT_*`` or
+  ``PROBLEM_*``) in a single ``target.*`` or ``design.*`` call's ``options``
+  now raises a ``ValueError``. These values are applied when the problem is
+  loaded, so the per-call value was silently ignored for the streams. Use
+  ``update_options(...)`` or a workspace scenario.
+- A failed Excel export to an explicit ``.xlsx`` path leaves any existing file
+  in place. The workbook is written to a temporary sibling and moved into
+  place only once complete; previously a failure deleted the existing file.
 
 HPR cost model and search
 ~~~~~~~~~~~~~~~~~~~~~~~~~
