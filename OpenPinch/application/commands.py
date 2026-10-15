@@ -10,7 +10,9 @@ from uuid import uuid4
 from pydantic import BaseModel
 
 from ..adapters.io.problem_sources import load_packaged_sample_case
+from ..contracts.reporting import TargetResults
 from ..domain.targets import BaseTargetModel
+from ..presentation.reporting.results import serialize_target
 from ._problem.accessors.design import HeatExchangerNetworkDesignView
 from .problem import PinchProblem
 
@@ -50,9 +52,9 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
     ``results``, the problem's ``TargetOutput`` (``None`` when no target has
     run), both as JSON-ready data. A returned case is ``{"data": ...}``, and
     in a session it also opens as a new ``session``. In a session a returned
-    target is ``{"ref": <id>}``, which later arguments pass as
-    ``{"$ref": <id>}``; outside a session targets are reported only in the
-    results.
+    target is ``{"ref": <id>, "target": <TargetResults JSON>}``, and later
+    arguments pass it as ``{"$ref": <id>}``; outside a session targets are
+    reported only in the results.
     """
     command = request["command"]
     if command == "open":
@@ -93,10 +95,19 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
     elif isinstance(returned, BaseTargetModel) and session is not None:
         ref = uuid4().hex
         session.targets[ref] = returned
-        value = {"ref": ref}
+        # By value too: a base_target command solves a detached residual
+        # case, so its target is not in this problem's results.
+        value = {"ref": ref, "target": _target_json(returned)}
     else:
         value = _to_json(returned)
     return {"value": value, "results": _to_json(problem.results)}
+
+
+def _target_json(target: BaseTargetModel) -> dict[str, Any]:
+    """One target as the results table reports it (``TargetResults``)."""
+    return TargetResults.model_validate(serialize_target(target)).model_dump(
+        mode="json"
+    )
 
 
 def _open(problem: PinchProblem) -> str:

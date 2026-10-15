@@ -274,6 +274,24 @@ def test_target_returned_in_a_session_can_be_passed_as_a_base_target(
     assert response["value"]["ref"] != heat_pump
 
 
+def test_residual_target_from_a_base_target_is_returned_by_value(
+    heat_pump_session,
+):
+    # The residual target is solved on a detached residual case, so it is not
+    # in the session problem's results; the value is the only place it shows.
+    session, heat_pump = heat_pump_session
+
+    response = run_command(
+        {
+            "command": "target.direct_heat_integration",
+            "session": session,
+            "arguments": {"base_target": {"$ref": heat_pump}},
+        }
+    )
+
+    assert response["value"]["target"]["integration_type"] == "Residual"
+
+
 def test_contract_arguments_are_validated_from_json(monkeypatch):
     def echo(self, *, request: HprPerformanceMapRequest) -> HprPerformanceMapRequest:
         return request

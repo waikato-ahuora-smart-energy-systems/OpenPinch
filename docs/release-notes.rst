@@ -37,7 +37,9 @@ Engine commands
   after ``target.all_periods.<method>``.
 - Commands may be deeper paths such as ``target.all_periods.<method>``; private
   names are rejected at every level.
-- In a session a returned target comes back as ``{"ref": <id>}``, and an
+- In a session a returned target comes back as ``{"ref": <id>, "target": ...}``
+  (the target's results row, which is the only place a ``base_target``
+  command's residual target appears), and an
   argument ``{"$ref": <id>}`` passes it to a later command (for example as
   ``base_target``). JSON arguments for parameters typed as a contract, such as
   the ``request`` of ``target.hpr_performance_map``, are validated into it.
