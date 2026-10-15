@@ -237,6 +237,55 @@ def test_case_returned_in_a_session_opens_as_a_new_session(monkeypatch):
     assert response["results"]["targets"]
 
 
+@pytest.fixture(scope="module")
+def heat_pump_session():
+    session = run_command(
+        {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
+    )["session"]
+    response = run_command(
+        {
+            "command": "target.carnot_heat_pump",
+            "session": session,
+            "arguments": {
+                "load_fraction": 0.25,
+                "condensers": 1,
+                "evaporators": 1,
+                "maximum_restarts": 1,
+            },
+        }
+    )
+    return session, response["value"]["ref"]
+
+
+def test_target_returned_in_a_session_can_be_passed_as_a_base_target(
+    heat_pump_session,
+):
+    session, heat_pump = heat_pump_session
+
+    response = run_command(
+        {
+            "command": "target.direct_heat_integration",
+            "session": session,
+            "arguments": {"base_target": {"$ref": heat_pump}},
+        }
+    )
+
+    assert response["value"]["ref"] != heat_pump
+
+
+def test_target_reference_needs_the_session_that_returned_it(heat_pump_session):
+    _session, heat_pump = heat_pump_session
+
+    with pytest.raises(ValueError, match="Unknown target reference"):
+        run_command(
+            {
+                "command": "target.direct_heat_integration",
+                "problem": {"sample_case": "basic_pinch.json"},
+                "arguments": {"base_target": {"$ref": heat_pump}},
+            }
+        )
+
+
 def test_closed_session_cannot_run_commands():
     session = run_command(
         {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass, field
 from typing import Any, Mapping
 from uuid import uuid4
 
@@ -13,8 +14,17 @@ from ..domain.targets import BaseTargetModel
 from ._problem.accessors.design import HeatExchangerNetworkDesignView
 from .problem import PinchProblem
 
-# Problems kept between commands, by session id, for the life of the engine.
-_SESSIONS: dict[str, PinchProblem] = {}
+
+@dataclass
+class _Session:
+    """A live problem and the targets its commands returned, by reference id."""
+
+    problem: PinchProblem
+    targets: dict[str, BaseTargetModel] = field(default_factory=dict)
+
+
+# Sessions kept between commands, by session id, for the life of the engine.
+_SESSIONS: dict[str, _Session] = {}
 
 
 def _load_problem(source: Mapping[str, Any]) -> PinchProblem:
@@ -27,26 +37,36 @@ def _load_problem(source: Mapping[str, Any]) -> PinchProblem:
 
 
 def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
-    """Run one engine command on a freshly loaded problem.
+    """Run one engine command on a freshly loaded problem or a session's problem.
 
-    ``request`` has ``command`` (``"target.<method>"`` or ``"design.<method>"``),
+    ``request`` has ``command`` (``"target.<method>"``, ``"design.<method>"``
+    or a deeper path such as ``"target.all_periods.<method>"``), either
     ``problem`` (``{"data": <TargetInput JSON>}`` or ``{"sample_case": <name>}``)
-    and optional ``arguments`` for the method. The response has ``value``, the
-    contract the method returned (``None`` for targets, which are reported in
-    the results), and ``results``, the problem's ``TargetOutput`` (``None``
-    when no target has run), both as JSON-ready data.
+    or ``session``, and optional ``arguments`` for the method. ``"open"`` loads
+    ``problem`` into a new session and returns its id as ``session``;
+    ``"close"`` discards ``session``.
+
+    The response has ``value``, the contract the method returned, and
+    ``results``, the problem's ``TargetOutput`` (``None`` when no target has
+    run), both as JSON-ready data. A returned case is ``{"data": ...}``, and
+    in a session it also opens as a new ``session``. In a session a returned
+    target is ``{"ref": <id>}``, which later arguments pass as
+    ``{"$ref": <id>}``; outside a session targets are reported only in the
+    results.
     """
     command = request["command"]
     if command == "open":
         session = _open(_load_problem(request["problem"]))
         return {"session": session, "value": None, "results": None}
+    session = None
     if "session" in request:
-        if request["session"] not in _SESSIONS:
+        session = _SESSIONS.get(request["session"])
+        if session is None:
             raise ValueError(f"Unknown session {request['session']!r}.")
         if command == "close":
             del _SESSIONS[request["session"]]
             return {"value": None, "results": None}
-        problem = _SESSIONS[request["session"]]
+        problem = session.problem
     else:
         problem = _load_problem(request["problem"])
     namespace, _, path = command.partition(".")
@@ -57,12 +77,20 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
         method = getattr(method, name, None)
     if not callable(method):
         raise ValueError(f"Unknown command {command!r}.")
-    returned = method(**request.get("arguments", {}))
+    arguments = {
+        name: _resolve(argument, session)
+        for name, argument in request.get("arguments", {}).items()
+    }
+    returned = method(**arguments)
     if isinstance(returned, PinchProblem):
         # A new case, such as the optimised case from utility placement.
         value = {"data": returned.to_problem_json()}
-        if "session" in request:
+        if session is not None:
             value["session"] = _open(returned)
+    elif isinstance(returned, BaseTargetModel) and session is not None:
+        ref = uuid4().hex
+        session.targets[ref] = returned
+        value = {"ref": ref}
     else:
         value = _to_json(returned)
     return {"value": value, "results": _to_json(problem.results)}
@@ -70,8 +98,17 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
 
 def _open(problem: PinchProblem) -> str:
     session = uuid4().hex
-    _SESSIONS[session] = problem
+    _SESSIONS[session] = _Session(problem)
     return session
+
+
+def _resolve(argument: Any, session: _Session | None) -> Any:
+    if not (isinstance(argument, Mapping) and set(argument) == {"$ref"}):
+        return argument
+    target = None if session is None else session.targets.get(argument["$ref"])
+    if target is None:
+        raise ValueError(f"Unknown target reference {argument['$ref']!r}.")
+    return target
 
 
 def run_command_json(request: str) -> str:
