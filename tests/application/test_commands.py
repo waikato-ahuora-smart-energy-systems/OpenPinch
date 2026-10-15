@@ -319,6 +319,4 @@ def test_closed_session_cannot_run_commands():
     run_command({"command": "close", "session": session})
 
     with pytest.raises(ValueError, match="Unknown session"):
-        run_command(
-            {"command": "target.direct_heat_integration", "session": session}
-        )
+        run_command({"command": "target.direct_heat_integration", "session": session})
