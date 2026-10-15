@@ -14,6 +14,7 @@ from OpenPinch.application._problem.accessors.design import (
 from OpenPinch.application._problem.accessors.target import _TargetAccessor
 from OpenPinch.application.commands import run_command, run_command_json
 from OpenPinch.application.problem import PinchProblem
+from OpenPinch.contracts.hpr_performance_map import HprPerformanceMapRequest
 from OpenPinch.contracts.workspace import ValidationReport
 from OpenPinch.tutorials import sample_cases
 
@@ -271,6 +272,30 @@ def test_target_returned_in_a_session_can_be_passed_as_a_base_target(
     )
 
     assert response["value"]["ref"] != heat_pump
+
+
+def test_contract_arguments_are_validated_from_json(monkeypatch):
+    def echo(self, *, request: HprPerformanceMapRequest) -> HprPerformanceMapRequest:
+        return request
+
+    monkeypatch.setattr(_TargetAccessor, "hpr_performance_map", echo)
+
+    response = run_command(
+        {
+            "command": "target.hpr_performance_map",
+            "problem": {"sample_case": "basic_pinch.json"},
+            "arguments": {
+                "request": {
+                    "map_id": "map",
+                    "source_temperatures": [20.0, 5.0],
+                    "sink_temperatures": [70.0],
+                    "load_fractions": [1.0],
+                }
+            },
+        }
+    )
+
+    assert response["value"]["source_temperatures"] == [5.0, 20.0]
 
 
 def test_target_reference_needs_the_session_that_returned_it(heat_pump_session):

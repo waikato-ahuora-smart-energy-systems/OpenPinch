@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any, Mapping
+from typing import Any, Mapping, get_type_hints
 from uuid import uuid4
 
 from pydantic import BaseModel
@@ -77,10 +77,13 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
         method = getattr(method, name, None)
     if not callable(method):
         raise ValueError(f"Unknown command {command!r}.")
-    arguments = {
-        name: _resolve(argument, session)
-        for name, argument in request.get("arguments", {}).items()
-    }
+    contracts = _contract_parameters(method)
+    arguments = {}
+    for name, argument in request.get("arguments", {}).items():
+        argument = _resolve(argument, session)
+        if name in contracts and isinstance(argument, Mapping):
+            argument = contracts[name].model_validate(argument)
+        arguments[name] = argument
     returned = method(**arguments)
     if isinstance(returned, PinchProblem):
         # A new case, such as the optimised case from utility placement.
@@ -100,6 +103,22 @@ def _open(problem: PinchProblem) -> str:
     session = uuid4().hex
     _SESSIONS[session] = _Session(problem)
     return session
+
+
+def _contract_parameters(method: Any) -> dict[str, type[BaseModel]]:
+    """Parameters typed as a contract, which JSON arguments are validated into."""
+    try:
+        hints = get_type_hints(method)
+    except NameError:
+        # Some hints name types imported only for type checking.
+        return {}
+    return {
+        name: hint
+        for name, hint in hints.items()
+        if isinstance(hint, type)
+        and issubclass(hint, BaseModel)
+        and not issubclass(hint, BaseTargetModel)
+    }
 
 
 def _resolve(argument: Any, session: _Session | None) -> Any:
