@@ -4,6 +4,25 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Engine commands for the tutorials
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``run_command`` gains problem commands: ``validate`` (normalised input and
+  ``ValidationReport``), ``to_problem_json``, ``streams`` (prepared streams
+  and utilities, one row per segment), ``report`` (metrics, ``ProblemReport``
+  and the summary table, with period and weighted-average rows),
+  ``compare``, ``residual_utility``, ``with_utilities_from`` and
+  ``components.add_process_mvr`` / ``inventory`` / ``activate`` /
+  ``deactivate`` for process MVR components in a session.
+- A request's problem can carry ``project_name``. A second problem is passed
+  as ``{"$session": <id>}``.
+- A returned case (utility placement) also carries its retargeted
+  ``results`` and its ``utility_placement_result`` evidence.
+- Heat pump targeting failures (``HPRTargetingError``) come back as
+  ``error`` with the ``hpr_failure_summary`` details instead of raising.
+- HEN ``thermal_derivative`` and ``network_evolution`` accept seed networks as
+  JSON, as returned in a design result.
+
 Contract JSON Schema
 ~~~~~~~~~~~~~~~~~~~~
 

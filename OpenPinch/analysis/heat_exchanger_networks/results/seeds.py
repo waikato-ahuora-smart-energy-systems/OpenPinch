@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from ....domain.heat_exchanger_network import HeatExchangerNetwork
 from ..prepared_problem import PreparedProblem
@@ -60,6 +60,12 @@ def _normalise_seed_networks(
         networks = tuple(initial_networks)
     if not networks:
         raise ValueError("initial_networks must contain at least one network.")
+    networks = tuple(
+        HeatExchangerNetwork.model_validate(network)
+        if isinstance(network, Mapping)
+        else network
+        for network in networks
+    )
     for network in networks:
         if not isinstance(network, HeatExchangerNetwork):
             raise TypeError("initial_networks must be HeatExchangerNetwork instances.")

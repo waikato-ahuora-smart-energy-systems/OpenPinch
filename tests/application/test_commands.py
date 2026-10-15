@@ -14,6 +14,11 @@ from OpenPinch.application._problem.accessors.design import (
 from OpenPinch.application._problem.accessors.target import _TargetAccessor
 from OpenPinch.application.commands import run_command, run_command_json
 from OpenPinch.application.problem import PinchProblem
+from OpenPinch.contracts.hpr import (
+    HPRFailureSummary,
+    HPRSearchBudget,
+    HPRTargetingError,
+)
 from OpenPinch.contracts.hpr_performance_map import HprPerformanceMapRequest
 from OpenPinch.contracts.workspace import ValidationReport
 from OpenPinch.tutorials import sample_cases
@@ -338,3 +343,241 @@ def test_closed_session_cannot_run_commands():
 
     with pytest.raises(ValueError, match="Unknown session"):
         run_command({"command": "target.direct_heat_integration", "session": session})
+
+
+def test_problem_source_names_the_project():
+    response = run_command(
+        {
+            "command": "target.direct_heat_integration",
+            "problem": {"sample_case": "basic_pinch.json", "project_name": "Mill"},
+        }
+    )
+
+    assert response["results"]["targets"][0]["scope"] == "Mill"
+
+
+def test_validate_returns_the_normalised_input_and_the_report():
+    value = run_command(
+        {"command": "validate", "problem": {"sample_case": "basic_pinch.json"}}
+    )["value"]
+
+    assert value["report"]["valid"] is True
+    assert value["input"]["streams"]
+
+
+def test_to_problem_json_returns_the_problem_input():
+    value = run_command(
+        {"command": "to_problem_json", "problem": {"sample_case": "basic_pinch.json"}}
+    )["value"]
+
+    assert PinchProblem(value).to_problem_json() == value
+
+
+def test_streams_returns_prepared_streams_and_utilities_with_segments():
+    value = run_command(
+        {"command": "streams", "problem": {"sample_case": "basic_pinch.json"}}
+    )["value"]
+
+    assert value["hot_streams"]["segment_index"]
+    assert set(value) == {
+        "hot_streams",
+        "cold_streams",
+        "hot_utilities",
+        "cold_utilities",
+    }
+
+
+def test_report_returns_metrics_report_and_summary_rows_for_solved_targets():
+    session = run_command(
+        {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
+    )["session"]
+    run_command({"command": "target.direct_heat_integration", "session": session})
+
+    value = run_command({"command": "report", "session": session})["value"]
+
+    assert value["metrics"]
+    assert value["report"]["project_name"] == "Site"
+    assert value["summary"]["data"]
+
+
+def test_adding_a_process_mvr_in_a_session_returns_the_component():
+    session = run_command(
+        {"command": "open", "problem": {"sample_case": "process_mvr.json"}}
+    )["session"]
+
+    value = run_command(
+        {
+            "command": "components.add_process_mvr",
+            "session": session,
+            "arguments": {"source_streams": "Evaporator vapour"},
+        }
+    )["value"]
+
+    assert value["id"] == "mvr_1"
+    assert value["original_streams"] == ["Evaporator vapour"]
+
+
+def test_process_component_can_be_deactivated_and_reactivated_by_id():
+    session = run_command(
+        {"command": "open", "problem": {"sample_case": "process_mvr.json"}}
+    )["session"]
+    run_command(
+        {
+            "command": "components.add_process_mvr",
+            "session": session,
+            "arguments": {"source_streams": "Evaporator vapour"},
+        }
+    )
+
+    off = run_command(
+        {
+            "command": "components.deactivate",
+            "session": session,
+            "arguments": {"id": "mvr_1"},
+        }
+    )["value"]
+    on = run_command(
+        {
+            "command": "components.activate",
+            "session": session,
+            "arguments": {"id": "mvr_1"},
+        }
+    )["value"]
+
+    assert (off["active"], on["active"]) == (False, True)
+
+
+def test_component_inventory_lists_the_session_components_by_id():
+    session = run_command(
+        {"command": "open", "problem": {"sample_case": "process_mvr.json"}}
+    )["session"]
+    run_command(
+        {
+            "command": "components.add_process_mvr",
+            "session": session,
+            "arguments": {"source_streams": "Evaporator vapour"},
+        }
+    )
+
+    value = run_command({"command": "components.inventory", "session": session})[
+        "value"
+    ]
+
+    assert list(value) == ["mvr_1"]
+
+
+def test_residual_utility_derives_a_case_from_a_session_target(heat_pump_session):
+    session, heat_pump = heat_pump_session
+
+    value = run_command(
+        {
+            "command": "residual_utility",
+            "session": session,
+            "arguments": {"base_target": {"$ref": heat_pump}},
+        }
+    )["value"]
+
+    # A residual case keeps the heat pump's residual, not the process streams.
+    assert value["data"]["residual_basis"]
+    assert value["session"] != session
+
+
+def test_with_utilities_from_takes_the_donor_problem_from_another_session():
+    receiver = run_command(
+        {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
+    )["session"]
+    donor = run_command(
+        {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
+    )["session"]
+
+    value = run_command(
+        {
+            "command": "with_utilities_from",
+            "session": receiver,
+            "arguments": {"other_problem": {"$session": donor}},
+        }
+    )["value"]
+
+    assert value["data"]["utilities"]
+
+
+def test_compare_returns_summary_rows_of_two_solved_sessions():
+    sessions = []
+    for case in ("basic_pinch.json", "basic_pinch.json"):
+        session = run_command({"command": "open", "problem": {"sample_case": case}})[
+            "session"
+        ]
+        run_command({"command": "target.direct_heat_integration", "session": session})
+        sessions.append(session)
+
+    value = run_command(
+        {
+            "command": "compare",
+            "session": sessions[0],
+            "arguments": {"other_problem": {"$session": sessions[1]}},
+        }
+    )["value"]
+
+    assert value["columns"] and value["data"]
+
+
+def test_returned_case_carries_its_placement_evidence(monkeypatch):
+    case = _optimised_case()
+    case._utility_placement_result = ValidationReport(valid=True, issues=[])
+    monkeypatch.setattr(
+        _TargetAccessor, "utility_placement", lambda self, **_kwargs: case
+    )
+
+    value = run_command(
+        {
+            "command": "target.utility_placement",
+            "problem": {"sample_case": "basic_pinch.json"},
+        }
+    )["value"]
+
+    assert value["utility_placement_result"] == {"valid": True, "issues": []}
+
+
+def test_returned_case_carries_its_own_results_once_solved(monkeypatch):
+    case = _optimised_case()
+    case.target.direct_heat_integration()
+    monkeypatch.setattr(
+        _TargetAccessor, "utility_placement", lambda self, **_kwargs: case
+    )
+
+    value = run_command(
+        {
+            "command": "target.utility_placement",
+            "problem": {"sample_case": "basic_pinch.json"},
+        }
+    )["value"]
+
+    assert value["results"] == case.results.model_dump(mode="json")
+
+
+def test_heat_pump_targeting_failure_is_returned_as_an_error(monkeypatch):
+    diagnostics = HPRFailureSummary(
+        simulation_backend="coolprop",
+        cycle="single-stage",
+        evaluated_count=0,
+        category_counts={},
+        representative_failures=(),
+        budget=HPRSearchBudget(maximum_iterations=1, maximum_evaluations=1),
+        warm_start_evaluated=False,
+        warm_start_viable=False,
+    )
+
+    def infeasible(self, **_kwargs):
+        raise HPRTargetingError("bounded failure", diagnostics=diagnostics)
+
+    monkeypatch.setattr(_TargetAccessor, "carnot_heat_pump", infeasible)
+
+    response = run_command(
+        {
+            "command": "target.carnot_heat_pump",
+            "problem": {"sample_case": "basic_pinch.json"},
+        }
+    )
+
+    assert response["error"]["type"] == "HPRTargetingError"
+    assert response["error"]["details"]["status"] == "typed infeasible"
