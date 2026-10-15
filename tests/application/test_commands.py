@@ -11,7 +11,10 @@ from OpenPinch.application._problem.accessors.design import (
     HeatExchangerNetworkDesignView,
     _DesignAccessor,
 )
+from OpenPinch.application._problem.accessors.target import _TargetAccessor
 from OpenPinch.application.commands import run_command, run_command_json
+from OpenPinch.application.problem import PinchProblem
+from OpenPinch.contracts.hpr_performance_map import HprPerformanceMapRequest
 from OpenPinch.contracts.workspace import ValidationReport
 from OpenPinch.tutorials import sample_cases
 
@@ -72,7 +75,15 @@ def test_design_command_returns_the_design_result_as_value(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "command", ["target._execute", "target.missing", "load.anything", "target"]
+    "command",
+    [
+        "target._execute",
+        "target.missing",
+        "load.anything",
+        "target",
+        "target.all_periods._run",
+        "target._problem.load",
+    ],
 )
 def test_command_rejects_names_that_are_not_public_engine_methods(command):
     with pytest.raises(ValueError, match="Unknown command"):
@@ -134,3 +145,196 @@ def test_target_command_accepts_problem_data_inline():
     )
 
     assert response["results"]["targets"]
+
+
+def test_commands_in_one_session_share_the_problem():
+    session = run_command(
+        {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
+    )["session"]
+
+    run_command({"command": "target.direct_heat_integration", "session": session})
+    response = run_command(
+        {"command": "target.indirect_heat_integration", "session": session}
+    )
+
+    assert len(response["results"]["targets"]) == 2
+
+
+def test_all_periods_command_returns_each_period_output():
+    response = run_command(
+        {
+            "command": "target.all_periods.direct_heat_integration",
+            "problem": {"sample_case": "crude_preheat_train_multiperiod.json"},
+        }
+    )
+
+    assert set(response["value"]) == {"turndown", "base", "peak"}
+    assert response["value"]["base"]["targets"]
+
+
+def test_session_runs_multiperiod_design_after_all_period_targeting(monkeypatch):
+    class Synthesised(Exception):
+        pass
+
+    def synthesise(self, **_kwargs):
+        raise Synthesised
+
+    monkeypatch.setattr(_DesignAccessor, "heat_exchanger_network", synthesise)
+    session = run_command(
+        {
+            "command": "open",
+            "problem": {"sample_case": "crude_preheat_train_multiperiod.json"},
+        }
+    )["session"]
+    run_command(
+        {"command": "target.all_periods.direct_heat_integration", "session": session}
+    )
+
+    with pytest.raises(Synthesised):
+        run_command(
+            {"command": "design.multiperiod_heat_exchanger_network", "session": session}
+        )
+
+
+def _optimised_case() -> PinchProblem:
+    data = json.loads(
+        (files(sample_cases) / "chocolate_factory.json").read_text(encoding="utf-8")
+    )
+    return PinchProblem(data)
+
+
+def test_command_returning_a_case_returns_its_problem_data(monkeypatch):
+    case = _optimised_case()
+    monkeypatch.setattr(
+        _TargetAccessor, "utility_placement", lambda self, **_kwargs: case
+    )
+
+    response = run_command(
+        {
+            "command": "target.utility_placement",
+            "problem": {"sample_case": "basic_pinch.json"},
+        }
+    )
+
+    assert response["value"] == {"data": case.to_problem_json()}
+
+
+def test_case_returned_in_a_session_opens_as_a_new_session(monkeypatch):
+    monkeypatch.setattr(
+        _TargetAccessor, "utility_placement", lambda self, **_kwargs: _optimised_case()
+    )
+    session = run_command(
+        {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
+    )["session"]
+
+    value = run_command({"command": "target.utility_placement", "session": session})[
+        "value"
+    ]
+    response = run_command(
+        {"command": "target.direct_heat_integration", "session": value["session"]}
+    )
+
+    assert value["session"] != session
+    assert response["results"]["targets"]
+
+
+@pytest.fixture(scope="module")
+def heat_pump_session():
+    session = run_command(
+        {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
+    )["session"]
+    response = run_command(
+        {
+            "command": "target.carnot_heat_pump",
+            "session": session,
+            "arguments": {
+                "load_fraction": 0.25,
+                "condensers": 1,
+                "evaporators": 1,
+                "maximum_restarts": 1,
+            },
+        }
+    )
+    return session, response["value"]["ref"]
+
+
+def test_target_returned_in_a_session_can_be_passed_as_a_base_target(
+    heat_pump_session,
+):
+    session, heat_pump = heat_pump_session
+
+    response = run_command(
+        {
+            "command": "target.direct_heat_integration",
+            "session": session,
+            "arguments": {"base_target": {"$ref": heat_pump}},
+        }
+    )
+
+    assert response["value"]["ref"] != heat_pump
+
+
+def test_residual_target_from_a_base_target_is_returned_by_value(
+    heat_pump_session,
+):
+    # The residual target is solved on a detached residual case, so it is not
+    # in the session problem's results; the value is the only place it shows.
+    session, heat_pump = heat_pump_session
+
+    response = run_command(
+        {
+            "command": "target.direct_heat_integration",
+            "session": session,
+            "arguments": {"base_target": {"$ref": heat_pump}},
+        }
+    )
+
+    assert response["value"]["target"]["integration_type"] == "Residual"
+
+
+def test_contract_arguments_are_validated_from_json(monkeypatch):
+    def echo(self, *, request: HprPerformanceMapRequest) -> HprPerformanceMapRequest:
+        return request
+
+    monkeypatch.setattr(_TargetAccessor, "hpr_performance_map", echo)
+
+    response = run_command(
+        {
+            "command": "target.hpr_performance_map",
+            "problem": {"sample_case": "basic_pinch.json"},
+            "arguments": {
+                "request": {
+                    "map_id": "map",
+                    "source_temperatures": [20.0, 5.0],
+                    "sink_temperatures": [70.0],
+                    "load_fractions": [1.0],
+                }
+            },
+        }
+    )
+
+    assert response["value"]["source_temperatures"] == [5.0, 20.0]
+
+
+def test_target_reference_needs_the_session_that_returned_it(heat_pump_session):
+    _session, heat_pump = heat_pump_session
+
+    with pytest.raises(ValueError, match="Unknown target reference"):
+        run_command(
+            {
+                "command": "target.direct_heat_integration",
+                "problem": {"sample_case": "basic_pinch.json"},
+                "arguments": {"base_target": {"$ref": heat_pump}},
+            }
+        )
+
+
+def test_closed_session_cannot_run_commands():
+    session = run_command(
+        {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
+    )["session"]
+
+    run_command({"command": "close", "session": session})
+
+    with pytest.raises(ValueError, match="Unknown session"):
+        run_command({"command": "target.direct_heat_integration", "session": session})

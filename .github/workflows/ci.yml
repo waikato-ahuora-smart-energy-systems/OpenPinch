@@ -314,6 +314,7 @@ jobs:
           - shard: core
             paths: >-
               tests/domain tests/contracts tests/adapters tests/optimisation
+              tests/packaging/test_installed_wheel.py
               tests/analysis --ignore=tests/analysis/heat_pumps
           - shard: heat-pumps
             paths: tests/analysis/heat_pumps

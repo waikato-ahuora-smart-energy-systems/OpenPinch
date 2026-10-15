@@ -36,14 +36,17 @@ import os, sys, micropip
 await micropip.install(["pint>=0.24.4", "pytest", "hypothesis", "jsonschema", "openpyxl", "pyxlsb", "plotly", "tespy", "gekko"])
 await micropip.install("emfs:/tmp/${wheelName}", deps=False)
 os.chdir("/work")
-# Import the installed wheel, not the mounted checkout.
-sys.path = [p for p in sys.path if p not in ("", "/work")]
+# Import the installed wheel, not the mounted checkout: the checkout goes
+# last, after site-packages, so only the tests package (shared strategies)
+# comes from it. pytest.ini's "pythonpath = ." would put it first, so that
+# setting is cleared.
+sys.path = [p for p in sys.path if p not in ("", "/work")] + ["/work"]
 # WebAssembly runs several times slower than native CPython, so the
 # default 200 ms Hypothesis deadline would fail tests on speed alone.
 from hypothesis import settings
 settings.register_profile("pyodide", deadline=None)
 settings.load_profile("pyodide")
 import pytest
-int(pytest.main(["-p", "no:cacheprovider", "--import-mode=importlib", *PYTEST_ARGS]))
+int(pytest.main(["-p", "no:cacheprovider", "--import-mode=importlib", "-o", "pythonpath=", *PYTEST_ARGS]))
 `)
 process.exit(Number(exitCode))
