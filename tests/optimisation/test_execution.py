@@ -121,6 +121,24 @@ def test_lambda_objective_runs_with_real_pools(n_runs):
     assert result.best.objective == pytest.approx(0.0, abs=1e-6)
 
 
+def test_polishing_runs_when_the_cpu_count_is_unknown(monkeypatch):
+    # os.cpu_count() returns None where the count cannot be determined.
+    monkeypatch.setattr(candidates.os, "cpu_count", lambda: None)
+
+    result = run_multistart_minimisation(
+        OptimisationProblem(
+            objective=lambda x: float(np.sum((np.asarray(x) - 0.3) ** 2)),
+            bounds=((0.0, 1.0), (0.0, 1.0)),
+        ),
+        method="dual_annealing",
+        options=OptimisationOptions(
+            n_runs=1, maxiter=5, maxfun=60, max_minima=3, cluster_tol=1e-6
+        ),
+    )
+
+    assert result.best.objective == pytest.approx(0.0, abs=1e-6)
+
+
 def _polish(monkeypatch, exc):
     monkeypatch.setattr(
         candidates,

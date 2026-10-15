@@ -947,3 +947,20 @@ def test_collect_candidates_reshapes_seed_and_pools_runs(monkeypatch):
     assert xs.shape == (2, 1)
     np.testing.assert_array_equal(fs, [0.0, 1.0])
     assert all(x0.shape == (1, 1) for x0 in seen)
+
+
+@pytest.mark.parametrize(
+    "backend",
+    [
+        bb_bo._get_bo_multiminima_in_parallel,
+        bb_cma._get_cma_multiminima_in_parallel,
+        bb_da._get_da_multiminima_in_parallel,
+        bb_rbf._get_rbf_surrogate_multiminima_in_parallel,
+    ],
+)
+def test_backend_run_count_default_does_not_depend_on_the_machine(backend):
+    import inspect
+
+    default = inspect.signature(backend).parameters["n_runs"].default
+
+    assert default == OptimisationOptions().n_runs

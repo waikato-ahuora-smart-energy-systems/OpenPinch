@@ -1,6 +1,5 @@
 """Bayesian-optimisation multi-start backend."""
 
-import os
 from typing import Callable, Optional
 
 import numpy as np
@@ -17,7 +16,7 @@ def _get_bo_multiminima_in_parallel(
     x0_ls=None,
     args=(),
     constraints=(),
-    n_runs=os.cpu_count(),
+    n_runs=1,
     maxiter=300,
     seed=0,
     maxfun=1_000_000,
