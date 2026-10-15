@@ -16,6 +16,10 @@ from ....domain.configuration import tol
 from ....domain.fluids import build_coolprop_abstract_state
 from ....domain.stream_collection import StreamCollection
 
+# Qualities this close to 0 or 1 are saturated liquid or vapour; differences
+# below it are CoolProp round-off and must not change the cycle's path.
+_SATURATION_QUALITY_TOL = 1e-9
+
 __all__ = ["VapourCompressionCycle"]
 
 
@@ -445,8 +449,16 @@ class VapourCompressionCycle:
             h_liquid = sat_liquid.hmass()
             h_vapour = sat_vapour.hmass()
 
-            if h_liquid <= h <= h_vapour:
-                quality = (h - h_liquid) / (h_vapour - h_liquid)
+            # Snap states within round-off of saturation, on either side, onto
+            # it: CoolProp builds (native, WebAssembly) differ in the last digits
+            # of h_liquid and h_vapour, which must not change the state or the
+            # branch taken.
+            quality = (h - h_liquid) / (h_vapour - h_liquid)
+            if -_SATURATION_QUALITY_TOL <= quality <= 1.0 + _SATURATION_QUALITY_TOL:
+                if quality > 1.0 - _SATURATION_QUALITY_TOL:
+                    quality = 1.0
+                elif quality < _SATURATION_QUALITY_TOL:
+                    quality = 0.0
                 return self._compute_state_from_pressure_quality(P=P, Q=quality)
 
             if h < h_liquid:
