@@ -146,7 +146,7 @@ def _polish_candidates(
     )
 
     n_tasks = len(basin_reps_idx)
-    n_workers = min(n_tasks, max(1, os.cpu_count()))
+    n_workers = min(n_tasks, os.cpu_count() or 1)
 
     results = _run_objective_tasks(
         worker_fn,
