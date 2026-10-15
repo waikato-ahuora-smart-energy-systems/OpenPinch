@@ -72,7 +72,15 @@ def test_design_command_returns_the_design_result_as_value(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "command", ["target._execute", "target.missing", "load.anything", "target"]
+    "command",
+    [
+        "target._execute",
+        "target.missing",
+        "load.anything",
+        "target",
+        "target.all_periods._run",
+        "target._problem.load",
+    ],
 )
 def test_command_rejects_names_that_are_not_public_engine_methods(command):
     with pytest.raises(ValueError, match="Unknown command"):
@@ -147,6 +155,18 @@ def test_commands_in_one_session_share_the_problem():
     )
 
     assert len(response["results"]["targets"]) == 2
+
+
+def test_all_periods_command_returns_each_period_output():
+    response = run_command(
+        {
+            "command": "target.all_periods.direct_heat_integration",
+            "problem": {"sample_case": "crude_preheat_train_multiperiod.json"},
+        }
+    )
+
+    assert set(response["value"]) == {"turndown", "base", "peak"}
+    assert response["value"]["base"]["targets"]
 
 
 def test_closed_session_cannot_run_commands():

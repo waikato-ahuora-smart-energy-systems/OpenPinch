@@ -50,10 +50,13 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
         problem = _SESSIONS[request["session"]]
     else:
         problem = _load_problem(request["problem"])
-    namespace, _, name = command.partition(".")
-    accessor = {"target": problem.target, "design": problem.design}.get(namespace)
-    method = getattr(accessor, name, None)
-    if name.startswith("_") or not callable(method):
+    namespace, _, path = command.partition(".")
+    method = {"target": problem.target, "design": problem.design}.get(namespace)
+    for name in path.split("."):
+        if name.startswith("_"):
+            raise ValueError(f"Unknown command {command!r}.")
+        method = getattr(method, name, None)
+    if not callable(method):
         raise ValueError(f"Unknown command {command!r}.")
     returned = method(**request.get("arguments", {}))
     return {
@@ -70,6 +73,8 @@ def run_command_json(request: str) -> str:
 def _to_json(value: Any) -> Any:
     if isinstance(value, HeatExchangerNetworkDesignView):
         value = value.result
+    if isinstance(value, Mapping):
+        return {key: _to_json(item) for key, item in value.items()}
     # A target model is reported through the problem results, not by value.
     if isinstance(value, BaseModel) and not isinstance(value, BaseTargetModel):
         return value.model_dump(mode="json")
