@@ -22,6 +22,16 @@ Engine commands for the tutorials
   ``error`` with the ``hpr_failure_summary`` details instead of raising.
 - HEN ``thermal_derivative`` and ``network_evolution`` accept seed networks as
   JSON, as returned in a design result.
+- Workspace sessions: ``open`` with ``workspace`` (a baseline problem or a
+  bundle), ``case`` to pick the case a command runs on, and
+  ``workspace.scenario`` / ``use_case`` / ``update_options`` /
+  ``set_dt_cont_multiplier`` / ``add`` / ``compare_cases`` / ``to_bundle`` /
+  ``batch`` (one command on each case, with per-case errors).
+- ``plot_catalog``, and ``export.excel`` / ``export.plots`` returning the
+  written files as base64; files go to a private temporary directory.
+- New ``PinchWorkspace.to_bundle()`` and ``PinchWorkspace.from_bundle()``
+  build and read a workspace bundle in memory; ``save_bundle`` and
+  ``load_bundle`` use them.
 
 Contract JSON Schema
 ~~~~~~~~~~~~~~~~~~~~

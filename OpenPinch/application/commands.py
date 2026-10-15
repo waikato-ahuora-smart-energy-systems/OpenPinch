@@ -10,22 +10,32 @@ from uuid import uuid4
 
 from pydantic import BaseModel
 
+from ..adapters.io.file_exports import export_files
 from ..adapters.io.problem_sources import load_packaged_sample_case
 from ..contracts.hpr import HPRTargetingError
 from ..contracts.reporting import TargetResults
+from ..contracts.workspace import PinchWorkspaceBundle
 from ..domain.targets import BaseTargetModel
 from ..presentation.reporting.hpr import hpr_failure_summary
 from ..presentation.reporting.results import serialize_target
 from ._problem.accessors.design import HeatExchangerNetworkDesignView
 from .problem import PinchProblem
+from .workspace import PinchWorkspace
 
 
 @dataclass
 class _Session:
-    """A live problem and the targets its commands returned, by reference id."""
+    """A live problem or workspace and the targets its commands returned."""
 
-    problem: PinchProblem
+    problem: PinchProblem | None
     targets: dict[str, BaseTargetModel] = field(default_factory=dict)
+    workspace: PinchWorkspace | None = None
+
+    def case(self, name: str | None) -> PinchProblem:
+        """The problem a command runs on: a workspace case, or the problem."""
+        if self.workspace is not None:
+            return self.workspace.case(name)
+        return self.problem
 
 
 # Sessions kept between commands, by session id, for the life of the engine.
@@ -44,19 +54,39 @@ def _load_problem(source: Mapping[str, Any]) -> PinchProblem:
     )
 
 
+def _load_workspace(source: Mapping[str, Any]) -> PinchWorkspace:
+    """A workspace from a saved ``bundle`` or a baseline ``problem`` source."""
+    if "bundle" in source:
+        return PinchWorkspace.from_bundle(
+            PinchWorkspaceBundle.model_validate(source["bundle"])
+        )
+    problem = source["problem"]
+    return PinchWorkspace(
+        _load_problem(problem), project_name=problem.get("project_name", "Site")
+    )
+
+
 def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
     """Run one engine command on a freshly loaded problem or a session's problem.
 
     ``request`` has ``command`` (``"target.<method>"``, ``"design.<method>"``,
     a deeper path such as ``"target.all_periods.<method>"``, or a problem
     command: ``validate``, ``to_problem_json``, ``streams``, ``report``,
-    ``compare``, ``residual_utility``, ``with_utilities_from`` and
-    ``components.add_process_mvr`` / ``inventory`` / ``activate`` /
+    ``compare``, ``residual_utility``, ``with_utilities_from``,
+    ``plot_catalog``, ``export.excel`` / ``export.plots`` (files as base64)
+    and ``components.add_process_mvr`` / ``inventory`` / ``activate`` /
     ``deactivate``), either ``problem`` (``{"data": <TargetInput JSON>}`` or
     ``{"sample_case": <name>}``, each with an optional ``project_name``) or
     ``session``, and optional ``arguments`` for the method. ``"open"`` loads
     ``problem`` into a new session and returns its id as ``session``;
     ``"close"`` discards ``session``.
+
+    ``"open"`` with ``workspace`` (``{"problem": <source>}`` or
+    ``{"bundle": <PinchWorkspaceBundle JSON>}``) opens a workspace session.
+    There ``case`` names the case a command runs on (default: the active
+    case), and ``workspace.<action>`` (``scenario``, ``use_case``,
+    ``update_options``, ``set_dt_cont_multiplier``, ``add``,
+    ``compare_cases``, ``to_bundle`` and ``batch``) acts on the workspace.
 
     The response has ``value``, the contract the method returned, and
     ``results``, the problem's ``TargetOutput`` (``None`` when no target has
@@ -71,7 +101,12 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
     """
     command = request["command"]
     if command == "open":
-        session = _open(_load_problem(request["problem"]))
+        if "workspace" in request:
+            workspace = _load_workspace(request["workspace"])
+            session = uuid4().hex
+            _SESSIONS[session] = _Session(None, workspace=workspace)
+        else:
+            session = _open(_load_problem(request["problem"]))
         return {"session": session, "value": None, "results": None}
     session = None
     if "session" in request:
@@ -81,16 +116,23 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
         if command == "close":
             del _SESSIONS[request["session"]]
             return {"value": None, "results": None}
-        problem = session.problem
+        if command == "workspace.batch":
+            return {"value": _batch(request), "results": None}
+        problem = session.case(request.get("case"))
     else:
         problem = _load_problem(request["problem"])
     handler = _PROBLEM_COMMANDS.get(command)
+    owner: Any = problem
+    if command in _WORKSPACE_COMMANDS:
+        if session is None or session.workspace is None:
+            raise ValueError(f"Command {command!r} needs a workspace session.")
+        handler, owner = _WORKSPACE_COMMANDS[command], session.workspace
     if handler is not None:
         arguments = {
             name: _resolve(argument, session)
             for name, argument in request.get("arguments", {}).items()
         }
-        method = partial(handler, problem)
+        method = partial(handler, owner)
     else:
         method = _accessor_method(problem, command)
         contracts = _contract_parameters(method)
@@ -234,13 +276,52 @@ def _deactivate(problem: PinchProblem, *, id: str) -> dict[str, Any]:
     return _component_json(_component(problem, id).deactivate())
 
 
-def _frame_json(frame: Any) -> dict[str, Any]:
-    """A DataFrame as ``{columns, data}``; pandas writes NaN as null."""
-    return json.loads(frame.to_json(orient="split", index=False))
+def _frame_json(frame: Any, *, index: bool = False) -> dict[str, Any]:
+    """A DataFrame as ``{columns, data}`` (and ``index``); NaN becomes null."""
+    return json.loads(frame.to_json(orient="split", index=index))
 
 
 def _compare(problem: PinchProblem, **arguments: Any) -> dict[str, Any]:
-    return _frame_json(problem.compare_to(**arguments))
+    # Comparison rows are labelled by the index (metric and change rows).
+    return _frame_json(problem.compare_to(**arguments), index=True)
+
+
+def _compare_cases(workspace: PinchWorkspace, **arguments: Any) -> dict[str, Any]:
+    return _frame_json(workspace.compare_cases(**arguments), index=True)
+
+
+def _plot_catalog(problem: PinchProblem) -> dict[str, Any]:
+    return _frame_json(problem.plot.catalog())
+
+
+def _export_excel(problem: PinchProblem, **arguments: Any) -> dict[str, Any]:
+    # Written to a private temporary directory, never a path from the request.
+    return {
+        "files": export_files(
+            lambda directory: problem.export_excel(directory, **arguments)
+        )
+    }
+
+
+def _export_plots(
+    problem: PinchProblem,
+    *,
+    plot: str | None = None,
+    gallery: bool = False,
+    zone_name: str | None = None,
+) -> dict[str, Any]:
+    """Standalone HTML plots, optionally one type and with a gallery index."""
+    method = None
+    if plot is not None:
+        method = getattr(problem.plot, plot, None)
+        if plot.startswith("_") or not callable(method):
+            raise ValueError(f"Unknown plot {plot!r}.")
+    export = problem.plot.export_gallery if gallery else problem.plot.export
+    return {
+        "files": export_files(
+            lambda directory: export(directory, zone_name=zone_name, plot=method)
+        )
+    }
 
 
 # Commands on the problem itself rather than on one of its accessors.
@@ -249,6 +330,9 @@ _PROBLEM_COMMANDS = {
     "residual_utility": PinchProblem.residual_utility,
     "with_utilities_from": PinchProblem.with_utilities_from,
     "compare": _compare,
+    "plot_catalog": _plot_catalog,
+    "export.excel": _export_excel,
+    "export.plots": _export_plots,
     "components.add_process_mvr": _add_process_mvr,
     "components.inventory": _inventory,
     "components.activate": _activate,
@@ -256,6 +340,64 @@ _PROBLEM_COMMANDS = {
     "report": _report,
     "streams": _streams,
     "to_problem_json": PinchProblem.to_problem_json,
+}
+
+
+def _batch(request: Mapping[str, Any]) -> dict[str, Any]:
+    """One command on each selected workspace case, isolating failures."""
+    session = _SESSIONS[request["session"]]
+    if session.workspace is None:
+        raise ValueError("Command 'workspace.batch' needs a workspace session.")
+    arguments = request.get("arguments", {})
+    results: dict[str, Any] = {}
+    errors: dict[str, Any] = {}
+    for case in arguments.get("cases") or session.workspace.list_cases():
+        try:
+            results[case] = run_command(
+                {
+                    "command": arguments["command"],
+                    "session": request["session"],
+                    "case": case,
+                    "arguments": arguments.get("arguments", {}),
+                }
+            )
+        except Exception as error:  # batch isolation, as in case batches
+            errors[case] = _error_json(error)
+    return {"results": results, "errors": errors}
+
+
+def _workspace_json(workspace: PinchWorkspace) -> dict[str, Any]:
+    return {
+        "cases": workspace.list_cases(),
+        "active_case": workspace.active_case_name,
+    }
+
+
+def _workspace_action(name: str) -> Any:
+    """A workspace method run for its effect; returns the case list."""
+
+    def action(workspace: PinchWorkspace, **arguments: Any) -> dict[str, Any]:
+        getattr(workspace, name)(**arguments)
+        return _workspace_json(workspace)
+
+    return action
+
+
+# Commands on a workspace session.
+_WORKSPACE_COMMANDS = {
+    "workspace.compare_cases": _compare_cases,
+    "workspace.to_bundle": lambda workspace: workspace.to_bundle().model_dump(
+        mode="json"
+    ),
+} | {
+    f"workspace.{name}": _workspace_action(name)
+    for name in (
+        "scenario",
+        "use_case",
+        "update_options",
+        "set_dt_cont_multiplier",
+        "add",
+    )
 }
 
 
@@ -294,7 +436,7 @@ def _resolve(argument: Any, session: _Session | None) -> Any:
         other = _SESSIONS.get(argument["$session"])
         if other is None:
             raise ValueError(f"Unknown session {argument['$session']!r}.")
-        return other.problem
+        return other.case(None)
     if not (isinstance(argument, Mapping) and set(argument) == {"$ref"}):
         return argument
     target = None if session is None else session.targets.get(argument["$ref"])

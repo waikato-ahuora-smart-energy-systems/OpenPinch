@@ -719,3 +719,18 @@ def test_batch_export_rejects_existing_case_symlink_outside_root(
     assert list(exported.errors) == ["baseline"]
     assert "outside the batch export destination" in str(exported.errors["baseline"])
     assert called is False
+
+
+def test_workspace_round_trips_through_an_in_memory_bundle() -> None:
+    # The engine command layer moves bundles as JSON, never through files.
+    workspace = PinchWorkspace(_basic_payload(), project_name="Demo")
+    workspace.scenario("wide_dt", base="baseline")
+    workspace.update_options({"THERMAL_DT_CONT": 15}, case_name="wide_dt")
+
+    reloaded = PinchWorkspace.from_bundle(workspace.to_bundle())
+
+    assert reloaded.list_cases() == ["baseline", "wide_dt"]
+    assert (
+        reloaded.to_problem_json(case_name="wide_dt")["options"]["THERMAL_DT_CONT"]
+        == 15
+    )
