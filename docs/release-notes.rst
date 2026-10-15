@@ -16,6 +16,8 @@ Contract JSON Schema
   JSON form (scalar or per-period values with a unit).
 - New ``openpinch schema -o DIR`` writes one ``<Contract>.schema.json`` file
   per contract.
+- The stream collection schema (``hpr_hot_streams``, ``hpr_cold_streams``)
+  requires every column and rejects unknown keys.
 
 Engine commands
 ~~~~~~~~~~~~~~~
@@ -28,6 +30,22 @@ Engine commands
   the browser engine and the local backend of the OpenPinch web app call it.
   Sample cases are resolved by name only and problem data must be a JSON
   object, so a request cannot make the engine read files from its host.
+- Engine sessions: ``"open"`` loads a problem and returns a ``session`` id,
+  later requests pass ``session`` instead of ``problem`` to run on the same
+  live problem, and ``"close"`` discards it. Commands that need an earlier
+  command's state now work, such as ``design.multiperiod_heat_exchanger_network``
+  after ``target.all_periods.<method>``.
+- Commands may be deeper paths such as ``target.all_periods.<method>``; private
+  names are rejected at every level.
+- In a session a returned target comes back as ``{"ref": <id>, "target": ...}``
+  (the target's results row, which is the only place a ``base_target``
+  command's residual target appears), and an
+  argument ``{"$ref": <id>}`` passes it to a later command (for example as
+  ``base_target``). JSON arguments for parameters typed as a contract, such as
+  the ``request`` of ``target.hpr_performance_map``, are validated into it.
+- A command that returns a new case, such as ``target.utility_placement``,
+  returns the case's problem data as ``{"data": ...}`` instead of nothing; in
+  a session the case also opens as a new ``session``.
 
 Heat pump cycle states at saturation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

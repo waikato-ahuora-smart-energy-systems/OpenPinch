@@ -57,33 +57,36 @@ _NUMBER_COLUMN = _column({"type": ["number", "null"]})
 
 # What StreamCollection.to_dict() emits: one array per column, one entry per
 # stream, in reporting order. NaN magnitudes serialise as null.
+_STREAM_COLUMNS: dict[str, Any] = {
+    "name": _column({"type": "string"}),
+    "category": _column(
+        {
+            "enum": [
+                "hot_stream",
+                "cold_stream",
+                "hot_utility",
+                "cold_utility",
+                "other",
+            ]
+        }
+    ),
+    "type": _column({"type": "string"}),
+    "is_process_stream": _column({"type": "boolean"}),
+    "t_supply": _NUMBER_COLUMN,
+    "t_target": _NUMBER_COLUMN,
+    "heat_flow": _NUMBER_COLUMN,
+    "dt_cont": _NUMBER_COLUMN,
+    "dt_cont_multiplier": _NUMBER_COLUMN,
+    "htc": _NUMBER_COLUMN,
+    "active": _column({"type": "boolean"}),
+}
 STREAM_COLLECTION_JSON_SCHEMA: dict[str, Any] = {
     "title": "StreamCollection",
     "description": "Streams by column, as StreamCollection.to_dict().",
     "type": "object",
-    "properties": {
-        "name": _column({"type": "string"}),
-        "category": _column(
-            {
-                "enum": [
-                    "hot_stream",
-                    "cold_stream",
-                    "hot_utility",
-                    "cold_utility",
-                    "other",
-                ]
-            }
-        ),
-        "type": _column({"type": "string"}),
-        "is_process_stream": _column({"type": "boolean"}),
-        "t_supply": _NUMBER_COLUMN,
-        "t_target": _NUMBER_COLUMN,
-        "heat_flow": _NUMBER_COLUMN,
-        "dt_cont": _NUMBER_COLUMN,
-        "dt_cont_multiplier": _NUMBER_COLUMN,
-        "htc": _NUMBER_COLUMN,
-        "active": _column({"type": "boolean"}),
-    },
+    "properties": _STREAM_COLUMNS,
+    "required": list(_STREAM_COLUMNS),
+    "additionalProperties": False,
 }
 
 

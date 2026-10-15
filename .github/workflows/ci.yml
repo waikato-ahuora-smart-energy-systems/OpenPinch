@@ -323,7 +323,8 @@ jobs:
         run: |
           node scripts/pyodide/run_tests.mjs dist/*.whl -q \
             --hypothesis-seed="$HYPOTHESIS_SEED" \
-            tests/domain tests/contracts tests/adapters tests/optimisation
+            tests/domain tests/contracts tests/adapters tests/optimisation \
+            tests/packaging/test_installed_wheel.py
 
   audit:
     name: Dependency audit
