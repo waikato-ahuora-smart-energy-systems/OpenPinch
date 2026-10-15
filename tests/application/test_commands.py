@@ -134,3 +134,29 @@ def test_target_command_accepts_problem_data_inline():
     )
 
     assert response["results"]["targets"]
+
+
+def test_commands_in_one_session_share_the_problem():
+    session = run_command(
+        {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
+    )["session"]
+
+    run_command({"command": "target.direct_heat_integration", "session": session})
+    response = run_command(
+        {"command": "target.indirect_heat_integration", "session": session}
+    )
+
+    assert len(response["results"]["targets"]) == 2
+
+
+def test_closed_session_cannot_run_commands():
+    session = run_command(
+        {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
+    )["session"]
+
+    run_command({"command": "close", "session": session})
+
+    with pytest.raises(ValueError, match="Unknown session"):
+        run_command(
+            {"command": "target.direct_heat_integration", "session": session}
+        )

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from typing import Any, Mapping
+from uuid import uuid4
 
 from pydantic import BaseModel
 
@@ -11,6 +12,9 @@ from ..adapters.io.problem_sources import load_packaged_sample_case
 from ..domain.targets import BaseTargetModel
 from ._problem.accessors.design import HeatExchangerNetworkDesignView
 from .problem import PinchProblem
+
+# Problems kept between commands, by session id, for the life of the engine.
+_SESSIONS: dict[str, PinchProblem] = {}
 
 
 def _load_problem(source: Mapping[str, Any]) -> PinchProblem:
@@ -33,8 +37,20 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
     when no target has run), both as JSON-ready data.
     """
     command = request["command"]
+    if command == "open":
+        session = uuid4().hex
+        _SESSIONS[session] = _load_problem(request["problem"])
+        return {"session": session, "value": None, "results": None}
+    if "session" in request:
+        if request["session"] not in _SESSIONS:
+            raise ValueError(f"Unknown session {request['session']!r}.")
+        if command == "close":
+            del _SESSIONS[request["session"]]
+            return {"value": None, "results": None}
+        problem = _SESSIONS[request["session"]]
+    else:
+        problem = _load_problem(request["problem"])
     namespace, _, name = command.partition(".")
-    problem = _load_problem(request["problem"])
     accessor = {"target": problem.target, "design": problem.design}.get(namespace)
     method = getattr(accessor, name, None)
     if name.startswith("_") or not callable(method):
