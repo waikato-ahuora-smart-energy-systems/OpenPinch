@@ -8,7 +8,7 @@ from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from functools import partial
 from multiprocessing.reduction import ForkingPickler
-from typing import Protocol, runtime_checkable
+from typing import Literal, Protocol, runtime_checkable
 
 import numpy as np
 
@@ -18,20 +18,28 @@ logger = logging.getLogger(__name__)
 _POOL_STARTUP_ERRORS = (OSError, RuntimeError)
 
 
+TaskPhase = Literal["search", "polish"]
+
+
 @runtime_checkable
 class TaskScopedObjective(Protocol):
     """Objective whose mutable state is scoped to one optimiser task.
 
     For a batch of ``count`` tasks the optimiser calls ``for_task(index,
-    count)`` in the parent, runs task ``index`` with that copy (serially or in
-    a worker process), and finally passes every copy's ``task_report()`` to
-    ``merge_task_reports`` in task order. Serial and pooled runs therefore see
-    identical objective state.
+    count, phase=...)`` in the parent, runs task ``index`` with that copy
+    (serially or in a worker process), and finally passes every copy's
+    ``task_report()`` to ``merge_task_reports`` in task order. Serial and
+    pooled runs therefore see identical objective state. ``phase`` is
+    ``"search"`` for the global-search runs and ``"polish"`` for the local
+    polish of their best candidates, so a budgeted objective can keep some
+    capacity back for polishing.
     """
 
     def __call__(self, x, *args) -> float: ...
 
-    def for_task(self, index: int, count: int) -> TaskScopedObjective: ...
+    def for_task(
+        self, index: int, count: int, *, phase: TaskPhase = "search"
+    ) -> TaskScopedObjective: ...
 
     def task_report(self) -> object: ...
 
@@ -103,6 +111,7 @@ def _run_objective_tasks(
     *,
     func: Callable,
     max_workers: int,
+    phase: TaskPhase = "search",
     pool_executor_cls=ProcessPoolExecutor,
     broken_pool_exc=BrokenProcessPool,
 ) -> list:
@@ -120,7 +129,10 @@ def _run_objective_tasks(
     count = len(items)
     outputs = _map_in_process_pool(
         partial(_call_with_scoped_objective, task),
-        [(item, func.for_task(index, count)) for index, item in enumerate(items)],
+        [
+            (item, func.for_task(index, count, phase=phase))
+            for index, item in enumerate(items)
+        ],
         max_workers=max_workers,
         pool_executor_cls=pool_executor_cls,
         broken_pool_exc=broken_pool_exc,
@@ -170,4 +182,4 @@ def _collect_candidates_in_parallel(
     return np.asarray(all_x), np.asarray(all_f)
 
 
-__all__ = ["TaskScopedObjective", "_collect_candidates_in_parallel"]
+__all__ = ["TaskPhase", "TaskScopedObjective", "_collect_candidates_in_parallel"]

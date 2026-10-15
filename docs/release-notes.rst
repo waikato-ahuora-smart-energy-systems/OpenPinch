@@ -153,9 +153,12 @@ Analysis corrections
   ``ArithmeticError``, ``LinAlgError``); other errors propagate.
 - Utility placement's ``evaluation_limit`` is a global budget shared across
   runs and worker processes, and ``PlacementTermination.evaluations`` counts
-  every worker's evaluations. ``status`` is ``"evaluation_limit_reached"``
-  when the budget ran out. Each worker previously had the full limit, and
-  only the parent's evaluations were counted.
+  every worker's evaluations. 20 % of the limit is kept back for polishing the
+  best candidates; the global-search runs split the rest (each run's
+  ``maxfun`` is its share), and polishing also gets whatever the runs leave
+  unspent. ``status`` is ``"evaluation_limit_reached"`` only when the whole
+  limit has been spent. Each worker previously had the full limit, and only
+  the parent's evaluations were counted.
 
 - The cross-flow (both streams unmixed) effectiveness series in
   ``HX_Eff``, ``HX_NTU`` and ``CalcAreaUE`` included one term too few, which

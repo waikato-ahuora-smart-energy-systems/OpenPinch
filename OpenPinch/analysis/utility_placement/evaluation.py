@@ -93,12 +93,25 @@ class PlacementTaskReport(BaseModel):
     diagnostic_representatives: tuple[CandidateDiagnostic, ...] = ()
 
 
+# Share of the request's evaluation limit kept back for polishing the best
+# global-search candidates, so search runs that spend their whole share do not
+# leave the polish with nothing.
+POLISH_BUDGET_FRACTION = 0.2
+
+
+def polish_budget_reserve(evaluation_limit: int) -> int:
+    """Evaluations of ``evaluation_limit`` reserved for the polish phase."""
+    return int(evaluation_limit * POLISH_BUDGET_FRACTION)
+
+
 class PlacementEvaluationSession:
     """Evaluate candidates with one bounded exact-coordinate memo per process.
 
     Optimiser tasks each get a :meth:`task_session` holding a share of the
     remaining budget; :meth:`merge_task_reports` charges what they spent back
-    here, so the evaluation limit holds across every worker process.
+    here, so the evaluation limit holds across every worker process. Search
+    tasks split the budget less a polish reserve; polish tasks then split the
+    reserve plus whatever the search tasks left unspent.
     """
 
     def __init__(
@@ -160,16 +173,30 @@ class PlacementEvaluationSession:
         """Whether a fresh candidate was refused for lack of budget."""
         return self._budget_exhausted_count > 0
 
-    def task_session(self, index: int, count: int) -> PlacementEvaluationSession:
+    @property
+    def limit_reached(self) -> bool:
+        """Whether every evaluation of the budget has been spent."""
+        return self._evaluation_count >= self.evaluation_budget
+
+    def task_session(
+        self, index: int, count: int, *, phase: str = "search"
+    ) -> PlacementEvaluationSession:
         """Return a fresh session holding share ``index`` of ``count`` of the budget.
 
         The remaining budget is split as evenly as integers allow, earlier
         shares taking the remainder, so the split never depends on whether the
-        tasks later run serially or in worker processes.
+        tasks later run serially or in worker processes. A ``"search"`` batch
+        from this (top-level) session leaves the polish reserve unsplit; a
+        ``"polish"`` batch splits everything that is left.
         """
         if count < 1 or not 0 <= index < count:
             raise ValueError("task index must lie in range(count).")
+        if phase not in ("search", "polish"):
+            raise ValueError("phase must be 'search' or 'polish'.")
         remaining = max(self.evaluation_budget - self._evaluation_count, 0)
+        if phase == "search" and self._evaluation_budget is None:
+            reserve = polish_budget_reserve(self.evaluation_budget)
+            remaining = max(remaining - reserve, 0)
         share, extra = divmod(remaining, count)
         task = PlacementEvaluationSession(
             request=self.request,
@@ -437,7 +464,9 @@ class PlacementEvaluationSession:
 
 
 __all__ = [
+    "POLISH_BUDGET_FRACTION",
     "PlacementEvaluation",
     "PlacementEvaluationSession",
     "PlacementTaskReport",
+    "polish_budget_reserve",
 ]

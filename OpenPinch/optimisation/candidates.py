@@ -153,6 +153,7 @@ def _polish_candidates(
         basin_reps_idx,
         func=func,
         max_workers=n_workers,
+        phase="polish",
         pool_executor_cls=ProcessPoolExecutor,
         broken_pool_exc=BrokenProcessPool,
     )

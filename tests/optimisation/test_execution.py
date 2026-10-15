@@ -174,8 +174,8 @@ class _ScopedObjective:
         self.calls += 1
         return _quadratic(x)
 
-    def for_task(self, index, count):
-        return _ScopedObjective(f"{index}/{count}")
+    def for_task(self, index, count, *, phase="search"):
+        return _ScopedObjective(f"{phase}:{index}/{count}")
 
     def task_report(self):
         return (self.label, self.calls)
@@ -199,4 +199,8 @@ def test_task_scoped_objective_gets_one_copy_per_run(pool_cls):
 
     assert xs.shape == (3, 1)
     assert objective.calls == 0
-    assert objective.merged == [("0/3", 2), ("1/3", 2), ("2/3", 2)]
+    assert objective.merged == [
+        ("search:0/3", 2),
+        ("search:1/3", 2),
+        ("search:2/3", 2),
+    ]

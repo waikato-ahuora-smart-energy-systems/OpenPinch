@@ -11,6 +11,7 @@ import OpenPinch.optimisation.execution as execution
 from OpenPinch.analysis.utility_placement.evaluation import (
     PlacementEvaluation,
     PlacementEvaluationSession,
+    polish_budget_reserve,
 )
 from OpenPinch.analysis.utility_placement.optimisation import (
     _optimizer_point_to_physical,
@@ -294,8 +295,9 @@ def _session_with(**options) -> PlacementEvaluationSession:
 def test_task_sessions_split_the_remaining_budget_deterministically() -> None:
     session = _session_with(evaluation_limit=10)
 
+    # Search tasks split the limit less the polish reserve (2 of 10).
     shares = [session.task_session(index, 3).evaluation_budget for index in range(3)]
-    assert shares == [4, 3, 3]
+    assert shares == [3, 3, 2]
 
     task = session.task_session(0, 1)
     for point in session.model.initial_points:
@@ -304,8 +306,51 @@ def test_task_sessions_split_the_remaining_budget_deterministically() -> None:
 
     assert session.evaluation_count == task.evaluation_count > 0
     remaining = 10 - session.evaluation_count
-    shares = [session.task_session(index, 4).evaluation_budget for index in range(4)]
+    shares = [
+        session.task_session(index, 4, phase="polish").evaluation_budget
+        for index in range(4)
+    ]
     assert sum(shares) == remaining
+
+
+def test_polish_keeps_its_reserve_after_search_spends_every_share() -> None:
+    session = _session_with(evaluation_limit=10)
+    assert polish_budget_reserve(10) == 2
+
+    # Charge the search batch with its full shares, as runs that hit their
+    # maxfun do.
+    search = [session.task_session(index, 2) for index in range(2)]
+    reports = [
+        task.task_report().model_copy(
+            update={"evaluation_count": task.evaluation_budget}
+        )
+        for task in search
+    ]
+    session.merge_task_reports(reports)
+
+    assert session.evaluation_count == 8
+    assert not session.limit_reached
+    polish = [session.task_session(index, 3, phase="polish") for index in range(3)]
+    assert [task.evaluation_budget for task in polish] == [1, 1, 0]
+
+
+def test_polish_also_gets_what_search_left_unspent() -> None:
+    session = _session_with(evaluation_limit=10)
+    search = [session.task_session(index, 2) for index in range(2)]
+    # Both runs stop early, spending 1 of their 4 each.
+    reports = [
+        task.task_report().model_copy(update={"evaluation_count": 1}) for task in search
+    ]
+    session.merge_task_reports(reports)
+
+    polish = [session.task_session(index, 2, phase="polish") for index in range(2)]
+    assert sum(task.evaluation_budget for task in polish) == 8
+
+
+def test_task_session_rejects_unknown_phase() -> None:
+    session = _session_with(evaluation_limit=10)
+    with pytest.raises(ValueError, match="phase"):
+        session.task_session(0, 1, phase="refine")
 
 
 def test_task_session_budget_survives_pickling_and_reports_exhaustion() -> None:

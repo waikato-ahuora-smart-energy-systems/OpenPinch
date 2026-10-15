@@ -24,6 +24,7 @@ from .evaluation import (
     PlacementEvaluation,
     PlacementEvaluationSession,
     PlacementTaskReport,
+    polish_budget_reserve,
 )
 
 OptimisationRunner = Callable[..., OptimisationResult]
@@ -151,8 +152,12 @@ class _BoundedSessionObjective:
     def __call__(self, point, *args) -> float:
         return _bounded_session_objective(point, session=self.session)
 
-    def for_task(self, index: int, count: int) -> _BoundedSessionObjective:
-        return _BoundedSessionObjective(self.session.task_session(index, count))
+    def for_task(
+        self, index: int, count: int, *, phase: str = "search"
+    ) -> _BoundedSessionObjective:
+        return _BoundedSessionObjective(
+            self.session.task_session(index, count, phase=phase)
+        )
 
     def task_report(self) -> PlacementTaskReport:
         return self.session.task_report()
@@ -175,13 +180,19 @@ def map_optimisation_options(
     options: UtilityPlacementOptions,
 ) -> tuple[OptimisationMethod, OptimisationOptions]:
     """Map frozen specialist options onto the existing optimizer contract."""
+    # Each run stops at its share of the search budget (the limit less the
+    # polish reserve) instead of spending calls on budget-exhausted penalties.
+    search_budget = options.evaluation_limit - polish_budget_reserve(
+        options.evaluation_limit
+    )
+    run_share = max(1, -(-search_budget // options.run_count))
     return (
         OptimisationMethod(options.method.value),
         OptimisationOptions(
             n_runs=options.run_count,
             maxiter=options.iteration_limit,
             seed=options.seed,
-            maxfun=options.evaluation_limit,
+            maxfun=run_share,
             cluster_tol=options.cluster_tolerance,
             max_minima=options.candidate_limit,
             local_method=options.local_method,
@@ -275,7 +286,9 @@ def coordinate_optimisation(
             details=(("candidate_count", len(unique_points)),),
         )
 
-    if session.budget_exhausted:
+    # The limit is reached only when the whole budget is spent: a task that
+    # used up its own share while others stopped early has not hit the limit.
+    if session.limit_reached:
         status = "evaluation_limit_reached"
         message = (
             "Optimization stopped at the evaluation limit; feasible placements "

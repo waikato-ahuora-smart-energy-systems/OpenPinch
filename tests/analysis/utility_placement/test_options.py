@@ -105,7 +105,9 @@ def test_map_options_uses_existing_solver_neutral_contract() -> None:
     assert method is OptimisationMethod.RBF
     assert mapped.n_runs == 2
     assert mapped.maxiter == 40
-    assert mapped.maxfun == 120
+    # Each of the 2 runs gets half the search budget: 120 less the 24 kept
+    # back for polishing.
+    assert mapped.maxfun == 48
     assert mapped.max_minima == 3
     assert mapped.seed == 17
     assert mapped.cluster_tol == pytest.approx(0.05)
