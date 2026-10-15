@@ -4,6 +4,19 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Contract JSON Schema
+~~~~~~~~~~~~~~~~~~~~
+
+- New ``OpenPinch.contracts.schema.contract_json_schemas()`` returns the JSON
+  Schema of each public contract (``TargetInput``, ``TargetOutput``,
+  ``PinchWorkspaceBundle``, the HPR performance map, utility placement,
+  dt_min and network synthesis results), so typed clients such as a
+  TypeScript frontend can be generated from them. Inputs use the validation
+  schema and results the serialisation schema; ``Value`` is described by its
+  JSON form (scalar or per-period values with a unit).
+- New ``openpinch schema -o DIR`` writes one ``<Contract>.schema.json`` file
+  per contract.
+
 Organic Rankine cycle targeting
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
