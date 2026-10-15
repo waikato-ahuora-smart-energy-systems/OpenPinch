@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from ....parallelism import supported_workers
 from ...indexing import build_index_grid
 from .._base import approach as _approach
 from .verification import _value
@@ -350,7 +351,7 @@ def _solve_evolution_candidates(
     print_output: bool,
     max_parallel: int,
 ) -> list[tuple[_EvolutionCandidateSpec, Any]]:
-    if max_parallel <= 1 or len(specs) <= 1:
+    if supported_workers(max_parallel) <= 1 or len(specs) <= 1:
         return [
             (spec, candidate)
             for spec in specs

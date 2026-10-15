@@ -18,6 +18,17 @@ Heat pump cycle states at saturation
   different optimum: tutorial 09's quick water heat pump moves from COP 7.72
   (24.3 kW) to COP 6.88 (27.2 kW), the same as in the browser.
 
+Running in the browser (Pyodide)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``workers`` and ``max_parallel`` fall back to serial execution where Python
+  cannot start threads (CPython built for Emscripten, as in Pyodide). Before,
+  ``all_periods`` targets and inverse dt_min with ``workers > 1``, and branched
+  HEN network evolution, failed there with "can't start new thread".
+- The optimiser backends default to one run (``n_runs=1``), matching
+  ``OptimisationOptions``, instead of the machine's CPU count. Candidate
+  polishing also works where the CPU count is unknown.
+
 Organic Rankine cycle targeting
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

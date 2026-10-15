@@ -15,6 +15,7 @@ from ....analysis.heat_pumps.performance_maps.target_basis import (
 from ....analysis.heat_pumps.performance_maps.targeting import (
     normalize_hpr_simulation_backend,
 )
+from ....analysis.parallelism import supported_workers
 from ....contracts.hpr import HPRSearchBudget
 from ....contracts.hpr_performance_map import (
     HprPerformanceMap,
@@ -121,7 +122,7 @@ class _AllPeriodsTargetAccessor:
             method(period_id=period_id, **kwargs)
             return deepcopy(isolated._results), prepared_period_state(isolated)
 
-        if workers == 1:
+        if supported_workers(workers) == 1:
             solved = [solve(period_id) for period_id in period_ids]
         else:
             with ThreadPoolExecutor(max_workers=workers) as executor:
