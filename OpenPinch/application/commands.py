@@ -38,8 +38,7 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
     """
     command = request["command"]
     if command == "open":
-        session = uuid4().hex
-        _SESSIONS[session] = _load_problem(request["problem"])
+        session = _open(_load_problem(request["problem"]))
         return {"session": session, "value": None, "results": None}
     if "session" in request:
         if request["session"] not in _SESSIONS:
@@ -59,10 +58,20 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
     if not callable(method):
         raise ValueError(f"Unknown command {command!r}.")
     returned = method(**request.get("arguments", {}))
-    return {
-        "value": _to_json(returned),
-        "results": _to_json(problem.results),
-    }
+    if isinstance(returned, PinchProblem):
+        # A new case, such as the optimised case from utility placement.
+        value = {"data": returned.to_problem_json()}
+        if "session" in request:
+            value["session"] = _open(returned)
+    else:
+        value = _to_json(returned)
+    return {"value": value, "results": _to_json(problem.results)}
+
+
+def _open(problem: PinchProblem) -> str:
+    session = uuid4().hex
+    _SESSIONS[session] = problem
+    return session
 
 
 def run_command_json(request: str) -> str:

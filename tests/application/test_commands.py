@@ -11,7 +11,9 @@ from OpenPinch.application._problem.accessors.design import (
     HeatExchangerNetworkDesignView,
     _DesignAccessor,
 )
+from OpenPinch.application._problem.accessors.target import _TargetAccessor
 from OpenPinch.application.commands import run_command, run_command_json
+from OpenPinch.application.problem import PinchProblem
 from OpenPinch.contracts.workspace import ValidationReport
 from OpenPinch.tutorials import sample_cases
 
@@ -191,6 +193,48 @@ def test_session_runs_multiperiod_design_after_all_period_targeting(monkeypatch)
         run_command(
             {"command": "design.multiperiod_heat_exchanger_network", "session": session}
         )
+
+
+def _optimised_case() -> PinchProblem:
+    data = json.loads(
+        (files(sample_cases) / "chocolate_factory.json").read_text(encoding="utf-8")
+    )
+    return PinchProblem(data)
+
+
+def test_command_returning_a_case_returns_its_problem_data(monkeypatch):
+    case = _optimised_case()
+    monkeypatch.setattr(
+        _TargetAccessor, "utility_placement", lambda self, **_kwargs: case
+    )
+
+    response = run_command(
+        {
+            "command": "target.utility_placement",
+            "problem": {"sample_case": "basic_pinch.json"},
+        }
+    )
+
+    assert response["value"] == {"data": case.to_problem_json()}
+
+
+def test_case_returned_in_a_session_opens_as_a_new_session(monkeypatch):
+    monkeypatch.setattr(
+        _TargetAccessor, "utility_placement", lambda self, **_kwargs: _optimised_case()
+    )
+    session = run_command(
+        {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
+    )["session"]
+
+    value = run_command({"command": "target.utility_placement", "session": session})[
+        "value"
+    ]
+    response = run_command(
+        {"command": "target.direct_heat_integration", "session": value["session"]}
+    )
+
+    assert value["session"] != session
+    assert response["results"]["targets"]
 
 
 def test_closed_session_cannot_run_commands():
