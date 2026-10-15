@@ -87,6 +87,11 @@ def load_external_problem_source(
     )
 
 
+def load_packaged_sample_case(name: str) -> JsonDict:
+    """Return the inputs of a packaged sample case, resolved by name only."""
+    return parse_json(read_sample_case(name))
+
+
 def _load_json_inputs(source_path: Path, *, source: PathLike) -> JsonDict:
     try:
         sample_case_name = _packaged_sample_case_name(source, source_path)
