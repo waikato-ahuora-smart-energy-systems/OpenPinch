@@ -1,0 +1,12 @@
+{
+  "name": "openpinch-tooling",
+  "private": true,
+  "description": "Agent guardrail tooling (probity) for the OpenPinch Python package. Not part of the Python distribution.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@nizos/probity": "^1.10.1"
+  }
+}
