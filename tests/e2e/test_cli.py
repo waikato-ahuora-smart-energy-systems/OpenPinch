@@ -30,6 +30,17 @@ def test_help_surfaces_supported_commands_and_flags(argv, expected, capsys):
     assert "sample" not in captured.out
 
 
+def test_schema_command_writes_one_json_schema_file_per_contract(tmp_path: Path):
+    import json
+
+    assert cli.main(["schema", "-o", str(tmp_path / "schemas")]) == 0
+
+    target_input = json.loads(
+        (tmp_path / "schemas" / "TargetInput.schema.json").read_text()
+    )
+    assert "streams" in target_input["properties"]
+
+
 def test_notebook_command_copies_full_series(tmp_path: Path, capsys):
     notebook_dir = tmp_path / "notebooks"
 
