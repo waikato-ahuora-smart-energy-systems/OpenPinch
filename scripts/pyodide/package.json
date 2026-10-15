@@ -1,0 +1,12 @@
+{
+  "name": "openpinch-pyodide-tests",
+  "private": true,
+  "description": "Runs part of the OpenPinch test suite inside Pyodide under Node (the browser engine's runtime). Not part of the Python distribution.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "pyodide": "314.0.7"
+  }
+}
