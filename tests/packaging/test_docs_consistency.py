@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import OpenPinch
@@ -95,7 +96,11 @@ def test_rtd_configuration_keeps_strict_python314_build():
     assert 'python: "3.14"' in config
     assert "configuration: docs/conf.py" in config
     assert "fail_on_warning: true" in config
-    assert "requirements: docs/requirements.txt" in config
+    # Docs dependencies come from uv.lock, with the same uv version as CI.
+    assert "uv sync --frozen --no-dev --group docs" in config
+    ci = _read(REPO_ROOT / ".github" / "workflows" / "ci.yml")
+    uv_version = re.search(r'UV_VERSION: "([^"]+)"', ci).group(1)
+    assert f"asdf install uv {uv_version}" in config
 
 
 def test_top_level_navigation_uses_user_first_information_architecture():

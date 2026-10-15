@@ -81,8 +81,38 @@ def _public_level(level, request: UtilityPlacementRequest) -> UtilityLevelPeriod
     )
 
 
+class PlacementTaskReport(BaseModel):
+    """Evaluation accounting one task session hands back to its parent."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    evaluation_count: int
+    memo_hit_count: int
+    budget_exhausted_count: int
+    diagnostic_counts: tuple[tuple[str, int], ...] = ()
+    diagnostic_representatives: tuple[CandidateDiagnostic, ...] = ()
+
+
+# Share of the request's evaluation limit kept back for polishing the best
+# global-search candidates, so search runs that spend their whole share do not
+# leave the polish with nothing.
+POLISH_BUDGET_FRACTION = 0.2
+
+
+def polish_budget_reserve(evaluation_limit: int) -> int:
+    """Evaluations of ``evaluation_limit`` reserved for the polish phase."""
+    return int(evaluation_limit * POLISH_BUDGET_FRACTION)
+
+
 class PlacementEvaluationSession:
-    """Evaluate candidates with one bounded exact-coordinate memo per process."""
+    """Evaluate candidates with one bounded exact-coordinate memo per process.
+
+    Optimiser tasks each get a :meth:`task_session` holding a share of the
+    remaining budget; :meth:`merge_task_reports` charges what they spent back
+    here, so the evaluation limit holds across every worker process. Search
+    tasks split the budget less a polish reserve; polish tasks then split the
+    reserve plus whatever the search tasks left unspent.
+    """
 
     def __init__(
         self,
@@ -96,6 +126,8 @@ class PlacementEvaluationSession:
         self.context = context
         self.model = model
         self.allocation_adapter = allocation_adapter
+        # Evaluations this session may spend; ``None`` means the request limit.
+        self._evaluation_budget: int | None = None
         self._reset_process_state()
 
     def _reset_process_state(self) -> None:
@@ -103,6 +135,7 @@ class PlacementEvaluationSession:
         self._lock = Lock()
         self._evaluation_count = 0
         self._memo_hit_count = 0
+        self._budget_exhausted_count = 0
         self._diagnostic_counts: Counter[str] = Counter()
         self._diagnostic_representatives: list[CandidateDiagnostic] = []
 
@@ -112,11 +145,20 @@ class PlacementEvaluationSession:
             "context": self.context,
             "model": self.model,
             "allocation_adapter": self.allocation_adapter,
+            "_evaluation_budget": self._evaluation_budget,
         }
 
     def __setstate__(self, state):
+        state.setdefault("_evaluation_budget", None)
         self.__dict__.update(state)
         self._reset_process_state()
+
+    @property
+    def evaluation_budget(self) -> int:
+        """Total evaluations this session may spend, including task shares."""
+        if self._evaluation_budget is None:
+            return self.request.options.evaluation_limit
+        return self._evaluation_budget
 
     @property
     def evaluation_count(self) -> int:
@@ -125,6 +167,68 @@ class PlacementEvaluationSession:
     @property
     def memo_hit_count(self) -> int:
         return self._memo_hit_count
+
+    @property
+    def budget_exhausted(self) -> bool:
+        """Whether a fresh candidate was refused for lack of budget."""
+        return self._budget_exhausted_count > 0
+
+    @property
+    def limit_reached(self) -> bool:
+        """Whether every evaluation of the budget has been spent."""
+        return self._evaluation_count >= self.evaluation_budget
+
+    def task_session(
+        self, index: int, count: int, *, phase: str = "search"
+    ) -> PlacementEvaluationSession:
+        """Return a fresh session holding share ``index`` of ``count`` of the budget.
+
+        The remaining budget is split as evenly as integers allow, earlier
+        shares taking the remainder, so the split never depends on whether the
+        tasks later run serially or in worker processes. A ``"search"`` batch
+        from this (top-level) session leaves the polish reserve unsplit; a
+        ``"polish"`` batch splits everything that is left.
+        """
+        if count < 1 or not 0 <= index < count:
+            raise ValueError("task index must lie in range(count).")
+        if phase not in ("search", "polish"):
+            raise ValueError("phase must be 'search' or 'polish'.")
+        remaining = max(self.evaluation_budget - self._evaluation_count, 0)
+        if phase == "search" and self._evaluation_budget is None:
+            reserve = polish_budget_reserve(self.evaluation_budget)
+            remaining = max(remaining - reserve, 0)
+        share, extra = divmod(remaining, count)
+        task = PlacementEvaluationSession(
+            request=self.request,
+            context=self.context,
+            model=self.model,
+            allocation_adapter=self.allocation_adapter,
+        )
+        task._evaluation_budget = share + (1 if index < extra else 0)
+        return task
+
+    def task_report(self) -> PlacementTaskReport:
+        """Summarise the evaluations this session spent, for its parent."""
+        return PlacementTaskReport(
+            evaluation_count=self._evaluation_count,
+            memo_hit_count=self._memo_hit_count,
+            budget_exhausted_count=self._budget_exhausted_count,
+            diagnostic_counts=self.diagnostic_counts,
+            diagnostic_representatives=self.diagnostic_representatives,
+        )
+
+    def merge_task_reports(self, reports) -> None:
+        """Charge task sessions' evaluations and diagnostics to this session."""
+        with self._lock:
+            for report in reports:
+                self._evaluation_count += report.evaluation_count
+                self._memo_hit_count += report.memo_hit_count
+                self._budget_exhausted_count += report.budget_exhausted_count
+                self._diagnostic_counts.update(dict(report.diagnostic_counts))
+                room = 10 - len(self._diagnostic_representatives)
+                self._diagnostic_representatives.extend(
+                    report.diagnostic_representatives[: max(room, 0)]
+                )
 
     @property
     def diagnostic_counts(self) -> tuple[tuple[str, int], ...]:
@@ -180,7 +284,8 @@ class PlacementEvaluationSession:
             if cached is not None:
                 self._memo_hit_count += 1
                 return cached
-            if self._evaluation_count >= self.request.options.evaluation_limit:
+            if self._evaluation_count >= self.evaluation_budget:
+                self._budget_exhausted_count += 1
                 diagnostic = CandidateDiagnostic(
                     code="evaluation_budget_exhausted",
                     constraint="evaluation_limit",
@@ -358,4 +463,10 @@ class PlacementEvaluationSession:
         return self.evaluate(coordinates).scalar_objective
 
 
-__all__ = ["PlacementEvaluation", "PlacementEvaluationSession"]
+__all__ = [
+    "POLISH_BUDGET_FRACTION",
+    "PlacementEvaluation",
+    "PlacementEvaluationSession",
+    "PlacementTaskReport",
+    "polish_budget_reserve",
+]

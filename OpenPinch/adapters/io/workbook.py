@@ -111,9 +111,9 @@ def _parse_sheet_with_units(
 
     for index in range(len(df_data.columns), len(col_names), -1):
         df_data = df_data.drop(columns=index - 1)
+    # Columns the table leaves out stay absent so the input contract applies
+    # its defaults; padding them with 0 forced dt_cont and htc to zero.
     df_data.columns = col_names[: len(df_data.columns)]
-    for index in range(len(df_data.columns), len(col_names)):
-        df_data[col_names[index]] = 0
 
     units_map = dict(zip(col_names, col_units))
     if sheet_name != "Summary":
@@ -140,6 +140,13 @@ def _parse_options_sheet(
             return {}
         df_full = pd.read_excel(workbook, sheet_name=sheet_name, header=None)
 
+    if df_full.empty:
+        return {}
+    if df_full.shape[1] < 2:
+        raise ValueError(
+            f"The {sheet_name} sheet needs option names in column A and their "
+            "values in column B."
+        )
     col0 = df_full.iloc[:, 0]
     col1 = df_full.iloc[:, 1]
     df_full = df_full.loc[col1.notna() & ~col0.astype(str).str.startswith("###")]
@@ -155,7 +162,7 @@ def _parse_options_sheet(
         if hasattr(value, "item"):
             try:
                 return value.item()
-            except AttributeError, RuntimeError, TypeError, ValueError:
+            except (AttributeError, RuntimeError, TypeError, ValueError):
                 pass
         return value
 

@@ -10,9 +10,10 @@ wake-management packages.
 Python Version Policy
 ---------------------
 
-OpenPinch stays on Python ``>=3.14.2`` for the migration. Source OpenHENS targets
-Python ``>=3.12``, but migrated synthesis dependencies must resolve and import
-under OpenPinch's Python target before solver code moves.
+OpenPinch supports Python ``>=3.12``, the same floor as the OpenHENS source, and
+develops on the version in ``.python-version``. Synthesis dependencies must
+resolve and import on every supported Python; CI runs the unit tests on 3.12,
+3.13 and the development version.
 
 The HENS-01 viability set is:
 

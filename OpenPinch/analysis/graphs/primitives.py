@@ -46,7 +46,7 @@ def _should_plot_series(values: list[float]) -> bool:
     """Return whether a graph series contains meaningful finite values."""
     try:
         numeric = np.asarray(values, dtype=float)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         numeric = np.array(
             [float(value) for value in values if value is not None],
             dtype=float,

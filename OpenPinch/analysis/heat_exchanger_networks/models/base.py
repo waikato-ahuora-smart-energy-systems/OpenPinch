@@ -75,7 +75,11 @@ class BaseHeatExchangerNetworkModel(ABC):
         self._piecewise_active_mappings: list[dict[str, Any]] = []
 
         self.setup_model()
-        self.setup()
+        try:
+            self.setup()
+        except BaseException:
+            _execution.cleanup_model(self)
+            raise
 
     def setup_model(self) -> None:
         "Create and configure the GEKKO model behind optional guards."
@@ -147,6 +151,10 @@ class BaseHeatExchangerNetworkModel(ABC):
     def set_match_restrictions(self, restrictions) -> None:
         "Apply inherited topology restrictions in the source array shape."
         return _approach.set_match_restrictions(self, restrictions)
+
+    def cleanup(self) -> None:
+        "Remove the GEKKO run directory; solved values stay on the model."
+        return _execution.cleanup_model(self)
 
     def optimise(self, print_output: bool) -> None:
         """Delegate solver execution with explicit model state."""

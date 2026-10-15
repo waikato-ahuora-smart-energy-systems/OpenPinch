@@ -29,6 +29,10 @@ def _apply_efficiency_limits(
     efficiency = work / work_isentropic
     if efficiency <= min_eff:
         return min_eff * work_isentropic, min_eff
+    # A correlation extrapolated past its fitted range can predict more than
+    # the isentropic work; no real turbine can.
+    if efficiency > 1.0:
+        return work_isentropic, 1.0
 
     return work, efficiency
 

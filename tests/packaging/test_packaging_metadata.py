@@ -7,6 +7,8 @@ import runpy
 import subprocess
 import tomllib
 
+import yaml
+
 from tests.support.paths import REPOSITORY_ROOT
 
 REPO_ROOT = REPOSITORY_ROOT
@@ -99,7 +101,7 @@ def test_dashboard_brayton_and_tespy_extras_are_declared():
         "openpyxl",
         "pyxlsb",
     ]
-    assert optional_deps["brayton_cycle"] == [TESPY_REQUIREMENT]
+    assert optional_deps["brayton_cycle"] == ["OpenPinch[tespy]"]
     assert optional_deps["tespy"] == [TESPY_REQUIREMENT]
 
 
@@ -116,7 +118,7 @@ def test_hpr_runtime_requires_coolprop_8_and_dev_retains_tespy_floor():
         if _dependency_name(dependency) == "tespy"
     ]
 
-    assert coolprop_entries == ["CoolProp>=8"]
+    assert coolprop_entries == ["CoolProp>=8,<9"]
     assert tespy_dev_entries == [TESPY_REQUIREMENT]
 
 
@@ -159,6 +161,8 @@ def test_full_extra_aggregates_every_optional_runtime_surface_without_duplicates
         for extra_name, dependencies in optional_deps.items()
         if extra_name != "full"
         for dep in dependencies
+        # Self-references (OpenPinch[tespy]) alias another extra.
+        if _dependency_name(dep) != "openpinch"
     }
 
     assert set(full_names) == expected_names
@@ -206,8 +210,27 @@ def test_jsonschema_is_a_development_only_contract_verifier():
 
 def test_requires_python_matches_python_version_files_and_ci():
     minimum_version = _minimum_python_version()
+    development_version = PYTHON_VERSION.read_text(encoding="utf-8").strip()
 
-    assert minimum_version == PYTHON_VERSION.read_text(encoding="utf-8").strip()
+    def as_tuple(version: str) -> tuple[int, ...]:
+        return tuple(int(part) for part in version.split("."))
+
+    # .python-version pins the development interpreter; requires-python is the
+    # oldest supported one. CI runs the unit lane on every minor in between.
+    assert as_tuple(minimum_version) <= as_tuple(development_version)
+    ci = yaml.safe_load((REPO_ROOT / ".github/workflows/ci.yml").read_text())
+    lane_pythons = {
+        row["python"]
+        for row in ci["jobs"]["tests"]["strategy"]["matrix"]["include"]
+        if "python" in row
+    }
+    lowest_minor, development_minor = (
+        as_tuple(minimum_version)[1],
+        as_tuple(development_version)[1],
+    )
+    assert lane_pythons == {
+        f"3.{minor}" for minor in range(lowest_minor, development_minor)
+    }
 
     update_toolchain = UPDATE_TOOLCHAIN.read_text(encoding="utf-8")
     assert "_read_python_minor" in update_toolchain
@@ -233,8 +256,9 @@ def test_update_toolchain_uses_minor_selector_for_python_install():
 def test_requires_python_classifier_matches_minimum_version():
     project = _read_pyproject()["project"]
 
-    assert project["requires-python"] == ">=3.14.2"
-    assert "Programming Language :: Python :: 3.14" in project["classifiers"]
+    assert project["requires-python"] == ">=3.12"
+    for minor in ("3.12", "3.13", "3.14"):
+        assert f"Programming Language :: Python :: {minor}" in project["classifiers"]
 
 
 def test_pytest_marker_policy_declares_optional_and_solver_tiers():
@@ -330,14 +354,16 @@ def test_installed_wheel_smoke_uses_only_the_root_workflow_contract():
     assert "hpr_performance_map" in smoke
 
 
-def test_core_dependencies_have_required_coolprop_floor_and_other_major_ceilings():
+def test_core_dependencies_have_tested_floors_and_major_ceilings():
     dependencies = _read_pyproject()["project"]["dependencies"]
 
+    # Floors: oldest releases with Python 3.14 wheels that pass the suite (CI
+    # "floors" lane). Ceilings: the next major version.
     assert dependencies == [
-        "numpy<3",
-        "pint<1",
-        "pandas<4",
-        "CoolProp>=8",
-        "pydantic<3",
-        "scipy<2",
+        "numpy>=2.3.2,<3",
+        "pint>=0.24.4,<1",
+        "pandas>=2.3.3,<4",
+        "CoolProp>=8,<9",
+        "pydantic>=2.12,<3",
+        "scipy>=1.16.1,<2",
     ]

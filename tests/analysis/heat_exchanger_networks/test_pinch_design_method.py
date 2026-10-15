@@ -7,7 +7,6 @@ import math
 import subprocess
 import sys
 import threading
-import time
 import warnings
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
@@ -624,6 +623,13 @@ def test_stage_reduction_active_stage_selection_uses_source_thresholds() -> None
     assert problem._get_active_stages(case) == [0, 2]
 
 
+def test_stage_reduction_keeps_all_stages_when_nothing_is_recovered() -> None:
+    problem = InternalHeatExchangerNetworkProblem(solver_arrays=_solver_arrays())
+    case = _StageReductionCase(stage_duties=[0.0, 0.0, 0.0, 0.0])
+
+    assert problem._get_active_stages(case) == [0, 1, 2, 3]
+
+
 def test_stagewise_evolution_candidate_selection_and_match_ranking() -> None:
     model = StageWiseModel.__new__(StageWiseModel)
     failed = _CandidateModel(mSuccess=0, TAC=999.0)
@@ -1135,6 +1141,10 @@ def test_local_executor_honours_max_parallel_for_stage_tasks(monkeypatch) -> Non
     active_count = 0
     max_active_count = 0
     lock = threading.Lock()
+    # Each task waits here for the other, so two parallel tasks are always
+    # active together however long task setup takes; serial execution times
+    # out and leaves max_active_count at 1.
+    both_running = threading.Barrier(2, timeout=10)
 
     def fake_get_solution(
         self, *, print_output=True, evolution=None, model_factories=None
@@ -1145,7 +1155,10 @@ def test_local_executor_honours_max_parallel_for_stage_tasks(monkeypatch) -> Non
             active_count += 1
             max_active_count = max(max_active_count, active_count)
         try:
-            time.sleep(0.05)
+            try:
+                both_running.wait()
+            except threading.BrokenBarrierError:
+                pass
             self.case = _SolvedCase()
             self.case.S = self.stages or 3
             self.case.stages = self.case.S
@@ -2752,6 +2765,81 @@ def test_pdm_decomposition_keeps_distinct_period_targets_and_union_topology() ->
     assert decomposition.clipped_hot_supply_temperatures_by_period[1][0] == 600.0
 
 
+def test_pdm_decomposition_splits_each_stream_at_its_own_contribution() -> None:
+    def stream(name, supply, target, cp, dt_cont):
+        return {
+            "zone": "Site",
+            "name": name,
+            "t_supply": supply,
+            "t_target": target,
+            "heat_flow": abs(supply - target) * cp,
+            "dt_cont": dt_cont,
+            "htc": 1.0,
+        }
+
+    problem = PinchProblem(
+        source={
+            "streams": [
+                stream("H1", 170.0, 60.0, 3.0, 10.0),
+                stream("H2", 150.0, 30.0, 1.5, 2.5),
+                stream("C1", 20.0, 135.0, 2.0, 2.5),
+                stream("C2", 80.0, 140.0, 4.0, 2.5),
+            ],
+            "utilities": [
+                {"name": "Steam", "type": "Hot", "t_supply": 200.0, "price": 30.0},
+                {"name": "CW", "type": "Cold", "t_supply": 10.0, "price": 5.0},
+            ],
+            "options": {"THERMAL_DT_CONT": 5.0},
+        },
+        project_name="Site",
+    )
+    cp_hot = np.array([3.0, 1.5])
+    cp_cold = np.array([2.0, 4.0])
+
+    decompositions = _pdm_decompositions(problem, dTmin=10.0)
+    above = decompositions["above"]
+    below = decompositions["below"]
+
+    # Shifted pinch 82.5 degC: H1 meets it at +10 K, the others at +/-2.5 K.
+    np.testing.assert_allclose(
+        above.clipped_hot_target_temperatures_by_period[0], [365.65, 358.15]
+    )
+    np.testing.assert_allclose(
+        above.clipped_cold_supply_temperatures_by_period[0], [353.15, 353.15]
+    )
+    np.testing.assert_allclose(
+        below.clipped_hot_supply_temperatures_by_period[0], [365.65, 358.15]
+    )
+
+    # Each side then balances to the MER targets, with no cross-pinch transfer.
+    def side_duty(T_in, T_out, cp):
+        return float(np.sum(cp * np.abs(np.asarray(T_in) - np.asarray(T_out))))
+
+    hot_above = side_duty(
+        above.clipped_hot_supply_temperatures_by_period[0],
+        above.clipped_hot_target_temperatures_by_period[0],
+        cp_hot,
+    )
+    cold_above = side_duty(
+        above.clipped_cold_supply_temperatures_by_period[0],
+        above.clipped_cold_target_temperatures_by_period[0],
+        cp_cold,
+    )
+    hot_below = side_duty(
+        below.clipped_hot_supply_temperatures_by_period[0],
+        below.clipped_hot_target_temperatures_by_period[0],
+        cp_hot,
+    )
+    cold_below = side_duty(
+        below.clipped_cold_supply_temperatures_by_period[0],
+        below.clipped_cold_target_temperatures_by_period[0],
+        cp_cold,
+    )
+    target = above.period_targets[0]
+    assert cold_above - hot_above == pytest.approx(target.hot_utility_target)
+    assert hot_below - cold_below == pytest.approx(target.cold_utility_target)
+
+
 def test_pdm_decomposition_private_helpers_cover_guard_and_stage_edges() -> None:
     with pytest.raises(ValueError, match="pinch_location"):
         pdm_decomposition.build_pinch_design_decomposition(
@@ -2822,8 +2910,9 @@ def test_pdm_decomposition_private_helpers_cover_guard_and_stage_edges() -> None
         T_h_out=T_h_out,
         T_c_in=T_c_in,
         T_c_out=T_c_out,
+        hot_contributions=np.array([5.0, 5.0]),
+        cold_contributions=np.array([5.0, 5.0]),
         shifted_pinch_temperature=400.0,
-        dTmin=10.0,
         pinch_location="below",
     )
 

@@ -80,6 +80,25 @@ def test_cascade_condensers_must_sit_dt_cascade_hx_above_evaporators(t_cond, pen
     assert violation == pytest.approx(penalty)
 
 
+@pytest.mark.parametrize(
+    "t_cond, t_evap, penalty",
+    [
+        ([90.0, 80.0, 70.0], [40.0, 30.0], 0.0),
+        # Only the first pair is out of order; the old telescoping sum missed it.
+        ([50.0, 90.0, 80.0], [40.0, 30.0], 40.0),
+        ([90.0, 80.0, 70.0], [20.0, 30.0, 25.0], 10.0),
+    ],
+)
+def test_cascade_stage_order_checks_every_adjacent_pair(t_cond, t_evap, penalty):
+    cycle = SimpleNamespace(_dt_cascade_hx=5.0)
+
+    violation = CascadeVapourCompressionCycle._validate_T_cond_and_evap(
+        cycle, np.array(t_cond), np.array(t_evap)
+    )
+
+    assert violation == pytest.approx(penalty)
+
+
 def test_encoded_seed_is_clipped_into_its_bounds():
     seed = clip_to_bounds([-1e-17, 1.0 + 1e-16, 0.5], [(0.0, 1.0)] * 3)
 

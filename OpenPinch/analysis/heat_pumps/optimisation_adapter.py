@@ -550,7 +550,7 @@ def evaluate_hpr_candidate(
 def _accepts_artifact_mode(objective: HPRObjective) -> bool:
     try:
         parameters = signature(objective).parameters.values()
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return False
     return any(
         parameter.name == "artifact_mode" or parameter.kind is Parameter.VAR_KEYWORD
@@ -734,7 +734,7 @@ def aggregate_hpr_period_results(
             if utility_capital is not None:
                 total = total + utility_capital
             updates["hpr_total_annualized_cost"] = total
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             pass
     if "hpr_total_annualized_cost" not in updates:
         weighted_total = _aggregate_result_field(
@@ -913,7 +913,7 @@ def _aggregate_values(
 
     try:
         arrays = [np.asarray(value, dtype=float) for value in values]
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
     if len({array.shape for array in arrays}) != 1:
         return None

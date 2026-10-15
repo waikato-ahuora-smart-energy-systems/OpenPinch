@@ -381,6 +381,10 @@ def _build_decomposition(
     }
     if any(rows.shape[0] != period_count for rows in state_rows.values()):
         raise ValueError("PDM period targets must match solver-array periods.")
+    # Each stream meets the shifted pinch at its own contribution, so its real
+    # pinch temperature is T* + dt_cont (hot) or T* - dt_cont (cold).
+    hot_contributions = np.asarray(values["T_h_cont_period"], dtype=float)
+    cold_contributions = np.asarray(values["T_c_cont_period"], dtype=float)
     z_i_active_period = []
     z_j_active_period = []
     for period_idx, target in enumerate(period_targets):
@@ -394,8 +398,9 @@ def _build_decomposition(
             T_h_out=state_rows["T_h_out_period"][period_idx],
             T_c_in=state_rows["T_c_in_period"][period_idx],
             T_c_out=state_rows["T_c_out_period"][period_idx],
+            hot_contributions=hot_contributions[period_idx],
+            cold_contributions=cold_contributions[period_idx],
             shifted_pinch_temperature=target.shifted_pinch_temperature,
-            dTmin=dTmin,
             pinch_location=pinch_location,
         )
         z_i_active_period.append(z_i_active)
@@ -462,39 +467,52 @@ def _clip_stream_temperatures(
     T_h_out: np.ndarray,
     T_c_in: np.ndarray,
     T_c_out: np.ndarray,
+    hot_contributions: np.ndarray,
+    cold_contributions: np.ndarray,
     shifted_pinch_temperature: float,
-    dTmin: float,
     pinch_location: PinchLocation,
 ) -> tuple[tuple[int, ...], tuple[int, ...]]:
-    hot_threshold = shifted_pinch_temperature + dTmin / 2.0
-    cold_threshold = shifted_pinch_temperature - dTmin / 2.0
+    hot_thresholds = shifted_pinch_temperature + np.asarray(hot_contributions)
+    cold_thresholds = shifted_pinch_temperature - np.asarray(cold_contributions)
     if pinch_location == "above":
-        z_i_active = tuple(1 if value > hot_threshold else 0 for value in T_h_in)
-        z_j_active = tuple(1 if value > cold_threshold else 0 for value in T_c_out)
+        z_i_active = tuple(
+            1 if value > threshold else 0
+            for value, threshold in zip(T_h_in, hot_thresholds)
+        )
+        z_j_active = tuple(
+            1 if value > threshold else 0
+            for value, threshold in zip(T_c_out, cold_thresholds)
+        )
         for index, is_active in enumerate(z_i_active):
             if is_active:
-                T_h_out[index] = max(T_h_out[index], hot_threshold)
+                T_h_out[index] = max(T_h_out[index], hot_thresholds[index])
             else:
                 T_h_in[index] = 0.0
                 T_h_out[index] = 0.0
         for index, is_active in enumerate(z_j_active):
             if is_active:
-                T_c_in[index] = max(T_c_in[index], cold_threshold)
+                T_c_in[index] = max(T_c_in[index], cold_thresholds[index])
             else:
                 T_c_in[index] = 0.0
                 T_c_out[index] = 0.0
     else:
-        z_i_active = tuple(1 if value < hot_threshold else 0 for value in T_h_out)
-        z_j_active = tuple(1 if value < cold_threshold else 0 for value in T_c_in)
+        z_i_active = tuple(
+            1 if value < threshold else 0
+            for value, threshold in zip(T_h_out, hot_thresholds)
+        )
+        z_j_active = tuple(
+            1 if value < threshold else 0
+            for value, threshold in zip(T_c_in, cold_thresholds)
+        )
         for index, is_active in enumerate(z_i_active):
             if is_active:
-                T_h_in[index] = min(T_h_in[index], hot_threshold)
+                T_h_in[index] = min(T_h_in[index], hot_thresholds[index])
             else:
                 T_h_in[index] = 0.0
                 T_h_out[index] = 0.0
         for index, is_active in enumerate(z_j_active):
             if is_active:
-                T_c_out[index] = min(T_c_out[index], cold_threshold)
+                T_c_out[index] = min(T_c_out[index], cold_thresholds[index])
             else:
                 T_c_in[index] = 0.0
                 T_c_out[index] = 0.0

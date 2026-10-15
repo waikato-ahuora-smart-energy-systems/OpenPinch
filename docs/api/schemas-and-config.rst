@@ -51,6 +51,12 @@ dTmin / (2 · ``THERMAL_DT_CONT``), so a stream at the default contributes
 exactly dTmin / 2. A utility without a ``price`` uses
 ``COSTING_UTILITY_PRICE``, the price of the default utilities.
 
+These defaults, ``THERMAL_DT_PHASE_CHANGE``, ``THERMAL_HTC``, the
+``INPUT_UNIT_*`` fields and the ``PROBLEM_*`` fields are applied when the
+problem is loaded. Change them with ``update_options(...)`` or a workspace
+scenario; passing them in a single ``target.*`` or ``design.*`` call's
+``options`` raises a ``ValueError``.
+
 A negative ``dt_cont`` is allowed, with a validation warning, as a deliberate
 modelling choice. It lets the real composite curves cross, so the degree of
 integration can exceed 1, and area targeting reports infinite area and capital

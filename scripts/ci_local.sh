@@ -59,6 +59,7 @@ pytest_lane() { # name, marker expression, extra pytest args...
 
 lane_lint() {
   uv run --no-sync ruff check .
+  uv run --no-sync ruff format --check .
   uv run --no-sync python scripts/check_lockfile_version.py
   if command -v actionlint > /dev/null; then
     actionlint

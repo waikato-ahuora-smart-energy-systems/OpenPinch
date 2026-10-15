@@ -11,6 +11,7 @@ from ..extraction.service import (
     extract_heat_exchanger_network,
     extract_network_synthesis_result,
 )
+from ..solver import backend
 from ..solver.arrays import PreparedSolverArrays
 from ..solver.pinch_design_decomposition import PinchDesignDecomposition
 from .stagewise import StageWiseModel
@@ -90,6 +91,7 @@ class InternalHeatExchangerNetworkProblem:
     ) -> Any:
         """Load, solve, and return the private solved model for this task."""
 
+        unreduced_case = None
         try:
             self.load_model(model_factories=model_factories)
             if self.framework == "PDM":
@@ -97,6 +99,7 @@ class InternalHeatExchangerNetworkProblem:
             else:
                 self.case.optimise(print_output=print_output)
             if self.framework in {"PDM", "TDM"}:
+                unreduced_case = self.case
                 self.case = self.remove_unused_stages(self.case)
             if evolution:
                 evolved = self.case.get_net_benefit_evolution(
@@ -113,6 +116,17 @@ class InternalHeatExchangerNetworkProblem:
         except ValueError as exc:
             self.solution_failure_reason = str(exc)
             return None
+        finally:
+            # Results live on the model variables now; drop every GEKKO run
+            # directory this solve created, including unsolved PDM sides and
+            # the never-solved amalgamated network.
+            for model in (
+                getattr(self, "above", None),
+                getattr(self, "below", None),
+                unreduced_case,
+                getattr(self, "case", None),
+            ):
+                _cleanup_model(model)
 
     def extract_network(self, *, run_id: str) -> HeatExchangerNetwork:
         """Convert the solved private case into an OpenPinch network result."""
@@ -340,6 +354,9 @@ class InternalHeatExchangerNetworkProblem:
             for j in range(case.J)
             for k in range(case.S)
         )
+        if q_total <= 0.0:
+            # No recovery to apportion: keep the stage layout unchanged.
+            return list(range(case.S))
         q_per_stage = [
             sum(case.Q_r[i][j][k][0] for i in range(case.I) for j in range(case.J))
             for k in range(case.S)
@@ -378,6 +395,11 @@ class InternalHeatExchangerNetworkProblem:
         if default == "StageWiseModel":
             return StageWiseModel
         raise ValueError(f"Unknown heat exchanger network model factory {default!r}.")
+
+
+def _cleanup_model(model: Any) -> None:
+    if model is not None:
+        backend.cleanup_gekko_model(getattr(model, "m", None))
 
 
 def _assign(variable: Any, value: float) -> None:

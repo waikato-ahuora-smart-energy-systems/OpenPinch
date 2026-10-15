@@ -232,7 +232,7 @@ class Value:
             if isinstance(other, Value):
                 return np.all(self.to(other.unit).value == other.value)
             return False
-        except DimensionalityError, TypeError, ValueError:
+        except (DimensionalityError, TypeError, ValueError):
             return False
 
     def __lt__(self, other):
@@ -242,7 +242,7 @@ class Value:
             if isinstance(other, Value):
                 return np.all(self.to(other.unit).value < other.value)
             return False
-        except DimensionalityError, TypeError, ValueError:
+        except (DimensionalityError, TypeError, ValueError):
             return False
 
     def __le__(self, other):
@@ -252,7 +252,7 @@ class Value:
             if isinstance(other, Value):
                 return np.all(self.to(other.unit).value <= other.value)
             return False
-        except DimensionalityError, TypeError, ValueError:
+        except (DimensionalityError, TypeError, ValueError):
             return False
 
     def __gt__(self, other):
@@ -262,7 +262,7 @@ class Value:
             if isinstance(other, Value):
                 return np.all(self.to(other.unit).value > other.value)
             return False
-        except DimensionalityError, TypeError, ValueError:
+        except (DimensionalityError, TypeError, ValueError):
             return False
 
     def __ge__(self, other):
@@ -272,7 +272,7 @@ class Value:
             if isinstance(other, Value):
                 return np.all(self.to(other.unit).value >= other.value)
             return False
-        except DimensionalityError, TypeError, ValueError:
+        except (DimensionalityError, TypeError, ValueError):
             return False
 
     def __add__(self, other):

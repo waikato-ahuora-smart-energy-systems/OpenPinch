@@ -42,6 +42,18 @@ Organic Rankine cycle targeting
   ``all_periods.organic_rankine_cycle(workers=...)`` no longer lets parallel
   period solves overwrite each other's fluid state mid-calculation.
 
+Excel and CSV inputs
+~~~~~~~~~~~~~~~~~~~~
+
+- Workbooks and CSV directories load again. The reader still added ``loc``
+  and ``index`` stream columns, which the stream input contract no longer
+  accepts, so every tabular source failed validation.
+- Stream and utility columns missing from a sheet or CSV are left out, so the
+  configured defaults apply. They were filled with 0, which set a missing
+  ``dt_cont`` or ``htc`` to zero.
+- ``streamlit_app.py`` runs ``problem.target.all_heat_integration()`` before
+  opening the dashboard; it called the target accessor as a function.
+
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -69,10 +81,112 @@ Heat exchanger network synthesis
 - Branched network evolution keeps at most ``HENS_EVM_BEAM_WIDTH`` (default 4)
   branches per depth, never solves a topology twice, and gives the same network
   in parallel and serial runs.
+- The pinch design method splits each stream at the pinch plus (hot) or minus
+  (cold) its own temperature contribution, not dTmin / 2 for every stream.
+  With mixed ``dt_cont`` values the two sides previously moved heat across
+  the pinch and broke the larger approaches.
+- A problem with no possible heat recovery returns its utility-only network
+  instead of failing with a division by zero in stage reduction.
+- Solved networks are checked before they count as a success: every match
+  against its own required approach, every exchanger's duty balance and every
+  stream's heat balance to target. Duty optimisation also checks each
+  exchanger's terminal approaches. A network that fails is reported as a failed
+  task (``verification failed: ...``) instead of a success; solver tolerances
+  are unchanged.
+- A failed post-optimisation alpha solve is no longer cached: it is retried,
+  and evolution ranks matches with a neutral alpha meanwhile.
+- GEKKO run directories are removed once each model's results are read. A
+  single default design run used to leave 25 or more behind in the temporary
+  directory.
+
+Options and exports
+~~~~~~~~~~~~~~~~~~~
+
+- Python 3.12 and 3.13 are supported again (``requires-python >=3.12``, was
+  ``>=3.14.2``). The only incompatibility was Python 3.14's unparenthesised
+  ``except A, B:`` syntax, now written ``except (A, B):``. CI runs the unit
+  tests on 3.12 and 3.13 as well as the development version (3.14.2).
+
+- Runtime dependencies declare tested floors: ``numpy>=2.3.2``,
+  ``pint>=0.24.4``, ``pandas>=2.3.3``, ``pydantic>=2.12``, ``scipy>=1.16.1``,
+  and ``CoolProp`` gains a ``<9`` ceiling. These are the oldest releases with
+  Python 3.14 wheels that pass the test suite; pandas 2.3 and 3.0 are both
+  supported. A new CI lane runs the unit tests at exactly these floors.
+
+- Passing a load-time default (``THERMAL_DT_CONT``, ``THERMAL_DT_PHASE_CHANGE``,
+  ``THERMAL_HTC``, ``COSTING_UTILITY_PRICE``, ``INPUT_UNIT_*`` or
+  ``PROBLEM_*``) in a single ``target.*`` or ``design.*`` call's ``options``
+  now raises a ``ValueError``. These values are applied when the problem is
+  loaded, so the per-call value was silently ignored for the streams. Use
+  ``update_options(...)`` or a workspace scenario.
+- A failed Excel export to an explicit ``.xlsx`` path leaves any existing file
+  in place. The workbook is written to a temporary sibling and moved into
+  place only once complete; previously a failure deleted the existing file.
+- ``PROBLEM_PERIOD_WEIGHTS`` (and per-value ``weights``) need either one
+  weight, which weights every period equally, or one weight per period. A
+  partial list now raises a ``ValueError`` naming the periods without a weight.
+  Missing weights used to be filled with 1, so hour-based weights such as
+  ``[6000, 2000]`` for three periods left the third with almost no weight, and
+  a single weight such as ``[6000]`` became ``[6000, 1, 1]``. This replaces
+  the earlier policy of padding omitted trailing weights with ``1.0``.
+- ``openpinch notebook -o notebooks/`` (and ``copy_notebook(name,
+  "notebooks/")``) treat a destination ending in a path separator as a
+  directory and create it. A directory that did not exist yet became a file
+  named ``notebooks``.
+- The multiperiod weighted-average row no longer reports a pinch temperature.
+  A weighted mean of the period pinches is not a temperature any period
+  pinches at; each period row still has its own. Ratio rows (degree of
+  integration, ETE, COP, ORC efficiency) convert every period to the first
+  period's units before summing, and warn when a period has a ratio but no
+  basis and is left out of the ratio of totals.
+- A workbook Options sheet with only one column raises a clear
+  ``ValueError`` instead of an ``IndexError``; a blank Options sheet is
+  ignored.
+
+Analysis corrections
+~~~~~~~~~~~~~~~~~~~~
+
+- Multi-start optimisation runs serially when the objective cannot be pickled
+  (a lambda or closure) instead of crashing, and an error raised by the
+  objective surfaces at once instead of triggering a serial rerun of every
+  task. Polishing tolerates only numerical failures (``ValueError``,
+  ``ArithmeticError``, ``LinAlgError``); other errors propagate.
+- Utility placement's ``evaluation_limit`` is a global budget shared across
+  runs and worker processes, and ``PlacementTermination.evaluations`` counts
+  every worker's evaluations. 20 % of the limit is kept back for polishing the
+  best candidates; the global-search runs split the rest (each run's
+  ``maxfun`` is its share), and polishing also gets whatever the runs leave
+  unspent. ``status`` is ``"evaluation_limit_reached"`` only when the whole
+  limit has been spent. Each worker previously had the full limit, and only
+  the parent's evaluations were counted.
+
+- The cross-flow (both streams unmixed) effectiveness series in
+  ``HX_Eff``, ``HX_NTU`` and ``CalcAreaUE`` included one term too few, which
+  overstated effectiveness (0.556 instead of 0.476 at NTU = 1, C = 1) and
+  understated area.
+- Cascade Carnot heat pumps and heat engines accept a second-law efficiency of
+  exactly 1. The cascade heat pump previously returned zero duty, reported as
+  solved, and the heat engine was treated as plain heat recovery.
+- ``compute_LMTD_from_ts`` accepts arrays (one exchanger per element); it
+  raised "truth value of an array is ambiguous".
+- Steam turbine work is capped at the isentropic work. An extrapolated
+  correlation could report an isentropic efficiency above 1.
+- The ``water.h_ps`` and ``water.s_ph`` docstrings give entropy in J/kg/K,
+  the units the functions actually use; they said kJ/kg/K.
+- Cascade vapour-compression cycles check that every pair of adjacent
+  condenser and evaporator temperatures is in order, hottest stage first. Only
+  the net change across the cascade was checked, so a stage out of order in the
+  middle passed without penalty.
 
 HPR cost model and search
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Vapour-compression cycles with an internal heat exchanger (IHX) compress
+  from the IHX outlet state. The compressor used the IHX-outlet enthalpy with
+  the evaporator-outlet entropy, which understated its work so heating COP
+  rose with IHX duty and could exceed the Carnot limit. Simulated VC,
+  parallel, cascade and VC-MVR results change, and the search no longer
+  favours large IHX duties.
 - Simulated HPR targets now carry installed capital per machine:
   ``C = F_inst * C_eq * (Q_cap / 1 MW)^0.7 * (0.7 + 0.3 * n_stages) * f_T``,
   with ``C_eq`` = $485k fitted to the IEA HPT Project 68 cost data (2025 USD),

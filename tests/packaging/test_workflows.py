@@ -63,11 +63,30 @@ def test_main_only_lanes():
 def test_every_ci_lane_is_present():
     jobs = workflow("ci.yml")["jobs"]
     lanes = {row["lane"] for row in jobs["tests"]["strategy"]["matrix"]["include"]}
-    assert lanes == {"unit", "docs", "tespy", "notebooks-hpr", "performance"}
+    assert lanes == {
+        "unit",
+        "unit-py312",
+        "unit-py313",
+        "floors",
+        "docs",
+        "tespy",
+        "notebooks-hpr",
+        "performance",
+    }
     markers = {
         row["lane"]: row["markers"]
         for row in jobs["tests"]["strategy"]["matrix"]["include"]
     }
+    # Every supported Python minor version runs the unit selection.
+    pythons = {
+        row["lane"]: row.get("python")
+        for row in jobs["tests"]["strategy"]["matrix"]["include"]
+    }
+    assert pythons["unit-py312"] == "3.12"
+    assert pythons["unit-py313"] == "3.13"
+    assert markers["unit-py312"] == markers["unit-py313"] == markers["unit"]
+    # The floors lane runs the unit selection at the lowest allowed versions.
+    assert markers["floors"] == markers["unit"]
     # HPR tutorial notebooks run once, in their own long-timeout lane.
     assert markers["tespy"] == "tespy and not tutorial_profile"
     assert markers["notebooks-hpr"] == "tespy and tutorial_profile"

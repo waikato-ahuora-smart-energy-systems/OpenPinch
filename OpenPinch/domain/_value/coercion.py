@@ -207,7 +207,7 @@ class ValueCoercion:
         unit_obj = self._unit_from_normalised(resolved_unit)
         try:
             return copied.to(unit_obj)
-        except DimensionalityError, TypeError, ValueError:
+        except (DimensionalityError, TypeError, ValueError):
             if self._quantity_is_dimensionless(copied):
                 return self._quantity_factory(
                     np.asarray(copied.magnitude, dtype=float).reshape(-1), unit_obj
@@ -230,7 +230,7 @@ class ValueCoercion:
             return quantity
         try:
             delta_unit = self._unit_from_normalised(f"delta_{name}")
-        except AttributeError, TypeError, ValueError:
+        except (AttributeError, TypeError, ValueError):
             return quantity
         return self._quantity_factory(quantity.magnitude, delta_unit)
 
