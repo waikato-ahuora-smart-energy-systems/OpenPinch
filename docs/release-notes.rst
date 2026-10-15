@@ -16,6 +16,17 @@ Engine commands
   Sample cases are resolved by name only and problem data must be a JSON
   object, so a request cannot make the engine read files from its host.
 
+Running in the browser (Pyodide)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``workers`` and ``max_parallel`` fall back to serial execution where Python
+  cannot start threads (CPython built for Emscripten, as in Pyodide). Before,
+  ``all_periods`` targets and inverse dt_min with ``workers > 1``, and branched
+  HEN network evolution, failed there with "can't start new thread".
+- The optimiser backends default to one run (``n_runs=1``), matching
+  ``OptimisationOptions``, instead of the machine's CPU count. Candidate
+  polishing also works where the CPU count is unknown.
+
 Organic Rankine cycle targeting
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
