@@ -54,7 +54,8 @@ def _problem_has_segments(problem: PreparedProblem) -> bool:
 def _normalise_seed_networks(
     initial_networks: HeatExchangerNetwork | Sequence[HeatExchangerNetwork],
 ) -> tuple[HeatExchangerNetwork, ...]:
-    if isinstance(initial_networks, HeatExchangerNetwork):
+    if isinstance(initial_networks, HeatExchangerNetwork | Mapping):
+        # One network, or the JSON of one, rather than a sequence of them.
         networks = (initial_networks,)
     else:
         networks = tuple(initial_networks)

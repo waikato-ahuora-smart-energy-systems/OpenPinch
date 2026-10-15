@@ -31,6 +31,12 @@ from OpenPinch.analysis.heat_exchanger_networks.execution.fake_executor import (
 from OpenPinch.analysis.heat_exchanger_networks.execution.pathways import (
     pathways_from_metadata,
 )
+from OpenPinch.analysis.heat_exchanger_networks.execution.task_builders import (
+    approach_temperature_from_network,
+)
+from OpenPinch.analysis.heat_exchanger_networks.extraction import (
+    metadata as extraction_metadata,
+)
 from OpenPinch.analysis.heat_exchanger_networks.models._stagewise import (
     verification as stagewise_verification,
 )
@@ -881,3 +887,26 @@ def test_seed_networks_accept_network_json():
     seeded = seeds._normalise_seed_networks([network.model_dump(mode="json")])
 
     assert seeded == (HeatExchangerNetwork.model_validate(network.model_dump()),)
+
+
+def test_one_seed_network_json_is_one_seed():
+    # The JSON form of passing one HeatExchangerNetwork rather than a sequence.
+    network = HeatExchangerNetwork()
+
+    seeded = seeds._normalise_seed_networks(network.model_dump(mode="json"))
+
+    assert seeded == (HeatExchangerNetwork.model_validate(network.model_dump()),)
+
+
+def test_seed_network_json_keeps_the_approach_temperature_it_was_solved_at():
+    # source_metadata is not serialised, so a JSON seed must carry the solver
+    # dTmin in its summary metrics or seeded TDM/EVM tasks run at another one.
+    network = HeatExchangerNetwork(
+        summary_metrics=extraction_metadata._summary_metrics(
+            SimpleNamespace(dTmin=14.0)
+        ),
+        source_metadata={"solver_dTmin": 14.0},
+    )
+    seed = HeatExchangerNetwork.model_validate(network.model_dump(mode="json"))
+
+    assert approach_temperature_from_network(seed, _settings()) == 14.0
