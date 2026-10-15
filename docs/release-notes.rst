@@ -4,6 +4,20 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat pump cycle states at saturation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- When a pressure-enthalpy flash fails and the enthalpy is within round-off
+  (a quality within 1e-9) of saturated liquid or vapour, on either side, the
+  vapour-compression cycle now uses exactly saturated liquid or vapour.
+  Before, an enthalpy a few ulps above saturated vapour was treated as
+  superheated, which could need a temperature below the triple point and fail
+  the candidate, while one a few ulps below gave a quality of 0.99999999999993.
+  Native and WebAssembly CoolProp differ in those last digits, so the heat
+  pump search took different paths. Short searches can now settle on a
+  different optimum: tutorial 09's quick water heat pump moves from COP 7.72
+  (24.3 kW) to COP 6.88 (27.2 kW), the same as in the browser.
+
 Organic Rankine cycle targeting
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
