@@ -164,7 +164,7 @@ def get_net_benefit_evolution(
         _update_with_best_model(owner, best_model)
     else:
         logger.debug("No evolution improvement found over original model.")
-    owner.m.cleanup()
+    owner.cleanup()
     return owner
 
 
@@ -216,7 +216,7 @@ def _get_source_net_benefit_evolution(
         _update_with_best_model(owner, best_model)
     else:
         logger.debug("No improvement found over original model.")
-    owner.m.cleanup()
+    owner.cleanup()
     return owner
 
 
@@ -459,9 +459,15 @@ def _update_with_best_model(owner, best_model) -> None:
                 ", ".join(reasons),
             )
             return
-    owner.alpha = build_index_grid(
-        lambda i, j, k: best_model.alpha[i][j][k],
-        (owner.I, owner.J, owner.S),
+    # An empty alpha (failed post-optimisation solve) is re-solved for the
+    # adopted topology by get_post_process below.
+    owner.alpha = (
+        build_index_grid(
+            lambda i, j, k: best_model.alpha[i][j][k],
+            (owner.I, owner.J, owner.S),
+        )
+        if len(best_model.alpha)
+        else []
     )
     owner.z_allowed = build_index_grid(
         lambda i, j, k: best_model.z_allowed[i][j][k],

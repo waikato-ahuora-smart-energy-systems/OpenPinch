@@ -59,13 +59,21 @@ def test_period_weight_expansion_invariant(period_count, data):
             max_size=supplied_count,
         )
     )
-    resolved = resolve_period_weights(
-        [f"period-{index}" for index in range(period_count)],
-        supplied,
-    )
+    period_ids = [f"period-{index}" for index in range(period_count)]
+    if 1 < supplied_count < period_count:
+        with pytest.raises(ValueError, match=period_ids[supplied_count]):
+            resolve_period_weights(period_ids, supplied)
+        return
 
-    np.testing.assert_allclose(resolved[:supplied_count], supplied)
-    np.testing.assert_allclose(resolved[supplied_count:], 1.0)
+    resolved = resolve_period_weights(period_ids, supplied)
+
+    if supplied_count == 0:
+        np.testing.assert_allclose(resolved, 1.0)
+    elif supplied_count == 1:
+        np.testing.assert_allclose(resolved, supplied[0])
+    else:
+        np.testing.assert_allclose(resolved, supplied)
+    assert resolved.size == period_count
     assert float(resolved.sum()) > 0.0
 
 

@@ -2,6 +2,7 @@
 
 import math
 
+import numpy as np
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -64,6 +65,22 @@ def test_lmtd_cold_fluid_cools_down_invalid():
         compute_LMTD_from_ts(150, 100, 80, 60)
 
 
+def test_lmtd_from_temperatures_accepts_arrays():
+    result = compute_LMTD_from_ts(
+        [150.0, 120.0], [100.0, 90.0], [50.0, 40.0], [80.0, 60.0]
+    )
+
+    np.testing.assert_allclose(
+        result,
+        [
+            compute_LMTD_from_ts(150.0, 100.0, 50.0, 80.0),
+            compute_LMTD_from_ts(120.0, 90.0, 40.0, 60.0),
+        ],
+    )
+    with pytest.raises(ValueError, match="Hot fluid must cool down"):
+        compute_LMTD_from_ts([150.0, 80.0], [100.0, 90.0], [50.0, 40.0], [80.0, 60.0])
+
+
 def test_Coth():
     assert round(Coth(1), 3) == round((math.exp(2) + 1) / (math.exp(2) - 1), 3)
 
@@ -86,7 +103,16 @@ def test_HX_Eff_variants(arrangement, Ntu, c, expected_range):
 
 def test_HX_Eff_crossflow_unmixed1():
     eff = HX_Eff(HX.CrFUU, 2.0, 0.5)
-    assert 0.8 < eff < 0.81
+    assert 0.73 < eff < 0.735
+
+
+def test_crossflow_unmixed_series_matches_reference_values():
+    # Mason (1954) series: 0.4762 at NTU = 1, C = 1; the C = 0 limit is
+    # 1 - exp(-NTU).
+    assert hx.CrossflowUnmixedEff1(1.0, 1.0) == pytest.approx(0.4762, abs=1e-4)
+    assert hx.CrossflowUnmixedEff1(1.0, 0.0) == pytest.approx(1 - math.exp(-1.0))
+    eff = HX_Eff(HX.CrFUU, 2.0, 0.5)
+    assert hx.HX_NTU(HX.CrFUU, eff, 0.5) == pytest.approx(2.0, rel=1e-5)
 
 
 def test_HX_Eff_crossflow_unmixed2_air():
@@ -144,7 +170,7 @@ def test_MultiPassNTU():
 
 def test_CrossflowUnmixedEff1():
     eff = CrossflowUnmixedEff1(2.0, 0.5)
-    assert 0.80 < eff < 0.81
+    assert 0.73 < eff < 0.735
 
 
 def test_CrossflowUnmixedEff2():
@@ -154,7 +180,7 @@ def test_CrossflowUnmixedEff2():
 
 def test_HX_NTU_Numerical():
     ntu = HX_NTU_Numerical(HX.CrFUU, 0.65, 0.5)
-    assert 1.1 < ntu < 1.2
+    assert 1.44 < ntu < 1.45
 
 
 # ===== Merged from test_heat_exchanger_extra.py =====

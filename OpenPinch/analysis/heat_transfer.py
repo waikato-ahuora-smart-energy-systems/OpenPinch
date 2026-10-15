@@ -56,17 +56,20 @@ def compute_LMTD_from_ts(
     T_hot_out: float | list | np.ndarray,
     T_cold_in: float | list | np.ndarray,
     T_cold_out: float | list | np.ndarray,
-) -> float:
-    """Return the LMTD for a counterflow heat exchanger from temperatures."""
+) -> np.ndarray:
+    """Return the LMTD for a counterflow heat exchanger from temperatures.
+
+    Scalars or equal-length arrays (one exchanger per element) are accepted.
+    """
     T_hot_in = np.array(T_hot_in)
     T_hot_out = np.array(T_hot_out)
     T_cold_in = np.array(T_cold_in)
     T_cold_out = np.array(T_cold_out)
 
     # Check temperature directions for counter-current assumption
-    if T_hot_in < T_hot_out:
+    if np.any(T_hot_in < T_hot_out):
         raise ValueError("Hot fluid must cool down (T_hot_in > T_hot_out)")
-    if T_cold_out < T_cold_in:
+    if np.any(T_cold_out < T_cold_in):
         raise ValueError("Cold fluid must heat up (T_cold_out > T_cold_in)")
 
     return compute_LMTD_from_dts(
@@ -283,7 +286,7 @@ def CrossflowUnmixedEff1(Ntu, c):
     Sum_Pn = 0
     for i in range(1, 21):
         Pn = 0
-        for j in range(1, i):
+        for j in range(1, i + 1):
             Pn = Pn + c**i / math.factorial(i + 1) * (i - j + 1) / math.factorial(
                 j
             ) * Ntu ** (i + j)

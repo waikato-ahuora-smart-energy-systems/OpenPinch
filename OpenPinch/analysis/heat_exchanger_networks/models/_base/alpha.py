@@ -12,29 +12,60 @@ from ...solver import backend
 logger = logging.getLogger(__name__)
 
 
-def get_alpha_values(model) -> list:
-    """Calculate source alpha flow-on values in a post-optimisation solve."""
+def get_alpha_values(model) -> list | None:
+    """Calculate source alpha flow-on values in a post-optimisation solve.
+
+    Returns ``None`` when the solve fails. The failed values are unsolved
+    initial guesses, so they are not cached on ``model.alpha``: callers treat
+    alpha as unavailable and a later call retries the solve.
+    """
 
     if model.alpha != []:
         return model.alpha
 
     solver_model = backend.create_gekko_model(remote=False)
-    solver_model.options.IMODE = 1
-    solver_model.options.SOLVER = 1
-    model.set_alpha_dqda_equations(m=solver_model, postoptimisation=True)
     try:
-        with backend.suppress_gekko_numpy_array_copy_deprecation():
-            solver_model.solve(disp=False)
-    except Exception:
-        # Callers index alpha[i][j][k][0] for benefit ranking, so keep the
-        # unsolved initial values but make the failure visible.
-        logger.warning(
-            "Post-optimisation alpha solve failed for %s; alpha values are "
-            "unsolved initial guesses and benefit ranking may be unreliable.",
-            getattr(model, "name", "model"),
-            exc_info=True,
-        )
-    return model.alpha
+        solver_model.options.IMODE = 1
+        solver_model.options.SOLVER = 1
+        model.set_alpha_dqda_equations(m=solver_model, postoptimisation=True)
+        try:
+            with backend.suppress_gekko_numpy_array_copy_deprecation():
+                solver_model.solve(disp=False)
+        except Exception:
+            logger.warning(
+                "Post-optimisation alpha solve failed for %s; alpha values are "
+                "unavailable and benefit ranking falls back to neutral alpha.",
+                getattr(model, "name", "model"),
+                exc_info=True,
+            )
+            model.alpha = []
+            return None
+        status = getattr(solver_model.options, "SOLVESTATUS", None)
+        if status != 1:
+            logger.warning(
+                "Post-optimisation alpha solve for %s ended with solver status "
+                "%s; alpha values are unavailable and benefit ranking falls "
+                "back to neutral alpha.",
+                getattr(model, "name", "model"),
+                status,
+            )
+            model.alpha = []
+            return None
+        return model.alpha
+    finally:
+        backend.cleanup_gekko_model(solver_model)
+
+
+def alpha_value(model, i: int, j: int, k: int) -> float:
+    """Return one solved alpha, or a neutral 1.0 when alpha is unavailable.
+
+    Alpha scales a match's recovered heat by its flow-on effect, so 1.0
+    ranks matches on their own duty and area alone.
+    """
+
+    if len(model.alpha) == 0:
+        return 1.0
+    return float(model.alpha[i][j][k][0])
 
 
 def set_alpha_dqda_equations(

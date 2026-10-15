@@ -214,7 +214,6 @@ __marimo__/
 
 # Other stuff
 .DS_Store
-results/*
 commands.txt
 
 # Locally generated research manuscript and analysis artifacts
@@ -228,30 +227,17 @@ openhens_baseline_results/main/
 openhens_baseline_results/refactor/*/manifest.json
 openhens_baseline_results/refactor/*/results/
 openhens_baseline_results/refactor/*/*/
-results/
-plans/
+
+# Root-level output folders only: unanchored names would also hide package
+# source such as OpenPinch/analysis/heat_exchanger_networks/results/.
+/results/
+/plans/
 
 # This active AI-DLC remediation plan is project documentation, not solver output.
-!aidlc-docs/inception/plans/
 aidlc-docs/inception/plans/*
 !aidlc-docs/inception/plans/application-design-plan.md
 !aidlc-docs/inception/plans/repository-issue-remediation-execution-plan.md
 !aidlc-docs/inception/plans/unit-of-work-plan.md
-
-# This is Python source, not generated solver output.
-!OpenPinch/analysis/heat_exchanger_networks/results/
-!OpenPinch/analysis/heat_exchanger_networks/results/*.py
-
-# This approved AI-DLC checklist is project documentation, not solver output.
-!aidlc-docs/construction/plans/
-!aidlc-docs/construction/plans/package-architecture-modernization-code-generation-plan.md
-!aidlc-docs/construction/plans/residual-compatibility-shims-code-generation-plan.md
-!aidlc-docs/construction/plans/post-implementation-import-type-fixes-code-generation-plan.md
-!aidlc-docs/construction/plans/application-state-filesystem-contracts-functional-design-plan.md
-!aidlc-docs/construction/plans/application-state-filesystem-contracts-code-generation-plan.md
-!aidlc-docs/construction/plans/exact-openhens-checkout-loading-functional-design-plan.md
-!aidlc-docs/construction/plans/exact-openhens-checkout-loading-code-generation-plan.md
-!aidlc-docs/construction/plans/current-documentation-drift-guards-code-generation-plan.md
 
 # Claude Code local settings and session data
 .claude/

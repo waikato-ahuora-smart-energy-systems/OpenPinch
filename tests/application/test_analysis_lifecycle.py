@@ -150,8 +150,26 @@ def test_child_targets_are_not_reported_when_traversal_is_disabled():
 
 def test_incompatible_thermal_settings_require_new_exergy_prerequisite():
     problem = PinchProblem(_two_period_payload(), project_name="Site")
-    problem.target.direct_heat_integration(options={"THERMAL_DT_CONT": 30.0})
+    problem.target.direct_heat_integration(options={"DIRECT_ASSISTED_HT_ENABLED": True})
     before = problem.results.model_dump(mode="json")
     with pytest.raises(RuntimeError, match="existing|compatible"):
         problem.target.exergy()
     assert problem.results.model_dump(mode="json") == before
+
+
+@pytest.mark.parametrize(
+    "option",
+    [
+        {"THERMAL_DT_CONT": 30.0},
+        {"THERMAL_HTC": 2.0},
+        {"COSTING_UTILITY_PRICE": 50.0},
+        {"PROBLEM_PERIOD_WEIGHTS": [2.0]},
+        {"INPUT_UNIT_TEMPERATURE": "K"},
+    ],
+)
+def test_per_call_load_time_defaults_are_rejected(option):
+    problem = PinchProblem(_two_period_payload(), project_name="Site")
+    key = next(iter(option))
+    with pytest.raises(ValueError, match=f"{key}.*update_options"):
+        problem.target.direct_heat_integration(options=option)
+    assert problem.results is None

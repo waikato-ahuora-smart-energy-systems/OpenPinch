@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
@@ -445,20 +446,9 @@ def _weighted_average_target(
         basis_is_numerator=False,
     )
     data["orc_total_annualized_cost_change"] = _total_orc_annualized_cost_change(data)
-    data["pinch_temp"] = PinchTemp(
-        cold_temp=_weighted_report_value(
-            targets,
-            "pinch_temp.cold_temp",
-            weights,
-            allow_partial_missing=True,
-        ),
-        hot_temp=_weighted_report_value(
-            targets,
-            "pinch_temp.hot_temp",
-            weights,
-            allow_partial_missing=True,
-        ),
-    )
+    # A weighted mean of pinch temperatures is not a temperature any period
+    # pinches at, so the summary row leaves it empty; each period row has its own.
+    data["pinch_temp"] = PinchTemp(cold_temp=None, hot_temp=None)
     data["hot_utilities"] = _weighted_utilities(targets, "hot_utilities", weights)
     data["cold_utilities"] = _weighted_utilities(targets, "cold_utilities", weights)
     return type(first).model_validate(data)
@@ -523,6 +513,19 @@ def _max_report_value(
     return Value(maximum, unit) if unit is not None else maximum
 
 
+def _in_unit(
+    value: float, value_unit: str | None, unit: str | None
+) -> tuple[float, str | None]:
+    """Return ``value`` converted to ``unit`` (adopting ``value_unit`` if unset)."""
+    if value_unit is None:
+        return value, unit
+    if unit is None:
+        return value, value_unit
+    if value_unit != unit:
+        value = Value(value, value_unit).to(unit).value
+    return float(value), unit
+
+
 def _ratio_of_totals(
     targets: Sequence[TargetResults],
     ratio_field: str,
@@ -540,25 +543,30 @@ def _ratio_of_totals(
     or there is no ``basis_field``.
     """
     numerator = denominator = 0.0
-    unit = None
+    unit = basis_unit = None
     ratios: list[tuple[float, float]] = []
+    without_basis: list[str] = []
     for target, weight in zip(targets, weights):
         period_idx = getattr(target, "period_idx", None)
         ratio, ratio_unit = split_report_value(
             _target_attr(target, ratio_field), period_idx=period_idx
         )
-        basis = None
+        basis = this_basis_unit = None
         if basis_field is not None:
-            basis, _basis_unit = split_report_value(
+            basis, this_basis_unit = split_report_value(
                 _target_attr(target, basis_field), period_idx=period_idx
             )
         if ratio is None or isinstance(ratio, list):
             continue
-        unit = unit or ratio_unit
-        ratios.append((float(ratio), float(weight)))
+        # Express every period in the first period's units before summing.
+        ratio, unit = _in_unit(float(ratio), ratio_unit, unit)
+        ratios.append((ratio, float(weight)))
         if basis is None or isinstance(basis, list):
+            if basis_field is not None:
+                without_basis.append(str(getattr(target, "period_id", period_idx)))
             continue
-        ratio, basis = float(ratio), abs(float(basis))
+        basis, basis_unit = _in_unit(float(basis), this_basis_unit, basis_unit)
+        basis = abs(basis)
         if basis_is_numerator:
             numerator += weight * basis
             denominator += weight * basis / ratio if abs(ratio) > 0.0 else 0.0
@@ -567,6 +575,13 @@ def _ratio_of_totals(
             denominator += weight * basis
     if not ratios:
         return None
+    if without_basis and denominator > 0.0:
+        warnings.warn(
+            f"{ratio_field} for period(s) {', '.join(without_basis)} has no "
+            f"{basis_field} and is left out of the weighted-average ratio.",
+            UserWarning,
+            stacklevel=2,
+        )
     if denominator > 0.0:
         value = numerator / denominator
     else:

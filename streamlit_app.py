@@ -21,7 +21,7 @@ PROBLEM_FILE = Path("examples/OpenPinchWkbs/Ziyatdinov et al (example 2).xlsb")
 def _load_problem(problem_path: str) -> PinchProblem:
     """Load and solve the pinch problem once per Streamlit session."""
     problem = PinchProblem(source=problem_path)
-    problem.target()
+    problem.target.all_heat_integration()
     return problem
 
 

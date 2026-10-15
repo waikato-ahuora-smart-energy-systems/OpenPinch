@@ -2,7 +2,7 @@
 
 ## Programming Languages and Formats
 
-- Python 3.14.2 or newer - package, tests, scripts, dashboard, and documentation configuration.
+- Python 3.12 or newer (developed on 3.14.2) - package, tests, scripts, dashboard, and documentation configuration.
 - reStructuredText - Sphinx user and API documentation.
 - Markdown - repository guides, reports, and workflow documentation.
 - TOML - package, build, dependency, formatter, and version-bump configuration.

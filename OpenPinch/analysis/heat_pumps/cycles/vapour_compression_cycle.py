@@ -616,16 +616,17 @@ class VapourCompressionCycle:
             self._penalty.append(h0_tar - h_ihx_in)
 
         # IHX outlet / compressor inlet
-        h_ihx_out = self._compute_state_from_pressure_temperature(
+        state_ihx_out = self._compute_state_from_pressure_temperature(
             P=P_lo,
             T=self._T_evap_sat_vap + self._dT_superheat + self._ihx_gas_dt,
             phase=1,
-        ).hmass()
+        )
+        h_ihx_out = state_ihx_out.hmass()
         dh_ihx = h_ihx_out - h_ihx_in
 
-        # 1 - Compressor discharge (real)
+        # 1 - Compressor discharge (real), compressing from the IHX outlet state
         state1 = self._compute_compressor_outlet_state(
-            h_in=h_ihx_out, s_in=state0.smass(), P_out=P_hi
+            h_in=h_ihx_out, s_in=state_ihx_out.smass(), P_out=P_hi
         )
         self._save_cycle_state(state1, 1)
 

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import numpy as np
 import openpyxl
 import pytest
 
+import OpenPinch.application._problem.periods.aggregation as aggregation
 from OpenPinch.application._problem.output.reporting import (
     _build_numeric_summary_frame,
 )
@@ -333,7 +335,7 @@ def test_weighted_average_output_rejects_partially_missing_numeric_fields():
         weighted_average_output([base, peak], [1.0, 1.0])
 
 
-def test_weighted_average_output_tolerates_partially_missing_pinch_diagnostic():
+def test_weighted_average_output_leaves_pinch_empty():
     base_target = _target(period_id="base", qh=10.0)
     peak_target = _target(period_id="peak", qh=30.0).model_copy(
         update={
@@ -353,8 +355,9 @@ def test_weighted_average_output_tolerates_partially_missing_pinch_diagnostic():
     )
     target = output.targets[0]
 
+    # A weighted mean pinch is not a temperature any period pinches at.
     assert target.pinch_temp.cold_temp is None
-    assert target.pinch_temp.hot_temp.value == pytest.approx(145.0)
+    assert target.pinch_temp.hot_temp is None
     assert target.Qh.value == pytest.approx(25.0)
 
 
@@ -592,3 +595,46 @@ def test_weighted_summary_surfaces_metrics_report_and_export(tmp_path):
         )
     finally:
         workbook.close()
+
+
+def test_ratio_of_totals_converts_basis_units_between_periods():
+    # 1000 kW and 1 MW are the same exergy, so the periods weigh equally.
+    targets = [
+        SimpleNamespace(
+            period_id="base",
+            period_idx=None,
+            ETE=0.4,
+            exergy_sources=Value(1000.0, "kW"),
+        ),
+        SimpleNamespace(
+            period_id="peak", period_idx=None, ETE=0.8, exergy_sources=Value(1.0, "MW")
+        ),
+    ]
+
+    value = aggregation._ratio_of_totals(
+        targets, "ETE", "exergy_sources", np.array([1.0, 1.0]), basis_is_numerator=False
+    )
+
+    assert value == pytest.approx(0.6)
+
+
+def test_ratio_of_totals_warns_about_periods_without_a_basis():
+    targets = [
+        SimpleNamespace(
+            period_id="base", period_idx=None, ETE=0.4, exergy_sources=Value(10.0, "kW")
+        ),
+        SimpleNamespace(
+            period_id="peak", period_idx=None, ETE=0.8, exergy_sources=None
+        ),
+    ]
+
+    with pytest.warns(UserWarning, match="period\\(s\\) peak has no exergy_sources"):
+        value = aggregation._ratio_of_totals(
+            targets,
+            "ETE",
+            "exergy_sources",
+            np.array([1.0, 1.0]),
+            basis_is_numerator=False,
+        )
+
+    assert value == pytest.approx(0.4)

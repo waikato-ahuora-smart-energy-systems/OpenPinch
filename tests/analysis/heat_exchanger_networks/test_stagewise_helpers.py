@@ -975,6 +975,91 @@ def test_stagewise_post_process_and_verify_failure_edges(monkeypatch):
     assert verify_model.verify() == (False, ["temperature", "cost", "area"])
 
 
+def test_stagewise_verify_rejects_network_feasibility_failures(monkeypatch):
+    model = StageWiseModel.__new__(StageWiseModel)
+    model.minimisation_goal = "total cost"
+    for check in ("_check_temperatures", "_check_utility_costs", "_check_area_costs"):
+        monkeypatch.setattr(stagewise_verification, check, lambda case: True)
+    monkeypatch.setattr(
+        stagewise_verification,
+        "_check_network_feasibility",
+        lambda case: (
+            "R1 minimum approach 4 is below its required approach 10",
+            "hot stream H1 heat removed 90 does not match required heat load 100",
+        ),
+    )
+
+    assert model.verify() == (
+        False,
+        [
+            "network: R1 minimum approach 4 is below its required approach 10",
+            "network: hot stream H1 heat removed 90 does not match required "
+            "heat load 100",
+        ],
+    )
+
+    monkeypatch.setattr(
+        stagewise_verification, "_check_network_feasibility", lambda case: ()
+    )
+    assert model.verify() == (True, [])
+
+
+def _benefit_model(alpha) -> StageWiseModel:
+    model = StageWiseModel.__new__(StageWiseModel)
+    model.I = 1
+    model.J = 2
+    model.S = 1
+    model.tol = 1e-3
+    model.alpha = alpha
+    model.z = [[[[1]], [[1]]]]
+    model.Q_r = [[[[100.0]], [[60.0]]]]
+    model.area_r = [[[10.0], [10.0]]]
+    model.hu_cost = [1.0]
+    model.cu_cost = [1.0]
+    model.unit_cost = [0.0]
+    model.A_coeff = [1.0]
+    model.A_exp = [1.0]
+    return model
+
+
+def test_benefit_ranking_uses_neutral_alpha_when_alpha_is_unavailable():
+    # Solved alpha reverses the duty order: the bigger match has less flow-on.
+    solved = _benefit_model([[[[0.1]], [[1.0]]]])
+    assert solved.get_lowest_benefit_HX_candidates(2) == [[0, 0, 0], [0, 1, 0]]
+
+    # A failed alpha solve leaves alpha empty; ranking treats every alpha as 1.
+    unavailable = _benefit_model([])
+    assert unavailable.get_lowest_benefit_HX_candidates(2) == [
+        [0, 1, 0],
+        [0, 0, 0],
+    ]
+    assert unavailable.net_benefit[0][0][0] == pytest.approx(190.0)
+
+
+def test_update_with_best_model_keeps_unavailable_alpha_empty():
+    target = StageWiseModel.__new__(StageWiseModel)
+    target.I = 1
+    target.J = 1
+    target.S = 1
+    target.alpha = [[[[0.5]]]]
+    target.set_initial_values_for_variables = lambda best, brackets: None
+    target.get_post_process = lambda: None
+    best = SimpleNamespace(
+        verify=lambda: (True, []),
+        alpha=[],
+        z_allowed=[[[1]]],
+        hu_cost_total=1.0,
+        cu_cost_total=2.0,
+        hu_area_cost_total=10.0,
+        cu_area_cost_total=11.0,
+    )
+
+    _update_with_best_model(target, best)
+
+    # Empty, so get_post_process solves alpha again for the adopted topology.
+    assert target.alpha == []
+
+
 @pytest.mark.parametrize(
     "kind",
     ["minus", "plus"],

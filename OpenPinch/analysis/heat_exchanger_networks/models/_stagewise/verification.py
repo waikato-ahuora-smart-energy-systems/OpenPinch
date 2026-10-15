@@ -8,7 +8,15 @@ from .._base import costing as _costing
 
 
 def verify(owner) -> tuple[bool, list[str]]:
-    """Run the source solution checks used by topology evolution."""
+    """Run the source solution checks used by topology evolution.
+
+    The solver accepts loosely converged points (relaxed constraint
+    tolerances, relaxed match binaries), so a solved model can still miss a
+    match's required approach or a stream's target. Once the source checks
+    pass, the solution is extracted and run through the same feasibility
+    checks applied to ranked networks (per-match required approach, exchanger
+    and stream heat balances to target temperatures).
+    """
 
     failures = []
     if not _check_temperatures(owner):
@@ -18,7 +26,27 @@ def verify(owner) -> tuple[bool, list[str]]:
             failures.append("cost")
         if not _check_area_costs(owner):
             failures.append("area")
+    if not failures:
+        failures.extend(
+            f"network: {reason}" for reason in _check_network_feasibility(owner)
+        )
     return len(failures) == 0, failures
+
+
+def _check_network_feasibility(owner) -> tuple[str, ...]:
+    """Return the reporting-layer feasibility failures for the solved model."""
+
+    from ...extraction.service import extract_heat_exchanger_network
+    from ...reporting.verification import verify_network_feasibility
+
+    network = extract_heat_exchanger_network(
+        owner,
+        owner.solver_arrays,
+        run_id="verification",
+        method=getattr(owner, "framework", None),
+        stage_count=getattr(owner, "S", None),
+    )
+    return verify_network_feasibility(network)
 
 
 def _check_temperatures(
@@ -397,7 +425,7 @@ def _value(value) -> float:
         return float(value)
     try:
         return float(value[0])
-    except TypeError, IndexError, KeyError:
+    except (TypeError, IndexError, KeyError):
         pass
     for attr in ("VALUE", "value"):
         if not hasattr(value, attr):
@@ -405,13 +433,13 @@ def _value(value) -> float:
         raw = getattr(value, attr)
         try:
             return float(raw[0])
-        except TypeError, IndexError, KeyError:
+        except (TypeError, IndexError, KeyError):
             pass
         raw_value = getattr(raw, "value", raw)
         if isinstance(raw_value, int | float):
             return float(raw_value)
         try:
             return float(raw_value[0])
-        except TypeError, IndexError, KeyError:
+        except (TypeError, IndexError, KeyError):
             return float(raw_value)
     return float(value)

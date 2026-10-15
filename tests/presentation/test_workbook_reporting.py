@@ -446,6 +446,45 @@ def test_failed_workbook_write_removes_reserved_artifact(tmp_path: Path, monkeyp
     assert list(tmp_path.glob("*.xlsx")) == []
 
 
+def test_failed_workbook_write_keeps_existing_explicit_file(
+    tmp_path: Path, monkeypatch
+):
+    target_response = SimpleNamespace(name="Project", targets=[])
+    existing = tmp_path / "report.xlsx"
+    existing.write_bytes(b"previous workbook")
+
+    def fail_summary(*_args, **_kwargs):
+        raise RuntimeError("writer failed")
+
+    monkeypatch.setattr(export_mod, "_write_summary_sheet", fail_summary)
+
+    with pytest.raises(RuntimeError, match="writer failed"):
+        export_target_summary_to_excel_with_units(
+            target_response,
+            master_zone=None,
+            out_dir=existing,
+        )
+
+    assert existing.read_bytes() == b"previous workbook"
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["report.xlsx"]
+
+
+def test_explicit_workbook_path_is_replaced_on_success(tmp_path: Path):
+    target_response = SimpleNamespace(name="Project", targets=[])
+    existing = tmp_path / "report.xlsx"
+    existing.write_bytes(b"previous workbook")
+
+    out_path = export_target_summary_to_excel_with_units(
+        target_response,
+        master_zone=None,
+        out_dir=existing,
+    )
+
+    assert out_path == existing
+    assert pd.read_excel(existing, sheet_name=None).keys() == {"Summary"}
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["report.xlsx"]
+
+
 # --------------------------------------------------------------------------------------
 # _autosize_columns
 # --------------------------------------------------------------------------------------

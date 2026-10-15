@@ -132,7 +132,7 @@ def _validate_scalar_details(details: Any, record: HprTargetSimulationRecord) ->
             continue
         try:
             array = np.asarray(value, dtype=float)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             _reject("non_scalar_nominal_data", f"Target field {name} is not scalar.")
         if array.size != 1:
             _reject("non_scalar_nominal_data", f"Target field {name} is not scalar.")

@@ -27,7 +27,7 @@ def try_cast_object_column_to_float(column):
     """Return a float array for numeric-like object columns, otherwise None."""
     try:
         return column.astype(float)
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         return None
 
 

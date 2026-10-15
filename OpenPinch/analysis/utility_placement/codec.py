@@ -208,7 +208,7 @@ def verify_candidate(
     for coordinate, raw_value in zip(model.coordinates, point, strict=True):
         try:
             value = float(raw_value)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             value = math.nan
         if not math.isfinite(value):
             diagnostics.append(

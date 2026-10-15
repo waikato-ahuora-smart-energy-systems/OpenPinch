@@ -22,6 +22,19 @@ class _MissingArgument:
 
 MISSING = _MissingArgument()
 
+# Options consumed while the zone tree and its streams are built: input units,
+# problem structure, and the defaults filled into streams and utilities.
+LOAD_TIME_OPTION_KEYS = frozenset(
+    name
+    for name, spec in CONFIG_FIELD_SPECS.items()
+    if spec.group in {"problem", "input_units"}
+) | {
+    "THERMAL_DT_CONT",
+    "THERMAL_DT_PHASE_CHANGE",
+    "THERMAL_HTC",
+    "COSTING_UTILITY_PRICE",
+}
+
 
 @dataclass(frozen=True)
 class ArgumentSpec:
@@ -99,6 +112,13 @@ def split_runtime_and_configuration_options(
 def temporary_zone_configuration(root, overrides: Mapping[str, Any] | None):
     """Apply validated numerical overrides to one zone tree for one invocation."""
     validated = validate_internal_configuration_options(dict(overrides or {}))
+    load_time = sorted(key for key in validated if key in LOAD_TIME_OPTION_KEYS)
+    if load_time:
+        raise ValueError(
+            f"{', '.join(load_time)} fill in input defaults when the problem is "
+            "loaded, so a per-call override cannot change them. Use "
+            "update_options(...) or a workspace scenario instead."
+        )
     if not validated:
         yield
         return
@@ -124,6 +144,7 @@ def temporary_zone_configuration(root, overrides: Mapping[str, Any] | None):
 __all__ = [
     "ArgumentSpec",
     "EffectiveArguments",
+    "LOAD_TIME_OPTION_KEYS",
     "MISSING",
     "resolve_effective_arguments",
     "split_runtime_and_configuration_options",

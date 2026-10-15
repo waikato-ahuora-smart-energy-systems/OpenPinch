@@ -26,22 +26,26 @@ exclude = [
 packages = ["OpenPinch"]
 [project]
 name = "OpenPinch"
+# Floors are the oldest releases with Python 3.14 wheels that pass the test
+# suite; CI's "floors" lane installs exactly these.
 dependencies=[
-  "numpy<3",
-  "pint<1",
-  "pandas<4",
-  "CoolProp>=8",
-  "pydantic<3",
-  "scipy<2",
+  "numpy>=2.3.2,<3",
+  "pint>=0.24.4,<1",
+  "pandas>=2.3.3,<4",
+  "CoolProp>=8,<9",
+  "pydantic>=2.12,<3",
+  "scipy>=1.16.1,<2",
 ]
-version = "0.6.20"
+version = "0.6.21"
 authors = [
   { name="Tim Walmsley", email="tim.walmsley@waikato.ac.nz" },
 ]
 description = "An advanced pinch analysis and total site integration toolkit"
 readme = "README.md"
-requires-python = ">=3.14.2"
+requires-python = ">=3.12"
 classifiers = [
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
     "Operating System :: OS Independent",
 ]
@@ -62,8 +66,9 @@ dashboard = [
   "openpyxl",
   "pyxlsb",
 ]
+# Kept as an alias of the tespy extra for existing installs.
 brayton_cycle = [
-  "tespy>=0.10.1.post2",
+  "OpenPinch[tespy]",
 ]
 tespy = [
   "tespy>=0.10.1.post2",
@@ -100,6 +105,11 @@ full = [
 ]
 
 [dependency-groups]
+# Read the Docs installs only this group (plus the package) from uv.lock.
+docs = [
+    "sphinx>=9.1.0",
+    "sphinx-rtd-theme>=3.1.0",
+]
 dev = [
     "build>=1.3.0",
     "hatchling>=1.26",
@@ -130,11 +140,11 @@ dev = [
 
 [tool.black]
 line-length = 88
-target-version = ["py314"]
+target-version = ["py312"]
 
 [tool.ruff]
 line-length = 88
-target-version = "py314"
+target-version = "py312"
 extend-exclude = ["docs/_build", "dist"]
 
 [tool.ruff.lint]

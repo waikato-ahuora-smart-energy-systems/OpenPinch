@@ -266,7 +266,7 @@ def empty_header(name: str, mode: str) -> dict[str, Any]:
 def has_problem_table_values(table: ProblemTable, column: ProblemTableLabel) -> bool:
     try:
         values = _as_float_array(table[column])
-    except KeyError, TypeError, ValueError:
+    except (KeyError, TypeError, ValueError):
         return False
     return values.size > 0 and not bool(np.all(np.isnan(values)))
 

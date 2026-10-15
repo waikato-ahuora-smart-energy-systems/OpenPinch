@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from functools import partial
 
 from pydantic import BaseModel, ConfigDict
 
@@ -21,7 +20,12 @@ from ...optimisation.models import (
 )
 from ...optimisation.service import run_multistart_minimisation
 from .errors import NoFeasiblePlacementError, PlacementOptimisationError
-from .evaluation import PlacementEvaluation, PlacementEvaluationSession
+from .evaluation import (
+    PlacementEvaluation,
+    PlacementEvaluationSession,
+    PlacementTaskReport,
+    polish_budget_reserve,
+)
 
 OptimisationRunner = Callable[..., OptimisationResult]
 
@@ -134,6 +138,34 @@ def _bounded_session_objective(
     return session.objective(_optimizer_point_to_physical(session, point))
 
 
+class _BoundedSessionObjective:
+    """Optimizer objective whose evaluation budget is shared by every task.
+
+    It satisfies :class:`OpenPinch.optimisation.execution.TaskScopedObjective`:
+    each optimiser run or polish task evaluates on its own task session, and
+    their spending is charged back to the parent session.
+    """
+
+    def __init__(self, session: PlacementEvaluationSession) -> None:
+        self.session = session
+
+    def __call__(self, point, *args) -> float:
+        return _bounded_session_objective(point, session=self.session)
+
+    def for_task(
+        self, index: int, count: int, *, phase: str = "search"
+    ) -> _BoundedSessionObjective:
+        return _BoundedSessionObjective(
+            self.session.task_session(index, count, phase=phase)
+        )
+
+    def task_report(self) -> PlacementTaskReport:
+        return self.session.task_report()
+
+    def merge_task_reports(self, reports) -> None:
+        self.session.merge_task_reports(reports)
+
+
 class PlacementOptimisationOutcome(BaseModel):
     """Canonical feasible evaluations and backend-independent termination."""
 
@@ -148,13 +180,19 @@ def map_optimisation_options(
     options: UtilityPlacementOptions,
 ) -> tuple[OptimisationMethod, OptimisationOptions]:
     """Map frozen specialist options onto the existing optimizer contract."""
+    # Each run stops at its share of the search budget (the limit less the
+    # polish reserve) instead of spending calls on budget-exhausted penalties.
+    search_budget = options.evaluation_limit - polish_budget_reserve(
+        options.evaluation_limit
+    )
+    run_share = max(1, -(-search_budget // options.run_count))
     return (
         OptimisationMethod(options.method.value),
         OptimisationOptions(
             n_runs=options.run_count,
             maxiter=options.iteration_limit,
             seed=options.seed,
-            maxfun=options.evaluation_limit,
+            maxfun=run_share,
             cluster_tol=options.cluster_tolerance,
             max_minima=options.candidate_limit,
             local_method=options.local_method,
@@ -172,7 +210,7 @@ def coordinate_optimisation(
     method, options = map_optimisation_options(session.request.options)
     model = session.model
     problem = OptimisationProblem(
-        objective=partial(_bounded_session_objective, session=session),
+        objective=_BoundedSessionObjective(session),
         bounds=((0.0, 1.0),) * len(model.coordinates),
         initial_points=tuple(
             _physical_point_to_optimizer(session, point)
@@ -248,12 +286,25 @@ def coordinate_optimisation(
             details=(("candidate_count", len(unique_points)),),
         )
 
+    # The limit is reached only when the whole budget is spent: a task that
+    # used up its own share while others stopped early has not hit the limit.
+    if session.limit_reached:
+        status = "evaluation_limit_reached"
+        message = (
+            "Optimization stopped at the evaluation limit; feasible placements "
+            "were canonically replayed."
+        )
+    else:
+        status = "complete"
+        message = (
+            "Optimization completed with canonically replayed feasible placements."
+        )
     termination = PlacementTermination(
         method=method.value,
         seed=session.request.options.seed,
-        status="complete",
+        status=status,
         code="feasible_candidates",
-        message="Optimization completed with canonically replayed feasible placements.",
+        message=message,
         iterations=None,
         evaluations=session.evaluation_count + canonical_session.evaluation_count,
         candidate_count=len(unique_points),

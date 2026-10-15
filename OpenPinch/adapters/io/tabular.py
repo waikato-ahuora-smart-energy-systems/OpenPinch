@@ -20,8 +20,6 @@ def get_column_names_and_units(df_full, sheet_name, row_units=1):
             "heat_flow",
             "dt_cont",
             "htc",
-            "loc",
-            "index",
         ]
     elif sheet_name == "Utility Data":
         col_names = [
