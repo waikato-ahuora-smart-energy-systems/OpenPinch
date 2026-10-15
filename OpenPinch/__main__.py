@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -52,6 +53,18 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Overwrite notebooks that already exist at the destination.",
     )
+
+    schema_parser = subparsers.add_parser(
+        "schema",
+        help="Write the JSON Schema of each public contract.",
+    )
+    schema_parser.add_argument(
+        "-o",
+        "--output",
+        type=Path,
+        default=Path("."),
+        help="Directory for the <Contract>.schema.json files.",
+    )
     return parser
 
 
@@ -64,10 +77,26 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "notebook":
             return _notebook_command(args)
+        if args.command == "schema":
+            return _schema_command(args)
     except Exception as exc:
         if args.debug:
             raise
         parser.exit(status=1, message=f"OpenPinch error: {exc}\n")
+    return 0
+
+
+def _schema_command(args: argparse.Namespace) -> int:
+    from .contracts.schema import contract_json_schemas
+
+    output = Path(args.output)
+    output.mkdir(parents=True, exist_ok=True)
+    schemas = contract_json_schemas()
+    for name, schema in schemas.items():
+        (output / f"{name}.schema.json").write_text(
+            json.dumps(schema, indent=2) + "\n", encoding="utf-8"
+        )
+    print(f"Wrote {len(schemas)} contract schema(s) to {output}")
     return 0
 
 
