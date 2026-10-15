@@ -49,6 +49,44 @@ VALUE_JSON_SCHEMA: dict[str, Any] = {
 }
 
 
+def _column(items: dict[str, Any]) -> dict[str, Any]:
+    return {"type": "array", "items": items}
+
+
+_NUMBER_COLUMN = _column({"type": ["number", "null"]})
+
+# What StreamCollection.to_dict() emits: one array per column, one entry per
+# stream, in reporting order. NaN magnitudes serialise as null.
+STREAM_COLLECTION_JSON_SCHEMA: dict[str, Any] = {
+    "title": "StreamCollection",
+    "description": "Streams by column, as StreamCollection.to_dict().",
+    "type": "object",
+    "properties": {
+        "name": _column({"type": "string"}),
+        "category": _column(
+            {
+                "enum": [
+                    "hot_stream",
+                    "cold_stream",
+                    "hot_utility",
+                    "cold_utility",
+                    "other",
+                ]
+            }
+        ),
+        "type": _column({"type": "string"}),
+        "is_process_stream": _column({"type": "boolean"}),
+        "t_supply": _NUMBER_COLUMN,
+        "t_target": _NUMBER_COLUMN,
+        "heat_flow": _NUMBER_COLUMN,
+        "dt_cont": _NUMBER_COLUMN,
+        "dt_cont_multiplier": _NUMBER_COLUMN,
+        "htc": _NUMBER_COLUMN,
+        "active": _column({"type": "boolean"}),
+    },
+}
+
+
 class _ContractSchemaGenerator(GenerateJsonSchema):
     """Describes the domain types that contracts carry by their JSON form."""
 
@@ -57,10 +95,7 @@ class _ContractSchemaGenerator(GenerateJsonSchema):
         if issubclass(cls, Value):
             return dict(VALUE_JSON_SCHEMA)
         if issubclass(cls, StreamCollection):
-            return {
-                "type": "object",
-                "description": "A stream collection, as StreamCollection.to_dict().",
-            }
+            return dict(STREAM_COLLECTION_JSON_SCHEMA)
         return super().is_instance_schema(schema)
 
 

@@ -19,6 +19,13 @@ def test_problem_output_schema_lists_targets_and_graphs():
     assert {"targets", "graphs"} <= set(schema["properties"])
 
 
+def test_stream_collection_fields_describe_their_columns():
+    report = contract_json_schemas()["TargetOutput"]["$defs"]["TargetResults"]
+    hpr_hot = report["properties"]["hpr_hot_streams"]["anyOf"][0]
+
+    assert hpr_hot["properties"]["t_supply"]["items"]["type"] == ["number", "null"]
+
+
 def test_workspace_bundle_schema_is_json():
     schema = json.loads(json.dumps(contract_json_schemas()["PinchWorkspaceBundle"]))
 
