@@ -4,7 +4,14 @@ from __future__ import annotations
 
 import json
 
-from OpenPinch.contracts.schema import contract_json_schemas
+import jsonschema
+import pytest
+
+from OpenPinch import PinchProblem
+from OpenPinch.contracts.schema import (
+    STREAM_COLLECTION_JSON_SCHEMA,
+    contract_json_schemas,
+)
 
 
 def test_problem_input_schema_lists_streams_and_utilities():
@@ -24,6 +31,19 @@ def test_stream_collection_fields_describe_their_columns():
     hpr_hot = report["properties"]["hpr_hot_streams"]["anyOf"][0]
 
     assert hpr_hot["properties"]["t_supply"]["items"]["type"] == ["number", "null"]
+
+
+def test_stream_collection_schema_requires_exactly_its_columns():
+    streams = json.loads(
+        json.dumps(PinchProblem("basic_pinch.json").hot_streams.to_dict())
+    )
+    missing = {key: value for key, value in streams.items() if key != "t_supply"}
+    extra = {**streams, "unknown": []}
+
+    jsonschema.validate(streams, STREAM_COLLECTION_JSON_SCHEMA)
+    for payload in (missing, extra):
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate(payload, STREAM_COLLECTION_JSON_SCHEMA)
 
 
 def test_workspace_bundle_schema_is_json():
