@@ -4,6 +4,18 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Engine commands
+~~~~~~~~~~~~~~~
+
+- New ``OpenPinch.application.commands.run_command`` runs one
+  ``target.<method>`` or ``design.<method>`` command on a problem given as
+  JSON (``{"data": ...}``) or as a packaged sample case name, and returns the
+  method's contract result and the problem's ``TargetOutput`` as JSON-ready
+  data. ``run_command_json`` does the same with JSON text, for Pyodide. Both
+  the browser engine and the local backend of the OpenPinch web app call it.
+  Sample cases are resolved by name only and problem data must be a JSON
+  object, so a request cannot make the engine read files from its host.
+
 Organic Rankine cycle targeting
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
