@@ -871,3 +871,13 @@ def test_stagewise_shared_area_cost_checks_each_failure_path():
         Q_c_by_period=[[10_000.0]],
     )
     assert stagewise_verification._check_area_costs(bad_cold_utility) is False
+
+
+def test_seed_networks_accept_network_json():
+    # JSON clients (the engine command layer) pass networks as they received
+    # them in a design result.
+    network = HeatExchangerNetwork()
+
+    seeded = seeds._normalise_seed_networks([network.model_dump(mode="json")])
+
+    assert seeded == (HeatExchangerNetwork.model_validate(network.model_dump()),)
