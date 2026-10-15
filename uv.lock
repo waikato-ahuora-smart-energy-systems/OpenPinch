@@ -1430,7 +1430,7 @@ wheels = [
 
 [[package]]
 name = "openpinch"
-version = "0.6.22"
+version = "0.6.23"
 source = { editable = "." }
 dependencies = [
     { name = "coolprop" },
