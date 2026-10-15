@@ -169,6 +169,30 @@ def test_all_periods_command_returns_each_period_output():
     assert response["value"]["base"]["targets"]
 
 
+def test_session_runs_multiperiod_design_after_all_period_targeting(monkeypatch):
+    class Synthesised(Exception):
+        pass
+
+    def synthesise(self, **_kwargs):
+        raise Synthesised
+
+    monkeypatch.setattr(_DesignAccessor, "heat_exchanger_network", synthesise)
+    session = run_command(
+        {
+            "command": "open",
+            "problem": {"sample_case": "crude_preheat_train_multiperiod.json"},
+        }
+    )["session"]
+    run_command(
+        {"command": "target.all_periods.direct_heat_integration", "session": session}
+    )
+
+    with pytest.raises(Synthesised):
+        run_command(
+            {"command": "design.multiperiod_heat_exchanger_network", "session": session}
+        )
+
+
 def test_closed_session_cannot_run_commands():
     session = run_command(
         {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
