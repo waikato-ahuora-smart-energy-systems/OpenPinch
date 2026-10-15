@@ -935,3 +935,45 @@ class _LinearSinglePhaseCycle(VapourCompressionCycle):
     def _compute_state_from_pressure_temperature(self, P, T, *, phase=1.0):
         del P, phase
         return SimpleNamespace(T=lambda: float(T))
+
+
+def test_enthalpy_at_saturated_vapour_gives_exactly_saturated_vapour():
+    # Water at 421 Pa: the HmassP flash fails, and h equals h_vapour to
+    # ~1e-13. Native and WebAssembly CoolProp put h on opposite sides of
+    # h_vapour, so the state must not depend on which side it lands.
+    cycle = VapourCompressionCycle()
+    cycle.state = "water"
+    cycle._refrigerant = "water"
+
+    state = cycle._compute_state_from_pressure_enthalpy(
+        P=4.214428784539e02, h=2.491697098325e06
+    )
+
+    assert state.Q() == 1.0
+
+
+def test_enthalpy_at_saturated_liquid_gives_exactly_saturated_liquid():
+    # Same pressure, h within round-off above h_liquid (the HmassP flash fails).
+    cycle = VapourCompressionCycle()
+    cycle.state = "water"
+    cycle._refrigerant = "water"
+
+    state = cycle._compute_state_from_pressure_enthalpy(
+        P=4.214428784539e02, h=-21233.49422188881
+    )
+
+    assert state.Q() == 0.0
+
+
+def test_enthalpy_round_off_above_saturated_vapour_is_saturated_vapour():
+    # h is 1e-7 J/kg above h_vapour; as superheated vapour it would need a
+    # temperature below the triple point at this pressure.
+    cycle = VapourCompressionCycle()
+    cycle.state = "water"
+    cycle._refrigerant = "water"
+
+    state = cycle._compute_state_from_pressure_enthalpy(
+        P=4.214428784539e02, h=2491697.0983252698
+    )
+
+    assert state.Q() == 1.0
