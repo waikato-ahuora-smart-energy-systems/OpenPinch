@@ -301,10 +301,39 @@ jobs:
   pyodide:
     # The OpenPinch web app runs the built wheel in Pyodide (CPython on
     # WebAssembly). Node runs the same WebAssembly runtime as the browser.
-    name: Tests (Pyodide)
+    # WebAssembly is several times slower than native CPython, so the suite
+    # is split into shards that run in parallel.
+    name: Tests (Pyodide, ${{ matrix.shard }})
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: core
+            paths: >-
+              tests/domain tests/contracts tests/adapters tests/optimisation
+              tests/packaging/test_installed_wheel.py
+              tests/analysis --ignore=tests/analysis/heat_pumps
+          - shard: heat-pumps
+            paths: tests/analysis/heat_pumps
+          - shard: placement
+            paths: >-
+              tests/application/test_utility_placement.py
+              tests/application/test_utility_placement_batch.py
+              tests/application/test_utility_placement_maximum_duties.py
+              tests/application/test_total_site_profile_hierarchy.py
+          - shard: application
+            # test_coolprop_hpr_audit.py takes over 12 minutes in Pyodide;
+            # the CPython test lanes cover it.
+            paths: >-
+              tests/application
+              --ignore=tests/application/test_coolprop_hpr_audit.py
+              --ignore=tests/application/test_utility_placement.py
+              --ignore=tests/application/test_utility_placement_batch.py
+              --ignore=tests/application/test_utility_placement_maximum_duties.py
+              --ignore=tests/application/test_total_site_profile_hierarchy.py
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -319,12 +348,36 @@ jobs:
       - name: Install Pyodide
         working-directory: scripts/pyodide
         run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Run the base tests in Pyodide against the built wheel
+      - name: Run the tests in Pyodide against the built wheel
+        env:
+          PATHS: ${{ matrix.paths }}
         run: |
-          node scripts/pyodide/run_tests.mjs dist/*.whl -q \
+          read -ra paths <<< "$PATHS"
+          excluded=(
+            # Emscripten cannot start processes: these check import
+            # isolation in a fresh interpreter, and gekko runs the APOPT
+            # solver binary.
+            --deselect tests/analysis/heat_exchanger_networks/test_full_sequence.py::test_synthesis_imports_do_not_load_live_solver_dependencies
+            --deselect tests/analysis/heat_exchanger_networks/test_pinch_design_method.py::test_models_package_import_is_optional_and_lazy
+            --deselect tests/analysis/heat_exchanger_networks/test_synthesis_dependency_boundaries.py::test_import_openpinch_does_not_import_synthesis_only_packages
+            -k "not test_apopt_"
+            # Emscripten cannot start threads: these start threads
+            # themselves to check thread safety and parallel speed-up.
+            --deselect tests/analysis/heat_exchanger_networks/test_pinch_design_method.py::test_local_executor_honours_max_parallel_for_stage_tasks
+            --deselect tests/analysis/orc/test_orc_cycle.py::test_each_thread_has_its_own_coolprop_state
+            --deselect tests/analysis/orc/test_orc_cycle.py::test_parallel_cycle_solves_match_serial_solves
+            --deselect tests/analysis/orc/test_orc_cycle.py::test_parallel_isopentane_sweep_matches_serial_solves
+            # Kaleido image export drives a headless Chrome.
+            --deselect tests/analysis/heat_exchanger_networks/test_reporting.py::test_grid_diagram_save_writes_image
+            # Pyodide ships CoolProp 7.2, which cannot flash this ternary
+            # mixture; the app and the CPython lanes use CoolProp 8.
+            --deselect "tests/analysis/heat_pumps/test_hpr_coolprop_simulator.py::test_coolprop_point_matches_existing_cycle_oracle[HEOS::R32[0.3]&R125[0.3]&R143a[0.4]-heat_pump]"
+            --deselect "tests/analysis/heat_pumps/test_hpr_coolprop_simulator.py::test_coolprop_point_matches_existing_cycle_oracle[HEOS::R32[0.3]&R125[0.3]&R143a[0.4]-refrigeration]"
+          )
+          node scripts/pyodide/run_tests.mjs dist/*.whl -q --durations=10 \
             --hypothesis-seed="$HYPOTHESIS_SEED" \
-            tests/domain tests/contracts tests/adapters tests/optimisation \
-            tests/packaging/test_installed_wheel.py
+            -m "not solver and not tespy and not performance and not docs" \
+            "${excluded[@]}" "${paths[@]}"
 
   audit:
     name: Dependency audit

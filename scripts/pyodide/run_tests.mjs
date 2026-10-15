@@ -6,8 +6,10 @@
 // browser engine of the OpenPinch web app. The built wheel is installed
 // without dependencies: Pyodide ships its own numpy, scipy, pandas and
 // pydantic builds, and its CoolProp 7.2 stands in for CoolProp 8 (the app
-// uses a CoolProp 8 JS build behind a shim). The checkout is mounted only for
-// its tests; the package under test is the installed wheel.
+// uses a CoolProp 8 JS build behind a shim). The optional plotly, pyxlsb,
+// tespy and gekko come from PyPI as pure-Python wheels so the tests of the
+// features they back can run. The checkout is mounted only for its tests;
+// the package under test is the installed wheel.
 import { readFileSync } from 'node:fs'
 import { basename, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -31,7 +33,7 @@ pyodide.FS.mount(pyodide.FS.filesystems.NODEFS, { root: REPO }, '/work')
 pyodide.globals.set('PYTEST_ARGS', pyodide.toPy(pytestArgs))
 const exitCode = await pyodide.runPythonAsync(`
 import os, sys, micropip
-await micropip.install(["pint>=0.24.4", "pytest", "hypothesis", "jsonschema", "openpyxl"])
+await micropip.install(["pint>=0.24.4", "pytest", "hypothesis", "jsonschema", "openpyxl", "pyxlsb", "plotly", "tespy", "gekko"])
 await micropip.install("emfs:/tmp/${wheelName}", deps=False)
 os.chdir("/work")
 # Import the installed wheel, not the mounted checkout: the checkout goes
@@ -39,6 +41,11 @@ os.chdir("/work")
 # comes from it. pytest.ini's "pythonpath = ." would put it first, so that
 # setting is cleared.
 sys.path = [p for p in sys.path if p not in ("", "/work")] + ["/work"]
+# WebAssembly runs several times slower than native CPython, so the
+# default 200 ms Hypothesis deadline would fail tests on speed alone.
+from hypothesis import settings
+settings.register_profile("pyodide", deadline=None)
+settings.load_profile("pyodide")
 import pytest
 int(pytest.main(["-p", "no:cacheprovider", "--import-mode=importlib", "-o", "pythonpath=", *PYTEST_ARGS]))
 `)
