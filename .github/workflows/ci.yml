@@ -298,6 +298,33 @@ jobs:
             core|tespy) uv run --no-sync python scripts/artifact_install_smoke.py --surface "$SURFACE" ;;
           esac
 
+  pyodide:
+    # The OpenPinch web app runs the built wheel in Pyodide (CPython on
+    # WebAssembly). Node runs the same WebAssembly runtime as the browser.
+    name: Tests (Pyodide)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist
+      - name: Install Pyodide
+        working-directory: scripts/pyodide
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run the base tests in Pyodide against the built wheel
+        run: |
+          node scripts/pyodide/run_tests.mjs dist/*.whl -q \
+            --hypothesis-seed="$HYPOTHESIS_SEED" \
+            tests/domain tests/contracts tests/adapters tests/optimisation
+
   audit:
     name: Dependency audit
     # Informational: listed in the CI OK summary but not required, so a newly
@@ -324,7 +351,7 @@ jobs:
     # only be satisfied by the full profile.
     name: ${{ (github.base_ref == 'main' || github.ref == 'refs/heads/main') && 'CI OK (main)' || 'CI OK' }}
     if: ${{ always() }}
-    needs: [lint, tests, solver, version, build, smoke, audit]
+    needs: [lint, tests, solver, version, build, smoke, pyodide, audit]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
