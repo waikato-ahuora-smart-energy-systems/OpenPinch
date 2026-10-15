@@ -98,6 +98,9 @@ def _summary_metrics(solved_model: Any) -> dict[str, float | int | str | bool | 
         "hot_utility_load": "Q_hu_total",
         "cold_utility_load": "Q_cu_total",
         "recovery_load": "Q_r_total",
+        # Also in source_metadata, which is not serialised: a seed network
+        # sent as JSON needs it to run seeded tasks at the same approach.
+        "approach_temperature": "dTmin",
     }
     metrics: dict[str, float | int | str | bool | None] = {}
     for label, attribute in fields.items():

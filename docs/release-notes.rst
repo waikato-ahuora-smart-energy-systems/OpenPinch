@@ -21,7 +21,10 @@ Engine commands for the tutorials
 - Heat pump targeting failures (``HPRTargetingError``) come back as
   ``error`` with the ``hpr_failure_summary`` details instead of raising.
 - HEN ``thermal_derivative`` and ``network_evolution`` accept seed networks as
-  JSON, as returned in a design result.
+  JSON, as returned in a design result: one network or a list of them.
+  Synthesised networks now also record the solver approach temperature in
+  ``summary_metrics["approach_temperature"]``, so a JSON seed runs its seeded
+  tasks at the approach it was solved at.
 
 Contract JSON Schema
 ~~~~~~~~~~~~~~~~~~~~
