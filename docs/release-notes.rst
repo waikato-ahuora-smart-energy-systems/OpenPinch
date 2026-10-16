@@ -4,6 +4,13 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Tutorials
+~~~~~~~~~
+
+- Tutorial 15 asks ``design.utility()`` for its case's hot utility by its
+  name, ``HPS``. It asked for ``HP Steam``, which used to answer 0 and now
+  raises as an unknown utility, so the notebook stopped running.
+
 Result fixes
 ~~~~~~~~~~~~
 
