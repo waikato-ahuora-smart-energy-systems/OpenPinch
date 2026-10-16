@@ -1014,3 +1014,64 @@ def test_json_text_entry_point_passes_progress_as_json_text(monkeypatch):
     run_command_json(json.dumps(request), events.append)
 
     assert [json.loads(event)["done"] for event in events] == [0, 1]
+
+
+class _Cancel(Exception):
+    pass
+
+
+def _cancel(_event):
+    raise _Cancel
+
+
+@pytest.mark.parametrize(
+    ("command", "arguments"),
+    [
+        (
+            "target.carnot_heat_pump",
+            {"load_fraction": 0.25, "condensers": 1, "evaporators": 1},
+        ),
+        ("target.utility_placement", {"isothermal": 2}),
+        ("design.pinch_design", {}),
+    ],
+)
+def test_a_progress_callback_cancels_a_command_and_leaves_the_session(
+    command, arguments
+):
+    session = run_command(
+        {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
+    )["session"]
+    before = run_command(
+        {"command": "target.direct_heat_integration", "session": session}
+    )["results"]
+
+    with pytest.raises(_Cancel):
+        run_command(
+            {"command": command, "session": session, "arguments": arguments},
+            progress=_cancel,
+        )
+
+    after = run_command({"command": "to_problem_json", "session": session})
+    assert after["results"] == before
+
+
+def test_all_periods_progress_carries_each_period_as_its_scope(monkeypatch):
+    solve = _TargetAccessor.direct_heat_integration
+
+    def reporting_solve(self, **kwargs):
+        progress.emit(analysis="a", stage="search", done=1, total=1)
+        return solve(self, **kwargs)
+
+    monkeypatch.setattr(_TargetAccessor, "direct_heat_integration", reporting_solve)
+    events = []
+
+    run_command(
+        {
+            "command": "target.all_periods.direct_heat_integration",
+            "problem": {"sample_case": "crude_preheat_train_multiperiod.json"},
+            "arguments": {"workers": 2},
+        },
+        progress=events.append,
+    )
+
+    assert sorted(event["scope"] for event in events) == ["base", "peak", "turndown"]
