@@ -26,6 +26,7 @@ from ..contracts.workspace import (
     ValidationReport,
 )
 from ..domain.targets import BaseTargetModel
+from ..presentation.configuration import configuration_field_metadata
 from ..presentation.reporting.hpr import hpr_failure_summary
 from ..presentation.reporting.results import serialize_target
 from ._problem.accessors.design import HeatExchangerNetworkDesignView
@@ -112,7 +113,8 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
 
     ``request`` has ``command`` (``"target.<method>"``, ``"design.<method>"``,
     a deeper path such as ``"target.all_periods.<method>"``, or a problem
-    command: ``validate``, ``to_problem_json``, ``streams``, ``load`` (input,
+    command: ``validate``, ``options`` (editable fields, effective values and
+    the options the case sets), ``to_problem_json``, ``streams``, ``load`` (input,
     prepared streams and zone tree), ``report``,
     ``compare``, ``residual_utility``, ``with_utilities_from``,
     ``plot_catalog``, ``export.excel`` / ``export.plots`` (files as base64)
@@ -336,6 +338,17 @@ def _accessor_method(problem: PinchProblem, command: str) -> Any:
     return method
 
 
+def _options(problem: PinchProblem) -> dict[str, Any]:
+    """The editable fields, their effective values, and the options set."""
+    return {
+        "fields": [
+            field.model_dump(mode="json") for field in configuration_field_metadata()
+        ],
+        "values": json.loads(json.dumps(dict(problem.config))),
+        "set": problem.to_problem_json()["options"],
+    }
+
+
 def _validate(problem: PinchProblem) -> dict[str, Any]:
     return {
         "input": problem.validate().model_dump(mode="json"),
@@ -501,6 +514,7 @@ def _export_plots(
 # Commands on the problem itself rather than on one of its accessors.
 _PROBLEM_COMMANDS = {
     "validate": _validate,
+    "options": _options,
     "residual_utility": PinchProblem.residual_utility,
     "with_utilities_from": PinchProblem.with_utilities_from,
     "compare": _compare,

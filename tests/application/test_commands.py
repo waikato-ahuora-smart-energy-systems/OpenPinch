@@ -416,6 +416,20 @@ def test_validate_reports_input_that_passes_the_schema_but_cannot_be_built():
     assert "Zone name and type" in report["issues"][0]["message"]
 
 
+def test_options_returns_fields_effective_values_and_options_set():
+    data = load_packaged_sample_case("basic_pinch.json")
+    data["options"] = {"THERMAL_DT_CONT": 5.0}
+
+    value = run_command({"command": "options", "problem": {"data": data}})["value"]
+
+    fields = {field["name"]: field for field in value["fields"]}
+    assert fields["THERMAL_DT_CONT"]["unit"] == "delta_degC"
+    assert value["values"]["THERMAL_DT_CONT"] == 5.0
+    assert value["values"]["THERMAL_HTC"] == 1.0
+    # Set to its default, yet set: the editor tells it from an unset option.
+    assert value["set"] == {"THERMAL_DT_CONT": 5.0}
+
+
 def test_to_problem_json_returns_the_problem_input():
     value = run_command(
         {"command": "to_problem_json", "problem": {"sample_case": "basic_pinch.json"}}

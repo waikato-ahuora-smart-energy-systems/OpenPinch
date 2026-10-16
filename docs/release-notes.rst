@@ -65,6 +65,11 @@ Command layer
   "Minimum contribution temperature difference" rather than the title-cased
   field name.
 
+- An ``options`` command returns the editable configuration fields
+  (``fields``), the case's effective values (``values``) and the options its
+  input sets (``set``), so an editor can tell an option set to its default
+  from one left unset.
+
 Example workbooks
 ~~~~~~~~~~~~~~~~~
 
