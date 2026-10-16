@@ -6,6 +6,7 @@ import base64
 import json
 from importlib.resources import files
 
+import jsonschema
 import pytest
 
 from OpenPinch.application._problem.accessors.design import (
@@ -70,6 +71,8 @@ def test_design_command_returns_the_design_result_as_value(monkeypatch):
         "pinch_design",
         lambda self, **_kwargs: HeatExchangerNetworkDesignView(report),
     )
+    # The stand-in result has no networks to view; the view is tested below.
+    monkeypatch.setattr(HeatExchangerNetworkDesignView, "view", lambda self: report)
 
     response = run_command(
         {
@@ -971,3 +974,34 @@ def test_non_finite_numbers_are_returned_as_null_so_the_json_is_strict(monkeypat
 
 def _reject(constant: str):
     raise AssertionError(f"Non-standard JSON constant {constant}")
+
+
+def test_design_command_returns_the_design_view_beside_the_result(monkeypatch):
+    from OpenPinch.contracts.schema import contract_json_schemas
+    from tests.analysis.heat_exchanger_networks.test_design_workflow import (
+        _public_example_payload,
+        _use_fake_default_executor,
+    )
+
+    _use_fake_default_executor(monkeypatch)
+
+    response = run_command(
+        {
+            "command": "design.heat_exchanger_network",
+            "problem": {"data": _public_example_payload()},
+        }
+    )
+
+    view = response["view"]
+    jsonschema.validate(view, contract_json_schemas()["HeatExchangerNetworkView"])
+    assert view["rank"] == 1
+    assert [row["rank"] for row in view["ranking"]] == [1]
+    assert view["total_heat_recovery"] == pytest.approx(
+        sum(
+            state["duty"]
+            for exchanger in response["value"]["network"]["exchangers"]
+            if exchanger["kind"] == "recovery"
+            for state in exchanger["period_states"]
+        ),
+        rel=1e-12,
+    )

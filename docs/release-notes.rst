@@ -46,6 +46,16 @@ Fuller results
   optimiser's allocation and the placed case's retargeted duty sit side by
   side. Results recorded before have an empty table.
 
+- The HEN design view gains ``view(rank=, period_id=)``, a
+  ``HeatExchangerNetworkView`` with the duplicate-free ranking table (rank,
+  method, status, objective, total annual cost, unit count and duty totals,
+  as ``top(n)`` ranks them), one ranked network's totals and utility duties,
+  and its grid layout; and ``grid_layout(rank=, period_id=)``, the grid
+  diagram's stream rows, stages, matches (with duties and temperatures) and
+  branch counts as data, without plotly. ``run_command`` returns the view as
+  ``view`` beside ``value`` for ``design.*`` commands, and the contract is in
+  ``contract_json_schemas()``.
+
 Example workbooks
 ~~~~~~~~~~~~~~~~~
 

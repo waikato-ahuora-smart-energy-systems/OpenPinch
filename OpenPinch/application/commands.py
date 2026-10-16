@@ -103,7 +103,9 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
     target is ``{"ref": <id>, "target": <TargetResults JSON>}``, and later
     arguments pass it as ``{"$ref": <id>}``; another session's problem is
     passed as ``{"$session": <id>}``. Outside a session targets are reported
-    only in the results. Analysis that runs and fails (heat pump targeting)
+    only in the results. A ``design.`` command also returns ``view``, the
+    ``HeatExchangerNetworkView`` of its rank-1 network (ranking, totals,
+    utility duties and grid layout). Analysis that runs and fails (heat pump targeting)
     returns ``error`` (``{type, message, details}``) instead of raising.
     Non-finite numbers come back as ``None``, so the response is strict JSON.
     """
@@ -205,7 +207,11 @@ def _run(request: Mapping[str, Any]) -> dict[str, Any]:
         value = returned
     else:
         value = _to_json(returned)
-    return {"value": value, "results": _results_json(problem)}
+    response = {"value": value, "results": _results_json(problem)}
+    if isinstance(returned, HeatExchangerNetworkDesignView):
+        # The ranking, totals, utility duties and grid a results screen shows.
+        response["view"] = returned.view().model_dump(mode="json")
+    return response
 
 
 def _results_json(problem: PinchProblem | None) -> Any:
