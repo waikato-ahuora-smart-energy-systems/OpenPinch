@@ -167,7 +167,14 @@ def _mode(name: str, classification: str) -> str:
         "validation_report",
     }:
         return "cached observation"
-    if name in {"load", "load_bundle", "from_bundle", "scenario", "update_options"}:
+    if name in {
+        "load",
+        "load_bundle",
+        "from_bundle",
+        "scenario",
+        "set_case_input",
+        "update_options",
+    }:
         return "preparation"
     return "explicit execution"
 
@@ -337,6 +344,7 @@ def _workspace_tutorial(name: str) -> int:
         "report",
         "results",
         "save_bundle",
+        "set_case_input",
         "summary_frame",
         "to_bundle",
         "to_problem_json",
