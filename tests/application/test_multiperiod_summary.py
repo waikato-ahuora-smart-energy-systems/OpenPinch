@@ -662,3 +662,25 @@ def test_all_period_targets_report_each_utility_duty_for_their_own_period():
             cold_duty = sum(u.heat_flow.value for u in target.cold_utilities)
             assert hot_duty == pytest.approx(target.Qh.value, abs=1e-6)
             assert cold_duty == pytest.approx(target.Qc.value, abs=1e-6)
+
+
+def test_plots_read_each_period_graphs_after_an_all_period_run():
+    problem = PinchProblem(source="crude_preheat_train_multiperiod.json")
+
+    problem.target.all_periods.direct_heat_integration()
+    catalog = problem.plot.catalog()
+
+    assert set(catalog["Period ID"]) == set(problem.period_ids)
+    assert len(catalog) == len(problem.period_ids) * len(
+        catalog.loc[catalog["Period ID"] == "base"]
+    )
+
+
+def test_a_single_period_run_keeps_the_all_period_analysis_for_reports():
+    problem = PinchProblem(source="crude_preheat_train_multiperiod.json")
+    problem.target.all_periods.direct_heat_integration()
+
+    problem.target.direct_heat_integration()
+    report = problem.report(include_periods=True)
+
+    assert {row.period_id for row in report.targets} == set(problem.period_ids)
