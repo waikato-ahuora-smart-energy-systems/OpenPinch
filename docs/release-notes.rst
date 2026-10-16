@@ -39,6 +39,13 @@ Fuller results
   once the area and cost or exergy targets have run. Without those targets
   the columns and metrics are unchanged.
 
+- ``utility_placement_result.retarget_comparison`` lists each placed utility
+  level of the winning periods (``UtilityPlacementRetargetRow``: period,
+  side, utility, kind, placement rank, supply and target temperatures,
+  ``optimizer_duty``, ``retargeted_duty`` and ``is_fallback``), so the
+  optimiser's allocation and the placed case's retargeted duty sit side by
+  side. Results recorded before have an empty table.
+
 Example workbooks
 ~~~~~~~~~~~~~~~~~
 

@@ -280,6 +280,8 @@ def test_result_schema_exposes_stable_top_level_fields() -> None:
         "alternatives",
         "termination",
         "diagnostics",
+        # Added with the per-utility retarget table (P7-4).
+        "retarget_comparison",
     }
 
 
