@@ -8,6 +8,7 @@ returns at once, so reporting never changes a result.
 from __future__ import annotations
 
 import math
+import os
 import threading
 import time
 from collections.abc import Callable, Iterator
@@ -52,11 +53,15 @@ class _Reporter:
         self.min_interval = min_interval
         self.clock = clock
         self.start = clock()
+        # A forked worker process inherits the reporter; only this one reports.
+        self.pid = os.getpid()
         # When each stage last reached the callback; threads share it.
         self.forwarded: dict[tuple[str, str, str | None], float] = {}
         self.lock = threading.Lock()
 
     def emit(self, **fields) -> None:
+        if os.getpid() != self.pid:
+            return
         now = self.clock()
         scope = _SCOPE.get()
         key = (fields["analysis"], fields["stage"], scope)

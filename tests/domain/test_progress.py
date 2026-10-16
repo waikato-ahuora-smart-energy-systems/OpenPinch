@@ -114,3 +114,13 @@ def test_events_carry_the_scope_they_run_in_also_in_copied_contexts():
                 future.result()
 
     assert sorted(event.scope for event in events) == ["P1", "P2"]
+
+
+def test_reports_from_a_forked_worker_process_are_not_passed_on(monkeypatch):
+    events = []
+
+    with progress.reporting(events.append):
+        monkeypatch.setattr(progress.os, "getpid", lambda: -1)
+        progress.emit(analysis="a", stage="search")
+
+    assert events == []
