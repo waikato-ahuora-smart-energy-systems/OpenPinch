@@ -10,6 +10,7 @@ from ....contracts.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
+from ....domain import progress
 from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ..errors import WorkflowContractError
 from ..models.problem import InternalHeatExchangerNetworkProblem
@@ -57,6 +58,8 @@ class LocalSynthesisExecutor:
         self.executed_tasks: list[HeatExchangerNetworkSynthesisTask] = []
         self.stage_order: list[HeatExchangerNetworkDesignMethod] = []
         self.problems_by_task_id: dict[str, InternalHeatExchangerNetworkProblem] = {}
+        # Lowest total annual cost solved so far, across stages, for progress.
+        self.best_objective: float | None = None
 
     def execute(
         self,
@@ -68,6 +71,7 @@ class LocalSynthesisExecutor:
     ) -> tuple[HeatExchangerNetworkSynthesisTaskOutcome, ...]:
         if tasks:
             self.stage_order.append(tasks[0].method)
+            self._report_progress(tasks, 0)
 
         worker_count = max(1, min(int(max_parallel), len(tasks)))
         if worker_count > 1 and _can_build_tasks_in_workers(tasks, parent_outcomes):
@@ -82,8 +86,8 @@ class LocalSynthesisExecutor:
                 for task in tasks
             )
             with self.worker_pool_factory(worker_count) as pool:
-                solved_results = tuple(
-                    pool.map(_build_and_solve_root_task, solve_inputs)
+                solved_results = self._reported(
+                    tasks, pool.map(_build_and_solve_root_task, solve_inputs), 0
                 )
             return self._collect_outcomes(tasks, solved_results, {})
 
@@ -131,15 +135,55 @@ class LocalSynthesisExecutor:
             )
             for task, internal_problem, task_model_factories in built
         )
+        # Tasks that failed to build count as done.
+        done = len(tasks) - len(built)
         if worker_count == 1:
-            solved_results = tuple(
-                _solve_built_task(worker_args) for worker_args in solve_inputs
+            solved_results = self._reported(
+                tasks,
+                (_solve_built_task(worker_args) for worker_args in solve_inputs),
+                done,
             )
         else:
             with self.worker_pool_factory(worker_count) as pool:
-                solved_results = tuple(pool.map(_solve_built_task, solve_inputs))
+                solved_results = self._reported(
+                    tasks, pool.map(_solve_built_task, solve_inputs), done
+                )
 
         return self._collect_outcomes(tasks, solved_results, failed)
+
+    def _reported(
+        self,
+        tasks: Sequence[HeatExchangerNetworkSynthesisTask],
+        solved_results: Any,
+        done: int,
+    ) -> tuple:
+        """The solved results, reporting progress as each one arrives."""
+        collected = []
+        for result in solved_results:
+            collected.append(result)
+            outcome = result[1]
+            if outcome.status == "success" and outcome.objective_value is not None:
+                if self.best_objective is None:
+                    self.best_objective = outcome.objective_value
+                else:
+                    self.best_objective = min(
+                        self.best_objective, outcome.objective_value
+                    )
+            self._report_progress(tasks, done + len(collected))
+        return tuple(collected)
+
+    def _report_progress(
+        self, tasks: Sequence[HeatExchangerNetworkSynthesisTask], done: int
+    ) -> None:
+        progress.emit(
+            analysis="hen_synthesis",
+            stage=str(tasks[0].method),
+            done=done,
+            total=len(tasks),
+            unit="tasks",
+            best_objective=self.best_objective,
+            objective="total annual cost",
+        )
 
     def _collect_outcomes(
         self,
