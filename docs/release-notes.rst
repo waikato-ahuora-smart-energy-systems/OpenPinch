@@ -35,6 +35,38 @@ Result fixes
   with duplicate network structures removed. Before, it sliced
   ``result.ranked_networks``, so rank ``k`` could differ between them.
 
+Fuller results
+~~~~~~~~~~~~~~
+
+- Heat pump and refrigeration target rows (``TargetResults``) carry the values
+  of ``hpr_summary``: ``hpr_selected_load`` and ``hpr_achieved_load`` (kW),
+  ``hpr_objective``, and for a shared multi-period design
+  ``hpr_design_vector``, ``hpr_period_ids``, ``hpr_period_weights``,
+  ``hpr_period_success`` (by period) and ``hpr_weighted_objective``.
+
+- ``summary_frame()`` and ``report().metrics`` include ``Area``, ``Units``,
+  ``Capital Cost``, ``Total Cost``, ``ETE``, ``Exergy Sources``,
+  ``Exergy Sinks``, ``Min Exergy Requirement`` and ``Min Exergy Destruction``
+  once the area and cost or exergy targets have run. Without those targets
+  the columns and metrics are unchanged.
+
+- ``utility_placement_result.retarget_comparison`` lists each placed utility
+  level of the winning periods (``UtilityPlacementRetargetRow``: period,
+  side, utility, kind, placement rank, supply and target temperatures,
+  ``optimizer_duty``, ``retargeted_duty`` and ``is_fallback``), so the
+  optimiser's allocation and the placed case's retargeted duty sit side by
+  side. Results recorded before have an empty table.
+
+- The HEN design view gains ``view(rank=, period_id=)``, a
+  ``HeatExchangerNetworkView`` with the duplicate-free ranking table (rank,
+  method, status, objective, total annual cost, unit count and duty totals,
+  as ``top(n)`` ranks them), one ranked network's totals and utility duties,
+  and its grid layout; and ``grid_layout(rank=, period_id=)``, the grid
+  diagram's stream rows, stages, matches (with duties and temperatures) and
+  branch counts as data, without plotly. ``run_command`` returns the view as
+  ``view`` beside ``value`` for ``design.*`` commands, and the contract is in
+  ``contract_json_schemas()``.
+
 Command layer
 ~~~~~~~~~~~~~
 

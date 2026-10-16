@@ -213,7 +213,23 @@ returned object wraps the
 Plotly ``fig``, a lightweight drawing adapter ``ax``, the selected ``network``,
 and the normalized ``grid_model`` used to draw the topology.
 
+For clients that draw the network themselves, the design view's
+``view(rank=, period_id=)`` returns a
+:class:`~OpenPinch.contracts.synthesis.view.HeatExchangerNetworkView`: the
+duplicate-free ranking table, one ranked network's duty totals and utility
+duties, and its grid layout
+(:class:`~OpenPinch.contracts.synthesis.view.HeatExchangerNetworkGridLayout`,
+also from ``grid_layout(rank=, period_id=)``) as plain data.
+
 .. autoclass:: OpenPinch.contracts.synthesis.result.HeatExchangerNetworkSynthesisResult
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.contracts.synthesis.view.HeatExchangerNetworkView
+   :members:
+   :no-index:
+
+.. autoclass:: OpenPinch.contracts.synthesis.view.HeatExchangerNetworkGridLayout
    :members:
    :no-index:
 

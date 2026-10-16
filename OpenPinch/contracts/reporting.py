@@ -179,6 +179,36 @@ class TargetResults(_ReportModel):
     hpr_ambient_cold: Value | None = report_field(
         "hpr_ambient_cold", "weighted_mean", None, representation="quantity"
     )
+    # The HPR service load selected from the available load, and the cycle
+    # duty achieved for it.
+    hpr_selected_load: Value | None = report_field(
+        "hpr_selected_load", "weighted_mean", None, representation="quantity"
+    )
+    hpr_achieved_load: Value | None = report_field(
+        "hpr_achieved_load", "weighted_mean", None, representation="quantity"
+    )
+    # The optimiser's objective; for a shared design, its weighted objective.
+    hpr_objective: Optional[float] = report_field(
+        "hpr_objective", "consensus", None, representation="scalar"
+    )
+    # One shared multi-period design: its decision vector, the periods it
+    # covers with their weights, whether each period's evaluation succeeded,
+    # and the weighted objective over the periods.
+    hpr_design_vector: tuple[float, ...] | None = report_field(
+        "hpr_design_vector", "consensus", None, representation="structured"
+    )
+    hpr_period_ids: tuple[str, ...] | None = report_field(
+        "hpr_period_ids", "consensus", None, representation="structured"
+    )
+    hpr_period_weights: tuple[float, ...] | None = report_field(
+        "hpr_period_weights", "consensus", None, representation="structured"
+    )
+    hpr_period_success: dict[str, bool] | None = report_field(
+        "hpr_period_success", "consensus", None, representation="structured"
+    )
+    hpr_weighted_objective: Optional[float] = report_field(
+        "hpr_weighted_objective", "consensus", None, representation="scalar"
+    )
     hpr_cop: Value | None = report_field(
         "hpr_cop", "derived", None, representation="quantity"
     )
@@ -315,6 +345,8 @@ class TargetResults(_ReportModel):
         "hpr_external_utility",
         "hpr_ambient_hot",
         "hpr_ambient_cold",
+        "hpr_selected_load",
+        "hpr_achieved_load",
         "hpr_cop",
         "hpr_eta_he",
         "hpr_operating_cost",

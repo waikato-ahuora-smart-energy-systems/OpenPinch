@@ -99,6 +99,21 @@ def test_network_synthesis_result_schema_lists_network():
     assert {"network", "run_id"} <= set(schema["properties"])
 
 
+def test_target_results_schema_lists_the_hpr_summary_values():
+    report = contract_json_schemas()["TargetOutput"]["$defs"]["TargetResults"]
+
+    assert {
+        "hpr_selected_load",
+        "hpr_achieved_load",
+        "hpr_objective",
+        "hpr_design_vector",
+        "hpr_period_ids",
+        "hpr_period_weights",
+        "hpr_period_success",
+        "hpr_weighted_objective",
+    } <= set(report["properties"])
+
+
 def _subschemas(schema):
     yield schema
     for item in schema.values() if isinstance(schema, dict) else schema:
