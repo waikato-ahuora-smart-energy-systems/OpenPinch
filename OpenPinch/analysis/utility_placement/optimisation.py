@@ -135,8 +135,8 @@ class _PlacementProgress:
     """Evaluations spent and the best objective found, for progress reports.
 
     Evaluations are counted as they happen in this process; after each task
-    batch the parent session's merged count, which includes worker
-    processes, replaces the count.
+    batch the parent session's merged count and best objective, which
+    include worker processes, replace them and are reported.
     """
 
     def __init__(self, total: int) -> None:
@@ -144,26 +144,33 @@ class _PlacementProgress:
         self.merged = 0
         self.live = 0
         self.best: float | None = None
+        self.stage = "search"
 
-    def report(self, stage: str, evaluation: PlacementEvaluation, fresh: bool) -> None:
+    def evaluated(self, evaluation: PlacementEvaluation, fresh: bool) -> None:
         self.live += fresh
         if evaluation.feasible and (
             self.best is None or evaluation.scalar_objective < self.best
         ):
             self.best = evaluation.scalar_objective
+        self.report()
+
+    def merge(self, spent: int, best: float | None) -> None:
+        self.merged = spent
+        self.live = 0
+        if best is not None and (self.best is None or best < self.best):
+            self.best = best
+        self.report()
+
+    def report(self) -> None:
         emit_progress(
             analysis="utility_placement",
-            stage=stage,
+            stage=self.stage,
             done=self.merged + self.live,
             total=self.total,
             unit="evaluations",
             best_objective=self.best,
             objective="placement objective",
         )
-
-    def merge(self, spent: int) -> None:
-        self.merged = spent
-        self.live = 0
 
 
 class _BoundedSessionObjective:
@@ -189,14 +196,14 @@ class _BoundedSessionObjective:
         evaluation = self.session.evaluate(
             _optimizer_point_to_physical(self.session, point)
         )
-        self.tracker.report(
-            self.phase, evaluation, self.session.evaluation_count > spent
-        )
+        self.tracker.stage = self.phase
+        self.tracker.evaluated(evaluation, self.session.evaluation_count > spent)
         return evaluation.scalar_objective
 
     def for_task(
         self, index: int, count: int, *, phase: str = "search"
     ) -> _BoundedSessionObjective:
+        self.tracker.stage = phase
         return _BoundedSessionObjective(
             self.session.task_session(index, count, phase=phase), self.tracker, phase
         )
@@ -206,7 +213,7 @@ class _BoundedSessionObjective:
 
     def merge_task_reports(self, reports) -> None:
         self.session.merge_task_reports(reports)
-        self.tracker.merge(self.session.evaluation_count)
+        self.tracker.merge(self.session.evaluation_count, self.session.best_objective)
 
 
 class PlacementOptimisationOutcome(BaseModel):

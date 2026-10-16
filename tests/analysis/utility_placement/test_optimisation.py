@@ -465,16 +465,73 @@ def test_coordinator_reports_search_polish_and_replay_progress() -> None:
 
     starts = len(model.initial_points)
     stages = [event.stage for event in events]
-    assert stages == ["search"] * starts + ["polish"] + ["replay"] * starts
+    # Each batch reports again once its evaluations merge into the session.
+    assert stages == (["search"] * (starts + 1) + ["polish"] * 2 + ["replay"] * starts)
     assert all(event.analysis == "utility_placement" for event in events)
-    search = events[:starts]
-    assert [event.done for event in search] == list(range(1, starts + 1))
+    search = events[: starts + 1]
+    assert [event.done for event in search] == [*range(1, starts + 1), starts]
     assert {event.total for event in search} == {request.options.evaluation_limit}
     assert {event.unit for event in search} == {"evaluations"}
     best = [event.best_objective for event in search]
     assert best == sorted(best, reverse=True)
-    replay = events[starts + 1 :]
+    assert [event.done for event in events[starts + 1 : starts + 3]] == [
+        starts + 1,
+        starts + 1,
+    ]
+    replay = events[starts + 3 :]
     assert [(event.done, event.total) for event in replay] == [
         (index, starts) for index in range(1, starts + 1)
     ]
     assert replay[-1].best_objective == outcome.evaluations[0].scalar_objective
+
+
+class _WorkerProcessRunner:
+    """Search on two task copies as worker processes would, then merge."""
+
+    def __init__(self, monkeypatch):
+        self.monkeypatch = monkeypatch
+
+    def __call__(self, problem, *, method, options):
+        objective = problem.objective
+        tasks = [
+            pickle.loads(pickle.dumps(objective.for_task(index, 2)))
+            for index in range(2)
+        ]
+        values = []
+        with self.monkeypatch.context() as patch:
+            # Reports from another process are not passed on.
+            patch.setattr(progress.os, "getpid", lambda: -1)
+            for task, point in zip(tasks, problem.initial_points, strict=False):
+                values.append(task(point))
+        objective.merge_task_reports([task.task_report() for task in tasks])
+        return OptimisationResult(
+            method=OptimisationMethod(method),
+            candidates=tuple(
+                OptimisationCandidate(objective=value, point=tuple(point))
+                for value, point in zip(values, problem.initial_points, strict=False)
+            ),
+        )
+
+
+def test_coordinator_reports_a_worker_batch_when_its_reports_merge(monkeypatch):
+    request, context, model = _case()
+    session = PlacementEvaluationSession(
+        request=request,
+        context=context,
+        model=model,
+        allocation_adapter=_Adapter(),
+    )
+    events = []
+
+    with progress.reporting(events.append, min_interval=0):
+        coordinate_optimisation(
+            session=session, runner=_WorkerProcessRunner(monkeypatch)
+        )
+
+    search = [event for event in events if event.stage == "search"]
+    assert [event.done for event in search] == [2]
+    replay = [event for event in events if event.stage == "replay"]
+    assert search[0].best_objective == min(
+        session.evaluate(point).scalar_objective for point in model.initial_points[:2]
+    )
+    assert replay
