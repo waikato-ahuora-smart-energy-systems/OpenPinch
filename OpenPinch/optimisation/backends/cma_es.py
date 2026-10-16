@@ -234,46 +234,68 @@ def _exact_matmul(a, b) -> np.ndarray:
     return np.array([[_exact_dot(row, col) for col in b.T] for row in a], dtype=float)
 
 
-def _symmetric_eigh(matrix, max_sweeps: int = 50) -> tuple[np.ndarray, np.ndarray]:
-    """Eigendecompose a symmetric matrix by cyclic Jacobi rotations.
+def _round_robin_pairs(n: int) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Split every index pair into n - 1 rounds of disjoint pairs (p < q)."""
+    players = list(range(n + n % 2))
+    rounds = []
+    for _ in range(len(players) - 1):
+        pairs = [
+            (min(players[i], players[-1 - i]), max(players[i], players[-1 - i]))
+            for i in range(len(players) // 2)
+        ]
+        pairs = [pair for pair in pairs if pair[1] < n]
+        rounds.append(
+            (
+                np.array([p for p, _ in pairs], dtype=int),
+                np.array([q for _, q in pairs], dtype=int),
+            )
+        )
+        players = [players[0], players[-1], *players[1:-1]]
+    return rounds
 
-    Eigenvalues ascend; each eigenvector's largest-magnitude entry is positive.
+
+def _symmetric_eigh(matrix, max_sweeps: int = 50) -> tuple[np.ndarray, np.ndarray]:
+    """Eigendecompose a symmetric matrix by parallel Jacobi rotations.
+
+    Each round rotates disjoint index pairs together with elementwise numpy
+    operations, so a sweep costs n - 1 rounds rather than n^2 / 2 interpreted
+    rotations. Eigenvalues ascend; each eigenvector's largest-magnitude entry
+    is positive.
     """
-    a = [[float(v) for v in row] for row in np.asarray(matrix, dtype=float)]
+    a = np.array(matrix, dtype=float)
     n = len(a)
-    v = [[1.0 if i == j else 0.0 for j in range(n)] for i in range(n)]
+    v = np.eye(n)
+    eps = np.finfo(float).eps
+    rounds = _round_robin_pairs(n)
     for _ in range(max_sweeps):
-        if all(a[p][q] == 0.0 for p in range(n) for q in range(p + 1, n)):
+        rotated = False
+        for p, q in rounds:
+            apq, app, aqq = a[p, q], a[p, p], a[q, q]
+            active = np.abs(apq) > eps * np.sqrt(np.abs(app * aqq))
+            if not active.any():
+                continue
+            rotated = True
+            p, q = p[active], q[active]
+            apq, app, aqq = apq[active], app[active], aqq[active]
+            theta = (aqq - app) / (2.0 * apq)
+            t = np.copysign(1.0, theta) / (np.abs(theta) + np.sqrt(theta * theta + 1.0))
+            c = 1.0 / np.sqrt(t * t + 1.0)
+            s = t * c
+            x, y = a[:, p], a[:, q]
+            a[:, p] = c * x - s * y
+            a[:, q] = s * x + c * y
+            x, y = a[p], a[q]
+            a[p] = c[:, np.newaxis] * x - s[:, np.newaxis] * y
+            a[q] = s[:, np.newaxis] * x + c[:, np.newaxis] * y
+            a[p, q] = 0.0
+            a[q, p] = 0.0
+            x, y = v[:, p], v[:, q]
+            v[:, p] = c * x - s * y
+            v[:, q] = s * x + c * y
+        if not rotated:
             break
-        for p in range(n):
-            for q in range(p + 1, n):
-                apq = a[p][q]
-                if apq == 0.0:
-                    continue
-                if abs(apq) <= 1e-18 * (abs(a[p][p]) + abs(a[q][q])):
-                    a[p][q] = a[q][p] = 0.0
-                    continue
-                theta = (a[q][q] - a[p][p]) / (2.0 * apq)
-                t = math.copysign(1.0, theta) / (
-                    abs(theta) + math.sqrt(theta * theta + 1.0)
-                )
-                c = 1.0 / math.sqrt(t * t + 1.0)
-                s = t * c
-                for k in range(n):
-                    akp, akq = a[k][p], a[k][q]
-                    a[k][p] = c * akp - s * akq
-                    a[k][q] = s * akp + c * akq
-                for k in range(n):
-                    apk, aqk = a[p][k], a[q][k]
-                    a[p][k] = c * apk - s * aqk
-                    a[q][k] = s * apk + c * aqk
-                a[p][q] = a[q][p] = 0.0
-                for k in range(n):
-                    vkp, vkq = v[k][p], v[k][q]
-                    v[k][p] = c * vkp - s * vkq
-                    v[k][q] = s * vkp + c * vkq
-    values = np.array([a[i][i] for i in range(n)], dtype=float)
-    vectors = np.array(v, dtype=float)
+    values = a.diagonal().copy()
+    vectors = v
     order = np.argsort(values, kind="stable")
     values, vectors = values[order], vectors[:, order]
     largest = np.abs(vectors).argmax(axis=0)

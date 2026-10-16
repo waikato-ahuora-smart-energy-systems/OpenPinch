@@ -111,9 +111,11 @@ Heat pump cycle states at saturation
 CMA-ES samples alike on every platform
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- The CMA-ES backend (the HPR default) now eigendecomposes its covariance by
-  Jacobi rotations and forms its matrix products from correctly rounded dot
-  products (``math.fsum``), instead of calling LAPACK ``eigh`` and BLAS.
+- The CMA-ES backend (the HPR and utility placement default) now
+  eigendecomposes its covariance by parallel Jacobi rotations (elementwise
+  numpy operations, about 16 ms for 50 coordinates) and forms its matrix
+  products from correctly rounded dot products (``math.fsum``), instead of
+  calling LAPACK ``eigh`` and BLAS.
   LAPACK and BLAS builds differ in the last bits and in eigenvector signs:
   from the second generation on, the browser (Pyodide) and the desktop sampled
   candidates about 1e-16 apart, and a short heat pump search then settled on a

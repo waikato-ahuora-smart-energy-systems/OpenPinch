@@ -203,6 +203,23 @@ def test_symmetric_eigh_decomposes_with_a_fixed_order_and_sign():
     assert (vectors[largest, range(3)] > 0).all()
 
 
+@pytest.mark.performance
+def test_symmetric_eigh_stays_fast_for_a_50_coordinate_search():
+    # Utility placement runs CMA-ES on one or two coordinates per utility
+    # template, with no dimension cap, and eigendecomposes every generation.
+    rng = np.random.default_rng(0)
+    a = rng.standard_normal((50, 50))
+    matrix = a @ a.T / 50 + np.eye(50)
+
+    elapsed = []
+    for _ in range(3):
+        start = time.perf_counter()
+        bb_cma._symmetric_eigh(matrix)
+        elapsed.append(time.perf_counter() - start)
+
+    assert min(elapsed) < 0.04
+
+
 def test_run_cma_single_nan_objective_appends_mean_fallback(monkeypatch):
     monkeypatch.setattr(
         bb_cma, "_evaluate_scalar_objective", lambda func, x, args: float("nan")
