@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import base64
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 from ...resources import list_sample_cases, read_sample_case
@@ -85,6 +88,36 @@ def load_external_problem_source(
         "a directory with 'streams.csv' and 'utilities.csv', "
         "or a (streams, utilities) tuple."
     )
+
+
+def load_problem_source_from_files(
+    files: Sequence[Mapping[str, str]],
+) -> ExternalProblemSource:
+    """Read a problem from file contents, each with its ``role``.
+
+    A ``problem`` file (JSON or a workbook, by suffix), or a ``streams`` and a
+    ``utilities`` CSV file. Each file is ``{name, role, content_base64}``. The
+    readers choose the format by suffix, so each file is written under its
+    base name, in a folder for its role, to a private temporary directory
+    removed afterwards.
+    """
+    roles = sorted(file["role"] for file in files)
+    if roles not in (["problem"], ["streams", "utilities"]):
+        raise ValueError(
+            "Import one 'problem' file, or a 'streams' and a 'utilities' CSV "
+            f"file; got roles {roles}."
+        )
+    with TemporaryDirectory() as directory:
+        paths: dict[str, Path] = {}
+        for file in files:
+            # A folder per role, so files that share a name stay apart.
+            folder = Path(directory) / file["role"]
+            folder.mkdir()
+            path = folder / Path(file["name"]).name
+            path.write_bytes(base64.b64decode(file["content_base64"]))
+            paths[file["role"]] = path
+        source = paths.get("problem") or (paths["streams"], paths["utilities"])
+        return load_external_problem_source(source, current_project_name="Untitled")
 
 
 def load_packaged_sample_case(name: str) -> JsonDict:

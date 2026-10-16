@@ -202,6 +202,14 @@ def schema_issue_to_view(
     )
 
 
+class InputValidationWarning(UserWarning):
+    """Input validation warnings, with the issues they report."""
+
+    def __init__(self, message: str, *, issues: list[ValidationIssue]) -> None:
+        super().__init__(message)
+        self.issues = issues
+
+
 def validate_problem_semantics(
     problem_inputs: TargetInput,
     *,
@@ -226,9 +234,11 @@ def validate_problem_semantics(
 
     if warning_issues:
         warnings.warn(
-            "Input validation reported "
-            f"{len(warning_issues)} warning(s):\n" + "\n".join(warning_issues),
-            UserWarning,
+            InputValidationWarning(
+                "Input validation reported "
+                f"{len(warning_issues)} warning(s):\n" + "\n".join(warning_issues),
+                issues=[issue for issue in issues if issue.severity == "warning"],
+            ),
             stacklevel=2,
         )
 

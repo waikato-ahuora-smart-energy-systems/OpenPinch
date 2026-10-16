@@ -10,6 +10,7 @@ from ..domain.configuration_fields import (
     USER_CONFIG_FIELD_SPECS,
     configuration_field_support_level,
 )
+from .configuration_text import CONFIGURATION_FIELD_TEXT
 
 
 def configuration_options() -> list[ConfigurationFieldMetadata]:
@@ -23,10 +24,14 @@ def configuration_field_metadata() -> list[ConfigurationFieldMetadata]:
     for name, spec in USER_CONFIG_FIELD_SPECS.items():
         enum_cls = spec.enum_cls
         field_type, multiple = annotation_metadata(spec.annotation, enum_cls=enum_cls)
+        text = CONFIGURATION_FIELD_TEXT[name]
         fields.append(
             ConfigurationFieldMetadata(
                 name=name,
-                label=name.replace("_", " ").title(),
+                label=text.label,
+                unit=text.unit,
+                description=text.description,
+                default=spec.default,
                 field_type=field_type,
                 group=spec.group,
                 config_path=list(spec.config_path),

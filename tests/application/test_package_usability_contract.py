@@ -73,6 +73,7 @@ EXPECTED_WORKSPACE_METHODS = {
     "report",
     "save_bundle",
     "scenario",
+    "set_case_input",
     "set_dt_cont_multiplier",
     "show_dashboard",
     "summary_frame",

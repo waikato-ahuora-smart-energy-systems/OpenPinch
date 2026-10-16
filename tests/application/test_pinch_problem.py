@@ -1722,7 +1722,7 @@ def test_export_graphs_writes_html(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(_PlotAccessor, "data", lambda self: payload)
 
     class FakeFigure:
-        def write_html(self, path):
+        def write_html(self, path, **_kwargs):
             Path(path).write_text("<html></html>", encoding="utf-8")
 
     monkeypatch.setattr(

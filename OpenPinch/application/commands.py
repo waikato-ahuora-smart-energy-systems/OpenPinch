@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import warnings
 from dataclasses import dataclass, field
 from functools import partial
 from typing import Any, Callable, Mapping, get_type_hints
@@ -12,7 +13,14 @@ from uuid import uuid4
 from pydantic import BaseModel
 
 from ..adapters.io.file_exports import export_files
-from ..adapters.io.problem_sources import load_packaged_sample_case
+from ..adapters.io.problem_sources import (
+    load_packaged_sample_case,
+    load_problem_source_from_files,
+)
+from ..analysis.heat_pumps.performance_maps.targeting import (
+    HprTargetCompatibilityError,
+)
+from ..analysis.targeting.utilities import is_default_utility
 from ..contracts.hpr import HPRTargetingError
 from ..contracts.reporting import TargetResults
 from ..contracts.workspace import (
@@ -22,10 +30,14 @@ from ..contracts.workspace import (
 )
 from ..domain.progress import reporting
 from ..domain.targets import BaseTargetModel
+from ..presentation.configuration import configuration_field_metadata
 from ..presentation.reporting.hpr import hpr_failure_summary
 from ..presentation.reporting.results import serialize_target
 from ._problem.accessors.design import HeatExchangerNetworkDesignView
-from ._problem.input.validation import build_validation_report
+from ._problem.input.validation import (
+    InputValidationWarning,
+    build_validation_report,
+)
 from .problem import PinchProblem
 from .workspace import PinchWorkspace
 
@@ -45,8 +57,25 @@ class _Session:
         return self.problem
 
 
+class UnknownSessionError(ValueError):
+    """A request names a session this engine does not hold."""
+
+    def __init__(self, session: str) -> None:
+        super().__init__(f"Unknown session {session!r}.")
+        self.session = session
+
+
 # Sessions kept between commands, by session id, for the life of the engine.
 _SESSIONS: dict[str, _Session] = {}
+
+
+class _DefaultUtilityWarning(UserWarning):
+    """A default utility added to a problem that gave none of its kind."""
+
+    def __init__(self, name: str, kind: str) -> None:
+        super().__init__(f"No {kind} utility given; added the default {name!r}.")
+        self.name = name
+        self.kind = kind
 
 
 def _load_problem(source: Mapping[str, Any]) -> PinchProblem:
@@ -54,11 +83,21 @@ def _load_problem(source: Mapping[str, Any]) -> PinchProblem:
     if "data" in source:
         if not isinstance(source["data"], Mapping):
             raise ValueError("Problem 'data' must be a JSON object.")
-        return PinchProblem(source["data"], project_name=project_name)
-    # Packaged cases only: a path here would read the engine host's files.
-    return PinchProblem(
-        load_packaged_sample_case(source["sample_case"]), project_name=project_name
-    )
+        problem = PinchProblem(source["data"], project_name=project_name)
+    else:
+        # Packaged cases only: a path here would read the engine host's files.
+        problem = PinchProblem(
+            load_packaged_sample_case(source["sample_case"]),
+            project_name=project_name,
+        )
+    for kind, utilities in (
+        ("hot", problem.hot_utilities),
+        ("cold", problem.cold_utilities),
+    ):
+        for utility in utilities:
+            if is_default_utility(utility):
+                warnings.warn(_DefaultUtilityWarning(utility.name, kind), stacklevel=1)
+    return problem
 
 
 def _load_workspace(source: Mapping[str, Any]) -> PinchWorkspace:
@@ -82,7 +121,8 @@ def run_command(
 
     ``request`` has ``command`` (``"target.<method>"``, ``"design.<method>"``,
     a deeper path such as ``"target.all_periods.<method>"``, or a problem
-    command: ``validate``, ``to_problem_json``, ``streams``, ``load`` (input,
+    command: ``validate``, ``options`` (editable fields, effective values and
+    the options the case sets), ``to_problem_json``, ``streams``, ``load`` (input,
     prepared streams and zone tree), ``report``,
     ``compare``, ``residual_utility``, ``with_utilities_from``,
     ``plot_catalog``, ``export.excel`` / ``export.plots`` (files as base64)
@@ -91,14 +131,17 @@ def run_command(
     ``{"sample_case": <name>}``, each with an optional ``project_name``) or
     ``session``, and optional ``arguments`` for the method. ``"open"`` loads
     ``problem`` into a new session and returns its id as ``session``;
-    ``"close"`` discards ``session``.
+    ``"close"`` discards ``session``. ``"import"`` reads problem data from
+    ``arguments.files`` (``{name, role, content_base64}``: one ``problem``
+    file, or a ``streams`` and a ``utilities`` CSV file) without building it.
 
     ``"open"`` with ``workspace`` (``{"problem": <source>}`` or
     ``{"bundle": <PinchWorkspaceBundle JSON>}``) opens a workspace session.
     There ``case`` names the case a command runs on (default: the active
     case), and ``workspace.<action>`` (``scenario``, ``use_case``,
     ``update_options``, ``set_dt_cont_multiplier``, ``add``,
-    ``compare_cases``, ``to_bundle`` and ``batch``) acts on the workspace.
+    ``set_case_input``, ``compare_cases``, ``to_bundle`` and ``batch``) acts
+    on the workspace.
 
     The response has ``value``, the contract the method returned, and
     ``results``, the problem's ``TargetOutput`` (``None`` when no target has
@@ -109,7 +152,12 @@ def run_command(
     arguments pass it as ``{"$ref": <id>}``; another session's problem is
     passed as ``{"$session": <id>}``. Outside a session targets are reported
     only in the results. Analysis that runs and fails (heat pump targeting)
-    returns ``error`` (``{type, message, details}``) instead of raising.
+    returns ``error`` (``{type, message, details}``) instead of raising, as
+    does a session the engine does not hold (type ``unknown_session``).
+    ``warnings`` lists the non-fatal issues the command met, each
+    ``{type, message, details}``: Python warnings by category name,
+    ``validation`` (one per input validation issue) and ``default_utility``
+    (a default utility added on loading).
     Non-finite numbers come back as ``None``, so the response is strict JSON.
 
     ``progress``, when given, is called during long analyses (heat pump
@@ -120,10 +168,58 @@ def run_command(
     Reports come at most every 0.25 s per stage. An exception it raises
     propagates out of the command, which cancels it.
     """
-    if progress is None:
-        return _finite(_run(request))
-    with reporting(lambda event: progress(event.to_json())):
-        return _finite(_run(request))
+    # Recording warnings is process-wide; an engine runs one command at a time.
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        try:
+            if progress is None:
+                response = _run(request)
+            else:
+                with reporting(lambda event: progress(event.to_json())):
+                    response = _run(request)
+        except UnknownSessionError as error:
+            response = {"value": None, "results": None, "error": _error_json(error)}
+    return _finite({**response, "warnings": _warnings_json(caught)})
+
+
+def _warnings_json(caught: list[warnings.WarningMessage]) -> list[dict[str, Any]]:
+    """Each distinct warning once, as ``{type, message, details}``."""
+    entries = []
+    for warning in caught:
+        if isinstance(warning.message, InputValidationWarning):
+            # One entry per issue, with its path, rather than one summary.
+            entries.extend(
+                {
+                    "type": "validation",
+                    "message": issue.message,
+                    "details": issue.model_dump(mode="json"),
+                }
+                for issue in warning.message.issues
+            )
+        elif isinstance(warning.message, _DefaultUtilityWarning):
+            entries.append(
+                {
+                    "type": "default_utility",
+                    "message": str(warning.message),
+                    "details": {
+                        "name": warning.message.name,
+                        "kind": warning.message.kind,
+                    },
+                }
+            )
+        else:
+            entries.append(
+                {
+                    "type": warning.category.__name__,
+                    "message": str(warning.message),
+                    "details": None,
+                }
+            )
+    reported = []
+    for entry in entries:
+        if entry not in reported:
+            reported.append(entry)
+    return reported
 
 
 def _finite(value: Any) -> Any:
@@ -139,6 +235,8 @@ def _finite(value: Any) -> Any:
 
 def _run(request: Mapping[str, Any]) -> dict[str, Any]:
     command = request["command"]
+    if command == "import":
+        return {"value": _import(**request.get("arguments", {})), "results": None}
     if command == "open":
         if "workspace" in request:
             workspace = _load_workspace(request["workspace"])
@@ -151,7 +249,7 @@ def _run(request: Mapping[str, Any]) -> dict[str, Any]:
     if "session" in request:
         session = _SESSIONS.get(request["session"])
         if session is None:
-            raise ValueError(f"Unknown session {request['session']!r}.")
+            raise UnknownSessionError(request["session"])
         if command == "close":
             del _SESSIONS[request["session"]]
             return {"value": None, "results": None}
@@ -229,15 +327,25 @@ def _results_json(problem: PinchProblem | None) -> Any:
     return None if problem is None else _to_json(problem.results)
 
 
-# Analysis that ran and failed is reported in the response; anything else
-# (a bad request, a bug) raises.
-_ANALYSIS_FAILURES = (HPRTargetingError,)
+# Analysis that ran and failed, or that this engine cannot run (TESPy without
+# the extra), is reported in the response; anything else (a bad request, a
+# bug) raises.
+_ANALYSIS_FAILURES = (HPRTargetingError, HprTargetCompatibilityError)
 
 
 def _error_json(error: Exception) -> dict[str, Any]:
-    details = (
-        hpr_failure_summary(error) if isinstance(error, HPRTargetingError) else None
-    )
+    if isinstance(error, UnknownSessionError):
+        # A stable code, so engines need not match the message.
+        return {
+            "type": "unknown_session",
+            "message": str(error),
+            "details": {"session": error.session},
+        }
+    details = None
+    if isinstance(error, HPRTargetingError):
+        details = hpr_failure_summary(error)
+    elif isinstance(error, HprTargetCompatibilityError):
+        details = {"code": error.code}
     return {"type": type(error).__name__, "message": str(error), "details": details}
 
 
@@ -252,6 +360,27 @@ def _accessor_method(problem: PinchProblem, command: str) -> Any:
     if not callable(method):
         raise ValueError(f"Unknown command {command!r}.")
     return method
+
+
+def _import(files: list[Mapping[str, str]]) -> dict[str, Any]:
+    """Problem data read from file contents, without building the problem."""
+    source = load_problem_source_from_files(files)
+    return {
+        "data": source.input_data,
+        "source_kind": source.source_kind,
+        "project_name": source.project_name,
+    }
+
+
+def _options(problem: PinchProblem) -> dict[str, Any]:
+    """The editable fields, their effective values, and the options set."""
+    return {
+        "fields": [
+            field.model_dump(mode="json") for field in configuration_field_metadata()
+        ],
+        "values": json.loads(json.dumps(dict(problem.config))),
+        "set": problem.to_problem_json()["options"],
+    }
 
 
 def _validate(problem: PinchProblem) -> dict[str, Any]:
@@ -401,8 +530,13 @@ def _export_plots(
     plot: str | None = None,
     gallery: bool = False,
     zone_name: str | None = None,
+    include_plotlyjs: bool | str = True,
 ) -> dict[str, Any]:
-    """Standalone HTML plots, optionally one type and with a gallery index."""
+    """Standalone HTML plots, optionally one type and with a gallery index.
+
+    ``include_plotlyjs`` (``True``, ``"cdn"`` or ``"directory"``) is how the
+    files load plotly.js.
+    """
     method = None
     if plot is not None:
         method = getattr(problem.plot, plot, None)
@@ -411,7 +545,12 @@ def _export_plots(
     export = problem.plot.export_gallery if gallery else problem.plot.export
     return {
         "files": export_files(
-            lambda directory: export(directory, zone_name=zone_name, plot=method)
+            lambda directory: export(
+                directory,
+                zone_name=zone_name,
+                plot=method,
+                include_plotlyjs=include_plotlyjs,
+            )
         )
     }
 
@@ -419,6 +558,7 @@ def _export_plots(
 # Commands on the problem itself rather than on one of its accessors.
 _PROBLEM_COMMANDS = {
     "validate": _validate,
+    "options": _options,
     "residual_utility": PinchProblem.residual_utility,
     "with_utilities_from": PinchProblem.with_utilities_from,
     "compare": _compare,
@@ -477,8 +617,17 @@ def _workspace_action(name: str) -> Any:
 
 
 # Commands on a workspace session.
+def _set_case_input(
+    workspace: PinchWorkspace, *, case_name: str, source: dict[str, Any]
+) -> dict[str, Any]:
+    """Replace one case's input; returns the case list and its report."""
+    report = workspace.set_case_input(case_name, source)
+    return {**_workspace_json(workspace), "report": report.model_dump(mode="json")}
+
+
 _WORKSPACE_COMMANDS = {
     "workspace.compare_cases": _compare_cases,
+    "workspace.set_case_input": _set_case_input,
     "workspace.to_bundle": lambda workspace: workspace.to_bundle().model_dump(
         mode="json"
     ),
@@ -528,7 +677,7 @@ def _resolve(argument: Any, session: _Session | None) -> Any:
         # Another session's problem, for commands that take a second problem.
         other = _SESSIONS.get(argument["$session"])
         if other is None:
-            raise ValueError(f"Unknown session {argument['$session']!r}.")
+            raise UnknownSessionError(argument["$session"])
         return other.case(None)
     if not (isinstance(argument, Mapping) and set(argument) == {"$ref"}):
         return argument
