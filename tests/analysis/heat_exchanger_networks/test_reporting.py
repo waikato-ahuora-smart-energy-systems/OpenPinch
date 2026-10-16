@@ -25,6 +25,9 @@ from OpenPinch.analysis.heat_exchanger_networks.results.selection import (
     ranked_networks,
     select_network,
 )
+from OpenPinch.application._problem.accessors.design import (
+    HeatExchangerNetworkDesignView,
+)
 from OpenPinch.contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
 from OpenPinch.contracts.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
@@ -387,6 +390,40 @@ def test_result_ranks_stage_shifted_networks_as_duplicate_structures() -> None:
     assert [outcome.network.run_id for outcome in ranked] == [
         "stage-best",
         "stage-distinct",
+    ]
+
+
+def test_design_view_ranks_top_and_network_the_same_way() -> None:
+    best_network = _stage_gap_network("stage-best")
+    outcomes = (
+        HeatExchangerNetworkSynthesisTaskOutcome(
+            task=_task(
+                method="network_evolution_method",
+                task_id=task_id,
+                approach_temperature=approach,
+            ),
+            status="success",
+            network=network,
+            objective_value=objective,
+        )
+        for task_id, approach, network, objective in (
+            ("esm-best", 14.0, best_network, 100.0),
+            ("esm-shifted", 16.0, _stage_compressed_network("shifted"), 100.05),
+            ("esm-distinct", 18.0, _distinct_network("distinct"), 200.0),
+        )
+    )
+    design = HeatExchangerNetworkDesignView(
+        HeatExchangerNetworkSynthesisResult(
+            network=best_network,
+            run_id="result",
+            method="network_evolution_method",
+            ranked_networks=tuple(outcomes),
+        )
+    )
+
+    assert [outcome.network for outcome in design.top(2)] == [
+        design.network(rank=1),
+        design.network(rank=2),
     ]
 
 

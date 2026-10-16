@@ -4,6 +4,26 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Result fixes
+~~~~~~~~~~~~
+
+- In ``target.all_periods.<method>`` (and a single-period target on a
+  multiperiod problem) each target's utilities now carry that period's duty as
+  a scalar. Before, each utility gave an array over all periods in which only
+  the target's own entry was set.
+- After ``target.all_periods.<method>`` with no single-period run,
+  ``plot.data()``, ``plot.catalog()``, the plot methods and the plot exports
+  read the graphs of every period's result. The catalogue gains a
+  ``Period ID`` column, and the graph data is keyed ``"<graph set> [<period>]"``.
+- A single-period ``target.<method>`` run no longer discards the last
+  all-periods results, so ``report(include_periods=True)`` and the weighted
+  summaries still work after it. Changing the problem's input still clears
+  them.
+- ``design.top(n)`` uses the same ranking as ``design.network(rank=)`` and
+  ``design.grid(rank=)``: successful, feasible outcomes of the accepted method
+  with duplicate network structures removed. Before, it sliced
+  ``result.ranked_networks``, so rank ``k`` could differ between them.
+
 Example workbooks
 ~~~~~~~~~~~~~~~~~
 

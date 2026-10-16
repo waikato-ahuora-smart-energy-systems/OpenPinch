@@ -17,6 +17,10 @@ GraphData = Dict[str, GraphRecord]
 HprGraphSelector = Callable[..., list[GraphRecord]]
 
 
+def _graph_record(value: Any) -> GraphRecord:
+    return value.model_dump() if hasattr(value, "model_dump") else dict(value)
+
+
 class _PlotAccessor:
     """Read-only graph inventory, selection, rendering, and export helpers."""
 
@@ -46,6 +50,7 @@ class _PlotAccessor:
                         "Zone Address": graph_zone_address,
                         "Target": target_name,
                         "Target Type": target_type,
+                        "Period ID": graph_set.get("period_id"),
                         "Graph Type": graph.get("type"),
                         "Graph Name": graph.get("name", f"Graph {index + 1}"),
                         "Index": index,
@@ -151,8 +156,20 @@ class _PlotAccessor:
         return selected
 
     def data(self) -> GraphData:
-        """Return the serialized graph data for the solved problem."""
+        """Return the serialized graph data for the solved problem.
+
+        Without a selected target run, the graphs of the last all-periods run
+        are returned, one entry per period and graph set.
+        """
         if getattr(self._problem._results, "graphs", None) is None:
+            period_graphs = {
+                f"{key} [{period_id}]": _graph_record(value)
+                for period_id, output in self._problem._period_results.items()
+                for key, value in (output.graphs or {}).items()
+            }
+            if period_graphs:
+                return period_graphs
+
             raise RuntimeError(
                 "No graph data is available. Run a problem.target.<method>() "
                 "workflow before requesting plots."
@@ -161,10 +178,7 @@ class _PlotAccessor:
         graphs = getattr(self._problem._results, "graphs", None)
 
         if graphs:
-            return {
-                key: value.model_dump() if hasattr(value, "model_dump") else dict(value)
-                for key, value in graphs.items()
-            }
+            return {key: _graph_record(value) for key, value in graphs.items()}
         return get_output_graph_data(self._problem._master_zone)
 
     def export(

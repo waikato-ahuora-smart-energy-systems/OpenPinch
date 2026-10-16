@@ -638,3 +638,49 @@ def test_ratio_of_totals_warns_about_periods_without_a_basis():
         )
 
     assert value == pytest.approx(0.4)
+
+
+def test_all_period_targets_report_each_utility_duty_for_their_own_period():
+    base = PinchProblem("Four-stream-Yee-and-Grossmann-1990-1.json")
+    source = base.to_problem_json()
+    source["options"]["PROBLEM_PERIOD_IDS"] = ["base", "turndown"]
+    source["options"]["PROBLEM_PERIOD_WEIGHTS"] = [0.7, 0.3]
+    for stream in source["streams"]:
+        duty = stream["heat_flow"]
+        stream["heat_flow"] = {
+            "values": [duty["value"], 0.8 * duty["value"]],
+            "unit": duty["unit"],
+        }
+        stream["heat_capacity_flowrate"] = None
+    problem = PinchProblem(source)
+
+    period_outputs = problem.target.all_periods.all_heat_integration()
+
+    for output in period_outputs.values():
+        for target in output.targets:
+            hot_duty = sum(u.heat_flow.value for u in target.hot_utilities)
+            cold_duty = sum(u.heat_flow.value for u in target.cold_utilities)
+            assert hot_duty == pytest.approx(target.Qh.value, abs=1e-6)
+            assert cold_duty == pytest.approx(target.Qc.value, abs=1e-6)
+
+
+def test_plots_read_each_period_graphs_after_an_all_period_run():
+    problem = PinchProblem(source="crude_preheat_train_multiperiod.json")
+
+    problem.target.all_periods.direct_heat_integration()
+    catalog = problem.plot.catalog()
+
+    assert set(catalog["Period ID"]) == set(problem.period_ids)
+    assert len(catalog) == len(problem.period_ids) * len(
+        catalog.loc[catalog["Period ID"] == "base"]
+    )
+
+
+def test_a_single_period_run_keeps_the_all_period_analysis_for_reports():
+    problem = PinchProblem(source="crude_preheat_train_multiperiod.json")
+    problem.target.all_periods.direct_heat_integration()
+
+    problem.target.direct_heat_integration()
+    report = problem.report(include_periods=True)
+
+    assert {row.period_id for row in report.targets} == set(problem.period_ids)
