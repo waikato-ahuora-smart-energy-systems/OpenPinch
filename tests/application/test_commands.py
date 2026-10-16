@@ -470,6 +470,23 @@ def test_import_reads_csv_files_by_their_named_roles():
     ]
 
 
+def test_import_keeps_role_files_apart_when_their_names_match():
+    # Files picked from two folders can share a name.
+    value = run_command(
+        {
+            "command": "import",
+            "arguments": {
+                "files": [
+                    _file("table.csv", _STREAMS_CSV, "streams"),
+                    _file("table.csv", _UTILITIES_CSV, "utilities"),
+                ]
+            },
+        }
+    )["value"]
+
+    assert [stream["name"] for stream in value["data"]["streams"]] == ["H1", "C1"]
+
+
 def test_import_reads_a_problem_file_by_its_suffix():
     workbook = REPOSITORY_ROOT / "examples" / "OpenPinchWkbs" / "Ahmad (example 1).xlsb"
     content = base64.b64encode(workbook.read_bytes()).decode("ascii")
