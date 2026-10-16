@@ -71,9 +71,10 @@ class _Reporter:
             if not finished and last is not None and now - last < self.min_interval:
                 return
             self.forwarded[key] = now
+        detail = fields.pop("detail")
         self.callback(
             Progress(
-                message=_message(**fields),
+                message=_message(**fields, detail=detail),
                 elapsed=now - self.start,
                 scope=scope,
                 **fields,
@@ -129,8 +130,12 @@ def emit(
     unit: str | None = None,
     best_objective: float | None = None,
     objective: str | None = None,
+    detail: str | None = None,
 ) -> None:
-    """Report progress to the installed reporter, if any."""
+    """Report progress to the installed reporter, if any.
+
+    ``detail`` is added to the message, after the count and best objective.
+    """
     reporter = _REPORTER.get()
     if reporter is None:
         return
@@ -142,6 +147,7 @@ def emit(
         unit=unit,
         best_objective=best_objective,
         objective=objective,
+        detail=detail,
     )
 
 
@@ -154,6 +160,7 @@ def _message(
     unit: str | None,
     best_objective: float | None,
     objective: str | None,
+    detail: str | None,
 ) -> str:
     parts = []
     if done is not None:
@@ -161,5 +168,7 @@ def _message(
         parts.append(f"{count} {unit}" if unit else count)
     if best_objective is not None and math.isfinite(best_objective):
         parts.append(f"best {objective or 'objective'} {best_objective:.4g}")
+    if detail:
+        parts.append(detail)
     title = stage.replace("_", " ").capitalize()
     return f"{title}: {', '.join(parts)}" if parts else title

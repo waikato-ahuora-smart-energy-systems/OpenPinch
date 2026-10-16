@@ -124,3 +124,18 @@ def test_reports_from_a_forked_worker_process_are_not_passed_on(monkeypatch):
         progress.emit(analysis="a", stage="search")
 
     assert events == []
+
+
+def test_a_detail_is_appended_to_the_message():
+    events = []
+    with progress.reporting(events.append):
+        progress.emit(
+            analysis="a",
+            stage="search",
+            done=1,
+            total=10,
+            unit="runs",
+            detail="240 evaluations",
+        )
+
+    assert events[0].message == "Search: 1 of 10 runs, 240 evaluations"
