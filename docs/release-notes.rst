@@ -35,6 +35,9 @@ Engine commands for the tutorials
 - New ``PinchWorkspace.to_bundle()`` and ``PinchWorkspace.from_bundle()``
   build and read a workspace bundle in memory; ``save_bundle`` and
   ``load_bundle`` use them.
+- ``validate`` on invalid inline input returns ``{"input": null, "report":
+  ...}`` with the ``ValidationReport`` issues instead of raising
+  ``ValueError``. Other commands still raise on invalid input.
 
 Contract JSON Schema
 ~~~~~~~~~~~~~~~~~~~~

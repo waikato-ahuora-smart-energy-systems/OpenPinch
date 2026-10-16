@@ -366,6 +366,20 @@ def test_validate_returns_the_normalised_input_and_the_report():
     assert value["input"]["streams"]
 
 
+def test_validate_reports_invalid_inline_input_instead_of_raising():
+    data = json.loads(
+        (files(sample_cases) / "basic_pinch.json").read_text(encoding="utf-8")
+    )
+    data["streams"][0]["t_supply"] = "warm"
+
+    response = run_command({"command": "validate", "problem": {"data": data}})
+
+    assert response["value"]["input"] is None
+    report = response["value"]["report"]
+    assert report["valid"] is False
+    assert report["issues"][0]["path"].startswith("streams[0].t_supply")
+
+
 def test_to_problem_json_returns_the_problem_input():
     value = run_command(
         {"command": "to_problem_json", "problem": {"sample_case": "basic_pinch.json"}}

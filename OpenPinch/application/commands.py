@@ -120,7 +120,13 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
             return {"value": _batch(request), "results": None}
         problem = session.case(request.get("case"))
     else:
-        problem = _load_problem(request["problem"])
+        try:
+            problem = _load_problem(request["problem"])
+        except ValueError:
+            data = request["problem"].get("data")
+            if command != "validate" or not isinstance(data, Mapping):
+                raise
+            return {"value": _invalid_input_report(data), "results": None}
     handler = _PROBLEM_COMMANDS.get(command)
     owner: Any = problem
     if command in _WORKSPACE_COMMANDS:
@@ -204,6 +210,14 @@ def _validate(problem: PinchProblem) -> dict[str, Any]:
         "input": problem.validate().model_dump(mode="json"),
         "report": problem.validation_report().model_dump(mode="json"),
     }
+
+
+def _invalid_input_report(data: Mapping[str, Any]) -> dict[str, Any]:
+    """The validation report of inline input that would not load."""
+    workspace = PinchWorkspace()
+    workspace.load(dict(data), case_name="input")
+    report = workspace.validation_report("input")
+    return {"input": None, "report": report.model_dump(mode="json")}
 
 
 def _streams(problem: PinchProblem) -> dict[str, Any]:
