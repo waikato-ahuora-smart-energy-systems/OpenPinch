@@ -16,3 +16,9 @@ def test_field_metadata_gives_label_unit_description_and_default():
     assert field.unit == "delta_degC"
     assert field.default == 5.0
     assert "dt_cont" in field.description
+
+
+def test_every_editable_field_has_its_own_label_and_description():
+    for field in configuration_field_metadata():
+        assert field.label != field.name.replace("_", " ").title(), field.name
+        assert field.description.endswith("."), field.name

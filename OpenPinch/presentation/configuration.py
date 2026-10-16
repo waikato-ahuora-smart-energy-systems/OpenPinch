@@ -24,13 +24,13 @@ def configuration_field_metadata() -> list[ConfigurationFieldMetadata]:
     for name, spec in USER_CONFIG_FIELD_SPECS.items():
         enum_cls = spec.enum_cls
         field_type, multiple = annotation_metadata(spec.annotation, enum_cls=enum_cls)
-        text = CONFIGURATION_FIELD_TEXT.get(name)
+        text = CONFIGURATION_FIELD_TEXT[name]
         fields.append(
             ConfigurationFieldMetadata(
                 name=name,
-                label=text.label if text else name.replace("_", " ").title(),
-                unit=text.unit if text else None,
-                description=text.description if text else "",
+                label=text.label,
+                unit=text.unit,
+                description=text.description,
                 default=spec.default,
                 field_type=field_type,
                 group=spec.group,
