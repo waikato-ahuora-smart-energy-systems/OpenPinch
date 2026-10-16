@@ -1047,6 +1047,22 @@ def test_validation_warnings_are_returned_one_per_issue():
     assert warning["message"] == warning["details"]["message"]
 
 
+def test_default_utilities_added_on_loading_are_returned_as_warnings():
+    data = load_packaged_sample_case("basic_pinch.json")
+    data["utilities"] = []
+
+    opened = run_command({"command": "open", "problem": {"data": data}})
+    targeted = run_command(
+        {"command": "target.direct_heat_integration", "session": opened["session"]}
+    )
+
+    defaults = [w for w in opened["warnings"] if w["type"] == "default_utility"]
+    assert {w["details"]["kind"] for w in defaults} == {"hot", "cold"}
+    assert all(w["details"]["name"] in w["message"] for w in defaults)
+    # Reported when the problem loads, not again by later commands.
+    assert targeted["warnings"] == []
+
+
 def test_non_finite_numbers_are_returned_as_null_so_the_json_is_strict(monkeypatch):
     # Browsers' JSON.parse rejects NaN; a missing magnitude must come back null.
     monkeypatch.setattr(

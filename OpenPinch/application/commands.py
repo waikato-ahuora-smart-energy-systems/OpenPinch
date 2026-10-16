@@ -17,6 +17,7 @@ from ..adapters.io.problem_sources import load_packaged_sample_case
 from ..analysis.heat_pumps.performance_maps.targeting import (
     HprTargetCompatibilityError,
 )
+from ..analysis.targeting.utilities import is_default_utility
 from ..contracts.hpr import HPRTargetingError
 from ..contracts.reporting import TargetResults
 from ..contracts.workspace import (
@@ -63,16 +64,35 @@ class UnknownSessionError(ValueError):
 _SESSIONS: dict[str, _Session] = {}
 
 
+class _DefaultUtilityWarning(UserWarning):
+    """A default utility added to a problem that gave none of its kind."""
+
+    def __init__(self, name: str, kind: str) -> None:
+        super().__init__(f"No {kind} utility given; added the default {name!r}.")
+        self.name = name
+        self.kind = kind
+
+
 def _load_problem(source: Mapping[str, Any]) -> PinchProblem:
     project_name = source.get("project_name", "Site")
     if "data" in source:
         if not isinstance(source["data"], Mapping):
             raise ValueError("Problem 'data' must be a JSON object.")
-        return PinchProblem(source["data"], project_name=project_name)
-    # Packaged cases only: a path here would read the engine host's files.
-    return PinchProblem(
-        load_packaged_sample_case(source["sample_case"]), project_name=project_name
-    )
+        problem = PinchProblem(source["data"], project_name=project_name)
+    else:
+        # Packaged cases only: a path here would read the engine host's files.
+        problem = PinchProblem(
+            load_packaged_sample_case(source["sample_case"]),
+            project_name=project_name,
+        )
+    for kind, utilities in (
+        ("hot", problem.hot_utilities),
+        ("cold", problem.cold_utilities),
+    ):
+        for utility in utilities:
+            if is_default_utility(utility):
+                warnings.warn(_DefaultUtilityWarning(utility.name, kind), stacklevel=1)
+    return problem
 
 
 def _load_workspace(source: Mapping[str, Any]) -> PinchWorkspace:
@@ -121,6 +141,10 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
     only in the results. Analysis that runs and fails (heat pump targeting)
     returns ``error`` (``{type, message, details}``) instead of raising, as
     does a session the engine does not hold (type ``unknown_session``).
+    ``warnings`` lists the non-fatal issues the command met, each
+    ``{type, message, details}``: Python warnings by category name,
+    ``validation`` (one per input validation issue) and ``default_utility``
+    (a default utility added on loading).
     Non-finite numbers come back as ``None``, so the response is strict JSON.
     """
     # Recording warnings is process-wide; an engine runs one command at a time.
@@ -146,6 +170,17 @@ def _warnings_json(caught: list[warnings.WarningMessage]) -> list[dict[str, Any]
                     "details": issue.model_dump(mode="json"),
                 }
                 for issue in warning.message.issues
+            )
+        elif isinstance(warning.message, _DefaultUtilityWarning):
+            entries.append(
+                {
+                    "type": "default_utility",
+                    "message": str(warning.message),
+                    "details": {
+                        "name": warning.message.name,
+                        "kind": warning.message.kind,
+                    },
+                }
             )
         else:
             entries.append(

@@ -41,6 +41,9 @@ Command layer
   warnings come one per issue, with type ``validation`` and the
   ``ValidationIssue`` as ``details``; the library raises them as an
   ``InputValidationWarning`` (a ``UserWarning``) carrying its ``issues``.
+  Loading a problem that gives no hot or no cold utility adds a
+  ``default_utility`` warning (``details``: ``name`` and ``kind``) for each
+  default utility added.
 
 Example workbooks
 ~~~~~~~~~~~~~~~~~
