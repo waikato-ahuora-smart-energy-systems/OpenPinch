@@ -80,6 +80,11 @@ Command layer
   take ``include_plotlyjs``: ``True`` (embedded, the default), ``"cdn"``, or
   ``"directory"`` for one shared ``plotly.min.js`` beside the files.
 
+- ``plot.catalog()`` (and the ``plot_catalog`` command) has a
+  ``Plot Method`` column: the ``problem.plot`` method, and ``export.plots``
+  ``plot`` name, that draws each graph (empty for graph types no method
+  draws).
+
 Example workbooks
 ~~~~~~~~~~~~~~~~~
 

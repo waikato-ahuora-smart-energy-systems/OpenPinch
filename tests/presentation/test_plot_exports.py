@@ -44,3 +44,12 @@ def test_export_rejects_other_ways_to_load_plotly_js(
         solved.plot.export(tmp_path, include_plotlyjs=include_plotlyjs)
     with pytest.raises(ValueError, match="include_plotlyjs"):
         solved.plot.export_gallery(tmp_path, include_plotlyjs=include_plotlyjs)
+
+
+def test_catalog_names_the_plot_method_of_each_graph(solved):
+    catalog = solved.plot.catalog()
+
+    gcc = catalog[catalog["Graph Type"] == "Grand Composite Curve"]
+    assert set(gcc["Plot Method"]) == {"grand_composite_curve"}
+    for method in catalog["Plot Method"].dropna():
+        assert callable(getattr(solved.plot, method))

@@ -15,6 +15,30 @@ PathLike = Union[str, Path]
 GraphRecord = Dict[str, Any]
 GraphData = Dict[str, GraphRecord]
 HprGraphSelector = Callable[..., list[GraphRecord]]
+# The graph type each plot method draws, by method name.
+PLOT_METHOD_GRAPH_TYPES: dict[str, GraphType] = {
+    "composite_curve": GraphType.CC,
+    "shifted_composite_curve": GraphType.SCC,
+    "balanced_composite_curve": GraphType.BCC,
+    "grand_composite_curve": GraphType.GCC,
+    "real_grand_composite_curve": GraphType.GCC_R,
+    "exergetic_grand_composite_curve": GraphType.GCC_X,
+    "grand_composite_curve_with_heat_pump": GraphType.GCC_HP,
+    "net_load_profiles": GraphType.NLP,
+    "net_load_profiles_with_heat_pump": GraphType.NLP_HP,
+    "grand_composite_curve_with_refrigeration": GraphType.GCC_RFRG,
+    "net_load_profiles_with_refrigeration": GraphType.NLP_RFRG,
+    "grand_composite_curve_with_orc": GraphType.GCC_ORC,
+    "net_load_profiles_with_orc": GraphType.NLP_ORC,
+    "exergetic_net_load_profiles": GraphType.NLP_X,
+    "total_site_profiles": GraphType.TSP,
+    "site_utility_grand_composite_curve": GraphType.SUGCC,
+    "energy_transfer_diagram": GraphType.ETD,
+}
+_PLOT_METHOD_BY_GRAPH_TYPE = {
+    graph_type.value: method for method, graph_type in PLOT_METHOD_GRAPH_TYPES.items()
+}
+
 # How an exported HTML file loads plotly.js (plotly's ``include_plotlyjs``).
 PlotlyJs = Literal[True, "cdn", "directory"]
 
@@ -54,6 +78,9 @@ class _PlotAccessor:
                         "Target Type": target_type,
                         "Period ID": graph_set.get("period_id"),
                         "Graph Type": graph.get("type"),
+                        "Plot Method": _PLOT_METHOD_BY_GRAPH_TYPE.get(
+                            graph.get("type")
+                        ),
                         "Graph Name": graph.get("name", f"Graph {index + 1}"),
                         "Index": index,
                     }
@@ -259,27 +286,8 @@ class _PlotAccessor:
             raise ValueError(
                 "plot must be a method bound to this problem.plot accessor."
             )
-        method_types = {
-            "composite_curve": GraphType.CC,
-            "shifted_composite_curve": GraphType.SCC,
-            "balanced_composite_curve": GraphType.BCC,
-            "grand_composite_curve": GraphType.GCC,
-            "real_grand_composite_curve": GraphType.GCC_R,
-            "exergetic_grand_composite_curve": GraphType.GCC_X,
-            "grand_composite_curve_with_heat_pump": GraphType.GCC_HP,
-            "net_load_profiles": GraphType.NLP,
-            "net_load_profiles_with_heat_pump": GraphType.NLP_HP,
-            "grand_composite_curve_with_refrigeration": GraphType.GCC_RFRG,
-            "net_load_profiles_with_refrigeration": GraphType.NLP_RFRG,
-            "grand_composite_curve_with_orc": GraphType.GCC_ORC,
-            "net_load_profiles_with_orc": GraphType.NLP_ORC,
-            "exergetic_net_load_profiles": GraphType.NLP_X,
-            "total_site_profiles": GraphType.TSP,
-            "site_utility_grand_composite_curve": GraphType.SUGCC,
-            "energy_transfer_diagram": GraphType.ETD,
-        }
         try:
-            return method_types[name]
+            return PLOT_METHOD_GRAPH_TYPES[name]
         except KeyError as exc:
             raise ValueError(f"Unsupported plot method {name!r}.") from exc
 
