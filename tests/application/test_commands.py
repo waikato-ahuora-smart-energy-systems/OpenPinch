@@ -22,6 +22,7 @@ from OpenPinch.contracts.hpr import (
 )
 from OpenPinch.contracts.hpr_performance_map import HprPerformanceMapRequest
 from OpenPinch.contracts.workspace import ValidationReport
+from OpenPinch.domain import progress
 from OpenPinch.domain.stream_collection import StreamCollection
 from OpenPinch.tutorials import sample_cases
 
@@ -971,3 +972,45 @@ def test_non_finite_numbers_are_returned_as_null_so_the_json_is_strict(monkeypat
 
 def _reject(constant: str):
     raise AssertionError(f"Non-standard JSON constant {constant}")
+
+
+def _design_reporting_progress(self, **_kwargs):
+    progress.emit(
+        analysis="hen_synthesis", stage="pinch_design_method", done=0, total=1
+    )
+    progress.emit(
+        analysis="hen_synthesis", stage="pinch_design_method", done=1, total=1
+    )
+    return HeatExchangerNetworkDesignView(ValidationReport(valid=True, issues=[]))
+
+
+def test_progress_callback_receives_json_events_during_a_command(monkeypatch):
+    monkeypatch.setattr(_DesignAccessor, "pinch_design", _design_reporting_progress)
+    request = {
+        "command": "design.pinch_design",
+        "problem": {"sample_case": "basic_pinch.json"},
+    }
+    events = []
+
+    response = run_command(request, progress=events.append)
+
+    assert [(event["stage"], event["done"], event["total"]) for event in events] == [
+        ("pinch_design_method", 0, 1),
+        ("pinch_design_method", 1, 1),
+    ]
+    assert events[-1]["message"] == "Pinch design method: 1 of 1"
+    assert json.loads(json.dumps(events)) == events
+    assert response == run_command(request)
+
+
+def test_json_text_entry_point_passes_progress_as_json_text(monkeypatch):
+    monkeypatch.setattr(_DesignAccessor, "pinch_design", _design_reporting_progress)
+    request = {
+        "command": "design.pinch_design",
+        "problem": {"sample_case": "basic_pinch.json"},
+    }
+    events = []
+
+    run_command_json(json.dumps(request), events.append)
+
+    assert [json.loads(event)["done"] for event in events] == [0, 1]
