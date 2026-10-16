@@ -167,7 +167,7 @@ def _mode(name: str, classification: str) -> str:
         "validation_report",
     }:
         return "cached observation"
-    if name in {"load", "load_bundle", "scenario", "update_options"}:
+    if name in {"load", "load_bundle", "from_bundle", "scenario", "update_options"}:
         return "preparation"
     return "explicit execution"
 
@@ -184,7 +184,7 @@ def _dimensions(
             "packaged sample;mapping"
             if name in {"__init__", "load"}
             else "workspace bundle"
-            if name in {"load_bundle", "save_bundle"}
+            if name in {"load_bundle", "save_bundle", "from_bundle", "to_bundle"}
             else "n/a"
         ),
         "zone_scope": (
@@ -327,6 +327,7 @@ def _workspace_tutorial(name: str) -> int:
     }:
         return 4
     if name in {
+        "from_bundle",
         "load",
         "load_bundle",
         "master_zone",
@@ -337,6 +338,7 @@ def _workspace_tutorial(name: str) -> int:
         "results",
         "save_bundle",
         "summary_frame",
+        "to_bundle",
         "to_problem_json",
         "validate",
         "validation_report",

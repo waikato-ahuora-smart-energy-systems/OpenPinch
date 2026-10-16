@@ -64,6 +64,8 @@ EXPECTED_WORKSPACE_METHODS = {
     "compare_cases",
     "compare_to",
     "export_excel",
+    # In-memory bundles for JSON clients (the engine command layer).
+    "from_bundle",
     "list_cases",
     "load",
     "load_bundle",
@@ -74,6 +76,7 @@ EXPECTED_WORKSPACE_METHODS = {
     "set_dt_cont_multiplier",
     "show_dashboard",
     "summary_frame",
+    "to_bundle",
     "to_problem_json",
     "update_options",
     "use_case",

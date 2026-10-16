@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 from importlib.resources import files
 
@@ -581,3 +582,294 @@ def test_heat_pump_targeting_failure_is_returned_as_an_error(monkeypatch):
 
     assert response["error"]["type"] == "HPRTargetingError"
     assert response["error"]["details"]["status"] == "typed infeasible"
+
+
+def test_plot_catalog_lists_the_solved_graphs():
+    session = run_command(
+        {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
+    )["session"]
+    run_command({"command": "target.direct_heat_integration", "session": session})
+
+    value = run_command({"command": "plot_catalog", "session": session})["value"]
+
+    assert value["columns"] and value["data"]
+
+
+def test_excel_export_returns_the_workbook_as_a_base64_file():
+    session = run_command(
+        {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
+    )["session"]
+    run_command({"command": "target.direct_heat_integration", "session": session})
+
+    files = run_command({"command": "export.excel", "session": session})["value"][
+        "files"
+    ]
+
+    (workbook,) = files
+    assert workbook["name"].endswith(".xlsx")
+    assert base64.b64decode(workbook["content_base64"])[:2] == b"PK"
+
+
+def test_plot_export_returns_html_files_for_the_named_plot():
+    session = run_command(
+        {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
+    )["session"]
+    run_command({"command": "target.direct_heat_integration", "session": session})
+
+    files = run_command(
+        {
+            "command": "export.plots",
+            "session": session,
+            "arguments": {"plot": "grand_composite_curve", "gallery": True},
+        }
+    )["value"]["files"]
+
+    names = [file["name"] for file in files]
+    assert "index.html" in names
+    assert all(name.endswith(".html") for name in names)
+
+
+def test_workspace_session_runs_commands_on_a_named_case():
+    session = run_command(
+        {
+            "command": "open",
+            "workspace": {"problem": {"sample_case": "basic_pinch.json"}},
+        }
+    )["session"]
+
+    response = run_command(
+        {
+            "command": "target.direct_heat_integration",
+            "session": session,
+            "case": "baseline",
+        }
+    )
+
+    assert response["results"]["targets"]
+
+
+def _workspace_session() -> str:
+    return run_command(
+        {
+            "command": "open",
+            "workspace": {"problem": {"sample_case": "basic_pinch.json"}},
+        }
+    )["session"]
+
+
+def test_workspace_scenario_adds_a_case_that_commands_can_target():
+    session = _workspace_session()
+
+    value = run_command(
+        {
+            "command": "workspace.scenario",
+            "session": session,
+            "arguments": {"name": "tight_dt", "dt_cont_multiplier": 0.75},
+        }
+    )["value"]
+    tight = run_command(
+        {
+            "command": "target.direct_heat_integration",
+            "session": session,
+            "case": "tight_dt",
+        }
+    )["results"]["targets"][0]
+    baseline = run_command(
+        {
+            "command": "target.direct_heat_integration",
+            "session": session,
+            "case": "baseline",
+        }
+    )["results"]["targets"][0]
+
+    assert value["cases"] == ["baseline", "tight_dt"]
+    assert tight["Qh"]["value"] < baseline["Qh"]["value"]
+
+
+def test_workspace_use_case_makes_a_case_active_for_case_free_commands():
+    session = _workspace_session()
+    run_command(
+        {
+            "command": "workspace.scenario",
+            "session": session,
+            "arguments": {"name": "wide_dt", "dt_cont_multiplier": 2.0},
+        }
+    )
+
+    value = run_command(
+        {
+            "command": "workspace.use_case",
+            "session": session,
+            "arguments": {"name": "wide_dt"},
+        }
+    )["value"]
+    data = run_command({"command": "to_problem_json", "session": session})["value"]
+
+    assert value["active_case"] == "wide_dt"
+    assert data["zone_tree"]["dt_cont_multiplier"] == pytest.approx(2.0)
+
+
+def test_workspace_update_options_changes_one_case_input():
+    session = _workspace_session()
+    run_command(
+        {
+            "command": "workspace.scenario",
+            "session": session,
+            "arguments": {"name": "wide_dt"},
+        }
+    )
+
+    run_command(
+        {
+            "command": "workspace.update_options",
+            "session": session,
+            "arguments": {"options": {"THERMAL_DT_CONT": 15}, "case_name": "wide_dt"},
+        }
+    )
+    data = run_command(
+        {"command": "to_problem_json", "session": session, "case": "wide_dt"}
+    )["value"]
+
+    assert data["options"]["THERMAL_DT_CONT"] == 15
+
+
+def test_workspace_sets_a_case_dt_cont_multiplier():
+    session = _workspace_session()
+
+    run_command(
+        {
+            "command": "workspace.set_dt_cont_multiplier",
+            "session": session,
+            "arguments": {"value": 1.5, "case_name": "baseline"},
+        }
+    )
+    data = run_command({"command": "to_problem_json", "session": session})["value"]
+
+    assert data["zone_tree"]["dt_cont_multiplier"] == pytest.approx(1.5)
+
+
+def test_workspace_compare_cases_returns_comparison_rows():
+    session = _workspace_session()
+    run_command(
+        {
+            "command": "workspace.scenario",
+            "session": session,
+            "arguments": {"name": "tight_dt", "dt_cont_multiplier": 0.75},
+        }
+    )
+    for case in ("baseline", "tight_dt"):
+        run_command(
+            {
+                "command": "target.direct_heat_integration",
+                "session": session,
+                "case": case,
+            }
+        )
+
+    value = run_command(
+        {
+            "command": "workspace.compare_cases",
+            "session": session,
+            "arguments": {"base_case": "baseline", "other_case": "tight_dt"},
+        }
+    )["value"]
+
+    assert value["columns"] and value["data"]
+
+
+def test_workspace_bundle_round_trips_through_json():
+    session = _workspace_session()
+    run_command(
+        {
+            "command": "workspace.scenario",
+            "session": session,
+            "arguments": {"name": "tight_dt", "dt_cont_multiplier": 0.75},
+        }
+    )
+
+    bundle = run_command({"command": "workspace.to_bundle", "session": session})[
+        "value"
+    ]
+    reopened = run_command({"command": "open", "workspace": {"bundle": bundle}})[
+        "session"
+    ]
+    data = run_command(
+        {"command": "to_problem_json", "session": reopened, "case": "tight_dt"}
+    )["value"]
+
+    assert data["zone_tree"]["dt_cont_multiplier"] == pytest.approx(0.75)
+
+
+def test_workspace_add_registers_another_session_problem_as_a_case():
+    session = _workspace_session()
+    other = run_command(
+        {"command": "open", "problem": {"sample_case": "chocolate_factory.json"}}
+    )["session"]
+
+    value = run_command(
+        {
+            "command": "workspace.add",
+            "session": session,
+            "arguments": {"case": {"$session": other}, "name": "factory"},
+        }
+    )["value"]
+
+    assert value["cases"] == ["baseline", "factory"]
+
+
+def test_a_workspace_session_passed_as_a_problem_is_its_active_case():
+    workspace = _workspace_session()
+    receiver = run_command(
+        {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
+    )["session"]
+
+    value = run_command(
+        {
+            "command": "with_utilities_from",
+            "session": receiver,
+            "arguments": {"other_problem": {"$session": workspace}},
+        }
+    )["value"]
+
+    assert value["data"]["utilities"]
+
+
+def test_workspace_batch_runs_one_command_on_each_case():
+    session = _workspace_session()
+    run_command(
+        {
+            "command": "workspace.scenario",
+            "session": session,
+            "arguments": {"name": "tight_dt", "dt_cont_multiplier": 0.75},
+        }
+    )
+
+    value = run_command(
+        {
+            "command": "workspace.batch",
+            "session": session,
+            "arguments": {"command": "target.direct_heat_integration"},
+        }
+    )["value"]
+
+    assert list(value["results"]) == ["baseline", "tight_dt"]
+    assert value["errors"] == {}
+    assert value["results"]["tight_dt"]["results"]["targets"]
+
+
+def test_workspace_batch_reports_a_failing_case_and_runs_the_rest():
+    session = _workspace_session()
+
+    value = run_command(
+        {
+            "command": "workspace.batch",
+            "session": session,
+            "arguments": {
+                "command": "target.direct_heat_integration",
+                "cases": ["missing", "baseline"],
+            },
+        }
+    )["value"]
+
+    assert list(value["results"]) == ["baseline"]
+    assert value["errors"]["missing"]["type"] == "KeyError"

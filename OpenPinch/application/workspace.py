@@ -239,7 +239,11 @@ class PinchWorkspace:
     @classmethod
     def load_bundle(cls, path: PathLike) -> "PinchWorkspace":
         """Load a previously persisted workspace bundle."""
-        bundle = load_workspace_bundle(path)
+        return cls.from_bundle(load_workspace_bundle(path))
+
+    @classmethod
+    def from_bundle(cls, bundle: PinchWorkspaceBundle) -> "PinchWorkspace":
+        """Build a workspace from a bundle held in memory."""
         workspace = cls(
             project_name=bundle.project_name,
             baseline_name=bundle.baseline_name,
@@ -630,8 +634,12 @@ class PinchWorkspace:
 
     def save_bundle(self, path: PathLike) -> Any:
         """Persist the current workspace, syncing any live case edits first."""
+        return save_workspace_bundle(path, self.to_bundle())
+
+    def to_bundle(self) -> PinchWorkspaceBundle:
+        """Return the current workspace as a bundle, syncing live case edits."""
         self._sync_all_cases()
-        bundle = PinchWorkspaceBundle(
+        return PinchWorkspaceBundle(
             schema_version="3",
             project_name=self.project_name,
             baseline_name=self.baseline_name,
@@ -642,7 +650,6 @@ class PinchWorkspace:
                 for name in self.list_cases()
             },
         )
-        return save_workspace_bundle(path, bundle)
 
     def _resolve_case_name(self, name: Optional[str]) -> str:
         return _workspace_state.resolve_case_name(self, name)
