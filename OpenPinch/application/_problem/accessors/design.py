@@ -21,17 +21,6 @@ def _set_if_supplied(values: dict[str, Any], key: str, value: Any) -> None:
         values[key] = value
 
 
-def _plain_utility_name(name: str) -> str:
-    """A utility's own name, without the network's ``Hot Utility.`` prefix."""
-    from ....domain.enums import StreamLoc
-
-    for location in (StreamLoc.HotU, StreamLoc.ColdU):
-        prefix = f"{location.value}."
-        if name.startswith(prefix):
-            return name[len(prefix) :]
-    return name
-
-
 class HeatExchangerNetworkDesignView:
     """Explicit application behavior around one serializable HEN result."""
 
@@ -42,7 +31,8 @@ class HeatExchangerNetworkDesignView:
         utility_names: Sequence[str] | None = None,
     ) -> None:
         self._result = result
-        # The problem's utilities, so ``utility`` can reject other names.
+        # The problem's utilities as the network names them ("Hot Utility.HPS"),
+        # so ``utility`` can resolve a utility's own name and reject others.
         self._utility_names = None if utility_names is None else tuple(utility_names)
 
     @property
@@ -116,18 +106,35 @@ class HeatExchangerNetworkDesignView:
 
         return self.selected_network.total_duty(kind=HeatExchangerKind.COLD_UTILITY)
 
+    def _network_utility_name(self, name: str) -> str:
+        """The network's stream name for ``name``, a utility or stream name."""
+        if self._utility_names is None or name in self._utility_names:
+            return name
+        matches = [
+            utility
+            for utility in self._utility_names
+            if utility.split(".", 1)[-1] == name
+        ]
+        if len(matches) > 1:
+            raise ValueError(
+                f"Utility {name!r} is both a hot and a cold utility; ask for "
+                + " or ".join(repr(match) for match in matches)
+                + "."
+            )
+        if not matches:
+            raise ValueError(
+                f"Unknown utility {name!r}. The problem's utilities are "
+                f"{', '.join(self._utility_names)}."
+            )
+        return matches[0]
+
     def utility(self, name: str, *, period_id: str | None = None) -> float:
         """Return selected-network utility duty for one named utility."""
         from ....domain.enums import HeatExchangerKind
 
         if not isinstance(name, str) or not name.strip():
             raise ValueError("utility name must be a non-empty string")
-        utility_name = _plain_utility_name(name.strip())
-        if self._utility_names is not None and utility_name not in self._utility_names:
-            raise ValueError(
-                f"Unknown utility {name.strip()!r}. The problem's utilities are "
-                f"{', '.join(self._utility_names)}."
-            )
+        utility_name = self._network_utility_name(name.strip())
         network = self.selected_network
         resolved_period_id = network.resolve_period_id(period_id)
         total = 0.0
@@ -138,7 +145,7 @@ class HeatExchangerNetworkDesignView:
                 stream = exchanger.sink_stream
             else:
                 continue
-            if _plain_utility_name(stream) == utility_name:
+            if stream == utility_name:
                 state = exchanger.state(resolved_period_id)
                 if state.active:
                     total += float(state.duty)
@@ -193,6 +200,7 @@ class _DesignAccessor:
         return runtime, configuration
 
     def _run(self, service, *, surface, runtime, configuration, **service_kwargs):
+        from ....domain.enums import StreamLoc
         from ..targeting.execution import walk_zone_tree
         from ..targeting.provenance import make_provenance
         from ..targeting.state import commit_problem, snapshot_problem
@@ -224,11 +232,12 @@ class _DesignAccessor:
         view = HeatExchangerNetworkDesignView(
             deepcopy(result),
             utility_names=[
-                utility.name
-                for utility in (
-                    *self._problem.hot_utilities,
-                    *self._problem.cold_utilities,
+                f"{location.value}.{utility.name}"
+                for location, utilities in (
+                    (StreamLoc.HotU, self._problem.hot_utilities),
+                    (StreamLoc.ColdU, self._problem.cold_utilities),
                 )
+                for utility in utilities
             ],
         )
         commit_problem(self._problem, isolated)

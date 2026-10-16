@@ -212,6 +212,29 @@ def test_design_utility_rejects_a_name_that_is_not_a_problem_utility(
         design.utility("HP Steam")
 
 
+def test_design_utility_keeps_hot_and_cold_utilities_of_one_name_apart(
+    monkeypatch,
+) -> None:
+    _use_fake_default_executor(monkeypatch)
+    payload = _public_example_payload()
+    for utility in payload["utilities"]:
+        utility["name"] = "Steam"
+    problem = PinchProblem(source=payload, project_name="Shared utility name")
+
+    design = problem.design.heat_exchanger_network()
+
+    duties = {
+        exchanger.kind: exchanger.state().duty
+        for exchanger in design.selected_network.exchangers
+    }
+    assert design.utility("Hot Utility.Steam") == duties[HeatExchangerKind.HOT_UTILITY]
+    assert (
+        design.utility("Cold Utility.Steam") == duties[HeatExchangerKind.COLD_UTILITY]
+    )
+    with pytest.raises(ValueError, match="'Hot Utility.Steam' or 'Cold Utility.Steam'"):
+        design.utility("Steam")
+
+
 def test_enhanced_synthesis_method_is_public_quality_tier_entrypoint(
     monkeypatch,
 ) -> None:

@@ -79,7 +79,9 @@ Command layer
 - ``design.utility(name)`` takes the problem's utility name (``"HPS"``) as
   well as the network's stream name (``"Hot Utility.HPS"``); before, the
   utility's own name answered 0. A name that is not one of the problem's
-  utilities raises ``ValueError`` instead of answering 0.
+  utilities raises ``ValueError`` instead of answering 0, as does a name
+  shared by a hot and a cold utility (ask for ``"Hot Utility.<name>"`` or
+  ``"Cold Utility.<name>"``).
 - ``design.multiperiod_heat_exchanger_network(prerequisites=True)`` runs
   ``target.all_periods.all_heat_integration()`` first when the problem has
   no all-period targets, so a fresh problem (or a session-less command) can
