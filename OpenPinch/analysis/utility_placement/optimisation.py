@@ -11,6 +11,7 @@ from ...contracts.utility_placement import (
     PlacementTermination,
     UtilityPlacementOptions,
 )
+from ...domain import progress
 from ...optimisation.errors import OptimisationError
 from ...optimisation.models import (
     OptimisationMethod,
@@ -130,12 +131,39 @@ def _physical_point_to_optimizer(
     return tuple(fractions)
 
 
-def _bounded_session_objective(
-    point,
-    *,
-    session: PlacementEvaluationSession,
-) -> float:
-    return session.objective(_optimizer_point_to_physical(session, point))
+class _PlacementProgress:
+    """Evaluations spent and the best objective found, for progress reports.
+
+    Evaluations are counted as they happen in this process; after each task
+    batch the parent session's merged count, which includes worker
+    processes, replaces the count.
+    """
+
+    def __init__(self, total: int) -> None:
+        self.total = total
+        self.merged = 0
+        self.live = 0
+        self.best: float | None = None
+
+    def report(self, stage: str, evaluation: PlacementEvaluation, fresh: bool) -> None:
+        self.live += fresh
+        if evaluation.feasible and (
+            self.best is None or evaluation.scalar_objective < self.best
+        ):
+            self.best = evaluation.scalar_objective
+        progress.emit(
+            analysis="utility_placement",
+            stage=stage,
+            done=self.merged + self.live,
+            total=self.total,
+            unit="evaluations",
+            best_objective=self.best,
+            objective="placement objective",
+        )
+
+    def merge(self, spent: int) -> None:
+        self.merged = spent
+        self.live = 0
 
 
 class _BoundedSessionObjective:
@@ -146,17 +174,31 @@ class _BoundedSessionObjective:
     their spending is charged back to the parent session.
     """
 
-    def __init__(self, session: PlacementEvaluationSession) -> None:
+    def __init__(
+        self,
+        session: PlacementEvaluationSession,
+        tracker: _PlacementProgress | None = None,
+        phase: str = "search",
+    ) -> None:
         self.session = session
+        self.tracker = tracker or _PlacementProgress(session.evaluation_budget)
+        self.phase = phase
 
     def __call__(self, point, *args) -> float:
-        return _bounded_session_objective(point, session=self.session)
+        spent = self.session.evaluation_count
+        evaluation = self.session.evaluate(
+            _optimizer_point_to_physical(self.session, point)
+        )
+        self.tracker.report(
+            self.phase, evaluation, self.session.evaluation_count > spent
+        )
+        return evaluation.scalar_objective
 
     def for_task(
         self, index: int, count: int, *, phase: str = "search"
     ) -> _BoundedSessionObjective:
         return _BoundedSessionObjective(
-            self.session.task_session(index, count, phase=phase)
+            self.session.task_session(index, count, phase=phase), self.tracker, phase
         )
 
     def task_report(self) -> PlacementTaskReport:
@@ -164,6 +206,7 @@ class _BoundedSessionObjective:
 
     def merge_task_reports(self, reports) -> None:
         self.session.merge_task_reports(reports)
+        self.tracker.merge(self.session.evaluation_count)
 
 
 class PlacementOptimisationOutcome(BaseModel):
@@ -260,8 +303,20 @@ def coordinate_optimisation(
         model=session.model,
         allocation_adapter=session.allocation_adapter,
     )
-    for point in unique_points:
+    best: float | None = None
+    for index, point in enumerate(unique_points, start=1):
         canonical = canonical_session.evaluate(point)
+        if canonical.feasible and (best is None or canonical.scalar_objective < best):
+            best = canonical.scalar_objective
+        progress.emit(
+            analysis="utility_placement",
+            stage="replay",
+            done=index,
+            total=len(unique_points),
+            unit="candidates",
+            best_objective=best,
+            objective="placement objective",
+        )
         if canonical.feasible:
             evaluations.append(canonical)
         elif len(diagnostics) < 10:

@@ -19,6 +19,7 @@ from OpenPinch.analysis.utility_placement.optimisation import (
     coordinate_optimisation,
 )
 from OpenPinch.contracts.utility_placement import UtilityPlacementOptimisationMethod
+from OpenPinch.domain import progress
 from OpenPinch.optimisation.models import (
     OptimisationCandidate,
     OptimisationMethod,
@@ -425,3 +426,55 @@ def test_generous_budget_reports_complete() -> None:
 
     assert outcome.termination.status == "complete"
     assert not session.budget_exhausted
+
+
+class _SearchThenPolishRunner:
+    """Search from each start, then polish the first, in this process."""
+
+    def __call__(self, problem, *, method, options):
+        objective = problem.objective
+        search = objective.for_task(0, 1, phase="search")
+        values = [search(point) for point in problem.initial_points]
+        objective.merge_task_reports([search.task_report()])
+        polish = objective.for_task(0, 1, phase="polish")
+        polish(problem.initial_points[0])
+        objective.merge_task_reports([polish.task_report()])
+        return OptimisationResult(
+            method=OptimisationMethod(method),
+            candidates=tuple(
+                OptimisationCandidate(objective=value, point=tuple(point))
+                for value, point in zip(values, problem.initial_points, strict=True)
+            ),
+        )
+
+
+def test_coordinator_reports_search_polish_and_replay_progress() -> None:
+    request, context, model = _case()
+    session = PlacementEvaluationSession(
+        request=request,
+        context=context,
+        model=model,
+        allocation_adapter=_Adapter(),
+    )
+    events = []
+
+    with progress.reporting(events.append, min_interval=0):
+        outcome = coordinate_optimisation(
+            session=session, runner=_SearchThenPolishRunner()
+        )
+
+    starts = len(model.initial_points)
+    stages = [event.stage for event in events]
+    assert stages == ["search"] * starts + ["polish"] + ["replay"] * starts
+    assert all(event.analysis == "utility_placement" for event in events)
+    search = events[:starts]
+    assert [event.done for event in search] == list(range(1, starts + 1))
+    assert {event.total for event in search} == {request.options.evaluation_limit}
+    assert {event.unit for event in search} == {"evaluations"}
+    best = [event.best_objective for event in search]
+    assert best == sorted(best, reverse=True)
+    replay = events[starts + 1 :]
+    assert [(event.done, event.total) for event in replay] == [
+        (index, starts) for index in range(1, starts + 1)
+    ]
+    assert replay[-1].best_objective == outcome.evaluations[0].scalar_objective
