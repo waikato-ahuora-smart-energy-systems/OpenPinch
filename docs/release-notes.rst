@@ -24,6 +24,15 @@ Result fixes
   with duplicate network structures removed. Before, it sliced
   ``result.ranked_networks``, so rank ``k`` could differ between them.
 
+Fuller results
+~~~~~~~~~~~~~~
+
+- Heat pump and refrigeration target rows (``TargetResults``) carry the values
+  of ``hpr_summary``: ``hpr_selected_load`` and ``hpr_achieved_load`` (kW),
+  ``hpr_objective``, and for a shared multi-period design
+  ``hpr_design_vector``, ``hpr_period_ids``, ``hpr_period_weights``,
+  ``hpr_period_success`` (by period) and ``hpr_weighted_objective``.
+
 Example workbooks
 ~~~~~~~~~~~~~~~~~
 

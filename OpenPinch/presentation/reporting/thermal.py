@@ -125,6 +125,34 @@ def _hpr_summary_values(target: HeatPumpTargetBase) -> dict:
             config=target.config,
         ),
         "hpr_objective": None if objective is None else float(objective),
+        **_hpr_shared_design_values(details),
+    }
+
+
+def _hpr_shared_design_values(details) -> dict:
+    vector = _detail(details, "design_vector")
+    period_ids = _detail(details, "period_ids")
+    weights = _detail(details, "period_weights")
+    period_outputs = _detail(details, "period_outputs")
+    weighted = _detail(details, "weighted_output")
+    weighted_objective = _detail(weighted, "obj") if weighted is not None else None
+    return {
+        "hpr_design_vector": None
+        if vector is None
+        else tuple(float(value) for value in vector),
+        "hpr_period_ids": None if period_ids is None else tuple(period_ids),
+        "hpr_period_weights": None
+        if weights is None
+        else tuple(float(weight) for weight in weights),
+        "hpr_period_success": None
+        if not isinstance(period_outputs, Mapping)
+        else {
+            str(period_id): bool(_detail(output, "success"))
+            for period_id, output in period_outputs.items()
+        },
+        "hpr_weighted_objective": None
+        if weighted_objective is None
+        else float(weighted_objective),
     }
 
 

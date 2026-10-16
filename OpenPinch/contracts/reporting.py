@@ -191,6 +191,24 @@ class TargetResults(_ReportModel):
     hpr_objective: Optional[float] = report_field(
         "hpr_objective", "consensus", None, representation="scalar"
     )
+    # One shared multi-period design: its decision vector, the periods it
+    # covers with their weights, whether each period's evaluation succeeded,
+    # and the weighted objective over the periods.
+    hpr_design_vector: tuple[float, ...] | None = report_field(
+        "hpr_design_vector", "consensus", None, representation="structured"
+    )
+    hpr_period_ids: tuple[str, ...] | None = report_field(
+        "hpr_period_ids", "consensus", None, representation="structured"
+    )
+    hpr_period_weights: tuple[float, ...] | None = report_field(
+        "hpr_period_weights", "consensus", None, representation="structured"
+    )
+    hpr_period_success: dict[str, bool] | None = report_field(
+        "hpr_period_success", "consensus", None, representation="structured"
+    )
+    hpr_weighted_objective: Optional[float] = report_field(
+        "hpr_weighted_objective", "consensus", None, representation="scalar"
+    )
     hpr_cop: Value | None = report_field(
         "hpr_cop", "derived", None, representation="quantity"
     )
