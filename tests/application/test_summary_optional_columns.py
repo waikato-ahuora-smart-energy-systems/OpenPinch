@@ -1,5 +1,7 @@
 """Area, cost and exergy columns in the summary once those targets have run."""
 
+import pytest
+
 from OpenPinch import PinchProblem
 
 
@@ -50,3 +52,35 @@ def test_summary_frame_columns_are_unchanged_without_those_targets():
         "Hot Utilities",
         "Cold Utilities",
     ]
+
+
+def test_report_metrics_include_area_and_cost_after_the_area_target():
+    problem = PinchProblem("basic_pinch.json")
+    problem.target.direct_heat_integration()
+    before = {metric.label for metric in problem.report().metrics}
+    problem.target.heat_exchanger_area_and_cost()
+    target = problem.results.targets[0]
+
+    metrics = {metric.label: metric for metric in problem.report().metrics}
+
+    assert "Area" not in before
+    assert metrics["Area"].value == pytest.approx(target.area.value, rel=1e-12)
+    assert metrics["Area"].unit == "m^2"
+    assert metrics["Capital Cost"].unit == "$"
+    assert metrics["Total Cost"].unit == "$/y"
+    assert metrics["Units"].unit is None
+
+
+def test_weighted_summary_row_takes_the_peak_period_area():
+    problem = PinchProblem("crude_preheat_train_multiperiod.json")
+    problem.target.all_periods.heat_exchanger_area_and_cost()
+
+    frame = problem.summary_frame(include_periods=True, include_weighted_average=True)
+    areas = {
+        row["Period ID"]: float(row["Area"].split()[0]) for _, row in frame.iterrows()
+    }
+
+    assert set(areas) == {"turndown", "base", "peak", "weighted_average"}
+    assert areas["weighted_average"] == pytest.approx(
+        max(areas[p] for p in ("turndown", "base", "peak")), abs=0.01
+    )

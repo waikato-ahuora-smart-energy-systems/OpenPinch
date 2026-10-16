@@ -33,6 +33,12 @@ Fuller results
   ``hpr_design_vector``, ``hpr_period_ids``, ``hpr_period_weights``,
   ``hpr_period_success`` (by period) and ``hpr_weighted_objective``.
 
+- ``summary_frame()`` and ``report().metrics`` include ``Area``, ``Units``,
+  ``Capital Cost``, ``Total Cost``, ``ETE``, ``Exergy Sources``,
+  ``Exergy Sinks``, ``Min Exergy Requirement`` and ``Min Exergy Destruction``
+  once the area and cost or exergy targets have run. Without those targets
+  the columns and metrics are unchanged.
+
 Example workbooks
 ~~~~~~~~~~~~~~~~~
 

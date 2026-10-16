@@ -167,7 +167,10 @@ def build_report_metrics(results: Any) -> list[ReportMetric]:
     metrics = []
     for target in results.targets:
         period_id = getattr(target, "period_id", None)
-        for label, attr_path in _SUMMARY_METRICS.items():
+        for label, attr_path in {
+            **_SUMMARY_METRICS,
+            **_optional_metrics([target]),
+        }.items():
             value, unit = split_report_value(
                 _target_attr(target, attr_path),
                 period_idx=getattr(target, "period_idx", None),
