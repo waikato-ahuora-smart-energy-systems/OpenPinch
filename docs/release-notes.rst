@@ -4,6 +4,14 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Result fixes
+~~~~~~~~~~~~
+
+- In ``target.all_periods.<method>`` (and a single-period target on a
+  multiperiod problem) each target's utilities now carry that period's duty as
+  a scalar. Before, each utility gave an array over all periods in which only
+  the target's own entry was set.
+
 Engine commands for the tutorials
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

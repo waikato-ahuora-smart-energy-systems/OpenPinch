@@ -16,6 +16,7 @@ from ...domain.targets import (
     IndirectIntegrationTarget,
     UtilitySummaryTarget,
 )
+from ...domain.value import Value
 
 
 def direct_result(target, *, is_total=False):
@@ -178,14 +179,28 @@ def _heat_utilities(
     return [
         HeatUtility(
             name=utility.name,
-            heat_flow=coerce_output_value(
-                utility.heat_flow,
-                metric_name="utility_heat_flow",
-                config=target.config,
+            heat_flow=_period_duty(
+                coerce_output_value(
+                    utility.heat_flow,
+                    metric_name="utility_heat_flow",
+                    config=target.config,
+                ),
+                period_idx=target.period_idx,
             ),
         )
         for utility in utilities
     ]
+
+
+def _period_duty(heat_flow: Value | None, *, period_idx: int | None):
+    """Return the duty for the target's own period.
+
+    Utility streams carry one duty per period, but a period's target only sets
+    its own entry; the others are left from the copied input.
+    """
+    if heat_flow is None or period_idx is None or heat_flow.num_periods <= 1:
+        return heat_flow
+    return Value(float(heat_flow.period_values[period_idx]), heat_flow.unit)
 
 
 def orc_result(target, *, is_total=False):
