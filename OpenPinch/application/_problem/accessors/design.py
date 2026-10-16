@@ -12,7 +12,10 @@ from ..arguments import (
 
 if TYPE_CHECKING:
     from ....contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
-    from ....contracts.synthesis.view import HeatExchangerNetworkGridLayout
+    from ....contracts.synthesis.view import (
+        HeatExchangerNetworkGridLayout,
+        HeatExchangerNetworkView,
+    )
     from ....domain.heat_exchanger_network import HeatExchangerNetwork
     from ...problem import PinchProblem
 
@@ -91,6 +94,19 @@ class HeatExchangerNetworkDesignView:
         from ....presentation.network_grid.layout import build_grid_layout
 
         return build_grid_layout(self.network(rank=rank), period_id=period_id)
+
+    def view(
+        self,
+        *,
+        rank: int = 1,
+        period_id: str | None = None,
+    ) -> "HeatExchangerNetworkView":
+        """Return the ranking, and one ranked network's totals, duties and grid."""
+        if isinstance(rank, bool) or not isinstance(rank, int) or rank < 1:
+            raise ValueError("rank must be a positive one-based integer.")
+        from ....presentation.network_grid.view import build_network_view
+
+        return build_network_view(self.result, rank=rank, period_id=period_id)
 
     @property
     def total_heat_recovery(self) -> float:

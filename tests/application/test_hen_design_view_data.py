@@ -47,3 +47,46 @@ def test_grid_layout_is_the_grid_model_as_data(design):
     assert {
         (branch.stream, branch.stage): branch.count for branch in layout.branch_counts
     } == model.branch_counts
+
+
+def test_view_totals_and_utility_duties_match_the_design_view(design):
+    view = design.view()
+
+    assert view.rank == 1
+    assert view.total_heat_recovery == pytest.approx(
+        design.total_heat_recovery, rel=1e-12
+    )
+    assert view.total_hot_utility == pytest.approx(design.total_hot_utility, rel=1e-12)
+    assert view.total_cold_utility == pytest.approx(
+        design.total_cold_utility, rel=1e-12
+    )
+    assert view.unit_count == len(design.selected_network.exchangers)
+    assert [(duty.name, duty.side) for duty in view.utility_duties] == [
+        ("Hot Utility.HPS", "hot"),
+        ("Cold Utility.CW", "cold"),
+    ]
+    for duty in view.utility_duties:
+        assert duty.duty == pytest.approx(design.utility(duty.name), rel=1e-12)
+    assert view.grid == design.grid_layout()
+
+
+def test_view_ranking_follows_the_duplicate_free_ranking(design):
+    ranked = design.top(10)
+
+    ranking = design.view().ranking
+
+    assert [row.rank for row in ranking] == list(range(1, len(ranked) + 1))
+    for row, outcome in zip(ranking, ranked, strict=True):
+        assert row.method == outcome.method.value
+        assert row.status == outcome.status
+        assert row.objective_value == pytest.approx(outcome.objective_value, rel=1e-12)
+        assert row.total_annual_cost == pytest.approx(
+            outcome.network.total_annual_cost, rel=1e-12
+        )
+        assert row.unit_count == len(outcome.network.exchangers)
+
+
+@pytest.mark.parametrize("rank", [0, True, 1.0])
+def test_view_rejects_a_rank_that_is_not_one_based(design, rank):
+    with pytest.raises(ValueError, match="rank must be a positive one-based integer"):
+        design.view(rank=rank)
