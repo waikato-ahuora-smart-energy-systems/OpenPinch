@@ -74,6 +74,7 @@ def snapshot_problem(problem, state: PreparedPeriodState | None = None):
     isolated._results = deepcopy(problem._results)
     isolated._period_results = {}
     isolated._period_states = {}
+    isolated._period_result_states = {}
     isolated._utility_placement_result = None
     return isolated
 
@@ -110,6 +111,7 @@ def invalidate_analysis(problem) -> None:
     problem._results = None
     problem._period_results = {}
     problem._period_states = {}
+    problem._period_result_states = {}
     problem._last_target_run_spec = None
     problem._utility_placement_result = None
     problem._retained_hpr_targets = {}

@@ -6,7 +6,7 @@ import json
 import math
 from dataclasses import dataclass, field
 from functools import partial
-from typing import Any, Mapping, get_type_hints
+from typing import Any, Callable, Mapping, get_type_hints
 from uuid import uuid4
 
 from pydantic import BaseModel
@@ -20,6 +20,7 @@ from ..contracts.workspace import (
     ValidationIssue,
     ValidationReport,
 )
+from ..domain.progress import reporting
 from ..domain.targets import BaseTargetModel
 from ..presentation.reporting.hpr import hpr_failure_summary
 from ..presentation.reporting.results import serialize_target
@@ -72,7 +73,11 @@ def _load_workspace(source: Mapping[str, Any]) -> PinchWorkspace:
     )
 
 
-def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
+def run_command(
+    request: Mapping[str, Any],
+    *,
+    progress: Callable[[dict[str, Any]], None] | None = None,
+) -> dict[str, Any]:
     """Run one engine command on a freshly loaded problem or a session's problem.
 
     ``request`` has ``command`` (``"target.<method>"``, ``"design.<method>"``,
@@ -108,8 +113,19 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
     utility duties and grid layout). Analysis that runs and fails (heat pump targeting)
     returns ``error`` (``{type, message, details}``) instead of raising.
     Non-finite numbers come back as ``None``, so the response is strict JSON.
+
+    ``progress``, when given, is called during long analyses (heat pump
+    targeting, utility placement, HEN synthesis) with each progress report
+    as JSON-ready data: ``analysis``, ``stage``, ``message``, ``done`` of
+    ``total`` ``unit``, ``best_objective`` (the ``objective`` it measures),
+    ``elapsed`` seconds and ``scope`` (the period of an all-periods run).
+    Reports come at most every 0.25 s per stage. An exception it raises
+    propagates out of the command, which cancels it.
     """
-    return _finite(_run(request))
+    if progress is None:
+        return _finite(_run(request))
+    with reporting(lambda event: progress(event.to_json())):
+        return _finite(_run(request))
 
 
 def _finite(value: Any) -> Any:
@@ -528,9 +544,15 @@ def _resolve(argument: Any, session: _Session | None) -> Any:
     return target
 
 
-def run_command_json(request: str) -> str:
-    """Run a command given and answered as JSON text (the Pyodide entry point)."""
-    return json.dumps(run_command(json.loads(request)))
+def run_command_json(
+    request: str, progress: Callable[[str], None] | None = None
+) -> str:
+    """Run a command given and answered as JSON text (the Pyodide entry point).
+
+    ``progress`` receives each progress report as JSON text.
+    """
+    report = None if progress is None else lambda event: progress(json.dumps(event))
+    return json.dumps(run_command(json.loads(request), progress=report))
 
 
 def _to_json(value: Any) -> Any:

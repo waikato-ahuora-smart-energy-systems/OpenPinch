@@ -23,6 +23,7 @@ from OpenPinch.contracts.hpr import (
 )
 from OpenPinch.contracts.hpr_performance_map import HprPerformanceMapRequest
 from OpenPinch.contracts.workspace import ValidationReport
+from OpenPinch.domain import progress
 from OpenPinch.domain.stream_collection import StreamCollection
 from OpenPinch.tutorials import sample_cases
 
@@ -1005,3 +1006,118 @@ def test_design_command_returns_the_design_view_beside_the_result(monkeypatch):
         ),
         rel=1e-12,
     )
+
+
+def _design_reporting_progress(self, **_kwargs):
+    progress.emit(
+        analysis="hen_synthesis", stage="pinch_design_method", done=0, total=1
+    )
+    progress.emit(
+        analysis="hen_synthesis", stage="pinch_design_method", done=1, total=1
+    )
+    return HeatExchangerNetworkDesignView(ValidationReport(valid=True, issues=[]))
+
+
+def test_progress_callback_receives_json_events_during_a_command(monkeypatch):
+    monkeypatch.setattr(_DesignAccessor, "pinch_design", _design_reporting_progress)
+    # The stand-in result has no networks to view; only the progress matters.
+    monkeypatch.setattr(
+        HeatExchangerNetworkDesignView,
+        "view",
+        lambda self: ValidationReport(valid=True, issues=[]),
+    )
+    request = {
+        "command": "design.pinch_design",
+        "problem": {"sample_case": "basic_pinch.json"},
+    }
+    events = []
+
+    response = run_command(request, progress=events.append)
+
+    assert [(event["stage"], event["done"], event["total"]) for event in events] == [
+        ("pinch_design_method", 0, 1),
+        ("pinch_design_method", 1, 1),
+    ]
+    assert events[-1]["message"] == "Pinch design method: 1 of 1"
+    assert json.loads(json.dumps(events)) == events
+    assert response == run_command(request)
+
+
+def test_json_text_entry_point_passes_progress_as_json_text(monkeypatch):
+    monkeypatch.setattr(_DesignAccessor, "pinch_design", _design_reporting_progress)
+    # The stand-in result has no networks to view; only the progress matters.
+    monkeypatch.setattr(
+        HeatExchangerNetworkDesignView,
+        "view",
+        lambda self: ValidationReport(valid=True, issues=[]),
+    )
+    request = {
+        "command": "design.pinch_design",
+        "problem": {"sample_case": "basic_pinch.json"},
+    }
+    events = []
+
+    run_command_json(json.dumps(request), events.append)
+
+    assert [json.loads(event)["done"] for event in events] == [0, 1]
+
+
+class _Cancel(Exception):
+    pass
+
+
+def _cancel(_event):
+    raise _Cancel
+
+
+@pytest.mark.parametrize(
+    ("command", "arguments"),
+    [
+        (
+            "target.carnot_heat_pump",
+            {"load_fraction": 0.25, "condensers": 1, "evaporators": 1},
+        ),
+        ("target.utility_placement", {"isothermal": 2}),
+        ("design.pinch_design", {}),
+    ],
+)
+def test_a_progress_callback_cancels_a_command_and_leaves_the_session(
+    command, arguments
+):
+    session = run_command(
+        {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
+    )["session"]
+    before = run_command(
+        {"command": "target.direct_heat_integration", "session": session}
+    )["results"]
+
+    with pytest.raises(_Cancel):
+        run_command(
+            {"command": command, "session": session, "arguments": arguments},
+            progress=_cancel,
+        )
+
+    after = run_command({"command": "to_problem_json", "session": session})
+    assert after["results"] == before
+
+
+def test_all_periods_progress_carries_each_period_as_its_scope(monkeypatch):
+    solve = _TargetAccessor.direct_heat_integration
+
+    def reporting_solve(self, **kwargs):
+        progress.emit(analysis="a", stage="search", done=1, total=1)
+        return solve(self, **kwargs)
+
+    monkeypatch.setattr(_TargetAccessor, "direct_heat_integration", reporting_solve)
+    events = []
+
+    run_command(
+        {
+            "command": "target.all_periods.direct_heat_integration",
+            "problem": {"sample_case": "crude_preheat_train_multiperiod.json"},
+            "arguments": {"workers": 2},
+        },
+        progress=events.append,
+    )
+
+    assert sorted(event["scope"] for event in events) == ["base", "peak", "turndown"]

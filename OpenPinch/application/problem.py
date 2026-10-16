@@ -86,6 +86,9 @@ class PinchProblem:
     _last_target_run_spec: Optional[_TargetRunSpec]
     _suspend_target_run_recording: bool
     _period_results: dict[str, TargetOutput]
+    # The prepared period states that produced ``_period_results``, kept apart
+    # from ``_period_states``, which later single-period runs replace.
+    _period_result_states: dict[str, Any]
     _utility_placement_result: Any | None
     components = _ComponentAccessorDescriptor()
     design = _DesignAccessorDescriptor()
@@ -113,6 +116,7 @@ class PinchProblem:
         self._suspend_target_run_recording = False
         self._period_results = {}
         self._period_states = {}
+        self._period_result_states = {}
         from uuid import uuid4
 
         self._analysis_owner_id = uuid4().hex
@@ -417,8 +421,8 @@ class PinchProblem:
         # All-period results come from each period's own solved zones; the
         # master zone only holds the last single-period run.
         period_zones = (
-            {pid: state.root for pid, state in self._period_states.items()}
-            if include_periods and self._period_states
+            {pid: state.root for pid, state in self._period_result_states.items()}
+            if include_periods and self._period_result_states
             else None
         )
         return export_target_summary_to_excel_with_units(

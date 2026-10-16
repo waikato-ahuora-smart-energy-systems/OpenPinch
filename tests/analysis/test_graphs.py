@@ -657,6 +657,30 @@ def test_clean_composite_curve_pops_duplicate_edges():
     assert np.allclose(y_clean, [1, 3])
 
 
+@pytest.mark.parametrize(
+    "x_hex",
+    [
+        ("0x1.23ec3d772ad3cp+10", "0x1.23ec3d782bc65p+10"),
+        ("0x1.23ec3d772ad3dp+10", "0x1.23ec3d782bc66p+10"),
+    ],
+)
+def test_clean_composite_curve_drops_points_on_a_nearly_vertical_segment(x_hex):
+    # A GCC from the desktop and the browser engine: the duties differ by one
+    # ulp and span 3e-7 kW over 10 degC. The temperature residual of the
+    # middle point is 5e-7 for one and 5e-6 for the other, either side of tol;
+    # its heat flow residual is well below tol for both.
+    x1 = float.fromhex("0x1.23ec3d76dc3b0p+10")
+    x2, x3 = (float.fromhex(value) for value in x_hex)
+
+    y_clean, x_clean = clean_composite_curve(
+        y_array=[200.0, 191.666667, 185.0, 182.657635, 175.0, 150.0],
+        x_array=[1000.0, x1, x1, x2, x3, 1500.0],
+    )
+
+    assert y_clean.tolist() == [200.0, 191.666667, 175.0, 150.0]
+    assert x_clean.tolist() == [1000.0, x1, x3, 1500.0]
+
+
 def test_clean_composite_curve_forced_duplicate_edges(monkeypatch):
     monkeypatch.setattr(
         "OpenPinch.analysis.graphs.composite.clean_composite_curve_ends",

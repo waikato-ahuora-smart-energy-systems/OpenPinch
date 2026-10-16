@@ -35,6 +35,7 @@ _PROBLEM_STATE_FIELDS = (
     "_last_target_run_spec",
     "_period_results",
     "_period_states",
+    "_period_result_states",
     "_utility_placement_result",
 )
 

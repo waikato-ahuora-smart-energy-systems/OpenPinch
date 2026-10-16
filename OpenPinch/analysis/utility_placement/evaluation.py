@@ -91,6 +91,7 @@ class PlacementTaskReport(BaseModel):
     budget_exhausted_count: int
     diagnostic_counts: tuple[tuple[str, int], ...] = ()
     diagnostic_representatives: tuple[CandidateDiagnostic, ...] = ()
+    best_objective: float | None = None
 
 
 # Share of the request's evaluation limit kept back for polishing the best
@@ -138,6 +139,8 @@ class PlacementEvaluationSession:
         self._budget_exhausted_count = 0
         self._diagnostic_counts: Counter[str] = Counter()
         self._diagnostic_representatives: list[CandidateDiagnostic] = []
+        # Lowest scalar objective of a feasible evaluation, for progress.
+        self._best_objective: float | None = None
 
     def __getstate__(self):
         return {
@@ -163,6 +166,11 @@ class PlacementEvaluationSession:
     @property
     def evaluation_count(self) -> int:
         return self._evaluation_count
+
+    @property
+    def best_objective(self) -> float | None:
+        """Lowest scalar objective of the feasible evaluations spent here."""
+        return self._best_objective
 
     @property
     def memo_hit_count(self) -> int:
@@ -215,6 +223,7 @@ class PlacementEvaluationSession:
             budget_exhausted_count=self._budget_exhausted_count,
             diagnostic_counts=self.diagnostic_counts,
             diagnostic_representatives=self.diagnostic_representatives,
+            best_objective=self._best_objective,
         )
 
     def merge_task_reports(self, reports) -> None:
@@ -224,6 +233,7 @@ class PlacementEvaluationSession:
                 self._evaluation_count += report.evaluation_count
                 self._memo_hit_count += report.memo_hit_count
                 self._budget_exhausted_count += report.budget_exhausted_count
+                self._note_objective(report.best_objective)
                 self._diagnostic_counts.update(dict(report.diagnostic_counts))
                 room = 10 - len(self._diagnostic_representatives)
                 self._diagnostic_representatives.extend(
@@ -237,6 +247,12 @@ class PlacementEvaluationSession:
     @property
     def diagnostic_representatives(self) -> tuple[CandidateDiagnostic, ...]:
         return tuple(self._diagnostic_representatives)
+
+    def _note_objective(self, objective: float | None) -> None:
+        if objective is not None and (
+            self._best_objective is None or objective < self._best_objective
+        ):
+            self._best_objective = objective
 
     def _record(self, diagnostics: tuple[CandidateDiagnostic, ...]) -> None:
         for diagnostic in diagnostics:
@@ -456,6 +472,8 @@ class PlacementEvaluationSession:
 
         with self._lock:
             self._memo[key] = result
+            if result.feasible:
+                self._note_objective(result.scalar_objective)
         return result
 
     def objective(self, coordinates, *args) -> float:

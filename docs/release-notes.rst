@@ -7,6 +7,10 @@ Unreleased
 Result fixes
 ~~~~~~~~~~~~
 
+- ``export_excel(include_periods=True)`` writes each period's problem tables
+  from the all-periods run that produced the exported results. Before, a later
+  single-period run replaced that period's tables, so the workbook mixed the
+  batch's summary with the later run's tables.
 - In ``target.all_periods.<method>`` (and a single-period target on a
   multiperiod problem) each target's utilities now carry that period's duty as
   a scalar. Before, each utility gave an array over all periods in which only
@@ -55,6 +59,27 @@ Fuller results
   branch counts as data, without plotly. ``run_command`` returns the view as
   ``view`` beside ``value`` for ``design.*`` commands, and the contract is in
   ``contract_json_schemas()``.
+
+Progress reports
+~~~~~~~~~~~~~~~~
+
+- Heat pump targeting, utility placement and HEN synthesis report progress
+  while they run. ``run_command(request, progress=callback)`` calls
+  ``callback`` with each report as JSON-ready data: ``analysis``, ``stage``,
+  ``message``, ``done`` of ``total`` ``unit``, ``best_objective`` (and the
+  ``objective`` it measures), ``elapsed`` seconds and ``scope`` (the period
+  of an all-periods run). ``run_command_json(request, progress)`` passes
+  each report as JSON text. Reports come at most every 0.25 s per stage.
+- Heat pump targeting reports warm starts, multistart runs finished of the
+  multistart count (with the evaluations so far) and the ranked candidates
+  checked. Utility placement reports evaluations of the evaluation limit in
+  its search and polish, then the candidates replayed. HEN synthesis reports
+  tasks solved of each method stage's tasks and the lowest total annual cost
+  so far. Work in worker processes is counted when its batch returns.
+- An exception the callback raises cancels the command: it propagates from
+  ``run_command`` unchanged and leaves the session as it was.
+- In Python, ``OpenPinch.domain.progress.reporting(callback)`` receives the
+  same reports as ``Progress`` objects for any analysis run inside it.
 
 Example workbooks
 ~~~~~~~~~~~~~~~~~
@@ -166,6 +191,26 @@ Heat pump cycle states at saturation
   pump search took different paths. Short searches can now settle on a
   different optimum: tutorial 09's quick water heat pump moves from COP 7.72
   (24.3 kW) to COP 6.88 (27.2 kW), the same as in the browser.
+
+CMA-ES samples alike on every platform
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- The CMA-ES backend (the HPR and utility placement default) now
+  eigendecomposes its covariance by parallel Jacobi rotations (elementwise
+  numpy operations, about 16 ms for 50 coordinates) and forms its matrix
+  products from correctly rounded dot products (``math.fsum``), instead of
+  calling LAPACK ``eigh`` and BLAS.
+  LAPACK and BLAS builds differ in the last bits and in eigenvector signs:
+  from the second generation on, the browser (Pyodide) and the desktop sampled
+  candidates about 1e-16 apart, and a short heat pump search then settled on a
+  different optimum. Given the same objective values, CMA-ES now visits the
+  same points on macOS, Linux, Windows and Pyodide. Short searches can settle
+  on a different optimum than before.
+- Composite and grand composite curves drop a point that lies within tol of
+  the line through its neighbours in heat flow, not only in temperature. On
+  a nearly vertical segment (a duty span of 1e-7 kW over several degrees) the
+  temperature residual crossed tol with a one-ulp change in a duty, so the
+  browser and desktop kept different points.
 
 Running in the browser (Pyodide)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
