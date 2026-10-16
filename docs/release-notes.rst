@@ -44,52 +44,42 @@ Command layer
   Loading a problem that gives no hot or no cold utility adds a
   ``default_utility`` warning (``details``: ``name`` and ``kind``) for each
   default utility added.
-
 - ``contract_json_schemas()`` defines ``Value`` and ``StreamCollection`` once
   under ``$defs`` and refers to them, so generated client types have one
   ``Value`` and one ``StreamCollection`` type.
-
 - ``PinchWorkspaceBundle`` has an optional ``active_case``:
   ``to_bundle()`` records the active case and ``from_bundle()`` activates it
   (the default case when it is absent). A bundle that names an active case
   it does not hold is rejected. Releases before this one reject bundles that
   carry ``active_case``.
-
 - ``PinchWorkspace.set_case_input(case_name, source)`` and the
   ``workspace.set_case_input`` command replace an existing case's input and
   return its validation report. The session and the other cases' results are
   kept.
-
 - ``ConfigurationFieldMetadata`` gives each field's ``unit``,
   ``description`` and ``default``, and ``label`` is a display name such as
   "Minimum contribution temperature difference" rather than the title-cased
   field name.
-
 - An ``options`` command returns the editable configuration fields
   (``fields``), the case's effective values (``values``) and the options its
   input sets (``set``), so an editor can tell an option set to its default
   from one left unset.
-
 - An ``import`` command reads problem data from file contents (base64), each
   file with its ``role``: one ``problem`` file (JSON or a workbook) or a
   ``streams`` and a ``utilities`` CSV file. It returns the data, its source
   kind and project name without building the problem, so invalid data can
   still be edited. ``load_problem_source_from_files`` is the adapter behind it.
-
 - ``plot.export``, ``plot.export_gallery`` and the ``export.plots`` command
   take ``include_plotlyjs``: ``True`` (embedded, the default), ``"cdn"``, or
   ``"directory"`` for one shared ``plotly.min.js`` beside the files.
-
 - ``plot.catalog()`` (and the ``plot_catalog`` command) has a
   ``Plot Method`` column: the ``problem.plot`` method, and ``export.plots``
   ``plot`` name, that draws each graph (empty for graph types no method
   draws).
-
 - ``design.utility(name)`` takes the problem's utility name (``"HPS"``) as
   well as the network's stream name (``"Hot Utility.HPS"``); before, the
   utility's own name answered 0. A name that is not one of the problem's
   utilities raises ``ValueError`` instead of answering 0.
-
 - ``design.multiperiod_heat_exchanger_network(prerequisites=True)`` runs
   ``target.all_periods.all_heat_integration()`` first when the problem has
   no all-period targets, so a fresh problem (or a session-less command) can
