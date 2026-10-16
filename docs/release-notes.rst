@@ -24,6 +24,14 @@ Result fixes
   with duplicate network structures removed. Before, it sliced
   ``result.ranked_networks``, so rank ``k`` could differ between them.
 
+Command layer
+~~~~~~~~~~~~~
+
+- ``run_command`` reports a session it does not hold (in ``session`` or a
+  ``{"$session": ...}`` argument) as an ``error`` with type
+  ``unknown_session`` and ``details.session``, instead of raising
+  ``ValueError``.
+
 Example workbooks
 ~~~~~~~~~~~~~~~~~
 

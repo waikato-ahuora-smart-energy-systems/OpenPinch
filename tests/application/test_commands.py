@@ -343,8 +343,26 @@ def test_closed_session_cannot_run_commands():
 
     run_command({"command": "close", "session": session})
 
-    with pytest.raises(ValueError, match="Unknown session"):
-        run_command({"command": "target.direct_heat_integration", "session": session})
+    response = run_command(
+        {"command": "target.direct_heat_integration", "session": session}
+    )
+
+    assert response["value"] is None
+    assert response["error"]["type"] == "unknown_session"
+    assert response["error"]["details"] == {"session": session}
+
+
+def test_an_unknown_session_argument_returns_an_unknown_session_error():
+    response = run_command(
+        {
+            "command": "with_utilities_from",
+            "problem": {"sample_case": "basic_pinch.json"},
+            "arguments": {"other_problem": {"$session": "missing"}},
+        }
+    )
+
+    assert response["error"]["type"] == "unknown_session"
+    assert response["error"]["details"] == {"session": "missing"}
 
 
 def test_problem_source_names_the_project():

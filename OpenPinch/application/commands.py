@@ -44,6 +44,14 @@ class _Session:
         return self.problem
 
 
+class UnknownSessionError(ValueError):
+    """A request names a session this engine does not hold."""
+
+    def __init__(self, session: str) -> None:
+        super().__init__(f"Unknown session {session!r}.")
+        self.session = session
+
+
 # Sessions kept between commands, by session id, for the life of the engine.
 _SESSIONS: dict[str, _Session] = {}
 
@@ -104,10 +112,15 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
     arguments pass it as ``{"$ref": <id>}``; another session's problem is
     passed as ``{"$session": <id>}``. Outside a session targets are reported
     only in the results. Analysis that runs and fails (heat pump targeting)
-    returns ``error`` (``{type, message, details}``) instead of raising.
+    returns ``error`` (``{type, message, details}``) instead of raising, as
+    does a session the engine does not hold (type ``unknown_session``).
     Non-finite numbers come back as ``None``, so the response is strict JSON.
     """
-    return _finite(_run(request))
+    try:
+        response = _run(request)
+    except UnknownSessionError as error:
+        response = {"value": None, "results": None, "error": _error_json(error)}
+    return _finite(response)
 
 
 def _finite(value: Any) -> Any:
@@ -135,7 +148,7 @@ def _run(request: Mapping[str, Any]) -> dict[str, Any]:
     if "session" in request:
         session = _SESSIONS.get(request["session"])
         if session is None:
-            raise ValueError(f"Unknown session {request['session']!r}.")
+            raise UnknownSessionError(request["session"])
         if command == "close":
             del _SESSIONS[request["session"]]
             return {"value": None, "results": None}
@@ -219,6 +232,13 @@ _ANALYSIS_FAILURES = (HPRTargetingError,)
 
 
 def _error_json(error: Exception) -> dict[str, Any]:
+    if isinstance(error, UnknownSessionError):
+        # A stable code, so engines need not match the message.
+        return {
+            "type": "unknown_session",
+            "message": str(error),
+            "details": {"session": error.session},
+        }
     details = (
         hpr_failure_summary(error) if isinstance(error, HPRTargetingError) else None
     )
@@ -512,7 +532,7 @@ def _resolve(argument: Any, session: _Session | None) -> Any:
         # Another session's problem, for commands that take a second problem.
         other = _SESSIONS.get(argument["$session"])
         if other is None:
-            raise ValueError(f"Unknown session {argument['$session']!r}.")
+            raise UnknownSessionError(argument["$session"])
         return other.case(None)
     if not (isinstance(argument, Mapping) and set(argument) == {"$ref"}):
         return argument
