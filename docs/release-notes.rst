@@ -7,6 +7,10 @@ Unreleased
 Result fixes
 ~~~~~~~~~~~~
 
+- ``export_excel(include_periods=True)`` writes each period's problem tables
+  from the all-periods run that produced the exported results. Before, a later
+  single-period run replaced that period's tables, so the workbook mixed the
+  batch's summary with the later run's tables.
 - In ``target.all_periods.<method>`` (and a single-period target on a
   multiperiod problem) each target's utilities now carry that period's duty as
   a scalar. Before, each utility gave an array over all periods in which only
