@@ -71,7 +71,8 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
 
     ``request`` has ``command`` (``"target.<method>"``, ``"design.<method>"``,
     a deeper path such as ``"target.all_periods.<method>"``, or a problem
-    command: ``validate``, ``to_problem_json``, ``streams``, ``report``,
+    command: ``validate``, ``to_problem_json``, ``streams``, ``load`` (input,
+    prepared streams and zone tree), ``report``,
     ``compare``, ``residual_utility``, ``with_utilities_from``,
     ``plot_catalog``, ``export.excel`` / ``export.plots`` (files as base64)
     and ``components.add_process_mvr`` / ``inventory`` / ``activate`` /
@@ -228,6 +229,27 @@ def _streams(problem: PinchProblem) -> dict[str, Any]:
     }
 
 
+def _load(problem: PinchProblem) -> dict[str, Any]:
+    """The problem input, its prepared streams and utilities, and its zone tree."""
+    return {
+        "input": problem.to_problem_json(),
+        "streams": _streams(problem),
+        "zones": _zone_json(problem.master_zone),
+    }
+
+
+def _zone_json(zone: Any) -> dict[str, Any]:
+    """A prepared zone with its process streams by name and its subzones."""
+    return {
+        "name": zone.name,
+        "type": zone.type,
+        "address": zone.address,
+        "hot_streams": [stream.name for stream in zone.hot_streams],
+        "cold_streams": [stream.name for stream in zone.cold_streams],
+        "subzones": [_zone_json(subzone) for subzone in zone.subzones.values()],
+    }
+
+
 def _report(
     problem: PinchProblem,
     *,
@@ -353,6 +375,7 @@ _PROBLEM_COMMANDS = {
     "components.deactivate": _deactivate,
     "report": _report,
     "streams": _streams,
+    "load": _load,
     "to_problem_json": PinchProblem.to_problem_json,
 }
 

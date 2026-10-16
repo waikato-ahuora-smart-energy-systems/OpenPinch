@@ -402,6 +402,27 @@ def test_streams_returns_prepared_streams_and_utilities_with_segments():
     }
 
 
+def test_load_returns_the_input_prepared_streams_and_zone_tree():
+    value = run_command(
+        {"command": "load", "problem": {"sample_case": "zonal_site.json"}}
+    )["value"]
+
+    assert PinchProblem(value["input"]).to_problem_json() == value["input"]
+    assert value["streams"]["hot_utilities"]["segment_index"]
+    site = value["zones"]
+    assert (site["name"], site["type"], site["address"]) == ("Site", "Site", "Site")
+    plant = site["subzones"][0]
+    assert plant["address"] == "Site/Chemical Plant[S]"
+    assert plant["subzones"][0] == {
+        "name": "O1",
+        "type": "Unit Operation",
+        "address": "Site/Chemical Plant[S]/O1",
+        "hot_streams": ["A1"],
+        "cold_streams": [],
+        "subzones": [],
+    }
+
+
 def test_report_returns_metrics_report_and_summary_rows_for_solved_targets():
     session = run_command(
         {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}

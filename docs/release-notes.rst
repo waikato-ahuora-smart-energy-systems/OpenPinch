@@ -41,6 +41,10 @@ Engine commands for the tutorials
 - ``ValidationReport`` gives one issue for a bad value field such as
   ``t_supply``, from the value form its input has (number, ``value`` or
   ``values``), instead of one issue per form.
+- ``load`` returns the prepared problem: its ``input`` (a sample case's
+  ``TargetInput`` too), its ``streams`` (as the ``streams`` command) and its
+  ``zones`` tree, each zone with its address, type, process streams by name
+  and subzones.
 
 Contract JSON Schema
 ~~~~~~~~~~~~~~~~~~~~
