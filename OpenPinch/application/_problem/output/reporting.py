@@ -23,6 +23,28 @@ _SUMMARY_METRICS = {
     "Cold Pinch": "pinch_temp.cold_temp",
 }
 
+# Shown only once a target has set them (area and cost, exergy).
+_OPTIONAL_SUMMARY_METRICS = {
+    "Area": "area",
+    "Units": "num_units",
+    "Capital Cost": "capital_cost",
+    "Total Cost": "total_cost",
+    "ETE": "ETE",
+    "Exergy Sources": "exergy_sources",
+    "Exergy Sinks": "exergy_sinks",
+    "Min Exergy Requirement": "exergy_req_min",
+    "Min Exergy Destruction": "exergy_des_min",
+}
+
+
+def _optional_metrics(targets) -> dict[str, str]:
+    """The optional metrics that at least one target has a value for."""
+    return {
+        label: attr
+        for label, attr in _OPTIONAL_SUMMARY_METRICS.items()
+        if any(getattr(target, attr, None) is not None for target in targets)
+    }
+
 
 def build_problem_summary_frame(
     results: Any,
@@ -34,6 +56,7 @@ def build_problem_summary_frame(
         return build_summary_dataframe(results.targets)
 
     rows = []
+    optional = _optional_metrics(results.targets)
     for target in results.targets:
         period_idx = getattr(target, "period_idx", None)
         qh_value, qh_unit = split_report_value(target.Qh, period_idx=period_idx)
@@ -74,6 +97,12 @@ def build_problem_summary_frame(
                     value=cold_pinch_value,
                     unit=cold_pinch_unit,
                 ),
+                **{
+                    label: format_res(
+                        value=getattr(target, attr), period_idx=period_idx
+                    )
+                    for label, attr in optional.items()
+                },
                 "Hot Utilities": ", ".join(
                     format_res(
                         name=utility.name,

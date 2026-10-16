@@ -1,0 +1,52 @@
+"""Area, cost and exergy columns in the summary once those targets have run."""
+
+from OpenPinch import PinchProblem
+
+
+def test_summary_frame_shows_area_and_cost_after_the_area_target():
+    problem = PinchProblem("basic_pinch.json")
+    problem.target.heat_exchanger_area_and_cost()
+    target = problem.results.targets[0]
+
+    row = problem.summary_frame().iloc[0]
+
+    assert row["Area"] == f"{target.area.value:.2f} m^2"
+    assert row["Units"] == f"{target.num_units:.2f}"
+    assert row["Capital Cost"] == f"{target.capital_cost.value:.2f} $"
+    assert row["Total Cost"] == f"{target.total_cost.value:.2f} $/y"
+
+
+def test_summary_frame_shows_exergy_after_the_exergy_target():
+    problem = PinchProblem("basic_pinch.json")
+    problem.target.direct_heat_integration()
+    problem.target.exergy()
+    target = problem.results.targets[0]
+
+    row = problem.summary_frame().iloc[0]
+
+    assert row["ETE"] == f"{target.ETE.value:.2f} {target.ETE.unit}"
+    assert row["Exergy Sources"] == f"{target.exergy_sources.value:.2f} kW"
+    assert row["Exergy Sinks"] == f"{target.exergy_sinks.value:.2f} kW"
+    assert row["Min Exergy Requirement"] == f"{target.exergy_req_min.value:.2f} kW"
+    assert row["Min Exergy Destruction"] == f"{target.exergy_des_min.value:.2f} kW"
+    assert "Area" not in row
+
+
+def test_summary_frame_columns_are_unchanged_without_those_targets():
+    problem = PinchProblem("basic_pinch.json")
+    problem.target.direct_heat_integration()
+
+    assert list(problem.summary_frame().columns) == [
+        "Scope",
+        "Zone Type",
+        "Integration Type",
+        "Target Method",
+        "Period ID",
+        "Hot Utility Target",
+        "Cold Utility Target",
+        "Heat Recovery",
+        "Hot Pinch",
+        "Cold Pinch",
+        "Hot Utilities",
+        "Cold Utilities",
+    ]
