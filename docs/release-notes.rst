@@ -28,6 +28,27 @@ Result fixes
   with duplicate network structures removed. Before, it sliced
   ``result.ranked_networks``, so rank ``k`` could differ between them.
 
+Progress reports
+~~~~~~~~~~~~~~~~
+
+- Heat pump targeting, utility placement and HEN synthesis report progress
+  while they run. ``run_command(request, progress=callback)`` calls
+  ``callback`` with each report as JSON-ready data: ``analysis``, ``stage``,
+  ``message``, ``done`` of ``total`` ``unit``, ``best_objective`` (and the
+  ``objective`` it measures), ``elapsed`` seconds and ``scope`` (the period
+  of an all-periods run). ``run_command_json(request, progress)`` passes
+  each report as JSON text. Reports come at most every 0.25 s per stage.
+- Heat pump targeting reports warm starts, multistart runs finished of the
+  multistart count (with the evaluations so far) and the ranked candidates
+  checked. Utility placement reports evaluations of the evaluation limit in
+  its search and polish, then the candidates replayed. HEN synthesis reports
+  tasks solved of each method stage's tasks and the lowest total annual cost
+  so far. Work in worker processes is counted when its batch returns.
+- An exception the callback raises cancels the command: it propagates from
+  ``run_command`` unchanged and leaves the session as it was.
+- In Python, ``OpenPinch.domain.progress.reporting(callback)`` receives the
+  same reports as ``Progress`` objects for any analysis run inside it.
+
 Example workbooks
 ~~~~~~~~~~~~~~~~~
 

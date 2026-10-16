@@ -7,6 +7,7 @@ import pytest
 
 import OpenPinch.analysis.heat_pumps.optimisation_adapter as adapter
 from OpenPinch.contracts.hpr import HPRBackendResult, HPRThermoArtifacts
+from OpenPinch.domain import progress
 from OpenPinch.domain.enums import BB_Minimiser
 from OpenPinch.domain.stream_collection import StreamCollection
 from OpenPinch.domain.value import Value
@@ -434,3 +435,54 @@ def test_heat_pump_ranked_above_zero_duty_is_returned():
     solve, _ = _solve_ranked({0.1: lambda: _result(0.1), 0.2: _zero_duty_result})
 
     assert solve().obj == pytest.approx(0.1)
+
+
+def test_search_reports_warm_starts_then_multistart_runs_with_the_best_objective():
+    def optimiser(problem, *, method, options):
+        for x in (0.9, 0.5 - 0.1 * options.seed):
+            problem.objective(np.array([x]), *problem.args)
+        raise NoOptimisationCandidatesError("none")
+
+    events = []
+    with progress.reporting(events.append, min_interval=0):
+        adapter.run_hpr_candidate_search(
+            objective=lambda x, _args, debug=False: _result(float(x[0])),
+            initial_points=np.array([0.7]),
+            bounds=[(0.0, 1.0)],
+            args=_base_args(max_multi_start=2),
+            optimiser=optimiser,
+        )
+
+    assert [(event.stage, event.done, event.total, event.unit) for event in events] == [
+        ("warm_starts", 1, 1, "starts"),
+        ("search", 0, 2, "runs"),
+        ("search", 0, 2, "runs"),
+        ("search", 0, 2, "runs"),
+        ("search", 1, 2, "runs"),
+        ("search", 1, 2, "runs"),
+        ("search", 1, 2, "runs"),
+        ("search", 2, 2, "runs"),
+    ]
+    assert [event.best_objective for event in events] == pytest.approx(
+        [0.7, 0.7, 0.7, 0.5, 0.5, 0.5, 0.4, 0.4]
+    )
+    assert {event.analysis for event in events} == {"hpr_targeting"}
+    assert events[-1].message.endswith("4 evaluations")
+
+
+def test_candidate_checks_report_candidates_checked_of_ranked_candidates():
+    solve, _ = _solve_ranked(
+        {
+            0.1: lambda: _result(0.1, success=False),
+            0.2: lambda: _result(0.2),
+            0.3: lambda: _result(0.3),
+        }
+    )
+    events = []
+
+    with progress.reporting(events.append, min_interval=0):
+        solve()
+
+    assert [
+        (event.stage, event.done, event.total, event.best_objective) for event in events
+    ] == [("candidates", 1, 3, None), ("candidates", 2, 3, 0.2)]

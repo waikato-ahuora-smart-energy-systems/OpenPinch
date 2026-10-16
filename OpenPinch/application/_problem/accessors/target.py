@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any, Mapping
 
@@ -28,6 +29,7 @@ from ....domain.enums import (
     TurbineModel,
     ZoneType,
 )
+from ....domain.progress import scope as progress_scope
 from ....domain.targets import BaseTargetModel
 from ...targeting import (
     area_cost_targeting_service,
@@ -119,14 +121,24 @@ class _AllPeriodsTargetAccessor:
         def solve(period_id: str):
             isolated = snapshot_problem(problem, problem._period_states.get(period_id))
             method = getattr(isolated.target, method_name)
-            method(period_id=period_id, **kwargs)
+            with progress_scope(period_id):
+                method(period_id=period_id, **kwargs)
             return deepcopy(isolated._results), prepared_period_state(isolated)
 
         if supported_workers(workers) == 1:
             solved = [solve(period_id) for period_id in period_ids]
         else:
             with ThreadPoolExecutor(max_workers=workers) as executor:
-                solved = list(executor.map(solve, period_ids))
+                # Each period runs in a copy of the caller's context, so it
+                # reports progress to the caller's reporter.
+                contexts = [copy_context() for _ in period_ids]
+                solved = list(
+                    executor.map(
+                        lambda context, period_id: context.run(solve, period_id),
+                        contexts,
+                        period_ids,
+                    )
+                )
         outputs = {sid: item[0] for sid, item in zip(period_ids, solved, strict=True)}
         states = {sid: item[1] for sid, item in zip(period_ids, solved, strict=True)}
         detached = deepcopy(outputs)
