@@ -45,6 +45,10 @@ Command layer
   ``default_utility`` warning (``details``: ``name`` and ``kind``) for each
   default utility added.
 
+- ``contract_json_schemas()`` defines ``Value`` and ``StreamCollection`` once
+  under ``$defs`` and refers to them, so generated client types have one
+  ``Value`` and one ``StreamCollection`` type.
+
 Example workbooks
 ~~~~~~~~~~~~~~~~~
 

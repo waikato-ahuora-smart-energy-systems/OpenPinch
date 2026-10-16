@@ -10,6 +10,7 @@ import pytest
 from OpenPinch import PinchProblem
 from OpenPinch.contracts.schema import (
     STREAM_COLLECTION_JSON_SCHEMA,
+    VALUE_JSON_SCHEMA,
     contract_json_schemas,
 )
 
@@ -27,10 +28,14 @@ def test_problem_output_schema_lists_targets_and_graphs():
 
 
 def test_stream_collection_fields_describe_their_columns():
-    report = contract_json_schemas()["TargetOutput"]["$defs"]["TargetResults"]
+    definitions = contract_json_schemas()["TargetOutput"]["$defs"]
+    report = definitions["TargetResults"]
     hpr_hot = report["properties"]["hpr_hot_streams"]["anyOf"][0]
 
-    assert hpr_hot["properties"]["t_supply"]["items"]["type"] == ["number", "null"]
+    assert hpr_hot == {"$ref": "#/$defs/StreamCollection"}
+    assert definitions["StreamCollection"]["properties"]["t_supply"]["items"][
+        "type"
+    ] == ["number", "null"]
 
 
 def test_stream_collection_schema_requires_exactly_its_columns():
@@ -92,3 +97,38 @@ def test_network_synthesis_result_schema_lists_network():
     schema = contract_json_schemas()["HeatExchangerNetworkSynthesisResult"]
 
     assert {"network", "run_id"} <= set(schema["properties"])
+
+
+def _subschemas(schema):
+    yield schema
+    for item in schema.values() if isinstance(schema, dict) else schema:
+        if isinstance(item, dict | list):
+            yield from _subschemas(item)
+
+
+@pytest.mark.parametrize(
+    ("title", "definition"),
+    [
+        ("Value", VALUE_JSON_SCHEMA),
+        ("StreamCollection", STREAM_COLLECTION_JSON_SCHEMA),
+    ],
+)
+def test_domain_types_are_one_shared_definition(title, definition):
+    referencing = []
+    for name, schema in contract_json_schemas().items():
+        refs = [
+            item
+            for item in _subschemas(schema)
+            if isinstance(item, dict) and item.get("$ref") == f"#/$defs/{title}"
+        ]
+        if not refs:
+            continue
+        referencing.append(name)
+        assert schema["$defs"][title] == definition, name
+        inline = [
+            item
+            for item in _subschemas(schema)
+            if isinstance(item, dict) and item.get("title") == title
+        ]
+        assert inline == [schema["$defs"][title]], name
+    assert "TargetOutput" in referencing
