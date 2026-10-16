@@ -179,6 +179,18 @@ class TargetResults(_ReportModel):
     hpr_ambient_cold: Value | None = report_field(
         "hpr_ambient_cold", "weighted_mean", None, representation="quantity"
     )
+    # The HPR service load selected from the available load, and the cycle
+    # duty achieved for it.
+    hpr_selected_load: Value | None = report_field(
+        "hpr_selected_load", "weighted_mean", None, representation="quantity"
+    )
+    hpr_achieved_load: Value | None = report_field(
+        "hpr_achieved_load", "weighted_mean", None, representation="quantity"
+    )
+    # The optimiser's objective; for a shared design, its weighted objective.
+    hpr_objective: Optional[float] = report_field(
+        "hpr_objective", "consensus", None, representation="scalar"
+    )
     hpr_cop: Value | None = report_field(
         "hpr_cop", "derived", None, representation="quantity"
     )
@@ -315,6 +327,8 @@ class TargetResults(_ReportModel):
         "hpr_external_utility",
         "hpr_ambient_hot",
         "hpr_ambient_cold",
+        "hpr_selected_load",
+        "hpr_achieved_load",
         "hpr_cop",
         "hpr_eta_he",
         "hpr_operating_cost",

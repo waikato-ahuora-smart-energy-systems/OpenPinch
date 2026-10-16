@@ -66,6 +66,7 @@ def hpr_result(target, *, is_total=False):
             "hpr_external_utility": _metric(target, "hpr_external_utility"),
             "hpr_ambient_hot": _metric(target, "hpr_ambient_hot"),
             "hpr_ambient_cold": _metric(target, "hpr_ambient_cold"),
+            **_hpr_summary_values(target),
             "hpr_cop": _metric(target, "hpr_cop"),
             "hpr_eta_he": _metric(target, "hpr_eta_he"),
             "hpr_operating_cost": _metric(target, "hpr_operating_cost"),
@@ -104,11 +105,37 @@ def hpr_result(target, *, is_total=False):
     )
 
 
-def _target_simulation_record(target: HeatPumpTargetBase):
+def _hpr_summary_values(target: HeatPumpTargetBase) -> dict:
+    load = target.hpr_load
     details = target.hpr_details
+    objective = _detail(details, "obj")
+    return {
+        "hpr_selected_load": None
+        if load is None
+        else coerce_output_value(
+            {"value": load.selected, "unit": load.heat_flow_unit},
+            metric_name="hpr_selected_load",
+            config=target.config,
+        ),
+        "hpr_achieved_load": None
+        if load is None
+        else coerce_output_value(
+            {"value": load.achieved, "unit": load.heat_flow_unit},
+            metric_name="hpr_achieved_load",
+            config=target.config,
+        ),
+        "hpr_objective": None if objective is None else float(objective),
+    }
+
+
+def _detail(details, field: str):
     if isinstance(details, Mapping):
-        return details.get("target_simulation_record")
-    return getattr(details, "target_simulation_record", None)
+        return details.get(field)
+    return getattr(details, field, None)
+
+
+def _target_simulation_record(target: HeatPumpTargetBase):
+    return _detail(target.hpr_details, "target_simulation_record")
 
 
 def _utility_summary_result(
