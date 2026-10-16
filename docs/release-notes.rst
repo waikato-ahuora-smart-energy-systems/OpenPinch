@@ -60,6 +60,11 @@ Command layer
   return its validation report. The session and the other cases' results are
   kept.
 
+- ``ConfigurationFieldMetadata`` gives each field's ``unit``,
+  ``description`` and ``default``, and ``label`` is a display name such as
+  "Minimum contribution temperature difference" rather than the title-cased
+  field name.
+
 Example workbooks
 ~~~~~~~~~~~~~~~~~
 

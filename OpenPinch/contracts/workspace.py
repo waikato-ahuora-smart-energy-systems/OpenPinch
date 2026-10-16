@@ -76,6 +76,9 @@ class ConfigurationFieldMetadata(BaseModel):
     numeric_min: Optional[float] = None
     numeric_max: Optional[float] = None
     multiple: bool = False
+    unit: Optional[str] = None
+    description: str = ""
+    default: Any = None
 
 
 class WorkspaceCaseBundleEntry(BaseModel):
