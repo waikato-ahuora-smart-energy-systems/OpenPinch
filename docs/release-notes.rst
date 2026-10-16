@@ -70,6 +70,12 @@ Command layer
   input sets (``set``), so an editor can tell an option set to its default
   from one left unset.
 
+- An ``import`` command reads problem data from file contents (base64), each
+  file with its ``role``: one ``problem`` file (JSON or a workbook) or a
+  ``streams`` and a ``utilities`` CSV file. It returns the data, its source
+  kind and project name without building the problem, so invalid data can
+  still be edited. ``load_problem_source_from_files`` is the adapter behind it.
+
 Example workbooks
 ~~~~~~~~~~~~~~~~~
 

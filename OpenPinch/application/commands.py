@@ -126,7 +126,9 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
     ``{"sample_case": <name>}``, each with an optional ``project_name``) or
     ``session``, and optional ``arguments`` for the method. ``"open"`` loads
     ``problem`` into a new session and returns its id as ``session``;
-    ``"close"`` discards ``session``.
+    ``"close"`` discards ``session``. ``"import"`` reads problem data from
+    ``arguments.files`` (``{name, role, content_base64}``: one ``problem``
+    file, or a ``streams`` and a ``utilities`` CSV file) without building it.
 
     ``"open"`` with ``workspace`` (``{"problem": <source>}`` or
     ``{"bundle": <PinchWorkspaceBundle JSON>}``) opens a workspace session.

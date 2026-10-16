@@ -26,6 +26,7 @@ from OpenPinch.contracts.hpr_performance_map import HprPerformanceMapRequest
 from OpenPinch.contracts.workspace import ValidationReport
 from OpenPinch.domain.stream_collection import StreamCollection
 from OpenPinch.tutorials import sample_cases
+from tests.support.paths import REPOSITORY_ROOT
 
 
 def test_target_command_returns_problem_results_as_json():
@@ -467,6 +468,50 @@ def test_import_reads_csv_files_by_their_named_roles():
         "HP Steam",
         "Cooling Water",
     ]
+
+
+def test_import_reads_a_problem_file_by_its_suffix():
+    workbook = REPOSITORY_ROOT / "examples" / "OpenPinchWkbs" / "Ahmad (example 1).xlsb"
+    content = base64.b64encode(workbook.read_bytes()).decode("ascii")
+
+    value = run_command(
+        {
+            "command": "import",
+            "arguments": {
+                "files": [
+                    {
+                        "name": workbook.name,
+                        "role": "problem",
+                        "content_base64": content,
+                    }
+                ]
+            },
+        }
+    )["value"]
+
+    assert value["source_kind"] == "excel"
+    assert value["project_name"] == "Ahmad (example 1)"
+    assert value["data"]["streams"]
+
+
+@pytest.mark.parametrize(
+    "roles",
+    [
+        ["streams"],
+        ["streams", "streams"],
+        ["problem", "streams"],
+        ["problem", "problem"],
+        ["stream"],
+        [],
+    ],
+)
+def test_import_needs_one_problem_file_or_a_streams_and_a_utilities_file(roles):
+    files = [
+        _file(f"{index}.csv", _STREAMS_CSV, role) for index, role in enumerate(roles)
+    ]
+
+    with pytest.raises(ValueError, match="one 'problem' file, or a 'streams'"):
+        run_command({"command": "import", "arguments": {"files": files}})
 
 
 def test_to_problem_json_returns_the_problem_input():

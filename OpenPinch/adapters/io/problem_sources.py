@@ -100,15 +100,20 @@ def load_problem_source_from_files(
     readers choose the format by suffix, so the files are written under their
     base names to a private temporary directory, removed afterwards.
     """
+    roles = sorted(file["role"] for file in files)
+    if roles not in (["problem"], ["streams", "utilities"]):
+        raise ValueError(
+            "Import one 'problem' file, or a 'streams' and a 'utilities' CSV "
+            f"file; got roles {roles}."
+        )
     with TemporaryDirectory() as directory:
         paths: dict[str, Path] = {}
         for file in files:
             path = Path(directory) / Path(file["name"]).name
             path.write_bytes(base64.b64decode(file["content_base64"]))
             paths[file["role"]] = path
-        return load_external_problem_source(
-            (paths["streams"], paths["utilities"]), current_project_name="Untitled"
-        )
+        source = paths.get("problem") or (paths["streams"], paths["utilities"])
+        return load_external_problem_source(source, current_project_name="Untitled")
 
 
 def load_packaged_sample_case(name: str) -> JsonDict:
