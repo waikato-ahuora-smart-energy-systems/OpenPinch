@@ -684,3 +684,23 @@ def test_a_single_period_run_keeps_the_all_period_analysis_for_reports():
     report = problem.report(include_periods=True)
 
     assert {row.period_id for row in report.targets} == set(problem.period_ids)
+
+
+def test_period_export_keeps_the_all_period_tables_after_a_single_period_run(
+    tmp_path,
+):
+    problem = PinchProblem(source="crude_preheat_train_multiperiod.json")
+    problem.target.all_periods.direct_heat_integration()
+    batch_path = problem.export_excel(tmp_path / "batch", include_periods=True)
+
+    problem.target.all_heat_integration(period_id="base")
+    later_path = problem.export_excel(tmp_path / "later", include_periods=True)
+
+    def sheet_names(path):
+        workbook = openpyxl.load_workbook(path, read_only=True)
+        try:
+            return workbook.sheetnames
+        finally:
+            workbook.close()
+
+    assert sheet_names(later_path) == sheet_names(batch_path)

@@ -30,6 +30,7 @@ from ...contracts.hpr import (
     MultiPeriodHPRTargetInputs,
 )
 from ...domain.enums import HeatPumpAndRefrigerationCycle
+from ...domain.progress import emit as emit_progress
 from ...domain.stream_collection import StreamCollection
 from ...domain.value import Value
 from ...optimisation.errors import NoOptimisationCandidatesError
@@ -80,6 +81,24 @@ class _CachedHPRScalarObjective:
     exhausted: bool = False
     failure_count: int = 0
     failures: list[HPRFailureDiagnostic] = dataclass_field(default_factory=list)
+    # Multistart runs finished of ``run_count``, while the search runs.
+    runs_done: int | None = None
+    run_count: int = 0
+
+    def report(self, stage: str, done: int, total: int, unit: str) -> None:
+        """Report search progress with the best viable objective so far."""
+        emit_progress(
+            analysis="hpr_targeting",
+            stage=stage,
+            done=done,
+            total=total,
+            unit=unit,
+            best_objective=min(
+                (candidate.objective for candidate in self.viable.values()),
+                default=None,
+            ),
+            detail=f"{len(self.cache)} evaluations",
+        )
 
     def __call__(self, point: Sequence[float] | np.ndarray) -> float:
         key = tuple(
@@ -120,6 +139,8 @@ class _CachedHPRScalarObjective:
                         )
                     )
             self.cache[key] = value
+        if self.runs_done is not None:
+            self.report("search", self.runs_done, self.run_count, "runs")
         return self.cache[key]
 
 
@@ -196,13 +217,22 @@ def solve_hpr_placement(
         )
 
     failures: list[tuple[int, HPRBackendResult]] = []
-    for candidate in candidates:
+    for checked, candidate in enumerate(candidates, start=1):
         result = evaluate_hpr_candidate(
             objective=f_obj,
             point=candidate.point,
             args=args,
         )
-        if result.success and np.isfinite(float(result.obj)):
+        found = result.success and np.isfinite(float(result.obj))
+        emit_progress(
+            analysis="hpr_targeting",
+            stage="candidates",
+            done=checked,
+            total=len(candidates),
+            unit="candidates",
+            best_objective=float(result.obj) if found else None,
+        )
+        if found:
             return translate_hpr_result(result, ambient_args=args)
         failures.append((len(failures), result))
         if result.failure_reason == ZERO_USEFUL_DUTY_REASON:
@@ -401,8 +431,9 @@ def run_hpr_candidate_search(
     backend_candidates = []
     warm_start_viable = False
     method = _resolve_hpr_optimisation_method(args.bb_minimiser)
+    run_count = max(1, int(args.max_multi_start))
     try:
-        for point in starts:
+        for index, point in enumerate(starts, start=1):
             warm_start_candidates.append(
                 OptimisationCandidate(
                     objective=cached_scalar(point),
@@ -410,7 +441,11 @@ def run_hpr_candidate_search(
                 )
             )
             warm_start_viable = warm_start_viable or point in cached_scalar.viable
-        for run in range(max(1, int(args.max_multi_start))):
+            cached_scalar.report("warm_starts", index, len(starts), "starts")
+        cached_scalar.run_count = run_count
+        for run in range(run_count):
+            cached_scalar.runs_done = run
+            cached_scalar.report("search", run, run_count, "runs")
             try:
                 offset = run % len(starts) if starts else 0
                 run_problem = replace(
@@ -435,6 +470,8 @@ def run_hpr_candidate_search(
                     )
             except NoOptimisationCandidatesError:
                 continue
+        cached_scalar.runs_done = run_count
+        cached_scalar.report("search", run_count, run_count, "runs")
     except _HPRSearchBudgetExhausted:
         pass
 
