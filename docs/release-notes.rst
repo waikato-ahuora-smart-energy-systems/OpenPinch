@@ -55,6 +55,11 @@ Command layer
   it does not hold is rejected. Releases before this one reject bundles that
   carry ``active_case``.
 
+- ``PinchWorkspace.set_case_input(case_name, source)`` and the
+  ``workspace.set_case_input`` command replace an existing case's input and
+  return its validation report. The session and the other cases' results are
+  kept.
+
 Example workbooks
 ~~~~~~~~~~~~~~~~~
 

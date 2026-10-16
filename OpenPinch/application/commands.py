@@ -128,7 +128,8 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
     There ``case`` names the case a command runs on (default: the active
     case), and ``workspace.<action>`` (``scenario``, ``use_case``,
     ``update_options``, ``set_dt_cont_multiplier``, ``add``,
-    ``compare_cases``, ``to_bundle`` and ``batch``) acts on the workspace.
+    ``set_case_input``, ``compare_cases``, ``to_bundle`` and ``batch``) acts
+    on the workspace.
 
     The response has ``value``, the contract the method returned, and
     ``results``, the problem's ``TargetOutput`` (``None`` when no target has
@@ -558,8 +559,17 @@ def _workspace_action(name: str) -> Any:
 
 
 # Commands on a workspace session.
+def _set_case_input(
+    workspace: PinchWorkspace, *, case_name: str, source: dict[str, Any]
+) -> dict[str, Any]:
+    """Replace one case's input; returns the case list and its report."""
+    report = workspace.set_case_input(case_name, source)
+    return {**_workspace_json(workspace), "report": report.model_dump(mode="json")}
+
+
 _WORKSPACE_COMMANDS = {
     "workspace.compare_cases": _compare_cases,
+    "workspace.set_case_input": _set_case_input,
     "workspace.to_bundle": lambda workspace: workspace.to_bundle().model_dump(
         mode="json"
     ),

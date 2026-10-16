@@ -828,6 +828,33 @@ def test_workspace_update_options_changes_one_case_input():
     assert data["options"]["THERMAL_DT_CONT"] == 15
 
 
+def test_workspace_set_case_input_replaces_a_case_in_the_session():
+    session = _workspace_session()
+    run_command(
+        {
+            "command": "workspace.scenario",
+            "session": session,
+            "arguments": {"name": "b"},
+        }
+    )
+    run_command({"command": "target.direct_heat_integration", "session": session})
+    data = load_packaged_sample_case("basic_pinch.json")
+    data["options"] = {"THERMAL_DT_CONT": 20.0}
+
+    value = run_command(
+        {
+            "command": "workspace.set_case_input",
+            "session": session,
+            "arguments": {"case_name": "b", "source": data},
+        }
+    )["value"]
+    baseline = run_command({"command": "to_problem_json", "session": session})
+
+    assert value["cases"] == ["baseline", "b"]
+    assert value["report"]["valid"] is True
+    assert baseline["results"]["targets"]
+
+
 def test_workspace_sets_a_case_dt_cont_multiplier():
     session = _workspace_session()
 
