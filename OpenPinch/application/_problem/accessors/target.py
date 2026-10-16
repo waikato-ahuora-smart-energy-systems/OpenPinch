@@ -23,13 +23,13 @@ from ....contracts.hpr_performance_map import (
     HprPerformanceMapRequest,
 )
 from ....contracts.output import TargetOutput
-from ....domain import progress
 from ....domain.enums import (
     HeatPumpAndRefrigerationCycle,
     TargetType,
     TurbineModel,
     ZoneType,
 )
+from ....domain.progress import scope as progress_scope
 from ....domain.targets import BaseTargetModel
 from ...targeting import (
     area_cost_targeting_service,
@@ -121,7 +121,7 @@ class _AllPeriodsTargetAccessor:
         def solve(period_id: str):
             isolated = snapshot_problem(problem, problem._period_states.get(period_id))
             method = getattr(isolated.target, method_name)
-            with progress.scope(period_id):
+            with progress_scope(period_id):
                 method(period_id=period_id, **kwargs)
             return deepcopy(isolated._results), prepared_period_state(isolated)
 

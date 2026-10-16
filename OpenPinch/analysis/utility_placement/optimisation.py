@@ -11,7 +11,7 @@ from ...contracts.utility_placement import (
     PlacementTermination,
     UtilityPlacementOptions,
 )
-from ...domain import progress
+from ...domain.progress import emit as emit_progress
 from ...optimisation.errors import OptimisationError
 from ...optimisation.models import (
     OptimisationMethod,
@@ -151,7 +151,7 @@ class _PlacementProgress:
             self.best is None or evaluation.scalar_objective < self.best
         ):
             self.best = evaluation.scalar_objective
-        progress.emit(
+        emit_progress(
             analysis="utility_placement",
             stage=stage,
             done=self.merged + self.live,
@@ -308,7 +308,7 @@ def coordinate_optimisation(
         canonical = canonical_session.evaluate(point)
         if canonical.feasible and (best is None or canonical.scalar_objective < best):
             best = canonical.scalar_objective
-        progress.emit(
+        emit_progress(
             analysis="utility_placement",
             stage="replay",
             done=index,

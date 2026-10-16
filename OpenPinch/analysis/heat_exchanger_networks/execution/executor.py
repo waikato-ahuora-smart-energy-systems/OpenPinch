@@ -10,8 +10,8 @@ from ....contracts.synthesis.task import (
     HeatExchangerNetworkSynthesisTask,
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
-from ....domain import progress
 from ....domain.enums import HeatExchangerNetworkDesignMethod
+from ....domain.progress import emit as emit_progress
 from ..errors import WorkflowContractError
 from ..models.problem import InternalHeatExchangerNetworkProblem
 from ..solver.arrays import PreparedSolverArrays, problem_to_solver_arrays
@@ -175,7 +175,7 @@ class LocalSynthesisExecutor:
     def _report_progress(
         self, tasks: Sequence[HeatExchangerNetworkSynthesisTask], done: int
     ) -> None:
-        progress.emit(
+        emit_progress(
             analysis="hen_synthesis",
             stage=str(tasks[0].method),
             done=done,

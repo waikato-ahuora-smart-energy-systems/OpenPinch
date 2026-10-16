@@ -29,8 +29,8 @@ from ...contracts.hpr import (
     HPRTopologyIdentifier,
     MultiPeriodHPRTargetInputs,
 )
-from ...domain import progress
 from ...domain.enums import HeatPumpAndRefrigerationCycle
+from ...domain.progress import emit as emit_progress
 from ...domain.stream_collection import StreamCollection
 from ...domain.value import Value
 from ...optimisation.errors import NoOptimisationCandidatesError
@@ -87,7 +87,7 @@ class _CachedHPRScalarObjective:
 
     def report(self, stage: str, done: int, total: int, unit: str) -> None:
         """Report search progress with the best viable objective so far."""
-        progress.emit(
+        emit_progress(
             analysis="hpr_targeting",
             stage=stage,
             done=done,
@@ -224,7 +224,7 @@ def solve_hpr_placement(
             args=args,
         )
         found = result.success and np.isfinite(float(result.obj))
-        progress.emit(
+        emit_progress(
             analysis="hpr_targeting",
             stage="candidates",
             done=checked,
