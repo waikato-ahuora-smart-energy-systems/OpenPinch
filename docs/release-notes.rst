@@ -4,6 +4,13 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Example workbooks
+~~~~~~~~~~~~~~~~~
+
+- ``examples/OpenPinchWkbs/Bjork and Pettersson.xlsb`` loads: its Utility
+  Data sheet no longer has a literal ``%`` in ``dt_cont``. Every bundled
+  example workbook now loads.
+
 Engine commands for the tutorials
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
