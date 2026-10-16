@@ -108,6 +108,19 @@ Heat pump cycle states at saturation
   different optimum: tutorial 09's quick water heat pump moves from COP 7.72
   (24.3 kW) to COP 6.88 (27.2 kW), the same as in the browser.
 
+CMA-ES samples alike on every platform
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- The CMA-ES backend (the HPR default) now eigendecomposes its covariance by
+  Jacobi rotations and forms its matrix products from correctly rounded dot
+  products (``math.fsum``), instead of calling LAPACK ``eigh`` and BLAS.
+  LAPACK and BLAS builds differ in the last bits and in eigenvector signs:
+  from the second generation on, the browser (Pyodide) and the desktop sampled
+  candidates about 1e-16 apart, and a short heat pump search then settled on a
+  different optimum. Given the same objective values, CMA-ES now visits the
+  same points on macOS, Linux, Windows and Pyodide. Short searches can settle
+  on a different optimum than before.
+
 Running in the browser (Pyodide)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -1,5 +1,6 @@
 """CMA-ES multi-start backend."""
 
+import math
 from typing import Callable, Optional
 
 import numpy as np
@@ -130,7 +131,7 @@ def _run_cma_single(
             break
 
         arz = rng.standard_normal((n_dim, n_eval))
-        ary = B @ (D[:, np.newaxis] * arz)
+        ary = _exact_matmul(B, D[:, np.newaxis] * arz)
         arx = np.clip(
             mean[:, np.newaxis] + sigma * ary, lb[:, np.newaxis], ub[:, np.newaxis]
         )
@@ -168,19 +169,19 @@ def _run_cma_single(
         old_mean = mean.copy()
         x_sel = arx[:, order[:n_select]]
         y_sel = (x_sel - old_mean[:, np.newaxis]) / sigma
-        y_w = y_sel @ weights
+        y_w = _exact_matmul(y_sel, weights)
         mean = np.clip(old_mean + sigma * y_w, lb, ub)
 
-        invsqrtC_y = B @ ((B.T @ y_w) / D)
+        invsqrtC_y = _exact_matmul(B, _exact_matmul(B.T, y_w) / D)
         ps = (1.0 - cs) * ps + np.sqrt(cs * (2.0 - cs) * mueff) * invsqrtC_y
-        norm_ps = np.linalg.norm(ps)
+        norm_ps = math.sqrt(_exact_dot(ps, ps))
         hsig_cond = (
             norm_ps / np.sqrt(1.0 - (1.0 - cs) ** (2.0 * (generation + 1))) / chi_n
         )
         hsig = 1.0 if hsig_cond < (1.4 + 2.0 / (n_dim + 1.0)) else 0.0
 
         pc = (1.0 - cc) * pc + hsig * np.sqrt(cc * (2.0 - cc) * mueff) * y_w
-        rank_mu = (y_sel * weights[np.newaxis, :]) @ y_sel.T
+        rank_mu = _exact_matmul(y_sel * weights[np.newaxis, :], y_sel.T)
 
         C = (
             (1.0 - c1 - cmu) * C
@@ -191,7 +192,7 @@ def _run_cma_single(
 
         sigma *= np.exp((cs / damps) * (norm_ps / chi_n - 1.0))
 
-        eigvals, eigvecs = np.linalg.eigh(C)
+        eigvals, eigvecs = _symmetric_eigh(C)
         eigvals = np.maximum(eigvals, 1e-20)
         D = np.sqrt(eigvals)
         B = eigvecs
@@ -210,6 +211,74 @@ def _run_cma_single(
         run_minima_f.append(float(run_minima_f[-1]))
 
     return run_minima_x, run_minima_f
+
+
+# CMA-ES samples through its covariance's eigendecomposition, so a last-bit
+# difference there changes every later candidate. LAPACK and BLAS builds
+# (macOS, Linux, Pyodide) differ in those bits and in eigenvector signs; these
+# helpers use only correctly rounded float operations, so every platform
+# samples the same points from the same inputs.
+
+
+def _exact_dot(a, b) -> float:
+    """Return the correctly rounded dot product of two vectors."""
+    return math.fsum(float(x) * float(y) for x, y in zip(a, b))
+
+
+def _exact_matmul(a, b) -> np.ndarray:
+    """Return ``a @ b`` with each entry a correctly rounded dot product."""
+    a = np.asarray(a, dtype=float)
+    b = np.asarray(b, dtype=float)
+    if b.ndim == 1:
+        return np.array([_exact_dot(row, b) for row in a], dtype=float)
+    return np.array([[_exact_dot(row, col) for col in b.T] for row in a], dtype=float)
+
+
+def _symmetric_eigh(matrix, max_sweeps: int = 50) -> tuple[np.ndarray, np.ndarray]:
+    """Eigendecompose a symmetric matrix by cyclic Jacobi rotations.
+
+    Eigenvalues ascend; each eigenvector's largest-magnitude entry is positive.
+    """
+    a = [[float(v) for v in row] for row in np.asarray(matrix, dtype=float)]
+    n = len(a)
+    v = [[1.0 if i == j else 0.0 for j in range(n)] for i in range(n)]
+    for _ in range(max_sweeps):
+        if all(a[p][q] == 0.0 for p in range(n) for q in range(p + 1, n)):
+            break
+        for p in range(n):
+            for q in range(p + 1, n):
+                apq = a[p][q]
+                if apq == 0.0:
+                    continue
+                if abs(apq) <= 1e-18 * (abs(a[p][p]) + abs(a[q][q])):
+                    a[p][q] = a[q][p] = 0.0
+                    continue
+                theta = (a[q][q] - a[p][p]) / (2.0 * apq)
+                t = math.copysign(1.0, theta) / (
+                    abs(theta) + math.sqrt(theta * theta + 1.0)
+                )
+                c = 1.0 / math.sqrt(t * t + 1.0)
+                s = t * c
+                for k in range(n):
+                    akp, akq = a[k][p], a[k][q]
+                    a[k][p] = c * akp - s * akq
+                    a[k][q] = s * akp + c * akq
+                for k in range(n):
+                    apk, aqk = a[p][k], a[q][k]
+                    a[p][k] = c * apk - s * aqk
+                    a[q][k] = s * apk + c * aqk
+                a[p][q] = a[q][p] = 0.0
+                for k in range(n):
+                    vkp, vkq = v[k][p], v[k][q]
+                    v[k][p] = c * vkp - s * vkq
+                    v[k][q] = s * vkp + c * vkq
+    values = np.array([a[i][i] for i in range(n)], dtype=float)
+    vectors = np.array(v, dtype=float)
+    order = np.argsort(values, kind="stable")
+    values, vectors = values[order], vectors[:, order]
+    largest = np.abs(vectors).argmax(axis=0)
+    vectors *= np.where(vectors[largest, range(n)] < 0.0, -1.0, 1.0)
+    return values, vectors
 
 
 def _default_cma_sigma(bounds: np.ndarray) -> float:

@@ -1,6 +1,7 @@
 """Regression and edge-path tests for scalar optimisation backends."""
 
 import time
+from fractions import Fraction
 
 import numpy as np
 import pytest
@@ -128,6 +129,78 @@ def test_run_cma_single_stops_by_tolx_and_stall():
     )
     assert len(xs_stall) >= 1
     assert len(fs_stall) >= 1
+
+
+def _cma_sampled_points(seed=3):
+    points = []
+
+    def objective(x, *args):
+        points.append(tuple(float(v) for v in x))
+        x = np.asarray(x, dtype=float)
+        return float((x[0] - 0.3) ** 2 + 2.0 * (x[1] - 0.1) ** 2 + x[0] * x[2])
+
+    bb_cma._run_cma_single(
+        run=0,
+        func=objective,
+        bounds=np.asarray([[0.0, 1.0]] * 3, dtype=float),
+        x0_ls=np.asarray([[0.5, 0.5, 0.5]]),
+        args=(),
+        maxiter=6,
+        seed=seed,
+        maxfevals=60,
+        popsize=None,
+        sigma0=None,
+        tolx=1e-12,
+        tolfun=1e-12,
+    )
+    return points
+
+
+def test_run_cma_single_samples_do_not_depend_on_lapack_eigenvector_signs(
+    monkeypatch,
+):
+    # LAPACK builds may return any sign for each eigenvector (and differ in
+    # the last bits); the browser and desktop engines must sample alike.
+    reference = _cma_sampled_points()
+    eigh = np.linalg.eigh
+
+    def flipped_eigh(matrix):
+        values, vectors = eigh(matrix)
+        return values, -vectors
+
+    monkeypatch.setattr(np.linalg, "eigh", flipped_eigh)
+
+    assert _cma_sampled_points() == reference
+
+
+def test_exact_matmul_is_the_correctly_rounded_product():
+    # Order-independent rounding: the result cannot depend on how a BLAS
+    # build orders or fuses the sums.
+    a = np.asarray([[1e16, 1.0, -1e16], [0.1, 0.2, 0.3]])
+    b = np.asarray([[1.0, 3.0], [1.0, 0.7], [1.0, 0.1]])
+
+    product = bb_cma._exact_matmul(a, b)
+
+    expected = [
+        [float(sum(Fraction(x) * Fraction(y) for x, y in zip(row, col))) for col in b.T]
+        for row in a
+    ]
+    assert product.tolist() == expected
+    assert bb_cma._exact_matmul(a, b[:, 0]).tolist() == [row[0] for row in expected]
+
+
+def test_symmetric_eigh_decomposes_with_a_fixed_order_and_sign():
+    matrix = np.asarray([[2.0, 0.3, -0.1], [0.3, 1.0, 0.05], [-0.1, 0.05, 1.5]])
+
+    values, vectors = bb_cma._symmetric_eigh(matrix)
+
+    np.testing.assert_allclose(values, np.linalg.eigvalsh(matrix), rtol=0, atol=1e-14)
+    np.testing.assert_allclose(vectors.T @ vectors, np.eye(3), rtol=0, atol=1e-14)
+    np.testing.assert_allclose(
+        vectors @ np.diag(values) @ vectors.T, matrix, rtol=0, atol=1e-14
+    )
+    largest = np.abs(vectors).argmax(axis=0)
+    assert (vectors[largest, range(3)] > 0).all()
 
 
 def test_run_cma_single_nan_objective_appends_mean_fallback(monkeypatch):
