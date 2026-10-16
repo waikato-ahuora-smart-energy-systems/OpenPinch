@@ -21,11 +21,29 @@ def _set_if_supplied(values: dict[str, Any], key: str, value: Any) -> None:
         values[key] = value
 
 
+def _plain_utility_name(name: str) -> str:
+    """A utility's own name, without the network's ``Hot Utility.`` prefix."""
+    from ....domain.enums import StreamLoc
+
+    for location in (StreamLoc.HotU, StreamLoc.ColdU):
+        prefix = f"{location.value}."
+        if name.startswith(prefix):
+            return name[len(prefix) :]
+    return name
+
+
 class HeatExchangerNetworkDesignView:
     """Explicit application behavior around one serializable HEN result."""
 
-    def __init__(self, result: "HeatExchangerNetworkSynthesisResult") -> None:
+    def __init__(
+        self,
+        result: "HeatExchangerNetworkSynthesisResult",
+        *,
+        utility_names: Sequence[str] | None = None,
+    ) -> None:
         self._result = result
+        # The problem's utilities, so ``utility`` can reject other names.
+        self._utility_names = None if utility_names is None else tuple(utility_names)
 
     @property
     def result(self) -> "HeatExchangerNetworkSynthesisResult":
@@ -104,19 +122,23 @@ class HeatExchangerNetworkDesignView:
 
         if not isinstance(name, str) or not name.strip():
             raise ValueError("utility name must be a non-empty string")
-        utility_name = name.strip()
+        utility_name = _plain_utility_name(name.strip())
+        if self._utility_names is not None and utility_name not in self._utility_names:
+            raise ValueError(
+                f"Unknown utility {name.strip()!r}. The problem's utilities are "
+                f"{', '.join(self._utility_names)}."
+            )
         network = self.selected_network
         resolved_period_id = network.resolve_period_id(period_id)
         total = 0.0
         for exchanger in network.exchangers:
-            matches = (
-                exchanger.kind is HeatExchangerKind.HOT_UTILITY
-                and exchanger.source_stream == utility_name
-            ) or (
-                exchanger.kind is HeatExchangerKind.COLD_UTILITY
-                and exchanger.sink_stream == utility_name
-            )
-            if matches:
+            if exchanger.kind is HeatExchangerKind.HOT_UTILITY:
+                stream = exchanger.source_stream
+            elif exchanger.kind is HeatExchangerKind.COLD_UTILITY:
+                stream = exchanger.sink_stream
+            else:
+                continue
+            if _plain_utility_name(stream) == utility_name:
                 state = exchanger.state(resolved_period_id)
                 if state.active:
                     total += float(state.duty)
@@ -199,7 +221,16 @@ class _DesignAccessor:
             )
             if isolated._results is not None:
                 isolated._results.design = result
-        view = HeatExchangerNetworkDesignView(deepcopy(result))
+        view = HeatExchangerNetworkDesignView(
+            deepcopy(result),
+            utility_names=[
+                utility.name
+                for utility in (
+                    *self._problem.hot_utilities,
+                    *self._problem.cold_utilities,
+                )
+            ],
+        )
         commit_problem(self._problem, isolated)
         return view
 

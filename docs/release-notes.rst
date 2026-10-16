@@ -85,6 +85,11 @@ Command layer
   ``plot`` name, that draws each graph (empty for graph types no method
   draws).
 
+- ``design.utility(name)`` takes the problem's utility name (``"HPS"``) as
+  well as the network's stream name (``"Hot Utility.HPS"``); before, the
+  utility's own name answered 0. A name that is not one of the problem's
+  utilities raises ``ValueError`` instead of answering 0.
+
 Example workbooks
 ~~~~~~~~~~~~~~~~~
 
