@@ -822,6 +822,24 @@ def test_plot_export_returns_html_files_for_the_named_plot():
     assert all(name.endswith(".html") for name in names)
 
 
+def test_plot_export_can_share_one_plotly_js_file():
+    session = run_command(
+        {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
+    )["session"]
+    run_command({"command": "target.direct_heat_integration", "session": session})
+
+    files = run_command(
+        {
+            "command": "export.plots",
+            "session": session,
+            "arguments": {"gallery": True, "include_plotlyjs": "directory"},
+        }
+    )["value"]["files"]
+
+    names = [file["name"] for file in files]
+    assert names.count("plotly.min.js") == 1
+
+
 def test_workspace_session_runs_commands_on_a_named_case():
     session = run_command(
         {

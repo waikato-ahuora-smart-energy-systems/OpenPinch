@@ -513,8 +513,13 @@ def _export_plots(
     plot: str | None = None,
     gallery: bool = False,
     zone_name: str | None = None,
+    include_plotlyjs: bool | str = True,
 ) -> dict[str, Any]:
-    """Standalone HTML plots, optionally one type and with a gallery index."""
+    """Standalone HTML plots, optionally one type and with a gallery index.
+
+    ``include_plotlyjs`` (``True``, ``"cdn"`` or ``"directory"``) is how the
+    files load plotly.js.
+    """
     method = None
     if plot is not None:
         method = getattr(problem.plot, plot, None)
@@ -523,7 +528,12 @@ def _export_plots(
     export = problem.plot.export_gallery if gallery else problem.plot.export
     return {
         "files": export_files(
-            lambda directory: export(directory, zone_name=zone_name, plot=method)
+            lambda directory: export(
+                directory,
+                zone_name=zone_name,
+                plot=method,
+                include_plotlyjs=include_plotlyjs,
+            )
         )
     }
 

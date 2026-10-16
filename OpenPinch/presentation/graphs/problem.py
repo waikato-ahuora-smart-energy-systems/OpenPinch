@@ -3,7 +3,7 @@
 from collections.abc import Callable
 from html import escape
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Literal, Optional, Union
 
 import pandas as pd
 
@@ -15,6 +15,8 @@ PathLike = Union[str, Path]
 GraphRecord = Dict[str, Any]
 GraphData = Dict[str, GraphRecord]
 HprGraphSelector = Callable[..., list[GraphRecord]]
+# How an exported HTML file loads plotly.js (plotly's ``include_plotlyjs``).
+PlotlyJs = Literal[True, "cdn", "directory"]
 
 
 def _graph_record(value: Any) -> GraphRecord:
@@ -187,8 +189,13 @@ class _PlotAccessor:
         *,
         zone_name: Optional[str] = None,
         plot: Callable | None = None,
+        include_plotlyjs: PlotlyJs = True,
     ) -> list[Path]:
-        """Write selected graph outputs as standalone HTML files."""
+        """Write selected graph outputs as standalone HTML files.
+
+        ``include_plotlyjs`` is as for :meth:`export_gallery`.
+        """
+        _check_include_plotlyjs(include_plotlyjs)
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
 
@@ -201,7 +208,7 @@ class _PlotAccessor:
             figure = self._build_graph_figure(graph)
             stem = _slugify(f"{graph_zone_name}_{graph.get('type', 'graph')}_{idx}")
             destination = output_path / f"{stem}.html"
-            figure.write_html(destination)
+            figure.write_html(destination, include_plotlyjs=include_plotlyjs)
             written_paths.append(destination)
         return written_paths
 
@@ -212,8 +219,15 @@ class _PlotAccessor:
         zone_name: Optional[str] = None,
         plot: Callable | None = None,
         index_name: str = "index.html",
+        include_plotlyjs: PlotlyJs = True,
     ) -> Path:
-        """Write selected graphs and a browsable HTML index to ``output_dir``."""
+        """Write selected graphs and a browsable HTML index to ``output_dir``.
+
+        ``include_plotlyjs`` is how each file loads plotly.js: embedded
+        (``True``, the default), from its CDN (``"cdn"``), or from one shared
+        ``plotly.min.js`` written beside the files (``"directory"``).
+        """
+        _check_include_plotlyjs(include_plotlyjs)
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
 
@@ -227,7 +241,7 @@ class _PlotAccessor:
             graph_title = str(graph.get("name") or graph.get("type") or f"Graph {idx}")
             stem = _slugify(f"{graph_zone_name}_{graph.get('type', 'graph')}_{idx}")
             destination = output_path / f"{stem}.html"
-            figure.write_html(destination)
+            figure.write_html(destination, include_plotlyjs=include_plotlyjs)
             links.append((destination.name, graph_zone_name, graph_title))
 
         index_path = output_path / index_name
@@ -625,6 +639,14 @@ def _graph_set_matches_zone_selector(
         if "/" in candidate_text and suffix == candidate_text.split("/", 1)[-1]:
             return True
     return False
+
+
+def _check_include_plotlyjs(include_plotlyjs: Any) -> None:
+    if include_plotlyjs is not True and include_plotlyjs not in ("cdn", "directory"):
+        raise ValueError(
+            "include_plotlyjs must be True, 'cdn' or 'directory'; "
+            f"got {include_plotlyjs!r}."
+        )
 
 
 def _slugify(value: str) -> str:

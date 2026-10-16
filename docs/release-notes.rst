@@ -76,6 +76,10 @@ Command layer
   kind and project name without building the problem, so invalid data can
   still be edited. ``load_problem_source_from_files`` is the adapter behind it.
 
+- ``plot.export``, ``plot.export_gallery`` and the ``export.plots`` command
+  take ``include_plotlyjs``: ``True`` (embedded, the default), ``"cdn"``, or
+  ``"directory"`` for one shared ``plotly.min.js`` beside the files.
+
 Example workbooks
 ~~~~~~~~~~~~~~~~~
 
