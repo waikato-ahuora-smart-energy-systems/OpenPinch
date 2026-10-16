@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field
 from functools import partial
 from typing import Any, Mapping, get_type_hints
@@ -98,7 +99,23 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
     passed as ``{"$session": <id>}``. Outside a session targets are reported
     only in the results. Analysis that runs and fails (heat pump targeting)
     returns ``error`` (``{type, message, details}``) instead of raising.
+    Non-finite numbers come back as ``None``, so the response is strict JSON.
     """
+    return _finite(_run(request))
+
+
+def _finite(value: Any) -> Any:
+    """``value`` with NaN and infinities as ``None``: JSON has neither."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, Mapping):
+        return {key: _finite(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [_finite(item) for item in value]
+    return value
+
+
+def _run(request: Mapping[str, Any]) -> dict[str, Any]:
     command = request["command"]
     if command == "open":
         if "workspace" in request:
@@ -118,14 +135,19 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
             return {"value": None, "results": None}
         if command == "workspace.batch":
             return {"value": _batch(request), "results": None}
+    workspace_command = command in _WORKSPACE_COMMANDS
+    if workspace_command and (session is None or session.workspace is None):
+        raise ValueError(f"Command {command!r} needs a workspace session.")
+    if workspace_command:
+        # Workspace commands need no case: the workspace may have none yet.
+        problem = None
+    elif session is not None:
         problem = session.case(request.get("case"))
     else:
         problem = _load_problem(request["problem"])
     handler = _PROBLEM_COMMANDS.get(command)
     owner: Any = problem
-    if command in _WORKSPACE_COMMANDS:
-        if session is None or session.workspace is None:
-            raise ValueError(f"Command {command!r} needs a workspace session.")
+    if workspace_command:
         handler, owner = _WORKSPACE_COMMANDS[command], session.workspace
     if handler is not None:
         arguments = {
@@ -147,7 +169,7 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
     except _ANALYSIS_FAILURES as error:
         return {
             "value": None,
-            "results": _to_json(problem.results),
+            "results": _results_json(problem),
             "error": _error_json(error),
         }
     if isinstance(returned, PinchProblem):
@@ -171,7 +193,12 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
         value = returned
     else:
         value = _to_json(returned)
-    return {"value": value, "results": _to_json(problem.results)}
+    return {"value": value, "results": _results_json(problem)}
+
+
+def _results_json(problem: PinchProblem | None) -> Any:
+    """The problem's ``TargetOutput``; workspace commands have no problem."""
+    return None if problem is None else _to_json(problem.results)
 
 
 # Analysis that ran and failed is reported in the response; anything else

@@ -22,6 +22,7 @@ from OpenPinch.contracts.hpr import (
 )
 from OpenPinch.contracts.hpr_performance_map import HprPerformanceMapRequest
 from OpenPinch.contracts.workspace import ValidationReport
+from OpenPinch.domain.stream_collection import StreamCollection
 from OpenPinch.tutorials import sample_cases
 
 
@@ -873,3 +874,50 @@ def test_workspace_batch_reports_a_failing_case_and_runs_the_rest():
 
     assert list(value["results"]) == ["baseline"]
     assert value["errors"]["missing"]["type"] == "KeyError"
+
+
+def test_an_empty_workspace_session_can_be_filled_and_saved():
+    bundle = {
+        "schema_version": "3",
+        "project_name": "Site",
+        "baseline_name": "baseline",
+        "cases": {},
+    }
+    session = run_command({"command": "open", "workspace": {"bundle": bundle}})[
+        "session"
+    ]
+    other = run_command(
+        {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
+    )["session"]
+
+    value = run_command(
+        {
+            "command": "workspace.add",
+            "session": session,
+            "arguments": {"case": {"$session": other}, "name": "baseline"},
+        }
+    )["value"]
+
+    assert value["cases"] == ["baseline"]
+
+
+def test_non_finite_numbers_are_returned_as_null_so_the_json_is_strict(monkeypatch):
+    # Browsers' JSON.parse rejects NaN; a missing magnitude must come back null.
+    monkeypatch.setattr(
+        StreamCollection,
+        "to_dict",
+        lambda self, **_kwargs: {"t_supply": [float("nan"), float("inf")]},
+    )
+
+    text = run_command_json(
+        json.dumps(
+            {"command": "streams", "problem": {"sample_case": "basic_pinch.json"}}
+        )
+    )
+
+    value = json.loads(text, parse_constant=_reject)["value"]
+    assert value["hot_streams"]["t_supply"] == [None, None]
+
+
+def _reject(constant: str):
+    raise AssertionError(f"Non-standard JSON constant {constant}")
