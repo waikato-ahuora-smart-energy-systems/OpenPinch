@@ -734,3 +734,26 @@ def test_workspace_round_trips_through_an_in_memory_bundle() -> None:
         reloaded.to_problem_json(case_name="wide_dt")["options"]["THERMAL_DT_CONT"]
         == 15
     )
+
+
+def test_workspace_bundle_keeps_the_active_case() -> None:
+    workspace = PinchWorkspace(_basic_payload(), project_name="Demo")
+    workspace.scenario("wide_dt", base="baseline")
+    workspace.use_case("wide_dt")
+
+    bundle = workspace.to_bundle()
+    reloaded = PinchWorkspace.from_bundle(bundle)
+
+    assert bundle.active_case == "wide_dt"
+    assert reloaded.active_case_name == "wide_dt"
+
+
+def test_workspace_bundle_rejects_an_active_case_it_does_not_hold() -> None:
+    with pytest.raises(ValidationError, match="active_case"):
+        PinchWorkspaceBundle.model_validate(
+            {
+                "schema_version": "3",
+                "cases": {"baseline": {"case_input": _basic_payload()}},
+                "active_case": "missing",
+            }
+        )

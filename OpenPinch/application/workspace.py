@@ -251,7 +251,9 @@ class PinchWorkspace:
         workspace._case_inputs = {
             name: deepcopy(entry.case_input) for name, entry in bundle.cases.items()
         }
-        workspace._active_case_name = workspace._default_case_name()
+        workspace._active_case_name = (
+            bundle.active_case or workspace._default_case_name()
+        )
         return workspace
 
     def __repr__(self) -> str:
@@ -649,6 +651,7 @@ class PinchWorkspace:
                 )
                 for name in self.list_cases()
             },
+            active_case=self._active_case_name,
         )
 
     def _resolve_case_name(self, name: Optional[str]) -> str:

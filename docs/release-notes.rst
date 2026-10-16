@@ -49,6 +49,12 @@ Command layer
   under ``$defs`` and refers to them, so generated client types have one
   ``Value`` and one ``StreamCollection`` type.
 
+- ``PinchWorkspaceBundle`` has an optional ``active_case``:
+  ``to_bundle()`` records the active case and ``from_bundle()`` activates it
+  (the default case when it is absent). A bundle that names an active case
+  it does not hold is rejected. Releases before this one reject bundles that
+  carry ``active_case``.
+
 Example workbooks
 ~~~~~~~~~~~~~~~~~
 
