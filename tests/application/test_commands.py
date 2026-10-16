@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import json
+import warnings
 from importlib.resources import files
 
 import pytest
@@ -991,6 +992,46 @@ def test_an_empty_workspace_session_can_be_filled_and_saved():
     )["value"]
 
     assert value["cases"] == ["baseline"]
+
+
+def test_every_response_has_a_warnings_list():
+    opened = run_command(
+        {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
+    )
+    targeted = run_command(
+        {"command": "target.direct_heat_integration", "session": opened["session"]}
+    )
+    closed = run_command({"command": "close", "session": opened["session"]})
+    unknown = run_command({"command": "close", "session": opened["session"]})
+
+    for response in (opened, targeted, closed, unknown):
+        assert response["warnings"] == []
+
+
+def test_warnings_raised_by_a_command_are_returned(monkeypatch):
+    target = _TargetAccessor.direct_heat_integration
+
+    def warning_target(self, **kwargs):
+        warnings.warn("The utilities fall short.", UserWarning, stacklevel=1)
+        warnings.warn("The utilities fall short.", UserWarning, stacklevel=1)
+        return target(self, **kwargs)
+
+    monkeypatch.setattr(_TargetAccessor, "direct_heat_integration", warning_target)
+
+    response = run_command(
+        {
+            "command": "target.direct_heat_integration",
+            "problem": {"sample_case": "basic_pinch.json"},
+        }
+    )
+
+    assert response["warnings"] == [
+        {
+            "type": "UserWarning",
+            "message": "The utilities fall short.",
+            "details": None,
+        }
+    ]
 
 
 def test_non_finite_numbers_are_returned_as_null_so_the_json_is_strict(monkeypatch):

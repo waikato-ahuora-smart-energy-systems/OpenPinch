@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import warnings
 from dataclasses import dataclass, field
 from functools import partial
 from typing import Any, Mapping, get_type_hints
@@ -119,11 +120,28 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
     does a session the engine does not hold (type ``unknown_session``).
     Non-finite numbers come back as ``None``, so the response is strict JSON.
     """
-    try:
-        response = _run(request)
-    except UnknownSessionError as error:
-        response = {"value": None, "results": None, "error": _error_json(error)}
-    return _finite(response)
+    # Recording warnings is process-wide; an engine runs one command at a time.
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        try:
+            response = _run(request)
+        except UnknownSessionError as error:
+            response = {"value": None, "results": None, "error": _error_json(error)}
+    return _finite({**response, "warnings": _warnings_json(caught)})
+
+
+def _warnings_json(caught: list[warnings.WarningMessage]) -> list[dict[str, Any]]:
+    """Each distinct warning once, as ``{type, message, details}``."""
+    reported = []
+    for warning in caught:
+        entry = {
+            "type": warning.category.__name__,
+            "message": str(warning.message),
+            "details": None,
+        }
+        if entry not in reported:
+            reported.append(entry)
+    return reported
 
 
 def _finite(value: Any) -> Any:

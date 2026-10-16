@@ -35,6 +35,9 @@ Command layer
   the ``tespy`` extra, returns an ``error`` of type
   ``HprTargetCompatibilityError`` with ``details.code`` (for example
   ``dependency_unavailable``) instead of raising.
+- Every ``run_command`` response has a top-level ``warnings`` list of the
+  non-fatal issues met while the command ran, each ``{type, message,
+  details}`` like ``error`` (empty when there are none).
 
 Example workbooks
 ~~~~~~~~~~~~~~~~~
