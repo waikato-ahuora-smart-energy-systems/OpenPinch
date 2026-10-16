@@ -90,6 +90,11 @@ Command layer
   utility's own name answered 0. A name that is not one of the problem's
   utilities raises ``ValueError`` instead of answering 0.
 
+- ``design.multiperiod_heat_exchanger_network(prerequisites=True)`` runs
+  ``target.all_periods.all_heat_integration()`` first when the problem has
+  no all-period targets, so a fresh problem (or a session-less command) can
+  run it. Without the argument it still asks for the targets first.
+
 Example workbooks
 ~~~~~~~~~~~~~~~~~
 

@@ -532,12 +532,19 @@ class _DesignAccessor:
             workspace_variant=None,
         )
 
-    def multiperiod_heat_exchanger_network(self, **kwargs):
-        """Synthesize one shared HEN after explicit all-period targeting."""
+    def multiperiod_heat_exchanger_network(self, *, prerequisites=False, **kwargs):
+        """Synthesize one shared HEN after explicit all-period targeting.
+
+        With ``prerequisites=True``, a problem with no all-period targets
+        runs ``target.all_periods.all_heat_integration()`` first.
+        """
+        if not self._problem.period_results and prerequisites:
+            self._problem.target.all_periods.all_heat_integration()
         if not self._problem.period_results:
             raise RuntimeError(
                 "Run problem.target.all_periods.<method>() before multiperiod HEN "
-                "synthesis."
+                "synthesis, or pass prerequisites=True to run "
+                "all_heat_integration first."
             )
         if "period_id" in kwargs:
             raise TypeError("multiperiod synthesis does not accept period_id.")
