@@ -1,7 +1,6 @@
 """Progress reports from long-running analyses."""
 
 import contextvars
-from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -105,15 +104,15 @@ def test_events_carry_the_scope_they_run_in_also_in_copied_contexts():
         with progress.scope(period):
             progress.emit(analysis="a", stage="search", done=1, total=1)
 
+    # A worker thread runs a copy of the caller's context, as all_periods
+    # gives each period; running the copies here needs no threads, which
+    # Pyodide cannot start.
     with progress.reporting(events.append):
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            for future in [
-                pool.submit(contextvars.copy_context().run, solve, period)
-                for period in ("P1", "P2")
-            ]:
-                future.result()
+        contexts = [contextvars.copy_context() for _ in ("P1", "P2")]
+    for context, period in zip(contexts, ("P1", "P2"), strict=True):
+        context.run(solve, period)
 
-    assert sorted(event.scope for event in events) == ["P1", "P2"]
+    assert [event.scope for event in events] == ["P1", "P2"]
 
 
 def test_reports_from_a_forked_worker_process_are_not_passed_on(monkeypatch):

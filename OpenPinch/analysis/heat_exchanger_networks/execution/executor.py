@@ -170,6 +170,9 @@ class LocalSynthesisExecutor:
                         self.best_objective, outcome.objective_value
                     )
             self._report_progress(tasks, done + len(collected))
+        if not collected and done:
+            # Every task failed to build: the stage is finished.
+            self._report_progress(tasks, done)
         return tuple(collected)
 
     def _report_progress(

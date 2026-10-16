@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
-
 import pytest
 
 from OpenPinch.analysis.heat_exchanger_networks.execution import (
@@ -80,12 +78,26 @@ def test_serial_synthesis_reports_each_task_solved_with_the_best_cost(stub_solve
     assert events[-1].objective == "total annual cost"
 
 
+class _InProcessPool:
+    """A worker pool that maps in this process: Pyodide cannot start workers."""
+
+    def __init__(self, workers):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        return False
+
+    def map(self, function, items):
+        return map(function, items)
+
+
 def test_parallel_synthesis_reports_each_task_and_keeps_task_order(stub_solves):
     events = []
     tasks = [_task(index) for index in range(3)]
-    executor = LocalSynthesisExecutor(
-        worker_pool_factory=lambda workers: ThreadPoolExecutor(max_workers=workers)
-    )
+    executor = LocalSynthesisExecutor(worker_pool_factory=_InProcessPool)
 
     with progress.reporting(events.append, min_interval=0):
         outcomes = executor.execute(
@@ -96,3 +108,21 @@ def test_parallel_synthesis_reports_each_task_and_keeps_task_order(stub_solves):
     assert [outcome.task.task_id for outcome in outcomes] == [
         task.task_id for task in tasks
     ]
+
+
+def test_a_stage_whose_tasks_all_fail_to_build_reports_it_finished(
+    stub_solves, monkeypatch
+):
+    def fail(self, task, **kwargs):
+        raise RuntimeError("bad build")
+
+    monkeypatch.setattr(LocalSynthesisExecutor, "_build_problem", fail)
+    events = []
+    tasks = [_task(index) for index in range(2)]
+
+    with progress.reporting(events.append, min_interval=0):
+        LocalSynthesisExecutor().execute(
+            tasks, problem=None, parent_outcomes={}, max_parallel=1
+        )
+
+    assert [(event.done, event.total) for event in events] == [(0, 2), (2, 2)]
