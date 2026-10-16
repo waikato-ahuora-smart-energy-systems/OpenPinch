@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 from pydantic import BaseModel
@@ -91,16 +92,53 @@ STREAM_COLLECTION_JSON_SCHEMA: dict[str, Any] = {
 }
 
 
+# Domain types that contracts carry by their JSON form, each defined once
+# under ``$defs`` so typed clients get one type for it.
+_DOMAIN_DEFINITIONS: dict[str, tuple[type, dict[str, Any]]] = {
+    "Value": (Value, VALUE_JSON_SCHEMA),
+    "StreamCollection": (StreamCollection, STREAM_COLLECTION_JSON_SCHEMA),
+}
+
+
+# Pydantic resolves every "$ref" against its own definitions, so a domain
+# type is marked with this key while generating and referenced afterwards.
+_DOMAIN_MARKER = "x-openpinch-domain-type"
+
+
 class _ContractSchemaGenerator(GenerateJsonSchema):
     """Describes the domain types that contracts carry by their JSON form."""
 
     def is_instance_schema(self, schema):
-        cls = schema["cls"]
-        if issubclass(cls, Value):
-            return dict(VALUE_JSON_SCHEMA)
-        if issubclass(cls, StreamCollection):
-            return dict(STREAM_COLLECTION_JSON_SCHEMA)
+        for name, (cls, _definition) in _DOMAIN_DEFINITIONS.items():
+            if issubclass(schema["cls"], cls):
+                return {_DOMAIN_MARKER: name}
         return super().is_instance_schema(schema)
+
+    def generate(self, schema, mode="validation"):
+        used: set[str] = set()
+        generated = _reference_domain_types(super().generate(schema, mode=mode), used)
+        for name in sorted(used):
+            generated.setdefault("$defs", {})[name] = deepcopy(
+                _DOMAIN_DEFINITIONS[name][1]
+            )
+        return generated
+
+
+def _reference_domain_types(schema: Any, used: set[str]) -> Any:
+    """``schema`` with each domain-type marker replaced by a ``$defs`` reference."""
+    if isinstance(schema, dict):
+        if _DOMAIN_MARKER in schema:
+            siblings = {key: item for key, item in schema.items()}
+            name = siblings.pop(_DOMAIN_MARKER)
+            used.add(name)
+            # Keep what the field adds, such as its description or default.
+            return {"$ref": f"#/$defs/{name}", **siblings}
+        return {
+            key: _reference_domain_types(item, used) for key, item in schema.items()
+        }
+    if isinstance(schema, list):
+        return [_reference_domain_types(item, used) for item in schema]
+    return schema
 
 
 # Public contracts by name. Inputs use the validation schema (what callers may

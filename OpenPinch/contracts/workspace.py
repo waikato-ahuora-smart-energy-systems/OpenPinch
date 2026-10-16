@@ -76,6 +76,9 @@ class ConfigurationFieldMetadata(BaseModel):
     numeric_min: Optional[float] = None
     numeric_max: Optional[float] = None
     multiple: bool = False
+    unit: Optional[str] = None
+    description: str = ""
+    default: Any = None
 
 
 class WorkspaceCaseBundleEntry(BaseModel):
@@ -93,6 +96,8 @@ class PinchWorkspaceBundle(BaseModel):
     project_name: Optional[str] = None
     baseline_name: str = "baseline"
     cases: Dict[str, WorkspaceCaseBundleEntry]
+    # The case commands act on when none is named; None opens the default.
+    active_case: Optional[str] = None
 
     model_config = ConfigDict(extra="forbid")
 
@@ -111,6 +116,11 @@ class PinchWorkspaceBundle(BaseModel):
             if isinstance(cases, Mapping):
                 for case_name in cases:
                     validate_workspace_case_name(case_name)
+                active_case = value.get("active_case")
+                if active_case is not None and active_case not in cases:
+                    raise ValueError(
+                        f"active_case {active_case!r} is not one of the cases."
+                    )
         return value
 
 

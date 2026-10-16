@@ -251,7 +251,9 @@ class PinchWorkspace:
         workspace._case_inputs = {
             name: deepcopy(entry.case_input) for name, entry in bundle.cases.items()
         }
-        workspace._active_case_name = workspace._default_case_name()
+        workspace._active_case_name = (
+            bundle.active_case or workspace._default_case_name()
+        )
         return workspace
 
     def __repr__(self) -> str:
@@ -324,6 +326,16 @@ class PinchWorkspace:
             raise ValueError("case input is invalid")
         added._utility_placement_result = deepcopy(case.utility_placement_result)
         return added
+
+    def set_case_input(self, case_name: str, source: TargetInput | JsonDict):
+        """Replace an existing case's input; the other cases keep their state.
+
+        Returns the case's validation report: invalid input is stored, as
+        ``load`` stores it, so it can be corrected.
+        """
+        self._get_case_input(case_name)  # an unknown case raises KeyError
+        self.load(source, case_name=case_name, activate=False)
+        return self.validation_report(case_name)
 
     def validation_report(self, case_name: Optional[str] = None):
         """Return a structured validation report for one case input."""
@@ -649,6 +661,7 @@ class PinchWorkspace:
                 )
                 for name in self.list_cases()
             },
+            active_case=self._active_case_name,
         )
 
     def _resolve_case_name(self, name: Optional[str]) -> str:

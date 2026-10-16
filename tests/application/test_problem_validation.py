@@ -47,6 +47,18 @@ def test_validation_report_and_warning_semantics(validation_cases):
         validation.validate_problem_semantics(validated, context={})
 
 
+def test_validation_warning_carries_its_issues(validation_cases):
+    data = validation_cases["warning_problem"]
+    validated = TargetInput.model_validate(data)
+    context = validation.build_validation_context(data, source_kind="json")
+
+    with pytest.warns(validation.InputValidationWarning) as caught:
+        validation.validate_problem_semantics(validated, context=context)
+
+    report = validation.build_validation_report(data)
+    assert caught[0].message.issues == report.issues
+
+
 @pytest.mark.parametrize(
     ("t_supply", "path", "message"),
     [

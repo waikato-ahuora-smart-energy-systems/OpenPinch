@@ -734,3 +734,45 @@ def test_workspace_round_trips_through_an_in_memory_bundle() -> None:
         reloaded.to_problem_json(case_name="wide_dt")["options"]["THERMAL_DT_CONT"]
         == 15
     )
+
+
+def test_workspace_bundle_keeps_the_active_case() -> None:
+    workspace = PinchWorkspace(_basic_payload(), project_name="Demo")
+    workspace.scenario("wide_dt", base="baseline")
+    workspace.use_case("wide_dt")
+
+    bundle = workspace.to_bundle()
+    reloaded = PinchWorkspace.from_bundle(bundle)
+
+    assert bundle.active_case == "wide_dt"
+    assert reloaded.active_case_name == "wide_dt"
+
+
+def test_workspace_bundle_rejects_an_active_case_it_does_not_hold() -> None:
+    with pytest.raises(ValidationError, match="active_case"):
+        PinchWorkspaceBundle.model_validate(
+            {
+                "schema_version": "3",
+                "cases": {"baseline": {"case_input": _basic_payload()}},
+                "active_case": "missing",
+            }
+        )
+
+
+def test_set_case_input_replaces_one_case_and_keeps_the_others() -> None:
+    workspace = PinchWorkspace(_basic_payload(), project_name="Demo")
+    workspace.scenario("wide_dt", base="baseline", activate=False)
+    baseline = workspace.case("baseline")
+    baseline.target.direct_heat_integration()
+    edited = _basic_payload()
+    edited["options"] = {"THERMAL_DT_CONT": 20.0}
+
+    report = workspace.set_case_input("wide_dt", edited)
+
+    assert report.valid
+    assert workspace.active_case_name == "baseline"
+    assert workspace.case("baseline") is baseline
+    assert workspace.case("baseline").results is not None
+    assert workspace.case("wide_dt").config["THERMAL_DT_CONT"] == 20.0
+    with pytest.raises(KeyError, match="Unknown case"):
+        workspace.set_case_input("missing", edited)

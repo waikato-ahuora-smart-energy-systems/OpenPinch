@@ -3,7 +3,7 @@
 from collections.abc import Callable
 from html import escape
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Literal, Optional, Union
 
 import pandas as pd
 
@@ -15,6 +15,32 @@ PathLike = Union[str, Path]
 GraphRecord = Dict[str, Any]
 GraphData = Dict[str, GraphRecord]
 HprGraphSelector = Callable[..., list[GraphRecord]]
+# The graph type each plot method draws, by method name.
+PLOT_METHOD_GRAPH_TYPES: dict[str, GraphType] = {
+    "composite_curve": GraphType.CC,
+    "shifted_composite_curve": GraphType.SCC,
+    "balanced_composite_curve": GraphType.BCC,
+    "grand_composite_curve": GraphType.GCC,
+    "real_grand_composite_curve": GraphType.GCC_R,
+    "exergetic_grand_composite_curve": GraphType.GCC_X,
+    "grand_composite_curve_with_heat_pump": GraphType.GCC_HP,
+    "net_load_profiles": GraphType.NLP,
+    "net_load_profiles_with_heat_pump": GraphType.NLP_HP,
+    "grand_composite_curve_with_refrigeration": GraphType.GCC_RFRG,
+    "net_load_profiles_with_refrigeration": GraphType.NLP_RFRG,
+    "grand_composite_curve_with_orc": GraphType.GCC_ORC,
+    "net_load_profiles_with_orc": GraphType.NLP_ORC,
+    "exergetic_net_load_profiles": GraphType.NLP_X,
+    "total_site_profiles": GraphType.TSP,
+    "site_utility_grand_composite_curve": GraphType.SUGCC,
+    "energy_transfer_diagram": GraphType.ETD,
+}
+_PLOT_METHOD_BY_GRAPH_TYPE = {
+    graph_type.value: method for method, graph_type in PLOT_METHOD_GRAPH_TYPES.items()
+}
+
+# How an exported HTML file loads plotly.js (plotly's ``include_plotlyjs``).
+PlotlyJs = Literal[True, "cdn", "directory"]
 
 
 def _graph_record(value: Any) -> GraphRecord:
@@ -52,6 +78,9 @@ class _PlotAccessor:
                         "Target Type": target_type,
                         "Period ID": graph_set.get("period_id"),
                         "Graph Type": graph.get("type"),
+                        "Plot Method": _PLOT_METHOD_BY_GRAPH_TYPE.get(
+                            graph.get("type")
+                        ),
                         "Graph Name": graph.get("name", f"Graph {index + 1}"),
                         "Index": index,
                     }
@@ -187,8 +216,13 @@ class _PlotAccessor:
         *,
         zone_name: Optional[str] = None,
         plot: Callable | None = None,
+        include_plotlyjs: PlotlyJs = True,
     ) -> list[Path]:
-        """Write selected graph outputs as standalone HTML files."""
+        """Write selected graph outputs as standalone HTML files.
+
+        ``include_plotlyjs`` is as for :meth:`export_gallery`.
+        """
+        _check_include_plotlyjs(include_plotlyjs)
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
 
@@ -201,7 +235,7 @@ class _PlotAccessor:
             figure = self._build_graph_figure(graph)
             stem = _slugify(f"{graph_zone_name}_{graph.get('type', 'graph')}_{idx}")
             destination = output_path / f"{stem}.html"
-            figure.write_html(destination)
+            figure.write_html(destination, include_plotlyjs=include_plotlyjs)
             written_paths.append(destination)
         return written_paths
 
@@ -212,8 +246,15 @@ class _PlotAccessor:
         zone_name: Optional[str] = None,
         plot: Callable | None = None,
         index_name: str = "index.html",
+        include_plotlyjs: PlotlyJs = True,
     ) -> Path:
-        """Write selected graphs and a browsable HTML index to ``output_dir``."""
+        """Write selected graphs and a browsable HTML index to ``output_dir``.
+
+        ``include_plotlyjs`` is how each file loads plotly.js: embedded
+        (``True``, the default), from its CDN (``"cdn"``), or from one shared
+        ``plotly.min.js`` written beside the files (``"directory"``).
+        """
+        _check_include_plotlyjs(include_plotlyjs)
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
 
@@ -227,7 +268,7 @@ class _PlotAccessor:
             graph_title = str(graph.get("name") or graph.get("type") or f"Graph {idx}")
             stem = _slugify(f"{graph_zone_name}_{graph.get('type', 'graph')}_{idx}")
             destination = output_path / f"{stem}.html"
-            figure.write_html(destination)
+            figure.write_html(destination, include_plotlyjs=include_plotlyjs)
             links.append((destination.name, graph_zone_name, graph_title))
 
         index_path = output_path / index_name
@@ -245,27 +286,8 @@ class _PlotAccessor:
             raise ValueError(
                 "plot must be a method bound to this problem.plot accessor."
             )
-        method_types = {
-            "composite_curve": GraphType.CC,
-            "shifted_composite_curve": GraphType.SCC,
-            "balanced_composite_curve": GraphType.BCC,
-            "grand_composite_curve": GraphType.GCC,
-            "real_grand_composite_curve": GraphType.GCC_R,
-            "exergetic_grand_composite_curve": GraphType.GCC_X,
-            "grand_composite_curve_with_heat_pump": GraphType.GCC_HP,
-            "net_load_profiles": GraphType.NLP,
-            "net_load_profiles_with_heat_pump": GraphType.NLP_HP,
-            "grand_composite_curve_with_refrigeration": GraphType.GCC_RFRG,
-            "net_load_profiles_with_refrigeration": GraphType.NLP_RFRG,
-            "grand_composite_curve_with_orc": GraphType.GCC_ORC,
-            "net_load_profiles_with_orc": GraphType.NLP_ORC,
-            "exergetic_net_load_profiles": GraphType.NLP_X,
-            "total_site_profiles": GraphType.TSP,
-            "site_utility_grand_composite_curve": GraphType.SUGCC,
-            "energy_transfer_diagram": GraphType.ETD,
-        }
         try:
-            return method_types[name]
+            return PLOT_METHOD_GRAPH_TYPES[name]
         except KeyError as exc:
             raise ValueError(f"Unsupported plot method {name!r}.") from exc
 
@@ -625,6 +647,14 @@ def _graph_set_matches_zone_selector(
         if "/" in candidate_text and suffix == candidate_text.split("/", 1)[-1]:
             return True
     return False
+
+
+def _check_include_plotlyjs(include_plotlyjs: Any) -> None:
+    if include_plotlyjs is not True and include_plotlyjs not in ("cdn", "directory"):
+        raise ValueError(
+            "include_plotlyjs must be True, 'cdn' or 'directory'; "
+            f"got {include_plotlyjs!r}."
+        )
 
 
 def _slugify(value: str) -> str:

@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import base64
 import json
+import warnings
 from importlib.resources import files
 
 import jsonschema
 import pytest
 
+from OpenPinch.adapters.io.problem_sources import load_packaged_sample_case
 from OpenPinch.application._problem.accessors.design import (
     HeatExchangerNetworkDesignView,
     _DesignAccessor,
@@ -26,6 +28,7 @@ from OpenPinch.contracts.workspace import ValidationReport
 from OpenPinch.domain import progress
 from OpenPinch.domain.stream_collection import StreamCollection
 from OpenPinch.tutorials import sample_cases
+from tests.support.paths import REPOSITORY_ROOT
 
 
 def test_target_command_returns_problem_results_as_json():
@@ -347,8 +350,26 @@ def test_closed_session_cannot_run_commands():
 
     run_command({"command": "close", "session": session})
 
-    with pytest.raises(ValueError, match="Unknown session"):
-        run_command({"command": "target.direct_heat_integration", "session": session})
+    response = run_command(
+        {"command": "target.direct_heat_integration", "session": session}
+    )
+
+    assert response["value"] is None
+    assert response["error"]["type"] == "unknown_session"
+    assert response["error"]["details"] == {"session": session}
+
+
+def test_an_unknown_session_argument_returns_an_unknown_session_error():
+    response = run_command(
+        {
+            "command": "with_utilities_from",
+            "problem": {"sample_case": "basic_pinch.json"},
+            "arguments": {"other_problem": {"$session": "missing"}},
+        }
+    )
+
+    assert response["error"]["type"] == "unknown_session"
+    assert response["error"]["details"] == {"session": "missing"}
 
 
 def test_problem_source_names_the_project():
@@ -398,6 +419,120 @@ def test_validate_reports_input_that_passes_the_schema_but_cannot_be_built():
     assert response["value"]["input"] is None
     assert report["valid"] is False
     assert "Zone name and type" in report["issues"][0]["message"]
+
+
+def test_options_returns_fields_effective_values_and_options_set():
+    data = load_packaged_sample_case("basic_pinch.json")
+    data["options"] = {"THERMAL_DT_CONT": 5.0}
+
+    value = run_command({"command": "options", "problem": {"data": data}})["value"]
+
+    fields = {field["name"]: field for field in value["fields"]}
+    assert fields["THERMAL_DT_CONT"]["unit"] == "delta_degC"
+    assert value["values"]["THERMAL_DT_CONT"] == 5.0
+    assert value["values"]["THERMAL_HTC"] == 1.0
+    # Set to its default, yet set: the editor tells it from an unset option.
+    assert value["set"] == {"THERMAL_DT_CONT": 5.0}
+
+
+_STREAMS_CSV = """Zone,Stream,Ts,Tt,Q,dTcont,HTC
+,,degC,degC,kW,degC,kW/m^2/degC
+Plant,H1,180.0,60.0,240.0,4.0,2.0
+Plant,C1,20.0,135.0,230.0,4.0,2.0
+"""
+_UTILITIES_CSV = """Utility,Type,Ts,Tt,dTcont,Price,HTC,Q
+,,degC,degC,degC,$/MWh,kW/m^2/degC,kW
+HP Steam,Hot,250.0,249.0,5.0,40.0,1.0,
+Cooling Water,Cold,15.0,25.0,5.0,5.0,1.0,
+"""
+
+
+def _file(name: str, text: str, role: str) -> dict[str, str]:
+    content = base64.b64encode(text.encode()).decode("ascii")
+    return {"name": name, "role": role, "content_base64": content}
+
+
+def test_import_reads_csv_files_by_their_named_roles():
+    # Neither name says which table it is: the roles do.
+    value = run_command(
+        {
+            "command": "import",
+            "arguments": {
+                "files": [
+                    _file("a.csv", _UTILITIES_CSV, "utilities"),
+                    _file("b.csv", _STREAMS_CSV, "streams"),
+                ]
+            },
+        }
+    )["value"]
+
+    assert value["source_kind"] == "csv"
+    assert [stream["name"] for stream in value["data"]["streams"]] == ["H1", "C1"]
+    assert [utility["name"] for utility in value["data"]["utilities"]] == [
+        "HP Steam",
+        "Cooling Water",
+    ]
+
+
+def test_import_keeps_role_files_apart_when_their_names_match():
+    # Files picked from two folders can share a name.
+    value = run_command(
+        {
+            "command": "import",
+            "arguments": {
+                "files": [
+                    _file("table.csv", _STREAMS_CSV, "streams"),
+                    _file("table.csv", _UTILITIES_CSV, "utilities"),
+                ]
+            },
+        }
+    )["value"]
+
+    assert [stream["name"] for stream in value["data"]["streams"]] == ["H1", "C1"]
+
+
+def test_import_reads_a_problem_file_by_its_suffix():
+    workbook = REPOSITORY_ROOT / "examples" / "OpenPinchWkbs" / "Ahmad (example 1).xlsb"
+    content = base64.b64encode(workbook.read_bytes()).decode("ascii")
+
+    value = run_command(
+        {
+            "command": "import",
+            "arguments": {
+                "files": [
+                    {
+                        "name": workbook.name,
+                        "role": "problem",
+                        "content_base64": content,
+                    }
+                ]
+            },
+        }
+    )["value"]
+
+    assert value["source_kind"] == "excel"
+    assert value["project_name"] == "Ahmad (example 1)"
+    assert value["data"]["streams"]
+
+
+@pytest.mark.parametrize(
+    "roles",
+    [
+        ["streams"],
+        ["streams", "streams"],
+        ["problem", "streams"],
+        ["problem", "problem"],
+        ["stream"],
+        [],
+    ],
+)
+def test_import_needs_one_problem_file_or_a_streams_and_a_utilities_file(roles):
+    files = [
+        _file(f"{index}.csv", _STREAMS_CSV, role) for index, role in enumerate(roles)
+    ]
+
+    with pytest.raises(ValueError, match="one 'problem' file, or a 'streams'"):
+        run_command({"command": "import", "arguments": {"files": files}})
 
 
 def test_to_problem_json_returns_the_problem_input():
@@ -639,6 +774,30 @@ def test_heat_pump_targeting_failure_is_returned_as_an_error(monkeypatch):
     assert response["error"]["details"]["status"] == "typed infeasible"
 
 
+def test_missing_tespy_is_returned_as_an_error(monkeypatch):
+    # An engine without the optional extra, such as the browser engine.
+    monkeypatch.setattr(
+        "OpenPinch.analysis.heat_pumps.performance_maps.targeting.find_spec",
+        lambda _name: None,
+    )
+
+    response = run_command(
+        {
+            "command": "target.vapour_compression_heat_pump",
+            "problem": {"sample_case": "basic_pinch.json"},
+            "arguments": {
+                "simulation_backend": "tespy",
+                "condensers": 1,
+                "evaporators": 1,
+            },
+        }
+    )
+
+    assert response["value"] is None
+    assert response["error"]["type"] == "HprTargetCompatibilityError"
+    assert response["error"]["details"] == {"code": "dependency_unavailable"}
+
+
 def test_plot_catalog_lists_the_solved_graphs():
     session = run_command(
         {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
@@ -682,6 +841,24 @@ def test_plot_export_returns_html_files_for_the_named_plot():
     names = [file["name"] for file in files]
     assert "index.html" in names
     assert all(name.endswith(".html") for name in names)
+
+
+def test_plot_export_can_share_one_plotly_js_file():
+    session = run_command(
+        {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
+    )["session"]
+    run_command({"command": "target.direct_heat_integration", "session": session})
+
+    files = run_command(
+        {
+            "command": "export.plots",
+            "session": session,
+            "arguments": {"gallery": True, "include_plotlyjs": "directory"},
+        }
+    )["value"]["files"]
+
+    names = [file["name"] for file in files]
+    assert names.count("plotly.min.js") == 1
 
 
 def test_workspace_session_runs_commands_on_a_named_case():
@@ -786,6 +963,33 @@ def test_workspace_update_options_changes_one_case_input():
     )["value"]
 
     assert data["options"]["THERMAL_DT_CONT"] == 15
+
+
+def test_workspace_set_case_input_replaces_a_case_in_the_session():
+    session = _workspace_session()
+    run_command(
+        {
+            "command": "workspace.scenario",
+            "session": session,
+            "arguments": {"name": "b"},
+        }
+    )
+    run_command({"command": "target.direct_heat_integration", "session": session})
+    data = load_packaged_sample_case("basic_pinch.json")
+    data["options"] = {"THERMAL_DT_CONT": 20.0}
+
+    value = run_command(
+        {
+            "command": "workspace.set_case_input",
+            "session": session,
+            "arguments": {"case_name": "b", "source": data},
+        }
+    )["value"]
+    baseline = run_command({"command": "to_problem_json", "session": session})
+
+    assert value["cases"] == ["baseline", "b"]
+    assert value["report"]["valid"] is True
+    assert baseline["results"]["targets"]
 
 
 def test_workspace_sets_a_case_dt_cont_multiplier():
@@ -953,6 +1157,74 @@ def test_an_empty_workspace_session_can_be_filled_and_saved():
     )["value"]
 
     assert value["cases"] == ["baseline"]
+
+
+def test_every_response_has_a_warnings_list():
+    opened = run_command(
+        {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
+    )
+    targeted = run_command(
+        {"command": "target.direct_heat_integration", "session": opened["session"]}
+    )
+    closed = run_command({"command": "close", "session": opened["session"]})
+    unknown = run_command({"command": "close", "session": opened["session"]})
+
+    for response in (opened, targeted, closed, unknown):
+        assert response["warnings"] == []
+
+
+def test_warnings_raised_by_a_command_are_returned(monkeypatch):
+    target = _TargetAccessor.direct_heat_integration
+
+    def warning_target(self, **kwargs):
+        warnings.warn("The utilities fall short.", UserWarning, stacklevel=1)
+        warnings.warn("The utilities fall short.", UserWarning, stacklevel=1)
+        return target(self, **kwargs)
+
+    monkeypatch.setattr(_TargetAccessor, "direct_heat_integration", warning_target)
+
+    response = run_command(
+        {
+            "command": "target.direct_heat_integration",
+            "problem": {"sample_case": "basic_pinch.json"},
+        }
+    )
+
+    assert response["warnings"] == [
+        {
+            "type": "UserWarning",
+            "message": "The utilities fall short.",
+            "details": None,
+        }
+    ]
+
+
+def test_validation_warnings_are_returned_one_per_issue():
+    data = load_packaged_sample_case("basic_pinch.json")
+    data["streams"][0]["dt_cont"] = {"value": -1.0, "unit": "delta_degC"}
+
+    response = run_command({"command": "to_problem_json", "problem": {"data": data}})
+
+    [warning] = response["warnings"]
+    assert warning["type"] == "validation"
+    assert warning["details"]["path"] == "streams[0].dt_cont"
+    assert warning["message"] == warning["details"]["message"]
+
+
+def test_default_utilities_added_on_loading_are_returned_as_warnings():
+    data = load_packaged_sample_case("basic_pinch.json")
+    data["utilities"] = []
+
+    opened = run_command({"command": "open", "problem": {"data": data}})
+    targeted = run_command(
+        {"command": "target.direct_heat_integration", "session": opened["session"]}
+    )
+
+    defaults = [w for w in opened["warnings"] if w["type"] == "default_utility"]
+    assert {w["details"]["kind"] for w in defaults} == {"hot", "cold"}
+    assert all(w["details"]["name"] in w["message"] for w in defaults)
+    # Reported when the problem loads, not again by later commands.
+    assert targeted["warnings"] == []
 
 
 def test_non_finite_numbers_are_returned_as_null_so_the_json_is_strict(monkeypatch):
