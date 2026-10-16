@@ -72,14 +72,29 @@ class _Reporter:
                 return
             self.forwarded[key] = now
         detail = fields.pop("detail")
-        self.callback(
-            Progress(
-                message=_message(**fields, detail=detail),
-                elapsed=now - self.start,
-                scope=scope,
-                **fields,
-            )
+        report = Progress(
+            message=_message(**fields, detail=detail),
+            elapsed=now - self.start,
+            scope=scope,
+            **fields,
         )
+        try:
+            self.callback(report)
+        except Exception as error:
+            raise _CallbackError(error) from None
+
+
+class _CallbackError(BaseException):
+    """Carries a callback's exception past an analysis's own error handling.
+
+    Analyses turn their failures into domain errors with ``except
+    Exception``; a callback cancelling the analysis must not become one.
+    :func:`reporting` raises the callback's exception again unchanged.
+    """
+
+    def __init__(self, error: Exception) -> None:
+        super().__init__(error)
+        self.error = error
 
 
 _REPORTER: ContextVar[_Reporter | None] = ContextVar(
@@ -107,6 +122,8 @@ def reporting(
     token = _REPORTER.set(_Reporter(callback, min_interval, clock))
     try:
         yield
+    except _CallbackError as carried:
+        raise carried.error from None
     finally:
         _REPORTER.reset(token)
 

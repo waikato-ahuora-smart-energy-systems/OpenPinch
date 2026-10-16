@@ -139,3 +139,24 @@ def test_a_detail_is_appended_to_the_message():
         )
 
     assert events[0].message == "Search: 1 of 10 runs, 240 evaluations"
+
+
+def test_a_callback_exception_passes_analysis_error_handlers_unchanged():
+    class Stop(Exception):
+        pass
+
+    stop = Stop()
+
+    def cancel(event):
+        raise stop
+
+    def analysis():
+        try:
+            progress.emit(analysis="a", stage="search")
+        except Exception as error:  # an analysis turning failures into others
+            raise RuntimeError("analysis failed") from error
+
+    with pytest.raises(Stop) as raised, progress.reporting(cancel):
+        analysis()
+
+    assert raised.value is stop
