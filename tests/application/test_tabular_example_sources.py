@@ -18,14 +18,7 @@ from tests.support.paths import REPOSITORY_ROOT
 
 WORKBOOK_DIR = REPOSITORY_ROOT / "examples" / "OpenPinchWkbs"
 
-# Its Utility Data dt_cont cells hold a literal "%" placeholder, which the
-# reader rejects as non-numeric rather than guessing a value.
-PERCENT_DT_CONT_WORKBOOK = "Bjork and Pettersson.xlsb"
-
 BUNDLED_WORKBOOKS = sorted(WORKBOOK_DIR.glob("*.xlsb"))
-LOADABLE_WORKBOOKS = [
-    path for path in BUNDLED_WORKBOOKS if path.name != PERCENT_DT_CONT_WORKBOOK
-]
 
 
 def _load(source) -> PinchProblem:
@@ -41,19 +34,14 @@ def _magnitude(value) -> float:
 
 def test_bundled_workbooks_are_discovered():
     assert len(BUNDLED_WORKBOOKS) > 40
-    assert PERCENT_DT_CONT_WORKBOOK in {path.name for path in BUNDLED_WORKBOOKS}
+    assert "Bjork and Pettersson.xlsb" in {path.name for path in BUNDLED_WORKBOOKS}
 
 
-@pytest.mark.parametrize("workbook", LOADABLE_WORKBOOKS, ids=lambda path: path.stem)
+@pytest.mark.parametrize("workbook", BUNDLED_WORKBOOKS, ids=lambda path: path.stem)
 def test_bundled_workbook_loads(workbook: Path):
     problem = _load(workbook)
 
     assert len(problem.hot_streams) + len(problem.cold_streams) > 0
-
-
-def test_workbook_with_percent_dt_cont_reports_the_bad_cell():
-    with pytest.raises(ValueError, match=r"Column 'dt_cont' has a non-numeric"):
-        _load(WORKBOOK_DIR / PERCENT_DT_CONT_WORKBOOK)
 
 
 def _write_csv(path: Path, rows: list[list]) -> None:
@@ -94,6 +82,20 @@ def test_seven_column_csv_directory_loads(tmp_path: Path):
     assert set(streams) == {"H1", "H2", "C1", "C2"}
     assert _magnitude(streams["H1"].delta_t_contribution) == pytest.approx(4.0)
     assert _magnitude(streams["H1"].heat_transfer_coefficient) == pytest.approx(2.0)
+
+
+def test_percent_placeholder_in_dt_cont_reports_the_bad_cell(tmp_path: Path):
+    # Bjork and Pettersson.xlsb once had a literal "%" in its utilities'
+    # dt_cont; the reader rejects it as non-numeric rather than guessing.
+    directory = _write_csv_directory(tmp_path, stream_columns=7)
+    utilities = directory / "utilities.csv"
+    utilities.write_text(
+        utilities.read_text(encoding="utf-8").replace(",5.0,40.0,", ",%,40.0,"),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=r"Column 'dt_cont' has a non-numeric"):
+        _load(directory)
 
 
 def test_csv_directory_without_dt_cont_and_htc_uses_configured_defaults(

@@ -24,6 +24,13 @@ Result fixes
   with duplicate network structures removed. Before, it sliced
   ``result.ranked_networks``, so rank ``k`` could differ between them.
 
+Example workbooks
+~~~~~~~~~~~~~~~~~
+
+- ``examples/OpenPinchWkbs/Bjork and Pettersson.xlsb`` loads: its Utility
+  Data sheet no longer has a literal ``%`` in ``dt_cont``. Every bundled
+  example workbook now loads.
+
 Engine commands for the tutorials
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
