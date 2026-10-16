@@ -544,6 +544,21 @@ class UtilityLevelPeriodResult(_FrozenContract):
     diagnostics: tuple[CandidateDiagnostic, ...] = ()
 
 
+class UtilityPlacementRetargetRow(_FrozenContract):
+    """One placed utility level beside its duty when the placed case retargets."""
+
+    period_id: _PeriodId
+    side: UtilitySide
+    utility: _Name
+    kind: UtilityLevelKind
+    placement_rank: int
+    supply_temperature: QuantityValue
+    target_temperature: QuantityValue
+    optimizer_duty: QuantityValue
+    retargeted_duty: QuantityValue
+    is_fallback: bool = False
+
+
 class ThermodynamicCostBreakdown(_FrozenContract):
     """Entropy and exergy terms for one result scope."""
 
@@ -666,6 +681,8 @@ class UtilityPlacementResult(_FrozenContract):
     alternatives: tuple[UtilityPlacementCandidate, ...] = ()
     termination: PlacementTermination
     diagnostics: tuple[CandidateDiagnostic, ...] = ()
+    # Each winning period's levels, hot then cold, with the retargeted duty.
+    retarget_comparison: tuple[UtilityPlacementRetargetRow, ...] = ()
 
     @field_validator("period_ids")
     @classmethod
@@ -797,6 +814,7 @@ __all__ = [
     "UtilityPlacementRequest",
     "UtilityPlacementModel",
     "UtilityPlacementResult",
+    "UtilityPlacementRetargetRow",
     "UtilitySide",
     "UtilityTemplateBlueprint",
     "UtilityTemplateSet",

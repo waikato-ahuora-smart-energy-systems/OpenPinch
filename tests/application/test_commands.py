@@ -7,6 +7,7 @@ import json
 import warnings
 from importlib.resources import files
 
+import jsonschema
 import pytest
 
 from OpenPinch.adapters.io.problem_sources import load_packaged_sample_case
@@ -74,6 +75,8 @@ def test_design_command_returns_the_design_result_as_value(monkeypatch):
         "pinch_design",
         lambda self, **_kwargs: HeatExchangerNetworkDesignView(report),
     )
+    # The stand-in result has no networks to view; the view is tested below.
+    monkeypatch.setattr(HeatExchangerNetworkDesignView, "view", lambda self: report)
 
     response = run_command(
         {
@@ -1246,6 +1249,37 @@ def _reject(constant: str):
     raise AssertionError(f"Non-standard JSON constant {constant}")
 
 
+def test_design_command_returns_the_design_view_beside_the_result(monkeypatch):
+    from OpenPinch.contracts.schema import contract_json_schemas
+    from tests.analysis.heat_exchanger_networks.test_design_workflow import (
+        _public_example_payload,
+        _use_fake_default_executor,
+    )
+
+    _use_fake_default_executor(monkeypatch)
+
+    response = run_command(
+        {
+            "command": "design.heat_exchanger_network",
+            "problem": {"data": _public_example_payload()},
+        }
+    )
+
+    view = response["view"]
+    jsonschema.validate(view, contract_json_schemas()["HeatExchangerNetworkView"])
+    assert view["rank"] == 1
+    assert [row["rank"] for row in view["ranking"]] == [1]
+    assert view["total_heat_recovery"] == pytest.approx(
+        sum(
+            state["duty"]
+            for exchanger in response["value"]["network"]["exchangers"]
+            if exchanger["kind"] == "recovery"
+            for state in exchanger["period_states"]
+        ),
+        rel=1e-12,
+    )
+
+
 def _design_reporting_progress(self, **_kwargs):
     progress.emit(
         analysis="hen_synthesis", stage="pinch_design_method", done=0, total=1
@@ -1258,6 +1292,12 @@ def _design_reporting_progress(self, **_kwargs):
 
 def test_progress_callback_receives_json_events_during_a_command(monkeypatch):
     monkeypatch.setattr(_DesignAccessor, "pinch_design", _design_reporting_progress)
+    # The stand-in result has no networks to view; only the progress matters.
+    monkeypatch.setattr(
+        HeatExchangerNetworkDesignView,
+        "view",
+        lambda self: ValidationReport(valid=True, issues=[]),
+    )
     request = {
         "command": "design.pinch_design",
         "problem": {"sample_case": "basic_pinch.json"},
@@ -1277,6 +1317,12 @@ def test_progress_callback_receives_json_events_during_a_command(monkeypatch):
 
 def test_json_text_entry_point_passes_progress_as_json_text(monkeypatch):
     monkeypatch.setattr(_DesignAccessor, "pinch_design", _design_reporting_progress)
+    # The stand-in result has no networks to view; only the progress matters.
+    monkeypatch.setattr(
+        HeatExchangerNetworkDesignView,
+        "view",
+        lambda self: ValidationReport(valid=True, issues=[]),
+    )
     request = {
         "command": "design.pinch_design",
         "problem": {"sample_case": "basic_pinch.json"},

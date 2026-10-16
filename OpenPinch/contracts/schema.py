@@ -15,6 +15,7 @@ from .hpr_performance_map import HprPerformanceMap, HprPerformanceMapRequest
 from .input import TargetInput
 from .output import TargetOutput
 from .synthesis.result import HeatExchangerNetworkSynthesisResult
+from .synthesis.view import HeatExchangerNetworkView
 from .utility_placement import UtilityPlacementResult
 from .workspace import (
     ConfigurationFieldMetadata,
@@ -156,6 +157,7 @@ CONTRACTS: dict[str, tuple[type[BaseModel], str]] = {
         HeatExchangerNetworkSynthesisResult,
         "serialization",
     ),
+    "HeatExchangerNetworkView": (HeatExchangerNetworkView, "serialization"),
 }
 
 
