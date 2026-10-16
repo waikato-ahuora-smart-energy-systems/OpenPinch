@@ -35,6 +35,11 @@ Engine commands for the tutorials
 - New ``PinchWorkspace.to_bundle()`` and ``PinchWorkspace.from_bundle()``
   build and read a workspace bundle in memory; ``save_bundle`` and
   ``load_bundle`` use them.
+- Workspace commands (``workspace.add``, ``workspace.to_bundle`` and the
+  rest) also work on a workspace with no cases yet, such as one opened from
+  an empty bundle.
+- Command responses are strict JSON: NaN and infinities come back as
+  ``null``.
 
 Contract JSON Schema
 ~~~~~~~~~~~~~~~~~~~~
