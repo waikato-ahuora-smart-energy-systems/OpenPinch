@@ -31,6 +31,10 @@ Command layer
   ``{"$session": ...}`` argument) as an ``error`` with type
   ``unknown_session`` and ``details.session``, instead of raising
   ``ValueError``.
+- A heat pump target the engine cannot run, such as a TESPy target without
+  the ``tespy`` extra, returns an ``error`` of type
+  ``HprTargetCompatibilityError`` with ``details.code`` (for example
+  ``dependency_unavailable``) instead of raising.
 
 Example workbooks
 ~~~~~~~~~~~~~~~~~

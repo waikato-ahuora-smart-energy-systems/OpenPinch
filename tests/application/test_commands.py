@@ -653,6 +653,30 @@ def test_heat_pump_targeting_failure_is_returned_as_an_error(monkeypatch):
     assert response["error"]["details"]["status"] == "typed infeasible"
 
 
+def test_missing_tespy_is_returned_as_an_error(monkeypatch):
+    # An engine without the optional extra, such as the browser engine.
+    monkeypatch.setattr(
+        "OpenPinch.analysis.heat_pumps.performance_maps.targeting.find_spec",
+        lambda _name: None,
+    )
+
+    response = run_command(
+        {
+            "command": "target.vapour_compression_heat_pump",
+            "problem": {"sample_case": "basic_pinch.json"},
+            "arguments": {
+                "simulation_backend": "tespy",
+                "condensers": 1,
+                "evaporators": 1,
+            },
+        }
+    )
+
+    assert response["value"] is None
+    assert response["error"]["type"] == "HprTargetCompatibilityError"
+    assert response["error"]["details"] == {"code": "dependency_unavailable"}
+
+
 def test_plot_catalog_lists_the_solved_graphs():
     session = run_command(
         {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}

@@ -13,6 +13,9 @@ from pydantic import BaseModel
 
 from ..adapters.io.file_exports import export_files
 from ..adapters.io.problem_sources import load_packaged_sample_case
+from ..analysis.heat_pumps.performance_maps.targeting import (
+    HprTargetCompatibilityError,
+)
 from ..contracts.hpr import HPRTargetingError
 from ..contracts.reporting import TargetResults
 from ..contracts.workspace import (
@@ -226,9 +229,10 @@ def _results_json(problem: PinchProblem | None) -> Any:
     return None if problem is None else _to_json(problem.results)
 
 
-# Analysis that ran and failed is reported in the response; anything else
-# (a bad request, a bug) raises.
-_ANALYSIS_FAILURES = (HPRTargetingError,)
+# Analysis that ran and failed, or that this engine cannot run (TESPy without
+# the extra), is reported in the response; anything else (a bad request, a
+# bug) raises.
+_ANALYSIS_FAILURES = (HPRTargetingError, HprTargetCompatibilityError)
 
 
 def _error_json(error: Exception) -> dict[str, Any]:
@@ -239,9 +243,11 @@ def _error_json(error: Exception) -> dict[str, Any]:
             "message": str(error),
             "details": {"session": error.session},
         }
-    details = (
-        hpr_failure_summary(error) if isinstance(error, HPRTargetingError) else None
-    )
+    details = None
+    if isinstance(error, HPRTargetingError):
+        details = hpr_failure_summary(error)
+    elif isinstance(error, HprTargetCompatibilityError):
+        details = {"code": error.code}
     return {"type": type(error).__name__, "message": str(error), "details": details}
 
 
