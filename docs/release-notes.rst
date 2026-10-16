@@ -37,7 +37,10 @@ Command layer
   ``dependency_unavailable``) instead of raising.
 - Every ``run_command`` response has a top-level ``warnings`` list of the
   non-fatal issues met while the command ran, each ``{type, message,
-  details}`` like ``error`` (empty when there are none).
+  details}`` like ``error`` (empty when there are none). Input validation
+  warnings come one per issue, with type ``validation`` and the
+  ``ValidationIssue`` as ``details``; the library raises them as an
+  ``InputValidationWarning`` (a ``UserWarning``) carrying its ``issues``.
 
 Example workbooks
 ~~~~~~~~~~~~~~~~~

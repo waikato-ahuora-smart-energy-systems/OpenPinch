@@ -28,7 +28,10 @@ from ..domain.targets import BaseTargetModel
 from ..presentation.reporting.hpr import hpr_failure_summary
 from ..presentation.reporting.results import serialize_target
 from ._problem.accessors.design import HeatExchangerNetworkDesignView
-from ._problem.input.validation import build_validation_report
+from ._problem.input.validation import (
+    InputValidationWarning,
+    build_validation_report,
+)
 from .problem import PinchProblem
 from .workspace import PinchWorkspace
 
@@ -132,13 +135,28 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
 
 def _warnings_json(caught: list[warnings.WarningMessage]) -> list[dict[str, Any]]:
     """Each distinct warning once, as ``{type, message, details}``."""
-    reported = []
+    entries = []
     for warning in caught:
-        entry = {
-            "type": warning.category.__name__,
-            "message": str(warning.message),
-            "details": None,
-        }
+        if isinstance(warning.message, InputValidationWarning):
+            # One entry per issue, with its path, rather than one summary.
+            entries.extend(
+                {
+                    "type": "validation",
+                    "message": issue.message,
+                    "details": issue.model_dump(mode="json"),
+                }
+                for issue in warning.message.issues
+            )
+        else:
+            entries.append(
+                {
+                    "type": warning.category.__name__,
+                    "message": str(warning.message),
+                    "details": None,
+                }
+            )
+    reported = []
+    for entry in entries:
         if entry not in reported:
             reported.append(entry)
     return reported

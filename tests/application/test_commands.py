@@ -9,6 +9,7 @@ from importlib.resources import files
 
 import pytest
 
+from OpenPinch.adapters.io.problem_sources import load_packaged_sample_case
 from OpenPinch.application._problem.accessors.design import (
     HeatExchangerNetworkDesignView,
     _DesignAccessor,
@@ -1032,6 +1033,18 @@ def test_warnings_raised_by_a_command_are_returned(monkeypatch):
             "details": None,
         }
     ]
+
+
+def test_validation_warnings_are_returned_one_per_issue():
+    data = load_packaged_sample_case("basic_pinch.json")
+    data["streams"][0]["dt_cont"] = {"value": -1.0, "unit": "delta_degC"}
+
+    response = run_command({"command": "to_problem_json", "problem": {"data": data}})
+
+    [warning] = response["warnings"]
+    assert warning["type"] == "validation"
+    assert warning["details"]["path"] == "streams[0].dt_cont"
+    assert warning["message"] == warning["details"]["message"]
 
 
 def test_non_finite_numbers_are_returned_as_null_so_the_json_is_strict(monkeypatch):
