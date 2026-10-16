@@ -15,11 +15,16 @@ from ..adapters.io.file_exports import export_files
 from ..adapters.io.problem_sources import load_packaged_sample_case
 from ..contracts.hpr import HPRTargetingError
 from ..contracts.reporting import TargetResults
-from ..contracts.workspace import PinchWorkspaceBundle
+from ..contracts.workspace import (
+    PinchWorkspaceBundle,
+    ValidationIssue,
+    ValidationReport,
+)
 from ..domain.targets import BaseTargetModel
 from ..presentation.reporting.hpr import hpr_failure_summary
 from ..presentation.reporting.results import serialize_target
 from ._problem.accessors.design import HeatExchangerNetworkDesignView
+from ._problem.input.validation import build_validation_report
 from .problem import PinchProblem
 from .workspace import PinchWorkspace
 
@@ -72,7 +77,8 @@ def run_command(request: Mapping[str, Any]) -> dict[str, Any]:
 
     ``request`` has ``command`` (``"target.<method>"``, ``"design.<method>"``,
     a deeper path such as ``"target.all_periods.<method>"``, or a problem
-    command: ``validate``, ``to_problem_json``, ``streams``, ``report``,
+    command: ``validate``, ``to_problem_json``, ``streams``, ``load`` (input,
+    prepared streams and zone tree), ``report``,
     ``compare``, ``residual_utility``, ``with_utilities_from``,
     ``plot_catalog``, ``export.excel`` / ``export.plots`` (files as base64)
     and ``components.add_process_mvr`` / ``inventory`` / ``activate`` /
@@ -144,7 +150,13 @@ def _run(request: Mapping[str, Any]) -> dict[str, Any]:
     elif session is not None:
         problem = session.case(request.get("case"))
     else:
-        problem = _load_problem(request["problem"])
+        try:
+            problem = _load_problem(request["problem"])
+        except ValueError as error:
+            data = request["problem"].get("data")
+            if command != "validate" or not isinstance(data, Mapping):
+                raise
+            return {"value": _invalid_input_report(data, error), "results": None}
     handler = _PROBLEM_COMMANDS.get(command)
     owner: Any = problem
     if workspace_command:
@@ -233,11 +245,48 @@ def _validate(problem: PinchProblem) -> dict[str, Any]:
     }
 
 
+def _invalid_input_report(data: Mapping[str, Any], error: ValueError) -> dict[str, Any]:
+    """The validation report of inline input that would not load.
+
+    Built from the input alone, never by constructing the problem again.
+    Input the report passes but construction rejects (an unknown zone type,
+    for example) is reported with the construction error as its issue.
+    """
+    report = build_validation_report(dict(data))
+    if report.valid:
+        report = ValidationReport(
+            valid=False,
+            issues=[ValidationIssue(severity="error", path="", message=str(error))],
+        )
+    return {"input": None, "report": report.model_dump(mode="json")}
+
+
 def _streams(problem: PinchProblem) -> dict[str, Any]:
     """The prepared streams and utilities, one row per segment."""
     return {
         name: getattr(problem, name).to_dict(expand_segments=True)
         for name in ("hot_streams", "cold_streams", "hot_utilities", "cold_utilities")
+    }
+
+
+def _load(problem: PinchProblem) -> dict[str, Any]:
+    """The problem input, its prepared streams and utilities, and its zone tree."""
+    return {
+        "input": problem.to_problem_json(),
+        "streams": _streams(problem),
+        "zones": _zone_json(problem.master_zone),
+    }
+
+
+def _zone_json(zone: Any) -> dict[str, Any]:
+    """A prepared zone with its process streams by name and its subzones."""
+    return {
+        "name": zone.name,
+        "type": zone.type,
+        "address": zone.address,
+        "hot_streams": [stream.name for stream in zone.hot_streams],
+        "cold_streams": [stream.name for stream in zone.cold_streams],
+        "subzones": [_zone_json(subzone) for subzone in zone.subzones.values()],
     }
 
 
@@ -366,6 +415,7 @@ _PROBLEM_COMMANDS = {
     "components.deactivate": _deactivate,
     "report": _report,
     "streams": _streams,
+    "load": _load,
     "to_problem_json": PinchProblem.to_problem_json,
 }
 

@@ -367,6 +367,35 @@ def test_validate_returns_the_normalised_input_and_the_report():
     assert value["input"]["streams"]
 
 
+def test_validate_reports_invalid_inline_input_instead_of_raising():
+    data = json.loads(
+        (files(sample_cases) / "basic_pinch.json").read_text(encoding="utf-8")
+    )
+    data["streams"][0]["t_supply"] = "warm"
+
+    response = run_command({"command": "validate", "problem": {"data": data}})
+
+    assert response["value"]["input"] is None
+    report = response["value"]["report"]
+    assert report["valid"] is False
+    assert report["issues"][0]["path"].startswith("streams[0].t_supply")
+
+
+def test_validate_reports_input_that_passes_the_schema_but_cannot_be_built():
+    # A zone type the schema accepts as text but problem construction rejects.
+    data = json.loads(
+        (files(sample_cases) / "basic_pinch.json").read_text(encoding="utf-8")
+    )
+    data["zone_tree"] = {"name": "Site", "type": "Bogus"}
+
+    response = run_command({"command": "validate", "problem": {"data": data}})
+
+    report = response["value"]["report"]
+    assert response["value"]["input"] is None
+    assert report["valid"] is False
+    assert "Zone name and type" in report["issues"][0]["message"]
+
+
 def test_to_problem_json_returns_the_problem_input():
     value = run_command(
         {"command": "to_problem_json", "problem": {"sample_case": "basic_pinch.json"}}
@@ -386,6 +415,27 @@ def test_streams_returns_prepared_streams_and_utilities_with_segments():
         "cold_streams",
         "hot_utilities",
         "cold_utilities",
+    }
+
+
+def test_load_returns_the_input_prepared_streams_and_zone_tree():
+    value = run_command(
+        {"command": "load", "problem": {"sample_case": "zonal_site.json"}}
+    )["value"]
+
+    assert PinchProblem(value["input"]).to_problem_json() == value["input"]
+    assert value["streams"]["hot_utilities"]["segment_index"]
+    site = value["zones"]
+    assert (site["name"], site["type"], site["address"]) == ("Site", "Site", "Site")
+    plant = site["subzones"][0]
+    assert plant["address"] == "Site/Chemical Plant[S]"
+    assert plant["subzones"][0] == {
+        "name": "O1",
+        "type": "Unit Operation",
+        "address": "Site/Chemical Plant[S]/O1",
+        "hot_streams": ["A1"],
+        "cold_streams": [],
+        "subzones": [],
     }
 
 
