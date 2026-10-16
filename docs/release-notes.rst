@@ -38,6 +38,9 @@ Engine commands for the tutorials
 - ``validate`` on invalid inline input returns ``{"input": null, "report":
   ...}`` with the ``ValidationReport`` issues instead of raising
   ``ValueError``. Other commands still raise on invalid input.
+- ``ValidationReport`` gives one issue for a bad value field such as
+  ``t_supply``, from the value form its input has (number, ``value`` or
+  ``values``), instead of one issue per form.
 
 Contract JSON Schema
 ~~~~~~~~~~~~~~~~~~~~
