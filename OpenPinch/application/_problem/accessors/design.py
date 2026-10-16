@@ -12,6 +12,7 @@ from ..arguments import (
 
 if TYPE_CHECKING:
     from ....contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
+    from ....contracts.synthesis.view import HeatExchangerNetworkGridLayout
     from ....domain.heat_exchanger_network import HeatExchangerNetwork
     from ...problem import PinchProblem
 
@@ -79,6 +80,17 @@ class HeatExchangerNetworkDesignView:
             period_id=period_id,
             temperature_scaled=temperature_scaled,
         )
+
+    def grid_layout(
+        self,
+        *,
+        rank: int = 1,
+        period_id: str | None = None,
+    ) -> "HeatExchangerNetworkGridLayout":
+        """Return one ranked network's grid topology as data (no plotting)."""
+        from ....presentation.network_grid.layout import build_grid_layout
+
+        return build_grid_layout(self.network(rank=rank), period_id=period_id)
 
     @property
     def total_heat_recovery(self) -> float:
