@@ -9,6 +9,7 @@ from functools import lru_cache
 from types import SimpleNamespace
 
 import numpy as np
+import openpyxl
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -1271,35 +1272,7 @@ def test_optimizer_evidence_exactly_matches_ordinary_retargeted_utility_duties(
 
 
 def test_returned_case_retargets_exact_duties_in_every_selected_period() -> None:
-    source = {
-        "streams": [
-            {
-                "zone": "Site/AreaA",
-                "name": "HotA",
-                "t_supply": {"values": [200.0, 220.0], "unit": "degC"},
-                "t_target": {"values": [80.0, 100.0], "unit": "degC"},
-                "heat_flow": {"values": [120.0, 160.0], "unit": "kW"},
-                "dt_cont": 10.0,
-                "htc": 1.0,
-            },
-            {
-                "zone": "Site/AreaA",
-                "name": "ColdA",
-                "t_supply": {"values": [20.0, 30.0], "unit": "degC"},
-                "t_target": {"values": [160.0, 180.0], "unit": "degC"},
-                "heat_flow": {"values": [180.0, 240.0], "unit": "kW"},
-                "dt_cont": 10.0,
-                "htc": 1.0,
-            },
-        ],
-        "utilities": [],
-        "zone_tree": {
-            "name": "Site",
-            "type": "Site",
-            "children": [{"name": "AreaA", "type": "Process Zone"}],
-        },
-        "options": {"PROBLEM_PERIOD_IDS": ["base", "peak"]},
-    }
+    source = _two_period_area_source()
     problem = PinchProblem(source, project_name="Site")
     optimized_case = problem.target.utility_placement(
         isothermal=2,
@@ -1661,3 +1634,56 @@ def test_shared_total_site_solution_is_copy_isolated(
     assert source.to_problem_json() == before
     assert source.utility_placement_result.model_dump(mode="json") == before_result
     assert second.to_problem_json() == before
+
+
+def test_returned_case_exports_each_selected_period_problem_tables(tmp_path) -> None:
+    source = _two_period_area_source()
+    problem = PinchProblem(source, project_name="Site")
+    optimized_case = problem.target.utility_placement(
+        isothermal=2,
+        zone="AreaA",
+        maximum_duties={"hot_iso_1": 10.0, "hot_iso_2": 10.0},
+        options=_tiny_options(),
+    )
+
+    path = optimized_case.export_excel(tmp_path, include_periods=True)
+
+    workbook = openpyxl.load_workbook(path, read_only=True)
+    try:
+        sheet_names = workbook.sheetnames
+    finally:
+        workbook.close()
+    for period_id in optimized_case.period_ids:
+        assert any(name.startswith(f"_{period_id}_ ") for name in sheet_names)
+
+
+def _two_period_area_source() -> dict:
+    return {
+        "streams": [
+            {
+                "zone": "Site/AreaA",
+                "name": "HotA",
+                "t_supply": {"values": [200.0, 220.0], "unit": "degC"},
+                "t_target": {"values": [80.0, 100.0], "unit": "degC"},
+                "heat_flow": {"values": [120.0, 160.0], "unit": "kW"},
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            },
+            {
+                "zone": "Site/AreaA",
+                "name": "ColdA",
+                "t_supply": {"values": [20.0, 30.0], "unit": "degC"},
+                "t_target": {"values": [160.0, 180.0], "unit": "degC"},
+                "heat_flow": {"values": [180.0, 240.0], "unit": "kW"},
+                "dt_cont": 10.0,
+                "htc": 1.0,
+            },
+        ],
+        "utilities": [],
+        "zone_tree": {
+            "name": "Site",
+            "type": "Site",
+            "children": [{"name": "AreaA", "type": "Process Zone"}],
+        },
+        "options": {"PROBLEM_PERIOD_IDS": ["base", "peak"]},
+    }

@@ -1084,7 +1084,10 @@ def _finalize_placement_case(problem, result):
                     )
         outputs[period.period_id] = deepcopy(problem._results)
     problem._period_results = outputs
-    problem._period_result_states = {}
+    # Each retarget above retained its period's solved state.
+    problem._period_result_states = {
+        period_id: problem._period_states[period_id] for period_id in outputs
+    }
 
 
 def run_problem_utility_placement(
