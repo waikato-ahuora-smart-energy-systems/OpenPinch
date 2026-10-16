@@ -13,7 +13,10 @@ from uuid import uuid4
 from pydantic import BaseModel
 
 from ..adapters.io.file_exports import export_files
-from ..adapters.io.problem_sources import load_packaged_sample_case
+from ..adapters.io.problem_sources import (
+    load_packaged_sample_case,
+    load_problem_source_from_files,
+)
 from ..analysis.heat_pumps.performance_maps.targeting import (
     HprTargetCompatibilityError,
 )
@@ -213,6 +216,8 @@ def _finite(value: Any) -> Any:
 
 def _run(request: Mapping[str, Any]) -> dict[str, Any]:
     command = request["command"]
+    if command == "import":
+        return {"value": _import(**request.get("arguments", {})), "results": None}
     if command == "open":
         if "workspace" in request:
             workspace = _load_workspace(request["workspace"])
@@ -336,6 +341,16 @@ def _accessor_method(problem: PinchProblem, command: str) -> Any:
     if not callable(method):
         raise ValueError(f"Unknown command {command!r}.")
     return method
+
+
+def _import(files: list[Mapping[str, str]]) -> dict[str, Any]:
+    """Problem data read from file contents, without building the problem."""
+    source = load_problem_source_from_files(files)
+    return {
+        "data": source.input_data,
+        "source_kind": source.source_kind,
+        "project_name": source.project_name,
+    }
 
 
 def _options(problem: PinchProblem) -> dict[str, Any]:

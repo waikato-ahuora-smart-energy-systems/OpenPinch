@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import base64
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 from ...resources import list_sample_cases, read_sample_case
@@ -85,6 +88,27 @@ def load_external_problem_source(
         "a directory with 'streams.csv' and 'utilities.csv', "
         "or a (streams, utilities) tuple."
     )
+
+
+def load_problem_source_from_files(
+    files: Sequence[Mapping[str, str]],
+) -> ExternalProblemSource:
+    """Read a problem from file contents, each with its ``role``.
+
+    A ``problem`` file (JSON or a workbook, by suffix), or a ``streams`` and a
+    ``utilities`` CSV file. Each file is ``{name, role, content_base64}``. The
+    readers choose the format by suffix, so the files are written under their
+    base names to a private temporary directory, removed afterwards.
+    """
+    with TemporaryDirectory() as directory:
+        paths: dict[str, Path] = {}
+        for file in files:
+            path = Path(directory) / Path(file["name"]).name
+            path.write_bytes(base64.b64decode(file["content_base64"]))
+            paths[file["role"]] = path
+        return load_external_problem_source(
+            (paths["streams"], paths["utilities"]), current_project_name="Untitled"
+        )
 
 
 def load_packaged_sample_case(name: str) -> JsonDict:

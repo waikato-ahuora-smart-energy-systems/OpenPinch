@@ -430,6 +430,45 @@ def test_options_returns_fields_effective_values_and_options_set():
     assert value["set"] == {"THERMAL_DT_CONT": 5.0}
 
 
+_STREAMS_CSV = """Zone,Stream,Ts,Tt,Q,dTcont,HTC
+,,degC,degC,kW,degC,kW/m^2/degC
+Plant,H1,180.0,60.0,240.0,4.0,2.0
+Plant,C1,20.0,135.0,230.0,4.0,2.0
+"""
+_UTILITIES_CSV = """Utility,Type,Ts,Tt,dTcont,Price,HTC,Q
+,,degC,degC,degC,$/MWh,kW/m^2/degC,kW
+HP Steam,Hot,250.0,249.0,5.0,40.0,1.0,
+Cooling Water,Cold,15.0,25.0,5.0,5.0,1.0,
+"""
+
+
+def _file(name: str, text: str, role: str) -> dict[str, str]:
+    content = base64.b64encode(text.encode()).decode("ascii")
+    return {"name": name, "role": role, "content_base64": content}
+
+
+def test_import_reads_csv_files_by_their_named_roles():
+    # Neither name says which table it is: the roles do.
+    value = run_command(
+        {
+            "command": "import",
+            "arguments": {
+                "files": [
+                    _file("a.csv", _UTILITIES_CSV, "utilities"),
+                    _file("b.csv", _STREAMS_CSV, "streams"),
+                ]
+            },
+        }
+    )["value"]
+
+    assert value["source_kind"] == "csv"
+    assert [stream["name"] for stream in value["data"]["streams"]] == ["H1", "C1"]
+    assert [utility["name"] for utility in value["data"]["utilities"]] == [
+        "HP Steam",
+        "Cooling Water",
+    ]
+
+
 def test_to_problem_json_returns_the_problem_input():
     value = run_command(
         {"command": "to_problem_json", "problem": {"sample_case": "basic_pinch.json"}}
