@@ -38,10 +38,18 @@ class HeatExchangerNetworkDesignView:
         return self.result.network
 
     def top(self, n: int):
-        """Return the first ``n`` ranked successful outcomes."""
+        """Return the first ``n`` ranked successful outcomes.
+
+        Uses the same ranking as ``network(rank=)`` and ``grid(rank=)``, so
+        ``top(n)[k - 1]`` is the network at rank ``k``.
+        """
         if isinstance(n, bool) or not isinstance(n, int) or n < 1:
             raise ValueError("n must be a positive integer.")
-        return self.result.ranked_networks[:n]
+        from ....analysis.heat_exchanger_networks.results.selection import (
+            ranked_networks,
+        )
+
+        return ranked_networks(self.result, n)
 
     def network(self, *, rank: int = 1) -> "HeatExchangerNetwork":
         """Return one ranked network using a one-based rank."""
