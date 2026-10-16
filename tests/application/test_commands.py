@@ -381,6 +381,21 @@ def test_validate_reports_invalid_inline_input_instead_of_raising():
     assert report["issues"][0]["path"].startswith("streams[0].t_supply")
 
 
+def test_validate_reports_input_that_passes_the_schema_but_cannot_be_built():
+    # A zone type the schema accepts as text but problem construction rejects.
+    data = json.loads(
+        (files(sample_cases) / "basic_pinch.json").read_text(encoding="utf-8")
+    )
+    data["zone_tree"] = {"name": "Site", "type": "Bogus"}
+
+    response = run_command({"command": "validate", "problem": {"data": data}})
+
+    report = response["value"]["report"]
+    assert response["value"]["input"] is None
+    assert report["valid"] is False
+    assert "Zone name and type" in report["issues"][0]["message"]
+
+
 def test_to_problem_json_returns_the_problem_input():
     value = run_command(
         {"command": "to_problem_json", "problem": {"sample_case": "basic_pinch.json"}}

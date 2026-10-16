@@ -15,11 +15,16 @@ from ..adapters.io.file_exports import export_files
 from ..adapters.io.problem_sources import load_packaged_sample_case
 from ..contracts.hpr import HPRTargetingError
 from ..contracts.reporting import TargetResults
-from ..contracts.workspace import PinchWorkspaceBundle
+from ..contracts.workspace import (
+    PinchWorkspaceBundle,
+    ValidationIssue,
+    ValidationReport,
+)
 from ..domain.targets import BaseTargetModel
 from ..presentation.reporting.hpr import hpr_failure_summary
 from ..presentation.reporting.results import serialize_target
 from ._problem.accessors.design import HeatExchangerNetworkDesignView
+from ._problem.input.validation import build_validation_report
 from .problem import PinchProblem
 from .workspace import PinchWorkspace
 
@@ -147,11 +152,11 @@ def _run(request: Mapping[str, Any]) -> dict[str, Any]:
     else:
         try:
             problem = _load_problem(request["problem"])
-        except ValueError:
+        except ValueError as error:
             data = request["problem"].get("data")
             if command != "validate" or not isinstance(data, Mapping):
                 raise
-            return {"value": _invalid_input_report(data), "results": None}
+            return {"value": _invalid_input_report(data, error), "results": None}
     handler = _PROBLEM_COMMANDS.get(command)
     owner: Any = problem
     if workspace_command:
@@ -240,11 +245,19 @@ def _validate(problem: PinchProblem) -> dict[str, Any]:
     }
 
 
-def _invalid_input_report(data: Mapping[str, Any]) -> dict[str, Any]:
-    """The validation report of inline input that would not load."""
-    workspace = PinchWorkspace()
-    workspace.load(dict(data), case_name="input")
-    report = workspace.validation_report("input")
+def _invalid_input_report(data: Mapping[str, Any], error: ValueError) -> dict[str, Any]:
+    """The validation report of inline input that would not load.
+
+    Built from the input alone, never by constructing the problem again.
+    Input the report passes but construction rejects (an unknown zone type,
+    for example) is reported with the construction error as its issue.
+    """
+    report = build_validation_report(dict(data))
+    if report.valid:
+        report = ValidationReport(
+            valid=False,
+            issues=[ValidationIssue(severity="error", path="", message=str(error))],
+        )
     return {"input": None, "report": report.model_dump(mode="json")}
 
 
