@@ -132,6 +132,7 @@ class _AllPeriodsTargetAccessor:
         detached = deepcopy(outputs)
         problem._period_results = outputs
         problem._period_states = states
+        problem._period_result_states = dict(states)
         return detached
 
     def heat_recovery_dt_min(

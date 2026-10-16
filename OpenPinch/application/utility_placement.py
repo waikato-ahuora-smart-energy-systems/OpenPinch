@@ -951,6 +951,7 @@ class _ExactTargetReplayAdapter:
         candidate._results = None
         candidate._last_target_run_spec = None
         candidate._period_results = {}
+        candidate._period_result_states = {}
         candidate._utility_placement_result = None
         candidate._process_components = {}
 
@@ -1083,6 +1084,10 @@ def _finalize_placement_case(problem, result):
                     )
         outputs[period.period_id] = deepcopy(problem._results)
     problem._period_results = outputs
+    # Each retarget above retained its period's solved state.
+    problem._period_result_states = {
+        period_id: problem._period_states[period_id] for period_id in outputs
+    }
 
 
 def run_problem_utility_placement(
