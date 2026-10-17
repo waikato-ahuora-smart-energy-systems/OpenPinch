@@ -69,7 +69,14 @@ def clean_composite_curve(
                 y_clean.append(y2)
         else:
             interpolated = y1 + (y3 - y1) * (x2 - x1) / (x3 - x1)
-            if abs(y2 - interpolated) > tol:
+            off_line = abs(y2 - interpolated)
+            if y3 != y1:
+                # On a steep segment the temperature residual divides by a
+                # tiny duty span, so an ulp in a duty can cross tol; the heat
+                # flow residual does not.
+                interpolated_x = x1 + (x3 - x1) * (y2 - y1) / (y3 - y1)
+                off_line = min(off_line, abs(x2 - interpolated_x))
+            if off_line > tol:
                 x_clean.append(x2)
                 y_clean.append(y2)
     x_clean.append(x_vals[-1])

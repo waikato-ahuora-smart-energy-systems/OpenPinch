@@ -4,6 +4,295 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Tutorials
+~~~~~~~~~
+
+- Tutorial 15 asks ``design.utility()`` for its case's hot utility by its
+  name, ``HPS``. It asked for ``HP Steam``, which used to answer 0 and now
+  raises as an unknown utility, so the notebook stopped running.
+
+Result fixes
+~~~~~~~~~~~~
+
+- ``export_excel(include_periods=True)`` writes each period's problem tables
+  from the all-periods run that produced the exported results. Before, a later
+  single-period run replaced that period's tables, so the workbook mixed the
+  batch's summary with the later run's tables.
+- In ``target.all_periods.<method>`` (and a single-period target on a
+  multiperiod problem) each target's utilities now carry that period's duty as
+  a scalar. Before, each utility gave an array over all periods in which only
+  the target's own entry was set.
+- After ``target.all_periods.<method>`` with no single-period run,
+  ``plot.data()``, ``plot.catalog()``, the plot methods and the plot exports
+  read the graphs of every period's result. The catalogue gains a
+  ``Period ID`` column, and the graph data is keyed ``"<graph set> [<period>]"``.
+- A single-period ``target.<method>`` run no longer discards the last
+  all-periods results, so ``report(include_periods=True)`` and the weighted
+  summaries still work after it. Changing the problem's input still clears
+  them.
+- ``design.top(n)`` uses the same ranking as ``design.network(rank=)`` and
+  ``design.grid(rank=)``: successful, feasible outcomes of the accepted method
+  with duplicate network structures removed. Before, it sliced
+  ``result.ranked_networks``, so rank ``k`` could differ between them.
+
+Fuller results
+~~~~~~~~~~~~~~
+
+- Heat pump and refrigeration target rows (``TargetResults``) carry the values
+  of ``hpr_summary``: ``hpr_selected_load`` and ``hpr_achieved_load`` (kW),
+  ``hpr_objective``, and for a shared multi-period design
+  ``hpr_design_vector``, ``hpr_period_ids``, ``hpr_period_weights``,
+  ``hpr_period_success`` (by period) and ``hpr_weighted_objective``.
+
+- ``summary_frame()`` and ``report().metrics`` include ``Area``, ``Units``,
+  ``Capital Cost``, ``Total Cost``, ``ETE``, ``Exergy Sources``,
+  ``Exergy Sinks``, ``Min Exergy Requirement`` and ``Min Exergy Destruction``
+  once the area and cost or exergy targets have run. Without those targets
+  the columns and metrics are unchanged.
+
+- ``utility_placement_result.retarget_comparison`` lists each placed utility
+  level of the winning periods (``UtilityPlacementRetargetRow``: period,
+  side, utility, kind, placement rank, supply and target temperatures,
+  ``optimizer_duty``, ``retargeted_duty`` and ``is_fallback``), so the
+  optimiser's allocation and the placed case's retargeted duty sit side by
+  side. Results recorded before have an empty table.
+
+- The HEN design view gains ``view(rank=, period_id=)``, a
+  ``HeatExchangerNetworkView`` with the duplicate-free ranking table (rank,
+  method, status, objective, total annual cost, unit count and duty totals,
+  as ``top(n)`` ranks them), one ranked network's totals and utility duties,
+  and its grid layout; and ``grid_layout(rank=, period_id=)``, the grid
+  diagram's stream rows, stages, matches (with duties and temperatures) and
+  branch counts as data, without plotly. ``run_command`` returns the view as
+  ``view`` beside ``value`` for ``design.*`` commands, and the contract is in
+  ``contract_json_schemas()``.
+
+Command layer
+~~~~~~~~~~~~~
+
+- ``run_command`` reports a session it does not hold (in ``session`` or a
+  ``{"$session": ...}`` argument) as an ``error`` with type
+  ``unknown_session`` and ``details.session``, instead of raising
+  ``ValueError``.
+- A heat pump target the engine cannot run, such as a TESPy target without
+  the ``tespy`` extra, returns an ``error`` of type
+  ``HprTargetCompatibilityError`` with ``details.code`` (for example
+  ``dependency_unavailable``) instead of raising.
+- Every ``run_command`` response has a top-level ``warnings`` list of the
+  non-fatal issues met while the command ran, each ``{type, message,
+  details}`` like ``error`` (empty when there are none). Input validation
+  warnings come one per issue, with type ``validation`` and the
+  ``ValidationIssue`` as ``details``; the library raises them as an
+  ``InputValidationWarning`` (a ``UserWarning``) carrying its ``issues``.
+  Loading a problem that gives no hot or no cold utility adds a
+  ``default_utility`` warning (``details``: ``name`` and ``kind``) for each
+  default utility added.
+- ``contract_json_schemas()`` defines ``Value`` and ``StreamCollection`` once
+  under ``$defs`` and refers to them, so generated client types have one
+  ``Value`` and one ``StreamCollection`` type.
+- ``PinchWorkspaceBundle`` has an optional ``active_case``:
+  ``to_bundle()`` records the active case and ``from_bundle()`` activates it
+  (the default case when it is absent). A bundle that names an active case
+  it does not hold is rejected. Releases before this one reject bundles that
+  carry ``active_case``.
+- ``PinchWorkspace.set_case_input(case_name, source)`` and the
+  ``workspace.set_case_input`` command replace an existing case's input and
+  return its validation report. The session and the other cases' results are
+  kept.
+- ``ConfigurationFieldMetadata`` gives each field's ``unit``,
+  ``description`` and ``default``, and ``label`` is a display name such as
+  "Minimum contribution temperature difference" rather than the title-cased
+  field name.
+- An ``options`` command returns the editable configuration fields
+  (``fields``), the case's effective values (``values``) and the options its
+  input sets (``set``), so an editor can tell an option set to its default
+  from one left unset.
+- An ``import`` command reads problem data from file contents (base64), each
+  file with its ``role``: one ``problem`` file (JSON or a workbook) or a
+  ``streams`` and a ``utilities`` CSV file. It returns the data, its source
+  kind and project name without building the problem, so invalid data can
+  still be edited. ``load_problem_source_from_files`` is the adapter behind it.
+- ``plot.export``, ``plot.export_gallery`` and the ``export.plots`` command
+  take ``include_plotlyjs``: ``True`` (embedded, the default), ``"cdn"``, or
+  ``"directory"`` for one shared ``plotly.min.js`` beside the files.
+- ``plot.catalog()`` (and the ``plot_catalog`` command) has a
+  ``Plot Method`` column: the ``problem.plot`` method, and ``export.plots``
+  ``plot`` name, that draws each graph (empty for graph types no method
+  draws).
+- ``design.utility(name)`` takes the problem's utility name (``"HPS"``) as
+  well as the network's stream name (``"Hot Utility.HPS"``); before, the
+  utility's own name answered 0. A name that is not one of the problem's
+  utilities raises ``ValueError`` instead of answering 0, as does a name
+  shared by a hot and a cold utility (ask for ``"Hot Utility.<name>"`` or
+  ``"Cold Utility.<name>"``).
+- ``design.multiperiod_heat_exchanger_network(prerequisites=True)`` runs
+  ``target.all_periods.all_heat_integration()`` first when the problem has
+  no all-period targets, so a fresh problem (or a session-less command) can
+  run it. Without the argument it still asks for the targets first.
+
+Progress reports
+~~~~~~~~~~~~~~~~
+
+- Heat pump targeting, utility placement and HEN synthesis report progress
+  while they run. ``run_command(request, progress=callback)`` calls
+  ``callback`` with each report as JSON-ready data: ``analysis``, ``stage``,
+  ``message``, ``done`` of ``total`` ``unit``, ``best_objective`` (and the
+  ``objective`` it measures), ``elapsed`` seconds and ``scope`` (the period
+  of an all-periods run). ``run_command_json(request, progress)`` passes
+  each report as JSON text. Reports come at most every 0.25 s per stage.
+- Heat pump targeting reports warm starts, multistart runs finished of the
+  multistart count (with the evaluations so far) and the ranked candidates
+  checked. Utility placement reports evaluations of the evaluation limit in
+  its search and polish, then the candidates replayed. HEN synthesis reports
+  tasks solved of each method stage's tasks and the lowest total annual cost
+  so far. Work in worker processes is counted when its batch returns.
+- An exception the callback raises cancels the command: it propagates from
+  ``run_command`` unchanged and leaves the session as it was.
+- In Python, ``OpenPinch.domain.progress.reporting(callback)`` receives the
+  same reports as ``Progress`` objects for any analysis run inside it.
+
+Example workbooks
+~~~~~~~~~~~~~~~~~
+
+- ``examples/OpenPinchWkbs/Bjork and Pettersson.xlsb`` loads: its Utility
+  Data sheet no longer has a literal ``%`` in ``dt_cont``. Every bundled
+  example workbook now loads.
+
+Engine commands for the tutorials
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``run_command`` gains problem commands: ``validate`` (normalised input and
+  ``ValidationReport``), ``to_problem_json``, ``streams`` (prepared streams
+  and utilities, one row per segment), ``report`` (metrics, ``ProblemReport``
+  and the summary table, with period and weighted-average rows),
+  ``compare``, ``residual_utility``, ``with_utilities_from`` and
+  ``components.add_process_mvr`` / ``inventory`` / ``activate`` /
+  ``deactivate`` for process MVR components in a session.
+- A request's problem can carry ``project_name``. A second problem is passed
+  as ``{"$session": <id>}``.
+- A returned case (utility placement) also carries its retargeted
+  ``results`` and its ``utility_placement_result`` evidence.
+- Heat pump targeting failures (``HPRTargetingError``) come back as
+  ``error`` with the ``hpr_failure_summary`` details instead of raising.
+- HEN ``thermal_derivative`` and ``network_evolution`` accept seed networks as
+  JSON, as returned in a design result: one network or a list of them.
+  Synthesised networks now also record the solver approach temperature in
+  ``summary_metrics["approach_temperature"]``, so a JSON seed runs its seeded
+  tasks at the approach it was solved at.
+- Workspace sessions: ``open`` with ``workspace`` (a baseline problem or a
+  bundle), ``case`` to pick the case a command runs on, and
+  ``workspace.scenario`` / ``use_case`` / ``update_options`` /
+  ``set_dt_cont_multiplier`` / ``add`` / ``compare_cases`` / ``to_bundle`` /
+  ``batch`` (one command on each case, with per-case errors).
+- ``plot_catalog``, and ``export.excel`` / ``export.plots`` returning the
+  written files as base64; files go to a private temporary directory.
+- New ``PinchWorkspace.to_bundle()`` and ``PinchWorkspace.from_bundle()``
+  build and read a workspace bundle in memory; ``save_bundle`` and
+  ``load_bundle`` use them.
+- Workspace commands (``workspace.add``, ``workspace.to_bundle`` and the
+  rest) also work on a workspace with no cases yet, such as one opened from
+  an empty bundle.
+- Command responses are strict JSON: NaN and infinities come back as
+  ``null``.
+- ``validate`` on invalid inline input returns ``{"input": null, "report":
+  ...}`` with the ``ValidationReport`` issues instead of raising
+  ``ValueError``. Other commands still raise on invalid input.
+- ``ValidationReport`` gives one issue for a bad value field such as
+  ``t_supply``, from the value form its input has (number, ``value`` or
+  ``values``), instead of one issue per form.
+- ``load`` returns the prepared problem: its ``input`` (a sample case's
+  ``TargetInput`` too), its ``streams`` (as the ``streams`` command) and its
+  ``zones`` tree, each zone with its address, type, process streams by name
+  and subzones.
+
+Contract JSON Schema
+~~~~~~~~~~~~~~~~~~~~
+
+- New ``OpenPinch.contracts.schema.contract_json_schemas()`` returns the JSON
+  Schema of each public contract (``TargetInput``, ``TargetOutput``,
+  ``PinchWorkspaceBundle``, the HPR performance map, utility placement,
+  dt_min and network synthesis results), so typed clients such as a
+  TypeScript frontend can be generated from them. Inputs use the validation
+  schema and results the serialisation schema; ``Value`` is described by its
+  JSON form (scalar or per-period values with a unit).
+- New ``openpinch schema -o DIR`` writes one ``<Contract>.schema.json`` file
+  per contract.
+- The stream collection schema (``hpr_hot_streams``, ``hpr_cold_streams``)
+  requires every column and rejects unknown keys.
+
+Engine commands
+~~~~~~~~~~~~~~~
+
+- New ``OpenPinch.application.commands.run_command`` runs one
+  ``target.<method>`` or ``design.<method>`` command on a problem given as
+  JSON (``{"data": ...}``) or as a packaged sample case name, and returns the
+  method's contract result and the problem's ``TargetOutput`` as JSON-ready
+  data. ``run_command_json`` does the same with JSON text, for Pyodide. Both
+  the browser engine and the local backend of the OpenPinch web app call it.
+  Sample cases are resolved by name only and problem data must be a JSON
+  object, so a request cannot make the engine read files from its host.
+- Engine sessions: ``"open"`` loads a problem and returns a ``session`` id,
+  later requests pass ``session`` instead of ``problem`` to run on the same
+  live problem, and ``"close"`` discards it. Commands that need an earlier
+  command's state now work, such as ``design.multiperiod_heat_exchanger_network``
+  after ``target.all_periods.<method>``.
+- Commands may be deeper paths such as ``target.all_periods.<method>``; private
+  names are rejected at every level.
+- In a session a returned target comes back as ``{"ref": <id>, "target": ...}``
+  (the target's results row, which is the only place a ``base_target``
+  command's residual target appears), and an
+  argument ``{"$ref": <id>}`` passes it to a later command (for example as
+  ``base_target``). JSON arguments for parameters typed as a contract, such as
+  the ``request`` of ``target.hpr_performance_map``, are validated into it.
+- A command that returns a new case, such as ``target.utility_placement``,
+  returns the case's problem data as ``{"data": ...}`` instead of nothing; in
+  a session the case also opens as a new ``session``.
+
+Heat pump cycle states at saturation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- When a pressure-enthalpy flash fails and the enthalpy is within round-off
+  (a quality within 1e-9) of saturated liquid or vapour, on either side, the
+  vapour-compression cycle now uses exactly saturated liquid or vapour.
+  Before, an enthalpy a few ulps above saturated vapour was treated as
+  superheated, which could need a temperature below the triple point and fail
+  the candidate, while one a few ulps below gave a quality of 0.99999999999993.
+  Native and WebAssembly CoolProp differ in those last digits, so the heat
+  pump search took different paths. Short searches can now settle on a
+  different optimum: tutorial 09's quick water heat pump moves from COP 7.72
+  (24.3 kW) to COP 6.88 (27.2 kW), the same as in the browser.
+
+CMA-ES samples alike on every platform
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- The CMA-ES backend (the HPR and utility placement default) now
+  eigendecomposes its covariance by parallel Jacobi rotations (elementwise
+  numpy operations, about 16 ms for 50 coordinates) and forms its matrix
+  products from correctly rounded dot products (``math.fsum``), instead of
+  calling LAPACK ``eigh`` and BLAS.
+  LAPACK and BLAS builds differ in the last bits and in eigenvector signs:
+  from the second generation on, the browser (Pyodide) and the desktop sampled
+  candidates about 1e-16 apart, and a short heat pump search then settled on a
+  different optimum. Given the same objective values, CMA-ES now visits the
+  same points on macOS, Linux, Windows and Pyodide. Short searches can settle
+  on a different optimum than before.
+- Composite and grand composite curves drop a point that lies within tol of
+  the line through its neighbours in heat flow, not only in temperature. On
+  a nearly vertical segment (a duty span of 1e-7 kW over several degrees) the
+  temperature residual crossed tol with a one-ulp change in a duty, so the
+  browser and desktop kept different points.
+
+Running in the browser (Pyodide)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``workers`` and ``max_parallel`` fall back to serial execution where Python
+  cannot start threads (CPython built for Emscripten, as in Pyodide). Before,
+  ``all_periods`` targets and inverse dt_min with ``workers > 1``, and branched
+  HEN network evolution, failed there with "can't start new thread".
+- The optimiser backends default to one run (``n_runs=1``), matching
+  ``OptimisationOptions``, instead of the machine's CPU count. Candidate
+  polishing also works where the CPU count is unknown.
+
 Organic Rankine cycle targeting
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

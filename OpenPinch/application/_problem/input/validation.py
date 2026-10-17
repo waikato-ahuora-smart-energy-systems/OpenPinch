@@ -7,6 +7,12 @@ from typing import Any, Optional
 
 from pydantic import ValidationError
 
+from ....contracts.common import (
+    PeriodValueWithUnit,
+    PeriodValueWithUnitAndIds,
+    PeriodValueWithUnitAndWeights,
+    ValueWithUnit,
+)
 from ....contracts.input import TargetInput
 from ....contracts.workspace import ValidationIssue, ValidationReport
 from .semantics import semantic_issues
@@ -52,7 +58,7 @@ def build_validation_report(
     try:
         validated = TargetInput.model_validate(problem_inputs)
     except ValidationError as exc:
-        for error in exc.errors():
+        for error in collapse_union_errors(exc.errors(), problem_inputs):
             issues.append(schema_issue_to_view(error, context=effective_context))
         return ValidationReport(valid=False, issues=issues)
 
@@ -61,6 +67,97 @@ def build_validation_report(
         valid=not any(issue.severity == "error" for issue in issues),
         issues=issues,
     )
+
+
+# Location tags Pydantic adds for the branches of a value union (ScalarOrVU).
+_VALUE_UNION_BRANCHES = frozenset(
+    {
+        "float",
+        *(
+            model.__name__
+            for model in (
+                ValueWithUnit,
+                PeriodValueWithUnit,
+                PeriodValueWithUnitAndWeights,
+                PeriodValueWithUnitAndIds,
+            )
+        ),
+    }
+)
+_SHAPE_MISMATCH_TYPES = frozenset({"missing", "extra_forbidden"})
+
+
+def collapse_union_errors(
+    errors: list[dict[str, Any]], problem_data: Any
+) -> list[dict[str, Any]]:
+    """Keep only the errors of the union branch each value field's shape matches.
+
+    Pydantic reports one error per union branch, so one bad value would give
+    an issue for each. The kept errors lose the branch tag from their location.
+    """
+    collapsed: list[Any] = []
+    groups: dict[tuple[Any, ...], dict[str, list[dict[str, Any]]]] = {}
+    for error in errors:
+        loc = tuple(error.get("loc", ()))
+        tag = next(
+            (
+                index
+                for index, part in enumerate(loc)
+                if isinstance(part, str) and part in _VALUE_UNION_BRANCHES
+            ),
+            None,
+        )
+        if tag is None:
+            collapsed.append(error)
+            continue
+        prefix = loc[:tag]
+        if prefix not in groups:
+            groups[prefix] = {}
+            collapsed.append(prefix)
+        groups[prefix].setdefault(loc[tag], []).append(
+            {**error, "loc": prefix + loc[tag + 1 :]}
+        )
+
+    result: list[dict[str, Any]] = []
+    for entry in collapsed:
+        if isinstance(entry, dict):
+            result.append(entry)
+        else:
+            raw = _value_at(problem_data, entry)
+            result.extend(_matching_branch_errors(groups[entry], raw))
+    return result
+
+
+def _matching_branch_errors(
+    branches: dict[str, list[dict[str, Any]]], raw: Any
+) -> list[dict[str, Any]]:
+    """The errors of the branch whose shape the raw value has."""
+    if not isinstance(raw, dict) and "float" in branches:
+        return branches["float"]
+    candidates = [
+        branch_errors
+        for branch, branch_errors in branches.items()
+        if branch != "float" or len(branches) == 1
+    ]
+    return min(
+        candidates,
+        key=lambda branch_errors: (
+            sum(error.get("type") in _SHAPE_MISMATCH_TYPES for error in branch_errors),
+            len(branch_errors),
+        ),
+    )
+
+
+def _value_at(data: Any, loc: tuple[Any, ...]) -> Any:
+    """The raw input value at a Pydantic location, or None when absent."""
+    for part in loc:
+        if isinstance(data, dict) and part in data:
+            data = data[part]
+        elif isinstance(data, list) and isinstance(part, int) and part < len(data):
+            data = data[part]
+        else:
+            return None
+    return data
 
 
 def build_validation_context(
@@ -105,6 +202,14 @@ def schema_issue_to_view(
     )
 
 
+class InputValidationWarning(UserWarning):
+    """Input validation warnings, with the issues they report."""
+
+    def __init__(self, message: str, *, issues: list[ValidationIssue]) -> None:
+        super().__init__(message)
+        self.issues = issues
+
+
 def validate_problem_semantics(
     problem_inputs: TargetInput,
     *,
@@ -129,9 +234,11 @@ def validate_problem_semantics(
 
     if warning_issues:
         warnings.warn(
-            "Input validation reported "
-            f"{len(warning_issues)} warning(s):\n" + "\n".join(warning_issues),
-            UserWarning,
+            InputValidationWarning(
+                "Input validation reported "
+                f"{len(warning_issues)} warning(s):\n" + "\n".join(warning_issues),
+                issues=[issue for issue in issues if issue.severity == "warning"],
+            ),
             stacklevel=2,
         )
 

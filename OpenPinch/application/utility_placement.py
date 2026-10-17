@@ -64,6 +64,7 @@ from ..contracts.utility_placement import (
     UtilityPlacementBaseTarget,
     UtilityPlacementOptions,
     UtilityPlacementRequest,
+    UtilityPlacementRetargetRow,
     UtilitySide,
 )
 from ..domain._value.resolution import get_scalar_value
@@ -951,6 +952,7 @@ class _ExactTargetReplayAdapter:
         candidate._results = None
         candidate._last_target_run_spec = None
         candidate._period_results = {}
+        candidate._period_result_states = {}
         candidate._utility_placement_result = None
         candidate._process_components = {}
 
@@ -1049,7 +1051,10 @@ class _ExactTargetReplayAdapter:
 
 
 def _finalize_placement_case(problem, result):
-    """Publish deterministic allocations for exactly the winning study periods."""
+    """Publish deterministic allocations for exactly the winning study periods.
+
+    Returns each placed level beside its retargeted duty.
+    """
     from copy import deepcopy
 
     outputs = {}
@@ -1059,12 +1064,13 @@ def _finalize_placement_case(problem, result):
         if request.base_target is UtilityPlacementBaseTarget.DIRECT
         else problem.target.indirect_heat_integration
     )
+    rows = []
     for period in result.best.period_results:
         target = method(zone=request.zone, period_id=period.period_id)
         idx = problem.period_ids[period.period_id]
-        for utilities, levels in (
-            (target.hot_utilities, period.hot_levels),
-            (target.cold_utilities, period.cold_levels),
+        for side, utilities, levels in (
+            (UtilitySide.HOT, target.hot_utilities, period.hot_levels),
+            (UtilitySide.COLD, target.cold_utilities, period.cold_levels),
         ):
             actual = {
                 u.name: float(get_scalar_value(u.heat_flow, period_idx=idx))
@@ -1072,8 +1078,9 @@ def _finalize_placement_case(problem, result):
             }
             for level in levels:
                 expected = level.allocated_duty.value
+                retargeted = actual.get(level.template_key.name, 0.0)
                 if not math.isclose(
-                    actual.get(level.template_key.name, 0.0),
+                    retargeted,
                     expected,
                     rel_tol=1e-5,
                     abs_tol=1e-4,
@@ -1081,8 +1088,29 @@ def _finalize_placement_case(problem, result):
                     raise ValueError(
                         "Final utility allocation differs from the winning placement."
                     )
+                rows.append(
+                    UtilityPlacementRetargetRow(
+                        period_id=period.period_id,
+                        side=side,
+                        utility=level.template_key.name,
+                        kind=level.kind,
+                        placement_rank=level.placement_rank,
+                        supply_temperature=level.supply_temperature,
+                        target_temperature=level.target_temperature,
+                        optimizer_duty=level.allocated_duty,
+                        retargeted_duty=QuantityValue(
+                            value=retargeted, unit=result.units.heat_flow
+                        ),
+                        is_fallback=level.is_fallback,
+                    )
+                )
         outputs[period.period_id] = deepcopy(problem._results)
     problem._period_results = outputs
+    # Each retarget above retained its period's solved state.
+    problem._period_result_states = {
+        period_id: problem._period_states[period_id] for period_id in outputs
+    }
+    return tuple(rows)
 
 
 def run_problem_utility_placement(
@@ -1176,17 +1204,18 @@ def run_problem_utility_placement(
     optimized_case = PinchProblem(optimized_input, project_name=problem.project_name)
     from ._problem.targeting.provenance import make_provenance
 
-    _finalize_placement_case(optimized_case, result)
+    retarget_comparison = _finalize_placement_case(optimized_case, result)
     selected = problem._resolve_target_zone(zone)
     optimized_case._utility_placement_result = result.model_copy(
         update={
+            "retarget_comparison": retarget_comparison,
             "provenance": make_provenance(
                 problem,
                 "target.utility_placement",
                 selected,
                 period_ids=result.period_ids,
                 settings=result.request.model_dump(mode="json"),
-            )
+            ),
         }
     )
     return optimized_case

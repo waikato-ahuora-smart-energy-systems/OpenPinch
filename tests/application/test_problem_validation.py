@@ -47,6 +47,59 @@ def test_validation_report_and_warning_semantics(validation_cases):
         validation.validate_problem_semantics(validated, context={})
 
 
+def test_validation_warning_carries_its_issues(validation_cases):
+    data = validation_cases["warning_problem"]
+    validated = TargetInput.model_validate(data)
+    context = validation.build_validation_context(data, source_kind="json")
+
+    with pytest.warns(validation.InputValidationWarning) as caught:
+        validation.validate_problem_semantics(validated, context=context)
+
+    report = validation.build_validation_report(data)
+    assert caught[0].message.issues == report.issues
+
+
+@pytest.mark.parametrize(
+    ("t_supply", "path", "message"),
+    [
+        ("warm", "streams[0].t_supply", "unable to parse string as a number"),
+        (
+            {"value": "warm", "unit": "degC"},
+            "streams[0].t_supply.value",
+            "unable to parse string as a number",
+        ),
+        (
+            {"values": [20.0, "warm"], "unit": "degC"},
+            "streams[0].t_supply.values[1]",
+            "unable to parse string as a number",
+        ),
+    ],
+)
+def test_validation_report_gives_one_issue_for_a_bad_union_field(
+    t_supply, path, message
+):
+    payload = {
+        "streams": [
+            {
+                "zone": "Site",
+                "name": "H1",
+                "t_supply": t_supply,
+                "t_target": 40.0,
+                "heat_flow": 100.0,
+            }
+        ],
+        "utilities": [],
+    }
+
+    issues = validation.build_validation_report(payload).issues
+
+    assert [(issue.path, issue.field) for issue in issues] == [
+        (path, path.removeprefix("streams[0].").replace("[1]", ".1"))
+    ]
+    assert message in issues[0].message
+    assert issues[0].record_label == "Stream 1 'H1'"
+
+
 def test_validation_report_rejects_discontinuous_segmented_utility_before_loading():
     payload = {
         "streams": [

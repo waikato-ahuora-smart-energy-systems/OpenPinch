@@ -98,6 +98,8 @@ OUTPUT_UNIT_RULES: dict[str, OutputUnitRule] = {
     "hpr_external_utility": OutputUnitRule("kW", "kW", unit_groups=("heat_flow",)),
     "hpr_ambient_hot": OutputUnitRule("kW", "kW", unit_groups=("heat_flow",)),
     "hpr_ambient_cold": OutputUnitRule("kW", "kW", unit_groups=("heat_flow",)),
+    "hpr_selected_load": OutputUnitRule("kW", "kW", unit_groups=("heat_flow",)),
+    "hpr_achieved_load": OutputUnitRule("kW", "kW", unit_groups=("heat_flow",)),
     "hpr_cop": OutputUnitRule(
         "dimensionless",
         "dimensionless",

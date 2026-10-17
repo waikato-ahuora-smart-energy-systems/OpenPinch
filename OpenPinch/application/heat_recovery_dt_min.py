@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from ..analysis.numerics import get_period_index
+from ..analysis.parallelism import supported_workers
 from ..analysis.targeting.heat_recovery_dt_min import (
     HeatRecoveryDtMinSolution,
     HeatRecoveryLimitError,
@@ -262,7 +263,7 @@ def calculate_all_period_heat_recovery_dt_min(
             period_id=period_id,
         )
 
-    if workers == 1:
+    if supported_workers(workers) == 1:
         return {period_id: solve(period_id) for period_id in period_ids}
     with ThreadPoolExecutor(max_workers=workers) as executor:
         solved = executor.map(solve, period_ids)

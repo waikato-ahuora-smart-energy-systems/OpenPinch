@@ -17,18 +17,6 @@ RTD_CONFIG = REPO_ROOT / ".readthedocs.yaml"
 GUIDES_ROOT = DOCS_ROOT / "guides"
 API_ROOT = DOCS_ROOT / "api"
 EXAMPLES_ROOT = DOCS_ROOT / "examples"
-AI_DLC_STATE = REPO_ROOT / "aidlc-docs" / "aidlc-state.md"
-REVERSE_ENGINEERING_ROOT = (
-    REPO_ROOT / "aidlc-docs" / "inception" / "reverse-engineering"
-)
-CURRENT_REVERSE_ENGINEERING_FILES = (
-    "api-documentation.md",
-    "architecture.md",
-    "business-overview.md",
-    "code-structure.md",
-    "component-inventory.md",
-    "dependencies.md",
-)
 RETIRED_CURRENT_CONTRACT_STRINGS = (
     "OpenPinch.main",
     "OpenPinch.classes",
@@ -75,19 +63,19 @@ def _docs_text(paths: list[Path] | None = None) -> str:
     return "\n".join(_read(path) for path in paths)
 
 
-def test_current_aidlc_contract_documents_reject_retired_api_claims():
+def test_current_documents_reject_retired_api_claims():
+    # The release notes record removals, so they may name retired APIs.
+    current = [
+        path
+        for path in DOCS_ROOT.rglob("*.rst")
+        if path.name != "release-notes.rst" and "_build" not in path.parts
+    ]
     current_documents = "\n".join(
-        _read(REVERSE_ENGINEERING_ROOT / name)
-        for name in CURRENT_REVERSE_ENGINEERING_FILES
+        [_docs_text([*current, README]), _read(REPO_ROOT / "AGENTS.md")]
     )
-    state = _read(AI_DLC_STATE)
-    current_status = state.split("## Current Status", maxsplit=1)[1].split(
-        "\n## ", maxsplit=1
-    )[0]
 
     for stale in RETIRED_CURRENT_CONTRACT_STRINGS:
         assert stale not in current_documents
-        assert stale not in current_status
 
 
 def test_rtd_configuration_keeps_strict_python314_build():

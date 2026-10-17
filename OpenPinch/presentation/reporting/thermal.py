@@ -16,6 +16,7 @@ from ...domain.targets import (
     IndirectIntegrationTarget,
     UtilitySummaryTarget,
 )
+from ...domain.value import Value
 
 
 def direct_result(target, *, is_total=False):
@@ -65,6 +66,7 @@ def hpr_result(target, *, is_total=False):
             "hpr_external_utility": _metric(target, "hpr_external_utility"),
             "hpr_ambient_hot": _metric(target, "hpr_ambient_hot"),
             "hpr_ambient_cold": _metric(target, "hpr_ambient_cold"),
+            **_hpr_summary_values(target),
             "hpr_cop": _metric(target, "hpr_cop"),
             "hpr_eta_he": _metric(target, "hpr_eta_he"),
             "hpr_operating_cost": _metric(target, "hpr_operating_cost"),
@@ -103,11 +105,65 @@ def hpr_result(target, *, is_total=False):
     )
 
 
-def _target_simulation_record(target: HeatPumpTargetBase):
+def _hpr_summary_values(target: HeatPumpTargetBase) -> dict:
+    load = target.hpr_load
     details = target.hpr_details
+    objective = _detail(details, "obj")
+    return {
+        "hpr_selected_load": None
+        if load is None
+        else coerce_output_value(
+            {"value": load.selected, "unit": load.heat_flow_unit},
+            metric_name="hpr_selected_load",
+            config=target.config,
+        ),
+        "hpr_achieved_load": None
+        if load is None
+        else coerce_output_value(
+            {"value": load.achieved, "unit": load.heat_flow_unit},
+            metric_name="hpr_achieved_load",
+            config=target.config,
+        ),
+        "hpr_objective": None if objective is None else float(objective),
+        **_hpr_shared_design_values(details),
+    }
+
+
+def _hpr_shared_design_values(details) -> dict:
+    vector = _detail(details, "design_vector")
+    period_ids = _detail(details, "period_ids")
+    weights = _detail(details, "period_weights")
+    period_outputs = _detail(details, "period_outputs")
+    weighted = _detail(details, "weighted_output")
+    weighted_objective = _detail(weighted, "obj") if weighted is not None else None
+    return {
+        "hpr_design_vector": None
+        if vector is None
+        else tuple(float(value) for value in vector),
+        "hpr_period_ids": None if period_ids is None else tuple(period_ids),
+        "hpr_period_weights": None
+        if weights is None
+        else tuple(float(weight) for weight in weights),
+        "hpr_period_success": None
+        if not isinstance(period_outputs, Mapping)
+        else {
+            str(period_id): bool(_detail(output, "success"))
+            for period_id, output in period_outputs.items()
+        },
+        "hpr_weighted_objective": None
+        if weighted_objective is None
+        else float(weighted_objective),
+    }
+
+
+def _detail(details, field: str):
     if isinstance(details, Mapping):
-        return details.get("target_simulation_record")
-    return getattr(details, "target_simulation_record", None)
+        return details.get(field)
+    return getattr(details, field, None)
+
+
+def _target_simulation_record(target: HeatPumpTargetBase):
+    return _detail(target.hpr_details, "target_simulation_record")
 
 
 def _utility_summary_result(
@@ -178,14 +234,28 @@ def _heat_utilities(
     return [
         HeatUtility(
             name=utility.name,
-            heat_flow=coerce_output_value(
-                utility.heat_flow,
-                metric_name="utility_heat_flow",
-                config=target.config,
+            heat_flow=_period_duty(
+                coerce_output_value(
+                    utility.heat_flow,
+                    metric_name="utility_heat_flow",
+                    config=target.config,
+                ),
+                period_idx=target.period_idx,
             ),
         )
         for utility in utilities
     ]
+
+
+def _period_duty(heat_flow: Value | None, *, period_idx: int | None):
+    """Return the duty for the target's own period.
+
+    Utility streams carry one duty per period, but a period's target only sets
+    its own entry; the others are left from the copied input.
+    """
+    if heat_flow is None or period_idx is None or heat_flow.num_periods <= 1:
+        return heat_flow
+    return Value(float(heat_flow.period_values[period_idx]), heat_flow.unit)
 
 
 def orc_result(target, *, is_total=False):

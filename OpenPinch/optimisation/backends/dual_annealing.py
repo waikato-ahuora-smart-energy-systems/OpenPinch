@@ -1,6 +1,5 @@
 """Dual-annealing multi-start backend."""
 
-import os
 from typing import Callable
 
 import numpy as np
@@ -15,7 +14,7 @@ def _get_da_multiminima_in_parallel(
     x0_ls=None,
     args=(),
     constraints=(),
-    n_runs=os.cpu_count(),
+    n_runs=1,
     maxiter=300,
     seed=0,
     initial_temp=5230.0,

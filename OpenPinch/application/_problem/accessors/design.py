@@ -12,6 +12,10 @@ from ..arguments import (
 
 if TYPE_CHECKING:
     from ....contracts.synthesis.result import HeatExchangerNetworkSynthesisResult
+    from ....contracts.synthesis.view import (
+        HeatExchangerNetworkGridLayout,
+        HeatExchangerNetworkView,
+    )
     from ....domain.heat_exchanger_network import HeatExchangerNetwork
     from ...problem import PinchProblem
 
@@ -24,8 +28,16 @@ def _set_if_supplied(values: dict[str, Any], key: str, value: Any) -> None:
 class HeatExchangerNetworkDesignView:
     """Explicit application behavior around one serializable HEN result."""
 
-    def __init__(self, result: "HeatExchangerNetworkSynthesisResult") -> None:
+    def __init__(
+        self,
+        result: "HeatExchangerNetworkSynthesisResult",
+        *,
+        utility_names: Sequence[str] | None = None,
+    ) -> None:
         self._result = result
+        # The problem's utilities as the network names them ("Hot Utility.HPS"),
+        # so ``utility`` can resolve a utility's own name and reject others.
+        self._utility_names = None if utility_names is None else tuple(utility_names)
 
     @property
     def result(self) -> "HeatExchangerNetworkSynthesisResult":
@@ -38,10 +50,18 @@ class HeatExchangerNetworkDesignView:
         return self.result.network
 
     def top(self, n: int):
-        """Return the first ``n`` ranked successful outcomes."""
+        """Return the first ``n`` ranked successful outcomes.
+
+        Uses the same ranking as ``network(rank=)`` and ``grid(rank=)``, so
+        ``top(n)[k - 1]`` is the network at rank ``k``.
+        """
         if isinstance(n, bool) or not isinstance(n, int) or n < 1:
             raise ValueError("n must be a positive integer.")
-        return self.result.ranked_networks[:n]
+        from ....analysis.heat_exchanger_networks.results.selection import (
+            ranked_networks,
+        )
+
+        return ranked_networks(self.result, n)
 
     def network(self, *, rank: int = 1) -> "HeatExchangerNetwork":
         """Return one ranked network using a one-based rank."""
@@ -72,6 +92,30 @@ class HeatExchangerNetworkDesignView:
             temperature_scaled=temperature_scaled,
         )
 
+    def grid_layout(
+        self,
+        *,
+        rank: int = 1,
+        period_id: str | None = None,
+    ) -> "HeatExchangerNetworkGridLayout":
+        """Return one ranked network's grid topology as data (no plotting)."""
+        from ....presentation.network_grid.layout import build_grid_layout
+
+        return build_grid_layout(self.network(rank=rank), period_id=period_id)
+
+    def view(
+        self,
+        *,
+        rank: int = 1,
+        period_id: str | None = None,
+    ) -> "HeatExchangerNetworkView":
+        """Return the ranking, and one ranked network's totals, duties and grid."""
+        if isinstance(rank, bool) or not isinstance(rank, int) or rank < 1:
+            raise ValueError("rank must be a positive one-based integer.")
+        from ....presentation.network_grid.view import build_network_view
+
+        return build_network_view(self.result, rank=rank, period_id=period_id)
+
     @property
     def total_heat_recovery(self) -> float:
         from ....domain.enums import HeatExchangerKind
@@ -90,25 +134,46 @@ class HeatExchangerNetworkDesignView:
 
         return self.selected_network.total_duty(kind=HeatExchangerKind.COLD_UTILITY)
 
+    def _network_utility_name(self, name: str) -> str:
+        """The network's stream name for ``name``, a utility or stream name."""
+        if self._utility_names is None or name in self._utility_names:
+            return name
+        matches = [
+            utility
+            for utility in self._utility_names
+            if utility.split(".", 1)[-1] == name
+        ]
+        if len(matches) > 1:
+            raise ValueError(
+                f"Utility {name!r} is both a hot and a cold utility; ask for "
+                + " or ".join(repr(match) for match in matches)
+                + "."
+            )
+        if not matches:
+            raise ValueError(
+                f"Unknown utility {name!r}. The problem's utilities are "
+                f"{', '.join(self._utility_names)}."
+            )
+        return matches[0]
+
     def utility(self, name: str, *, period_id: str | None = None) -> float:
         """Return selected-network utility duty for one named utility."""
         from ....domain.enums import HeatExchangerKind
 
         if not isinstance(name, str) or not name.strip():
             raise ValueError("utility name must be a non-empty string")
-        utility_name = name.strip()
+        utility_name = self._network_utility_name(name.strip())
         network = self.selected_network
         resolved_period_id = network.resolve_period_id(period_id)
         total = 0.0
         for exchanger in network.exchangers:
-            matches = (
-                exchanger.kind is HeatExchangerKind.HOT_UTILITY
-                and exchanger.source_stream == utility_name
-            ) or (
-                exchanger.kind is HeatExchangerKind.COLD_UTILITY
-                and exchanger.sink_stream == utility_name
-            )
-            if matches:
+            if exchanger.kind is HeatExchangerKind.HOT_UTILITY:
+                stream = exchanger.source_stream
+            elif exchanger.kind is HeatExchangerKind.COLD_UTILITY:
+                stream = exchanger.sink_stream
+            else:
+                continue
+            if stream == utility_name:
                 state = exchanger.state(resolved_period_id)
                 if state.active:
                     total += float(state.duty)
@@ -163,6 +228,7 @@ class _DesignAccessor:
         return runtime, configuration
 
     def _run(self, service, *, surface, runtime, configuration, **service_kwargs):
+        from ....domain.enums import StreamLoc
         from ..targeting.execution import walk_zone_tree
         from ..targeting.provenance import make_provenance
         from ..targeting.state import commit_problem, snapshot_problem
@@ -191,7 +257,17 @@ class _DesignAccessor:
             )
             if isolated._results is not None:
                 isolated._results.design = result
-        view = HeatExchangerNetworkDesignView(deepcopy(result))
+        view = HeatExchangerNetworkDesignView(
+            deepcopy(result),
+            utility_names=[
+                f"{location.value}.{utility.name}"
+                for location, utilities in (
+                    (StreamLoc.HotU, self._problem.hot_utilities),
+                    (StreamLoc.ColdU, self._problem.cold_utilities),
+                )
+                for utility in utilities
+            ],
+        )
         commit_problem(self._problem, isolated)
         return view
 
@@ -493,12 +569,19 @@ class _DesignAccessor:
             workspace_variant=None,
         )
 
-    def multiperiod_heat_exchanger_network(self, **kwargs):
-        """Synthesize one shared HEN after explicit all-period targeting."""
+    def multiperiod_heat_exchanger_network(self, *, prerequisites=False, **kwargs):
+        """Synthesize one shared HEN after explicit all-period targeting.
+
+        With ``prerequisites=True``, a problem with no all-period targets
+        runs ``target.all_periods.all_heat_integration()`` first.
+        """
+        if not self._problem.period_results and prerequisites:
+            self._problem.target.all_periods.all_heat_integration()
         if not self._problem.period_results:
             raise RuntimeError(
                 "Run problem.target.all_periods.<method>() before multiperiod HEN "
-                "synthesis."
+                "synthesis, or pass prerequisites=True to run "
+                "all_heat_integration first."
             )
         if "period_id" in kwargs:
             raise TypeError("multiperiod synthesis does not accept period_id.")
