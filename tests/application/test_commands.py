@@ -76,7 +76,7 @@ def test_design_command_returns_the_design_result_as_value(monkeypatch):
         lambda self, **_kwargs: HeatExchangerNetworkDesignView(report),
     )
     # The stand-in result has no networks to view; the view is tested below.
-    monkeypatch.setattr(HeatExchangerNetworkDesignView, "view", lambda self: report)
+    monkeypatch.setattr(HeatExchangerNetworkDesignView, "views", lambda self: (report,))
 
     response = run_command(
         {
@@ -824,6 +824,23 @@ def test_excel_export_returns_the_workbook_as_a_base64_file():
     assert base64.b64decode(workbook["content_base64"])[:2] == b"PK"
 
 
+def test_excel_export_after_an_all_periods_run_returns_the_workbook():
+    session = run_command(
+        {
+            "command": "open",
+            "problem": {"sample_case": "crude_preheat_train_multiperiod.json"},
+        }
+    )["session"]
+    run_command(
+        {"command": "target.all_periods.direct_heat_integration", "session": session}
+    )
+
+    response = run_command({"command": "export.excel", "session": session})
+
+    (workbook,) = response["value"]["files"]
+    assert base64.b64decode(workbook["content_base64"])[:2] == b"PK"
+
+
 def test_plot_export_returns_html_files_for_the_named_plot():
     session = run_command(
         {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}
@@ -1280,6 +1297,100 @@ def test_design_command_returns_the_design_view_beside_the_result(monkeypatch):
     )
 
 
+def _two_period_hen_payload() -> dict:
+    """Tutorial 17's case: the four-stream example in two weighted periods."""
+    from tests.analysis.heat_exchanger_networks.test_design_workflow import (
+        _public_example_payload,
+    )
+
+    payload = _public_example_payload()
+    payload["options"]["PROBLEM_PERIOD_IDS"] = ["base", "turndown"]
+    payload["options"]["PROBLEM_PERIOD_WEIGHTS"] = [0.7, 0.3]
+    for stream in payload["streams"]:
+        duty = stream["heat_flow"]
+        stream["heat_flow"] = {
+            "values": [duty["value"], 0.8 * duty["value"]],
+            "unit": duty["unit"],
+        }
+        stream["heat_capacity_flowrate"] = None
+    return payload
+
+
+def _use_two_period_fake_executor(monkeypatch) -> None:
+    """The fake executor, its networks spread over a base and turndown period."""
+    from OpenPinch.analysis.heat_exchanger_networks.execution.fake_executor import (
+        FakeSynthesisExecutor,
+    )
+
+    def two_periods(network):
+        data = network.model_dump()
+        for exchanger in data["exchangers"]:
+            (state,) = exchanger["period_states"]
+            turndown = {**state, "period_id": "turndown", "period_idx": 1}
+            turndown["duty"] = 0.8 * state["duty"]
+            exchanger["period_states"] = ({**state, "period_id": "base"}, turndown)
+        return type(network).model_validate(data)
+
+    class TwoPeriodExecutor(FakeSynthesisExecutor):
+        def execute(self, tasks, **kwargs):
+            return tuple(
+                outcome.model_copy(update={"network": two_periods(outcome.network)})
+                if outcome.network is not None
+                else outcome
+                for outcome in super().execute(tasks, **kwargs)
+            )
+
+    from OpenPinch.analysis.heat_exchanger_networks.targeting import (
+        network_evolution_method,
+        open_hens_method,
+        pinch_design_method,
+        thermal_derivative_method,
+    )
+
+    for module in (
+        open_hens_method,
+        network_evolution_method,
+        pinch_design_method,
+        thermal_derivative_method,
+    ):
+        monkeypatch.setattr(module, "LocalSynthesisExecutor", TwoPeriodExecutor)
+
+
+def test_multiperiod_design_command_returns_one_view_per_period(monkeypatch):
+    from OpenPinch.contracts.schema import contract_json_schemas
+
+    _use_two_period_fake_executor(monkeypatch)
+    session = run_command(
+        {"command": "open", "problem": {"data": _two_period_hen_payload()}}
+    )["session"]
+    run_command(
+        {"command": "target.all_periods.all_heat_integration", "session": session}
+    )
+
+    response = run_command(
+        {"command": "design.multiperiod_heat_exchanger_network", "session": session}
+    )
+
+    views = response["views"]
+    schema = contract_json_schemas()["HeatExchangerNetworkView"]
+    for view in views:
+        jsonschema.validate(view, schema)
+    assert [view["period_id"] for view in views] == ["base", "turndown"]
+    assert [view["grid"]["period_id"] for view in views] == ["base", "turndown"]
+    assert response["view"] == views[0]
+    for view in views:
+        assert view["total_heat_recovery"] == pytest.approx(
+            sum(
+                state["duty"]
+                for exchanger in response["value"]["network"]["exchangers"]
+                if exchanger["kind"] == "recovery"
+                for state in exchanger["period_states"]
+                if state["period_id"] == view["period_id"] and state["active"]
+            ),
+            rel=1e-12,
+        )
+
+
 def _design_reporting_progress(self, **_kwargs):
     progress.emit(
         analysis="hen_synthesis", stage="pinch_design_method", done=0, total=1
@@ -1295,8 +1406,8 @@ def test_progress_callback_receives_json_events_during_a_command(monkeypatch):
     # The stand-in result has no networks to view; only the progress matters.
     monkeypatch.setattr(
         HeatExchangerNetworkDesignView,
-        "view",
-        lambda self: ValidationReport(valid=True, issues=[]),
+        "views",
+        lambda self: (ValidationReport(valid=True, issues=[]),),
     )
     request = {
         "command": "design.pinch_design",
@@ -1320,8 +1431,8 @@ def test_json_text_entry_point_passes_progress_as_json_text(monkeypatch):
     # The stand-in result has no networks to view; only the progress matters.
     monkeypatch.setattr(
         HeatExchangerNetworkDesignView,
-        "view",
-        lambda self: ValidationReport(valid=True, issues=[]),
+        "views",
+        lambda self: (ValidationReport(valid=True, issues=[]),),
     )
     request = {
         "command": "design.pinch_design",

@@ -70,6 +70,10 @@ def test_view_totals_and_utility_duties_match_the_design_view(design):
     assert view.grid == design.grid_layout()
 
 
+def test_views_of_a_single_period_network_is_its_one_view(design):
+    assert design.views() == (design.view(),)
+
+
 def test_view_ranking_follows_the_duplicate_free_ranking(design):
     ranked = design.top(10)
 
