@@ -125,6 +125,9 @@ Command layer
   "bogus"}``, is a validation issue on its field: ``build_validation_report``
   returns ``valid=False`` and the ``validate`` command returns its report.
   Before, both raised ``UndefinedUnitError``.
+- A ``zone_tree`` whose zone has two children of the same name is rejected
+  when the input is loaded or validated ("Duplicate zone name ...").
+  Before, the second child was merged into the first.
 - ``ConfigurationFieldMetadata`` gives each field's ``unit``,
   ``description`` and ``default``, and ``label`` is a display name such as
   "Minimum contribution temperature difference" rather than the title-cased

@@ -145,6 +145,31 @@ def test_validation_report_gives_an_issue_for_an_undefined_unit(thermal, path):
     )
 
 
+def test_validation_report_rejects_duplicate_sibling_zone_names():
+    stream = {"name": "H1", "t_supply": 150.0, "t_target": 40.0, "heat_flow": 100.0}
+    payload = {
+        "streams": [stream | {"zone": "Area"}],
+        "utilities": [],
+        "zone_tree": {
+            "name": "Site",
+            "type": "Site",
+            "children": [
+                {"name": "Area", "type": "Process Zone"},
+                {"name": "Area", "type": "Process Zone"},
+            ],
+        },
+    }
+
+    report = validation.build_validation_report(payload)
+
+    assert report.valid is False
+    assert any(
+        issue.path.startswith("zone_tree.children")
+        and "Duplicate zone name 'Area'" in issue.message
+        for issue in report.issues
+    )
+
+
 def test_validation_report_rejects_discontinuous_segmented_utility_before_loading():
     payload = {
         "streams": [
