@@ -133,6 +133,10 @@ Command layer
   the ``Value`` constructor does, so a ``Stream`` takes ``dt_cont`` as
   ``{"value": 5, "unit": "degC"}``. Before, it raised
   ``DimensionalityError``.
+- ``run_command`` raises ``ValueError`` naming the accepted shapes,
+  ``{"data": ...}`` or ``{"sample_case": ...}``, when ``problem`` is a bare
+  string or names neither. Before, it raised ``AttributeError`` or
+  ``KeyError``.
 - ``ConfigurationFieldMetadata`` gives each field's ``unit``,
   ``description`` and ``default``, and ``label`` is a display name such as
   "Minimum contribution temperature difference" rather than the title-cased

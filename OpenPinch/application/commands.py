@@ -79,6 +79,13 @@ class _DefaultUtilityWarning(UserWarning):
 
 
 def _load_problem(source: Mapping[str, Any]) -> PinchProblem:
+    if not isinstance(source, Mapping) or not (
+        "data" in source or "sample_case" in source
+    ):
+        raise ValueError(
+            'A problem must be {"data": <TargetInput JSON>} or '
+            '{"sample_case": <name>}, each with an optional project_name.'
+        )
     project_name = source.get("project_name", "Site")
     if "data" in source:
         if not isinstance(source["data"], Mapping):
@@ -270,7 +277,8 @@ def _run(request: Mapping[str, Any]) -> dict[str, Any]:
         try:
             problem = _load_problem(request["problem"])
         except ValueError as error:
-            data = request["problem"].get("data")
+            source = request["problem"]
+            data = source.get("data") if isinstance(source, Mapping) else None
             if command != "validate" or not isinstance(data, Mapping):
                 raise
             return {"value": _invalid_input_report(data, error), "results": None}

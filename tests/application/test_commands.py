@@ -138,6 +138,22 @@ def test_problem_data_must_be_a_json_object_not_a_file_path(tmp_path):
         )
 
 
+@pytest.mark.parametrize(
+    "request_",
+    [
+        {"command": "target.direct_heat_integration", "problem": "basic_pinch.json"},
+        {"command": "validate", "problem": "basic_pinch.json"},
+        {"command": "open", "problem": "basic_pinch.json"},
+        {"command": "open", "workspace": {"problem": "basic_pinch.json"}},
+        {"command": "validate", "problem": {"name": "basic_pinch.json"}},
+    ],
+    ids=["target", "validate", "open", "workspace", "no_source"],
+)
+def test_problem_must_be_a_data_or_sample_case_object(request_):
+    with pytest.raises(ValueError, match=r'\{"data": .*\} or \{"sample_case": '):
+        run_command(request_)
+
+
 def test_json_text_entry_point_round_trips_a_command():
     request = {
         "command": "target.direct_heat_integration",
