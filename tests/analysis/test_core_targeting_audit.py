@@ -205,6 +205,40 @@ def test_negative_dt_cont_runs_through_direct_and_area_targeting():
     assert area.area == float("inf")
 
 
+@pytest.mark.parametrize(
+    ("case", "hot_utility", "cold_utility", "area", "capital_cost"),
+    [
+        ("basic_pinch.json", 750.0, 1000.0, 554.1173, 442752.48),
+        ("pulp_mill.json", 155528.905, 58413.668, 29689.089, 13462802.18),
+        (
+            "Four-stream-Yee-and-Grossmann-1990-1.json",
+            450.0,
+            2100.0,
+            341.0759,
+            84161.387,
+        ),
+    ],
+)
+def test_area_targets_integrate_refreshed_interval_widths(
+    case, hot_utility, cold_utility, area, capital_cost
+):
+    # Before the stale-width fix, inserted temperature intervals kept the
+    # wrong DELTA_T, so these areas were 5-22 % low (basic_pinch 475.40,
+    # pulp_mill 28175.8, Four-stream 264.26). The corrected basic_pinch area
+    # matches an independent fine-slice Bath-formula integration of the
+    # balanced composite curves. Energy targets were never affected.
+    problem = PinchProblem(case, project_name="Site")
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        target = problem.target.heat_exchanger_area_and_cost()
+
+    assert target.hot_utility_target == pytest.approx(hot_utility, rel=1e-6)
+    assert target.cold_utility_target == pytest.approx(cold_utility, rel=1e-6)
+    assert target.area == pytest.approx(area, rel=1e-6)
+    assert target.capital_cost == pytest.approx(capital_cost, rel=1e-6)
+
+
 # 2.7 Exergy on real temperatures
 
 

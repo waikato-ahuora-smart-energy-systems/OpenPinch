@@ -79,6 +79,13 @@ class _DefaultUtilityWarning(UserWarning):
 
 
 def _load_problem(source: Mapping[str, Any]) -> PinchProblem:
+    if not isinstance(source, Mapping) or not (
+        "data" in source or "sample_case" in source
+    ):
+        raise ValueError(
+            'A problem must be {"data": <TargetInput JSON>} or '
+            '{"sample_case": <name>}, each with an optional project_name.'
+        )
     project_name = source.get("project_name", "Site")
     if "data" in source:
         if not isinstance(source["data"], Mapping):
@@ -270,7 +277,8 @@ def _run(request: Mapping[str, Any]) -> dict[str, Any]:
         try:
             problem = _load_problem(request["problem"])
         except ValueError as error:
-            data = request["problem"].get("data")
+            source = request["problem"]
+            data = source.get("data") if isinstance(source, Mapping) else None
             if command != "validate" or not isinstance(data, Mapping):
                 raise
             return {"value": _invalid_input_report(data, error), "results": None}
@@ -627,9 +635,22 @@ def _workspace_action(name: str) -> Any:
 
 # Commands on a workspace session.
 def _set_case_input(
-    workspace: PinchWorkspace, *, case_name: str, source: dict[str, Any]
+    workspace: PinchWorkspace, *, case_name: str, source: Any
 ) -> dict[str, Any]:
-    """Replace one case's input; returns the case list and its report."""
+    """Replace one case's input; returns the case list and its report.
+
+    ``source`` is ``{"data": <TargetInput JSON>}`` or the TargetInput JSON
+    itself, never a path: a request must not read the engine host's files.
+    """
+    if not isinstance(source, Mapping):
+        raise ValueError(
+            "Case input 'source' must be a JSON object: "
+            '{"data": ...} or the TargetInput JSON, not a file path.'
+        )
+    if "data" in source:
+        source = source["data"]
+        if not isinstance(source, Mapping):
+            raise ValueError("Case input 'data' must be a JSON object.")
     report = workspace.set_case_input(case_name, source)
     return {**_workspace_json(workspace), "report": report.model_dump(mode="json")}
 

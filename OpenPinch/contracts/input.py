@@ -280,6 +280,22 @@ class ZoneTreeSchema(BaseModel):
             raise ValueError("dt_cont_multiplier must be a finite non-negative value.")
         return float(value)
 
+    @field_validator("children")
+    @classmethod
+    def _validate_unique_child_names(
+        cls, children: Optional[List["ZoneTreeSchema"]]
+    ) -> Optional[List["ZoneTreeSchema"]]:
+        # Zones are found by name, so a second sibling would merge into the first.
+        names = set()
+        for child in children or ():
+            if child.name in names:
+                raise ValueError(
+                    f"Duplicate zone name {child.name!r}: sibling zones need "
+                    "unique names."
+                )
+            names.add(child.name)
+        return children
+
 
 class HeatExchangerAreaSliceSchema(BaseModel):
     """JSON-visible area contribution for one exchanger segment pair."""

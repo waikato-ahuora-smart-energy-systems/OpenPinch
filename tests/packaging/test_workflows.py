@@ -1,5 +1,8 @@
 """Contracts for the GitHub Actions workflows (CI, release, version bump)."""
 
+import json
+import re
+
 import yaml
 
 from tests.support.paths import REPOSITORY_ROOT
@@ -48,6 +51,9 @@ def test_ci_triggers_and_single_required_check():
     assert gate["if"] == "${{ always() }}"
     assert set(gate["needs"]) == set(ci["jobs"]) - {"ci-ok"}
     assert '"solver"' in runs(gate) and '"version"' in runs(gate)
+    (required,) = re.findall(r"^required='(.*)'$", runs(gate), re.MULTILINE)
+    # audit stays informational; every other always-on lane blocks a merge.
+    assert json.loads(required) == ["lint", "tests", "build", "smoke", "pyodide"]
 
 
 def test_main_only_lanes():
@@ -101,6 +107,12 @@ def test_every_ci_lane_is_present():
     }
     assert {row["os"] for row in smoke["include"]} == {"windows-latest", "macos-latest"}
     assert "SOURCE_DATE_EPOCH" in runs(jobs["build"])
+
+
+def test_pyodide_shards_cover_the_presentation_tests():
+    matrix = workflow("ci.yml")["jobs"]["pyodide"]["strategy"]["matrix"]
+    shards = {row["shard"]: row["paths"].split() for row in matrix["include"]}
+    assert "tests/presentation" in shards["core"]
 
 
 def test_release_publishes_the_bytes_ci_built():

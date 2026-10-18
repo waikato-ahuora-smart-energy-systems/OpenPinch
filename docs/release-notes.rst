@@ -4,6 +4,21 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Testing and CI
+~~~~~~~~~~~~~~
+
+- The Pyodide test lane is required by ``CI OK``, so a change that breaks the
+  web app's engine blocks the merge. Its PyPI test dependencies are pinned
+  to the ``uv.lock`` versions in ``scripts/pyodide/requirements.txt``, a test
+  keeps the two in step, and the run fails if micropip fetches anything
+  else from PyPI. ``tests/presentation`` now runs in the lane's core shard,
+  and the utility placement timing tests allow WebAssembly ten times their
+  native budget.
+- ``tests/conftest.py`` loads an ``openpinch`` Hypothesis profile
+  (``derandomize=False``, no deadline, no example database), so
+  ``--hypothesis-seed`` picks the same examples on GitHub, locally and in
+  Pyodide. Before, Hypothesis's own CI profile ignored the seed on GitHub.
+
 Tutorials
 ~~~~~~~~~
 
@@ -14,6 +29,13 @@ Tutorials
 Result fixes
 ~~~~~~~~~~~~
 
+- ``target.heat_exchanger_area_and_cost()`` reports higher area, capital cost
+  and total cost targets. Inserting temperatures into a problem table left the
+  inserted intervals and their neighbours with the wrong widths and enthalpy
+  steps, so the area integration over the balanced composite curves came out
+  5-22 % low. For example, the ``basic_pinch`` area target rises from about
+  475 m2 to about 554 m2. Published area and cost numbers change; energy
+  targets do not.
 - ``run_command`` with ``design.multiperiod_heat_exchanger_network`` returns
   its result. Before, building the response's ``view`` raised "period_id is
   required when a network has multiple period states" for the shared
@@ -111,6 +133,25 @@ Command layer
   ``workspace.set_case_input`` command replace an existing case's input and
   return its validation report. The session and the other cases' results are
   kept.
+- ``workspace.set_case_input`` takes ``source`` as ``{"data": ...}`` or the
+  TargetInput JSON and rejects anything else, such as a file path, with
+  ``ValueError``. Before, a path string read that file on the engine host.
+- A unit string pint does not know, such as ``{"value": 200, "unit":
+  "bogus"}``, is a validation issue on its field: ``build_validation_report``
+  returns ``valid=False`` and the ``validate`` command returns its report.
+  Before, both raised ``UndefinedUnitError``.
+- A ``zone_tree`` whose zone has two children of the same name is rejected
+  when the input is loaded or validated ("Duplicate zone name ...").
+  Before, the second child was merged into the first.
+- ``Value.to`` converts an offset temperature (``degC``, ``C``, ``°C``,
+  ``degF``) to a difference unit such as ``delta_degC`` as a difference, as
+  the ``Value`` constructor does, so a ``Stream`` takes ``dt_cont`` as
+  ``{"value": 5, "unit": "degC"}``. Before, it raised
+  ``DimensionalityError``.
+- ``run_command`` raises ``ValueError`` naming the accepted shapes,
+  ``{"data": ...}`` or ``{"sample_case": ...}``, when ``problem`` is a bare
+  string or names neither. Before, it raised ``AttributeError`` or
+  ``KeyError``.
 - ``ConfigurationFieldMetadata`` gives each field's ``unit``,
   ``description`` and ``default``, and ``label`` is a display name such as
   "Minimum contribution temperature difference" rather than the title-cased

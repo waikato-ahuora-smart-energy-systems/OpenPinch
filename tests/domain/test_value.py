@@ -351,3 +351,24 @@ def test_prefixed_annual_cost_units_parse(unit):
     scale = 1e6 if unit.startswith("M") else 1e3
     assert value.to("$/y").value == pytest.approx(2.0 * scale)
     assert Value(2000.0, "$").to("k$").value == pytest.approx(2.0)
+
+
+@pytest.mark.parametrize(
+    ("unit", "expected"),
+    [("degC", 5.0), ("C", 5.0), ("°C", 5.0), ("degF", 5.0 / 1.8)],
+)
+def test_to_converts_an_offset_temperature_as_a_difference(unit, expected):
+    converted = Value(5.0, unit).to("delta_degC")
+
+    assert converted.unit == "delta_degC"
+    assert converted.value == pytest.approx(expected, rel=1e-12)
+
+
+def test_to_still_rejects_another_dimension():
+    with pytest.raises(Exception, match="Cannot convert"):
+        Value(5.0, "kW").to("delta_degC")
+
+
+def test_to_does_not_convert_a_difference_to_an_offset_temperature():
+    with pytest.raises(Exception, match="Cannot convert"):
+        Value(5.0, "delta_degC").to("degC")

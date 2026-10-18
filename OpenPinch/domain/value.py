@@ -129,10 +129,21 @@ class Value:
         self._set_storage(self._quantity.to(self._normalise_unit_input(unit_str)))
 
     def to(self, new_unit: str) -> "Value":
-        """Return a copy converted to ``new_unit``."""
-        new_value = self._from_quantity(
-            self._quantity.to(self._normalise_unit_input(new_unit)),
-        )
+        """Return a copy converted to ``new_unit``.
+
+        An offset temperature (``degC``) converts to a difference unit
+        (``delta_degC``) as a difference, as the constructor does; a difference
+        still does not convert to an offset temperature.
+        """
+        unit = self._normalise_unit_input(new_unit)
+        try:
+            quantity = self._quantity.to(unit)
+        except DimensionalityError:
+            to_difference = str(self._unit_from_normalised(unit)).startswith("delta_")
+            if not (to_difference and self._same_dimensionality(self._quantity, unit)):
+                raise
+            quantity = self._coercion()._coerce_quantity_to_unit(self._quantity, unit)
+        new_value = self._from_quantity(quantity)
         new_value._weights = self._weights.copy() if self._weights is not None else None
         return new_value
 

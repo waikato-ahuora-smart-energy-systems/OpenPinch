@@ -355,9 +355,10 @@ def test_insert_temperature_interval_adds_top_interval_with_zero_heat():
     assert inserted == 1
     assert pt.shape[0] == 4
     assert pt.loc[0, ProblemTableLabel.T] == pytest.approx(350.0)
-    assert pt.loc[0, ProblemTableLabel.DELTA_T] == pytest.approx(
-        pt.loc[0, ProblemTableLabel.T] - pt.loc[1, ProblemTableLabel.T]
-    )
+    # The hottest row closes no interval, so its width is zero. An earlier
+    # expectation copied the new interval's width onto the top row, which made
+    # area targets integrate a phantom interval (stale-width bug).
+    assert pt.loc[0, ProblemTableLabel.DELTA_T] == pytest.approx(0.0)
     assert pt.loc[1, ProblemTableLabel.DELTA_T] == pytest.approx(
         pt.loc[0, ProblemTableLabel.T] - pt.loc[1, ProblemTableLabel.T]
     )
@@ -475,6 +476,47 @@ def test_insert_temperature_interval_vectorises_across_top_middle_and_bottom():
     assert pt.loc[mid_idx, ProblemTableLabel.H_HOT] == pytest.approx(150.0)
     assert pt.loc[mid_idx, ProblemTableLabel.H_COLD] == pytest.approx(15.0)
     assert pt.loc[mid_idx, ProblemTableLabel.H_NET] == pytest.approx(25.0)
+
+
+def test_insert_temperature_interval_refreshes_interval_widths_and_enthalpy_steps():
+    pt = _make_problem_table_for_interval_tests()
+    heat_pairs = (
+        (ProblemTableLabel.CP_HOT, ProblemTableLabel.DELTA_H_HOT),
+        (ProblemTableLabel.CP_COLD, ProblemTableLabel.DELTA_H_COLD),
+        (ProblemTableLabel.CP_NET, ProblemTableLabel.DELTA_H_NET),
+    )
+    original_sums = {dh: float(np.sum(pt[dh])) for _, dh in heat_pairs}
+    hot_span = pt.loc[0, ProblemTableLabel.H_HOT] - pt.loc[2, ProblemTableLabel.H_HOT]
+    net_span = pt.loc[2, ProblemTableLabel.H_NET] - pt.loc[0, ProblemTableLabel.H_NET]
+
+    # Asymmetric mid insertion plus two bottom insertions: a symmetric
+    # midpoint hides a shifted width, and stacked edge rows expose stale ones.
+    inserted = pt.insert_temperature_interval([290.0, 80.0, 60.0])
+
+    assert inserted == 3
+    T = np.asarray(pt[ProblemTableLabel.T], dtype=float)
+    assert T.tolist() == [300.0, 290.0, 200.0, 100.0, 80.0, 60.0]
+    expected_widths = np.concatenate(([0.0], -np.diff(T)))
+    np.testing.assert_allclose(
+        np.asarray(pt[ProblemTableLabel.DELTA_T], dtype=float),
+        expected_widths,
+        atol=1e-9,
+    )
+    for cp, dh in heat_pairs:
+        np.testing.assert_allclose(
+            np.asarray(pt[dh], dtype=float),
+            expected_widths * np.asarray(pt[cp], dtype=float),
+            atol=1e-9,
+        )
+        assert float(np.sum(pt[dh])) == pytest.approx(original_sums[dh])
+    assert float(np.sum(pt[ProblemTableLabel.DELTA_H_HOT])) == pytest.approx(
+        pt.loc[0, ProblemTableLabel.H_HOT] - pt.loc[5, ProblemTableLabel.H_HOT]
+    )
+    assert float(np.sum(pt[ProblemTableLabel.DELTA_H_HOT])) == pytest.approx(hot_span)
+    assert float(np.sum(pt[ProblemTableLabel.DELTA_H_NET])) == pytest.approx(
+        pt.loc[5, ProblemTableLabel.H_NET] - pt.loc[0, ProblemTableLabel.H_NET]
+    )
+    assert float(np.sum(pt[ProblemTableLabel.DELTA_H_NET])) == pytest.approx(net_span)
 
 
 def test_share_temperature_intervals_aligns_both_tables_to_same_pattern():
