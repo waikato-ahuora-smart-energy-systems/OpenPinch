@@ -7,6 +7,7 @@ from collections.abc import Callable, Sequence
 from typing import Any, Optional
 
 import numpy as np
+from pint.errors import PintError
 
 from ....contracts.input import TargetInput
 from ....contracts.units import standardise_input_value
@@ -247,7 +248,7 @@ def _coerce_validation_values(
                 field_name=field_name,
                 config=config,
             )
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, PintError) as exc:
             values[field_name] = None
             issues.append(
                 _build_issue(
@@ -471,7 +472,7 @@ def _validate_segmented_stream_states(
                         config=config,
                     )
                 )
-            except (TypeError, ValueError) as exc:
+            except (TypeError, ValueError, PintError) as exc:
                 issues.append(
                     _build_issue(
                         severity="error",
@@ -753,7 +754,7 @@ def _validate_temperature_heat_profile_states(
                         config=config,
                     )
                 )
-            except (TypeError, ValueError) as exc:
+            except (TypeError, ValueError, PintError) as exc:
                 issues.append(
                     _build_issue(
                         severity="error",

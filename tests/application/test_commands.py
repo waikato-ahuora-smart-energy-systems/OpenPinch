@@ -406,6 +406,20 @@ def test_validate_reports_invalid_inline_input_instead_of_raising():
     assert report["issues"][0]["path"].startswith("streams[0].t_supply")
 
 
+def test_validate_reports_an_undefined_unit_instead_of_raising():
+    data = load_packaged_sample_case("basic_pinch.json")
+    data["streams"][0]["t_supply"] = {"value": 200.0, "unit": "bogus"}
+
+    response = run_command({"command": "validate", "problem": {"data": data}})
+
+    report = response["value"]["report"]
+    assert report["valid"] is False
+    assert any(
+        issue["path"] == "streams[0].t_supply" and "bogus" in issue["message"]
+        for issue in report["issues"]
+    )
+
+
 def test_validate_reports_input_that_passes_the_schema_but_cannot_be_built():
     # A zone type the schema accepts as text but problem construction rejects.
     data = json.loads(
