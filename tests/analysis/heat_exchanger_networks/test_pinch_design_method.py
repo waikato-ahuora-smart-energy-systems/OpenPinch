@@ -1323,6 +1323,14 @@ def test_local_executor_uses_worker_pool_for_prebuilt_tasks(monkeypatch) -> None
         "_build_problem",
         lambda *args, **kwargs: SuccessfulInternalProblem(),
     )
+    # The pool path itself, on any runtime: under Emscripten (the Pyodide
+    # lane) supported_workers would otherwise send these tasks down the
+    # serial path, which has its own test.
+    monkeypatch.setattr(
+        "OpenPinch.analysis.heat_exchanger_networks.execution.executor"
+        ".supported_workers",
+        lambda requested: requested,
+    )
 
     outcomes = executor.execute(
         tasks,
