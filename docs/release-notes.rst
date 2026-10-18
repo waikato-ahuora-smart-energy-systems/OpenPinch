@@ -69,6 +69,15 @@ Result fixes
   with duplicate network structures removed. Before, it sliced
   ``result.ranked_networks``, so rank ``k`` could differ between them.
 
+Multiperiod and WebAssembly fixes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Setting one period's value on a stream with a single (scalar) value in a
+  multiperiod problem, for example
+  ``stream.set_attr_for_period("heat_flow", 50, period_id="c")``, changes only
+  that period. Before, it wrote the value to every period. Assigning a
+  segmented utility's duty for one period had the same fault.
+
 Fuller results
 ~~~~~~~~~~~~~~
 

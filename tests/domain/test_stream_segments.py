@@ -1061,3 +1061,22 @@ def test_structured_multiperiod_profile_linearises_onto_one_stable_union_grid():
         )
         for left, right in zip(stream.segments[:-1], stream.segments[1:])
     )
+
+
+def test_scalar_segmented_utility_total_duty_changes_only_selected_period():
+    collection = StreamCollection()
+    collection.set_period_context({"a": 0, "b": 1, "c": 2}, [1.0, 1.0, 1.0], 3)
+    utility = Stream(name="HU", segments=_hot_segments(), is_process_stream=False)
+    collection.add(utility)
+
+    utility._set_segmented_total_heat_flow_at_idx(30.0, idx=2)
+
+    np.testing.assert_allclose(
+        utility.heat_flow.period_values, np.array([150.0, 150.0, 30.0])
+    )
+    np.testing.assert_allclose(
+        utility.segments[0].heat_flow.period_values, np.array([50.0, 50.0, 10.0])
+    )
+    np.testing.assert_allclose(
+        utility.segments[1].heat_flow.period_values, np.array([100.0, 100.0, 20.0])
+    )

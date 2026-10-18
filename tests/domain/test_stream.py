@@ -8,6 +8,7 @@ import pytest
 from OpenPinch.domain._stream.value_state import resolve_period_weights
 from OpenPinch.domain.enums import FluidPhase, StreamType
 from OpenPinch.domain.stream import Stream
+from OpenPinch.domain.stream_collection import StreamCollection
 from OpenPinch.domain.value import Value
 from tests.support.paths import FIXTURES_ROOT
 
@@ -585,3 +586,21 @@ def test_stream_takes_dt_cont_in_an_offset_temperature_unit(dt_cont, expected):
     )
 
     assert float(stream.delta_t_contribution) == pytest.approx(expected, rel=1e-12)
+
+
+def test_scalar_stream_set_attr_for_period_changes_only_that_period():
+    collection = StreamCollection()
+    collection.set_period_context({"a": 0, "b": 1, "c": 2}, [1.0, 1.0, 1.0], 3)
+    stream = Stream(
+        name="H1",
+        supply_temperature=100.0,
+        target_temperature=50.0,
+        heat_flow=100.0,
+    )
+    collection.add(stream)
+
+    stream.set_attr_for_period("heat_flow", 50.0, period_id="c")
+
+    np.testing.assert_allclose(
+        stream.heat_flow.period_values, np.array([100.0, 100.0, 50.0])
+    )
