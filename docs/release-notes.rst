@@ -69,6 +69,38 @@ Result fixes
   with duplicate network structures removed. Before, it sliced
   ``result.ranked_networks``, so rank ``k`` could differ between them.
 
+Multiperiod and WebAssembly fixes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Setting one period's value on a stream with a single (scalar) value in a
+  multiperiod problem, for example
+  ``stream.set_attr_for_period("heat_flow", 50, period_id="c")``, changes only
+  that period. Before, it wrote the value to every period. Assigning a
+  segmented utility's duty for one period had the same fault.
+- Heat exchanger network synthesis with ``HENS_MAX_PARALLEL`` above 1 runs
+  in the browser (Pyodide). It solves each stage's tasks one at a time where
+  the runtime cannot start worker processes, instead of raising
+  ``NotImplementedError``. The packaged Four-stream sample sets
+  ``HENS_MAX_PARALLEL`` to 10.
+- The weighted-average summary of a shared-design multiperiod heat pump or
+  refrigeration run works when one period has no heat pump load. Before,
+  building that period's zero-load row raised a validation error on
+  ``hpr_period_ids``, so ``report()`` and the weighted summaries failed. The
+  zero-load row keeps the shared design's values (``hpr_design_vector``,
+  ``hpr_period_ids``, ``hpr_period_weights``, ``hpr_period_success`` and
+  ``hpr_weighted_objective``), so the weighted-average row reports them too.
+- A shared-design (``HPR_MULTIPERIOD_OPTIMIZATION_ENABLED``) utility heat pump
+  or refrigeration target with ``include_subzones=True`` reports the same
+  subzone and base rows as a single-period target. Before, preparing the
+  shared design left each period's base targets on the zones, so a run for
+  one period kept only its heat pump rows. A zone with no heat pump or
+  refrigeration load in the selected period now gets no target, as in a
+  single-period run, instead of raising "requires a non-zero HPR load". A
+  period with no load runs no machine, so it has no case in the shared design,
+  but its weight still counts: the weighted operation (duties, work, operating
+  cost and penalty) is spread over the whole schedule, while the COP and the
+  peak capital are unchanged.
+
 Fuller results
 ~~~~~~~~~~~~~~
 

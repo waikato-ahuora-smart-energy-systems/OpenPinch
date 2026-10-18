@@ -74,6 +74,65 @@ def test_zero_load_period_counts_as_no_heat_pump():
     assert hpr.hpr_success is True
 
 
+def test_zero_load_period_keeps_shared_design_period_ids():
+    shared = {
+        "hpr_shared_design": True,
+        "hpr_period_ids": ("winter", "summer"),
+        "hpr_period_weights": (0.5, 0.5),
+    }
+    winter = TargetOutput(
+        name="Site",
+        period_id="winter",
+        targets=[
+            _row(period_id="winter"),
+            _hpr_row(period_id="winter", work=10.0, cop=4.0, **shared),
+        ],
+    )
+    summer = TargetOutput(  # no HPR row: the HPR load was zero
+        name="Site", period_id="summer", targets=[_row(period_id="summer")]
+    )
+
+    output = weighted_average_output([winter, summer], [1.0, 1.0])
+
+    hpr = next(t for t in output.targets if t.target_method == "Heat Pump")
+    assert hpr.hpr_work.value == pytest.approx(5.0)
+    assert hpr.hpr_period_ids == ("winter", "summer")
+
+
+def test_zero_load_period_keeps_every_shared_design_value():
+    # The design vector, weights, success and weighted objective describe the
+    # shared machine, which still exists in the idle period, so they agree
+    # across periods (consensus) and survive into the weighted-average row.
+    shared = {
+        "hpr_shared_design": True,
+        "hpr_design_vector": (120.0, 0.4),
+        "hpr_period_ids": ("winter", "summer"),
+        "hpr_period_weights": (0.5, 0.5),
+        "hpr_period_success": {"winter": True, "summer": True},
+        "hpr_weighted_objective": 7.5,
+    }
+    winter = TargetOutput(
+        name="Site",
+        period_id="winter",
+        targets=[
+            _row(period_id="winter"),
+            _hpr_row(period_id="winter", work=10.0, cop=4.0, **shared),
+        ],
+    )
+    summer = TargetOutput(  # no HPR row: the HPR load was zero
+        name="Site", period_id="summer", targets=[_row(period_id="summer")]
+    )
+
+    output = weighted_average_output([winter, summer], [1.0, 1.0])
+
+    hpr = next(t for t in output.targets if t.target_method == "Heat Pump")
+    assert hpr.hpr_work.value == pytest.approx(5.0)
+    assert hpr.hpr_design_vector == pytest.approx((120.0, 0.4))
+    assert hpr.hpr_period_weights == pytest.approx((0.5, 0.5))
+    assert hpr.hpr_period_success == {"winter": True, "summer": True}
+    assert hpr.hpr_weighted_objective == pytest.approx(7.5)
+
+
 # 4.3 Physical aggregation
 
 
