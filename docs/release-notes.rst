@@ -77,6 +77,11 @@ Multiperiod and WebAssembly fixes
   ``stream.set_attr_for_period("heat_flow", 50, period_id="c")``, changes only
   that period. Before, it wrote the value to every period. Assigning a
   segmented utility's duty for one period had the same fault.
+- Heat exchanger network synthesis with ``HENS_MAX_PARALLEL`` above 1 runs
+  in the browser (Pyodide). It solves each stage's tasks one at a time where
+  the runtime cannot start worker processes, instead of raising
+  ``NotImplementedError``. The packaged Four-stream sample sets
+  ``HENS_MAX_PARALLEL`` to 10.
 
 Fuller results
 ~~~~~~~~~~~~~~

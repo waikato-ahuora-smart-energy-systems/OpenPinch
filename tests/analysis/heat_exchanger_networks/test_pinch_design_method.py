@@ -1335,6 +1335,62 @@ def test_local_executor_uses_worker_pool_for_prebuilt_tasks(monkeypatch) -> None
     assert pool_calls == [(2, 2)]
 
 
+def _two_prebuilt_successful_tasks(monkeypatch, worker_pool_factory):
+    problem = _four_stream_problem()
+    settings = workflow_settings_from_problem(problem)
+    tasks = build_pinch_design_method_tasks(settings)
+    tasks = (tasks[0], tasks[0].model_copy(update={"run_id": "second-worker-task"}))
+
+    class SuccessfulInternalProblem:
+        case = SimpleNamespace(solver_run=SimpleNamespace(status="ok"))
+
+        def get_solution(self, **kwargs):
+            return SimpleNamespace(mSuccess=1)
+
+        def extract_network(self, *, run_id):
+            return HeatExchangerNetwork(run_id=run_id, total_annual_cost=1.0)
+
+    executor = LocalSynthesisExecutor(worker_pool_factory=worker_pool_factory)
+    monkeypatch.setattr(
+        executor,
+        "_build_problem",
+        lambda *args, **kwargs: SuccessfulInternalProblem(),
+    )
+    return executor.execute(
+        tasks,
+        problem=problem,
+        parent_outcomes={"force-local-build": SimpleNamespace(status="success")},
+        max_parallel=10,
+    )
+
+
+def test_local_executor_runs_serially_where_threads_are_unsupported(
+    monkeypatch,
+) -> None:
+    pool_calls = []
+
+    def recording_pool(worker_count):
+        pool_calls.append(worker_count)
+        return ThreadPoolExecutor(worker_count)
+
+    monkeypatch.setattr(sys, "platform", "emscripten")
+    outcomes = _two_prebuilt_successful_tasks(monkeypatch, recording_pool)
+
+    assert [outcome.status for outcome in outcomes] == ["success", "success"]
+    assert pool_calls == []
+
+
+def test_local_executor_runs_serially_when_worker_pool_is_unavailable(
+    monkeypatch,
+) -> None:
+    def unavailable_pool(worker_count):
+        raise NotImplementedError("lacks multiprocessing.synchronize")
+
+    outcomes = _two_prebuilt_successful_tasks(monkeypatch, unavailable_pool)
+
+    assert [outcome.status for outcome in outcomes] == ["success", "success"]
+
+
 def test_solve_built_task_model_args_failures_and_verification_paths() -> None:
     task = HeatExchangerNetworkSynthesisTask(
         run_id="executor-helper",
