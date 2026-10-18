@@ -1009,6 +1009,39 @@ def test_workspace_set_case_input_replaces_a_case_in_the_session():
     assert baseline["results"]["targets"]
 
 
+def test_workspace_set_case_input_refuses_a_host_path(tmp_path):
+    session = _workspace_session()
+    path = tmp_path / "case.json"
+    path.write_text(json.dumps(load_packaged_sample_case("basic_pinch.json")))
+
+    with pytest.raises(ValueError, match=r'\{"data": \.\.\.\}'):
+        run_command(
+            {
+                "command": "workspace.set_case_input",
+                "session": session,
+                "arguments": {"case_name": "baseline", "source": str(path)},
+            }
+        )
+
+
+def test_workspace_set_case_input_takes_a_data_source():
+    session = _workspace_session()
+    data = load_packaged_sample_case("basic_pinch.json")
+    data["options"] = {"THERMAL_DT_CONT": 20.0}
+
+    value = run_command(
+        {
+            "command": "workspace.set_case_input",
+            "session": session,
+            "arguments": {"case_name": "baseline", "source": {"data": data}},
+        }
+    )["value"]
+    stored = run_command({"command": "to_problem_json", "session": session})
+
+    assert value["report"]["valid"] is True
+    assert stored["value"]["options"]["THERMAL_DT_CONT"] == 20.0
+
+
 def test_workspace_sets_a_case_dt_cont_multiplier():
     session = _workspace_session()
 

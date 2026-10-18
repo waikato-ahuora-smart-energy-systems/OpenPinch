@@ -118,6 +118,9 @@ Command layer
   ``workspace.set_case_input`` command replace an existing case's input and
   return its validation report. The session and the other cases' results are
   kept.
+- ``workspace.set_case_input`` takes ``source`` as ``{"data": ...}`` or the
+  TargetInput JSON and rejects anything else, such as a file path, with
+  ``ValueError``. Before, a path string read that file on the engine host.
 - ``ConfigurationFieldMetadata`` gives each field's ``unit``,
   ``description`` and ``default``, and ``label`` is a display name such as
   "Minimum contribution temperature difference" rather than the title-cased
