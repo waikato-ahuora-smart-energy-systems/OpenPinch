@@ -128,6 +128,11 @@ Command layer
 - A ``zone_tree`` whose zone has two children of the same name is rejected
   when the input is loaded or validated ("Duplicate zone name ...").
   Before, the second child was merged into the first.
+- ``Value.to`` converts an offset temperature (``degC``, ``C``, ``°C``,
+  ``degF``) to a difference unit such as ``delta_degC`` as a difference, as
+  the ``Value`` constructor does, so a ``Stream`` takes ``dt_cont`` as
+  ``{"value": 5, "unit": "degC"}``. Before, it raised
+  ``DimensionalityError``.
 - ``ConfigurationFieldMetadata`` gives each field's ``unit``,
   ``description`` and ``default``, and ``label`` is a display name such as
   "Minimum contribution temperature difference" rather than the title-cased

@@ -564,3 +564,24 @@ def test_multiperiod_pressure_preserves_all_core_field_derived_broadcasting():
     assert stream.heat_capacity_flowrate.num_periods == 2
     np.testing.assert_allclose(stream.heat_capacity_flowrate.period_values, [0.5, 0.5])
     np.testing.assert_allclose(stream.minimum_temperature.period_values, [100.0, 100.0])
+
+
+@pytest.mark.parametrize(
+    ("dt_cont", "expected"),
+    [
+        ({"value": 5.0, "unit": "degC"}, 5.0),
+        ({"value": 5.0, "unit": "C"}, 5.0),
+        ({"value": 5.0, "unit": "°C"}, 5.0),
+        ({"value": 9.0, "unit": "degF"}, 5.0),
+    ],
+)
+def test_stream_takes_dt_cont_in_an_offset_temperature_unit(dt_cont, expected):
+    stream = Stream(
+        name="H1",
+        supply_temperature=150.0,
+        target_temperature=50.0,
+        heat_flow=100.0,
+        delta_t_contribution=dt_cont,
+    )
+
+    assert float(stream.delta_t_contribution) == pytest.approx(expected, rel=1e-12)
