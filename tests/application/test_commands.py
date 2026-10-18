@@ -824,6 +824,23 @@ def test_excel_export_returns_the_workbook_as_a_base64_file():
     assert base64.b64decode(workbook["content_base64"])[:2] == b"PK"
 
 
+def test_excel_export_after_an_all_periods_run_returns_the_workbook():
+    session = run_command(
+        {
+            "command": "open",
+            "problem": {"sample_case": "crude_preheat_train_multiperiod.json"},
+        }
+    )["session"]
+    run_command(
+        {"command": "target.all_periods.direct_heat_integration", "session": session}
+    )
+
+    response = run_command({"command": "export.excel", "session": session})
+
+    (workbook,) = response["value"]["files"]
+    assert base64.b64decode(workbook["content_base64"])[:2] == b"PK"
+
+
 def test_plot_export_returns_html_files_for_the_named_plot():
     session = run_command(
         {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}

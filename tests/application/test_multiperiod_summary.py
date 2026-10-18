@@ -704,3 +704,44 @@ def test_period_export_keeps_the_all_period_tables_after_a_single_period_run(
             workbook.close()
 
     assert sheet_names(later_path) == sheet_names(batch_path)
+
+
+def _workbook(path):
+    workbook = openpyxl.load_workbook(path, read_only=True)
+    try:
+        summary = workbook["Summary"]
+        header = next(summary.iter_rows(max_row=1, values_only=True))
+        period_column = header.index("Period ID")
+        periods = [
+            row[period_column]
+            for row in summary.iter_rows(min_row=2, values_only=True)
+            if row[period_column] is not None
+        ]
+        return workbook.sheetnames, periods
+    finally:
+        workbook.close()
+
+
+def test_export_after_only_an_all_period_run_writes_every_period(tmp_path):
+    problem = PinchProblem(source="crude_preheat_train_multiperiod.json")
+    problem.target.all_periods.direct_heat_integration()
+
+    path = problem.export_excel(tmp_path / "default")
+
+    expected = problem.export_excel(
+        tmp_path / "periods", include_periods=True, include_weighted_average=True
+    )
+    sheets, periods = _workbook(path)
+    assert (sheets, periods) == _workbook(expected)
+    assert periods == [*problem.period_results, "weighted_average"]
+
+
+def test_export_after_a_single_period_run_writes_that_run_only(tmp_path):
+    problem = PinchProblem(source="crude_preheat_train_multiperiod.json")
+    problem.target.all_periods.direct_heat_integration()
+    problem.target.direct_heat_integration(period_id="base")
+
+    sheets, periods = _workbook(problem.export_excel(tmp_path))
+
+    assert periods == ["base"]
+    assert len(sheets) == 3
