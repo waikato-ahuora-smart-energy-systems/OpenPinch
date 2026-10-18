@@ -15,7 +15,7 @@ from ...domain.stream import Stream
 from ...domain.stream_collection import StreamCollection
 from ...domain.targets import DirectIntegrationTarget
 from ...domain.zone import Zone
-from ..numerics import delta_vals, delta_with_zero_at_start, get_period_index
+from ..numerics import delta_vals, get_period_index
 from .area_cost import (
     get_area_targets,
     get_balanced_CC,
@@ -332,19 +332,6 @@ def _insert_utility_temperature_intervals(
     )
     if len(utility_grid):
         pt.insert_temperature_interval(utility_grid[ProblemTableLabel.T].tolist())
-        _refresh_interval_derived_columns(pt)
-
-
-def _refresh_interval_derived_columns(pt: ProblemTable) -> None:
-    """Rebuild interval widths and heat increments after grid augmentation."""
-    delta_t = delta_with_zero_at_start(pt[ProblemTableLabel.T])
-    pt[ProblemTableLabel.DELTA_T] = delta_t
-    for cp_label, delta_h_label in (
-        (ProblemTableLabel.CP_HOT, ProblemTableLabel.DELTA_H_HOT),
-        (ProblemTableLabel.CP_COLD, ProblemTableLabel.DELTA_H_COLD),
-        (ProblemTableLabel.CP_NET, ProblemTableLabel.DELTA_H_NET),
-    ):
-        pt[delta_h_label] = delta_t * pt[cp_label]
 
 
 ################################################################################

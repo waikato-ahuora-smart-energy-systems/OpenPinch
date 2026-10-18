@@ -336,12 +336,8 @@ def test_insert_temperature_interval_helper_guard_paths():
     assert inserted == 0
     assert np.allclose(same_data, pt.data, equal_nan=True)
 
-    rows, top_adj, bot_adj = engine._build_mid_block(
-        pt.data[0], pt.data[1], np.array([])
-    )
+    rows = engine._build_mid_block(pt.data[0], pt.data[1], np.array([]))
     assert rows.size == 0
-    assert top_adj.shape == pt.data[0].shape
-    assert bot_adj.shape == pt.data[1].shape
 
     new_data = np.zeros((2, pt.data.shape[1]))
     row_meta = [{"type": "top"}, {"type": "top"}]
@@ -360,28 +356,25 @@ def test_temperature_block_and_interpolation_edge_paths():
         add_default_labels=False,
     )
     mini_engine = TemperatureIntervalEngine(mini)
-    empty_block, _ = mini_engine._build_top_or_bottom_block(
+    empty_block = mini_engine._build_top_or_bottom_block(
         row_neighbor=np.array([100.0, 0.0], dtype=float),
         T_vals=np.array([]),
-        is_top_block=True,
     )
     assert empty_block.shape == (0, 2)
 
     full = _default_table()
     engine = TemperatureIntervalEngine(full)
     row_neighbor = full.data[0].copy()
-    block, _ = engine._build_top_or_bottom_block(
+    block = engine._build_top_or_bottom_block(
         row_neighbor=row_neighbor,
         T_vals=np.array([220.0, 240.0, 260.0], dtype=float),
-        is_top_block=True,
     )
     assert block.shape[0] == 3
+    t_col = full.col_index[ProblemTableLabel.T.value]
+    assert block[:, t_col].tolist() == [260.0, 240.0, 220.0]
 
-    rows0, (t_idx, delta_idx) = engine._initialise_insert_rows(
-        full.data[0], full.data[1], np.array([])
-    )
+    rows0 = engine._initialise_insert_rows(full.data[1], np.array([]))
     assert rows0.shape[0] == 0
-    assert isinstance(t_idx, int) and isinstance(delta_idx, int)
 
     engine._interpolate_heat_columns(
         rows=np.empty((0, full.data.shape[1])),
@@ -413,14 +406,6 @@ def test_temperature_block_and_interpolation_edge_paths():
         t_idx=full.col_index[ProblemTableLabel.T.value],
     )
     assert rows[0, full.col_index[ProblemTableLabel.H_HOT.value]] == pytest.approx(11.0)
-
-    adjusted = engine._adjust_bottom_row(
-        row_bot=bot,
-        rows=np.empty((0, full.data.shape[1])),
-        t_idx=full.col_index[ProblemTableLabel.T.value],
-        delta_idx=full.col_index[ProblemTableLabel.DELTA_T.value],
-    )
-    assert np.allclose(adjusted, bot, equal_nan=True)
 
 
 def test_row_mutation_update_sort_and_export_errors():

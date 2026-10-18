@@ -14,6 +14,13 @@ Tutorials
 Result fixes
 ~~~~~~~~~~~~
 
+- ``target.heat_exchanger_area_and_cost()`` reports higher area, capital cost
+  and total cost targets. Inserting temperatures into a problem table left the
+  inserted intervals and their neighbours with the wrong widths and enthalpy
+  steps, so the area integration over the balanced composite curves came out
+  5-22 % low. For example, the ``basic_pinch`` area target rises from about
+  475 m2 to about 554 m2. Published area and cost numbers change; energy
+  targets do not.
 - ``run_command`` with ``design.multiperiod_heat_exchanger_network`` returns
   its result. Before, building the response's ``view`` raised "period_id is
   required when a network has multiple period states" for the shared
