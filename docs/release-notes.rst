@@ -14,6 +14,13 @@ Tutorials
 Result fixes
 ~~~~~~~~~~~~
 
+- ``run_command`` with ``design.multiperiod_heat_exchanger_network`` returns
+  its result. Before, building the response's ``view`` raised "period_id is
+  required when a network has multiple period states" for the shared
+  multiperiod network. ``design.*`` responses now carry ``views``, one
+  ``HeatExchangerNetworkView`` per period of the rank-1 network in period
+  order (one for a single-period network), and ``view`` is the first of them.
+  The HEN design view gains ``views(rank=)``, which returns them.
 - ``export_excel(include_periods=True)`` writes each period's problem tables
   from the all-periods run that produced the exported results. Before, a later
   single-period run replaced that period's tables, so the workbook mixed the

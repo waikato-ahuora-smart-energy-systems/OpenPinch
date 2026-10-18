@@ -116,6 +116,17 @@ class HeatExchangerNetworkDesignView:
 
         return build_network_view(self.result, rank=rank, period_id=period_id)
 
+    def views(self, *, rank: int = 1) -> tuple["HeatExchangerNetworkView", ...]:
+        """Return ``view`` for each period of one ranked network, in period order.
+
+        A single-period network has one view; a shared multiperiod network
+        has one per period, each naming its ``period_id``.
+        """
+        period_ids = self.network(rank=rank).period_ids or (None,)
+        return tuple(
+            self.view(rank=rank, period_id=period_id) for period_id in period_ids
+        )
+
     @property
     def total_heat_recovery(self) -> float:
         from ....domain.enums import HeatExchangerKind

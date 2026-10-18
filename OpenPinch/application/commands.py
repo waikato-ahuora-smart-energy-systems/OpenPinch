@@ -151,12 +151,13 @@ def run_command(
     target is ``{"ref": <id>, "target": <TargetResults JSON>}``, and later
     arguments pass it as ``{"$ref": <id>}``; another session's problem is
     passed as ``{"$session": <id>}``. Outside a session targets are reported
-    only in the results. A ``design.`` command also returns ``view``, the
+    only in the results. A ``design.`` command also returns ``views``, the
     ``HeatExchangerNetworkView`` of its rank-1 network (ranking, totals,
-    utility duties and grid layout). Analysis that runs and fails (heat pump
-    targeting) returns ``error`` (``{type, message, details}``) instead of
-    raising, as does a session the engine does not hold (type
-    ``unknown_session``). ``warnings`` lists the non-fatal issues the command
+    utility duties and grid layout) for each of the network's periods in
+    period order, and ``view``, the first of them. Analysis that runs and
+    fails (heat pump targeting) returns ``error`` (``{type, message,
+    details}``) instead of raising, as does a session the engine does not hold
+    (type ``unknown_session``). ``warnings`` lists the non-fatal issues the command
     met, each ``{type, message, details}``: Python warnings by category name,
     ``validation`` (one per input validation issue) and ``default_utility``
     (a default utility added on loading).
@@ -324,7 +325,9 @@ def _run(request: Mapping[str, Any]) -> dict[str, Any]:
     response = {"value": value, "results": _results_json(problem)}
     if isinstance(returned, HeatExchangerNetworkDesignView):
         # The ranking, totals, utility duties and grid a results screen shows.
-        response["view"] = returned.view().model_dump(mode="json")
+        # One view per period; ``view`` is the first period's.
+        views = [view.model_dump(mode="json") for view in returned.views()]
+        response["view"], response["views"] = views[0], views
     return response
 
 

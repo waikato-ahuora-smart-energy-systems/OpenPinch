@@ -219,7 +219,9 @@ For clients that draw the network themselves, the design view's
 duplicate-free ranking table, one ranked network's duty totals and utility
 duties, and its grid layout
 (:class:`~OpenPinch.contracts.synthesis.view.HeatExchangerNetworkGridLayout`,
-also from ``grid_layout(rank=, period_id=)``) as plain data.
+also from ``grid_layout(rank=, period_id=)``) as plain data. A shared
+multiperiod network needs ``period_id``; ``views(rank=)`` returns one view per
+period, each naming its ``period_id``.
 
 .. autoclass:: OpenPinch.contracts.synthesis.result.HeatExchangerNetworkSynthesisResult
    :members:
