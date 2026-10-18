@@ -86,6 +86,14 @@ Multiperiod and WebAssembly fixes
   refrigeration run works when one period has no heat pump load. Before,
   building that period's zero-load row raised a validation error on
   ``hpr_period_ids``, so ``report()`` and the weighted summaries failed.
+- A shared-design (``HPR_MULTIPERIOD_OPTIMIZATION_ENABLED``) utility heat pump
+  or refrigeration target with ``include_subzones=True`` reports the same
+  subzone and base rows as a single-period target. Before, preparing the
+  shared design left each period's base targets on the zones, so a run for
+  one period kept only its heat pump rows. A zone with no heat pump or
+  refrigeration load in the selected period now gets no target, as in a
+  single-period run, instead of raising "requires a non-zero HPR load", and a
+  period with no load is left out of the shared design.
 
 Fuller results
 ~~~~~~~~~~~~~~

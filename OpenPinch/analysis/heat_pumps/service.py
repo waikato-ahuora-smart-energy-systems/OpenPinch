@@ -244,6 +244,7 @@ def _compute_multiperiod_heat_pump_or_refrigeration_target(
     | DirectRefrigerationTarget
     | IndirectHeatPumpTarget
     | IndirectRefrigerationTarget
+    | None
 ):
     idx, period_id = get_period_index(period_ids=zone.period_ids, args=args)
     selected_period_id = period_id_for_index(zone, idx)
@@ -253,6 +254,9 @@ def _compute_multiperiod_heat_pump_or_refrigeration_target(
         is_direct=is_direct,
         args=args,
     )
+    if selected_period_id not in {str(case.period_id) for case in cases}:
+        # No HPR load in the selected period: no target, as for one period.
+        return None
     res = get_multiperiod_hpr_targets(
         period_cases=cases,
         selected_period_id=selected_period_id,

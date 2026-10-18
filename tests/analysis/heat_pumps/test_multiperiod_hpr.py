@@ -1,5 +1,6 @@
 """Multi-period heat pump and refrigeration optimisation tests."""
 
+import json
 from types import SimpleNamespace
 
 import numpy as np
@@ -40,6 +41,7 @@ from OpenPinch.domain.targets import DirectHeatPumpTarget
 from OpenPinch.domain.value import Value
 from OpenPinch.domain.zone import Zone
 from OpenPinch.optimisation.models import OptimisationCandidate
+from OpenPinch.resources import read_sample_case
 
 from .helpers import _base_args
 
@@ -873,3 +875,48 @@ def test_shared_design_fails_when_an_idle_period_cannot_be_priced():
     assert not result.success
     assert result.failure_reason != ZERO_USEFUL_DUTY_REASON
     assert "'p1'" in result.failure_reason
+
+
+def _zonal_site_problem(zone_names: set[str], *, shared: bool) -> PinchProblem:
+    payload = json.loads(read_sample_case("zonal_site_multiperiod.json"))
+    payload["streams"] = [
+        stream
+        for stream in payload["streams"]
+        if stream["zone"].split("[")[0] in zone_names
+    ]
+    payload["options"]["HPR_MULTIPERIOD_OPTIMIZATION_ENABLED"] = shared
+    return PinchProblem(source=payload, project_name="Zonal")
+
+
+def _utility_heat_pump_rows(problem: PinchProblem) -> list[tuple]:
+    problem.target.carnot_heat_pump(
+        is_utility_heat_pump=True,
+        include_subzones=True,
+        period_id="summer",
+        maximum_iterations=5,
+        maximum_evaluations=200,
+    )
+    return sorted(
+        (target.scope, target.target_method, target.integration_type)
+        for target in problem.results.targets
+    )
+
+
+def test_shared_utility_heat_pump_keeps_every_subzone_target():
+    zones = {"Chemical Plant"}
+
+    shared = _utility_heat_pump_rows(_zonal_site_problem(zones, shared=True))
+    single = _utility_heat_pump_rows(_zonal_site_problem(zones, shared=False))
+
+    assert shared == single
+
+
+def test_shared_utility_heat_pump_skips_a_zone_without_load():
+    # Food Plant has no utility heat pump load in summer.
+    zones = {"Chemical Plant", "Food Plant"}
+
+    shared = _utility_heat_pump_rows(_zonal_site_problem(zones, shared=True))
+    single = _utility_heat_pump_rows(_zonal_site_problem(zones, shared=False))
+
+    assert shared == single
+    assert ("Zonal/Food Plant[S]", "Heat Pump", "Utility") not in shared
