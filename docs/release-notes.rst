@@ -85,7 +85,10 @@ Multiperiod and WebAssembly fixes
 - The weighted-average summary of a shared-design multiperiod heat pump or
   refrigeration run works when one period has no heat pump load. Before,
   building that period's zero-load row raised a validation error on
-  ``hpr_period_ids``, so ``report()`` and the weighted summaries failed.
+  ``hpr_period_ids``, so ``report()`` and the weighted summaries failed. The
+  zero-load row keeps the shared design's values (``hpr_design_vector``,
+  ``hpr_period_ids``, ``hpr_period_weights``, ``hpr_period_success`` and
+  ``hpr_weighted_objective``), so the weighted-average row reports them too.
 - A shared-design (``HPR_MULTIPERIOD_OPTIMIZATION_ENABLED``) utility heat pump
   or refrigeration target with ``include_subzones=True`` reports the same
   subzone and base rows as a single-period target. Before, preparing the

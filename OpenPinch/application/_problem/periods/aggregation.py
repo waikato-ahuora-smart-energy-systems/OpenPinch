@@ -308,16 +308,22 @@ def _zero_load_hpr_row(base: TargetResults, template: TargetResults) -> TargetRe
     ):
         data[field] = getattr(template, field, None)
     metadata = {"hpr_cycle", "hpr_simulation_backend", "hpr_shared_design"}
+    specifications = metric_specifications(type(template))
     for field in type(template).model_fields:
         if not field.startswith("hpr_") or field in metadata:
             continue
         value = getattr(template, field, None)
-        if field in _HPR_ZERO_NONE_FIELDS:
+        spec = specifications.get(field)
+        if spec is not None and spec.aggregation is AggregationPolicy.CONSENSUS:
+            # Shared-design values (design vector, period ids and weights,
+            # weighted objective) describe the machine, not this period's
+            # load, and the machine still exists while it is idle.
+            data[field] = value
+        elif field in _HPR_ZERO_NONE_FIELDS:
             data[field] = None
         elif isinstance(value, Value):
             data[field] = Value({"value": 0.0, "unit": value.to_dict()["unit"]})
         elif isinstance(value, tuple):
-            # Labels such as hpr_period_ids describe the design, not its load.
             data[field] = (
                 tuple(0.0 for _ in value)
                 if all(_is_number(item) for item in value)
