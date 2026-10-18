@@ -317,12 +317,21 @@ def _zero_load_hpr_row(base: TargetResults, template: TargetResults) -> TargetRe
         elif isinstance(value, Value):
             data[field] = Value({"value": 0.0, "unit": value.to_dict()["unit"]})
         elif isinstance(value, tuple):
-            data[field] = tuple(0.0 for _ in value)
-        elif isinstance(value, (int, float)) and not isinstance(value, bool):
+            # Labels such as hpr_period_ids describe the design, not its load.
+            data[field] = (
+                tuple(0.0 for _ in value)
+                if all(_is_number(item) for item in value)
+                else value
+            )
+        elif _is_number(value):
             data[field] = 0.0
         else:
             data[field] = None
     return type(template).model_validate(data)
+
+
+def _is_number(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 def _aligned_target_groups(

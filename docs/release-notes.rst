@@ -82,6 +82,10 @@ Multiperiod and WebAssembly fixes
   the runtime cannot start worker processes, instead of raising
   ``NotImplementedError``. The packaged Four-stream sample sets
   ``HENS_MAX_PARALLEL`` to 10.
+- The weighted-average summary of a shared-design multiperiod heat pump or
+  refrigeration run works when one period has no heat pump load. Before,
+  building that period's zero-load row raised a validation error on
+  ``hpr_period_ids``, so ``report()`` and the weighted summaries failed.
 
 Fuller results
 ~~~~~~~~~~~~~~
