@@ -92,8 +92,11 @@ Multiperiod and WebAssembly fixes
   shared design left each period's base targets on the zones, so a run for
   one period kept only its heat pump rows. A zone with no heat pump or
   refrigeration load in the selected period now gets no target, as in a
-  single-period run, instead of raising "requires a non-zero HPR load", and a
-  period with no load is left out of the shared design.
+  single-period run, instead of raising "requires a non-zero HPR load". A
+  period with no load runs no machine, so it has no case in the shared design,
+  but its weight still counts: the weighted operation (duties, work, operating
+  cost and penalty) is spread over the whole schedule, while the COP and the
+  peak capital are unchanged.
 
 Fuller results
 ~~~~~~~~~~~~~~

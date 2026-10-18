@@ -32,6 +32,7 @@ from ..targeting.cascade import (
 from ._multiperiod.execution import get_multiperiod_hpr_targets
 from ._multiperiod.preparation import (
     build_multiperiod_hpr_cases,
+    idle_period_weight,
     period_case_by_id,
     period_id_for_index,
 )
@@ -261,6 +262,8 @@ def _compute_multiperiod_heat_pump_or_refrigeration_target(
         period_cases=cases,
         selected_period_id=selected_period_id,
         selected_period_idx=idx,
+        # Periods without HPR load have no case but keep their schedule share.
+        idle_period_weight=idle_period_weight(zone, cases),
     )
     selected_case = period_case_by_id(cases, selected_period_id)
     pt = _calc_hpr_cascade(

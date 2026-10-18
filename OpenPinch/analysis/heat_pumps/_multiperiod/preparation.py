@@ -220,6 +220,18 @@ def _canonical_period_items(zone: Zone) -> list[tuple[str, int]]:
     return [(str(period_id), int(idx)) for period_id, idx in period_ids.items()]
 
 
+def idle_period_weight(zone: Zone, period_cases) -> float:
+    """The weight of the zone's periods without a prepared case (no HPR load)."""
+    prepared = {str(case.period_id) for case in period_cases}
+    return float(
+        sum(
+            weight
+            for period_id, weight in _canonical_period_weights(zone).items()
+            if period_id not in prepared
+        )
+    )
+
+
 def _canonical_period_weights(zone: Zone) -> dict[str, float]:
     items = _canonical_period_items(zone)
     flat_weights = resolve_period_weights(
@@ -245,6 +257,7 @@ def _period_args(
 
 __all__ = [
     "build_multiperiod_hpr_cases",
+    "idle_period_weight",
     "period_case_by_id",
     "period_id_for_index",
 ]

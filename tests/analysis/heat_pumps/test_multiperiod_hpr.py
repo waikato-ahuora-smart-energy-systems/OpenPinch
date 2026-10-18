@@ -920,3 +920,129 @@ def test_shared_utility_heat_pump_skips_a_zone_without_load():
 
     assert shared == single
     assert ("Zonal/Food Plant[S]", "Heat Pump", "Utility") not in shared
+
+
+def _weighted_cost_args(*, idle_period_weight: float) -> MultiPeriodHPRTargetInputs:
+    return MultiPeriodHPRTargetInputs(
+        period_cases=[
+            HPRPeriodCase(
+                period_id=f"p{idx}",
+                period_idx=idx,
+                weight=weight,
+                args=_input_args(period_idx=idx),
+            )
+            for idx, weight in ((0, 1.0), (1, 3.0))
+        ],
+        selected_period_id="p0",
+        selected_period_idx=0,
+        hpr_type=HeatPumpAndRefrigerationCycle.CascadeCarnot.value,
+        max_multi_start=1,
+        bb_minimiser="rbf_surrogate",
+        idle_period_weight=idle_period_weight,
+    )
+
+
+def test_an_idle_periods_weight_counts_in_the_weighted_operation():
+    # Two loaded periods (weights 1 and 3) and idle periods weighing 4 more:
+    # the idle share runs no machine, so it adds no operating cost but still
+    # dilutes the loaded periods' share of the schedule. Capital is the peak.
+    def objective(x, args, debug=False):
+        operating = {0: 100.0, 1: 300.0}[args.period_idx]
+        capital = {0: 500.0, 1: 50.0}[args.period_idx]
+        return _backend_result(
+            obj=1.0, utility_tot=10.0, period_idx=args.period_idx
+        ).with_updates(
+            hpr_operating_cost=Value(operating, "$/y"),
+            hpr_annualized_capital_cost=Value(capital, "$/y"),
+            feasibility_penalty=0.0,
+        )
+
+    loaded_only = hp_aggregation.evaluate_multiperiod_candidate(
+        np.array([1.0]),
+        _weighted_cost_args(idle_period_weight=0.0),
+        period_objective=objective,
+    )
+    with_idle = hp_aggregation.evaluate_multiperiod_candidate(
+        np.array([1.0]),
+        _weighted_cost_args(idle_period_weight=4.0),
+        period_objective=objective,
+    )
+
+    assert loaded_only.weighted_output.hpr_operating_cost.value == pytest.approx(250.0)
+    assert with_idle.weighted_output.hpr_operating_cost.value == pytest.approx(125.0)
+    assert with_idle.weighted_output.utility_tot == pytest.approx(5.0)
+    assert with_idle.weighted_output.hpr_annualized_capital_cost.value == (
+        pytest.approx(500.0)
+    )
+    assert with_idle.obj == pytest.approx(625.0)
+
+
+def test_an_idle_periods_weight_counts_without_a_cost_breakdown():
+    def objective(x, args, debug=False):
+        return HPRBackendResult(
+            obj=10.0 + 10.0 * args.period_idx,
+            utility_tot=1.0,
+            w_net=1.0,
+            Q_ext_heat=0.0,
+            Q_ext_cold=0.0,
+            Q_amb_hot=0.0,
+            Q_amb_cold=0.0,
+        )
+
+    result = hp_aggregation.evaluate_multiperiod_candidate(
+        np.array([1.0]),
+        _weighted_cost_args(idle_period_weight=4.0),
+        period_objective=objective,
+    )
+
+    # (1 x 10 + 3 x 20) / (1 + 3 + 4)
+    assert result.obj == pytest.approx(8.75)
+
+
+def test_shared_design_is_given_the_weight_of_periods_without_load(monkeypatch):
+    zone = Zone(
+        config=Configuration(
+            options={
+                "PROBLEM_PERIOD_IDS": ["p0", "p1", "p2"],
+                "PROBLEM_PERIOD_WEIGHTS": [1.0, 3.0, 4.0],
+                "HPR_MULTIPERIOD_OPTIMIZATION_ENABLED": True,
+            }
+        )
+    )
+    loaded = [
+        _PreparedHPRPeriodCase(
+            period_id=period_id,
+            period_idx=idx,
+            weight=weight,
+            solver_case=HPRPeriodCase(
+                period_id=period_id,
+                period_idx=idx,
+                weight=weight,
+                args=_input_args(period_idx=idx),
+            ),
+            base_target=None,
+            optimizer_pt=None,
+        )
+        for period_id, idx, weight in (("p0", 0, 1.0), ("p1", 1, 3.0))
+    ]
+    monkeypatch.setattr(hp, "build_multiperiod_hpr_cases", lambda **_kwargs: loaded)
+    seen = {}
+
+    class Stop(Exception):
+        pass
+
+    def fake_targets(**kwargs):
+        seen.update(kwargs)
+        raise Stop
+
+    monkeypatch.setattr(hp, "get_multiperiod_hpr_targets", fake_targets)
+
+    with pytest.raises(Stop):
+        hp.compute_direct_heat_pump_or_refrigeration_target(
+            zone,
+            is_heat_pumping=True,
+            args={"period_id": "p0", "period_idx": 0},
+        )
+
+    # p2 has no HPR load, so it has no case, but its weight still counts.
+    assert seen["idle_period_weight"] == pytest.approx(4.0)

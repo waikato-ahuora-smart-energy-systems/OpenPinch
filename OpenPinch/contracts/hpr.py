@@ -332,6 +332,9 @@ class MultiPeriodHPRTargetInputs(BaseModel):
 
     search_budget: HPRSearchBudget = Field(default_factory=HPRSearchBudget)
     period_cases: List[HPRPeriodCase]
+    # Schedule weight of the periods with no HPR load, which have no case: no
+    # machine runs there, but they still count in the weighted operation.
+    idle_period_weight: float = Field(default=0.0, ge=0.0)
     selected_period_id: str
     selected_period_idx: int
     hpr_type: str
