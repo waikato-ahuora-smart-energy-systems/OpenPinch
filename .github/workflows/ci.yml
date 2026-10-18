@@ -302,7 +302,19 @@ jobs:
     # The OpenPinch web app runs the built wheel in Pyodide (CPython on
     # WebAssembly). Node runs the same WebAssembly runtime as the browser.
     # WebAssembly is several times slower than native CPython, so the suite
-    # is split into shards that run in parallel.
+    # is split into shards that run in parallel. Required by CI OK: Pyodide's
+    # own packages come from the jsDelivr CDN for the version pinned in
+    # scripts/pyodide/package-lock.json, and the test dependencies from PyPI
+    # at the uv.lock versions in scripts/pyodide/requirements.txt, so a
+    # failure is a real one or a download to re-run, not a new release.
+    #
+    # Outside every shard, and covered by the CPython lanes: tests/e2e (over
+    # two minutes on CPython, so too long for a shard, and its CLI tests
+    # start subprocesses), tests/architecture (it inspects the checkout's
+    # source tree and imports in fresh subprocesses), tests/packaging apart
+    # from the wheel, pin and Hypothesis checks (docs builds, notebooks and
+    # release checks that run git, uv or other subprocesses), and
+    # test_coolprop_hpr_audit.py (over 12 minutes in Pyodide).
     name: Tests (Pyodide, ${{ matrix.shard }})
     needs: build
     runs-on: ubuntu-latest
@@ -314,7 +326,10 @@ jobs:
           - shard: core
             paths: >-
               tests/domain tests/contracts tests/adapters tests/optimisation
+              tests/presentation
               tests/packaging/test_installed_wheel.py
+              tests/packaging/test_pyodide_pins.py
+              tests/packaging/test_hypothesis_profile.py
               tests/analysis --ignore=tests/analysis/heat_pumps
           - shard: heat-pumps
             paths: tests/analysis/heat_pumps
@@ -367,6 +382,7 @@ jobs:
             --deselect tests/analysis/orc/test_orc_cycle.py::test_each_thread_has_its_own_coolprop_state
             --deselect tests/analysis/orc/test_orc_cycle.py::test_parallel_cycle_solves_match_serial_solves
             --deselect tests/analysis/orc/test_orc_cycle.py::test_parallel_isopentane_sweep_matches_serial_solves
+            --deselect tests/presentation/test_workbook_reporting.py::test_workbook_path_reservation_is_unique_under_concurrency
             # Kaleido image export drives a headless Chrome.
             --deselect tests/analysis/heat_exchanger_networks/test_reporting.py::test_grid_diagram_save_writes_image
             # Pyodide ships CoolProp 7.2, which cannot flash this ternary
@@ -417,7 +433,9 @@ jobs:
           PR_TO_MAIN: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' }}
         run: |
           echo "$RESULTS" | jq -r 'to_entries[] | "- \(.key): \(.value.result)"' | tee -a "$GITHUB_STEP_SUMMARY"
-          required='["lint","tests","build","smoke"]'
+          # audit stays informational: a newly published advisory must not
+          # block unrelated merges. pyodide is required (see its job).
+          required='["lint","tests","build","smoke","pyodide"]'
           [ "$FULL" = true ] && required="$(jq -c '. + ["solver"]' <<< "$required")"
           [ "$PR_TO_MAIN" = true ] && required="$(jq -c '. + ["version"]' <<< "$required")"
           failed="$(jq -r --argjson req "$required" \

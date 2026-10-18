@@ -4,6 +4,21 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Testing and CI
+~~~~~~~~~~~~~~
+
+- The Pyodide test lane is required by ``CI OK``, so a change that breaks the
+  web app's engine blocks the merge. Its PyPI test dependencies are pinned
+  to the ``uv.lock`` versions in ``scripts/pyodide/requirements.txt``, a test
+  keeps the two in step, and the run fails if micropip fetches anything
+  else from PyPI. ``tests/presentation`` now runs in the lane's core shard,
+  and the utility placement timing tests allow WebAssembly ten times their
+  native budget.
+- ``tests/conftest.py`` loads an ``openpinch`` Hypothesis profile
+  (``derandomize=False``, no deadline, no example database), so
+  ``--hypothesis-seed`` picks the same examples on GitHub, locally and in
+  Pyodide. Before, Hypothesis's own CI profile ignored the seed on GitHub.
+
 Tutorials
 ~~~~~~~~~
 
