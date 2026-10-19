@@ -291,6 +291,23 @@ def locate_summary_row(
     return candidates.iloc[0]
 
 
+def _root_scope(frame: pd.DataFrame) -> str:
+    scopes = frame["Scope"].astype(str)
+    return min(scopes, key=lambda scope: (scope.count("/"), len(scope)))
+
+
+def _matching_scope(
+    scope: str,
+    base_frame: pd.DataFrame,
+    other_frame: pd.DataFrame,
+) -> str:
+    """Return the other frame's scope for a base scope; projects may differ."""
+    base_root = _root_scope(base_frame)
+    if scope != base_root and not scope.startswith(f"{base_root}/"):
+        return scope
+    return _root_scope(other_frame) + scope[len(base_root) :]
+
+
 def compare_problem_summaries(
     base_frame: pd.DataFrame,
     other_frame: pd.DataFrame,
@@ -312,7 +329,7 @@ def compare_problem_summaries(
     base_row = locate_summary_row(base_frame, **selectors)
     other_row = locate_summary_row(
         other_frame,
-        scope=scope or str(base_row["Scope"]),
+        scope=_matching_scope(str(base_row["Scope"]), base_frame, other_frame),
         zone_type=zone_type or str(base_row["Zone Type"]),
         integration_type=integration_type or str(base_row["Integration Type"]),
         target_method=target_method or str(base_row["Target Method"]),

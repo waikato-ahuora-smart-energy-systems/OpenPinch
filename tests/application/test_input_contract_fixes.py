@@ -109,3 +109,15 @@ def test_stream_without_heat_flow_or_heat_capacity_flowrate_is_rejected():
 
     assert report.valid is False
     assert any("heat_flow" in issue.message for issue in report.issues)
+
+
+def test_compare_to_matches_rows_across_project_names():
+    base = PinchProblem(source="basic_pinch.json", project_name="Base")
+    other = PinchProblem(source="basic_pinch.json", project_name="Scenario")
+    base.target.direct_heat_integration()
+    other.target.direct_heat_integration()
+
+    comparison = base.compare_to(other)
+
+    assert comparison.loc["Change", "Hot Utility Target"] == 0.0
+    assert comparison.loc["Scenario", "Scope"] == "Scenario"
