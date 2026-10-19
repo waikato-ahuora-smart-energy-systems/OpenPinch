@@ -75,6 +75,7 @@ class ConfigurationFieldMetadata(BaseModel):
     enum_choices: List[str] = Field(default_factory=list)
     numeric_min: Optional[float] = None
     numeric_max: Optional[float] = None
+    numeric_min_exclusive: bool = False
     multiple: bool = False
     unit: Optional[str] = None
     description: str = ""
