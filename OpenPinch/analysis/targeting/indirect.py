@@ -21,6 +21,7 @@ from ...domain.zone import Zone
 from ..numerics import get_period_index
 from .cascade import get_process_heat_cascade
 from .direct import _create_net_hot_and_cold_stream_collections_for_site_analysis
+from .utilities import _apply_utility_duties
 
 __all__ = [
     "compute_subzone_aggregate_target",
@@ -42,34 +43,26 @@ def compute_subzone_aggregate_target(
     hot_utility_target = cold_utility_target = heat_recovery_target = 0.0
     utility_cost = 0.0
 
-    hot_utilities = deepcopy(zone.hot_utilities).set_common_stream_attribute(
-        attr_name="heat_flow", value=0.0, idx=idx
-    )
-    cold_utilities = deepcopy(zone.cold_utilities).set_common_stream_attribute(
-        attr_name="heat_flow", value=0.0, idx=idx
-    )
+    hot_totals = [0.0] * len(zone.hot_utilities)
+    cold_totals = [0.0] * len(zone.cold_utilities)
     for subzone in zone.subzones.values():
         t = subzone.targets[TargetType.DI.value]
         hot_utility_target += t.hot_utility_target
         cold_utility_target += t.cold_utility_target
         heat_recovery_target += t.heat_recovery_target
         utility_cost += t.utility_cost
-
-        for j in range(len(hot_utilities)):
-            hot_utilities[j].set_value_attr_at_idx(
-                attr_name="heat_flow",
-                value=hot_utilities[j].heat_flow[idx]
-                + t.hot_utilities[j].heat_flow[idx],
-                idx=idx,
-            )
-
-        for j in range(len(cold_utilities)):
-            cold_utilities[j].set_value_attr_at_idx(
-                attr_name="heat_flow",
-                value=cold_utilities[j].heat_flow[idx]
-                + t.cold_utilities[j].heat_flow[idx],
-                idx=idx,
-            )
+        for j in range(len(hot_totals)):
+            hot_totals[j] += float(t.hot_utilities[j].heat_flow[idx])
+        for j in range(len(cold_totals)):
+            cold_totals[j] += float(t.cold_utilities[j].heat_flow[idx])
+    # Assigning totals through the targeting helper keeps segmented utilities'
+    # profiles, whose parent heat flow cannot be set directly.
+    hot_utilities = _apply_utility_duties(
+        deepcopy(zone.hot_utilities), tuple(hot_totals), idx=idx
+    )
+    cold_utilities = _apply_utility_duties(
+        deepcopy(zone.cold_utilities), tuple(cold_totals), idx=idx
+    )
 
     heat_recovery_limit = zone.targets[TargetType.DI.value].heat_recovery_limit
     output = {
@@ -256,10 +249,10 @@ def _target_site_utilities(
     """
     hot_utilities = deepcopy(hot_utilities)
     cold_utilities = deepcopy(cold_utilities)
-    uses = [_utility_span(u, idx) for u in hot_utilities]
-    gens = [_utility_span(u, idx) for u in cold_utilities]
+    uses = [_utility_spans(u, idx) for u in hot_utilities]
+    gens = [_utility_spans(u, idx) for u in cold_utilities]
     bounds = sorted(
-        {t for span in uses + gens for t in span[:2]},
+        {t for spans in uses + gens for span in spans for t in span[:2]},
         reverse=True,
     )
     unmet = [0.0] * len(uses)
@@ -267,8 +260,8 @@ def _target_site_utilities(
     # Generation available to lower intervals, most recent (coldest) last.
     stack: list[list] = []
     for t_hi, t_lo in zip(bounds, bounds[1:]):
-        use_q = [_interval_duty(span, t_hi, t_lo) for span in uses]
-        gen_q = [_interval_duty(span, t_hi, t_lo) for span in gens]
+        use_q = [_interval_duty(spans, t_hi, t_lo) for spans in uses]
+        gen_q = [_interval_duty(spans, t_hi, t_lo) for spans in gens]
         # A utility level meets its own use first.
         for j, u_h in enumerate(hot_utilities):
             for k, u_c in enumerate(cold_utilities):
@@ -289,35 +282,42 @@ def _target_site_utilities(
             unmet[j] += demand
     for k, q in stack:
         surplus[k] += q
-    for utility, duty in zip(hot_utilities, unmet):
-        utility.set_value_attr_at_idx("heat_flow", duty, idx=idx)
-    for utility, duty in zip(cold_utilities, surplus):
-        utility.set_value_attr_at_idx("heat_flow", duty, idx=idx)
-    return hot_utilities, cold_utilities
+    return (
+        _apply_utility_duties(hot_utilities, tuple(unmet), idx=idx),
+        _apply_utility_duties(cold_utilities, tuple(surplus), idx=idx),
+    )
 
 
-def _utility_span(utility, idx: int | None) -> tuple[float, float, float]:
-    """Return ``(t_high, t_low, heat_flow)`` for one utility in one period."""
-    t_s = float(utility.supply_temperature[idx])
-    t_t = float(utility.target_temperature[idx])
-    return max(t_s, t_t), min(t_s, t_t), float(utility.heat_flow[idx])
+def _utility_spans(utility, idx: int | None) -> list[tuple[float, float, float]]:
+    """Return ``(t_high, t_low, heat_flow)`` for each piece of one utility.
+
+    A segmented utility contributes each segment over its own temperatures.
+    """
+    pieces = utility.segments if utility.has_segments else (utility,)
+    spans = []
+    for piece in pieces:
+        t_s = float(piece.supply_temperature[idx])
+        t_t = float(piece.target_temperature[idx])
+        spans.append((max(t_s, t_t), min(t_s, t_t), float(piece.heat_flow[idx])))
+    return spans
 
 
 def _interval_duty(
-    span: tuple[float, float, float],
+    spans: list[tuple[float, float, float]],
     t_hi: float,
     t_lo: float,
 ) -> float:
     """Return the share of a utility's duty that lies in ``[t_lo, t_hi]``.
 
-    Stream construction gives every utility a temperature span of at least
-    0.01 K, so the duty spreads linearly over that span.
+    Stream construction gives every utility piece a temperature span of at
+    least 0.01 K, so each piece's duty spreads linearly over its span.
     """
-    u_hi, u_lo, q = span
-    if q <= 0.0:
-        return 0.0
-    overlap = min(u_hi, t_hi) - max(u_lo, t_lo)
-    return q * overlap / (u_hi - u_lo) if overlap > 0.0 else 0.0
+    duty = 0.0
+    for u_hi, u_lo, q in spans:
+        overlap = min(u_hi, t_hi) - max(u_lo, t_lo)
+        if q > 0.0 and overlap > 0.0:
+            duty += q * overlap / (u_hi - u_lo)
+    return duty
 
 
 def _match_utility_gen_and_use_at_same_level(

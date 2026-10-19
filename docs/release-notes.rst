@@ -23,6 +23,9 @@ These change published numbers. Energy targets do not change.
   listed 25 kW of hot water. Its Total Site utility cost falls from
   6.68 $/h to 5.18 $/h (``zonal_site_multiperiod``, first period: 5.36 to
   4.76 $/h).
+- Total Site targeting accepts segmented utilities. Before, summing the
+  subzone utilities raised "'heat_flow' is derived for segmented stream".
+  Each segment now enters the site cascade over its own temperatures.
 - The area target's ``total_cost`` is the annualised capital cost plus the
   utility cost over ``COSTING_ANNUAL_OP_TIME`` hours. Before, it was the
   annualised capital alone.

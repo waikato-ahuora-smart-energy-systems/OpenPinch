@@ -374,15 +374,12 @@ def coerce_output_value(
     if year_exponent_change:
         # Pint's year is 8766 calendar hours; a year of cost is one operating
         # year of COSTING_ANNUAL_OP_TIME hours.
+        calendar_hours = float(Value(1.0, "year").to("h").value)
         converted = (
             converted
-            * (_annual_operating_hours(config) / _CALENDAR_HOURS_PER_YEAR)
-            ** year_exponent_change
+            * (_annual_operating_hours(config) / calendar_hours) ** year_exponent_change
         )
     return converted
-
-
-_CALENDAR_HOURS_PER_YEAR = float(Value(1.0, "year").to("h").value)
 
 
 def _annual_operating_hours(

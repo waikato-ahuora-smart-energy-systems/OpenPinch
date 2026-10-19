@@ -493,3 +493,56 @@ def test_sample_total_site_utility_lists_sum_to_the_site_targets(case):
     assert sum(cold) == pytest.approx(target.cold_utility_target, abs=1e-9 * scale)
     if target.hot_utility_target == pytest.approx(0.0, abs=1e-9 * scale):
         assert all(duty == pytest.approx(0.0, abs=1e-9 * scale) for duty in hot)
+
+
+def test_total_site_retargets_segmented_utilities_through_their_segments():
+    from OpenPinch import PinchProblem
+
+    problem = PinchProblem(
+        {
+            "streams": [
+                {
+                    "zone": "A",
+                    "name": "Cold",
+                    "t_supply": 20.0,
+                    "t_target": 150.0,
+                    "heat_flow": 100.0,
+                    "dt_cont": 10.0,
+                },
+                {
+                    "zone": "B",
+                    "name": "Hot",
+                    "t_supply": 60.0,
+                    "t_target": 30.0,
+                    "heat_flow": 50.0,
+                    "dt_cont": 5.0,
+                },
+            ],
+            "utilities": [
+                {
+                    "name": "Steam profile",
+                    "type": "Hot",
+                    "dt_cont": 0.0,
+                    "segments": [
+                        {"t_supply": 250.0, "t_target": 200.0, "heat_flow": 30.0},
+                        {"t_supply": 200.0, "t_target": 160.0, "heat_flow": 70.0},
+                    ],
+                },
+                {"name": "CU", "type": "Cold", "t_supply": 0.0},
+            ],
+        },
+        project_name="Site",
+    )
+    problem.target.all_heat_integration()
+    target = problem.master_zone.targets[TargetType.II.value]
+
+    steam = target.hot_utilities.get_stream_by_name("Steam profile")
+
+    assert target.hot_utility_target == pytest.approx(100.0, rel=1e-9)
+    assert float(steam.heat_flow[0]) == pytest.approx(100.0, rel=1e-9)
+    assert [float(s.heat_flow[0]) for s in steam.segments] == pytest.approx(
+        [30.0, 70.0], rel=1e-9
+    )
+    assert sum(float(u.heat_flow[0]) for u in target.cold_utilities) == (
+        pytest.approx(target.cold_utility_target, rel=1e-9)
+    )
