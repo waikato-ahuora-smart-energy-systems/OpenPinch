@@ -182,3 +182,49 @@ def test_compare_summaries_maps_a_zone_scope_by_project_name(other_root, other_s
     )
 
     assert comparison.loc["Scenario", "Scope"] == f"{other_root}/Bleaching"
+
+
+def test_scalar_cp_agrees_with_per_period_heat_flow():
+    payload = _payload(
+        _stream(
+            heat_flow={"values": [180.0, 180.0], "unit": "kW"},
+            heat_capacity_flowrate=2.0,
+        )
+    )
+    payload["options"] = {"PROBLEM_PERIOD_IDS": ["a", "b"]}
+
+    report = validation.build_validation_report(payload)
+
+    assert report.valid is True
+
+
+def test_negative_heat_capacity_flowrate_is_rejected():
+    report = validation.build_validation_report(
+        _payload(_stream(heat_flow=..., heat_capacity_flowrate=-2.0))
+    )
+
+    assert report.valid is False
+    assert any(
+        issue.field == "heat_capacity_flowrate" and issue.severity == "error"
+        for issue in report.issues
+    )
+
+
+def test_compare_to_uses_zone_tree_root_names():
+    def problem(project_name: str) -> PinchProblem:
+        payload = _payload(
+            _stream(zone="Site/Plant"),
+            _stream(name="C1", zone="Site/Plant", t_supply=40.0, t_target=120.0),
+        )
+        payload["zone_tree"] = {
+            "name": "Site",
+            "type": "Site",
+            "children": [{"name": "Plant", "type": "Process Zone", "children": None}],
+        }
+        result = PinchProblem(payload, project_name=project_name)
+        result.target.direct_heat_integration()
+        return result
+
+    comparison = problem("Site").compare_to(problem("Scenario"))
+
+    assert comparison.loc["Change", "Hot Utility Target"] == pytest.approx(0.0)

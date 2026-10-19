@@ -305,10 +305,10 @@ def _validate_heat_capacity_flowrate_agreement(
     derived = heat_flow_from_heat_capacity_flowrate(
         values["t_supply"], values["t_target"], heat_capacity_flowrate
     )
-    given = np.broadcast_to(heat_flow.period_values, derived.period_values.shape)
-    if np.allclose(
-        given, derived.period_values, rtol=_HEAT_CAPACITY_FLOWRATE_RTOL, atol=0.0
-    ):
+    given, expected = np.broadcast_arrays(
+        heat_flow.period_values, derived.period_values
+    )
+    if np.allclose(given, expected, rtol=_HEAT_CAPACITY_FLOWRATE_RTOL, atol=0.0):
         return []
     return [
         _build_issue(
@@ -355,6 +355,18 @@ def _validate_stream_record_states(
             record_index=record_index,
             record_label=record_label,
             field_name="heat_flow",
+            severity="error",
+            message="Value must be non-negative.",
+            period_ids=period_ids,
+        )
+    )
+    issues.extend(
+        _validate_non_negative_states(
+            values.get("heat_capacity_flowrate"),
+            section=section,
+            record_index=record_index,
+            record_label=record_label,
+            field_name="heat_capacity_flowrate",
             severity="error",
             message="Value must be non-negative.",
             period_ids=period_ids,

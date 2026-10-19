@@ -467,8 +467,8 @@ class PinchProblem:
             target_method=target_method,
             base_label=base_label,
             other_label=other_label,
-            base_root=self.project_name,
-            other_root=other_problem.project_name,
+            base_root=_root_zone_name(self),
+            other_root=_root_zone_name(other_problem),
         )
 
     def _data_preprocessing(self) -> "Zone":
@@ -702,3 +702,10 @@ class PinchProblem:
             self,
             problem_inputs,
         )
+
+
+def _root_zone_name(problem: "PinchProblem") -> str | None:
+    """Return the root zone name that starts every summary scope."""
+    # An explicit zone_tree names the root itself, whatever the project name.
+    zone = problem._master_zone
+    return str(zone.name) if zone is not None else problem.project_name
