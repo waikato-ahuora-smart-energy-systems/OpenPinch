@@ -14,7 +14,10 @@ HEN utility approach temperatures
   with a crossed cooler. On a case with cooling water at 320 to 325 K, PDM
   and TDM accepted a cooler at 324 to 322 K (hot-end dT -1 K). That case now
   has no feasible network in the stagewise superstructure, which places
-  coolers after the last stage, so synthesis rejects it.
+  coolers after the last stage, so synthesis rejects it. In the relaxed
+  models that stage reduction and network evolution solve, a heater or
+  cooler whose fixed end cannot meet its approach carries no duty, and stage
+  reduction keeps only the heaters and coolers the solved network uses.
 - A synthesised exchanger with a crossed or touching end gets no area. Its
   area used to come from a fallback temperature difference (20 m2 for the
   crossed cooler above); verification now reports its duty without area.
