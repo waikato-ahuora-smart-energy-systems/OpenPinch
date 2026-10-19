@@ -36,6 +36,11 @@ Area and unit-count targets
 - The balance check in area targeting is relative to the duty, so area
   targets no longer raise "requires the inputted composite curves to be
   balanced" on MW-scale problems whose rounding residue exceeds 1e-6 kW.
+- Heat exchanger network area slicing on segmented streams accepts a
+  solver duty that overshoots its stream profile by noise relative to the
+  duty (1e-6 of the profile) and drops the overshoot. A 2e-6 kW overshoot on
+  a 15 MW match raised "Exchanger duty exceeds an available parent segment
+  profile".
 
 Network grid data
 ~~~~~~~~~~~~~~~~~
