@@ -18,6 +18,12 @@ HEN utility approach temperatures
 - A synthesised exchanger with a crossed or touching end gets no area. Its
   area used to come from a fallback temperature difference (20 m2 for the
   crossed cooler above); verification now reports its duty without area.
+- Network verification checks heaters and coolers for a temperature cross
+  and against their utility's approach temperature, which synthesised
+  networks now record in ``source_metadata``
+  (``hot_utility_minimum_approach_by_period`` and
+  ``cold_utility_minimum_approach_by_period``). It checked recovery
+  exchangers only.
 
 Network grid data
 ~~~~~~~~~~~~~~~~~

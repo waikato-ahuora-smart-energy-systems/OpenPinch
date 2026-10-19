@@ -657,6 +657,101 @@ def test_network_feasibility_checks_minimum_approach_temperature() -> None:
     )
 
 
+def _utility_network(
+    *,
+    cooler_inlet: float,
+    heater_outlet: float = 350.0,
+    source_metadata: dict[str, object] | None = None,
+) -> HeatExchangerNetwork:
+    """A cooler on H1 against CW (320 to 325 K) and a heater on C1 from HPS."""
+    return HeatExchangerNetwork(
+        exchangers=(
+            HeatExchanger(
+                exchanger_id="CU1",
+                kind=HeatExchangerKind.COLD_UTILITY,
+                source_stream="H1",
+                sink_stream="CW",
+                source_stream_role=StreamID.Process,
+                sink_stream_role=StreamID.Utility,
+                period_states=(
+                    _period_state(
+                        duty=20.0,
+                        source_inlet_temperature=cooler_inlet,
+                        source_outlet_temperature=322.0,
+                        sink_inlet_temperature=320.0,
+                        sink_outlet_temperature=325.0,
+                    ),
+                ),
+                area=20.0,
+            ),
+            HeatExchanger(
+                exchanger_id="HU1",
+                kind=HeatExchangerKind.HOT_UTILITY,
+                source_stream="HPS",
+                sink_stream="C1",
+                source_stream_role=StreamID.Utility,
+                sink_stream_role=StreamID.Process,
+                period_states=(
+                    _period_state(
+                        duty=100.0,
+                        source_inlet_temperature=450.0,
+                        source_outlet_temperature=450.0,
+                        sink_inlet_temperature=340.0,
+                        sink_outlet_temperature=heater_outlet,
+                    ),
+                ),
+                area=2.0,
+            ),
+        ),
+        run_id="utility-approach",
+        solver_axis_metadata={
+            "axis_maps": {
+                "hot_process_streams": {"H1": 0},
+                "cold_process_streams": {"C1": 0},
+                "hot_utilities": {"HPS": 0},
+                "cold_utilities": {"CW": 0},
+            }
+        },
+        source_metadata=source_metadata or {},
+    )
+
+
+def test_network_feasibility_rejects_a_crossed_utility_exchanger() -> None:
+    crossed = _utility_network(cooler_inlet=324.0)
+
+    assert any(
+        "CU1 hot inlet is colder than cold outlet" in reason
+        for reason in verify_network_feasibility(crossed)
+    )
+
+
+def test_network_feasibility_checks_utility_minimum_approach() -> None:
+    # [period][hot utility][cold stream] and [period][hot stream][cold utility]
+    metadata = {
+        "hot_utility_minimum_approach_by_period": [[[110.0]]],
+        "cold_utility_minimum_approach_by_period": [[[2.0]]],
+    }
+
+    close = verify_network_feasibility(
+        _utility_network(cooler_inlet=326.0, source_metadata=metadata)
+    )
+    clear = verify_network_feasibility(
+        _utility_network(
+            cooler_inlet=327.0, heater_outlet=340.0, source_metadata=metadata
+        )
+    )
+
+    assert any(
+        "CU1 minimum approach 1 is below its required approach 2" in reason
+        for reason in close
+    )
+    assert any(
+        "HU1 minimum approach 100 is below its required approach 110" in reason
+        for reason in close
+    )
+    assert not any("minimum approach" in reason for reason in clear)
+
+
 def test_network_feasibility_checks_installed_area_against_lmtd() -> None:
     network = _feasible_balance_network("under-area", recovery_area=1.0)
 

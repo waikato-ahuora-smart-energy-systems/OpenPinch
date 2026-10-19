@@ -316,6 +316,13 @@ def test_segmented_utility_dt_cont_mapping_is_built_into_stagewise_constraints()
 
     assert model.T_hu_in_cont_by_period == [0.2]
     assert model.T_cu_in_cont_by_period == [0.7]
+    # Verification bounds every terminal by the least segment contribution.
+    assert model.dT_hu_min_period == [
+        [[0.2 + value for value in model.T_c_cont_period[0]]]
+    ]
+    assert model.dT_cu_min_period == [
+        [[value + 0.3] for value in model.T_h_cont_period[0]]
+    ]
     assert len(model.T_hu_out_cont_by_period) == 1
     assert len(model.T_cu_out_cont_by_period) == 1
     assert len(model.T_hu_solved_out_by_period) == 1

@@ -14,8 +14,14 @@ from dataclasses import replace
 
 import pytest
 
+from OpenPinch.analysis.heat_exchanger_networks.extraction.service import (
+    extract_heat_exchanger_network,
+)
 from OpenPinch.analysis.heat_exchanger_networks.models.stagewise import (
     StageWiseModel,
+)
+from OpenPinch.analysis.heat_exchanger_networks.reporting.verification import (
+    verify_network_feasibility,
 )
 from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
     problem_to_solver_arrays,
@@ -67,11 +73,7 @@ def _fixed_topology(arrays):
     return [z, [1, 1], [1, 1]]
 
 
-@pytest.mark.synthesis
-@pytest.mark.parametrize("non_isothermal_model", [False, True])
-def test_stagewise_utility_exchangers_keep_their_approach_temperature(
-    non_isothermal_model,
-):
+def _solved_fixed_topology_model(non_isothermal_model: bool):
     pytest.importorskip("gekko")
     arrays = problem_to_solver_arrays(_cross_problem(), D_TMIN)
     model = StageWiseModel(
@@ -90,12 +92,38 @@ def test_stagewise_utility_exchangers_keep_their_approach_temperature(
     )
 
     model.optimise(False)
-
     assert model.mSuccess == 1
+    return model, arrays
+
+
+@pytest.mark.synthesis
+@pytest.mark.parametrize("non_isothermal_model", [False, True])
+def test_stagewise_utility_exchangers_keep_their_approach_temperature(
+    non_isothermal_model,
+):
+    model, _arrays = _solved_fixed_topology_model(non_isothermal_model)
+
     units = list(_utility_terminal_differences(model))
     assert any(kind == "cooler" for kind, *_ in units)
     for kind, index, hot_end, cold_end, required in units:
         assert min(hot_end, cold_end) >= required - 1e-4, (kind, index)
+
+
+@pytest.mark.synthesis
+def test_extracted_network_records_utility_approaches_for_verification():
+    model, arrays = _solved_fixed_topology_model(non_isothermal_model=True)
+
+    network = extract_heat_exchanger_network(model, arrays, run_id="utility")
+
+    metadata = network.source_metadata
+    # [period][hot utility][cold stream] and [period][hot stream][cold utility]
+    assert metadata["hot_utility_minimum_approach_by_period"] == [
+        [list(model.dT_hu_period[0])]
+    ]
+    assert metadata["cold_utility_minimum_approach_by_period"] == [
+        [[value] for value in model.dT_cu_period[0]]
+    ]
+    assert verify_network_feasibility(network) == ()
 
 
 @pytest.mark.solver
@@ -108,9 +136,6 @@ def test_open_hens_method_networks_have_no_utility_cross():
     )
     from OpenPinch.analysis.heat_exchanger_networks.execution.settings import (
         workflow_settings_from_problem,
-    )
-    from OpenPinch.analysis.heat_exchanger_networks.reporting.verification import (
-        verify_network_feasibility,
     )
     from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
         MissingSynthesisDependencyError,

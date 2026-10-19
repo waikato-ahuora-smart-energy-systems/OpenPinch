@@ -57,6 +57,8 @@ def _set_minimum_approach_temperatures(model) -> None:
         ],
         dtype=float,
     )
+    model.dT_hu_min_period = utility_minimum_approach_by_period(model, "hot")
+    model.dT_cu_min_period = utility_minimum_approach_by_period(model, "cold")
     model.dT_r = model.dT_r_period[0].copy()
     model.dT_hu = model.dT_hu_period[0].copy()
     model.dT_cu = model.dT_cu_period[0].copy()
@@ -214,6 +216,37 @@ def _utility_max_temperature_contribution(
     ]
     count = int(model.solver_arrays.arrays[f"{side}_utility_segment_count"][0])
     return float(np.max(values[:count]))
+
+
+def utility_minimum_approach_by_period(model, side: str) -> list:
+    """Return the least approach any heater or cooler may have, by period.
+
+    Hot utilities give ``[period][utility][cold stream]`` and cold utilities
+    ``[period][hot stream][utility]``, the recovery pairs' orientation. A
+    segmented utility's approach varies along it, so its least segment
+    contribution bounds every terminal.
+    """
+    by_period = []
+    for n in range(model.N_periods):
+        if side == "hot":
+            stream_contributions = model.T_c_cont_period[n]
+            flat = model.dT_hu_period[n]
+        else:
+            stream_contributions = model.T_h_cont_period[n]
+            flat = model.dT_cu_period[n]
+        if _piecewise._utility_is_segmented(model, side):
+            values = model.solver_arrays.arrays[
+                f"{side}_utility_segment_dt_cont_period"
+            ][n, 0]
+            count = int(model.solver_arrays.arrays[f"{side}_utility_segment_count"][0])
+            utility = float(np.min(values[:count]))
+            approaches = [utility + float(value) for value in stream_contributions]
+        else:
+            approaches = [float(value) for value in flat]
+        by_period.append(
+            [approaches] if side == "hot" else [[value] for value in approaches]
+        )
+    return by_period
 
 
 def _set_multiperiod_utility_approach_equations(model) -> None:
