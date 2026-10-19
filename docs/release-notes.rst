@@ -15,6 +15,10 @@ Input and export hardening
   from validated options.
 - ``workspace.batch`` cannot run another ``workspace.batch``, and one request
   runs at most 100 cases; a larger case list is an error and runs nothing.
+- Excel exports (``export_excel``, the ``export.excel`` command,
+  ``export_problem_table`` and the dashboard's table export) write every text
+  cell as a plain string, never as a formula, and text starting with ``=``,
+  ``+``, ``-``, ``@``, a tab or a carriage return gets Excel's quote prefix.
 
 Network grid data
 ~~~~~~~~~~~~~~~~~
