@@ -665,6 +665,46 @@ def test_duty_aligned_area_slices_use_local_htcs_and_sum_exactly():
     assert sum(item.area for item in contributions) == pytest.approx(3.6630468947)
 
 
+def test_duty_aligned_area_slices_tolerate_solver_overshoot_relative_to_duty():
+    # The solver accepts constraint violations far above 1e-6 kW, so a match
+    # using a 15 MW profile in full can come back 2e-6 kW over it. Slicing
+    # rejected that with an absolute 1e-6 kW check.
+    scale = 1e5
+
+    def scaled(profile):
+        return PiecewiseThermalProfile(
+            identities=profile.identities,
+            temperatures_in=profile.temperatures_in,
+            temperatures_out=profile.temperatures_out,
+            duties=profile.duties * scale,
+            heat_capacity_flowrates=profile.heat_capacity_flowrates * scale,
+            heat_transfer_coefficients=profile.heat_transfer_coefficients,
+        )
+
+    contributions = duty_aligned_area_contributions(
+        scaled(_profile("Hot", hot=True)),
+        scaled(_profile("Cold", hot=False)),
+        duty=150.0 * scale + 2e-6,
+        hot_inlet_temperature=473.15,
+        cold_inlet_temperature=323.15,
+        period="normal",
+    )
+
+    assert sum(item.duty for item in contributions) == pytest.approx(
+        150.0 * scale, rel=1e-12
+    )
+
+    with pytest.raises(ValueError, match="exceeds an available parent segment"):
+        duty_aligned_area_contributions(
+            scaled(_profile("Hot", hot=True)),
+            scaled(_profile("Cold", hot=False)),
+            duty=151.0 * scale,
+            hot_inlet_temperature=473.15,
+            cold_inlet_temperature=323.15,
+            period="normal",
+        )
+
+
 def test_piecewise_profile_rejects_discontinuity_and_out_of_range_lookup():
     with pytest.raises(ValueError, match="continuous"):
         PiecewiseThermalProfile(

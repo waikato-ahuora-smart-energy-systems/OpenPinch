@@ -6,7 +6,7 @@ import math
 
 import numpy as np
 
-from ...domain.configuration import tol
+from ...domain.configuration import duty_tolerance, heat_resolution, tol
 from ..numerics import interp_with_plateaus
 
 __all__ = ["get_temperature_driving_forces"]
@@ -50,9 +50,13 @@ def get_temperature_driving_forces(
     """
     dp = int(-math.log10(tol))
     T_hot = np.asarray(T_hot, dtype=float).round(dp)
-    H_hot = np.asarray(H_hot, dtype=float).round(dp)
     T_cold = np.asarray(T_cold, dtype=float).round(dp)
-    H_cold = np.asarray(H_cold, dtype=float).round(dp)
+    # Heat flows round to the problem's resolution: 6 dp from 1 kW up, finer
+    # below, so a small problem keeps its significant digits.
+    resolution = heat_resolution(H_hot, H_cold)
+    h_dp = int(math.ceil(-math.log10(resolution))) if resolution > 0 else dp
+    H_hot = np.asarray(H_hot, dtype=float).round(h_dp)
+    H_cold = np.asarray(H_cold, dtype=float).round(h_dp)
 
     if T_hot.size != H_hot.size or T_cold.size != H_cold.size:
         raise ValueError(
@@ -60,14 +64,17 @@ def get_temperature_driving_forces(
         )
     if T_hot.size == 0 or T_cold.size == 0:
         raise ValueError("Composite curve arrays cannot be empty.")
-    if abs((np.max(H_hot) - np.min(H_hot)) - (np.max(H_cold) - np.min(H_cold))) > tol:
+    duty_hot = np.max(H_hot) - np.min(H_hot)
+    duty_cold = np.max(H_cold) - np.min(H_cold)
+    # Rounding residue scales with the duty, so the balance test does too.
+    if abs(duty_hot - duty_cold) > duty_tolerance(duty_hot, duty_cold):
         raise ValueError(
             "The temperature driving force plot requires the inputted "
             "composite curves to be balanced."
         )
 
-    H_hot, T_hot = _normalise_curve(H_hot, T_hot)
-    H_cold, T_cold = _normalise_curve(H_cold, T_cold)
+    H_hot, T_hot = _normalise_curve(H_hot, T_hot, resolution)
+    H_cold, T_cold = _normalise_curve(H_cold, T_cold, resolution)
 
     # Collect a unified heat-load grid across both curves
     h_vals = _build_h_grid(H_hot, H_cold)
@@ -76,22 +83,15 @@ def get_temperature_driving_forces(
     dh_vals = h_end - h_start
 
     # Interpolate temperatures for each H at both ends
-    t_h1 = interp_with_plateaus(H_hot, T_hot, h_start, side="right")
-    t_h2 = interp_with_plateaus(H_hot, T_hot, h_end, side="left")
-    t_c1 = interp_with_plateaus(H_cold, T_cold, h_start, side="right")
-    t_c2 = interp_with_plateaus(H_cold, T_cold, h_end, side="left")
+    t_h1 = interp_with_plateaus(H_hot, T_hot, h_start, side="right", tol=resolution)
+    t_h2 = interp_with_plateaus(H_hot, T_hot, h_end, side="left", tol=resolution)
+    t_c1 = interp_with_plateaus(H_cold, T_cold, h_start, side="right", tol=resolution)
+    t_c2 = interp_with_plateaus(H_cold, T_cold, h_end, side="left", tol=resolution)
 
-    delta_T1_raw = t_h1 - t_c1
-    delta_T2_raw = t_h2 - t_c2
-
-    discontinuities = _collect_discontinuities(H_hot, H_cold)
-    if discontinuities:
-        for i in range(len(delta_T2_raw) - 2, -1, -1):
-            if _is_discontinuity(h_end[i], discontinuities):
-                delta_T2_raw[i] = min(delta_T2_raw[i], delta_T2_raw[i + 1])
-
-    delta_T1 = delta_T1_raw - min_dT
-    delta_T2 = delta_T2_raw - min_dT
+    # Each slice ends at its left limit, also where a composite steps in
+    # temperature at constant heat flow, so the LMTD is that of the slice.
+    delta_T1 = t_h1 - t_c1 - min_dT
+    delta_T2 = t_h2 - t_c2 - min_dT
 
     return {
         "h_vals": h_vals,
@@ -127,7 +127,7 @@ def _build_h_grid(h_hot: np.ndarray, h_cold: np.ndarray) -> np.ndarray:
 
 
 def _normalise_curve(
-    h_vals: np.ndarray, t_vals: np.ndarray
+    h_vals: np.ndarray, t_vals: np.ndarray, resolution: float = tol
 ) -> tuple[np.ndarray, np.ndarray]:
     """Orient a composite curve and shift heat flow so it starts at zero.
 
@@ -160,65 +160,7 @@ def _normalise_curve(
 
     # Shift the curve so it begins at zero heat load
     offset = h_vals[0]
-    if abs(offset) > tol:
+    if abs(offset) > resolution:
         h_vals = h_vals - offset
 
     return h_vals, t_vals
-
-
-def _collect_discontinuities(h_hot: np.ndarray, h_cold: np.ndarray) -> set[float]:
-    """Return heat-load positions where either curve has a discontinuity.
-
-    Parameters
-    ----------
-    h_hot, h_cold : np.ndarray
-        Heat-flow coordinates for hot and cold curves.
-
-    Returns
-    -------
-    set[float]
-        Combined discontinuity heat-load values.
-    """
-    return set(_discontinuity_values(h_hot)) | set(_discontinuity_values(h_cold))
-
-
-def _discontinuity_values(h_vals: np.ndarray) -> np.ndarray:
-    """Extract heat-load values associated with zero-width segments.
-
-    Parameters
-    ----------
-    h_vals : np.ndarray
-        Heat-flow coordinates.
-
-    Returns
-    -------
-    np.ndarray
-        Heat-load values at repeated adjacent coordinates.
-    """
-    if h_vals.size < 2:
-        return np.empty(0, dtype=float)
-    mask = np.isclose(np.diff(h_vals), 0.0, atol=tol)
-    if not mask.any():
-        return np.empty(0, dtype=float)
-    return h_vals[1:][mask]
-
-
-def _is_discontinuity(value: float, discontinuities: set[float]) -> bool:
-    """Check whether a heat-load value matches a known discontinuity.
-
-    Parameters
-    ----------
-    value : float
-        Heat-load value to test.
-    discontinuities : set[float]
-        Known discontinuity values.
-
-    Returns
-    -------
-    bool
-        ``True`` when ``value`` is within tolerance of any discontinuity.
-    """
-    for disc in discontinuities:
-        if abs(value - disc) <= tol:
-            return True
-    return False
