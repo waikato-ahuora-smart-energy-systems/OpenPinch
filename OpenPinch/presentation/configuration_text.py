@@ -593,7 +593,9 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "Integrated expander", None,
         (
             "Let Carnot-model cycles generate work where heat flows from a hotter "
-            "evaporator level to a colder condenser level."
+            "evaporator level to a colder condenser level. Heat only moves "
+            "downhill, one condenser-evaporator pair at a time; with this off, "
+            "such a pair is plain heat recovery with no work credit."
         ),
     ),
     "HPR_DT_CONT": FieldText(

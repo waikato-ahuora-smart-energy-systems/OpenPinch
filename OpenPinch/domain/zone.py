@@ -430,33 +430,29 @@ class Zone:
             self.add_target(t)
 
     def get_subzone(self, loc: str = None) -> "Zone":
-        """Resolve a slash-delimited zone path relative to this zone."""
-        zone = self
+        """Resolve a slash-delimited zone path relative to this zone.
+
+        The path may start with this zone's own name, which can itself contain
+        a slash (a project name such as ``"Site A/2026"``).
+        """
         if loc is None:
-            return zone
-        loc_address = loc.split("/", 1)
-        sub = loc_address[0]
-        if sub in zone.subzones.keys():
-            if len(loc_address) == 1:
-                return zone.subzones[sub]
-            else:
-                sub_loc = loc_address[-1]
-                return zone.subzones[sub].get_subzone(sub_loc)
-        if sub == zone.name:
-            loc_address.pop(0)
-            if len(loc_address) == 0:
-                return zone
-            loc_address = loc_address[-1].split("/", 1)
-            sub = loc_address[0]
-        if sub in zone.subzones.keys():
-            if len(loc_address) == 1:
-                return zone.subzones[sub]
-            else:
-                sub_loc = loc_address[-1]
-                return zone.subzones[sub].get_subzone(sub_loc)
-        else:
+            return self
+        found = self._find_child_zone(loc)
+        own_name = str(self.name)
+        if found is None and loc == own_name:
+            return self
+        if found is None and loc.startswith(f"{own_name}/"):
+            found = self._find_child_zone(loc[len(own_name) + 1 :])
+        if found is None:
             warnings.warn(f"Subzone '{loc}' not found.")
-            return None
+        return found
+
+    def _find_child_zone(self, loc: str) -> "Zone | None":
+        sub, separator, rest = loc.partition("/")
+        child = self.subzones.get(sub)
+        if child is None or not separator:
+            return child
+        return child.get_subzone(rest)
 
     def calc_utility_cost(self):
         """Calculate and cache the annual utility cost across assigned utilities."""
