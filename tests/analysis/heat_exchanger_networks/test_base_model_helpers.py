@@ -639,7 +639,8 @@ def test_output_to_cmd_line_logs_successful_solve(caplog):
     assert "Q_hu total" in caplog.text
 
 
-def test_utility_approach_equations_skip_streams_inactive_in_a_period():
+@pytest.mark.parametrize("inactive_by", ["pinch decomposition", "zero duty"])
+def test_utility_approach_equations_skip_streams_inactive_in_a_period(inactive_by):
     from OpenPinch.analysis.heat_exchanger_networks.models._base.approach import (
         _set_multiperiod_utility_approach_equations,
     )
@@ -664,8 +665,13 @@ def test_utility_approach_equations_skip_streams_inactive_in_a_period():
     model.T_c_out_period = np.array([[150.0], [150.0]])
     model.T_h_by_period = [[[200.0, 120.0]], [[0.0, 0.0]]]
     model.T_c_by_period = [[[140.0, 50.0]], [[140.0, 50.0]]]
-    model.z_i_active_period = [[1], [0]]
-    model.z_j_active_period = [[1], [1]]
+    if inactive_by == "pinch decomposition":
+        model.z_i_active_period = [[1], [0]]
+        model.z_j_active_period = [[1], [1]]
+    else:
+        # A stagewise model has no activity flags: H1 has no duty in peak.
+        model.Qtot_sh_period = np.array([[100.0], [0.0]])
+        model.Qtot_sc_period = np.array([[100.0], [100.0]])
     model.Q_h_by_period = model.Q_c_by_period = [[[0.0]], [[0.0]]]
 
     _set_multiperiod_utility_approach_equations(model)
