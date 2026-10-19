@@ -46,6 +46,16 @@ Area and unit-count targets
   1,350 kW target), and area targeting raised "requires the inputted
   composite curves to be balanced" on about one problem in eight, including
   ``zonal_site_multiperiod``.
+- Energy, area and unit-count targets scale with the heat flows from x1e-6
+  to x1e3 and are unchanged by a uniform temperature shift. Heat-flow
+  thresholds in pocket removal, balanced composite curves and area targeting
+  were absolute (1e-6 kW), so at x1e-6 a shallow pocket survived, a utility
+  was over-assigned and area targeting raised or drifted by up to 0.1 %.
+  They now keep 1e-6 kW from 1 kW up and shrink with smaller problems.
+- Composite curve end cleaning (plots and area targeting) trims only rounding
+  residue at the curve ends. It used ``np.isclose``'s default relative
+  tolerance of 1e-5 of the end heat flow, which dropped real end segments on
+  MW-scale curves.
 - Heat exchanger network area slicing on segmented streams accepts a
   solver duty that overshoots its stream profile by noise relative to the
   duty (1e-6 of the profile) and drops the overshoot. A 2e-6 kW overshoot on

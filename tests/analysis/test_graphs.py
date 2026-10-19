@@ -695,3 +695,26 @@ def test_clean_composite_curve_forced_duplicate_edges(monkeypatch):
     )
     assert np.allclose(x_clean, [0.0, 2.0])
     assert np.allclose(y_clean, [1.0, 3.0])
+
+
+@pytest.mark.parametrize("scale", [1.0, 1e-6])
+def test_clean_composite_curve_ends_keeps_a_real_end_segment_at_any_scale(scale):
+    # An 8 kW segment at the top of a 1 GW curve is 8e-6 of the end value;
+    # np.isclose's default rtol=1e-5 treated it as constant and trimmed it.
+    T = np.array([400.0, 300.0, 200.0, 100.0])
+    H = np.array([1_000_000.0, 999_992.0, 500_000.0, 0.0]) * scale
+
+    y_clean, x_clean = clean_composite_curve_ends(T, H)
+
+    np.testing.assert_array_equal(y_clean, T)
+    np.testing.assert_array_equal(x_clean, H)
+
+
+def test_clean_composite_curve_ends_trims_rounding_residue_at_the_ends():
+    T = np.array([259.0, 258.9, 145.0, 11.1, 11.0])
+    H = np.array([6900.000002, 6900.0, 3400.0, 0.0, -0.000002])
+
+    y_clean, x_clean = clean_composite_curve_ends(T, H)
+
+    np.testing.assert_array_equal(y_clean, T[1:4])
+    np.testing.assert_array_equal(x_clean, H[1:4])

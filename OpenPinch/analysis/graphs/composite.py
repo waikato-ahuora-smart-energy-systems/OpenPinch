@@ -6,7 +6,7 @@ from typing import Any
 
 import numpy as np
 
-from ...domain.configuration import tol
+from ...domain.configuration import duty_tolerance, heat_resolution, tol
 from ...domain.enums import (
     ArrowHead,
     GraphType,
@@ -34,12 +34,16 @@ def clean_composite_curve_ends(
     """Remove redundant constant-enthalpy points from curve ends."""
     y_vals = np.asarray(y_vals)
     x_vals = np.asarray(x_vals)
-    # Compare the duty range with tol (variance is in kW^2, so a small curve
-    # with a real duty would vanish).
-    if x_vals.size == 0 or np.ptp(x_vals) <= tol:
+    # Compare the duty range with the heat-flow resolution (variance is in
+    # kW^2, so a small curve with a real duty would vanish).
+    if x_vals.size == 0 or np.ptp(x_vals) <= heat_resolution(x_vals):
         return np.array([]), np.array([])
-    start_mask = ~np.isclose(x_vals, x_vals[0] * np.ones(len(x_vals)), atol=tol)
-    end_mask = ~np.isclose(x_vals, x_vals[-1] * np.ones(len(x_vals)), atol=tol)
+    # Only rounding residue counts as constant at the ends: an absolute
+    # tolerance relative to the duty, not np.isclose's default rtol=1e-5 of
+    # the end value, which trimmed real end segments on MW-scale curves.
+    atol = max(duty_tolerance(x_vals), np.finfo(float).eps)
+    start_mask = np.abs(x_vals - x_vals[0]) > atol
+    end_mask = np.abs(x_vals - x_vals[-1]) > atol
     start = np.flatnonzero(start_mask)[0] - 1
     end = np.flatnonzero(end_mask)[-1] + 1
     return y_vals[start : end + 1], x_vals[start : end + 1]
