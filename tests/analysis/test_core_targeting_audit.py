@@ -208,8 +208,8 @@ def test_negative_dt_cont_runs_through_direct_and_area_targeting():
 @pytest.mark.parametrize(
     ("case", "hot_utility", "cold_utility", "area", "capital_cost"),
     [
-        ("basic_pinch.json", 750.0, 1000.0, 554.1173, 442752.48),
-        ("pulp_mill.json", 155528.905, 58413.668, 29372.737, 13376546.14),
+        ("basic_pinch.json", 750.0, 1000.0, 554.1173, 1066247.46),
+        ("pulp_mill.json", 155528.905, 58413.668, 29372.737, 28744828.36),
         (
             "Four-stream-Yee-and-Grossmann-1990-1.json",
             450.0,
@@ -231,6 +231,9 @@ def test_area_targets_integrate_refreshed_interval_widths(
     # driving force at a composite temperature step with the next slice's;
     # it put pulp_mill at 29689.089 and Four-stream at 341.0759 (1-6 % high
     # against the Bath integration in tests/analysis/test_area_bath_oracle.py).
+    # Capital costs price the unit count. It was 0 on basic_pinch and 13 on
+    # pulp_mill (442752.48 and 13376546.14) until the balanced-curve zero
+    # test became duty-relative; it is now 9 and 88, N = S - 1 per region.
     problem = PinchProblem(case, project_name="Site")
 
     with warnings.catch_warnings():

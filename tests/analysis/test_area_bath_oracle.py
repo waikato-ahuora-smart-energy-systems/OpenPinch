@@ -16,7 +16,9 @@ BATH_RTOL = 1e-5
 
 
 def _segments(collection, *, by_segment: bool):
-    view = collection.segment_numeric_view() if by_segment else collection.numeric_view()
+    view = (
+        collection.segment_numeric_view() if by_segment else collection.numeric_view()
+    )
     return list(zip(view.t_min, view.t_max, view.heat_flow, view.cp / view.rcp))
 
 

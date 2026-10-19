@@ -7,7 +7,7 @@ import warnings
 import numpy as np
 
 from ...domain._problem_table.types import ProblemTableUpdateKwargs
-from ...domain.configuration import Configuration, tol
+from ...domain.configuration import DUTY_RTOL, Configuration, tol
 from ...domain.enums import ProblemTableLabel
 from ...domain.stream_collection import StreamCollection
 from ..economics import compute_annual_capital_cost, compute_capital_cost
@@ -139,7 +139,9 @@ def get_area_targets(
     R_cold_bal: np.ndarray,
 ) -> dict:
     """Estimate heat-transfer area targets with vectorised counter-current logic."""
-    if abs((H_hot_bal[0] - H_hot_bal[-1]) - (H_cold_bal[0] - H_cold_bal[-1])) > tol:
+    if abs(
+        (H_hot_bal[0] - H_hot_bal[-1]) - (H_cold_bal[0] - H_cold_bal[-1])
+    ) > _duty_tolerance(H_hot_bal, H_cold_bal):
         # Raise an error because heat-flow balance is required for this analysis.
         raise ValueError(
             "The temperature driving force plot requires the inputted "
@@ -203,8 +205,13 @@ def get_min_number_hx(
     idx: int | None = None,
 ) -> int:
     """Estimate the minimum number of exchangers using vectorised interval logic."""
-    H_net_bal = H_cold_bal - H_hot_bal
-    mask = np.isclose(H_net_bal, 0.0, atol=tol)
+    H_net_bal = np.asarray(H_cold_bal, dtype=float) - np.asarray(H_hot_bal, dtype=float)
+    if H_net_bal.size < 2:
+        return 0
+    mask = np.abs(H_net_bal) <= _duty_tolerance(H_hot_bal, H_cold_bal)
+    # The balanced curves meet at both ends by construction; only rounding
+    # residue keeps the ends off zero.
+    mask[[0, -1]] = True
     mask_true_positions = np.flatnonzero(mask)
     if mask_true_positions.size < 2:
         return 0
@@ -230,6 +237,15 @@ def get_min_number_hx(
 ################################################################################
 # Helper functions
 ################################################################################
+
+
+def _duty_tolerance(*heat_flows: np.ndarray) -> float:
+    """Return a zero tolerance relative to the problem's heat-flow scale."""
+    scale = max(
+        (float(np.max(np.abs(values))) for values in heat_flows if np.size(values)),
+        default=0.0,
+    )
+    return max(tol, DUTY_RTOL * scale)
 
 
 def _map_interval_resistances_to_tdf(

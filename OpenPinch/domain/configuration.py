@@ -17,6 +17,10 @@ from .configuration_fields import (
 
 C_to_K: float = 273.15  # degrees
 tol: float = 1e-6
+# Heat-flow residues from rounding and solver noise scale with the duties, so
+# zero and balance tests on heat flows use this tolerance relative to the
+# problem's largest heat flow (with ``tol`` as a floor).
+DUTY_RTOL: float = 1e-6
 T_CRIT: float = 373.9  # C
 ACTIVATE_TIMING = False
 LOG_TIMING = False
@@ -25,6 +29,7 @@ __all__ = [
     "ACTIVATE_TIMING",
     "C_to_K",
     "Configuration",
+    "DUTY_RTOL",
     "LOG_TIMING",
     "T_CRIT",
     "tol",

@@ -6,7 +6,7 @@ import math
 
 import numpy as np
 
-from ...domain.configuration import tol
+from ...domain.configuration import DUTY_RTOL, tol
 from ..numerics import interp_with_plateaus
 
 __all__ = ["get_temperature_driving_forces"]
@@ -60,7 +60,10 @@ def get_temperature_driving_forces(
         )
     if T_hot.size == 0 or T_cold.size == 0:
         raise ValueError("Composite curve arrays cannot be empty.")
-    if abs((np.max(H_hot) - np.min(H_hot)) - (np.max(H_cold) - np.min(H_cold))) > tol:
+    duty_hot = np.max(H_hot) - np.min(H_hot)
+    duty_cold = np.max(H_cold) - np.min(H_cold)
+    # Rounding residue scales with the duty, so the balance test does too.
+    if abs(duty_hot - duty_cold) > max(tol, DUTY_RTOL * max(duty_hot, duty_cold)):
         raise ValueError(
             "The temperature driving force plot requires the inputted "
             "composite curves to be balanced."

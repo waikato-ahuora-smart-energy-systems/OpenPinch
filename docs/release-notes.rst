@@ -22,6 +22,20 @@ Area and unit-count targets
   ``chocolate_factory`` have no gap and are unchanged. Utility placement's
   entropy terms use the same driving-force intervals and never read the
   replaced value, so placement results do not change.
+- The minimum number of units (``num_units``) is no longer 0 on about a
+  third of problems. Rounding residue of a few 1e-6 kW at the ends of the
+  balanced composite curves failed an absolute 1e-6 kW zero test, so only the
+  pinch counted as a region boundary. The zero test is now relative to the
+  problem's duty, and the first and last rows are always boundaries, so the
+  count is N = S - 1 per pinch region. Capital and total cost change with it
+  where ``COSTING_HX_UNIT_COST`` is non-zero. ``basic_pinch`` and
+  ``crude_preheat_train``: 0 to 9 units (capital cost 442,752 to 1,066,247);
+  ``chocolate_factory``: 0 to 110; ``pulp_mill``: 13 to 88. Rows that repeat a
+  stream name are separate streams in OpenPinch (``F2`` and ``F2_1``), so
+  ``basic_pinch`` counts 9 units, not the 7 of its four physical streams.
+- The balance check in area targeting is relative to the duty, so area
+  targets no longer raise "requires the inputted composite curves to be
+  balanced" on MW-scale problems whose rounding residue exceeds 1e-6 kW.
 
 Network grid data
 ~~~~~~~~~~~~~~~~~
