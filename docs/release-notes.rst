@@ -17,7 +17,8 @@ HEN utility approach temperatures
   coolers after the last stage, so synthesis rejects it. In the relaxed
   models that stage reduction and network evolution solve, a heater or
   cooler whose fixed end cannot meet its approach carries no duty, and stage
-  reduction keeps only the heaters and coolers the solved network uses.
+  reduction keeps only the heaters and coolers the solved network uses in
+  some period.
 - A synthesised exchanger with a crossed or touching end gets no area. Its
   area used to come from a fallback temperature difference (20 m2 for the
   crossed cooler above); verification now reports its duty without area.
