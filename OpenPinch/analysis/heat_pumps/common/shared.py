@@ -674,7 +674,11 @@ def calc_carnot_heat_pump_cop(
     T_l: float | np.ndarray,
     eta_ii: float,
 ) -> float | np.ndarray:
-    """Compute a Carnot-based heating COP with a second-law efficiency factor."""
+    """Compute a Carnot-based heating COP with a second-law efficiency factor.
+
+    ``eta_ii`` applies to the cooling Carnot COP, T_l/(T_h - T_l), and the
+    heating COP follows from the energy balance: 1 + eta_ii x T_l/(T_h - T_l).
+    """
     T_h_arr = np.asarray(T_h, dtype=float)
     T_l_arr = np.asarray(T_l, dtype=float)
     delta_T = T_h_arr - T_l_arr

@@ -402,6 +402,9 @@ def test_indirect_helpers_compute_cost_shift_profiles_and_graph_slices():
 
     graphs = indirect._save_graph_data(pt)
 
+    # Audit M16: only the graph copies are rounded; the stored table that
+    # indirect heat pumps and energy transfer read keeps full precision.
+    assert pt[ProblemTableLabel.T].tolist() == [100.12345, 80.98765]
     assert sorted(graphs) == sorted([GraphType.SUGCC.value, GraphType.TSP.value])
     assert graphs[GraphType.TSP.value][ProblemTableLabel.T].tolist() == [
         100.1234,

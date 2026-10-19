@@ -380,7 +380,7 @@ def _validate_stream_record_states(
             record_label=record_label,
             field_name="dt_cont",
             severity="warning",
-            message="Value should be non-negative.",
+            message=_NEGATIVE_DT_CONT_MESSAGE,
             period_ids=period_ids,
         )
     )
@@ -995,7 +995,11 @@ def _validate_utility_record_states(
                 record_label=record_label,
                 field_name=field_name,
                 severity="warning",
-                message="Value should be non-negative.",
+                message=(
+                    _NEGATIVE_DT_CONT_MESSAGE
+                    if field_name == "dt_cont"
+                    else "Value should be non-negative."
+                ),
                 period_ids=period_ids,
             )
         )
@@ -1157,6 +1161,14 @@ def _validate_value_finiteness(
         reject=lambda magnitude: not math.isfinite(magnitude),
         period_ids=period_ids,
     )
+
+
+# A negative dt_cont stays a warning, but it lets the shifted hot and cold
+# curves overlap, so the targets are no longer bounded by thermodynamics.
+_NEGATIVE_DT_CONT_MESSAGE = (
+    "Value should be non-negative: with a negative dt_cont the reported heat "
+    "recovery can exceed the thermodynamic limit."
+)
 
 
 def _validate_non_negative_states(
