@@ -8,7 +8,7 @@ import numpy as np
 
 from ....analysis.heat_transfer import compute_LMTD_from_dts
 from ....domain._heat_exchanger.area import HeatExchangerAreaSlice
-from ....domain.configuration import tol
+from ....domain.configuration import DUTY_RTOL, tol
 from .arrays import PreparedSolverArrays
 
 
@@ -285,11 +285,19 @@ def duty_aligned_area_contributions(
         return ()
     hot_q = hot_profile.heat_at_temperature(hot_inlet_temperature)
     cold_inlet_q = cold_profile.heat_at_temperature(cold_inlet_temperature)
-    cold_q = cold_inlet_q + remaining
-    if hot_q + remaining > hot_profile.total_duty + tolerance or cold_q > (
-        cold_profile.total_duty + tolerance
-    ):
+    available = min(
+        hot_profile.total_duty - hot_q, cold_profile.total_duty - cold_inlet_q
+    )
+    # Solvers return duties that overshoot a profile by noise that scales
+    # with the duty, so the allowance does too; the overshoot is dropped.
+    overshoot_allowance = max(
+        tolerance,
+        DUTY_RTOL * max(hot_profile.total_duty, cold_profile.total_duty),
+    )
+    if remaining > available + overshoot_allowance:
         raise ValueError("Exchanger duty exceeds an available parent segment profile.")
+    remaining = min(remaining, available)
+    cold_q = cold_inlet_q + remaining
     contributions = []
     while remaining > tolerance:
         hot_index = hot_profile.segment_index_at_heat(hot_q)

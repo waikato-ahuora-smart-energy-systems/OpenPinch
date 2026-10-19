@@ -195,6 +195,26 @@ def test_get_area_targets_rejects_internal_shape_mismatch(monkeypatch):
         )
 
 
+def test_get_area_targets_balance_check_is_relative_to_the_duty():
+    # At MW scale the balanced curves carry rounding residue far above 1e-6
+    # kW but tiny against the duty; an absolute check raised on such cases
+    # (Yee and Grossmann and process_mvr with heat flows x1000).
+    fixture = _capital_area_fixture()["area_target"]
+    scale = 1e6
+    H_hot_bal = np.array(fixture["H_hot_bal"]) * scale
+    H_hot_bal[0] += 1e-2
+
+    area = get_area_targets(
+        np.array(fixture["T_vals"]),
+        H_hot_bal,
+        np.array(fixture["H_cold_bal"]) * scale,
+        np.array(fixture["R_hot_bal"]),
+        np.array(fixture["R_cold_bal"]),
+    )
+
+    assert area == pytest.approx(fixture["expected_area"] * scale, rel=1e-6)
+
+
 def test_get_area_targets_requires_balanced_curves():
     T_vals = np.array([300.0, 200.0])
     H_hot_bal = np.array([200.0, 0.0])

@@ -220,14 +220,14 @@ def test_negative_dt_cont_warning_states_its_consequence():
 @pytest.mark.parametrize(
     ("case", "hot_utility", "cold_utility", "area", "capital_cost"),
     [
-        ("basic_pinch.json", 750.0, 1000.0, 554.1173, 442752.48),
-        ("pulp_mill.json", 155528.905, 58413.668, 29689.089, 13462802.18),
+        ("basic_pinch.json", 750.0, 1000.0, 554.1173, 1066247.46),
+        ("pulp_mill.json", 155528.905, 58413.668, 29372.936, 28744945.11),
         (
             "Four-stream-Yee-and-Grossmann-1990-1.json",
             450.0,
             2100.0,
-            341.0759,
-            84161.387,
+            337.2019,
+            83580.281,
         ),
     ],
 )
@@ -239,6 +239,15 @@ def test_area_targets_integrate_refreshed_interval_widths(
     # pulp_mill 28175.8, Four-stream 264.26). The corrected basic_pinch area
     # matches an independent fine-slice Bath-formula integration of the
     # balanced composite curves. Energy targets were never affected.
+    # A later fix dropped the discontinuity rule that replaced a slice's end
+    # driving force at a composite temperature step with the next slice's;
+    # it put pulp_mill at 29689.089 and Four-stream at 341.0759 (1-6 % high
+    # against the Bath integration in tests/analysis/test_area_bath_oracle.py).
+    # Capital costs price the unit count. It was 0 on basic_pinch and 13 on
+    # pulp_mill (442752.48 and 13376546.14) until the balanced-curve zero
+    # test became duty-relative; it is now 9 and 88, N = S - 1 per region.
+    # Flattening the pocket-exit row removed 0.17 kW of excess utility on
+    # pulp_mill, moving its area from 29372.737 to 29372.936.
     problem = PinchProblem(case, project_name="Site")
 
     with warnings.catch_warnings():
@@ -484,3 +493,19 @@ def test_exergy_spec_marks_curves_built_on_real_temperatures(
         and np.array_equal(branch[1], pt[ProblemTableLabel[name]])
     }
     assert marked == real_columns
+
+
+def test_fully_balanced_problem_reports_the_pinch_band_ends():
+    # With zero approach and matching streams the GCC is zero over the whole
+    # range: every temperature is a pinch, so the hot pinch is the top and the
+    # cold pinch the bottom of the band. Both used to be None.
+    payload = _two_stream_payload(options={"THERMAL_DT_CONT": 0.0})
+    payload["streams"][1]["t_supply"] = 50.0
+    payload["streams"][1]["t_target"] = 150.0
+
+    target = PinchProblem(payload, project_name="Site").target.direct_heat_integration()
+
+    assert target.hot_utility_target == pytest.approx(0.0)
+    assert target.cold_utility_target == pytest.approx(0.0)
+    assert target.hot_pinch == pytest.approx(150.0)
+    assert target.cold_pinch == pytest.approx(50.0)

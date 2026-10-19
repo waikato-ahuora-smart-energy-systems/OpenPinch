@@ -22,6 +22,88 @@ HEN synthesis with several utilities
   did for hot utilities.
 - Results with one hot and one cold utility are unchanged.
 
+Area and unit-count targets
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``target.heat_exchanger_area_and_cost()`` reports lower area, capital cost
+  and total cost targets on problems whose composite curves have a
+  temperature gap (a step at constant heat flow, for example between the
+  process streams and a utility). This is the second change to area targets
+  in two releases: 0.7.1 fixed interval widths that made areas 5-22 % low,
+  and this release removes a "discontinuity" rule that made them 1-6 % high.
+  At each step the rule replaced a slice's end driving force with the next
+  slice's, which collapsed that slice's LMTD. Every slice now ends at its
+  left limit, and area targets match an independent fine-slice Bath
+  integration. Four-stream Yee and Grossmann: 341.08 to 337.20 m2 (capital
+  cost 84,161 to 83,580). ``pulp_mill``: 29,689 to 29,373 m2; its capital
+  cost still rises, from 13,462,802 to 28,744,945, because its unit count
+  also changes (13 to 88, below). ``basic_pinch``, ``crude_preheat_train`` and
+  ``chocolate_factory`` have no gap and are unchanged. Utility placement's
+  entropy terms use the same driving-force intervals and never read the
+  replaced value, so placement results do not change.
+- The minimum number of units (``num_units``) is no longer 0 on about a
+  third of problems. Rounding residue of a few 1e-6 kW at the ends of the
+  balanced composite curves failed an absolute 1e-6 kW zero test, so only the
+  pinch counted as a region boundary. The zero test is now relative to the
+  problem's duty, and the first and last rows are always boundaries, so the
+  count is N = S - 1 per pinch region. Capital and total cost change with it
+  where ``COSTING_HX_UNIT_COST`` is non-zero. ``basic_pinch`` and
+  ``crude_preheat_train``: 0 to 9 units (capital cost 442,752 to 1,066,247);
+  ``chocolate_factory``: 0 to 110; ``pulp_mill``: 13 to 88. Rows that repeat a
+  stream name are separate streams in OpenPinch (``F2`` and ``F2_1``), so
+  ``basic_pinch`` counts 9 units, not the 7 of its four physical streams.
+- The balance check in area targeting is relative to the duty, so area
+  targets no longer raise "requires the inputted composite curves to be
+  balanced" on MW-scale problems whose rounding residue exceeds 1e-6 kW.
+- Pocket removal flattens the row it inserts at a pocket's exit, and the exit
+  row below the pinch when no row is inserted. The exit temperature is
+  inserted rounded to 6 dp, so the pocket-free Grand Composite Curve kept a
+  bump of up to 0.07 kW on steep segments, and a near-coincident temperature
+  could leave a whole pocket row unflattened below the pinch. Utilities were
+  then assigned more than their targets (``pulp_mill`` by 0.17 kW, area
+  29,372.74 to 29,372.94 m2; one reported case 1,433 kW of cooling against a
+  1,350 kW target), and area targeting raised "requires the inputted
+  composite curves to be balanced" on about one problem in eight, including
+  ``zonal_site_multiperiod``.
+- Energy, area and unit-count targets scale with the heat flows from x1e-6
+  to x1e3 and are unchanged by a uniform temperature shift. Heat-flow
+  thresholds in pocket removal, balanced composite curves and area targeting
+  were absolute (1e-6 kW), so at x1e-6 a shallow pocket survived, a utility
+  was over-assigned and area targeting raised or drifted by up to 0.1 %.
+  They now keep 1e-6 kW from 1 kW up and shrink with smaller problems.
+- Composite curve end cleaning (plots and area targeting) trims only rounding
+  residue at the curve ends. It used ``np.isclose``'s default relative
+  tolerance of 1e-5 of the end heat flow, which dropped real end segments on
+  MW-scale curves.
+- Composite and net load graphs leave out a series with no heat-flow span,
+  such as the cold composite of a problem with only hot streams. It used to
+  appear as a segment with no data points.
+- Carnot heat pump and refrigeration searches cut short by small iteration
+  limits (as in tutorial 08) can stop at a different point, because the
+  pocket-exit and curve-end fixes change heat flows by about 1e-6 kW. On
+  ``basic_pinch`` with one condenser, one evaporator and 20 iterations the
+  heat pump work moves from 53.7 to 77.0 kW. With the default limits the
+  result is unchanged (21.85 kW, to 3e-6).
+- A direct-integration target whose Grand Composite Curve is zero over its
+  whole range (no utility needed, every temperature a pinch) reports the top
+  and bottom of that band as its hot and cold pinch temperatures. Both were
+  None.
+- Heat exchanger network area slicing on segmented streams accepts a
+  solver duty that overshoots its stream profile by noise relative to the
+  duty (1e-6 of the profile) and drops the overshoot. A 2e-6 kW overshoot on
+  a 15 MW match raised "Exchanger duty exceeds an available parent segment
+  profile".
+
+The "Total cost now" column under "Utility cost and totals" below predates
+these area and unit-count changes. With both, the area target's total cost
+on the sample cases is: ``basic_pinch`` and ``crude_preheat_train`` 245,896
+$/y, ``crude_preheat_train_multiperiod`` 206,290, Four-stream Yee and
+Grossmann 151,080, ``chocolate_factory`` 1,639,540, ``process_mvr`` 20,705,
+``pulp_mill`` 55,985,020, ``zonal_site`` 71,327,
+``dairy_chilling_multiperiod`` 905,252 and ``zonal_site_multiperiod``
+66,564 (its area target no longer raises). Multiperiod cases give their
+first period.
+
 Multiperiod HEN pinch design
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
