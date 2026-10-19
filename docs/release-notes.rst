@@ -4,6 +4,17 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Multiperiod HEN pinch design
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Multiperiod pinch design (PDM) no longer applies approach constraints to a
+  stream in a period where it is absent from that side of the pinch. The
+  pinch decomposition sets such a stream to 0 K in that period, so the
+  constraints made the shared topology infeasible:
+  ``crude_preheat_train_multiperiod`` failed at every dTmin and now solves
+  at 5, 10 and 20 K. Those periods also get no approach temperature or
+  area from the 0 K values.
+
 HEN utility approach temperatures
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
