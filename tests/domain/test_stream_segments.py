@@ -1080,3 +1080,33 @@ def test_scalar_segmented_utility_total_duty_changes_only_selected_period():
     np.testing.assert_allclose(
         utility.segments[1].heat_flow.period_values, np.array([100.0, 100.0, 20.0])
     )
+
+
+def test_segment_period_setter_changes_only_the_named_period():
+    stream = Stream(
+        name="H",
+        segments=[
+            StreamSegment(
+                name="S1",
+                supply_temperature=200.0,
+                target_temperature=150.0,
+                heat_flow=50.0,
+            ),
+            StreamSegment(
+                name="S2",
+                supply_temperature=150.0,
+                target_temperature=100.0,
+                heat_flow=100.0,
+            ),
+        ],
+    )
+    collection = StreamCollection()
+    collection.set_period_context({"a": 0, "b": 1, "c": 2}, [1.0, 1.0, 1.0], 3)
+    collection.add(stream)
+
+    stream.segments[1].set_attr_for_period("heat_flow", 10.0, period_id="c")
+
+    assert stream.segments[1].heat_flow.period_values == pytest.approx(
+        [100.0, 100.0, 10.0]
+    )
+    assert stream.heat_flow.period_values == pytest.approx([150.0, 150.0, 60.0])
