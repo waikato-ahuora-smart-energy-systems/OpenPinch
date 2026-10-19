@@ -26,6 +26,8 @@ try:
     ureg.define("NZD = [currency]")
 except PintError:  # pragma: no cover - Pint may already know this unit.
     pass
+# Every unit or quantity text Pint parses is held to a bounded grammar first.
+ureg.preprocessors.append(_value_units.check_unit_text)
 set_application_registry(ureg)
 Q_ = ureg.Quantity  # type: ignore
 

@@ -29,6 +29,66 @@ def normalise_unit_text(unit: str | None) -> str | None:
     return text.replace(".K", "/K").replace(".degC", "/degC")
 
 
+MAX_UNIT_TEXT_LENGTH = 64
+_MAX_UNIT_PARENTHESIS_DEPTH = 2
+# Unit text tokens: names, plain numbers, one bounded power per factor, the
+# product and ratio operators, parentheses and spaces.
+_UNIT_TOKEN = re.compile(
+    r"(?P<space>\s+)"
+    r"|(?P<name>[A-Za-z_$%°Δµμ][A-Za-z0-9_$%°Δµμ]*)"
+    r"|(?P<number>[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d{1,3})?)"
+    r"|(?P<power>(?:\^|\*\*)\s*[+-]?\d{1,2}(?:\.\d{1,3})?(?![\d.]))"
+    r"|(?P<operator>[*/])"
+    r"|(?P<open>\()"
+    r"|(?P<close>\))"
+)
+
+
+class UnitTextError(ValueError):
+    """Unit text outside the grammar OpenPinch accepts."""
+
+
+def check_unit_text(text: str) -> str:
+    """Return ``text`` when it is plain unit or quantity text, else raise.
+
+    Pint evaluates unit text as an expression, so text is held to a bounded
+    grammar first: at most ``MAX_UNIT_TEXT_LENGTH`` characters, products and
+    ratios of names and numbers, one power of at most two digits on a name
+    or a parenthesised group, and at most two levels of parentheses.
+    """
+    if len(text) > MAX_UNIT_TEXT_LENGTH:
+        raise UnitTextError(
+            f"A unit can have at most {MAX_UNIT_TEXT_LENGTH} characters."
+        )
+    depth = 0
+    previous = None
+    position = 0
+    while position < len(text):
+        match = _UNIT_TOKEN.match(text, position)
+        if match is None:
+            raise UnitTextError(f"Unsupported character in unit {text!r}.")
+        kind = match.lastgroup
+        position = match.end()
+        if kind == "space":
+            continue
+        if kind == "power" and previous not in {"name", "close"}:
+            raise UnitTextError(
+                f"A power in unit {text!r} must follow a unit name or a group."
+            )
+        if kind == "open":
+            depth += 1
+            if depth > _MAX_UNIT_PARENTHESIS_DEPTH:
+                raise UnitTextError(f"Too many nested groups in unit {text!r}.")
+        if kind == "close":
+            depth -= 1
+            if depth < 0:
+                raise UnitTextError(f"Unbalanced parentheses in unit {text!r}.")
+        previous = kind
+    if depth:
+        raise UnitTextError(f"Unbalanced parentheses in unit {text!r}.")
+    return text
+
+
 def clean_unit_text(text: str) -> str:
     """Return stable OpenPinch unit spelling for serialization and display."""
     text = text.replace("USD", "$").replace("NZD", "$").replace(" ", "")
