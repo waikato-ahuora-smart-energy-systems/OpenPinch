@@ -48,6 +48,8 @@ def test_allow_listed_solver_options_are_accepted(key, options):
         {"max_iter": [1, 2]},
         {"max_iter": None},
         {"tol": ""},
+        {"max_iter": 10**1000},
+        {"max_iter": "9" * 40},
     ],
 )
 def test_other_solver_option_names_and_values_are_rejected(key, options):

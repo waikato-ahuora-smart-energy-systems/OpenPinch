@@ -89,6 +89,9 @@ _APOPT_OPTIONS = frozenset(
 
 ALLOWED_SOLVER_OPTION_NAMES = _IPOPT_OPTIONS | _COUENNE_OPTIONS | _APOPT_OPTIONS
 
+# Integers as large as a solver's 64-bit settings, and short value text.
+_MAX_INTEGER = 2**63 - 1
+_MAX_TEXT_LENGTH = 32
 _NUMBER_TEXT = re.compile(r"^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d{1,3})?$")
 _WORD_TEXT = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,31}$")
 
@@ -99,12 +102,18 @@ def validate_solver_option(name: Any, value: Any) -> tuple[str, Any]:
         raise ValueError(f"Unsupported solver option {str(name)[:64]!r}.")
     if isinstance(value, bool):
         return name, value
-    if isinstance(value, int | float):
+    if isinstance(value, int):
+        if abs(value) > _MAX_INTEGER:
+            raise ValueError(f"The solver option {name!r} is too large.")
+        return name, value
+    if isinstance(value, float):
         if not math.isfinite(value):
             raise ValueError(f"The solver option {name!r} must be finite.")
         return name, value
-    if isinstance(value, str) and (
-        _NUMBER_TEXT.fullmatch(value) or _WORD_TEXT.fullmatch(value)
+    if (
+        isinstance(value, str)
+        and len(value) <= _MAX_TEXT_LENGTH
+        and (_NUMBER_TEXT.fullmatch(value) or _WORD_TEXT.fullmatch(value))
     ):
         return name, value
     raise ValueError(
