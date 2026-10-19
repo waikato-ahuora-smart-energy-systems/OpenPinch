@@ -4,20 +4,59 @@ Pre-Release Notes
 Unreleased
 ----------
 
-Command layer
-~~~~~~~~~~~~~
+HEN synthesis orchestration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- ``run_command`` collects warnings per call, so concurrent calls from worker
-  threads each return only their own warnings, none lost, and the global
-  warning filters and ``showwarning`` are unchanged once the calls finish.
-  Before, calls replaced the process-wide filters in turn: under 24
-  concurrent calls a response could carry other commands' warnings or lose
-  its own, and the filters stayed modified. A warning raised outside a
-  command while one runs is shown as before rather than returned with it.
-- An ORC target that fails (``OrcTargetingError``: the surplus is too cold
-  for the condensing temperature, or no ORC pays) returns an ``error``
-  envelope from ``run_command``, as heat pump targeting failures do, instead
-  of raising out of it.
+- In PDM and TDM networks (isothermal mixing), a stream split across several
+  matches in one stage reports each branch leaving at the stage's mixing
+  temperature, with its split fraction (its share of the stage duty). Each
+  branch used to be reported as if it carried the whole stream, so its
+  outlet temperature disagreed with its approach temperatures and area: one
+  ``crude_preheat_train`` exchanger reported 43.0 m2 of area while its own
+  temperatures gave 21.1 m2. Areas are unchanged; the temperatures now match
+  them.
+
+- Multiperiod stage reduction after PDM and TDM keeps a stage, a match and
+  a heater or cooler that carries duty in any period, and starts the reduced
+  model with each of them switched on. It read only the first period, so a stage
+  used only in later periods was dropped and the reduced network was solved
+  without it, or the reduction failed and fell back to the unreduced model.
+  A reduced network that fails the model's own solution checks is not used:
+  the unreduced network is kept.
+
+- ``design.heat_exchanger_network()`` no longer takes ``initial_networks``.
+  The default workflow never used seed networks and raised for any value;
+  ``design.thermal_derivative()`` and ``design.network_evolution()`` take
+  them.
+
+- The default ``design.heat_exchanger_network()`` (quality tier 0) runs one
+  set of tasks for every value in ``HENS_APPROACH_TEMPERATURES``, as the
+  option's help says. It ran only the first value. The result manifest's
+  ``approach_temperatures`` lists the approach temperatures the tasks ran,
+  including the multiples that expanded tiers explore; it listed the
+  configured values whether they ran or not.
+
+- The accepted network is the feasible network with the lowest total annual
+  cost from any method stage, and the result's ``method`` records the stage it
+  came from. It always came from the last stage that succeeded, so a cheaper
+  PDM or TDM network lost to any network evolution result, and the ranked
+  networks (``design.top()``, ``design.network(rank=...)``) listed only that
+  stage's networks; they now rank every stage's feasible networks by cost.
+
+- Piecewise linearisation of a temperature-heat curve refines its break
+  points against the curve in increasing heat. It flipped both arrays
+  instead, so for curves listed in increasing heat (cold streams, segmented
+  stream profiles, the vapour-compression and MVR evaporator curves) it
+  interpolated against a decreasing heat axis: the reported error was
+  meaningless (40 K where the fit was 0.16 K off) and the refinement's
+  integrity bound was never enforced (first-audit H8). The result no longer
+  depends on point order.
+
+- A single-stage network's post-optimisation flow-on factors no longer take
+  cold flow-on from the stage itself. Its cold gamma is 0, as for the first
+  stage of any network (it was 0.56 where 0 was due on the first audit's
+  case), so network evolution ranks single-stage candidates by the right
+  benefit. Reported results did not use these factors.
 
 HEN synthesis with several utilities
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

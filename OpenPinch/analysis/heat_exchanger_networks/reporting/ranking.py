@@ -125,15 +125,7 @@ def _ranked_candidate_outcomes(
         and outcome.objective_value is not None
         and is_network_feasible(outcome.network)
     ]
-    accepted_method = [
-        outcome for outcome in candidates if outcome.task.method == result.method
-    ]
-    return tuple(
-        sorted(
-            accepted_method or candidates,
-            key=outcome_ranking_key,
-        )
-    )
+    return tuple(sorted(candidates, key=outcome_ranking_key))
 
 
 __all__ = [

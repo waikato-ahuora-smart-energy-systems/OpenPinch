@@ -136,3 +136,31 @@ def test_get_piecewise_breakpoints_reduces_epsilon_when_error_too_large(monkeypa
 
     assert out.shape[0] == 11
     assert calls["refine"] >= 2
+
+
+def _true_piecewise_error(curve, points):
+    order = np.argsort(points[:, 0])
+    fitted = np.interp(curve[:, 0], points[order, 0], points[order, 1])
+    return float(np.max(np.abs(fitted - curve[:, 1])))
+
+
+@pytest.mark.parametrize("increasing_heat", [True, False])
+def test_refinement_measures_its_error_in_either_point_order(increasing_heat):
+    # First-audit H8: refinement flipped both arrays and interpolated against
+    # the flipped heat axis, which is decreasing for increasing-heat curves,
+    # so np.interp returned garbage and the reported error was meaningless.
+    heat = np.linspace(0.0, 100.0, 200)
+    curve = np.column_stack([heat, 300.0 + 40.0 * (heat / 100.0) ** 2])
+    pw_points = curve[[0, 25, 50, 75, 100, 125, 150, 175, 199]]
+    if not increasing_heat:
+        curve, pw_points = curve[::-1], pw_points[::-1]
+
+    refined, max_err = sl._refine_pw_points_for_heating_or_cooling(
+        curve=curve, pw_points=pw_points, eps_lb=0.01, hot_stream=False
+    )
+
+    assert max_err == pytest.approx(_true_piecewise_error(curve, refined), abs=1e-9)
+    assert max_err < _true_piecewise_error(curve, pw_points)
+    # The refined points keep the caller's order and fixed end points.
+    np.testing.assert_allclose(refined[[0, -1]], pw_points[[0, -1]])
+    assert np.all(np.diff(refined[:, 0]) > 0) == increasing_heat

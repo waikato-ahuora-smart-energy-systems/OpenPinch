@@ -269,6 +269,7 @@ class InternalHeatExchangerNetworkProblem:
         if len(active_stages) == case.S:
             return case
 
+        peak_recovery = _peak_recovery_duties(case)
         active_locations = [
             [[None for _k in range(len(active_stages))] for _j in range(case.J)]
             for _i in range(case.I)
@@ -277,9 +278,11 @@ class InternalHeatExchangerNetworkProblem:
             for i in range(case.I):
                 for j in range(case.J):
                     active_locations[i][j][new_k] = (
-                        1 if case.Q_r[i][j][old_k][0] > case.tol else 0
+                        1 if peak_recovery[i][j][old_k] > case.tol else 0
                     )
 
+        heaters_in_use = _used_in_any_period(case, "Q_h")
+        coolers_in_use = _used_in_any_period(case, "Q_c")
         f_case = StageWiseModel(
             name=f"reduced-{case.name}",
             framework=case.framework,
@@ -291,8 +294,8 @@ class InternalHeatExchangerNetworkProblem:
             # only those the solved case uses in some period.
             z_restriction=[
                 active_locations,
-                _used_in_any_period(case, "Q_h"),
-                _used_in_any_period(case, "Q_c"),
+                heaters_in_use,
+                coolers_in_use,
             ],
             min_dqda=case.min_dqda,
             minimisation_goal=case.minimisation_goal,
@@ -310,7 +313,8 @@ class InternalHeatExchangerNetworkProblem:
                         else 0.0
                     )
                     _assign(f_case.Q_r[i][j][new_k], q_val)
-                    _assign_binary(f_case.z[i][j][new_k], q_val)
+                    # Shared across periods: a match used in any period is on.
+                    _assign_binary(f_case.z[i][j][new_k], active_locations[i][j][new_k])
                     _assign(f_case.theta_1[i][j][new_k], case.theta_1[i][j][old_k][0])
                     _assign(f_case.theta_2[i][j][new_k], case.theta_2[i][j][old_k][0])
 
@@ -335,14 +339,14 @@ class InternalHeatExchangerNetworkProblem:
             for new_k, old_k in enumerate(reduced_boundaries):
                 _assign(f_case.T_c[j][new_k], case.T_c[j][old_k][0])
 
-        for duties, flags, source in (
-            (f_case.Q_c, f_case.z_cu, case.Q_c),
-            (f_case.Q_h, f_case.z_hu, case.Q_h),
+        for duties, flags, source, in_use in (
+            (f_case.Q_c, f_case.z_cu, case.Q_c, coolers_in_use),
+            (f_case.Q_h, f_case.z_hu, case.Q_h, heaters_in_use),
         ):
             for index, row in enumerate(source):
                 for u, duty in enumerate(row):
                     _assign(duties[index][u], duty[0])
-                    _assign_binary(flags[index][u], duty[0])
+                    _assign_binary(flags[index][u], in_use[index][u])
 
         f_case.TAC_model = case.TAC_model
         f_case.TAC = case.TAC
@@ -350,13 +354,16 @@ class InternalHeatExchangerNetworkProblem:
         f_case.mSuccess = case.mSuccess
 
         f_case.optimise(print_output=False)
-        if f_case.mSuccess != 1:
+        # Reduction only simplifies the solved network: keep the original
+        # unless the reduced one solves and passes the same checks.
+        if f_case.mSuccess != 1 or not f_case.verify()[0]:
             return case
         return f_case
 
     def _get_active_stages(self, case) -> list[int]:
+        peak_recovery = _peak_recovery_duties(case)
         q_total = sum(
-            case.Q_r[i][j][k][0]
+            peak_recovery[i][j][k]
             for i in range(case.I)
             for j in range(case.J)
             for k in range(case.S)
@@ -365,7 +372,7 @@ class InternalHeatExchangerNetworkProblem:
             # No recovery to apportion: keep the stage layout unchanged.
             return list(range(case.S))
         q_per_stage = [
-            sum(case.Q_r[i][j][k][0] for i in range(case.I) for j in range(case.J))
+            sum(peak_recovery[i][j][k] for i in range(case.I) for j in range(case.J))
             for k in range(case.S)
         ]
         threshold = self._utilisation_threshold(case.S)
@@ -402,6 +409,22 @@ class InternalHeatExchangerNetworkProblem:
         if default == "StageWiseModel":
             return StageWiseModel
         raise ValueError(f"Unknown heat exchanger network model factory {default!r}.")
+
+
+def _peak_recovery_duties(case) -> list:
+    """Return each match's largest duty over the periods, ``[hot][cold][stage]``.
+
+    ``Q_r`` is period 0's; a stage or match used only in a later period
+    still belongs in the reduced network.
+    """
+    by_period = getattr(case, "Q_r_by_period", None) or [case.Q_r]
+    return [
+        [
+            [max(period[i][j][k][0] for period in by_period) for k in range(case.S)]
+            for j in range(case.J)
+        ]
+        for i in range(case.I)
+    ]
 
 
 def _used_in_any_period(case, name: str) -> list[list[int]]:

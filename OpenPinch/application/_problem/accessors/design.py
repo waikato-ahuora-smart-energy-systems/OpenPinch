@@ -285,9 +285,6 @@ class _DesignAccessor:
     def heat_exchanger_network(
         self,
         *,
-        initial_networks: (
-            "HeatExchangerNetwork | Sequence[HeatExchangerNetwork] | None"
-        ) = None,
         options: Mapping[str, Any] | None = None,
         period_id: str | None = None,
         approach_temperatures=None,
@@ -323,7 +320,6 @@ class _DesignAccessor:
             surface="heat_exchanger_network",
             runtime=runtime,
             configuration=configuration,
-            initial_networks=initial_networks,
             method=None,
             workspace_variant=None,
         )

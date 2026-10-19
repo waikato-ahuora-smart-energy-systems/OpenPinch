@@ -2659,8 +2659,10 @@ def test_extraction_uses_identity_fallbacks_and_requires_utilities() -> None:
 
 
 def test_extraction_private_helpers_cover_temperature_and_metadata_edges() -> None:
+    # The stage boundary is the outlet (isothermal mixing); the heat-capacity
+    # balance is the fallback where the model has no boundary.
     calculated_hot = extraction_period_state._hot_recovery_outlet(
-        SimpleNamespace(T_h=[[650.0, 620.0]], f_h=[2.0]),
+        SimpleNamespace(T_h=[[650.0]], f_h=[2.0]),
         0,
         0,
         0,
@@ -2674,7 +2676,7 @@ def test_extraction_private_helpers_cover_temperature_and_metadata_edges() -> No
         10.0,
     )
     calculated_cold = extraction_period_state._cold_recovery_outlet(
-        SimpleNamespace(T_c=[[400.0, 450.0]], f_c=[5.0]),
+        SimpleNamespace(T_c=[[None, 450.0]], f_c=[5.0]),
         0,
         0,
         0,

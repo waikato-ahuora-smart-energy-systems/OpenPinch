@@ -98,9 +98,9 @@ def _build_pathway_pinch_design_method_tasks(
             continue
         if pathway.multiplier is None:
             continue
-        approach_temperature = _pathway_approach_temperature(settings, pathway)
-        key = (pathway.pdm_mode, approach_temperature)
-        grouped.setdefault(key, []).append(pathway)
+        for approach_temperature in _pathway_approach_temperatures(settings, pathway):
+            key = (pathway.pdm_mode, approach_temperature)
+            grouped.setdefault(key, []).append(pathway)
 
     for (pdm_mode, approach_temperature), grouped_pathways in grouped.items():
         settings_data = {"pdm_mode": pdm_mode}
@@ -181,15 +181,27 @@ def _with_quality_pdm_tasks(
     return (*tasks, *quality_tasks)
 
 
-def _pathway_approach_temperature(
+def _pathway_approach_temperatures(
     settings: SynthesisWorkflowSettings,
     pathway: TierPathway,
-) -> float:
-    """Return the concrete dTmin represented by one PDM multiplier pathway."""
+) -> tuple[float, ...]:
+    """Return the concrete dTmins one PDM multiplier pathway runs.
+
+    The tier-0 pathways run every configured approach temperature; the
+    expanded-tier pathways explore multiples of the first one.
+    """
 
     if pathway.multiplier is None:
         raise ValueError("PDM multiplier pathway requires a multiplier.")
-    return float(settings.approach_temperatures[0]) * float(pathway.multiplier)
+    approach_temperatures = (
+        settings.approach_temperatures
+        if pathway.pathway_kind == "tier0_pdm_evm"
+        else settings.approach_temperatures[:1]
+    )
+    return tuple(
+        float(approach_temperature) * float(pathway.multiplier)
+        for approach_temperature in approach_temperatures
+    )
 
 
 __all__ = [
