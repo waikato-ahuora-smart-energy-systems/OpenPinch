@@ -108,6 +108,7 @@ def run_multistart_minimisation(
             "max_minima": _BACKEND_MINIMA_FACTOR * int(requested_minima),
         }
     points, objectives = backend(
+        feasibility_tolerance=feasibility_tolerance,
         func=problem.objective,
         bounds=bounds,
         x0_ls=initial_points,

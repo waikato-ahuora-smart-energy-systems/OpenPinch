@@ -182,3 +182,48 @@ def test_malformed_constraints_are_rejected_before_the_solve(constraints, monkey
 
     with pytest.raises(InvalidOptimisationProblemError, match="constraint"):
         run_multistart_minimisation(problem)
+
+
+def test_polish_ranks_feasibility_with_the_configured_tolerance(monkeypatch):
+    # The raw start violates x >= 1.5 by 5e-7: feasible at the default 1e-6
+    # but not at a zero tolerance, where the feasible polish must win.
+    monkeypatch.setattr(
+        candidates,
+        "minimize",
+        lambda **_: SimpleNamespace(x=np.array([1.5]), fun=0.25, success=True),
+    )
+
+    x, f = _polish_single_candidate(
+        0,
+        all_x=np.array([[1.4999995]]),
+        all_f=np.array([0.2499995]),
+        func=_shifted_quadratic,
+        args=(),
+        local_method="SLSQP",
+        bounds_arg=np.array([[-2.0, 2.0]]),
+        constraints=({"type": "ineq", "fun": lambda x: x[0] - 1.5},),
+        feasibility_tolerance=0.0,
+    )
+
+    assert x[0] == pytest.approx(1.5)
+    assert f == pytest.approx(0.25)
+
+
+@pytest.mark.parametrize("method", list(OptimisationMethod))
+def test_backends_receive_the_configured_feasibility_tolerance(method, monkeypatch):
+    received = {}
+
+    def recording_backend(**kwargs):
+        received.update(kwargs)
+        return np.array([[0.0]]), np.array([1.0])
+
+    monkeypatch.setattr(
+        optimisation_service, "_resolve_backend", lambda _method: recording_backend
+    )
+    problem = OptimisationProblem(objective=_shifted_quadratic, bounds=((-2.0, 2.0),))
+
+    run_multistart_minimisation(
+        problem, method=method, options={"feasibility_tolerance": 1e-9}
+    )
+
+    assert received["feasibility_tolerance"] == 1e-9
