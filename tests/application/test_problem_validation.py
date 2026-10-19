@@ -381,6 +381,7 @@ def test_stream_value_state_validation_edges():
         section="streams",
         record_index=0,
         record_label="Stream 1",
+        period_ids=("a", "b", "c"),
     )
 
     assert any("must differ" in issue.message for issue in issues)
@@ -390,6 +391,7 @@ def test_stream_value_state_validation_edges():
             section="streams",
             record_index=0,
             record_label="Stream 1",
+            period_ids=("a", "b", "c"),
         )
         == []
     )
@@ -416,6 +418,7 @@ def test_stream_classification_and_utility_state_edges():
         section="streams",
         record_index=0,
         record_label="Stream 1",
+        period_ids=("a", "b", "c", "d"),
     )
     utility_issues = semantics._validate_utility_record_states(
         {
@@ -429,6 +432,7 @@ def test_stream_classification_and_utility_state_edges():
         section="utilities",
         record_index=0,
         record_label="Utility 1",
+        period_ids=("a", "b"),
     )
 
     assert any("classify consistently" in issue.message for issue in issues)

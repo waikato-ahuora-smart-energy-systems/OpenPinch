@@ -128,7 +128,7 @@ class TargetResults(_ReportModel):
         representation="quantity",
     )
     turbine_efficiency_target: Value | None = report_field(
-        "turbine_efficiency_target", "weighted_mean", None, representation="quantity"
+        "turbine_efficiency_target", "derived", None, representation="quantity"
     )
     area: Value | None = report_field(
         "area", "maximum", None, representation="quantity"
