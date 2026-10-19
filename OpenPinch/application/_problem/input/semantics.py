@@ -994,32 +994,26 @@ def _validate_period_lengths(
 ) -> list[ValidationIssue]:
     """Require a record's per-period arrays to agree on the number of periods.
 
-    A value is either one number for every period or one per period. With
-    ``PROBLEM_PERIOD_IDS`` declared, that is its length; otherwise all of the
-    record's multi-period values must share one length. Any other mix would
-    silently change the problem's period model or index out of range.
+    A value is either one number for every period or one per period, and
+    ``PROBLEM_PERIOD_IDS`` declares the periods. Per-period values without it
+    would silently use only the first period, and any other length would
+    change the problem's period model or index out of range.
     """
     lengths = {
         field_name: len(value)
         for field_name, value in values.items()
         if isinstance(value, Value) and len(value) > 1
     }
-    if period_ids:
-        expected = len(period_ids)
-    elif lengths:
-        expected = max(set(lengths.values()), key=list(lengths.values()).count)
-    else:
-        return []
     issues: list[ValidationIssue] = []
     for field_name, count in lengths.items():
-        if count == expected:
+        if period_ids and count == len(period_ids):
             continue
         message = (
             f"Has {count} period values, but PROBLEM_PERIOD_IDS declares "
-            f"{expected} periods."
+            f"{len(period_ids)} periods."
             if period_ids
-            else f"Has {count} period values, but other values of this record "
-            f"have {expected}."
+            else f"Has {count} period values, but PROBLEM_PERIOD_IDS is not "
+            "set. Declare one id per period in the options."
         )
         issues.append(
             _build_issue(

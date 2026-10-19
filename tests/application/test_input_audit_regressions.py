@@ -111,6 +111,45 @@ def test_period_lengths_must_match_declared_period_ids():
     assert any("declares 3 periods" in message for _, message in messages)
 
 
+def test_period_values_without_period_ids_are_a_validation_error():
+    payload = {
+        "streams": [_stream(heat_flow={"values": [100.0, 90.0], "unit": "kW"})],
+        "utilities": [],
+    }
+
+    report = validation.build_validation_report(payload)
+
+    assert report.valid is False
+    assert any(
+        issue.severity == "error"
+        and "2 period values" in issue.message
+        and "PROBLEM_PERIOD_IDS" in issue.message
+        for issue in report.issues
+    )
+    with pytest.raises(ValueError, match="PROBLEM_PERIOD_IDS"):
+        PinchProblem(payload)
+
+
+def test_records_of_different_period_lengths_get_a_clear_message():
+    payload = {
+        "streams": [
+            _stream(heat_flow={"values": [100.0, 90.0], "unit": "kW"}),
+            _stream(
+                name="C1",
+                t_supply=40.0,
+                t_target=120.0,
+                heat_flow={"values": [80.0, 70.0, 60.0], "unit": "kW"},
+            ),
+        ],
+        "utilities": [],
+    }
+
+    with pytest.raises(ValueError, match="PROBLEM_PERIOD_IDS") as raised:
+        PinchProblem(payload)
+
+    assert "must align" not in str(raised.value)
+
+
 def test_temperatures_below_absolute_zero_are_rejected():
     messages = _messages({"streams": [_stream(t_target=-300.0)], "utilities": []})
 
