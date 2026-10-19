@@ -56,11 +56,12 @@ Heat pump conventions, exergy and targeting details
 - ``ETE`` is the exergy transfer effectiveness of the Balanced Composite
   Curves: the exergy gained by the cold balanced composite over the exergy
   released by the hot one, relative to ``ENV_TEMPERATURE`` and with utilities
-  included. It is at most 100 percent. It was the above-pinch deficit exergy
+  included; below ambient the roles swap, so refrigeration problems are
+  covered. It is at most 100 percent. It was the above-pinch deficit exergy
   over the below-pinch surplus exergy, which is not an effectiveness and was
   458 percent on ``pulp_mill``. The new ``exergy_released`` field is its
   denominator and weights it across periods. Direct Integration values change
-  from 100.5 to 76.9 percent on ``basic_pinch``, 458.7 to 68.9 percent on
+  from 100.5 to 77.1 percent on ``basic_pinch``, 458.7 to 69.0 percent on
   ``pulp_mill``, 108.9 to 73.5 percent on ``chocolate_factory`` and 28.8 to
   75.3 percent on ``Four-stream-Yee-and-Grossmann-1990-1``.
 - The warning for a negative stream or utility ``dt_cont`` now says that the

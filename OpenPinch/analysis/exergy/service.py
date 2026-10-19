@@ -516,14 +516,17 @@ def _resolve_target_exergy_spec(
 def _balanced_curve_exergy_transfer(
     target: Any, spec: dict[str, Any]
 ) -> tuple[float, float]:
-    """Return the exergy gained by the cold and released by the hot BCC (kW).
+    """Return the exergy gained and released across the BCC heat transfer (kW).
 
     The Balanced Composite Curves are the process composites plus the
     utilities (and any heat-pump streams), relative to ``ENV_TEMPERATURE``.
-    Their ratio is the exergy transfer effectiveness: at most 1, and the
-    shortfall is the exergy destroyed in heat transfer. A Direct Integration
-    target uses its real-temperature table. Other targets use their own table,
-    un-shifted interval by interval as the exergy curves are.
+    Above ambient the hot curve releases exergy and the cold curve gains it;
+    below ambient the roles swap, since cooling a stream there raises its
+    exergy. The ratio of gained to released exergy is the exergy transfer
+    effectiveness: at most 1, and the shortfall is the exergy destroyed in
+    heat transfer. A Direct Integration target uses its real-temperature
+    table. Other targets use their own table, un-shifted interval by interval
+    as the exergy curves are.
     """
     t_env = spec["t_env"]
     pt_real = getattr(target, "pt_real", None)
@@ -568,30 +571,36 @@ def _balanced_curve_exergy_transfer(
             (_optional_column(pt, ProblemTableLabel.H_COLD_UT), cold_offset),
             (_optional_column(pt, ProblemTableLabel.H_COLD_HP), 0.0),
         ]
-    released = sum(
-        _curve_exergy(t_vals, h_vals, offset, t_env)
-        for h_vals, offset in hot_curves
-        if h_vals is not None
-    )
-    gained = sum(
-        _curve_exergy(t_vals, h_vals, offset, t_env)
-        for h_vals, offset in cold_curves
-        if h_vals is not None
-    )
+    gained = released = 0.0
+    for curves, is_hot in ((hot_curves, True), (cold_curves, False)):
+        for h_vals, offset in curves:
+            if h_vals is None:
+                continue
+            # Above ambient the hot curve releases and the cold curve gains;
+            # below ambient it is the other way round.
+            above, below = _curve_exergy_changes(t_vals, h_vals, offset, t_env)
+            if is_hot:
+                released += above
+                gained += below
+            else:
+                released += below
+                gained += above
     return float(gained), float(released)
 
 
-def _curve_exergy(
+def _curve_exergy_changes(
     t_vals: np.ndarray,
     h_vals: np.ndarray,
     offset: np.ndarray | float,
     t_env: float,
-) -> float:
-    """Return sum dH (1 - T0/T_lm) over a piecewise-linear T-H curve, in kW.
+) -> tuple[float, float]:
+    """Return the (above-ambient, below-ambient) exergy of a T-H curve, in kW.
 
-    ``t_vals`` are in degC, falling down the table; ``offset`` moves each
-    interval onto real temperatures. T_lm is the log-mean temperature of the
-    interval, so a linear segment is integrated exactly.
+    Each interval contributes dH (1 - T0/T) integrated along it, which is
+    positive above ambient and negative below; intervals that cross ambient
+    are split there, and the below-ambient part is returned as a magnitude.
+    ``t_vals`` are in degC, falling down the table, and ``offset`` moves each
+    interval onto real temperatures. A linear segment is integrated exactly.
     """
     h_vals = np.nan_to_num(np.asarray(h_vals, dtype=float))
     t_abs = np.asarray(t_vals, dtype=float) + C_to_K
@@ -599,14 +608,32 @@ def _curve_exergy(
     t_lower = t_abs[1:] + offset
     t_ref = t_env + C_to_K
     delta_h = h_vals[:-1] - h_vals[1:]
-    span = t_upper - t_lower
-    with np.errstate(divide="ignore", invalid="ignore"):
-        carnot_factor = np.where(
-            np.abs(span) > tol,
-            1.0 - t_ref * np.log(t_upper / t_lower) / span,
-            1.0 - t_ref / t_upper,
-        )
-    return float(np.sum(delta_h * carnot_factor))
+    above = below = 0.0
+    for t_u, t_l, d_h in zip(
+        np.broadcast_to(t_upper, delta_h.shape),
+        np.broadcast_to(t_lower, delta_h.shape),
+        delta_h,
+    ):
+        if abs(d_h) <= tol:
+            continue
+        span = t_u - t_l
+        if abs(span) <= tol:
+            pieces = [d_h * (1.0 - t_ref / t_u)]
+        else:
+            cp = d_h / span
+            hi, lo = max(t_u, t_l), min(t_u, t_l)
+            bounds = [hi, t_ref, lo] if lo < t_ref < hi else [hi, lo]
+            sign = 1.0 if span > 0 else -1.0
+            pieces = [
+                sign * cp * ((a - b) - t_ref * np.log(a / b))
+                for a, b in zip(bounds[:-1], bounds[1:])
+            ]
+        for piece in pieces:
+            if piece >= 0.0:
+                above += piece
+            else:
+                below -= piece
+    return float(above), float(below)
 
 
 def _zone_stream_shift_sources(target: Any) -> tuple[list, list, int | None] | None:

@@ -43,21 +43,38 @@ def test_exergetic_temp_below_absolute_zero_raises():
         compute_exergetic_temperature(-300, units_of_T="C")
 
 
-def _balanced_curve_exergy(T_celsius, H, T0_kelvin):
-    """Independent exergy of a piecewise-linear composite: sum dH (1 - T0/T_lm)."""
+def _exergy_changes(T_celsius, H, T0_kelvin, steps=2000):
+    """Independent (gain, loss) of exergy along a piecewise-linear T-H curve.
+
+    Each interval is cut into ``steps`` slices and dX = dH (1 - T0/T) is
+    summed, keeping increases and decreases apart, so a curve crossing
+    ambient is not netted out.
+    """
     import numpy as np
 
     T = np.asarray(T_celsius, dtype=float) + 273.15
     H = np.asarray(H, dtype=float)
-    dH = H[:-1] - H[1:]
-    T_u, T_l = T[:-1], T[1:]
-    with np.errstate(divide="ignore", invalid="ignore"):
-        factor = np.where(
-            np.abs(T_u - T_l) > 1e-9,
-            T0_kelvin * np.log(T_u / T_l) / (T_u - T_l),
-            T0_kelvin / T_u,
-        )
-    return float((dH * (1.0 - factor)).sum())
+    gain = loss = 0.0
+    for t_u, t_l, h_u, h_l in zip(T[:-1], T[1:], H[:-1], H[1:]):
+        fractions = (np.arange(steps) + 0.5) / steps
+        t_mid = t_u + (t_l - t_u) * fractions
+        dX = (h_u - h_l) / steps * (1.0 - T0_kelvin / t_mid)
+        gain += float(dX[dX > 0].sum())
+        loss += float(-dX[dX < 0].sum())
+    return gain, loss
+
+
+def _balanced_curve_oracle(T_celsius, H_hot, H_cold, T0_kelvin):
+    """Return (exergy released, ETE) of hot and cold balanced composites.
+
+    Above ambient the hot curve gives up exergy and the cold curve gains it;
+    below ambient the roles swap (cooling a hot stream raises its exergy).
+    """
+    hot_up, hot_down = _exergy_changes(T_celsius, H_hot, T0_kelvin)
+    cold_up, cold_down = _exergy_changes(T_celsius, H_cold, T0_kelvin)
+    released = hot_up + cold_down
+    gained = cold_up + hot_down
+    return released, gained / released
 
 
 @pytest.mark.parametrize(
@@ -96,9 +113,64 @@ def test_ete_is_the_exergy_transfer_effectiveness_of_the_balanced_curves(
 
     pt = target.pt_real
     T0 = target.config.environment.temperature + 273.15
-    released = _balanced_curve_exergy(pt[L.T], pt[L.H_HOT] + pt[L.H_HOT_UT], T0)
-    gained = _balanced_curve_exergy(pt[L.T], pt[L.H_COLD] + pt[L.H_COLD_UT], T0)
-    assert target.exergy_released == pytest.approx(released, rel=1e-9)
-    assert target.ETE == pytest.approx(gained / released, rel=1e-9)
+    released, ete = _balanced_curve_oracle(
+        pt[L.T], pt[L.H_HOT] + pt[L.H_HOT_UT], pt[L.H_COLD] + pt[L.H_COLD_UT], T0
+    )
+    assert target.exergy_released == pytest.approx(released, rel=1e-5)
+    assert target.ETE == pytest.approx(ete, rel=1e-5)
     assert 0.0 < target.ETE <= 1.0
     assert target.ETE != pytest.approx(previous_ete, abs=1e-3)
+
+
+def test_ete_of_a_sub_ambient_problem_counts_exergy_sources_below_ambient():
+    # Codex review on PR #191: below ENV_TEMPERATURE both balanced composites
+    # change exergy with the opposite sign, so a plain signed sum gave a
+    # negative "released" exergy and ETE 0 for a refrigeration problem.
+    import warnings
+
+    from OpenPinch import PinchProblem
+    from OpenPinch.analysis.exergy.service import apply_exergy_targeting
+    from OpenPinch.domain.enums import ProblemTableLabel as L
+
+    data = {
+        "streams": [
+            {
+                "zone": "Cold",
+                "name": "H1",
+                "t_supply": -5.0,
+                "t_target": -35.0,
+                "heat_flow": 300.0,
+                "htc": 1.0,
+            },
+            {
+                "zone": "Cold",
+                "name": "C1",
+                "t_supply": -45.0,
+                "t_target": -15.0,
+                "heat_flow": 240.0,
+                "htc": 1.0,
+            },
+        ],
+        "utilities": [],
+        "options": {"ENV_TEMPERATURE": 15.0},
+    }
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        problem = PinchProblem(data, project_name="Cold")
+        problem.target.direct_heat_integration()
+    target = next(
+        t
+        for t in problem._master_zone.targets.values()
+        if getattr(t, "type", None) == "Direct Integration"
+    )
+
+    apply_exergy_targeting(target)
+
+    pt = target.pt_real
+    T0 = target.config.environment.temperature + 273.15
+    released, ete = _balanced_curve_oracle(
+        pt[L.T], pt[L.H_HOT] + pt[L.H_HOT_UT], pt[L.H_COLD] + pt[L.H_COLD_UT], T0
+    )
+    assert target.exergy_released == pytest.approx(released, rel=1e-5)
+    assert target.ETE == pytest.approx(ete, rel=1e-5)
+    assert 0.0 < target.ETE <= 1.0
