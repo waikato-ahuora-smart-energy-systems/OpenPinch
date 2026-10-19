@@ -16,8 +16,9 @@ HEN synthesis orchestration
   temperatures gave 21.1 m2. Areas are unchanged; the temperatures now match
   them.
 
-- Multiperiod stage reduction after PDM and TDM keeps a stage, and a match,
-  that carries duty in any period. It read only the first period, so a stage
+- Multiperiod stage reduction after PDM and TDM keeps a stage, a match and
+  a heater or cooler that carries duty in any period, and starts the reduced
+  model with each of them switched on. It read only the first period, so a stage
   used only in later periods was dropped and the reduced network was solved
   without it, or the reduction failed and fell back to the unreduced model.
   A reduced network that fails the model's own solution checks is not used:

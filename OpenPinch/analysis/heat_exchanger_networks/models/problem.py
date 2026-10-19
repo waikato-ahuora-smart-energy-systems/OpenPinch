@@ -281,6 +281,8 @@ class InternalHeatExchangerNetworkProblem:
                         1 if peak_recovery[i][j][old_k] > case.tol else 0
                     )
 
+        heaters_in_use = _used_in_any_period(case, "Q_h")
+        coolers_in_use = _used_in_any_period(case, "Q_c")
         f_case = StageWiseModel(
             name=f"reduced-{case.name}",
             framework=case.framework,
@@ -292,8 +294,8 @@ class InternalHeatExchangerNetworkProblem:
             # only those the solved case uses in some period.
             z_restriction=[
                 active_locations,
-                _used_in_any_period(case, "Q_h"),
-                _used_in_any_period(case, "Q_c"),
+                heaters_in_use,
+                coolers_in_use,
             ],
             min_dqda=case.min_dqda,
             minimisation_goal=case.minimisation_goal,
@@ -311,7 +313,8 @@ class InternalHeatExchangerNetworkProblem:
                         else 0.0
                     )
                     _assign(f_case.Q_r[i][j][new_k], q_val)
-                    _assign_binary(f_case.z[i][j][new_k], q_val)
+                    # Shared across periods: a match used in any period is on.
+                    _assign_binary(f_case.z[i][j][new_k], active_locations[i][j][new_k])
                     _assign(f_case.theta_1[i][j][new_k], case.theta_1[i][j][old_k][0])
                     _assign(f_case.theta_2[i][j][new_k], case.theta_2[i][j][old_k][0])
 
@@ -336,14 +339,14 @@ class InternalHeatExchangerNetworkProblem:
             for new_k, old_k in enumerate(reduced_boundaries):
                 _assign(f_case.T_c[j][new_k], case.T_c[j][old_k][0])
 
-        for duties, flags, source in (
-            (f_case.Q_c, f_case.z_cu, case.Q_c),
-            (f_case.Q_h, f_case.z_hu, case.Q_h),
+        for duties, flags, source, in_use in (
+            (f_case.Q_c, f_case.z_cu, case.Q_c, coolers_in_use),
+            (f_case.Q_h, f_case.z_hu, case.Q_h, heaters_in_use),
         ):
             for index, row in enumerate(source):
                 for u, duty in enumerate(row):
                     _assign(duties[index][u], duty[0])
-                    _assign_binary(flags[index][u], duty[0])
+                    _assign_binary(flags[index][u], in_use[index][u])
 
         f_case.TAC_model = case.TAC_model
         f_case.TAC = case.TAC

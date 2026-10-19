@@ -446,6 +446,47 @@ def test_isothermal_split_branches_report_mixing_outlets_and_split_fractions():
     assert [state.sink_split_fraction for state in states] == pytest.approx([1.0, 1.0])
 
 
+class _Variable:
+    def __init__(self):
+        self.lower, self.upper = -1e9, 1e9
+        self.VALUE = SimpleNamespace(value=None)
+
+
+class _ReducedModel:
+    def __init__(self, **kwargs):
+        stages = kwargs["stages"]
+
+        def grid(*shape):
+            if not shape:
+                return _Variable()
+            return [grid(*shape[1:]) for _ in range(shape[0])]
+
+        self.Q_r = grid(2, 1, stages)
+        self.z = grid(2, 1, stages)
+        self.theta_1 = grid(2, 1, stages)
+        self.theta_2 = grid(2, 1, stages)
+        self.T_h = grid(2, stages + 1)
+        self.T_c = grid(1, stages + 1)
+        self.Q_h = grid(1, 1)
+        self.z_hu = grid(1, 1)
+        self.Q_c = grid(2, 1)
+        self.z_cu = grid(2, 1)
+
+    valid = True
+    flags_at_solve: dict = {}
+
+    def optimise(self, print_output=False):
+        self.mSuccess = 1
+        type(self).flags_at_solve = {
+            "z": [[[f.VALUE.value for f in row] for row in hot] for hot in self.z],
+            "z_hu": [[f.VALUE.value for f in row] for row in self.z_hu],
+            "z_cu": [[f.VALUE.value for f in row] for row in self.z_cu],
+        }
+
+    def verify(self):
+        return self.valid, ["temperature"]
+
+
 def test_stage_reduction_keeps_the_original_when_the_reduced_network_fails(
     monkeypatch,
 ):
@@ -456,36 +497,8 @@ def test_stage_reduction_keeps_the_original_when_the_reduced_network_fails(
         InternalHeatExchangerNetworkProblem,
     )
 
-    class _Variable:
-        def __init__(self):
-            self.lower, self.upper = -1e9, 1e9
-            self.VALUE = SimpleNamespace(value=None)
-
-    class _Reduced:
-        def __init__(self, **kwargs):
-            stages = kwargs["stages"]
-
-            def grid(*shape):
-                if not shape:
-                    return _Variable()
-                return [grid(*shape[1:]) for _ in range(shape[0])]
-
-            self.Q_r = grid(2, 1, stages)
-            self.z = grid(2, 1, stages)
-            self.theta_1 = grid(2, 1, stages)
-            self.theta_2 = grid(2, 1, stages)
-            self.T_h = grid(2, stages + 1)
-            self.T_c = grid(1, stages + 1)
-            self.Q_h = grid(1, 1)
-            self.z_hu = grid(1, 1)
-            self.Q_c = grid(2, 1)
-            self.z_cu = grid(2, 1)
-
-        def optimise(self, print_output=False):
-            self.mSuccess = 1
-
-        def verify(self):
-            return False, ["temperature"]
+    _Reduced = _ReducedModel
+    _Reduced.valid = False
 
     monkeypatch.setattr(unit, "StageWiseModel", _Reduced)
     case = _two_period_stage_case()
@@ -500,3 +513,33 @@ def test_stage_reduction_keeps_the_original_when_the_reduced_network_fails(
     ).remove_unused_stages(case)
 
     assert reduced is case
+
+
+def test_stage_reduction_sets_shared_flags_from_every_period(monkeypatch):
+    # The reduced model is relaxed: a match, heater or cooler flagged 0 has
+    # no approach constraint or unit cost however much duty it carries, so a
+    # unit used only in a later period must keep its flag at 1.
+    from OpenPinch.analysis.heat_exchanger_networks.models import problem as unit
+    from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
+        InternalHeatExchangerNetworkProblem,
+    )
+
+    monkeypatch.setattr(unit, "StageWiseModel", _ReducedModel)
+    _ReducedModel.valid = True
+    case = _two_period_stage_case()
+    case.Q_r = case.Q_r_by_period[0]
+    case.T_h = [[[400.0]] * 4] * 2
+    case.T_c = [[[300.0]] * 4]
+    case.theta_1 = case.theta_2 = [[[[10.0]] * 3]] * 2
+    case.TAC_model = case.TAC = case.solve_time = 1.0
+    case.Q_h_by_period = [[[[0.0]]], [[[6.0]]]]
+    case.Q_h = case.Q_h_by_period[0]
+
+    InternalHeatExchangerNetworkProblem(
+        solver_arrays=object(), framework="TDM", stages=3
+    ).remove_unused_stages(case)
+
+    flags = _ReducedModel.flags_at_solve
+    assert flags["z"] == [[[1, 1]], [[1, 0]]]
+    assert flags["z_hu"] == [[1]]
+    assert flags["z_cu"] == [[0], [0]]
