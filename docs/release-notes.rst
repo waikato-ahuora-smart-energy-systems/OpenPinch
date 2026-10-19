@@ -406,6 +406,12 @@ Network grid data
 Testing and CI
 ~~~~~~~~~~~~~~
 
+- The utility placement timing tests
+  (``tests/analysis/utility_placement/test_performance.py``) carry the
+  ``performance`` marker, so they run in the performance lane and no longer in
+  the unit lanes. Their wall-clock budgets failed on busy shared runners with
+  no code change: a bound reduction that takes about 10 ms measured 0.5 s on
+  ``unit-py312`` against a 0.45 s budget.
 - The Pyodide test lane is required by ``CI OK``, so a change that breaks the
   web app's engine blocks the merge. Its PyPI test dependencies are pinned
   to the ``uv.lock`` versions in ``scripts/pyodide/requirements.txt``, a test
