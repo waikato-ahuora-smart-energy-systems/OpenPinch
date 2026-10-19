@@ -93,8 +93,9 @@ These settle the questions of intent the report left open.
        heat recovery can then exceed the thermodynamic limit.
    * - M14
      - ``heat_capacity_flowrate`` is supported: without ``heat_flow``, the
-       heat flow is CP x (T_supply - T_target). When both are given and
-       disagree, validation reports an issue.
+       heat flow is CP x abs(T_supply - T_target), non-negative for hot and
+       cold streams alike. When both are given and disagree, validation
+       reports an issue.
    * - M15
      - With assisted heat transfer, unmet pocket demand below the pinch is
        met by hot utility and reported, so the energy balance always closes.
