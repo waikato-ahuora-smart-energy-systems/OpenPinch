@@ -159,6 +159,13 @@ def compute_carnot_objective(
         eta_ii_he_carnot=args.eta_ii_he_carnot,
         args=args,
     )
+    if not cycle.solved:
+        return HPRBackendResult.failure(
+            reason=(
+                "Carnot cycle failed its energy balance or second-law "
+                "(entropy generation) check."
+            ),
+        )
 
     return evaluate(
         args=args,

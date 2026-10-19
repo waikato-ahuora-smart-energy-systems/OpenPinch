@@ -11,10 +11,13 @@ from .records import (
     validate_utility_data,
 )
 from .tabular import (
-    get_column_names_and_units as _get_column_names_and_units,
+    problem_frame_from_sheet as _problem_frame_from_sheet,
 )
 from .tabular import (
     problem_records_from_frame as _write_problem_to_dict_and_list,
+)
+from .tabular import (
+    summary_frame_from_sheet as _summary_frame_from_sheet,
 )
 from .tabular import (
     target_records_from_frame as _write_targets_to_dict_and_list,
@@ -102,23 +105,16 @@ def _parse_sheet_with_units(
             "(names, units, and data rows)."
         )
 
-    col_names, col_units = _get_column_names_and_units(
-        df_full,
-        sheet_name,
-        row_units,
-    )
-    df_data: pd.DataFrame = df_full.iloc[row_data:].copy()
-
-    for index in range(len(df_data.columns), len(col_names), -1):
-        df_data = df_data.drop(columns=index - 1)
-    # Columns the table leaves out stay absent so the input contract applies
-    # its defaults; padding them with 0 forced dt_cont and htc to zero.
-    df_data.columns = col_names[: len(df_data.columns)]
-
-    units_map = dict(zip(col_names, col_units))
-    if sheet_name != "Summary":
-        # Keep every numeric column's unit (price included), as the CSV reader
-        # does; text columns carry no unit.
+    if sheet_name == "Summary":
+        df_data, units_map = _summary_frame_from_sheet(df_full, row_units, row_data)
+    else:
+        # Columns the table leaves out stay absent so the input contract
+        # applies its defaults; padding them with 0 forced dt_cont and htc to
+        # zero. Numeric columns keep their unit (price included), as the CSV
+        # reader does; text columns carry no unit.
+        df_data, units_map = _problem_frame_from_sheet(
+            df_full, sheet_name, row_units, row_data
+        )
         units_map = {
             key: unit
             for key, unit in units_map.items()

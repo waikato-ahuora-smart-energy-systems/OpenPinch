@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
 from pint.errors import DimensionalityError
 
 from ..domain.value import Value, ureg
@@ -41,6 +42,10 @@ INPUT_UNIT_RULES: dict[str, InputUnitRule] = {
     "h_supply": InputUnitRule("kJ/kg", unit_groups=("enthalpy",)),
     "h_target": InputUnitRule("kJ/kg", unit_groups=("enthalpy",)),
     "heat_flow": InputUnitRule("kW", unit_groups=("heat_flow",)),
+    "heat_capacity_flowrate": InputUnitRule(
+        "kW/delta_degC",
+        unit_groups=("heat_capacity_flowrate",),
+    ),
     "maximum_heat_flow": InputUnitRule("kW", unit_groups=("heat_flow",)),
     "dt_cont": InputUnitRule(
         "delta_degC",
@@ -338,6 +343,21 @@ def standardise_input_value(
         user_unit=rule.canonical_unit if user_unit is None else user_unit,
     )
     return resolved.to(rule.canonical_unit)
+
+
+def heat_flow_from_heat_capacity_flowrate(
+    t_supply: Value,
+    t_target: Value,
+    heat_capacity_flowrate: Value,
+) -> Value:
+    """Return a stream's heat flow, CP x abs(T_supply - T_target), in kW."""
+    values = (t_supply, t_target, heat_capacity_flowrate)
+    magnitudes = heat_capacity_flowrate.to("kW/delta_degC").period_values * np.abs(
+        t_supply.to("degC").period_values - t_target.to("degC").period_values
+    )
+    if any(np.ndim(value.value) for value in values):
+        return Value({"values": magnitudes.tolist(), "unit": "kW"})
+    return Value(float(magnitudes[0]), unit="kW")
 
 
 def coerce_output_value(
