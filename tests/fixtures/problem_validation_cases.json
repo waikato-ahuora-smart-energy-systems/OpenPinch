@@ -26,7 +26,8 @@
   },
   "warning_problem": {
     "options": {
-      "THERMAL_DT_CONT": 10
+      "THERMAL_DT_CONT": 10,
+      "PROBLEM_PERIOD_IDS": ["a", "b"]
     },
     "streams": [
       {
