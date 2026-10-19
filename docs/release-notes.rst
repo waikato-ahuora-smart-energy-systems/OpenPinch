@@ -27,8 +27,8 @@ Utility placement and optimisers
   supply temperature (it had no price and htc 1.0). In the Direct scope it
   also keeps that utility's ``dt_cont`` and lists the real temperatures
   that ``dt_cont`` outward of the placed (shifted) levels, so the case
-  targets the same levels; in the Indirect and Total Site scopes the placed
-  levels keep ``dt_cont = 0``. Tutorial 19's process case now shows its
+  targets the same levels; in the Indirect and Total Site scopes, and when
+  that ``dt_cont`` varies by period, the placed levels keep ``dt_cont = 0``. Tutorial 19's process case now shows its
   utilities 2 degC outward with chocolate_factory's utility price.
 - A script without an ``if __name__ == "__main__":`` guard no longer reruns
   the whole placement in every spawned worker: the optimiser runs serially

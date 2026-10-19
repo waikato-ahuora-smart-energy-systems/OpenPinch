@@ -163,3 +163,38 @@ def test_total_site_case_keeps_price_and_htc_with_unshifted_levels():
         assert utility["t_supply"]["value"] == pytest.approx(
             level.supply_temperature.value
         )
+
+
+def test_period_varying_dt_cont_keeps_the_placed_level_unshifted():
+    from types import SimpleNamespace
+
+    from OpenPinch.application.utility_placement import _optimized_utility
+    from OpenPinch.contracts.utility_placement import (
+        QuantityValue,
+        UtilityPlacementBaseTarget,
+    )
+
+    level = SimpleNamespace(
+        template_key=SimpleNamespace(name="hot_iso_1"),
+        supply_temperature=QuantityValue(value=150.0, unit="degC"),
+        target_temperature=QuantityValue(value=149.99, unit="degC"),
+    )
+    result = SimpleNamespace(
+        request=SimpleNamespace(
+            base_target=UtilityPlacementBaseTarget.DIRECT, maximum_duties=()
+        ),
+        units=SimpleNamespace(heat_flow="kW", temperature_difference="delta_degC"),
+    )
+    raw = {
+        "dt_cont": {"values": [1.0, 3.0], "period_ids": ["a", "b"], "unit": "degC"},
+        "price": {"value": 10.0, "unit": "$/MWh"},
+        "htc": {"value": 2.0, "unit": "kW/m^2/degC"},
+    }
+
+    utility = _optimized_utility(level, "Hot", ("HU", 200.0, 1.0, raw), result)
+
+    # One temperature cannot carry a shift that differs by period.
+    assert utility["dt_cont"] == {"value": 0.0, "unit": "delta_degC"}
+    assert utility["t_supply"]["value"] == pytest.approx(150.0)
+    assert utility["price"] == raw["price"]
+    assert utility["htc"] == raw["htc"]

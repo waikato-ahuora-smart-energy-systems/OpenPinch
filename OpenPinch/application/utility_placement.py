@@ -1258,7 +1258,8 @@ def _optimized_utility(level, utility_type, source, result) -> dict[str, object]
     real temperatures sit that shift outward of the placed (shifted) levels
     and the case targets them exactly. Indirect and Total Site targets
     depend on each subzone's utility shift as well, so there the levels keep
-    ``dt_cont = 0``; price and htc are carried over in every scope.
+    ``dt_cont = 0``, as they do when the source's ``dt_cont`` varies by
+    period. Price and htc are carried over in every scope.
     """
     name = level.template_key.name
     limit = _serialized_limit(result.request, name)
@@ -1280,6 +1281,8 @@ def _optimized_utility(level, utility_type, source, result) -> dict[str, object]
     keeps_shift = (
         result.request.base_target is UtilityPlacementBaseTarget.DIRECT
         and raw.get("dt_cont") is not None
+        # One temperature cannot carry a shift that differs by period.
+        and len(set(raw["dt_cont"].get("values") or [None])) == 1
     )
     offset = (shift if utility_type == "Hot" else -shift) if keeps_shift else 0.0
     return {
