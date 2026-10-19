@@ -36,6 +36,33 @@ Tutorials
   name, ``HPS``. It asked for ``HP Steam``, which used to answer 0 and now
   raises as an unknown utility, so the notebook stopped running.
 
+Heat pump second law
+~~~~~~~~~~~~~~~~~~~~
+
+- Cascade Carnot targeting (``carnot_heat_pump()`` and
+  ``carnot_refrigeration()`` with more than one condenser or evaporator) no
+  longer moves heat uphill for free. The heat-engine and recovery branch
+  pooled every condenser and evaporator that took part in any downhill pair,
+  so heat from a cold evaporator could reach a hotter condenser with no work,
+  and the optimiser exploited it. Duty is now allocated pair by pair, from an
+  evaporator to a condenser at or below its temperature, and a pair earns work
+  only when ``HPR_INTEGRATED_EXPANDER_ENABLED`` is on (it already set the
+  heat-engine efficiency to 0 when off; the field help now says so). A Carnot
+  cycle is solved only if its entropy generation, sum(Q/T) delivered minus
+  absorbed, is non-negative, and targeting rejects an unsolved cycle as an
+  infeasible candidate. Published numbers change for the default call
+  (three condensers, two evaporators, ``load_fraction=0.5``):
+
+  - ``basic_pinch``: work 0.0005 kW to 62.07 kW, ``hpr_cop`` 4.32 to 6.04,
+    hot utility 375 kW in both; entropy generation -0.124 to +0.069 kW/K.
+  - ``pulp_mill``: work 0.23 kW to 24,330 kW, ``hpr_cop`` 2.54 to 3.20, hot
+    utility 97,115 kW to 77,775 kW; entropy generation -43.7 to +28.8 kW/K.
+
+  One-condenser, one-evaporator and parallel Carnot targets are unchanged,
+  so tutorials 08 and 10 keep their numbers. Cascade vapour-compression
+  targeting seeds from this optimiser; the tutorial runs (09, and 10's
+  3x2 cascade) give the same results.
+
 Result fixes
 ~~~~~~~~~~~~
 
