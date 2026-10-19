@@ -4,6 +4,100 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Utility cost and totals
+~~~~~~~~~~~~~~~~~~~~~~~
+
+These change published numbers. Energy targets do not change.
+
+- Direct Integration targets report their utility cost, the sum of each
+  utility's price times its duty. Before, ``utility_cost`` was always 0 on
+  Direct Integration and area targets, and the subzone sums and the workbook
+  "Utility Cost" column added up those zeros. ``basic_pinch`` now reports
+  17.5 $/h (750 kW of hot and 1000 kW of cold utility at 10 $/MWh).
+- Total Site utility lists come from the site utility cascade, so they sum to
+  the Total Site hot and cold utility targets. Generation at one level now
+  meets use at a lower level, nearest level first; use left unmet is listed
+  as hot utility and generation left over as cold utility. Before, the lists
+  only netted generation against use at the same level, so they could
+  contradict the targets: ``zonal_site`` has a 0 kW hot utility target but
+  listed 25 kW of hot water. Its Total Site utility cost falls from
+  6.68 $/h to 5.18 $/h (``zonal_site_multiperiod``, first period: 5.36 to
+  4.76 $/h).
+- Total Site targeting accepts segmented utilities. Before, summing the
+  subzone utilities raised "'heat_flow' is derived for segmented stream".
+  Each segment now enters the site cascade over its own temperatures.
+- The area target's ``total_cost`` is the annualised capital cost plus the
+  utility cost over ``COSTING_ANNUAL_OP_TIME`` hours. Before, it was the
+  annualised capital alone.
+- A per-year output unit for a cost (for example ``OUTPUT_UNIT_UTILITY_COST``
+  set to ``$/y``) counts a year as ``COSTING_ANNUAL_OP_TIME`` operating
+  hours. Before, the conversion used an 8766 h calendar year, so annual
+  utility costs read 5.6 % high at the default 8300 h.
+
+Direct Integration utility cost and area-target total cost on the sample
+cases (``COSTING_ANNUAL_OP_TIME`` is 8300 h, 1000 h for Yee and Grossmann;
+multiperiod cases give their first period):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 15 15 15 15
+
+   * - Case
+     - Utility cost before ($/h)
+     - Utility cost now ($/h)
+     - Total cost before ($/y)
+     - Total cost now ($/y)
+   * - ``basic_pinch``
+     - 0
+     - 17.50
+     - 41,793
+     - 187,043
+   * - ``crude_preheat_train``
+     - 0
+     - 17.50
+     - 41,793
+     - 187,043
+   * - ``crude_preheat_train_multiperiod``
+     - 0
+     - 12.69
+     - 40,884
+     - 146,190
+   * - ``Four-stream-Yee-and-Grossmann-1990-1``
+     - 0
+     - 67.50
+     - 84,161
+     - 151,661
+   * - ``chocolate_factory``
+     - 0
+     - 134.53
+     - 79,784
+     - 1,196,358
+   * - ``process_mvr``
+     - 0
+     - 2.00
+     - 4,105
+     - 20,705
+   * - ``pulp_mill``
+     - 0
+     - 6,418.29
+     - 1,270,793
+     - 54,542,579
+   * - ``zonal_site``
+     - 0
+     - 5.18
+     - 28,331
+     - 71,329
+   * - ``dairy_chilling_multiperiod``
+     - 0
+     - 101.67
+     - 62,907
+     - 906,741
+   * - ``zonal_site_multiperiod``
+     - 0
+     - 4.76
+     - (area target raises)
+     - (area target raises)
+
 Input, contracts and option metadata
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
