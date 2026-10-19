@@ -135,16 +135,17 @@ def _task_count_by_method(
 def _accepted_outcome(
     outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
 ) -> HeatExchangerNetworkSynthesisTaskOutcome:
-    for method in reversed(_METHOD_SEQUENCE):
-        candidates = [
-            outcome
-            for outcome in outcomes
-            if outcome.status == "success" and outcome.task.method == method
-        ]
-        if candidates:
-            from ..reporting.ranking import outcome_ranking_key
+    """Return the cheapest successful outcome, whichever method produced it.
 
-            return min(candidates, key=outcome_ranking_key)
+    The result records that outcome's method. A later method usually improves
+    on its parent, but a utility-only PDM network, or one whose descendants
+    failed, can still be the cheapest.
+    """
+    candidates = [outcome for outcome in outcomes if outcome.status == "success"]
+    if candidates:
+        from ..reporting.ranking import outcome_ranking_key
+
+        return min(candidates, key=outcome_ranking_key)
     detail = _failed_outcome_summary(outcomes)
     message = "heat exchanger network synthesis produced no successful task outcomes."
     if detail:

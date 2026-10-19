@@ -286,3 +286,53 @@ def test_only_stages_after_the_first_get_cold_gamma_flow_on(
     # A single stage is both the last and the first: gamma_c used to take
     # flow-on from stage k - 1 = -1, the stage itself.
     assert cold_calls == cold_flow_on_stages
+
+
+# M7: the accepted network is the cheapest feasible one from any method
+
+
+def _outcome(method: str, task_id: str, total_annual_cost: float, status="success"):
+    return SimpleNamespace(
+        status=status,
+        task=SimpleNamespace(method=method, task_id=task_id),
+        objective_value=total_annual_cost,
+    )
+
+
+def test_accepted_outcome_is_the_cheapest_success_from_any_method():
+    from OpenPinch.analysis.heat_exchanger_networks.results.assembly import (
+        _accepted_outcome,
+    )
+
+    outcomes = (
+        _outcome("pinch_design_method", "pdm", 1530.0),
+        _outcome("thermal_derivative_method", "tdm", 1610.0),
+        _outcome("network_evolution_method", "evm", 4819.5),
+        _outcome("network_evolution_method", "evm-failed", 10.0, status="failed"),
+    )
+
+    accepted = _accepted_outcome(outcomes)
+
+    assert accepted.task.task_id == "pdm"
+
+
+def test_ranked_networks_compare_every_method():
+    from OpenPinch.analysis.heat_exchanger_networks.reporting import ranking
+    from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
+
+    feasible = HeatExchangerNetwork()
+    result = SimpleNamespace(
+        method="pinch_design_method",
+        ranked_networks=tuple(
+            SimpleNamespace(**vars(outcome), network=feasible)
+            for outcome in (
+                _outcome("network_evolution_method", "evm", 4819.5),
+                _outcome("pinch_design_method", "pdm", 1530.0),
+                _outcome("thermal_derivative_method", "tdm", 1610.0),
+            )
+        ),
+    )
+
+    ranked = ranking._ranked_candidate_outcomes(result)
+
+    assert [outcome.task.task_id for outcome in ranked] == ["pdm", "tdm", "evm"]

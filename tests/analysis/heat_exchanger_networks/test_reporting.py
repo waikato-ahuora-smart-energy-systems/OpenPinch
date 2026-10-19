@@ -308,7 +308,7 @@ def test_grid_diagram_save_uses_html_writer_for_html_paths(tmp_path: Path) -> No
     assert fig.image_path is None
 
 
-def test_grid_diagram_ranks_successful_networks_by_accepted_method() -> None:
+def test_grid_diagram_ranks_successful_networks_by_total_annual_cost() -> None:
     _require_plotly()
     result = _result()
 
@@ -1674,8 +1674,9 @@ def _result() -> HeatExchangerNetworkSynthesisResult:
             HeatExchangerNetworkSynthesisTaskOutcome(
                 task=pdm_task,
                 status="success",
-                network=_network("pdm-better-objective"),
-                objective_value=1.0,
+                # Same structure as the best network and dearer: ranked out.
+                network=_network("pdm-dearer"),
+                objective_value=300.0,
             ),
             HeatExchangerNetworkSynthesisTaskOutcome(
                 task=esm_second_task,

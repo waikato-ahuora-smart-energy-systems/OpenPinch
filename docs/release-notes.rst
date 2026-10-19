@@ -7,6 +7,13 @@ Unreleased
 HEN synthesis orchestration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- The accepted network is the feasible network with the lowest total annual
+  cost from any method stage, and the result's ``method`` records the stage it
+  came from. It always came from the last stage that succeeded, so a cheaper
+  PDM or TDM network lost to any network evolution result, and the ranked
+  networks (``design.top()``, ``design.network(rank=...)``) listed only that
+  stage's networks; they now rank every stage's feasible networks by cost.
+
 - Piecewise linearisation of a temperature-heat curve refines its break
   points against the curve in increasing heat. It flipped both arrays
   instead, so for curves listed in increasing heat (cold streams, segmented

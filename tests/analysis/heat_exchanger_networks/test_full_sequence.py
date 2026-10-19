@@ -444,7 +444,12 @@ def test_missing_couenne_skips_derivative_stage_and_runs_evolution() -> None:
         and outcome.task.method == "network_evolution_method"
     )
 
-    assert result.accepted_result.method == "network_evolution_method"
+    # The cheapest successful network is accepted, whichever method made it.
+    cheapest = min(
+        (outcome for outcome in outcomes if outcome.status == "success"),
+        key=lambda outcome: outcome.objective_value,
+    )
+    assert result.accepted_result.task_id == cheapest.task.task_id
     assert all(outcome.status == "failed" for outcome in tdm_failures)
     assert esm_success.task.parent_task_id == pdm_success.task.task_id
     assert esm_success.task.derivative_threshold is None
