@@ -32,14 +32,15 @@ HEN utility approach temperatures
   recomputed cost with itself, because post-processing had already
   overwritten the solver's value, so it could not fail.
 - Published numbers: no tutorial network had a heater or cooler below its
-  approach, but the new constraints change the solvers' paths, so two
-  results move. Tutorial 15's selected network has total annual cost
-  160,353 $/y with 7 units (was 163,556 $/y with 8 units). Tutorial 16's
-  ``pinch_design()`` network has 190,663 $/y at dTmin 16 K (was 182,104 $/y
-  at 20 K). PDM minimises hot utility only, so every network at the target
-  is optimal and their costs are not compared; this result moves whenever
-  the solver's path does. Tutorial 16's other designs and tutorial 17 are
-  unchanged.
+  approach, but the new constraints change the solvers' paths, and stage
+  reduction no longer carries unused coolers. Tutorial 15's selected network
+  has total annual cost 154,853.86 $/y with 6 units (was 163,556.12 $/y with
+  8 units), the best known network for its case. Tutorial 16's
+  ``pinch_design()`` network has 190,449.50 $/y at dTmin 14 K (was
+  182,103.64 $/y at 20 K). PDM minimises hot utility only, so every network
+  at the target is optimal and their costs are not compared; this result
+  moves whenever the solver's path does. Tutorial 16's other designs and
+  tutorial 17 are unchanged.
 
 Network grid data
 ~~~~~~~~~~~~~~~~~
