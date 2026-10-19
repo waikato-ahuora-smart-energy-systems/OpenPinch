@@ -1,0 +1,83 @@
+"""Utility placement conventions: bounds, ambient, entropy basis and outputs."""
+
+import math
+
+import pytest
+
+from OpenPinch import PinchProblem
+
+_OPTIONS = {
+    "iteration_limit": 3,
+    "evaluation_limit": 6,
+    "candidate_limit": 1,
+    "run_count": 1,
+    "seed": 20260715,
+}
+
+
+@pytest.mark.parametrize(("isothermal", "sensible"), [(2, 1), (3, 2), (2, 3)])
+def test_yee_grossmann_places_with_sensible_levels(isothermal, sensible):
+    # HP steam at 680 K and cooling water at 300 K made the span bound reach
+    # below absolute zero from the lowest supply temperature.
+    problem = PinchProblem("Four-stream-Yee-and-Grossmann-1990-1.json")
+
+    placed = problem.target.utility_placement(
+        isothermal=isothermal,
+        sensible=sensible,
+        period_ids=("0",),
+        options=_OPTIONS,
+    )
+
+    (period,) = placed.utility_placement_result.best.period_results
+    assert [level.kind.value for level in period.hot_levels].count(
+        "sensible"
+    ) == sensible
+    for level in period.hot_levels + period.cold_levels:
+        assert level.target_temperature.unit == "degC"
+        assert level.target_temperature.value > -273.15
+
+
+@pytest.fixture(scope="module")
+def placed_basic_pinch():
+    problem = PinchProblem("basic_pinch.json")
+    problem.update_options({"ENV_TEMPERATURE": 30.0})
+    return problem.target.utility_placement(
+        isothermal=2, sensible=1, period_ids=("0",), options=_OPTIONS
+    )
+
+
+def test_placement_exergy_uses_the_problem_ambient(placed_basic_pinch):
+    (period,) = placed_basic_pinch.utility_placement_result.best.period_results
+    thermodynamic = period.thermodynamic
+
+    assert thermodynamic.ambient_temperature.value == pytest.approx(303.15)
+    assert thermodynamic.exergy_destruction.value == pytest.approx(
+        303.15 * thermodynamic.total_entropy_generation.value
+    )
+
+
+def _level_entropy_change(level) -> float:
+    duty = level.allocated_duty.value
+    inlet = level.supply_temperature.value + 273.15
+    outlet = level.target_temperature.value + 273.15
+    # Cooling (hot utility) lowers its entropy, heating raises it.
+    return duty / abs(outlet - inlet) * math.log(outlet / inlet)
+
+
+def test_placement_entropy_breakdown_uses_one_basis(placed_basic_pinch):
+    (period,) = placed_basic_pinch.utility_placement_result.best.period_results
+    thermodynamic = period.thermodynamic
+    levels = [
+        level
+        for level in period.hot_levels + period.cold_levels
+        if level.allocated_duty.value > 0.0
+    ]
+
+    utility_entropy = math.fsum(_level_entropy_change(level) for level in levels)
+
+    assert thermodynamic.utility_entropy.value == pytest.approx(
+        utility_entropy, rel=1e-6
+    )
+    assert (
+        thermodynamic.process_entropy.value + thermodynamic.utility_entropy.value
+    ) == pytest.approx(thermodynamic.total_entropy_generation.value, rel=1e-9)

@@ -675,7 +675,9 @@ def _extract_period(
         snapshot=snapshot,
         residual_hot_duty=residual_hot_duty,
         residual_cold_duty=residual_cold_duty,
-        ambient_temperature_kelvin=298.15,
+        ambient_temperature_kelvin=(
+            float(isolated.master_zone.config.environment.temperature) + C_to_K
+        ),
         maximum_duties=tuple(
             (limit.name, limit.for_period(period_id).value)
             for limit in request.maximum_duties
