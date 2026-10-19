@@ -81,3 +81,18 @@ def test_placement_entropy_breakdown_uses_one_basis(placed_basic_pinch):
     assert (
         thermodynamic.process_entropy.value + thermodynamic.utility_entropy.value
     ) == pytest.approx(thermodynamic.total_entropy_generation.value, rel=1e-9)
+
+
+def test_placement_local_method_is_a_closed_choice():
+    from OpenPinch.contracts.utility_placement import (
+        UtilityPlacementLocalMethod,
+        UtilityPlacementOptions,
+    )
+    from OpenPinch.optimisation.models import LOCAL_METHODS
+
+    assert tuple(method.value for method in UtilityPlacementLocalMethod) == (
+        LOCAL_METHODS
+    )
+    assert UtilityPlacementOptions(local_method="Powell").local_method == "Powell"
+    with pytest.raises(ValueError, match="local_method"):
+        UtilityPlacementOptions(local_method="BFGS")

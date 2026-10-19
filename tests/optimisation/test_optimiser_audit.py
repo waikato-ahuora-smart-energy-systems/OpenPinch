@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+import OpenPinch.optimisation.service as optimisation_service
 from OpenPinch.optimisation import candidates
 from OpenPinch.optimisation.backends.dual_annealing import _run_da_single
 from OpenPinch.optimisation.backends.rbf import _fit_rbf_surrogate_model
@@ -136,3 +137,48 @@ def test_local_methods_that_ignore_bounds_are_rejected(local_method):
 
     with pytest.raises(InvalidOptimisationProblemError, match="local_method"):
         run_multistart_minimisation(problem, options={"local_method": local_method})
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"n_runs": "abc"},
+        {"n_runs": 1.7},
+        {"n_runs": True},
+        {"maxiter": -0.5},
+        {"seed": 1.5},
+        {"seed": "x"},
+        {"maxfun": 2.5},
+        {"cluster_tol": float("nan")},
+        {"cluster_tol": "wide"},
+        {"max_minima": 1.5},
+    ],
+)
+def test_malformed_options_are_rejected_before_the_solve(options, monkeypatch):
+    def backend_must_not_run(_method):
+        raise AssertionError("the backend ran before validation")
+
+    monkeypatch.setattr(optimisation_service, "_resolve_backend", backend_must_not_run)
+    problem = OptimisationProblem(objective=_shifted_quadratic, bounds=((-2.0, 2.0),))
+
+    with pytest.raises(InvalidOptimisationProblemError):
+        run_multistart_minimisation(problem, options=options)
+
+
+@pytest.mark.parametrize(
+    "constraints",
+    ["NoBounds", ({"type": "ineq"},), ({"type": "bad", "fun": abs},), (object(),)],
+)
+def test_malformed_constraints_are_rejected_before_the_solve(constraints, monkeypatch):
+    def backend_must_not_run(_method):
+        raise AssertionError("the backend ran before validation")
+
+    monkeypatch.setattr(optimisation_service, "_resolve_backend", backend_must_not_run)
+    problem = OptimisationProblem(
+        objective=_shifted_quadratic,
+        bounds=((-2.0, 2.0),),
+        constraints=constraints,
+    )
+
+    with pytest.raises(InvalidOptimisationProblemError, match="constraint"):
+        run_multistart_minimisation(problem)

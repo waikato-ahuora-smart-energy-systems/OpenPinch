@@ -17,7 +17,7 @@ from .errors import (
     InvalidOptimisationProblemError,
     NoOptimisationCandidatesError,
 )
-from .feasibility import is_feasible
+from .feasibility import is_feasible, validate_constraints
 from .models import (
     LOCAL_METHODS,
     OptimisationCandidate,
@@ -96,6 +96,7 @@ def run_multistart_minimisation(
     bounds, initial_points = _validate_problem(problem)
     backend_kwargs = options.to_backend_kwargs()
     _validate_options(method, backend_kwargs)
+    validate_constraints(problem.constraints)
 
     backend = _resolve_backend(method)
     # Ask for more basins than kept: non-finite and infeasible candidates are
@@ -204,16 +205,26 @@ def _validate_options(
         raise InvalidOptimisationProblemError(
             f"Unsupported {method.value} option(s): {names}."
         )
-    if int(backend_kwargs["n_runs"]) < 1:
+    if _integer_option(backend_kwargs, "n_runs") < 1:
         raise InvalidOptimisationProblemError("n_runs must be at least one.")
-    if int(backend_kwargs["maxiter"]) < 0:
+    if _integer_option(backend_kwargs, "maxiter") < 0:
         raise InvalidOptimisationProblemError("maxiter must be non-negative.")
-    if int(backend_kwargs["maxfun"]) < 1:
+    if _integer_option(backend_kwargs, "maxfun") < 1:
         raise InvalidOptimisationProblemError("maxfun must be positive.")
-    if float(backend_kwargs["cluster_tol"]) < 0.0:
-        raise InvalidOptimisationProblemError("cluster_tol must be non-negative.")
-    max_minima = backend_kwargs["max_minima"]
-    if max_minima is not None and int(max_minima) < 1:
+    _integer_option(backend_kwargs, "seed")
+    cluster_tol = backend_kwargs["cluster_tol"]
+    if (
+        isinstance(cluster_tol, bool)
+        or not isinstance(cluster_tol, (int, float, np.integer, np.floating))
+        or not math.isfinite(float(cluster_tol))
+        or float(cluster_tol) < 0.0
+    ):
+        raise InvalidOptimisationProblemError(
+            "cluster_tol must be a finite non-negative number."
+        )
+    if backend_kwargs["max_minima"] is not None and (
+        _integer_option(backend_kwargs, "max_minima") < 1
+    ):
         raise InvalidOptimisationProblemError("max_minima must be positive or None.")
     local_method = backend_kwargs["local_method"]
     if local_method is not None and str(local_method).upper() not in {
@@ -223,6 +234,16 @@ def _validate_options(
         raise InvalidOptimisationProblemError(
             f"local_method must be None or one of: {names}."
         )
+
+
+def _integer_option(backend_kwargs: Mapping[str, object], name: str) -> int:
+    """Return an integral option value, rejecting text, booleans and fractions."""
+    value = backend_kwargs[name]
+    if isinstance(value, (int, np.integer)) and not isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (float, np.floating)) and float(value).is_integer():
+        return int(value)
+    raise InvalidOptimisationProblemError(f"{name} must be an integer.")
 
 
 def _validate_feasibility_tolerance(value: object) -> float:
