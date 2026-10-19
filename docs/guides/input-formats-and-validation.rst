@@ -63,6 +63,31 @@ Supported Source Shapes
 - ``TargetInput`` instances
 - plain mappings that already match the case-input structure
 
+Workbook and CSV Tables
+-----------------------
+
+A ``Stream Data`` or ``Utility Data`` table (a worksheet or a CSV file) has a
+header row, a units row and then one row per stream or utility. Columns are
+matched by their header, so they can come in any order. Each field accepts its
+own name and common spellings; case, spaces, underscores and a bracketed unit
+are ignored:
+
+- ``zone`` (``Process Zone``), ``name`` (``Stream``, or ``Utility`` in a
+  utility table), and ``type`` (utilities only);
+- ``t_supply`` (``TS``, ``Supply temperature``) and ``t_target`` (``TT``,
+  ``Target temperature``);
+- ``heat_flow`` (``ΔH``, ``Duty``), ``heat_capacity_flowrate`` (``CP``,
+  streams only, used for the heat flow when it is not given), ``dt_cont``
+  (``ΔTcont``), ``htc`` and
+  ``price``.
+
+A column with an unrecognised header is ignored with a warning, and two
+columns for the same field are an error. A header row with no recognised name
+falls back to the fixed order ``zone, name, t_supply, t_target, heat_flow,
+dt_cont, htc`` for streams and ``name, type, t_supply, t_target, dt_cont,
+price, htc, heat_flow`` for utilities, with a warning. Blank rows and rows of
+blank cells are skipped.
+
 Canonical Input Fields
 ----------------------
 
@@ -71,6 +96,12 @@ unknown fields. Process streams use ``name`` and
 ``heat_capacity_flowrate`` as their canonical field names. Retired spellings
 such as ``stream_name``, ``heat_capacity_flow_rate``, and
 ``flow_heat_capacity`` are invalid inputs and are not migrated.
+
+An ordinary stream gives either ``heat_flow`` or ``heat_capacity_flowrate``
+(CP, ``kW/K`` by default). Without ``heat_flow``, the heat flow is
+CP x abs(``t_supply`` - ``t_target``), so it is positive for hot and cold
+streams alike. When both are given they must agree to within 0.01 percent,
+or validation reports an error on ``heat_capacity_flowrate``.
 
 Variable Heat-Capacity Streams
 ------------------------------

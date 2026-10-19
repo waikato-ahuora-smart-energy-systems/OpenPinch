@@ -23,6 +23,6 @@ def test_csv_rejects_non_numeric_unit_bearing_utility_values(field, column):
 @pytest.mark.parametrize("value", [None, "", "  ", float("nan")])
 def test_tabular_numeric_blanks_remain_missing(value):
     result = problem_records_from_frame(
-        pd.DataFrame({"price": [value]}), {"price": "$/MWh"}
+        pd.DataFrame({"name": ["HU"], "price": [value]}), {"price": "$/MWh"}
     )
     assert result[0]["price"] == {"value": None, "unit": "$/MWh"}
