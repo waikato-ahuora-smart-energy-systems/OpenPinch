@@ -217,12 +217,14 @@ def _utility_max_temperature_contribution(
 
 
 def _set_multiperiod_utility_approach_equations(model) -> None:
-    """Constrain both utility terminals with local segment contributions."""
+    """Constrain both terminals of every heater and cooler.
+
+    Segmented utilities use the local segment contribution at each terminal;
+    flat utilities use their single contribution.
+    """
     for n in range(model.N_periods):
         for j in range(model.J):
-            if model.z_hu_allowed[j] <= 0 or not _piecewise._utility_is_segmented(
-                model, "hot"
-            ):
+            if model.z_hu_allowed[j] <= 0:
                 continue
             inlet_approach = _hot_utility_inlet_approach_temperature(model, j, n)
             outlet_approach = _hot_utility_outlet_approach_temperature(model, j, n)
@@ -258,9 +260,7 @@ def _set_multiperiod_utility_approach_equations(model) -> None:
             )
 
         for i in range(model.I):
-            if model.z_cu_allowed[i] <= 0 or not _piecewise._utility_is_segmented(
-                model, "cold"
-            ):
+            if model.z_cu_allowed[i] <= 0:
                 continue
             inlet_approach = _cold_utility_inlet_approach_temperature(model, i, n)
             outlet_approach = _cold_utility_outlet_approach_temperature(model, i, n)

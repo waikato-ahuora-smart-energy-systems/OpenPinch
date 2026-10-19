@@ -4,6 +4,16 @@ Pre-Release Notes
 Unreleased
 ----------
 
+HEN utility approach temperatures
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Heat exchanger network synthesis constrains both ends of every heater and
+  cooler to their approach temperature, as it already did for segmented
+  utilities. Before, a flat utility had no approach constraint: a hot stream
+  could be cooled by recovery below the cooling water outlet and finished
+  with a crossed cooler. On a case with cooling water at 320 to 325 K, PDM
+  and TDM accepted a cooler at 324 to 322 K (hot-end dT -1 K).
+
 Network grid data
 ~~~~~~~~~~~~~~~~~
 
