@@ -325,7 +325,11 @@ def _build_site_utility_profile(
 def _save_graph_data(
     pt: ProblemTable,
 ) -> Zone:
-    """Prepare graph-ready tables capturing site-level utility composite curves."""
+    """Prepare graph-ready tables capturing site-level utility composite curves.
+
+    Only a copy is rounded for plotting; the stored table keeps full precision.
+    """
+    pt = deepcopy(pt)
     pt.round(decimals=4)
     return {
         GraphType.TSP.value: pt.slice(
