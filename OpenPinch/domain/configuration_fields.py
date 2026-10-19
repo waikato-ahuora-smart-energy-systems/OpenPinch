@@ -13,6 +13,7 @@ from types import UnionType
 from typing import Any, List, get_args, get_origin
 
 from .enums import BB_Minimiser, HeatPumpAndRefrigerationCycle, TurbineModel, ZoneType
+from .solver_options import validate_solver_option
 
 
 @dataclass(frozen=True)
@@ -80,6 +81,10 @@ def _solver_options(name: str, value: Any) -> dict[str, Any]:
         option_name = str(key).strip()
         if not option_name:
             raise ValueError(f"{name} cannot contain empty option names.")
+        try:
+            validate_solver_option(option_name, option_value)
+        except ValueError as error:
+            raise ValueError(f"{name}: {error}") from None
         options[option_name] = option_value
     return options
 

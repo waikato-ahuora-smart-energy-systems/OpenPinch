@@ -445,7 +445,7 @@ def _weighted_average_target(
         targets, "degree_of_integration", "Qr", weights, basis_is_numerator=True
     )
     data["ETE"] = _ratio_of_totals(
-        targets, "ETE", "exergy_sources", weights, basis_is_numerator=False
+        targets, "ETE", "exergy_released", weights, basis_is_numerator=False
     )
     data["hpr_cop"] = _ratio_of_totals(
         targets, "hpr_cop", "hpr_work", weights, basis_is_numerator=False

@@ -138,6 +138,34 @@ def test_weighted_average_output_aggregates_values_utilities_and_metadata():
     }
 
 
+def test_weighted_average_ete_is_weighted_by_the_exergy_released():
+    # ETE is exergy gained over exergy released by the balanced composites,
+    # so the seasonal value is sum(w ETE X_released) / sum(w X_released).
+    # Weighting by exergy_sources (the old basis) would give 0.5 here.
+    def period(period_id, ete, released, sources):
+        return TargetOutput(
+            name="Site",
+            period_id=period_id,
+            targets=[
+                _target(period_id=period_id).model_copy(
+                    update={
+                        "ETE": Value(ete, "%"),
+                        "exergy_released": Value(released, "kW"),
+                        "exergy_sources": Value(sources, "kW"),
+                    }
+                )
+            ],
+        )
+
+    output = weighted_average_output(
+        [period("base", 40.0, 30.0, 10.0), period("peak", 60.0, 10.0, 10.0)],
+        [1.0, 1.0],
+    )
+
+    assert output.targets[0].ETE.value == pytest.approx(45.0)
+    assert output.targets[0].exergy_released.value == pytest.approx(20.0)
+
+
 def test_weighted_average_output_uses_peak_hpr_capital_and_weighted_operation():
     base_target = _target(period_id="base", qh=10.0).model_copy(
         update={

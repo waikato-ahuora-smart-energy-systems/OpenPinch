@@ -110,14 +110,36 @@ def test_create_energy_transfer_diagram_builds_stacked_operation_profile():
     assert operation["stacked_heat"] == [15.0, 65.0, 5.0]
 
 
-def test_create_energy_transfer_diagram_prefers_saved_gcc_payload():
-    fallback_pt = ProblemTable(
+def test_create_energy_transfer_diagram_prefers_the_unrounded_problem_table():
+    # Audit M16: the saved GCC graph is rounded to 4 dp, which put the
+    # pulp_mill Digestion cascade 8.3 kW off. The target's own table wins.
+    pt = ProblemTable(
         {
-            ProblemTableLabel.T: [200.0, 100.0],
-            ProblemTableLabel.CP_NET: [0.0, 0.0],
-            ProblemTableLabel.H_NET: [999.0, 999.0],
+            ProblemTableLabel.T: [200.0, 150.00004, 100.0],
+            ProblemTableLabel.H_NET: [0.0, 25.0, -10.0],
         }
     )
+    rounded_gcc = ProblemTable(
+        {
+            ProblemTableLabel.T: [200.0, 150.0, 100.0],
+            ProblemTableLabel.H_NET: [0.0, 25.0, -10.0],
+        }
+    )
+    target = SimpleNamespace(
+        zone_name="NestedUnit",
+        type=TargetType.DI.value,
+        pt=pt,
+        graphs={GraphType.GCC.value: rounded_gcc},
+        hot_utility_target=0.0,
+        cold_utility_target=0.0,
+    )
+
+    diagram = create_energy_transfer_diagram([target])
+
+    assert diagram["temperatures"] == [200.0, 150.00004, 100.0]
+
+
+def test_create_energy_transfer_diagram_falls_back_to_the_saved_gcc_payload():
     gcc = ProblemTable(
         {
             ProblemTableLabel.T: [200.0, 150.0, 100.0],
@@ -127,7 +149,7 @@ def test_create_energy_transfer_diagram_prefers_saved_gcc_payload():
     target = SimpleNamespace(
         zone_name="NestedUnit",
         type=TargetType.DI.value,
-        pt=fallback_pt,
+        pt=None,
         graphs={GraphType.GCC.value: gcc},
         hot_utility_target=0.0,
         cold_utility_target=0.0,
