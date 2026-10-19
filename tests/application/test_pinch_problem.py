@@ -1072,7 +1072,8 @@ def test_validate_rejects_period_streams_with_mixed_hot_cold_classification():
                 "t_target": {"values": [100.0, 200.0]},
                 "heat_flow": {"values": [100.0, 100.0]},
             }
-        ]
+        ],
+        "options": {"PROBLEM_PERIOD_IDS": ["a", "b"]},
     }
 
     with pytest.raises(ValueError, match="Stream states must classify consistently"):
@@ -1999,7 +2000,7 @@ def test_load_preserves_period_stream_values_on_runtime_streams():
             }
         ],
         "utilities": [],
-        "options": {},
+        "options": {"PROBLEM_PERIOD_IDS": ["a", "b"]},
     }
 
     problem = PinchProblem()

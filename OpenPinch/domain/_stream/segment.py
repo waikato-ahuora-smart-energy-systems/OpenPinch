@@ -158,7 +158,7 @@ class StreamSegment(Stream):
         if current is None:
             current = Value(0.0, unit=self._VALUE_UNITS[internal_name])
         candidate = Value(current)
-        target_size = self._period_vector_size()
+        target_size = max(self._period_vector_size(), self._num_periods or 1)
         if candidate.num_periods == 1 and target_size > 1:
             candidate = Value(
                 np.full(target_size, float(candidate.value), dtype=float),

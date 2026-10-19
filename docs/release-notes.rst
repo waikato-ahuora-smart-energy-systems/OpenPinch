@@ -43,6 +43,46 @@ HEN utility approach temperatures
   moves whenever the solver's path does. Tutorial 16's other designs and
   tutorial 17 are unchanged.
 
+Multiperiod fixes
+~~~~~~~~~~~~~~~~~
+
+- Weighted-average summaries pair each period's weight with that period's
+  results by period id. A utility placement case whose ``period_ids`` were
+  given out of order (for example ``("c", "a", "b")``) applied the first
+  weight to the first period it ran, so with weights 0.6, 0.3 and 0.1 on a, b
+  and c and cold utility duties of 1000, 1600 and 2200 kW the weighted cold
+  utility was 1780 kW instead of 1300 kW. A case placed on a subset of the
+  periods (``period_ids=("b", "c")``) now summarises, reports and exports,
+  weighting over its own periods; before, each raised "Expected at most 2
+  period weight(s), got 3." Placement cases run with all periods in their
+  canonical order, as the tutorials do, are unchanged.
+- Per-period values (``{"values": [...]}``) without ``PROBLEM_PERIOD_IDS``,
+  including those inside a record's ``segments`` or ``profile`` points, are
+  a validation error that names the field and asks for one id per period.
+  Before, the problem silently had one period and every target used only the
+  first value; records of different lengths failed later with an
+  unrelated "weights for stream ... must align" error.
+- ``StreamSegment.set_attr_for_period`` with a scalar changes only the named
+  period, as ``Stream.set_attr_for_period`` has since 0.7.1. Before, it
+  overwrote the segment's value, and so its parent's total, in every period.
+- A single-period call finds that period's retained targets. After
+  ``target.direct_heat_integration`` ran for each period in turn,
+  ``target.exergy(period_id=...)`` for any but the last raised "could not
+  find a compatible existing target"; it now runs from that period's state,
+  as ``target.all_periods`` does.
+- The weighted-average ``turbine_efficiency_target`` is total turbine work
+  over total isentropic work across the periods, not a weighted mean of the
+  period efficiencies. A period with no turbine work no longer pulls it down:
+  80 % in one period and an idle period at equal weight now summarise to
+  80 % instead of 40 %. Per-period values are unchanged, and so is tutorial
+  13's weighted value (10 %, the same in every period).
+- Domain ``Stream`` objects reject a ``period_ids`` key in period-value
+  data. A stream reads its values in the problem's period order and ignored
+  the ids, so ``{"values": [10, 20], "period_ids": ["b", "a"]}`` gave period
+  ``a`` 10 rather than 20. Inputs that key values by period id on purpose
+  (a utility's ``maximum_heat_flow``, utility placement ``maximum_duties``)
+  still take it.
+
 Input and export hardening
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
