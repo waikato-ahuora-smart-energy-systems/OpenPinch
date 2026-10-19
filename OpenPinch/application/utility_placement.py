@@ -71,6 +71,7 @@ from ..domain._value.resolution import get_scalar_value
 from ..domain.configuration import C_to_K
 from ..domain.enums import ProblemTableLabel, StreamType, TargetType, ZoneType
 from ..domain.problem_table import ProblemTable
+from ..domain.value import Value
 from ..domain.zone import Zone
 from ._problem.input.construction import _find_extreme_process_temperatures
 from ._problem.input.utilities import (
@@ -1177,27 +1178,14 @@ def run_problem_utility_placement(
             )
 
     optimized_input = problem.to_problem_json()
+    sources = _utility_sources(problem, selected_zone, optimized_input["utilities"])
     optimized_input["utilities"] = [
-        {
-            "name": level.template_key.name,
-            "type": utility_type,
-            "t_supply": level.supply_temperature.model_dump(),
-            "t_target": level.target_temperature.model_dump(),
-            "heat_flow": {"value": 0.0, "unit": result.units.heat_flow},
-            **(
-                {
-                    "maximum_heat_flow": _serialized_limit(
-                        result.request,
-                        level.template_key.name,
-                    )
-                }
-                if _serialized_limit(result.request, level.template_key.name)
-                is not None
-                else {}
-            ),
-            "dt_cont": {"value": 0.0, "unit": result.units.temperature_difference},
-            "htc": {"value": 1.0, "unit": "kW/m^2/delta_degC"},
-        }
+        _optimized_utility(
+            level,
+            utility_type,
+            _source_utility(sources[utility_type], level),
+            result,
+        )
         for utility_type, levels in levels_by_side.items()
         for level in levels
     ]
@@ -1221,6 +1209,96 @@ def run_problem_utility_placement(
         }
     )
     return optimized_case
+
+
+def _utility_sources(problem, selected_zone, raw_utilities):
+    """Return each side's original utilities as (name, supply, shift, raw)."""
+    raw_by_name = {utility["name"]: utility for utility in raw_utilities}
+    sources = {}
+    for utility_type, attribute in (
+        ("Hot", "hot_utilities"),
+        ("Cold", "cold_utilities"),
+    ):
+        # A subzone without its own utilities draws on the site's.
+        utilities = getattr(selected_zone, attribute) or getattr(
+            problem.master_zone, attribute
+        )
+        sources[utility_type] = [
+            (
+                utility.name,
+                float(get_scalar_value(utility.supply_temperature)),
+                float(get_scalar_value(utility.effective_delta_t_contribution)),
+                raw_by_name[utility.name],
+            )
+            for utility in utilities
+            if utility.name in raw_by_name
+        ]
+    return sources
+
+
+def _level_temperature(quantity) -> float:
+    return Value(quantity.value, quantity.unit).to("degC").value
+
+
+def _source_utility(sources, level):
+    """Return the same-named original utility, else the nearest by supply."""
+    if not sources:
+        return None
+    for source in sources:
+        if source[0] == level.template_key.name:
+            return source
+    supply = _level_temperature(level.supply_temperature)
+    return min(sources, key=lambda source: abs(source[1] - supply))
+
+
+def _optimized_utility(level, utility_type, source, result) -> dict[str, object]:
+    """Serialise one placed level, keeping its source utility's properties.
+
+    Direct targeting shifts utilities by their ``dt_cont``, so there the
+    real temperatures sit that shift outward of the placed (shifted) levels
+    and the case targets them exactly. Indirect and Total Site targets
+    depend on each subzone's utility shift as well, so there the levels keep
+    ``dt_cont = 0``; price and htc are carried over in every scope.
+    """
+    name = level.template_key.name
+    limit = _serialized_limit(result.request, name)
+    utility: dict[str, object] = {
+        "name": name,
+        "type": utility_type,
+        "heat_flow": {"value": 0.0, "unit": result.units.heat_flow},
+        **({"maximum_heat_flow": limit} if limit is not None else {}),
+    }
+    if source is None:
+        return {
+            **utility,
+            "t_supply": level.supply_temperature.model_dump(),
+            "t_target": level.target_temperature.model_dump(),
+            "dt_cont": {"value": 0.0, "unit": result.units.temperature_difference},
+            "htc": {"value": 1.0, "unit": "kW/m^2/delta_degC"},
+        }
+    _, _, shift, raw = source
+    keeps_shift = (
+        result.request.base_target is UtilityPlacementBaseTarget.DIRECT
+        and raw.get("dt_cont") is not None
+    )
+    offset = (shift if utility_type == "Hot" else -shift) if keeps_shift else 0.0
+    return {
+        **utility,
+        "t_supply": {
+            "value": _level_temperature(level.supply_temperature) + offset,
+            "unit": "degC",
+        },
+        "t_target": {
+            "value": _level_temperature(level.target_temperature) + offset,
+            "unit": "degC",
+        },
+        "dt_cont": (
+            raw["dt_cont"]
+            if keeps_shift
+            else {"value": 0.0, "unit": result.units.temperature_difference}
+        ),
+        **{key: raw[key] for key in ("htc", "price") if raw.get(key) is not None},
+    }
 
 
 __all__ = ["build_problem_placement_context", "run_problem_utility_placement"]

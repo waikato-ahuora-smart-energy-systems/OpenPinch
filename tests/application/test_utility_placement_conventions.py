@@ -4,7 +4,7 @@ import math
 
 import pytest
 
-from OpenPinch import PinchProblem
+from OpenPinch import PinchProblem, PinchWorkspace
 
 _OPTIONS = {
     "iteration_limit": 3,
@@ -96,3 +96,70 @@ def test_placement_local_method_is_a_closed_choice():
     assert UtilityPlacementOptions(local_method="Powell").local_method == "Powell"
     with pytest.raises(ValueError, match="local_method"):
         UtilityPlacementOptions(local_method="BFGS")
+
+
+def test_direct_case_keeps_the_nearest_original_utility_properties():
+    problem = PinchWorkspace(source="chocolate_factory.json").use_case("baseline")
+    original = problem.to_problem_json()["utilities"]
+
+    # A process zone places against its Direct Integration target.
+    placed = problem.target.utility_placement(
+        isothermal=2, sensible=2, zone="Almond", period_ids=("0",), options=_OPTIONS
+    )
+
+    (period,) = placed.utility_placement_result.best.period_results
+    levels = {
+        level.template_key.name: level
+        for level in period.hot_levels + period.cold_levels
+    }
+    for utility in placed.to_problem_json()["utilities"]:
+        level = levels[utility["name"]]
+        source = min(
+            (item for item in original if item["type"] in (utility["type"], "Both")),
+            key=lambda item: (
+                item["name"] != utility["name"],
+                abs(item["t_supply"]["value"] - level.supply_temperature.value),
+            ),
+        )
+        assert utility["price"] == source["price"]
+        assert utility["htc"] == source["htc"]
+        assert utility["dt_cont"] == source["dt_cont"]
+        # The placed temperatures are shifted; the real ones sit dt_cont
+        # outward so the case targets the same shifted levels.
+        offset = source["dt_cont"]["value"] * (
+            1.0 if utility["type"] == "Hot" else -1.0
+        )
+        assert utility["t_supply"]["value"] == pytest.approx(
+            level.supply_temperature.value + offset
+        )
+        assert utility["t_target"]["value"] == pytest.approx(
+            level.target_temperature.value + offset
+        )
+
+
+def test_total_site_case_keeps_price_and_htc_with_unshifted_levels():
+    problem = PinchProblem("basic_pinch.json")
+    original = {
+        utility["type"]: utility for utility in problem.to_problem_json()["utilities"]
+    }
+
+    placed = problem.target.utility_placement(
+        isothermal=2, sensible=1, period_ids=("0",), options=_OPTIONS
+    )
+
+    (period,) = placed.utility_placement_result.best.period_results
+    levels = {
+        level.template_key.name: level
+        for level in period.hot_levels + period.cold_levels
+    }
+    for utility in placed.to_problem_json()["utilities"]:
+        source = original[utility["type"]]
+        assert utility["price"] == source["price"]
+        assert utility["htc"] == source["htc"]
+        # Total Site targets also depend on each subzone's utility shift, so
+        # the placed levels stay unshifted.
+        assert utility["dt_cont"]["value"] == 0.0
+        level = levels[utility["name"]]
+        assert utility["t_supply"]["value"] == pytest.approx(
+            level.supply_temperature.value
+        )
