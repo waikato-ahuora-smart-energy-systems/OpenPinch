@@ -4,6 +4,16 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Input and export hardening
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``HENS_SOLVER_OPTIONS_PDM``, ``HENS_SOLVER_OPTIONS_TDM`` and
+  ``HENS_SOLVER_OPTIONS_EVM`` accept only known IPOPT, Couenne and APOPT
+  tolerances, iteration limits and numeric settings, each with a number, a
+  boolean or a single word as its value. Any other option name or value is a
+  validation issue, and solver option files and option lines are written only
+  from validated options.
+
 Network grid data
 ~~~~~~~~~~~~~~~~~
 
