@@ -11,7 +11,15 @@ from . import piecewise as _piecewise
 
 
 def _set_minimum_approach_temperatures(model) -> None:
-    """Derive pair-specific approach limits from stream contributions."""
+    """Derive pair-specific approach limits from stream contributions.
+
+    Heaters are ``dT_hu_period[period][utility][cold]`` and coolers
+    ``dT_cu_period[period][hot][utility]``, the orientation of the recovery
+    pairs. A model with no utility on a side gets one at ``dTmin / 2``.
+    """
+
+    def contributions(values):
+        return [float(value) for value in values] or [model.dTmin / 2.0]
 
     model.dT_r_period = np.array(
         [
@@ -29,13 +37,8 @@ def _set_minimum_approach_temperatures(model) -> None:
     model.dT_hu_period = np.array(
         [
             [
-                (
-                    model.T_hu_cont_period[n][0]
-                    if len(model.T_hu_cont_period[n])
-                    else model.dTmin / 2.0
-                )
-                + model.T_c_cont_period[n][j]
-                for j in range(len(model.T_c_cont_period[n]))
+                [utility + cold for cold in model.T_c_cont_period[n]]
+                for utility in contributions(model.T_hu_cont_period[n])
             ]
             for n in range(model.N_periods)
         ],
@@ -44,13 +47,8 @@ def _set_minimum_approach_temperatures(model) -> None:
     model.dT_cu_period = np.array(
         [
             [
-                model.T_h_cont_period[n][i]
-                + (
-                    model.T_cu_cont_period[n][0]
-                    if len(model.T_cu_cont_period[n])
-                    else model.dTmin / 2.0
-                )
-                for i in range(len(model.T_h_cont_period[n]))
+                [hot + utility for utility in contributions(model.T_cu_cont_period[n])]
+                for hot in model.T_h_cont_period[n]
             ]
             for n in range(model.N_periods)
         ],
@@ -79,12 +77,13 @@ def _recovery_approach_temperature(
 def _hot_utility_inlet_approach_temperature(
     model,
     j: int,
-    period_idx: int = 0,
+    u: int,
+    period_idx: int,
 ) -> float:
     contribution = (
-        model.T_hu_in_cont_by_period[period_idx]
+        model.T_hu_in_cont_by_period[period_idx][u]
         if hasattr(model, "T_hu_in_cont_by_period")
-        else model.T_hu_cont_period[period_idx][0]
+        else model.T_hu_cont_period[period_idx][u]
     )
     return float(contribution + model.T_c_cont_period[period_idx][j])
 
@@ -92,7 +91,8 @@ def _hot_utility_inlet_approach_temperature(
 def _hot_utility_outlet_approach_temperature(
     model,
     j: int,
-    period_idx: int = 0,
+    u: int,
+    period_idx: int,
     heat_duty: float | None = None,
 ):
     contribution = _utility_outlet_temperature_contribution(
@@ -100,6 +100,7 @@ def _hot_utility_outlet_approach_temperature(
         "hot",
         period_idx,
         match_index=j,
+        utility=u,
         heat_duty=heat_duty,
     )
     return contribution + model.T_c_cont_period[period_idx][j]
@@ -108,12 +109,13 @@ def _hot_utility_outlet_approach_temperature(
 def _cold_utility_inlet_approach_temperature(
     model,
     i: int,
-    period_idx: int = 0,
+    u: int,
+    period_idx: int,
 ) -> float:
     contribution = (
-        model.T_cu_in_cont_by_period[period_idx]
+        model.T_cu_in_cont_by_period[period_idx][u]
         if hasattr(model, "T_cu_in_cont_by_period")
-        else model.T_cu_cont_period[period_idx][0]
+        else model.T_cu_cont_period[period_idx][u]
     )
     return float(model.T_h_cont_period[period_idx][i] + contribution)
 
@@ -121,7 +123,8 @@ def _cold_utility_inlet_approach_temperature(
 def _cold_utility_outlet_approach_temperature(
     model,
     i: int,
-    period_idx: int = 0,
+    u: int,
+    period_idx: int,
     heat_duty: float | None = None,
 ):
     contribution = _utility_outlet_temperature_contribution(
@@ -129,6 +132,7 @@ def _cold_utility_outlet_approach_temperature(
         "cold",
         period_idx,
         match_index=i,
+        utility=u,
         heat_duty=heat_duty,
     )
     return model.T_h_cont_period[period_idx][i] + contribution
@@ -139,21 +143,22 @@ def _utility_outlet_temperature_contribution(
     side: str,
     period_idx: int,
     match_index: int,
+    utility: int,
     heat_duty: float | None = None,
 ):
     if heat_duty is None and hasattr(
         model,
         f"T_{side[0]}u_out_cont_by_period",
     ):
-        return getattr(model, f"T_{side[0]}u_out_cont_by_period")[period_idx][
+        return getattr(model, f"T_{side[0]}u_out_cont_by_period")[period_idx][utility][
             match_index
         ]
     scalar = (
-        model.T_hu_cont_period[period_idx][0]
+        model.T_hu_cont_period[period_idx][utility]
         if side == "hot"
-        else model.T_cu_cont_period[period_idx][0]
+        else model.T_cu_cont_period[period_idx][utility]
     )
-    if heat_duty is None or not _piecewise._utility_is_segmented(model, side):
+    if heat_duty is None or not _piecewise._utility_is_segmented(model, side, utility):
         return float(scalar)
 
     from ...solver.piecewise import profile_from_solver_arrays
@@ -161,7 +166,7 @@ def _utility_outlet_temperature_contribution(
     profile = profile_from_solver_arrays(
         model.solver_arrays,
         side=f"{side}_utility",
-        parent_index=0,
+        parent_index=utility,
         period_index=period_idx,
     )
     return profile.temperature_contribution_at_heat(heat_duty)
@@ -172,6 +177,7 @@ def _utility_solved_outlet_temperature(
     side: str,
     period_idx: int,
     match_index: int,
+    utility: int,
     heat_duty: float | None = None,
 ):
     if heat_duty is None and hasattr(
@@ -179,13 +185,13 @@ def _utility_solved_outlet_temperature(
         f"T_{side[0]}u_solved_out_by_period",
     ):
         return getattr(model, f"T_{side[0]}u_solved_out_by_period")[period_idx][
-            match_index
-        ]
-    if heat_duty is None or not _piecewise._utility_is_segmented(model, side):
+            utility
+        ][match_index]
+    if heat_duty is None or not _piecewise._utility_is_segmented(model, side, utility):
         return (
-            model.T_hu_out_period[period_idx][0]
+            model.T_hu_out_period[period_idx][utility]
             if side == "hot"
-            else model.T_cu_out_period[period_idx][0]
+            else model.T_cu_out_period[period_idx][utility]
         )
 
     from ...solver.piecewise import profile_from_solver_arrays
@@ -193,28 +199,32 @@ def _utility_solved_outlet_temperature(
     return profile_from_solver_arrays(
         model.solver_arrays,
         side=f"{side}_utility",
-        parent_index=0,
+        parent_index=utility,
         period_index=period_idx,
     ).temperature_at_heat(heat_duty)
+
+
+def _utility_segment_contributions(model, side: str, period_idx: int, u: int):
+    values = model.solver_arrays.arrays[f"{side}_utility_segment_dt_cont_period"][
+        period_idx, u
+    ]
+    count = int(model.solver_arrays.arrays[f"{side}_utility_segment_count"][u])
+    return values[:count]
 
 
 def _utility_max_temperature_contribution(
     model,
     side: str,
     period_idx: int,
+    u: int,
 ) -> float:
-    scalar = (
-        model.T_hu_cont_period[period_idx][0]
-        if side == "hot"
-        else model.T_cu_cont_period[period_idx][0]
-    )
-    if not _piecewise._utility_is_segmented(model, side):
-        return float(scalar)
-    values = model.solver_arrays.arrays[f"{side}_utility_segment_dt_cont_period"][
-        period_idx, 0
-    ]
-    count = int(model.solver_arrays.arrays[f"{side}_utility_segment_count"][0])
-    return float(np.max(values[:count]))
+    if not _piecewise._utility_is_segmented(model, side, u):
+        return float(
+            model.T_hu_cont_period[period_idx][u]
+            if side == "hot"
+            else model.T_cu_cont_period[period_idx][u]
+        )
+    return float(np.max(_utility_segment_contributions(model, side, period_idx, u)))
 
 
 def utility_minimum_approach_by_period(model, side: str) -> list:
@@ -228,93 +238,154 @@ def utility_minimum_approach_by_period(model, side: str) -> list:
     by_period = []
     for n in range(model.N_periods):
         if side == "hot":
-            stream_contributions = model.T_c_cont_period[n]
-            flat = model.dT_hu_period[n]
+            rows = [[float(value) for value in row] for row in model.dT_hu_period[n]]
+            for u in range(len(rows)):
+                if _piecewise._utility_is_segmented(model, "hot", u):
+                    least = float(
+                        np.min(_utility_segment_contributions(model, "hot", n, u))
+                    )
+                    rows[u] = [least + float(c) for c in model.T_c_cont_period[n]]
         else:
-            stream_contributions = model.T_h_cont_period[n]
-            flat = model.dT_cu_period[n]
-        if _piecewise._utility_is_segmented(model, side):
-            values = model.solver_arrays.arrays[
-                f"{side}_utility_segment_dt_cont_period"
-            ][n, 0]
-            count = int(model.solver_arrays.arrays[f"{side}_utility_segment_count"][0])
-            utility = float(np.min(values[:count]))
-            approaches = [utility + float(value) for value in stream_contributions]
-        else:
-            approaches = [float(value) for value in flat]
-        by_period.append(
-            [approaches] if side == "hot" else [[value] for value in approaches]
-        )
+            rows = [[float(value) for value in row] for row in model.dT_cu_period[n]]
+            for u in range(len(rows[0]) if rows else 0):
+                if _piecewise._utility_is_segmented(model, "cold", u):
+                    least = float(
+                        np.min(_utility_segment_contributions(model, "cold", n, u))
+                    )
+                    for i, hot in enumerate(model.T_h_cont_period[n]):
+                        rows[i][u] = float(hot) + least
+        by_period.append(rows)
     return by_period
+
+
+def utility_match_feasibility(owner) -> tuple[list[list[int]], list[list[int]]]:
+    """Flag each (stream, utility) pair whose fixed end can meet its approach.
+
+    A heater's utility inlet faces the cold stream's target, and a cooler's
+    utility inlet the hot stream's target. Both temperatures are fixed, so a
+    pair below its least approach there in any period the stream runs can
+    never be used.
+    """
+
+    def periods(side: str, index: int) -> list[int]:
+        return [
+            n for n in range(owner.N_periods) if _stream_active(owner, side, n, index)
+        ]
+
+    hot = [
+        [
+            int(
+                all(
+                    owner.T_hu_in_period[n][u] - owner.T_c_out_period[n][j]
+                    >= owner.dT_hu_min_period[n][u][j] - owner.tol
+                    for n in periods("cold", j)
+                )
+            )
+            for u in range(owner.NHU)
+        ]
+        for j in range(owner.J)
+    ]
+    cold = [
+        [
+            int(
+                all(
+                    owner.T_h_out_period[n][i] - owner.T_cu_in_period[n][u]
+                    >= owner.dT_cu_min_period[n][i][u] - owner.tol
+                    for n in periods("hot", i)
+                )
+            )
+            for u in range(owner.NCU)
+        ]
+        for i in range(owner.I)
+    ]
+    return hot, cold
 
 
 def _stream_active(model, side: str, period_idx: int, index: int) -> bool:
     """Return whether a stream takes part in period ``period_idx``.
 
-    Pinch-decomposition models clip a stream absent from their side of the
-    pinch in a period to 0 K; other models have every stream in every period.
+    Pinch-decomposition models flag a stream absent from their side of the
+    pinch in a period (and clip it to 0 K); elsewhere a stream takes part in
+    the periods where it has duty.
     """
     flags = getattr(model, f"z_{'i' if side == 'hot' else 'j'}_active_period", None)
-    return flags is None or flags[period_idx][index] > 0
+    if flags is not None:
+        return flags[period_idx][index] > 0
+    duties = getattr(model, f"Qtot_s{'h' if side == 'hot' else 'c'}_period", None)
+    return duties is None or duties[period_idx][index] > model.tol
 
 
 def _set_multiperiod_utility_approach_equations(model) -> None:
     """Constrain both terminals of every heater and cooler.
 
-    Segmented utilities use the local segment contribution at each terminal;
-    flat utilities use their single contribution.
+    Each (stream, utility) pair is its own unit. Segmented utilities use the
+    local segment contribution at each terminal; flat utilities use their
+    single contribution.
     """
     for n in range(model.N_periods):
         for j in range(model.J):
-            if model.z_hu_allowed[j] <= 0 or not _stream_active(model, "cold", n, j):
+            if not _stream_active(model, "cold", n, j):
                 continue
-            outlet_approach = _hot_utility_outlet_approach_temperature(model, j, n)
-            maximum_approach = (
-                _utility_max_temperature_contribution(model, "hot", n)
-                + model.T_c_cont_period[n][j]
-            )
-            big_m = max(
-                abs(model.T_hu_in_period[n][0] - model.T_c_out_period[n][j]),
-                abs(model.T_hu_in_period[n][0] - model.T_c_in_period[n][j]),
-                abs(model.T_hu_out_period[n][0] - model.T_c_out_period[n][j]),
-                abs(model.T_hu_out_period[n][0] - model.T_c_in_period[n][j]),
-            ) + max(maximum_approach, float(model.dTmin))
-            _set_terminal_approach_equations(
-                model,
-                match=model.z_hu[j],
-                duty=model.Q_h_by_period[n][j],
-                inlet_shortfall=_hot_utility_inlet_approach_temperature(model, j, n)
-                - (model.T_hu_in_period[n][0] - model.T_c_out_period[n][j]),
-                outlet_margin=model._utility_solved_outlet_temperature("hot", n, j)
-                - model.T_c_by_period[n][j][0]
-                - outlet_approach,
-                big_m=big_m,
-            )
-
+            for u in range(model.NHU):
+                if model.z_hu_allowed[j][u] <= 0:
+                    continue
+                _set_hot_utility_approach_equations(model, n, j, u)
         for i in range(model.I):
-            if model.z_cu_allowed[i] <= 0 or not _stream_active(model, "hot", n, i):
+            if not _stream_active(model, "hot", n, i):
                 continue
-            outlet_approach = _cold_utility_outlet_approach_temperature(model, i, n)
-            maximum_approach = model.T_h_cont_period[n][
-                i
-            ] + _utility_max_temperature_contribution(model, "cold", n)
-            big_m = max(
-                abs(model.T_h_in_period[n][i] - model.T_cu_out_period[n][0]),
-                abs(model.T_h_in_period[n][i] - model.T_cu_in_period[n][0]),
-                abs(model.T_h_out_period[n][i] - model.T_cu_out_period[n][0]),
-                abs(model.T_h_out_period[n][i] - model.T_cu_in_period[n][0]),
-            ) + max(maximum_approach, float(model.dTmin))
-            _set_terminal_approach_equations(
-                model,
-                match=model.z_cu[i],
-                duty=model.Q_c_by_period[n][i],
-                inlet_shortfall=_cold_utility_inlet_approach_temperature(model, i, n)
-                - (model.T_h_out_period[n][i] - model.T_cu_in_period[n][0]),
-                outlet_margin=model.T_h_by_period[n][i][model.S]
-                - model._utility_solved_outlet_temperature("cold", n, i)
-                - outlet_approach,
-                big_m=big_m,
-            )
+            for u in range(model.NCU):
+                if model.z_cu_allowed[i][u] <= 0:
+                    continue
+                _set_cold_utility_approach_equations(model, n, i, u)
+
+
+def _set_hot_utility_approach_equations(model, n: int, j: int, u: int) -> None:
+    outlet_approach = _hot_utility_outlet_approach_temperature(model, j, u, n)
+    maximum_approach = (
+        _utility_max_temperature_contribution(model, "hot", n, u)
+        + model.T_c_cont_period[n][j]
+    )
+    big_m = max(
+        abs(model.T_hu_in_period[n][u] - model.T_c_out_period[n][j]),
+        abs(model.T_hu_in_period[n][u] - model.T_c_in_period[n][j]),
+        abs(model.T_hu_out_period[n][u] - model.T_c_out_period[n][j]),
+        abs(model.T_hu_out_period[n][u] - model.T_c_in_period[n][j]),
+    ) + max(maximum_approach, float(model.dTmin))
+    _set_terminal_approach_equations(
+        model,
+        match=model.z_hu[j][u],
+        duty=model.Q_h_by_period[n][j][u],
+        inlet_shortfall=_hot_utility_inlet_approach_temperature(model, j, u, n)
+        - (model.T_hu_in_period[n][u] - model.T_c_out_period[n][j]),
+        outlet_margin=model._utility_solved_outlet_temperature("hot", n, j, u)
+        - model.T_c_by_period[n][j][0]
+        - outlet_approach,
+        big_m=big_m,
+    )
+
+
+def _set_cold_utility_approach_equations(model, n: int, i: int, u: int) -> None:
+    outlet_approach = _cold_utility_outlet_approach_temperature(model, i, u, n)
+    maximum_approach = model.T_h_cont_period[n][
+        i
+    ] + _utility_max_temperature_contribution(model, "cold", n, u)
+    big_m = max(
+        abs(model.T_h_in_period[n][i] - model.T_cu_out_period[n][u]),
+        abs(model.T_h_in_period[n][i] - model.T_cu_in_period[n][u]),
+        abs(model.T_h_out_period[n][i] - model.T_cu_out_period[n][u]),
+        abs(model.T_h_out_period[n][i] - model.T_cu_in_period[n][u]),
+    ) + max(maximum_approach, float(model.dTmin))
+    _set_terminal_approach_equations(
+        model,
+        match=model.z_cu[i][u],
+        duty=model.Q_c_by_period[n][i][u],
+        inlet_shortfall=_cold_utility_inlet_approach_temperature(model, i, u, n)
+        - (model.T_h_out_period[n][i] - model.T_cu_in_period[n][u]),
+        outlet_margin=model.T_h_by_period[n][i][model.S]
+        - model._utility_solved_outlet_temperature("cold", n, i, u)
+        - outlet_approach,
+        big_m=big_m,
+    )
 
 
 def _set_terminal_approach_equations(
@@ -403,26 +474,26 @@ def set_match_restrictions(model, restrictions) -> None:
     else:
         model.z_allowed = model.z_feasible
 
-    if zhu_restriction is not None:
-        if isinstance(zhu_restriction[0], int):
-            model.z_hu_allowed = [
-                1 if zhu_restriction[j] > model.tol else 0 for j in range(model.J)
-            ]
-        else:
-            model.z_hu_allowed = [
-                1 if zhu_restriction[j][0] > model.tol else 0 for j in range(model.J)
-            ]
-    else:
-        model.z_hu_allowed = model.z_hu_feasible
+    model.z_hu_allowed = (
+        _utility_restriction(model, zhu_restriction, model.J, model.NHU)
+        if zhu_restriction is not None
+        else model.z_hu_feasible
+    )
+    model.z_cu_allowed = (
+        _utility_restriction(model, zcu_restriction, model.I, model.NCU)
+        if zcu_restriction is not None
+        else model.z_cu_feasible
+    )
 
-    if zcu_restriction is not None:
-        if isinstance(zcu_restriction[0], int):
-            model.z_cu_allowed = [
-                1 if zcu_restriction[i] > model.tol else 0 for i in range(model.I)
-            ]
-        else:
-            model.z_cu_allowed = [
-                1 if zcu_restriction[i][0] > model.tol else 0 for i in range(model.I)
-            ]
-    else:
-        model.z_cu_allowed = model.z_cu_feasible
+
+def _utility_restriction(model, restriction, streams: int, utilities: int):
+    """Return ``[stream][utility]`` 0/1 flags from solved or given values."""
+
+    def flag(value) -> int:
+        number = value if isinstance(value, int | float) else value[0]
+        return 1 if number > model.tol else 0
+
+    return [
+        [flag(restriction[index][u]) for u in range(utilities)]
+        for index in range(streams)
+    ]

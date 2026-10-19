@@ -32,14 +32,7 @@ def _get_multiperiod_post_process(owner) -> None:
         ]
         for n in range(owner.N_periods)
     ]
-    q_h = [
-        [owner._active_binary_value(owner.Q_h_by_period[n][j]) for j in range(owner.J)]
-        for n in range(owner.N_periods)
-    ]
-    q_c = [
-        [owner._active_binary_value(owner.Q_c_by_period[n][i]) for i in range(owner.I)]
-        for n in range(owner.N_periods)
-    ]
+    q_h, q_c = _area.solved_utility_duties(owner)
 
     owner.z = [
         [
@@ -58,22 +51,15 @@ def _get_multiperiod_post_process(owner) -> None:
         ]
         for i in range(owner.I)
     ]
-    owner.z_hu = [
-        [1 if max(q_h[n][j] for n in range(owner.N_periods)) > owner.tol else 0]
-        for j in range(owner.J)
-    ]
-    owner.z_cu = [
-        [1 if max(q_c[n][i] for n in range(owner.N_periods)) > owner.tol else 0]
-        for i in range(owner.I)
-    ]
+    owner.z_hu, owner.z_cu = _area.used_utility_matches(owner, q_h, q_c)
     owner.n_recovery_units = sum(
         owner.z[i][j][k][0]
         for k in range(owner.S)
         for j in range(owner.J)
         for i in range(owner.I)
     )
-    owner.n_hu_units = sum(owner.z_hu[j][0] for j in range(owner.J))
-    owner.n_cu_units = sum(owner.z_cu[i][0] for i in range(owner.I))
+    owner.n_hu_units = sum(flag[0] for row in owner.z_hu for flag in row)
+    owner.n_cu_units = sum(flag[0] for row in owner.z_cu for flag in row)
     owner.n_units = owner.n_recovery_units + owner.n_hu_units + owner.n_cu_units
 
     owner.LMTD_r_by_period = [
@@ -144,106 +130,9 @@ def _get_multiperiod_post_process(owner) -> None:
         for n in range(owner.N_periods)
     ]
 
-    owner.LMTD_hu_by_period = [
-        [
-            _area._post_process_lmtd(
-                owner,
-                owner.T_hu_in_period[n][0] - owner.T_c_out_period[n][j],
-                owner._utility_solved_outlet_temperature("hot", n, j, q_h[n][j])
-                - owner._active_binary_value(owner.T_c_by_period[n][j][0]),
-                owner.z_hu[j][0],
-                formula_allowed=(
-                    abs(
-                        (owner.T_hu_in_period[n][0] - owner.T_c_out_period[n][j])
-                        - (
-                            owner._utility_solved_outlet_temperature(
-                                "hot", n, j, q_h[n][j]
-                            )
-                            - owner._active_binary_value(owner.T_c_by_period[n][j][0])
-                        )
-                    )
-                    > owner.tol
-                    and owner.T_hu_in_period[n][0]
-                    - owner.T_c_out_period[n][j]
-                    - _approach._hot_utility_inlet_approach_temperature(owner, j, n)
-                    >= owner.tol
-                    and owner._utility_solved_outlet_temperature("hot", n, j, q_h[n][j])
-                    - owner._active_binary_value(owner.T_c_by_period[n][j][0])
-                    - _approach._hot_utility_outlet_approach_temperature(
-                        owner, j, n, q_h[n][j]
-                    )
-                    >= owner.tol
-                ),
-            )
-            for j in range(owner.J)
-        ]
-        for n in range(owner.N_periods)
-    ]
-    owner.area_hu_by_period = [
-        [
-            (
-                q_h[n][j] / owner.U_hu_period[n][j] / owner.LMTD_hu_by_period[n][j]
-                if owner.LMTD_hu_by_period[n][j] > owner.tol and q_h[n][j] > owner.tol
-                else 0.0
-            )
-            for j in range(owner.J)
-        ]
-        for n in range(owner.N_periods)
-    ]
-    owner.LMTD_cu_by_period = [
-        [
-            _area._post_process_lmtd(
-                owner,
-                owner._active_binary_value(owner.T_h_by_period[n][i][owner.S])
-                - owner._utility_solved_outlet_temperature("cold", n, i, q_c[n][i]),
-                owner.T_h_out_period[n][i] - owner.T_cu_in_period[n][0],
-                owner.z_cu[i][0],
-                formula_allowed=(
-                    abs(
-                        (
-                            owner._active_binary_value(
-                                owner.T_h_by_period[n][i][owner.S]
-                            )
-                            - owner._utility_solved_outlet_temperature(
-                                "cold", n, i, q_c[n][i]
-                            )
-                        )
-                        - (owner.T_h_out_period[n][i] - owner.T_cu_in_period[n][0])
-                    )
-                    > owner.tol
-                    and owner._active_binary_value(owner.T_h_by_period[n][i][owner.S])
-                    - owner._utility_solved_outlet_temperature("cold", n, i, q_c[n][i])
-                    - _approach._cold_utility_outlet_approach_temperature(
-                        owner, i, n, q_c[n][i]
-                    )
-                    >= owner.tol
-                    and owner.T_h_out_period[n][i]
-                    - owner.T_cu_in_period[n][0]
-                    - _approach._cold_utility_inlet_approach_temperature(owner, i, n)
-                    >= owner.tol
-                ),
-            )
-            for i in range(owner.I)
-        ]
-        for n in range(owner.N_periods)
-    ]
-    owner.area_cu_by_period = [
-        [
-            (
-                q_c[n][i] / owner.U_cu_period[n][i] / owner.LMTD_cu_by_period[n][i]
-                if owner.LMTD_cu_by_period[n][i] > owner.tol and q_c[n][i] > owner.tol
-                else 0.0
-            )
-            for i in range(owner.I)
-        ]
-        for n in range(owner.N_periods)
-    ]
-
-    _area._apply_segment_utility_areas(owner, q_h, q_c)
+    _area.set_utility_lmtd_and_areas(owner, q_h, q_c)
 
     owner.LMTD_r = owner.LMTD_r_by_period[0]
-    owner.LMTD_hu = owner.LMTD_hu_by_period[0]
-    owner.LMTD_cu = owner.LMTD_cu_by_period[0]
     owner.area_r = [
         [
             [
@@ -255,14 +144,6 @@ def _get_multiperiod_post_process(owner) -> None:
         for i in range(owner.I)
     ]
     _area._apply_segment_recovery_areas(owner, q_r)
-    owner.area_hu = [
-        max(owner.area_hu_by_period[n][j] for n in range(owner.N_periods))
-        for j in range(owner.J)
-    ]
-    owner.area_cu = [
-        max(owner.area_cu_by_period[n][i] for n in range(owner.N_periods))
-        for i in range(owner.I)
-    ]
 
     set_period_totals_and_costs(owner, q_h, q_c, q_r)
     owner.unit_cost_total = owner.unit_cost[0] * owner.n_recovery_units
@@ -317,7 +198,7 @@ def _get_multiperiod_post_process(owner) -> None:
             for i in range(owner.I):
                 if owner.area_r[i][j][k] > 0.0:
                     owner.dtacda[i][j][k] = owner.dqda[i][j][k] * (
-                        owner.hu_cost[0] + owner.cu_cost[0]
+                        _area.recovered_utility_price(owner)
                     ) - (
                         owner.A_coeff[0]
                         * owner.A_exp[0]
@@ -325,7 +206,7 @@ def _get_multiperiod_post_process(owner) -> None:
                     )
                 else:
                     owner.dtacda[i][j][k] = owner.dqda[i][j][k] * (
-                        owner.hu_cost[0] + owner.cu_cost[0]
+                        _area.recovered_utility_price(owner)
                     ) - (owner.A_coeff[0] * owner.A_exp[0])
     owner.alpha_dqda = [
         [
@@ -366,7 +247,7 @@ def get_lowest_benefit_HX_candidates(owner, limit: int) -> list[list[int]]:
                     owner.net_benefit[i][j][k] = owner.Q_r[i][j][k][
                         0
                     ] * _alpha.alpha_value(owner, i, j, k) * (
-                        owner.hu_cost[0] + owner.cu_cost[0]
+                        _area.recovered_utility_price(owner)
                     ) - (
                         owner.unit_cost[0]
                         + owner.A_coeff[0] * (owner.area_r[i][j][k] ** owner.A_exp[0])

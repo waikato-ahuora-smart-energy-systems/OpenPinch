@@ -166,44 +166,36 @@ def _check_utility_costs(
     rel_tol: float = 0.1,
     abs_tol: float = 1.0,
 ) -> bool:
-    def utility_cost(side: str, period_index: int, duty: float) -> float:
-        if hasattr(case, "_utility_cost_value"):
-            return case._utility_cost_value(side, period_index, duty)
-        prices = case.hu_cost_period if side == "hot" else case.cu_cost_period
-        return float(prices[period_index][0]) * duty
+    def utility_cost(side: str, period_index: int, duties) -> float:
+        if hasattr(case, "_utilities_cost_value"):
+            return case._utilities_cost_value(side, period_index, duties)
+        prices = (
+            getattr(case, "hu_cost_period", [getattr(case, "hu_cost", None)])
+            if side == "hot"
+            else getattr(case, "cu_cost_period", [getattr(case, "cu_cost", None)])
+        )
+        return sum(
+            float(prices[period_index][u]) * duty for u, duty in enumerate(duties)
+        )
 
-    if hasattr(case, "Q_h_by_period"):
-        post_hot_utility = _costing._weighted_numeric_average(
-            case,
-            [
-                utility_cost(
-                    "hot",
-                    n,
-                    sum(_value(case.Q_h_by_period[n][j]) for j in range(case.J)),
-                )
-                for n in range(case.N_periods)
-            ],
-        )
-        post_cold_utility = _costing._weighted_numeric_average(
-            case,
-            [
-                utility_cost(
-                    "cold",
-                    n,
-                    sum(_value(case.Q_c_by_period[n][i]) for i in range(case.I)),
-                )
-                for n in range(case.N_periods)
-            ],
-        )
-    else:
-        hot_duty = sum(case.Q_h[j][0] for j in range(case.J))
-        cold_duty = sum(case.Q_c[i][0] for i in range(case.I))
-        if hasattr(case, "_utility_cost_value"):
-            post_hot_utility = case._utility_cost_value("hot", 0, hot_duty)
-            post_cold_utility = case._utility_cost_value("cold", 0, cold_duty)
-        else:
-            post_hot_utility = case.hu_cost[0] * hot_duty
-            post_cold_utility = case.cu_cost[0] * cold_duty
+    def recomputed(side: str) -> float:
+        grids = getattr(case, f"Q_{side[0]}_by_period", None) or [
+            getattr(case, f"Q_{side[0]}")
+        ]
+        costs = [
+            utility_cost(
+                side,
+                n,
+                [sum(_value(row[u]) for row in grid) for u in range(len(grid[0]))],
+            )
+            for n, grid in enumerate(grids)
+        ]
+        if len(costs) == 1:
+            return costs[0]
+        return _costing._weighted_numeric_average(case, costs)
+
+    post_hot_utility = recomputed("hot")
+    post_cold_utility = recomputed("cold")
     model_hot_utility = _solver_utility_cost(case, case.hu_cost_solver_by_period)
     model_cold_utility = _solver_utility_cost(case, case.cu_cost_solver_by_period)
     return math.isclose(
@@ -243,10 +235,10 @@ def _check_area_costs(
             for i in range(case.I)
         )
         hu_area_cost = case.hu_coeff[0] * sum(
-            case.area_hu[j] ** case.hu_exp[0] for j in range(case.J)
+            area ** case.hu_exp[0] for row in case.area_hu for area in row
         )
         cu_area_cost = case.cu_coeff[0] * sum(
-            case.area_cu[i] ** case.cu_exp[0] for i in range(case.I)
+            area ** case.cu_exp[0] for row in case.area_cu for area in row
         )
         return all(
             math.isclose(expected, actual, rel_tol=rel_tol, abs_tol=abs_tol)
@@ -343,56 +335,34 @@ def _check_shared_area_costs(
                     if _value(case.area_r_shared[i][j][k]) + abs_tol < required_area:
                         return False
         for j in range(case.J):
-            q = _value(case.Q_h_by_period[n][j])
-            if q > q_tol:
+            for u in range(case.NHU):
+                q = _value(case.Q_h_by_period[n][j][u])
+                if q <= q_tol:
+                    continue
                 required_area = q / (
-                    case.U_hu_period[n][j]
-                    * (
-                        (case.T_hu_in_period[n][0] - case.T_c_out_period[n][j])
-                        * (
-                            case._utility_solved_outlet_temperature("hot", n, j, q)
-                            - _value(case.T_c_by_period[n][j][0])
-                        )
-                        * (
-                            (case.T_hu_in_period[n][0] - case.T_c_out_period[n][j])
-                            + (
-                                case._utility_solved_outlet_temperature("hot", n, j, q)
-                                - _value(case.T_c_by_period[n][j][0])
-                            )
-                        )
-                        / 2
-                        + 1e-3
+                    case.U_hu_period[n][j][u]
+                    * _chen_mean(
+                        case.T_hu_in_period[n][u] - case.T_c_out_period[n][j],
+                        case._utility_solved_outlet_temperature("hot", n, j, u, q)
+                        - _value(case.T_c_by_period[n][j][0]),
                     )
-                    ** (1 / 3)
                 )
-                if _value(case.area_hu_shared[j]) + abs_tol < required_area:
+                if _value(case.area_hu_shared[j][u]) + abs_tol < required_area:
                     return False
         for i in range(case.I):
-            q = _value(case.Q_c_by_period[n][i])
-            if q > q_tol:
+            for u in range(case.NCU):
+                q = _value(case.Q_c_by_period[n][i][u])
+                if q <= q_tol:
+                    continue
                 required_area = q / (
-                    case.U_cu_period[n][i]
-                    * (
-                        (
-                            _value(case.T_h_by_period[n][i][case.S])
-                            - case._utility_solved_outlet_temperature("cold", n, i, q)
-                        )
-                        * (case.T_h_out_period[n][i] - case.T_cu_in_period[n][0])
-                        * (
-                            (
-                                _value(case.T_h_by_period[n][i][case.S])
-                                - case._utility_solved_outlet_temperature(
-                                    "cold", n, i, q
-                                )
-                            )
-                            + (case.T_h_out_period[n][i] - case.T_cu_in_period[n][0])
-                        )
-                        / 2
-                        + 1e-3
+                    case.U_cu_period[n][i][u]
+                    * _chen_mean(
+                        _value(case.T_h_by_period[n][i][case.S])
+                        - case._utility_solved_outlet_temperature("cold", n, i, u, q),
+                        case.T_h_out_period[n][i] - case.T_cu_in_period[n][u],
                     )
-                    ** (1 / 3)
                 )
-                if _value(case.area_cu_shared[i]) + abs_tol < required_area:
+                if _value(case.area_cu_shared[i][u]) + abs_tol < required_area:
                     return False
 
     recovery_area_cost = case.A_coeff[0] * sum(
@@ -402,10 +372,10 @@ def _check_shared_area_costs(
         for i in range(case.I)
     )
     hu_area_cost = case.hu_coeff[0] * sum(
-        _value(case.area_hu_shared[j]) ** case.hu_exp[0] for j in range(case.J)
+        _value(area) ** case.hu_exp[0] for row in case.area_hu_shared for area in row
     )
     cu_area_cost = case.cu_coeff[0] * sum(
-        _value(case.area_cu_shared[i]) ** case.cu_exp[0] for i in range(case.I)
+        _value(area) ** case.cu_exp[0] for row in case.area_cu_shared for area in row
     )
     return (
         math.isclose(
@@ -427,6 +397,10 @@ def _check_shared_area_costs(
             abs_tol=abs_tol,
         )
     )
+
+
+def _chen_mean(delta_1: float, delta_2: float) -> float:
+    return (delta_1 * delta_2 * (delta_1 + delta_2) / 2 + 1e-3) ** (1 / 3)
 
 
 def _value(value) -> float:

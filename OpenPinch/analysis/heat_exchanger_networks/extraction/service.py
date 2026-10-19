@@ -22,8 +22,8 @@ from .metadata import (
     _optional_int,
     _period_ids,
     _result_method,
-    _single_utility,
     _summary_metrics,
+    _utilities,
     _utility_cost,
 )
 from .recovery import _recovery_exchangers
@@ -71,26 +71,30 @@ def extract_heat_exchanger_network(
             include_inactive=include_inactive,
         )
     )
-    exchangers.extend(
-        _hot_utility_exchangers(
-            solved_model,
-            hot_utility=_single_utility(hot_utilities, "hot utility"),
-            cold_streams=cold_streams,
-            period_ids=period_ids,
-            tolerance=tolerance,
-            include_inactive=include_inactive,
+    for u, hot_utility in enumerate(_utilities(hot_utilities, "hot utility")):
+        exchangers.extend(
+            _hot_utility_exchangers(
+                solved_model,
+                hot_utility=hot_utility,
+                utility_index=u,
+                cold_streams=cold_streams,
+                period_ids=period_ids,
+                tolerance=tolerance,
+                include_inactive=include_inactive,
+            )
         )
-    )
-    exchangers.extend(
-        _cold_utility_exchangers(
-            solved_model,
-            cold_utility=_single_utility(cold_utilities, "cold utility"),
-            hot_streams=hot_streams,
-            period_ids=period_ids,
-            tolerance=tolerance,
-            include_inactive=include_inactive,
+    for u, cold_utility in enumerate(_utilities(cold_utilities, "cold utility")):
+        exchangers.extend(
+            _cold_utility_exchangers(
+                solved_model,
+                cold_utility=cold_utility,
+                utility_index=u,
+                hot_streams=hot_streams,
+                period_ids=period_ids,
+                tolerance=tolerance,
+                include_inactive=include_inactive,
+            )
         )
-    )
 
     total_annual_cost = _optional_float(getattr(solved_model, "TAC", None))
     objective = (

@@ -81,41 +81,33 @@ def set_initial_values_for_variables(
                 brackets=brackets,
             )
 
-    for i in range(owner.I):
-        if owner.z_cu_allowed[i] > 0:
-            _execution._set_value(
-                owner,
-                owner.Q_c[i],
-                init_solution.Q_c[i].VALUE[0],
-                brackets=brackets,
+    for side in ("cold", "hot"):
+        duties, flags, allowed, source_duties, source_flags = (
+            (
+                owner.Q_c,
+                owner.z_cu,
+                owner.z_cu_allowed,
+                init_solution.Q_c,
+                init_solution.z_cu,
             )
-            _execution._set_value(
-                owner,
-                owner.z_cu[i],
-                init_solution.z_cu[i][0],
-                brackets=brackets,
+            if side == "cold"
+            else (
+                owner.Q_h,
+                owner.z_hu,
+                owner.z_hu_allowed,
+                init_solution.Q_h,
+                init_solution.z_hu,
             )
-        else:
-            _execution._set_value(owner, owner.Q_c[i], 0.0, brackets=brackets)
-            _execution._set_value(owner, owner.z_cu[i], 0, brackets=brackets)
-
-    for j in range(owner.J):
-        if owner.z_hu_allowed[j] > 0:
-            _execution._set_value(
-                owner,
-                owner.Q_h[j],
-                init_solution.Q_h[j].VALUE[0],
-                brackets=brackets,
-            )
-            _execution._set_value(
-                owner,
-                owner.z_hu[j],
-                init_solution.z_hu[j][0],
-                brackets=brackets,
-            )
-        else:
-            _execution._set_value(owner, owner.Q_h[j], 0.0, brackets=brackets)
-            _execution._set_value(owner, owner.z_hu[j], 0, brackets=brackets)
+        )
+        for index, row in enumerate(allowed):
+            for u, is_allowed in enumerate(row):
+                if is_allowed > 0:
+                    duty = source_duties[index][u].VALUE[0]
+                    flag = source_flags[index][u][0]
+                else:
+                    duty, flag = 0.0, 0
+                _execution._set_value(owner, duties[index][u], duty, brackets=brackets)
+                _execution._set_value(owner, flags[index][u], flag, brackets=brackets)
 
     if owner.non_isothermal_model:
         if init_solution.non_isothermal_model:
@@ -320,30 +312,20 @@ def _set_multiperiod_initial_values(owner, init_solution, *, brackets: bool) -> 
                     owner._active_binary_value(source_t_c[source_period_idx][j][k]),
                     brackets=brackets,
                 )
-        for i in range(owner.I):
-            value = (
-                owner._active_binary_value(source_q_c[source_period_idx][i])
-                if owner.z_cu_allowed[i] > 0
-                else 0.0
-            )
-            _execution._set_value(
-                owner,
-                owner.Q_c_by_period[n][i],
-                value,
-                brackets=brackets,
-            )
-        for j in range(owner.J):
-            value = (
-                owner._active_binary_value(source_q_h[source_period_idx][j])
-                if owner.z_hu_allowed[j] > 0
-                else 0.0
-            )
-            _execution._set_value(
-                owner,
-                owner.Q_h_by_period[n][j],
-                value,
-                brackets=brackets,
-            )
+        for target, source, allowed in (
+            (owner.Q_c_by_period[n], source_q_c[source_period_idx], owner.z_cu_allowed),
+            (owner.Q_h_by_period[n], source_q_h[source_period_idx], owner.z_hu_allowed),
+        ):
+            for index, row in enumerate(allowed):
+                for u, is_allowed in enumerate(row):
+                    value = (
+                        owner._active_binary_value(source[index][u])
+                        if is_allowed > 0
+                        else 0.0
+                    )
+                    _execution._set_value(
+                        owner, target[index][u], value, brackets=brackets
+                    )
 
     for k in range(owner.S):
         for j in range(owner.J):
@@ -354,20 +336,18 @@ def _set_multiperiod_initial_values(owner, init_solution, *, brackets: bool) -> 
                     owner._active_binary_value(init_solution.z[i][j][k]),
                     brackets=brackets,
                 )
-    for i in range(owner.I):
-        _execution._set_value(
-            owner,
-            owner.z_cu[i],
-            owner._active_binary_value(init_solution.z_cu[i]),
-            brackets=brackets,
-        )
-    for j in range(owner.J):
-        _execution._set_value(
-            owner,
-            owner.z_hu[j],
-            owner._active_binary_value(init_solution.z_hu[j]),
-            brackets=brackets,
-        )
+    for target, source in (
+        (owner.z_cu, init_solution.z_cu),
+        (owner.z_hu, init_solution.z_hu),
+    ):
+        for index, row in enumerate(target):
+            for u, flag in enumerate(row):
+                _execution._set_value(
+                    owner,
+                    flag,
+                    owner._active_binary_value(source[index][u]),
+                    brackets=brackets,
+                )
 
     source_area_r = getattr(init_solution, "area_r_shared", None)
     source_area_hu = getattr(init_solution, "area_hu_shared", None)
@@ -382,22 +362,20 @@ def _set_multiperiod_initial_values(owner, init_solution, *, brackets: bool) -> 
                         owner._active_binary_value(source_area_r[i][j][k]),
                         brackets=brackets,
                     )
-    if source_area_hu is not None and hasattr(owner, "area_hu_shared"):
-        for j in range(owner.J):
-            _execution._set_value(
-                owner,
-                owner.area_hu_shared[j],
-                owner._active_binary_value(source_area_hu[j]),
-                brackets=brackets,
-            )
-    if source_area_cu is not None and hasattr(owner, "area_cu_shared"):
-        for i in range(owner.I):
-            _execution._set_value(
-                owner,
-                owner.area_cu_shared[i],
-                owner._active_binary_value(source_area_cu[i]),
-                brackets=brackets,
-            )
+    for source, target_name in (
+        (source_area_hu, "area_hu_shared"),
+        (source_area_cu, "area_cu_shared"),
+    ):
+        if source is None or not hasattr(owner, target_name):
+            continue
+        for index, row in enumerate(getattr(owner, target_name)):
+            for u, area in enumerate(row):
+                _execution._set_value(
+                    owner,
+                    area,
+                    owner._active_binary_value(source[index][u]),
+                    brackets=brackets,
+                )
 
     if owner.non_isothermal_model and hasattr(owner, "X_by_period"):
         source_x = getattr(init_solution, "X_by_period", None)

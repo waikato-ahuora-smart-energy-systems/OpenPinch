@@ -835,10 +835,13 @@ def _snapshot_solution_arrays(
     q_r = _zeros(hot_count, cold_count, stages)
     area_r = _zeros(hot_count, cold_count, stages)
     theta = _zeros(hot_count, cold_count, stages)
-    q_h = [0.0 for _ in range(cold_count)]
-    q_c = [0.0 for _ in range(hot_count)]
-    area_hu = [0.0 for _ in range(cold_count)]
-    area_cu = [0.0 for _ in range(hot_count)]
+    hot_utility_axis = arrays.axis_maps["hot_utilities"]
+    cold_utility_axis = arrays.axis_maps["cold_utilities"]
+    # Heaters and coolers are [stream][utility].
+    q_h = _zeros(cold_count, len(hot_utility_axis))
+    q_c = _zeros(hot_count, len(cold_utility_axis))
+    area_hu = _zeros(cold_count, len(hot_utility_axis))
+    area_cu = _zeros(hot_count, len(cold_utility_axis))
 
     hot_axis = arrays.axis_maps["hot_process_streams"]
     cold_axis = arrays.axis_maps["cold_process_streams"]
@@ -853,12 +856,14 @@ def _snapshot_solution_arrays(
             theta[hot_index][cold_index][stage_index] = expected["best_dTmin"]
         elif kind == "hot_utility":
             cold_index = cold_axis[exchanger["sink_stream"]]
-            q_h[cold_index] = exchanger["duty"]
-            area_hu[cold_index] = exchanger["area"]
+            utility_index = hot_utility_axis[exchanger["source_stream"]]
+            q_h[cold_index][utility_index] = exchanger["duty"]
+            area_hu[cold_index][utility_index] = exchanger["area"]
         elif kind == "cold_utility":
             hot_index = hot_axis[exchanger["source_stream"]]
-            q_c[hot_index] = exchanger["duty"]
-            area_cu[hot_index] = exchanger["area"]
+            utility_index = cold_utility_axis[exchanger["sink_stream"]]
+            q_c[hot_index][utility_index] = exchanger["duty"]
+            area_cu[hot_index][utility_index] = exchanger["area"]
 
     return {
         "Q_r": q_r,

@@ -7,6 +7,7 @@ from collections.abc import Iterable
 import numpy as np
 
 from ...indexing import build_index_grid
+from .._base import approach as _approach
 from .._base import piecewise as _piecewise
 
 
@@ -168,21 +169,21 @@ def _set_multiperiod_preprocessing(owner) -> None:
     )
     owner.U_hu_period = np.array(
         build_index_grid(
-            lambda n, j: _overall_heat_transfer_coefficient(
-                owner.htc_hu_period[n][0],
+            lambda n, j, u: _overall_heat_transfer_coefficient(
+                owner.htc_hu_period[n][u],
                 owner.htc_c_period[n][j],
             ),
-            (owner.N_periods, owner.J),
+            (owner.N_periods, owner.J, owner.NHU),
         ),
         dtype=float,
     )
     owner.U_cu_period = np.array(
         build_index_grid(
-            lambda n, i: _overall_heat_transfer_coefficient(
+            lambda n, i, u: _overall_heat_transfer_coefficient(
                 owner.htc_h_period[n][i],
-                owner.htc_cu_period[n][0],
+                owner.htc_cu_period[n][u],
             ),
-            (owner.N_periods, owner.I),
+            (owner.N_periods, owner.I, owner.NCU),
         ),
         dtype=float,
     )
@@ -215,11 +216,20 @@ def _set_multiperiod_preprocessing(owner) -> None:
         ),
         (owner.I, owner.J, owner.S),
     )
+    # Heaters only above the pinch and coolers only below, each on a stream
+    # this side has and a utility that can meet its approach at the target.
+    hot_reachable, cold_reachable = _approach.utility_match_feasibility(owner)
     owner.z_hu_feasible = [
-        1 if owner.pinch_loc == "above" and owner.z_j_active[j] > 0 else 0
+        [
+            int(owner.pinch_loc == "above" and owner.z_j_active[j] > 0 and reachable)
+            for reachable in hot_reachable[j]
+        ]
         for j in range(owner.J)
     ]
     owner.z_cu_feasible = [
-        1 if owner.pinch_loc == "below" and owner.z_i_active[i] > 0 else 0
+        [
+            int(owner.pinch_loc == "below" and owner.z_i_active[i] > 0 and reachable)
+            for reachable in cold_reachable[i]
+        ]
         for i in range(owner.I)
     ]

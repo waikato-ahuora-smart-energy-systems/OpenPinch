@@ -59,6 +59,8 @@ def get_model_parameters_from_solver_arrays(model) -> None:
     for name, values in model.solver_arrays.arrays.items():
         setattr(model, name, np.array(values, copy=True))
     _normalise_state_arrays(model)
+    model.NHU = int(model.T_hu_in_period.shape[1])
+    model.NCU = int(model.T_cu_in_period.shape[1])
     _approach._set_minimum_approach_temperatures(model)
 
 

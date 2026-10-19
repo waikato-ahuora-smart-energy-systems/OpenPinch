@@ -39,26 +39,29 @@ def _cross_problem() -> PinchProblem:
 
 
 def _utility_terminal_differences(model, n: int = 0):
-    """Yield (kind, index, hot-end dT, cold-end dT, required) per active unit."""
+    """Yield (kind, index, hot-end dT, cold-end dT, required) per active unit.
+
+    The case has one utility on each side, utility index 0.
+    """
     for i in range(model.I):
-        if model._active_binary_value(model.Q_c_by_period[n][i]) > model.tol:
+        if model._active_binary_value(model.Q_c_by_period[n][i][0]) > model.tol:
             yield (
                 "cooler",
                 i,
                 model._active_binary_value(model.T_h_by_period[n][i][model.S])
                 - model.T_cu_out_period[n][0],
                 model.T_h_out_period[n][i] - model.T_cu_in_period[n][0],
-                model.dT_cu_period[n][i],
+                model.dT_cu_period[n][i][0],
             )
     for j in range(model.J):
-        if model._active_binary_value(model.Q_h_by_period[n][j]) > model.tol:
+        if model._active_binary_value(model.Q_h_by_period[n][j][0]) > model.tol:
             yield (
                 "heater",
                 j,
                 model.T_hu_in_period[n][0] - model.T_c_out_period[n][j],
                 model.T_hu_out_period[n][0]
                 - model._active_binary_value(model.T_c_by_period[n][j][0]),
-                model.dT_hu_period[n][j],
+                model.dT_hu_period[n][0][j],
             )
 
 
@@ -71,7 +74,8 @@ def _fixed_topology(arrays):
         [[1 if (i, j) in pairs and k == 0 else 0 for k in range(2)] for j in range(2)]
         for i in range(2)
     ]
-    return [z, [1, 1], [1, 1]]
+    # Heater and cooler restrictions are [stream][utility]; one of each here.
+    return [z, [[1], [1]], [[1], [1]]]
 
 
 def _solved_fixed_topology_model(non_isothermal_model: bool):
@@ -119,10 +123,10 @@ def test_apopt_extracted_network_records_utility_approaches():
     metadata = network.source_metadata
     # [period][hot utility][cold stream] and [period][hot stream][cold utility]
     assert metadata["hot_utility_minimum_approach_by_period"] == [
-        [list(model.dT_hu_period[0])]
+        model.dT_hu_period[0].tolist()
     ]
     assert metadata["cold_utility_minimum_approach_by_period"] == [
-        [[value] for value in model.dT_cu_period[0]]
+        model.dT_cu_period[0].tolist()
     ]
     assert verify_network_feasibility(network) == ()
 
@@ -300,8 +304,9 @@ def test_stage_reduction_keeps_only_the_heaters_and_coolers_in_use(monkeypatch):
         S=2,
         # Stage 2 is empty, so the case is reduced to one stage.
         Q_r=[[[[10.0], [0.0]]], [[[5.0], [0.0]]]],
-        Q_h=[[3.0]],
-        Q_c=[[0.0], [4.0]],
+        # Heaters and coolers are [stream][utility].
+        Q_h=[[[3.0]]],
+        Q_c=[[[0.0]], [[4.0]]],
     )
 
     with pytest.raises(_Built):
@@ -310,7 +315,7 @@ def test_stage_reduction_keeps_only_the_heaters_and_coolers_in_use(monkeypatch):
         ).remove_unused_stages(case)
 
     assert built["stages"] == 1
-    assert built["z_restriction"] == [[[[1]], [[1]]], [1], [0, 1]]
+    assert built["z_restriction"] == [[[[1]], [[1]]], [[1]], [[0], [1]]]
 
 
 def test_stage_reduction_keeps_heaters_and_coolers_used_in_any_period(monkeypatch):
@@ -331,8 +336,9 @@ def test_stage_reduction_keeps_heaters_and_coolers_used_in_any_period(monkeypatc
         raise _Built
 
     monkeypatch.setattr(unit, "StageWiseModel", record)
-    hot_utility_by_period = [[[0.0]], [[3.0]]]
-    cold_utility_by_period = [[[0.0], [4.0]], [[2.0], [0.0]]]
+    # [period][stream][utility]
+    hot_utility_by_period = [[[[0.0]]], [[[3.0]]]]
+    cold_utility_by_period = [[[[0.0]], [[4.0]]], [[[2.0]], [[0.0]]]]
     case = SimpleNamespace(
         mSuccess=1,
         name="case",
@@ -358,4 +364,4 @@ def test_stage_reduction_keeps_heaters_and_coolers_used_in_any_period(monkeypatc
             solver_arrays=object(), framework="TDM", stages=2
         ).remove_unused_stages(case)
 
-    assert built["z_restriction"][1:] == [[1], [1, 1]]
+    assert built["z_restriction"][1:] == [[[1]], [[1], [1]]]

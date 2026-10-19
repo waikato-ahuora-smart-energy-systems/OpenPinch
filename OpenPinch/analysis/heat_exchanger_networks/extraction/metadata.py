@@ -252,9 +252,9 @@ def _identities_by_axis(
     )
 
 
-def _single_utility(identities: tuple[str, ...], label: str) -> str:
+def _utilities(identities: tuple[str, ...], label: str) -> tuple[str, ...]:
     if not identities:
         raise ValueError(
             f"solved heat exchanger network extraction requires at least one {label}."
         )
-    return identities[0]
+    return identities

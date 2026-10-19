@@ -335,13 +335,14 @@ class InternalHeatExchangerNetworkProblem:
             for new_k, old_k in enumerate(reduced_boundaries):
                 _assign(f_case.T_c[j][new_k], case.T_c[j][old_k][0])
 
-        for i in range(case.I):
-            _assign(f_case.Q_c[i], case.Q_c[i][0])
-            _assign_binary(f_case.z_cu[i], case.Q_c[i][0])
-
-        for j in range(case.J):
-            _assign(f_case.Q_h[j], case.Q_h[j][0])
-            _assign_binary(f_case.z_hu[j], case.Q_h[j][0])
+        for duties, flags, source in (
+            (f_case.Q_c, f_case.z_cu, case.Q_c),
+            (f_case.Q_h, f_case.z_hu, case.Q_h),
+        ):
+            for index, row in enumerate(source):
+                for u, duty in enumerate(row):
+                    _assign(duties[index][u], duty[0])
+                    _assign_binary(flags[index][u], duty[0])
 
         f_case.TAC_model = case.TAC_model
         f_case.TAC = case.TAC
@@ -403,12 +404,18 @@ class InternalHeatExchangerNetworkProblem:
         raise ValueError(f"Unknown heat exchanger network model factory {default!r}.")
 
 
-def _used_in_any_period(case, name: str) -> list[int]:
-    """Flag each heater or cooler with duty in any period (``Q_h`` is period 0)."""
+def _used_in_any_period(case, name: str) -> list[list[int]]:
+    """Flag each (stream, utility) unit with duty in any period.
+
+    ``Q_h`` and ``Q_c`` are period 0's ``[stream][utility]`` duties.
+    """
     by_period = getattr(case, f"{name}_by_period", None) or [getattr(case, name)]
     return [
-        1 if any(period[index][0] > case.tol for period in by_period) else 0
-        for index in range(len(by_period[0]))
+        [
+            1 if any(period[index][u][0] > case.tol for period in by_period) else 0
+            for u in range(len(row))
+        ]
+        for index, row in enumerate(by_period[0])
     ]
 
 
