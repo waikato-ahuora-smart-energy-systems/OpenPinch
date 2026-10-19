@@ -13,6 +13,8 @@ Input and export hardening
   boolean or a single word as its value. Any other option name or value is a
   validation issue, and solver option files and option lines are written only
   from validated options.
+- ``workspace.batch`` cannot run another ``workspace.batch``, and one request
+  runs at most 100 cases; a larger case list is an error and runs nothing.
 
 Network grid data
 ~~~~~~~~~~~~~~~~~
