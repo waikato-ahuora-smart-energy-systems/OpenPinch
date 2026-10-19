@@ -77,9 +77,15 @@ def test_single_stage_cascade_carnot_is_unchanged():
         load_fraction=0.25, condensers=1, evaporators=1, **SMALL_BUDGET
     )
 
-    assert target.hpr_work == pytest.approx(53.713002507, rel=1e-6)
-    assert target.hpr_cop == pytest.approx(3.42294389, rel=1e-6)
-    assert target.hot_utility_target == pytest.approx(566.143407188, rel=1e-6)
+    # SMALL_BUDGET stops the search after 20 iterations, so the pinned point
+    # is wherever the search is then, and it moves with heat-flow changes of
+    # about 1e-6 kW. The area and tolerance fixes (pocket-exit flattening,
+    # curve-end cleaning) moved it from 53.713 kW of work (COP 3.423, hot
+    # utility 566.143 kW). With the default budget the result is 21.85 kW
+    # either way, agreeing to 3e-6.
+    assert target.hpr_work == pytest.approx(77.008120626, rel=1e-6)
+    assert target.hpr_cop == pytest.approx(2.423196453, rel=1e-6)
+    assert target.hot_utility_target == pytest.approx(563.394190232, rel=1e-6)
     _assert_second_law(target)
 
 

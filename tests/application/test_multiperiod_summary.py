@@ -773,3 +773,97 @@ def test_export_after_a_single_period_run_writes_that_run_only(tmp_path):
 
     assert periods == ["base"]
     assert len(sheets) == 3
+
+
+def _publish_periods_like_a_placement_case(problem, period_ids):
+    """Keep only ``period_ids``, in that order, as a placement case does."""
+    outputs = dict(problem._period_results)
+    states = dict(problem._period_result_states)
+    problem._period_results = {pid: outputs[pid] for pid in period_ids}
+    problem._period_result_states = {pid: states[pid] for pid in period_ids}
+
+
+def _weighted_qh_by_period_id(problem, period_ids):
+    weights = dict(zip(problem.period_ids, problem.master_zone.weights, strict=True))
+    qh = {
+        pid: float(problem._period_results[pid].targets[0].Qh.value)
+        for pid in period_ids
+    }
+    return sum(weights[pid] * qh[pid] for pid in period_ids) / sum(
+        weights[pid] for pid in period_ids
+    )
+
+
+def test_weighted_summary_pairs_weights_with_periods_by_id():
+    problem = PinchProblem(source="crude_preheat_train_multiperiod.json")
+    problem.target.all_periods.direct_heat_integration()
+    _publish_periods_like_a_placement_case(problem, ("peak", "turndown", "base"))
+    expected = _weighted_qh_by_period_id(problem, ("peak", "turndown", "base"))
+
+    summary = problem._summary_results(periods="weighted_average")
+
+    assert float(summary.targets[0].Qh.value) == pytest.approx(expected, rel=1e-9)
+    combined = problem._summary_results(periods="all")
+    assert list(dict.fromkeys(t.period_id for t in combined.targets)) == [
+        "turndown",
+        "base",
+        "peak",
+    ]
+
+
+def test_a_period_subset_summarises_reports_and_exports(tmp_path):
+    problem = PinchProblem(source="crude_preheat_train_multiperiod.json")
+    problem.target.all_periods.direct_heat_integration()
+    _publish_periods_like_a_placement_case(problem, ("peak", "base"))
+    expected = _weighted_qh_by_period_id(problem, ("base", "peak"))
+
+    summary = problem._summary_results(periods="weighted_average")
+    report = problem.report(include_weighted_average=True)
+    export_path = problem.export_excel(tmp_path, include_weighted_average=True)
+
+    assert float(summary.targets[0].Qh.value) == pytest.approx(expected, rel=1e-9)
+    assert report.targets[0].period_id == WEIGHTED_AVERAGE_PERIOD_ID
+    assert export_path.exists()
+
+
+def test_a_single_period_call_finds_that_periods_retained_state():
+    problem = PinchProblem(source="crude_preheat_train_multiperiod.json")
+    for period_id in ("turndown", "base", "peak"):
+        problem.target.direct_heat_integration(period_id=period_id)
+
+    problem.target.exergy(period_id="turndown")
+
+    assert problem.results.period_id == "turndown"
+    expected = PinchProblem(source="crude_preheat_train_multiperiod.json")
+    expected.target.direct_heat_integration(period_id="turndown")
+    expected.target.exergy(period_id="turndown")
+    assert [t.model_dump(exclude={"provenance"}) for t in problem.results.targets] == [
+        t.model_dump(exclude={"provenance"}) for t in expected.results.targets
+    ]
+
+
+def test_weighted_turbine_efficiency_is_total_work_over_isentropic_work():
+    # Period a runs the turbine at 80 %; in period b it is idle (no work, and
+    # the turbine reports 0 % efficiency), which must not halve the summary.
+    working = _target(period_id="a", qh=10.0).model_copy(
+        update={
+            "work_target": Value(100.0, "kW"),
+            "turbine_efficiency_target": Value(80.0, "%"),
+        }
+    )
+    idle = _target(period_id="b", qh=10.0).model_copy(
+        update={
+            "work_target": Value(0.0, "kW"),
+            "turbine_efficiency_target": Value(0.0, "%"),
+        }
+    )
+
+    summary = weighted_average_output(
+        [
+            TargetOutput(name="Site", period_id="a", targets=[working]),
+            TargetOutput(name="Site", period_id="b", targets=[idle]),
+        ],
+        [0.5, 0.5],
+    )
+
+    assert summary.targets[0].turbine_efficiency_target.value == pytest.approx(80.0)

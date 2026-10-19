@@ -326,7 +326,9 @@ def test_create_graph_set_includes_net_load_curves():
     assert len(graph_set["graphs"]) == 1
     assert graph_set["graphs"][0]["type"] == GraphType.NLP.value
     assert graph_set["graphs"][0]["name"] == "Net Load Curves: ZoneA/Direct Integration"
-    assert len(graph_set["graphs"][0]["segments"]) == 4
+    # The constant hot utility series (5 kW throughout) has no curve; it was
+    # a fourth segment with no data points.
+    assert len(graph_set["graphs"][0]["segments"]) == 3
 
 
 def test_create_graph_set_includes_real_grand_composite_curve():
@@ -695,3 +697,61 @@ def test_clean_composite_curve_forced_duplicate_edges(monkeypatch):
     )
     assert np.allclose(x_clean, [0.0, 2.0])
     assert np.allclose(y_clean, [1.0, 3.0])
+
+
+@pytest.mark.parametrize("scale", [1.0, 1e-6])
+def test_clean_composite_curve_ends_keeps_a_real_end_segment_at_any_scale(scale):
+    # An 8 kW segment at the top of a 1 GW curve is 8e-6 of the end value;
+    # np.isclose's default rtol=1e-5 treated it as constant and trimmed it.
+    T = np.array([400.0, 300.0, 200.0, 100.0])
+    H = np.array([1_000_000.0, 999_992.0, 500_000.0, 0.0]) * scale
+
+    y_clean, x_clean = clean_composite_curve_ends(T, H)
+
+    np.testing.assert_array_equal(y_clean, T)
+    np.testing.assert_array_equal(x_clean, H)
+
+
+def test_clean_composite_curve_ends_trims_rounding_residue_at_the_ends():
+    T = np.array([259.0, 258.9, 145.0, 11.1, 11.0])
+    H = np.array([6900.000002, 6900.0, 3400.0, 0.0, -0.000002])
+
+    y_clean, x_clean = clean_composite_curve_ends(T, H)
+
+    np.testing.assert_array_equal(y_clean, T[1:4])
+    np.testing.assert_array_equal(x_clean, H[1:4])
+
+
+def test_composite_graphs_skip_series_without_a_heat_flow_span():
+    # With one hot stream the cold composite column is constant at the cold
+    # utility target. It passed the non-zero check and produced segments with
+    # no data points.
+    from OpenPinch import PinchProblem
+
+    problem = PinchProblem(
+        {
+            "streams": [
+                {
+                    "zone": "P",
+                    "name": "H",
+                    "t_supply": 150.0,
+                    "t_target": 50.0,
+                    "heat_flow": 100.0,
+                    "dt_cont": 5.0,
+                }
+            ]
+        },
+        project_name="Site",
+    )
+    problem.target.direct_heat_integration()
+
+    graphs = get_output_graph_data(problem.master_zone)
+
+    segments = [
+        segment
+        for zone_graphs in graphs.values()
+        for graph in zone_graphs["graphs"]
+        for segment in graph["segments"]
+    ]
+    assert segments
+    assert all(len(segment["data_points"]) >= 2 for segment in segments)

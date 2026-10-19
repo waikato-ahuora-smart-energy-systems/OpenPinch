@@ -218,16 +218,7 @@ def _set_multiperiod_preprocessing(owner) -> None:
     )
     # Heaters only above the pinch and coolers only below, each on a stream
     # this side has and a utility that can meet its approach at the target.
-    hot_reachable, cold_reachable = _approach.utility_match_feasibility(
-        owner,
-        lambda side, index: [
-            n
-            for n in range(owner.N_periods)
-            if (owner.z_j_active_period if side == "cold" else owner.z_i_active_period)[
-                n
-            ][index]
-        ],
-    )
+    hot_reachable, cold_reachable = _approach.utility_match_feasibility(owner)
     owner.z_hu_feasible = [
         [
             int(owner.pinch_loc == "above" and owner.z_j_active[j] > 0 and reachable)

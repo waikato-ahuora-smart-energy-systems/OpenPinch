@@ -892,10 +892,16 @@ def test_solver_array_private_helpers_cover_period_and_value_edges() -> None:
         == 8.0
     )
 
+    from OpenPinch.analysis.targeting.utilities import mark_default_utility
+
+    # The backup that input preparation adds is left out; the flag, not the
+    # name, identifies it.
+    backup = SimpleNamespace(name="HU")
+    mark_default_utility(backup)
     synthetic_utilities = arrays_module._ordered_utility_items(
         SimpleNamespace(_validated_data=SimpleNamespace(utilities=())),
         [
-            ("zone.HU", SimpleNamespace(name="HU")),
+            ("zone.HU", backup),
             ("steam", SimpleNamespace(name="steam")),
         ],
     )

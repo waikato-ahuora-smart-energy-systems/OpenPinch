@@ -19,6 +19,13 @@ def coerce_to_value(value, *, target_unit: str) -> Value | None:
         raw_value = raw_value.model_dump(mode="python")
 
     if isinstance(raw_value, Mapping) and is_period_value_data(raw_value):
+        if "period_ids" in raw_value:
+            # Stream values are read in the problem's period order; ids given
+            # beside them would be silently ignored.
+            raise ValueError(
+                "Stream values do not take period_ids: give the values in the "
+                "problem's period order (PROBLEM_PERIOD_IDS)."
+            )
         raw_value = {
             "values": raw_value.get("values"),
             "unit": raw_value.get("unit"),

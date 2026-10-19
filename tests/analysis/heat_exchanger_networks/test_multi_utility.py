@@ -217,3 +217,30 @@ def test_dairy_chilling_synthesis_cools_chilled_streams_with_glycol():
         "Pasteurised milk final cooling",
     ):
         assert coolers.get(chilled) == "Glycol", coolers
+
+
+def test_a_user_utility_named_cu_stays_in_synthesis():
+    import json
+
+    from tests.support.paths import FIXTURES_ROOT
+
+    # Only the backup that input preparation adds is left out; a utility the
+    # user named CU is theirs to use.
+    fixture = FIXTURES_ROOT / "hen_audit" / "utility_cross_cooling_water.json"
+    source = json.loads(fixture.read_text())
+    cooling_water = next(u for u in source["utilities"] if u["name"] == "CW")
+    glycol = {
+        **cooling_water,
+        "name": "Glycol",
+        "t_supply": {"value": 260.0, "unit": "K"},
+        "t_target": {"value": 265.0, "unit": "K"},
+    }
+    cooling_water["name"] = "CU"
+    source["utilities"].append(glycol)
+
+    axis_maps = problem_to_solver_arrays(PinchProblem(source=source), D_TMIN).axis_maps
+
+    assert set(axis_maps["cold_utilities"]) == {
+        "Cold Utility.CU",
+        "Cold Utility.Glycol",
+    }

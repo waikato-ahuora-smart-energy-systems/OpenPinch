@@ -258,18 +258,20 @@ def utility_minimum_approach_by_period(model, side: str) -> list:
     return by_period
 
 
-def utility_match_feasibility(
-    owner,
-    active_periods=None,
-) -> tuple[list[list[int]], list[list[int]]]:
+def utility_match_feasibility(owner) -> tuple[list[list[int]], list[list[int]]]:
     """Flag each (stream, utility) pair whose fixed end can meet its approach.
 
     A heater's utility inlet faces the cold stream's target, and a cooler's
     utility inlet the hot stream's target. Both temperatures are fixed, so a
     pair below its least approach there in any period the stream runs can
-    never be used. ``active_periods(side, index)`` names those periods.
+    never be used.
     """
-    periods = active_periods or (lambda _side, _index: range(owner.N_periods))
+
+    def periods(side: str, index: int) -> list[int]:
+        return [
+            n for n in range(owner.N_periods) if _stream_active(owner, side, n, index)
+        ]
+
     hot = [
         [
             int(
@@ -302,11 +304,15 @@ def utility_match_feasibility(
 def _stream_active(model, side: str, period_idx: int, index: int) -> bool:
     """Return whether a stream takes part in period ``period_idx``.
 
-    Pinch-decomposition models clip a stream absent from their side of the
-    pinch in a period to 0 K; other models have every stream in every period.
+    Pinch-decomposition models flag a stream absent from their side of the
+    pinch in a period (and clip it to 0 K); elsewhere a stream takes part in
+    the periods where it has duty.
     """
     flags = getattr(model, f"z_{'i' if side == 'hot' else 'j'}_active_period", None)
-    return flags is None or flags[period_idx][index] > 0
+    if flags is not None:
+        return flags[period_idx][index] > 0
+    duties = getattr(model, f"Qtot_s{'h' if side == 'hot' else 'c'}_period", None)
+    return duties is None or duties[period_idx][index] > model.tol
 
 
 def _set_multiperiod_utility_approach_equations(model) -> None:
