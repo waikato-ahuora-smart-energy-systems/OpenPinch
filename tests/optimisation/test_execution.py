@@ -72,8 +72,15 @@ def _reset_calls():
 
 @pytest.fixture
 def native_platform(monkeypatch):
-    """Exercise the pool path even where the suite runs under Pyodide."""
+    """Exercise the pool path even where the suite runs under Pyodide.
+
+    Pyodide reports emscripten and a single CPU, and its test runner's main
+    script may have no main guard; each would send the tasks down the serial
+    path. The main-guard tests set their own start method afterwards.
+    """
     monkeypatch.setattr(execution.sys, "platform", "linux")
+    monkeypatch.setattr(execution.os, "cpu_count", lambda: 8)
+    monkeypatch.setattr(execution.multiprocessing, "get_start_method", lambda: "fork")
 
 
 def test_objective_runtime_error_propagates_without_serial_rerun():
