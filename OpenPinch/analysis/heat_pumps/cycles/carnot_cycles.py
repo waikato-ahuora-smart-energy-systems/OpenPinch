@@ -103,6 +103,11 @@ class ParallelCarnotCycles:
         return float(self._Q_cond.sum() / w_hpr) if w_hpr > tol else 0.0
 
     @property
+    def COP_c(self) -> float:
+        w_hpr = float(self._w_hpr.sum())
+        return float(self._Q_evap.sum() / w_hpr) if w_hpr > tol else 0.0
+
+    @property
     def eta_he(self) -> float:
         q_cond = float(self._Q_cond.sum())
         return float(self._w_he.sum() / (q_cond + 1e-6)) if q_cond != 0 else 0.0
@@ -236,6 +241,7 @@ class CascadeCarnotCycle:
         self._w_hpr = 0.0
         self._w_he = 0.0
         self._cop = 1.0
+        self._cop_c = 1.0
         self._penalty = np.empty(0, dtype=float)
         self._args: Any = None
 
@@ -303,6 +309,10 @@ class CascadeCarnotCycle:
     def COP_h(self) -> float:
         return self._cop
 
+    @property
+    def COP_c(self) -> float:
+        return self._cop_c
+
     def solve(
         self,
         *,
@@ -360,6 +370,7 @@ class CascadeCarnotCycle:
         self._w_he = float(self._Q_evap_he.sum() - self._Q_cond_he.sum())
         self._w_hpr = float(Qc_hpr.sum() - Qe_hpr.sum())
         self._cop = float(Qc_hpr.sum() / self._w_hpr) if self._w_hpr > 0 else 1.0
+        self._cop_c = float(Qe_hpr.sum() / self._w_hpr) if self._w_hpr > 0 else 1.0
         self._Q_cond = Qc_hpr + self._Q_cond_he
         self._Q_evap = Qe_hpr + self._Q_evap_he
         self._solved = bool(

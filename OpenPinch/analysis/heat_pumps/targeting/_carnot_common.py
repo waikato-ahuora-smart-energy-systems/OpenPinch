@@ -167,7 +167,9 @@ def compute_carnot_objective(
         w_hpr=cycle.w_hpr,
         w_he=cycle.w_he,
         heat_recovery=cycle.heat_recovery,
-        cop_h=cycle.COP_h,
+        # hpr_cop follows the duty: heating COP for heat pumps, cooling COP
+        # for refrigeration, as the vapour-compression models report it.
+        cop_h=cycle.COP_h if args.is_heat_pumping else cycle.COP_c,
         Q_cond_total=cycle.Q_cond,
         Q_evap_total=cycle.Q_evap,
         penalty_terms=cycle.penalty,
