@@ -34,6 +34,10 @@ from OpenPinch.domain.stream_collection import StreamCollection
 from OpenPinch.tutorials import sample_cases
 from tests.support.paths import REPOSITORY_ROOT
 
+needs_threads = pytest.mark.skipif(
+    sys.platform == "emscripten", reason="Pyodide cannot start threads"
+)
+
 
 def test_target_command_returns_problem_results_as_json():
     response = run_command(
@@ -1350,6 +1354,7 @@ def test_warnings_raised_by_a_command_are_returned(monkeypatch):
     ]
 
 
+@needs_threads
 def test_concurrent_commands_each_return_only_their_own_warnings(monkeypatch):
     # The audit saw warnings cross between 24 concurrent responses, and the
     # global warning filters left modified, when calls ran in worker threads.
@@ -1393,6 +1398,7 @@ def test_concurrent_commands_each_return_only_their_own_warnings(monkeypatch):
     assert warnings.showwarning is showwarning
 
 
+@needs_threads
 def test_a_warning_raised_outside_a_command_is_shown_as_before(monkeypatch):
     target = _TargetAccessor.direct_heat_integration
     inside, outside = threading.Event(), threading.Event()
@@ -1428,6 +1434,9 @@ def test_a_warning_raised_outside_a_command_is_shown_as_before(monkeypatch):
 
 @pytest.mark.skipif(
     sys.version_info < (3, 14), reason="context-aware warnings need Python 3.14"
+)
+@pytest.mark.skipif(
+    sys.platform == "emscripten", reason="Pyodide cannot start processes"
 )
 def test_concurrent_commands_keep_their_warnings_with_context_aware_warnings():
     # With -X context_aware_warnings the filters are per context, and TESPy
