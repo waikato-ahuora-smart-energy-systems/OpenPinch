@@ -60,6 +60,12 @@ Area and unit-count targets
 - Composite and net load graphs leave out a series with no heat-flow span,
   such as the cold composite of a problem with only hot streams. It used to
   appear as a segment with no data points.
+- Carnot heat pump and refrigeration searches cut short by small iteration
+  limits (as in tutorial 08) can stop at a different point, because the
+  pocket-exit and curve-end fixes change heat flows by about 1e-6 kW. On
+  ``basic_pinch`` with one condenser, one evaporator and 20 iterations the
+  heat pump work moves from 53.7 to 77.0 kW. With the default limits the
+  result is unchanged (21.85 kW, to 3e-6).
 - A direct-integration target whose Grand Composite Curve is zero over its
   whole range (no utility needed, every temperature a pinch) reports the top
   and bottom of that band as its hot and cold pinch temperatures. Both were
