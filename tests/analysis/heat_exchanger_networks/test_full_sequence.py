@@ -931,6 +931,10 @@ def test_design_accessor_rejects_retired_selector_and_invalid_seed_shapes(
     with pytest.raises(TypeError, match="unexpected keyword argument 'method'"):
         problem.design.heat_exchanger_network(method="not_a_method")
 
+    # The default workflow takes no seed networks; the argument always raised.
+    with pytest.raises(TypeError, match="unexpected keyword argument"):
+        problem.design.heat_exchanger_network(initial_networks=(seed,))
+
     with pytest.raises(TypeError, match="unexpected keyword argument"):
         problem.design.open_hens(initial_networks=(seed,))
 

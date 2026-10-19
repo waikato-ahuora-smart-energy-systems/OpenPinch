@@ -7,6 +7,11 @@ Unreleased
 HEN synthesis orchestration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``design.heat_exchanger_network()`` no longer takes ``initial_networks``.
+  The default workflow never used seed networks and raised for any value;
+  ``design.thermal_derivative()`` and ``design.network_evolution()`` take
+  them.
+
 - The default ``design.heat_exchanger_network()`` (quality tier 0) runs one
   set of tasks for every value in ``HENS_APPROACH_TEMPERATURES``, as the
   option's help says. It ran only the first value. The result manifest's
