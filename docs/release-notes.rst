@@ -4,6 +4,24 @@ Pre-Release Notes
 Unreleased
 ----------
 
+HEN synthesis with several utilities
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Heat exchanger network synthesis uses every hot and cold utility. It used
+  only the first of each: ``dairy_chilling_multiperiod`` put every chilling
+  cooler on cooling water (20 to 25 C) for streams ending at 2 to 5 C and
+  failed, and where the first utility was feasible but another was cheaper
+  the result was silently dearer. Each heater and cooler is now one
+  (stream, utility) pair with its own duty, approach temperatures, price and
+  area, in the stagewise and pinch design models, post-processing,
+  verification and the extracted network (one exchanger per pair, named by
+  its utility). The pinch design method prefers the cheaper utility when a
+  side has a choice. The HEN guide describes multi-utility synthesis.
+- The default ``CU`` that input preparation adds as a backup stays out of
+  synthesis when real cold utilities exist, as the default ``HU`` already
+  did for hot utilities.
+- Results with one hot and one cold utility are unchanged.
+
 Multiperiod HEN pinch design
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

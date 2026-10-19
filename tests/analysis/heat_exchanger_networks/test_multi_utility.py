@@ -163,3 +163,57 @@ def test_default_backup_utilities_stay_out_of_synthesis():
 
     assert axis_maps["hot_utilities"] == {"Hot Utility.HPS": 0}
     assert axis_maps["cold_utilities"] == {"Cold Utility.CW": 0}
+
+
+@pytest.mark.solver
+def test_dairy_chilling_synthesis_cools_chilled_streams_with_glycol():
+    # Every chilling stream ends at 2 to 5 C, below cooling water (20 to
+    # 25 C); synthesis used only the first cold utility and so failed.
+    from dataclasses import replace
+
+    from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
+        LocalSynthesisExecutor,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.execution.settings import (
+        workflow_settings_from_problem,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
+        MissingSynthesisDependencyError,
+        MissingSynthesisSolverError,
+        require_solver_binary,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.targeting.open_hens_method import (
+        execute_open_hens_method,
+    )
+
+    try:
+        for binary in ("couenne", "ipopt"):
+            require_solver_binary(binary, purpose="multi-utility regression")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError) as exc:
+        pytest.skip(str(exc))
+    problem = PinchProblem("dairy_chilling_multiperiod.json")
+    problem.target.all_heat_integration()
+    settings = replace(
+        workflow_settings_from_problem(problem),
+        approach_temperatures=(5.0,),
+        max_parallel=1,
+    )
+
+    result = execute_open_hens_method(
+        problem, settings, executor=LocalSynthesisExecutor(print_output=False)
+    )
+
+    network = result.accepted_result.network
+    assert verify_network_feasibility(network) == ()
+    coolers = {
+        exchanger.source_stream.split(".")[-1]: exchanger.sink_stream.split(".")[-1]
+        for exchanger in network.exchangers
+        if exchanger.kind is HeatExchangerKind.COLD_UTILITY
+        and any(state.active for state in exchanger.period_states)
+    }
+    for chilled in (
+        "Raw milk chilling",
+        "Ice-water return",
+        "Pasteurised milk final cooling",
+    ):
+        assert coolers.get(chilled) == "Glycol", coolers
