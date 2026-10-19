@@ -59,6 +59,10 @@ Area and unit-count targets
 - Composite and net load graphs leave out a series with no heat-flow span,
   such as the cold composite of a problem with only hot streams. It used to
   appear as a segment with no data points.
+- A direct-integration target whose Grand Composite Curve is zero over its
+  whole range (no utility needed, every temperature a pinch) reports the top
+  and bottom of that band as its hot and cold pinch temperatures. Both were
+  None.
 - Heat exchanger network area slicing on segmented streams accepts a
   solver duty that overshoots its stream profile by noise relative to the
   duty (1e-6 of the profile) and drops the overshoot. A 2e-6 kW overshoot on

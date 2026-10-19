@@ -481,3 +481,19 @@ def test_exergy_spec_marks_curves_built_on_real_temperatures(
         and np.array_equal(branch[1], pt[ProblemTableLabel[name]])
     }
     assert marked == real_columns
+
+
+def test_fully_balanced_problem_reports_the_pinch_band_ends():
+    # With zero approach and matching streams the GCC is zero over the whole
+    # range: every temperature is a pinch, so the hot pinch is the top and the
+    # cold pinch the bottom of the band. Both used to be None.
+    payload = _two_stream_payload(options={"THERMAL_DT_CONT": 0.0})
+    payload["streams"][1]["t_supply"] = 50.0
+    payload["streams"][1]["t_target"] = 150.0
+
+    target = PinchProblem(payload, project_name="Site").target.direct_heat_integration()
+
+    assert target.hot_utility_target == pytest.approx(0.0)
+    assert target.cold_utility_target == pytest.approx(0.0)
+    assert target.hot_pinch == pytest.approx(150.0)
+    assert target.cold_pinch == pytest.approx(50.0)
