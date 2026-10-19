@@ -4,6 +4,44 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Input, contracts and option metadata
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Workbook and CSV ``Stream Data`` and ``Utility Data`` tables are read by
+  their header row, so columns can come in any order. Before, columns were
+  taken by position and a header that put ``t_target`` before ``t_supply``
+  silently swapped them. The legacy template spellings (``TS``, ``TT``,
+  ``ΔH``, ``ΔTcont``, ``Process Zone``, ``Stream``) are recognised; an unknown
+  column is ignored with a warning, two columns for one field are an error,
+  and a header row with no recognised name falls back to the old fixed order
+  with a warning.
+- Blank rows, and rows of blank or whitespace-only cells, in workbook and CSV
+  tables are skipped. Before, each became a phantom stream ``S1`` that failed
+  validation.
+- An ordinary stream may give ``heat_capacity_flowrate`` (CP) instead of
+  ``heat_flow``: the heat flow is then CP x abs(``t_supply`` - ``t_target``).
+  When both are given and disagree by more than 0.01 percent, validation
+  reports an error on ``heat_capacity_flowrate``. Before, the field was
+  accepted and ignored. Tables accept a ``CP`` column.
+- The Options sheet of ``Excel_Version/Data_input_template.xlsx`` lists the
+  current option names, grouped, with their defaults. Its old names
+  (``DT_CONT``, ``ANNUAL_OP_TIME`` and so on) were all rejected as unknown.
+- ``compare_to`` works between problems with different project names. Before,
+  it raised ``KeyError`` because it looked for the base case's scope, which
+  starts with the project name, in the other problem.
+- Configuration metadata (``config_options()`` and the ``options`` command)
+  reports numeric list options (``PROBLEM_PERIOD_WEIGHTS``,
+  ``HENS_APPROACH_TEMPERATURES`` and others) as ``number_list`` rather than
+  ``string_list``, and ``HPR_LOAD_PERIOD_VALUES`` as ``object`` rather than
+  ``number``. A new ``numeric_min_exclusive`` flag is true for options that
+  must be greater than their ``numeric_min`` (such as ``THERMAL_HTC`` and the
+  efficiencies), which reject 0.
+- Utility rows without a name are still ignored, now with a warning when they
+  hold data. Stream names that become the same name after normalisation
+  (``H.1`` and ``H-1`` both become ``H-1``) are an error. A ``TRUE`` cell in a
+  numeric column is an error rather than 1. A project name may contain ``/``;
+  before, every load with such a name failed.
+
 Network grid data
 ~~~~~~~~~~~~~~~~~
 
