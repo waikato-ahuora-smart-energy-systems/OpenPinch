@@ -8,13 +8,15 @@ from typing import List, Tuple
 
 import numpy as np
 
-from ...domain.configuration import tol
+from ...domain.configuration import duty_tolerance, heat_resolution, tol
 from ...domain.enums import GraphType, ProblemTableLabel, StreamType, TargetType
 from ...domain.problem_table import ProblemTable
 from ...domain.stream import Stream
 from ...domain.stream_collection import StreamCollection
 from ...domain.targets import DirectIntegrationTarget
+from ...domain.value import Value
 from ...domain.zone import Zone
+from ..heat_pumps.common.postprocessing import _compute_utility_cost
 from ..numerics import delta_vals, get_period_index
 from .area_cost import (
     get_area_targets,
@@ -185,6 +187,9 @@ def compute_direct_integration_targets(
             "graphs": _save_graph_data(pt, pt_real),
             "hot_utilities": zone.hot_utilities,
             "cold_utilities": zone.cold_utilities,
+            "utility_cost": _compute_utility_cost(
+                zone.hot_utilities, zone.cold_utilities, period_idx=idx
+            ),
             "hot_pinch": hot_pinch,
             "cold_pinch": cold_pinch,
             "period_id": sid,
@@ -306,6 +311,8 @@ def _build_direct_integration_profile(
     )
     zonal_targets = set_zonal_targets(pt=pt, pt_real=pt_real_limit)
     hot_pinch, cold_pinch = pt.pinch_temperatures()
+    if hot_pinch is None and cold_pinch is None:
+        hot_pinch, cold_pinch = _balanced_pinch_band(pt)
     return _PreparedDirectIntegrationProfile(
         pt=pt,
         pt_real=pt_real,
@@ -313,6 +320,22 @@ def _build_direct_integration_profile(
         hot_pinch=hot_pinch,
         cold_pinch=cold_pinch,
     )
+
+
+def _balanced_pinch_band(pt: ProblemTable) -> tuple[float | None, float | None]:
+    """Return the band ends when heat exchange balances over the whole range.
+
+    A GCC that is zero everywhere makes every temperature a pinch, so the hot
+    pinch is the top of the band and the cold pinch its bottom.
+    """
+    h_net = np.asarray(pt[ProblemTableLabel.H_NET], dtype=float)
+    h_hot = np.asarray(pt[ProblemTableLabel.H_HOT], dtype=float)
+    if h_net.size < 2 or np.ptp(h_hot) <= heat_resolution(h_hot):
+        return None, None
+    if np.any(np.abs(h_net) > duty_tolerance(h_hot)):
+        return None, None
+    temperatures = pt[ProblemTableLabel.T]
+    return float(temperatures[0]), float(temperatures[-1])
 
 
 def _insert_utility_temperature_intervals(
@@ -381,11 +404,16 @@ def build_area_cost_target_data(
         num_units=num_units,
         config=zone.config,
     )
+    annual_utility_cost = Value(
+        _compute_utility_cost(zone.hot_utilities, zone.cold_utilities, period_idx=idx)
+        * float(zone.config.costing.annual_op_time),
+        "$/y",
+    )
     return {
         "area": area,
         "num_units": num_units,
         "capital_cost": capital_cost,
-        "total_cost": annual_capital_cost,
+        "total_cost": annual_capital_cost + annual_utility_cost,
     }
 
 

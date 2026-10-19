@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any, Iterable, Optional
 import pandas as pd
 
 from ...contracts.report_units import split_report_value
+from .excel_text import write_text_as_plain_strings
 from .problem_table import problem_table_frame
 
 if TYPE_CHECKING:
@@ -97,6 +98,7 @@ def export_target_summary_to_excel_with_units(
                 )
         else:
             _write_problem_tables(master_zone, xw)
+        write_text_as_plain_strings(writer.book)
         writer.close()
         os.replace(scratch_path, out_path)
         completed = True

@@ -123,8 +123,9 @@ class StreamSchema(BaseModel):
     p_target: Optional[ScalarOrVU] = None
     h_supply: Optional[ScalarOrVU] = None
     h_target: Optional[ScalarOrVU] = None
-    heat_flow: Optional[ScalarOrVU] = None
+    # Validated before heat_flow, which it can stand in for.
     heat_capacity_flowrate: Optional[ScalarOrVU] = None
+    heat_flow: Optional[ScalarOrVU] = None
     # None means THERMAL_DT_CONT, filled in when the problem is built.
     dt_cont: Optional[ScalarOrVU] = None
     htc: Optional[ScalarOrVU] = 1.0
@@ -172,9 +173,15 @@ class StreamSchema(BaseModel):
             info.data.get("segments") is not None
             or info.data.get("profile") is not None
         )
-        if _is_missing_value(value) and not has_nested:
-            raise ValueError(f"Ordinary streams require {info.field_name}.")
-        return value
+        if not _is_missing_value(value) or has_nested:
+            return value
+        if info.field_name == "heat_flow":
+            if not _is_missing_value(info.data.get("heat_capacity_flowrate")):
+                return value
+            raise ValueError(
+                "Ordinary streams require heat_flow or heat_capacity_flowrate."
+            )
+        raise ValueError(f"Ordinary streams require {info.field_name}.")
 
     @model_validator(mode="after")
     def _validate_thermal_definition(self) -> Self:

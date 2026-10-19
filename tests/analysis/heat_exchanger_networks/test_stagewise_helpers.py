@@ -448,11 +448,11 @@ def test_stagewise_utility_cost_verification_handles_source_and_period_cases():
     )
 
     bad_source = _case("utility_cost_source")
-    bad_source.hu_cost_total = 999.0
+    bad_source.hu_cost_solver_by_period = [999.0]
     assert stagewise_verification._check_utility_costs(bad_source) is False
 
     bad_state = _case("utility_cost_state")
-    bad_state.cu_cost_total = 999.0
+    bad_state.cu_cost_solver_by_period = [15.0, 999.0]
     assert stagewise_verification._check_utility_costs(bad_state) is False
 
 

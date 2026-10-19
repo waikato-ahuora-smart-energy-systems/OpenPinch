@@ -271,8 +271,8 @@ def test_compute_indirect_integration_targets_auto_aligns_utility_profile_grids(
     )
     monkeypatch.setattr(
         indirect,
-        "_match_utility_gen_and_use_at_same_level",
-        lambda hot_utilities, cold_utilities, period_idx=0: (
+        "_target_site_utilities",
+        lambda hot_utilities, cold_utilities, idx=None: (
             hot_utilities,
             cold_utilities,
         ),
@@ -402,6 +402,9 @@ def test_indirect_helpers_compute_cost_shift_profiles_and_graph_slices():
 
     graphs = indirect._save_graph_data(pt)
 
+    # Audit M16: only the graph copies are rounded; the stored table that
+    # indirect heat pumps and energy transfer read keeps full precision.
+    assert pt[ProblemTableLabel.T].tolist() == [100.12345, 80.98765]
     assert sorted(graphs) == sorted([GraphType.SUGCC.value, GraphType.TSP.value])
     assert graphs[GraphType.TSP.value][ProblemTableLabel.T].tolist() == [
         100.1234,
@@ -412,3 +415,137 @@ def test_indirect_helpers_compute_cost_shift_profiles_and_graph_slices():
         ProblemTableLabel.H_NET_UT.value,
         ProblemTableLabel.H_NET_HP.value,
     ]
+
+
+def _cascaded_site_problem():
+    """Zone A generates 400 kW LPS; zone B uses 300 kW HW below it.
+
+    The site cascade lets the LPS surplus supply the hot water, so the site
+    needs no hot utility and rejects 100 kW.
+    """
+    from OpenPinch import PinchProblem
+
+    def utility(name, kind, t_supply, t_target):
+        return {
+            "name": name,
+            "type": kind,
+            "t_supply": t_supply,
+            "t_target": t_target,
+            "dt_cont": 0.0,
+            "price": 10.0,
+        }
+
+    def stream(zone, name, t_supply, t_target, heat_flow):
+        return {
+            "zone": zone,
+            "name": name,
+            "t_supply": t_supply,
+            "t_target": t_target,
+            "heat_flow": heat_flow,
+            "dt_cont": 5.0,
+        }
+
+    return PinchProblem(
+        {
+            "streams": [
+                stream("A", "h1", 200.0, 160.0, 400.0),
+                stream("B", "c1", 40.0, 60.0, 300.0),
+            ],
+            "utilities": [
+                utility("HPS", "Hot", 250.0, 249.0),
+                utility("LPS", "Both", 150.0, 149.0),
+                utility("HW", "Both", 90.0, 70.0),
+                utility("CW", "Cold", 20.0, 25.0),
+            ],
+        },
+        project_name="Site",
+    )
+
+
+def test_total_site_utility_lists_and_cost_follow_the_site_cascade():
+    problem = _cascaded_site_problem()
+    problem.target.all_heat_integration()
+    target = problem.master_zone.targets[TargetType.II.value]
+
+    hot_total = sum(float(u.heat_flow[0]) for u in target.hot_utilities)
+    cold_total = sum(float(u.heat_flow[0]) for u in target.cold_utilities)
+
+    assert target.hot_utility_target == pytest.approx(0.0, abs=1e-6)
+    assert target.cold_utility_target == pytest.approx(100.0, rel=1e-9)
+    assert hot_total == pytest.approx(target.hot_utility_target, abs=1e-6)
+    assert cold_total == pytest.approx(target.cold_utility_target, rel=1e-9)
+    # 100 kW at 10 $/MWh.
+    assert target.utility_cost == pytest.approx(1.0, rel=1e-9)
+
+
+@pytest.mark.parametrize("case", ["zonal_site", "Four-stream-Yee-and-Grossmann-1990-1"])
+def test_sample_total_site_utility_lists_sum_to_the_site_targets(case):
+    from OpenPinch import PinchProblem
+
+    problem = PinchProblem(
+        f"OpenPinch/tutorials/sample_cases/{case}.json", project_name="Site"
+    )
+    problem.target.all_heat_integration()
+    target = problem.master_zone.targets[TargetType.II.value]
+
+    hot = [float(u.heat_flow[0]) for u in target.hot_utilities]
+    cold = [float(u.heat_flow[0]) for u in target.cold_utilities]
+    scale = max(target.hot_utility_target, target.cold_utility_target)
+
+    assert sum(hot) == pytest.approx(target.hot_utility_target, abs=1e-9 * scale)
+    assert sum(cold) == pytest.approx(target.cold_utility_target, abs=1e-9 * scale)
+    if target.hot_utility_target == pytest.approx(0.0, abs=1e-9 * scale):
+        assert all(duty == pytest.approx(0.0, abs=1e-9 * scale) for duty in hot)
+
+
+def test_total_site_retargets_segmented_utilities_through_their_segments():
+    from OpenPinch import PinchProblem
+
+    problem = PinchProblem(
+        {
+            "streams": [
+                {
+                    "zone": "A",
+                    "name": "Cold",
+                    "t_supply": 20.0,
+                    "t_target": 150.0,
+                    "heat_flow": 100.0,
+                    "dt_cont": 10.0,
+                },
+                {
+                    "zone": "B",
+                    "name": "Hot",
+                    "t_supply": 60.0,
+                    "t_target": 30.0,
+                    "heat_flow": 50.0,
+                    "dt_cont": 5.0,
+                },
+            ],
+            "utilities": [
+                {
+                    "name": "Steam profile",
+                    "type": "Hot",
+                    "dt_cont": 0.0,
+                    "segments": [
+                        {"t_supply": 250.0, "t_target": 200.0, "heat_flow": 30.0},
+                        {"t_supply": 200.0, "t_target": 160.0, "heat_flow": 70.0},
+                    ],
+                },
+                {"name": "CU", "type": "Cold", "t_supply": 0.0},
+            ],
+        },
+        project_name="Site",
+    )
+    problem.target.all_heat_integration()
+    target = problem.master_zone.targets[TargetType.II.value]
+
+    steam = target.hot_utilities.get_stream_by_name("Steam profile")
+
+    assert target.hot_utility_target == pytest.approx(100.0, rel=1e-9)
+    assert float(steam.heat_flow[0]) == pytest.approx(100.0, rel=1e-9)
+    assert [float(s.heat_flow[0]) for s in steam.segments] == pytest.approx(
+        [30.0, 70.0], rel=1e-9
+    )
+    assert sum(float(u.heat_flow[0]) for u in target.cold_utilities) == (
+        pytest.approx(target.cold_utility_target, rel=1e-9)
+    )

@@ -276,21 +276,95 @@ def test_cascade_carnot_cycle_negative_pool_counts_each_evaporator_once():
 
     cycle = _solve_cascade_carnot_cycle(T_cond, Q_cond, T_evap, Q_evap, args)
 
-    expected_eta_he = args.eta_ii_he_carnot * (
-        1
-        - compute_entropic_mean_temperature(T_cond, Q_cond)
-        / compute_entropic_mean_temperature(T_evap, Q_evap)
-    )
-    expected_Q_evap = min(Q_evap.sum(), Q_cond.sum() / (1.0 - expected_eta_he))
-    expected_work_gen = expected_Q_evap * expected_eta_he
-    expected_Q_cond = expected_Q_evap - expected_work_gen
+    # Each condenser-evaporator pair runs its own heat engine between its own
+    # temperatures (the pooled entropic means are no longer used).
+    T_e = T_evap[0] + 273.15
+    eta_pairs = args.eta_ii_he_carnot * (1 - (T_cond + 273.15) / T_e)
+    expected_Q_evap_pairs = Q_cond / (1.0 - eta_pairs)
+    expected_work_gen = float((expected_Q_evap_pairs - Q_cond).sum())
 
     assert cycle.w_hpr == pytest.approx(0.0, abs=0.01)
     assert cycle.w_he == pytest.approx(expected_work_gen, abs=0.01)
-    assert cycle.heat_recovery.sum() == pytest.approx(expected_Q_cond, abs=0.01)
+    assert cycle.heat_recovery.sum() == pytest.approx(Q_cond.sum(), abs=0.01)
     assert cycle.COP_h == pytest.approx(1.0, abs=0.01)
     assert cycle.Q_cond.sum() == pytest.approx(Q_cond.sum(), abs=0.01)
-    assert cycle.Q_evap.sum() == pytest.approx(expected_Q_evap, abs=0.01)
+    assert cycle.Q_evap.sum() == pytest.approx(expected_Q_evap_pairs.sum(), abs=0.01)
+
+
+def _entropy_generation(cycle: CascadeCarnotCycle) -> float:
+    """Return sum(Q/T) delivered minus sum(Q/T) absorbed, in kW/K."""
+    return float(
+        (cycle.Q_cond / (cycle.T_cond + 273.15)).sum()
+        - (cycle.Q_evap / (cycle.T_evap + 273.15)).sum()
+    )
+
+
+@pytest.mark.parametrize("eta_he", [0.0, 0.5])
+def test_cascade_carnot_cycle_never_moves_heat_uphill_without_work(eta_he):
+    # Audit C2: the 220 C evaporator is "on" only for the 200 C condenser, and
+    # the 120 C evaporator only for the 20 C one. Pooling the pairs let the
+    # 120 C heat reach the 200 C condenser with no work (S_gen -0.17 kW/K).
+    T_cond = np.array([200.0, 20.0])
+    Q_cond = np.array([400.0, 0.001])
+    T_evap = np.array([220.0, 120.0])
+    Q_evap = np.array([0.001, 400.0])
+    args, _, _ = _build_cascade_carnot_profiles(
+        T_cond, Q_cond, T_evap, Q_evap, eta_hp=0.5, eta_he=eta_he
+    )
+
+    cycle = _solve_cascade_carnot_cycle(T_cond, Q_cond, T_evap, Q_evap, args)
+
+    assert cycle.solved is True
+    assert _entropy_generation(cycle) >= -1e-9
+    # The 200 C condenser gets at most the 0.001 kW the 220 C evaporator has
+    # by recovery; the rest needs a heat pump with real work.
+    assert cycle.Q_cond_he[0] <= 0.001 + 1e-9
+    reversible_work = cycle.Q_cond[0] * (1 - (120.0 + 273.15) / (200.0 + 273.15))
+    assert cycle.work >= reversible_work - 1e-6
+
+
+def test_cascade_carnot_cycle_recovery_serves_hottest_condenser_first():
+    # Pairwise recovery: the 100 C evaporator is the only source hot enough for
+    # the 90 C condenser, so it goes there; the 60 C evaporator serves 50 C.
+    T_cond = np.array([90.0, 50.0])
+    Q_cond = np.array([30.0, 40.0])
+    T_evap = np.array([100.0, 60.0])
+    Q_evap = np.array([30.0, 50.0])
+    args, _, _ = _build_cascade_carnot_profiles(
+        T_cond, Q_cond, T_evap, Q_evap, eta_hp=0.5, eta_he=0.0
+    )
+
+    cycle = _solve_cascade_carnot_cycle(T_cond, Q_cond, T_evap, Q_evap, args)
+
+    assert cycle.solved is True
+    np.testing.assert_allclose(cycle.Q_cond_he, [30.0, 40.0], atol=1e-3)
+    np.testing.assert_allclose(cycle.Q_evap_he, [30.0, 40.0], atol=1e-3)
+    assert cycle.w_he == pytest.approx(0.0, abs=1e-9)
+    assert _entropy_generation(cycle) >= -1e-9
+
+
+def test_cascade_carnot_cycle_is_unsolved_when_entropy_generation_is_negative(
+    monkeypatch,
+):
+    # An allocation that moves 100 kW from 30 C to 80 C with no work balances
+    # energy but breaks the second law, so the cycle must not report solved.
+    def uphill(self, *, is_on, Qc_pool, Qe_pool, eta_ii_he_carnot):
+        return np.array([100.0]), np.array([100.0])
+
+    monkeypatch.setattr(
+        CascadeCarnotCycle, "_get_heat_engine_and_recovery_duty", uphill
+    )
+    T_cond = np.array([80.0])
+    Q_cond = np.array([100.0])
+    T_evap = np.array([30.0])
+    Q_evap = np.array([100.0])
+    args, _, _ = _build_cascade_carnot_profiles(
+        T_cond, Q_cond, T_evap, Q_evap, eta_hp=0.5, eta_he=0.0
+    )
+
+    cycle = _solve_cascade_carnot_cycle(T_cond, Q_cond, T_evap, Q_evap, args)
+
+    assert cycle.solved is False
 
 
 def test_cascade_carnot_cycle_negative_lift_without_engine_becomes_heat_exchange():
@@ -446,6 +520,25 @@ def test_cascade_carnot_objective_debug_branch(monkeypatch):
 
     assert out.success is True
     assert called["plot"] == 1
+
+
+def test_cascade_carnot_objective_rejects_an_unsolved_cycle(monkeypatch):
+    # A cycle that fails its energy or entropy check is an infeasible
+    # candidate, not a result to evaluate.
+    class UnsolvedCycle(CascadeCarnotCycle):
+        @property
+        def solved(self) -> bool:
+            return False
+
+    monkeypatch.setattr(hp_cascade_carnot, "CascadeCarnotCycle", UnsolvedCycle)
+    args = _base_args(n_cond=1, n_evap=1, period_idx=0)
+
+    out = hp_cascade_carnot._compute_cascade_carnot_cycle_obj(
+        np.array([0.7, 0.0, 1.0]), args
+    )
+
+    assert out.success is False
+    assert "Carnot cycle" in out.failure_reason
 
 
 def test_cascade_carnot_cycle_matches_parallel_at_ideal_efficiency():

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import types
 from enum import Enum
-from typing import Any
+from typing import Any, Union, get_args, get_origin
 
 from ..contracts.workspace import ConfigurationFieldMetadata
 from ..domain.configuration_fields import (
@@ -40,6 +41,8 @@ def configuration_field_metadata() -> list[ConfigurationFieldMetadata]:
                 enum_choices=[str(item.value) for item in enum_cls] if enum_cls else [],
                 numeric_min=spec.numeric_min,
                 numeric_max=spec.numeric_max,
+                # positive=True fields reject their minimum (0) itself.
+                numeric_min_exclusive=spec.positive,
                 multiple=multiple,
             )
         )
@@ -54,24 +57,22 @@ def annotation_metadata(
     """Map Python annotations to frontend input field kinds."""
     if enum_cls is not None:
         return "enum", False
+    origin = get_origin(annotation)
+    if origin in {Union, types.UnionType}:
+        members = [arg for arg in get_args(annotation) if arg is not type(None)]
+        if len(members) == 1:
+            return annotation_metadata(members[0], enum_cls=None)
+    if annotation is list or origin is list:
+        items = get_args(annotation)
+        if items and items[0] in {int, float}:
+            return "number_list", True
+        return "string_list", True
+    if annotation is dict or origin is dict:
+        return "object", False
     if annotation in {bool}:
         return "boolean", False
     if annotation in {int, float}:
         return "number", False
-    if annotation in {str}:
-        return "string", False
-    if annotation in {list[str], list}:
-        return "string_list", True
-
-    text = str(annotation)
-    if "List" in text or "list[" in text:
-        return "string_list", True
-    if "bool" in text:
-        return "boolean", False
-    if "float" in text or "int" in text:
-        return "number", False
-    if "dict" in text:
-        return "object", False
     return "string", False
 
 

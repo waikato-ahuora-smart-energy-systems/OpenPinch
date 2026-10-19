@@ -442,7 +442,7 @@ class TemperatureIntervalEngine:
 
 def insert_temperature_intervals(table, temperatures) -> int:
     """Insert missing intervals through a dedicated table-owned engine."""
-    if table.data is None or table.data.shape[0] < 2 == 0:
+    if table.data is None:
         return 0
     engine = TemperatureIntervalEngine(table)
     values = canonical_temperature_values(temperatures)

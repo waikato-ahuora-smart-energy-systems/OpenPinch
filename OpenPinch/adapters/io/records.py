@@ -53,6 +53,7 @@ def validate_stream_data(sd: pd.DataFrame):
         append = cleaned.append
         previous_zone = None
         used_names = set()
+        original_names: dict[tuple, str] = {}
         next_default_name_idx = 1
 
         for record in records:
@@ -84,6 +85,15 @@ def validate_stream_data(sd: pd.DataFrame):
                 )
             else:
                 record["name"] = _normalize_label(name, default_stream_prefix)
+                key = (record["zone"], record["name"])
+                original = _label_text(name)
+                earlier = original_names.setdefault(key, original)
+                if earlier != original:
+                    raise ValueError(
+                        f"Stream names {earlier!r} and {original!r} in zone "
+                        f"{record['zone']!r} both become {record['name']!r}; "
+                        "rename one of them."
+                    )
 
             used_names.add(record["name"])
             append(record)
@@ -121,22 +131,49 @@ def validate_utility_data(ud: pd.DataFrame):
             valid = ~name_series.isna()
             if valid.any():
                 valid &= name_series.astype(str).str.strip() != ""
+            records = ud.replace({pd.NA: None}).to_dict(orient="records")
+            for row, record in enumerate(records, start=1):
+                if not valid.iloc[row - 1]:
+                    _warn_unnamed_utility(row, record)
             ud = ud.loc[valid].reset_index(drop=True)
         return ud
 
     cleaned = []
     append = cleaned.append
-    for record in ud:
+    for row, record in enumerate(ud, start=1):
         if not isinstance(record, dict):
             continue
         name = record.get("name")
-        if name is None or pd.isna(name):
-            continue
-        if isinstance(name, str) and not name.strip():
+        if (
+            name is None
+            or pd.isna(name)
+            or (isinstance(name, str) and not name.strip())
+        ):
+            _warn_unnamed_utility(row, record)
             continue
         record = {**record, "name": _label_text(name)}
         append(record)
     return cleaned
+
+
+def _warn_unnamed_utility(row: int, record: dict) -> None:
+    """Warn when a utility row dropped for having no name carries data."""
+    if any(_cell_has_data(value) for key, value in record.items() if key != "name"):
+        warnings.warn(
+            f"Utility data: utility row {row} has no name and was ignored.",
+            UserWarning,
+            stacklevel=4,
+        )
+
+
+def _cell_has_data(value) -> bool:
+    if isinstance(value, dict):
+        value = value.get("value", value.get("values"))
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, tuple)):
+        return any(_cell_has_data(item) for item in value)
+    return value is not None and not pd.isna(value)
 
 
 def _label_text(value) -> str:

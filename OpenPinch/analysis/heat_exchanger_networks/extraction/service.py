@@ -140,6 +140,14 @@ def extract_heat_exchanger_network(
             "recovery_minimum_approach_by_period": _float_tensor(
                 getattr(solved_model, "dT_r_period", None)
             ),
+            # Each heater's and cooler's least approach, by period:
+            # [period][hot utility][cold] and [period][hot][cold utility].
+            "hot_utility_minimum_approach_by_period": _float_tensor(
+                getattr(solved_model, "dT_hu_min_period", None)
+            ),
+            "cold_utility_minimum_approach_by_period": _float_tensor(
+                getattr(solved_model, "dT_cu_min_period", None)
+            ),
             "segment_profile_version": SEGMENT_PROFILE_VERSION,
             "operating_periods": _operating_state_metadata(solved_model),
             "hot_stream_heat_capacity_flowrates": _float_list(

@@ -192,6 +192,8 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
         ]
         for n in range(owner.N_periods)
     ]
+    # A stream absent from this side of the pinch in period n is clipped to
+    # 0 K there, so its matches carry no approach constraint in that period.
     for n in range(owner.N_periods):
         _ = [
             (
@@ -201,6 +203,8 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                     - M_ij_period[n][i][j] * (1 - owner.z[i][j][k])
                 )
                 if owner.z_allowed[i][j][k] > 0
+                and owner.z_i_active_period[n][i] > 0
+                and owner.z_j_active_period[n][j] > 0
                 else None
             )
             for k in range(owner.S)
@@ -218,6 +222,8 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                     - M_ij_period[n][i][j] * (1 - owner.z[i][j][k])
                 )
                 if owner.z_allowed[i][j][k] > 0
+                and owner.z_i_active_period[n][i] > 0
+                and owner.z_j_active_period[n][j] > 0
                 else None
             )
             for k in range(owner.S)

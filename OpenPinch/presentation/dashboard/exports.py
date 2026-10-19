@@ -8,6 +8,7 @@ from typing import Any
 
 import pandas as pd
 
+from ..reporting.excel_text import write_text_as_plain_strings
 from .dependencies import _require_openpyxl
 
 
@@ -41,6 +42,7 @@ def render_table_export(
     engine_name = _require_openpyxl().__name__
     with pd.ExcelWriter(buffer, engine=engine_name) as writer:
         frame.to_excel(writer, index=False, sheet_name="Problem Table")
+        write_text_as_plain_strings(writer.book)
     try:
         Path(destination).parent.mkdir(parents=True, exist_ok=True)
         Path(destination).write_bytes(buffer.getvalue())

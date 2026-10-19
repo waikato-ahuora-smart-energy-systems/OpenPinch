@@ -643,7 +643,7 @@ def test_validate_period_alignment_uses_first_period_stream_as_canonical():
                 "values": [120.0, 100.0],
                 "unit": "degC",
             },
-            heat_flow={"values": [100.0, 80.0], "period_ids": ["0", "1"], "unit": "kW"},
+            heat_flow={"values": [100.0, 80.0], "unit": "kW"},
             heat_transfer_coefficient=1.0,
         ),
         key="AreaA.H1",

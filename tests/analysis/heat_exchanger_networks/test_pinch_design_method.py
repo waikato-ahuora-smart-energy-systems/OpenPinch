@@ -293,15 +293,15 @@ def test_gekko_solver_configuration_merges_ipopt_and_apopt_options(monkeypatch):
     ipopt_run = backend.configure_gekko_solver(
         ipopt_model,
         "ipopt-GEKKO",
-        solver_options=["max_iter 20", "# ignored", "warm_start"],
+        solver_options=["max_iter 20", "# ignored", "mu_strategy adaptive"],
     )
 
     assert ipopt_run.extension == 0
     assert ipopt_run.solver_options["max_iter"] == "20"
-    assert ipopt_run.solver_options["warm_start"] == ""
+    assert ipopt_run.solver_options["mu_strategy"] == "adaptive"
     assert "tol 1e-3" in ipopt_model.solver_options
     assert "max_iter 20" in ipopt_model.solver_options
-    assert "warm_start" in ipopt_model.solver_options
+    assert "mu_strategy adaptive" in ipopt_model.solver_options
 
     apopt_model = _FakeGekkoModel()
     apopt_run = backend.configure_gekko_solver(
@@ -567,8 +567,8 @@ def test_solver_backend_solve_reports_exceptions_and_non_success_status():
 def test_solver_backend_low_level_option_helpers_cover_edge_cases(monkeypatch):
     assert backend._as_float_or_none(None) is None
     assert backend._as_float_or_none("bad") is None
-    assert backend._normalise_solver_options(["", "# comment", "plain"]) == {
-        "plain": ""
+    assert backend._normalise_solver_options(["", "# comment", "tol 1e-6"]) == {
+        "tol": "1e-6"
     }
 
     with pytest.raises(ValueError, match="mapping or a list"):
@@ -1980,6 +1980,8 @@ def _source_shaped_lmtd_post_process_model(model_cls):
     model.period_weight_sum = 1.0
     model.tol = 1e-3
     model.dTmin = 20.0
+    model.z_i_active_period = [[1]]
+    model.z_j_active_period = [[1]]
     model.minimisation_goal = "variable total cost"
     model.Q_r = [[[[100.0], [50.0]]]]
     model.Q_h = [[30.0]]

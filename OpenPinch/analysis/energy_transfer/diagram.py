@@ -259,6 +259,15 @@ def get_base_problem_table(
 
 
 def get_source_problem_table(target: UtilitySummaryTarget) -> ProblemTable:
+    # The target's own table is unrounded; the saved GCC graph is rounded to
+    # 4 dp for plotting, so it is only a fallback.
+    table = getattr(target, "pt", None)
+    if (
+        isinstance(table, ProblemTable)
+        and has_problem_table_values(table, ProblemTableLabel.T)
+        and has_problem_table_values(table, ProblemTableLabel.H_NET)
+    ):
+        return table
     graphs = getattr(target, "graphs", None)
     if isinstance(graphs, dict):
         gcc = graphs.get(GraphType.GCC.value)
