@@ -687,6 +687,24 @@ def calc_carnot_heat_pump_cop(
     return cop.item() if cop.ndim == 0 else cop
 
 
+def satisfies_second_law(
+    T_cond: np.ndarray,
+    Q_cond: np.ndarray,
+    T_evap: np.ndarray,
+    Q_evap: np.ndarray,
+) -> bool:
+    """Return whether a cycle's entropy generation is non-negative.
+
+    Entropy generation is sum(Q/T) over the condensers minus sum(Q/T) over the
+    evaporators (temperatures in degC, work carries no entropy). The tolerance
+    is relative to the entropy flows, so it does not depend on the duty scale.
+    """
+    S_out = np.asarray(Q_cond, dtype=float) / (np.asarray(T_cond, dtype=float) + 273.15)
+    S_in = np.asarray(Q_evap, dtype=float) / (np.asarray(T_evap, dtype=float) + 273.15)
+    S_scale = float(np.abs(S_out).sum() + np.abs(S_in).sum())
+    return bool(S_out.sum() - S_in.sum() >= -_tol * S_scale)
+
+
 def calc_carnot_heat_engine_eta(
     T_h: float | np.ndarray,
     T_l: float | np.ndarray,
