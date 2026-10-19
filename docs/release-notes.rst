@@ -12,7 +12,12 @@ HEN utility approach temperatures
   utilities. Before, a flat utility had no approach constraint: a hot stream
   could be cooled by recovery below the cooling water outlet and finished
   with a crossed cooler. On a case with cooling water at 320 to 325 K, PDM
-  and TDM accepted a cooler at 324 to 322 K (hot-end dT -1 K).
+  and TDM accepted a cooler at 324 to 322 K (hot-end dT -1 K). That case now
+  has no feasible network in the stagewise superstructure, which places
+  coolers after the last stage, so synthesis rejects it.
+- A synthesised exchanger with a crossed or touching end gets no area. Its
+  area used to come from a fallback temperature difference (20 m2 for the
+  crossed cooler above); verification now reports its duty without area.
 
 Network grid data
 ~~~~~~~~~~~~~~~~~

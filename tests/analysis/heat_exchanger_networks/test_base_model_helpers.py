@@ -279,10 +279,10 @@ def test_base_model_scalar_helpers_and_value_assignment():
         model, 12.0, 12.0, 1.0, formula_allowed=True
     ) == pytest.approx(12.0)
     assert _post_process_lmtd(model, 20.0, 10.0, 0.0, formula_allowed=True) == 0.0
-    # A non-positive end on an active match keeps the finite fallback.
-    assert _post_process_lmtd(
-        model, 0.0, 10.0, 0.5, formula_allowed=False, fallback_delta=8.0
-    ) == pytest.approx(4.0)
+    # A crossed or touching end has no log-mean: the match gets no area, so
+    # verification reports its duty without area instead of a made-up one.
+    for crossed in ((0.0, 10.0), (10.0, -1.0)):
+        assert _post_process_lmtd(model, *crossed, 0.5, formula_allowed=False) == 0.0
 
 
 @pytest.mark.parametrize("ends", [(10.0, 50.0), (50.0, 10.0)])
