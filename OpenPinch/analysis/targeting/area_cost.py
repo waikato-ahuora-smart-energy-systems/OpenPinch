@@ -7,7 +7,12 @@ import warnings
 import numpy as np
 
 from ...domain._problem_table.types import ProblemTableUpdateKwargs
-from ...domain.configuration import Configuration, tol
+from ...domain.configuration import (
+    Configuration,
+    duty_tolerance,
+    heat_resolution,
+    tol,
+)
 from ...domain.enums import ProblemTableLabel
 from ...domain.stream_collection import StreamCollection
 from ..economics import compute_annual_capital_cost, compute_capital_cost
@@ -103,7 +108,8 @@ def get_balanced_CC(
             0,
         )
         R_hot_bal = np.zeros_like(dH_hot_bal, dtype=float)
-        mask_hot = dH_hot_bal > tol
+        resolution = heat_resolution(H_hot_bal, H_cold_bal)
+        mask_hot = dH_hot_bal > resolution
         np.divide(
             (RCP_hot + RCP_hot_ut) * dT_vals,
             dH_hot_bal,
@@ -111,7 +117,7 @@ def get_balanced_CC(
             where=mask_hot,
         )
         R_cold_bal = np.zeros_like(dH_cold_bal, dtype=float)
-        mask_cold = dH_cold_bal > tol
+        mask_cold = dH_cold_bal > resolution
         np.divide(
             (RCP_cold + RCP_cold_ut) * dT_vals,
             dH_cold_bal,
@@ -139,7 +145,9 @@ def get_area_targets(
     R_cold_bal: np.ndarray,
 ) -> dict:
     """Estimate heat-transfer area targets with vectorised counter-current logic."""
-    if abs((H_hot_bal[0] - H_hot_bal[-1]) - (H_cold_bal[0] - H_cold_bal[-1])) > tol:
+    if abs(
+        (H_hot_bal[0] - H_hot_bal[-1]) - (H_cold_bal[0] - H_cold_bal[-1])
+    ) > duty_tolerance(H_hot_bal, H_cold_bal):
         # Raise an error because heat-flow balance is required for this analysis.
         raise ValueError(
             "The temperature driving force plot requires the inputted "
@@ -147,9 +155,10 @@ def get_area_targets(
         )
 
     # Shift the hot and cold cascades to start from zero at the lowest temperature.
-    if abs(H_hot_bal[0]) > tol:
+    resolution = heat_resolution(H_hot_bal, H_cold_bal)
+    if abs(H_hot_bal[0]) > resolution:
         H_hot_bal = H_hot_bal - H_hot_bal[-1]
-    if abs(H_cold_bal[0]) > tol:
+    if abs(H_cold_bal[0]) > resolution:
         H_cold_bal = H_cold_bal - H_cold_bal[-1]
 
     Th, Hh = clean_composite_curve_ends(T_vals, H_hot_bal)
@@ -163,7 +172,7 @@ def get_area_targets(
     # negative dt_cont) needs infinite area. Report that, not an error, so the
     # energy targets still come back.
     no_driving_force = (delta_T1.round(6) <= 0.0) | (delta_T2.round(6) <= 0.0)
-    if np.any(no_driving_force & (Q_i > tol)):
+    if np.any(no_driving_force & (Q_i > resolution)):
         warnings.warn(
             "The balanced composite curves touch or cross (zero or negative "
             "approach temperature), so the area and capital cost targets are "
@@ -203,8 +212,13 @@ def get_min_number_hx(
     idx: int | None = None,
 ) -> int:
     """Estimate the minimum number of exchangers using vectorised interval logic."""
-    H_net_bal = H_cold_bal - H_hot_bal
-    mask = np.isclose(H_net_bal, 0.0, atol=tol)
+    H_net_bal = np.asarray(H_cold_bal, dtype=float) - np.asarray(H_hot_bal, dtype=float)
+    if H_net_bal.size < 2:
+        return 0
+    mask = np.abs(H_net_bal) <= duty_tolerance(H_hot_bal, H_cold_bal)
+    # The balanced curves meet at both ends by construction; only rounding
+    # residue keeps the ends off zero.
+    mask[[0, -1]] = True
     mask_true_positions = np.flatnonzero(mask)
     if mask_true_positions.size < 2:
         return 0
