@@ -7,6 +7,15 @@ Unreleased
 HEN synthesis orchestration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- In PDM and TDM networks (isothermal mixing), a stream split across several
+  matches in one stage reports each branch leaving at the stage's mixing
+  temperature, with its split fraction (its share of the stage duty). Each
+  branch used to be reported as if it carried the whole stream, so its
+  outlet temperature disagreed with its approach temperatures and area: one
+  ``crude_preheat_train`` exchanger reported 43.0 m2 of area while its own
+  temperatures gave 21.1 m2. Areas are unchanged; the temperatures now match
+  them.
+
 - Multiperiod stage reduction after PDM and TDM keeps a stage, and a match,
   that carries duty in any period. It read only the first period, so a stage
   used only in later periods was dropped and the reduced network was solved

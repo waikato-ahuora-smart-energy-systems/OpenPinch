@@ -396,3 +396,51 @@ def test_stage_reduction_keeps_stages_and_matches_used_in_any_period(monkeypatch
 
     assert built["stages"] == 2
     assert built["z_restriction"][0] == [[[1, 1]], [[1, 0]]]
+
+
+# M5: isothermal split branches report their own outlets and split fractions
+
+
+def test_isothermal_split_branches_report_mixing_outlets_and_split_fractions():
+    from OpenPinch.analysis.heat_exchanger_networks.extraction.period_state import (
+        _recovery_period_state,
+    )
+
+    # Stage 1: H1 (CP 10) cools 400 -> 300 K, 600 kW to C1 and 400 kW to C2,
+    # which each leave the stage at its mixing temperature.
+    model = SimpleNamespace(
+        T_h_by_period=[[[400.0, 300.0]]],
+        T_c_by_period=[[[390.0, 290.0], [360.0, 280.0]]],
+        f_h_period=[[10.0]],
+        f_c_period=[[6.0, 5.0]],
+        z=[[[[1.0]], [[1.0]]]],
+        theta_1_by_period=[[[[10.0], [40.0]]]],
+        theta_2_by_period=[[[[10.0], [20.0]]]],
+    )
+    q_by_period = [[[[600.0], [400.0]]]]
+
+    states = [
+        _recovery_period_state(
+            model,
+            period_id="0",
+            period_idx=0,
+            hot_index=0,
+            cold_index=j,
+            stage_index=0,
+            q_values=None,
+            q_values_by_period=q_by_period,
+            tolerance=1e-6,
+        )
+        for j in (0, 1)
+    ]
+
+    # Each branch leaves at the hot stream's stage outlet, not at
+    # 400 - Q / CP as if it carried the whole stream (340 and 360 K).
+    assert [state.source_outlet_temperature for state in states] == [300.0, 300.0]
+    assert [state.source_split_fraction for state in states] == pytest.approx(
+        [0.6, 0.4]
+    )
+    # Each cold stream has one match here: the whole stream, outlet at its
+    # stage boundary.
+    assert [state.sink_outlet_temperature for state in states] == [390.0, 360.0]
+    assert [state.sink_split_fraction for state in states] == pytest.approx([1.0, 1.0])
