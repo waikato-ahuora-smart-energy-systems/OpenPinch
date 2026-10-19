@@ -7,6 +7,7 @@ import warnings
 import pytest
 
 from OpenPinch import PinchProblem
+from tests.analysis.test_area_bath_oracle import _random_payload
 from tests.support.unit_count import minimum_units
 
 
@@ -45,6 +46,10 @@ def _units_and_oracle(problem: PinchProblem) -> tuple[float, int]:
         "crude_preheat_train.json",
         "process_mvr.json",
         "pulp_mill.json",
+        "zonal_site.json",
+        "crude_preheat_train_multiperiod.json",
+        "dairy_chilling_multiperiod.json",
+        "zonal_site_multiperiod.json",
     ],
 )
 def test_sample_case_unit_count_is_streams_minus_one_per_pinch_region(case):
@@ -52,5 +57,14 @@ def test_sample_case_unit_count_is_streams_minus_one_per_pinch_region(case):
     # residues of 2e-6 to 3.5e-5 kW at the balanced curve ends failed an
     # absolute 1e-6 kW zero test, so only the pinch counted as a boundary.
     units, oracle = _units_and_oracle(PinchProblem(case, project_name="Site"))
+
+    assert units == oracle
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_random_case_unit_count_is_streams_minus_one_per_pinch_region(seed):
+    units, oracle = _units_and_oracle(
+        PinchProblem(_random_payload(seed), project_name="Site")
+    )
 
     assert units == oracle
