@@ -831,6 +831,22 @@ def test_missing_tespy_is_returned_as_an_error(monkeypatch):
     assert response["error"]["details"] == {"code": "dependency_unavailable"}
 
 
+def test_orc_targeting_failure_is_returned_as_an_error():
+    # 200 degC is above the basic case's surplus, so no ORC can condense.
+    response = run_command(
+        {
+            "command": "target.carnot_orc",
+            "problem": {"sample_case": "basic_pinch.json"},
+            "arguments": {"condensing_temperature": 200.0},
+        }
+    )
+
+    assert response["value"] is None
+    assert response["error"]["type"] == "OrcTargetingError"
+    assert "too cold" in response["error"]["message"]
+    assert response["error"]["details"] is None
+
+
 def test_plot_catalog_lists_the_solved_graphs():
     session = run_command(
         {"command": "open", "problem": {"sample_case": "basic_pinch.json"}}

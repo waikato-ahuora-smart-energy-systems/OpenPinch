@@ -24,6 +24,7 @@ from ..adapters.io.problem_sources import (
 from ..analysis.heat_pumps.performance_maps.targeting import (
     HprTargetCompatibilityError,
 )
+from ..analysis.orc.search import OrcTargetingError
 from ..analysis.targeting.utilities import is_default_utility
 from ..contracts.hpr import HPRTargetingError
 from ..contracts.reporting import TargetResults
@@ -166,7 +167,7 @@ def run_command(
     ``HeatExchangerNetworkView`` of its rank-1 network (ranking, totals,
     utility duties and grid layout) for each of the network's periods in
     period order, and ``view``, the first of them. Analysis that runs and
-    fails (heat pump targeting) returns ``error`` (``{type, message,
+    fails (heat pump or ORC targeting) returns ``error`` (``{type, message,
     details}``) instead of raising, as does a session the engine does not hold
     (type ``unknown_session``). ``warnings`` lists the non-fatal issues the command
     met, each ``{type, message, details}``: Python warnings by category name,
@@ -407,7 +408,11 @@ def _results_json(problem: PinchProblem | None) -> Any:
 # Analysis that ran and failed, or that this engine cannot run (TESPy without
 # the extra), is reported in the response; anything else (a bad request, a
 # bug) raises.
-_ANALYSIS_FAILURES = (HPRTargetingError, HprTargetCompatibilityError)
+_ANALYSIS_FAILURES = (
+    HPRTargetingError,
+    HprTargetCompatibilityError,
+    OrcTargetingError,
+)
 
 
 def _error_json(error: Exception) -> dict[str, Any]:

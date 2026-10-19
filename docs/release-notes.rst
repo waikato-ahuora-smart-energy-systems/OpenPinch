@@ -14,6 +14,10 @@ Command layer
   concurrent calls a response could carry other commands' warnings or lose
   its own, and the filters stayed modified. A warning raised outside a
   command while one runs is shown as before rather than returned with it.
+- An ORC target that fails (``OrcTargetingError``: the surplus is too cold
+  for the condensing temperature, or no ORC pays) returns an ``error``
+  envelope from ``run_command``, as heat pump targeting failures do, instead
+  of raising out of it.
 
 Network grid data
 ~~~~~~~~~~~~~~~~~
