@@ -38,15 +38,21 @@ class AnalysisExecutionContext:
 
     @classmethod
     def prepare(cls, problem, arguments):
-        isolated = snapshot_problem(problem)
-        root = isolated._build_execution_master_zone()
-        zone = isolated._resolve_target_zone(arguments.get("zone"), master_zone=root)
         runtime, configuration = split_runtime_and_configuration_options(
             arguments.get("options")
         )
         configuration.update(arguments.get("configuration") or {})
         if arguments.get("period_id") is not None:
             runtime["period_id"] = arguments["period_id"]
+        # The master zone holds only the last period run; earlier periods'
+        # targets are kept in their retained states, as all_periods uses them.
+        state = None
+        if problem._period_states and problem._master_zone is not None:
+            _, sid = resolve_runtime_period_options(runtime, zone=problem._master_zone)
+            state = problem._period_states.get(sid)
+        isolated = snapshot_problem(problem, state)
+        root = isolated._build_execution_master_zone()
+        zone = isolated._resolve_target_zone(arguments.get("zone"), master_zone=root)
         runtime, sid = resolve_runtime_period_options(runtime, zone=zone)
         return cls(
             isolated,

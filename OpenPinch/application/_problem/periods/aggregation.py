@@ -434,6 +434,7 @@ def _weighted_average_target(
             "hpr_total_annualized_cost",
             "orc_thermal_efficiency",
             "orc_total_annualized_cost_change",
+            "turbine_efficiency_target",
             "pinch_temp",
             "hot_utilities",
             "cold_utilities",
@@ -463,6 +464,15 @@ def _weighted_average_target(
     )
     _apply_peak_machine_capital(targets, data)
     data["hpr_total_annualized_cost"] = _total_hpr_annualized_cost(data)
+    # Turbine efficiency is work over isentropic work, so the yearly value is
+    # total work over total isentropic work; an idle period adds neither.
+    data["turbine_efficiency_target"] = _ratio_of_totals(
+        targets,
+        "turbine_efficiency_target",
+        "work_target",
+        weights,
+        basis_is_numerator=True,
+    )
     data["orc_thermal_efficiency"] = _ratio_of_totals(
         targets,
         "orc_thermal_efficiency",
