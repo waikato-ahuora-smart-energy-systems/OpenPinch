@@ -150,6 +150,54 @@ def test_records_of_different_period_lengths_get_a_clear_message():
     assert "must align" not in str(raised.value)
 
 
+@pytest.mark.parametrize(
+    "thermal",
+    [
+        {
+            "segments": [
+                {
+                    "t_supply": 150.0,
+                    "t_target": 100.0,
+                    "heat_flow": {"values": [50.0, 40.0], "unit": "kW"},
+                },
+                {"t_supply": 100.0, "t_target": 60.0, "heat_flow": 50.0},
+            ]
+        },
+        {
+            "profile": {
+                "points": [
+                    {"temperature": 150.0, "cumulative_heat": 0.0},
+                    {
+                        "temperature": 60.0,
+                        "cumulative_heat": {"values": [100.0, 90.0], "unit": "kW"},
+                    },
+                ]
+            }
+        },
+    ],
+    ids=["segments", "profile"],
+)
+@pytest.mark.parametrize(
+    "options, expected",
+    [
+        ({}, "PROBLEM_PERIOD_IDS is not set"),
+        ({"PROBLEM_PERIOD_IDS": ["a", "b", "c"]}, "declares 3 periods"),
+    ],
+    ids=["no-ids", "wrong-count"],
+)
+def test_nested_period_values_need_matching_period_ids(thermal, options, expected):
+    stream = {"zone": "Zone A", "name": "H1", "dt_cont": 10.0, "htc": 1.0}
+
+    messages = _messages(
+        {"streams": [stream | thermal], "utilities": [], "options": options}
+    )
+
+    assert any(
+        severity == "error" and "2 period values" in message and expected in message
+        for severity, message in messages
+    )
+
+
 def test_temperatures_below_absolute_zero_are_rejected():
     messages = _messages({"streams": [_stream(t_target=-300.0)], "utilities": []})
 

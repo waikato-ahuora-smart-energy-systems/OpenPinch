@@ -134,6 +134,15 @@ def semantic_issues(
             )
         )
         issues.extend(
+            _nested_period_length_issues(
+                stream,
+                section="streams",
+                record_index=index,
+                record_label=label,
+                period_ids=period_ids,
+            )
+        )
+        issues.extend(
             segmented_record_issues(
                 stream,
                 section="streams",
@@ -158,6 +167,15 @@ def semantic_issues(
         issues.extend(
             _validate_utility_record_states(
                 utility_values,
+                section="utilities",
+                record_index=index,
+                record_label=label,
+                period_ids=period_ids,
+            )
+        )
+        issues.extend(
+            _nested_period_length_issues(
+                utility,
                 section="utilities",
                 record_index=index,
                 record_label=label,
@@ -1006,15 +1024,9 @@ def _validate_period_lengths(
     }
     issues: list[ValidationIssue] = []
     for field_name, count in lengths.items():
-        if period_ids and count == len(period_ids):
+        message = _period_length_message(count, period_ids)
+        if message is None:
             continue
-        message = (
-            f"Has {count} period values, but PROBLEM_PERIOD_IDS declares "
-            f"{len(period_ids)} periods."
-            if period_ids
-            else f"Has {count} period values, but PROBLEM_PERIOD_IDS is not "
-            "set. Declare one id per period in the options."
-        )
         issues.append(
             _build_issue(
                 severity="error",
@@ -1026,6 +1038,61 @@ def _validate_period_lengths(
                 message=message,
             )
         )
+    return issues
+
+
+def _period_length_message(count: int, period_ids: Sequence[str] | None) -> str | None:
+    """Return why ``count`` period values disagree with the declared periods."""
+    if period_ids and count == len(period_ids):
+        return None
+    if period_ids:
+        return (
+            f"Has {count} period values, but PROBLEM_PERIOD_IDS declares "
+            f"{len(period_ids)} periods."
+        )
+    return (
+        f"Has {count} period values, but PROBLEM_PERIOD_IDS is not set. "
+        "Declare one id per period in the options."
+    )
+
+
+def _nested_period_length_issues(
+    record,
+    *,
+    section: str,
+    record_index: int,
+    record_label: Optional[str],
+    period_ids: Sequence[str] | None,
+) -> list[ValidationIssue]:
+    """Apply the period-length rule to a record's segment and profile values."""
+    nested: list[tuple[str, Any]] = []
+    for idx, segment in enumerate(getattr(record, "segments", None) or []):
+        nested.append((f"segments[{idx}]", segment))
+    profile = getattr(record, "profile", None)
+    if profile is not None:
+        for idx, point in enumerate(profile.points):
+            nested.append((f"profile.points[{idx}]", point))
+    issues: list[ValidationIssue] = []
+    for prefix, item in nested:
+        data = item.model_dump(mode="python") if hasattr(item, "model_dump") else item
+        for field_name, raw in data.items():
+            magnitudes = raw.get("values") if isinstance(raw, dict) else None
+            if not isinstance(magnitudes, list) or len(magnitudes) <= 1:
+                continue
+            message = _period_length_message(len(magnitudes), period_ids)
+            if message is None:
+                continue
+            issues.append(
+                _build_issue(
+                    severity="error",
+                    section=section,
+                    record_index=record_index,
+                    record_label=record_label,
+                    path_field=f"{prefix}.{field_name}",
+                    field=field_name,
+                    message=message,
+                )
+            )
     return issues
 
 

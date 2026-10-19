@@ -17,9 +17,9 @@ Multiperiod fixes
   weighting over its own periods; before, each raised "Expected at most 2
   period weight(s), got 3." Placement cases run with all periods in their
   canonical order, as the tutorials do, are unchanged.
-- Per-period values (``{"values": [...]}``) without ``PROBLEM_PERIOD_IDS``
-  are a validation error that names the field and asks for one id per
-  period. Before, the problem silently had one period and every target used
+- Per-period values (``{"values": [...]}``) without ``PROBLEM_PERIOD_IDS``,
+  including those inside a record's ``segments`` or ``profile`` points, are
+  a validation error that names the field and asks for one id per period. Before, the problem silently had one period and every target used
   only the first value; records of different lengths failed later with an
   unrelated "weights for stream ... must align" error.
 - ``StreamSegment.set_attr_for_period`` with a scalar changes only the named
