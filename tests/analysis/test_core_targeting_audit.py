@@ -209,13 +209,13 @@ def test_negative_dt_cont_runs_through_direct_and_area_targeting():
     ("case", "hot_utility", "cold_utility", "area", "capital_cost"),
     [
         ("basic_pinch.json", 750.0, 1000.0, 554.1173, 442752.48),
-        ("pulp_mill.json", 155528.905, 58413.668, 29689.089, 13462802.18),
+        ("pulp_mill.json", 155528.905, 58413.668, 29372.737, 13376546.14),
         (
             "Four-stream-Yee-and-Grossmann-1990-1.json",
             450.0,
             2100.0,
-            341.0759,
-            84161.387,
+            337.2019,
+            83580.281,
         ),
     ],
 )
@@ -227,6 +227,10 @@ def test_area_targets_integrate_refreshed_interval_widths(
     # pulp_mill 28175.8, Four-stream 264.26). The corrected basic_pinch area
     # matches an independent fine-slice Bath-formula integration of the
     # balanced composite curves. Energy targets were never affected.
+    # A later fix dropped the discontinuity rule that replaced a slice's end
+    # driving force at a composite temperature step with the next slice's;
+    # it put pulp_mill at 29689.089 and Four-stream at 341.0759 (1-6 % high
+    # against the Bath integration in tests/analysis/test_area_bath_oracle.py).
     problem = PinchProblem(case, project_name="Site")
 
     with warnings.catch_warnings():

@@ -81,17 +81,10 @@ def get_temperature_driving_forces(
     t_c1 = interp_with_plateaus(H_cold, T_cold, h_start, side="right")
     t_c2 = interp_with_plateaus(H_cold, T_cold, h_end, side="left")
 
-    delta_T1_raw = t_h1 - t_c1
-    delta_T2_raw = t_h2 - t_c2
-
-    discontinuities = _collect_discontinuities(H_hot, H_cold)
-    if discontinuities:
-        for i in range(len(delta_T2_raw) - 2, -1, -1):
-            if _is_discontinuity(h_end[i], discontinuities):
-                delta_T2_raw[i] = min(delta_T2_raw[i], delta_T2_raw[i + 1])
-
-    delta_T1 = delta_T1_raw - min_dT
-    delta_T2 = delta_T2_raw - min_dT
+    # Each slice ends at its left limit, also where a composite steps in
+    # temperature at constant heat flow, so the LMTD is that of the slice.
+    delta_T1 = t_h1 - t_c1 - min_dT
+    delta_T2 = t_h2 - t_c2 - min_dT
 
     return {
         "h_vals": h_vals,
@@ -164,61 +157,3 @@ def _normalise_curve(
         h_vals = h_vals - offset
 
     return h_vals, t_vals
-
-
-def _collect_discontinuities(h_hot: np.ndarray, h_cold: np.ndarray) -> set[float]:
-    """Return heat-load positions where either curve has a discontinuity.
-
-    Parameters
-    ----------
-    h_hot, h_cold : np.ndarray
-        Heat-flow coordinates for hot and cold curves.
-
-    Returns
-    -------
-    set[float]
-        Combined discontinuity heat-load values.
-    """
-    return set(_discontinuity_values(h_hot)) | set(_discontinuity_values(h_cold))
-
-
-def _discontinuity_values(h_vals: np.ndarray) -> np.ndarray:
-    """Extract heat-load values associated with zero-width segments.
-
-    Parameters
-    ----------
-    h_vals : np.ndarray
-        Heat-flow coordinates.
-
-    Returns
-    -------
-    np.ndarray
-        Heat-load values at repeated adjacent coordinates.
-    """
-    if h_vals.size < 2:
-        return np.empty(0, dtype=float)
-    mask = np.isclose(np.diff(h_vals), 0.0, atol=tol)
-    if not mask.any():
-        return np.empty(0, dtype=float)
-    return h_vals[1:][mask]
-
-
-def _is_discontinuity(value: float, discontinuities: set[float]) -> bool:
-    """Check whether a heat-load value matches a known discontinuity.
-
-    Parameters
-    ----------
-    value : float
-        Heat-load value to test.
-    discontinuities : set[float]
-        Known discontinuity values.
-
-    Returns
-    -------
-    bool
-        ``True`` when ``value`` is within tolerance of any discontinuity.
-    """
-    for disc in discontinuities:
-        if abs(value - disc) <= tol:
-            return True
-    return False

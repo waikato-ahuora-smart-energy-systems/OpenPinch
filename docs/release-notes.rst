@@ -4,6 +4,25 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Area and unit-count targets
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``target.heat_exchanger_area_and_cost()`` reports lower area, capital cost
+  and total cost targets on problems whose composite curves have a
+  temperature gap (a step at constant heat flow, for example between the
+  process streams and a utility). This is the second change to area targets
+  in two releases: 0.7.1 fixed interval widths that made areas 5-22 % low,
+  and this release removes a "discontinuity" rule that made them 1-6 % high.
+  At each step the rule replaced a slice's end driving force with the next
+  slice's, which collapsed that slice's LMTD. Every slice now ends at its
+  left limit, and area targets match an independent fine-slice Bath
+  integration. Four-stream Yee and Grossmann: 341.08 to 337.20 m2 (capital
+  cost 84,161 to 83,580). ``pulp_mill``: 29,689 to 29,373 m2 (capital cost
+  13,462,802 to 13,376,546). ``basic_pinch``, ``crude_preheat_train`` and
+  ``chocolate_factory`` have no gap and are unchanged. Utility placement's
+  entropy terms use the same driving-force intervals and never read the
+  replaced value, so placement results do not change.
+
 Network grid data
 ~~~~~~~~~~~~~~~~~
 
