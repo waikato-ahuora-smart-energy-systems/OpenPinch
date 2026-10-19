@@ -14,7 +14,9 @@ from ...domain.problem_table import ProblemTable
 from ...domain.stream import Stream
 from ...domain.stream_collection import StreamCollection
 from ...domain.targets import DirectIntegrationTarget
+from ...domain.value import Value
 from ...domain.zone import Zone
+from ..heat_pumps.common.postprocessing import _compute_utility_cost
 from ..numerics import delta_vals, get_period_index
 from .area_cost import (
     get_area_targets,
@@ -185,6 +187,9 @@ def compute_direct_integration_targets(
             "graphs": _save_graph_data(pt, pt_real),
             "hot_utilities": zone.hot_utilities,
             "cold_utilities": zone.cold_utilities,
+            "utility_cost": _compute_utility_cost(
+                zone.hot_utilities, zone.cold_utilities, period_idx=idx
+            ),
             "hot_pinch": hot_pinch,
             "cold_pinch": cold_pinch,
             "period_id": sid,
@@ -399,11 +404,16 @@ def build_area_cost_target_data(
         num_units=num_units,
         config=zone.config,
     )
+    annual_utility_cost = Value(
+        _compute_utility_cost(zone.hot_utilities, zone.cold_utilities, period_idx=idx)
+        * float(zone.config.costing.annual_op_time),
+        "$/y",
+    )
     return {
         "area": area,
         "num_units": num_units,
         "capital_cost": capital_cost,
-        "total_cost": annual_capital_cost,
+        "total_cost": annual_capital_cost + annual_utility_cost,
     }
 
 
