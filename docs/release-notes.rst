@@ -7,6 +7,15 @@ Unreleased
 HEN synthesis orchestration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Piecewise linearisation of a temperature-heat curve refines its break
+  points against the curve in increasing heat. It flipped both arrays
+  instead, so for curves listed in increasing heat (cold streams, segmented
+  stream profiles, the vapour-compression and MVR evaporator curves) it
+  interpolated against a decreasing heat axis: the reported error was
+  meaningless (40 K where the fit was 0.16 K off) and the refinement's
+  integrity bound was never enforced (first-audit H8). The result no longer
+  depends on point order.
+
 - A single-stage network's post-optimisation flow-on factors no longer take
   cold flow-on from the stage itself. Its cold gamma is 0, as for the first
   stage of any network (it was 0.56 where 0 was due on the first audit's
