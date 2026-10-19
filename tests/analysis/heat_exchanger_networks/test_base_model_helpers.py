@@ -393,22 +393,23 @@ def test_blank_and_solver_array_state_helpers_validate_static_arrays():
     assert model.period_weight_sum == pytest.approx(4.0)
     assert model.T_h_in.tolist() == [200.0]
     assert model.dT_r_period.tolist() == [[[10.0]], [[12.0]]]
-    assert model.dT_hu.tolist() == [8.0]
-    assert model.dT_cu.tolist() == [7.0]
+    # Heaters are [utility][cold] and coolers [hot][utility].
+    assert model.dT_hu.tolist() == [[8.0]]
+    assert model.dT_cu.tolist() == [[7.0]]
     assert _recovery_approach_temperature(model, 0, 0, period_idx=1) == pytest.approx(
         12.0
     )
     assert _hot_utility_inlet_approach_temperature(
-        model, 0, period_idx=1
+        model, 0, 0, period_idx=1
     ) == pytest.approx(10.0)
     assert _hot_utility_outlet_approach_temperature(
-        model, 0, period_idx=1, heat_duty=1.0
+        model, 0, 0, period_idx=1, heat_duty=1.0
     ) == pytest.approx(10.0)
     assert _cold_utility_inlet_approach_temperature(
-        model, 0, period_idx=1
+        model, 0, 0, period_idx=1
     ) == pytest.approx(9.0)
     assert _cold_utility_outlet_approach_temperature(
-        model, 0, period_idx=1, heat_duty=1.0
+        model, 0, 0, period_idx=1, heat_duty=1.0
     ) == pytest.approx(9.0)
     assert _weighted_state_average(model, [10.0, 30.0]) == pytest.approx(25.0)
 
@@ -473,8 +474,8 @@ def test_minimum_approach_temperatures_use_dTmin_when_utilities_are_absent():
 
     _set_minimum_approach_temperatures(model)
 
-    assert model.dT_hu.tolist() == [11.0]
-    assert model.dT_cu.tolist() == [9.0]
+    assert model.dT_hu.tolist() == [[11.0]]
+    assert model.dT_cu.tolist() == [[9.0]]
 
 
 def test_match_restrictions_accept_supported_shapes_and_reject_invalid_shape():
@@ -482,27 +483,32 @@ def test_match_restrictions_accept_supported_shapes_and_reject_invalid_shape():
     model.I = 1
     model.J = 1
     model.S = 1
+    model.NHU = 1
+    model.NCU = 2
     model.tol = 0.1
     model.z_feasible = [[[1]]]
-    model.z_hu_feasible = [1]
-    model.z_cu_feasible = [1]
+    model.z_hu_feasible = [[1]]
+    model.z_cu_feasible = [[1, 1]]
 
     model.set_match_restrictions(None)
     assert model.z_allowed == [[[1]]]
-    assert model.z_hu_allowed == [1]
-    assert model.z_cu_allowed == [1]
+    assert model.z_hu_allowed == [[1]]
+    assert model.z_cu_allowed == [[1, 1]]
 
-    model.set_match_restrictions([[[[0]]], [0], [1]])
+    # Utility restrictions are [stream][utility].
+    model.set_match_restrictions([[[[0]]], [[0]], [[1, 0]]])
     assert model.z_allowed == [[[0]]]
-    assert model.z_hu_allowed == [0]
-    assert model.z_cu_allowed == [1]
+    assert model.z_hu_allowed == [[0]]
+    assert model.z_cu_allowed == [[1, 0]]
 
-    model.set_match_restrictions([[[[[1.0]]]], [[1.0]], [[0.0]]])
+    model.set_match_restrictions([[[[[1.0]]]], [[[1.0]]], [[[0.0], [1.0]]]])
     assert model.z_allowed == [[[1]]]
-    assert model.z_hu_allowed == [1]
-    assert model.z_cu_allowed == [0]
+    assert model.z_hu_allowed == [[1]]
+    assert model.z_cu_allowed == [[0, 1]]
 
-    model.set_match_restrictions([[[[GKVariable()]]], [GKParameter()], [GKParameter()]])
+    model.set_match_restrictions(
+        [[[[GKVariable()]]], [[GKParameter()]], [[GKParameter(), GKParameter()]]]
+    )
     assert model.z_allowed == [[[0]]]
 
     with pytest.raises(ValueError, match="Invalid restriction type"):
@@ -642,9 +648,9 @@ def test_utility_approach_equations_skip_streams_inactive_in_a_period():
     model.m = _FakeModel()
     model.N_periods = 2
     model.period_ids = ["base", "peak"]
-    model.I = model.J = model.S = 1
-    model.z_hu_allowed = model.z_cu_allowed = [1]
-    model.z_hu = model.z_cu = [1]
+    model.I = model.J = model.S = model.NHU = model.NCU = 1
+    model.z_hu_allowed = model.z_cu_allowed = [[1]]
+    model.z_hu = model.z_cu = [[1]]
     model.T_hu_in_period = model.T_hu_out_period = np.array([[250.0], [250.0]])
     model.T_cu_in_period = np.array([[20.0], [20.0]])
     model.T_cu_out_period = np.array([[40.0], [40.0]])

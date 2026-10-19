@@ -647,8 +647,10 @@ def test_stagewise_evolution_candidate_selection_and_match_ranking() -> None:
     ranking_model.z = [[[[1], [0]], [[1], [0]]]]
     ranking_model.Q_r = [[[[10.0], [0.0]], [[20.0], [0.0]]]]
     ranking_model.alpha = [[[[0.1], [0.0]], [[0.2], [0.0]]]]
-    ranking_model.hu_cost = [5.0]
-    ranking_model.cu_cost = [5.0]
+    ranking_model.hu_cost_period = [[5.0]]
+    ranking_model.cu_cost_period = [[5.0]]
+    ranking_model.Q_hu_by_utility_by_period = [[0.0]]
+    ranking_model.Q_cu_by_utility_by_period = [[0.0]]
     ranking_model.unit_cost = [50.0]
     ranking_model.A_coeff = [2.0]
     ranking_model.A_exp = [1.0]
@@ -1679,13 +1681,13 @@ def test_lmtd_replacement_uses_endpoint_lmtd_for_active_units(model_cls) -> None
     )
 
     np.testing.assert_allclose(model.LMTD_r, [[[recovery_lmtd[0], recovery_lmtd[1]]]])
-    np.testing.assert_allclose(model.LMTD_hu, [hot_utility_lmtd])
-    np.testing.assert_allclose(model.LMTD_cu, [cold_utility_lmtd])
+    np.testing.assert_allclose(model.LMTD_hu, [[hot_utility_lmtd]])
+    np.testing.assert_allclose(model.LMTD_cu, [[cold_utility_lmtd]])
     np.testing.assert_allclose(
         model.area_r, [[[expected_area_r[0], expected_area_r[1]]]]
     )
-    np.testing.assert_allclose(model.area_hu, [expected_area_hu])
-    np.testing.assert_allclose(model.area_cu, [expected_area_cu])
+    np.testing.assert_allclose(model.area_hu, [[expected_area_hu]])
+    np.testing.assert_allclose(model.area_cu, [[expected_area_cu]])
     assert model.n_recovery_units == 2
     assert model.n_hu_units == 1
     assert model.n_cu_units == 1
@@ -1983,17 +1985,20 @@ def _source_shaped_lmtd_post_process_model(model_cls):
     model.z_i_active_period = [[1]]
     model.z_j_active_period = [[1]]
     model.minimisation_goal = "variable total cost"
+    model.NHU = 1
+    model.NCU = 1
     model.Q_r = [[[[100.0], [50.0]]]]
-    model.Q_h = [[30.0]]
-    model.Q_c = [[20.0]]
+    # Heaters and coolers are [stream][utility].
+    model.Q_h = [[[30.0]]]
+    model.Q_c = [[[20.0]]]
     model.z = [[[[1.0], [1.0]]]]
-    model.z_hu = [[1.0]]
-    model.z_cu = [[1.0]]
+    model.z_hu = [[[1.0]]]
+    model.z_cu = [[[1.0]]]
     model.theta_1 = [[[[70.0], [70.0]]]]
     model.theta_2 = [[[[40.0], [20.0]]]]
     model.U_r = [[0.5]]
-    model.U_hu = [0.25]
-    model.U_cu = [0.4]
+    model.U_hu = [[0.25]]
+    model.U_cu = [[0.4]]
     model.T_h = [[[500.0], [470.0], [360.0]]]
     model.T_c = [[[300.0], [330.0], [320.0]]]
     model.T_h_out = [340.0]
@@ -2235,10 +2240,10 @@ def _pdm_multiperiod_side_result(*, required: bool) -> SimpleNamespace:
         for n in range(2)
     ]
     side.Q_h_by_period = [
-        [_ValueCell(value) for _ in range(stream_count)] for value in (0.0, 6.0)
+        [[_ValueCell(value)] for _ in range(stream_count)] for value in (0.0, 6.0)
     ]
     side.Q_c_by_period = [
-        [_ValueCell(0.0) for _ in range(stream_count)] for _ in range(2)
+        [[_ValueCell(0.0)] for _ in range(stream_count)] for _ in range(2)
     ]
     side.non_isothermal_model = True
     side.X_by_period = [
@@ -2303,10 +2308,11 @@ def _pdm_side_result(
         theta_2_by_period=[_value_cell_grid(20.0, stream_count, stream_count, stages)],
         T_h_by_period=[t_h],
         T_c_by_period=[t_c],
-        Q_h_by_period=[[_ValueCell(5.0 + j) for j in range(stream_count)]],
-        z_hu=[_ValueCell(1.0) for _ in range(stream_count)],
-        Q_c_by_period=[[_ValueCell(7.0 + i) for i in range(stream_count)]],
-        z_cu=[_ValueCell(1.0) for _ in range(stream_count)],
+        # Heaters and coolers are [stream][utility], one utility each here.
+        Q_h_by_period=[[[_ValueCell(5.0 + j)] for j in range(stream_count)]],
+        z_hu=[[_ValueCell(1.0)] for _ in range(stream_count)],
+        Q_c_by_period=[[[_ValueCell(7.0 + i)] for i in range(stream_count)]],
+        z_cu=[[_ValueCell(1.0)] for _ in range(stream_count)],
     )
 
 
@@ -3090,6 +3096,12 @@ def test_pinch_decomp_below_preprocessing_handles_inactive_streams_and_manual_st
     model.htc_c_period = np.array([[3.0, 4.0]])
     model.htc_hu_period = np.array([[5.0]])
     model.htc_cu_period = np.array([[6.0]])
+    model.NHU = 1
+    model.NCU = 1
+    model.T_hu_in_period = np.array([[600.0]])
+    model.T_cu_in_period = np.array([[280.0]])
+    model.dT_hu_min_period = [[[10.0, 10.0]]]
+    model.dT_cu_min_period = [[[10.0], [10.0]]]
     model.tol = 1e-6
     monkeypatch.setattr(
         base_approach,
@@ -3107,8 +3119,8 @@ def test_pinch_decomp_below_preprocessing_handles_inactive_streams_and_manual_st
     np.testing.assert_allclose(model.T_h_out_period[0], [390.0, 0.0])
     np.testing.assert_allclose(model.T_c_in_period[0], [390.0, 0.0])
     np.testing.assert_allclose(model.T_c_out_period[0], [395.0, 0.0])
-    assert model.z_hu_feasible == [0, 0]
-    assert model.z_cu_feasible == [1, 0]
+    assert model.z_hu_feasible == [[0], [0]]
+    assert model.z_cu_feasible == [[1], [0]]
 
 
 def test_pinch_decomp_non_integer_superstructure_builds_param_binaries(
@@ -3125,9 +3137,11 @@ def test_pinch_decomp_non_integer_superstructure_builds_param_binaries(
     model.Q_max_period = np.array([[[100.0]]])
     model.Qtot_sh_period = np.array([[20.0]])
     model.Qtot_sc_period = np.array([[15.0]])
+    model.NHU = 1
+    model.NCU = 1
     model.z_allowed = [[[1, 0]]]
-    model.z_cu_allowed = [0]
-    model.z_hu_allowed = [1]
+    model.z_cu_allowed = [[0]]
+    model.z_hu_allowed = [[1]]
     model.z_i_active = [1]
     model.z_j_active = [1]
     model.z_i_active_period = [[1]]
@@ -3156,8 +3170,8 @@ def test_pinch_decomp_non_integer_superstructure_builds_param_binaries(
     model._set_multiperiod_stage_wise_superstructure()
 
     assert model.z == [[[1.0, 0.0]]]
-    assert model.z_hu == [1.0]
-    assert model.z_cu == [0.0]
+    assert model.z_hu == [[1.0]]
+    assert model.z_cu == [[0.0]]
     assert model.dqda == []
     assert model.alpha == []
     assert model.m.equations
@@ -3182,8 +3196,10 @@ def test_pinch_decomp_set_obj_covers_remaining_objective_modes(
     model.I = 1
     model.J = 1
     model.S = 1
-    model.Q_h_by_period = [[2.0]]
-    model.Q_c_by_period = [[3.0]]
+    model.NHU = 1
+    model.NCU = 1
+    model.Q_h_by_period = [[[2.0]]]
+    model.Q_c_by_period = [[[3.0]]]
     model.Q_r_by_period = [[[[4.0]]]]
     model.z = [[[1.0]]]
     model.period_weights = [1.0]
@@ -3202,6 +3218,8 @@ def test_pinch_decomp_set_obj_rejects_unsupported_goal(goal: str) -> None:
     model.m = _AlgebraModel()
     model.minimisation_goal = goal
     model.N_periods = 1
+    model.NHU = 1
+    model.NCU = 1
 
     with pytest.raises(ValueError, match="Unsupported pinch-decomposition"):
         model.set_obj()
@@ -3315,8 +3333,8 @@ def test_pdm_amalgamation_retains_later_period_only_nonisothermal_matches() -> N
     assert network.N_periods == 2
     assert network.Q_r_by_period[0][0][0][0][0] == pytest.approx(0.0)
     assert network.Q_r_by_period[1][0][0][0][0] == pytest.approx(12.0)
-    assert network.Q_h_by_period[0][0][0] == pytest.approx(0.0)
-    assert network.Q_h_by_period[1][0][0] == pytest.approx(6.0)
+    assert network.Q_h_by_period[0][0][0][0] == pytest.approx(0.0)
+    assert network.Q_h_by_period[1][0][0][0] == pytest.approx(6.0)
     assert network.z_allowed[0][0][0] == 1
     assert network.X_by_period[1][0][0][0][0] == pytest.approx(0.25)
     assert network.Y_by_period[1][0][0][0][0] == pytest.approx(0.5)

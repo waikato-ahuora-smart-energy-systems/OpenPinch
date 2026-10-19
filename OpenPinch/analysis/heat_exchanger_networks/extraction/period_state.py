@@ -34,25 +34,28 @@ def _utility_outlet_temperature(
     side: str,
     period_idx: int,
     match_index: int,
+    utility_index: int,
     duty: float,
 ) -> float | None:
     resolver = getattr(solved_model, "_utility_solved_outlet_temperature", None)
     if callable(resolver):
-        return _optional_float(resolver(side, period_idx, match_index, duty))
+        return _optional_float(
+            resolver(side, period_idx, match_index, utility_index, duty)
+        )
     if side == "hot":
         return _period_value(
             solved_model,
             "T_hu_out_period",
             "T_hu_out",
             period_idx,
-            0,
+            utility_index,
         )
     return _period_value(
         solved_model,
         "T_cu_out_period",
         "T_cu_out",
         period_idx,
-        0,
+        utility_index,
     )
 
 
@@ -183,14 +186,15 @@ def _hot_utility_period_state(
     period_id: str,
     period_idx: int,
     cold_index: int,
+    utility_index: int,
     q_values: Any,
     q_values_by_period: Any,
     tolerance: float,
 ) -> HeatExchangerPeriodState:
     duty = _normalized_solver_duty(
-        _index(q_values_by_period, period_idx, cold_index)
+        _index(q_values_by_period, period_idx, cold_index, utility_index)
         if q_values_by_period is not None
-        else _index(q_values, cold_index),
+        else _index(q_values, cold_index, utility_index),
         tolerance=tolerance,
     )
     source_inlet = _period_value(
@@ -198,13 +202,14 @@ def _hot_utility_period_state(
         "T_hu_in_period",
         "T_hu_in",
         period_idx,
-        0,
+        utility_index,
     )
     source_outlet = _utility_outlet_temperature(
         solved_model,
         side="hot",
         period_idx=period_idx,
         match_index=cold_index,
+        utility_index=utility_index,
         duty=duty,
     )
     sink_inlet = _period_value(
@@ -224,7 +229,7 @@ def _hot_utility_period_state(
     )
     active = _is_active(
         duty,
-        _index(getattr(solved_model, "z_hu", None), cold_index),
+        _index(getattr(solved_model, "z_hu", None), cold_index, utility_index),
         tolerance,
     )
     return HeatExchangerPeriodState(
@@ -246,15 +251,16 @@ def _cold_utility_period_state(
     period_id: str,
     period_idx: int,
     hot_index: int,
+    utility_index: int,
     last_stage: int | None,
     q_values: Any,
     q_values_by_period: Any,
     tolerance: float,
 ) -> HeatExchangerPeriodState:
     duty = _normalized_solver_duty(
-        _index(q_values_by_period, period_idx, hot_index)
+        _index(q_values_by_period, period_idx, hot_index, utility_index)
         if q_values_by_period is not None
-        else _index(q_values, hot_index),
+        else _index(q_values, hot_index, utility_index),
         tolerance=tolerance,
     )
     source_inlet = _period_value(
@@ -277,18 +283,19 @@ def _cold_utility_period_state(
         "T_cu_in_period",
         "T_cu_in",
         period_idx,
-        0,
+        utility_index,
     )
     sink_outlet = _utility_outlet_temperature(
         solved_model,
         side="cold",
         period_idx=period_idx,
         match_index=hot_index,
+        utility_index=utility_index,
         duty=duty,
     )
     active = _is_active(
         duty,
-        _index(getattr(solved_model, "z_cu", None), hot_index),
+        _index(getattr(solved_model, "z_cu", None), hot_index, utility_index),
         tolerance,
     )
     return HeatExchangerPeriodState(

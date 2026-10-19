@@ -68,26 +68,7 @@ def set_preprocessing(owner) -> None:
         ],
         dtype=float,
     )
-    owner.U_hu_period = np.array(
-        [
-            [
-                1 / (1 / owner.htc_hu_period[n][0] + 1 / owner.htc_c_period[n][j])
-                for j in range(owner.J)
-            ]
-            for n in range(owner.N_periods)
-        ],
-        dtype=float,
-    )
-    owner.U_cu_period = np.array(
-        [
-            [
-                1 / (1 / owner.htc_h_period[n][i] + 1 / owner.htc_cu_period[n][0])
-                for i in range(owner.I)
-            ]
-            for n in range(owner.N_periods)
-        ],
-        dtype=float,
-    )
+    owner.U_hu_period, owner.U_cu_period = _utility_heat_transfer_coefficients(owner)
     owner.U_r = owner.U_r_period[0].copy()
     owner.U_hu = owner.U_hu_period[0].copy()
     owner.U_cu = owner.U_cu_period[0].copy()
@@ -154,5 +135,37 @@ def set_preprocessing(owner) -> None:
         ]
         for i in range(owner.I)
     ]
-    owner.z_hu_feasible = [1 for _j in range(owner.J)]
-    owner.z_cu_feasible = [1 for _i in range(owner.I)]
+    owner.z_hu_feasible, owner.z_cu_feasible = _approach.utility_match_feasibility(
+        owner
+    )
+
+
+def _utility_heat_transfer_coefficients(owner) -> tuple[np.ndarray, np.ndarray]:
+    """Return heater U ``[period][cold][utility]`` and cooler U ``[period][hot][u]``."""
+    hot = np.array(
+        [
+            [
+                [
+                    1 / (1 / owner.htc_hu_period[n][u] + 1 / owner.htc_c_period[n][j])
+                    for u in range(owner.NHU)
+                ]
+                for j in range(owner.J)
+            ]
+            for n in range(owner.N_periods)
+        ],
+        dtype=float,
+    )
+    cold = np.array(
+        [
+            [
+                [
+                    1 / (1 / owner.htc_h_period[n][i] + 1 / owner.htc_cu_period[n][u])
+                    for u in range(owner.NCU)
+                ]
+                for i in range(owner.I)
+            ]
+            for n in range(owner.N_periods)
+        ],
+        dtype=float,
+    )
+    return hot, cold

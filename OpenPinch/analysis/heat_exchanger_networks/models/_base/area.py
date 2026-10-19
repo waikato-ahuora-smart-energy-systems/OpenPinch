@@ -125,8 +125,156 @@ def _apply_segment_recovery_areas(model, q_r) -> None:
     ]
 
 
+def solved_utility_duties(model) -> tuple[list, list]:
+    """Return solved heater ``[period][cold][utility]`` and cooler duties."""
+    q_h = [
+        [
+            [model._active_binary_value(value) for value in row]
+            for row in model.Q_h_by_period[n]
+        ]
+        for n in range(model.N_periods)
+    ]
+    q_c = [
+        [
+            [model._active_binary_value(value) for value in row]
+            for row in model.Q_c_by_period[n]
+        ]
+        for n in range(model.N_periods)
+    ]
+    return q_h, q_c
+
+
+def used_utility_matches(model, q_h, q_c) -> tuple[list, list]:
+    """Return ``[[flag]]`` per (stream, utility): whether a period uses it."""
+
+    def used(duties, index: int, u: int) -> list[int]:
+        peak = max(duties[n][index][u] for n in range(model.N_periods))
+        return [1 if peak > model.tol else 0]
+
+    return (
+        [[used(q_h, j, u) for u in range(model.NHU)] for j in range(model.J)],
+        [[used(q_c, i, u) for u in range(model.NCU)] for i in range(model.I)],
+    )
+
+
+def recovered_utility_price(model) -> float:
+    """Return the price of the utility heat one unit of recovery saves.
+
+    Recovery saves heat from the hot and the cold utility in use; where
+    several are in use, each counts by its share of the solved period-0 duty.
+    """
+
+    def price(prices, totals) -> float:
+        used = sum(totals)
+        if used <= model.tol:
+            return float(min(prices))
+        return float(sum(p * q for p, q in zip(prices, totals, strict=True)) / used)
+
+    return price(model.hu_cost_period[0], model.Q_hu_by_utility_by_period[0]) + price(
+        model.cu_cost_period[0], model.Q_cu_by_utility_by_period[0]
+    )
+
+
+def set_utility_lmtd_and_areas(model, q_h, q_c) -> None:
+    """Set every heater's and cooler's log-mean difference and area by period.
+
+    ``q_h`` is ``[period][cold][utility]`` and ``q_c`` ``[period][hot][utility]``;
+    each (stream, utility) pair is its own unit, and its design area is the
+    largest over the periods.
+    """
+    model.LMTD_hu_by_period = [
+        [
+            [
+                _post_process_lmtd(
+                    model,
+                    *_heater_terminal_differences(model, n, j, u, q_h[n][j][u]),
+                    model.z_hu[j][u][0],
+                    formula_allowed=False,
+                )
+                for u in range(model.NHU)
+            ]
+            for j in range(model.J)
+        ]
+        for n in range(model.N_periods)
+    ]
+    model.area_hu_by_period = [
+        [
+            [
+                _heat_load_area(model, q_h[n][j][u], model.U_hu_period[n][j][u], lmtd)
+                for u, lmtd in enumerate(model.LMTD_hu_by_period[n][j])
+            ]
+            for j in range(model.J)
+        ]
+        for n in range(model.N_periods)
+    ]
+    model.LMTD_cu_by_period = [
+        [
+            [
+                _post_process_lmtd(
+                    model,
+                    *_cooler_terminal_differences(model, n, i, u, q_c[n][i][u]),
+                    model.z_cu[i][u][0],
+                    formula_allowed=False,
+                )
+                for u in range(model.NCU)
+            ]
+            for i in range(model.I)
+        ]
+        for n in range(model.N_periods)
+    ]
+    model.area_cu_by_period = [
+        [
+            [
+                _heat_load_area(model, q_c[n][i][u], model.U_cu_period[n][i][u], lmtd)
+                for u, lmtd in enumerate(model.LMTD_cu_by_period[n][i])
+            ]
+            for i in range(model.I)
+        ]
+        for n in range(model.N_periods)
+    ]
+    _apply_segment_utility_areas(model, q_h, q_c)
+    model.LMTD_hu = model.LMTD_hu_by_period[0]
+    model.LMTD_cu = model.LMTD_cu_by_period[0]
+    model.area_hu = [
+        [
+            max(model.area_hu_by_period[n][j][u] for n in range(model.N_periods))
+            for u in range(model.NHU)
+        ]
+        for j in range(model.J)
+    ]
+    model.area_cu = [
+        [
+            max(model.area_cu_by_period[n][i][u] for n in range(model.N_periods))
+            for u in range(model.NCU)
+        ]
+        for i in range(model.I)
+    ]
+
+
+def _heater_terminal_differences(model, n: int, j: int, u: int, duty: float):
+    return (
+        model.T_hu_in_period[n][u] - model.T_c_out_period[n][j],
+        model._utility_solved_outlet_temperature("hot", n, j, u, duty)
+        - model._active_binary_value(model.T_c_by_period[n][j][0]),
+    )
+
+
+def _cooler_terminal_differences(model, n: int, i: int, u: int, duty: float):
+    return (
+        model._active_binary_value(model.T_h_by_period[n][i][model.S])
+        - model._utility_solved_outlet_temperature("cold", n, i, u, duty),
+        model.T_h_out_period[n][i] - model.T_cu_in_period[n][u],
+    )
+
+
+def _heat_load_area(model, duty: float, coefficient: float, lmtd: float) -> float:
+    if lmtd <= model.tol or duty <= model.tol:
+        return 0.0
+    return duty / coefficient / lmtd
+
+
 def _apply_segment_utility_areas(model, q_h, q_c) -> None:
-    """Use local process segments for hot- and cold-utility area totals."""
+    """Use local segments for the area of heaters and coolers that have them."""
     if not hasattr(model, "solver_arrays"):
         return
     if not (
@@ -138,8 +286,8 @@ def _apply_segment_utility_areas(model, q_h, q_c) -> None:
             _piecewise._solver_parent_is_segmented(model, "cold", j)
             for j in range(model.J)
         )
-        or _piecewise._utility_is_segmented(model, "hot")
-        or _piecewise._utility_is_segmented(model, "cold")
+        or _piecewise._any_utility_segmented(model, "hot")
+        or _piecewise._any_utility_segmented(model, "cold")
     ):
         return
     from ...solver.piecewise import (
@@ -148,103 +296,108 @@ def _apply_segment_utility_areas(model, q_h, q_c) -> None:
         utility_thermal_profile,
     )
 
-    hot_utility_identity = model.solver_arrays.utility_identities["hot_utilities"][0]
-    cold_utility_identity = model.solver_arrays.utility_identities["cold_utilities"][0]
+    identities = model.solver_arrays.utility_identities
     model.segment_area_hu_contributions_by_period = [
-        [() for _j in range(model.J)] for _n in range(model.N_periods)
+        [[() for _u in range(model.NHU)] for _j in range(model.J)]
+        for _n in range(model.N_periods)
     ]
     model.segment_area_cu_contributions_by_period = [
-        [() for _i in range(model.I)] for _n in range(model.N_periods)
+        [[() for _u in range(model.NCU)] for _i in range(model.I)]
+        for _n in range(model.N_periods)
     ]
     for n in range(model.N_periods):
         period = str(model.period_ids[n])
         for j in range(model.J):
-            duty = float(q_h[n][j])
-            if duty <= model.tol or not (
-                _piecewise._solver_parent_is_segmented(model, "cold", j)
-                or _piecewise._utility_is_segmented(model, "hot")
-            ):
-                continue
-            hot_utility_profile = (
-                profile_from_solver_arrays(
-                    model.solver_arrays,
-                    side="hot_utility",
-                    parent_index=0,
-                    period_index=n,
+            for u in range(model.NHU):
+                duty = float(q_h[n][j][u])
+                segmented_utility = _piecewise._utility_is_segmented(model, "hot", u)
+                if duty <= model.tol or not (
+                    _piecewise._solver_parent_is_segmented(model, "cold", j)
+                    or segmented_utility
+                ):
+                    continue
+                hot_utility_profile = (
+                    profile_from_solver_arrays(
+                        model.solver_arrays,
+                        side="hot_utility",
+                        parent_index=u,
+                        period_index=n,
+                    )
+                    if segmented_utility
+                    else utility_thermal_profile(
+                        identity=identities["hot_utilities"][u],
+                        inlet_temperature=model.T_hu_in_period[n][u],
+                        outlet_temperature=model.T_hu_out_period[n][u],
+                        duty=duty,
+                        heat_transfer_coefficient=model.htc_hu_period[n][u],
+                    )
                 )
-                if _piecewise._utility_is_segmented(model, "hot")
-                else utility_thermal_profile(
-                    identity=hot_utility_identity,
-                    inlet_temperature=model.T_hu_in_period[n][0],
-                    outlet_temperature=model.T_hu_out_period[n][0],
+                contributions = duty_aligned_area_contributions(
+                    hot_utility_profile,
+                    profile_from_solver_arrays(
+                        model.solver_arrays,
+                        side="cold",
+                        parent_index=j,
+                        period_index=n,
+                    ),
                     duty=duty,
-                    heat_transfer_coefficient=model.htc_hu_period[n][0],
+                    hot_inlet_temperature=model.T_hu_in_period[n][u],
+                    cold_inlet_temperature=model._active_binary_value(
+                        model.T_c_by_period[n][j][0]
+                    ),
+                    period=period,
+                    tolerance=model.tol,
                 )
-            )
-            contributions = duty_aligned_area_contributions(
-                hot_utility_profile,
-                profile_from_solver_arrays(
-                    model.solver_arrays,
-                    side="cold",
-                    parent_index=j,
-                    period_index=n,
-                ),
-                duty=duty,
-                hot_inlet_temperature=model.T_hu_in_period[n][0],
-                cold_inlet_temperature=model._active_binary_value(
-                    model.T_c_by_period[n][j][0]
-                ),
-                period=period,
-                tolerance=model.tol,
-            )
-            model.segment_area_hu_contributions_by_period[n][j] = contributions
-            model.area_hu_by_period[n][j] = sum(
-                contribution.area for contribution in contributions
-            )
+                model.segment_area_hu_contributions_by_period[n][j][u] = contributions
+                model.area_hu_by_period[n][j][u] = sum(
+                    contribution.area for contribution in contributions
+                )
 
         for i in range(model.I):
-            duty = float(q_c[n][i])
-            if duty <= model.tol or not (
-                _piecewise._solver_parent_is_segmented(model, "hot", i)
-                or _piecewise._utility_is_segmented(model, "cold")
-            ):
-                continue
-            cold_utility_profile = (
-                profile_from_solver_arrays(
-                    model.solver_arrays,
-                    side="cold_utility",
-                    parent_index=0,
-                    period_index=n,
+            for u in range(model.NCU):
+                duty = float(q_c[n][i][u])
+                segmented_utility = _piecewise._utility_is_segmented(model, "cold", u)
+                if duty <= model.tol or not (
+                    _piecewise._solver_parent_is_segmented(model, "hot", i)
+                    or segmented_utility
+                ):
+                    continue
+                cold_utility_profile = (
+                    profile_from_solver_arrays(
+                        model.solver_arrays,
+                        side="cold_utility",
+                        parent_index=u,
+                        period_index=n,
+                    )
+                    if segmented_utility
+                    else utility_thermal_profile(
+                        identity=identities["cold_utilities"][u],
+                        inlet_temperature=model.T_cu_in_period[n][u],
+                        outlet_temperature=model.T_cu_out_period[n][u],
+                        duty=duty,
+                        heat_transfer_coefficient=model.htc_cu_period[n][u],
+                    )
                 )
-                if _piecewise._utility_is_segmented(model, "cold")
-                else utility_thermal_profile(
-                    identity=cold_utility_identity,
-                    inlet_temperature=model.T_cu_in_period[n][0],
-                    outlet_temperature=model.T_cu_out_period[n][0],
+                contributions = duty_aligned_area_contributions(
+                    profile_from_solver_arrays(
+                        model.solver_arrays,
+                        side="hot",
+                        parent_index=i,
+                        period_index=n,
+                    ),
+                    cold_utility_profile,
                     duty=duty,
-                    heat_transfer_coefficient=model.htc_cu_period[n][0],
+                    hot_inlet_temperature=model._active_binary_value(
+                        model.T_h_by_period[n][i][model.S]
+                    ),
+                    cold_inlet_temperature=model.T_cu_in_period[n][u],
+                    period=period,
+                    tolerance=model.tol,
                 )
-            )
-            contributions = duty_aligned_area_contributions(
-                profile_from_solver_arrays(
-                    model.solver_arrays,
-                    side="hot",
-                    parent_index=i,
-                    period_index=n,
-                ),
-                cold_utility_profile,
-                duty=duty,
-                hot_inlet_temperature=model._active_binary_value(
-                    model.T_h_by_period[n][i][model.S]
-                ),
-                cold_inlet_temperature=model.T_cu_in_period[n][0],
-                period=period,
-                tolerance=model.tol,
-            )
-            model.segment_area_cu_contributions_by_period[n][i] = contributions
-            model.area_cu_by_period[n][i] = sum(
-                contribution.area for contribution in contributions
-            )
+                model.segment_area_cu_contributions_by_period[n][i][u] = contributions
+                model.area_cu_by_period[n][i][u] = sum(
+                    contribution.area for contribution in contributions
+                )
 
 
 def _segment_exact_dqda(

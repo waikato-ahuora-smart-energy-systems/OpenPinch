@@ -641,10 +641,11 @@ def test_internal_problem_stage_reduction_transfers_nonisothermal_state_and_fall
             ]
             self.T_h = [[_Variable() for _k in range(self.S + 1)]]
             self.T_c = [[_Variable() for _k in range(self.S + 1)]]
-            self.Q_c = [_Variable()]
-            self.z_cu = [_Variable()]
-            self.Q_h = [_Variable()]
-            self.z_hu = [_Variable()]
+            # Heaters and coolers are [stream][utility].
+            self.Q_c = [[_Variable()]]
+            self.z_cu = [[_Variable()]]
+            self.Q_h = [[_Variable()]]
+            self.z_hu = [[_Variable()]]
             self.mSuccess = 0
 
         def optimise(self, print_output=False):
@@ -666,10 +667,10 @@ def test_internal_problem_stage_reduction_transfers_nonisothermal_state_and_fall
         T_c_out_y=[[[[80.0], [0.0]]]],
         T_h=[[[150.0], [120.0], [100.0]]],
         T_c=[[[60.0], [80.0], [90.0]]],
-        Q_c=[[1.0]],
-        z_cu=[[1.0]],
-        Q_h=[[2.0]],
-        z_hu=[[1.0]],
+        Q_c=[[[1.0]]],
+        z_cu=[[[1.0]]],
+        Q_h=[[[2.0]]],
+        z_hu=[[[1.0]]],
         non_isothermal_model=True,
         tol=1e-6,
         name="case",
@@ -805,15 +806,17 @@ def test_stagewise_shared_area_cost_checks_each_failure_path():
         I=1,
         J=1,
         S=1,
+        NHU=1,
+        NCU=1,
         U_r_period=[[[1.0]]],
         theta_1_by_period=[[[[1.0]]]],
         theta_2_by_period=[[[[1.0]]]],
-        U_hu_period=[[1.0]],
+        U_hu_period=[[[1.0]]],
         T_hu_in_period=[[200.0]],
         T_hu_out_period=[[180.0]],
         T_c_out_period=[[100.0]],
         T_c_by_period=[[[80.0, 90.0]]],
-        U_cu_period=[[1.0]],
+        U_cu_period=[[[1.0]]],
         T_h_by_period=[[[150.0, 120.0]]],
         T_h_out_period=[[110.0]],
         T_cu_out_period=[[40.0]],
@@ -828,7 +831,7 @@ def test_stagewise_shared_area_cost_checks_each_failure_path():
         hu_area_cost_total=0.0,
         cu_area_cost_total=0.0,
         _utility_solved_outlet_temperature=(
-            lambda side, period_idx, match_index, heat_duty: (
+            lambda side, period_idx, match_index, utility, heat_duty: (
                 180.0 if side == "hot" else 40.0
             )
         ),
@@ -838,10 +841,10 @@ def test_stagewise_shared_area_cost_checks_each_failure_path():
         **base,
         area_r_shared=[[[0.0]]],
         Q_r_by_period=[[[[0.0]]]],
-        area_hu_shared=[0.0],
-        Q_h_by_period=[[0.0]],
-        area_cu_shared=[0.0],
-        Q_c_by_period=[[0.0]],
+        area_hu_shared=[[0.0]],
+        Q_h_by_period=[[[0.0]]],
+        area_cu_shared=[[0.0]],
+        Q_c_by_period=[[[0.0]]],
     )
     assert stagewise_verification._check_area_costs(no_recovery) is True
 
@@ -849,10 +852,10 @@ def test_stagewise_shared_area_cost_checks_each_failure_path():
         **base,
         area_r_shared=[[[0.0]]],
         Q_r_by_period=[[[[5.0]]]],
-        area_hu_shared=[100.0],
-        Q_h_by_period=[[0.0]],
-        area_cu_shared=[100.0],
-        Q_c_by_period=[[0.0]],
+        area_hu_shared=[[100.0]],
+        Q_h_by_period=[[[0.0]]],
+        area_cu_shared=[[100.0]],
+        Q_c_by_period=[[[0.0]]],
     )
     assert stagewise_verification._check_area_costs(bad_recovery) is False
 
@@ -860,10 +863,10 @@ def test_stagewise_shared_area_cost_checks_each_failure_path():
         **base,
         area_r_shared=[[[100.0]]],
         Q_r_by_period=[[[[0.0]]]],
-        area_hu_shared=[0.0],
-        Q_h_by_period=[[10_000.0]],
-        area_cu_shared=[100.0],
-        Q_c_by_period=[[0.0]],
+        area_hu_shared=[[0.0]],
+        Q_h_by_period=[[[10_000.0]]],
+        area_cu_shared=[[100.0]],
+        Q_c_by_period=[[[0.0]]],
     )
     assert stagewise_verification._check_area_costs(bad_hot_utility) is False
 
@@ -871,10 +874,10 @@ def test_stagewise_shared_area_cost_checks_each_failure_path():
         **base,
         area_r_shared=[[[100.0]]],
         Q_r_by_period=[[[[0.0]]]],
-        area_hu_shared=[100.0],
-        Q_h_by_period=[[0.0]],
-        area_cu_shared=[0.0],
-        Q_c_by_period=[[10_000.0]],
+        area_hu_shared=[[100.0]],
+        Q_h_by_period=[[[0.0]]],
+        area_cu_shared=[[0.0]],
+        Q_c_by_period=[[[10_000.0]]],
     )
     assert stagewise_verification._check_area_costs(bad_cold_utility) is False
 

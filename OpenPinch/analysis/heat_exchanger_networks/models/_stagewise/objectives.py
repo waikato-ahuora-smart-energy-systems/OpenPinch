@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ...indexing import build_index_grid
 from .._base import approach as _approach
 from .._base import piecewise as _piecewise
 
@@ -15,7 +16,7 @@ def set_obj(owner) -> None:
                 _approach._weighted_state_average(
                     owner,
                     [
-                        owner.m.sum([owner.Q_h_by_period[n][j] for j in range(owner.J)])
+                        owner.m.sum(_utility_loads(owner.Q_h_by_period[n]))
                         for n in range(owner.N_periods)
                     ],
                 )
@@ -25,7 +26,7 @@ def set_obj(owner) -> None:
                 _approach._weighted_state_average(
                     owner,
                     [
-                        owner.m.sum([owner.Q_c_by_period[n][i] for i in range(owner.I)])
+                        owner.m.sum(_utility_loads(owner.Q_c_by_period[n]))
                         for n in range(owner.N_periods)
                     ],
                 )
@@ -35,32 +36,30 @@ def set_obj(owner) -> None:
                 _approach._weighted_state_average(
                     owner,
                     [
-                        owner.m.sum([owner.Q_h_by_period[n][j] for j in range(owner.J)])
-                        + owner.m.sum(
-                            [owner.Q_c_by_period[n][i] for i in range(owner.I)]
-                        )
+                        owner.m.sum(_utility_loads(owner.Q_h_by_period[n]))
+                        + owner.m.sum(_utility_loads(owner.Q_c_by_period[n]))
                         for n in range(owner.N_periods)
                     ],
                 )
             )
         elif owner.minimisation_goal == "utility costs":
             hot_costs = [
-                _piecewise._utility_cost_expression(
+                _utilities_cost_expression(
                     owner,
                     "hot",
                     n,
-                    owner.m.sum([owner.Q_h_by_period[n][j] for j in range(owner.J)]),
-                    name=f"hot_utility_period_{n}",
+                    _utility_totals(owner, "hot", n),
+                    name="hot_utility",
                 )
                 for n in range(owner.N_periods)
             ]
             cold_costs = [
-                _piecewise._utility_cost_expression(
+                _utilities_cost_expression(
                     owner,
                     "cold",
                     n,
-                    owner.m.sum([owner.Q_c_by_period[n][i] for i in range(owner.I)]),
-                    name=f"cold_utility_period_{n}",
+                    _utility_totals(owner, "cold", n),
+                    name="cold_utility",
                 )
                 for n in range(owner.N_periods)
             ]
@@ -90,7 +89,11 @@ def set_obj(owner) -> None:
         elif owner.minimisation_goal == "dQ/dA obj":
             owner.m.Minimize(
                 _approach._weighted_state_average(
-                    owner, [sum(owner.Q_h_by_period[n]) for n in range(owner.N_periods)]
+                    owner,
+                    [
+                        sum(_utility_loads(owner.Q_h_by_period[n]))
+                        for n in range(owner.N_periods)
+                    ],
                 )
                 - owner.HU_target
             )
@@ -101,28 +104,20 @@ def set_obj(owner) -> None:
         return
 
     if owner.minimisation_goal == "hot utility":
-        owner.m.Minimize(owner.m.sum([owner.Q_h[j] for j in range(owner.J)]))
+        owner.m.Minimize(owner.m.sum(_utility_loads(owner.Q_h)))
     elif owner.minimisation_goal == "cold utility":
-        owner.m.Minimize(owner.m.sum([owner.Q_c[i] for i in range(owner.I)]))
+        owner.m.Minimize(owner.m.sum(_utility_loads(owner.Q_c)))
     elif owner.minimisation_goal == "total utility":
         owner.m.Minimize(
-            owner.m.sum([owner.Q_h[j] for j in range(owner.J)])
-            + owner.m.sum([owner.Q_c[i] for i in range(owner.I)])
+            owner.m.sum(_utility_loads(owner.Q_h))
+            + owner.m.sum(_utility_loads(owner.Q_c))
         )
     elif owner.minimisation_goal == "utility costs":
-        hot_cost = _piecewise._utility_cost_expression(
-            owner,
-            "hot",
-            0,
-            owner.m.sum([owner.Q_h[j] for j in range(owner.J)]),
-            name="hot_utility",
+        hot_cost = _utilities_cost_expression(
+            owner, "hot", 0, _utility_totals(owner, "hot", 0), name="hot_utility"
         )
-        cold_cost = _piecewise._utility_cost_expression(
-            owner,
-            "cold",
-            0,
-            owner.m.sum([owner.Q_c[i] for i in range(owner.I)]),
-            name="cold_utility",
+        cold_cost = _utilities_cost_expression(
+            owner, "cold", 0, _utility_totals(owner, "cold", 0), name="cold_utility"
         )
         owner.m.Minimize(hot_cost + cold_cost)
     elif owner.minimisation_goal == "heat recovery":
@@ -137,11 +132,64 @@ def set_obj(owner) -> None:
             )
         )
     elif owner.minimisation_goal == "dQ/dA obj":
-        owner.m.Minimize(sum(owner.Q_h) - owner.HU_target)
+        owner.m.Minimize(sum(_utility_loads(owner.Q_h)) - owner.HU_target)
     elif owner.minimisation_goal in {"total cost", "variable total cost"}:
         _set_total_cost_objective(owner)
     else:
         _raise_unsupported_goal(owner)
+
+
+def _utility_loads(grid) -> list:
+    """Flatten a ``[stream][utility]`` duty grid into one list of loads."""
+    return [load for row in grid for load in row]
+
+
+def _utility_totals(owner, side: str, n: int) -> list:
+    """Return each utility's total duty over its heaters or coolers in period n."""
+    grid = owner.Q_h_by_period[n] if side == "hot" else owner.Q_c_by_period[n]
+    count = owner.NHU if side == "hot" else owner.NCU
+    return [owner.m.sum([row[u] for row in grid]) for u in range(count)]
+
+
+def _utilities_cost_expression(owner, side: str, n: int, totals, *, name: str):
+    """Return the summed cost expression of each utility's total duty."""
+    return sum(
+        _piecewise._utility_cost_expression(
+            owner, side, n, total, utility=u, name=f"{name}{u}_period_{n}"
+        )
+        for u, total in enumerate(totals)
+    )
+
+
+def _heater_terminal_differences(owner, n: int, j: int, u: int, *, solved_outlet):
+    """Return a heater's (hot-end, cold-end) temperature differences."""
+    utility_outlet = (
+        owner._utility_solved_outlet_temperature("hot", n, j, u)
+        if solved_outlet
+        else owner.T_hu_out_period[n][u]
+    )
+    return (
+        owner.T_hu_in_period[n][u] - owner.T_c_out_period[n][j],
+        utility_outlet - owner.T_c_by_period[n][j][0],
+    )
+
+
+def _cooler_terminal_differences(owner, n: int, i: int, u: int, *, solved_outlet):
+    """Return a cooler's (hot-end, cold-end) temperature differences."""
+    utility_outlet = (
+        owner._utility_solved_outlet_temperature("cold", n, i, u)
+        if solved_outlet
+        else owner.T_cu_out_period[n][u]
+    )
+    return (
+        owner.T_h_by_period[n][i][owner.S] - utility_outlet,
+        owner.T_h_out_period[n][i] - owner.T_cu_in_period[n][u],
+    )
+
+
+def _chen_mean(delta_1, delta_2):
+    """Return Chen's approximation of the log-mean temperature difference."""
+    return (delta_1 * delta_2 * (delta_1 + delta_2) / 2 + 1e-3) ** (1 / 3)
 
 
 def _raise_unsupported_goal(owner) -> None:
@@ -159,21 +207,21 @@ def _set_total_cost_objective(owner) -> None:
 
 def _set_source_total_cost_objective(owner) -> None:
     owner.hu_cost_total = owner.m.Intermediate(
-        _piecewise._utility_cost_expression(
+        _utilities_cost_expression(
             owner,
             "hot",
             0,
-            owner.m.sum([owner.Q_h[j] for j in range(owner.J)]),
+            _utility_totals(owner, "hot", 0),
             name="hot_utility_total_cost",
         ),
         name="Hot utility cost",
     )
     owner.cu_cost_total = owner.m.Intermediate(
-        _piecewise._utility_cost_expression(
+        _utilities_cost_expression(
             owner,
             "cold",
             0,
-            owner.m.sum([owner.Q_c[i] for i in range(owner.I)]),
+            _utility_totals(owner, "cold", 0),
             name="cold_utility_total_cost",
         ),
         name="Cold utility cost",
@@ -223,26 +271,22 @@ def _set_source_total_cost_objective(owner) -> None:
         * sum(
             (
                 (
-                    owner.Q_h[j]
+                    owner.Q_h[j][u]
                     / (
-                        owner.U_hu[j]
-                        * (
-                            (owner.T_hu_in[0] - owner.T_c_out[j])
-                            * (owner.T_hu_out[0] - owner.T_c[j][0])
-                            * (
-                                (owner.T_hu_in[0] - owner.T_c_out[j])
-                                + (owner.T_hu_out[0] - owner.T_c[j][0])
+                        owner.U_hu[j][u]
+                        * _chen_mean(
+                            *_heater_terminal_differences(
+                                owner, 0, j, u, solved_outlet=False
                             )
-                            / 2
-                            + 1e-3
                         )
-                        ** (1 / 3)
                     )
                 )
                 + 1e-3
             )
             ** owner.hu_exp[0]
             for j in range(owner.J)
+            for u in range(owner.NHU)
+            if owner.z_hu_allowed[j][u] > 0
         ),
         name="Total hot utility HX area cost",
     )
@@ -251,34 +295,30 @@ def _set_source_total_cost_objective(owner) -> None:
         * sum(
             (
                 (
-                    owner.Q_c[i]
+                    owner.Q_c[i][u]
                     / (
-                        owner.U_cu[i]
-                        * (
-                            (owner.T_h[i][owner.S] - owner.T_cu_out[0])
-                            * (owner.T_h_out[i] - owner.T_cu_in[0])
-                            * (
-                                (owner.T_h[i][owner.S] - owner.T_cu_out[0])
-                                + (owner.T_h_out[i] - owner.T_cu_in[0])
+                        owner.U_cu[i][u]
+                        * _chen_mean(
+                            *_cooler_terminal_differences(
+                                owner, 0, i, u, solved_outlet=False
                             )
-                            / 2
-                            + 1e-3
                         )
-                        ** (1 / 3)
                     )
                 )
                 + 1e-3
             )
             ** owner.cu_exp[0]
             for i in range(owner.I)
+            for u in range(owner.NCU)
+            if owner.z_cu_allowed[i][u] > 0
         ),
         name="Total cold utility HX area cost",
     )
 
     if owner.minimisation_goal == "total cost":
         owner.utility_unit_cost_total = owner.m.Intermediate(
-            owner.hu_unit_cost[0] * sum(owner.z_hu[j] for j in range(owner.J))
-            + owner.cu_unit_cost[0] * sum(owner.z_cu[i] for i in range(owner.I)),
+            owner.hu_unit_cost[0] * sum(_utility_loads(owner.z_hu))
+            + owner.cu_unit_cost[0] * sum(_utility_loads(owner.z_cu)),
             name="Total utility base cost",
         )
         owner.recovery_unit_cost = [
@@ -324,12 +364,12 @@ def _set_source_total_cost_objective(owner) -> None:
 def _set_multiperiod_total_cost_objective(owner) -> None:
     owner.hu_cost_total_by_period = [
         owner.m.Intermediate(
-            _piecewise._utility_cost_expression(
+            _utilities_cost_expression(
                 owner,
                 "hot",
                 n,
-                owner.m.sum([owner.Q_h_by_period[n][j] for j in range(owner.J)]),
-                name=f"hot_utility_total_cost_period_{n}",
+                _utility_totals(owner, "hot", n),
+                name="hot_utility_total_cost",
             ),
             name=f"Hot utility cost state {n}",
         )
@@ -337,12 +377,12 @@ def _set_multiperiod_total_cost_objective(owner) -> None:
     ]
     owner.cu_cost_total_by_period = [
         owner.m.Intermediate(
-            _piecewise._utility_cost_expression(
+            _utilities_cost_expression(
                 owner,
                 "cold",
                 n,
-                owner.m.sum([owner.Q_c_by_period[n][i] for i in range(owner.I)]),
-                name=f"cold_utility_total_cost_period_{n}",
+                _utility_totals(owner, "cold", n),
+                name="cold_utility_total_cost",
             ),
             name=f"Cold utility cost state {n}",
         )
@@ -388,22 +428,22 @@ def _set_multiperiod_total_cost_objective(owner) -> None:
         ]
         for i in range(owner.I)
     ]
-    owner.area_hu_shared = [
-        (
-            owner.m.Var(value=0.0, lb=0.0, name=f"area_HU_to_C{j}")
-            if owner.z_hu_allowed[j] > 0
-            else owner.m.Param(value=0.0, name=f"area_HU_to_C{j}")
-        )
-        for j in range(owner.J)
-    ]
-    owner.area_cu_shared = [
-        (
-            owner.m.Var(value=0.0, lb=0.0, name=f"area_H{i}_to_CU")
-            if owner.z_cu_allowed[i] > 0
-            else owner.m.Param(value=0.0, name=f"area_H{i}_to_CU")
-        )
-        for i in range(owner.I)
-    ]
+    owner.area_hu_shared = build_index_grid(
+        lambda j, u: (
+            owner.m.Var(value=0.0, lb=0.0, name=f"area_HU{u}_to_C{j}")
+            if owner.z_hu_allowed[j][u] > 0
+            else owner.m.Param(value=0.0, name=f"area_HU{u}_to_C{j}")
+        ),
+        (owner.J, owner.NHU),
+    )
+    owner.area_cu_shared = build_index_grid(
+        lambda i, u: (
+            owner.m.Var(value=0.0, lb=0.0, name=f"area_H{i}_to_CU{u}")
+            if owner.z_cu_allowed[i][u] > 0
+            else owner.m.Param(value=0.0, name=f"area_H{i}_to_CU{u}")
+        ),
+        (owner.I, owner.NCU),
+    )
 
     for n in range(owner.N_periods):
         _ = [
@@ -436,74 +476,42 @@ def _set_multiperiod_total_cost_objective(owner) -> None:
         _ = [
             (
                 owner.m.Equation(
-                    owner.area_hu_shared[j]
-                    >= owner.Q_h_by_period[n][j]
+                    owner.area_hu_shared[j][u]
+                    >= owner.Q_h_by_period[n][j][u]
                     / (
-                        owner.U_hu_period[n][j]
-                        * (
-                            (owner.T_hu_in_period[n][0] - owner.T_c_out_period[n][j])
-                            * (
-                                owner._utility_solved_outlet_temperature("hot", n, j)
-                                - owner.T_c_by_period[n][j][0]
+                        owner.U_hu_period[n][j][u]
+                        * _chen_mean(
+                            *_heater_terminal_differences(
+                                owner, n, j, u, solved_outlet=True
                             )
-                            * (
-                                (
-                                    owner.T_hu_in_period[n][0]
-                                    - owner.T_c_out_period[n][j]
-                                )
-                                + (
-                                    owner._utility_solved_outlet_temperature(
-                                        "hot", n, j
-                                    )
-                                    - owner.T_c_by_period[n][j][0]
-                                )
-                            )
-                            / 2
-                            + 1e-3
                         )
-                        ** (1 / 3)
                     )
                 )
-                if owner.z_hu_allowed[j] > 0
+                if owner.z_hu_allowed[j][u] > 0
                 else None
             )
             for j in range(owner.J)
+            for u in range(owner.NHU)
         ]
         _ = [
             (
                 owner.m.Equation(
-                    owner.area_cu_shared[i]
-                    >= owner.Q_c_by_period[n][i]
+                    owner.area_cu_shared[i][u]
+                    >= owner.Q_c_by_period[n][i][u]
                     / (
-                        owner.U_cu_period[n][i]
-                        * (
-                            (
-                                owner.T_h_by_period[n][i][owner.S]
-                                - owner._utility_solved_outlet_temperature("cold", n, i)
+                        owner.U_cu_period[n][i][u]
+                        * _chen_mean(
+                            *_cooler_terminal_differences(
+                                owner, n, i, u, solved_outlet=True
                             )
-                            * (owner.T_h_out_period[n][i] - owner.T_cu_in_period[n][0])
-                            * (
-                                (
-                                    owner.T_h_by_period[n][i][owner.S]
-                                    - owner._utility_solved_outlet_temperature(
-                                        "cold", n, i
-                                    )
-                                )
-                                + (
-                                    owner.T_h_out_period[n][i]
-                                    - owner.T_cu_in_period[n][0]
-                                )
-                            )
-                            / 2
-                            + 1e-3
                         )
-                        ** (1 / 3)
                     )
                 )
-                if owner.z_cu_allowed[i] > 0
+                if owner.z_cu_allowed[i][u] > 0
                 else None
             )
             for i in range(owner.I)
+            for u in range(owner.NCU)
         ]
 
     owner.recovery_area_cost_total = owner.m.Intermediate(
@@ -518,12 +526,12 @@ def _set_multiperiod_total_cost_objective(owner) -> None:
     )
     owner.hu_area_cost_total = owner.m.Intermediate(
         owner.hu_coeff[0]
-        * sum(owner.area_hu_shared[j] ** owner.hu_exp[0] for j in range(owner.J)),
+        * sum(area ** owner.hu_exp[0] for area in _utility_loads(owner.area_hu_shared)),
         name="Total hot utility HX area cost",
     )
     owner.cu_area_cost_total = owner.m.Intermediate(
         owner.cu_coeff[0]
-        * sum(owner.area_cu_shared[i] ** owner.cu_exp[0] for i in range(owner.I)),
+        * sum(area ** owner.cu_exp[0] for area in _utility_loads(owner.area_cu_shared)),
         name="Total cold utility HX area cost",
     )
     owner.unit_cost_total = owner.m.Intermediate(
@@ -537,8 +545,8 @@ def _set_multiperiod_total_cost_objective(owner) -> None:
         name="Total recovery base cost",
     )
     owner.utility_unit_cost_total = owner.m.Intermediate(
-        owner.hu_unit_cost[0] * sum(owner.z_hu[j] for j in range(owner.J))
-        + owner.cu_unit_cost[0] * sum(owner.z_cu[i] for i in range(owner.I)),
+        owner.hu_unit_cost[0] * sum(_utility_loads(owner.z_hu))
+        + owner.cu_unit_cost[0] * sum(_utility_loads(owner.z_cu)),
         name="Total utility base cost",
     )
     owner.capital_cost_total = owner.m.Intermediate(

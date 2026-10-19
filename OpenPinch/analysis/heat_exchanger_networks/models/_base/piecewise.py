@@ -13,11 +13,24 @@ def _register_piecewise_mapping(model, mapping) -> None:
         model._piecewise_active_mappings.append(mapping)
 
 
-def _utility_is_segmented(model, side: str) -> bool:
+def _utility_is_segmented(model, side: str, utility: int) -> bool:
     if not hasattr(model, "solver_arrays"):
         return False
     values = model.solver_arrays.arrays.get(f"{side}_utility_parent_segmented")
-    return bool(values is not None and np.asarray(values, dtype=bool)[0])
+    return bool(values is not None and np.asarray(values, dtype=bool)[utility])
+
+
+def _any_utility_segmented(model, side: str) -> bool:
+    return any(
+        _utility_is_segmented(model, side, u)
+        for u in range(_utility_count(model, side))
+    )
+
+
+def _utility_count(model, side: str) -> int:
+    """Return the number of hot or cold utilities on the model's utility axis."""
+    temperatures = model.T_hu_in_period if side == "hot" else model.T_cu_in_period
+    return int(np.shape(temperatures)[1])
 
 
 def _utility_cost_expression(
@@ -26,15 +39,16 @@ def _utility_cost_expression(
     period_index: int,
     heat_duty,
     *,
+    utility: int,
     name: str,
 ):
-    """Return the flat or exact piecewise utility-cost solver expression."""
+    """Return the flat or exact piecewise cost expression of one utility."""
     price_attr = "hu_cost_period" if side == "hot" else "cu_cost_period"
-    if not _utility_is_segmented(model, side):
+    if not _utility_is_segmented(model, side, utility):
         if hasattr(model, price_attr):
-            price = getattr(model, price_attr)[period_index][0]
+            price = getattr(model, price_attr)[period_index][utility]
         else:
-            price = getattr(model, "hu_cost" if side == "hot" else "cu_cost")[0]
+            price = getattr(model, "hu_cost" if side == "hot" else "cu_cost")[utility]
         return price * heat_duty
 
     from ...solver.piecewise import (
@@ -45,7 +59,7 @@ def _utility_cost_expression(
     profile = profile_from_solver_arrays(
         model.solver_arrays,
         side=f"{side}_utility",
-        parent_index=0,
+        parent_index=utility,
         period_index=period_index,
     )
     coordinate = model.m.Var(
@@ -80,19 +94,21 @@ def _utility_cost_value(
     side: str,
     period_index: int,
     heat_duty: float,
+    *,
+    utility: int,
 ) -> float:
-    """Return exact solved utility cost for reporting and verification."""
+    """Return one utility's exact solved cost for reporting and verification."""
     duty = max(float(heat_duty), 0.0)
     price_attr = "hu_cost_period" if side == "hot" else "cu_cost_period"
-    if not _utility_is_segmented(model, side):
-        return float(getattr(model, price_attr)[period_index][0]) * duty
+    if not _utility_is_segmented(model, side, utility):
+        return float(getattr(model, price_attr)[period_index][utility]) * duty
 
     from ...solver.piecewise import profile_from_solver_arrays
 
     profile = profile_from_solver_arrays(
         model.solver_arrays,
         side=f"{side}_utility",
-        parent_index=0,
+        parent_index=utility,
         period_index=period_index,
     )
     if duty > profile.total_duty + model.tol:
@@ -261,136 +277,148 @@ def _set_segmented_utility_capacity_constraints(model) -> None:
     from ...solver.piecewise import profile_from_solver_arrays
 
     for n in range(model.N_periods):
-        if _utility_is_segmented(model, "hot"):
-            hot_profile = profile_from_solver_arrays(
-                model.solver_arrays,
-                side="hot_utility",
-                parent_index=0,
-                period_index=n,
-            )
-            model.m.Equation(sum(model.Q_h_by_period[n]) <= hot_profile.total_duty)
-        if _utility_is_segmented(model, "cold"):
-            cold_profile = profile_from_solver_arrays(
-                model.solver_arrays,
-                side="cold_utility",
-                parent_index=0,
-                period_index=n,
-            )
-            model.m.Equation(sum(model.Q_c_by_period[n]) <= cold_profile.total_duty)
+        for side, loads in (
+            ("hot", model.Q_h_by_period[n]),
+            ("cold", model.Q_c_by_period[n]),
+        ):
+            for u in range(_utility_count(model, side)):
+                if not _utility_is_segmented(model, side, u):
+                    continue
+                profile = profile_from_solver_arrays(
+                    model.solver_arrays,
+                    side=f"{side}_utility",
+                    parent_index=u,
+                    period_index=n,
+                )
+                model.m.Equation(sum(load[u] for load in loads) <= profile.total_duty)
 
 
 def _set_piecewise_utility_outlet_states(model) -> None:
-    """Map aggregate utility duty to outlet temperature and local ``dt_cont``."""
+    """Map each utility's duty to its outlet temperature and local ``dt_cont``.
+
+    The outlet states are indexed ``[period][utility][match]``: a segmented
+    utility's outlet follows the duty of that one heater or cooler.
+    """
     from ...solver.piecewise import (
         add_piecewise_temperature_contribution_mapping,
         add_piecewise_temperature_mapping,
         profile_from_solver_arrays,
     )
 
-    model.T_hu_solved_out_by_period = [[] for _n in range(model.N_periods)]
-    model.T_cu_solved_out_by_period = [[] for _n in range(model.N_periods)]
-    model.T_hu_out_cont_by_period = [[] for _n in range(model.N_periods)]
-    model.T_cu_out_cont_by_period = [[] for _n in range(model.N_periods)]
-    model.T_hu_in_cont_by_period = []
-    model.T_cu_in_cont_by_period = []
+    for side in ("hot", "cold"):
+        prefix = f"T_{side[0]}u"
+        setattr(model, f"{prefix}_solved_out_by_period", [])
+        setattr(model, f"{prefix}_out_cont_by_period", [])
+        setattr(model, f"{prefix}_in_cont_by_period", [])
     for n in range(model.N_periods):
         for side, loads in (
             ("hot", model.Q_h_by_period[n]),
             ("cold", model.Q_c_by_period[n]),
         ):
-            scalar_contribution = float(
-                (
-                    model.T_hu_cont_period[n][0]
+            prefix = f"T_{side[0]}u"
+            solved_by_utility = []
+            contributions_by_utility = []
+            inlet_by_utility = []
+            for u in range(_utility_count(model, side)):
+                scalar_contribution = float(
+                    model.T_hu_cont_period[n][u]
                     if side == "hot"
-                    else model.T_cu_cont_period[n][0]
+                    else model.T_cu_cont_period[n][u]
                 )
-            )
-            inlet_contribution = scalar_contribution
-            if _utility_is_segmented(model, side):
+                solved_outlets = []
+                outlet_contributions = []
+                solved_by_utility.append(solved_outlets)
+                contributions_by_utility.append(outlet_contributions)
+                if not _utility_is_segmented(model, side, u):
+                    inlet_by_utility.append(scalar_contribution)
+                    for _load in loads:
+                        solved_outlets.append(
+                            model.T_hu_out_period[n][u]
+                            if side == "hot"
+                            else model.T_cu_out_period[n][u]
+                        )
+                        outlet_contributions.append(scalar_contribution)
+                    continue
+
                 profile = profile_from_solver_arrays(
                     model.solver_arrays,
                     side=f"{side}_utility",
-                    parent_index=0,
+                    parent_index=u,
                     period_index=n,
                 )
-                inlet_contribution = float(profile.temperature_contributions[0])
-            getattr(model, f"T_{side[0]}u_in_cont_by_period").append(inlet_contribution)
-
-            solved_outlets = getattr(model, f"T_{side[0]}u_solved_out_by_period")[n]
-            outlet_contributions = getattr(model, f"T_{side[0]}u_out_cont_by_period")[n]
-            for match_index, load in enumerate(loads):
-                if not _utility_is_segmented(model, side):
-                    solved_outlets.append(
-                        model.T_hu_out_period[n][0]
+                inlet_by_utility.append(float(profile.temperature_contributions[0]))
+                for match_index, load in enumerate(loads):
+                    tag = f"{side}_utility{u}_M{match_index}_period{n}"
+                    matched_duty = (
+                        model.Qtot_sc_period[n][match_index]
                         if side == "hot"
-                        else model.T_cu_out_period[n][0]
+                        else model.Qtot_sh_period[n][match_index]
                     )
-                    outlet_contributions.append(scalar_contribution)
-                    continue
-
-                matched_duty = (
-                    model.Qtot_sc_period[n][match_index]
-                    if side == "hot"
-                    else model.Qtot_sh_period[n][match_index]
-                )
-                initial_duty = min(matched_duty / 2.0, profile.total_duty)
-                coordinate = model.m.Var(
-                    value=initial_duty,
-                    lb=0.0,
-                    ub=profile.total_duty,
-                    name=(f"Qcoord_{side}_utility_M{match_index}_period{n}"),
-                )
-                model.m.Equation(coordinate == load)
-                solved_outlet = model.m.Var(
-                    value=profile.temperature_at_heat(initial_duty),
-                    lb=float(
-                        min(
-                            profile.temperatures_in.min(),
-                            profile.temperatures_out.min(),
-                        )
-                    ),
-                    ub=float(
-                        max(
-                            profile.temperatures_in.max(),
-                            profile.temperatures_out.max(),
-                        )
-                    ),
-                    name=(f"T_{side}_utility_out_M{match_index}_period{n}"),
-                )
-                contribution_values = profile.temperature_contributions
-                outlet_contribution = model.m.Var(
-                    value=profile.temperature_contribution_at_heat(initial_duty),
-                    lb=float(contribution_values.min()),
-                    ub=float(contribution_values.max()),
-                    name=(f"dTcont_{side}_utility_out_M{match_index}_period{n}"),
-                )
-                temperature_segment = profile.segment_index_at_heat(initial_duty)
-                contribution_segment = profile.contribution_index_at_heat(initial_duty)
-                _register_piecewise_mapping(
-                    model,
-                    add_piecewise_temperature_mapping(
-                        model.m,
-                        coordinate,
-                        solved_outlet,
-                        profile,
-                        name=(f"TQ_{side}_utility_M{match_index}_period{n}"),
-                        integer_capable=model.solver in {"apopt", "couenne"},
-                        initial_segment=temperature_segment,
-                    ),
-                )
-                _register_piecewise_mapping(
-                    model,
-                    add_piecewise_temperature_contribution_mapping(
-                        model.m,
-                        coordinate,
-                        outlet_contribution,
-                        profile,
-                        name=(f"dTQ_{side}_utility_M{match_index}_period{n}"),
-                        initial_segment=contribution_segment,
-                    ),
-                )
-                solved_outlets.append(solved_outlet)
-                outlet_contributions.append(outlet_contribution)
+                    initial_duty = min(matched_duty / 2.0, profile.total_duty)
+                    coordinate = model.m.Var(
+                        value=initial_duty,
+                        lb=0.0,
+                        ub=profile.total_duty,
+                        name=f"Qcoord_{tag}",
+                    )
+                    model.m.Equation(coordinate == load[u])
+                    solved_outlet = model.m.Var(
+                        value=profile.temperature_at_heat(initial_duty),
+                        lb=float(
+                            min(
+                                profile.temperatures_in.min(),
+                                profile.temperatures_out.min(),
+                            )
+                        ),
+                        ub=float(
+                            max(
+                                profile.temperatures_in.max(),
+                                profile.temperatures_out.max(),
+                            )
+                        ),
+                        name=f"T_out_{tag}",
+                    )
+                    contribution_values = profile.temperature_contributions
+                    outlet_contribution = model.m.Var(
+                        value=profile.temperature_contribution_at_heat(initial_duty),
+                        lb=float(contribution_values.min()),
+                        ub=float(contribution_values.max()),
+                        name=f"dTcont_out_{tag}",
+                    )
+                    temperature_segment = profile.segment_index_at_heat(initial_duty)
+                    contribution_segment = profile.contribution_index_at_heat(
+                        initial_duty
+                    )
+                    _register_piecewise_mapping(
+                        model,
+                        add_piecewise_temperature_mapping(
+                            model.m,
+                            coordinate,
+                            solved_outlet,
+                            profile,
+                            name=f"TQ_{tag}",
+                            integer_capable=model.solver in {"apopt", "couenne"},
+                            initial_segment=temperature_segment,
+                        ),
+                    )
+                    _register_piecewise_mapping(
+                        model,
+                        add_piecewise_temperature_contribution_mapping(
+                            model.m,
+                            coordinate,
+                            outlet_contribution,
+                            profile,
+                            name=f"dTQ_{tag}",
+                            initial_segment=contribution_segment,
+                        ),
+                    )
+                    solved_outlets.append(solved_outlet)
+                    outlet_contributions.append(outlet_contribution)
+            getattr(model, f"{prefix}_solved_out_by_period").append(solved_by_utility)
+            getattr(model, f"{prefix}_out_cont_by_period").append(
+                contributions_by_utility
+            )
+            getattr(model, f"{prefix}_in_cont_by_period").append(inlet_by_utility)
 
 
 def _hot_parent_segmented(model, index: int) -> bool:

@@ -581,10 +581,12 @@ def _ordered_utility_items(problem: PreparedProblem, items) -> list[_PreparedIte
     ordered = _items_in_input_order(item_list, input_utilities)
     if len(ordered) <= 1:
         return ordered
+    # Input preparation adds a default HU or CU as a backup where the given
+    # utilities fall short; synthesis uses it only when it is the only one.
     real_utilities = [
         item
         for item in ordered
-        if not (item[1].name == "HU" and item[0].endswith(".HU"))
+        if not (item[1].name in {"HU", "CU"} and item[0].endswith(f".{item[1].name}"))
     ]
     return real_utilities or ordered
 
