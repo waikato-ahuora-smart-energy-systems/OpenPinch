@@ -121,3 +121,16 @@ def test_compare_to_matches_rows_across_project_names():
 
     assert comparison.loc["Change", "Hot Utility Target"] == 0.0
     assert comparison.loc["Scenario", "Scope"] == "Scenario"
+
+
+def test_project_name_may_contain_a_slash():
+    problem = PinchProblem(source="basic_pinch.json", project_name="Site A/2026")
+    reference = PinchProblem(source="basic_pinch.json")
+
+    problem.target.direct_heat_integration()
+    reference.target.direct_heat_integration()
+
+    assert problem.project_name == "Site A/2026"
+    assert problem.summary_frame()["Hot Utility Target"].tolist() == (
+        reference.summary_frame()["Hot Utility Target"].tolist()
+    )
