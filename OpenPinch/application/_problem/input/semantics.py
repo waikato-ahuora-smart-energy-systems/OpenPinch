@@ -10,7 +10,10 @@ import numpy as np
 from pint.errors import PintError
 
 from ....contracts.input import TargetInput
-from ....contracts.units import standardise_input_value
+from ....contracts.units import (
+    heat_flow_from_heat_capacity_flowrate,
+    standardise_input_value,
+)
 from ....contracts.workspace import ValidationIssue
 from ....domain.configuration import tol
 from ....domain.configuration_fields import (
@@ -30,6 +33,7 @@ _STREAM_VALUE_FIELDS = (
     "h_supply",
     "h_target",
     "heat_flow",
+    "heat_capacity_flowrate",
     "dt_cont",
     "htc",
 )
@@ -282,6 +286,48 @@ def _raw_value_is_missing(raw_value: Any) -> bool:
     return False
 
 
+# Relative tolerance for heat_flow against CP x abs(T_supply - T_target): wide
+# enough for values rounded to four significant figures in a spreadsheet.
+_HEAT_CAPACITY_FLOWRATE_RTOL = 1e-4
+
+
+def _validate_heat_capacity_flowrate_agreement(
+    values: dict[str, Value | None],
+    *,
+    section: str,
+    record_index: int,
+    record_label: Optional[str],
+) -> list[ValidationIssue]:
+    heat_flow = values.get("heat_flow")
+    heat_capacity_flowrate = values.get("heat_capacity_flowrate")
+    if heat_flow is None or heat_capacity_flowrate is None:
+        return []
+    derived = heat_flow_from_heat_capacity_flowrate(
+        values["t_supply"], values["t_target"], heat_capacity_flowrate
+    )
+    given = np.broadcast_to(heat_flow.period_values, derived.period_values.shape)
+    if np.allclose(
+        given, derived.period_values, rtol=_HEAT_CAPACITY_FLOWRATE_RTOL, atol=0.0
+    ):
+        return []
+    return [
+        _build_issue(
+            severity="error",
+            section=section,
+            record_index=record_index,
+            record_label=record_label,
+            path_field="heat_capacity_flowrate",
+            field="heat_capacity_flowrate",
+            message=(
+                "heat_flow "
+                f"{np.round(heat_flow.period_values, 6).tolist()} kW disagrees "
+                "with heat_capacity_flowrate x abs(t_supply - t_target) = "
+                f"{np.round(derived.period_values, 6).tolist()} kW."
+            ),
+        )
+    ]
+
+
 def _validate_stream_record_states(
     values: dict[str, Value | None],
     *,
@@ -361,6 +407,15 @@ def _validate_stream_record_states(
     t_target = values.get("t_target")
     if t_supply is None or t_target is None or length_issues:
         return issues
+
+    issues.extend(
+        _validate_heat_capacity_flowrate_agreement(
+            values,
+            section=section,
+            record_index=record_index,
+            record_label=record_label,
+        )
+    )
 
     classifications: dict[str, list[str]] = {
         StreamType.Hot.value: [],

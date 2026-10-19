@@ -76,7 +76,9 @@ are ignored:
   utility table), and ``type`` (utilities only);
 - ``t_supply`` (``TS``, ``Supply temperature``) and ``t_target`` (``TT``,
   ``Target temperature``);
-- ``heat_flow`` (``ΔH``, ``Duty``), ``dt_cont`` (``ΔTcont``), ``htc`` and
+- ``heat_flow`` (``ΔH``, ``Duty``), ``heat_capacity_flowrate`` (``CP``,
+  streams only, used for the heat flow when it is not given), ``dt_cont``
+  (``ΔTcont``), ``htc`` and
   ``price``.
 
 A column with an unrecognised header is ignored with a warning, and two
@@ -94,6 +96,12 @@ unknown fields. Process streams use ``name`` and
 ``heat_capacity_flowrate`` as their canonical field names. Retired spellings
 such as ``stream_name``, ``heat_capacity_flow_rate``, and
 ``flow_heat_capacity`` are invalid inputs and are not migrated.
+
+An ordinary stream gives either ``heat_flow`` or ``heat_capacity_flowrate``
+(CP, ``kW/K`` by default). Without ``heat_flow``, the heat flow is
+CP x abs(``t_supply`` - ``t_target``), so it is positive for hot and cold
+streams alike. When both are given they must agree to within 0.01 percent,
+or validation reports an error on ``heat_capacity_flowrate``.
 
 Variable Heat-Capacity Streams
 ------------------------------

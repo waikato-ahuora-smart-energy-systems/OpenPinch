@@ -316,3 +316,19 @@ def test_get_problem_from_csv_rejects_duplicate_header_columns(tmp_path: Path):
 
     with pytest.raises(ValueError, match="t_supply"):
         get_problem_from_csv(streams_csv, utilities_csv)
+
+
+def test_get_problem_from_csv_reads_heat_capacity_flowrate_column(tmp_path: Path):
+    streams_csv = tmp_path / "streams.csv"
+    utilities_csv = tmp_path / "utilities.csv"
+    streams_csv.write_text(
+        "Zone,Name,T_supply,T_target,CP\n,,degC,degC,kW/K\nZone A,H1,150,60,2\n",
+        encoding="utf-8",
+    )
+    _write_csv(utilities_csv, _utility_rows())
+
+    out = get_problem_from_csv(streams_csv, utilities_csv)
+
+    stream = out["streams"][0]
+    assert stream["heat_capacity_flowrate"] == {"value": 2.0, "unit": "kW/K"}
+    assert "heat_flow" not in stream

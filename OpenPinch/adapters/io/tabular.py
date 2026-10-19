@@ -72,6 +72,7 @@ _HEADER_ALIASES = {
         "t_supply": ("ts", "tsupply", "supply temperature", "tin"),
         "t_target": ("tt", "ttarget", "target temperature", "tout"),
         "heat_flow": ("dh", "heat load", "duty", "q"),
+        "heat_capacity_flowrate": ("cp", "mcp", "fcp", "heat capacity flowrate"),
         "dt_cont": ("dtcont", "dt contribution"),
         "htc": ("heat transfer coefficient",),
     },
