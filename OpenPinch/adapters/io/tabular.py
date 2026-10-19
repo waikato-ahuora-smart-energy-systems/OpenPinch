@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+import warnings
 from typing import Any, Optional
 
 import numpy as np
@@ -58,6 +60,114 @@ def get_column_names_and_units(df_full, sheet_name, row_units=1):
     # Exponents such as "m2" are handled by the unit normaliser, which only
     # treats a "2" after a letter as a power; a blind replace broke "kW/m^2/K".
     return col_names, col_units
+
+
+# Header spellings accepted for each column, compared after lower-casing,
+# reading a Greek delta as "d", dropping any bracketed unit and removing
+# everything but letters and digits.
+_HEADER_ALIASES = {
+    "Stream Data": {
+        "zone": ("process zone", "zone name"),
+        "name": ("stream", "stream name"),
+        "t_supply": ("ts", "tsupply", "supply temperature", "tin"),
+        "t_target": ("tt", "ttarget", "target temperature", "tout"),
+        "heat_flow": ("dh", "heat load", "duty", "q"),
+        "dt_cont": ("dtcont", "dt contribution"),
+        "htc": ("heat transfer coefficient",),
+    },
+    "Utility Data": {
+        "name": ("utility", "utility name"),
+        "type": ("utility type",),
+        "t_supply": ("ts", "tsupply", "supply temperature", "tin"),
+        "t_target": ("tt", "ttarget", "target temperature", "tout"),
+        "dt_cont": ("dtcont", "dt contribution"),
+        "price": ("cost", "unit price"),
+        "htc": ("heat transfer coefficient",),
+        "heat_flow": ("dh", "heat load", "duty", "q"),
+    },
+}
+
+
+def _header_key(text: str) -> str:
+    key = re.sub(r"\(.*?\)|\[.*?\]", "", text).lower().replace("δ", "d")
+    return re.sub(r"[^a-z0-9]", "", key)
+
+
+def _map_header_row(header: list, sheet_name: str) -> Optional[list]:
+    """Return the field name for each column, or None when no header is known."""
+    aliases = {
+        _header_key(alias): field
+        for field, names in _HEADER_ALIASES[sheet_name].items()
+        for alias in (field, *names)
+    }
+    labels = [
+        cell.strip() if isinstance(cell, str) and cell.strip() else None
+        for cell in header
+    ]
+    fields = [aliases.get(_header_key(label)) if label else None for label in labels]
+    if not any(fields):
+        return None
+    for field in set(filter(None, fields)):
+        columns = [label for label, f in zip(labels, fields) if f == field]
+        if len(columns) > 1:
+            raise ValueError(
+                f"{sheet_name} has more than one column for {field!r}: "
+                f"{', '.join(repr(column) for column in columns)}."
+            )
+    unknown = [label for label, f in zip(labels, fields) if label and not f]
+    if unknown:
+        warnings.warn(
+            f"{sheet_name} column(s) {', '.join(repr(u) for u in unknown)} "
+            "are not recognised and were ignored.",
+            UserWarning,
+            stacklevel=4,
+        )
+    return fields
+
+
+def problem_frame_from_sheet(
+    df_full: pd.DataFrame,
+    sheet_name: str,
+    row_units: int,
+    row_data: int,
+) -> tuple[pd.DataFrame, dict]:
+    """Select a stream or utility table's columns and their units.
+
+    Columns are matched by the header text in the first row. A header with no
+    recognised column name falls back to the fixed column order.
+    """
+    col_names, _ = get_column_names_and_units(df_full, sheet_name, row_units)
+    raw_units = [
+        unit.replace("°", "deg") if isinstance(unit, str) else None
+        for unit in df_full.iloc[row_units].tolist()
+    ]
+    fields = _map_header_row(df_full.iloc[0].tolist(), sheet_name)
+    if fields is None:
+        warnings.warn(
+            f"{sheet_name} header row has no recognised column names; columns "
+            f"are read in the order {', '.join(col_names)}.",
+            UserWarning,
+            stacklevel=3,
+        )
+        count = min(len(df_full.columns), len(col_names))
+        fields = col_names[:count] + [None] * (len(df_full.columns) - count)
+    positions = [index for index, field in enumerate(fields) if field]
+    df_data = df_full.iloc[row_data:, positions].copy()
+    df_data.columns = [fields[index] for index in positions]
+    units_map = {fields[index]: raw_units[index] for index in positions}
+    return df_data, units_map
+
+
+def summary_frame_from_sheet(
+    df_full: pd.DataFrame,
+    row_units: int,
+    row_data: int,
+) -> tuple[pd.DataFrame, dict]:
+    """Name a summary table's columns by position and collect their units."""
+    col_names, col_units = get_column_names_and_units(df_full, "Summary", row_units)
+    df_data = df_full.iloc[row_data:, : len(col_names)].copy()
+    df_data.columns = col_names[: len(df_data.columns)]
+    return df_data, dict(zip(col_names, col_units))
 
 
 def problem_records_from_frame(df_data: pd.DataFrame, units_map: dict) -> list:

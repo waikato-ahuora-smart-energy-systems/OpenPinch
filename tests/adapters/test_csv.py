@@ -274,3 +274,45 @@ def test_get_problem_from_csv_skips_blank_and_whitespace_rows(tmp_path: Path):
     out = get_problem_from_csv(streams_csv, utilities_csv)
 
     assert [s["name"] for s in out["streams"]] == ["H1", "C1"]
+
+
+def test_get_problem_from_csv_maps_columns_by_header_name(tmp_path: Path):
+    streams_csv = tmp_path / "streams.csv"
+    utilities_csv = tmp_path / "utilities.csv"
+    streams_csv.write_text(
+        "Zone,Name,T_target,T_supply,Heat flow,Comment\n"
+        ",,degC,degF,kW,\n"
+        "Zone A,H1,50,392,100,first\n",
+        encoding="utf-8",
+    )
+    utilities_csv.write_text(
+        "Type,Name,Price,T_supply,T_target\n,,$/MWh,degC,degC\nHot,HU,60,260,259\n",
+        encoding="utf-8",
+    )
+
+    with pytest.warns(UserWarning, match="'Comment'"):
+        out = get_problem_from_csv(streams_csv, utilities_csv)
+
+    stream = out["streams"][0]
+    assert stream["t_supply"] == {"value": 392.0, "unit": "degF"}
+    assert stream["t_target"] == {"value": 50.0, "unit": "degC"}
+    assert "Comment" not in stream and "comment" not in stream
+    utility = out["utilities"][0]
+    assert utility["name"] == "HU"
+    assert utility["type"] == "Hot"
+    assert utility["price"] == {"value": 60.0, "unit": "$/MWh"}
+
+
+def test_get_problem_from_csv_rejects_duplicate_header_columns(tmp_path: Path):
+    streams_csv = tmp_path / "streams.csv"
+    utilities_csv = tmp_path / "utilities.csv"
+    streams_csv.write_text(
+        "Zone,Name,T_supply,TS,T_target,Heat flow\n"
+        ",,degC,degC,degC,kW\n"
+        "Zone A,H1,150,150,60,100\n",
+        encoding="utf-8",
+    )
+    _write_csv(utilities_csv, _utility_rows())
+
+    with pytest.raises(ValueError, match="t_supply"):
+        get_problem_from_csv(streams_csv, utilities_csv)

@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import OpenPinch.adapters.io.tabular as _tabular
 import OpenPinch.adapters.io.workbook as wkbook_to_json
 from OpenPinch.adapters.io.records import validate_stream_data, validate_utility_data
 from OpenPinch.adapters.io.workbook import (
@@ -342,7 +343,7 @@ def test_get_problem_from_excel_writes_json(tmp_path: Path, capsys):
 
 def test_get_column_names_and_units_pads_units_for_short_stream_sheet():
     df = pd.DataFrame([["ignored"] * 5, [None] * 5])
-    names, units = wkbook_to_json._get_column_names_and_units(df, "Stream Data")
+    names, units = _tabular.get_column_names_and_units(df, "Stream Data")
     assert len(names) == 7
     assert len(units) == 7
 
@@ -664,3 +665,32 @@ def test_get_problem_from_excel_rejects_boolean_numeric_cells(tmp_path: Path):
 
     with pytest.raises(ValueError, match="'heat_flow' has a non-numeric value"):
         get_problem_from_excel(path)
+
+
+def test_get_problem_from_excel_reads_legacy_template_headers(tmp_path: Path):
+    path = tmp_path / "legacy.xlsx"
+    stream_rows = [
+        ["Process Zone", "Stream", "TT", "TS", "ΔH", "ΔTcont", "HTC"],
+        [None, None, "°C", "°C", "kW", "°C", "kW/m2/°C"],
+        ["Zone A", "H1", 60.0, 150.0, 100.0, 10.0, 0.5],
+    ]
+    util_rows = [
+        ["Utility", "Type", "Ts", "Tt", "ΔTcont", "Price", "HTC"],
+        [None, None, "°C", "°C", "°C", "$/MWh", "kW/m2/°C"],
+        ["HU", "Hot", 250.0, 249.0, 10.0, 50.0, 0.8],
+    ]
+    with pd.ExcelWriter(path, engine="openpyxl") as xw:
+        pd.DataFrame(stream_rows).to_excel(
+            xw, sheet_name="Stream Data", header=None, index=False
+        )
+        pd.DataFrame(util_rows).to_excel(
+            xw, sheet_name="Utility Data", header=None, index=False
+        )
+
+    out = get_problem_from_excel(path)
+
+    stream = out["streams"][0]
+    assert stream["t_supply"]["value"] == 150.0
+    assert stream["t_target"]["value"] == 60.0
+    assert stream["heat_flow"]["value"] == 100.0
+    assert out["utilities"][0]["price"] == {"value": 50.0, "unit": "$/MWh"}
