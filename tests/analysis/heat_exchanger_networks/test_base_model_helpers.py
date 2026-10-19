@@ -666,6 +666,7 @@ def test_utility_approach_equations_skip_streams_inactive_in_a_period():
     model.T_c_by_period = [[[140.0, 50.0]], [[140.0, 50.0]]]
     model.z_i_active_period = [[1], [0]]
     model.z_j_active_period = [[1], [1]]
+    model.Q_h_by_period = model.Q_c_by_period = [[[0.0]], [[0.0]]]
 
     _set_multiperiod_utility_approach_equations(model)
 

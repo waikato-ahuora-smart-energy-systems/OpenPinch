@@ -287,7 +287,13 @@ class InternalHeatExchangerNetworkProblem:
             solver_arrays=case.solver_arrays,
             stages=len(active_stages),
             dTmin=case.dTmin,
-            z_restriction=[active_locations, None, None],
+            # Relaxed: an allowed heater or cooler is fixed in use, so keep
+            # only those the solved case uses.
+            z_restriction=[
+                active_locations,
+                [[1 if duty[0] > case.tol else 0 for duty in row] for row in case.Q_h],
+                [[1 if duty[0] > case.tol else 0 for duty in row] for row in case.Q_c],
+            ],
             min_dqda=case.min_dqda,
             minimisation_goal=case.minimisation_goal,
             non_isothermal_model=case.non_isothermal_model,

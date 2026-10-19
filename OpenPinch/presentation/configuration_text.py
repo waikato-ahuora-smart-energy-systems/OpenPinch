@@ -87,7 +87,10 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
     ),
     "OUTPUT_UNIT_UTILITY_COST": FieldText(
         "Utility cost output unit", None,
-        "Unit used to report utility cost rates.",
+        (
+            "Unit used to report utility cost rates. A per-year unit counts a year "
+            "as COSTING_ANNUAL_OP_TIME operating hours."
+        ),
     ),
     "OUTPUT_UNIT_WORK": FieldText(
         "Work output unit", None,
@@ -103,7 +106,10 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
     ),
     "OUTPUT_UNIT_ANNUAL_COST": FieldText(
         "Annual cost output unit", None,
-        "Unit used to report annual and annualised costs.",
+        (
+            "Unit used to report annual and annualised costs. A year is "
+            "COSTING_ANNUAL_OP_TIME operating hours."
+        ),
     ),
     "OUTPUT_UNIT_EXERGY": FieldText(
         "Exergy output unit", None,
@@ -590,7 +596,9 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
         "Integrated expander", None,
         (
             "Let Carnot-model cycles generate work where heat flows from a hotter "
-            "evaporator level to a colder condenser level."
+            "evaporator level to a colder condenser level. Heat only moves "
+            "downhill, one condenser-evaporator pair at a time; with this off, "
+            "such a pair is plain heat recovery with no work credit."
         ),
     ),
     "HPR_DT_CONT": FieldText(

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 
@@ -189,3 +190,129 @@ def test_open_hens_method_networks_have_no_utility_cross():
             hot_end = state.source_inlet_temperature - state.sink_outlet_temperature
             cold_end = state.source_outlet_temperature - state.sink_inlet_temperature
             assert min(hot_end, cold_end) >= D_TMIN - 1e-3, exchanger.exchanger_id
+
+
+def _recovery_only_problem() -> PinchProblem:
+    """H1 150 to 60 C and C1 40 to 130 C balance exactly by recovery.
+
+    Steam at 135 C cannot heat C1 to 130 C with a 10 K approach.
+    """
+
+    def value(number, unit):
+        return {"value": number, "unit": unit}
+
+    def stream(name, supply, target):
+        return {
+            "zone": "Site/Plant",
+            "name": name,
+            "t_supply": value(supply, "degC"),
+            "t_target": value(target, "degC"),
+            "heat_flow": value(900.0, "kW"),
+            "dt_cont": value(5.0, "delta_degC"),
+            "htc": value(1.0, "kW/m^2/delta_degC"),
+        }
+
+    def utility(name, kind, supply, target):
+        return {
+            "name": name,
+            "type": kind,
+            "t_supply": value(supply, "degC"),
+            "t_target": value(target, "degC"),
+            "dt_cont": value(5.0, "delta_degC"),
+            "price": value(10.0, "$/MWh"),
+            "htc": value(1.0, "kW/m^2/delta_degC"),
+            "heat_flow": None,
+        }
+
+    return PinchProblem(
+        source={
+            "streams": [stream("H1", 150.0, 60.0), stream("C1", 40.0, 130.0)],
+            "utilities": [
+                utility("Steam", "Hot", 135.0, 134.9),
+                utility("CW", "Cold", 20.0, 40.0),
+            ],
+            "zone_tree": {
+                "name": "Site",
+                "type": "Site",
+                "children": [{"name": "Plant", "type": "Process Zone"}],
+            },
+        }
+    )
+
+
+@pytest.mark.synthesis
+def test_apopt_relaxed_model_builds_with_an_unusable_heater():
+    # Stage reduction and evolution build relaxed models whose utility
+    # binaries are fixed at 1. A heater whose fixed end cannot meet its
+    # approach then carries no duty; construction used to raise on it.
+    pytest.importorskip("gekko")
+    arrays = problem_to_solver_arrays(_recovery_only_problem(), 10.0)
+    model = StageWiseModel(
+        name="recovery-only-relaxed",
+        framework="TDM",
+        solver="apopt",
+        solver_arrays=arrays,
+        stages=1,
+        dTmin=10.0,
+        z_restriction=[[[[1]]], None, None],
+        min_dqda=0.0,
+        minimisation_goal="hot utility",
+        non_isothermal_model=False,
+        integers=False,
+        tol=1e-6,
+    )
+
+    model.optimise(False)
+
+    assert model.mSuccess == 1
+    assert model.Q_r_total == pytest.approx(900.0, abs=1e-3)
+    assert model.Q_hu_total == pytest.approx(0.0, abs=1e-3)
+    assert model.Q_cu_total == pytest.approx(0.0, abs=1e-3)
+
+
+def test_stage_reduction_keeps_only_the_heaters_and_coolers_in_use(monkeypatch):
+    # The reduced model is relaxed, so every allowed heater and cooler has its
+    # binary fixed at 1 and both approach constraints. Restricting them to the
+    # ones the solved case uses keeps an unused unit from constraining it.
+    from OpenPinch.analysis.heat_exchanger_networks.models import problem as unit
+    from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
+        InternalHeatExchangerNetworkProblem,
+    )
+
+    class _Built(Exception):
+        pass
+
+    built: dict = {}
+
+    def record(**kwargs):
+        built.update(kwargs)
+        raise _Built
+
+    monkeypatch.setattr(unit, "StageWiseModel", record)
+    case = SimpleNamespace(
+        mSuccess=1,
+        name="case",
+        framework="TDM",
+        solver_arrays=object(),
+        dTmin=10.0,
+        min_dqda=0.0,
+        minimisation_goal="total cost",
+        non_isothermal_model=False,
+        tol=1e-3,
+        I=2,
+        J=1,
+        S=2,
+        # Stage 2 is empty, so the case is reduced to one stage.
+        Q_r=[[[[10.0], [0.0]]], [[[5.0], [0.0]]]],
+        # Heaters and coolers are [stream][utility].
+        Q_h=[[[3.0]]],
+        Q_c=[[[0.0]], [[4.0]]],
+    )
+
+    with pytest.raises(_Built):
+        InternalHeatExchangerNetworkProblem(
+            solver_arrays=object(), framework="TDM", stages=2
+        ).remove_unused_stages(case)
+
+    assert built["stages"] == 1
+    assert built["z_restriction"] == [[[[1]], [[1]]], [[1]], [[0], [1]]]

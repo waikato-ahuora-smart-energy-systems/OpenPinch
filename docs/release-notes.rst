@@ -25,7 +25,10 @@ HEN utility approach temperatures
   with a crossed cooler. On a case with cooling water at 320 to 325 K, PDM
   and TDM accepted a cooler at 324 to 322 K (hot-end dT -1 K). That case now
   has no feasible network in the stagewise superstructure, which places
-  coolers after the last stage, so synthesis rejects it.
+  coolers after the last stage, so synthesis rejects it. In the relaxed
+  models that stage reduction and network evolution solve, a heater or
+  cooler whose fixed end cannot meet its approach carries no duty, and stage
+  reduction keeps only the heaters and coolers the solved network uses.
 - A synthesised exchanger with a crossed or touching end gets no area. Its
   area used to come from a fallback temperature difference (20 m2 for the
   crossed cooler above); verification now reports its duty without area.
@@ -40,14 +43,147 @@ HEN utility approach temperatures
   recomputed cost with itself, because post-processing had already
   overwritten the solver's value, so it could not fail.
 - Published numbers: no tutorial network had a heater or cooler below its
-  approach, but the new constraints change the solvers' paths, so two
-  results move. Tutorial 15's selected network has total annual cost
-  160,353 $/y with 7 units (was 163,556 $/y with 8 units). Tutorial 16's
-  ``pinch_design()`` network has 190,663 $/y at dTmin 16 K (was 182,104 $/y
-  at 20 K). PDM minimises hot utility only, so every network at the target
-  is optimal and their costs are not compared; this result moves whenever
-  the solver's path does. Tutorial 16's other designs and tutorial 17 are
-  unchanged.
+  approach, but the new constraints change the solvers' paths, and stage
+  reduction no longer carries unused coolers. Tutorial 15's selected network
+  has total annual cost 154,853.86 $/y with 6 units (was 163,556.12 $/y with
+  8 units), the best known network for its case. Tutorial 16's
+  ``pinch_design()`` network has 190,449.50 $/y at dTmin 14 K (was
+  182,103.64 $/y at 20 K). PDM minimises hot utility only, so every network
+  at the target is optimal and their costs are not compared; this result
+  moves whenever the solver's path does. Tutorial 16's other designs and
+  tutorial 17 are unchanged.
+
+Utility cost and totals
+~~~~~~~~~~~~~~~~~~~~~~~
+
+These change published numbers. Energy targets do not change.
+
+- Direct Integration targets report their utility cost, the sum of each
+  utility's price times its duty. Before, ``utility_cost`` was always 0 on
+  Direct Integration and area targets, and the subzone sums and the workbook
+  "Utility Cost" column added up those zeros. ``basic_pinch`` now reports
+  17.5 $/h (750 kW of hot and 1000 kW of cold utility at 10 $/MWh).
+- Total Site utility lists come from the site utility cascade, so they sum to
+  the Total Site hot and cold utility targets. Generation at one level now
+  meets use at a lower level, nearest level first; use left unmet is listed
+  as hot utility and generation left over as cold utility. Before, the lists
+  only netted generation against use at the same level, so they could
+  contradict the targets: ``zonal_site`` has a 0 kW hot utility target but
+  listed 25 kW of hot water. Its Total Site utility cost falls from
+  6.68 $/h to 5.18 $/h (``zonal_site_multiperiod``, first period: 5.36 to
+  4.76 $/h).
+- Total Site targeting accepts segmented utilities. Before, summing the
+  subzone utilities raised "'heat_flow' is derived for segmented stream".
+  Each segment now enters the site cascade over its own temperatures.
+- The area target's ``total_cost`` is the annualised capital cost plus the
+  utility cost over ``COSTING_ANNUAL_OP_TIME`` hours. Before, it was the
+  annualised capital alone.
+- A per-year output unit for a cost (for example ``OUTPUT_UNIT_UTILITY_COST``
+  set to ``$/y``) counts a year as ``COSTING_ANNUAL_OP_TIME`` operating
+  hours. Before, the conversion used an 8766 h calendar year, so annual
+  utility costs read 5.6 % high at the default 8300 h.
+
+Direct Integration utility cost and area-target total cost on the sample
+cases (``COSTING_ANNUAL_OP_TIME`` is 8300 h, 1000 h for Yee and Grossmann;
+multiperiod cases give their first period):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 15 15 15 15
+
+   * - Case
+     - Utility cost before ($/h)
+     - Utility cost now ($/h)
+     - Total cost before ($/y)
+     - Total cost now ($/y)
+   * - ``basic_pinch``
+     - 0
+     - 17.50
+     - 41,793
+     - 187,043
+   * - ``crude_preheat_train``
+     - 0
+     - 17.50
+     - 41,793
+     - 187,043
+   * - ``crude_preheat_train_multiperiod``
+     - 0
+     - 12.69
+     - 40,884
+     - 146,190
+   * - ``Four-stream-Yee-and-Grossmann-1990-1``
+     - 0
+     - 67.50
+     - 84,161
+     - 151,661
+   * - ``chocolate_factory``
+     - 0
+     - 134.53
+     - 79,784
+     - 1,196,358
+   * - ``process_mvr``
+     - 0
+     - 2.00
+     - 4,105
+     - 20,705
+   * - ``pulp_mill``
+     - 0
+     - 6,418.29
+     - 1,270,793
+     - 54,542,579
+   * - ``zonal_site``
+     - 0
+     - 5.18
+     - 28,331
+     - 71,329
+   * - ``dairy_chilling_multiperiod``
+     - 0
+     - 101.67
+     - 62,907
+     - 906,741
+   * - ``zonal_site_multiperiod``
+     - 0
+     - 4.76
+     - (area target raises)
+     - (area target raises)
+
+Input, contracts and option metadata
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Workbook and CSV ``Stream Data`` and ``Utility Data`` tables are read by
+  their header row, so columns can come in any order. Before, columns were
+  taken by position and a header that put ``t_target`` before ``t_supply``
+  silently swapped them. The legacy template spellings (``TS``, ``TT``,
+  ``ΔH``, ``ΔTcont``, ``Process Zone``, ``Stream``) are recognised; an unknown
+  column is ignored with a warning, two columns for one field are an error,
+  and a header row with no recognised name falls back to the old fixed order
+  with a warning.
+- Blank rows, and rows of blank or whitespace-only cells, in workbook and CSV
+  tables are skipped. Before, each became a phantom stream ``S1`` that failed
+  validation.
+- An ordinary stream may give ``heat_capacity_flowrate`` (CP) instead of
+  ``heat_flow``: the heat flow is then CP x abs(``t_supply`` - ``t_target``).
+  When both are given and disagree by more than 0.01 percent, validation
+  reports an error on ``heat_capacity_flowrate``. Before, the field was
+  accepted and ignored. Tables accept a ``CP`` column.
+- The Options sheet of ``Excel_Version/Data_input_template.xlsx`` lists the
+  current option names, grouped, with their defaults. Its old names
+  (``DT_CONT``, ``ANNUAL_OP_TIME`` and so on) were all rejected as unknown.
+- ``compare_to`` works between problems with different project names. Before,
+  it raised ``KeyError`` because it looked for the base case's scope, which
+  starts with the project name, in the other problem.
+- Configuration metadata (``config_options()`` and the ``options`` command)
+  reports numeric list options (``PROBLEM_PERIOD_WEIGHTS``,
+  ``HENS_APPROACH_TEMPERATURES`` and others) as ``number_list`` rather than
+  ``string_list``, and ``HPR_LOAD_PERIOD_VALUES`` as ``object`` rather than
+  ``number``. A new ``numeric_min_exclusive`` flag is true for options that
+  must be greater than their ``numeric_min`` (such as ``THERMAL_HTC`` and the
+  efficiencies), which reject 0.
+- Utility rows without a name are still ignored, now with a warning when they
+  hold data. Stream names that become the same name after normalisation
+  (``H.1`` and ``H-1`` both become ``H-1``) are an error. A ``TRUE`` cell in a
+  numeric column is an error rather than 1. A project name may contain ``/``;
+  before, every load with such a name failed.
 
 Network grid data
 ~~~~~~~~~~~~~~~~~
@@ -80,6 +216,33 @@ Tutorials
 - Tutorial 15 asks ``design.utility()`` for its case's hot utility by its
   name, ``HPS``. It asked for ``HP Steam``, which used to answer 0 and now
   raises as an unknown utility, so the notebook stopped running.
+
+Heat pump second law
+~~~~~~~~~~~~~~~~~~~~
+
+- Cascade Carnot targeting (``carnot_heat_pump()`` and
+  ``carnot_refrigeration()`` with more than one condenser or evaporator) no
+  longer moves heat uphill for free. The heat-engine and recovery branch
+  pooled every condenser and evaporator that took part in any downhill pair,
+  so heat from a cold evaporator could reach a hotter condenser with no work,
+  and the optimiser exploited it. Duty is now allocated pair by pair, from an
+  evaporator to a condenser at or below its temperature, and a pair earns work
+  only when ``HPR_INTEGRATED_EXPANDER_ENABLED`` is on (it already set the
+  heat-engine efficiency to 0 when off; the field help now says so). A Carnot
+  cycle is solved only if its entropy generation, sum(Q/T) delivered minus
+  absorbed, is non-negative, and targeting rejects an unsolved cycle as an
+  infeasible candidate. Published numbers change for the default call
+  (three condensers, two evaporators, ``load_fraction=0.5``):
+
+  - ``basic_pinch``: work 0.0005 kW to 62.07 kW, ``hpr_cop`` 4.32 to 6.04,
+    hot utility 375 kW in both; entropy generation -0.124 to +0.069 kW/K.
+  - ``pulp_mill``: work 0.23 kW to 24,330 kW, ``hpr_cop`` 2.54 to 3.20, hot
+    utility 97,115 kW to 77,775 kW; entropy generation -43.7 to +28.8 kW/K.
+
+  One-condenser, one-evaporator and parallel Carnot targets are unchanged,
+  so tutorials 08 and 10 keep their numbers. Cascade vapour-compression
+  targeting seeds from this optimiser; the tutorial runs (09, and 10's
+  3x2 cascade) give the same results.
 
 Result fixes
 ~~~~~~~~~~~~
