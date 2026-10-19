@@ -210,7 +210,7 @@ def test_hen_costs_are_annualised_like_area_targeting():
 
 
 @pytest.mark.synthesis
-def test_stagewise_verify_compares_solver_utility_cost_with_recomputation():
+def test_apopt_stagewise_verify_compares_solver_utility_cost():
     pytest.importorskip("gekko")
     import json
 
