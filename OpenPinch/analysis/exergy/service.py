@@ -332,11 +332,9 @@ def apply_exergy_targeting(target: Any, *, dt_cont_multiplier: float = 1.0) -> A
     }
     target.exergy_sources = float(nlp_output["source_total"])
     target.exergy_sinks = float(nlp_output["sink_total"])
-    target.ETE = (
-        (target.exergy_sinks / target.exergy_sources)
-        if target.exergy_sources > tol
-        else 0.0
-    )
+    gained, released = _balanced_curve_exergy_transfer(target, spec)
+    target.exergy_released = released
+    target.ETE = gained / released if released > tol else 0.0
     target.exergy_req_min = float(gcc_output[ProblemTableLabel.X_GCC.value][0])
     target.exergy_des_min = float(gcc_output[ProblemTableLabel.X_GCC.value][-1])
     return target
@@ -513,6 +511,102 @@ def _resolve_target_exergy_spec(
         )
 
     return None
+
+
+def _balanced_curve_exergy_transfer(
+    target: Any, spec: dict[str, Any]
+) -> tuple[float, float]:
+    """Return the exergy gained by the cold and released by the hot BCC (kW).
+
+    The Balanced Composite Curves are the process composites plus the
+    utilities (and any heat-pump streams), relative to ``ENV_TEMPERATURE``.
+    Their ratio is the exergy transfer effectiveness: at most 1, and the
+    shortfall is the exergy destroyed in heat transfer. A Direct Integration
+    target uses its real-temperature table. Other targets use their own table,
+    un-shifted interval by interval as the exergy curves are.
+    """
+    t_env = spec["t_env"]
+    pt_real = getattr(target, "pt_real", None)
+    real_columns = (
+        [
+            _optional_column(pt_real, label)
+            for label in (
+                ProblemTableLabel.H_HOT,
+                ProblemTableLabel.H_HOT_UT,
+                ProblemTableLabel.H_COLD,
+                ProblemTableLabel.H_COLD_UT,
+            )
+        ]
+        if pt_real is not None
+        else [None]
+    )
+    if all(column is not None for column in real_columns):
+        t_vals = _to_float_array(pt_real[ProblemTableLabel.T])
+        hot_curves = [(real_columns[0], 0.0), (real_columns[1], 0.0)]
+        cold_curves = [(real_columns[2], 0.0), (real_columns[3], 0.0)]
+    else:
+        pt = target.pt
+        t_vals = spec["temperatures"]
+        n_intervals = max(len(t_vals) - 1, 0)
+        if spec["gcc_is_real"]:
+            hot_offset = cold_offset = np.zeros(n_intervals, dtype=float)
+        else:
+            hot_offset = _interval_shifts(
+                spec.get("hot_shifts"), n_intervals, spec["dt_cont_shift"]
+            )
+            cold_offset = -_interval_shifts(
+                spec.get("cold_shifts"), n_intervals, spec["dt_cont_shift"]
+            )
+        # Heat-pump streams carry no temperature contribution.
+        hot_curves = [
+            (_optional_column(pt, ProblemTableLabel.H_HOT), hot_offset),
+            (_optional_column(pt, ProblemTableLabel.H_HOT_UT), hot_offset),
+            (_optional_column(pt, ProblemTableLabel.H_HOT_HP), 0.0),
+        ]
+        cold_curves = [
+            (_optional_column(pt, ProblemTableLabel.H_COLD), cold_offset),
+            (_optional_column(pt, ProblemTableLabel.H_COLD_UT), cold_offset),
+            (_optional_column(pt, ProblemTableLabel.H_COLD_HP), 0.0),
+        ]
+    released = sum(
+        _curve_exergy(t_vals, h_vals, offset, t_env)
+        for h_vals, offset in hot_curves
+        if h_vals is not None
+    )
+    gained = sum(
+        _curve_exergy(t_vals, h_vals, offset, t_env)
+        for h_vals, offset in cold_curves
+        if h_vals is not None
+    )
+    return float(gained), float(released)
+
+
+def _curve_exergy(
+    t_vals: np.ndarray,
+    h_vals: np.ndarray,
+    offset: np.ndarray | float,
+    t_env: float,
+) -> float:
+    """Return sum dH (1 - T0/T_lm) over a piecewise-linear T-H curve, in kW.
+
+    ``t_vals`` are in degC, falling down the table; ``offset`` moves each
+    interval onto real temperatures. T_lm is the log-mean temperature of the
+    interval, so a linear segment is integrated exactly.
+    """
+    h_vals = np.nan_to_num(np.asarray(h_vals, dtype=float))
+    t_abs = np.asarray(t_vals, dtype=float) + C_to_K
+    t_upper = t_abs[:-1] + offset
+    t_lower = t_abs[1:] + offset
+    t_ref = t_env + C_to_K
+    delta_h = h_vals[:-1] - h_vals[1:]
+    span = t_upper - t_lower
+    with np.errstate(divide="ignore", invalid="ignore"):
+        carnot_factor = np.where(
+            np.abs(span) > tol,
+            1.0 - t_ref * np.log(t_upper / t_lower) / span,
+            1.0 - t_ref / t_upper,
+        )
+    return float(np.sum(delta_h * carnot_factor))
 
 
 def _zone_stream_shift_sources(target: Any) -> tuple[list, list, int | None] | None:

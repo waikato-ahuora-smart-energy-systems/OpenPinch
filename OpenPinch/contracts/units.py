@@ -86,6 +86,7 @@ OUTPUT_UNIT_RULES: dict[str, OutputUnitRule] = {
     ),
     "exergy_sources": OutputUnitRule("kW", "kW", unit_groups=("exergy", "heat_flow")),
     "exergy_sinks": OutputUnitRule("kW", "kW", unit_groups=("exergy", "heat_flow")),
+    "exergy_released": OutputUnitRule("kW", "kW", unit_groups=("exergy", "heat_flow")),
     "ETE": OutputUnitRule(
         "dimensionless",
         "%",

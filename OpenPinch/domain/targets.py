@@ -140,6 +140,7 @@ class UtilitySummaryTarget(BaseTargetModel):
     process_component_work_target: Optional[float] = None
     exergy_sinks: Optional[float] = None
     exergy_sources: Optional[float] = None
+    exergy_released: Optional[float] = None
     exergy_des_min: Optional[float] = None
     exergy_req_min: Optional[float] = None
     ETE: Optional[float] = None

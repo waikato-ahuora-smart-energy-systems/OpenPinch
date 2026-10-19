@@ -36,6 +36,46 @@ Tutorials
   name, ``HPS``. It asked for ``HP Steam``, which used to answer 0 and now
   raises as an unknown utility, so the notebook stopped running.
 
+Heat pump conventions, exergy and targeting details
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``hpr_cop`` follows the duty for every cycle model: heat pumps report the
+  heating COP (Q_cond/W) and refrigeration the cooling COP (Q_evap/W). Carnot
+  refrigeration reported the heating COP, so its ``hpr_cop`` falls by 1 for
+  the same design: tutorial 08's refrigeration 1.58 to 0.58, tutorial 10's
+  Carnot refrigeration 2.38 to 1.38. Vapour-compression, MVR and TESPy targets
+  already reported this way and are unchanged.
+- The Carnot heating COP stays 1 + eta x T_l/(T_h - T_l): ``HPR_ETA_II_CARNOT``
+  applies to the cooling Carnot COP and the heating COP follows from the
+  energy balance. The field help and the Heat Pump guide now say so.
+- Vapour-compression streams keep their full duty when the evaporator inlet is
+  exactly saturated liquid, as in a zero-lift cascade stage. The first profile
+  point was dropped, so the stream carried 95 percent of the stage's duty and
+  ``hpr_load`` was out of balance (0.55 kW in the audit's ``basic_pinch``
+  two-by-two water cascade).
+- ``ETE`` is the exergy transfer effectiveness of the Balanced Composite
+  Curves: the exergy gained by the cold balanced composite over the exergy
+  released by the hot one, relative to ``ENV_TEMPERATURE`` and with utilities
+  included. It is at most 100 percent. It was the above-pinch deficit exergy
+  over the below-pinch surplus exergy, which is not an effectiveness and was
+  458 percent on ``pulp_mill``. The new ``exergy_released`` field is its
+  denominator and weights it across periods. Direct Integration values change
+  from 100.5 to 76.9 percent on ``basic_pinch``, 458.7 to 68.9 percent on
+  ``pulp_mill``, 108.9 to 73.5 percent on ``chocolate_factory`` and 28.8 to
+  75.3 percent on ``Four-stream-Yee-and-Grossmann-1990-1``.
+- The warning for a negative stream or utility ``dt_cont`` now says that the
+  reported heat recovery can then exceed the thermodynamic limit.
+- With assisted heat transfer (``DIRECT_ASSISTED_HT_ENABLED``), heating demand
+  in a pocket below the pinch is met by hot utility, so the utilities balance
+  the targets. On ``zonal_site`` the hot utilities rise from 0 to 44.65 kW (LPS
+  17.22 kW, HW 27.43 kW) and the "unmet hot utility" warning is gone.
+- Total Site targeting no longer rounds its stored Problem Table to 4 decimal
+  places (only the graph copies are rounded), and the energy transfer diagram
+  is built from each target's unrounded table. On ``pulp_mill`` the diagram's
+  operation cascades moved by up to 8.3 kW.
+- The vapour-compression docstrings say that T_evap is the dew-point and T_cond
+  the bubble-point temperature, as the code uses them.
+
 Result fixes
 ~~~~~~~~~~~~
 

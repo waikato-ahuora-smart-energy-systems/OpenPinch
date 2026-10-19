@@ -37,8 +37,15 @@ Expected Output
 ---------------
 
 The selected thermal target is enriched with fields such as
-``exergy_sources``, ``exergy_sinks``, ``ETE``, ``exergy_req_min``, and
-``exergy_des_min``.
+``exergy_sources``, ``exergy_sinks``, ``ETE``, ``exergy_released``,
+``exergy_req_min``, and ``exergy_des_min``.
+
+``ETE`` is the exergy transfer effectiveness of the Balanced Composite Curves:
+the exergy gained by the cold balanced composite over the exergy released by
+the hot balanced composite (``exergy_released``). Both include the utilities
+(and any heat-pump streams) and are taken relative to ``ENV_TEMPERATURE``. ETE
+is at most 100 percent; the shortfall is the exergy destroyed in heat
+transfer. Across periods, ETE is weighted by ``exergy_released``.
 
 Interpretation
 --------------
