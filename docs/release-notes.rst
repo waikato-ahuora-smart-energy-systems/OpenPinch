@@ -4,6 +4,27 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Input and export hardening
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``HENS_SOLVER_OPTIONS_PDM``, ``HENS_SOLVER_OPTIONS_TDM`` and
+  ``HENS_SOLVER_OPTIONS_EVM`` accept only known IPOPT, Couenne and APOPT
+  tolerances, iteration limits and numeric settings, each with a number, a
+  boolean or a single word as its value. Any other option name or value is a
+  validation issue, and solver option files and option lines are written only
+  from validated options.
+- Unit text is checked against a bounded grammar before Pint parses it: at
+  most 64 characters, products and ratios of unit names and numbers (Pint's
+  ``·`` and ``⋅`` included), one power of at most two digits (``^``, ``**``
+  or superscript digits) on a unit name or a group, and at most two
+  levels of parentheses. Other unit text raises a ``ValueError``.
+- ``workspace.batch`` cannot run another ``workspace.batch``, and one request
+  runs at most 100 cases; a larger case list is an error and runs nothing.
+- Excel exports (``export_excel``, the ``export.excel`` command,
+  ``export_problem_table`` and the dashboard's table export) write every text
+  cell as a plain string, never as a formula, and text starting with ``=``,
+  ``+``, ``-``, ``@``, a tab or a carriage return gets Excel's quote prefix.
+
 Utility cost and totals
 ~~~~~~~~~~~~~~~~~~~~~~~
 

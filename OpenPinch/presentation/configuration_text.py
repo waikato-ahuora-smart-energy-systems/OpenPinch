@@ -426,15 +426,18 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
     ),
     "HENS_SOLVER_OPTIONS_PDM": FieldText(
         "Pinch design solver options", None,
-        "Options passed to the pinch design solver.",
+        "Options passed to the pinch design solver: known tolerances, iteration "
+        "limits and numeric settings, each a number, a boolean or one word.",
     ),
     "HENS_SOLVER_OPTIONS_TDM": FieldText(
         "Thermal derivative solver options", None,
-        "Options passed to the thermal derivative solver.",
+        "Options passed to the thermal derivative solver: known tolerances, iteration "
+        "limits and numeric settings, each a number, a boolean or one word.",
     ),
     "HENS_SOLVER_OPTIONS_EVM": FieldText(
         "Network evolution solver options", None,
-        "Options passed to the network evolution solver.",
+        "Options passed to the network evolution solver: known tolerances, iteration "
+        "limits and numeric settings, each a number, a boolean or one word.",
     ),
     "HENS_SOLVE_TOLERANCE": FieldText(
         "HEN solve tolerance", None,
