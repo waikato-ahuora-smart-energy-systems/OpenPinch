@@ -203,31 +203,38 @@ class TemperatureIntervalEngine:
             lower_pos = orig_positions.get(lower_idx)
             self._insert_mid_block(new_data, positions, upper_pos, lower_pos)
 
+        self._refresh_interval_widths(new_data)
         return new_data, inserted_total
+
+    def _refresh_interval_widths(self, data: np.ndarray) -> None:
+        """Recompute interval widths and enthalpy steps on the merged grid.
+
+        Row ``i`` closes the interval from ``T[i-1]`` down to ``T[i]``, so its
+        width is ``T[i-1] - T[i]`` and the hottest row has zero width.
+        """
+        T_idx = self._column_index_for(ProblemTableLabel.T)
+        delta_idx = self._column_index_for(ProblemTableLabel.DELTA_T)
+        delta_t = np.zeros(data.shape[0], dtype=data.dtype)
+        delta_t[1:] = data[:-1, T_idx] - data[1:, T_idx]
+        data[:, delta_idx] = delta_t
+        for cp_key, dh_key in HEAT_CAPACITY_PAIRS:
+            if cp_key in self.col_index and dh_key in self.col_index:
+                data[:, self.col_index[dh_key]] = (
+                    delta_t * data[:, self.col_index[cp_key]]
+                )
 
     def _build_mid_block(
         self, row_top: np.ndarray, row_bot: np.ndarray, T_vals: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Construct interpolated rows and return updated neighbour rows."""
-        rows, (t_idx, delta_idx) = self._initialise_insert_rows(
-            row_top, row_bot, T_vals
-        )
-        top_adjusted = row_top.copy()
-        bottom_adjusted = row_bot.copy()
+    ) -> np.ndarray:
+        """Construct interpolated rows between two neighbour rows.
 
-        if rows.size == 0:
-            return rows, top_adjusted, bottom_adjusted
-
-        self._interpolate_heat_columns(rows, row_top, row_bot, t_idx)
-        temps_chain = np.concatenate(
-            ([row_top[t_idx]], rows[:, t_idx], [row_bot[t_idx]])
-        )
-        for i in range(rows.shape[0]):
-            rows[i, delta_idx] = temps_chain[i + 1] - temps_chain[i + 2]
-        top_adjusted[delta_idx] = temps_chain[0] - temps_chain[1]
-        bottom_adjusted = self._adjust_bottom_row(row_bot, rows, t_idx, delta_idx)
-        self._update_heat_capacity_pairs(rows, top_adjusted, bottom_adjusted, delta_idx)
-        return rows, top_adjusted, bottom_adjusted
+        Interval widths and enthalpy steps are refreshed on the merged table.
+        """
+        rows = self._initialise_insert_rows(row_bot, T_vals)
+        if rows.size:
+            t_idx = self._column_index_for(ProblemTableLabel.T)
+            self._interpolate_heat_columns(rows, row_top, row_bot, t_idx)
+        return rows
 
     def _rebuild_edge_block(
         self,
@@ -270,12 +277,9 @@ class TemperatureIntervalEngine:
         sorted_positions = sorted(positions)
         temps = new_data[np.asarray(sorted_positions), T_idx]
 
-        block, neighbor_adjusted = self._build_top_or_bottom_block(
-            neighbor_row, temps, is_top_block=is_top
-        )
+        block = self._build_top_or_bottom_block(neighbor_row, temps)
         for idx_pos, row_vals in zip(sorted_positions, block):
             new_data[idx_pos] = row_vals
-        new_data[neighbor_idx] = neighbor_adjusted
 
     def _insert_mid_block(
         self,
@@ -294,14 +298,11 @@ class TemperatureIntervalEngine:
         T_idx = self._column_index_for(ProblemTableLabel.T)
         temps_mid = new_data[np.asarray(positions), T_idx]
 
-        block, top_adjusted, bottom_adjusted = self._build_mid_block(
+        block = self._build_mid_block(
             new_data[upper_pos].copy(), new_data[lower_pos].copy(), temps_mid
         )
-
-        new_data[upper_pos] = top_adjusted
         for idx_pos, row_vals in zip(positions, block):
             new_data[idx_pos] = row_vals
-        new_data[lower_pos] = bottom_adjusted
 
     def _append_placeholders(
         self,
@@ -363,62 +364,38 @@ class TemperatureIntervalEngine:
                 target_row[col_idx] = value
 
     def _build_top_or_bottom_block(
-        self, row_neighbor: np.ndarray, T_vals: np.ndarray, is_top_block: bool = True
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """Build rows to prepend above the current hottest interval."""
+        self, row_neighbor: np.ndarray, T_vals: np.ndarray
+    ) -> np.ndarray:
+        """Build zero-heat rows beyond the hottest or coldest existing row.
+
+        Rows are returned in descending temperature order. Interval widths
+        and enthalpy steps are refreshed on the merged table.
+        """
         n_cols = self.data.shape[1]
         if T_vals.size == 0:
-            return np.empty((0, n_cols), dtype=self.data.dtype), row_neighbor.copy()
+            return np.empty((0, n_cols), dtype=self.data.dtype)
 
         T_idx = self._column_index_for(ProblemTableLabel.T)
-        delta_T_idx = self._column_index_for(ProblemTableLabel.DELTA_T)
-
-        temps_sorted = np.sort(T_vals)
+        temps_sorted = np.sort(T_vals)[::-1]
         block = np.full((temps_sorted.size, n_cols), np.nan, dtype=self.data.dtype)
-        neighbor = row_neighbor.copy()
-
-        for i, temp in enumerate(temps_sorted):
-            row = block[i]
+        for row, temp in zip(block, temps_sorted):
             row[T_idx] = temp
-            row[delta_T_idx] = (
-                temp - neighbor[T_idx] if is_top_block else neighbor[T_idx] - temp
-            )
             self._populate_from_neighbor(
                 row,
-                neighbor,
+                row_neighbor,
                 copy_interpolation=True,
                 zero_non_interpolation=True,
             )
-            neighbor = row
-
-        if is_top_block:
-            for i, temp in enumerate(block[:, delta_T_idx]):
-                if i == 0:
-                    row_neighbor[delta_T_idx] = temp
-                elif i + 1 == block[:, 0].size:
-                    block[i - 1][delta_T_idx] = block[i][delta_T_idx]
-                    block[i][delta_T_idx] = 0.0
-                else:
-                    block[i - 1][delta_T_idx] = block[i][delta_T_idx]
-
-        return block[::-1], row_neighbor
+        return block
 
     def _initialise_insert_rows(
-        self, row_top: np.ndarray, row_bot: np.ndarray, T_vals: np.ndarray
-    ) -> Tuple[np.ndarray, Tuple[int, int]]:
-        """Initialise new rows with temperature and delta values."""
-        n_rows = T_vals.size
+        self, row_bot: np.ndarray, T_vals: np.ndarray
+    ) -> np.ndarray:
+        """Initialise new rows with temperatures and the lower row's values."""
         n_cols = self.data.shape[1]
-        rows = np.full((n_rows, n_cols), np.nan, dtype=self.data.dtype)
-        if n_rows == 0:
-            t_idx = self._column_index_for(ProblemTableLabel.T)
-            delta_idx = self._column_index_for(ProblemTableLabel.DELTA_T)
-            return rows, (t_idx, delta_idx)
-
+        rows = np.full((T_vals.size, n_cols), np.nan, dtype=self.data.dtype)
         temps_sorted = np.sort(T_vals)[::-1]
         t_idx = self._column_index_for(ProblemTableLabel.T)
-        delta_idx = self._column_index_for(ProblemTableLabel.DELTA_T)
-
         for i, temp in enumerate(temps_sorted):
             row = rows[i]
             row[t_idx] = temp
@@ -429,8 +406,7 @@ class TemperatureIntervalEngine:
                 zero_non_interpolation=False,
                 relevant_cp_source=row_bot,
             )
-
-        return rows, (t_idx, delta_idx)
+        return rows
 
     def _interpolate_heat_columns(
         self,
@@ -462,43 +438,6 @@ class TemperatureIntervalEngine:
                 rows[:, col_idx] = bot_val
                 continue
             rows[:, col_idx] = bot_val + ratio * (top_val - bot_val)
-
-    def _adjust_bottom_row(
-        self,
-        row_bot: np.ndarray,
-        rows: np.ndarray,
-        t_idx: int,
-        delta_idx: int,
-    ) -> np.ndarray:
-        """Update the existing lower row to account for inserted intervals."""
-        adjusted = row_bot.copy()
-        if rows.size == 0:
-            return adjusted
-        last_temp = rows[-1, t_idx]
-        adjusted[delta_idx] = last_temp - adjusted[t_idx]
-        for cp_key, dh_key in HEAT_CAPACITY_PAIRS:
-            cp_idx = self.col_index[cp_key]
-            dh_idx = self.col_index[dh_key]
-            adjusted[dh_idx] = adjusted[delta_idx] * adjusted[cp_idx]
-        return adjusted
-
-    def _update_heat_capacity_pairs(
-        self,
-        rows: np.ndarray,
-        top_adjusted: np.ndarray,
-        bottom_adjusted: np.ndarray,
-        delta_idx: int,
-    ) -> None:
-        """Recalculate delta-H columns using heat capacities and delta-T."""
-        for cp_key, dh_key in HEAT_CAPACITY_PAIRS:
-            cp_idx = self.col_index[cp_key]
-            dh_idx = self.col_index[dh_key]
-            if rows.size:
-                rows[:, dh_idx] = rows[:, delta_idx] * rows[:, cp_idx]
-            top_adjusted[dh_idx] = top_adjusted[delta_idx] * top_adjusted[cp_idx]
-            bottom_adjusted[dh_idx] = (
-                bottom_adjusted[delta_idx] * bottom_adjusted[cp_idx]
-            )
 
 
 def insert_temperature_intervals(table, temperatures) -> int:

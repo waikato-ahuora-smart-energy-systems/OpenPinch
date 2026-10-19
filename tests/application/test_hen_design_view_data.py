@@ -2,7 +2,12 @@
 
 import pytest
 
+from OpenPinch.domain._heat_exchanger.period_state import HeatExchangerPeriodState
+from OpenPinch.domain.enums import HeatExchangerKind, StreamID
+from OpenPinch.domain.heat_exchanger import HeatExchanger
+from OpenPinch.domain.heat_exchanger_network import HeatExchangerNetwork
 from OpenPinch.presentation.network_grid.geometry import build_grid_model
+from OpenPinch.presentation.network_grid.layout import build_grid_layout
 from tests.analysis.heat_exchanger_networks.test_design_workflow import (
     _public_example_problem,
     _use_fake_default_executor,
@@ -70,6 +75,10 @@ def test_view_totals_and_utility_duties_match_the_design_view(design):
     assert view.grid == design.grid_layout()
 
 
+def test_views_of_a_single_period_network_is_its_one_view(design):
+    assert design.views() == (design.view(),)
+
+
 def test_view_ranking_follows_the_duplicate_free_ranking(design):
     ranked = design.top(10)
 
@@ -90,3 +99,111 @@ def test_view_ranking_follows_the_duplicate_free_ranking(design):
 def test_view_rejects_a_rank_that_is_not_one_based(design, rank):
     with pytest.raises(ValueError, match="rank must be a positive one-based integer"):
         design.view(rank=rank)
+
+
+def _exchanger(name, kind, source, sink, stage, duty, temperatures, area=None):
+    source_in, source_out, sink_in, sink_out = temperatures
+    return HeatExchanger(
+        exchanger_id=name,
+        kind=kind,
+        source_stream=source,
+        sink_stream=sink,
+        source_stream_role=StreamID.Utility
+        if kind is HeatExchangerKind.HOT_UTILITY
+        else StreamID.Process,
+        sink_stream_role=StreamID.Utility
+        if kind is HeatExchangerKind.COLD_UTILITY
+        else StreamID.Process,
+        stage=stage,
+        area=area,
+        period_states=(
+            HeatExchangerPeriodState(
+                period_id="0",
+                period_idx=0,
+                duty=duty,
+                source_inlet_temperature=source_in,
+                source_outlet_temperature=source_out,
+                sink_inlet_temperature=sink_in,
+                sink_outlet_temperature=sink_out,
+            ),
+        ),
+    )
+
+
+# H1 cools 650 -> 370 K through a recovery exchanger in two parallel parts
+# (one grid match) and a cooler; C1 heats 350 -> 600 K through it and a heater.
+SMALL_NETWORK = HeatExchangerNetwork(
+    stage_count=1,
+    exchangers=(
+        _exchanger(
+            "E1a",
+            HeatExchangerKind.RECOVERY,
+            "H1",
+            "C1",
+            1,
+            60.0,
+            (650.0, 500.0, 350.0, 480.0),
+            area=4.0,
+        ),
+        _exchanger(
+            "E1b",
+            HeatExchangerKind.RECOVERY,
+            "H1",
+            "C1",
+            1,
+            40.0,
+            (650.0, 500.0, 350.0, 480.0),
+            area=2.5,
+        ),
+        _exchanger(
+            "C1",
+            HeatExchangerKind.COLD_UTILITY,
+            "H1",
+            "CW",
+            None,
+            50.0,
+            (500.0, 370.0, 290.0, 300.0),
+        ),
+        _exchanger(
+            "H1",
+            HeatExchangerKind.HOT_UTILITY,
+            "Steam",
+            "C1",
+            None,
+            30.0,
+            (700.0, 699.0, 480.0, 600.0),
+        ),
+    ),
+)
+
+
+def test_grid_layout_gives_each_stream_its_supply_and_target_temperature():
+    layout = build_grid_layout(SMALL_NETWORK, period_id="0")
+
+    assert [
+        (row.stream, row.side, row.supply_temperature, row.target_temperature)
+        for row in layout.stream_temperatures
+    ] == [("H1", "hot", 650.0, 370.0), ("C1", "cold", 350.0, 600.0)]
+
+
+def test_grid_layout_sums_the_area_of_the_exchangers_one_match_merges():
+    layout = build_grid_layout(SMALL_NETWORK, period_id="0")
+
+    [recovery] = [match for match in layout.matches if match.kind == "recovery"]
+    assert (recovery.duty, recovery.area) == (100.0, 6.5)
+    assert [match.area for match in layout.matches if match.kind != "recovery"] == [
+        None,
+        None,
+    ]
+
+
+def test_grid_layout_gives_each_match_the_area_of_its_exchangers(design):
+    network = design.network(rank=1)
+    areas = {exchanger.exchanger_id: exchanger.area for exchanger in network.exchangers}
+
+    layout = design.grid_layout()
+
+    recovery = [match for match in layout.matches if match.kind == "recovery"]
+    assert recovery
+    for match in recovery:
+        assert match.area == pytest.approx(areas[match.exchanger_id], rel=1e-12)

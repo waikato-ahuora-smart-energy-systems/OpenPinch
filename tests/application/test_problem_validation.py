@@ -100,6 +100,76 @@ def test_validation_report_gives_one_issue_for_a_bad_union_field(
     assert issues[0].record_label == "Stream 1 'H1'"
 
 
+_BOGUS = {"value": 150.0, "unit": "bogus"}
+
+
+@pytest.mark.parametrize(
+    ("thermal", "path"),
+    [
+        (
+            {"t_supply": _BOGUS, "t_target": 40.0, "heat_flow": 100.0},
+            "streams[0].t_supply",
+        ),
+        (
+            {
+                "segments": [
+                    {"t_supply": _BOGUS, "t_target": 60.0, "heat_flow": 50.0},
+                    {"t_supply": 60.0, "t_target": 40.0, "heat_flow": 50.0},
+                ]
+            },
+            "streams[0].segments[0].t_supply",
+        ),
+        (
+            {
+                "profile": {
+                    "points": [
+                        {"temperature": _BOGUS, "cumulative_heat": 0.0},
+                        {"temperature": 40.0, "cumulative_heat": 100.0},
+                    ]
+                }
+            },
+            "streams[0].profile.points[0].temperature",
+        ),
+    ],
+    ids=["stream", "segment", "profile"],
+)
+def test_validation_report_gives_an_issue_for_an_undefined_unit(thermal, path):
+    stream = {"zone": "Site", "name": "H1", "dt_cont": 10.0, "htc": 1.0}
+    payload = {"streams": [stream | thermal], "utilities": []}
+
+    report = validation.build_validation_report(payload)
+
+    assert report.valid is False
+    assert any(
+        issue.path == path and "bogus" in issue.message for issue in report.issues
+    )
+
+
+def test_validation_report_rejects_duplicate_sibling_zone_names():
+    stream = {"name": "H1", "t_supply": 150.0, "t_target": 40.0, "heat_flow": 100.0}
+    payload = {
+        "streams": [stream | {"zone": "Area"}],
+        "utilities": [],
+        "zone_tree": {
+            "name": "Site",
+            "type": "Site",
+            "children": [
+                {"name": "Area", "type": "Process Zone"},
+                {"name": "Area", "type": "Process Zone"},
+            ],
+        },
+    }
+
+    report = validation.build_validation_report(payload)
+
+    assert report.valid is False
+    assert any(
+        issue.path.startswith("zone_tree.children")
+        and "Duplicate zone name 'Area'" in issue.message
+        for issue in report.issues
+    )
+
+
 def test_validation_report_rejects_discontinuous_segmented_utility_before_loading():
     payload = {
         "streams": [

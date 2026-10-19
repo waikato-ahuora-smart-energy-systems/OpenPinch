@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from copy import deepcopy
 
 import numpy as np
@@ -33,33 +34,36 @@ def build_multiperiod_hpr_cases(
     """Prepare aligned single-period HPR inputs for one shared design vector."""
     raw_cases = []
     weights = _canonical_period_weights(zone)
-    for period_id, period_idx in _canonical_period_items(zone):
-        period_args = _period_args(args, period_id=period_id, period_idx=period_idx)
-        base_target = _compute_hpr_base_target_for_period(
-            zone=zone,
-            period_args=period_args,
-            is_direct=is_direct,
-        )
-        if base_target is None:
-            raise ValueError(
-                "Multi-period HPR optimisation requires a valid base target for "
-                f"period {period_id!r}."
+    # Each period's base targets are added to the zone tree only while the
+    # period is prepared; the zones keep the targets they had before.
+    with _preserved_zone_targets(zone):
+        for period_id, period_idx in _canonical_period_items(zone):
+            period_args = _period_args(args, period_id=period_id, period_idx=period_idx)
+            base_target = _compute_hpr_base_target_for_period(
+                zone=zone,
+                period_args=period_args,
+                is_direct=is_direct,
             )
-        optimizer_pt = _optimizer_problem_table_for_hpr(
-            zone=zone,
-            base_target=base_target,
-            is_direct=is_direct,
-            period_idx=period_idx,
-        )
-        raw_cases.append(
-            {
-                "period_id": period_id,
-                "period_idx": period_idx,
-                "weight": weights[period_id],
-                "base_target": base_target,
-                "optimizer_pt": optimizer_pt,
-            }
-        )
+            if base_target is None:
+                raise ValueError(
+                    "Multi-period HPR optimisation requires a valid base target "
+                    f"for period {period_id!r}."
+                )
+            optimizer_pt = _optimizer_problem_table_for_hpr(
+                zone=zone,
+                base_target=base_target,
+                is_direct=is_direct,
+                period_idx=period_idx,
+            )
+            raw_cases.append(
+                {
+                    "period_id": period_id,
+                    "period_idx": period_idx,
+                    "weight": weights[period_id],
+                    "base_target": base_target,
+                    "optimizer_pt": optimizer_pt,
+                }
+            )
 
     _align_hpr_problem_tables([case["optimizer_pt"] for case in raw_cases])
 
@@ -78,10 +82,9 @@ def build_multiperiod_hpr_cases(
             period_idx=period_idx,
         )
         if target_load < tol:
-            raise ValueError(
-                "Multi-period HPR optimisation requires a non-zero HPR load for "
-                f"period {period_id!r}."
-            )
+            # A period with no HPR load runs no heat pump, as a single-period
+            # target would report, so it takes no part in the shared design.
+            continue
         solver_case = HPRPeriodCase(
             period_id=period_id,
             period_idx=period_idx,
@@ -150,6 +153,23 @@ def _compute_hpr_base_target_for_period(
     return compute_indirect_integration_targets(zone, period_args)
 
 
+@contextmanager
+def _preserved_zone_targets(zone: Zone):
+    saved = [(item, dict(item.targets)) for item in _zone_subtree(zone)]
+    try:
+        yield
+    finally:
+        for item, targets in saved:
+            item.targets.clear()
+            item.targets.update(targets)
+
+
+def _zone_subtree(zone: Zone):
+    yield zone
+    for subzone in zone.subzones.values():
+        yield from _zone_subtree(subzone)
+
+
 def _refresh_direct_targets_for_subtree(zone: Zone, period_args: dict) -> None:
     for subzone in zone.subzones.values():
         _refresh_direct_targets_for_subtree(subzone, period_args)
@@ -200,6 +220,18 @@ def _canonical_period_items(zone: Zone) -> list[tuple[str, int]]:
     return [(str(period_id), int(idx)) for period_id, idx in period_ids.items()]
 
 
+def idle_period_weight(zone: Zone, period_cases) -> float:
+    """The weight of the zone's periods without a prepared case (no HPR load)."""
+    prepared = {str(case.period_id) for case in period_cases}
+    return float(
+        sum(
+            weight
+            for period_id, weight in _canonical_period_weights(zone).items()
+            if period_id not in prepared
+        )
+    )
+
+
 def _canonical_period_weights(zone: Zone) -> dict[str, float]:
     items = _canonical_period_items(zone)
     flat_weights = resolve_period_weights(
@@ -225,6 +257,7 @@ def _period_args(
 
 __all__ = [
     "build_multiperiod_hpr_cases",
+    "idle_period_weight",
     "period_case_by_id",
     "period_id_for_index",
 ]

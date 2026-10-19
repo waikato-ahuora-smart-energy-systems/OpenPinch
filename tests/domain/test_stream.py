@@ -8,6 +8,7 @@ import pytest
 from OpenPinch.domain._stream.value_state import resolve_period_weights
 from OpenPinch.domain.enums import FluidPhase, StreamType
 from OpenPinch.domain.stream import Stream
+from OpenPinch.domain.stream_collection import StreamCollection
 from OpenPinch.domain.value import Value
 from tests.support.paths import FIXTURES_ROOT
 
@@ -564,3 +565,42 @@ def test_multiperiod_pressure_preserves_all_core_field_derived_broadcasting():
     assert stream.heat_capacity_flowrate.num_periods == 2
     np.testing.assert_allclose(stream.heat_capacity_flowrate.period_values, [0.5, 0.5])
     np.testing.assert_allclose(stream.minimum_temperature.period_values, [100.0, 100.0])
+
+
+@pytest.mark.parametrize(
+    ("dt_cont", "expected"),
+    [
+        ({"value": 5.0, "unit": "degC"}, 5.0),
+        ({"value": 5.0, "unit": "C"}, 5.0),
+        ({"value": 5.0, "unit": "°C"}, 5.0),
+        ({"value": 9.0, "unit": "degF"}, 5.0),
+    ],
+)
+def test_stream_takes_dt_cont_in_an_offset_temperature_unit(dt_cont, expected):
+    stream = Stream(
+        name="H1",
+        supply_temperature=150.0,
+        target_temperature=50.0,
+        heat_flow=100.0,
+        delta_t_contribution=dt_cont,
+    )
+
+    assert float(stream.delta_t_contribution) == pytest.approx(expected, rel=1e-12)
+
+
+def test_scalar_stream_set_attr_for_period_changes_only_that_period():
+    collection = StreamCollection()
+    collection.set_period_context({"a": 0, "b": 1, "c": 2}, [1.0, 1.0, 1.0], 3)
+    stream = Stream(
+        name="H1",
+        supply_temperature=100.0,
+        target_temperature=50.0,
+        heat_flow=100.0,
+    )
+    collection.add(stream)
+
+    stream.set_attr_for_period("heat_flow", 50.0, period_id="c")
+
+    np.testing.assert_allclose(
+        stream.heat_flow.period_values, np.array([100.0, 100.0, 50.0])
+    )

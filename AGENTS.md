@@ -33,7 +33,7 @@ Python package published to PyPI; documentation on Read the Docs.
 - `tests/` - pytest suite mirroring the package layout.
 - `docs/` - Sphinx documentation, including `release-notes.rst`.
 - `scripts/` - CI, release and toolchain helpers (`scripts/ci_local.sh` runs
-  the CI lanes locally).
+  most CI lanes locally; `scripts/pyodide` runs the suite in Pyodide).
 
 ## Commands
 
@@ -42,7 +42,15 @@ Python package published to PyPI; documentation on Read the Docs.
   `uv run --no-sync pytest -m "not solver and not tespy and not performance and not docs" --hypothesis-seed=20260715`
 - Focused tests: `uv run --no-sync pytest tests/<area>`
 - Lint: `uv run --no-sync ruff check . && uv run --no-sync ruff format --check .`
-- All CI lanes locally: `scripts/ci_local.sh` (`quick`, `all`, or lane names).
+- CI lanes locally: `scripts/ci_local.sh` (`quick`, `all`, or lane names).
+  It does not run the Pyodide lane, `floors`, the py312/py313 unit lanes,
+  the non-core and non-Linux smoke tests, or the dependency audit. A Pyodide
+  shard runs with Node 22: `uv build --out-dir dist`, then
+  `node scripts/pyodide/run_tests.mjs dist/*.whl <pytest args>` (shard paths
+  and deselections are in `.github/workflows/ci.yml`; run `npm ci` in
+  `scripts/pyodide` once).
+- Hypothesis settings come from the `openpinch` profile in
+  `tests/conftest.py`, so `--hypothesis-seed` behaves the same everywhere.
 - Probity tooling (once per clone): `nvm use && npm install`, and be logged in
   to Claude Code (`claude /login`) so the TDD validator can run.
 

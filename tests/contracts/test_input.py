@@ -389,3 +389,36 @@ def test_target_results_serialize_domain_values_without_legacy_encoders():
     assert payload["Qh"] == {"value": 100.0, "unit": "kW"}
     assert payload["hpr_hot_streams"] == StreamCollection().to_dict()
     assert payload["hpr_cold_streams"] == StreamCollection().to_dict()
+
+
+def test_zone_tree_rejects_duplicate_sibling_names():
+    with pytest.raises(ValidationError, match="Duplicate zone name 'Area'"):
+        ZoneTreeSchema.model_validate(
+            {
+                "name": "Site",
+                "type": "Site",
+                "children": [
+                    {"name": "Area", "type": "Process Zone"},
+                    {"name": "Area", "type": "Process Zone"},
+                ],
+            }
+        )
+
+
+def test_zone_tree_allows_one_name_under_different_parents():
+    tree = ZoneTreeSchema.model_validate(
+        {
+            "name": "Site",
+            "type": "Site",
+            "children": [
+                {
+                    "name": f"Plant {index}",
+                    "type": "Site",
+                    "children": [{"name": "Area", "type": "Process Zone"}],
+                }
+                for index in (1, 2)
+            ],
+        }
+    )
+
+    assert [child.children[0].name for child in tree.children] == ["Area", "Area"]

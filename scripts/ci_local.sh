@@ -8,6 +8,9 @@
 #   scripts/ci_local.sh --linux all  # same, inside a Linux container like CI (needs Docker)
 #
 # Lanes: lint unit docs tespy performance solver notebooks build
+# Not covered here: the Pyodide lane (see scripts/pyodide/run_tests.mjs), the
+# floors and py312/py313 unit lanes, the non-core and Windows/macOS smoke
+# tests, and the dependency audit. CI runs those.
 # Needs uv. The solver lane downloads the IDAES solver binaries on first use.
 set -euo pipefail
 cd "$(dirname "$0")/.."

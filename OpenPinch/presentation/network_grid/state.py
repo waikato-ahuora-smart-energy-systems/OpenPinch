@@ -19,6 +19,9 @@ class GridDiagramMatch:
     sink_stream: str
     stage: int | None
     duty: float
+    # The heat transfer area of the match's exchangers, summed; None when any
+    # of them has none.
+    area: float | None = None
 
 
 @dataclass(frozen=True)

@@ -34,13 +34,19 @@ def get_multiperiod_hpr_targets(
     period_cases: list[_PreparedHPRPeriodCase],
     selected_period_id: str,
     selected_period_idx: int,
+    idle_period_weight: float = 0.0,
 ) -> HeatPumpTargetOutputs:
-    """Solve a shared HPR design and project it into the output contract."""
+    """Solve a shared HPR design and project it into the output contract.
+
+    ``idle_period_weight`` is the weight of the periods left out for having no
+    HPR load; it still counts in the weighted operation.
+    """
     solver_cases = [case.solver_case for case in period_cases]
     selected_case = period_case_by_id(period_cases, selected_period_id).solver_case
     args = MultiPeriodHPRTargetInputs(
         search_budget=selected_case.args.search_budget,
         period_cases=solver_cases,
+        idle_period_weight=idle_period_weight,
         selected_period_id=selected_period_id,
         selected_period_idx=selected_period_idx,
         hpr_type=selected_case.args.hpr_type,

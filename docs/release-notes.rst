@@ -4,6 +4,31 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Network grid data
+~~~~~~~~~~~~~~~~~
+
+- A network's grid layout (``design.grid_layout()``, and ``view.grid`` in
+  ``design.`` command responses) now gives each stream row its supply and
+  target temperature in the period (``stream_temperatures``, the ends of its
+  exchangers' temperatures) and each match its heat transfer area (summed
+  over the exchangers one match merges). A client can draw a full grid
+  diagram, with end temperatures and areas, from the layout alone.
+
+Testing and CI
+~~~~~~~~~~~~~~
+
+- The Pyodide test lane is required by ``CI OK``, so a change that breaks the
+  web app's engine blocks the merge. Its PyPI test dependencies are pinned
+  to the ``uv.lock`` versions in ``scripts/pyodide/requirements.txt``, a test
+  keeps the two in step, and the run fails if micropip fetches anything
+  else from PyPI. ``tests/presentation`` now runs in the lane's core shard,
+  and the utility placement timing tests allow WebAssembly ten times their
+  native budget.
+- ``tests/conftest.py`` loads an ``openpinch`` Hypothesis profile
+  (``derandomize=False``, no deadline, no example database), so
+  ``--hypothesis-seed`` picks the same examples on GitHub, locally and in
+  Pyodide. Before, Hypothesis's own CI profile ignored the seed on GitHub.
+
 Tutorials
 ~~~~~~~~~
 
@@ -14,6 +39,25 @@ Tutorials
 Result fixes
 ~~~~~~~~~~~~
 
+- ``target.heat_exchanger_area_and_cost()`` reports higher area, capital cost
+  and total cost targets. Inserting temperatures into a problem table left the
+  inserted intervals and their neighbours with the wrong widths and enthalpy
+  steps, so the area integration over the balanced composite curves came out
+  5-22 % low. For example, the ``basic_pinch`` area target rises from about
+  475 m2 to about 554 m2. Published area and cost numbers change; energy
+  targets do not.
+- ``run_command`` with ``design.multiperiod_heat_exchanger_network`` returns
+  its result. Before, building the response's ``view`` raised "period_id is
+  required when a network has multiple period states" for the shared
+  multiperiod network. ``design.*`` responses now carry ``views``, one
+  ``HeatExchangerNetworkView`` per period of the rank-1 network in period
+  order (one for a single-period network), and ``view`` is the first of them.
+  The HEN design view gains ``views(rank=)``, which returns them.
+- ``export_excel()`` (and the ``export.excel`` command) after only
+  ``target.all_periods.<method>`` writes that run's period sheets and the
+  weighted average, as ``include_periods=True, include_weighted_average=True``
+  does. Before, it raised "No target analysis is available". With a
+  single-period run, or with either flag given, the workbook is unchanged.
 - ``export_excel(include_periods=True)`` writes each period's problem tables
   from the all-periods run that produced the exported results. Before, a later
   single-period run replaced that period's tables, so the workbook mixed the
@@ -34,6 +78,38 @@ Result fixes
   ``design.grid(rank=)``: successful, feasible outcomes of the accepted method
   with duplicate network structures removed. Before, it sliced
   ``result.ranked_networks``, so rank ``k`` could differ between them.
+
+Multiperiod and WebAssembly fixes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Setting one period's value on a stream with a single (scalar) value in a
+  multiperiod problem, for example
+  ``stream.set_attr_for_period("heat_flow", 50, period_id="c")``, changes only
+  that period. Before, it wrote the value to every period. Assigning a
+  segmented utility's duty for one period had the same fault.
+- Heat exchanger network synthesis with ``HENS_MAX_PARALLEL`` above 1 runs
+  in the browser (Pyodide). It solves each stage's tasks one at a time where
+  the runtime cannot start worker processes, instead of raising
+  ``NotImplementedError``. The packaged Four-stream sample sets
+  ``HENS_MAX_PARALLEL`` to 10.
+- The weighted-average summary of a shared-design multiperiod heat pump or
+  refrigeration run works when one period has no heat pump load. Before,
+  building that period's zero-load row raised a validation error on
+  ``hpr_period_ids``, so ``report()`` and the weighted summaries failed. The
+  zero-load row keeps the shared design's values (``hpr_design_vector``,
+  ``hpr_period_ids``, ``hpr_period_weights``, ``hpr_period_success`` and
+  ``hpr_weighted_objective``), so the weighted-average row reports them too.
+- A shared-design (``HPR_MULTIPERIOD_OPTIMIZATION_ENABLED``) utility heat pump
+  or refrigeration target with ``include_subzones=True`` reports the same
+  subzone and base rows as a single-period target. Before, preparing the
+  shared design left each period's base targets on the zones, so a run for
+  one period kept only its heat pump rows. A zone with no heat pump or
+  refrigeration load in the selected period now gets no target, as in a
+  single-period run, instead of raising "requires a non-zero HPR load". A
+  period with no load runs no machine, so it has no case in the shared design,
+  but its weight still counts: the weighted operation (duties, work, operating
+  cost and penalty) is spread over the whole schedule, while the COP and the
+  peak capital are unchanged.
 
 Fuller results
 ~~~~~~~~~~~~~~
@@ -99,6 +175,25 @@ Command layer
   ``workspace.set_case_input`` command replace an existing case's input and
   return its validation report. The session and the other cases' results are
   kept.
+- ``workspace.set_case_input`` takes ``source`` as ``{"data": ...}`` or the
+  TargetInput JSON and rejects anything else, such as a file path, with
+  ``ValueError``. Before, a path string read that file on the engine host.
+- A unit string pint does not know, such as ``{"value": 200, "unit":
+  "bogus"}``, is a validation issue on its field: ``build_validation_report``
+  returns ``valid=False`` and the ``validate`` command returns its report.
+  Before, both raised ``UndefinedUnitError``.
+- A ``zone_tree`` whose zone has two children of the same name is rejected
+  when the input is loaded or validated ("Duplicate zone name ...").
+  Before, the second child was merged into the first.
+- ``Value.to`` converts an offset temperature (``degC``, ``C``, ``°C``,
+  ``degF``) to a difference unit such as ``delta_degC`` as a difference, as
+  the ``Value`` constructor does, so a ``Stream`` takes ``dt_cont`` as
+  ``{"value": 5, "unit": "degC"}``. Before, it raised
+  ``DimensionalityError``.
+- ``run_command`` raises ``ValueError`` naming the accepted shapes,
+  ``{"data": ...}`` or ``{"sample_case": ...}``, when ``problem`` is a bare
+  string or names neither. Before, it raised ``AttributeError`` or
+  ``KeyError``.
 - ``ConfigurationFieldMetadata`` gives each field's ``unit``,
   ``description`` and ``default``, and ``label`` is a display name such as
   "Minimum contribution temperature difference" rather than the title-cased

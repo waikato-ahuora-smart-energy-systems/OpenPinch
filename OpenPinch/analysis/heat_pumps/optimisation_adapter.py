@@ -685,11 +685,24 @@ def _validate_hpr_public_value(value: Any, *, active: set[int]) -> None:
         active.remove(identity)
 
 
+# Ratios rather than amounts: a period with no machine running does not dilute
+# them.
+_HPR_RATIO_FIELDS = frozenset({"cop_h", "eta_he"})
+
+
 def aggregate_hpr_period_results(
     period_outputs: dict[str, HPRBackendResult],
     weights: Sequence[float] | np.ndarray,
+    *,
+    idle_weight: float = 0.0,
 ) -> tuple[HPRBackendResult, float]:
-    """Apply HPR-specific weighted-operation and peak-capital policies."""
+    """Apply HPR-specific weighted-operation and peak-capital policies.
+
+    ``idle_weight`` is the schedule share of periods with no HPR load, which
+    have no result: no machine runs there, so they add no operation (duties,
+    work, operating cost, penalty) but dilute the loaded periods' share of it.
+    Ratios such as the COP and the peak capital do not change.
+    """
     ordered = list(period_outputs.values())
     if not ordered:
         raise ValueError("At least one HPR period result is required.")
@@ -700,6 +713,11 @@ def aggregate_hpr_period_results(
         or float(weights_array.sum()) <= 0.0
     ):
         raise ValueError("Period weights must be finite and have a positive sum.")
+    if not np.isfinite(idle_weight) or idle_weight < 0.0:
+        raise ValueError("The idle period weight must be finite and non-negative.")
+    loaded_share = float(weights_array.sum()) / (
+        float(weights_array.sum()) + float(idle_weight)
+    )
 
     updates: dict[str, Any] = {}
     for field in (
@@ -729,6 +747,7 @@ def aggregate_hpr_period_results(
             field,
             weights=weights_array,
             reducer="weighted",
+            share=1.0 if field in _HPR_RATIO_FIELDS else loaded_share,
         )
         if weighted is not None:
             updates[field] = weighted
@@ -783,7 +802,9 @@ def aggregate_hpr_period_results(
         if weighted_total is not None:
             updates["hpr_total_annualized_cost"] = weighted_total
 
-    shared_objective = _shared_candidate_objective(ordered, weights_array)
+    shared_objective = _shared_candidate_objective(
+        ordered, weights_array, loaded_share=loaded_share
+    )
     updates["obj"] = shared_objective
     return ordered[0].with_updates(**updates), shared_objective
 
@@ -920,11 +941,12 @@ def _aggregate_result_field(
     *,
     weights: np.ndarray | None,
     reducer: str,
+    share: float = 1.0,
 ) -> Any:
     values = [getattr(result, field, None) for result in results]
     if any(value is None for value in values):
         return None
-    return _aggregate_values(values, weights=weights, reducer=reducer)
+    return _aggregate_values(values, weights=weights, reducer=reducer, share=share)
 
 
 def _aggregate_values(
@@ -932,7 +954,10 @@ def _aggregate_values(
     *,
     weights: np.ndarray | None,
     reducer: str,
+    share: float = 1.0,
 ) -> Any:
+    """Weighted mean (times ``share``, the loaded periods' schedule share) or
+    maximum of the period values."""
     first = values[0]
     if isinstance(first, Value):
         unit = first.unit
@@ -942,7 +967,7 @@ def _aggregate_values(
                 return None
             magnitudes.append(float(value.to(unit).value))
         aggregate = (
-            float(np.average(magnitudes, weights=weights))
+            float(np.average(magnitudes, weights=weights)) * share
             if reducer == "weighted"
             else float(np.max(magnitudes))
         )
@@ -956,7 +981,7 @@ def _aggregate_values(
         return None
     stacked = np.stack(arrays, axis=0)
     aggregate = (
-        np.average(stacked, axis=0, weights=weights)
+        np.average(stacked, axis=0, weights=weights) * share
         if reducer == "weighted"
         else np.max(stacked, axis=0)
     )
@@ -968,6 +993,8 @@ def _aggregate_values(
 def _shared_candidate_objective(
     results: list[HPRBackendResult],
     weights: np.ndarray,
+    *,
+    loaded_share: float = 1.0,
 ) -> float:
     has_cost_breakdown = any(
         result.hpr_operating_cost is not None
@@ -980,6 +1007,7 @@ def _shared_candidate_objective(
             "obj",
             weights=weights,
             reducer="weighted",
+            share=loaded_share,
         )
         if fallback is None:
             raise ValueError("Shared HPR candidates require finite objectives.")
@@ -999,12 +1027,14 @@ def _shared_candidate_objective(
         "hpr_operating_cost",
         weights=weights,
         reducer="weighted",
+        share=loaded_share,
     )
     penalty = _aggregate_result_field(
         results,
         "feasibility_penalty",
         weights=weights,
         reducer="weighted",
+        share=loaded_share,
     )
     machine_peaks = _peak_machine_capital(results)
     annualized_capital = (

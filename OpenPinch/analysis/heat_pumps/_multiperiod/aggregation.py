@@ -88,6 +88,7 @@ def evaluate_multiperiod_candidate(
     weighted, shared_objective = aggregate_hpr_period_results(
         period_outputs,
         weights,
+        idle_weight=args.idle_period_weight,
     )
     selected = period_outputs[str(selected_period_case(args).period_id)]
     return selected.with_updates(

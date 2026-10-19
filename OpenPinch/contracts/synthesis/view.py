@@ -29,6 +29,20 @@ class HeatExchangerNetworkGridMatch(_ViewModel):
     source_outlet_temperature: float | None = None
     sink_inlet_temperature: float | None = None
     sink_outlet_temperature: float | None = None
+    area: float | None = None
+
+
+class HeatExchangerNetworkGridStream(_ViewModel):
+    """A stream row's supply and target temperatures in the period.
+
+    Taken from its exchangers: a hot stream's supply is its hottest inlet and
+    its target its coldest outlet; a cold stream's the reverse.
+    """
+
+    stream: str
+    side: Literal["hot", "cold"]
+    supply_temperature: float | None = None
+    target_temperature: float | None = None
 
 
 class HeatExchangerNetworkGridBranchCount(_ViewModel):
@@ -52,6 +66,7 @@ class HeatExchangerNetworkGridLayout(_ViewModel):
     stages: tuple[int, ...]
     matches: tuple[HeatExchangerNetworkGridMatch, ...]
     branch_counts: tuple[HeatExchangerNetworkGridBranchCount, ...] = ()
+    stream_temperatures: tuple[HeatExchangerNetworkGridStream, ...] = ()
 
 
 class HeatExchangerNetworkRankingRow(_ViewModel):
@@ -102,4 +117,5 @@ __all__ = [
     "HeatExchangerNetworkGridBranchCount",
     "HeatExchangerNetworkGridLayout",
     "HeatExchangerNetworkGridMatch",
+    "HeatExchangerNetworkGridStream",
 ]

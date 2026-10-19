@@ -12,6 +12,7 @@ from ....contracts.synthesis.task import (
 )
 from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ....domain.progress import emit as emit_progress
+from ...parallelism import supported_workers
 from ..errors import WorkflowContractError
 from ..models.problem import InternalHeatExchangerNetworkProblem
 from ..solver.arrays import PreparedSolverArrays, problem_to_solver_arrays
@@ -73,7 +74,8 @@ class LocalSynthesisExecutor:
             self.stage_order.append(tasks[0].method)
             self._report_progress(tasks, 0)
 
-        worker_count = max(1, min(int(max_parallel), len(tasks)))
+        max_parallel = supported_workers(int(max_parallel))
+        worker_count = max(1, min(max_parallel, len(tasks)))
         if worker_count > 1 and _can_build_tasks_in_workers(tasks, parent_outcomes):
             solve_inputs = (
                 (
@@ -85,10 +87,11 @@ class LocalSynthesisExecutor:
                 )
                 for task in tasks
             )
-            with self.worker_pool_factory(worker_count) as pool:
-                solved_results = self._reported(
-                    tasks, pool.map(_build_and_solve_root_task, solve_inputs), 0
-                )
+            solved_results = self._reported(
+                tasks,
+                self._map(_build_and_solve_root_task, solve_inputs, worker_count),
+                0,
+            )
             return self._collect_outcomes(tasks, solved_results, {})
 
         built: list[
@@ -123,8 +126,8 @@ class LocalSynthesisExecutor:
                 if task.task_id is not None:
                     failed[task.task_id] = _failed_task_outcome(task, str(exc))
 
-        worker_count = max(1, min(int(max_parallel), len(built)))
-        branch_parallel = max(1, int(max_parallel)) if worker_count == 1 else 1
+        worker_count = max(1, min(max_parallel, len(built)))
+        branch_parallel = max(1, max_parallel) if worker_count == 1 else 1
         solve_inputs = (
             (
                 task,
@@ -137,19 +140,25 @@ class LocalSynthesisExecutor:
         )
         # Tasks that failed to build count as done.
         done = len(tasks) - len(built)
-        if worker_count == 1:
-            solved_results = self._reported(
-                tasks,
-                (_solve_built_task(worker_args) for worker_args in solve_inputs),
-                done,
-            )
-        else:
-            with self.worker_pool_factory(worker_count) as pool:
-                solved_results = self._reported(
-                    tasks, pool.map(_solve_built_task, solve_inputs), done
-                )
+        solved_results = self._reported(
+            tasks, self._map(_solve_built_task, solve_inputs, worker_count), done
+        )
 
         return self._collect_outcomes(tasks, solved_results, failed)
+
+    def _map(self, func, inputs, worker_count: int):
+        """Yield ``func`` over ``inputs``, in a worker pool when one can start."""
+        if worker_count > 1:
+            try:
+                pool = self.worker_pool_factory(worker_count)
+            except NotImplementedError as exc:
+                logger.debug("Solving HEN tasks serially: %s", exc)
+            else:
+                with pool:
+                    yield from pool.map(func, inputs)
+                return
+        for worker_args in inputs:
+            yield func(worker_args)
 
     def _reported(
         self,

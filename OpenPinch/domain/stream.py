@@ -540,7 +540,7 @@ class Stream:
         else:
             current = current.mutable_copy()
 
-        target_size = self._period_vector_size()
+        target_size = max(self._period_vector_size(), self._num_periods or 1)
         if current.num_periods == 1 and target_size > 1:
             current = Value(
                 np.full(target_size, float(current.value), dtype=float),

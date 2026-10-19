@@ -404,9 +404,21 @@ class PinchProblem:
         include_periods: bool = False,
         include_weighted_average: bool = False,
     ) -> Any:
-        """Export the solved target summary and problem tables to an Excel file."""
+        """Export the solved target summary and problem tables to an Excel file.
+
+        With neither flag and no single-period run, the workbook has the last
+        all-periods run's period sheets and weighted average, as if both
+        flags were set.
+        """
         if destination is None:
             raise ValueError("destination is required for Excel export.")
+        if (
+            self._results is None
+            and self._period_results
+            and include_periods is False
+            and include_weighted_average is False
+        ):
+            include_periods = include_weighted_average = True
         from ..presentation.reporting.workbook import (
             export_target_summary_to_excel_with_units,
         )
