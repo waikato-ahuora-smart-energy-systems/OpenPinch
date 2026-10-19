@@ -296,9 +296,9 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
         Parameters
         ----------
         T_evap : np.ndarray
-            Liquid saturation temperature in the evaporator [deg C].
+            Dew-point (saturated vapour) temperature in the evaporator [deg C].
         T_cond : np.ndarray
-            Gas saturation temperature in the condenser [deg C].
+            Bubble-point (saturated liquid) temperature in the condenser [deg C].
         dtcont : float
             Minimum temperature approach used by HPR targeting [K].
         dT_superheat : np.ndarray, optional

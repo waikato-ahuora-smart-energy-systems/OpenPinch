@@ -205,6 +205,18 @@ def test_negative_dt_cont_runs_through_direct_and_area_targeting():
     assert area.area == float("inf")
 
 
+def test_negative_dt_cont_warning_states_its_consequence():
+    # Audit M13: a negative dt_cont stays a warning, but the warning must say
+    # what it does. Here the reported recovery (degree of integration 1.08)
+    # exceeds what the streams can exchange.
+    with pytest.warns(UserWarning) as record:
+        PinchProblem(_two_stream_payload(dt_cont=-2.0), project_name="Site")
+
+    messages = " ".join(str(w.message) for w in record)
+    assert "dt_cont" in messages
+    assert "heat recovery can exceed the thermodynamic limit" in messages
+
+
 @pytest.mark.parametrize(
     ("case", "hot_utility", "cold_utility", "area", "capital_cost"),
     [

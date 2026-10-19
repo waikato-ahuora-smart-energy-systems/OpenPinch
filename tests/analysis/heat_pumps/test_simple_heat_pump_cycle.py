@@ -669,6 +669,39 @@ def test_refrigeration_cycle_uses_q_cool_as_primary_duty():
     )
 
 
+@pytest.mark.parametrize(
+    "T_evap, T_cond, dT_subcool",
+    [
+        (20.0, 20.0, 0.0),  # zero lift: the evaporator inlet is saturated liquid
+        (0.0, 40.0, 60.0),  # the subcooling clamp binds at the evaporator's h_liq
+    ],
+)
+def test_streams_keep_the_full_duty_when_the_evaporator_inlet_is_saturated(
+    T_evap, T_cond, dT_subcool
+):
+    # Audit M4: the two-phase block skipped its first point whenever it was
+    # the saturated-liquid enthalpy, assuming the subcooled block had added
+    # it. With a saturated inlet that block never runs, so the stream lost
+    # 1/20 of the duty (95 kW of 100 kW).
+    cycle = VapourCompressionCycle()
+    cycle.solve(
+        T_evap,
+        T_cond,
+        dtcont=0.0,
+        refrigerant="ammonia",
+        dT_subcool=dT_subcool,
+        dT_ihx_gas_side=0.0,
+        Q_cool=100.0,
+        is_heat_pump=False,
+    )
+
+    streams = cycle.build_stream_collection(include_cond=True, include_evap=True)
+    cold = sum(float(s.heat_flow) for s in streams.get_cold_streams())
+    hot = sum(float(s.heat_flow) for s in streams.get_hot_streams())
+    assert cold == pytest.approx(cycle.Q_cool, rel=1e-6)
+    assert hot == pytest.approx(cycle.Q_heat, rel=1e-6)
+
+
 def test_refrigeration_cycle_caps_q_heat_to_available_q_cond():
     cycle = VapourCompressionCycle()
     cycle.solve(
