@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+import numpy as np
 import pandas as pd
 
 from ...domain.enums import IntegrationType, TargetMethod, ZoneType
@@ -65,6 +66,11 @@ def problem_records_from_frame(df_data: pd.DataFrame, units_map: dict) -> list:
         return []
 
     clean_df = df_data.replace({pd.NA: None}).reset_index(drop=True)
+    # Blank separator rows (empty or whitespace-only cells) carry no data; drop
+    # them before numeric cells are wrapped as {"value": None, ...} records.
+    clean_df = clean_df.loc[~clean_df.map(_is_blank_cell).all(axis=1)]
+    if clean_df.empty:
+        return []
     records = clean_df.to_dict(orient="records")
 
     for column_name, unit in units_map.items():
@@ -78,11 +84,14 @@ def problem_records_from_frame(df_data: pd.DataFrame, units_map: dict) -> list:
                 lambda value: isinstance(value, str) and not value.strip()
             )
             invalid = numeric_values.isna() & ~missing
+            invalid |= column_values.map(
+                lambda value: isinstance(value, (bool, np.bool_))
+            )
             if invalid.any():
                 row = invalid[invalid].index[0]
                 raise ValueError(
                     f"Column {column_name!r} has a non-numeric value at "
-                    f"data row {row + 1}: {column_values.iloc[row]!r}."
+                    f"data row {row + 1}: {column_values.loc[row]!r}."
                 )
             value_entries = [
                 {"value": (None if pd.isna(val) else float(val)), "unit": unit}
@@ -95,6 +104,12 @@ def problem_records_from_frame(df_data: pd.DataFrame, units_map: dict) -> list:
                 record[column_name] = value if not pd.isna(value) else None
 
     return records
+
+
+def _is_blank_cell(value: Any) -> bool:
+    if isinstance(value, str):
+        return not value.strip()
+    return value is None or bool(pd.isna(value))
 
 
 def target_records_from_frame(

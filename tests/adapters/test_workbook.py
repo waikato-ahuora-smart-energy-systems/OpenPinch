@@ -618,3 +618,49 @@ def test_parse_sheet_with_units_rejects_empty_dataframe(monkeypatch):
 
     with pytest.raises(ValueError, match="Worksheet 'Stream Data' is empty"):
         wkbook_to_json._parse_sheet_with_units("dummy.xlsx", sheet_name="Stream Data")
+
+
+def _write_stream_sheet(path: Path, data_rows: list[list]) -> None:
+    rows = [
+        ["Zone", "Name", "T_supply", "T_target", "Heat flow", "dT_cont", "HTC"],
+        [None, None, "degC", "degC", "kW", "K", "kW/mK"],
+        *data_rows,
+    ]
+    util_rows = [
+        ["Name", "Type", "T_supply", "T_target", "dT_cont", "Price", "HTC"],
+        [None, None, "degC", "degC", "K", "$/MWh", "kW/mK"],
+        ["HU", "Hot", 250.0, 249.0, 10.0, 50.0, 0.8],
+        ["CU", "Cold", 20.0, 30.0, 5.0, 5.0, 0.3],
+    ]
+    with pd.ExcelWriter(path, engine="openpyxl") as xw:
+        pd.DataFrame(rows).to_excel(
+            xw, sheet_name="Stream Data", header=None, index=False
+        )
+        pd.DataFrame(util_rows).to_excel(
+            xw, sheet_name="Utility Data", header=None, index=False
+        )
+
+
+def test_get_problem_from_excel_skips_blank_and_whitespace_rows(tmp_path: Path):
+    path = tmp_path / "blank.xlsx"
+    _write_stream_sheet(
+        path,
+        [
+            ["Zone A", "H1", 150.0, 60.0, 100.0, 10.0, 0.5],
+            [None] * 7,
+            ["  ", " ", "   ", None, " ", None, None],
+            ["Zone A", "C1", 40.0, 120.0, 90.0, 10.0, 0.5],
+        ],
+    )
+
+    out = get_problem_from_excel(path)
+
+    assert [s["name"] for s in out["streams"]] == ["H1", "C1"]
+
+
+def test_get_problem_from_excel_rejects_boolean_numeric_cells(tmp_path: Path):
+    path = tmp_path / "bool.xlsx"
+    _write_stream_sheet(path, [["Zone A", "H1", 150.0, 60.0, True, 10.0, 0.5]])
+
+    with pytest.raises(ValueError, match="'heat_flow' has a non-numeric value"):
+        get_problem_from_excel(path)

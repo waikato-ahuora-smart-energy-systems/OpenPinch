@@ -255,3 +255,22 @@ def test_get_problem_from_csv_reports_missing_file(tmp_path: Path):
 
     with pytest.raises(FileNotFoundError, match="CSV input file not found"):
         csv_to_json.get_problem_from_csv(streams_csv, tmp_path / "missing.csv")
+
+
+def test_get_problem_from_csv_skips_blank_and_whitespace_rows(tmp_path: Path):
+    streams_csv = tmp_path / "streams.csv"
+    utilities_csv = tmp_path / "utilities.csv"
+    streams_csv.write_text(
+        "zone,name,t_supply,t_target,heat_flow,dt_cont,htc\n"
+        ",,degC,degC,kW,K,kW/mK\n"
+        "Zone A,H1,150,60,100,10,0.5\n"
+        ",,,,,,\n"
+        "  , ,  ,,   ,,\n"
+        "Zone A,C1,40,120,90,10,0.5\n",
+        encoding="utf-8",
+    )
+    _write_csv(utilities_csv, _utility_rows())
+
+    out = get_problem_from_csv(streams_csv, utilities_csv)
+
+    assert [s["name"] for s in out["streams"]] == ["H1", "C1"]
