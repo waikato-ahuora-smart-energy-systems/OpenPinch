@@ -584,8 +584,10 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
     "HPR_ETA_II_CARNOT": FieldText(
         "HPR Carnot efficiency", None,
         (
-            "Fraction of the Carnot COP achieved by Carnot-model heat pumps and "
-            "refrigeration."
+            "Second-law efficiency of Carnot-model heat pumps and refrigeration: "
+            "the fraction of the cooling Carnot COP, T_l/(T_h - T_l), they achieve. "
+            "The heating COP follows from the energy balance, "
+            "1 + eta x T_l/(T_h - T_l)."
         ),
     ),
     "HPR_HE_ETA_II_CARNOT": FieldText(

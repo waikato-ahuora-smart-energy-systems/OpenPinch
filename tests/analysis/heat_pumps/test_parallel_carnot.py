@@ -313,3 +313,55 @@ def test_parallel_carnot_optimise_normalises_stage_count_and_delegates(monkeypat
     np.testing.assert_allclose(captured["x0_ls"], expected_x0)
     assert captured["bnds"] == expected_bounds
     assert captured["args"] is args
+
+
+def test_parallel_carnot_cooling_cop_counts_only_heat_pump_stages():
+    # Codex review on PR #191: a recovery stage (T_cond below T_evap) adds
+    # evaporator duty without compressor work, so dividing the total
+    # evaporator duty by the compressor work inflated the cooling COP. The
+    # cooling COP is the heat-pump stages' evaporator duty over their work,
+    # as in CascadeCarnotCycle.COP_c.
+    T_cond = np.array([80.0, 30.0])
+    T_evap = np.array([20.0, 60.0])
+    cycle = ParallelCarnotCycles()
+    cycle.solve(
+        T_cond=T_cond,
+        T_evap=T_evap,
+        duty_allocation=DutyAllocationRequest(
+            heat=StageDutyRequest(
+                Q_base=200.0,
+                x_split=np.ones(2),
+                Q_available=np.array([100.0, 100.0]),
+            ),
+            cool=StageDutyRequest(Q_available=np.array([1000.0, 1000.0])),
+        ),
+        eta_ii_hpr_carnot=0.5,
+        eta_ii_he_carnot=0.0,
+        args=SimpleNamespace(),
+    )
+
+    w_hpr = float(cycle.w_hpr.sum())
+    heat_pump_evap = cycle.Q_cond[0] - w_hpr
+    assert cycle.Q_evap[1] == pytest.approx(100.0)
+    assert cycle.COP_c == pytest.approx(heat_pump_evap / w_hpr, rel=1e-9)
+    assert cycle.COP_c == pytest.approx(0.5 * 293.15 / 60.0, rel=1e-9)
+
+
+def test_parallel_carnot_cooling_cop_is_zero_without_heat_pump_stages():
+    cycle = ParallelCarnotCycles()
+    cycle.solve(
+        T_cond=np.array([30.0]),
+        T_evap=np.array([60.0]),
+        duty_allocation=DutyAllocationRequest(
+            heat=StageDutyRequest(
+                Q_base=100.0, x_split=np.ones(1), Q_available=np.array([100.0])
+            ),
+            cool=StageDutyRequest(Q_available=np.array([1000.0])),
+        ),
+        eta_ii_hpr_carnot=0.5,
+        eta_ii_he_carnot=0.0,
+        args=SimpleNamespace(),
+    )
+
+    assert cycle.Q_evap.sum() == pytest.approx(100.0)
+    assert cycle.COP_c == 0.0
