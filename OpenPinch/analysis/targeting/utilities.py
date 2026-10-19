@@ -285,6 +285,18 @@ def _calculate_assigned_utility_duties(
     idx: int | None,
 ) -> tuple[float, ...]:
     """Return ordered utility duties using the canonical targeting algorithm."""
+    # Assisted heat transfer can keep a pocket below the pinch whose heating
+    # demand still needs hot utility. Extend the hot segment to the last row of
+    # the demand profile that has any, so the utility balance closes. Without
+    # such a pocket the profile is flat there and nothing changes; a residue
+    # below 1 W (or a millionth of the profile) is rounding, not demand.
+    if is_hot_ut:
+        threshold = max(
+            _UNMET_DEMAND_ABS_TOL, 1e-6 * float(np.max(H_vals, initial=0.0))
+        )
+        loaded = np.flatnonzero(H_vals > threshold)
+        if loaded.size:
+            pinch_row = min(max(pinch_row, int(loaded[-1]) + 1), len(H_vals) - 1)
     if is_hot_ut:
         T_segment = T_vals[: pinch_row + 1]
         H_segment = H_vals[: pinch_row + 1]
