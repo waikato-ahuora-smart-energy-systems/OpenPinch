@@ -253,3 +253,36 @@ def test_apopt_stagewise_verify_compares_solver_utility_cost():
     solved.VALUE.value = [2.0 * verification._value(solved)]
 
     assert verification._check_utility_costs(model) is False
+
+
+# First-audit H10: the first stage has no cold flow-on, whatever S is
+
+
+@pytest.mark.parametrize(("stages", "cold_flow_on_stages"), [(1, []), (2, [1])])
+def test_only_stages_after_the_first_get_cold_gamma_flow_on(
+    monkeypatch, stages, cold_flow_on_stages
+):
+    from OpenPinch.analysis.heat_exchanger_networks.models._base import alpha
+
+    cold_calls: list[int] = []
+    monkeypatch.setattr(
+        alpha,
+        "_cold_gamma_flow_on",
+        lambda model, i, j, k: cold_calls.append(k) or 1.0,
+    )
+    monkeypatch.setattr(alpha, "_hot_gamma_flow_on", lambda model, i, j, k: 1.0)
+    model = SimpleNamespace(
+        I=1,
+        J=1,
+        S=stages,
+        z_allowed=[[[1] * stages]],
+        gamma_h=[[[0.0] * stages]],
+        gamma_c=[[[0.0] * stages]],
+    )
+    equations = SimpleNamespace(Equation=lambda expression: expression)
+
+    alpha._set_gamma_equations(model, equations)
+
+    # A single stage is both the last and the first: gamma_c used to take
+    # flow-on from stage k - 1 = -1, the stage itself.
+    assert cold_calls == cold_flow_on_stages

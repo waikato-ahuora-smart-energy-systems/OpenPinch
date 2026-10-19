@@ -4,6 +4,15 @@ Pre-Release Notes
 Unreleased
 ----------
 
+HEN synthesis orchestration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- A single-stage network's post-optimisation flow-on factors no longer take
+  cold flow-on from the stage itself. Its cold gamma is 0, as for the first
+  stage of any network (it was 0.56 where 0 was due on the first audit's
+  case), so network evolution ranks single-stage candidates by the right
+  benefit. Reported results did not use these factors.
+
 Multiperiod HEN pinch design
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
