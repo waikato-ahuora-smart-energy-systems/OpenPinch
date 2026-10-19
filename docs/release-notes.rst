@@ -14,8 +14,9 @@ Input and export hardening
   validation issue, and solver option files and option lines are written only
   from validated options.
 - Unit text is checked against a bounded grammar before Pint parses it: at
-  most 64 characters, products and ratios of unit names and numbers, one
-  power of at most two digits on a unit name or a group, and at most two
+  most 64 characters, products and ratios of unit names and numbers (Pint's
+  ``·`` and ``⋅`` included), one power of at most two digits (``^``, ``**``
+  or superscript digits) on a unit name or a group, and at most two
   levels of parentheses. Other unit text raises a ``ValueError``.
 - ``workspace.batch`` cannot run another ``workspace.batch``, and one request
   runs at most 100 cases; a larger case list is an error and runs nothing.

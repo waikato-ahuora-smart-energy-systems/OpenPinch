@@ -37,8 +37,11 @@ _UNIT_TOKEN = re.compile(
     r"(?P<space>\s+)"
     r"|(?P<name>[A-Za-z_$%°Δµμ][A-Za-z0-9_$%°Δµμ]*)"
     r"|(?P<number>[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d{1,3})?)"
-    r"|(?P<power>(?:\^|\*\*)\s*[+-]?\d{1,2}(?:\.\d{1,3})?(?![\d.]))"
-    r"|(?P<operator>[*/])"
+    r"|(?P<power>(?:\^|\*\*)\s*[+-]?\d{1,2}(?:\.\d{1,3})?(?![\d.])"
+    # Pint's superscript exponents, where ``⋅`` is the decimal point.
+    r"|⁻?[⁰¹²³⁴⁵⁶⁷⁸⁹]{1,2}(?:⋅[⁰¹²³⁴⁵⁶⁷⁸⁹]{1,3})?(?![⁰¹²³⁴⁵⁶⁷⁸⁹⋅]))"
+    # ``·`` and ``⋅`` are Pint's pretty-printed products.
+    r"|(?P<operator>[*/·⋅])"
     r"|(?P<open>\()"
     r"|(?P<close>\))"
 )
@@ -53,8 +56,9 @@ def check_unit_text(text: str) -> str:
 
     Pint evaluates unit text as an expression, so text is held to a bounded
     grammar first: at most ``MAX_UNIT_TEXT_LENGTH`` characters, products and
-    ratios of names and numbers, one power of at most two digits on a name
-    or a parenthesised group, and at most two levels of parentheses.
+    ratios of names and numbers, one power of at most two digits (``^``,
+    ``**`` or superscript digits) on a name or a parenthesised group, and at
+    most two levels of parentheses.
     """
     if len(text) > MAX_UNIT_TEXT_LENGTH:
         raise UnitTextError(
@@ -71,6 +75,10 @@ def check_unit_text(text: str) -> str:
         position = match.end()
         if kind == "space":
             continue
+        if kind == "operator" and previous in {None, "operator", "open"}:
+            raise UnitTextError(
+                f"An operator in unit {text!r} must follow a unit or a group."
+            )
         if kind == "power" and previous not in {"name", "close"}:
             raise UnitTextError(
                 f"A power in unit {text!r} must follow a unit name or a group."

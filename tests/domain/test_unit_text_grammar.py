@@ -30,8 +30,27 @@ def test_ordinary_unit_spellings_are_accepted(unit, expected):
 
 
 @pytest.mark.parametrize(
+    ("unit", "ascii_unit"),
+    [
+        ("m²", "m^2"),
+        ("W/m²/K", "W/m^2/K"),
+        ("m⁻¹", "m^-1"),
+        ("kW·h", "kW*h"),
+        ("kW⋅h", "kW*h"),
+        ("m¹⋅⁵", "m^1.5"),
+    ],
+)
+def test_pint_unicode_unit_spellings_are_accepted(unit, ascii_unit):
+    assert Value(2.0, unit).to(ascii_unit).value == pytest.approx(2.0)
+
+
+@pytest.mark.parametrize(
     "unit",
     [
+        "m²²²",
+        "m²^2",
+        "m^2²",
+        "kW··h",
         "kW^2^2",
         "kW**2**2",
         "kW*2**2",
