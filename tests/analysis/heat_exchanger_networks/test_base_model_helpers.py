@@ -631,3 +631,38 @@ def test_output_to_cmd_line_logs_successful_solve(caplog):
 
     assert "Successful Solve.Path" in caplog.text
     assert "Q_hu total" in caplog.text
+
+
+def test_utility_approach_equations_skip_streams_inactive_in_a_period():
+    from OpenPinch.analysis.heat_exchanger_networks.models._base.approach import (
+        _set_multiperiod_utility_approach_equations,
+    )
+
+    model = _model()
+    model.m = _FakeModel()
+    model.N_periods = 2
+    model.period_ids = ["base", "peak"]
+    model.I = model.J = model.S = 1
+    model.z_hu_allowed = model.z_cu_allowed = [1]
+    model.z_hu = model.z_cu = [1]
+    model.T_hu_in_period = model.T_hu_out_period = np.array([[250.0], [250.0]])
+    model.T_cu_in_period = np.array([[20.0], [20.0]])
+    model.T_cu_out_period = np.array([[40.0], [40.0]])
+    model.T_hu_cont_period = model.T_cu_cont_period = np.array([[2.0], [2.0]])
+    model.T_h_cont_period = model.T_c_cont_period = np.array([[3.0], [3.0]])
+    # The pinch decomposition clips H1 to 0 K in the peak period, where it is
+    # absent from this side of the pinch.
+    model.T_h_in_period = np.array([[200.0], [0.0]])
+    model.T_h_out_period = np.array([[100.0], [0.0]])
+    model.T_c_in_period = np.array([[50.0], [50.0]])
+    model.T_c_out_period = np.array([[150.0], [150.0]])
+    model.T_h_by_period = [[[200.0, 120.0]], [[0.0, 0.0]]]
+    model.T_c_by_period = [[[140.0, 50.0]], [[140.0, 50.0]]]
+    model.z_i_active_period = [[1], [0]]
+    model.z_j_active_period = [[1], [1]]
+
+    _set_multiperiod_utility_approach_equations(model)
+
+    # Both terminals of the heater in both periods, the cooler in base only.
+    assert len(model.m.equations) == 6
+    assert all(model.m.equations)

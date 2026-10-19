@@ -249,6 +249,16 @@ def utility_minimum_approach_by_period(model, side: str) -> list:
     return by_period
 
 
+def _stream_active(model, side: str, period_idx: int, index: int) -> bool:
+    """Return whether a stream takes part in period ``period_idx``.
+
+    Pinch-decomposition models clip a stream absent from their side of the
+    pinch in a period to 0 K; other models have every stream in every period.
+    """
+    flags = getattr(model, f"z_{'i' if side == 'hot' else 'j'}_active_period", None)
+    return flags is None or flags[period_idx][index] > 0
+
+
 def _set_multiperiod_utility_approach_equations(model) -> None:
     """Constrain both terminals of every heater and cooler.
 
@@ -257,7 +267,7 @@ def _set_multiperiod_utility_approach_equations(model) -> None:
     """
     for n in range(model.N_periods):
         for j in range(model.J):
-            if model.z_hu_allowed[j] <= 0:
+            if model.z_hu_allowed[j] <= 0 or not _stream_active(model, "cold", n, j):
                 continue
             inlet_approach = _hot_utility_inlet_approach_temperature(model, j, n)
             outlet_approach = _hot_utility_outlet_approach_temperature(model, j, n)
@@ -293,7 +303,7 @@ def _set_multiperiod_utility_approach_equations(model) -> None:
             )
 
         for i in range(model.I):
-            if model.z_cu_allowed[i] <= 0:
+            if model.z_cu_allowed[i] <= 0 or not _stream_active(model, "hot", n, i):
                 continue
             inlet_approach = _cold_utility_inlet_approach_temperature(model, i, n)
             outlet_approach = _cold_utility_outlet_approach_temperature(model, i, n)

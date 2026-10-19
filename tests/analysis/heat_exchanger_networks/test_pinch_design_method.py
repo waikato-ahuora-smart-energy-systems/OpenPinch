@@ -1980,6 +1980,8 @@ def _source_shaped_lmtd_post_process_model(model_cls):
     model.period_weight_sum = 1.0
     model.tol = 1e-3
     model.dTmin = 20.0
+    model.z_i_active_period = [[1]]
+    model.z_j_active_period = [[1]]
     model.minimisation_goal = "variable total cost"
     model.Q_r = [[[[100.0], [50.0]]]]
     model.Q_h = [[30.0]]
