@@ -153,19 +153,16 @@ def test_period_stream_resolves_named_periods_from_context():
         name="Period-valued",
         supply_temperature={
             "values": [300.0, 280.0],
-            "period_ids": ["base", "peak"],
             "weights": [0.25, 0.75],
             "unit": "degC",
         },
         target_temperature={
             "values": [200.0, 180.0],
-            "period_ids": ["base", "peak"],
             "weights": [0.25, 0.75],
             "unit": "degC",
         },
         heat_flow={
             "values": [5000.0, 4000.0],
-            "period_ids": ["base", "peak"],
             "weights": [0.25, 0.75],
             "unit": "kW",
         },
@@ -193,15 +190,13 @@ def test_stream_broadcasts_scalar_updates_over_existing_state_context():
         name="Period-valued",
         supply_temperature={
             "values": [300.0, 280.0],
-            "period_ids": ["0", "1"],
             "unit": "degC",
         },
         target_temperature={
             "values": [200.0, 180.0],
-            "period_ids": ["0", "1"],
             "unit": "degC",
         },
-        heat_flow={"values": [5000.0, 4000.0], "period_ids": ["0", "1"], "unit": "kW"},
+        heat_flow={"values": [5000.0, 4000.0], "unit": "kW"},
         delta_t_contribution=10.0,
         heat_transfer_coefficient=2.0,
     )
@@ -219,15 +214,13 @@ def test_stream_set_attr_for_state_updates_selected_position():
         name="Period-valued",
         supply_temperature={
             "values": [300.0, 280.0],
-            "period_ids": ["0", "1"],
             "unit": "degC",
         },
         target_temperature={
             "values": [200.0, 180.0],
-            "period_ids": ["0", "1"],
             "unit": "degC",
         },
-        heat_flow={"values": [5000.0, 4000.0], "period_ids": ["0", "1"], "unit": "kW"},
+        heat_flow={"values": [5000.0, 4000.0], "unit": "kW"},
         delta_t_contribution=10.0,
         heat_transfer_coefficient=2.0,
     )
@@ -244,15 +237,13 @@ def test_stream_accessor_assignment_updates_selected_position():
         name="Period-valued",
         supply_temperature={
             "values": [300.0, 280.0],
-            "period_ids": ["0", "1"],
             "unit": "degC",
         },
         target_temperature={
             "values": [200.0, 180.0],
-            "period_ids": ["0", "1"],
             "unit": "degC",
         },
-        heat_flow={"values": [5000.0, 4000.0], "period_ids": ["0", "1"], "unit": "kW"},
+        heat_flow={"values": [5000.0, 4000.0], "unit": "kW"},
         delta_t_contribution=10.0,
         heat_transfer_coefficient=2.0,
     )
@@ -271,15 +262,13 @@ def test_stream_accessor_assignment_with_none_updates_default_period():
         name="Period-valued",
         supply_temperature={
             "values": [300.0, 280.0],
-            "period_ids": ["0", "1"],
             "unit": "degC",
         },
         target_temperature={
             "values": [200.0, 180.0],
-            "period_ids": ["0", "1"],
             "unit": "degC",
         },
-        heat_flow={"values": [5000.0, 4000.0], "period_ids": ["0", "1"], "unit": "kW"},
+        heat_flow={"values": [5000.0, 4000.0], "unit": "kW"},
         delta_t_contribution=10.0,
         heat_transfer_coefficient=2.0,
     )
@@ -448,15 +437,13 @@ def test_stream_value_setters_validate_mutability_and_period_lengths():
         name="Period-valued",
         supply_temperature={
             "values": [300.0, 280.0],
-            "period_ids": ["0", "1"],
             "unit": "degC",
         },
         target_temperature={
             "values": [200.0, 180.0],
-            "period_ids": ["0", "1"],
             "unit": "degC",
         },
-        heat_flow={"values": [5000.0, 4000.0], "period_ids": ["0", "1"], "unit": "kW"},
+        heat_flow={"values": [5000.0, 4000.0], "unit": "kW"},
         delta_t_contribution=10.0,
         heat_transfer_coefficient=2.0,
     )
@@ -525,15 +512,13 @@ def test_stream_period_context_helpers_validate_ids_and_lengths():
         name="Period-valued",
         supply_temperature={
             "values": [300.0, 280.0],
-            "period_ids": ["0", "1"],
             "unit": "degC",
         },
         target_temperature={
             "values": [200.0, 180.0],
-            "period_ids": ["0", "1"],
             "unit": "degC",
         },
-        heat_flow={"values": [5000.0, 4000.0], "period_ids": ["0", "1"], "unit": "kW"},
+        heat_flow={"values": [5000.0, 4000.0], "unit": "kW"},
         delta_t_contribution=10.0,
         heat_transfer_coefficient=2.0,
     )
@@ -604,3 +589,13 @@ def test_scalar_stream_set_attr_for_period_changes_only_that_period():
     np.testing.assert_allclose(
         stream.heat_flow.period_values, np.array([100.0, 100.0, 50.0])
     )
+
+
+def test_stream_rejects_period_ids_in_a_value_it_would_ignore():
+    with pytest.raises(ValueError, match="period_ids"):
+        Stream(
+            name="H",
+            supply_temperature=100.0,
+            target_temperature=50.0,
+            heat_flow={"values": [10.0, 20.0], "period_ids": ["b", "a"], "unit": "kW"},
+        )
