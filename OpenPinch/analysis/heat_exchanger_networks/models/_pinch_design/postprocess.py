@@ -168,7 +168,6 @@ def _get_multiperiod_post_process(owner) -> None:
                 owner.tol,
                 _approach._cold_utility_inlet_approach_temperature(owner, i, n),
             ),
-            fallback_delta=(owner.T_h_out_period[n][i] - owner.T_cu_in_period[n][0]),
         ),
         (owner.N_periods, owner.I),
     )

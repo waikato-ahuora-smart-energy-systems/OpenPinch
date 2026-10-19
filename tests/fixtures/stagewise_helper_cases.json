@@ -84,8 +84,8 @@
     "cu_cost": [3.0],
     "Q_h": [[10.0]],
     "Q_c": [[5.0]],
-    "hu_cost_total": 20.0,
-    "cu_cost_total": 15.0
+    "hu_cost_solver_by_period": [20.0],
+    "cu_cost_solver_by_period": [15.0]
   },
   "utility_cost_state": {
     "I": 1,
@@ -97,7 +97,7 @@
     "cu_cost_period": [[3.0], [6.0]],
     "Q_h_by_period": [[[10.0]], [[20.0]]],
     "Q_c_by_period": [[[5.0]], [[15.0]]],
-    "hu_cost_total": 65.0,
-    "cu_cost_total": 71.25
+    "hu_cost_solver_by_period": [20.0, 80.0],
+    "cu_cost_solver_by_period": [15.0, 90.0]
   }
 }

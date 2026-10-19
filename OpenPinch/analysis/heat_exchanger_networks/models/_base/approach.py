@@ -7,7 +7,6 @@ from typing import Any
 
 import numpy as np
 
-from . import execution as _execution
 from . import piecewise as _piecewise
 
 
@@ -57,6 +56,8 @@ def _set_minimum_approach_temperatures(model) -> None:
         ],
         dtype=float,
     )
+    model.dT_hu_min_period = utility_minimum_approach_by_period(model, "hot")
+    model.dT_cu_min_period = utility_minimum_approach_by_period(model, "cold")
     model.dT_r = model.dT_r_period[0].copy()
     model.dT_hu = model.dT_hu_period[0].copy()
     model.dT_cu = model.dT_cu_period[0].copy()
@@ -216,15 +217,47 @@ def _utility_max_temperature_contribution(
     return float(np.max(values[:count]))
 
 
+def utility_minimum_approach_by_period(model, side: str) -> list:
+    """Return the least approach any heater or cooler may have, by period.
+
+    Hot utilities give ``[period][utility][cold stream]`` and cold utilities
+    ``[period][hot stream][utility]``, the recovery pairs' orientation. A
+    segmented utility's approach varies along it, so its least segment
+    contribution bounds every terminal.
+    """
+    by_period = []
+    for n in range(model.N_periods):
+        if side == "hot":
+            stream_contributions = model.T_c_cont_period[n]
+            flat = model.dT_hu_period[n]
+        else:
+            stream_contributions = model.T_h_cont_period[n]
+            flat = model.dT_cu_period[n]
+        if _piecewise._utility_is_segmented(model, side):
+            values = model.solver_arrays.arrays[
+                f"{side}_utility_segment_dt_cont_period"
+            ][n, 0]
+            count = int(model.solver_arrays.arrays[f"{side}_utility_segment_count"][0])
+            utility = float(np.min(values[:count]))
+            approaches = [utility + float(value) for value in stream_contributions]
+        else:
+            approaches = [float(value) for value in flat]
+        by_period.append(
+            [approaches] if side == "hot" else [[value] for value in approaches]
+        )
+    return by_period
+
+
 def _set_multiperiod_utility_approach_equations(model) -> None:
-    """Constrain both utility terminals with local segment contributions."""
+    """Constrain both terminals of every heater and cooler.
+
+    Segmented utilities use the local segment contribution at each terminal;
+    flat utilities use their single contribution.
+    """
     for n in range(model.N_periods):
         for j in range(model.J):
-            if model.z_hu_allowed[j] <= 0 or not _piecewise._utility_is_segmented(
-                model, "hot"
-            ):
+            if model.z_hu_allowed[j] <= 0:
                 continue
-            inlet_approach = _hot_utility_inlet_approach_temperature(model, j, n)
             outlet_approach = _hot_utility_outlet_approach_temperature(model, j, n)
             maximum_approach = (
                 _utility_max_temperature_contribution(model, "hot", n)
@@ -236,33 +269,21 @@ def _set_multiperiod_utility_approach_equations(model) -> None:
                 abs(model.T_hu_out_period[n][0] - model.T_c_out_period[n][j]),
                 abs(model.T_hu_out_period[n][0] - model.T_c_in_period[n][j]),
             ) + max(maximum_approach, float(model.dTmin))
-            inlet_delta = model.T_hu_in_period[n][0] - model.T_c_out_period[n][j]
-            if type(model.z_hu[j]).__name__ == "GKParameter":
-                if (
-                    _execution._solver_value(model, model.z_hu[j].VALUE.value)
-                    > model.tol
-                    and inlet_delta + model.tol < inlet_approach
-                ):
-                    raise ValueError(
-                        f"Hot utility match {j} violates its inlet approach "
-                        f"temperature in period {model.period_ids[n]!r}."
-                    )
-            else:
-                model.m.Equation(
-                    inlet_delta >= inlet_approach - big_m * (1 - model.z_hu[j])
-                )
-            model.m.Equation(
-                model._utility_solved_outlet_temperature("hot", n, j)
+            _set_terminal_approach_equations(
+                model,
+                match=model.z_hu[j],
+                duty=model.Q_h_by_period[n][j],
+                inlet_shortfall=_hot_utility_inlet_approach_temperature(model, j, n)
+                - (model.T_hu_in_period[n][0] - model.T_c_out_period[n][j]),
+                outlet_margin=model._utility_solved_outlet_temperature("hot", n, j)
                 - model.T_c_by_period[n][j][0]
-                >= outlet_approach - big_m * (1 - model.z_hu[j])
+                - outlet_approach,
+                big_m=big_m,
             )
 
         for i in range(model.I):
-            if model.z_cu_allowed[i] <= 0 or not _piecewise._utility_is_segmented(
-                model, "cold"
-            ):
+            if model.z_cu_allowed[i] <= 0:
                 continue
-            inlet_approach = _cold_utility_inlet_approach_temperature(model, i, n)
             outlet_approach = _cold_utility_outlet_approach_temperature(model, i, n)
             maximum_approach = model.T_h_cont_period[n][
                 i
@@ -273,26 +294,41 @@ def _set_multiperiod_utility_approach_equations(model) -> None:
                 abs(model.T_h_out_period[n][i] - model.T_cu_out_period[n][0]),
                 abs(model.T_h_out_period[n][i] - model.T_cu_in_period[n][0]),
             ) + max(maximum_approach, float(model.dTmin))
-            model.m.Equation(
-                model.T_h_by_period[n][i][model.S]
+            _set_terminal_approach_equations(
+                model,
+                match=model.z_cu[i],
+                duty=model.Q_c_by_period[n][i],
+                inlet_shortfall=_cold_utility_inlet_approach_temperature(model, i, n)
+                - (model.T_h_out_period[n][i] - model.T_cu_in_period[n][0]),
+                outlet_margin=model.T_h_by_period[n][i][model.S]
                 - model._utility_solved_outlet_temperature("cold", n, i)
-                >= outlet_approach - big_m * (1 - model.z_cu[i])
+                - outlet_approach,
+                big_m=big_m,
             )
-            inlet_delta = model.T_h_out_period[n][i] - model.T_cu_in_period[n][0]
-            if type(model.z_cu[i]).__name__ == "GKParameter":
-                if (
-                    _execution._solver_value(model, model.z_cu[i].VALUE.value)
-                    > model.tol
-                    and inlet_delta + model.tol < inlet_approach
-                ):
-                    raise ValueError(
-                        f"Cold utility match {i} violates its inlet approach "
-                        f"temperature in period {model.period_ids[n]!r}."
-                    )
-            else:
-                model.m.Equation(
-                    inlet_delta >= inlet_approach - big_m * (1 - model.z_cu[i])
-                )
+
+
+def _set_terminal_approach_equations(
+    model,
+    *,
+    match,
+    duty,
+    inlet_shortfall: float,
+    outlet_margin,
+    big_m: float,
+) -> None:
+    """Keep a heater's or cooler's two ends at their approach.
+
+    The utility inlet faces the stream's fixed target, so ``inlet_shortfall``
+    is a number; the other end moves with the stream. A binary ``match``
+    relaxes both by big-M. A relaxed model fixes ``match``, so a unit whose
+    fixed end falls short of its approach there can carry no duty.
+    """
+    if type(match).__name__ != "GKParameter":
+        model.m.Equation(-inlet_shortfall >= -big_m * (1 - match))
+    elif inlet_shortfall > model.tol:
+        model.m.Equation(duty == 0)
+        return
+    model.m.Equation(outlet_margin >= -big_m * (1 - match))
 
 
 def _weighted_state_average(model, values: Sequence[Any]) -> Any:

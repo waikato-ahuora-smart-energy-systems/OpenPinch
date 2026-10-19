@@ -178,6 +178,10 @@ def _set_source_total_cost_objective(owner) -> None:
         ),
         name="Cold utility cost",
     )
+    # Post-processing overwrites hu_cost_total and cu_cost_total with costs
+    # recomputed from the duties; verify() checks the solver's own against them.
+    owner.hu_cost_solver_by_period = [owner.hu_cost_total]
+    owner.cu_cost_solver_by_period = [owner.cu_cost_total]
     owner.recovery_area_cost_filtered = [
         [0 for _j in range(owner.J)] for _k in range(owner.S)
     ]
@@ -351,6 +355,8 @@ def _set_multiperiod_total_cost_objective(owner) -> None:
         )
         for n in range(owner.N_periods)
     ]
+    owner.hu_cost_solver_by_period = owner.hu_cost_total_by_period
+    owner.cu_cost_solver_by_period = owner.cu_cost_total_by_period
     owner.hu_cost_total = _approach._weighted_state_average(
         owner, owner.hu_cost_total_by_period
     )

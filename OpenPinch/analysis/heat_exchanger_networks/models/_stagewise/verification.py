@@ -204,8 +204,8 @@ def _check_utility_costs(
         else:
             post_hot_utility = case.hu_cost[0] * hot_duty
             post_cold_utility = case.cu_cost[0] * cold_duty
-    model_hot_utility = _value(case.hu_cost_total)
-    model_cold_utility = _value(case.cu_cost_total)
+    model_hot_utility = _solver_utility_cost(case, case.hu_cost_solver_by_period)
+    model_cold_utility = _solver_utility_cost(case, case.cu_cost_solver_by_period)
     return math.isclose(
         post_hot_utility,
         model_hot_utility,
@@ -216,6 +216,15 @@ def _check_utility_costs(
         model_cold_utility,
         rel_tol=rel_tol,
         abs_tol=abs_tol,
+    )
+
+
+def _solver_utility_cost(case, solver_costs) -> float:
+    """Return the period-weighted utility cost the solver itself reached."""
+    if len(solver_costs) == 1:
+        return _value(solver_costs[0])
+    return _costing._weighted_numeric_average(
+        case, [_value(cost) for cost in solver_costs]
     )
 
 
