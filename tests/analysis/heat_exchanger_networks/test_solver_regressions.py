@@ -309,10 +309,12 @@ def test_four_stream_live_solver_corrected_warm_start_branch_is_feasible() -> No
         "network_evolution_method",
     ]
     assert design.method == "network_evolution_method"
-    # Correct X/Y normalization follows the fixed hot/cold stream axes. For
-    # this one-candidate local solve it deterministically reaches the checked-in
-    # second-quartile OpenHENS solution instead of the legacy swapped-axis seed.
-    corrected_total = expected["quartile_2"]
+    # Correct X/Y normalization follows the fixed hot/cold stream axes. Stage
+    # reduction keeps only the heaters and coolers the solved case uses, so
+    # unused ones no longer constrain the reduced model: this one-candidate
+    # local solve now reaches the checked-in best OpenHENS solution (it reached
+    # the second-quartile one, 159,038.72, before).
+    corrected_total = expected["best_solution"]
     _assert_close(
         design.objective_values["total_annual_cost"],
         corrected_total,
@@ -833,10 +835,13 @@ def _snapshot_solution_arrays(
     q_r = _zeros(hot_count, cold_count, stages)
     area_r = _zeros(hot_count, cold_count, stages)
     theta = _zeros(hot_count, cold_count, stages)
-    q_h = [0.0 for _ in range(cold_count)]
-    q_c = [0.0 for _ in range(hot_count)]
-    area_hu = [0.0 for _ in range(cold_count)]
-    area_cu = [0.0 for _ in range(hot_count)]
+    hot_utility_axis = arrays.axis_maps["hot_utilities"]
+    cold_utility_axis = arrays.axis_maps["cold_utilities"]
+    # Heaters and coolers are [stream][utility].
+    q_h = _zeros(cold_count, len(hot_utility_axis))
+    q_c = _zeros(hot_count, len(cold_utility_axis))
+    area_hu = _zeros(cold_count, len(hot_utility_axis))
+    area_cu = _zeros(hot_count, len(cold_utility_axis))
 
     hot_axis = arrays.axis_maps["hot_process_streams"]
     cold_axis = arrays.axis_maps["cold_process_streams"]
@@ -851,12 +856,14 @@ def _snapshot_solution_arrays(
             theta[hot_index][cold_index][stage_index] = expected["best_dTmin"]
         elif kind == "hot_utility":
             cold_index = cold_axis[exchanger["sink_stream"]]
-            q_h[cold_index] = exchanger["duty"]
-            area_hu[cold_index] = exchanger["area"]
+            utility_index = hot_utility_axis[exchanger["source_stream"]]
+            q_h[cold_index][utility_index] = exchanger["duty"]
+            area_hu[cold_index][utility_index] = exchanger["area"]
         elif kind == "cold_utility":
             hot_index = hot_axis[exchanger["source_stream"]]
-            q_c[hot_index] = exchanger["duty"]
-            area_cu[hot_index] = exchanger["area"]
+            utility_index = cold_utility_axis[exchanger["sink_stream"]]
+            q_c[hot_index][utility_index] = exchanger["duty"]
+            area_cu[hot_index][utility_index] = exchanger["area"]
 
     return {
         "Q_r": q_r,

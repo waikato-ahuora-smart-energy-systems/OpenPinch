@@ -279,10 +279,10 @@ def test_base_model_scalar_helpers_and_value_assignment():
         model, 12.0, 12.0, 1.0, formula_allowed=True
     ) == pytest.approx(12.0)
     assert _post_process_lmtd(model, 20.0, 10.0, 0.0, formula_allowed=True) == 0.0
-    # A non-positive end on an active match keeps the finite fallback.
-    assert _post_process_lmtd(
-        model, 0.0, 10.0, 0.5, formula_allowed=False, fallback_delta=8.0
-    ) == pytest.approx(4.0)
+    # A crossed or touching end has no log-mean: the match gets no area, so
+    # verification reports its duty without area instead of a made-up one.
+    for crossed in ((0.0, 10.0), (10.0, -1.0)):
+        assert _post_process_lmtd(model, *crossed, 0.5, formula_allowed=False) == 0.0
 
 
 @pytest.mark.parametrize("ends", [(10.0, 50.0), (50.0, 10.0)])
@@ -393,22 +393,23 @@ def test_blank_and_solver_array_state_helpers_validate_static_arrays():
     assert model.period_weight_sum == pytest.approx(4.0)
     assert model.T_h_in.tolist() == [200.0]
     assert model.dT_r_period.tolist() == [[[10.0]], [[12.0]]]
-    assert model.dT_hu.tolist() == [8.0]
-    assert model.dT_cu.tolist() == [7.0]
+    # Heaters are [utility][cold] and coolers [hot][utility].
+    assert model.dT_hu.tolist() == [[8.0]]
+    assert model.dT_cu.tolist() == [[7.0]]
     assert _recovery_approach_temperature(model, 0, 0, period_idx=1) == pytest.approx(
         12.0
     )
     assert _hot_utility_inlet_approach_temperature(
-        model, 0, period_idx=1
+        model, 0, 0, period_idx=1
     ) == pytest.approx(10.0)
     assert _hot_utility_outlet_approach_temperature(
-        model, 0, period_idx=1, heat_duty=1.0
+        model, 0, 0, period_idx=1, heat_duty=1.0
     ) == pytest.approx(10.0)
     assert _cold_utility_inlet_approach_temperature(
-        model, 0, period_idx=1
+        model, 0, 0, period_idx=1
     ) == pytest.approx(9.0)
     assert _cold_utility_outlet_approach_temperature(
-        model, 0, period_idx=1, heat_duty=1.0
+        model, 0, 0, period_idx=1, heat_duty=1.0
     ) == pytest.approx(9.0)
     assert _weighted_state_average(model, [10.0, 30.0]) == pytest.approx(25.0)
 
@@ -473,8 +474,8 @@ def test_minimum_approach_temperatures_use_dTmin_when_utilities_are_absent():
 
     _set_minimum_approach_temperatures(model)
 
-    assert model.dT_hu.tolist() == [11.0]
-    assert model.dT_cu.tolist() == [9.0]
+    assert model.dT_hu.tolist() == [[11.0]]
+    assert model.dT_cu.tolist() == [[9.0]]
 
 
 def test_match_restrictions_accept_supported_shapes_and_reject_invalid_shape():
@@ -482,27 +483,32 @@ def test_match_restrictions_accept_supported_shapes_and_reject_invalid_shape():
     model.I = 1
     model.J = 1
     model.S = 1
+    model.NHU = 1
+    model.NCU = 2
     model.tol = 0.1
     model.z_feasible = [[[1]]]
-    model.z_hu_feasible = [1]
-    model.z_cu_feasible = [1]
+    model.z_hu_feasible = [[1]]
+    model.z_cu_feasible = [[1, 1]]
 
     model.set_match_restrictions(None)
     assert model.z_allowed == [[[1]]]
-    assert model.z_hu_allowed == [1]
-    assert model.z_cu_allowed == [1]
+    assert model.z_hu_allowed == [[1]]
+    assert model.z_cu_allowed == [[1, 1]]
 
-    model.set_match_restrictions([[[[0]]], [0], [1]])
+    # Utility restrictions are [stream][utility].
+    model.set_match_restrictions([[[[0]]], [[0]], [[1, 0]]])
     assert model.z_allowed == [[[0]]]
-    assert model.z_hu_allowed == [0]
-    assert model.z_cu_allowed == [1]
+    assert model.z_hu_allowed == [[0]]
+    assert model.z_cu_allowed == [[1, 0]]
 
-    model.set_match_restrictions([[[[[1.0]]]], [[1.0]], [[0.0]]])
+    model.set_match_restrictions([[[[[1.0]]]], [[[1.0]]], [[[0.0], [1.0]]]])
     assert model.z_allowed == [[[1]]]
-    assert model.z_hu_allowed == [1]
-    assert model.z_cu_allowed == [0]
+    assert model.z_hu_allowed == [[1]]
+    assert model.z_cu_allowed == [[0, 1]]
 
-    model.set_match_restrictions([[[[GKVariable()]]], [GKParameter()], [GKParameter()]])
+    model.set_match_restrictions(
+        [[[[GKVariable()]]], [[GKParameter()]], [[GKParameter(), GKParameter()]]]
+    )
     assert model.z_allowed == [[[0]]]
 
     with pytest.raises(ValueError, match="Invalid restriction type"):
@@ -631,3 +637,45 @@ def test_output_to_cmd_line_logs_successful_solve(caplog):
 
     assert "Successful Solve.Path" in caplog.text
     assert "Q_hu total" in caplog.text
+
+
+@pytest.mark.parametrize("inactive_by", ["pinch decomposition", "zero duty"])
+def test_utility_approach_equations_skip_streams_inactive_in_a_period(inactive_by):
+    from OpenPinch.analysis.heat_exchanger_networks.models._base.approach import (
+        _set_multiperiod_utility_approach_equations,
+    )
+
+    model = _model()
+    model.m = _FakeModel()
+    model.N_periods = 2
+    model.period_ids = ["base", "peak"]
+    model.I = model.J = model.S = model.NHU = model.NCU = 1
+    model.z_hu_allowed = model.z_cu_allowed = [[1]]
+    model.z_hu = model.z_cu = [[1]]
+    model.T_hu_in_period = model.T_hu_out_period = np.array([[250.0], [250.0]])
+    model.T_cu_in_period = np.array([[20.0], [20.0]])
+    model.T_cu_out_period = np.array([[40.0], [40.0]])
+    model.T_hu_cont_period = model.T_cu_cont_period = np.array([[2.0], [2.0]])
+    model.T_h_cont_period = model.T_c_cont_period = np.array([[3.0], [3.0]])
+    # The pinch decomposition clips H1 to 0 K in the peak period, where it is
+    # absent from this side of the pinch.
+    model.T_h_in_period = np.array([[200.0], [0.0]])
+    model.T_h_out_period = np.array([[100.0], [0.0]])
+    model.T_c_in_period = np.array([[50.0], [50.0]])
+    model.T_c_out_period = np.array([[150.0], [150.0]])
+    model.T_h_by_period = [[[200.0, 120.0]], [[0.0, 0.0]]]
+    model.T_c_by_period = [[[140.0, 50.0]], [[140.0, 50.0]]]
+    if inactive_by == "pinch decomposition":
+        model.z_i_active_period = [[1], [0]]
+        model.z_j_active_period = [[1], [1]]
+    else:
+        # A stagewise model has no activity flags: H1 has no duty in peak.
+        model.Qtot_sh_period = np.array([[100.0], [0.0]])
+        model.Qtot_sc_period = np.array([[100.0], [100.0]])
+    model.Q_h_by_period = model.Q_c_by_period = [[[0.0]], [[0.0]]]
+
+    _set_multiperiod_utility_approach_equations(model)
+
+    # Both terminals of the heater in both periods, the cooler in base only.
+    assert len(model.m.equations) == 6
+    assert all(model.m.equations)

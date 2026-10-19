@@ -33,7 +33,7 @@ _OPTIONAL_SUMMARY_METRICS = {
     "Exergy Sources": "exergy_sources",
     "Exergy Sinks": "exergy_sinks",
     "Min Exergy Requirement": "exergy_req_min",
-    "Min Exergy Destruction": "exergy_des_min",
+    "Min Exergy Rejected": "exergy_des_min",
 }
 
 
@@ -291,6 +291,15 @@ def locate_summary_row(
     return candidates.iloc[0]
 
 
+def _matching_scope(scope: str, base_root: str, other_root: str) -> str:
+    """Return the other problem's scope for a base scope; names may differ."""
+    if scope == base_root:
+        return other_root
+    if scope.startswith(f"{base_root}/"):
+        return other_root + scope[len(base_root) :]
+    return scope
+
+
 def compare_problem_summaries(
     base_frame: pd.DataFrame,
     other_frame: pd.DataFrame,
@@ -301,8 +310,14 @@ def compare_problem_summaries(
     target_method: str | None,
     base_label: str,
     other_label: str,
+    base_root: str | None = None,
+    other_root: str | None = None,
 ) -> pd.DataFrame:
-    """Compare unit-aware numeric metrics from two solved summary frames."""
+    """Compare unit-aware numeric metrics from two solved summary frames.
+
+    ``base_root`` and ``other_root`` are the problems' project names, which
+    start every scope; the other row is found by the scope below its root.
+    """
     selectors = {
         "scope": scope,
         "zone_type": zone_type,
@@ -312,7 +327,11 @@ def compare_problem_summaries(
     base_row = locate_summary_row(base_frame, **selectors)
     other_row = locate_summary_row(
         other_frame,
-        scope=scope or str(base_row["Scope"]),
+        scope=(
+            _matching_scope(str(base_row["Scope"]), base_root, other_root)
+            if base_root is not None and other_root is not None
+            else str(base_row["Scope"])
+        ),
         zone_type=zone_type or str(base_row["Zone Type"]),
         integration_type=integration_type or str(base_row["Integration Type"]),
         target_method=target_method or str(base_row["Target Method"]),

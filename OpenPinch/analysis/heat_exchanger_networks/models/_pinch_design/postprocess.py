@@ -27,14 +27,7 @@ def _get_multiperiod_post_process(owner) -> None:
         lambda n, i, j, k: owner._active_binary_value(owner.Q_r_by_period[n][i][j][k]),
         (owner.N_periods, owner.I, owner.J, owner.S),
     )
-    q_h = build_index_grid(
-        lambda n, j: owner._active_binary_value(owner.Q_h_by_period[n][j]),
-        (owner.N_periods, owner.J),
-    )
-    q_c = build_index_grid(
-        lambda n, i: owner._active_binary_value(owner.Q_c_by_period[n][i]),
-        (owner.N_periods, owner.I),
-    )
+    q_h, q_c = _area.solved_utility_duties(owner)
 
     owner.z = build_index_grid(
         lambda i, j, k: _active_period_flag(
@@ -43,34 +36,25 @@ def _get_multiperiod_post_process(owner) -> None:
         ),
         (owner.I, owner.J, owner.S),
     )
-    owner.z_hu = build_index_grid(
-        lambda j: _active_period_flag(
-            (q_h[n][j] for n in range(owner.N_periods)),
-            owner.tol,
-        ),
-        (owner.J,),
-    )
-    owner.z_cu = build_index_grid(
-        lambda i: _active_period_flag(
-            (q_c[n][i] for n in range(owner.N_periods)),
-            owner.tol,
-        ),
-        (owner.I,),
-    )
+    owner.z_hu, owner.z_cu = _area.used_utility_matches(owner, q_h, q_c)
     owner.n_recovery_units = sum(
         owner.z[i][j][k][0]
         for k in range(owner.S)
         for j in range(owner.J)
         for i in range(owner.I)
     )
-    owner.n_hu_units = sum(owner.z_hu[j][0] for j in range(owner.J))
-    owner.n_cu_units = sum(owner.z_cu[i][0] for i in range(owner.I))
+    owner.n_hu_units = sum(flag[0] for row in owner.z_hu for flag in row)
+    owner.n_cu_units = sum(flag[0] for row in owner.z_cu for flag in row)
     owner.n_units = owner.n_recovery_units + owner.n_hu_units + owner.n_cu_units
 
     def recovery_temperature_difference(
         n: int, i: int, j: int, hot_stage: int, cold_stage: int
     ) -> list[float]:
-        if owner.z[i][j][cold_stage][0] <= 0:
+        if (
+            owner.z[i][j][cold_stage][0] <= 0
+            or owner.z_i_active_period[n][i] <= 0
+            or owner.z_j_active_period[n][j] <= 0
+        ):
             return [_approach._recovery_approach_temperature(owner, i, j, n)]
         return [
             owner._active_binary_value(owner.T_h_by_period[n][i][hot_stage])
@@ -121,78 +105,7 @@ def _get_multiperiod_post_process(owner) -> None:
     )
     _area._apply_segment_recovery_areas(owner, q_r)
 
-    owner.LMTD_hu_by_period = build_index_grid(
-        lambda n, j: _area._post_process_lmtd(
-            owner,
-            owner.T_hu_in_period[n][0] - owner.T_c_out_period[n][j],
-            owner._utility_solved_outlet_temperature("hot", n, j, q_h[n][j])
-            - owner._active_binary_value(owner.T_c_by_period[n][j][0]),
-            owner.z_hu[j][0],
-            formula_allowed=_lmtd_formula_allowed(
-                owner.T_hu_in_period[n][0] - owner.T_c_out_period[n][j],
-                owner._utility_solved_outlet_temperature("hot", n, j, q_h[n][j])
-                - owner._active_binary_value(owner.T_c_by_period[n][j][0]),
-                _approach._hot_utility_inlet_approach_temperature(owner, j, n),
-                owner.tol,
-                _approach._hot_utility_outlet_approach_temperature(
-                    owner, j, n, q_h[n][j]
-                ),
-            ),
-        ),
-        (owner.N_periods, owner.J),
-    )
-    owner.area_hu_by_period = build_index_grid(
-        lambda n, j: _area_from_heat_load(
-            q_h[n][j],
-            owner.U_hu_period[n][j],
-            owner.LMTD_hu_by_period[n][j],
-            owner.tol,
-        ),
-        (owner.N_periods, owner.J),
-    )
-
-    owner.LMTD_cu_by_period = build_index_grid(
-        lambda n, i: _area._post_process_lmtd(
-            owner,
-            owner._active_binary_value(owner.T_h_by_period[n][i][owner.S])
-            - owner._utility_solved_outlet_temperature("cold", n, i, q_c[n][i]),
-            owner.T_h_out_period[n][i] - owner.T_cu_in_period[n][0],
-            owner.z_cu[i][0],
-            formula_allowed=_lmtd_formula_allowed(
-                owner._active_binary_value(owner.T_h_by_period[n][i][owner.S])
-                - owner._utility_solved_outlet_temperature("cold", n, i, q_c[n][i]),
-                owner.T_h_out_period[n][i] - owner.T_cu_in_period[n][0],
-                _approach._cold_utility_outlet_approach_temperature(
-                    owner, i, n, q_c[n][i]
-                ),
-                owner.tol,
-                _approach._cold_utility_inlet_approach_temperature(owner, i, n),
-            ),
-            fallback_delta=(owner.T_h_out_period[n][i] - owner.T_cu_in_period[n][0]),
-        ),
-        (owner.N_periods, owner.I),
-    )
-    owner.area_cu_by_period = build_index_grid(
-        lambda n, i: _area_from_heat_load(
-            q_c[n][i],
-            owner.U_cu_period[n][i],
-            owner.LMTD_cu_by_period[n][i],
-            owner.tol,
-        ),
-        (owner.N_periods, owner.I),
-    )
-    _area._apply_segment_utility_areas(owner, q_h, q_c)
-    owner.LMTD_hu = owner.LMTD_hu_by_period[0]
-    owner.LMTD_cu = owner.LMTD_cu_by_period[0]
-
-    owner.area_hu = build_index_grid(
-        lambda j: max(owner.area_hu_by_period[n][j] for n in range(owner.N_periods)),
-        (owner.J,),
-    )
-    owner.area_cu = build_index_grid(
-        lambda i: max(owner.area_cu_by_period[n][i] for n in range(owner.N_periods)),
-        (owner.I,),
-    )
+    _area.set_utility_lmtd_and_areas(owner, q_h, q_c)
     set_period_totals_and_costs(owner, q_h, q_c, q_r)
     owner.TAC_model = owner.m.options.objfcnval
     owner.TAC = owner.capital_cost_value + owner.weighted_operating_cost_value

@@ -8,8 +8,21 @@ from collections.abc import Sequence
 def set_period_totals_and_costs(owner, q_h, q_c, q_r) -> None:
     """Set per-period duty totals and the operating, capital and area costs."""
 
-    owner.Q_hu_total_by_period = [sum(q_h[n]) for n in range(owner.N_periods)]
-    owner.Q_cu_total_by_period = [sum(q_c[n]) for n in range(owner.N_periods)]
+    # q_h is [period][cold][utility] and q_c [period][hot][utility].
+    owner.Q_hu_by_utility_by_period = [
+        [sum(q_h[n][j][u] for j in range(owner.J)) for u in range(owner.NHU)]
+        for n in range(owner.N_periods)
+    ]
+    owner.Q_cu_by_utility_by_period = [
+        [sum(q_c[n][i][u] for i in range(owner.I)) for u in range(owner.NCU)]
+        for n in range(owner.N_periods)
+    ]
+    owner.Q_hu_total_by_period = [
+        sum(owner.Q_hu_by_utility_by_period[n]) for n in range(owner.N_periods)
+    ]
+    owner.Q_cu_total_by_period = [
+        sum(owner.Q_cu_by_utility_by_period[n]) for n in range(owner.N_periods)
+    ]
     owner.Q_r_total_by_period = [
         sum(
             q_r[n][i][j][k]
@@ -24,8 +37,8 @@ def set_period_totals_and_costs(owner, q_h, q_c, q_r) -> None:
     owner.Q_r_total = _weighted_numeric_average(owner, owner.Q_r_total_by_period)
 
     owner.operating_cost_by_period = [
-        owner._utility_cost_value("hot", n, owner.Q_hu_total_by_period[n])
-        + owner._utility_cost_value("cold", n, owner.Q_cu_total_by_period[n])
+        owner._utilities_cost_value("hot", n, owner.Q_hu_by_utility_by_period[n])
+        + owner._utilities_cost_value("cold", n, owner.Q_cu_by_utility_by_period[n])
         for n in range(owner.N_periods)
     ]
     owner.weighted_operating_cost_value = _weighted_numeric_average(
@@ -40,22 +53,20 @@ def set_period_totals_and_costs(owner, q_h, q_c, q_r) -> None:
             for j in range(owner.J)
             for i in range(owner.I)
         )
-        + owner.hu_coeff[0]
-        * sum(owner.area_hu[j] ** owner.hu_exp[0] for j in range(owner.J))
-        + owner.cu_coeff[0]
-        * sum(owner.area_cu[i] ** owner.cu_exp[0] for i in range(owner.I))
+        + _utility_area_cost(owner, "hot")
+        + _utility_area_cost(owner, "cold")
     )
     owner.hu_cost_total = _weighted_numeric_average(
         owner,
         [
-            owner._utility_cost_value("hot", n, owner.Q_hu_total_by_period[n])
+            owner._utilities_cost_value("hot", n, owner.Q_hu_by_utility_by_period[n])
             for n in range(owner.N_periods)
         ],
     )
     owner.cu_cost_total = _weighted_numeric_average(
         owner,
         [
-            owner._utility_cost_value("cold", n, owner.Q_cu_total_by_period[n])
+            owner._utilities_cost_value("cold", n, owner.Q_cu_by_utility_by_period[n])
             for n in range(owner.N_periods)
         ],
     )
@@ -65,12 +76,17 @@ def set_period_totals_and_costs(owner, q_h, q_c, q_r) -> None:
         for j in range(owner.J)
         for i in range(owner.I)
     )
-    owner.hu_area_cost_total = owner.hu_coeff[0] * sum(
-        owner.area_hu[j] ** owner.hu_exp[0] for j in range(owner.J)
-    )
-    owner.cu_area_cost_total = owner.cu_coeff[0] * sum(
-        owner.area_cu[i] ** owner.cu_exp[0] for i in range(owner.I)
-    )
+    owner.hu_area_cost_total = _utility_area_cost(owner, "hot")
+    owner.cu_area_cost_total = _utility_area_cost(owner, "cold")
+
+
+def _utility_area_cost(owner, side: str) -> float:
+    """Return the area cost of every heater or cooler, one per (stream, utility)."""
+    if side == "hot":
+        coefficient, exponent, areas = owner.hu_coeff[0], owner.hu_exp[0], owner.area_hu
+    else:
+        coefficient, exponent, areas = owner.cu_coeff[0], owner.cu_exp[0], owner.area_cu
+    return coefficient * sum(area**exponent for row in areas for area in row)
 
 
 def _weighted_numeric_average(owner, values: Sequence[float]) -> float:

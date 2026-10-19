@@ -674,7 +674,11 @@ def calc_carnot_heat_pump_cop(
     T_l: float | np.ndarray,
     eta_ii: float,
 ) -> float | np.ndarray:
-    """Compute a Carnot-based heating COP with a second-law efficiency factor."""
+    """Compute a Carnot-based heating COP with a second-law efficiency factor.
+
+    ``eta_ii`` applies to the cooling Carnot COP, T_l/(T_h - T_l), and the
+    heating COP follows from the energy balance: 1 + eta_ii x T_l/(T_h - T_l).
+    """
     T_h_arr = np.asarray(T_h, dtype=float)
     T_l_arr = np.asarray(T_l, dtype=float)
     delta_T = T_h_arr - T_l_arr
@@ -685,6 +689,24 @@ def calc_carnot_heat_pump_cop(
             np.inf,
         )
     return cop.item() if cop.ndim == 0 else cop
+
+
+def satisfies_second_law(
+    T_cond: np.ndarray,
+    Q_cond: np.ndarray,
+    T_evap: np.ndarray,
+    Q_evap: np.ndarray,
+) -> bool:
+    """Return whether a cycle's entropy generation is non-negative.
+
+    Entropy generation is sum(Q/T) over the condensers minus sum(Q/T) over the
+    evaporators (temperatures in degC, work carries no entropy). The tolerance
+    is relative to the entropy flows, so it does not depend on the duty scale.
+    """
+    S_out = np.asarray(Q_cond, dtype=float) / (np.asarray(T_cond, dtype=float) + 273.15)
+    S_in = np.asarray(Q_evap, dtype=float) / (np.asarray(T_evap, dtype=float) + 273.15)
+    S_scale = float(np.abs(S_out).sum() + np.abs(S_in).sum())
+    return bool(S_out.sum() - S_in.sum() >= -_tol * S_scale)
 
 
 def calc_carnot_heat_engine_eta(

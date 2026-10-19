@@ -34,6 +34,27 @@ The design view also exposes ``selected_network``, total recovery, hot and cold
 utility duty, and ``utility(name)``. Serialize the complete result with
 ``design.result.model_dump(mode="json")``.
 
+Several Hot or Cold Utilities
+-----------------------------
+
+Synthesis uses every hot and cold utility in the problem. Each heater and
+cooler is one (stream, utility) pair at the end of the stream, with its own
+duty, approach temperatures at both ends, price and area, so a stream can be
+finished by the cheapest utility that reaches its target. In
+``dairy_chilling_multiperiod.json`` the chilling streams, which end at 2 to
+5 C, are cooled by glycol, while cooling water takes heat only where it can.
+
+- A utility whose inlet cannot meet its approach at a stream's target in some
+  period is never matched with that stream.
+- Heaters and coolers on one stream run in parallel between the same stream
+  temperatures. Synthesis does not place one utility after another along a
+  stream, for example cooling water first and then glycol; each unit spans
+  the stream's whole utility duty range.
+- The pinch design method meets the utility targets and, where a side has a
+  choice of utilities, prefers the cheaper ones.
+- The default ``HU`` and ``CU`` that input preparation adds as backups take
+  part only when they are the only utility on their side.
+
 Named Advanced Methods
 ----------------------
 

@@ -15,6 +15,7 @@ def _hot_utility_exchangers(
     solved_model: Any,
     *,
     hot_utility: str,
+    utility_index: int,
     cold_streams: tuple[str, ...],
     period_ids: tuple[str, ...],
     tolerance: float,
@@ -32,6 +33,7 @@ def _hot_utility_exchangers(
                 period_id=period_id,
                 period_idx=period_idx,
                 cold_index=j,
+                utility_index=utility_index,
                 q_values=q_values,
                 q_values_by_period=q_values_by_period,
                 tolerance=tolerance,
@@ -44,8 +46,11 @@ def _hot_utility_exchangers(
             solved_model,
             "segment_area_hu_contributions_by_period",
             j,
+            utility_index,
         )
-        area = _optional_float(_index(getattr(solved_model, "area_hu", None), j))
+        area = _optional_float(
+            _index(getattr(solved_model, "area_hu", None), j, utility_index)
+        )
         if segment_contributions:
             area = None
         exchangers.append(
@@ -60,7 +65,9 @@ def _hot_utility_exchangers(
                 area=area,
                 segment_area_contributions=segment_contributions,
                 match_allowed=_allowed(
-                    _index(getattr(solved_model, "z_hu_allowed", None), j)
+                    _index(
+                        getattr(solved_model, "z_hu_allowed", None), j, utility_index
+                    )
                 ),
             )
         )
@@ -71,6 +78,7 @@ def _cold_utility_exchangers(
     solved_model: Any,
     *,
     cold_utility: str,
+    utility_index: int,
     hot_streams: tuple[str, ...],
     period_ids: tuple[str, ...],
     tolerance: float,
@@ -89,6 +97,7 @@ def _cold_utility_exchangers(
                 period_id=period_id,
                 period_idx=period_idx,
                 hot_index=i,
+                utility_index=utility_index,
                 last_stage=last_stage,
                 q_values=q_values,
                 q_values_by_period=q_values_by_period,
@@ -102,8 +111,11 @@ def _cold_utility_exchangers(
             solved_model,
             "segment_area_cu_contributions_by_period",
             i,
+            utility_index,
         )
-        area = _optional_float(_index(getattr(solved_model, "area_cu", None), i))
+        area = _optional_float(
+            _index(getattr(solved_model, "area_cu", None), i, utility_index)
+        )
         if segment_contributions:
             area = None
         exchangers.append(
@@ -118,7 +130,9 @@ def _cold_utility_exchangers(
                 area=area,
                 segment_area_contributions=segment_contributions,
                 match_allowed=_allowed(
-                    _index(getattr(solved_model, "z_cu_allowed", None), i)
+                    _index(
+                        getattr(solved_model, "z_cu_allowed", None), i, utility_index
+                    )
                 ),
             )
         )

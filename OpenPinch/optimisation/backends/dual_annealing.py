@@ -5,6 +5,7 @@ from typing import Callable
 import numpy as np
 from scipy.optimize import dual_annealing
 
+from ..feasibility import DEFAULT_FEASIBILITY_TOLERANCE
 from ._multistart import run_multistart
 
 
@@ -25,6 +26,7 @@ def _get_da_multiminima_in_parallel(
     cluster_tol=0.01,
     max_minima=4,
     local_method="SLSQP",
+    feasibility_tolerance=DEFAULT_FEASIBILITY_TOLERANCE,
 ):
     """Return deduplicated local minima from multi-start dual annealing."""
     return run_multistart(
@@ -38,6 +40,7 @@ def _get_da_multiminima_in_parallel(
         cluster_tol=cluster_tol,
         max_minima=max_minima,
         local_method=local_method,
+        feasibility_tolerance=feasibility_tolerance,
         maxiter=maxiter,
         seed=seed,
         initial_temp=initial_temp,

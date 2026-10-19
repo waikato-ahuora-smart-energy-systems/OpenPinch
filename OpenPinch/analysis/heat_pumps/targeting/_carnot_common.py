@@ -159,6 +159,13 @@ def compute_carnot_objective(
         eta_ii_he_carnot=args.eta_ii_he_carnot,
         args=args,
     )
+    if not cycle.solved:
+        return HPRBackendResult.failure(
+            reason=(
+                "Carnot cycle failed its energy balance or second-law "
+                "(entropy generation) check."
+            ),
+        )
 
     return evaluate(
         args=args,
@@ -167,7 +174,9 @@ def compute_carnot_objective(
         w_hpr=cycle.w_hpr,
         w_he=cycle.w_he,
         heat_recovery=cycle.heat_recovery,
-        cop_h=cycle.COP_h,
+        # hpr_cop follows the duty: heating COP for heat pumps, cooling COP
+        # for refrigeration, as the vapour-compression models report it.
+        cop_h=cycle.COP_h if args.is_heat_pumping else cycle.COP_c,
         Q_cond_total=cycle.Q_cond,
         Q_evap_total=cycle.Q_evap,
         penalty_terms=cycle.penalty,

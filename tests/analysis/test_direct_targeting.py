@@ -27,6 +27,7 @@ from OpenPinch.domain.enums import GraphType, ProblemTableLabel, ZoneType
 from OpenPinch.domain.problem_table import ProblemTable
 from OpenPinch.domain.stream import Stream
 from OpenPinch.domain.stream_collection import StreamCollection
+from OpenPinch.domain.value import Value
 
 
 def _assign_utility(**kwargs):
@@ -283,7 +284,7 @@ def test_balanced_curve_predicate_and_area_cost_payload(monkeypatch):
     assert should_update_balanced_composite_curves(direct_config, True) is True
 
     zone = SimpleNamespace(
-        config=SimpleNamespace(),
+        config=SimpleNamespace(costing=SimpleNamespace(annual_op_time=1000.0)),
         hot_streams=StreamCollection(),
         cold_streams=StreamCollection(),
         hot_utilities=StreamCollection(),
@@ -294,7 +295,7 @@ def test_balanced_curve_predicate_and_area_cost_payload(monkeypatch):
     monkeypatch.setattr(
         direct,
         "get_capital_cost_targets",
-        lambda **_kwargs: ("capital", "annual"),
+        lambda **_kwargs: ("capital", Value(250.0, "$/y")),
     )
 
     payload = build_area_cost_target_data(
@@ -309,7 +310,8 @@ def test_balanced_curve_predicate_and_area_cost_payload(monkeypatch):
         "area": 120.0,
         "num_units": 3,
         "capital_cost": "capital",
-        "total_cost": "annual",
+        # No utilities, so the total is the annualised capital alone.
+        "total_cost": Value(250.0, "$/y"),
     }
 
     assert (
@@ -651,3 +653,30 @@ def test_add_net_segment_period_skips_depleted_current_utility():
     assert next_k == 2
     assert residuals == [0.0, 40.0]
     assert len(net_streams) == 1
+
+
+def test_direct_target_reports_utility_cost_of_its_utilities() -> None:
+    """basic_pinch needs 750 kW HU and 1000 kW CU, both at 10 $/MWh."""
+    problem = PinchProblem(
+        "OpenPinch/tutorials/sample_cases/basic_pinch.json", project_name="x"
+    )
+
+    target = problem.target.direct_heat_integration()
+
+    assert target.utility_cost == pytest.approx(17.5, rel=1e-6)
+
+
+def test_area_target_total_cost_adds_annual_utility_cost_to_capital() -> None:
+    """Yee and Grossmann: no discounting over one year, 1000 h operation."""
+    problem = PinchProblem(
+        "OpenPinch/tutorials/sample_cases/Four-stream-Yee-and-Grossmann-1990-1.json",
+        project_name="x",
+    )
+
+    target = problem.target.heat_exchanger_area_and_cost()
+
+    # Annualised capital equals capital cost here; 67.5 $/h for 1000 h.
+    assert target.utility_cost == pytest.approx(67.5, rel=1e-9)
+    assert target.total_cost == pytest.approx(
+        target.capital_cost + 67.5 * 1000.0, rel=1e-9
+    )

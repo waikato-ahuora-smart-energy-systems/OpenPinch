@@ -153,7 +153,8 @@ def run_command(
     case), and ``workspace.<action>`` (``scenario``, ``use_case``,
     ``update_options``, ``set_dt_cont_multiplier``, ``add``,
     ``set_case_input``, ``compare_cases``, ``to_bundle`` and ``batch``) acts
-    on the workspace.
+    on the workspace. ``batch`` runs one command on each case, at most
+    ``MAX_BATCH_CASES`` cases, and cannot run another ``batch``.
 
     The response has ``value``, the contract the method returned, and
     ``results``, the problem's ``TargetOutput`` (``None`` when no target has
@@ -658,27 +659,45 @@ _PROBLEM_COMMANDS = {
 }
 
 
+# The most cases, and so commands, one ``workspace.batch`` request runs.
+MAX_BATCH_CASES = 100
+
+
 def _batch(request: Mapping[str, Any]) -> dict[str, Any]:
     """One command on each selected workspace case, isolating failures."""
     session = _SESSIONS[request["session"]]
     if session.workspace is None:
         raise ValueError("Command 'workspace.batch' needs a workspace session.")
     arguments = request.get("arguments", {})
+    if arguments.get("command") == "workspace.batch":
+        raise ValueError("Command 'workspace.batch' cannot run 'workspace.batch'.")
+    cases = list(arguments.get("cases") or session.workspace.list_cases())
+    if len(cases) > MAX_BATCH_CASES:
+        raise ValueError(
+            f"Command 'workspace.batch' runs at most {MAX_BATCH_CASES} cases "
+            f"per request, not {len(cases)}."
+        )
     results: dict[str, Any] = {}
     errors: dict[str, Any] = {}
-    for case in arguments.get("cases") or session.workspace.list_cases():
+    for case in cases:
         try:
-            results[case] = run_command(
-                {
-                    "command": arguments["command"],
-                    "session": request["session"],
-                    "case": case,
-                    "arguments": arguments.get("arguments", {}),
-                }
-            )
+            results[case] = _batch_case(request["session"], case, arguments)
         except Exception as error:  # batch isolation, as in case batches
             errors[case] = _error_json(error)
     return {"results": results, "errors": errors}
+
+
+def _batch_case(
+    session: str, case: str, arguments: Mapping[str, Any]
+) -> dict[str, Any]:
+    return run_command(
+        {
+            "command": arguments["command"],
+            "session": session,
+            "case": case,
+            "arguments": arguments.get("arguments", {}),
+        }
+    )
 
 
 def _workspace_json(workspace: PinchWorkspace) -> dict[str, Any]:

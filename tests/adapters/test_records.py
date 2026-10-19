@@ -1,6 +1,7 @@
 """Regression tests for input validation utility helpers."""
 
 import pandas as pd
+import pytest
 
 import OpenPinch.adapters.io.records as iv
 from OpenPinch.adapters.io.records import (
@@ -154,3 +155,28 @@ def test_validate_utility_data_list_skips_non_dict_records():
         ]
     )
     assert out == [{"name": "HP Steam", "type": "Hot"}]
+
+
+def test_validate_utility_data_warns_about_unnamed_rows_with_data():
+    utilities = [
+        {"name": None, "type": "Hot", "t_supply": {"value": 400.0, "unit": "degC"}},
+        {"name": "", "type": None, "t_supply": {"value": None, "unit": "degC"}},
+        {"name": "HU", "type": "Hot", "t_supply": {"value": 250.0, "unit": "degC"}},
+    ]
+
+    with pytest.warns(UserWarning, match="utility row 1 has no name") as record:
+        out = validate_utility_data(utilities)
+
+    assert [u["name"] for u in out] == ["HU"]
+    assert len(record) == 1
+
+
+def test_validate_stream_data_rejects_names_that_normalise_to_a_duplicate():
+    streams = [
+        {"zone": "Z", "name": "H.1", "t_supply": 150.0},
+        {"zone": "Z", "name": "H-1", "t_supply": 140.0},
+    ]
+
+    with pytest.raises(ValueError, match="'H.1' and 'H-1'"):
+        with pytest.warns(UserWarning):
+            validate_stream_data(streams)

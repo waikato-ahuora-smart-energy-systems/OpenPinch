@@ -82,7 +82,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                         for k in range(owner.S)
                         for j in range(owner.J)
                     )
-                    - owner.Q_c_by_period[n][i]
+                    - sum(owner.Q_c_by_period[n][i])
                     == 0.0
                 )
                 if owner.z_i_active_period[n][i] > 0
@@ -99,7 +99,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                         for k in range(owner.S)
                         for i in range(owner.I)
                     )
-                    - owner.Q_h_by_period[n][j]
+                    - sum(owner.Q_h_by_period[n][j])
                     == 0.0
                 )
                 if owner.z_j_active_period[n][j] > 0
@@ -156,22 +156,24 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
             _ = [
                 (
                     owner.m.Equation(
-                        owner.Q_c_by_period[n][i] * (1 - owner.z_cu[i]) == 0.0
+                        owner.Q_c_by_period[n][i][u] * (1 - owner.z_cu[i][u]) == 0.0
                     )
-                    if owner.z_cu_allowed[i] > 0
+                    if owner.z_cu_allowed[i][u] > 0
                     else None
                 )
                 for i in range(owner.I)
+                for u in range(owner.NCU)
             ]
             _ = [
                 (
                     owner.m.Equation(
-                        owner.Q_h_by_period[n][j] * (1 - owner.z_hu[j]) == 0.0
+                        owner.Q_h_by_period[n][j][u] * (1 - owner.z_hu[j][u]) == 0.0
                     )
-                    if owner.z_hu_allowed[j] > 0
+                    if owner.z_hu_allowed[j][u] > 0
                     else None
                 )
                 for j in range(owner.J)
+                for u in range(owner.NHU)
             ]
 
     _approach._set_multiperiod_utility_approach_equations(owner)
@@ -192,6 +194,8 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
         ]
         for n in range(owner.N_periods)
     ]
+    # A stream absent from this side of the pinch in period n is clipped to
+    # 0 K there, so its matches carry no approach constraint in that period.
     for n in range(owner.N_periods):
         _ = [
             (
@@ -201,6 +205,8 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                     - M_ij_period[n][i][j] * (1 - owner.z[i][j][k])
                 )
                 if owner.z_allowed[i][j][k] > 0
+                and owner.z_i_active_period[n][i] > 0
+                and owner.z_j_active_period[n][j] > 0
                 else None
             )
             for k in range(owner.S)
@@ -218,6 +224,8 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                     - M_ij_period[n][i][j] * (1 - owner.z[i][j][k])
                 )
                 if owner.z_allowed[i][j][k] > 0
+                and owner.z_i_active_period[n][i] > 0
+                and owner.z_j_active_period[n][j] > 0
                 else None
             )
             for k in range(owner.S)
@@ -229,27 +237,71 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
     owner.alpha = []
 
 
+def _total_duty(grid):
+    """Return the summed duty of a ``[stream][utility]`` grid."""
+    return sum(load for row in grid for load in row)
+
+
+def _set_utility_choice_objective(owner) -> None:
+    """Price the utilities when a side has a choice of them.
+
+    The utility targets fix how much utility each side uses, but not which
+    utility: with more than one, their cost picks the cheaper feasible ones.
+    """
+    if owner.NHU <= 1 and owner.NCU <= 1:
+        return
+    owner.m.Minimize(
+        _approach._weighted_state_average(
+            owner,
+            [
+                sum(
+                    _piecewise._utility_cost_expression(
+                        owner,
+                        side,
+                        n,
+                        sum(row[u] for row in grid),
+                        utility=u,
+                        name=f"pdm_{side}_utility{u}_period_{n}",
+                    )
+                    for side, grid, count in (
+                        ("hot", owner.Q_h_by_period[n], owner.NHU),
+                        ("cold", owner.Q_c_by_period[n], owner.NCU),
+                    )
+                    for u in range(count)
+                )
+                for n in range(owner.N_periods)
+            ],
+        )
+    )
+
+
 def set_obj(owner) -> None:
     """Attach PDM objective expressions."""
+
+    _set_utility_choice_objective(owner)
 
     if owner.minimisation_goal == "hot utility":
         for n in range(owner.N_periods):
             owner.m.Equation(
-                sum(owner.Q_h_by_period[n]) - owner.HU_target_by_period[n] >= 0.0
+                _total_duty(owner.Q_h_by_period[n]) - owner.HU_target_by_period[n]
+                >= 0.0
             )
         owner.m.Minimize(
             _approach._weighted_state_average(
-                owner, [sum(owner.Q_h_by_period[n]) for n in range(owner.N_periods)]
+                owner,
+                [_total_duty(owner.Q_h_by_period[n]) for n in range(owner.N_periods)],
             )
         )
     elif owner.minimisation_goal == "cold utility":
         for n in range(owner.N_periods):
             owner.m.Equation(
-                sum(owner.Q_c_by_period[n]) - owner.CU_target_by_period[n] >= 0.0
+                _total_duty(owner.Q_c_by_period[n]) - owner.CU_target_by_period[n]
+                >= 0.0
             )
         owner.m.Minimize(
             _approach._weighted_state_average(
-                owner, [sum(owner.Q_c_by_period[n]) for n in range(owner.N_periods)]
+                owner,
+                [_total_duty(owner.Q_c_by_period[n]) for n in range(owner.N_periods)],
             )
         )
     elif owner.minimisation_goal == "total utility":
@@ -257,7 +309,8 @@ def set_obj(owner) -> None:
             _approach._weighted_state_average(
                 owner,
                 [
-                    sum(owner.Q_h_by_period[n]) + sum(owner.Q_c_by_period[n])
+                    _total_duty(owner.Q_h_by_period[n])
+                    + _total_duty(owner.Q_c_by_period[n])
                     for n in range(owner.N_periods)
                 ],
             )

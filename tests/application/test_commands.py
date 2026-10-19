@@ -14,6 +14,7 @@ import jsonschema
 import pytest
 
 from OpenPinch.adapters.io.problem_sources import load_packaged_sample_case
+from OpenPinch.application import commands
 from OpenPinch.application._problem.accessors.design import (
     HeatExchangerNetworkDesignView,
     _DesignAccessor,
@@ -1231,6 +1232,57 @@ def test_workspace_batch_reports_a_failing_case_and_runs_the_rest():
 
     assert list(value["results"]) == ["baseline"]
     assert value["errors"]["missing"]["type"] == "KeyError"
+
+
+def test_workspace_batch_cannot_run_a_batch():
+    session = _workspace_session()
+
+    with pytest.raises(ValueError, match="cannot run 'workspace.batch'"):
+        run_command(
+            {
+                "command": "workspace.batch",
+                "session": session,
+                "arguments": {
+                    "command": "workspace.batch",
+                    "arguments": {"command": "target.direct_heat_integration"},
+                },
+            }
+        )
+
+
+def test_workspace_batch_caps_the_cases_one_request_runs(monkeypatch):
+    session = _workspace_session()
+    request = {
+        "command": "workspace.batch",
+        "session": session,
+        "arguments": {"command": "target.direct_heat_integration"},
+    }
+    ran = []
+    monkeypatch.setattr(commands, "_batch_case", lambda *args: ran.append(args) or {})
+
+    with pytest.raises(ValueError, match="at most"):
+        run_command(
+            {
+                **request,
+                "arguments": {
+                    **request["arguments"],
+                    "cases": ["baseline"] * (commands.MAX_BATCH_CASES + 1),
+                },
+            }
+        )
+
+    run_command(
+        {
+            "command": "workspace.scenario",
+            "session": session,
+            "arguments": {"name": "tight_dt", "dt_cont_multiplier": 0.75},
+        }
+    )
+    monkeypatch.setattr(commands, "MAX_BATCH_CASES", 1)
+    with pytest.raises(ValueError, match="at most 1 "):
+        run_command(request)
+
+    assert ran == []
 
 
 def test_an_empty_workspace_session_can_be_filled_and_saved():

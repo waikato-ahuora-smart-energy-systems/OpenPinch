@@ -110,9 +110,25 @@ class BaseHeatExchangerNetworkModel(ABC):
         side: str,
         period_index: int,
         heat_duty: float,
+        *,
+        utility: int,
     ) -> float:
-        "Return exact solved utility cost for reporting and verification."
-        return _piecewise._utility_cost_value(self, side, period_index, heat_duty)
+        "Return one utility's exact solved cost for reporting and verification."
+        return _piecewise._utility_cost_value(
+            self, side, period_index, heat_duty, utility=utility
+        )
+
+    def _utilities_cost_value(
+        self,
+        side: str,
+        period_index: int,
+        duties_by_utility,
+    ) -> float:
+        "Return the summed solved cost of each utility's duty on one side."
+        return sum(
+            self._utility_cost_value(side, period_index, duty, utility=u)
+            for u, duty in enumerate(duties_by_utility)
+        )
 
     def get_alpha_values(self) -> list:
         "Calculate source alpha flow-on values in a post-optimisation solve."
@@ -142,10 +158,11 @@ class BaseHeatExchangerNetworkModel(ABC):
         side: str,
         period_idx: int,
         match_index: int,
+        utility: int,
         heat_duty: float | None = None,
     ):
         return _approach._utility_solved_outlet_temperature(
-            self, side, period_idx, match_index, heat_duty
+            self, side, period_idx, match_index, utility, heat_duty
         )
 
     def set_match_restrictions(self, restrictions) -> None:

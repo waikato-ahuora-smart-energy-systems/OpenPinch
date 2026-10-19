@@ -64,7 +64,7 @@ def test_options_round_trip_sorted_json_safe_overrides() -> None:
         ({"run_count": True}, "integer"),
         ({"cluster_tolerance": -1.0}, "non-negative"),
         ({"cluster_tolerance": math.inf}, "finite"),
-        ({"local_method": "  "}, "empty"),
+        ({"local_method": "  "}, "local_method"),
         ({"backend_options": (("", 1),)}, "name"),
         ({"backend_options": (("xi", math.nan),)}, "finite"),
         ({"backend_options": (("xi", 1), ("xi", 2))}, "unique"),
