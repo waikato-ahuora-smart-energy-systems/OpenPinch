@@ -34,6 +34,7 @@ class ParallelCarnotCycles:
         self._w_hpr = np.empty(0, dtype=float)
         self._w_he = np.empty(0, dtype=float)
         self._heat_recovery = 0.0
+        self._Q_evap_hpr = 0.0
         self._penalty = np.empty(0, dtype=float)
         self._args: Any = None
 
@@ -104,8 +105,10 @@ class ParallelCarnotCycles:
 
     @property
     def COP_c(self) -> float:
+        # Only heat-pump stages take compressor work; recovery and heat-engine
+        # stages would inflate the ratio.
         w_hpr = float(self._w_hpr.sum())
-        return float(self._Q_evap.sum() / w_hpr) if w_hpr > tol else 0.0
+        return float(self._Q_evap_hpr / w_hpr) if w_hpr > tol else 0.0
 
     @property
     def eta_he(self) -> float:
@@ -206,6 +209,7 @@ class ParallelCarnotCycles:
         self._Q_cond = self._Q_cond_he + Qc_hx + Qc_hpr
         self._Q_evap = self._Q_evap_he + Qe_hx + Qe_hpr
         self._heat_recovery = float(Qc_hx.sum())
+        self._Q_evap_hpr = float(Qe_hpr.sum())
         self._solved = bool(
             np.isclose(
                 self._Q_cond.sum() + self._w_he.sum(),
