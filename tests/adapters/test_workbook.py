@@ -694,3 +694,21 @@ def test_get_problem_from_excel_reads_legacy_template_headers(tmp_path: Path):
     assert stream["t_target"]["value"] == 60.0
     assert stream["heat_flow"]["value"] == 100.0
     assert out["utilities"][0]["price"] == {"value": 50.0, "unit": "$/MWh"}
+
+
+def test_excel_input_template_lists_current_option_names():
+    from OpenPinch.domain.configuration_fields import USER_CONFIG_FIELD_SPECS
+
+    template = (
+        Path(__file__).resolve().parents[2]
+        / "Excel_Version"
+        / "Data_input_template.xlsx"
+    )
+    options = pd.read_excel(template, sheet_name="Options", header=None)
+    names = [
+        name.strip()
+        for name in options.iloc[:, 0]
+        if isinstance(name, str) and not name.startswith("###")
+    ]
+
+    assert sorted(names) == sorted(USER_CONFIG_FIELD_SPECS)
