@@ -269,6 +269,7 @@ class InternalHeatExchangerNetworkProblem:
         if len(active_stages) == case.S:
             return case
 
+        peak_recovery = _peak_recovery_duties(case)
         active_locations = [
             [[None for _k in range(len(active_stages))] for _j in range(case.J)]
             for _i in range(case.I)
@@ -277,7 +278,7 @@ class InternalHeatExchangerNetworkProblem:
             for i in range(case.I):
                 for j in range(case.J):
                     active_locations[i][j][new_k] = (
-                        1 if case.Q_r[i][j][old_k][0] > case.tol else 0
+                        1 if peak_recovery[i][j][old_k] > case.tol else 0
                     )
 
         f_case = StageWiseModel(
@@ -355,8 +356,9 @@ class InternalHeatExchangerNetworkProblem:
         return f_case
 
     def _get_active_stages(self, case) -> list[int]:
+        peak_recovery = _peak_recovery_duties(case)
         q_total = sum(
-            case.Q_r[i][j][k][0]
+            peak_recovery[i][j][k]
             for i in range(case.I)
             for j in range(case.J)
             for k in range(case.S)
@@ -365,7 +367,7 @@ class InternalHeatExchangerNetworkProblem:
             # No recovery to apportion: keep the stage layout unchanged.
             return list(range(case.S))
         q_per_stage = [
-            sum(case.Q_r[i][j][k][0] for i in range(case.I) for j in range(case.J))
+            sum(peak_recovery[i][j][k] for i in range(case.I) for j in range(case.J))
             for k in range(case.S)
         ]
         threshold = self._utilisation_threshold(case.S)
@@ -402,6 +404,22 @@ class InternalHeatExchangerNetworkProblem:
         if default == "StageWiseModel":
             return StageWiseModel
         raise ValueError(f"Unknown heat exchanger network model factory {default!r}.")
+
+
+def _peak_recovery_duties(case) -> list:
+    """Return each match's largest duty over the periods, ``[hot][cold][stage]``.
+
+    ``Q_r`` is period 0's; a stage or match used only in a later period
+    still belongs in the reduced network.
+    """
+    by_period = getattr(case, "Q_r_by_period", None) or [case.Q_r]
+    return [
+        [
+            [max(period[i][j][k][0] for period in by_period) for k in range(case.S)]
+            for j in range(case.J)
+        ]
+        for i in range(case.I)
+    ]
 
 
 def _cleanup_model(model: Any) -> None:

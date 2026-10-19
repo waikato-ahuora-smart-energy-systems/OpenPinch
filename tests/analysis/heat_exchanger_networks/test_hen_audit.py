@@ -336,3 +336,63 @@ def test_ranked_networks_compare_every_method():
     ranked = ranking._ranked_candidate_outcomes(result)
 
     assert [outcome.task.task_id for outcome in ranked] == ["pdm", "tdm", "evm"]
+
+
+# M6: multiperiod stage reduction reads every period
+
+
+def _two_period_stage_case():
+    # [period][hot][cold][stage]: stage 2 is used only in period 2, and the
+    # second hot stream's stage-1 match only in period 2. Stage 3 is empty.
+    recovery = [
+        [[[10.0, 0.0, 0.0]], [[0.0, 0.0, 0.0]]],
+        [[[10.0, 400.0, 0.0]], [[5.0, 0.0, 0.0]]],
+    ]
+    return SimpleNamespace(
+        mSuccess=1,
+        name="case",
+        framework="TDM",
+        solver_arrays=object(),
+        dTmin=10.0,
+        min_dqda=0.0,
+        minimisation_goal="total cost",
+        non_isothermal_model=False,
+        tol=1e-3,
+        I=2,
+        J=1,
+        S=3,
+        Q_r_by_period=[
+            [[[[q] for q in stages] for stages in hot] for hot in period]
+            for period in recovery
+        ],
+        Q_h=[[[0.0]]],
+        Q_c=[[[0.0]], [[0.0]]],
+    )
+
+
+def test_stage_reduction_keeps_stages_and_matches_used_in_any_period(monkeypatch):
+    from OpenPinch.analysis.heat_exchanger_networks.models import problem as unit
+    from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
+        InternalHeatExchangerNetworkProblem,
+    )
+
+    class _Built(Exception):
+        pass
+
+    built: dict = {}
+
+    def record(**kwargs):
+        built.update(kwargs)
+        raise _Built
+
+    monkeypatch.setattr(unit, "StageWiseModel", record)
+    case = _two_period_stage_case()
+    case.Q_r = case.Q_r_by_period[0]
+
+    with pytest.raises(_Built):
+        InternalHeatExchangerNetworkProblem(
+            solver_arrays=object(), framework="TDM", stages=3
+        ).remove_unused_stages(case)
+
+    assert built["stages"] == 2
+    assert built["z_restriction"][0] == [[[1, 1]], [[1, 0]]]

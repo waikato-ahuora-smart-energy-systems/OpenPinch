@@ -7,6 +7,11 @@ Unreleased
 HEN synthesis orchestration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Multiperiod stage reduction after PDM and TDM keeps a stage, and a match,
+  that carries duty in any period. It read only the first period, so a stage
+  used only in later periods was dropped and the reduced network was solved
+  without it, or the reduction failed and fell back to the unreduced model.
+
 - ``design.heat_exchanger_network()`` no longer takes ``initial_networks``.
   The default workflow never used seed networks and raised for any value;
   ``design.thermal_derivative()`` and ``design.network_evolution()`` take
