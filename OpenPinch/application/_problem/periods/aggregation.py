@@ -126,10 +126,13 @@ def target_output_for_recorded_period(
     return TargetOutput.model_validate(problem._results.model_dump(mode="python"))
 
 
-def period_weights_for_summary(problem: "PinchProblem") -> list[float]:
-    """Return period weights in canonical identity order."""
+def period_weights_for_summary(
+    problem: "PinchProblem", period_ids: Sequence[str] | None = None
+) -> list[float]:
+    """Return the weights of ``period_ids``, all periods by default, by identity."""
     master_zone = problem._require_prepared_root_zone()
-    period_ids = list(master_zone.period_ids)
+    if period_ids is None:
+        period_ids = list(master_zone.period_ids)
     resolved = resolve_period_weights(
         master_zone.period_ids,
         getattr(master_zone, "weights", None),
@@ -158,13 +161,20 @@ def summary_results(
         # A copy, so editing a returned report never changes the cached one.
         return _deep_copy(problem._results)
 
-    outputs = list(problem._period_results.values())
-    if not outputs:
+    if not problem._period_results:
         raise RuntimeError(
             "No all-period analysis is available. Run the matching "
             "problem.target.all_periods.<method>() workflow first."
         )
-    weights = period_weights_for_summary(problem)
+    # Canonical period order, whatever order the results were published in; a
+    # placement case may hold only a subset of the periods.
+    period_ids = [
+        period_id
+        for period_id in problem._require_prepared_root_zone().period_ids
+        if period_id in problem._period_results
+    ]
+    outputs = [problem._period_results[period_id] for period_id in period_ids]
+    weights = period_weights_for_summary(problem, period_ids)
     return output_for_period_mode(outputs, weights, periods=periods)
 
 
@@ -424,6 +434,7 @@ def _weighted_average_target(
             "hpr_total_annualized_cost",
             "orc_thermal_efficiency",
             "orc_total_annualized_cost_change",
+            "turbine_efficiency_target",
             "pinch_temp",
             "hot_utilities",
             "cold_utilities",
@@ -453,6 +464,15 @@ def _weighted_average_target(
     )
     _apply_peak_machine_capital(targets, data)
     data["hpr_total_annualized_cost"] = _total_hpr_annualized_cost(data)
+    # Turbine efficiency is work over isentropic work, so the yearly value is
+    # total work over total isentropic work; an idle period adds neither.
+    data["turbine_efficiency_target"] = _ratio_of_totals(
+        targets,
+        "turbine_efficiency_target",
+        "work_target",
+        weights,
+        basis_is_numerator=True,
+    )
     data["orc_thermal_efficiency"] = _ratio_of_totals(
         targets,
         "orc_thermal_efficiency",
