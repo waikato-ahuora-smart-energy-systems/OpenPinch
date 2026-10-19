@@ -17,8 +17,9 @@ Area and unit-count targets
   slice's, which collapsed that slice's LMTD. Every slice now ends at its
   left limit, and area targets match an independent fine-slice Bath
   integration. Four-stream Yee and Grossmann: 341.08 to 337.20 m2 (capital
-  cost 84,161 to 83,580). ``pulp_mill``: 29,689 to 29,373 m2 (capital cost
-  13,462,802 to 13,376,546). ``basic_pinch``, ``crude_preheat_train`` and
+  cost 84,161 to 83,580). ``pulp_mill``: 29,689 to 29,373 m2; its capital
+  cost still rises, from 13,462,802 to 28,744,945, because its unit count
+  also changes (13 to 88, below). ``basic_pinch``, ``crude_preheat_train`` and
   ``chocolate_factory`` have no gap and are unchanged. Utility placement's
   entropy terms use the same driving-force intervals and never read the
   replaced value, so placement results do not change.
