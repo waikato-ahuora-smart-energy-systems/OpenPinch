@@ -17,7 +17,9 @@ from .errors import (
     InvalidOptimisationProblemError,
     NoOptimisationCandidatesError,
 )
+from .feasibility import is_feasible
 from .models import (
+    LOCAL_METHODS,
     OptimisationCandidate,
     OptimisationMethod,
     OptimisationOptions,
@@ -213,6 +215,14 @@ def _validate_options(
     max_minima = backend_kwargs["max_minima"]
     if max_minima is not None and int(max_minima) < 1:
         raise InvalidOptimisationProblemError("max_minima must be positive or None.")
+    local_method = backend_kwargs["local_method"]
+    if local_method is not None and str(local_method).upper() not in {
+        name.upper() for name in LOCAL_METHODS
+    }:
+        names = ", ".join(LOCAL_METHODS)
+        raise InvalidOptimisationProblemError(
+            f"local_method must be None or one of: {names}."
+        )
 
 
 def _validate_feasibility_tolerance(value: object) -> float:
@@ -287,61 +297,9 @@ def _is_feasible_candidate(
     tolerance: float,
 ) -> bool:
     """Return whether one finite point satisfies bounds and supplied constraints."""
-    if np.any(point < bounds[:, 0] - tolerance) or np.any(
-        point > bounds[:, 1] + tolerance
-    ):
-        return False
-    if constraints is None or (
-        isinstance(constraints, (tuple, list)) and not constraints
-    ):
-        return True
-    constraint_items = (
-        (constraints,)
-        if isinstance(constraints, Mapping) or hasattr(constraints, "lb")
-        else tuple(constraints)
+    return is_feasible(
+        point, bounds=bounds, constraints=constraints, tolerance=tolerance
     )
-    for constraint in constraint_items:
-        if isinstance(constraint, Mapping):
-            constraint_type = str(constraint.get("type", "")).lower()
-            function = constraint.get("fun")
-            if constraint_type not in {"eq", "ineq"} or not callable(function):
-                raise InvalidOptimisationProblemError(
-                    "constraints must use scipy-compatible 'eq' or 'ineq' mappings."
-                )
-            values = np.asarray(
-                function(point, *tuple(constraint.get("args", ()))),
-                dtype=float,
-            )
-            if not np.isfinite(values).all():
-                return False
-            if constraint_type == "eq" and np.any(np.abs(values) > tolerance):
-                return False
-            if constraint_type == "ineq" and np.any(values < -tolerance):
-                return False
-            continue
-
-        lower = getattr(constraint, "lb", None)
-        upper = getattr(constraint, "ub", None)
-        if lower is None or upper is None:
-            raise InvalidOptimisationProblemError(
-                "constraints must be scipy-compatible constraint objects or mappings."
-            )
-        if hasattr(constraint, "A"):
-            values = np.asarray(constraint.A @ point, dtype=float)
-        else:
-            function = getattr(constraint, "fun", None)
-            if not callable(function):
-                raise InvalidOptimisationProblemError(
-                    "constraint objects must provide a callable fun or a matrix A."
-                )
-            values = np.asarray(function(point), dtype=float)
-        if not np.isfinite(values).all():
-            return False
-        if np.any(values < np.asarray(lower, dtype=float) - tolerance) or np.any(
-            values > np.asarray(upper, dtype=float) + tolerance
-        ):
-            return False
-    return True
 
 
 __all__ = ["run_multistart_minimisation"]

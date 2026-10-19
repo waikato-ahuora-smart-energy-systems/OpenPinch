@@ -11,6 +11,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 from .execution import _run_objective_tasks
+from .feasibility import is_feasible
 
 logger = logging.getLogger(__name__)
 
@@ -70,13 +71,18 @@ def _polish_single_candidate(
         return np.array(x0, dtype=float), f0
 
     f_loc = float(res_loc.fun)
-    if (
-        not getattr(res_loc, "success", False)
-        or not np.isfinite(f_loc)
-        or (np.isfinite(f0) and f_loc > f0)
-    ):
+    x_loc = np.array(res_loc.x, dtype=float)
+    if not getattr(res_loc, "success", False) or not np.isfinite(f_loc):
         return np.array(x0, dtype=float), f0
-    return np.array(res_loc.x, dtype=float), f_loc
+    # Feasibility first, then objective: the global search ignores
+    # constraints, so a feasible polish may cost more than its raw start.
+    raw_feasible = is_feasible(x0, bounds=bounds_arg, constraints=constraints)
+    polished_feasible = is_feasible(x_loc, bounds=bounds_arg, constraints=constraints)
+    if raw_feasible and not polished_feasible:
+        return np.array(x0, dtype=float), f0
+    if raw_feasible == polished_feasible and np.isfinite(f0) and f_loc > f0:
+        return np.array(x0, dtype=float), f0
+    return x_loc, f_loc
 
 
 def _cluster_candidates(
@@ -132,9 +138,8 @@ def _polish_candidates(
     if not basin_reps_idx:
         return np.asarray([]), np.asarray([])
 
-    bounds_arg = (
-        bounds if local_method.upper() in ("SLSQP", "L-BFGS-B", "TNC") else None
-    )
+    # Every accepted local method honours bounds (see LOCAL_METHODS).
+    bounds_arg = np.asarray(bounds, dtype=float)
     worker_fn = partial(
         _polish_single_candidate,
         all_x=all_x,
