@@ -467,6 +467,8 @@ class PinchProblem:
             target_method=target_method,
             base_label=base_label,
             other_label=other_label,
+            base_root=self.project_name,
+            other_root=other_problem.project_name,
         )
 
     def _data_preprocessing(self) -> "Zone":

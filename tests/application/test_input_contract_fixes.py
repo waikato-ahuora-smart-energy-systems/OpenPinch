@@ -134,3 +134,51 @@ def test_project_name_may_contain_a_slash():
     assert problem.summary_frame()["Hot Utility Target"].tolist() == (
         reference.summary_frame()["Hot Utility Target"].tolist()
     )
+
+
+def _summary(*scopes: str):
+    import pandas as pd
+
+    return pd.DataFrame(
+        [
+            {
+                "Scope": scope,
+                "Zone Type": "Site" if "/" not in scope else "Process Zone",
+                "Integration Type": "Process",
+                "Target Method": "Heat Exchange",
+                "Hot Utility Target": 10.0,
+                "Hot Utility Target (unit)": "kW",
+            }
+            for scope in scopes
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    ("other_root", "other_scopes"),
+    [
+        # A zone-only run of a same-named problem (tutorial 14).
+        ("Site", ("Site/Bleaching",)),
+        ("Other", ("Other/Bleaching",)),
+        ("Other", ("Other", "Other/Bleaching")),
+    ],
+)
+def test_compare_summaries_maps_a_zone_scope_by_project_name(other_root, other_scopes):
+    from OpenPinch.application._problem.output.reporting import (
+        compare_problem_summaries,
+    )
+
+    comparison = compare_problem_summaries(
+        _summary("Site", "Site/Bleaching"),
+        _summary(*other_scopes),
+        scope="Site/Bleaching",
+        zone_type="Process Zone",
+        integration_type=None,
+        target_method=None,
+        base_label="Base case",
+        other_label="Scenario",
+        base_root="Site",
+        other_root=other_root,
+    )
+
+    assert comparison.loc["Scenario", "Scope"] == f"{other_root}/Bleaching"
