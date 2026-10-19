@@ -46,7 +46,8 @@ HEN utility approach temperatures
   coolers after the last stage, so synthesis rejects it. In the relaxed
   models that stage reduction and network evolution solve, a heater or
   cooler whose fixed end cannot meet its approach carries no duty, and stage
-  reduction keeps only the heaters and coolers the solved network uses.
+  reduction keeps only the heaters and coolers the solved network uses in
+  some period.
 - A synthesised exchanger with a crossed or touching end gets no area. Its
   area used to come from a fallback temperature difference (20 m2 for the
   crossed cooler above); verification now reports its duty without area.
@@ -70,6 +71,27 @@ HEN utility approach temperatures
   at the target is optimal and their costs are not compared; this result
   moves whenever the solver's path does. Tutorial 16's other designs and
   tutorial 17 are unchanged.
+
+Input and export hardening
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``HENS_SOLVER_OPTIONS_PDM``, ``HENS_SOLVER_OPTIONS_TDM`` and
+  ``HENS_SOLVER_OPTIONS_EVM`` accept only known IPOPT, Couenne and APOPT
+  tolerances, iteration limits and numeric settings, each with a number, a
+  boolean or a single word as its value. Any other option name or value is a
+  validation issue, and solver option files and option lines are written only
+  from validated options.
+- Unit text is checked against a bounded grammar before Pint parses it: at
+  most 64 characters, products and ratios of unit names and numbers (Pint's
+  ``·`` and ``⋅`` included), one power of at most two digits (``^``, ``**``
+  or superscript digits) on a unit name or a group, and at most two
+  levels of parentheses. Other unit text raises a ``ValueError``.
+- ``workspace.batch`` cannot run another ``workspace.batch``, and one request
+  runs at most 100 cases; a larger case list is an error and runs nothing.
+- Excel exports (``export_excel``, the ``export.excel`` command,
+  ``export_problem_table`` and the dashboard's table export) write every text
+  cell as a plain string, never as a formula, and text starting with ``=``,
+  ``+``, ``-``, ``@``, a tab or a carriage return gets Excel's quote prefix.
 
 Utility cost and totals
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -261,6 +283,47 @@ Heat pump second law
   so tutorials 08 and 10 keep their numbers. Cascade vapour-compression
   targeting seeds from this optimiser; the tutorial runs (09, and 10's
   3x2 cascade) give the same results.
+
+Heat pump conventions, exergy and targeting details
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``hpr_cop`` follows the duty for every cycle model: heat pumps report the
+  heating COP (Q_cond/W) and refrigeration the cooling COP (Q_evap/W). Carnot
+  refrigeration reported the heating COP, so its ``hpr_cop`` falls by 1 for
+  the same design: tutorial 08's refrigeration 1.58 to 0.58, tutorial 10's
+  Carnot refrigeration 2.38 to 1.38. Vapour-compression, MVR and TESPy targets
+  already reported this way and are unchanged.
+- The Carnot heating COP stays 1 + eta x T_l/(T_h - T_l): ``HPR_ETA_II_CARNOT``
+  applies to the cooling Carnot COP and the heating COP follows from the
+  energy balance. The field help and the Heat Pump guide now say so.
+- Vapour-compression streams keep their full duty when the evaporator inlet is
+  exactly saturated liquid, as in a zero-lift cascade stage. The first profile
+  point was dropped, so the stream carried 95 percent of the stage's duty and
+  ``hpr_load`` was out of balance (0.55 kW in the audit's ``basic_pinch``
+  two-by-two water cascade).
+- ``ETE`` is the exergy transfer effectiveness of the Balanced Composite
+  Curves: the exergy gained by the cold balanced composite over the exergy
+  released by the hot one, relative to ``ENV_TEMPERATURE`` and with utilities
+  included; below ambient the roles swap, so refrigeration problems are
+  covered. It is at most 100 percent. It was the above-pinch deficit exergy
+  over the below-pinch surplus exergy, which is not an effectiveness and was
+  458 percent on ``pulp_mill``. The new ``exergy_released`` field is its
+  denominator and weights it across periods. Direct Integration values change
+  from 100.5 to 77.1 percent on ``basic_pinch``, 458.7 to 69.0 percent on
+  ``pulp_mill``, 108.9 to 73.5 percent on ``chocolate_factory`` and 28.8 to
+  75.3 percent on ``Four-stream-Yee-and-Grossmann-1990-1``.
+- The warning for a negative stream or utility ``dt_cont`` now says that the
+  reported heat recovery can then exceed the thermodynamic limit.
+- With assisted heat transfer (``DIRECT_ASSISTED_HT_ENABLED``), heating demand
+  in a pocket below the pinch is met by hot utility, so the utilities balance
+  the targets. On ``zonal_site`` the hot utilities rise from 0 to 44.65 kW (LPS
+  17.22 kW, HW 27.43 kW) and the "unmet hot utility" warning is gone.
+- Total Site targeting no longer rounds its stored Problem Table to 4 decimal
+  places (only the graph copies are rounded), and the energy transfer diagram
+  is built from each target's unrounded table. On ``pulp_mill`` the diagram's
+  operation cascades moved by up to 8.3 kW.
+- The vapour-compression docstrings say that T_evap is the dew-point and T_cond
+  the bubble-point temperature, as the code uses them.
 
 Result fixes
 ~~~~~~~~~~~~

@@ -288,11 +288,11 @@ class InternalHeatExchangerNetworkProblem:
             stages=len(active_stages),
             dTmin=case.dTmin,
             # Relaxed: an allowed heater or cooler is fixed in use, so keep
-            # only those the solved case uses.
+            # only those the solved case uses in some period.
             z_restriction=[
                 active_locations,
-                [[1 if duty[0] > case.tol else 0 for duty in row] for row in case.Q_h],
-                [[1 if duty[0] > case.tol else 0 for duty in row] for row in case.Q_c],
+                _used_in_any_period(case, "Q_h"),
+                _used_in_any_period(case, "Q_c"),
             ],
             min_dqda=case.min_dqda,
             minimisation_goal=case.minimisation_goal,
@@ -402,6 +402,21 @@ class InternalHeatExchangerNetworkProblem:
         if default == "StageWiseModel":
             return StageWiseModel
         raise ValueError(f"Unknown heat exchanger network model factory {default!r}.")
+
+
+def _used_in_any_period(case, name: str) -> list[list[int]]:
+    """Flag each (stream, utility) unit with duty in any period.
+
+    ``Q_h`` and ``Q_c`` are period 0's ``[stream][utility]`` duties.
+    """
+    by_period = getattr(case, f"{name}_by_period", None) or [getattr(case, name)]
+    return [
+        [
+            1 if any(period[index][u][0] > case.tol for period in by_period) else 0
+            for u in range(len(row))
+        ]
+        for index, row in enumerate(by_period[0])
+    ]
 
 
 def _cleanup_model(model: Any) -> None:

@@ -2,6 +2,7 @@
 
 import json
 import os
+import warnings
 
 import numpy as np
 import pytest
@@ -534,3 +535,28 @@ def test_target_utility(filename):
         assert len(z.hot_utilities) == len(t.hot_utilities)
         assert len(z.cold_utilities) == len(t.cold_utilities)
     pass
+
+
+@pytest.mark.parametrize(
+    "case", ["zonal_site.json", "basic_pinch.json", "pulp_mill.json"]
+)
+def test_assisted_heat_transfer_utilities_close_the_energy_balance(case):
+    # Audit M15: with assisted heat transfer, zonal_site keeps a pocket below
+    # the pinch whose 44.65 kW heating demand got no hot utility, so the
+    # utilities were out of balance by -44.65 kW and a misleading "unmet hot
+    # utility" warning was raised although HW could supply it.
+    with open(f"OpenPinch/tutorials/sample_cases/{case}") as f:
+        data = json.load(f)
+    data["options"] = {"DIRECT_ASSISTED_HT_ENABLED": True}
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        warnings.filterwarnings("ignore", message="Name .* was changed")
+        target = PinchProblem(data, project_name="M15").target.direct_heat_integration()
+
+    hot = sum(float(u.heat_flow[0]) for u in target.hot_utilities)
+    cold = sum(float(u.heat_flow[0]) for u in target.cold_utilities)
+    scale = max(hot, cold, 1.0)
+    assert hot - cold == pytest.approx(
+        target.hot_utility_target - target.cold_utility_target, abs=1e-6 * scale
+    )

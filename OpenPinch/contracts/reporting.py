@@ -148,6 +148,10 @@ class TargetResults(_ReportModel):
     exergy_sinks: Value | None = report_field(
         "exergy_sinks", "weighted_mean", None, representation="quantity"
     )
+    # Exergy released by the hot Balanced Composite Curve: the ETE denominator.
+    exergy_released: Value | None = report_field(
+        "exergy_released", "weighted_mean", None, representation="quantity"
+    )
     ETE: Value | None = report_field("ETE", "derived", None, representation="quantity")
     exergy_req_min: Value | None = report_field(
         "exergy_req_min", "weighted_mean", None, representation="quantity"
@@ -337,6 +341,7 @@ class TargetResults(_ReportModel):
         "total_cost",
         "exergy_sources",
         "exergy_sinks",
+        "exergy_released",
         "ETE",
         "exergy_req_min",
         "exergy_des_min",

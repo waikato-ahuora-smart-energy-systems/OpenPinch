@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 
 from ...domain.problem_table import ProblemTable
+from .excel_text import write_text_as_plain_strings
 
 
 def problem_table_frame(
@@ -52,6 +53,7 @@ def export_problem_table(
             sheet_name=sheet_name,
             index=include_index,
         )
+        write_text_as_plain_strings(writer.book)
     return output_path
 
 
