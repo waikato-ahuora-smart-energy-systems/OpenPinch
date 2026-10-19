@@ -98,7 +98,7 @@ def _solved_fixed_topology_model(non_isothermal_model: bool):
 
 @pytest.mark.synthesis
 @pytest.mark.parametrize("non_isothermal_model", [False, True])
-def test_stagewise_utility_exchangers_keep_their_approach_temperature(
+def test_apopt_stagewise_utility_exchangers_keep_their_approach_temperature(
     non_isothermal_model,
 ):
     model, _arrays = _solved_fixed_topology_model(non_isothermal_model)
@@ -110,7 +110,7 @@ def test_stagewise_utility_exchangers_keep_their_approach_temperature(
 
 
 @pytest.mark.synthesis
-def test_extracted_network_records_utility_approaches_for_verification():
+def test_apopt_extracted_network_records_utility_approaches():
     model, arrays = _solved_fixed_topology_model(non_isothermal_model=True)
 
     network = extract_heat_exchanger_network(model, arrays, run_id="utility")
