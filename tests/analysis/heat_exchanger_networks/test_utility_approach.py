@@ -311,3 +311,51 @@ def test_stage_reduction_keeps_only_the_heaters_and_coolers_in_use(monkeypatch):
 
     assert built["stages"] == 1
     assert built["z_restriction"] == [[[[1]], [[1]]], [1], [0, 1]]
+
+
+def test_stage_reduction_keeps_heaters_and_coolers_used_in_any_period(monkeypatch):
+    # Q_h and Q_c are period 0's duties; a unit used only in a later period
+    # must stay available in the reduced model.
+    from OpenPinch.analysis.heat_exchanger_networks.models import problem as unit
+    from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
+        InternalHeatExchangerNetworkProblem,
+    )
+
+    class _Built(Exception):
+        pass
+
+    built: dict = {}
+
+    def record(**kwargs):
+        built.update(kwargs)
+        raise _Built
+
+    monkeypatch.setattr(unit, "StageWiseModel", record)
+    hot_utility_by_period = [[[0.0]], [[3.0]]]
+    cold_utility_by_period = [[[0.0], [4.0]], [[2.0], [0.0]]]
+    case = SimpleNamespace(
+        mSuccess=1,
+        name="case",
+        framework="TDM",
+        solver_arrays=object(),
+        dTmin=10.0,
+        min_dqda=0.0,
+        minimisation_goal="total cost",
+        non_isothermal_model=False,
+        tol=1e-3,
+        I=2,
+        J=1,
+        S=2,
+        Q_r=[[[[10.0], [0.0]]], [[[5.0], [0.0]]]],
+        Q_h=hot_utility_by_period[0],
+        Q_c=cold_utility_by_period[0],
+        Q_h_by_period=hot_utility_by_period,
+        Q_c_by_period=cold_utility_by_period,
+    )
+
+    with pytest.raises(_Built):
+        InternalHeatExchangerNetworkProblem(
+            solver_arrays=object(), framework="TDM", stages=2
+        ).remove_unused_stages(case)
+
+    assert built["z_restriction"][1:] == [[1], [1, 1]]
