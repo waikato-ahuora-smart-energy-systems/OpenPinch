@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import OpenPinch.adapters.io.tabular as _tabular
 import OpenPinch.adapters.io.workbook as wkbook_to_json
 from OpenPinch.adapters.io.records import validate_stream_data, validate_utility_data
 from OpenPinch.adapters.io.workbook import (
@@ -342,7 +343,7 @@ def test_get_problem_from_excel_writes_json(tmp_path: Path, capsys):
 
 def test_get_column_names_and_units_pads_units_for_short_stream_sheet():
     df = pd.DataFrame([["ignored"] * 5, [None] * 5])
-    names, units = wkbook_to_json._get_column_names_and_units(df, "Stream Data")
+    names, units = _tabular.get_column_names_and_units(df, "Stream Data")
     assert len(names) == 7
     assert len(units) == 7
 
@@ -618,3 +619,96 @@ def test_parse_sheet_with_units_rejects_empty_dataframe(monkeypatch):
 
     with pytest.raises(ValueError, match="Worksheet 'Stream Data' is empty"):
         wkbook_to_json._parse_sheet_with_units("dummy.xlsx", sheet_name="Stream Data")
+
+
+def _write_stream_sheet(path: Path, data_rows: list[list]) -> None:
+    rows = [
+        ["Zone", "Name", "T_supply", "T_target", "Heat flow", "dT_cont", "HTC"],
+        [None, None, "degC", "degC", "kW", "K", "kW/mK"],
+        *data_rows,
+    ]
+    util_rows = [
+        ["Name", "Type", "T_supply", "T_target", "dT_cont", "Price", "HTC"],
+        [None, None, "degC", "degC", "K", "$/MWh", "kW/mK"],
+        ["HU", "Hot", 250.0, 249.0, 10.0, 50.0, 0.8],
+        ["CU", "Cold", 20.0, 30.0, 5.0, 5.0, 0.3],
+    ]
+    with pd.ExcelWriter(path, engine="openpyxl") as xw:
+        pd.DataFrame(rows).to_excel(
+            xw, sheet_name="Stream Data", header=None, index=False
+        )
+        pd.DataFrame(util_rows).to_excel(
+            xw, sheet_name="Utility Data", header=None, index=False
+        )
+
+
+def test_get_problem_from_excel_skips_blank_and_whitespace_rows(tmp_path: Path):
+    path = tmp_path / "blank.xlsx"
+    _write_stream_sheet(
+        path,
+        [
+            ["Zone A", "H1", 150.0, 60.0, 100.0, 10.0, 0.5],
+            [None] * 7,
+            ["  ", " ", "   ", None, " ", None, None],
+            ["Zone A", "C1", 40.0, 120.0, 90.0, 10.0, 0.5],
+        ],
+    )
+
+    out = get_problem_from_excel(path)
+
+    assert [s["name"] for s in out["streams"]] == ["H1", "C1"]
+
+
+def test_get_problem_from_excel_rejects_boolean_numeric_cells(tmp_path: Path):
+    path = tmp_path / "bool.xlsx"
+    _write_stream_sheet(path, [["Zone A", "H1", 150.0, 60.0, True, 10.0, 0.5]])
+
+    with pytest.raises(ValueError, match="'heat_flow' has a non-numeric value"):
+        get_problem_from_excel(path)
+
+
+def test_get_problem_from_excel_reads_legacy_template_headers(tmp_path: Path):
+    path = tmp_path / "legacy.xlsx"
+    stream_rows = [
+        ["Process Zone", "Stream", "TT", "TS", "ΔH", "ΔTcont", "HTC"],
+        [None, None, "°C", "°C", "kW", "°C", "kW/m2/°C"],
+        ["Zone A", "H1", 60.0, 150.0, 100.0, 10.0, 0.5],
+    ]
+    util_rows = [
+        ["Utility", "Type", "Ts", "Tt", "ΔTcont", "Price", "HTC"],
+        [None, None, "°C", "°C", "°C", "$/MWh", "kW/m2/°C"],
+        ["HU", "Hot", 250.0, 249.0, 10.0, 50.0, 0.8],
+    ]
+    with pd.ExcelWriter(path, engine="openpyxl") as xw:
+        pd.DataFrame(stream_rows).to_excel(
+            xw, sheet_name="Stream Data", header=None, index=False
+        )
+        pd.DataFrame(util_rows).to_excel(
+            xw, sheet_name="Utility Data", header=None, index=False
+        )
+
+    out = get_problem_from_excel(path)
+
+    stream = out["streams"][0]
+    assert stream["t_supply"]["value"] == 150.0
+    assert stream["t_target"]["value"] == 60.0
+    assert stream["heat_flow"]["value"] == 100.0
+    assert out["utilities"][0]["price"] == {"value": 50.0, "unit": "$/MWh"}
+
+
+def test_excel_input_template_lists_current_option_names():
+    from OpenPinch.domain.configuration_fields import USER_CONFIG_FIELD_SPECS
+
+    template = (
+        Path(__file__).resolve().parents[2]
+        / "Excel_Version"
+        / "Data_input_template.xlsx"
+    )
+    options = pd.read_excel(template, sheet_name="Options", header=None)
+    names = [
+        name.strip()
+        for name in options.iloc[:, 0]
+        if isinstance(name, str) and not name.startswith("###")
+    ]
+
+    assert sorted(names) == sorted(USER_CONFIG_FIELD_SPECS)

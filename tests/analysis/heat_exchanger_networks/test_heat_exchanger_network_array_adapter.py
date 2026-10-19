@@ -244,7 +244,7 @@ def test_nine_stream_adapter_uses_openhens_order_and_real_utilities() -> None:
     np.testing.assert_allclose(_single_state_array(payload, "hu_cost"), [60.0])
 
 
-def test_adapter_prefers_input_heat_capacity_flowrate_when_supplied() -> None:
+def test_adapter_uses_input_heat_capacity_flowrate_without_heat_flow() -> None:
     problem = PinchProblem(
         source={
             "streams": [
@@ -253,7 +253,6 @@ def test_adapter_prefers_input_heat_capacity_flowrate_when_supplied() -> None:
                     "name": "H1",
                     "t_supply": {"value": 500.0, "unit": "K"},
                     "t_target": {"value": 370.0, "unit": "K"},
-                    "heat_flow": {"value": 999.0, "unit": "kW"},
                     "heat_capacity_flowrate": {
                         "value": 14.8,
                         "unit": "kW/delta_degC",
@@ -264,7 +263,6 @@ def test_adapter_prefers_input_heat_capacity_flowrate_when_supplied() -> None:
                     "name": "C1",
                     "t_supply": {"value": 310.0, "unit": "K"},
                     "t_target": {"value": 470.0, "unit": "K"},
-                    "heat_flow": {"value": 888.0, "unit": "kW"},
                     "heat_capacity_flowrate": 6.1,
                 },
             ],
@@ -300,8 +298,9 @@ def test_adapter_prefers_input_heat_capacity_flowrate_when_supplied() -> None:
 
     payload = problem_to_solver_arrays(problem, 10.0)
 
-    assert float(problem.hot_streams[0].heat_capacity_flowrate) != pytest.approx(14.8)
-    assert float(problem.cold_streams[0].heat_capacity_flowrate) != pytest.approx(6.1)
+    # Without heat_flow, the heat flow is CP x abs(T_supply - T_target).
+    assert float(problem.hot_streams[0].heat_flow) == pytest.approx(14.8 * 130.0)
+    assert float(problem.cold_streams[0].heat_flow) == pytest.approx(6.1 * 160.0)
     assert _single_state_array(payload, "f_h").tolist() == [14.8]
     assert _single_state_array(payload, "f_c").tolist() == [6.1]
 
