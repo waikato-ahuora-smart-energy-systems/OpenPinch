@@ -478,6 +478,13 @@ def _update_with_best_model(owner, best_model) -> None:
 
     owner.hu_cost_total = copy.deepcopy(best_model.hu_cost_total)
     owner.cu_cost_total = copy.deepcopy(best_model.cu_cost_total)
+    if hasattr(best_model, "hu_cost_solver_by_period"):
+        owner.hu_cost_solver_by_period = copy.deepcopy(
+            best_model.hu_cost_solver_by_period
+        )
+        owner.cu_cost_solver_by_period = copy.deepcopy(
+            best_model.cu_cost_solver_by_period
+        )
     if hasattr(best_model, "recovery_area_cost_filtered"):
         owner.recovery_area_cost_filtered = copy.deepcopy(
             best_model.recovery_area_cost_filtered

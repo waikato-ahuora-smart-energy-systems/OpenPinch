@@ -186,27 +186,26 @@ def _check_temperature_order(
                     f"{exchanger.exchanger_id or exchanger.kind.value} sink "
                     "temperature decreases across a heat sink"
                 )
-        if exchanger.kind is HeatExchangerKind.RECOVERY:
-            if (
-                state.source_inlet_temperature is not None
-                and state.sink_outlet_temperature is not None
-                and state.source_inlet_temperature + _TEMPERATURE_ABS_TOL
-                < state.sink_outlet_temperature
-            ):
-                failures.append(
-                    f"{exchanger.exchanger_id or exchanger.kind.value} hot inlet "
-                    "is colder than cold outlet"
-                )
-            if (
-                state.source_outlet_temperature is not None
-                and state.sink_inlet_temperature is not None
-                and state.source_outlet_temperature + _TEMPERATURE_ABS_TOL
-                < state.sink_inlet_temperature
-            ):
-                failures.append(
-                    f"{exchanger.exchanger_id or exchanger.kind.value} hot outlet "
-                    "is colder than cold inlet"
-                )
+        if (
+            state.source_inlet_temperature is not None
+            and state.sink_outlet_temperature is not None
+            and state.source_inlet_temperature + _TEMPERATURE_ABS_TOL
+            < state.sink_outlet_temperature
+        ):
+            failures.append(
+                f"{exchanger.exchanger_id or exchanger.kind.value} hot inlet "
+                "is colder than cold outlet"
+            )
+        if (
+            state.source_outlet_temperature is not None
+            and state.sink_inlet_temperature is not None
+            and state.source_outlet_temperature + _TEMPERATURE_ABS_TOL
+            < state.sink_inlet_temperature
+        ):
+            failures.append(
+                f"{exchanger.exchanger_id or exchanger.kind.value} hot outlet "
+                "is colder than cold inlet"
+            )
     return failures
 
 
@@ -214,30 +213,48 @@ def _check_minimum_approach(
     network: HeatExchangerNetwork,
     period_id: str,
 ) -> list[str]:
-    """Check each recovery match against its own required approach.
+    """Check each match against its own required approach.
 
     The solver requires each pair (i, j) to keep its own approach dT_r, the
     sum of the two streams' contributions, not the global dTmin. A network
     with a low-dt_cont stream at its own approach is valid; a pair below its
-    own approach is not, even when that is above dTmin.
+    own approach is not, even when that is above dTmin. Heaters and coolers
+    are checked against their utility's approach when the network records it.
     """
     metadata = network.source_metadata
     d_tmin = _optional_float(metadata.get("solver_dTmin"))
-    required = _pair_minimum_approaches(network, period_id)
-    if d_tmin is None and not required:
+    required = {
+        HeatExchangerKind.RECOVERY: _pair_minimum_approaches(network, period_id),
+        HeatExchangerKind.HOT_UTILITY: _pair_minimum_approaches(
+            network,
+            period_id,
+            metadata_key="hot_utility_minimum_approach_by_period",
+            hot_axis="hot_utilities",
+        ),
+        HeatExchangerKind.COLD_UTILITY: _pair_minimum_approaches(
+            network,
+            period_id,
+            metadata_key="cold_utility_minimum_approach_by_period",
+            cold_axis="cold_utilities",
+        ),
+    }
+    if d_tmin is None and not any(required.values()):
         return []
 
     failures: list[str] = []
     for exchanger in network.exchangers:
         state = exchanger.state(period_id)
-        if not state.active or exchanger.kind is not HeatExchangerKind.RECOVERY:
+        if not state.active:
             continue
-        limit = required.get((exchanger.source_stream, exchanger.sink_stream), d_tmin)
+        default = d_tmin if exchanger.kind is HeatExchangerKind.RECOVERY else None
+        limit = required[exchanger.kind].get(
+            (exchanger.source_stream, exchanger.sink_stream), default
+        )
         if limit is None:
             continue
         approaches = state.approach_temperatures
         if not approaches:
-            approaches = _recovery_terminal_approaches(state)
+            approaches = _terminal_approaches(state)
         if approaches and min(approaches) + _TEMPERATURE_ABS_TOL < limit:
             failures.append(
                 f"{exchanger.exchanger_id or exchanger.kind.value} minimum "
@@ -250,9 +267,13 @@ def _check_minimum_approach(
 def _pair_minimum_approaches(
     network: HeatExchangerNetwork,
     period_id: str,
+    *,
+    metadata_key: str = "recovery_minimum_approach_by_period",
+    hot_axis: str = "hot_process_streams",
+    cold_axis: str = "cold_process_streams",
 ) -> dict[tuple[str, str], float]:
-    """Return each (hot, cold) stream pair's required approach for one period."""
-    by_period = network.source_metadata.get("recovery_minimum_approach_by_period")
+    """Return each (hot, cold) pair's required approach for one period."""
+    by_period = network.source_metadata.get(metadata_key)
     if not isinstance(by_period, list | tuple) or not by_period:
         return {}
     try:
@@ -260,8 +281,8 @@ def _pair_minimum_approaches(
     except ValueError:
         period_idx = 0
     matrix = by_period[min(period_idx, len(by_period) - 1)]
-    hot_order = _stream_order(network, "hot_process_streams")
-    cold_order = _stream_order(network, "cold_process_streams")
+    hot_order = _stream_order(network, hot_axis)
+    cold_order = _stream_order(network, cold_axis)
     pairs: dict[tuple[str, str], float] = {}
     for i, hot in enumerate(hot_order):
         row = matrix[i] if i < len(matrix) else []
@@ -610,7 +631,7 @@ def _overall_heat_transfer_coefficient(
 
 
 def _terminal_lmtd(state) -> float | None:
-    approaches = _recovery_terminal_approaches(state)
+    approaches = _terminal_approaches(state)
     if len(approaches) != 2:
         return None
     delta_1, delta_2 = approaches
@@ -710,7 +731,7 @@ def _heat_added(
     return heat_capacity_flowrate * (outlet_temperature - inlet_temperature)
 
 
-def _recovery_terminal_approaches(state) -> tuple[float, ...]:
+def _terminal_approaches(state) -> tuple[float, ...]:
     values = (
         _temperature_difference(
             state.source_inlet_temperature,

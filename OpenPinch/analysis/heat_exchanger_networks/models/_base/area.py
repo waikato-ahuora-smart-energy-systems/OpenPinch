@@ -16,16 +16,16 @@ def _post_process_lmtd(
     active: float,
     *,
     formula_allowed: bool,
-    fallback_delta: float | None = None,
 ) -> float:
     """Return the post-solve log-mean temperature difference of one match.
 
     This uses the true log-mean whenever both ends are positive, including an
     end at its minimum approach (OpenHENS fell back to ``delta_1`` there, which
     misstates area at the pinch, where matches touch that bound by design).
-    Equal ends give the arithmetic mean and inactive matches 0. Only an active
-    match with a non-positive end keeps the old fallback, so area stays finite.
-    ``formula_allowed`` is kept for callers but no longer gates the formula.
+    Equal ends give the arithmetic mean and inactive matches 0. A match with a
+    non-positive end is crossed and has no log-mean: it returns 0, so the match
+    gets no area and verification reports it. ``formula_allowed`` is kept for
+    callers but no longer gates the formula.
     """
     del formula_allowed
     tolerance = float(getattr(model, "tol", 1e-6))
@@ -35,7 +35,7 @@ def _post_process_lmtd(
         if abs(delta_1 - delta_2) <= tolerance:
             return active * 0.5 * (delta_1 + delta_2)
         return active * float(compute_LMTD_from_dts(delta_1, delta_2))
-    return (delta_1 if fallback_delta is None else fallback_delta) * active
+    return 0.0
 
 
 def _apply_segment_recovery_areas(model, q_r) -> None:

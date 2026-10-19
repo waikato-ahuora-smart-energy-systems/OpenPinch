@@ -86,6 +86,56 @@ Grossmann 151,080, ``chocolate_factory`` 1,639,540, ``process_mvr`` 20,705,
 66,564 (its area target no longer raises). Multiperiod cases give their
 first period.
 
+Multiperiod HEN pinch design
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Multiperiod pinch design (PDM) no longer applies approach constraints to a
+  stream in a period where it is absent from that side of the pinch. The
+  pinch decomposition sets such a stream to 0 K in that period, so the
+  constraints made the shared topology infeasible:
+  ``crude_preheat_train_multiperiod`` failed at every dTmin and now solves
+  at 5, 10 and 20 K. Those periods also get no approach temperature or
+  area from the 0 K values.
+
+HEN utility approach temperatures
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Heat exchanger network synthesis constrains both ends of every heater and
+  cooler to their approach temperature, as it already did for segmented
+  utilities. Before, a flat utility had no approach constraint: a hot stream
+  could be cooled by recovery below the cooling water outlet and finished
+  with a crossed cooler. On a case with cooling water at 320 to 325 K, PDM
+  and TDM accepted a cooler at 324 to 322 K (hot-end dT -1 K). That case now
+  has no feasible network in the stagewise superstructure, which places
+  coolers after the last stage, so synthesis rejects it. In the relaxed
+  models that stage reduction and network evolution solve, a heater or
+  cooler whose fixed end cannot meet its approach carries no duty, and stage
+  reduction keeps only the heaters and coolers the solved network uses in
+  some period.
+- A synthesised exchanger with a crossed or touching end gets no area. Its
+  area used to come from a fallback temperature difference (20 m2 for the
+  crossed cooler above); verification now reports its duty without area.
+- Network verification checks heaters and coolers for a temperature cross
+  and against their utility's approach temperature, which synthesised
+  networks now record in ``source_metadata``
+  (``hot_utility_minimum_approach_by_period`` and
+  ``cold_utility_minimum_approach_by_period``). It checked recovery
+  exchangers only.
+- The stagewise models' solution check compares the utility cost the solver
+  reached with one recomputed from the solved duties. It compared the
+  recomputed cost with itself, because post-processing had already
+  overwritten the solver's value, so it could not fail.
+- Published numbers: no tutorial network had a heater or cooler below its
+  approach, but the new constraints change the solvers' paths, and stage
+  reduction no longer carries unused coolers. Tutorial 15's selected network
+  has total annual cost 154,853.86 $/y with 6 units (was 163,556.12 $/y with
+  8 units), the best known network for its case. Tutorial 16's
+  ``pinch_design()`` network has 190,449.50 $/y at dTmin 14 K (was
+  182,103.64 $/y at 20 K). PDM minimises hot utility only, so every network
+  at the target is optimal and their costs are not compared; this result
+  moves whenever the solver's path does. Tutorial 16's other designs and
+  tutorial 17 are unchanged.
+
 Multiperiod fixes
 ~~~~~~~~~~~~~~~~~
 

@@ -70,7 +70,11 @@ def _get_multiperiod_post_process(owner) -> None:
     def recovery_temperature_difference(
         n: int, i: int, j: int, hot_stage: int, cold_stage: int
     ) -> list[float]:
-        if owner.z[i][j][cold_stage][0] <= 0:
+        if (
+            owner.z[i][j][cold_stage][0] <= 0
+            or owner.z_i_active_period[n][i] <= 0
+            or owner.z_j_active_period[n][j] <= 0
+        ):
             return [_approach._recovery_approach_temperature(owner, i, j, n)]
         return [
             owner._active_binary_value(owner.T_h_by_period[n][i][hot_stage])
@@ -168,7 +172,6 @@ def _get_multiperiod_post_process(owner) -> None:
                 owner.tol,
                 _approach._cold_utility_inlet_approach_temperature(owner, i, n),
             ),
-            fallback_delta=(owner.T_h_out_period[n][i] - owner.T_cu_in_period[n][0]),
         ),
         (owner.N_periods, owner.I),
     )
