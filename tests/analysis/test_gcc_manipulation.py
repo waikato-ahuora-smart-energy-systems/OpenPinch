@@ -412,3 +412,72 @@ def test_gcc_private_pocket_helpers_cover_run_and_cut_edges():
         )
         is None
     )
+
+
+@pytest.mark.parametrize(
+    ("t_vals", "h_net", "t_exit"),
+    [
+        # Pocket above the pinch, exit at 100 + 5000/1000100 degC.
+        ([200.0, 150.0, 100.0, 50.0], [100.0, 1_000_100.0, 0.0, 0.0], 100.005),
+        # Pocket below the pinch, exit at 200 - 5000/1000100 degC.
+        ([250.0, 200.0, 150.0, 100.0], [0.0, 0.0, 1_000_100.0, 100.0], 199.995),
+    ],
+)
+def test_get_gcc_without_pockets_flattens_the_inserted_pocket_exit_row(
+    t_vals, h_net, t_exit
+):
+    # The problem table inserts the irrational pocket exit temperature rounded
+    # to 6 dp. On this 2e4 kW/K segment the rounding puts the inserted row's
+    # interpolated H up to 0.01 kW off the pocket level, and the pocket-free
+    # GCC kept it as a bump that utility targeting then assigned.
+    result = get_GCC_without_pockets(make_df(t_vals, h_net))
+
+    t_out = np.asarray(result[ProblemTableLabel.T])
+    h_np = np.asarray(result[ProblemTableLabel.H_NET_NP])
+    exit_row = np.flatnonzero(np.abs(t_out - t_exit) < 1e-3)
+    assert exit_row.size == 1
+    assert h_np[exit_row[0]] == pytest.approx(100.0, abs=1e-9)
+
+
+def test_pocket_exit_row_below_the_pinch_is_flattened_when_nothing_is_inserted():
+    # An earlier constant-H insertion already holds the pocket exit
+    # temperature, rounded to 6 dp and 2.2e-6 kW below the pocket level, so
+    # the exit insertion adds no row. The flattening range then skipped the
+    # exit row below the pinch, leaving an 83.3 kW pocket remnant at 140 degC
+    # that cold utility targeting assigned (1433.33 kW against 1350 kW).
+    from OpenPinch import PinchProblem
+
+    def stream(name, t_supply, t_target, heat_flow):
+        return {
+            "zone": "Site",
+            "name": name,
+            "t_supply": t_supply,
+            "t_target": t_target,
+            "heat_flow": heat_flow,
+            "dt_cont": 0.0,
+        }
+
+    problem = PinchProblem(
+        {
+            "streams": [
+                stream("H1", 240.0, 230.0, 350.0),
+                stream("H2", 170.0, 80.0, 550.0),
+                stream("C1", 60.0, 140.0, 450.0),
+                stream("H3", 30.0, 20.0, 900.0),
+            ],
+            "utilities": [],
+            "options": {},
+        },
+        project_name="Site",
+    )
+    target = problem.target.direct_heat_integration()
+
+    t_vals = np.asarray(target.pt[ProblemTableLabel.T])
+    h_np = np.asarray(target.pt[ProblemTableLabel.H_NET_NP])
+    assert target.cold_utility_target == pytest.approx(1350.0)
+    assert h_np[np.flatnonzero(np.abs(t_vals - 140.0) < 1e-9)[0]] == pytest.approx(
+        450.0
+    )
+    assert sum(float(u.heat_flow) for u in target.cold_utilities) == pytest.approx(
+        1350.0
+    )

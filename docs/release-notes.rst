@@ -36,6 +36,16 @@ Area and unit-count targets
 - The balance check in area targeting is relative to the duty, so area
   targets no longer raise "requires the inputted composite curves to be
   balanced" on MW-scale problems whose rounding residue exceeds 1e-6 kW.
+- Pocket removal flattens the row it inserts at a pocket's exit, and the exit
+  row below the pinch when no row is inserted. The exit temperature is
+  inserted rounded to 6 dp, so the pocket-free Grand Composite Curve kept a
+  bump of up to 0.07 kW on steep segments, and a near-coincident temperature
+  could leave a whole pocket row unflattened below the pinch. Utilities were
+  then assigned more than their targets (``pulp_mill`` by 0.17 kW, area
+  29,372.74 to 29,372.94 m2; one reported case 1,433 kW of cooling against a
+  1,350 kW target), and area targeting raised "requires the inputted
+  composite curves to be balanced" on about one problem in eight, including
+  ``zonal_site_multiperiod``.
 - Heat exchanger network area slicing on segmented streams accepts a
   solver duty that overshoots its stream profile by noise relative to the
   duty (1e-6 of the profile) and drops the overshoot. A 2e-6 kW overshoot on

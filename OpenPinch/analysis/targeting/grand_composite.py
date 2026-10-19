@@ -394,7 +394,12 @@ def _remove_pockets_on_one_side_of_the_pinch(
                 else:
                     i_0 += n_int_added
 
-            j_rng = range(i_0 + 1, i + 1) if is_above_pinch else range(i + 1, i_0)
+            # Flatten every pocket row, the exit row and the inserted exit
+            # row. The exit temperature is inserted rounded, so the inserted
+            # row's interpolated H is only close to the pocket level.
+            j_rng = (
+                range(i_0 + 1, i + 1 + n_int_added) if is_above_pinch else range(i, i_0)
+            )
             for j in j_rng:
                 H_NP_vals[j] = H_vals[i_0]
 

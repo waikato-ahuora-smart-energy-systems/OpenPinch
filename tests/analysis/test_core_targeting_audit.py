@@ -209,7 +209,7 @@ def test_negative_dt_cont_runs_through_direct_and_area_targeting():
     ("case", "hot_utility", "cold_utility", "area", "capital_cost"),
     [
         ("basic_pinch.json", 750.0, 1000.0, 554.1173, 1066247.46),
-        ("pulp_mill.json", 155528.905, 58413.668, 29372.737, 28744828.36),
+        ("pulp_mill.json", 155528.905, 58413.668, 29372.936, 28744945.11),
         (
             "Four-stream-Yee-and-Grossmann-1990-1.json",
             450.0,
@@ -234,6 +234,8 @@ def test_area_targets_integrate_refreshed_interval_widths(
     # Capital costs price the unit count. It was 0 on basic_pinch and 13 on
     # pulp_mill (442752.48 and 13376546.14) until the balanced-curve zero
     # test became duty-relative; it is now 9 and 88, N = S - 1 per region.
+    # Flattening the pocket-exit row removed 0.17 kW of excess utility on
+    # pulp_mill, moving its area from 29372.737 to 29372.936.
     problem = PinchProblem(case, project_name="Site")
 
     with warnings.catch_warnings():

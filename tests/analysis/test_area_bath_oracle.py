@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import warnings
 
+import numpy as np
 import pytest
 
 from OpenPinch import PinchProblem
@@ -57,5 +58,35 @@ def test_yee_and_grossmann_area_matches_the_bath_integration():
 )
 def test_sample_case_area_matches_the_bath_integration(case):
     area, oracle = _area_and_oracle(PinchProblem(case, project_name="Site"))
+
+    assert area == pytest.approx(oracle, rel=BATH_RTOL)
+
+
+def _random_payload(seed: int) -> dict:
+    rng = np.random.default_rng(seed)
+    streams = []
+    for kind, count in (("H", rng.integers(1, 5)), ("C", rng.integers(1, 5))):
+        for n in range(count):
+            t_low, t_high = np.sort(rng.uniform(20.0, 300.0, size=2).round(1))
+            t_high = max(t_high, t_low + 5.0)
+            supply, target = (t_high, t_low) if kind == "H" else (t_low, t_high)
+            streams.append(
+                {
+                    "zone": "Site",
+                    "name": f"{kind}{n}",
+                    "t_supply": float(supply),
+                    "t_target": float(target),
+                    "heat_flow": round(float(rng.uniform(50.0, 2000.0)), 1),
+                    "htc": round(float(rng.uniform(0.2, 2.0)), 2),
+                }
+            )
+    return {"streams": streams, "utilities": [], "options": {}}
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_random_case_area_matches_the_bath_integration(seed):
+    area, oracle = _area_and_oracle(
+        PinchProblem(_random_payload(seed), project_name="Site")
+    )
 
     assert area == pytest.approx(oracle, rel=BATH_RTOL)
