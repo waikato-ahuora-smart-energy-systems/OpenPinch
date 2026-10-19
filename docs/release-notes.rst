@@ -4,6 +4,16 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Network grid data
+~~~~~~~~~~~~~~~~~
+
+- A network's grid layout (``design.grid_layout()``, and ``view.grid`` in
+  ``design.`` command responses) now gives each stream row its supply and
+  target temperature in the period (``stream_temperatures``, the ends of its
+  exchangers' temperatures) and each match its heat transfer area (summed
+  over the exchangers one match merges). A client can draw a full grid
+  diagram, with end temperatures and areas, from the layout alone.
+
 Testing and CI
 ~~~~~~~~~~~~~~
 

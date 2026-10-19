@@ -154,7 +154,12 @@ def _add_or_accumulate(
         sink_stream=current.sink_stream,
         stage=current.stage,
         duty=current.duty + exchanger.state(period_id).duty,
+        area=_summed_area(current.area, exchanger.area),
     )
+
+
+def _summed_area(first: float | None, second: float | None) -> float | None:
+    return None if first is None or second is None else first + second
 
 
 def _is_significant_match(
@@ -192,6 +197,7 @@ def _match(exchanger: HeatExchanger, *, period_id: str) -> GridDiagramMatch:
         sink_stream=exchanger.sink_stream,
         stage=exchanger.stage,
         duty=state.duty,
+        area=exchanger.area,
     )
 
 
