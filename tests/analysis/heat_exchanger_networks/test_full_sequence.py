@@ -1326,3 +1326,34 @@ def _with_pathway_tac(
             "objective_value": tac,
         }
     )
+
+
+def test_default_design_runs_every_approach_temperature(monkeypatch) -> None:
+    # Audit H8: the default entry (tier 0) built tasks only from the first
+    # approach temperature, while the manifest listed every one.
+    _use_fake_default_executor(monkeypatch)
+    problem = _small_problem_with_options(
+        {"HENS_APPROACH_TEMPERATURES": [2.0, 4.0, 8.0]}
+    )
+
+    design = problem.design.heat_exchanger_network()
+
+    manifest = design.result.manifest
+    assert manifest.synthesis_quality_tier == 0
+    assert manifest.task_count_by_method["pinch_design_method"] == 3
+    assert manifest.approach_temperatures == (2.0, 4.0, 8.0)
+
+
+def test_manifest_lists_the_approach_temperatures_that_ran(monkeypatch) -> None:
+    # Expanded tiers run multiples of the first approach temperature too.
+    _use_fake_default_executor(monkeypatch)
+    problem = _small_problem_with_options(
+        {
+            "HENS_APPROACH_TEMPERATURES": [10.0],
+            "HENS_DT_CONT_MULTIPLIERS": [0.5, 1.0],
+        }
+    )
+
+    design = problem.design.heat_exchanger_network()
+
+    assert design.result.manifest.approach_temperatures == (5.0, 10.0)

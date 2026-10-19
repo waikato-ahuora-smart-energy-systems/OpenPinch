@@ -7,6 +7,13 @@ Unreleased
 HEN synthesis orchestration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- The default ``design.heat_exchanger_network()`` (quality tier 0) runs one
+  set of tasks for every value in ``HENS_APPROACH_TEMPERATURES``, as the
+  option's help says. It ran only the first value. The result manifest's
+  ``approach_temperatures`` lists the approach temperatures the tasks ran,
+  including the multiples that expanded tiers explore; it listed the
+  configured values whether they ran or not.
+
 - The accepted network is the feasible network with the lowest total annual
   cost from any method stage, and the result's ``method`` records the stage it
   came from. It always came from the last stage that succeeded, so a cheaper

@@ -70,7 +70,12 @@ def build_synthesis_result(
     selected_pathway = _selected_pathway_metadata(accepted)
     manifest = HeatExchangerNetworkSynthesisManifest(
         run_id=settings.run_id,
-        approach_temperatures=settings.approach_temperatures,
+        # The approach temperatures the tasks ran, which expanded tiers widen
+        # with multiples of the first configured one.
+        approach_temperatures=tuple(
+            sorted({float(task.approach_temperature) for task in tasks})
+        )
+        or settings.approach_temperatures,
         derivative_thresholds=settings.quality_derivative_thresholds,
         stage_selection=settings.stage_selection,
         method_sequence=settings.method_sequence,
