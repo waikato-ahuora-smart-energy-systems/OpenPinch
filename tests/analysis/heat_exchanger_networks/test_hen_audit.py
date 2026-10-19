@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from OpenPinch.analysis.heat_exchanger_networks.execution.task_builders import (
     has_recovery_topology,
 )
@@ -202,3 +204,52 @@ def test_hen_costs_are_annualised_like_area_targeting():
     for name, quoted in (("A_coeff", 150.0), ("unit_cost", 5500.0)):
         np.testing.assert_allclose(annualised[name], [quoted * crf])
     np.testing.assert_allclose(annualised["A_exp"], as_quoted["A_exp"])
+
+
+# verify() compares the solver's utility cost with a recomputation
+
+
+@pytest.mark.synthesis
+def test_stagewise_verify_compares_solver_utility_cost_with_recomputation():
+    pytest.importorskip("gekko")
+    import json
+
+    from OpenPinch.analysis.heat_exchanger_networks.models._stagewise import (
+        verification,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.models.stagewise import (
+        StageWiseModel,
+    )
+    from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
+        problem_to_solver_arrays,
+    )
+    from OpenPinch.application.problem import PinchProblem
+    from tests.support.paths import FIXTURES_ROOT
+
+    fixture = FIXTURES_ROOT / "hen_audit" / "utility_cross_cooling_water.json"
+    model = StageWiseModel(
+        name="verify-utility-cost",
+        framework="TDM",
+        solver="apopt",
+        solver_arrays=problem_to_solver_arrays(
+            PinchProblem(source=json.loads(fixture.read_text())), 2.0
+        ),
+        stages=1,
+        dTmin=2.0,
+        z_restriction=None,
+        min_dqda=0.0,
+        minimisation_goal="total cost",
+        non_isothermal_model=False,
+        integers=False,
+        tol=1e-6,
+    )
+    model.optimise(False)
+    assert model.mSuccess == 1
+    assert verification._check_utility_costs(model) is True
+
+    # A solver whose cost expression disagrees with its duties must fail,
+    # even though post-processing recomputed hu_cost_total from the duties.
+    solved = model.hu_cost_solver_by_period[0]
+    solved.VALUE.value = [2.0 * verification._value(solved)]
+
+    assert verification._check_utility_costs(model) is False

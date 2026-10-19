@@ -24,6 +24,10 @@ HEN utility approach temperatures
   (``hot_utility_minimum_approach_by_period`` and
   ``cold_utility_minimum_approach_by_period``). It checked recovery
   exchangers only.
+- The stagewise models' solution check compares the utility cost the solver
+  reached with one recomputed from the solved duties. It compared the
+  recomputed cost with itself, because post-processing had already
+  overwritten the solver's value, so it could not fail.
 
 Network grid data
 ~~~~~~~~~~~~~~~~~
