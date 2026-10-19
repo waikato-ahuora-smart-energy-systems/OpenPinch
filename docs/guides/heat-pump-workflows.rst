@@ -31,6 +31,23 @@ separate load-mode string.
 The Carnot methods cover Cascade Carnot cycles and parallel Carnot screening
 without asking for a cycle-name string.
 
+COP conventions
+---------------
+
+``hpr_cop`` follows the duty, for every cycle model: a heat pump reports its
+heating COP, Q_cond/W, and refrigeration reports its cooling COP, Q_evap/W.
+
+The Carnot models apply the second-law efficiency ``HPR_ETA_II_CARNOT``
+(eta) to the cooling Carnot COP, with temperatures in kelvin::
+
+   COP_cooling = eta * T_l / (T_h - T_l)
+   COP_heating = 1 + eta * T_l / (T_h - T_l)
+
+The heating COP follows from the energy balance, Q_cond = Q_evap + W. It is
+higher than eta times the heating Carnot COP, eta * T_h / (T_h - T_l), by
+1 - eta. Cascade Carnot cycles use the entropic mean temperatures of their
+condenser and evaporator duties as T_h and T_l.
+
 Load, economics and target-specific plots
 -----------------------------------------
 

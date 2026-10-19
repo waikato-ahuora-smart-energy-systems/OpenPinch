@@ -527,9 +527,9 @@ class VapourCompressionCycle:
         Parameters
         ----------
         T_evap : float
-            Liquid saturation temperature in the evaporator [deg C].
+            Dew-point (saturated vapour) temperature in the evaporator [deg C].
         T_cond : float
-            Gas saturation temperature in the condenser [deg C].
+            Bubble-point (saturated liquid) temperature in the condenser [deg C].
         dtcont : float
             Minimum temperature approach used by HPR targeting [K].
         dT_superheat : float, optional
@@ -854,7 +854,7 @@ class VapourCompressionCycle:
                 for h in np.linspace(
                     min(h_sat_vapor, H[4]), max(h_sat_liquid, H[2]), 21
                 ):
-                    if h != h_sat_vapor or H[4] < h_sat_vapor:
+                    if not _repeats_last_point(t_h_curve_points, h):
                         state = self._compute_state_from_pressure_enthalpy(
                             P=p_high, h=h
                         )
@@ -862,7 +862,7 @@ class VapourCompressionCycle:
 
             if H[2] < h_sat_liquid:
                 for h in np.linspace(min(h_sat_liquid, H[4]), H[2], 21):
-                    if h != h_sat_liquid or H[4] < h_sat_liquid:
+                    if not _repeats_last_point(t_h_curve_points, h):
                         state = self._compute_state_from_pressure_enthalpy(
                             P=p_high, h=h
                         )
@@ -926,13 +926,13 @@ class VapourCompressionCycle:
                 for h in np.linspace(
                     max(h_sat_liquid, H[3]), min(h_sat_vapor, H[5]), 21
                 ):
-                    if h != h_sat_liquid or H[3] > h_sat_liquid:
+                    if not _repeats_last_point(t_h_curve_points, h):
                         state = self._compute_state_from_pressure_enthalpy(P=p_low, h=h)
                         t_h_curve_points.append([h, float(state.T())])
 
             if H[5] > h_sat_vapor:
                 for h in np.linspace(max(h_sat_vapor, H[3]), H[5], 21):
-                    if h != h_sat_vapor or H[3] > h_sat_vapor:
+                    if not _repeats_last_point(t_h_curve_points, h):
                         state = self._compute_state_from_pressure_enthalpy(P=p_low, h=h)
                         t_h_curve_points.append([h, float(state.T())])
 
@@ -961,3 +961,12 @@ class VapourCompressionCycle:
     def _require_solution(self) -> None:
         if not self._solved:
             raise RuntimeError("Solve the cycle before accessing results.")
+
+
+def _repeats_last_point(points: list, h: float) -> bool:
+    """Return whether ``h`` is the enthalpy of the last profile point.
+
+    Adjacent phase blocks share their boundary point; only the repeat is
+    skipped, so a block whose neighbour did not run keeps its first point.
+    """
+    return bool(points) and h == points[-1][0]

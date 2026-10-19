@@ -207,6 +207,7 @@ def _utility_summary_result(
         ),
         exergy_sources=_metric(target, "exergy_sources"),
         exergy_sinks=_metric(target, "exergy_sinks"),
+        exergy_released=_metric(target, "exergy_released"),
         ETE=_metric(target, "ETE"),
         exergy_req_min=_metric(target, "exergy_req_min"),
         exergy_des_min=_metric(target, "exergy_des_min"),

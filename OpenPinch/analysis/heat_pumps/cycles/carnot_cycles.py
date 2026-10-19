@@ -35,6 +35,7 @@ class ParallelCarnotCycles:
         self._w_hpr = np.empty(0, dtype=float)
         self._w_he = np.empty(0, dtype=float)
         self._heat_recovery = 0.0
+        self._Q_evap_hpr = 0.0
         self._penalty = np.empty(0, dtype=float)
         self._args: Any = None
 
@@ -102,6 +103,13 @@ class ParallelCarnotCycles:
     def COP_h(self) -> float:
         w_hpr = float(self._w_hpr.sum())
         return float(self._Q_cond.sum() / w_hpr) if w_hpr > tol else 0.0
+
+    @property
+    def COP_c(self) -> float:
+        # Only heat-pump stages take compressor work; recovery and heat-engine
+        # stages would inflate the ratio.
+        w_hpr = float(self._w_hpr.sum())
+        return float(self._Q_evap_hpr / w_hpr) if w_hpr > tol else 0.0
 
     @property
     def eta_he(self) -> float:
@@ -202,6 +210,7 @@ class ParallelCarnotCycles:
         self._Q_cond = self._Q_cond_he + Qc_hx + Qc_hpr
         self._Q_evap = self._Q_evap_he + Qe_hx + Qe_hpr
         self._heat_recovery = float(Qc_hx.sum())
+        self._Q_evap_hpr = float(Qe_hpr.sum())
         self._solved = bool(
             np.isclose(
                 self._Q_cond.sum() + self._w_he.sum(),
@@ -239,6 +248,7 @@ class CascadeCarnotCycle:
         self._w_hpr = 0.0
         self._w_he = 0.0
         self._cop = 1.0
+        self._cop_c = 1.0
         self._penalty = np.empty(0, dtype=float)
         self._args: Any = None
 
@@ -306,6 +316,10 @@ class CascadeCarnotCycle:
     def COP_h(self) -> float:
         return self._cop
 
+    @property
+    def COP_c(self) -> float:
+        return self._cop_c
+
     def solve(
         self,
         *,
@@ -363,6 +377,7 @@ class CascadeCarnotCycle:
         self._w_he = float(self._Q_evap_he.sum() - self._Q_cond_he.sum())
         self._w_hpr = float(Qc_hpr.sum() - Qe_hpr.sum())
         self._cop = float(Qc_hpr.sum() / self._w_hpr) if self._w_hpr > 0 else 1.0
+        self._cop_c = float(Qe_hpr.sum() / self._w_hpr) if self._w_hpr > 0 else 1.0
         self._Q_cond = Qc_hpr + self._Q_cond_he
         self._Q_evap = Qe_hpr + self._Q_evap_he
         self._solved = bool(

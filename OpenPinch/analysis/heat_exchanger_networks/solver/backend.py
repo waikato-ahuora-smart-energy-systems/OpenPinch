@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ....domain.solver_options import validate_solver_options
 from .dependencies import (
     MissingSynthesisSolverError,
     require_solver_binary,
@@ -275,11 +276,13 @@ def _normalise_solver_options(
     if solver_options is None:
         return {}
     if isinstance(solver_options, Mapping):
-        return {
-            str(name): value
-            for name, value in solver_options.items()
-            if value is not None
-        }
+        return validate_solver_options(
+            {
+                str(name): value
+                for name, value in solver_options.items()
+                if value is not None
+            }
+        )
     if isinstance(solver_options, (str, bytes)) or not isinstance(
         solver_options,
         Sequence,
@@ -293,13 +296,13 @@ def _normalise_solver_options(
             continue
         name, sep, value = option.partition(" ")
         normalised[name] = value.strip() if sep else ""
-    return normalised
+    return validate_solver_options(normalised)
 
 
 def _format_solver_option_lines(options: Mapping[str, Any]) -> list[str]:
     return [
-        f"{name} {_format_solver_option_value(value)}".rstrip()
-        for name, value in options.items()
+        f"{name} {_format_solver_option_value(value)}"
+        for name, value in validate_solver_options(options).items()
     ]
 
 
