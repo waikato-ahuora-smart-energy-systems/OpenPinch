@@ -38,6 +38,7 @@ def test_cascade_carnot_backend_validates_mapping_state(monkeypatch):
     )
 
     class FakeCycle:
+        solved = True
         work = 1.0
         w_hpr = 1.0
         w_he = 0.0

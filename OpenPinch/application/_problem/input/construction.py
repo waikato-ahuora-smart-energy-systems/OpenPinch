@@ -7,7 +7,10 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 from ....contracts.input import StreamSchema, UtilitySchema, ZoneTreeSchema
-from ....contracts.units import standardise_input_value
+from ....contracts.units import (
+    heat_flow_from_heat_capacity_flowrate,
+    standardise_input_value,
+)
 from ....domain._value.resolution import resolve_value_array
 from ....domain.configuration import tol
 from ....domain.enums import StreamType
@@ -194,11 +197,28 @@ def _validate_stream_temperatures(stream: StreamSchema, config=None):
     t_target = standardise_input_value(
         stream.t_target, field_name="t_target", config=config
     ).period_values
-    heat_flow = resolve_value_array(stream.heat_flow)
+    heat_flow = _stream_heat_flow(stream, config).period_values
     if np.all((abs(t_supply - t_target) < tol) * (heat_flow != 0.0)):
         raise ValueError(
             f"Process stream '{stream.name}' must classify as Hot or Cold."
         )
+
+
+def _stream_heat_flow(stream: StreamSchema, config=None) -> Value:
+    """Return the stream's heat flow, derived from its CP when not given."""
+    given = resolve_value_array(stream.heat_flow)
+    if given.size and not np.all(np.isnan(given)):
+        return standardise_input_value(
+            stream.heat_flow, field_name="heat_flow", config=config
+        )
+    return heat_flow_from_heat_capacity_flowrate(
+        *(
+            standardise_input_value(
+                getattr(stream, field), field_name=field, config=config
+            )
+            for field in ("t_supply", "t_target", "heat_capacity_flowrate")
+        )
+    )
 
 
 def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
@@ -244,11 +264,7 @@ def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
             field_name="h_target",
             config=zone.config,
         ),
-        heat_flow=standardise_input_value(
-            stream.heat_flow,
-            field_name="heat_flow",
-            config=zone.config,
-        ),
+        heat_flow=_stream_heat_flow(stream, zone.config),
         delta_t_contribution=standardise_input_value(
             stream.dt_cont,
             field_name="dt_cont",
