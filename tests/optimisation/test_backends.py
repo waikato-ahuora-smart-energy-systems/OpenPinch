@@ -626,7 +626,7 @@ def test_polish_candidates_empty_single_worker_and_pool_paths(monkeypatch):
     monkeypatch.setattr(
         bb_common,
         "_polish_single_candidate",
-        lambda idx, all_x, all_f, func, args, local_method, bounds_arg, constraints: (
+        lambda idx, all_x, all_f, func, args, local_method, bounds_arg, constraints, **_: (
             all_x[idx],
             float(idx),
         ),

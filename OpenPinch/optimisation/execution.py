@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import ast
 import logging
+import multiprocessing
+import os
+import sys
 from collections.abc import Callable, Iterable, Sequence
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from functools import partial
 from multiprocessing.reduction import ForkingPickler
+from pathlib import Path
 from typing import Literal, Protocol, runtime_checkable
 
 import numpy as np
@@ -56,6 +61,61 @@ def _is_picklable(obj: object) -> bool:
     return True
 
 
+def _is_main_guard(node: ast.stmt) -> bool:
+    """Return whether ``node`` is ``if __name__ == "__main__":``."""
+    if not isinstance(node, ast.If) or not isinstance(node.test, ast.Compare):
+        return False
+    test = node.test
+    operands = (test.left, *test.comparators)
+    return (
+        len(test.ops) == 1
+        and isinstance(test.ops[0], ast.Eq)
+        and any(
+            isinstance(item, ast.Name) and item.id == "__name__" for item in operands
+        )
+        and any(
+            isinstance(item, ast.Constant) and item.value == "__main__"
+            for item in operands
+        )
+    )
+
+
+def _main_module_reruns_in_workers() -> bool:
+    """Return whether spawned workers would rerun an unguarded main script.
+
+    Under the spawn and forkserver start methods each worker imports the
+    main module again; a script with no main guard then repeats its whole
+    run in every worker.
+    """
+    if multiprocessing.get_start_method() == "fork":
+        return False
+    path = getattr(sys.modules.get("__main__"), "__file__", None)
+    if not path or not str(path).endswith(".py"):
+        return False
+    try:
+        tree = ast.parse(Path(path).read_text(encoding="utf-8"))
+    except (OSError, SyntaxError, UnicodeDecodeError, ValueError):
+        return False
+    return not any(_is_main_guard(node) for node in tree.body)
+
+
+def _pool_worker_count(requested: int, task_count: int) -> int:
+    """Return the worker processes to start; 1 means run serially."""
+    if sys.platform == "emscripten":
+        # Pyodide has no process pools.
+        return 1
+    workers = min(int(requested), task_count, os.cpu_count() or 1)
+    if workers > 1 and _main_module_reruns_in_workers():
+        logger.warning(
+            "Running optimisation tasks serially: the main script has no "
+            "main guard, so every worker process would rerun it. Put the "
+            'script\'s entry code under `if __name__ == "__main__":` to '
+            "use worker processes."
+        )
+        return 1
+    return workers
+
+
 def _map_in_process_pool(
     fn: Callable,
     items: Sequence,
@@ -71,7 +131,7 @@ def _map_in_process_pool(
     exception raised by ``fn`` itself propagates unchanged.
     """
     items = list(items)
-    workers = min(int(max_workers), len(items))
+    workers = _pool_worker_count(max_workers, len(items))
     if workers <= 1:
         return [fn(item) for item in items]
     # Items of one batch share their types, so the first stands for the rest.

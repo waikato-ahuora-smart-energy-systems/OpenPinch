@@ -314,7 +314,7 @@ def test_default_feasibility_tolerance_accepts_slsqp_scale_residual(
     assert result.best.point == pytest.approx((0.5000005,))
 
 
-def test_feasibility_tolerance_can_be_tightened_without_reaching_backend(
+def test_feasibility_tolerance_can_be_tightened_for_polish_and_filter(
     monkeypatch,
 ) -> None:
     backend_options = None
@@ -340,7 +340,8 @@ def test_feasibility_tolerance_can_be_tightened_without_reaching_backend(
         )
 
     assert backend_options is not None
-    assert "feasibility_tolerance" not in backend_options
+    # The polish ranks feasibility with the same tolerance as the filter.
+    assert backend_options["feasibility_tolerance"] == 1.0e-8
 
 
 @pytest.mark.parametrize("tolerance", [-1.0, float("nan"), float("inf")])

@@ -6,6 +6,7 @@ from typing import Callable, Optional
 import numpy as np
 
 from ..candidates import _evaluate_scalar_objective
+from ..feasibility import DEFAULT_FEASIBILITY_TOLERANCE
 from ._multistart import run_multistart
 
 
@@ -25,6 +26,7 @@ def _get_cma_multiminima_in_parallel(
     cluster_tol=0.01,
     max_minima=4,
     local_method="SLSQP",
+    feasibility_tolerance=DEFAULT_FEASIBILITY_TOLERANCE,
     tolx=1e-8,
     tolfun=1e-10,
 ):
@@ -55,6 +57,7 @@ def _get_cma_multiminima_in_parallel(
         cluster_tol=cluster_tol,
         max_minima=max_minima,
         local_method=local_method,
+        feasibility_tolerance=feasibility_tolerance,
         maxiter=maxiter,
         seed=seed,
         maxfevals=effective_maxfevals,

@@ -31,6 +31,8 @@ from .units import (
 )
 
 ABSOLUTE_ZERO_C = -C_to_K
+# Clearance kept between a reachable temperature and absolute zero.
+_KELVIN_MARGIN = 0.01
 
 
 def _expected_coordinates(
@@ -197,6 +199,13 @@ def _build_effective_template(
             caller_bounds=blueprint.span_bounds,
             tolerance=request.tolerances.bounds,
         )
+        span_upper = span_bounds.upper
+        if blueprint.key.side is UtilitySide.HOT:
+            # Clamp the span so the lowest reachable target, the lowest
+            # supply less the largest span, stays above absolute zero.
+            span_upper = min(
+                span_upper, supply_bounds.lower - ABSOLUTE_ZERO_C - _KELVIN_MARGIN
+            )
         if span_bounds.lower <= 0.0:
             raise EmptyPlacementFeasibleRegionError(
                 code="nonpositive_sensible_span",
@@ -204,6 +213,16 @@ def _build_effective_template(
                 template_key=blueprint.key,
                 field_path=DecisionField.TEMPERATURE_SPAN.value,
             )
+        if span_upper < span_bounds.lower:
+            raise EmptyPlacementFeasibleRegionError(
+                code="nonpositive_kelvin_region",
+                message="Accepted temperature bounds must remain above absolute zero.",
+                template_key=blueprint.key,
+                field_path=DecisionField.TEMPERATURE_SPAN.value,
+            )
+        span_bounds = QuantityInterval(
+            lower=span_bounds.lower, upper=span_upper, unit=span_bounds.unit
+        )
     maximum_span = (
         blueprint.fixed_span.value
         if blueprint.fixed_span is not None

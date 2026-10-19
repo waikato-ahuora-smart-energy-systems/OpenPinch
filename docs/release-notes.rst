@@ -22,6 +22,52 @@ HEN synthesis with several utilities
   did for hot utilities.
 - Results with one hot and one cold utility are unchanged.
 
+Utility placement and optimisers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Utility placement with sensible levels no longer fails with
+  ``nonpositive_kelvin_region`` when the hottest temperature is more than
+  about twice the coldest in kelvin above 0 degC (for example a 320 degC hot
+  utility with cooling water, or the Four-stream Yee and Grossmann case for
+  every ``sensible > 0``). The sensible span bound is clamped so the lowest
+  reachable target stays above absolute zero.
+- Placement exergy destruction uses the problem's ``ENV_TEMPERATURE``
+  instead of a fixed 298.15 K. The entropy breakdown now has one basis:
+  ``utility_entropy`` is the placed utilities' own entropy change and
+  ``process_entropy`` the rest of the generation over the process net loads.
+  The objective is unchanged. On ``basic_pinch`` (2 isothermal and 1
+  sensible level, default options): ``utility_entropy`` 0.5882 to
+  1.1230 kW/K, ``process_entropy`` -0.3877 to -0.9224 kW/K, ambient
+  298.15 to 288.15 K, ``exergy_destruction`` 59.79 to 57.78 kW;
+  ``total_entropy_generation`` stays 0.2005 kW/K.
+- The optimised placement case keeps the price and htc of the original
+  utility with the same name, else of the nearest one on the same side by
+  supply temperature (it had no price and htc 1.0). In the Direct scope it
+  also keeps that utility's ``dt_cont`` and lists the real temperatures
+  that ``dt_cont`` outward of the placed (shifted) levels, so the case
+  targets the same levels; in the Indirect and Total Site scopes, and when
+  that ``dt_cont`` varies by period, the placed levels keep ``dt_cont = 0``. Tutorial 19's process case now shows its
+  utilities 2 degC outward with chocolate_factory's utility price.
+- A script without an ``if __name__ == "__main__":`` guard no longer reruns
+  the whole placement in every spawned worker: the optimiser runs serially
+  and logs how to enable workers. Under Pyodide the optimiser skips the
+  process pool, and the search pool is capped at the CPU count.
+- The scalar optimiser compares a polished candidate with its start on
+  feasibility first, then on the objective, so a constrained problem whose
+  global search ends in the infeasible region returns the constrained
+  optimum instead of ``NoOptimisationCandidatesError``. Every local method
+  polishes within the bounds, and ``local_method`` (also in
+  ``UtilityPlacementOptions``) is one of SLSQP, L-BFGS-B, TNC, Nelder-Mead,
+  Powell, COBYLA, COBYQA and trust-constr.
+- Optimiser options are validated before the solve: ``n_runs``,
+  ``maxiter``, ``maxfun``, ``seed`` and ``max_minima`` must be integers,
+  ``cluster_tol`` a finite non-negative number, and malformed constraints
+  raise ``InvalidOptimisationProblemError`` before any backend runs.
+- ``exergy_des_min`` is labelled "Min Exergy Rejected" in summaries and
+  "Exergy Rejected Min" in the workbook (was "Min Exergy Destruction" and
+  "Exergy Des Min"). It is the exergy of the below-pinch surplus rejected to
+  cold utility, not exergy destruction. The field name is unchanged.
+
 Area and unit-count targets
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
