@@ -56,6 +56,9 @@ Area and unit-count targets
   residue at the curve ends. It used ``np.isclose``'s default relative
   tolerance of 1e-5 of the end heat flow, which dropped real end segments on
   MW-scale curves.
+- Composite and net load graphs leave out a series with no heat-flow span,
+  such as the cold composite of a problem with only hot streams. It used to
+  appear as a segment with no data points.
 - Heat exchanger network area slicing on segmented streams accepts a
   solver duty that overshoots its stream profile by noise relative to the
   duty (1e-6 of the profile) and drops the overshoot. A 2e-6 kW overshoot on

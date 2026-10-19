@@ -118,7 +118,11 @@ def _make_composite_graph(
     for field, stream_loc in zip(fields, stream_types):
         column_key = _column_key(field)
         x_vals = _column_to_list(data, column_key)
-        if _should_plot_series(x_vals):
+        # A constant series (for example the cold composite of a problem with
+        # only hot streams) has no curve to draw.
+        if _should_plot_series(x_vals) and np.ptp(
+            np.asarray(x_vals, dtype=float)
+        ) > heat_resolution(x_vals):
             segments.extend(
                 _graph_cc(
                     key,

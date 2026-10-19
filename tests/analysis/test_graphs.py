@@ -326,7 +326,9 @@ def test_create_graph_set_includes_net_load_curves():
     assert len(graph_set["graphs"]) == 1
     assert graph_set["graphs"][0]["type"] == GraphType.NLP.value
     assert graph_set["graphs"][0]["name"] == "Net Load Curves: ZoneA/Direct Integration"
-    assert len(graph_set["graphs"][0]["segments"]) == 4
+    # The constant hot utility series (5 kW throughout) has no curve; it was
+    # a fourth segment with no data points.
+    assert len(graph_set["graphs"][0]["segments"]) == 3
 
 
 def test_create_graph_set_includes_real_grand_composite_curve():
@@ -718,3 +720,38 @@ def test_clean_composite_curve_ends_trims_rounding_residue_at_the_ends():
 
     np.testing.assert_array_equal(y_clean, T[1:4])
     np.testing.assert_array_equal(x_clean, H[1:4])
+
+
+def test_composite_graphs_skip_series_without_a_heat_flow_span():
+    # With one hot stream the cold composite column is constant at the cold
+    # utility target. It passed the non-zero check and produced segments with
+    # no data points.
+    from OpenPinch import PinchProblem
+
+    problem = PinchProblem(
+        {
+            "streams": [
+                {
+                    "zone": "P",
+                    "name": "H",
+                    "t_supply": 150.0,
+                    "t_target": 50.0,
+                    "heat_flow": 100.0,
+                    "dt_cont": 5.0,
+                }
+            ]
+        },
+        project_name="Site",
+    )
+    problem.target.direct_heat_integration()
+
+    graphs = get_output_graph_data(problem.master_zone)
+
+    segments = [
+        segment
+        for zone_graphs in graphs.values()
+        for graph in zone_graphs["graphs"]
+        for segment in graph["segments"]
+    ]
+    assert segments
+    assert all(len(segment["data_points"]) >= 2 for segment in segments)
