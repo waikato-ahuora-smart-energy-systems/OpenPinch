@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from pint.errors import DimensionalityError
 
+from ..domain.configuration_fields import CONFIG_FIELD_SPECS
 from ..domain.value import Value, ureg
 
 if TYPE_CHECKING:
@@ -366,4 +367,32 @@ def coerce_output_value(
         return resolved
     if metric_name == "heat_recovery_dt_min":
         target_unit = _as_temperature_difference_unit(target_unit)
-    return resolved.to(target_unit)
+    converted = resolved.to(target_unit)
+    year_exponent_change = resolved.unit_exponent("year") - converted.unit_exponent(
+        "year"
+    )
+    if year_exponent_change:
+        # Pint's year is 8766 calendar hours; a year of cost is one operating
+        # year of COSTING_ANNUAL_OP_TIME hours.
+        converted = (
+            converted
+            * (_annual_operating_hours(config) / _CALENDAR_HOURS_PER_YEAR)
+            ** year_exponent_change
+        )
+    return converted
+
+
+_CALENDAR_HOURS_PER_YEAR = float(Value(1.0, "year").to("h").value)
+
+
+def _annual_operating_hours(
+    config: Configuration | Mapping[str, Any] | None,
+) -> float:
+    if isinstance(config, Mapping):
+        hours = config.get("COSTING_ANNUAL_OP_TIME")
+    else:
+        costing = getattr(config, "costing", None)
+        hours = getattr(costing, "annual_op_time", None)
+    if hours is None:
+        hours = CONFIG_FIELD_SPECS["COSTING_ANNUAL_OP_TIME"].default
+    return float(hours)

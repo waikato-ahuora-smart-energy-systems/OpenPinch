@@ -149,11 +149,11 @@ def compute_indirect_integration_targets(
     )
     hot_pinch, cold_pinch = pt.pinch_temperatures(col_H=ProblemTableLabel.H_NET_UT)
 
-    # Apply the utility targeting method to determine the net utility use and generation
-    hot_utilities, cold_utilities = _match_utility_gen_and_use_at_same_level(
-        hot_utilities=deepcopy(s_tzt.hot_utilities),
-        cold_utilities=deepcopy(s_tzt.cold_utilities),
-        period_idx=idx,
+    # Allocate the site's external utilities on the cascaded site profile
+    hot_utilities, cold_utilities = _target_site_utilities(
+        hot_utilities=s_tzt.hot_utilities,
+        cold_utilities=s_tzt.cold_utilities,
+        idx=idx,
     )
 
     output = {
@@ -238,6 +238,86 @@ def _reconstruct_subzone_direct_profiles(
             net_cold_streams.add(stream, key=f"{subzone.name}.{key}")
 
     return net_hot_streams, net_cold_streams
+
+
+def _target_site_utilities(
+    hot_utilities: StreamCollection,
+    cold_utilities: StreamCollection,
+    idx: int | None = None,
+) -> Tuple[StreamCollection, StreamCollection]:
+    """Return the site's external utilities from the site utility cascade.
+
+    Subzone utility use (``hot_utilities``) and generation
+    (``cold_utilities``) are cascaded by temperature interval from the top, as
+    the site utility profile is. Generation flows down to meet use, nearest
+    level first; use left unmet is the site's hot utility, and generation left
+    over is its cold utility. The duties therefore sum to the site's hot and
+    cold utility targets.
+    """
+    hot_utilities = deepcopy(hot_utilities)
+    cold_utilities = deepcopy(cold_utilities)
+    uses = [_utility_span(u, idx) for u in hot_utilities]
+    gens = [_utility_span(u, idx) for u in cold_utilities]
+    bounds = sorted(
+        {t for span in uses + gens for t in span[:2]},
+        reverse=True,
+    )
+    unmet = [0.0] * len(uses)
+    surplus = [0.0] * len(gens)
+    # Generation available to lower intervals, most recent (coldest) last.
+    stack: list[list] = []
+    for t_hi, t_lo in zip(bounds, bounds[1:]):
+        use_q = [_interval_duty(span, t_hi, t_lo) for span in uses]
+        gen_q = [_interval_duty(span, t_hi, t_lo) for span in gens]
+        # A utility level meets its own use first.
+        for j, u_h in enumerate(hot_utilities):
+            for k, u_c in enumerate(cold_utilities):
+                if u_h.name == u_c.name:
+                    matched = min(use_q[j], gen_q[k])
+                    use_q[j] -= matched
+                    gen_q[k] -= matched
+        for k, q in enumerate(gen_q):
+            if q > 0.0:
+                stack.append([k, q])
+        for j, demand in enumerate(use_q):
+            while demand > 0.0 and stack:
+                take = min(demand, stack[-1][1])
+                demand -= take
+                stack[-1][1] -= take
+                if stack[-1][1] <= 0.0:
+                    stack.pop()
+            unmet[j] += demand
+    for k, q in stack:
+        surplus[k] += q
+    for utility, duty in zip(hot_utilities, unmet):
+        utility.set_value_attr_at_idx("heat_flow", duty, idx=idx)
+    for utility, duty in zip(cold_utilities, surplus):
+        utility.set_value_attr_at_idx("heat_flow", duty, idx=idx)
+    return hot_utilities, cold_utilities
+
+
+def _utility_span(utility, idx: int | None) -> tuple[float, float, float]:
+    """Return ``(t_high, t_low, heat_flow)`` for one utility in one period."""
+    t_s = float(utility.supply_temperature[idx])
+    t_t = float(utility.target_temperature[idx])
+    return max(t_s, t_t), min(t_s, t_t), float(utility.heat_flow[idx])
+
+
+def _interval_duty(
+    span: tuple[float, float, float],
+    t_hi: float,
+    t_lo: float,
+) -> float:
+    """Return the share of a utility's duty that lies in ``[t_lo, t_hi]``.
+
+    Stream construction gives every utility a temperature span of at least
+    0.01 K, so the duty spreads linearly over that span.
+    """
+    u_hi, u_lo, q = span
+    if q <= 0.0:
+        return 0.0
+    overlap = min(u_hi, t_hi) - max(u_lo, t_lo)
+    return q * overlap / (u_hi - u_lo) if overlap > 0.0 else 0.0
 
 
 def _match_utility_gen_and_use_at_same_level(

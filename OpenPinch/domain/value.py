@@ -147,6 +147,10 @@ class Value:
         new_value._weights = self._weights.copy() if self._weights is not None else None
         return new_value
 
+    def unit_exponent(self, unit_name: str) -> float:
+        """Return the power of one Pint unit (``"year"``) in this unit, or 0."""
+        return float(dict(self._quantity.units._units).get(unit_name, 0))
+
     def __getitem__(self, idx):
         """Return one selected period as an independent ``Value``."""
         if idx is None or not self._is_period_valued():
