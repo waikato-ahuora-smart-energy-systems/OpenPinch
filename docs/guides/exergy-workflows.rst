@@ -38,7 +38,10 @@ Expected Output
 
 The selected thermal target is enriched with fields such as
 ``exergy_sources``, ``exergy_sinks``, ``ETE``, ``exergy_req_min``, and
-``exergy_des_min``.
+``exergy_des_min``. ``exergy_des_min`` is the exergy of the below-pinch
+surplus rejected to cold utility, read from the bottom of the exergetic
+grand composite curve. It is not exergy destruction: an ORC or Heat Pump
+could still recover part of it. Summaries label it "Min Exergy Rejected".
 
 Interpretation
 --------------

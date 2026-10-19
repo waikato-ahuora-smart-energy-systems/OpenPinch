@@ -33,7 +33,7 @@ _OPTIONAL_SUMMARY_METRICS = {
     "Exergy Sources": "exergy_sources",
     "Exergy Sinks": "exergy_sinks",
     "Min Exergy Requirement": "exergy_req_min",
-    "Min Exergy Destruction": "exergy_des_min",
+    "Min Exergy Rejected": "exergy_des_min",
 }
 
 
