@@ -17,7 +17,9 @@ from .errors import (
     InvalidOptimisationProblemError,
     NoOptimisationCandidatesError,
 )
+from .feasibility import is_feasible, validate_constraints
 from .models import (
+    LOCAL_METHODS,
     OptimisationCandidate,
     OptimisationMethod,
     OptimisationOptions,
@@ -94,6 +96,7 @@ def run_multistart_minimisation(
     bounds, initial_points = _validate_problem(problem)
     backend_kwargs = options.to_backend_kwargs()
     _validate_options(method, backend_kwargs)
+    validate_constraints(problem.constraints)
 
     backend = _resolve_backend(method)
     # Ask for more basins than kept: non-finite and infeasible candidates are
@@ -105,6 +108,7 @@ def run_multistart_minimisation(
             "max_minima": _BACKEND_MINIMA_FACTOR * int(requested_minima),
         }
     points, objectives = backend(
+        feasibility_tolerance=feasibility_tolerance,
         func=problem.objective,
         bounds=bounds,
         x0_ls=initial_points,
@@ -202,17 +206,45 @@ def _validate_options(
         raise InvalidOptimisationProblemError(
             f"Unsupported {method.value} option(s): {names}."
         )
-    if int(backend_kwargs["n_runs"]) < 1:
+    if _integer_option(backend_kwargs, "n_runs") < 1:
         raise InvalidOptimisationProblemError("n_runs must be at least one.")
-    if int(backend_kwargs["maxiter"]) < 0:
+    if _integer_option(backend_kwargs, "maxiter") < 0:
         raise InvalidOptimisationProblemError("maxiter must be non-negative.")
-    if int(backend_kwargs["maxfun"]) < 1:
+    if _integer_option(backend_kwargs, "maxfun") < 1:
         raise InvalidOptimisationProblemError("maxfun must be positive.")
-    if float(backend_kwargs["cluster_tol"]) < 0.0:
-        raise InvalidOptimisationProblemError("cluster_tol must be non-negative.")
-    max_minima = backend_kwargs["max_minima"]
-    if max_minima is not None and int(max_minima) < 1:
+    _integer_option(backend_kwargs, "seed")
+    cluster_tol = backend_kwargs["cluster_tol"]
+    if (
+        isinstance(cluster_tol, bool)
+        or not isinstance(cluster_tol, (int, float, np.integer, np.floating))
+        or not math.isfinite(float(cluster_tol))
+        or float(cluster_tol) < 0.0
+    ):
+        raise InvalidOptimisationProblemError(
+            "cluster_tol must be a finite non-negative number."
+        )
+    if backend_kwargs["max_minima"] is not None and (
+        _integer_option(backend_kwargs, "max_minima") < 1
+    ):
         raise InvalidOptimisationProblemError("max_minima must be positive or None.")
+    local_method = backend_kwargs["local_method"]
+    if local_method is not None and str(local_method).upper() not in {
+        name.upper() for name in LOCAL_METHODS
+    }:
+        names = ", ".join(LOCAL_METHODS)
+        raise InvalidOptimisationProblemError(
+            f"local_method must be None or one of: {names}."
+        )
+
+
+def _integer_option(backend_kwargs: Mapping[str, object], name: str) -> int:
+    """Return an integral option value, rejecting text, booleans and fractions."""
+    value = backend_kwargs[name]
+    if isinstance(value, (int, np.integer)) and not isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (float, np.floating)) and float(value).is_integer():
+        return int(value)
+    raise InvalidOptimisationProblemError(f"{name} must be an integer.")
 
 
 def _validate_feasibility_tolerance(value: object) -> float:
@@ -287,61 +319,9 @@ def _is_feasible_candidate(
     tolerance: float,
 ) -> bool:
     """Return whether one finite point satisfies bounds and supplied constraints."""
-    if np.any(point < bounds[:, 0] - tolerance) or np.any(
-        point > bounds[:, 1] + tolerance
-    ):
-        return False
-    if constraints is None or (
-        isinstance(constraints, (tuple, list)) and not constraints
-    ):
-        return True
-    constraint_items = (
-        (constraints,)
-        if isinstance(constraints, Mapping) or hasattr(constraints, "lb")
-        else tuple(constraints)
+    return is_feasible(
+        point, bounds=bounds, constraints=constraints, tolerance=tolerance
     )
-    for constraint in constraint_items:
-        if isinstance(constraint, Mapping):
-            constraint_type = str(constraint.get("type", "")).lower()
-            function = constraint.get("fun")
-            if constraint_type not in {"eq", "ineq"} or not callable(function):
-                raise InvalidOptimisationProblemError(
-                    "constraints must use scipy-compatible 'eq' or 'ineq' mappings."
-                )
-            values = np.asarray(
-                function(point, *tuple(constraint.get("args", ()))),
-                dtype=float,
-            )
-            if not np.isfinite(values).all():
-                return False
-            if constraint_type == "eq" and np.any(np.abs(values) > tolerance):
-                return False
-            if constraint_type == "ineq" and np.any(values < -tolerance):
-                return False
-            continue
-
-        lower = getattr(constraint, "lb", None)
-        upper = getattr(constraint, "ub", None)
-        if lower is None or upper is None:
-            raise InvalidOptimisationProblemError(
-                "constraints must be scipy-compatible constraint objects or mappings."
-            )
-        if hasattr(constraint, "A"):
-            values = np.asarray(constraint.A @ point, dtype=float)
-        else:
-            function = getattr(constraint, "fun", None)
-            if not callable(function):
-                raise InvalidOptimisationProblemError(
-                    "constraint objects must provide a callable fun or a matrix A."
-                )
-            values = np.asarray(function(point), dtype=float)
-        if not np.isfinite(values).all():
-            return False
-        if np.any(values < np.asarray(lower, dtype=float) - tolerance) or np.any(
-            values > np.asarray(upper, dtype=float) + tolerance
-        ):
-            return False
-    return True
 
 
 __all__ = ["run_multistart_minimisation"]

@@ -223,7 +223,7 @@ def _make_summary_row(t) -> dict:
             "Exergy Req Min", t.exergy_req_min, period_idx=period_idx
         ),
         **_value_unit_columns(
-            "Exergy Des Min", t.exergy_des_min, period_idx=period_idx
+            "Exergy Rejected Min", t.exergy_des_min, period_idx=period_idx
         ),
         "HPR Cycle": getattr(t, "hpr_cycle", None),
         "HPR Success": getattr(t, "hpr_success", None),

@@ -19,6 +19,7 @@ from ..candidates import (
     _postprocess_candidates,
 )
 from ..execution import _collect_candidates_in_parallel
+from ..feasibility import DEFAULT_FEASIBILITY_TOLERANCE
 
 RunSingle = Callable[..., tuple[list[np.ndarray], list[float]]]
 
@@ -75,6 +76,7 @@ def run_multistart(
     cluster_tol: float,
     max_minima: int,
     local_method: str,
+    feasibility_tolerance: float = DEFAULT_FEASIBILITY_TOLERANCE,
     **options,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return deduplicated, polished local minima from ``n_runs`` backend runs.
@@ -101,6 +103,7 @@ def run_multistart(
         cluster_tol=cluster_tol,
         max_minima=max_minima,
         local_method=local_method,
+        feasibility_tolerance=feasibility_tolerance,
         cluster_fn=_cluster_candidates,
         polish_fn=_polish_candidates,
     )

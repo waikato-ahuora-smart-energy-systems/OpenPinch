@@ -6,6 +6,7 @@ import numpy as np
 from scipy.interpolate import RBFInterpolator
 
 from ..candidates import _evaluate_scalar_objective
+from ..feasibility import DEFAULT_FEASIBILITY_TOLERANCE
 from ._multistart import run_multistart
 from ._surrogate import candidate_pool, run_surrogate_loop
 
@@ -31,6 +32,7 @@ def _get_rbf_surrogate_multiminima_in_parallel(
     cluster_tol=0.01,
     max_minima=4,
     local_method="SLSQP",
+    feasibility_tolerance=DEFAULT_FEASIBILITY_TOLERANCE,
 ):
     """Return deduplicated local minima from multi-start RBF-surrogate search."""
     effective_maxfevals = maxfevals if maxfevals is not None else maxfun
@@ -45,6 +47,7 @@ def _get_rbf_surrogate_multiminima_in_parallel(
         cluster_tol=cluster_tol,
         max_minima=max_minima,
         local_method=local_method,
+        feasibility_tolerance=feasibility_tolerance,
         maxiter=maxiter,
         seed=seed,
         maxfevals=effective_maxfevals,

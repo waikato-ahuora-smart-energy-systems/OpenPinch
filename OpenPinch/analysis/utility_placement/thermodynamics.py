@@ -253,21 +253,17 @@ def _balanced_composite_curves(period, allocation):
     return hot_temperature, hot_heat, cold_temperature, cold_heat
 
 
-def _process_entropy(period: PlacementPeriodInput) -> float:
-    terms = []
-    for item in period.snapshot.entropy_slices:
-        if item.temperature_in_kelvin == item.temperature_out_kelvin:
-            magnitude = item.available_duty / item.temperature_in_kelvin
-            terms.append(-magnitude if item.side.value == "hot" else magnitude)
-        else:
-            terms.append(
-                stream_entropy_change(
-                    item.available_duty,
-                    item.temperature_in_kelvin,
-                    item.temperature_out_kelvin,
-                )
-            )
-    return math.fsum(terms)
+def _utility_entropy(allocation: PlacementPeriodAllocation) -> float:
+    """Return the placed utilities' own entropy change, cooling hot levels."""
+    return math.fsum(
+        stream_entropy_change(
+            float(level.allocated_duty),
+            float(level.supply_temperature) + C_to_K,
+            float(level.target_temperature) + C_to_K,
+        )
+        for level in allocation.hot_levels + allocation.cold_levels
+        if level.allocated_duty > 0.0
+    )
 
 
 def evaluate_thermodynamic_cost(
@@ -286,8 +282,10 @@ def evaluate_thermodynamic_cost(
         cold_temperatures_celsius=cold_temperature,
         cold_heat_loads=cold_heat,
     )
-    process_entropy = _process_entropy(period)
-    utility_entropy = generation - process_entropy
+    # Generation is taken over the process net loads plus the placed
+    # utilities, so the process share is on that same net-load basis.
+    utility_entropy = _utility_entropy(allocation)
+    process_entropy = generation - utility_entropy
     exergy = period.ambient_temperature_kelvin * generation
     units = request.units
     return ThermodynamicCostBreakdown(

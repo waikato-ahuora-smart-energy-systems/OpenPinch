@@ -49,6 +49,11 @@ hot curve gains and the cold curve releases. ETE is at most 100 percent; the
 shortfall is the exergy destroyed in heat transfer. Across periods, ETE is
 weighted by ``exergy_released``.
 
+``exergy_des_min`` is the exergy of the below-pinch surplus rejected to cold
+utility, read from the bottom of the exergetic grand composite curve. It is
+not exergy destruction: an ORC or Heat Pump could still recover part of it.
+Summaries label it "Min Exergy Rejected".
+
 Interpretation
 --------------
 
