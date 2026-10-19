@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import sys
+import types
 from concurrent.futures.process import BrokenProcessPool
 
 import numpy as np
@@ -222,3 +224,78 @@ def test_task_scoped_objective_gets_one_copy_per_run(pool_cls):
         ("search:1/3", 2),
         ("search:2/3", 2),
     ]
+
+
+class _ForbiddenPool(_InProcessPool):
+    def __init__(self, max_workers):
+        raise AssertionError("no pool should start here")
+
+
+def test_emscripten_runs_tasks_serially_without_a_pool(monkeypatch, caplog):
+    monkeypatch.setattr(execution.sys, "platform", "emscripten")
+
+    with caplog.at_level(logging.WARNING, logger=execution.__name__):
+        xs, fs = execution._collect_candidates_in_parallel(
+            _record_run, n_runs=2, pool_executor_cls=_ForbiddenPool
+        )
+
+    assert fs.tolist() == [0.0, 1.0]
+    assert caplog.text == ""
+
+
+def _main_script(monkeypatch, tmp_path, source):
+    script = tmp_path / "user_script.py"
+    script.write_text(source)
+    main = types.ModuleType("__main__")
+    main.__file__ = str(script)
+    monkeypatch.setitem(sys.modules, "__main__", main)
+    monkeypatch.setattr(execution.multiprocessing, "get_start_method", lambda: "spawn")
+
+
+def test_unguarded_main_module_runs_serially_with_a_warning(
+    monkeypatch, tmp_path, caplog
+):
+    _main_script(monkeypatch, tmp_path, "import OpenPinch\nrun_placement()\n")
+
+    with caplog.at_level(logging.WARNING, logger=execution.__name__):
+        xs, fs = execution._collect_candidates_in_parallel(
+            _record_run, n_runs=2, pool_executor_cls=_ForbiddenPool
+        )
+
+    assert fs.tolist() == [0.0, 1.0]
+    assert 'if __name__ == "__main__":' in caplog.text
+
+
+def test_guarded_main_module_uses_worker_processes(monkeypatch, tmp_path):
+    _main_script(
+        monkeypatch,
+        tmp_path,
+        'import OpenPinch\n\nif __name__ == "__main__":\n    run_placement()\n',
+    )
+    started = []
+
+    class _RecordingPool(_InProcessPool):
+        def __init__(self, max_workers):
+            started.append(max_workers)
+
+    execution._collect_candidates_in_parallel(
+        _record_run, n_runs=2, pool_executor_cls=_RecordingPool
+    )
+
+    assert started == [2]
+
+
+def test_search_pool_is_capped_at_the_cpu_count(monkeypatch):
+    monkeypatch.setattr(execution.os, "cpu_count", lambda: 2)
+    started = []
+
+    class _RecordingPool(_InProcessPool):
+        def __init__(self, max_workers):
+            started.append(max_workers)
+
+    xs, fs = execution._collect_candidates_in_parallel(
+        _record_run, n_runs=5, pool_executor_cls=_RecordingPool
+    )
+
+    assert started == [2]
+    assert fs.tolist() == [0.0, 1.0, 2.0, 3.0, 4.0]
