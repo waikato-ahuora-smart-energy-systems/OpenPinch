@@ -351,7 +351,9 @@ class InternalHeatExchangerNetworkProblem:
         f_case.mSuccess = case.mSuccess
 
         f_case.optimise(print_output=False)
-        if f_case.mSuccess != 1:
+        # Reduction only simplifies the solved network: keep the original
+        # unless the reduced one solves and passes the same checks.
+        if f_case.mSuccess != 1 or not f_case.verify()[0]:
             return case
         return f_case
 

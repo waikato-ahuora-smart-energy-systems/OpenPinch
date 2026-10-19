@@ -444,3 +444,59 @@ def test_isothermal_split_branches_report_mixing_outlets_and_split_fractions():
     # stage boundary.
     assert [state.sink_outlet_temperature for state in states] == [390.0, 360.0]
     assert [state.sink_split_fraction for state in states] == pytest.approx([1.0, 1.0])
+
+
+def test_stage_reduction_keeps_the_original_when_the_reduced_network_fails(
+    monkeypatch,
+):
+    # Reduction only simplifies a solved network: a reduced solve that fails
+    # verification must not replace it.
+    from OpenPinch.analysis.heat_exchanger_networks.models import problem as unit
+    from OpenPinch.analysis.heat_exchanger_networks.models.problem import (
+        InternalHeatExchangerNetworkProblem,
+    )
+
+    class _Variable:
+        def __init__(self):
+            self.lower, self.upper = -1e9, 1e9
+            self.VALUE = SimpleNamespace(value=None)
+
+    class _Reduced:
+        def __init__(self, **kwargs):
+            stages = kwargs["stages"]
+
+            def grid(*shape):
+                if not shape:
+                    return _Variable()
+                return [grid(*shape[1:]) for _ in range(shape[0])]
+
+            self.Q_r = grid(2, 1, stages)
+            self.z = grid(2, 1, stages)
+            self.theta_1 = grid(2, 1, stages)
+            self.theta_2 = grid(2, 1, stages)
+            self.T_h = grid(2, stages + 1)
+            self.T_c = grid(1, stages + 1)
+            self.Q_h = grid(1, 1)
+            self.z_hu = grid(1, 1)
+            self.Q_c = grid(2, 1)
+            self.z_cu = grid(2, 1)
+
+        def optimise(self, print_output=False):
+            self.mSuccess = 1
+
+        def verify(self):
+            return False, ["temperature"]
+
+    monkeypatch.setattr(unit, "StageWiseModel", _Reduced)
+    case = _two_period_stage_case()
+    case.Q_r = case.Q_r_by_period[0]
+    case.T_h = [[[400.0]] * 4] * 2
+    case.T_c = [[[300.0]] * 4]
+    case.theta_1 = case.theta_2 = [[[[10.0]] * 3]] * 2
+    case.TAC_model = case.TAC = case.solve_time = 1.0
+
+    reduced = InternalHeatExchangerNetworkProblem(
+        solver_arrays=object(), framework="TDM", stages=3
+    ).remove_unused_stages(case)
+
+    assert reduced is case
