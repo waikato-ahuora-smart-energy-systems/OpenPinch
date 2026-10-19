@@ -27,6 +27,19 @@ class UtilityPlacementOptimisationMethod(StrEnum):
     RBF = "rbf_surrogate"
 
 
+class UtilityPlacementLocalMethod(StrEnum):
+    """scipy local methods that polish placement candidates inside the bounds."""
+
+    SLSQP = "SLSQP"
+    L_BFGS_B = "L-BFGS-B"
+    TNC = "TNC"
+    NELDER_MEAD = "Nelder-Mead"
+    POWELL = "Powell"
+    COBYLA = "COBYLA"
+    COBYQA = "COBYQA"
+    TRUST_CONSTR = "trust-constr"
+
+
 class UtilityPlacementBaseTarget(StrEnum):
     """Targeting scopes available to the later application service."""
 
@@ -176,9 +189,7 @@ class UtilityPlacementOptions(_FrozenContract):
             mode="before",
         ),
     ] = 0.01
-    local_method: Annotated[str, non_empty_str("local_method must not be empty")] = (
-        "SLSQP"
-    )
+    local_method: UtilityPlacementLocalMethod = UtilityPlacementLocalMethod.SLSQP
     backend_options: tuple[tuple[str, str | int | float | bool | None], ...] = ()
     minimum_separation: QuantityValue = Field(
         default_factory=lambda: QuantityValue(value=0.01, unit="delta_degC")
@@ -809,6 +820,7 @@ __all__ = [
     "UtilityDutyLimit",
     "UtilityPlacementBaseTarget",
     "UtilityPlacementCandidate",
+    "UtilityPlacementLocalMethod",
     "UtilityPlacementOptimisationMethod",
     "UtilityPlacementOptions",
     "UtilityPlacementRequest",

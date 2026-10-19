@@ -8,6 +8,20 @@ from typing import Any, Callable, Mapping
 
 ScalarObjective = Callable[..., float]
 
+# scipy local methods that keep a polish inside the bounds. Methods that
+# ignore bounds (BFGS, CG, Newton-CG, trust-region variants) would walk the
+# polish out of the box, so they are not accepted.
+LOCAL_METHODS = (
+    "SLSQP",
+    "L-BFGS-B",
+    "TNC",
+    "Nelder-Mead",
+    "Powell",
+    "COBYLA",
+    "COBYQA",
+    "trust-constr",
+)
+
 
 class OptimisationMethod(StrEnum):
     """Supported black-box minimisation methods."""
@@ -123,6 +137,7 @@ class OptimisationResult:
 
 
 __all__ = [
+    "LOCAL_METHODS",
     "OptimisationCandidate",
     "OptimisationMethod",
     "OptimisationOptions",
