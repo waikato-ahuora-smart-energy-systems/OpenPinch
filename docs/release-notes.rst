@@ -4,6 +4,17 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Command layer
+~~~~~~~~~~~~~
+
+- ``run_command`` collects warnings per call, so concurrent calls from worker
+  threads each return only their own warnings, none lost, and the global
+  warning filters and ``showwarning`` are unchanged once the calls finish.
+  Before, calls replaced the process-wide filters in turn: under 24
+  concurrent calls a response could carry other commands' warnings or lose
+  its own, and the filters stayed modified. A warning raised outside a
+  command while one runs is shown as before rather than returned with it.
+
 Network grid data
 ~~~~~~~~~~~~~~~~~
 

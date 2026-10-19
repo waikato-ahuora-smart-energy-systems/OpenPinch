@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import base64
 import json
+import subprocess
+import sys
+import threading
 import warnings
 from importlib.resources import files
 
@@ -1277,6 +1280,114 @@ def test_warnings_raised_by_a_command_are_returned(monkeypatch):
             "details": None,
         }
     ]
+
+
+def test_concurrent_commands_each_return_only_their_own_warnings(monkeypatch):
+    # The audit saw warnings cross between 24 concurrent responses, and the
+    # global warning filters left modified, when calls ran in worker threads.
+    target = _TargetAccessor.direct_heat_integration
+    calls = 24
+    barrier = threading.Barrier(calls, timeout=60)
+
+    def warning_target(self, **kwargs):
+        name = threading.current_thread().name
+        warnings.warn(f"{name} before", UserWarning, stacklevel=1)
+        barrier.wait()  # every call is now inside run_command at once
+        warnings.warn(f"{name} after", UserWarning, stacklevel=1)
+        return target(self, **kwargs)
+
+    monkeypatch.setattr(_TargetAccessor, "direct_heat_integration", warning_target)
+    filters = list(warnings.filters)
+    showwarning = warnings.showwarning
+    responses: dict[str, dict] = {}
+
+    def call():
+        responses[threading.current_thread().name] = run_command(
+            {
+                "command": "target.direct_heat_integration",
+                "problem": {"sample_case": "basic_pinch.json"},
+            }
+        )
+
+    threads = [threading.Thread(target=call, name=f"call-{i}") for i in range(calls)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert len(responses) == calls
+    for name, response in responses.items():
+        assert [w["message"] for w in response["warnings"]] == [
+            f"{name} before",
+            f"{name} after",
+        ]
+    assert warnings.filters == filters
+    assert warnings.showwarning is showwarning
+
+
+def test_a_warning_raised_outside_a_command_is_shown_as_before(monkeypatch):
+    target = _TargetAccessor.direct_heat_integration
+    inside, outside = threading.Event(), threading.Event()
+    shown = []
+
+    def waiting_target(self, **kwargs):
+        inside.set()
+        assert outside.wait(timeout=60)
+        return target(self, **kwargs)
+
+    def outside_command():
+        assert inside.wait(timeout=60)
+        warnings.warn("Not from a command.", UserWarning, stacklevel=1)
+        outside.set()
+
+    monkeypatch.setattr(_TargetAccessor, "direct_heat_integration", waiting_target)
+    monkeypatch.setattr(
+        warnings, "showwarning", lambda message, *args: shown.append(str(message))
+    )
+    thread = threading.Thread(target=outside_command)
+    thread.start()
+    response = run_command(
+        {
+            "command": "target.direct_heat_integration",
+            "problem": {"sample_case": "basic_pinch.json"},
+        }
+    )
+    thread.join()
+
+    assert response["warnings"] == []
+    assert shown == ["Not from a command."]
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 14), reason="context-aware warnings need Python 3.14"
+)
+def test_concurrent_commands_keep_their_warnings_with_context_aware_warnings():
+    # With -X context_aware_warnings the filters are per context, and TESPy
+    # (imported with the package) replaces showwarning, so recording through
+    # catch_warnings alone would return no warnings.
+    node = (
+        "tests/application/test_commands.py::"
+        "test_concurrent_commands_each_return_only_their_own_warnings"
+    )
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-X",
+            "context_aware_warnings=1",
+            "-m",
+            "pytest",
+            node,
+            "-q",
+            "-p",
+            "no:cacheprovider",
+        ],
+        cwd=REPOSITORY_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stdout + completed.stderr
 
 
 def test_validation_warnings_are_returned_one_per_issue():
