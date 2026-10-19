@@ -70,6 +70,12 @@ def _reset_calls():
     _CALLS.clear()
 
 
+@pytest.fixture
+def native_platform(monkeypatch):
+    """Exercise the pool path even where the suite runs under Pyodide."""
+    monkeypatch.setattr(execution.sys, "platform", "linux")
+
+
 def test_objective_runtime_error_propagates_without_serial_rerun():
     with pytest.raises(RuntimeError, match="objective failed"):
         execution._collect_candidates_in_parallel(
@@ -81,7 +87,9 @@ def test_objective_runtime_error_propagates_without_serial_rerun():
 
 
 @pytest.mark.parametrize("pool_cls", [_BreakingPool, _StartupFailingPool])
-def test_pool_infrastructure_failure_falls_back_to_serial(pool_cls, caplog):
+def test_pool_infrastructure_failure_falls_back_to_serial(
+    native_platform, pool_cls, caplog
+):
     with caplog.at_level(logging.WARNING, logger=execution.__name__):
         xs, fs = execution._collect_candidates_in_parallel(
             _record_run, n_runs=2, pool_executor_cls=pool_cls
@@ -253,7 +261,7 @@ def _main_script(monkeypatch, tmp_path, source):
 
 
 def test_unguarded_main_module_runs_serially_with_a_warning(
-    monkeypatch, tmp_path, caplog
+    native_platform, monkeypatch, tmp_path, caplog
 ):
     _main_script(monkeypatch, tmp_path, "import OpenPinch\nrun_placement()\n")
 
@@ -266,7 +274,9 @@ def test_unguarded_main_module_runs_serially_with_a_warning(
     assert 'if __name__ == "__main__":' in caplog.text
 
 
-def test_guarded_main_module_uses_worker_processes(monkeypatch, tmp_path):
+def test_guarded_main_module_uses_worker_processes(
+    native_platform, monkeypatch, tmp_path
+):
     _main_script(
         monkeypatch,
         tmp_path,
@@ -285,7 +295,7 @@ def test_guarded_main_module_uses_worker_processes(monkeypatch, tmp_path):
     assert started == [2]
 
 
-def test_search_pool_is_capped_at_the_cpu_count(monkeypatch):
+def test_search_pool_is_capped_at_the_cpu_count(native_platform, monkeypatch):
     monkeypatch.setattr(execution.os, "cpu_count", lambda: 2)
     started = []
 
