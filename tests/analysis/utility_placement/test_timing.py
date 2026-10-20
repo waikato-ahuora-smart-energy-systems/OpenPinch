@@ -28,3 +28,14 @@ def test_webassembly_gets_the_wasm_factor_without_ci_in_its_environment(
     monkeypatch.delenv("CI", raising=False)
     monkeypatch.setattr(sys, "platform", "emscripten")
     assert time_budget(0.1) == 0.1 * WASM_BUDGET_FACTOR
+
+
+def test_wall_clock_budget_tests_run_only_in_the_performance_lane():
+    # Shared runners under load miss wall-clock budgets with no code change
+    # (a 10 ms call measured 0.5 s on a busy unit-py312 runner), so these
+    # tests belong to the performance lane, not the unit lanes.
+    from tests.analysis.utility_placement import test_performance
+
+    marks = getattr(test_performance, "pytestmark", [])
+    marks = marks if isinstance(marks, list) else [marks]
+    assert "performance" in {mark.name for mark in marks}

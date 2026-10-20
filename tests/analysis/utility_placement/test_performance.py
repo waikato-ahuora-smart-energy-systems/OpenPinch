@@ -5,6 +5,8 @@ from __future__ import annotations
 import statistics
 import time
 
+import pytest
+
 from OpenPinch.analysis.utility_placement import (
     build_utility_placement_model,
     decode_placement,
@@ -24,6 +26,9 @@ from OpenPinch.contracts.utility_placement import (
     UtilityLevelKind,
 )
 from tests.analysis.utility_placement._timing import time_budget
+
+# Wall-clock budgets: the performance lane runs these, not the unit lanes.
+pytestmark = pytest.mark.performance
 
 
 def _representative_case(period_count: int = 100):
