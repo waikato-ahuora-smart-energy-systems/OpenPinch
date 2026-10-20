@@ -4,6 +4,9 @@ Pre-Release Notes
 Unreleased
 ----------
 
+0.7.2 (2026-10-20)
+------------------
+
 HEN synthesis orchestration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -447,16 +450,6 @@ Input, contracts and option metadata
   numeric column is an error rather than 1. A project name may contain ``/``;
   before, every load with such a name failed.
 
-Network grid data
-~~~~~~~~~~~~~~~~~
-
-- A network's grid layout (``design.grid_layout()``, and ``view.grid`` in
-  ``design.`` command responses) now gives each stream row its supply and
-  target temperature in the period (``stream_temperatures``, the ends of its
-  exchangers' temperatures) and each match its heat transfer area (summed
-  over the exchangers one match merges). A client can draw a full grid
-  diagram, with end temperatures and areas, from the layout alone.
-
 Testing and CI
 ~~~~~~~~~~~~~~
 
@@ -466,24 +459,6 @@ Testing and CI
   the unit lanes. Their wall-clock budgets failed on busy shared runners with
   no code change: a bound reduction that takes about 10 ms measured 0.5 s on
   ``unit-py312`` against a 0.45 s budget.
-- The Pyodide test lane is required by ``CI OK``, so a change that breaks the
-  web app's engine blocks the merge. Its PyPI test dependencies are pinned
-  to the ``uv.lock`` versions in ``scripts/pyodide/requirements.txt``, a test
-  keeps the two in step, and the run fails if micropip fetches anything
-  else from PyPI. ``tests/presentation`` now runs in the lane's core shard,
-  and the utility placement timing tests allow WebAssembly ten times their
-  native budget.
-- ``tests/conftest.py`` loads an ``openpinch`` Hypothesis profile
-  (``derandomize=False``, no deadline, no example database), so
-  ``--hypothesis-seed`` picks the same examples on GitHub, locally and in
-  Pyodide. Before, Hypothesis's own CI profile ignored the seed on GitHub.
-
-Tutorials
-~~~~~~~~~
-
-- Tutorial 15 asks ``design.utility()`` for its case's hot utility by its
-  name, ``HPS``. It asked for ``HP Steam``, which used to answer 0 and now
-  raises as an unknown utility, so the notebook stopped running.
 
 Heat pump second law
 ~~~~~~~~~~~~~~~~~~~~
@@ -553,6 +528,34 @@ Heat pump conventions, exergy and targeting details
 - The vapour-compression docstrings say that T_evap is the dew-point and T_cond
   the bubble-point temperature, as the code uses them.
 
+0.7.1 (2026-10-19)
+------------------
+
+Network grid data
+~~~~~~~~~~~~~~~~~
+
+- A network's grid layout (``design.grid_layout()``, and ``view.grid`` in
+  ``design.`` command responses) now gives each stream row its supply and
+  target temperature in the period (``stream_temperatures``, the ends of its
+  exchangers' temperatures) and each match its heat transfer area (summed
+  over the exchangers one match merges). A client can draw a full grid
+  diagram, with end temperatures and areas, from the layout alone.
+
+Testing and CI
+~~~~~~~~~~~~~~
+
+- The Pyodide test lane is required by ``CI OK``, so a change that breaks the
+  web app's engine blocks the merge. Its PyPI test dependencies are pinned
+  to the ``uv.lock`` versions in ``scripts/pyodide/requirements.txt``, a test
+  keeps the two in step, and the run fails if micropip fetches anything
+  else from PyPI. ``tests/presentation`` now runs in the lane's core shard,
+  and the utility placement timing tests allow WebAssembly ten times their
+  native budget.
+- ``tests/conftest.py`` loads an ``openpinch`` Hypothesis profile
+  (``derandomize=False``, no deadline, no example database), so
+  ``--hypothesis-seed`` picks the same examples on GitHub, locally and in
+  Pyodide. Before, Hypothesis's own CI profile ignored the seed on GitHub.
+
 Result fixes
 ~~~~~~~~~~~~
 
@@ -575,26 +578,6 @@ Result fixes
   weighted average, as ``include_periods=True, include_weighted_average=True``
   does. Before, it raised "No target analysis is available". With a
   single-period run, or with either flag given, the workbook is unchanged.
-- ``export_excel(include_periods=True)`` writes each period's problem tables
-  from the all-periods run that produced the exported results. Before, a later
-  single-period run replaced that period's tables, so the workbook mixed the
-  batch's summary with the later run's tables.
-- In ``target.all_periods.<method>`` (and a single-period target on a
-  multiperiod problem) each target's utilities now carry that period's duty as
-  a scalar. Before, each utility gave an array over all periods in which only
-  the target's own entry was set.
-- After ``target.all_periods.<method>`` with no single-period run,
-  ``plot.data()``, ``plot.catalog()``, the plot methods and the plot exports
-  read the graphs of every period's result. The catalogue gains a
-  ``Period ID`` column, and the graph data is keyed ``"<graph set> [<period>]"``.
-- A single-period ``target.<method>`` run no longer discards the last
-  all-periods results, so ``report(include_periods=True)`` and the weighted
-  summaries still work after it. Changing the problem's input still clears
-  them.
-- ``design.top(n)`` uses the same ranking as ``design.network(rank=)`` and
-  ``design.grid(rank=)``: successful, feasible outcomes of the accepted method
-  with duplicate network structures removed. Before, it sliced
-  ``result.ranked_networks``, so rank ``k`` could differ between them.
 
 Multiperiod and WebAssembly fixes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -627,6 +610,63 @@ Multiperiod and WebAssembly fixes
   but its weight still counts: the weighted operation (duties, work, operating
   cost and penalty) is spread over the whole schedule, while the COP and the
   peak capital are unchanged.
+
+Command layer
+~~~~~~~~~~~~~
+
+- ``workspace.set_case_input`` takes ``source`` as ``{"data": ...}`` or the
+  TargetInput JSON and rejects anything else, such as a file path, with
+  ``ValueError``. Before, a path string read that file on the engine host.
+- A unit string pint does not know, such as ``{"value": 200, "unit":
+  "bogus"}``, is a validation issue on its field: ``build_validation_report``
+  returns ``valid=False`` and the ``validate`` command returns its report.
+  Before, both raised ``UndefinedUnitError``.
+- A ``zone_tree`` whose zone has two children of the same name is rejected
+  when the input is loaded or validated ("Duplicate zone name ...").
+  Before, the second child was merged into the first.
+- ``Value.to`` converts an offset temperature (``degC``, ``C``, ``°C``,
+  ``degF``) to a difference unit such as ``delta_degC`` as a difference, as
+  the ``Value`` constructor does, so a ``Stream`` takes ``dt_cont`` as
+  ``{"value": 5, "unit": "degC"}``. Before, it raised
+  ``DimensionalityError``.
+- ``run_command`` raises ``ValueError`` naming the accepted shapes,
+  ``{"data": ...}`` or ``{"sample_case": ...}``, when ``problem`` is a bare
+  string or names neither. Before, it raised ``AttributeError`` or
+  ``KeyError``.
+
+0.5.1 to 0.7.0
+--------------
+
+Tutorials
+~~~~~~~~~
+
+- Tutorial 15 asks ``design.utility()`` for its case's hot utility by its
+  name, ``HPS``. It asked for ``HP Steam``, which used to answer 0 and now
+  raises as an unknown utility, so the notebook stopped running.
+
+Result fixes
+~~~~~~~~~~~~
+
+- ``export_excel(include_periods=True)`` writes each period's problem tables
+  from the all-periods run that produced the exported results. Before, a later
+  single-period run replaced that period's tables, so the workbook mixed the
+  batch's summary with the later run's tables.
+- In ``target.all_periods.<method>`` (and a single-period target on a
+  multiperiod problem) each target's utilities now carry that period's duty as
+  a scalar. Before, each utility gave an array over all periods in which only
+  the target's own entry was set.
+- After ``target.all_periods.<method>`` with no single-period run,
+  ``plot.data()``, ``plot.catalog()``, the plot methods and the plot exports
+  read the graphs of every period's result. The catalogue gains a
+  ``Period ID`` column, and the graph data is keyed ``"<graph set> [<period>]"``.
+- A single-period ``target.<method>`` run no longer discards the last
+  all-periods results, so ``report(include_periods=True)`` and the weighted
+  summaries still work after it. Changing the problem's input still clears
+  them.
+- ``design.top(n)`` uses the same ranking as ``design.network(rank=)`` and
+  ``design.grid(rank=)``: successful, feasible outcomes of the accepted method
+  with duplicate network structures removed. Before, it sliced
+  ``result.ranked_networks``, so rank ``k`` could differ between them.
 
 Fuller results
 ~~~~~~~~~~~~~~
@@ -692,25 +732,6 @@ Command layer
   ``workspace.set_case_input`` command replace an existing case's input and
   return its validation report. The session and the other cases' results are
   kept.
-- ``workspace.set_case_input`` takes ``source`` as ``{"data": ...}`` or the
-  TargetInput JSON and rejects anything else, such as a file path, with
-  ``ValueError``. Before, a path string read that file on the engine host.
-- A unit string pint does not know, such as ``{"value": 200, "unit":
-  "bogus"}``, is a validation issue on its field: ``build_validation_report``
-  returns ``valid=False`` and the ``validate`` command returns its report.
-  Before, both raised ``UndefinedUnitError``.
-- A ``zone_tree`` whose zone has two children of the same name is rejected
-  when the input is loaded or validated ("Duplicate zone name ...").
-  Before, the second child was merged into the first.
-- ``Value.to`` converts an offset temperature (``degC``, ``C``, ``°C``,
-  ``degF``) to a difference unit such as ``delta_degC`` as a difference, as
-  the ``Value`` constructor does, so a ``Stream`` takes ``dt_cont`` as
-  ``{"value": 5, "unit": "degC"}``. Before, it raised
-  ``DimensionalityError``.
-- ``run_command`` raises ``ValueError`` naming the accepted shapes,
-  ``{"data": ...}`` or ``{"sample_case": ...}``, when ``problem`` is a bare
-  string or names neither. Before, it raised ``AttributeError`` or
-  ``KeyError``.
 - ``ConfigurationFieldMetadata`` gives each field's ``unit``,
   ``description`` and ``default``, and ``label`` is a display name such as
   "Minimum contribution temperature difference" rather than the title-cased
@@ -1170,7 +1191,7 @@ Analysis reliability and extensibility
   :doc:`developer/adding-analysis-methods` for the extension contract.
 
 HPR and MVR robustness and tutorial reliability
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - Hardened CoolProp-backed HPR residual accounting when shared temperature
   grids contain duplicate levels. Equivalent detached residual rows collapse
@@ -1192,7 +1213,6 @@ HPR and MVR robustness and tutorial reliability
   matrix, support boundary, notebook catalog, and generated coverage metadata
   to document budgets, diagnostics, direct process MVR, optimized VC+MVR, and
   the two multiperiod modes.
-
 
 Target-owned HPR performance maps
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1250,7 +1270,7 @@ Heat-recovery ``dt_min`` service
   of the ordinary cached target.
 
 0.5.0 architecture clean break
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+------------------------------
 
 - ``PinchProblem`` remains the strict
   mapping-in/result-out contract. Its signature, validation order, return
