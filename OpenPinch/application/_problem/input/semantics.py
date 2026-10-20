@@ -10,7 +10,10 @@ import numpy as np
 from pint.errors import PintError
 
 from ....contracts.input import TargetInput
-from ....contracts.units import standardise_input_value
+from ....contracts.units import (
+    heat_flow_from_heat_capacity_flowrate,
+    standardise_input_value,
+)
 from ....contracts.workspace import ValidationIssue
 from ....domain.configuration import tol
 from ....domain.configuration_fields import (
@@ -30,6 +33,7 @@ _STREAM_VALUE_FIELDS = (
     "h_supply",
     "h_target",
     "heat_flow",
+    "heat_capacity_flowrate",
     "dt_cont",
     "htc",
 )
@@ -134,6 +138,15 @@ def semantic_issues(
             )
         )
         issues.extend(
+            _nested_period_length_issues(
+                stream,
+                section="streams",
+                record_index=index,
+                record_label=label,
+                period_ids=period_ids,
+            )
+        )
+        issues.extend(
             segmented_record_issues(
                 stream,
                 section="streams",
@@ -158,6 +171,15 @@ def semantic_issues(
         issues.extend(
             _validate_utility_record_states(
                 utility_values,
+                section="utilities",
+                record_index=index,
+                record_label=label,
+                period_ids=period_ids,
+            )
+        )
+        issues.extend(
+            _nested_period_length_issues(
+                utility,
                 section="utilities",
                 record_index=index,
                 record_label=label,
@@ -282,6 +304,48 @@ def _raw_value_is_missing(raw_value: Any) -> bool:
     return False
 
 
+# Relative tolerance for heat_flow against CP x abs(T_supply - T_target): wide
+# enough for values rounded to four significant figures in a spreadsheet.
+_HEAT_CAPACITY_FLOWRATE_RTOL = 1e-4
+
+
+def _validate_heat_capacity_flowrate_agreement(
+    values: dict[str, Value | None],
+    *,
+    section: str,
+    record_index: int,
+    record_label: Optional[str],
+) -> list[ValidationIssue]:
+    heat_flow = values.get("heat_flow")
+    heat_capacity_flowrate = values.get("heat_capacity_flowrate")
+    if heat_flow is None or heat_capacity_flowrate is None:
+        return []
+    derived = heat_flow_from_heat_capacity_flowrate(
+        values["t_supply"], values["t_target"], heat_capacity_flowrate
+    )
+    given, expected = np.broadcast_arrays(
+        heat_flow.period_values, derived.period_values
+    )
+    if np.allclose(given, expected, rtol=_HEAT_CAPACITY_FLOWRATE_RTOL, atol=0.0):
+        return []
+    return [
+        _build_issue(
+            severity="error",
+            section=section,
+            record_index=record_index,
+            record_label=record_label,
+            path_field="heat_capacity_flowrate",
+            field="heat_capacity_flowrate",
+            message=(
+                "heat_flow "
+                f"{np.round(heat_flow.period_values, 6).tolist()} kW disagrees "
+                "with heat_capacity_flowrate x abs(t_supply - t_target) = "
+                f"{np.round(derived.period_values, 6).tolist()} kW."
+            ),
+        )
+    ]
+
+
 def _validate_stream_record_states(
     values: dict[str, Value | None],
     *,
@@ -316,13 +380,25 @@ def _validate_stream_record_states(
     )
     issues.extend(
         _validate_non_negative_states(
+            values.get("heat_capacity_flowrate"),
+            section=section,
+            record_index=record_index,
+            record_label=record_label,
+            field_name="heat_capacity_flowrate",
+            severity="error",
+            message="Value must be non-negative.",
+            period_ids=period_ids,
+        )
+    )
+    issues.extend(
+        _validate_non_negative_states(
             values.get("dt_cont"),
             section=section,
             record_index=record_index,
             record_label=record_label,
             field_name="dt_cont",
             severity="warning",
-            message="Value should be non-negative.",
+            message=_NEGATIVE_DT_CONT_MESSAGE,
             period_ids=period_ids,
         )
     )
@@ -361,6 +437,15 @@ def _validate_stream_record_states(
     t_target = values.get("t_target")
     if t_supply is None or t_target is None or length_issues:
         return issues
+
+    issues.extend(
+        _validate_heat_capacity_flowrate_agreement(
+            values,
+            section=section,
+            record_index=record_index,
+            record_label=record_label,
+        )
+    )
 
     classifications: dict[str, list[str]] = {
         StreamType.Hot.value: [],
@@ -928,7 +1013,11 @@ def _validate_utility_record_states(
                 record_label=record_label,
                 field_name=field_name,
                 severity="warning",
-                message="Value should be non-negative.",
+                message=(
+                    _NEGATIVE_DT_CONT_MESSAGE
+                    if field_name == "dt_cont"
+                    else "Value should be non-negative."
+                ),
                 period_ids=period_ids,
             )
         )
@@ -994,33 +1083,21 @@ def _validate_period_lengths(
 ) -> list[ValidationIssue]:
     """Require a record's per-period arrays to agree on the number of periods.
 
-    A value is either one number for every period or one per period. With
-    ``PROBLEM_PERIOD_IDS`` declared, that is its length; otherwise all of the
-    record's multi-period values must share one length. Any other mix would
-    silently change the problem's period model or index out of range.
+    A value is either one number for every period or one per period, and
+    ``PROBLEM_PERIOD_IDS`` declares the periods. Per-period values without it
+    would silently use only the first period, and any other length would
+    change the problem's period model or index out of range.
     """
     lengths = {
         field_name: len(value)
         for field_name, value in values.items()
         if isinstance(value, Value) and len(value) > 1
     }
-    if period_ids:
-        expected = len(period_ids)
-    elif lengths:
-        expected = max(set(lengths.values()), key=list(lengths.values()).count)
-    else:
-        return []
     issues: list[ValidationIssue] = []
     for field_name, count in lengths.items():
-        if count == expected:
+        message = _period_length_message(count, period_ids)
+        if message is None:
             continue
-        message = (
-            f"Has {count} period values, but PROBLEM_PERIOD_IDS declares "
-            f"{expected} periods."
-            if period_ids
-            else f"Has {count} period values, but other values of this record "
-            f"have {expected}."
-        )
         issues.append(
             _build_issue(
                 severity="error",
@@ -1032,6 +1109,61 @@ def _validate_period_lengths(
                 message=message,
             )
         )
+    return issues
+
+
+def _period_length_message(count: int, period_ids: Sequence[str] | None) -> str | None:
+    """Return why ``count`` period values disagree with the declared periods."""
+    if period_ids and count == len(period_ids):
+        return None
+    if period_ids:
+        return (
+            f"Has {count} period values, but PROBLEM_PERIOD_IDS declares "
+            f"{len(period_ids)} periods."
+        )
+    return (
+        f"Has {count} period values, but PROBLEM_PERIOD_IDS is not set. "
+        "Declare one id per period in the options."
+    )
+
+
+def _nested_period_length_issues(
+    record,
+    *,
+    section: str,
+    record_index: int,
+    record_label: Optional[str],
+    period_ids: Sequence[str] | None,
+) -> list[ValidationIssue]:
+    """Apply the period-length rule to a record's segment and profile values."""
+    nested: list[tuple[str, Any]] = []
+    for idx, segment in enumerate(getattr(record, "segments", None) or []):
+        nested.append((f"segments[{idx}]", segment))
+    profile = getattr(record, "profile", None)
+    if profile is not None:
+        for idx, point in enumerate(profile.points):
+            nested.append((f"profile.points[{idx}]", point))
+    issues: list[ValidationIssue] = []
+    for prefix, item in nested:
+        data = item.model_dump(mode="python") if hasattr(item, "model_dump") else item
+        for field_name, raw in data.items():
+            magnitudes = raw.get("values") if isinstance(raw, dict) else None
+            if not isinstance(magnitudes, list) or len(magnitudes) <= 1:
+                continue
+            message = _period_length_message(len(magnitudes), period_ids)
+            if message is None:
+                continue
+            issues.append(
+                _build_issue(
+                    severity="error",
+                    section=section,
+                    record_index=record_index,
+                    record_label=record_label,
+                    path_field=f"{prefix}.{field_name}",
+                    field=field_name,
+                    message=message,
+                )
+            )
     return issues
 
 
@@ -1090,6 +1222,14 @@ def _validate_value_finiteness(
         reject=lambda magnitude: not math.isfinite(magnitude),
         period_ids=period_ids,
     )
+
+
+# A negative dt_cont stays a warning, but it lets the shifted hot and cold
+# curves overlap, so the targets are no longer bounded by thermodynamics.
+_NEGATIVE_DT_CONT_MESSAGE = (
+    "Value should be non-negative: with a negative dt_cont the reported heat "
+    "recovery can exceed the thermodynamic limit."
+)
 
 
 def _validate_non_negative_states(

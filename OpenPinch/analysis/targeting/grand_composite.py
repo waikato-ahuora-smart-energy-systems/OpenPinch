@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from ...domain._problem_table.types import ProblemTableUpdateKwargs
-from ...domain.configuration import tol
+from ...domain.configuration import heat_resolution, tol
 from ...domain.enums import ProblemTableLabel
 from ...domain.problem_table import ProblemTable
 from ..numerics import delta_with_zero_at_start, linear_interpolation
@@ -363,17 +363,20 @@ def _remove_pockets_on_one_side_of_the_pinch(
         sgn = -1
 
     T_vals, H_vals, H_NP_vals = pt[ProblemTableLabel.T], pt[col_H], pt[col_H_NP]
+    # Pocket depths compare with the problem's heat-flow resolution, so a
+    # small problem's pockets are not mistaken for rounding noise.
+    resolution = heat_resolution(H_vals)
 
-    if H_vals[i] < tol:
+    if H_vals[i] < resolution:
         # No heating or cooling required
         return pt, hot_pinch_loc, cold_pinch_loc
 
     for _ in range(i, pinch_loc, sgn):
         di = sgn
         n_int_added = 0
-        if H_vals[i] < H_vals[i + sgn] - tol:
+        if H_vals[i] < H_vals[i + sgn] - resolution:
             i_0 = i
-            i = _pocket_exit_index(H_vals, i, pinch_loc, sgn)
+            i = _pocket_exit_index(H_vals, i, pinch_loc, sgn, resolution)
 
             if i != pinch_loc:
                 T0 = linear_interpolation(
@@ -394,7 +397,12 @@ def _remove_pockets_on_one_side_of_the_pinch(
                 else:
                     i_0 += n_int_added
 
-            j_rng = range(i_0 + 1, i + 1) if is_above_pinch else range(i + 1, i_0)
+            # Flatten every pocket row, the exit row and the inserted exit
+            # row. The exit temperature is inserted rounded, so the inserted
+            # row's interpolated H is only close to the pocket level.
+            j_rng = (
+                range(i_0 + 1, i + 1 + n_int_added) if is_above_pinch else range(i, i_0)
+            )
             for j in j_rng:
                 H_NP_vals[j] = H_vals[i_0]
 
@@ -407,16 +415,22 @@ def _remove_pockets_on_one_side_of_the_pinch(
     return pt, hot_pinch_loc, cold_pinch_loc
 
 
-def _pocket_exit_index(H_vals: np.ndarray, i_0: int, pinch_loc: int, sgn: int) -> int:
+def _pocket_exit_index(
+    H_vals: np.ndarray,
+    i_0: int,
+    pinch_loc: int,
+    sgn: int,
+    resolution: float = tol,
+) -> int:
     """Return index where a pocket terminates when marching in direction ``sgn``."""
     if sgn > 0:
         for i in range(i_0 + 1, pinch_loc + 1):
-            if H_vals[i_0] >= H_vals[i] + tol:
+            if H_vals[i_0] >= H_vals[i] + resolution:
                 return i - 1
         return pinch_loc
     else:
         for i in range(i_0 - 1, pinch_loc - 1, -1):
-            if H_vals[i_0] >= H_vals[i] + tol:
+            if H_vals[i_0] >= H_vals[i] + resolution:
                 return i + 1
         return pinch_loc
 

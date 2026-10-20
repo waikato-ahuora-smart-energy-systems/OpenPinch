@@ -165,11 +165,16 @@ def _single_state_objective_case(goal: str) -> StageWiseModel:
     model.I = 1
     model.J = 1
     model.S = 1
+    model.NHU = 1
+    model.NCU = 1
     model.N_periods = 1
     model.minimisation_goal = goal
     model.m = _ObjectiveModel()
-    model.Q_h = [10.0]
-    model.Q_c = [5.0]
+    # Heater and cooler grids are [stream][utility].
+    model.Q_h = [[10.0]]
+    model.Q_c = [[5.0]]
+    model.Q_h_by_period = [model.Q_h]
+    model.Q_c_by_period = [model.Q_c]
     model.Q_r = [[[7.0]]]
     model.hu_cost = [2.0]
     model.cu_cost = [3.0]
@@ -177,8 +182,10 @@ def _single_state_objective_case(goal: str) -> StageWiseModel:
     model.hu_unit_cost = [2.0]
     model.cu_unit_cost = [3.0]
     model.unit_cost = [4.0]
-    model.z_hu = [1]
-    model.z_cu = [1]
+    model.z_hu = [[1]]
+    model.z_cu = [[1]]
+    model.z_hu_allowed = [[1]]
+    model.z_cu_allowed = [[1]]
     model.z = [[[1]]]
     model.z_allowed = [[[1]]]
     model.A_coeff = [1.0]
@@ -188,18 +195,18 @@ def _single_state_objective_case(goal: str) -> StageWiseModel:
     model.theta_2 = [[[20.0]]]
     model.hu_coeff = [1.0]
     model.hu_exp = [1.0]
-    model.U_hu = [1.0]
-    model.T_hu_in = [200.0]
-    model.T_hu_out = [180.0]
-    model.T_c_out = [50.0]
-    model.T_c = [[40.0, 60.0]]
+    model.U_hu = [[1.0]]
+    model.T_hu_in_period = [[200.0]]
+    model.T_hu_out_period = [[180.0]]
+    model.T_c_out_period = [[50.0]]
+    model.T_c_by_period = [[[40.0, 60.0]]]
     model.cu_coeff = [1.0]
     model.cu_exp = [1.0]
-    model.U_cu = [1.0]
-    model.T_h = [[100.0, 80.0]]
-    model.T_h_out = [60.0]
-    model.T_cu_in = [20.0]
-    model.T_cu_out = [30.0]
+    model.U_cu = [[1.0]]
+    model.T_h_by_period = [[[100.0, 80.0]]]
+    model.T_h_out_period = [[60.0]]
+    model.T_cu_in_period = [[20.0]]
+    model.T_cu_out_period = [[30.0]]
     model.hu_cost_total = 10.0
     model.cu_cost_total = 20.0
     model.recovery_area_cost_filtered = [[30.0]]
@@ -218,8 +225,10 @@ def _multi_state_objective_case(goal: str) -> StageWiseModel:
     model.period_weight_sum = 4.0
     model.minimisation_goal = goal
     model.m = _ObjectiveModel()
-    model.Q_h_by_period = [[10.0], [20.0]]
-    model.Q_c_by_period = [[5.0], [15.0]]
+    model.NHU = 1
+    model.NCU = 1
+    model.Q_h_by_period = [[[10.0]], [[20.0]]]
+    model.Q_c_by_period = [[[5.0]], [[15.0]]]
     model.Q_r_by_period = [[[[7.0]]], [[[9.0]]]]
     model.hu_cost_period = [[2.0], [4.0]]
     model.cu_cost_period = [[3.0], [6.0]]
@@ -236,18 +245,18 @@ def _single_period_warm_start_model(*, stages: int = 2) -> StageWiseModel:
     model.dTmin = 7.0
     model.non_isothermal_model = True
     model.z_allowed = [[[1 if index < stages - 1 else 0 for index in range(stages)]]]
-    model.z_cu_allowed = [0]
-    model.z_hu_allowed = [0]
+    model.z_cu_allowed = [[0]]
+    model.z_hu_allowed = [[0]]
     model.Q_r = _variables((1, 1, stages))
     model.z = _variables((1, 1, stages))
     model.theta_1 = _variables((1, 1, stages))
     model.theta_2 = _variables((1, 1, stages))
     model.T_h = _variables((1, stages + 1))
     model.T_c = _variables((1, stages + 1))
-    model.Q_c = _variables((1,))
-    model.z_cu = _variables((1,))
-    model.Q_h = _variables((1,))
-    model.z_hu = _variables((1,))
+    model.Q_c = _variables((1, 1))
+    model.z_cu = _variables((1, 1))
+    model.Q_h = _variables((1, 1))
+    model.z_hu = _variables((1, 1))
     model.X = _variables((1, 1, stages))
     model.Y = _variables((1, 1, stages))
     model.T_h_out_x = _variables((1, 1, stages))
@@ -265,10 +274,10 @@ def _single_period_source(*, non_isothermal: bool, q_values: list[float]):
         theta_2=_source_variables([[[20.0 + index for index in range(stages)]]]),
         T_h=_source_variables([[100.0 - 5.0 * index for index in range(stages + 1)]]),
         T_c=_source_variables([[40.0 + 5.0 * index for index in range(stages + 1)]]),
-        Q_c=_source_variables([5.0]),
-        z_cu=[[1]],
-        Q_h=_source_variables([6.0]),
-        z_hu=[[1]],
+        Q_c=_source_variables([[5.0]]),
+        z_cu=[[[1]]],
+        Q_h=_source_variables([[6.0]]),
+        z_hu=[[[1]]],
         X=_source_variables([[[0.25 + 0.1 * index for index in range(stages)]]]),
         Y=_source_variables([[[0.35 + 0.1 * index for index in range(stages)]]]),
         T_h_out_x=_source_variables(
@@ -288,11 +297,11 @@ def _multi_period_warm_start_model() -> StageWiseModel:
     model.theta_2_by_period = _variables((2, 1, 1, 2))
     model.T_h_by_period = _variables((2, 1, 3))
     model.T_c_by_period = _variables((2, 1, 3))
-    model.Q_c_by_period = _variables((2, 1))
-    model.Q_h_by_period = _variables((2, 1))
+    model.Q_c_by_period = _variables((2, 1, 1))
+    model.Q_h_by_period = _variables((2, 1, 1))
     model.area_r_shared = _variables((1, 1, 2))
-    model.area_hu_shared = _variables((1,))
-    model.area_cu_shared = _variables((1,))
+    model.area_hu_shared = _variables((1, 1))
+    model.area_cu_shared = _variables((1, 1))
     model.X_by_period = _variables((2, 1, 1, 2))
     model.Y_by_period = _variables((2, 1, 1, 2))
     model.T_h_out_x_by_period = _variables((2, 1, 1, 2))
@@ -309,19 +318,19 @@ def _asymmetric_warm_start_model(*, multiperiod: bool) -> StageWiseModel:
     model.dTmin = 7.0
     model.non_isothermal_model = True
     model.z_allowed = [[[1], [1]], [[1], [1]]]
-    model.z_cu_allowed = [0, 0]
-    model.z_hu_allowed = [0, 0]
+    model.z_cu_allowed = [[0], [0]]
+    model.z_hu_allowed = [[0], [0]]
     model.z = _variables((2, 2, 1))
-    model.z_cu = _variables((2,))
-    model.z_hu = _variables((2,))
+    model.z_cu = _variables((2, 1))
+    model.z_hu = _variables((2, 1))
     if not multiperiod:
         model.Q_r = _variables((2, 2, 1))
         model.theta_1 = _variables((2, 2, 1))
         model.theta_2 = _variables((2, 2, 1))
         model.T_h = _variables((2, 2))
         model.T_c = _variables((2, 2))
-        model.Q_c = _variables((2,))
-        model.Q_h = _variables((2,))
+        model.Q_c = _variables((2, 1))
+        model.Q_h = _variables((2, 1))
         model.X = _variables((2, 2, 1))
         model.Y = _variables((2, 2, 1))
         model.T_h_out_x = _variables((2, 2, 1))
@@ -334,8 +343,8 @@ def _asymmetric_warm_start_model(*, multiperiod: bool) -> StageWiseModel:
     model.theta_2_by_period = _variables((2, 2, 2, 1))
     model.T_h_by_period = _variables((2, 2, 2))
     model.T_c_by_period = _variables((2, 2, 2))
-    model.Q_c_by_period = _variables((2, 2))
-    model.Q_h_by_period = _variables((2, 2))
+    model.Q_c_by_period = _variables((2, 2, 1))
+    model.Q_h_by_period = _variables((2, 2, 1))
     model.X_by_period = _variables((2, 2, 2, 1))
     model.Y_by_period = _variables((2, 2, 2, 1))
     model.T_h_out_x_by_period = _variables((2, 2, 2, 1))
@@ -353,10 +362,10 @@ def _asymmetric_isothermal_source() -> SimpleNamespace:
         theta_2=_source_variables([[[15.0], [15.0]], [[15.0], [15.0]]]),
         T_h=_source_variables([[200.0, 150.0], [190.0, 140.0]]),
         T_c=_source_variables([[50.0, 100.0], [60.0, 110.0]]),
-        Q_c=_source_variables([0.0, 0.0]),
-        z_cu=[[0], [0]],
-        Q_h=_source_variables([0.0, 0.0]),
-        z_hu=[[0], [0]],
+        Q_c=_source_variables([[0.0], [0.0]]),
+        z_cu=[[[0]], [[0]]],
+        Q_h=_source_variables([[0.0], [0.0]]),
+        z_hu=[[[0]], [[0]]],
     )
 
 
@@ -383,12 +392,14 @@ def _shared_area_case() -> SimpleNamespace:
         J=1,
         S=1,
         N_periods=1,
+        NHU=1,
+        NCU=1,
         Q_r_by_period=[[[[10.0]]]],
-        Q_h_by_period=[[10.0]],
-        Q_c_by_period=[[10.0]],
+        Q_h_by_period=[[[10.0]]],
+        Q_c_by_period=[[[10.0]]],
         U_r_period=[[[1.0]]],
-        U_hu_period=[[1.0]],
-        U_cu_period=[[1.0]],
+        U_hu_period=[[[1.0]]],
+        U_cu_period=[[[1.0]]],
         theta_1_by_period=[[[[10.0]]]],
         theta_2_by_period=[[[[20.0]]]],
         T_hu_in_period=[[200.0]],
@@ -400,8 +411,8 @@ def _shared_area_case() -> SimpleNamespace:
         T_cu_in_period=[[20.0]],
         T_cu_out_period=[[30.0]],
         area_r_shared=[[[100.0]]],
-        area_hu_shared=[100.0],
-        area_cu_shared=[100.0],
+        area_hu_shared=[[100.0]],
+        area_cu_shared=[[100.0]],
         A_coeff=[2.0],
         A_exp=[1.0],
         hu_coeff=[3.0],
@@ -413,10 +424,10 @@ def _shared_area_case() -> SimpleNamespace:
         cu_area_cost_total=400.0,
     )
     case._utility_solved_outlet_temperature = (
-        lambda side, period_idx, match_index, heat_duty: (
-            case.T_hu_out_period[period_idx][0]
+        lambda side, period_idx, match_index, utility, heat_duty: (
+            case.T_hu_out_period[period_idx][utility]
             if side == "hot"
-            else case.T_cu_out_period[period_idx][0]
+            else case.T_cu_out_period[period_idx][utility]
         )
     )
     return case
@@ -448,11 +459,11 @@ def test_stagewise_utility_cost_verification_handles_source_and_period_cases():
     )
 
     bad_source = _case("utility_cost_source")
-    bad_source.hu_cost_total = 999.0
+    bad_source.hu_cost_solver_by_period = [999.0]
     assert stagewise_verification._check_utility_costs(bad_source) is False
 
     bad_state = _case("utility_cost_state")
-    bad_state.cu_cost_total = 999.0
+    bad_state.cu_cost_solver_by_period = [15.0, 999.0]
     assert stagewise_verification._check_utility_costs(bad_state) is False
 
 
@@ -470,11 +481,11 @@ def test_stagewise_area_cost_verification_handles_source_and_shared_cases():
     assert stagewise_verification._check_area_costs(failed_recovery) is False
 
     failed_hot_utility = _shared_area_case()
-    failed_hot_utility.area_hu_shared = [0.0]
+    failed_hot_utility.area_hu_shared = [[0.0]]
     assert stagewise_verification._check_area_costs(failed_hot_utility) is False
 
     failed_cold_utility = _shared_area_case()
-    failed_cold_utility.area_cu_shared = [0.0]
+    failed_cold_utility.area_cu_shared = [[0.0]]
     assert stagewise_verification._check_area_costs(failed_cold_utility) is False
 
     failed_total = _shared_area_case()
@@ -606,10 +617,10 @@ def test_stagewise_single_period_initial_values_cover_inactive_utilities_and_non
     assert model.Q_r[0][0][0].VALUE.value == pytest.approx(10.0)
     assert model.Q_r[0][0][1].VALUE.value == pytest.approx(0.0)
     assert model.theta_1[0][0][1].VALUE.value == pytest.approx(model.dTmin)
-    assert model.Q_c[0].VALUE.value == pytest.approx(0.0)
-    assert model.z_cu[0].VALUE.value == 0
-    assert model.Q_h[0].VALUE.value == pytest.approx(0.0)
-    assert model.z_hu[0].VALUE.value == 0
+    assert model.Q_c[0][0].VALUE.value == pytest.approx(0.0)
+    assert model.z_cu[0][0].VALUE.value == 0
+    assert model.Q_h[0][0].VALUE.value == pytest.approx(0.0)
+    assert model.z_hu[0][0].VALUE.value == 0
     assert model.X[0][0][0].VALUE.value == pytest.approx(0.25)
     assert model.Y[0][0][0].VALUE.value == pytest.approx(0.35)
     assert model.X[0][0][1].VALUE.value == pytest.approx(0.0)
@@ -638,8 +649,8 @@ def test_stagewise_multiperiod_initial_values_use_source_fallback_and_shared_are
     model = _multi_period_warm_start_model()
     source = _single_period_source(non_isothermal=True, q_values=[10.0, 0.0])
     source.area_r_shared = [[[11.0, 12.0]]]
-    source.area_hu_shared = [13.0]
-    source.area_cu_shared = [14.0]
+    source.area_hu_shared = [[13.0]]
+    source.area_cu_shared = [[14.0]]
 
     model.set_initial_values_for_variables(source)
 
@@ -647,14 +658,14 @@ def test_stagewise_multiperiod_initial_values_use_source_fallback_and_shared_are
     assert model.Q_r_by_period[1][0][0][0].VALUE.value == pytest.approx(10.0)
     assert model.Q_r_by_period[0][0][0][1].VALUE.value == pytest.approx(0.0)
     assert model.theta_1_by_period[0][0][0][1].VALUE.value == pytest.approx(model.dTmin)
-    assert model.Q_c_by_period[0][0].VALUE.value == pytest.approx(0.0)
-    assert model.Q_h_by_period[0][0].VALUE.value == pytest.approx(0.0)
+    assert model.Q_c_by_period[0][0][0].VALUE.value == pytest.approx(0.0)
+    assert model.Q_h_by_period[0][0][0].VALUE.value == pytest.approx(0.0)
     assert model.z[0][0][0].VALUE.value == 1
-    assert model.z_cu[0].VALUE.value == 1
-    assert model.z_hu[0].VALUE.value == 1
+    assert model.z_cu[0][0].VALUE.value == 1
+    assert model.z_hu[0][0].VALUE.value == 1
     assert model.area_r_shared[0][0][0].VALUE.value == pytest.approx(11.0)
-    assert model.area_hu_shared[0].VALUE.value == pytest.approx(13.0)
-    assert model.area_cu_shared[0].VALUE.value == pytest.approx(14.0)
+    assert model.area_hu_shared[0][0].VALUE.value == pytest.approx(13.0)
+    assert model.area_cu_shared[0][0].VALUE.value == pytest.approx(14.0)
     assert model.X_by_period[1][0][0][0].VALUE.value == pytest.approx(0.25)
     assert model.Y_by_period[1][0][0][0].VALUE.value == pytest.approx(0.35)
     assert model.T_h_out_x_by_period[1][0][0][0].VALUE.value == pytest.approx(80.0)
@@ -1014,8 +1025,10 @@ def _benefit_model(alpha) -> StageWiseModel:
     model.z = [[[[1]], [[1]]]]
     model.Q_r = [[[[100.0]], [[60.0]]]]
     model.area_r = [[[10.0], [10.0]]]
-    model.hu_cost = [1.0]
-    model.cu_cost = [1.0]
+    model.hu_cost_period = [[1.0]]
+    model.cu_cost_period = [[1.0]]
+    model.Q_hu_by_utility_by_period = [[0.0]]
+    model.Q_cu_by_utility_by_period = [[0.0]]
     model.unit_cost = [0.0]
     model.A_coeff = [1.0]
     model.A_exp = [1.0]

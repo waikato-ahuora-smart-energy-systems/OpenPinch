@@ -444,7 +444,12 @@ def test_missing_couenne_skips_derivative_stage_and_runs_evolution() -> None:
         and outcome.task.method == "network_evolution_method"
     )
 
-    assert result.accepted_result.method == "network_evolution_method"
+    # The cheapest successful network is accepted, whichever method made it.
+    cheapest = min(
+        (outcome for outcome in outcomes if outcome.status == "success"),
+        key=lambda outcome: outcome.objective_value,
+    )
+    assert result.accepted_result.task_id == cheapest.task.task_id
     assert all(outcome.status == "failed" for outcome in tdm_failures)
     assert esm_success.task.parent_task_id == pdm_success.task.task_id
     assert esm_success.task.derivative_threshold is None
@@ -926,6 +931,10 @@ def test_design_accessor_rejects_retired_selector_and_invalid_seed_shapes(
     with pytest.raises(TypeError, match="unexpected keyword argument 'method'"):
         problem.design.heat_exchanger_network(method="not_a_method")
 
+    # The default workflow takes no seed networks; the argument always raised.
+    with pytest.raises(TypeError, match="unexpected keyword argument"):
+        problem.design.heat_exchanger_network(initial_networks=(seed,))
+
     with pytest.raises(TypeError, match="unexpected keyword argument"):
         problem.design.open_hens(initial_networks=(seed,))
 
@@ -1321,3 +1330,34 @@ def _with_pathway_tac(
             "objective_value": tac,
         }
     )
+
+
+def test_default_design_runs_every_approach_temperature(monkeypatch) -> None:
+    # Audit H8: the default entry (tier 0) built tasks only from the first
+    # approach temperature, while the manifest listed every one.
+    _use_fake_default_executor(monkeypatch)
+    problem = _small_problem_with_options(
+        {"HENS_APPROACH_TEMPERATURES": [2.0, 4.0, 8.0]}
+    )
+
+    design = problem.design.heat_exchanger_network()
+
+    manifest = design.result.manifest
+    assert manifest.synthesis_quality_tier == 0
+    assert manifest.task_count_by_method["pinch_design_method"] == 3
+    assert manifest.approach_temperatures == (2.0, 4.0, 8.0)
+
+
+def test_manifest_lists_the_approach_temperatures_that_ran(monkeypatch) -> None:
+    # Expanded tiers run multiples of the first approach temperature too.
+    _use_fake_default_executor(monkeypatch)
+    problem = _small_problem_with_options(
+        {
+            "HENS_APPROACH_TEMPERATURES": [10.0],
+            "HENS_DT_CONT_MULTIPLIERS": [0.5, 1.0],
+        }
+    )
+
+    design = problem.design.heat_exchanger_network()
+
+    assert design.result.manifest.approach_temperatures == (5.0, 10.0)

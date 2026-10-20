@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import json
 import math
+import sys
+import threading
 import warnings
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from functools import partial
-from typing import Any, Callable, Mapping, get_type_hints
+from typing import Any, Callable, Iterator, Mapping, get_type_hints
 from uuid import uuid4
 
 from pydantic import BaseModel
@@ -20,6 +24,7 @@ from ..adapters.io.problem_sources import (
 from ..analysis.heat_pumps.performance_maps.targeting import (
     HprTargetCompatibilityError,
 )
+from ..analysis.orc.search import OrcTargetingError
 from ..analysis.targeting.utilities import is_default_utility
 from ..contracts.hpr import HPRTargetingError
 from ..contracts.reporting import TargetResults
@@ -148,7 +153,8 @@ def run_command(
     case), and ``workspace.<action>`` (``scenario``, ``use_case``,
     ``update_options``, ``set_dt_cont_multiplier``, ``add``,
     ``set_case_input``, ``compare_cases``, ``to_bundle`` and ``batch``) acts
-    on the workspace.
+    on the workspace. ``batch`` runs one command on each case, at most
+    ``MAX_BATCH_CASES`` cases, and cannot run another ``batch``.
 
     The response has ``value``, the contract the method returned, and
     ``results``, the problem's ``TargetOutput`` (``None`` when no target has
@@ -162,7 +168,7 @@ def run_command(
     ``HeatExchangerNetworkView`` of its rank-1 network (ranking, totals,
     utility duties and grid layout) for each of the network's periods in
     period order, and ``view``, the first of them. Analysis that runs and
-    fails (heat pump targeting) returns ``error`` (``{type, message,
+    fails (heat pump or ORC targeting) returns ``error`` (``{type, message,
     details}``) instead of raising, as does a session the engine does not hold
     (type ``unknown_session``). ``warnings`` lists the non-fatal issues the command
     met, each ``{type, message, details}``: Python warnings by category name,
@@ -178,9 +184,7 @@ def run_command(
     Reports come at most every 0.25 s per stage. An exception it raises
     propagates out of the command, which cancels it.
     """
-    # Recording warnings is process-wide; an engine runs one command at a time.
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
+    with _collected_warnings() as caught:
         try:
             if progress is None:
                 response = _run(request)
@@ -190,6 +194,64 @@ def run_command(
         except UnknownSessionError as error:
             response = {"value": None, "results": None, "error": _error_json(error)}
     return _finite({**response, "warnings": _warnings_json(caught)})
+
+
+# Warnings go to the collector of the command running in the current context,
+# so concurrent commands (engine worker threads) keep their own warnings.
+_COLLECTOR: ContextVar[list[warnings.WarningMessage] | None] = ContextVar(
+    "openpinch_command_warnings", default=None
+)
+_CAPTURE_LOCK = threading.Lock()
+_capture: dict[str, Any] = {"depth": 0}
+
+
+@contextmanager
+def _collected_warnings() -> Iterator[list[warnings.WarningMessage]]:
+    """Collect the warnings this call raises, in this context only.
+
+    While any command runs, ``showwarning`` routes each warning to the
+    collector of the command running in the current context, or to the
+    previous ``showwarning`` for a warning raised outside a command, and every
+    warning is shown ("always"). Where warning filters are per context
+    (``context_aware_warnings``) each call sets its own; elsewhere they are
+    process-wide and one shared ``catch_warnings`` holds them. The last
+    command to finish restores the filters and ``showwarning``.
+    """
+    context_aware = bool(getattr(sys.flags, "context_aware_warnings", False))
+    caught: list[warnings.WarningMessage] = []
+    token = _COLLECTOR.set(caught)
+    with _CAPTURE_LOCK:
+        if _capture["depth"] == 0:
+            if not context_aware:
+                _capture["filters"] = warnings.catch_warnings(action="always")
+                _capture["filters"].__enter__()
+            _capture["showwarning"] = warnings.showwarning
+            warnings.showwarning = _show_warning
+        _capture["depth"] += 1
+    try:
+        if context_aware:
+            with warnings.catch_warnings(action="always"):
+                yield caught
+        else:
+            yield caught
+    finally:
+        with _CAPTURE_LOCK:
+            _capture["depth"] -= 1
+            if _capture["depth"] == 0:
+                warnings.showwarning = _capture["showwarning"]
+                if not context_aware:
+                    _capture.pop("filters").__exit__(None, None, None)
+        _COLLECTOR.reset(token)
+
+
+def _show_warning(message, category, filename, lineno, file=None, line=None):
+    caught = _COLLECTOR.get()
+    if caught is None:
+        _capture["showwarning"](message, category, filename, lineno, file, line)
+        return
+    caught.append(
+        warnings.WarningMessage(message, category, filename, lineno, file, line)
+    )
 
 
 def _warnings_json(caught: list[warnings.WarningMessage]) -> list[dict[str, Any]]:
@@ -347,7 +409,11 @@ def _results_json(problem: PinchProblem | None) -> Any:
 # Analysis that ran and failed, or that this engine cannot run (TESPy without
 # the extra), is reported in the response; anything else (a bad request, a
 # bug) raises.
-_ANALYSIS_FAILURES = (HPRTargetingError, HprTargetCompatibilityError)
+_ANALYSIS_FAILURES = (
+    HPRTargetingError,
+    HprTargetCompatibilityError,
+    OrcTargetingError,
+)
 
 
 def _error_json(error: Exception) -> dict[str, Any]:
@@ -593,27 +659,45 @@ _PROBLEM_COMMANDS = {
 }
 
 
+# The most cases, and so commands, one ``workspace.batch`` request runs.
+MAX_BATCH_CASES = 100
+
+
 def _batch(request: Mapping[str, Any]) -> dict[str, Any]:
     """One command on each selected workspace case, isolating failures."""
     session = _SESSIONS[request["session"]]
     if session.workspace is None:
         raise ValueError("Command 'workspace.batch' needs a workspace session.")
     arguments = request.get("arguments", {})
+    if arguments.get("command") == "workspace.batch":
+        raise ValueError("Command 'workspace.batch' cannot run 'workspace.batch'.")
+    cases = list(arguments.get("cases") or session.workspace.list_cases())
+    if len(cases) > MAX_BATCH_CASES:
+        raise ValueError(
+            f"Command 'workspace.batch' runs at most {MAX_BATCH_CASES} cases "
+            f"per request, not {len(cases)}."
+        )
     results: dict[str, Any] = {}
     errors: dict[str, Any] = {}
-    for case in arguments.get("cases") or session.workspace.list_cases():
+    for case in cases:
         try:
-            results[case] = run_command(
-                {
-                    "command": arguments["command"],
-                    "session": request["session"],
-                    "case": case,
-                    "arguments": arguments.get("arguments", {}),
-                }
-            )
+            results[case] = _batch_case(request["session"], case, arguments)
         except Exception as error:  # batch isolation, as in case batches
             errors[case] = _error_json(error)
     return {"results": results, "errors": errors}
+
+
+def _batch_case(
+    session: str, case: str, arguments: Mapping[str, Any]
+) -> dict[str, Any]:
+    return run_command(
+        {
+            "command": arguments["command"],
+            "session": session,
+            "case": case,
+            "arguments": arguments.get("arguments", {}),
+        }
+    )
 
 
 def _workspace_json(workspace: PinchWorkspace) -> dict[str, Any]:

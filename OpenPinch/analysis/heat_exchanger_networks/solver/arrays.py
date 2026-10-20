@@ -13,6 +13,7 @@ from ....domain.stream import Stream
 from ....domain.value import Value
 from ....domain.zone import Zone
 from ...economics import compute_capital_recovery_factor
+from ...targeting.utilities import is_default_utility
 from ..indexing import ordered_mapping_keys
 from ..prepared_problem import PreparedProblem
 
@@ -581,11 +582,9 @@ def _ordered_utility_items(problem: PreparedProblem, items) -> list[_PreparedIte
     ordered = _items_in_input_order(item_list, input_utilities)
     if len(ordered) <= 1:
         return ordered
-    real_utilities = [
-        item
-        for item in ordered
-        if not (item[1].name == "HU" and item[0].endswith(".HU"))
-    ]
+    # Input preparation adds a default HU or CU as a backup where the given
+    # utilities fall short; synthesis uses it only when it is the only one.
+    real_utilities = [item for item in ordered if not is_default_utility(item[1])]
     return real_utilities or ordered
 
 

@@ -124,13 +124,14 @@ def _model_utility_segment_contributions(
     solved_model: Any,
     attribute_name: str,
     parent_index: int,
+    utility_index: int,
 ):
     grid = getattr(solved_model, attribute_name, None)
     if grid is None:
         return ()
     contributions = []
     for period_values in grid:
-        values = _index(period_values, parent_index)
+        values = _index(period_values, parent_index, utility_index)
         if values:
             contributions.extend(values)
     return tuple(contributions)

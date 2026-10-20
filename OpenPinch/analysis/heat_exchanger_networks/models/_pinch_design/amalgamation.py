@@ -72,18 +72,10 @@ def amalgamate_networks(
                         else amalgamated.T_c_out_period[n][j]
                     )
                     amalgamated.T_c_by_period[n][j][k].VALUE.value = [value]
-        for j in range(owner.J):
-            for n in range(amalgamated.N_periods):
-                amalgamated.Q_h_by_period[n][j].VALUE.value = [
-                    above_case.Q_h_by_period[n][j][0]
-                ]
-            amalgamated.z_hu[j].VALUE.value = [above_case.z_hu[j][0]]
+        _copy_utility_matches(amalgamated, above_case, "hot")
         if not below_required:
-            for i in range(owner.I):
-                for n in range(amalgamated.N_periods):
-                    amalgamated.Q_c_by_period[n][i].VALUE.value = [0]
-                amalgamated.z_cu[i].VALUE.value = [0]
-                amalgamated.minimisation_goal = "hot utility"
+            _clear_utility_matches(amalgamated, "cold")
+            amalgamated.minimisation_goal = "hot utility"
 
     if below_required and below_case.mSuccess == 1:
         amalgamated.mSuccess = below_case.mSuccess
@@ -128,18 +120,10 @@ def amalgamate_networks(
                     else:
                         value = amalgamated.T_c_in_period[n][j]
                     amalgamated.T_c_by_period[n][j][k].VALUE.value = [value]
-        for i in range(owner.I):
-            for n in range(amalgamated.N_periods):
-                amalgamated.Q_c_by_period[n][i].VALUE.value = [
-                    round(below_case.Q_c_by_period[n][i][0], 5)
-                ]
-            amalgamated.z_cu[i].VALUE.value = [below_case.z_cu[i][0]]
+        _copy_utility_matches(amalgamated, below_case, "cold", digits=5)
         if not above_required:
-            for j in range(owner.J):
-                for n in range(amalgamated.N_periods):
-                    amalgamated.Q_h_by_period[n][j].VALUE.value = [0]
-                amalgamated.z_hu[j].VALUE.value = [0]
-                amalgamated.minimisation_goal = "cold utility"
+            _clear_utility_matches(amalgamated, "hot")
+            amalgamated.minimisation_goal = "cold utility"
 
     if (
         above_required
@@ -176,6 +160,42 @@ def amalgamate_networks(
         for i in range(amalgamated.I)
     ]
     return amalgamated
+
+
+def _utility_grids(model, side: str):
+    if side == "hot":
+        return model.Q_h_by_period, model.z_hu
+    return model.Q_c_by_period, model.z_cu
+
+
+def _copy_utility_matches(
+    target: StageWiseModel,
+    source: "PinchDecompModel",
+    side: str,
+    *,
+    digits: int | None = None,
+) -> None:
+    """Copy each (stream, utility) heater or cooler from one side's solution."""
+    target_duties, target_flags = _utility_grids(target, side)
+    source_duties, source_flags = _utility_grids(source, side)
+    for index, row in enumerate(target_flags):
+        for u, flag in enumerate(row):
+            for n in range(target.N_periods):
+                duty = source_duties[n][index][u][0]
+                target_duties[n][index][u].VALUE.value = [
+                    duty if digits is None else round(duty, digits)
+                ]
+            flag.VALUE.value = [source_flags[index][u][0]]
+
+
+def _clear_utility_matches(target: StageWiseModel, side: str) -> None:
+    """Switch off every heater or cooler on the side the other half lacks."""
+    target_duties, target_flags = _utility_grids(target, side)
+    for index, row in enumerate(target_flags):
+        for u, flag in enumerate(row):
+            for n in range(target.N_periods):
+                target_duties[n][index][u].VALUE.value = [0]
+            flag.VALUE.value = [0]
 
 
 def _copy_recovery_match(

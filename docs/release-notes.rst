@@ -4,6 +4,541 @@ Pre-Release Notes
 Unreleased
 ----------
 
+0.7.2 (2026-10-20)
+------------------
+
+HEN synthesis orchestration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- In PDM and TDM networks (isothermal mixing), a stream split across several
+  matches in one stage reports each branch leaving at the stage's mixing
+  temperature, with its split fraction (its share of the stage duty). Each
+  branch used to be reported as if it carried the whole stream, so its
+  outlet temperature disagreed with its approach temperatures and area: one
+  ``crude_preheat_train`` exchanger reported 43.0 m2 of area while its own
+  temperatures gave 21.1 m2. Areas are unchanged; the temperatures now match
+  them.
+
+- Multiperiod stage reduction after PDM and TDM keeps a stage, a match and
+  a heater or cooler that carries duty in any period, and starts the reduced
+  model with each of them switched on. It read only the first period, so a stage
+  used only in later periods was dropped and the reduced network was solved
+  without it, or the reduction failed and fell back to the unreduced model.
+  A reduced network that fails the model's own solution checks is not used:
+  the unreduced network is kept.
+
+- ``design.heat_exchanger_network()`` no longer takes ``initial_networks``.
+  The default workflow never used seed networks and raised for any value;
+  ``design.thermal_derivative()`` and ``design.network_evolution()`` take
+  them.
+
+- The default ``design.heat_exchanger_network()`` (quality tier 0) runs one
+  set of tasks for every value in ``HENS_APPROACH_TEMPERATURES``, as the
+  option's help says. It ran only the first value. The result manifest's
+  ``approach_temperatures`` lists the approach temperatures the tasks ran,
+  including the multiples that expanded tiers explore; it listed the
+  configured values whether they ran or not.
+
+- The accepted network is the feasible network with the lowest total annual
+  cost from any method stage, and the result's ``method`` records the stage it
+  came from. It always came from the last stage that succeeded, so a cheaper
+  PDM or TDM network lost to any network evolution result, and the ranked
+  networks (``design.top()``, ``design.network(rank=...)``) listed only that
+  stage's networks; they now rank every stage's feasible networks by cost.
+
+- Piecewise linearisation of a temperature-heat curve refines its break
+  points against the curve in increasing heat. It flipped both arrays
+  instead, so for curves listed in increasing heat (cold streams, segmented
+  stream profiles, the vapour-compression and MVR evaporator curves) it
+  interpolated against a decreasing heat axis: the reported error was
+  meaningless (40 K where the fit was 0.16 K off) and the refinement's
+  integrity bound was never enforced (first-audit H8). The result no longer
+  depends on point order.
+
+- A single-stage network's post-optimisation flow-on factors no longer take
+  cold flow-on from the stage itself. Its cold gamma is 0, as for the first
+  stage of any network (it was 0.56 where 0 was due on the first audit's
+  case), so network evolution ranks single-stage candidates by the right
+  benefit. Reported results did not use these factors.
+
+HEN synthesis with several utilities
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Heat exchanger network synthesis uses every hot and cold utility. It used
+  only the first of each: ``dairy_chilling_multiperiod`` put every chilling
+  cooler on cooling water (20 to 25 C) for streams ending at 2 to 5 C and
+  failed, and where the first utility was feasible but another was cheaper
+  the result was silently dearer. Each heater and cooler is now one
+  (stream, utility) pair with its own duty, approach temperatures, price and
+  area, in the stagewise and pinch design models, post-processing,
+  verification and the extracted network (one exchanger per pair, named by
+  its utility). The pinch design method prefers the cheaper utility when a
+  side has a choice. The HEN guide describes multi-utility synthesis.
+- The default ``CU`` that input preparation adds as a backup stays out of
+  synthesis when real cold utilities exist, as the default ``HU`` already
+  did for hot utilities.
+- Results with one hot and one cold utility are unchanged.
+
+Utility placement and optimisers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Utility placement with sensible levels no longer fails with
+  ``nonpositive_kelvin_region`` when the hottest temperature is more than
+  about twice the coldest in kelvin above 0 degC (for example a 320 degC hot
+  utility with cooling water, or the Four-stream Yee and Grossmann case for
+  every ``sensible > 0``). The sensible span bound is clamped so the lowest
+  reachable target stays above absolute zero.
+- Placement exergy destruction uses the problem's ``ENV_TEMPERATURE``
+  instead of a fixed 298.15 K. The entropy breakdown now has one basis:
+  ``utility_entropy`` is the placed utilities' own entropy change and
+  ``process_entropy`` the rest of the generation over the process net loads.
+  The objective is unchanged. On ``basic_pinch`` (2 isothermal and 1
+  sensible level, default options): ``utility_entropy`` 0.5882 to
+  1.1230 kW/K, ``process_entropy`` -0.3877 to -0.9224 kW/K, ambient
+  298.15 to 288.15 K, ``exergy_destruction`` 59.79 to 57.78 kW;
+  ``total_entropy_generation`` stays 0.2005 kW/K.
+- The optimised placement case keeps the price and htc of the original
+  utility with the same name on the same side, else of the nearest one on
+  that side by supply temperature (it had no price and htc 1.0). A hot and a
+  cold utility that share a name each keep their own properties. In the Direct scope it
+  also keeps that utility's ``dt_cont`` and lists the real temperatures
+  that ``dt_cont`` outward of the placed (shifted) levels, so the case
+  targets the same levels; in the Indirect and Total Site scopes, and when
+  that ``dt_cont`` varies by period, the placed levels keep ``dt_cont = 0``. Tutorial 19's process case now shows its
+  utilities 2 degC outward with chocolate_factory's utility price.
+- A script without an ``if __name__ == "__main__":`` guard no longer reruns
+  the whole placement in every spawned worker: the optimiser runs serially
+  and logs how to enable workers. Under Pyodide the optimiser skips the
+  process pool, and the search pool is capped at the CPU count.
+- The scalar optimiser compares a polished candidate with its start on
+  feasibility first, then on the objective, so a constrained problem whose
+  global search ends in the infeasible region returns the constrained
+  optimum instead of ``NoOptimisationCandidatesError``. Every local method
+  polishes within the bounds, and ``local_method`` (also in
+  ``UtilityPlacementOptions``) is one of SLSQP, L-BFGS-B, TNC, Nelder-Mead,
+  Powell, COBYLA, COBYQA and trust-constr.
+- Optimiser options are validated before the solve: ``n_runs``,
+  ``maxiter``, ``maxfun``, ``seed`` and ``max_minima`` must be integers,
+  ``cluster_tol`` a finite non-negative number, and malformed constraints
+  raise ``InvalidOptimisationProblemError`` before any backend runs.
+- ``exergy_des_min`` is labelled "Min Exergy Rejected" in summaries and
+  "Exergy Rejected Min" in the workbook (was "Min Exergy Destruction" and
+  "Exergy Des Min"). It is the exergy of the below-pinch surplus rejected to
+  cold utility, not exergy destruction. The field name is unchanged.
+
+Area and unit-count targets
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``target.heat_exchanger_area_and_cost()`` reports lower area, capital cost
+  and total cost targets on problems whose composite curves have a
+  temperature gap (a step at constant heat flow, for example between the
+  process streams and a utility). This is the second change to area targets
+  in two releases: 0.7.1 fixed interval widths that made areas 5-22 % low,
+  and this release removes a "discontinuity" rule that made them 1-6 % high.
+  At each step the rule replaced a slice's end driving force with the next
+  slice's, which collapsed that slice's LMTD. Every slice now ends at its
+  left limit, and area targets match an independent fine-slice Bath
+  integration. Four-stream Yee and Grossmann: 341.08 to 337.20 m2 (capital
+  cost 84,161 to 83,580). ``pulp_mill``: 29,689 to 29,373 m2; its capital
+  cost still rises, from 13,462,802 to 28,744,945, because its unit count
+  also changes (13 to 88, below). ``basic_pinch``, ``crude_preheat_train`` and
+  ``chocolate_factory`` have no gap and are unchanged. Utility placement's
+  entropy terms use the same driving-force intervals and never read the
+  replaced value, so placement results do not change.
+- The minimum number of units (``num_units``) is no longer 0 on about a
+  third of problems. Rounding residue of a few 1e-6 kW at the ends of the
+  balanced composite curves failed an absolute 1e-6 kW zero test, so only the
+  pinch counted as a region boundary. The zero test is now relative to the
+  problem's duty, and the first and last rows are always boundaries, so the
+  count is N = S - 1 per pinch region. Capital and total cost change with it
+  where ``COSTING_HX_UNIT_COST`` is non-zero. ``basic_pinch`` and
+  ``crude_preheat_train``: 0 to 9 units (capital cost 442,752 to 1,066,247);
+  ``chocolate_factory``: 0 to 110; ``pulp_mill``: 13 to 88. Rows that repeat a
+  stream name are separate streams in OpenPinch (``F2`` and ``F2_1``), so
+  ``basic_pinch`` counts 9 units, not the 7 of its four physical streams.
+- The balance check in area targeting is relative to the duty, so area
+  targets no longer raise "requires the inputted composite curves to be
+  balanced" on MW-scale problems whose rounding residue exceeds 1e-6 kW.
+- Pocket removal flattens the row it inserts at a pocket's exit, and the exit
+  row below the pinch when no row is inserted. The exit temperature is
+  inserted rounded to 6 dp, so the pocket-free Grand Composite Curve kept a
+  bump of up to 0.07 kW on steep segments, and a near-coincident temperature
+  could leave a whole pocket row unflattened below the pinch. Utilities were
+  then assigned more than their targets (``pulp_mill`` by 0.17 kW, area
+  29,372.74 to 29,372.94 m2; one reported case 1,433 kW of cooling against a
+  1,350 kW target), and area targeting raised "requires the inputted
+  composite curves to be balanced" on about one problem in eight, including
+  ``zonal_site_multiperiod``.
+- Energy, area and unit-count targets scale with the heat flows from x1e-6
+  to x1e3 and are unchanged by a uniform temperature shift. Heat-flow
+  thresholds in pocket removal, balanced composite curves and area targeting
+  were absolute (1e-6 kW), so at x1e-6 a shallow pocket survived, a utility
+  was over-assigned and area targeting raised or drifted by up to 0.1 %.
+  They now keep 1e-6 kW from 1 kW up and shrink with smaller problems.
+- Composite curve end cleaning (plots and area targeting) trims only rounding
+  residue at the curve ends. It used ``np.isclose``'s default relative
+  tolerance of 1e-5 of the end heat flow, which dropped real end segments on
+  MW-scale curves.
+- Composite and net load graphs leave out a series with no heat-flow span,
+  such as the cold composite of a problem with only hot streams. It used to
+  appear as a segment with no data points.
+- Carnot heat pump and refrigeration searches cut short by small iteration
+  limits (as in tutorial 08) can stop at a different point, because the
+  pocket-exit and curve-end fixes change heat flows by about 1e-6 kW. On
+  ``basic_pinch`` with one condenser, one evaporator and 20 iterations the
+  heat pump work moves from 53.7 to 77.0 kW. With the default limits the
+  result is unchanged (21.85 kW, to 3e-6).
+- A direct-integration target whose Grand Composite Curve is zero over its
+  whole range (no utility needed, every temperature a pinch) reports the top
+  and bottom of that band as its hot and cold pinch temperatures. Both were
+  None.
+- Heat exchanger network area slicing on segmented streams accepts a
+  solver duty that overshoots its stream profile by noise relative to the
+  duty (1e-6 of the profile) and drops the overshoot. A 2e-6 kW overshoot on
+  a 15 MW match raised "Exchanger duty exceeds an available parent segment
+  profile".
+
+The "Total cost now" column under "Utility cost and totals" below predates
+these area and unit-count changes. With both, the area target's total cost
+on the sample cases is: ``basic_pinch`` and ``crude_preheat_train`` 245,896
+$/y, ``crude_preheat_train_multiperiod`` 206,290, Four-stream Yee and
+Grossmann 151,080, ``chocolate_factory`` 1,639,540, ``process_mvr`` 20,705,
+``pulp_mill`` 55,985,020, ``zonal_site`` 71,327,
+``dairy_chilling_multiperiod`` 905,252 and ``zonal_site_multiperiod``
+66,564 (its area target no longer raises). Multiperiod cases give their
+first period.
+
+Multiperiod HEN pinch design
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Multiperiod pinch design (PDM) no longer applies approach constraints to a
+  stream in a period where it is absent from that side of the pinch. The
+  pinch decomposition sets such a stream to 0 K in that period, so the
+  constraints made the shared topology infeasible:
+  ``crude_preheat_train_multiperiod`` failed at every dTmin and now solves
+  at 5, 10 and 20 K. Those periods also get no approach temperature or
+  area from the 0 K values.
+
+HEN utility approach temperatures
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Heat exchanger network synthesis constrains both ends of every heater and
+  cooler to their approach temperature, as it already did for segmented
+  utilities. Before, a flat utility had no approach constraint: a hot stream
+  could be cooled by recovery below the cooling water outlet and finished
+  with a crossed cooler. On a case with cooling water at 320 to 325 K, PDM
+  and TDM accepted a cooler at 324 to 322 K (hot-end dT -1 K). That case now
+  has no feasible network in the stagewise superstructure, which places
+  coolers after the last stage, so synthesis rejects it. In the relaxed
+  models that stage reduction and network evolution solve, a heater or
+  cooler whose fixed end cannot meet its approach carries no duty, and stage
+  reduction keeps only the heaters and coolers the solved network uses in
+  some period.
+- A synthesised exchanger with a crossed or touching end gets no area. Its
+  area used to come from a fallback temperature difference (20 m2 for the
+  crossed cooler above); verification now reports its duty without area.
+- Network verification checks heaters and coolers for a temperature cross
+  and against their utility's approach temperature, which synthesised
+  networks now record in ``source_metadata``
+  (``hot_utility_minimum_approach_by_period`` and
+  ``cold_utility_minimum_approach_by_period``). It checked recovery
+  exchangers only.
+- The stagewise models' solution check compares the utility cost the solver
+  reached with one recomputed from the solved duties. It compared the
+  recomputed cost with itself, because post-processing had already
+  overwritten the solver's value, so it could not fail.
+- Published numbers: no tutorial network had a heater or cooler below its
+  approach, but the new constraints change the solvers' paths, and stage
+  reduction no longer carries unused coolers. Tutorial 15's selected network
+  has total annual cost 154,853.86 $/y with 6 units (was 163,556.12 $/y with
+  8 units), the best known network for its case. Tutorial 16's
+  ``pinch_design()`` network has 190,449.50 $/y at dTmin 14 K (was
+  182,103.64 $/y at 20 K). PDM minimises hot utility only, so every network
+  at the target is optimal and their costs are not compared; this result
+  moves whenever the solver's path does. Tutorial 16's other designs and
+  tutorial 17 are unchanged.
+
+Multiperiod fixes
+~~~~~~~~~~~~~~~~~
+
+- Weighted-average summaries pair each period's weight with that period's
+  results by period id. A utility placement case whose ``period_ids`` were
+  given out of order (for example ``("c", "a", "b")``) applied the first
+  weight to the first period it ran, so with weights 0.6, 0.3 and 0.1 on a, b
+  and c and cold utility duties of 1000, 1600 and 2200 kW the weighted cold
+  utility was 1780 kW instead of 1300 kW. A case placed on a subset of the
+  periods (``period_ids=("b", "c")``) now summarises, reports and exports,
+  weighting over its own periods; before, each raised "Expected at most 2
+  period weight(s), got 3." Placement cases run with all periods in their
+  canonical order, as the tutorials do, are unchanged.
+- Per-period values (``{"values": [...]}``) without ``PROBLEM_PERIOD_IDS``,
+  including those inside a record's ``segments`` or ``profile`` points, are
+  a validation error that names the field and asks for one id per period.
+  Before, the problem silently had one period and every target used only the
+  first value; records of different lengths failed later with an
+  unrelated "weights for stream ... must align" error.
+- ``StreamSegment.set_attr_for_period`` with a scalar changes only the named
+  period, as ``Stream.set_attr_for_period`` has since 0.7.1. Before, it
+  overwrote the segment's value, and so its parent's total, in every period.
+- A single-period call finds that period's retained targets. After
+  ``target.direct_heat_integration`` ran for each period in turn,
+  ``target.exergy(period_id=...)`` for any but the last raised "could not
+  find a compatible existing target"; it now runs from that period's state,
+  as ``target.all_periods`` does.
+- The weighted-average ``turbine_efficiency_target`` is total turbine work
+  over total isentropic work across the periods, not a weighted mean of the
+  period efficiencies. A period with no turbine work no longer pulls it down:
+  80 % in one period and an idle period at equal weight now summarise to
+  80 % instead of 40 %. Per-period values are unchanged, and so is tutorial
+  13's weighted value (10 %, the same in every period).
+- Domain ``Stream`` objects reject a ``period_ids`` key in period-value
+  data. A stream reads its values in the problem's period order and ignored
+  the ids, so ``{"values": [10, 20], "period_ids": ["b", "a"]}`` gave period
+  ``a`` 10 rather than 20. Inputs that key values by period id on purpose
+  (a utility's ``maximum_heat_flow``, utility placement ``maximum_duties``)
+  still take it.
+
+Input and export hardening
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``HENS_SOLVER_OPTIONS_PDM``, ``HENS_SOLVER_OPTIONS_TDM`` and
+  ``HENS_SOLVER_OPTIONS_EVM`` accept only known IPOPT, Couenne and APOPT
+  tolerances, iteration limits and numeric settings, each with a number, a
+  boolean or a single word as its value. Any other option name or value is a
+  validation issue, and solver option files and option lines are written only
+  from validated options.
+- Unit text is checked against a bounded grammar before Pint parses it: at
+  most 64 characters, products and ratios of unit names and numbers (Pint's
+  ``·`` and ``⋅`` included), one power of at most two digits (``^``, ``**``
+  or superscript digits) on a unit name or a group, and at most two
+  levels of parentheses. Other unit text raises a ``ValueError``.
+- ``workspace.batch`` cannot run another ``workspace.batch``, and one request
+  runs at most 100 cases; a larger case list is an error and runs nothing.
+- Excel exports (``export_excel``, the ``export.excel`` command,
+  ``export_problem_table`` and the dashboard's table export) write every text
+  cell as a plain string, never as a formula, and text starting with ``=``,
+  ``+``, ``-``, ``@``, a tab or a carriage return gets Excel's quote prefix.
+
+Utility cost and totals
+~~~~~~~~~~~~~~~~~~~~~~~
+
+These change published numbers. Energy targets do not change.
+
+- Direct Integration targets report their utility cost, the sum of each
+  utility's price times its duty. Before, ``utility_cost`` was always 0 on
+  Direct Integration and area targets, and the subzone sums and the workbook
+  "Utility Cost" column added up those zeros. ``basic_pinch`` now reports
+  17.5 $/h (750 kW of hot and 1000 kW of cold utility at 10 $/MWh).
+- Total Site utility lists come from the site utility cascade, so they sum to
+  the Total Site hot and cold utility targets. Generation at one level now
+  meets use at a lower level, nearest level first; use left unmet is listed
+  as hot utility and generation left over as cold utility. Before, the lists
+  only netted generation against use at the same level, so they could
+  contradict the targets: ``zonal_site`` has a 0 kW hot utility target but
+  listed 25 kW of hot water. Its Total Site utility cost falls from
+  6.68 $/h to 5.18 $/h (``zonal_site_multiperiod``, first period: 5.36 to
+  4.76 $/h).
+- Total Site targeting accepts segmented utilities. Before, summing the
+  subzone utilities raised "'heat_flow' is derived for segmented stream".
+  Each segment now enters the site cascade over its own temperatures.
+- The area target's ``total_cost`` is the annualised capital cost plus the
+  utility cost over ``COSTING_ANNUAL_OP_TIME`` hours. Before, it was the
+  annualised capital alone.
+- A per-year output unit for a cost (for example ``OUTPUT_UNIT_UTILITY_COST``
+  set to ``$/y``) counts a year as ``COSTING_ANNUAL_OP_TIME`` operating
+  hours. Before, the conversion used an 8766 h calendar year, so annual
+  utility costs read 5.6 % high at the default 8300 h.
+
+Direct Integration utility cost and area-target total cost on the sample
+cases (``COSTING_ANNUAL_OP_TIME`` is 8300 h, 1000 h for Yee and Grossmann;
+multiperiod cases give their first period):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 15 15 15 15
+
+   * - Case
+     - Utility cost before ($/h)
+     - Utility cost now ($/h)
+     - Total cost before ($/y)
+     - Total cost now ($/y)
+   * - ``basic_pinch``
+     - 0
+     - 17.50
+     - 41,793
+     - 187,043
+   * - ``crude_preheat_train``
+     - 0
+     - 17.50
+     - 41,793
+     - 187,043
+   * - ``crude_preheat_train_multiperiod``
+     - 0
+     - 12.69
+     - 40,884
+     - 146,190
+   * - ``Four-stream-Yee-and-Grossmann-1990-1``
+     - 0
+     - 67.50
+     - 84,161
+     - 151,661
+   * - ``chocolate_factory``
+     - 0
+     - 134.53
+     - 79,784
+     - 1,196,358
+   * - ``process_mvr``
+     - 0
+     - 2.00
+     - 4,105
+     - 20,705
+   * - ``pulp_mill``
+     - 0
+     - 6,418.29
+     - 1,270,793
+     - 54,542,579
+   * - ``zonal_site``
+     - 0
+     - 5.18
+     - 28,331
+     - 71,329
+   * - ``dairy_chilling_multiperiod``
+     - 0
+     - 101.67
+     - 62,907
+     - 906,741
+   * - ``zonal_site_multiperiod``
+     - 0
+     - 4.76
+     - (area target raises)
+     - (area target raises)
+
+Input, contracts and option metadata
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Workbook and CSV ``Stream Data`` and ``Utility Data`` tables are read by
+  their header row, so columns can come in any order. Before, columns were
+  taken by position and a header that put ``t_target`` before ``t_supply``
+  silently swapped them. The legacy template spellings (``TS``, ``TT``,
+  ``ΔH``, ``ΔTcont``, ``Process Zone``, ``Stream``) are recognised; an unknown
+  column is ignored with a warning, two columns for one field are an error,
+  and a header row with no recognised name falls back to the old fixed order
+  with a warning.
+- Blank rows, and rows of blank or whitespace-only cells, in workbook and CSV
+  tables are skipped. Before, each became a phantom stream ``S1`` that failed
+  validation.
+- An ordinary stream may give ``heat_capacity_flowrate`` (CP) instead of
+  ``heat_flow``: the heat flow is then CP x abs(``t_supply`` - ``t_target``).
+  When both are given and disagree by more than 0.01 percent, validation
+  reports an error on ``heat_capacity_flowrate``. Before, the field was
+  accepted and ignored. Tables accept a ``CP`` column.
+- The Options sheet of ``Excel_Version/Data_input_template.xlsx`` lists the
+  current option names, grouped, with their defaults. Its old names
+  (``DT_CONT``, ``ANNUAL_OP_TIME`` and so on) were all rejected as unknown.
+- ``compare_to`` works between problems with different project names. Before,
+  it raised ``KeyError`` because it looked for the base case's scope, which
+  starts with the project name, in the other problem.
+- Configuration metadata (``config_options()`` and the ``options`` command)
+  reports numeric list options (``PROBLEM_PERIOD_WEIGHTS``,
+  ``HENS_APPROACH_TEMPERATURES`` and others) as ``number_list`` rather than
+  ``string_list``, and ``HPR_LOAD_PERIOD_VALUES`` as ``object`` rather than
+  ``number``. A new ``numeric_min_exclusive`` flag is true for options that
+  must be greater than their ``numeric_min`` (such as ``THERMAL_HTC`` and the
+  efficiencies), which reject 0.
+- Utility rows without a name are still ignored, now with a warning when they
+  hold data. Stream names that become the same name after normalisation
+  (``H.1`` and ``H-1`` both become ``H-1``) are an error. A ``TRUE`` cell in a
+  numeric column is an error rather than 1. A project name may contain ``/``;
+  before, every load with such a name failed.
+
+Testing and CI
+~~~~~~~~~~~~~~
+
+- The four-stream warm-start solver regression accepts either of the two
+  checked-in OpenHENS solutions it can reach: the best network (154,853.85
+  $/y) with the macOS IDAES solver binaries, or the second-quartile one
+  (159,038.72 $/y) with CI's Ubuntu 22.04 binaries. It had been changed to
+  expect only the best one, which failed the solver lane on the 0.7.2 release
+  pull request. It still checks the network's structure, heat balances and
+  cost against whichever solution was reached.
+- The utility placement timing tests
+  (``tests/analysis/utility_placement/test_performance.py``) carry the
+  ``performance`` marker, so they run in the performance lane and no longer in
+  the unit lanes. Their wall-clock budgets failed on busy shared runners with
+  no code change: a bound reduction that takes about 10 ms measured 0.5 s on
+  ``unit-py312`` against a 0.45 s budget.
+
+Heat pump second law
+~~~~~~~~~~~~~~~~~~~~
+
+- Cascade Carnot targeting (``carnot_heat_pump()`` and
+  ``carnot_refrigeration()`` with more than one condenser or evaporator) no
+  longer moves heat uphill for free. The heat-engine and recovery branch
+  pooled every condenser and evaporator that took part in any downhill pair,
+  so heat from a cold evaporator could reach a hotter condenser with no work,
+  and the optimiser exploited it. Duty is now allocated pair by pair, from an
+  evaporator to a condenser at or below its temperature, and a pair earns work
+  only when ``HPR_INTEGRATED_EXPANDER_ENABLED`` is on (it already set the
+  heat-engine efficiency to 0 when off; the field help now says so). A Carnot
+  cycle is solved only if its entropy generation, sum(Q/T) delivered minus
+  absorbed, is non-negative, and targeting rejects an unsolved cycle as an
+  infeasible candidate. Published numbers change for the default call
+  (three condensers, two evaporators, ``load_fraction=0.5``):
+
+  - ``basic_pinch``: work 0.0005 kW to 62.07 kW, ``hpr_cop`` 4.32 to 6.04,
+    hot utility 375 kW in both; entropy generation -0.124 to +0.069 kW/K.
+  - ``pulp_mill``: work 0.23 kW to 24,330 kW, ``hpr_cop`` 2.54 to 3.20, hot
+    utility 97,115 kW to 77,775 kW; entropy generation -43.7 to +28.8 kW/K.
+
+  One-condenser, one-evaporator and parallel Carnot targets are unchanged,
+  so tutorials 08 and 10 keep their numbers. Cascade vapour-compression
+  targeting seeds from this optimiser; the tutorial runs (09, and 10's
+  3x2 cascade) give the same results.
+
+Heat pump conventions, exergy and targeting details
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``hpr_cop`` follows the duty for every cycle model: heat pumps report the
+  heating COP (Q_cond/W) and refrigeration the cooling COP (Q_evap/W). Carnot
+  refrigeration reported the heating COP, so its ``hpr_cop`` falls by 1 for
+  the same design: tutorial 08's refrigeration 1.58 to 0.58, tutorial 10's
+  Carnot refrigeration 2.38 to 1.38. Vapour-compression, MVR and TESPy targets
+  already reported this way and are unchanged.
+- The Carnot heating COP stays 1 + eta x T_l/(T_h - T_l): ``HPR_ETA_II_CARNOT``
+  applies to the cooling Carnot COP and the heating COP follows from the
+  energy balance. The field help and the Heat Pump guide now say so.
+- Vapour-compression streams keep their full duty when the evaporator inlet is
+  exactly saturated liquid, as in a zero-lift cascade stage. The first profile
+  point was dropped, so the stream carried 95 percent of the stage's duty and
+  ``hpr_load`` was out of balance (0.55 kW in the audit's ``basic_pinch``
+  two-by-two water cascade).
+- ``ETE`` is the exergy transfer effectiveness of the Balanced Composite
+  Curves: the exergy gained by the cold balanced composite over the exergy
+  released by the hot one, relative to ``ENV_TEMPERATURE`` and with utilities
+  included; below ambient the roles swap, so refrigeration problems are
+  covered. It is at most 100 percent. It was the above-pinch deficit exergy
+  over the below-pinch surplus exergy, which is not an effectiveness and was
+  458 percent on ``pulp_mill``. The new ``exergy_released`` field is its
+  denominator and weights it across periods. Direct Integration values change
+  from 100.5 to 77.1 percent on ``basic_pinch``, 458.7 to 69.0 percent on
+  ``pulp_mill``, 108.9 to 73.5 percent on ``chocolate_factory`` and 28.8 to
+  75.3 percent on ``Four-stream-Yee-and-Grossmann-1990-1``.
+- The warning for a negative stream or utility ``dt_cont`` now says that the
+  reported heat recovery can then exceed the thermodynamic limit.
+- With assisted heat transfer (``DIRECT_ASSISTED_HT_ENABLED``), heating demand
+  in a pocket below the pinch is met by hot utility, so the utilities balance
+  the targets. On ``zonal_site`` the hot utilities rise from 0 to 44.65 kW (LPS
+  17.22 kW, HW 27.43 kW) and the "unmet hot utility" warning is gone.
+- Total Site targeting no longer rounds its stored Problem Table to 4 decimal
+  places (only the graph copies are rounded), and the energy transfer diagram
+  is built from each target's unrounded table. On ``pulp_mill`` the diagram's
+  operation cascades moved by up to 8.3 kW.
+- The vapour-compression docstrings say that T_evap is the dew-point and T_cond
+  the bubble-point temperature, as the code uses them.
+
+0.7.1 (2026-10-19)
+------------------
+
 Network grid data
 ~~~~~~~~~~~~~~~~~
 
@@ -29,13 +564,6 @@ Testing and CI
   ``--hypothesis-seed`` picks the same examples on GitHub, locally and in
   Pyodide. Before, Hypothesis's own CI profile ignored the seed on GitHub.
 
-Tutorials
-~~~~~~~~~
-
-- Tutorial 15 asks ``design.utility()`` for its case's hot utility by its
-  name, ``HPS``. It asked for ``HP Steam``, which used to answer 0 and now
-  raises as an unknown utility, so the notebook stopped running.
-
 Result fixes
 ~~~~~~~~~~~~
 
@@ -58,26 +586,6 @@ Result fixes
   weighted average, as ``include_periods=True, include_weighted_average=True``
   does. Before, it raised "No target analysis is available". With a
   single-period run, or with either flag given, the workbook is unchanged.
-- ``export_excel(include_periods=True)`` writes each period's problem tables
-  from the all-periods run that produced the exported results. Before, a later
-  single-period run replaced that period's tables, so the workbook mixed the
-  batch's summary with the later run's tables.
-- In ``target.all_periods.<method>`` (and a single-period target on a
-  multiperiod problem) each target's utilities now carry that period's duty as
-  a scalar. Before, each utility gave an array over all periods in which only
-  the target's own entry was set.
-- After ``target.all_periods.<method>`` with no single-period run,
-  ``plot.data()``, ``plot.catalog()``, the plot methods and the plot exports
-  read the graphs of every period's result. The catalogue gains a
-  ``Period ID`` column, and the graph data is keyed ``"<graph set> [<period>]"``.
-- A single-period ``target.<method>`` run no longer discards the last
-  all-periods results, so ``report(include_periods=True)`` and the weighted
-  summaries still work after it. Changing the problem's input still clears
-  them.
-- ``design.top(n)`` uses the same ranking as ``design.network(rank=)`` and
-  ``design.grid(rank=)``: successful, feasible outcomes of the accepted method
-  with duplicate network structures removed. Before, it sliced
-  ``result.ranked_networks``, so rank ``k`` could differ between them.
 
 Multiperiod and WebAssembly fixes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -110,6 +618,63 @@ Multiperiod and WebAssembly fixes
   but its weight still counts: the weighted operation (duties, work, operating
   cost and penalty) is spread over the whole schedule, while the COP and the
   peak capital are unchanged.
+
+Command layer
+~~~~~~~~~~~~~
+
+- ``workspace.set_case_input`` takes ``source`` as ``{"data": ...}`` or the
+  TargetInput JSON and rejects anything else, such as a file path, with
+  ``ValueError``. Before, a path string read that file on the engine host.
+- A unit string pint does not know, such as ``{"value": 200, "unit":
+  "bogus"}``, is a validation issue on its field: ``build_validation_report``
+  returns ``valid=False`` and the ``validate`` command returns its report.
+  Before, both raised ``UndefinedUnitError``.
+- A ``zone_tree`` whose zone has two children of the same name is rejected
+  when the input is loaded or validated ("Duplicate zone name ...").
+  Before, the second child was merged into the first.
+- ``Value.to`` converts an offset temperature (``degC``, ``C``, ``°C``,
+  ``degF``) to a difference unit such as ``delta_degC`` as a difference, as
+  the ``Value`` constructor does, so a ``Stream`` takes ``dt_cont`` as
+  ``{"value": 5, "unit": "degC"}``. Before, it raised
+  ``DimensionalityError``.
+- ``run_command`` raises ``ValueError`` naming the accepted shapes,
+  ``{"data": ...}`` or ``{"sample_case": ...}``, when ``problem`` is a bare
+  string or names neither. Before, it raised ``AttributeError`` or
+  ``KeyError``.
+
+0.5.1 to 0.7.0
+--------------
+
+Tutorials
+~~~~~~~~~
+
+- Tutorial 15 asks ``design.utility()`` for its case's hot utility by its
+  name, ``HPS``. It asked for ``HP Steam``, which used to answer 0 and now
+  raises as an unknown utility, so the notebook stopped running.
+
+Result fixes
+~~~~~~~~~~~~
+
+- ``export_excel(include_periods=True)`` writes each period's problem tables
+  from the all-periods run that produced the exported results. Before, a later
+  single-period run replaced that period's tables, so the workbook mixed the
+  batch's summary with the later run's tables.
+- In ``target.all_periods.<method>`` (and a single-period target on a
+  multiperiod problem) each target's utilities now carry that period's duty as
+  a scalar. Before, each utility gave an array over all periods in which only
+  the target's own entry was set.
+- After ``target.all_periods.<method>`` with no single-period run,
+  ``plot.data()``, ``plot.catalog()``, the plot methods and the plot exports
+  read the graphs of every period's result. The catalogue gains a
+  ``Period ID`` column, and the graph data is keyed ``"<graph set> [<period>]"``.
+- A single-period ``target.<method>`` run no longer discards the last
+  all-periods results, so ``report(include_periods=True)`` and the weighted
+  summaries still work after it. Changing the problem's input still clears
+  them.
+- ``design.top(n)`` uses the same ranking as ``design.network(rank=)`` and
+  ``design.grid(rank=)``: successful, feasible outcomes of the accepted method
+  with duplicate network structures removed. Before, it sliced
+  ``result.ranked_networks``, so rank ``k`` could differ between them.
 
 Fuller results
 ~~~~~~~~~~~~~~
@@ -175,25 +740,6 @@ Command layer
   ``workspace.set_case_input`` command replace an existing case's input and
   return its validation report. The session and the other cases' results are
   kept.
-- ``workspace.set_case_input`` takes ``source`` as ``{"data": ...}`` or the
-  TargetInput JSON and rejects anything else, such as a file path, with
-  ``ValueError``. Before, a path string read that file on the engine host.
-- A unit string pint does not know, such as ``{"value": 200, "unit":
-  "bogus"}``, is a validation issue on its field: ``build_validation_report``
-  returns ``valid=False`` and the ``validate`` command returns its report.
-  Before, both raised ``UndefinedUnitError``.
-- A ``zone_tree`` whose zone has two children of the same name is rejected
-  when the input is loaded or validated ("Duplicate zone name ...").
-  Before, the second child was merged into the first.
-- ``Value.to`` converts an offset temperature (``degC``, ``C``, ``°C``,
-  ``degF``) to a difference unit such as ``delta_degC`` as a difference, as
-  the ``Value`` constructor does, so a ``Stream`` takes ``dt_cont`` as
-  ``{"value": 5, "unit": "degC"}``. Before, it raised
-  ``DimensionalityError``.
-- ``run_command`` raises ``ValueError`` naming the accepted shapes,
-  ``{"data": ...}`` or ``{"sample_case": ...}``, when ``problem`` is a bare
-  string or names neither. Before, it raised ``AttributeError`` or
-  ``KeyError``.
 - ``ConfigurationFieldMetadata`` gives each field's ``unit``,
   ``description`` and ``default``, and ``label`` is a display name such as
   "Minimum contribution temperature difference" rather than the title-cased
@@ -653,7 +1199,7 @@ Analysis reliability and extensibility
   :doc:`developer/adding-analysis-methods` for the extension contract.
 
 HPR and MVR robustness and tutorial reliability
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - Hardened CoolProp-backed HPR residual accounting when shared temperature
   grids contain duplicate levels. Equivalent detached residual rows collapse
@@ -675,7 +1221,6 @@ HPR and MVR robustness and tutorial reliability
   matrix, support boundary, notebook catalog, and generated coverage metadata
   to document budgets, diagnostics, direct process MVR, optimized VC+MVR, and
   the two multiperiod modes.
-
 
 Target-owned HPR performance maps
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -733,7 +1278,7 @@ Heat-recovery ``dt_min`` service
   of the ordinary cached target.
 
 0.5.0 architecture clean break
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+------------------------------
 
 - ``PinchProblem`` remains the strict
   mapping-in/result-out contract. Its signature, validation order, return

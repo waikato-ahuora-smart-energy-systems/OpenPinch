@@ -225,3 +225,26 @@ def test_coerce_output_value_uses_default_and_configured_display_units():
 
     assert raw_fraction.value == pytest.approx(0.5)
     assert raw_fraction.unit == "-"
+
+
+def test_annual_cost_display_units_use_the_annual_operating_time():
+    """A year of cost is COSTING_ANNUAL_OP_TIME hours, not 8766 calendar hours."""
+    config = Configuration(
+        options={
+            "OUTPUT_UNIT_UTILITY_COST": "$/y",
+            "OUTPUT_UNIT_ANNUAL_COST": "$/h",
+            "COSTING_ANNUAL_OP_TIME": 8000.0,
+        }
+    )
+
+    utility_cost = unit_system.coerce_output_value(
+        10.0, metric_name="utility_cost", config=config
+    )
+    total_cost = unit_system.coerce_output_value(
+        80000.0, metric_name="total_cost", config=config
+    )
+
+    assert utility_cost.unit == "$/y"
+    assert utility_cost.value == pytest.approx(80000.0, rel=1e-12)
+    assert total_cost.unit == "$/h"
+    assert total_cost.value == pytest.approx(10.0, rel=1e-12)

@@ -236,9 +236,13 @@ def _refine_pw_points_for_heating_or_cooling(
     :param hot_stream: True if the stream is hot, False if the stream is cold.
     :returns: Simplified array of points, maximum error.
     """
-    # Ensure the data is a numpy array
-    curve = np.flipud(curve)
-    pw_points = np.flipud(pw_points)
+    # np.interp needs increasing heat; refine in that order and hand the
+    # points back in the caller's order.
+    curve = np.asarray(curve, dtype=float)
+    pw_points = np.asarray(pw_points, dtype=float)
+    reversed_order = pw_points[-1, 0] < pw_points[0, 0]
+    curve = curve[np.argsort(curve[:, 0], kind="stable")]
+    pw_points = pw_points[np.argsort(pw_points[:, 0], kind="stable")]
 
     # Remove the first and last points because they are fixed
     # Convert 2d array to 1d array
@@ -284,7 +288,9 @@ def _refine_pw_points_for_heating_or_cooling(
     refined_pw_points = np.vstack(
         (args["first_point"], res.x.reshape(-1, 2), args["last_point"])
     )
-    return np.flipud(refined_pw_points), np.max(np.abs(delta_pw_and_data(res.x, args)))
+    if reversed_order:
+        refined_pw_points = np.flipud(refined_pw_points)
+    return refined_pw_points, np.max(np.abs(delta_pw_and_data(res.x, args)))
 
 
 def _get_piecewise_breakpoints(

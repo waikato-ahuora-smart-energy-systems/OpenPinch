@@ -30,7 +30,8 @@ def test_summary_frame_shows_exergy_after_the_exergy_target():
     assert row["Exergy Sources"] == f"{target.exergy_sources.value:.2f} kW"
     assert row["Exergy Sinks"] == f"{target.exergy_sinks.value:.2f} kW"
     assert row["Min Exergy Requirement"] == f"{target.exergy_req_min.value:.2f} kW"
-    assert row["Min Exergy Destruction"] == f"{target.exergy_des_min.value:.2f} kW"
+    assert "Min Exergy Destruction" not in row
+    assert row["Min Exergy Rejected"] == f"{target.exergy_des_min.value:.2f} kW"
     assert "Area" not in row
 
 

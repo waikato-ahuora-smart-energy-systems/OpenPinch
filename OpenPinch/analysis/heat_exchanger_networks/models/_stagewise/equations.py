@@ -193,7 +193,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                         for j in range(owner.J)
                     ]
                 )
-                - owner.Q_c_by_period[n][i]
+                - sum(owner.Q_c_by_period[n][i])
                 == 0.0
                 for i in range(owner.I)
             ]
@@ -208,7 +208,7 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
                         for i in range(owner.I)
                     ]
                 )
-                - owner.Q_h_by_period[n][j]
+                - sum(owner.Q_h_by_period[n][j])
                 == 0.0
                 for j in range(owner.J)
             ]
@@ -255,24 +255,26 @@ def _set_multiperiod_stage_wise_superstructure(owner) -> None:
             _ = [
                 (
                     owner.m.Equation(
-                        owner.Q_c_by_period[n][i]
-                        <= owner.Qtot_sh_period[n][i] * owner.z_cu[i]
+                        owner.Q_c_by_period[n][i][u]
+                        <= owner.Qtot_sh_period[n][i] * owner.z_cu[i][u]
                     )
-                    if owner.z_cu_allowed[i] > 0
+                    if owner.z_cu_allowed[i][u] > 0
                     else None
                 )
                 for i in range(owner.I)
+                for u in range(owner.NCU)
             ]
             _ = [
                 (
                     owner.m.Equation(
-                        owner.Q_h_by_period[n][j]
-                        <= owner.Qtot_sc_period[n][j] * owner.z_hu[j]
+                        owner.Q_h_by_period[n][j][u]
+                        <= owner.Qtot_sc_period[n][j] * owner.z_hu[j][u]
                     )
-                    if owner.z_hu_allowed[j] > 0
+                    if owner.z_hu_allowed[j][u] > 0
                     else None
                 )
                 for j in range(owner.J)
+                for u in range(owner.NHU)
             ]
 
     _approach._set_multiperiod_utility_approach_equations(owner)

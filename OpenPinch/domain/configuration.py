@@ -7,6 +7,8 @@ from dataclasses import dataclass, fields
 from types import SimpleNamespace, UnionType
 from typing import Any, Union, get_args, get_origin, get_type_hints
 
+import numpy as np
+
 from ._value.coercion import coerce_period_index
 from .configuration_fields import (
     CONFIG_FIELD_SPECS,
@@ -17,6 +19,10 @@ from .configuration_fields import (
 
 C_to_K: float = 273.15  # degrees
 tol: float = 1e-6
+# Heat-flow residues from rounding and solver noise scale with the duties, so
+# zero and balance tests on heat flows use this tolerance relative to the
+# problem's largest heat flow.
+DUTY_RTOL: float = 1e-6
 T_CRIT: float = 373.9  # C
 ACTIVATE_TIMING = False
 LOG_TIMING = False
@@ -25,10 +31,37 @@ __all__ = [
     "ACTIVATE_TIMING",
     "C_to_K",
     "Configuration",
+    "DUTY_RTOL",
+    "duty_tolerance",
+    "heat_resolution",
     "LOG_TIMING",
     "T_CRIT",
     "tol",
 ]
+
+
+def _heat_scale(heat_flows) -> float:
+    scale = 0.0
+    for values in heat_flows:
+        finite = np.abs(np.asarray(values, dtype=float))
+        finite = finite[np.isfinite(finite)]
+        if finite.size:
+            scale = max(scale, float(finite.max()))
+    return scale
+
+
+def duty_tolerance(*heat_flows) -> float:
+    """Return the noise tolerance for heat flows, relative to their scale."""
+    return DUTY_RTOL * _heat_scale(heat_flows)
+
+
+def heat_resolution(*heat_flows) -> float:
+    """Return the smallest heat flow treated as non-zero.
+
+    It is ``tol`` kW for problems of 1 kW and above, and shrinks with the
+    heat-flow scale below that, so small problems keep their resolution.
+    """
+    return min(tol, DUTY_RTOL * _heat_scale(heat_flows))
 
 
 # Typed views of the configuration groups. ``CONFIG_FIELD_SPECS`` stays the

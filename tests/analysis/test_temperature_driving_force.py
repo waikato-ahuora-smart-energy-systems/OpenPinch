@@ -4,7 +4,6 @@ import numpy as np
 import pytest
 
 from OpenPinch.analysis.targeting.temperature_driving_force import (
-    _discontinuity_values,
     _normalise_curve,
     get_temperature_driving_forces,
 )
@@ -76,7 +75,22 @@ def test_temperature_driving_force_helpers_reject_mismatches_and_short_curves():
     with pytest.raises(ValueError, match="same length"):
         _normalise_curve(np.array([0.0]), np.array([100.0, 90.0]))
 
-    assert _discontinuity_values(np.array([0.0])).size == 0
+
+def test_slice_ending_at_a_composite_temperature_step_keeps_its_left_limit():
+    # The cold curve steps from 150 to 250 at H = 100 (no cold stream spans
+    # that range). The first slice ends against the bottom of the step, so its
+    # end driving force is 350 - 150 = 200, not the next slice's 100. Taking
+    # the next slice's value inflated area targets by 1-6 % on cases with a
+    # composite temperature gap.
+    T_hot = np.array([300.0, 350.0, 400.0])
+    H_hot = np.array([0.0, 100.0, 200.0])
+    T_cold = np.array([100.0, 150.0, 250.0, 300.0])
+    H_cold = np.array([0.0, 100.0, 100.0, 200.0])
+
+    result = get_temperature_driving_forces(T_hot, H_hot, T_cold, H_cold)
+
+    np.testing.assert_allclose(result["delta_T1"], [200.0, 100.0], atol=1e-9)
+    np.testing.assert_allclose(result["delta_T2"], [200.0, 100.0], atol=1e-9)
 
 
 def test_get_temperature_driving_forces_shifts_curves_to_common_origin():

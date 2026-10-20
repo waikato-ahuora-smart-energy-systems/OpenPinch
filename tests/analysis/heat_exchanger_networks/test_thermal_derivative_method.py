@@ -101,7 +101,7 @@ def test_pinch_design_quality_task_builder_adds_deduped_stage_pair_tasks() -> No
     ] == [[2, 1]]
 
     with pytest.raises(ValueError, match="requires a multiplier"):
-        pinch_design_method._pathway_approach_temperature(
+        pinch_design_method._pathway_approach_temperatures(
             settings,
             TierPathway(
                 pathway_id="bad",

@@ -34,25 +34,28 @@ def _utility_outlet_temperature(
     side: str,
     period_idx: int,
     match_index: int,
+    utility_index: int,
     duty: float,
 ) -> float | None:
     resolver = getattr(solved_model, "_utility_solved_outlet_temperature", None)
     if callable(resolver):
-        return _optional_float(resolver(side, period_idx, match_index, duty))
+        return _optional_float(
+            resolver(side, period_idx, match_index, utility_index, duty)
+        )
     if side == "hot":
         return _period_value(
             solved_model,
             "T_hu_out_period",
             "T_hu_out",
             period_idx,
-            0,
+            utility_index,
         )
     return _period_value(
         solved_model,
         "T_cu_out_period",
         "T_cu_out",
         period_idx,
-        0,
+        utility_index,
     )
 
 
@@ -145,6 +148,7 @@ def _recovery_period_state(
             hot_index=hot_index,
             cold_index=cold_index,
             stage_index=stage_index,
+            duty=duty,
             tolerance=tolerance,
         ),
         sink_split_fraction=_recovery_split_fraction(
@@ -154,6 +158,7 @@ def _recovery_period_state(
             hot_index=hot_index,
             cold_index=cold_index,
             stage_index=stage_index,
+            duty=duty,
             tolerance=tolerance,
         ),
         source_inlet_temperature=source_inlet,
@@ -183,14 +188,15 @@ def _hot_utility_period_state(
     period_id: str,
     period_idx: int,
     cold_index: int,
+    utility_index: int,
     q_values: Any,
     q_values_by_period: Any,
     tolerance: float,
 ) -> HeatExchangerPeriodState:
     duty = _normalized_solver_duty(
-        _index(q_values_by_period, period_idx, cold_index)
+        _index(q_values_by_period, period_idx, cold_index, utility_index)
         if q_values_by_period is not None
-        else _index(q_values, cold_index),
+        else _index(q_values, cold_index, utility_index),
         tolerance=tolerance,
     )
     source_inlet = _period_value(
@@ -198,13 +204,14 @@ def _hot_utility_period_state(
         "T_hu_in_period",
         "T_hu_in",
         period_idx,
-        0,
+        utility_index,
     )
     source_outlet = _utility_outlet_temperature(
         solved_model,
         side="hot",
         period_idx=period_idx,
         match_index=cold_index,
+        utility_index=utility_index,
         duty=duty,
     )
     sink_inlet = _period_value(
@@ -224,7 +231,7 @@ def _hot_utility_period_state(
     )
     active = _is_active(
         duty,
-        _index(getattr(solved_model, "z_hu", None), cold_index),
+        _index(getattr(solved_model, "z_hu", None), cold_index, utility_index),
         tolerance,
     )
     return HeatExchangerPeriodState(
@@ -246,15 +253,16 @@ def _cold_utility_period_state(
     period_id: str,
     period_idx: int,
     hot_index: int,
+    utility_index: int,
     last_stage: int | None,
     q_values: Any,
     q_values_by_period: Any,
     tolerance: float,
 ) -> HeatExchangerPeriodState:
     duty = _normalized_solver_duty(
-        _index(q_values_by_period, period_idx, hot_index)
+        _index(q_values_by_period, period_idx, hot_index, utility_index)
         if q_values_by_period is not None
-        else _index(q_values, hot_index),
+        else _index(q_values, hot_index, utility_index),
         tolerance=tolerance,
     )
     source_inlet = _period_value(
@@ -277,18 +285,19 @@ def _cold_utility_period_state(
         "T_cu_in_period",
         "T_cu_in",
         period_idx,
-        0,
+        utility_index,
     )
     sink_outlet = _utility_outlet_temperature(
         solved_model,
         side="cold",
         period_idx=period_idx,
         match_index=hot_index,
+        utility_index=utility_index,
         duty=duty,
     )
     active = _is_active(
         duty,
-        _index(getattr(solved_model, "z_cu", None), hot_index),
+        _index(getattr(solved_model, "z_cu", None), hot_index, utility_index),
         tolerance,
     )
     return HeatExchangerPeriodState(
@@ -328,31 +337,50 @@ def _hot_recovery_outlet(
         )
     if explicit is not None:
         return explicit
-    inlet = _period_value(
-        solved_model,
-        "T_h_by_period",
-        "T_h",
-        period_idx,
-        i,
-        k,
-    )
-    heat_capacity = _period_value(
-        solved_model,
-        "f_h_period",
-        "f_h",
-        period_idx,
-        i,
-    )
+    # Isothermal mixing: every branch leaves at the stage's outlet boundary.
+    boundary = _period_value(solved_model, "T_h_by_period", "T_h", period_idx, i, k + 1)
+    if boundary is not None:
+        return boundary
+    inlet = _period_value(solved_model, "T_h_by_period", "T_h", period_idx, i, k)
+    heat_capacity = _period_value(solved_model, "f_h_period", "f_h", period_idx, i)
     if inlet is not None and heat_capacity is not None and heat_capacity > 0.0:
         return inlet - duty / heat_capacity
-    return _period_value(
-        solved_model,
-        "T_h_by_period",
-        "T_h",
-        period_idx,
-        i,
-        k + 1,
+    return None
+
+
+def _isothermal_split_fraction(
+    solved_model: Any,
+    *,
+    side: str,
+    period_idx: int,
+    stream_index: int,
+    stage_index: int,
+    duty: float,
+    tolerance: float,
+) -> float | None:
+    """Return a branch's flow share from its duty and the stage's boundaries.
+
+    Isothermal-mixing models have no branch outlets: each branch spans the
+    stream's whole temperature change in the stage, so its share of the flow
+    is its share of the stage duty.
+    """
+    prefix, cp_name = ("T_h", "f_h") if side == "hot" else ("T_c", "f_c")
+    boundaries = (stage_index, stage_index + 1)
+    temperatures = [
+        _period_value(
+            solved_model, f"{prefix}_by_period", prefix, period_idx, stream_index, k
+        )
+        for k in boundaries
+    ]
+    heat_capacity = _period_value(
+        solved_model, f"{cp_name}_period", cp_name, period_idx, stream_index
     )
+    if None in temperatures or heat_capacity is None or duty <= tolerance:
+        return None
+    stage_duty = heat_capacity * abs(temperatures[0] - temperatures[1])
+    if stage_duty <= tolerance:
+        return None
+    return min(duty / stage_duty, 1.0)
 
 
 def _recovery_split_fraction(
@@ -363,6 +391,7 @@ def _recovery_split_fraction(
     hot_index: int,
     cold_index: int,
     stage_index: int,
+    duty: float,
     tolerance: float,
 ) -> float | None:
     if side == "hot":
@@ -385,7 +414,15 @@ def _recovery_split_fraction(
                 )
             )
         if explicit is None:
-            return None
+            return _isothermal_split_fraction(
+                solved_model,
+                side="hot",
+                period_idx=period_idx,
+                stream_index=hot_index,
+                stage_index=stage_index,
+                duty=duty,
+                tolerance=tolerance,
+            )
         value = _period_value(
             solved_model,
             "X_by_period",
@@ -415,7 +452,15 @@ def _recovery_split_fraction(
                 )
             )
         if explicit is None:
-            return None
+            return _isothermal_split_fraction(
+                solved_model,
+                side="cold",
+                period_idx=period_idx,
+                stream_index=cold_index,
+                stage_index=stage_index,
+                duty=duty,
+                tolerance=tolerance,
+            )
         value = _period_value(
             solved_model,
             "Y_by_period",
@@ -460,28 +505,12 @@ def _cold_recovery_outlet(
         )
     if explicit is not None:
         return explicit
-    inlet = _period_value(
-        solved_model,
-        "T_c_by_period",
-        "T_c",
-        period_idx,
-        j,
-        k + 1,
-    )
-    heat_capacity = _period_value(
-        solved_model,
-        "f_c_period",
-        "f_c",
-        period_idx,
-        j,
-    )
+    # Isothermal mixing: every branch leaves at the stage's outlet boundary.
+    boundary = _period_value(solved_model, "T_c_by_period", "T_c", period_idx, j, k)
+    if boundary is not None:
+        return boundary
+    inlet = _period_value(solved_model, "T_c_by_period", "T_c", period_idx, j, k + 1)
+    heat_capacity = _period_value(solved_model, "f_c_period", "f_c", period_idx, j)
     if inlet is not None and heat_capacity is not None and heat_capacity > 0.0:
         return inlet + duty / heat_capacity
-    return _period_value(
-        solved_model,
-        "T_c_by_period",
-        "T_c",
-        period_idx,
-        j,
-        k,
-    )
+    return None

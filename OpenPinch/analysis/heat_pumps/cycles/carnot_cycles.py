@@ -15,6 +15,7 @@ from ..common.shared import (
     calc_carnot_heat_engine_eta,
     calc_carnot_heat_pump_cop,
     compute_entropic_mean_temperature,
+    satisfies_second_law,
 )
 
 __all__ = ["CascadeCarnotCycle", "ParallelCarnotCycles"]
@@ -34,6 +35,7 @@ class ParallelCarnotCycles:
         self._w_hpr = np.empty(0, dtype=float)
         self._w_he = np.empty(0, dtype=float)
         self._heat_recovery = 0.0
+        self._Q_evap_hpr = 0.0
         self._penalty = np.empty(0, dtype=float)
         self._args: Any = None
 
@@ -101,6 +103,13 @@ class ParallelCarnotCycles:
     def COP_h(self) -> float:
         w_hpr = float(self._w_hpr.sum())
         return float(self._Q_cond.sum() / w_hpr) if w_hpr > tol else 0.0
+
+    @property
+    def COP_c(self) -> float:
+        # Only heat-pump stages take compressor work; recovery and heat-engine
+        # stages would inflate the ratio.
+        w_hpr = float(self._w_hpr.sum())
+        return float(self._Q_evap_hpr / w_hpr) if w_hpr > tol else 0.0
 
     @property
     def eta_he(self) -> float:
@@ -201,12 +210,15 @@ class ParallelCarnotCycles:
         self._Q_cond = self._Q_cond_he + Qc_hx + Qc_hpr
         self._Q_evap = self._Q_evap_he + Qe_hx + Qe_hpr
         self._heat_recovery = float(Qc_hx.sum())
+        self._Q_evap_hpr = float(Qe_hpr.sum())
         self._solved = bool(
             np.isclose(
                 self._Q_cond.sum() + self._w_he.sum(),
                 self._Q_evap.sum() + self._w_hpr.sum(),
                 atol=tol,
             )
+        ) and satisfies_second_law(
+            self._T_cond, self._Q_cond, self._T_evap, self._Q_evap
         )
         return self.work
 
@@ -236,6 +248,7 @@ class CascadeCarnotCycle:
         self._w_hpr = 0.0
         self._w_he = 0.0
         self._cop = 1.0
+        self._cop_c = 1.0
         self._penalty = np.empty(0, dtype=float)
         self._args: Any = None
 
@@ -303,6 +316,10 @@ class CascadeCarnotCycle:
     def COP_h(self) -> float:
         return self._cop
 
+    @property
+    def COP_c(self) -> float:
+        return self._cop_c
+
     def solve(
         self,
         *,
@@ -360,6 +377,7 @@ class CascadeCarnotCycle:
         self._w_he = float(self._Q_evap_he.sum() - self._Q_cond_he.sum())
         self._w_hpr = float(Qc_hpr.sum() - Qe_hpr.sum())
         self._cop = float(Qc_hpr.sum() / self._w_hpr) if self._w_hpr > 0 else 1.0
+        self._cop_c = float(Qe_hpr.sum() / self._w_hpr) if self._w_hpr > 0 else 1.0
         self._Q_cond = Qc_hpr + self._Q_cond_he
         self._Q_evap = Qe_hpr + self._Q_evap_he
         self._solved = bool(
@@ -368,6 +386,8 @@ class CascadeCarnotCycle:
                 self._Q_evap_he.sum() + Qe_hpr.sum() + self._w_hpr,
                 atol=tol,
             )
+        ) and satisfies_second_law(
+            self._T_cond, self._Q_cond, self._T_evap, self._Q_evap
         )
         return self.work
 
@@ -383,28 +403,42 @@ class CascadeCarnotCycle:
         Qe_pool: np.ndarray,
         eta_ii_he_carnot: float,
     ) -> Tuple[np.ndarray, np.ndarray]:
+        """Allocate heat-engine and recovery duty pair by pair.
+
+        Heat only moves downhill, from an evaporator to a condenser at or
+        below its temperature (``is_on[i_c, i_e]``). Condensers are served
+        hottest first, each from the coolest evaporator hot enough for it, so
+        hot sources stay free for the condensers only they can serve. With a
+        heat-engine efficiency the pair earns work between its own two
+        temperatures; otherwise it is plain heat recovery.
+        """
         Qc_he = np.zeros_like(Qc_pool)
         Qe_he = np.zeros_like(Qe_pool)
-        if np.any(is_on):
-            i_c, i_e = self._get_unique_idx(is_on)
-            Qc_pool_sum, Qe_pool_sum = Qc_pool[i_c].sum(), Qe_pool[i_e].sum()
-            if Qc_pool_sum * Qe_pool_sum > tol:
-                if 1 >= eta_ii_he_carnot > 0:
-                    T_h = compute_entropic_mean_temperature(
-                        self._T_evap[i_e],
-                        Qe_pool[i_e],
+        Qc_left = np.maximum(np.asarray(Qc_pool, dtype=float), 0.0)
+        Qe_left = np.maximum(np.asarray(Qe_pool, dtype=float), 0.0)
+        use_engine = 1 >= eta_ii_he_carnot > 0
+        for i_c in np.argsort(-self._T_cond, kind="stable"):
+            on_evap = np.flatnonzero(is_on[i_c])
+            for i_e in on_evap[np.argsort(self._T_evap[on_evap], kind="stable")]:
+                if Qc_left[i_c] <= tol:
+                    break
+                if Qe_left[i_e] <= tol:
+                    continue
+                eta_he = (
+                    calc_carnot_heat_engine_eta(
+                        self._T_evap[i_e] + 273.15,
+                        self._T_cond[i_c] + 273.15,
+                        eta_ii_he_carnot,
                     )
-                    T_l = compute_entropic_mean_temperature(
-                        self._T_cond[i_c],
-                        Qc_pool[i_c],
-                    )
-                    eta_he = calc_carnot_heat_engine_eta(T_h, T_l, eta_ii_he_carnot)
-                    Qe_used = min(Qe_pool_sum, Qc_pool_sum / max(1.0 - eta_he, tol))
-                    Qc_used = Qe_used * (1 - eta_he)
-                else:
-                    Qe_used = Qc_used = min(Qe_pool_sum, Qc_pool_sum)
-                Qc_he[i_c] = Qc_pool[i_c] * (Qc_used / Qc_pool_sum)
-                Qe_he[i_e] = Qe_pool[i_e] * (Qe_used / Qe_pool_sum)
+                    if use_engine
+                    else 0.0
+                )
+                Qe_used = min(Qe_left[i_e], Qc_left[i_c] / (1.0 - eta_he))
+                Qc_used = Qe_used * (1.0 - eta_he)
+                Qc_he[i_c] += Qc_used
+                Qe_he[i_e] += Qe_used
+                Qc_left[i_c] -= Qc_used
+                Qe_left[i_e] -= Qe_used
         return Qc_he, Qe_he
 
     def _get_heat_pump_duty(

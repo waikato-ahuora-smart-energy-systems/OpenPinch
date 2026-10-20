@@ -26,6 +26,8 @@ try:
     ureg.define("NZD = [currency]")
 except PintError:  # pragma: no cover - Pint may already know this unit.
     pass
+# Every unit or quantity text Pint parses is held to a bounded grammar first.
+ureg.preprocessors.append(_value_units.check_unit_text)
 set_application_registry(ureg)
 Q_ = ureg.Quantity  # type: ignore
 
@@ -146,6 +148,10 @@ class Value:
         new_value = self._from_quantity(quantity)
         new_value._weights = self._weights.copy() if self._weights is not None else None
         return new_value
+
+    def unit_exponent(self, unit_name: str) -> float:
+        """Return the power of one Pint unit (``"year"``) in this unit, or 0."""
+        return float(dict(self._quantity.units._units).get(unit_name, 0))
 
     def __getitem__(self, idx):
         """Return one selected period as an independent ``Value``."""

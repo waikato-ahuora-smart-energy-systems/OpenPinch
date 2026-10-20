@@ -317,7 +317,7 @@ def _set_gamma_equations(model, m: Any) -> None:
     model.gamma_c_eqn = []
     for k, j, i in _recovery_indices(model):
         last_stage = k + 1 >= model.S
-        first_stage = not last_stage and k - 1 < 0
+        first_stage = k == 0
         hot_flow_on = 0.0 if last_stage else _hot_gamma_flow_on(model, i, j, k)
         model.gamma_h_eqn.append([m.Equation(model.gamma_h[i][j][k] == hot_flow_on)])
         cold_flow_on = 0.0 if first_stage else _cold_gamma_flow_on(model, i, j, k)
