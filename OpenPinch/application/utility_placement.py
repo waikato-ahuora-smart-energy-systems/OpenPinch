@@ -1213,12 +1213,18 @@ def run_problem_utility_placement(
 
 def _utility_sources(problem, selected_zone, raw_utilities):
     """Return each side's original utilities as (name, supply, shift, raw)."""
-    raw_by_name = {utility["name"]: utility for utility in raw_utilities}
     sources = {}
     for utility_type, attribute in (
         ("Hot", "hot_utilities"),
         ("Cold", "cold_utilities"),
     ):
+        # A hot and a cold utility may share a name; a "Both" utility serves
+        # either side.
+        raw_by_name = {
+            utility["name"]: utility
+            for utility in raw_utilities
+            if utility.get("type") in (utility_type, StreamType.Both.value)
+        }
         # A subzone without its own utilities draws on the site's.
         utilities = getattr(selected_zone, attribute) or getattr(
             problem.master_zone, attribute

@@ -198,3 +198,28 @@ def test_period_varying_dt_cont_keeps_the_placed_level_unshifted():
     assert utility["t_supply"]["value"] == pytest.approx(150.0)
     assert utility["price"] == raw["price"]
     assert utility["htc"] == raw["htc"]
+
+
+def test_source_utilities_are_matched_by_side_as_well_as_name():
+    # A hot and a cold utility may share a name; each side's placed levels
+    # must copy that side's price, htc and dt_cont, not the other side's.
+    import json
+
+    from OpenPinch.application.utility_placement import _utility_sources
+    from OpenPinch.resources import read_sample_case
+
+    case = json.loads(read_sample_case("basic_pinch.json"))
+    hot = next(u for u in case["utilities"] if u["type"] == "Hot")
+    cold = next(u for u in case["utilities"] if u["type"] == "Cold")
+    case["utilities"] = [
+        dict(hot, price={"value": 10.0, "unit": "$/MWh"}),
+        dict(cold, name=hot["name"], price={"value": 99.0, "unit": "$/MWh"}),
+    ]
+    problem = PinchProblem(case)
+
+    sources = _utility_sources(
+        problem, problem.master_zone, problem.to_problem_json()["utilities"]
+    )
+
+    assert [raw["price"]["value"] for *_, raw in sources["Hot"]] == [10.0]
+    assert [raw["price"]["value"] for *_, raw in sources["Cold"]] == [99.0]

@@ -98,8 +98,9 @@ Utility placement and optimisers
   298.15 to 288.15 K, ``exergy_destruction`` 59.79 to 57.78 kW;
   ``total_entropy_generation`` stays 0.2005 kW/K.
 - The optimised placement case keeps the price and htc of the original
-  utility with the same name, else of the nearest one on the same side by
-  supply temperature (it had no price and htc 1.0). In the Direct scope it
+  utility with the same name on the same side, else of the nearest one on
+  that side by supply temperature (it had no price and htc 1.0). A hot and a
+  cold utility that share a name each keep their own properties. In the Direct scope it
   also keeps that utility's ``dt_cont`` and lists the real temperatures
   that ``dt_cont`` outward of the placed (shifted) levels, so the case
   targets the same levels; in the Indirect and Total Site scopes, and when
