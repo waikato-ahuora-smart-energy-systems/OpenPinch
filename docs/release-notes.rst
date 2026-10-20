@@ -4,6 +4,15 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Testing and CI
+~~~~~~~~~~~~~~
+
+- When a Pyodide test run fails outside pytest (for example while micropip
+  installs the test dependencies), ``scripts/pyodide/run_tests.mjs`` prints
+  the Python traceback and exits with status 1. Before, Node printed a
+  1.2 MB line of Pyodide's minified source first; GitHub cut it at 64 KB and
+  dropped the traceback, so these failures showed no cause.
+
 0.7.2 (2026-10-20)
 ------------------
 
