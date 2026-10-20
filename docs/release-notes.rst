@@ -454,6 +454,13 @@ Input, contracts and option metadata
 Testing and CI
 ~~~~~~~~~~~~~~
 
+- The four-stream warm-start solver regression accepts either of the two
+  checked-in OpenHENS solutions it can reach: the best network (154,853.85
+  $/y) with the macOS IDAES solver binaries, or the second-quartile one
+  (159,038.72 $/y) with CI's Ubuntu 22.04 binaries. It had been changed to
+  expect only the best one, which failed the solver lane on the 0.7.2 release
+  pull request. It still checks the network's structure, heat balances and
+  cost against whichever solution was reached.
 - The utility placement timing tests
   (``tests/analysis/utility_placement/test_performance.py``) carry the
   ``performance`` marker, so they run in the performance lane and no longer in
