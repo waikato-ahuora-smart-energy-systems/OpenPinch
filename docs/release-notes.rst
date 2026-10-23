@@ -4,6 +4,9 @@ Pre-Release Notes
 Unreleased
 ----------
 
+0.7.3 (2026-10-24)
+------------------
+
 Citation
 ~~~~~~~~
 
