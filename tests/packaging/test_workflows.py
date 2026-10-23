@@ -123,7 +123,9 @@ def test_pyodide_job_runs_the_runner_test_once_its_node_packages_are_installed()
     names = [step.get("name") for step in steps]
     install = names.index("Install Pyodide")
     runner = next(
-        i for i, step in enumerate(steps) if "tests/packaging/test_pyodide_runner.py" in step.get("run", "")
+        i
+        for i, step in enumerate(steps)
+        if "tests/packaging/test_pyodide_runner.py" in step.get("run", "")
     )
     assert runner > install
     assert steps[runner]["if"] == "${{ matrix.shard == 'core' }}"
