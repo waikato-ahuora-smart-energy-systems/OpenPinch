@@ -115,6 +115,21 @@ def test_pyodide_shards_cover_the_presentation_tests():
     assert "tests/presentation" in shards["core"]
 
 
+def test_pyodide_job_runs_the_runner_test_once_its_node_packages_are_installed():
+    # The runner test skips without scripts/pyodide/node_modules, which only
+    # the Pyodide job installs, so it runs there (on CPython, in one shard)
+    # and fails if it was skipped.
+    steps = workflow("ci.yml")["jobs"]["pyodide"]["steps"]
+    names = [step.get("name") for step in steps]
+    install = names.index("Install Pyodide")
+    runner = next(
+        i for i, step in enumerate(steps) if "tests/packaging/test_pyodide_runner.py" in step.get("run", "")
+    )
+    assert runner > install
+    assert steps[runner]["if"] == "${{ matrix.shard == 'core' }}"
+    assert "skipped" in steps[runner]["run"]
+
+
 def test_release_publishes_the_bytes_ci_built():
     release = workflow("release.yml")
     assert release["on"]["push"]["branches"] == ["main"]

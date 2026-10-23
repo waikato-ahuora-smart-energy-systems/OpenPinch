@@ -29,6 +29,10 @@ Testing and CI
   certifi 2026.6.17. Pillow 13 needs streamlit 1.66.1 (the ``dashboard``
   extra), which drops its ``httptools`` and ``toml`` dependencies.
 
+- CI runs the Pyodide runner's own regression test (a failed run prints its
+  traceback) in the Pyodide job, where its Node packages are installed. It
+  used to skip in every lane, so the behaviour had no CI coverage.
+
 0.7.2 (2026-10-20)
 ------------------
 
