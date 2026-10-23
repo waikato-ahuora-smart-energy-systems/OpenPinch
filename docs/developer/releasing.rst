@@ -68,6 +68,10 @@ Cutting a release
    merged commit, uploads the wheel and sdist to PyPI with trusted publishing,
    and creates the ``v<version>`` tag and GitHub release with the same files
    attached.
+5. Zenodo archives the published GitHub release and mints its DOI (the
+   GitHub integration, see below). The record's title, creator, licence and
+   keywords come from ``CITATION.cff``; update that file, not the Zenodo
+   record, when they change.
 
 The bump commit is pushed with the workflow token, which does not start new
 workflow runs. If a ``develop`` → ``main`` pull request is already open when
@@ -109,6 +113,12 @@ One-time repository settings
   ``release.yml`` and the environment to ``pypi``. The old ``ci-publish.yml``
   publisher and the TestPyPI publisher are no longer used.
 - Environment ``pypi``: restrict deployments to the ``main`` branch.
+- Zenodo: in Zenodo's GitHub settings (https://zenodo.org/account/settings/github/),
+  signed in as an owner of the ``waikato-ahuora-smart-energy-systems``
+  organisation (or with its access granted to Zenodo), switch the
+  ``OpenPinch`` repository on. From then on each published release gets a
+  version DOI, and all versions share one concept DOI for "the latest
+  release". Releases published before the switch are not archived.
 - A pull request retargeted from ``develop`` to ``main`` has no
   **CI OK (main)** check until its checks re-run, so it cannot merge early:
   push a commit or close and reopen it. Title and description edits do not

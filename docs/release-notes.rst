@@ -4,6 +4,14 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Citation
+~~~~~~~~
+
+- The repository has a ``CITATION.cff``. GitHub's "Cite this repository"
+  offers the foundational article, and Zenodo reads the file to archive each
+  GitHub release with its own DOI, crediting Timothy Gordon Walmsley (ORCID
+  0000-0002-9192-0771).
+
 Testing and CI
 ~~~~~~~~~~~~~~
 

@@ -1,0 +1,40 @@
+cff-version: 1.2.0
+message: >-
+  If you use OpenPinch, please cite the foundational article below and the
+  version of the software you used (its Zenodo DOI).
+type: software
+title: OpenPinch
+abstract: >-
+  An advanced pinch analysis and total site integration toolkit: process and
+  site heat integration targets, multiperiod analysis, heat pumps and
+  refrigeration, cogeneration, utility placement, exergy, and heat exchanger
+  network synthesis.
+authors:
+  - family-names: Walmsley
+    given-names: Timothy Gordon
+    orcid: "https://orcid.org/0000-0002-9192-0771"
+    affiliation: University of Waikato
+license: MIT
+repository-code: "https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch"
+url: "https://openpinch.readthedocs.io/en/latest/"
+keywords:
+  - pinch analysis
+  - total site integration
+  - heat integration
+  - heat exchanger network synthesis
+  - heat pumps
+  - energy efficiency
+  - process integration
+preferred-citation:
+  type: article
+  authors:
+    - family-names: Walmsley
+      given-names: Timothy Gordon
+      orcid: "https://orcid.org/0000-0002-9192-0771"
+      affiliation: University of Waikato
+  title: >-
+    OpenPinch: An Open-Source Python Library for Advanced Pinch Analysis and
+    Total Site Integration
+  journal: Process Integration and Optimization for Sustainability
+  year: 2026
+  doi: 10.1007/s41660-026-00729-6
