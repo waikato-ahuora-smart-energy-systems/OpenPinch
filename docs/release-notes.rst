@@ -21,6 +21,11 @@ Testing and CI
   1.2 MB line of Pyodide's minified source first; GitHub cut it at 64 KB and
   dropped the traceback, so these failures showed no cause.
 
+- The lock file pins pillow 13.0.0 and certifi 2026.10.23, which fix the
+  advisories that failed the Dependency audit job against pillow 12.3.0 and
+  certifi 2026.6.17. Pillow 13 needs streamlit 1.66.1 (the ``dashboard``
+  extra), which drops its ``httptools`` and ``toml`` dependencies.
+
 0.7.2 (2026-10-20)
 ------------------
 
