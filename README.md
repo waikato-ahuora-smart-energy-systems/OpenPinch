@@ -5,6 +5,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/openpinch.svg)](https://pypi.org/project/OpenPinch/)
 [![Python versions](https://img.shields.io/pypi/pyversions/openpinch.svg)](https://pypi.org/project/OpenPinch/)
 [![License: MIT](https://img.shields.io/github/license/waikato-ahuora-smart-energy-systems/OpenPinch.svg)](LICENSE)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23619779.svg)](https://doi.org/10.5281/zenodo.23619779)
 
 OpenPinch is an open-source Python toolkit for advanced Pinch Analysis and
 Total Site Integration. It supports direct and indirect heat integration
@@ -201,6 +202,10 @@ this repository:
 Timothy Gordon Walmsley, 2026. OpenPinch: An Open-Source Python Library for
 Advanced Pinch Analysis and Total Site Integration. Process Integration and
 Optimization for Sustainability. https://doi.org/10.1007/s41660-026-00729-6
+
+Each release of the software is archived on Zenodo with its own DOI. The DOI
+https://doi.org/10.5281/zenodo.23619779 always resolves to the latest release;
+cite the DOI of the version you used, listed on its Zenodo page.
 
 ## Contributors
 
