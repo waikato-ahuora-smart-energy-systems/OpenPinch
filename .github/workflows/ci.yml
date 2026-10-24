@@ -363,6 +363,20 @@ jobs:
       - name: Install Pyodide
         working-directory: scripts/pyodide
         run: npm ci --ignore-scripts --no-audit --no-fund
+      # The runner's own regression test (a failed run prints its traceback)
+      # runs on CPython and skips without the Node packages installed above,
+      # so it runs here, once, and a skip fails the step.
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        if: ${{ matrix.shard == 'core' }}
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Check the runner reports a failed run
+        if: ${{ matrix.shard == 'core' }}
+        run: |
+          uv sync --frozen --group dev
+          uv run --no-sync pytest tests/packaging/test_pyodide_runner.py -rs -q | tee runner.log
+          if grep -q skipped runner.log; then echo "The runner test was skipped." >&2; exit 1; fi
       - name: Run the tests in Pyodide against the built wheel
         env:
           PATHS: ${{ matrix.paths }}

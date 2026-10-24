@@ -16,6 +16,18 @@ import { basename, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { loadPyodide } from 'pyodide'
 
+// An error thrown out of Pyodide (a Python exception becomes a PythonError)
+// would otherwise reach Node uncaught, and Node prints the throwing line of
+// pyodide.asm.mjs first: one minified line of several hundred kilobytes.
+// GitHub cuts log lines at 64 KB and drops the Python traceback after it,
+// so print only the error and exit non-zero.
+function reportAndExit(error) {
+  console.error(`Pyodide test run failed:\n${error?.message ?? error}`)
+  process.exit(1)
+}
+process.on('uncaughtException', reportAndExit)
+process.on('unhandledRejection', reportAndExit)
+
 const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO = resolve(HERE, '..', '..')
 const requirements = readFileSync(resolve(HERE, 'requirements.txt'), 'utf8')
