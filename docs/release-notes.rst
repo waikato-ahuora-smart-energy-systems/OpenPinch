@@ -4,6 +4,14 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Citation
+~~~~~~~~
+
+- Zenodo archived 0.7.3, the first release since the repository was switched
+  on: 10.5281/zenodo.23619780 for that version, and the concept DOI
+  10.5281/zenodo.23619779 for all versions. The README carries the DOI badge
+  and its citation section, and ``CITATION.cff`` names the concept DOI.
+
 0.7.3 (2026-10-24)
 ------------------
 
