@@ -1545,6 +1545,35 @@ def test_a_given_utility_named_like_the_default_keeps_its_name_and_role():
     assert cold["details"]["given"] == ["CU"]
 
 
+def test_the_default_is_marked_even_beside_two_given_utilities_of_its_name():
+    # Two given cold utilities are both called CU (the collection renames the
+    # second CU_1) and both are too warm. Exactly one cold utility is the
+    # added default, and the two given ones stay given, whatever names the
+    # collection ends up giving them.
+    data = load_packaged_sample_case("basic_pinch.json")
+    cold = next(u for u in data["utilities"] if u["type"] == "Cold")
+    cold["t_supply"] = {"value": 100, "unit": "degC"}
+    cold["t_target"] = {"value": 105, "unit": "degC"}
+    data["utilities"].append({**cold})
+
+    opened = run_command({"command": "open", "problem": {"data": data}})
+
+    [warning] = [
+        w
+        for w in opened["warnings"]
+        if w["type"] == "default_utility" and w["details"]["kind"] == "cold"
+    ]
+    given = warning["details"]["given"]
+    assert len(given) == 2
+    assert warning["details"]["name"] not in given
+    # The added default sits at the cold end; the given ones at 100 °C.
+    problem = PinchProblem(data)
+    [default] = [
+        u for u in problem.cold_utilities if u.name == warning["details"]["name"]
+    ]
+    assert default.supply_temperature < 100
+
+
 def test_a_bare_cooler_name_with_two_cold_utilities_returns_an_error_envelope():
     # Which cold utility a bare cooler uses is ambiguous with two; the
     # response says so instead of raising out of run_command.

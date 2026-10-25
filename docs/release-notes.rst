@@ -22,7 +22,9 @@ Command layer
   ``CU`` that is too warm, say) is named ``CU_1``, and only it is treated as
   the backup. Before, the default was renamed only when it joined the
   utilities, and marking went by the name ``CU``, so the given ``CU`` was
-  taken for the backup and the added one for a given utility.
+  taken for the backup and the added one for a given utility. The default
+  is now marked by identity, so this holds whatever names the utilities end
+  up with (two given utilities both named ``CU``, for example).
 
 - ``design.optimise_duties`` with a bare heater or cooler name, on a side with
   several utilities, returns an error envelope (``UtilityChoiceError``, with
