@@ -82,7 +82,7 @@ def _get_hot_and_cold_utilities(
         cu_t_max=cu_t_max,
         dt_cont_multiplier=placement,
     )
-    utilities_with_defaults = _add_default_utilities(
+    utilities_with_defaults, default_names = _add_default_utilities(
         utilities=utilities_filled,
         config=config,
         add_default_hu=add_default_hu,
@@ -103,16 +103,12 @@ def _get_hot_and_cold_utilities(
         dt_cont_multiplier=dt_cont_multiplier,
         config=config,
     )
-    # Mark the defaults this preparation added (never a user utility that is
-    # merely named HU or CU), so targeting uses them only as a backup.
-    for added, collection, name in (
-        (add_default_hu, hot_utilities, "HU"),
-        (add_default_cu, cold_utilities, "CU"),
-    ):
-        if added:
-            for stream in collection:
-                if stream.name == name:
-                    mark_default_utility(stream)
+    # Mark the defaults this preparation added, by the free names they were
+    # given (never a user utility that is itself named HU or CU), so targeting
+    # uses them only as a backup.
+    for stream in hot_utilities + cold_utilities:
+        if stream.name in default_names:
+            mark_default_utility(stream)
     prepared = hot_utilities + cold_utilities
     period_ids = {
         str(period_id): index
@@ -379,12 +375,27 @@ def _add_default_utilities(
     hu_t_min: float,
     cu_t_max: float,
     dt_cont_multiplier: float = 1.0,
-) -> List[UtilitySchema]:
-    """Add default hot and cold utilities to the list of utilities."""
+) -> Tuple[List[UtilitySchema], set[str]]:
+    """Add default hot and cold utilities to the list; also return their names.
+
+    A default is named HU or CU, or HU_1, CU_1, ... when a given utility
+    already has that name, so the given one keeps its name and role.
+    """
+    taken = {utility.name for utility in utilities}
+
+    def free(name: str) -> str:
+        chosen, counter = name, 1
+        while chosen in taken:
+            chosen, counter = f"{name}_{counter}", counter + 1
+        taken.add(chosen)
+        return chosen
+
+    names: set[str] = set()
     if add_default_hu:
+        names.add(hu_name := free("HU"))
         utilities.append(
             _create_default_utility(
-                "HU",
+                hu_name,
                 StreamType.Hot.value,
                 hu_t_min,
                 config,
@@ -392,16 +403,17 @@ def _add_default_utilities(
             )
         )
     if add_default_cu:
+        names.add(cu_name := free("CU"))
         utilities.append(
             _create_default_utility(
-                "CU",
+                cu_name,
                 StreamType.Cold.value,
                 cu_t_max,
                 config,
                 dt_cont_multiplier=dt_cont_multiplier,
             )
         )
-    return utilities
+    return utilities, names
 
 
 def _create_default_utility(

@@ -1524,6 +1524,27 @@ def test_a_default_utility_added_beside_given_ones_says_none_was_cold_enough():
     assert cold["details"]["given"] == ["Warm water"]
 
 
+def test_a_given_utility_named_like_the_default_keeps_its_name_and_role():
+    # The given cold utility is called CU but is too warm, so a default is
+    # added beside it. The default takes a free name (CU_1) and is the one
+    # marked as the backup; the given CU stays a given utility.
+    data = load_packaged_sample_case("basic_pinch.json")
+    for utility in data["utilities"]:
+        if utility["type"] == "Cold":
+            utility["t_supply"] = {"value": 100, "unit": "degC"}
+            utility["t_target"] = {"value": 105, "unit": "degC"}
+
+    opened = run_command({"command": "open", "problem": {"data": data}})
+
+    [cold] = [
+        w
+        for w in opened["warnings"]
+        if w["type"] == "default_utility" and w["details"]["kind"] == "cold"
+    ]
+    assert cold["details"]["name"] == "CU_1"
+    assert cold["details"]["given"] == ["CU"]
+
+
 def test_a_bare_cooler_name_with_two_cold_utilities_returns_an_error_envelope():
     # Which cold utility a bare cooler uses is ambiguous with two; the
     # response says so instead of raising out of run_command.
