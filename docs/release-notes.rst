@@ -4,6 +4,30 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Command layer
+~~~~~~~~~~~~~
+
+- The ``default_utility`` warning says why the default was added. When the
+  problem gives utilities of that kind but none is cold enough (or hot
+  enough) and uncapped, it reads "None of the given cold utilities is cold
+  enough and uncapped; added the default 'CU' as a backup." instead of "No
+  cold utility given", and its ``details`` list the ``given`` utilities. The
+  dairy chilling case, which gives Cooling Water and Glycol, used to be told
+  it gave none.
+
+- A default utility added beside a given utility of the same name (a given
+  ``CU`` that is too warm, say) is named ``CU_1``, and only it is treated as
+  the backup. Before, the default was renamed only when it joined the
+  utilities, and marking went by the name ``CU``, so the given ``CU`` was
+  taken for the backup and the added one for a given utility.
+
+- ``design.optimise_duties`` with a bare heater or cooler name, on a side with
+  several utilities, returns an error envelope (``UtilityChoiceError``, with
+  ``details`` naming the ``side`` and its ``utilities``) instead of raising
+  out of ``run_command``, which engines reported as an internal error. Called
+  from Python, it still raises: ``UtilityChoiceError`` is a ``ValueError``,
+  and its message now lists the utilities to choose from.
+
 Citation
 ~~~~~~~~
 
