@@ -15,6 +15,12 @@ authors:
     orcid: "https://orcid.org/0000-0002-9192-0771"
     affiliation: University of Waikato
 license: MIT
+# The Zenodo concept DOI: it resolves to the latest archived release.
+doi: 10.5281/zenodo.23619779
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.23619779
+    description: All versions on Zenodo (resolves to the latest release)
 repository-code: "https://github.com/waikato-ahuora-smart-energy-systems/OpenPinch"
 url: "https://openpinch.readthedocs.io/en/latest/"
 keywords:

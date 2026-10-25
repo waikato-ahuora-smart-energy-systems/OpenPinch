@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from copy import deepcopy
-from typing import List, Tuple
+from typing import List, Sequence, Tuple
 
 import numpy as np
 
@@ -82,7 +82,7 @@ def _get_hot_and_cold_utilities(
         cu_t_max=cu_t_max,
         dt_cont_multiplier=placement,
     )
-    utilities_with_defaults = _add_default_utilities(
+    utilities_with_defaults, defaults = _add_default_utilities(
         utilities=utilities_filled,
         config=config,
         add_default_hu=add_default_hu,
@@ -91,28 +91,23 @@ def _get_hot_and_cold_utilities(
         cu_t_max=cu_t_max,
         dt_cont_multiplier=placement,
     )
+    # The streams built from the defaults this preparation added are marked
+    # (by identity, never by name: a given utility may be called HU or CU, and
+    # the collection may rename either), so targeting uses them only as a backup.
     hot_utilities, utilities_left = _create_utilities_list(
         utilities=utilities_with_defaults,
         utility_type=StreamType.Hot.value,
         dt_cont_multiplier=dt_cont_multiplier,
         config=config,
+        defaults=defaults,
     )
     cold_utilities, _ = _create_utilities_list(
         utilities=utilities_left,
         utility_type=StreamType.Cold.value,
         dt_cont_multiplier=dt_cont_multiplier,
         config=config,
+        defaults=defaults,
     )
-    # Mark the defaults this preparation added (never a user utility that is
-    # merely named HU or CU), so targeting uses them only as a backup.
-    for added, collection, name in (
-        (add_default_hu, hot_utilities, "HU"),
-        (add_default_cu, cold_utilities, "CU"),
-    ):
-        if added:
-            for stream in collection:
-                if stream.name == name:
-                    mark_default_utility(stream)
     prepared = hot_utilities + cold_utilities
     period_ids = {
         str(period_id): index
@@ -379,12 +374,26 @@ def _add_default_utilities(
     hu_t_min: float,
     cu_t_max: float,
     dt_cont_multiplier: float = 1.0,
-) -> List[UtilitySchema]:
-    """Add default hot and cold utilities to the list of utilities."""
+) -> Tuple[List[UtilitySchema], List[UtilitySchema]]:
+    """Add default hot and cold utilities to the list; also return the defaults.
+
+    A default is named HU or CU, or HU_1, CU_1, ... when a given utility
+    already has that name, so the given one keeps its name.
+    """
+    taken = {utility.name for utility in utilities}
+
+    def free(name: str) -> str:
+        chosen, counter = name, 1
+        while chosen in taken:
+            chosen, counter = f"{name}_{counter}", counter + 1
+        taken.add(chosen)
+        return chosen
+
+    defaults: List[UtilitySchema] = []
     if add_default_hu:
-        utilities.append(
+        defaults.append(
             _create_default_utility(
-                "HU",
+                free("HU"),
                 StreamType.Hot.value,
                 hu_t_min,
                 config,
@@ -392,16 +401,17 @@ def _add_default_utilities(
             )
         )
     if add_default_cu:
-        utilities.append(
+        defaults.append(
             _create_default_utility(
-                "CU",
+                free("CU"),
                 StreamType.Cold.value,
                 cu_t_max,
                 config,
                 dt_cont_multiplier=dt_cont_multiplier,
             )
         )
-    return utilities
+    utilities.extend(defaults)
+    return utilities, defaults
 
 
 def _create_default_utility(
@@ -435,8 +445,13 @@ def _create_utilities_list(
     utility_type: str,
     dt_cont_multiplier: float = 1.0,
     config: Configuration = Configuration(),
+    defaults: Sequence[UtilitySchema] = (),
 ) -> Tuple[StreamCollection, List[UtilitySchema]]:
-    """Create a sorted list of hot or cold Stream objects based on type."""
+    """Create a sorted list of hot or cold Stream objects based on type.
+
+    The stream built from each utility in ``defaults`` (the default HU and CU
+    added by preparation) is marked as a default utility.
+    """
     created_utilities = StreamCollection()
     unassigned_utilities = utilities
 
@@ -520,8 +535,10 @@ def _create_utilities_list(
                 fluid_name=selected.fluid_name,
                 fluid_phase=selected.fluid_phase,
             )
+        if any(selected is default for default in defaults):
+            mark_default_utility(created)
         created_utilities.add(created, key)
-        created_utilities[key].delta_t_contribution_multiplier = dt_cont_multiplier
+        created.delta_t_contribution_multiplier = dt_cont_multiplier
         if selected.type == utility_type:
             selected.active = False
 

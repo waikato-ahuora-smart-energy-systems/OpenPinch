@@ -20,6 +20,18 @@ if TYPE_CHECKING:
     from ...problem import PinchProblem
 
 
+class UtilityChoiceError(ValueError):
+    """A heater or cooler names no utility, and its side has several to choose from."""
+
+    def __init__(self, side: str, utilities: Sequence[str]) -> None:
+        super().__init__(
+            f"pass {side}_utility explicitly; the problem defines "
+            f"{len(utilities)} {side} utilities ({', '.join(utilities)})."
+        )
+        self.side = side
+        self.utilities = tuple(utilities)
+
+
 def _set_if_supplied(values: dict[str, Any], key: str, value: Any) -> None:
     if value is not None:
         values[key] = value
@@ -479,11 +491,7 @@ class _DesignAccessor:
             if getattr(utility.type, "value", utility.type) == kind
         ]
         if len(names) != 1:
-            side = kind.lower()
-            raise ValueError(
-                f"pass {side}_utility explicitly; the problem defines "
-                f"{len(names)} {side} utilities."
-            )
+            raise UtilityChoiceError(kind.lower(), names)
         return names[0]
 
     def optimise_duties(

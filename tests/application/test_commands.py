@@ -1495,6 +1495,116 @@ def test_default_utilities_added_on_loading_are_returned_as_warnings():
     assert targeted["warnings"] == []
 
 
+def test_a_default_utility_added_beside_given_ones_says_none_was_cold_enough():
+    # A cold utility is given, but at 100 °C it cannot cool the process to its
+    # 40 °C targets, so OpenPinch adds the backup CU. "No cold utility given"
+    # would be wrong: one was.
+    data = load_packaged_sample_case("basic_pinch.json")
+    hot = next(utility for utility in data["utilities"] if utility["type"] == "Hot")
+    warm = {
+        **hot,
+        "name": "Warm water",
+        "type": "Cold",
+        "t_supply": {"value": 100, "unit": "degC"},
+        "t_target": {"value": 105, "unit": "degC"},
+    }
+    data["utilities"] = [hot, warm]
+
+    opened = run_command({"command": "open", "problem": {"data": data}})
+
+    [cold] = [
+        w
+        for w in opened["warnings"]
+        if w["type"] == "default_utility" and w["details"]["kind"] == "cold"
+    ]
+    assert cold["message"] == (
+        "None of the given cold utilities is cold enough and uncapped; "
+        "added the default 'CU' as a backup."
+    )
+    assert cold["details"]["given"] == ["Warm water"]
+
+
+def test_a_given_utility_named_like_the_default_keeps_its_name_and_role():
+    # The given cold utility is called CU but is too warm, so a default is
+    # added beside it. The default takes a free name (CU_1) and is the one
+    # marked as the backup; the given CU stays a given utility.
+    data = load_packaged_sample_case("basic_pinch.json")
+    for utility in data["utilities"]:
+        if utility["type"] == "Cold":
+            utility["t_supply"] = {"value": 100, "unit": "degC"}
+            utility["t_target"] = {"value": 105, "unit": "degC"}
+
+    opened = run_command({"command": "open", "problem": {"data": data}})
+
+    [cold] = [
+        w
+        for w in opened["warnings"]
+        if w["type"] == "default_utility" and w["details"]["kind"] == "cold"
+    ]
+    assert cold["details"]["name"] == "CU_1"
+    assert cold["details"]["given"] == ["CU"]
+
+
+def test_the_default_is_marked_even_beside_two_given_utilities_of_its_name():
+    # Two given cold utilities are both called CU (the collection renames the
+    # second CU_1) and both are too warm. Exactly one cold utility is the
+    # added default, and the two given ones stay given, whatever names the
+    # collection ends up giving them.
+    data = load_packaged_sample_case("basic_pinch.json")
+    cold = next(u for u in data["utilities"] if u["type"] == "Cold")
+    cold["t_supply"] = {"value": 100, "unit": "degC"}
+    cold["t_target"] = {"value": 105, "unit": "degC"}
+    data["utilities"].append({**cold})
+
+    opened = run_command({"command": "open", "problem": {"data": data}})
+
+    [warning] = [
+        w
+        for w in opened["warnings"]
+        if w["type"] == "default_utility" and w["details"]["kind"] == "cold"
+    ]
+    given = warning["details"]["given"]
+    assert len(given) == 2
+    assert warning["details"]["name"] not in given
+    # The added default sits at the cold end; the given ones at 100 °C.
+    problem = PinchProblem(data)
+    [default] = [
+        u for u in problem.cold_utilities if u.name == warning["details"]["name"]
+    ]
+    assert default.supply_temperature < 100
+
+
+def test_a_bare_cooler_name_with_two_cold_utilities_returns_an_error_envelope():
+    # Which cold utility a bare cooler uses is ambiguous with two; the
+    # response says so instead of raising out of run_command.
+    data = load_packaged_sample_case("basic_pinch.json")
+    cold = next(utility for utility in data["utilities"] if utility["type"] == "Cold")
+    data["utilities"].append({**cold, "name": "CHW"})
+
+    response = run_command(
+        {
+            "command": "design.optimise_duties",
+            "problem": {"data": data},
+            "arguments": {
+                "network": {
+                    "recovery": [["F2", "F1", 1]],
+                    "heaters": [],
+                    "coolers": ["F2"],
+                    "hot_utility": "HU",
+                }
+            },
+        }
+    )
+
+    assert response["value"] is None
+    assert response["error"] == {
+        "type": "UtilityChoiceError",
+        "message": "pass cold_utility explicitly; the problem defines 2 cold "
+        "utilities (CU, CHW).",
+        "details": {"side": "cold", "utilities": ["CU", "CHW"]},
+    }
+
+
 def test_non_finite_numbers_are_returned_as_null_so_the_json_is_strict(monkeypatch):
     # Browsers' JSON.parse rejects NaN; a missing magnitude must come back null.
     monkeypatch.setattr(
