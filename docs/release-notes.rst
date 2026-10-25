@@ -4,6 +4,17 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Command layer
+~~~~~~~~~~~~~
+
+- The ``default_utility`` warning says why the default was added. When the
+  problem gives utilities of that kind but none is cold enough (or hot
+  enough) and uncapped, it reads "None of the given cold utilities is cold
+  enough and uncapped; added the default 'CU' as a backup." instead of "No
+  cold utility given", and its ``details`` list the ``given`` utilities. The
+  dairy chilling case, which gives Cooling Water and Glycol, used to be told
+  it gave none.
+
 Citation
 ~~~~~~~~
 

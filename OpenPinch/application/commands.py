@@ -75,12 +75,26 @@ _SESSIONS: dict[str, _Session] = {}
 
 
 class _DefaultUtilityWarning(UserWarning):
-    """A default utility added to a problem that gave none of its kind."""
+    """A default utility added because no given utility of its kind can serve.
 
-    def __init__(self, name: str, kind: str) -> None:
-        super().__init__(f"No {kind} utility given; added the default {name!r}.")
+    ``given`` names the problem's own utilities of that kind: none at all, or
+    ones that are too warm (cold) or too cool (hot), or capped, to take the
+    whole duty, in which case the default is a backup beside them.
+    """
+
+    def __init__(self, name: str, kind: str, given: list[str]) -> None:
+        if given:
+            enough = "cold enough" if kind == "cold" else "hot enough"
+            message = (
+                f"None of the given {kind} utilities is {enough} and uncapped; "
+                f"added the default {name!r} as a backup."
+            )
+        else:
+            message = f"No {kind} utility given; added the default {name!r}."
+        super().__init__(message)
         self.name = name
         self.kind = kind
+        self.given = given
 
 
 def _load_problem(source: Mapping[str, Any]) -> PinchProblem:
@@ -106,9 +120,14 @@ def _load_problem(source: Mapping[str, Any]) -> PinchProblem:
         ("hot", problem.hot_utilities),
         ("cold", problem.cold_utilities),
     ):
+        given = [
+            utility.name for utility in utilities if not is_default_utility(utility)
+        ]
         for utility in utilities:
             if is_default_utility(utility):
-                warnings.warn(_DefaultUtilityWarning(utility.name, kind), stacklevel=1)
+                warnings.warn(
+                    _DefaultUtilityWarning(utility.name, kind, given), stacklevel=1
+                )
     return problem
 
 
@@ -276,6 +295,7 @@ def _warnings_json(caught: list[warnings.WarningMessage]) -> list[dict[str, Any]
                     "details": {
                         "name": warning.message.name,
                         "kind": warning.message.kind,
+                        "given": warning.message.given,
                     },
                 }
             )

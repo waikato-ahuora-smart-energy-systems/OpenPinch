@@ -1495,6 +1495,35 @@ def test_default_utilities_added_on_loading_are_returned_as_warnings():
     assert targeted["warnings"] == []
 
 
+def test_a_default_utility_added_beside_given_ones_says_none_was_cold_enough():
+    # A cold utility is given, but at 100 °C it cannot cool the process to its
+    # 40 °C targets, so OpenPinch adds the backup CU. "No cold utility given"
+    # would be wrong: one was.
+    data = load_packaged_sample_case("basic_pinch.json")
+    hot = next(utility for utility in data["utilities"] if utility["type"] == "Hot")
+    warm = {
+        **hot,
+        "name": "Warm water",
+        "type": "Cold",
+        "t_supply": {"value": 100, "unit": "degC"},
+        "t_target": {"value": 105, "unit": "degC"},
+    }
+    data["utilities"] = [hot, warm]
+
+    opened = run_command({"command": "open", "problem": {"data": data}})
+
+    [cold] = [
+        w
+        for w in opened["warnings"]
+        if w["type"] == "default_utility" and w["details"]["kind"] == "cold"
+    ]
+    assert cold["message"] == (
+        "None of the given cold utilities is cold enough and uncapped; "
+        "added the default 'CU' as a backup."
+    )
+    assert cold["details"]["given"] == ["Warm water"]
+
+
 def test_non_finite_numbers_are_returned_as_null_so_the_json_is_strict(monkeypatch):
     # Browsers' JSON.parse rejects NaN; a missing magnitude must come back null.
     monkeypatch.setattr(
