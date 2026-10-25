@@ -4,6 +4,9 @@ Pre-Release Notes
 Unreleased
 ----------
 
+0.7.4 (2026-10-26)
+------------------
+
 Command layer
 ~~~~~~~~~~~~~
 
