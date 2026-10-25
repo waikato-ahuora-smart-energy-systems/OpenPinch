@@ -1524,6 +1524,37 @@ def test_a_default_utility_added_beside_given_ones_says_none_was_cold_enough():
     assert cold["details"]["given"] == ["Warm water"]
 
 
+def test_a_bare_cooler_name_with_two_cold_utilities_returns_an_error_envelope():
+    # Which cold utility a bare cooler uses is ambiguous with two; the
+    # response says so instead of raising out of run_command.
+    data = load_packaged_sample_case("basic_pinch.json")
+    cold = next(utility for utility in data["utilities"] if utility["type"] == "Cold")
+    data["utilities"].append({**cold, "name": "CHW"})
+
+    response = run_command(
+        {
+            "command": "design.optimise_duties",
+            "problem": {"data": data},
+            "arguments": {
+                "network": {
+                    "recovery": [["F2", "F1", 1]],
+                    "heaters": [],
+                    "coolers": ["F2"],
+                    "hot_utility": "HU",
+                }
+            },
+        }
+    )
+
+    assert response["value"] is None
+    assert response["error"] == {
+        "type": "UtilityChoiceError",
+        "message": "pass cold_utility explicitly; the problem defines 2 cold "
+        "utilities (CU, CHW).",
+        "details": {"side": "cold", "utilities": ["CU", "CHW"]},
+    }
+
+
 def test_non_finite_numbers_are_returned_as_null_so_the_json_is_strict(monkeypatch):
     # Browsers' JSON.parse rejects NaN; a missing magnitude must come back null.
     monkeypatch.setattr(

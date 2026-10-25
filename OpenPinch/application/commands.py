@@ -38,7 +38,10 @@ from ..domain.targets import BaseTargetModel
 from ..presentation.configuration import configuration_field_metadata
 from ..presentation.reporting.hpr import hpr_failure_summary
 from ..presentation.reporting.results import serialize_target
-from ._problem.accessors.design import HeatExchangerNetworkDesignView
+from ._problem.accessors.design import (
+    HeatExchangerNetworkDesignView,
+    UtilityChoiceError,
+)
 from ._problem.input.validation import (
     InputValidationWarning,
     build_validation_report,
@@ -433,6 +436,7 @@ _ANALYSIS_FAILURES = (
     HPRTargetingError,
     HprTargetCompatibilityError,
     OrcTargetingError,
+    UtilityChoiceError,
 )
 
 
@@ -449,6 +453,8 @@ def _error_json(error: Exception) -> dict[str, Any]:
         details = hpr_failure_summary(error)
     elif isinstance(error, HprTargetCompatibilityError):
         details = {"code": error.code}
+    elif isinstance(error, UtilityChoiceError):
+        details = {"side": error.side, "utilities": list(error.utilities)}
     return {"type": type(error).__name__, "message": str(error), "details": details}
 
 

@@ -15,6 +15,13 @@ Command layer
   dairy chilling case, which gives Cooling Water and Glycol, used to be told
   it gave none.
 
+- ``design.optimise_duties`` with a bare heater or cooler name, on a side with
+  several utilities, returns an error envelope (``UtilityChoiceError``, with
+  ``details`` naming the ``side`` and its ``utilities``) instead of raising
+  out of ``run_command``, which engines reported as an internal error. Called
+  from Python, it still raises: ``UtilityChoiceError`` is a ``ValueError``,
+  and its message now lists the utilities to choose from.
+
 Citation
 ~~~~~~~~
 
