@@ -4,6 +4,14 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Sample cases
+~~~~~~~~~~~~
+
+- The pulp mill sample names its accumulator cooling stream
+  ``Cooling od Acc-0`` instead of ``Cooling od Acc.0``. Loading the sample no
+  longer warns that the name was changed (dots in names become dashes); the
+  stream and its results are the same.
+
 0.7.4 (2026-10-26)
 ------------------
 
