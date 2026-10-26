@@ -4,6 +4,9 @@ Pre-Release Notes
 Unreleased
 ----------
 
+0.7.5 (2026-10-27)
+------------------
+
 Sample cases
 ~~~~~~~~~~~~
 
