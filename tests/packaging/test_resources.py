@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
+import warnings
 from pathlib import Path
 
 import pytest
 
 import OpenPinch.resources as resource_module
+from OpenPinch import PinchProblem
 from OpenPinch.analysis.heat_pumps.performance_maps.resources import (
     load_tespy_compressor_characteristic,
     read_tespy_compressor_characteristic_bytes,
@@ -16,6 +19,7 @@ from OpenPinch.resources import (
     list_sample_cases,
     load_hpr_performance_map_contract_resource,
     read_hpr_performance_map_contract_resource,
+    read_sample_case,
 )
 
 EXPECTED_HPR_CONTRACT_RESOURCES = [
@@ -39,6 +43,18 @@ def test_copy_sample_case_uses_original_name_for_directory_destinations(
 
     assert copied == destination / sample_name
     assert copied.exists()
+
+
+@pytest.mark.parametrize("name", list_sample_cases())
+def test_sample_case_names_load_unchanged(name: str) -> None:
+    payload = json.loads(read_sample_case(name))
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        PinchProblem(payload)
+
+    renamed = [str(w.message) for w in caught if "was changed to" in str(w.message)]
+    assert renamed == []
 
 
 def test_hpr_performance_map_contract_resource_catalog_is_closed() -> None:

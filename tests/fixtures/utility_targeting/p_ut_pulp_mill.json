@@ -1244,7 +1244,7 @@
         },
         {
             "zone": "Digestion",
-            "name": "Cooling od Acc.0",
+            "name": "Cooling od Acc-0",
             "t_supply": {
                 "value": 80,
                 "unit": "degC"
