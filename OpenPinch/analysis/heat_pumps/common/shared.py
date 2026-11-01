@@ -209,6 +209,12 @@ def calc_hpr_machine_capital_costs(
     return tuple(costs)
 
 
+# A cascade stage doing no more than this fraction of its machine's work has
+# no compressor, so it adds no stage capital (the same fraction as
+# NEGLIGIBLE_USEFUL_DUTY_FRACTION uses for duty).
+NEGLIGIBLE_STAGE_WORK_FRACTION = 1e-3
+
+
 def _single_cost_unit(
     state: HPRParsedState,
     hpr_streams: StreamCollection,
@@ -220,7 +226,9 @@ def _single_cost_unit(
     Each closed stage has its own compressor, so the stage count comes from
     the solved stage works: a cascade with ``n_cond`` condenser and
     ``n_evap`` evaporator levels has ``n_cond + n_evap - 1`` stages, more
-    than its ``n_cond`` condensing temperatures.
+    than its ``n_cond`` condensing temperatures. A stage whose work is at
+    most ``NEGLIGIBLE_STAGE_WORK_FRACTION`` of the machine's work (merged
+    levels, or no duty) has no compressor and is not charged.
     """
     hot = hpr_streams.get_hot_utility_streams()
     Q_cap = (
@@ -229,9 +237,12 @@ def _single_cost_unit(
         else 0.0
     )
     T_cond = np.asarray(state.T_cond, dtype=float).ravel()
+    works = np.abs(np.asarray(work_arr if work_arr is not None else [], dtype=float))
     n_stages = (
-        np.asarray(work_arr, dtype=float).size if work_arr is not None else 0
-    ) or T_cond.size
+        int(np.count_nonzero(works > NEGLIGIBLE_STAGE_WORK_FRACTION * works.sum()))
+        if works.size
+        else T_cond.size
+    )
     return [
         HPRCostUnit(
             Q_cap=Q_cap,
