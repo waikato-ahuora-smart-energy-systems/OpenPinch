@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import math
 import re
 from typing import Any
@@ -50,6 +51,23 @@ def build_coolprop_abstract_state(value: str | Any):
         [mole_fraction / mole_fraction_total for mole_fraction in mole_fractions]
     )
     return state
+
+
+@functools.cache
+def critical_point(value: str) -> tuple[float, float, float]:
+    """Return a fluid spec's critical temperature (K), pressure (Pa) and density.
+
+    A mixture's critical point is a costly CoolProp solve, so each spec is
+    solved once per process.
+    """
+    import CoolProp
+
+    state = build_coolprop_abstract_state(value)
+    return (
+        state.keyed_output(CoolProp.iT_critical),
+        state.keyed_output(CoolProp.iP_critical),
+        state.keyed_output(CoolProp.irhomass_critical),
+    )
 
 
 def validate_coolprop_fluid_name(value: str) -> None:

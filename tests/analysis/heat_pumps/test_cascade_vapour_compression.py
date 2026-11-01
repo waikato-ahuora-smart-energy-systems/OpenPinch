@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 import OpenPinch.analysis.heat_pumps.common._shared.plotting as hp_plotting
+import OpenPinch.analysis.heat_pumps.common.shared as hp_shared
 import OpenPinch.analysis.heat_pumps.targeting.cascade_vapour_compression as hp_cascade
 import OpenPinch.analysis.targeting.cascade as target_cascade
 from OpenPinch.analysis.heat_pumps.common.encoding import decode_available_fractions
@@ -139,6 +140,8 @@ def test_cascade_x0_bounds_and_parse(monkeypatch):
         "PropsSI",
         lambda prop, *_args: 200.0 if prop == "Tmin" else 422.0,
     )
+    # The condensing caps read the cached critical point, not PropsSI.
+    monkeypatch.setattr(hp_shared, "critical_point", lambda _ref: (422.0, 0.0, 0.0))
     assert len(bnds) == 12
 
     vars = hp_cascade._parse_cascade_hp_state_variables(
