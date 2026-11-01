@@ -4,6 +4,41 @@ Pre-Release Notes
 Unreleased
 ----------
 
+0.7.6 (2026-11-02)
+------------------
+
+Heat pumps and refrigeration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Vapour-compression targets with a refrigerant mixture (for example
+  ``R134a[0.5]&R245fa[0.5]``) run about three times faster. The condenser and
+  evaporator profiles of a mixture now step in quality inside the two-phase
+  region and in temperature outside it, instead of flashing CoolProp at each
+  enthalpy, which costs tens of milliseconds for a mixture. Each profile point
+  still lies exactly on its isobar, but the points are placed differently, so
+  mixture results can move slightly. A fluid's critical point, a costly solve
+  for a mixture, is now computed once per process instead of for every
+  candidate cycle (new ``OpenPinch.domain.fluids.critical_point``). Pure-fluid
+  profiles and results are unchanged. A mixture candidate still costs about
+  60 times a pure-fluid one.
+- A cascade vapour-compression target no longer charges capital for a stage
+  that does no work. The machine cost's stage factor counted every configured
+  stage (``n_cond + n_evap - 1``), so a 3x2 cascade whose levels merged still
+  paid for four compressors, and could never cost less than a 2x1 or single
+  stage design it contains. A stage now counts only when its work exceeds
+  0.1 % of the machine's work. Cascade targets whose optimum merges or idles
+  stages get a lower TAC and may settle on a different design; single-stage,
+  parallel and VC+MVR targets are unchanged.
+- Vapour-compression targeting stops each evaporator at its refrigerant's
+  minimum temperature, and a cycle asked to evaporate below it raises an
+  error. CoolProp extrapolates saturation below that limit without error, so
+  targets could run on states that do not exist. A water single-stage heat
+  pump on the brewery case with utility placement used to evaporate at
+  -0.06 degC, below the triple point of water, and so reach a 265 kW load;
+  at 25% load the target now evaporates at 10 degC and its total annualised
+  cost rises from about 222,000 to 282,000 $/y. Targets that evaporated water
+  below 0.01 degC will change.
+
 0.7.5 (2026-10-27)
 ------------------
 

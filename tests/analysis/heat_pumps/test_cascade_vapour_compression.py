@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 import OpenPinch.analysis.heat_pumps.common._shared.plotting as hp_plotting
+import OpenPinch.analysis.heat_pumps.common.shared as hp_shared
 import OpenPinch.analysis.heat_pumps.targeting.cascade_vapour_compression as hp_cascade
 import OpenPinch.analysis.targeting.cascade as target_cascade
 from OpenPinch.analysis.heat_pumps.common.encoding import decode_available_fractions
@@ -137,8 +138,10 @@ def test_cascade_x0_bounds_and_parse(monkeypatch):
     monkeypatch.setattr(
         coolprop,
         "PropsSI",
-        lambda prop, *_args: 420.0 if prop == "Tmin" else 422.0,
+        lambda prop, *_args: 200.0 if prop == "Tmin" else 422.0,
     )
+    # The condensing caps read the cached critical point, not PropsSI.
+    monkeypatch.setattr(hp_shared, "critical_point", lambda _ref: (422.0, 0.0, 0.0))
     assert len(bnds) == 12
 
     vars = hp_cascade._parse_cascade_hp_state_variables(
@@ -367,3 +370,27 @@ def test_cascade_optimiser_allows_missing_initial_seed(monkeypatch):
 
     assert captured["x0_ls"] is None
     assert out.success is True
+
+
+def test_cascade_parse_floors_evaporation_at_the_refrigerant_minimum():
+    args = _base_args(n_cond=1, n_evap=1)
+    args.T_hot = np.array([30.0, 10.0, -20.0])
+    args.refrigerant_ls = ["water"]
+    _, bnds = hp_cascade._get_cascade_hp_opt_setup(None, args)
+
+    # x_evap = 0 decodes to the coldest source temperature, -20 degC.
+    state = hp_cascade._parse_cascade_hp_state_variables(np.zeros(len(bnds)), args)
+
+    assert state.T_evap[0] == pytest.approx(0.01, abs=1e-5)
+
+
+def test_cascade_process_evaporator_uses_the_bottom_stage_refrigerant_minimum():
+    args = _base_args(n_cond=2, n_evap=1)
+    args.T_hot = np.array([30.0, 10.0, -20.0])
+    args.refrigerant_ls = ["water", "ammonia"]
+    _, bnds = hp_cascade._get_cascade_hp_opt_setup(None, args)
+
+    state = hp_cascade._parse_cascade_hp_state_variables(np.zeros(len(bnds)), args)
+
+    # The process evaporator belongs to the ammonia stage, not the water stage.
+    assert state.T_evap[0] == pytest.approx(-20.0)

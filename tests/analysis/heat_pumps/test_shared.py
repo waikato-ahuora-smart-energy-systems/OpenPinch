@@ -410,6 +410,20 @@ def test_cascade_cost_unit_counts_every_solved_stage():
     assert unit.T_hot_max == pytest.approx(110.0)
 
 
+def test_cascade_cost_unit_does_not_charge_a_stage_that_does_no_work():
+    """A stage with no work (merged levels, no duty) has no compressor to buy,
+    so a 3x2 cascade can collapse onto a cheaper 2x1 or 1x1 design."""
+    args = _base_args()
+    streams = _sc(_stream("cond", 120.0, 100.0, 500.0, is_process_stream=False))
+    state = HPRParsedState(T_cond=np.array([110.0, 90.0, 90.0]))
+
+    (unit,) = hp_shared._single_cost_unit(
+        state, streams, np.array([10.0, 0.0, 6.0, 0.0]), args
+    )
+
+    assert unit.n_closed == 2
+
+
 def test_vapour_evaluator_keeps_background_profiles_out_of_one_point_match():
     args = _base_args(
         T_hot=np.array([100.0, 50.0]),
@@ -665,6 +679,19 @@ def test_condensing_search_range_stays_below_the_refrigerant_critical_point():
     assert cold == 60.0
     t_crit = hp_shared._coolprop.PropsSI("Tcrit", "ammonia") - 273.15
     assert hot == pytest.approx(t_crit - hp_shared.SUBCRITICAL_CONDENSING_MARGIN_K)
+
+
+def test_condensing_caps_reuse_the_cached_mixture_critical_point():
+    """A mixture critical point takes about 0.1 s, and the caps run per candidate."""
+    spec = "R134a[0.5]&R245fa[0.5]"
+    args = SimpleNamespace(T_cold=np.array([200.0, 60.0]), refrigerant_ls=[spec])
+    hp_shared.critical_point.cache_clear()
+
+    hp_shared.condensing_temperature_search_range(args)
+    hp_shared.cap_stage_condensing_temperatures(np.array([150.0]), args)
+
+    info = hp_shared.critical_point.cache_info()
+    assert (info.misses, info.hits) == (1, 1)
 
 
 def test_condensing_search_range_is_unchanged_when_no_cap_applies():
