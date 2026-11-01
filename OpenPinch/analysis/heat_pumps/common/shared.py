@@ -25,6 +25,7 @@ from ....contracts.hpr import (
 )
 from ....domain.configuration import tol as _tol
 from ....domain.enums import ProblemTableLabel
+from ....domain.fluids import critical_point
 from ....domain.stream_collection import StreamCollection
 from ....domain.value import Value
 from ..optimisation_adapter import (
@@ -209,6 +210,12 @@ def calc_hpr_machine_capital_costs(
     return tuple(costs)
 
 
+# A cascade stage doing no more than this fraction of its machine's work has
+# no compressor, so it adds no stage capital (the same fraction as
+# NEGLIGIBLE_USEFUL_DUTY_FRACTION uses for duty).
+NEGLIGIBLE_STAGE_WORK_FRACTION = 1e-3
+
+
 def _single_cost_unit(
     state: HPRParsedState,
     hpr_streams: StreamCollection,
@@ -220,7 +227,9 @@ def _single_cost_unit(
     Each closed stage has its own compressor, so the stage count comes from
     the solved stage works: a cascade with ``n_cond`` condenser and
     ``n_evap`` evaporator levels has ``n_cond + n_evap - 1`` stages, more
-    than its ``n_cond`` condensing temperatures.
+    than its ``n_cond`` condensing temperatures. A stage whose work is at
+    most ``NEGLIGIBLE_STAGE_WORK_FRACTION`` of the machine's work (merged
+    levels, or no duty) has no compressor and is not charged.
     """
     hot = hpr_streams.get_hot_utility_streams()
     Q_cap = (
@@ -229,9 +238,12 @@ def _single_cost_unit(
         else 0.0
     )
     T_cond = np.asarray(state.T_cond, dtype=float).ravel()
+    works = np.abs(np.asarray(work_arr if work_arr is not None else [], dtype=float))
     n_stages = (
-        np.asarray(work_arr, dtype=float).size if work_arr is not None else 0
-    ) or T_cond.size
+        int(np.count_nonzero(works > NEGLIGIBLE_STAGE_WORK_FRACTION * works.sum()))
+        if works.size
+        else T_cond.size
+    )
     return [
         HPRCostUnit(
             Q_cap=Q_cap,
@@ -770,7 +782,7 @@ def condensing_temperature_search_range(
         return t_hot, t_cold
     try:
         refrigerants = list(getattr(args, "refrigerant_ls", None) or ["water"])
-        t_crit = max(float(_coolprop.PropsSI("Tcrit", ref)) for ref in refrigerants)
+        t_crit = max(float(critical_point(ref)[0]) for ref in refrigerants)
     except (ValueError, TypeError):
         return t_hot, t_cold
     ceiling = t_crit - 273.15 - SUBCRITICAL_CONDENSING_MARGIN_K
@@ -814,7 +826,7 @@ def cap_stage_condensing_temperatures(
     for index in range(T_cond.size):
         refrigerant = refrigerants[min(index, len(refrigerants) - 1)]
         try:
-            t_crit = float(_coolprop.PropsSI("Tcrit", refrigerant)) - 273.15
+            t_crit = float(critical_point(refrigerant)[0]) - 273.15
         except (ValueError, TypeError):
             continue
         ceilings[index] = t_crit - SUBCRITICAL_CONDENSING_MARGIN_K
