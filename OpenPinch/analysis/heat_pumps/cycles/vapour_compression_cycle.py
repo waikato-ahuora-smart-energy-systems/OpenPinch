@@ -327,7 +327,7 @@ class VapourCompressionCycle:
         refrigerant: str = None,
     ) -> bool:
         if refrigerant is not None:
-            self.state = self._get_fluid_state(refrigerant)
+            self.state = refrigerant
         if self._state is None:
             raise ValueError("A fluid must be specified before solving the cycle.")
         return True

@@ -1070,3 +1070,15 @@ def test_enthalpy_round_off_above_saturated_vapour_is_saturated_vapour():
     )
 
     assert state.Q() == 1.0
+
+
+def test_solving_with_a_mixture_reuses_the_cached_critical_point():
+    shp_mod.critical_point.cache_clear()
+
+    for _ in range(2):
+        VapourCompressionCycle().solve(
+            T_evap=0.0, T_cond=35.0, dtcont=5.0, refrigerant="R32[0.5]&R125[0.5]"
+        )
+
+    info = shp_mod.critical_point.cache_info()
+    assert (info.misses, info.hits) == (1, 1)
