@@ -601,6 +601,13 @@ class VapourCompressionCycle:
             0.0,
         )
 
+        # CoolProp extrapolates saturation below Tmin without error.
+        if self._T_evap < self._state.Tmin():
+            raise ValueError(
+                "Evaporating temperature is below the refrigerant's minimum "
+                "temperature."
+            )
+
         P_lo = self._get_P_sat_from_T(self._T_evap, Q=1.0)
         P_hi = self._get_P_sat_from_T(self._T_cond, Q=0.0)
 

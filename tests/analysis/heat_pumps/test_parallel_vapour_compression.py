@@ -124,7 +124,7 @@ def test_parallel_x0_bounds_parse_and_performance(monkeypatch):
     monkeypatch.setattr(
         coolprop,
         "PropsSI",
-        lambda prop, *_args: 420.0 if prop == "Tmin" else 422.0,
+        lambda prop, *_args: 200.0 if prop == "Tmin" else 422.0,
     )
     assert len(bnds) == 10
 
@@ -264,3 +264,18 @@ def test_parallel_optimiser_allows_missing_initial_seed(monkeypatch):
 
     assert captured["x0_ls"] is None
     assert out.success is True
+
+
+def test_parallel_parse_floors_evaporation_at_the_refrigerant_minimum():
+    args = _base_args(n_cond=2, n_evap=2)
+    args.T_hot = np.array([30.0, 10.0, -20.0])
+    args.refrigerant_ls = ["water", "ammonia"]
+    size = hp_parallel_vapour._parallel_layout(args).size
+
+    # x_evap = 0 decodes every evaporator to the coldest source, -20 degC.
+    state = hp_parallel_vapour._parse_parallel_hp_state_temperatures(
+        np.zeros(size), args
+    )
+
+    assert state.T_evap[0] == pytest.approx(0.01, abs=1e-5)
+    assert state.T_evap[1] == pytest.approx(-20.0)

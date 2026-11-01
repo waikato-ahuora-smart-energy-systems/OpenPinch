@@ -4,6 +4,19 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat pump targeting
+~~~~~~~~~~~~~~~~~~~
+
+- Vapour-compression targeting stops each evaporator at its refrigerant's
+  minimum temperature, and a cycle asked to evaporate below it raises an
+  error. CoolProp extrapolates saturation below that limit without error, so
+  targets could run on states that do not exist. A water single-stage heat
+  pump on the brewery case with utility placement used to evaporate at
+  -0.06 degC, below the triple point of water, and so reach a 265 kW load;
+  at 25% load the target now evaporates at 10 degC and its total annualised
+  cost rises from about 222,000 to 282,000 $/y. Targets that evaporated water
+  below 0.01 degC will change.
+
 0.7.5 (2026-10-27)
 ------------------
 

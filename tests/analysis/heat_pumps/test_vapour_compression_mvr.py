@@ -1552,3 +1552,22 @@ def test_vc_mvr_cascade_duty_is_a_fraction_of_availability_without_penalty():
     assert cascade.solved is True
     np.testing.assert_allclose(cascade.internal_heat + cascade.direct_vc_heat, [300.0])
     assert sum(cascade.penalty) == pytest.approx(0.0)
+
+
+def test_vc_mvr_parse_floors_evaporation_at_the_refrigerant_minimum():
+    args = _base_args(
+        n_cond=1,
+        n_evap=1,
+        n_mvr=1,
+        refrigerant_ls=["water"],
+        mvr_fluid_ls=["Water"],
+        eta_mvr_comp=0.7,
+        eta_motor=0.95,
+    )
+    args.T_hot = np.array([30.0, 10.0, -20.0])
+    x = np.zeros(hp_vc_mvr._vc_mvr_layout(args).size)
+
+    # x_evap = 0 decodes to the coldest source temperature, -20 degC.
+    state = hp_vc_mvr._parse_vc_mvr_state_variables(x, args)
+
+    assert state.T_evap[-1] == pytest.approx(0.01, abs=1e-5)

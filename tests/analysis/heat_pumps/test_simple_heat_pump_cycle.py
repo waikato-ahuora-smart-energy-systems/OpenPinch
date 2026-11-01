@@ -20,6 +20,9 @@ class _FakeFluid:
     def keyed_output(self, _key):
         return 500.0
 
+    def Tmin(self):
+        return 100.0
+
 
 class _FakeState:
     def __init__(self, *, h=0.0, s=1.0, p=1.0, T=300.0):

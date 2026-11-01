@@ -10,10 +10,14 @@ import pytest
 from OpenPinch.analysis.heat_pumps.common.layout import clip_to_bounds
 from OpenPinch.analysis.heat_pumps.common.shared import (
     cap_stage_condensing_temperatures,
+    floor_stage_evaporating_temperatures,
     is_negligible_useful_duty,
 )
 from OpenPinch.analysis.heat_pumps.cycles.cascade_vapour_compression_cycle import (
     CascadeVapourCompressionCycle,
+)
+from OpenPinch.analysis.heat_pumps.cycles.vapour_compression_cycle import (
+    VapourCompressionCycle,
 )
 
 # 3.2 Subcritical caps per stage
@@ -103,3 +107,31 @@ def test_encoded_seed_is_clipped_into_its_bounds():
     seed = clip_to_bounds([-1e-17, 1.0 + 1e-16, 0.5], [(0.0, 1.0)] * 3)
 
     np.testing.assert_array_equal(seed, [0.0, 1.0, 0.5])
+
+
+# Evaporating temperature limit
+
+
+def test_cycle_rejects_evaporation_below_the_fluid_minimum_temperature():
+    pytest.importorskip("CoolProp")
+    cycle = VapourCompressionCycle()
+
+    # CoolProp extrapolates water saturation below its triple point (0.01 degC)
+    # without error, so the cycle has to refuse the state itself.
+    with pytest.raises(ValueError, match="minimum temperature"):
+        cycle.solve(
+            T_evap=-0.1, T_cond=85.0, dtcont=5.0, eta_comp=0.7, refrigerant="water"
+        )
+
+
+def test_each_evaporator_is_floored_at_its_own_refrigerant_minimum():
+    pytest.importorskip("CoolProp")
+    args = SimpleNamespace(
+        refrigerant_ls=["water", "ammonia"], simulation_backend="coolprop"
+    )
+
+    floored = floor_stage_evaporating_temperatures(np.array([-5.0, -20.0]), args)
+
+    # Water stops at its triple point (0.01 degC); ammonia (Tmin -77.7 degC) does not.
+    assert floored[0] == pytest.approx(0.01, abs=1e-5)
+    assert floored[1] == pytest.approx(-20.0)

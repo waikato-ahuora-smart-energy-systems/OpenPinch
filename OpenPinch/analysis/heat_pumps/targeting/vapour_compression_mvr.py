@@ -30,6 +30,7 @@ from ..common.shared import (
     cap_stage_condensing_temperatures,
     condensing_temperature_search_range,
     evaluate_vapour_hpr_result,
+    floor_stage_evaporating_temperatures,
     is_negligible_useful_duty,
     post_solve_error,
     validate_vapour_hp_refrigerant_ls,
@@ -176,10 +177,13 @@ def _parse_vc_mvr_state_variables(
         map_x_arr_to_T_arr(parts["x_cond"], *condensing_temperature_search_range(args)),
         args,
     )
-    T_evap_vc = map_x_arr_to_T_arr(
-        parts["x_evap"],
-        args.T_hot[-1],
-        args.T_hot[0],
+    T_evap_vc = floor_stage_evaporating_temperatures(
+        map_x_arr_to_T_arr(
+            parts["x_evap"],
+            args.T_hot[-1],
+            args.T_hot[0],
+        ),
+        args,
     )
     Q_heat_available = limit_available_duty(
         get_Q_vals_at_T_hpr_from_bckgrd_profile(

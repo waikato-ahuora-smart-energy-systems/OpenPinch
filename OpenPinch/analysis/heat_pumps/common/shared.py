@@ -61,6 +61,7 @@ __all__ = [
     "cap_stage_condensing_temperatures",
     "is_negligible_useful_duty",
     "condensing_temperature_search_range",
+    "floor_stage_evaporating_temperatures",
     "calc_simulated_hpr_annualized_costs",
     "hpr_penalty_cost_scale",
     "refrigeration_allowance",
@@ -825,6 +826,44 @@ def cap_stage_condensing_temperatures(
     for index in range(1, capped.size):
         capped[index] = min(capped[index], capped[index - 1])
     return capped
+
+
+# Keeps a floored temperature above Tmin through the degC to K round trip.
+EVAPORATING_FLOOR_MARGIN_K = 1e-6
+
+
+def floor_stage_evaporating_temperatures(
+    T_evap: np.ndarray,
+    args: HeatPumpTargetInputs,
+    *,
+    first_stage: int = 0,
+) -> np.ndarray:
+    """Raise each evaporator to its own refrigerant's minimum temperature.
+
+    CoolProp extrapolates saturation below ``Tmin`` without error, so the search
+    range must stop there. Flooring at decode keeps candidates evaluable, where
+    rejecting them would spend a small search budget on failures. Evaporator
+    ``i`` uses ``args.refrigerant_ls[first_stage + i]``; the result is
+    non-increasing (a floored stage lifts the warmer stages with it).
+    """
+    T_evap = np.asarray(T_evap, dtype=float)
+    if getattr(args, "simulation_backend", "coolprop") == "tespy":
+        return T_evap
+    refrigerants = list(getattr(args, "refrigerant_ls", None) or [])
+    if not refrigerants:
+        return T_evap
+    floors = np.full(T_evap.shape, -np.inf)
+    for index in range(T_evap.size):
+        refrigerant = refrigerants[min(first_stage + index, len(refrigerants) - 1)]
+        try:
+            t_min = float(_coolprop.PropsSI("Tmin", refrigerant)) - 273.15
+        except (ValueError, TypeError):
+            continue
+        floors[index] = t_min + EVAPORATING_FLOOR_MARGIN_K
+    floored = np.maximum(T_evap, floors)
+    for index in range(floored.size - 2, -1, -1):
+        floored[index] = max(floored[index], floored[index + 1])
+    return floored
 
 
 def validate_vapour_hp_refrigerant_ls(
