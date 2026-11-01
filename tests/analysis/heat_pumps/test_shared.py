@@ -681,6 +681,19 @@ def test_condensing_search_range_stays_below_the_refrigerant_critical_point():
     assert hot == pytest.approx(t_crit - hp_shared.SUBCRITICAL_CONDENSING_MARGIN_K)
 
 
+def test_condensing_caps_reuse_the_cached_mixture_critical_point():
+    """A mixture critical point takes about 0.1 s, and the caps run per candidate."""
+    spec = "R134a[0.5]&R245fa[0.5]"
+    args = SimpleNamespace(T_cold=np.array([200.0, 60.0]), refrigerant_ls=[spec])
+    hp_shared.critical_point.cache_clear()
+
+    hp_shared.condensing_temperature_search_range(args)
+    hp_shared.cap_stage_condensing_temperatures(np.array([150.0]), args)
+
+    info = hp_shared.critical_point.cache_info()
+    assert (info.misses, info.hits) == (1, 1)
+
+
 def test_condensing_search_range_is_unchanged_when_no_cap_applies():
     within = SimpleNamespace(T_cold=np.array([120.0, 60.0]), refrigerant_ls=["water"])
     assert hp_shared.condensing_temperature_search_range(within) == (120.0, 60.0)
