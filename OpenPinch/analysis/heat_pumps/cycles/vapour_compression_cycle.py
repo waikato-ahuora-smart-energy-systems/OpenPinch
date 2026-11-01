@@ -413,6 +413,69 @@ class VapourCompressionCycle:
         s.update(CoolProp.PQ_INPUTS, P, Q)
         return s
 
+    def _isobar_points(
+        self,
+        P: float,
+        h_start: float,
+        h_end: float,
+        num: int,
+    ) -> list[list[float]]:
+        """Return ``num`` [h, T] points from ``h_start`` to ``h_end`` on isobar ``P``.
+
+        Pure fluids step in enthalpy. A HEOS mixture's pressure-enthalpy flash
+        costs tens of milliseconds, so a mixture steps in quality inside the
+        two-phase region and in temperature outside it; both give exact points
+        on the same isobar. Segment ends keep their exact enthalpies so that
+        adjacent profile blocks still share their boundary point.
+        """
+        if len(self._get_fluid_state(self._refrigerant).fluid_names()) == 1:
+            return [
+                [h, float(self._compute_state_from_pressure_enthalpy(P=P, h=h).T())]
+                for h in np.linspace(h_start, h_end, num)
+            ]
+
+        h_liquid = self._compute_state_from_pressure_quality(P, 0.0).hmass()
+        h_vapour = self._compute_state_from_pressure_quality(P, 1.0).hmass()
+        start, end = (
+            self._isobar_end_state(P, h, h_liquid, h_vapour) for h in (h_start, h_end)
+        )
+        if all(h_liquid <= h <= h_vapour for h in (h_start, h_end)):
+            states = [
+                self._compute_state_from_pressure_quality(P, Q)
+                for Q in np.linspace(start[2], end[2], num)[1:-1]
+            ]
+        else:
+            states = [
+                self._compute_state_from_pressure_temperature(P, T)
+                for T in np.linspace(start[1], end[1], num)[1:-1]
+            ]
+        interior = [[float(s.hmass()), float(s.T())] for s in states]
+        return [[start[0], start[1]], *interior, [end[0], end[1]]]
+
+    def _isobar_end_state(
+        self,
+        P: float,
+        h: float,
+        h_liquid: float,
+        h_vapour: float,
+    ) -> tuple[float, float, float | None]:
+        """Return (h, T, quality) of a profile segment end on a mixture isobar.
+
+        Saturation ends and solved cycle states are already known; only an end
+        strictly inside the two-phase region needs a flash, for its quality.
+        """
+        if h == h_vapour:
+            return h, float(self._compute_state_from_pressure_quality(P, 1.0).T()), 1.0
+        if h == h_liquid:
+            return h, float(self._compute_state_from_pressure_quality(P, 0.0).T()), 0.0
+        if not h_liquid < h < h_vapour:
+            for point in self._cycle_states:
+                if point and point["P"] == P and point["H"] == h:
+                    return h, point["T"], None
+        state = self._compute_state_from_pressure_enthalpy(P=P, h=h)
+        quality = float(state.Q()) if h_liquid < h < h_vapour else None
+        return h, float(state.T()), quality
+
     def _compute_compressor_outlet_state(
         self, h_in: float, s_in: float, P_out: float
     ) -> CoolProp.AbstractState:
@@ -846,27 +909,23 @@ class VapourCompressionCycle:
             ).hmass()
 
             if H[4] > h_sat_vapor:
-                for h in np.linspace(H[4], max(h_sat_vapor, H[2]), 21):
-                    state = self._compute_state_from_pressure_enthalpy(P=p_high, h=h)
-                    t_h_curve_points.append([h, float(state.T())])
+                t_h_curve_points.extend(
+                    self._isobar_points(p_high, H[4], max(h_sat_vapor, H[2]), 21)
+                )
 
             if H[4] > h_sat_liquid and not (H[2] > h_sat_vapor):
-                for h in np.linspace(
-                    min(h_sat_vapor, H[4]), max(h_sat_liquid, H[2]), 21
+                for point in self._isobar_points(
+                    p_high, min(h_sat_vapor, H[4]), max(h_sat_liquid, H[2]), 21
                 ):
-                    if not _repeats_last_point(t_h_curve_points, h):
-                        state = self._compute_state_from_pressure_enthalpy(
-                            P=p_high, h=h
-                        )
-                        t_h_curve_points.append([h, float(state.T())])
+                    if not _repeats_last_point(t_h_curve_points, point[0]):
+                        t_h_curve_points.append(point)
 
             if H[2] < h_sat_liquid:
-                for h in np.linspace(min(h_sat_liquid, H[4]), H[2], 21):
-                    if not _repeats_last_point(t_h_curve_points, h):
-                        state = self._compute_state_from_pressure_enthalpy(
-                            P=p_high, h=h
-                        )
-                        t_h_curve_points.append([h, float(state.T())])
+                for point in self._isobar_points(
+                    p_high, min(h_sat_liquid, H[4]), H[2], 21
+                ):
+                    if not _repeats_last_point(t_h_curve_points, point[0]):
+                        t_h_curve_points.append(point)
 
         else:
             # Determine supercritical gas cooler profile
@@ -918,23 +977,23 @@ class VapourCompressionCycle:
             h_sat_liquid = self._compute_state_from_pressure_quality(p_low, 0.0).hmass()
 
             if H[3] < h_sat_liquid:
-                for h in np.linspace(H[3], min(h_sat_liquid, H[5]), 21):
-                    state = self._compute_state_from_pressure_enthalpy(P=p_low, h=h)
-                    t_h_curve_points.append([h, float(state.T())])
+                t_h_curve_points.extend(
+                    self._isobar_points(p_low, H[3], min(h_sat_liquid, H[5]), 21)
+                )
 
             if H[3] < h_sat_vapor and not (H[5] < h_sat_liquid):
-                for h in np.linspace(
-                    max(h_sat_liquid, H[3]), min(h_sat_vapor, H[5]), 21
+                for point in self._isobar_points(
+                    p_low, max(h_sat_liquid, H[3]), min(h_sat_vapor, H[5]), 21
                 ):
-                    if not _repeats_last_point(t_h_curve_points, h):
-                        state = self._compute_state_from_pressure_enthalpy(P=p_low, h=h)
-                        t_h_curve_points.append([h, float(state.T())])
+                    if not _repeats_last_point(t_h_curve_points, point[0]):
+                        t_h_curve_points.append(point)
 
             if H[5] > h_sat_vapor:
-                for h in np.linspace(max(h_sat_vapor, H[3]), H[5], 21):
-                    if not _repeats_last_point(t_h_curve_points, h):
-                        state = self._compute_state_from_pressure_enthalpy(P=p_low, h=h)
-                        t_h_curve_points.append([h, float(state.T())])
+                for point in self._isobar_points(
+                    p_low, max(h_sat_vapor, H[3]), H[5], 21
+                ):
+                    if not _repeats_last_point(t_h_curve_points, point[0]):
+                        t_h_curve_points.append(point)
 
         else:
             # Determine supercritical gas heater profile

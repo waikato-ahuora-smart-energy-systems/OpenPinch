@@ -4,6 +4,18 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat pumps and refrigeration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Vapour-compression targets with a refrigerant mixture (for example
+  ``R134a[0.5]&R245fa[0.5]``) run about three times faster. The condenser and
+  evaporator profiles of a mixture now step in quality inside the two-phase
+  region and in temperature outside it, instead of flashing CoolProp at each
+  enthalpy, which costs tens of milliseconds for a mixture. Each profile point
+  still lies exactly on its isobar, but the points are placed differently, so
+  mixture results can move slightly. Pure-fluid profiles and results are
+  unchanged.
+
 0.7.5 (2026-10-27)
 ------------------
 

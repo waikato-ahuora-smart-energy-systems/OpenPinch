@@ -589,6 +589,47 @@ def test_heat_pump_cycle_with_zeotropic_mixture_generates_gliding_profiles():
     )
 
 
+def test_binary_mixture_profiles_are_exact_without_a_ph_flash_per_point(
+    monkeypatch,
+):
+    """A HEOS mixture PH flash costs tens of ms, so profiles must not use one per point."""
+    cycle = VapourCompressionCycle()
+    cycle.solve(
+        T_evap=20.0,
+        T_cond=80.0,
+        dtcont=0.0,
+        dT_subcool=3.0,
+        dT_ihx_gas_side=5.0,
+        eta_comp=0.7,
+        refrigerant="HEOS::R134a[0.5]&R245fa[0.5]",
+        Q_heat=1000.0,
+        is_heat_pump=True,
+    )
+    flashes = []
+    original = VapourCompressionCycle._compute_state_from_pressure_enthalpy
+
+    def _counting(self, P, h):
+        flashes.append(h)
+        return original(self, P, h)
+
+    monkeypatch.setattr(
+        VapourCompressionCycle, "_compute_state_from_pressure_enthalpy", _counting
+    )
+    cycle._build_condenser_profile()
+    cycle._build_evaporator_profile()
+
+    assert len(flashes) <= 4
+    reference = shp_mod.build_coolprop_abstract_state(cycle.refrigerant)
+    for curve, pressure in (
+        (cycle._condenser_th_curve, cycle.Ps[4]),
+        (cycle._evaporator_th_curve, cycle.Ps[0]),
+    ):
+        assert len(curve) >= 20
+        for h, temperature in curve:
+            reference.update(shp_mod.CoolProp.HmassP_INPUTS, h, pressure)
+            assert temperature == pytest.approx(reference.T() - 273.15, abs=1e-6)
+
+
 def test_heat_pump_cycle_accepts_binary_mole_fraction_refrigerant_string():
     refrigerant = "HEOS::R32[0.5]&R125[0.5]"
 
