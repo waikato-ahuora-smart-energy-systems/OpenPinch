@@ -18,6 +18,14 @@ Heat pumps and refrigeration
   candidate cycle (new ``OpenPinch.domain.fluids.critical_point``). Pure-fluid
   profiles and results are unchanged. A mixture candidate still costs about
   60 times a pure-fluid one.
+- A cascade vapour-compression target no longer charges capital for a stage
+  that does no work. The machine cost's stage factor counted every configured
+  stage (``n_cond + n_evap - 1``), so a 3x2 cascade whose levels merged still
+  paid for four compressors, and could never cost less than a 2x1 or single
+  stage design it contains. A stage now counts only when its work exceeds
+  0.1 % of the machine's work. Cascade targets whose optimum merges or idles
+  stages get a lower TAC and may settle on a different design; single-stage,
+  parallel and VC+MVR targets are unchanged.
 
 0.7.5 (2026-10-27)
 ------------------

@@ -410,6 +410,20 @@ def test_cascade_cost_unit_counts_every_solved_stage():
     assert unit.T_hot_max == pytest.approx(110.0)
 
 
+def test_cascade_cost_unit_does_not_charge_a_stage_that_does_no_work():
+    """A stage with no work (merged levels, no duty) has no compressor to buy,
+    so a 3x2 cascade can collapse onto a cheaper 2x1 or 1x1 design."""
+    args = _base_args()
+    streams = _sc(_stream("cond", 120.0, 100.0, 500.0, is_process_stream=False))
+    state = HPRParsedState(T_cond=np.array([110.0, 90.0, 90.0]))
+
+    (unit,) = hp_shared._single_cost_unit(
+        state, streams, np.array([10.0, 0.0, 6.0, 0.0]), args
+    )
+
+    assert unit.n_closed == 2
+
+
 def test_vapour_evaluator_keeps_background_profiles_out_of_one_point_match():
     args = _base_args(
         T_hot=np.array([100.0, 50.0]),
