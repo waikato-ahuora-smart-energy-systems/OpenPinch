@@ -28,6 +28,7 @@ from ..common.shared import (
     cap_stage_condensing_temperatures,
     condensing_temperature_search_range,
     evaluate_vapour_hpr_result,
+    floor_stage_evaporating_temperatures,
     validate_vapour_hp_refrigerant_ls,
 )
 from ..cycles.parallel_vapour_compression_cycles import (
@@ -161,7 +162,9 @@ def _parse_parallel_hp_state_temperatures(
     T_cond = cap_stage_condensing_temperatures(
         map_x_arr_to_T_arr(x_cond, *condensing_temperature_search_range(args)), args
     )
-    T_evap = map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0])
+    T_evap = floor_stage_evaporating_temperatures(
+        map_x_arr_to_T_arr(x_evap, args.T_hot[-1], args.T_hot[0]), args
+    )
     dT_subcool = map_x_arr_to_DT_arr(x_subcool, T_cond, T_evap)
     Q_heat_available = (
         limit_available_duty(
