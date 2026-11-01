@@ -13,8 +13,11 @@ Heat pumps and refrigeration
   region and in temperature outside it, instead of flashing CoolProp at each
   enthalpy, which costs tens of milliseconds for a mixture. Each profile point
   still lies exactly on its isobar, but the points are placed differently, so
-  mixture results can move slightly. Pure-fluid profiles and results are
-  unchanged.
+  mixture results can move slightly. A fluid's critical point, a costly solve
+  for a mixture, is now computed once per process instead of for every
+  candidate cycle (new ``OpenPinch.domain.fluids.critical_point``). Pure-fluid
+  profiles and results are unchanged. A mixture candidate still costs about
+  60 times a pure-fluid one.
 
 0.7.5 (2026-10-27)
 ------------------

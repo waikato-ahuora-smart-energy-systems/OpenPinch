@@ -13,7 +13,7 @@ from ....domain._stream.linearisation import (
     get_piecewise_data_points,
 )
 from ....domain.configuration import tol
-from ....domain.fluids import build_coolprop_abstract_state
+from ....domain.fluids import build_coolprop_abstract_state, critical_point
 from ....domain.stream_collection import StreamCollection
 
 # Qualities this close to 0 or 1 are saturated liquid or vapour; differences
@@ -93,9 +93,12 @@ class VapourCompressionCycle:
         """Set the working-fluid state object and refresh critical properties."""
         self._state = self._get_fluid_state(value)
         self._solved = False
-        self._p_crit = self._state.keyed_output(CoolProp.iP_critical)
-        self._t_crit = self._state.keyed_output(CoolProp.iT_critical)
-        self._d_crit = self._state.keyed_output(CoolProp.irhomass_critical)
+        if isinstance(value, str):
+            self._t_crit, self._p_crit, self._d_crit = critical_point(value)
+        else:
+            self._p_crit = self._state.keyed_output(CoolProp.iP_critical)
+            self._t_crit = self._state.keyed_output(CoolProp.iT_critical)
+            self._d_crit = self._state.keyed_output(CoolProp.irhomass_critical)
 
     @property
     def cycle_states(self) -> list[dict[str, float]]:

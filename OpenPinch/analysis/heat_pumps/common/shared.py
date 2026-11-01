@@ -25,6 +25,7 @@ from ....contracts.hpr import (
 )
 from ....domain.configuration import tol as _tol
 from ....domain.enums import ProblemTableLabel
+from ....domain.fluids import critical_point
 from ....domain.stream_collection import StreamCollection
 from ....domain.value import Value
 from ..optimisation_adapter import (
@@ -770,7 +771,7 @@ def condensing_temperature_search_range(
         return t_hot, t_cold
     try:
         refrigerants = list(getattr(args, "refrigerant_ls", None) or ["water"])
-        t_crit = max(float(_coolprop.PropsSI("Tcrit", ref)) for ref in refrigerants)
+        t_crit = max(float(critical_point(ref)[0]) for ref in refrigerants)
     except (ValueError, TypeError):
         return t_hot, t_cold
     ceiling = t_crit - 273.15 - SUBCRITICAL_CONDENSING_MARGIN_K
@@ -814,7 +815,7 @@ def cap_stage_condensing_temperatures(
     for index in range(T_cond.size):
         refrigerant = refrigerants[min(index, len(refrigerants) - 1)]
         try:
-            t_crit = float(_coolprop.PropsSI("Tcrit", refrigerant)) - 273.15
+            t_crit = float(critical_point(refrigerant)[0]) - 273.15
         except (ValueError, TypeError):
             continue
         ceilings[index] = t_crit - SUBCRITICAL_CONDENSING_MARGIN_K

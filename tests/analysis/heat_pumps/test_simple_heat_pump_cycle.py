@@ -630,6 +630,17 @@ def test_binary_mixture_profiles_are_exact_without_a_ph_flash_per_point(
             assert temperature == pytest.approx(reference.T() - 273.15, abs=1e-6)
 
 
+def test_cycles_with_the_same_mixture_share_one_critical_point_solve():
+    spec = "HEOS::R134a[0.5]&R245fa[0.5]"
+    shp_mod.critical_point.cache_clear()
+
+    VapourCompressionCycle().state = spec
+    VapourCompressionCycle().state = spec
+
+    info = shp_mod.critical_point.cache_info()
+    assert (info.misses, info.hits) == (1, 1)
+
+
 def test_heat_pump_cycle_accepts_binary_mole_fraction_refrigerant_string():
     refrigerant = "HEOS::R32[0.5]&R125[0.5]"
 
