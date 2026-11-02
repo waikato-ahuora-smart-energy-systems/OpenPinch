@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 from copy import deepcopy
+from types import SimpleNamespace
 
 from OpenPinch.analysis.heat_exchanger_networks.context import (
     ensure_target_results,
@@ -368,3 +369,74 @@ def _load_benchmark_module():
     assert spec.loader is not None
     spec.loader.exec_module(module)
     return module
+
+
+def _load_nine_stream_script():
+    spec = importlib.util.spec_from_file_location(
+        "benchmark_nine_stream_under_test",
+        REPO_ROOT / "scripts" / "benchmark_nine_stream.py",
+    )
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def _nine_stream_outcome(method: str, status: str = "success"):
+    return SimpleNamespace(task=SimpleNamespace(method=method), status=status)
+
+
+def test_nine_stream_script_keeps_the_live_expectations_and_the_fixture() -> None:
+    script = _load_nine_stream_script()
+    expected = script.EXPECTED
+
+    assert expected["best_solution"] == 2905508.6335796523
+    assert expected["total_cases_attempted"] == 1133
+    assert (FIXTURE_ROOT / f"{script.CASE_ID}.json").is_file()
+
+
+def test_nine_stream_script_reports_each_mismatch_with_the_expected_value() -> None:
+    script = _load_nine_stream_script()
+    expected = script.EXPECTED
+    outcomes = [_nine_stream_outcome("pinch_design_method")]
+    metrics = {
+        "recovery_units": expected["best_recovery_units"],
+        "hot_utility_units": expected["best_hu_units"],
+        "cold_utility_units": expected["best_cu_units"],
+    }
+
+    failures = script.compare_to_expected(
+        total_annual_cost=expected["best_solution"] * 1.01,
+        stage_count=expected["best_stages"],
+        summary_metrics=metrics,
+        outcomes=outcomes,
+    )
+
+    assert any("total_annual_cost" in failure for failure in failures)
+    assert any("total_cases_attempted" in failure for failure in failures)
+    assert any("solved_esm_count" in failure for failure in failures)
+    assert not any("stage_count" in failure for failure in failures)
+
+
+def test_nine_stream_script_accepts_the_expected_result() -> None:
+    script = _load_nine_stream_script()
+    expected = script.EXPECTED
+    # 1133 weighted attempts = 1133 - 11 * 67 = 396 plain jobs plus 67 ESM runs.
+    outcomes = [_nine_stream_outcome("pinch_design_method") for _ in range(396)] + [
+        _nine_stream_outcome("network_evolution_method") for _ in range(67)
+    ]
+    metrics = {
+        "recovery_units": expected["best_recovery_units"],
+        "hot_utility_units": expected["best_hu_units"],
+        "cold_utility_units": expected["best_cu_units"],
+    }
+
+    failures = script.compare_to_expected(
+        total_annual_cost=expected["best_solution"],
+        stage_count=expected["best_stages"],
+        summary_metrics=metrics,
+        outcomes=outcomes,
+    )
+
+    assert failures == []

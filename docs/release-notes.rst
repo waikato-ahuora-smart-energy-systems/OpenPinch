@@ -237,6 +237,10 @@ Testing and CI
   traceback) in the Pyodide job, where its Node packages are installed. It
   used to skip in every lane, so the behaviour had no CI coverage.
 
+- The nine-stream live solver benchmark, which pytest always skipped, is now
+  ``scripts/benchmark_nine_stream.py``, run by hand. It can take hours and has
+  no CI use.
+
 0.7.2 (2026-10-20)
 ------------------
 
