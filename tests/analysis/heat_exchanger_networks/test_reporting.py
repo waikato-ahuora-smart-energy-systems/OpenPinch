@@ -1123,6 +1123,7 @@ def test_grid_diagram_uses_one_based_ranking_and_reports_missing_rank() -> None:
         build_result_grid_diagram(result, solution_rank=0)
 
 
+@pytest.mark.synthesis
 def test_grid_diagram_save_writes_image(tmp_path: Path) -> None:
     _require_plotly()
     result = _result()

@@ -6,7 +6,7 @@ import tomllib
 
 import yaml
 
-from scripts import optional_install_smoke
+from scripts import check_synthesis_stack_absent, optional_install_smoke
 from tests.support.paths import REPOSITORY_ROOT
 
 WORKFLOW_DIR = REPOSITORY_ROOT / ".github" / "workflows"
@@ -76,6 +76,7 @@ def test_every_ci_lane_is_present():
         "unit-py312",
         "unit-py313",
         "floors",
+        "no-synthesis",
         "docs",
         "tespy",
         "notebooks-hpr",
@@ -110,6 +111,52 @@ def test_every_ci_lane_is_present():
     }
     assert {row["os"] for row in smoke["include"]} == {"windows-latest", "macos-latest"}
     assert "SOURCE_DATE_EPOCH" in runs(jobs["build"])
+
+
+def test_no_synthesis_lane_runs_the_fast_tests_without_the_stack():
+    matrix = workflow("ci.yml")["jobs"]["tests"]["strategy"]["matrix"]["include"]
+    rows = {row["lane"]: row for row in matrix}
+    lane = rows["no-synthesis"]
+    assert lane["markers"] == f"not synthesis and {rows['unit']['markers']}"
+
+    # Everything only synthesis asks for: plotly and openpyxl stay, because
+    # the dashboard and notebook extras need them too.
+    extras = tomllib.loads((REPOSITORY_ROOT / "pyproject.toml").read_text())["project"][
+        "optional-dependencies"
+    ]
+
+    def names(extra):
+        return {re.split("[<>=]", requirement)[0] for requirement in extras[extra]}
+
+    stack = names("synthesis") - names("dashboard")
+    assert stack == {"pyomo", "gekko", "kaleido", "wakepy", "idaes-pse"}
+    sync = lane["sync"].split()
+    assert sync[:2] == ["--group", "dev"]
+    assert set(sync[3::2]) == stack
+    assert set(sync[2::2]) == {"--no-install-package"}
+
+    # A lane that still had the stack would pass and prove nothing.
+    steps = workflow("ci.yml")["jobs"]["tests"]["steps"]
+    check = next(
+        step for step in steps if step.get("if") == "${{ matrix.no_synthesis }}"
+    )
+    assert lane["no_synthesis"] == "true"
+    assert "scripts/check_synthesis_stack_absent.py" in check["run"]
+
+
+def test_stack_check_fails_naming_each_package_found(monkeypatch, capsys):
+    monkeypatch.setattr(
+        check_synthesis_stack_absent,
+        "find_spec",
+        lambda module: object() if module in {"gekko", "idaes"} else None,
+    )
+    assert check_synthesis_stack_absent.main() == 1
+    assert "gekko, idaes" in capsys.readouterr().err
+
+
+def test_stack_check_passes_when_nothing_is_found(monkeypatch):
+    monkeypatch.setattr(check_synthesis_stack_absent, "find_spec", lambda module: None)
+    assert check_synthesis_stack_absent.main() == 0
 
 
 def test_every_extra_has_a_smoke_surface_the_script_accepts():
