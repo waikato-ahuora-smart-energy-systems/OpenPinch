@@ -71,8 +71,9 @@ Graph accessors are available after enrichment:
    gcc_x = problem.plot.exergetic_grand_composite_curve()
    nlp_x = problem.plot.exergetic_net_load_profiles()
 
-Use ``zone_name=...``, ``include_subzones=True``, and ``period_id=...`` when
-the exergy scope needs to match a specific thermal solve.
+Use ``zone=...``, ``include_subzones=True``, and ``period_id=...`` on
+``problem.target.exergy`` when the exergy scope needs to match a specific
+thermal solve. The plot accessors take ``zone_name=...`` instead.
 
 Next Steps
 ----------

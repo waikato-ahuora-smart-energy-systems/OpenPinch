@@ -7,6 +7,17 @@ Unreleased
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Vapour-compression targets now limit each compressor's pressure ratio, with
+  the new ``HPR_MAX_PRESSURE_RATIO`` option (default 15). A candidate over the
+  limit evaporates warmer, or in a cascade raises its lower levels, so targets
+  with a large lift in one compressor can change or find no design. Raise the
+  option to relax the limit. TESPy targets and the Carnot models are not
+  limited.
+- A single-period vapour-compression refrigeration target whose best design
+  still carries a feasibility penalty, such as unserved cooling, now raises
+  ``HPRTargetingError``. It previously returned that design with the penalty in
+  its objective. With a small search budget, raise the budget before relaxing a
+  limit: the design may exist.
 - Single-stage and cascade vapour-compression targets can now subcool the
   condensate down to the coldest evaporating temperature, the same limit as
   parallel machines. The limit was previously the gap to the top of the sink
