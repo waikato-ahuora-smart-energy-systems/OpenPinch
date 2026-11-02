@@ -22,7 +22,10 @@ execution, main-bound solver execution, and batch-delegation contracts.
 
 The two Brayton callables, and their batch mirrors, are marked
 ``unmapped; under development``. They remain public but raise while the Brayton
-solver is under development, so no tutorial demonstrates them.
+solver is under development, so no tutorial demonstrates them. The ORC
+operations (``carnot_orc``, ``organic_rankine_cycle``, their all-period and
+batch mirrors, and two ORC plots) are also unmapped while ORC is under
+development; they run, but no tutorial owns them.
 
 Counting Rules
 --------------
@@ -72,7 +75,7 @@ Release Verification Snapshot
 For this release candidate, all declared profiles were executed from clean
 temporary directories:
 
-- ``base``: 10 notebooks, passed in the routine non-solver suite;
+- ``base``: 11 notebooks, passed in the routine non-solver suite;
 - ``slow-hpr``: 4 notebooks, passed;
 - ``solver``: 3 HEN notebooks, passed with the synthesis environment; and
 - ``interactive``: 1 notebook, passed with dashboard launch guarded while real

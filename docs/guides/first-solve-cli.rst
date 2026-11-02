@@ -5,7 +5,9 @@ Purpose
 -------
 
 Use the OpenPinch CLI when you want to copy maintained notebook sources into a
-working directory. The CLI is an onboarding and asset-copy surface only.
+working directory, or write the contract JSON Schemas with
+``openpinch schema -o DIR``. The CLI is an onboarding and asset-copy surface
+only.
 Validation, targeting, graph export, Excel export, dashboards, and advanced
 workflows are Python workflows.
 
@@ -24,8 +26,8 @@ Sample Asset
 
 Notebook 01 is the recommended first copied asset:
 
-``01_first_solve_summary_graphs.ipynb``
-   First solve, summary tables, graphing, and workspace sensitivity.
+``01_first_solve_and_core_curves.ipynb``
+   First solve, summary tables, and core curves.
 
 Runnable Workflow
 -----------------
@@ -40,20 +42,11 @@ Copy one notebook:
 
 .. code-block:: bash
 
-   openpinch notebook --name 01_first_solve_summary_graphs.ipynb -o notebooks
+   openpinch notebook --name 01_first_solve_and_core_curves.ipynb -o notebooks/
 
-The packaged notebook series is:
-
-- ``01_first_solve_summary_graphs.ipynb``
-- ``02_total_site_sugcc_interpretation.ipynb``
-- ``03_multiperiod_workspace_scenarios.ipynb``
-- ``04_carnot_heat_pump_screening.ipynb``
-- ``05_direct_gas_stream_mvr_scenarios.ipynb``
-- ``06_vapour_compression_mvr_cascade_hpr.ipynb``
-- ``07_multiperiod_heat_exchanger_network.ipynb``
-- ``08_energy_transfer_analysis.ipynb``
-- ``09_schema_service_exports_and_bundles.ipynb``
-- ``10_multiperiod_hpr_shared_design.ipynb``
+The packaged notebook series has nineteen notebooks, ``01_first_solve_and_core_curves.ipynb``
+through ``19_utility_placement_optimisation.ipynb``; see
+:doc:`../examples/notebook-series` for the full list.
 
 Expected Output
 ---------------
