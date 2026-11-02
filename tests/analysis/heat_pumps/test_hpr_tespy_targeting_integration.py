@@ -165,6 +165,40 @@ def test_optimizer_owns_one_open_cache_and_close_for_complete_call(
 
 
 @pytest.mark.parametrize(
+    ("refrigerants", "sort", "ceiling"),
+    [
+        # The sort simulates water, so R134a's ceiling must not apply.
+        (["R134a", "water"], True, 200.0),
+        (["R134a", "water"], False, 101.06 - 2.0),
+    ],
+)
+def test_tespy_condensing_cap_uses_the_simulated_refrigerant(
+    monkeypatch,
+    refrigerants: list[str],
+    sort: bool,
+    ceiling: float,
+) -> None:
+    args, prepared = _prepared_args(
+        refrigerant_ls=refrigerants,
+        do_refrigerant_sort=sort,
+        T_cold=np.array([200.0, 180.0, 55.0]),
+    )
+    fake = FakeHprTargetEvaluator()
+
+    def solve(*, f_obj: Callable, x0_ls, bnds, args):
+        point = _candidate(args)
+        point[0] = 0.0
+        return f_obj(point, args)
+
+    monkeypatch.setattr(cascade, "get_hpr_target_evaluator", lambda _prepared: fake)
+    monkeypatch.setattr(cascade, "solve_hpr_placement", solve)
+
+    cascade.optimise_cascade_heat_pump_placement(args, prepared_tespy=prepared)
+
+    assert fake.requests[0].condensing_temperature == pytest.approx(ceiling, abs=0.1)
+
+
+@pytest.mark.parametrize(
     ("initialise", "expected_seed"),
     [(True, "carnot-seed"), (False, None)],
 )

@@ -33,6 +33,11 @@ Heat pumps and refrigeration
   unseeded first restart could stall where the allocated duty is zero, so with
   a small search budget a target such as R245fa on ``basic_pinch.json`` raised
   ``HPRTargetingError``. TESPy target values can change.
+- TESPy vapour-compression targets now keep condensing at least 2 K below the
+  refrigerant's critical temperature, the same limit as CoolProp targets. A
+  TESPy design could previously sit just below the critical point, where
+  CoolProp targets cannot go, so its cost was not comparable. TESPy targets for
+  a refrigerant near that limit can cost more.
 
 Exergy
 ~~~~~~
