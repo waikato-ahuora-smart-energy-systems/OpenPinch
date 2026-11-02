@@ -60,8 +60,9 @@ These modules own the top-level targeting workflows once a zone tree has been
 constructed.
 
 - Direct integration works on process streams within a zone and applies Problem
-  Table analysis, utility targeting, optional Heat Pump targeting, and optional
-  cost/exergy add-ons.
+  Table analysis and utility targeting, with optional area and cost targeting.
+  Heat Pump and exergy targeting are separate services in
+  :mod:`OpenPinch.application.targeting`.
 - Indirect integration aggregates the net thermal behaviour of solved subzones
   and applies utility-to-utility balancing for Total Site studies.
 - Lower-level Heat Pump and refrigeration screening for both routes is
@@ -141,8 +142,13 @@ Advanced Add-On Analyses
 ------------------------
 
 The modules below expose specialised calculations that sit on top of the core
-Problem Table workflow. Some are used automatically when corresponding options
-are enabled, while others are better viewed as expert-level helper libraries.
+Problem Table workflow. Some are run by their own target methods, for example
+``target.heat_exchanger_area_and_cost`` and ``target.exergy``, while others are
+better viewed as expert-level helper libraries. Organic Rankine cycle
+(``OpenPinch.analysis.orc``), energy transfer
+(``OpenPinch.analysis.energy_transfer``) and utility placement
+(``OpenPinch.analysis.utility_placement``) are separate packages with their own
+``target.*`` methods and are not expanded on this page.
 
 The Heat Pump and refrigeration stack is documented separately in
 :doc:`api-heat-pump` because it spans a dedicated package with multiple cycle
@@ -160,13 +166,5 @@ optimisers and helper modules. The main low-level entrypoints remain
 .. automodule:: OpenPinch.analysis.power.service
    :members:
 
-Experimental or Partial Analysis Modules
-----------------------------------------
-
-The modules below remain visible for codebase orientation and restoration work,
-but they should not be read as stable production workflows. They are present in
-the repository with partial implementations, commented stubs, or incomplete
-workflow documentation.
-
 .. automodule:: OpenPinch.analysis.exergy.service
-   :no-members:
+   :members:

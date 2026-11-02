@@ -32,6 +32,7 @@ from ..common.shared import (
     evaluate_vapour_hpr_result,
     floor_stage_evaporating_temperatures,
     is_negligible_useful_duty,
+    limit_parallel_pressure_ratios,
     post_solve_error,
     validate_vapour_hp_refrigerant_ls,
 )
@@ -185,6 +186,7 @@ def _parse_vc_mvr_state_variables(
         ),
         args,
     )
+    T_evap_vc = limit_parallel_pressure_ratios(T_cond_vc, T_evap_vc, args)
     Q_heat_available = limit_available_duty(
         get_Q_vals_at_T_hpr_from_bckgrd_profile(
             T_cond_vc,

@@ -12,8 +12,8 @@ to screen direct and indirect integration opportunities.
 Where To Start
 --------------
 
-Repository developers can begin with the parent-owned internal surfaces
-documented in :doc:`api-core`:
+Repository developers can begin with the parent-owned surfaces on
+``PinchProblem`` listed in :doc:`../api/pinchproblem`:
 
 - ``problem.target.carnot_heat_pump(...)``
 - ``problem.target.carnot_refrigeration(...)``
@@ -63,7 +63,8 @@ Public Targeting Reliability Contract
 The scalar Carnot, vapour-compression, and VC+MVR target methods accept bounded
 search controls through ``maximum_restarts``, ``maximum_iterations``, and
 ``maximum_evaluations``. Vapour-compression methods additionally accept
-explicit condenser, evaporator, backend, and refrigerant selections;
+explicit backend and refrigerant selections. The Carnot, vapour-compression, and
+``mvr_heat_pump`` methods accept explicit condenser and evaporator selections;
 ``mvr_heat_pump`` accepts explicit MVR fluids and stage count. A successful
 target exposes ``hpr_success``, ``hpr_load`` where scalar load evidence exists,
 and detached ``hpr_details``.
