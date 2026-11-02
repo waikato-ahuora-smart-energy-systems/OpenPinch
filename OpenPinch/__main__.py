@@ -20,7 +20,10 @@ def build_parser() -> argparse.ArgumentParser:
     """Create the CLI argument parser."""
     parser = argparse.ArgumentParser(
         prog="openpinch",
-        description="Copy packaged OpenPinch example notebooks.",
+        description=(
+            "Copy packaged OpenPinch example notebooks and write the JSON Schema "
+            "of each public contract."
+        ),
     )
     parser.add_argument(
         "--debug",

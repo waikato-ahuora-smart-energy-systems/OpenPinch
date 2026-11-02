@@ -217,7 +217,7 @@ jobs:
           git show "origin/$BASE_REF:pyproject.toml" > "$RUNNER_TEMP/base-pyproject.toml"
           version="$(python3 scripts/check_release_version.py --base-pyproject "$RUNNER_TEMP/base-pyproject.toml")" || {
             echo "::error title=Version bump required::$version"
-            echo "Bump the version on develop (uv run bump-my-version bump patch) before merging to main." >&2
+            echo "Bump the version on develop (uvx bump-my-version bump patch) before merging to main." >&2
             exit 1
           }
           taken="$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/v$version" --jq "map(select(.ref == \"refs/tags/v$version\")) | length")"

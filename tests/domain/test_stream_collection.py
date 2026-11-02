@@ -708,7 +708,8 @@ def test_state_context_is_preserved_on_copy_and_subset():
     np.testing.assert_allclose(hot_streams.weights, np.array([0.25, 0.75]))
 
 
-def test_export_to_csv(sample_streams):
+def test_export_to_csv(sample_streams, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
     sc = StreamCollection()
     for stream in sample_streams:
         sc.add(stream)
@@ -718,6 +719,7 @@ def test_export_to_csv(sample_streams):
 
     try:
         assert output_path.exists()
+        assert output_path.parent == tmp_path
         with output_path.open(newline="", encoding="utf-8") as csvfile:
             rows = list(csv.DictReader(csvfile))
 
