@@ -6,7 +6,7 @@ Heat exchanger network (HEN) synthesis, fixed-structure duty optimisation and co
 ## Interface
 - `heat_exchanger_network_synthesis_service` and per-method `heat_exchanger_network_*_method_service` functions (`service.py`): dispatch one method and update the problem cache.
 - `prepare_service_context`, `finalise_design_result`, `ensure_target_results`, `normalise_runtime_options`, `optional_text` (`context.py`): shared service-boundary helpers.
-- `heat_exchanger_network_duty_optimisation_service`, `build_duty_optimisation_request`, `DutyOptimisationRequest`, `fixed_network_structure`, `FixedNetworkStructure`, `FixedStructureDutyExecutor`, `build_solution_network`, `verify_solution`, `duty_optimisation_task`, `DUTY_OBJECTIVE_GOALS`, `DEFAULT_FEASIBILITY_APPROACH` (`duty_optimisation.py`): optimise exchanger duties on a user-defined network for `"utility"`, `"area"` or `"cost"`.
+- `heat_exchanger_network_duty_optimisation_service`, `build_duty_optimisation_request`, `DutyOptimisationRequest`, `fixed_network_structure`, `FixedNetworkStructure`, `FixedStructureDutyExecutor`, `build_solution_network`, `verify_solution` (not in `__all__`), `duty_optimisation_task`, `DUTY_OBJECTIVE_GOALS`, `DEFAULT_FEASIBILITY_APPROACH` (`duty_optimisation.py`): optimise exchanger duties on a user-defined network for `"utility"`, `"area"` or `"cost"`.
 - `quantify_heat_exchanger_network_controllability` (`controllability.py`): 0 to 1 steady-state controllability score from an interaction matrix.
 - `PreparedProblem`, `SynthesisProblem` (`prepared_problem.py`): structural protocols for the problem state analysis code reads.
 - `WorkflowContractError` (`errors.py`): task fan-out contract violation.
@@ -27,8 +27,8 @@ Heat exchanger network (HEN) synthesis, fixed-structure duty optimisation and co
 - An accepted design is ranked, selected and verified; verification failures raise `RuntimeError` [context.py:finalise_design_result].
 - Analysis code accepts the `PreparedProblem` protocol instead of importing the application layer [prepared_problem.py:PreparedProblem].
 - Duty optimisation: `"area"` needs a utility cap, `"cost"` and `"utility"` reject caps, and every process stream needs at least one exchanger [duty_optimisation.py:build_duty_optimisation_request, _require_every_stream_served].
-- Exchangers left at zero duty in every period are removed and the allocation is re-solved [duty_optimisation.py:FixedStructureDutyExecutor._solve].
-- Controllability option values are validated, component scores are clipped to 0 to 1, and the composite uses fixed weights [controllability.py:_validate_options, _COMPOSITE_WEIGHTS].
+- Exchangers left at zero duty in every period are removed one per pass, the idle one with the smallest `max_duty` first, and the allocation is re-solved until none are idle [duty_optimisation.py:FixedStructureDutyExecutor._solve].
+- Controllability option values are validated, component scores are clipped to 0 to 1, and the composite uses fixed weights renormalised over the components that are not `None` [controllability.py:_validate_options, _COMPOSITE_WEIGHTS].
 
 ## Side Effects
 - `finalise_design_result` assigns `problem._results` with the design attached [context.py:finalise_design_result].

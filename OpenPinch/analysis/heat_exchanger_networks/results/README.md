@@ -18,7 +18,7 @@ Turns executed task outcomes into the canonical synthesis result, resolves seed 
 - The accepted network must be present, and its run id, task id, period id, method are overwritten from settings and task, and the stage count is kept from the network when it has one [assembly.py:build_synthesis_result].
 - Manifest approach temperatures are those the tasks actually ran, falling back to the settings values [assembly.py:build_synthesis_result].
 - `solution_rank` is one-based; ranks below 1 or beyond the available count raise `IndexError` [selection.py:network_for_rank].
-- `select_network` keeps `ranked_networks` unchanged so later selections still see every outcome [selection.py:select_network].
+- `select_network` keeps whatever `ranked_networks` the result holds; for a finalised design that is the unique feasible ranking built by `finalise_design_result`, not every outcome, and `solution_rank` indexes that list [selection.py:select_network] [context.py:finalise_design_result].
 - A cached seed must come from the expected upstream method, and for problems with segmented streams must carry the current `SEGMENT_PROFILE_VERSION` [seeds.py:resolve_seed_networks].
 - Seed networks must be non-empty `HeatExchangerNetwork` instances or mappings that validate as one [seeds.py:_normalise_seed_networks].
 

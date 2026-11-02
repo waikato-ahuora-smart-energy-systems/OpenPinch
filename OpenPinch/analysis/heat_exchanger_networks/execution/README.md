@@ -16,7 +16,7 @@ Resolves synthesis settings from a prepared problem, plans the quality-tier path
 - Couenne fallback predicates (`fallbacks.py`): private (underscore) helpers used by `targeting/open_hens_method.py`.
 
 ## Invariants
-- A downstream task needs a successful parent outcome and the parent's in-process solver problem; otherwise `WorkflowContractError` is raised [executor.py:LocalSynthesisExecutor._parent_problem].
+- A downstream task needs a successful parent outcome and the parent's in-process solver problem; `_parent_problem` raises `WorkflowContractError`, but `LocalSynthesisExecutor.execute` catches it and returns a failed task outcome carrying the message, while `FakeSynthesisExecutor` lets it propagate [executor.py:LocalSynthesisExecutor._parent_problem] [executor.py:LocalSynthesisExecutor.execute] [fake_executor.py:FakeSynthesisExecutor.execute].
 - Tasks are built inside pool workers only when no parent outcomes exist and no task has a parent [executor.py:_can_build_tasks_in_workers].
 - TDM and ESM models use a fixed approach of 0.1 K; PDM uses the task approach temperature [executor.py:_task_model_approach_temperature].
 - A solve counts as successful only when `mSuccess == 1` and `verify()` (if present) passes; failures carry a non-empty error string [executor.py:_solve_built_task, _failed_task_outcome].
@@ -24,7 +24,7 @@ Resolves synthesis settings from a prepared problem, plans the quality-tier path
 - Outcomes are returned in the order of the input tasks [executor.py:LocalSynthesisExecutor._collect_outcomes].
 - Settings are immutable and `evm_solver_options` is copied on construction [settings.py:SynthesisWorkflowSettings.__post_init__].
 - Tier 0 has one unprotected pathway per configured multiplier and tier 1 a single unprotected route; tiers 2 to 5 include tier 0 and 1 routes as protected and add expanded routes [pathways.py:tier_pathways].
-- The Couenne fallback applies only when every outcome of the stage failed with a "couenne ... not found on PATH" error [fallbacks.py:_missing_couenne_failure].
+- The Couenne fallback applies only when the stage's configured solver (`pdm_solver` or `tdm_solver`) is `couenne`, the stage has tasks and outcomes, and every outcome failed with a "couenne ... not found on PATH" error [fallbacks.py:_missing_couenne_failure].
 - Utility-only networks (no active staged recovery exchanger) are not valid seeds [task_builders.py:has_recovery_topology].
 - The fake executor requires successful parents for downstream tasks [fake_executor.py:FakeSynthesisExecutor.execute].
 
