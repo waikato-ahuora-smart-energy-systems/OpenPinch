@@ -15,7 +15,7 @@ Builds grid diagrams of heat exchanger networks and the plain-data design view o
 - Subdirectories: none.
 
 ## Invariants
-- A period id that cannot be resolved (empty-period network) raises `ValueError`. [geometry.py:build_grid_model]
+- `period_id` is required for a network with more than one period and must be one of its periods; an unknown or missing id, or, with no `period_id`, an empty-period network, raises `ValueError`. [geometry.py:build_grid_model]
 - A match is drawn only if it is active, `match_allowed` and its duty exceeds `1e-5` of the largest active duty in that period. [geometry.py:_is_significant_match] [_constants.py:_DUTY_RELATIVE_TOLERANCE]
 - Exchangers with the same stream pair and stage are merged, adding duty and areas; the area is `None` if any part has none. [geometry.py:_add_or_accumulate] [geometry.py:_summed_area]
 - Recovery exchangers without a stage add streams but are not drawn as matches. [geometry.py:build_grid_model]

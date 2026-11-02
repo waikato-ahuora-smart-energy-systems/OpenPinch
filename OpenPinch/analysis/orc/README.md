@@ -31,7 +31,7 @@ Targets an organic Rankine cycle (ORC) that takes the process surplus below the 
 - The residual GCC is lifted so it is non-negative before utilities are re-targeted. [service.py:_residual_utility_summary]
 
 ## Side Effects
-- Runs the optimiser backend selected by `bb_minimiser`, which can be slow and is seeded by `seed`. [search.py:search_orc]
+- Runs the optimiser backend selected by `bb_minimiser`, which can be slow and is seeded by `OrcTargetInputs.seed`. [search.py:search_orc]
 - Works on a deep copy of the base target's problem table; the base target is not changed. [service.py:compute_direct_orc_target]
 - CoolProp states are cached per fluid and per thread, and critical temperatures are cached with `lru_cache`. [cycle.py:_state] [cycle.py:critical_temperature]
 - CoolProp is imported lazily inside the cycle solver. [cycle.py:_sat]

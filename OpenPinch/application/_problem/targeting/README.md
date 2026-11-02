@@ -12,8 +12,8 @@ success, and `provenance.py` fingerprints inputs and stamps targets so later cal
 - `METHOD_CATALOG`, `AnalysisMethodSpec` (`catalog.py`): read-only map of `target.*` and `design.*` method names to scopes, prerequisites, period behaviour, dependencies and result adapter.
 - `require_available`, `catalog_method_names`, `install_catalog_forwarders` (`catalog.py`): reject unavailable methods; list a surface's names; add `**kwargs` forwarders to a class.
 - `run_targeting_for_zone_and_subzones` (`dispatch.py`): children first, then direct and indirect services by zone type.
-- `execute_targeting`, `execute_cogeneration_targeting`, `execute_exergy_targeting` (`execution.py`): run one target family and return the resulting target.
-- `run_problem_targeting`, `run_exergy_targeting_for_zone_and_subzones` (`execution.py`): run a whole tree and cache `problem._results`.
+- `execute_targeting`, `execute_cogeneration_targeting`, `execute_exergy_targeting` (`execution.py`): run one target family and return the resulting target; `execute_targeting` returns `None` when a heat pump, refrigeration or ORC service produces no target.
+- `run_problem_targeting` (`execution.py`): run a whole tree and cache `problem._results`; `run_exergy_targeting_for_zone_and_subzones` walks a tree in post-order calling the exergy service and caches nothing.
 - `resolve_target_zone`, `walk_zone_tree`, `resolve_runtime_period_options`, `build_execution_master_zone`, `scratch_child_targets` (`execution.py`): zone and period selection helpers.
 - `process_component_work_for_zone`, `attach_process_component_work_targets` (`execution.py`): add attached component work to targets.
 - `AnalysisExecutionContext`, `PreparedPeriodState` (`state.py`): isolated invocation context and the per-period retained runtime graph.

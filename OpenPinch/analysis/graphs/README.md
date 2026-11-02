@@ -6,7 +6,7 @@ Turns the problem tables and diagram payloads stored on targets into serialised 
 ## Interface
 - `get_output_graph_data(zone, graph_sets)` (`service.py`): returns `{target name: graph set}` for every reportable target in the zone and its subzones.
 - `resolve_graph_context`, `iter_available_graph_specs`, `build_available_graphs`, `build_graph_from_spec`, `build_graph_set_payload` (`service.py`): per-target steps of the build.
-- `clean_composite_curve`, `clean_composite_curve_ends` (`composite.py`): remove constant-enthalpy ends, repeated points and collinear points from a curve.
+- `clean_composite_curve`, `clean_composite_curve_ends` (`composite.py`): `clean_composite_curve_ends` trims constant-enthalpy ends (an empty curve results when the duty range is within `heat_resolution`); `clean_composite_curve` also removes repeated and collinear points.
 - `GRAPH_BUILD_SPECS`, `COMPOSITE_GRAPH_SPECS`, `GCC_GRAPH_SPECS`, `ENERGY_TRANSFER_GRAPH_SPECS`, `REFRIGERATION_GRAPH_SPECS`, `ORC_GRAPH_SPECS` (`specifications.py`): declarative graph specifications.
 - `GRAPH_SERIES_META` (`metadata.py`): labels, descriptions and titles keyed by problem table column.
 - `GCC_VERTICAL_TOL` (`grand_composite.py`): enthalpy difference below which a GCC segment counts as vertical.
@@ -21,7 +21,7 @@ Turns the problem tables and diagram payloads stored on targets into serialised 
 - Composite curve ends are trimmed with a tolerance proportional to the curve's duty scale (`duty_tolerance`), not `np.isclose`'s relative tolerance on the end value. [composite.py:clean_composite_curve_ends]
 - Arrow heads for the Total Site Profiles graph are the reverse of those for other composite graphs. [composite.py:_graph_cc]
 - GCC segments are classified by the sign of the enthalpy step, inverted for utility profiles; near-vertical steps are drawn black. [grand_composite.py:_classify_segment] [grand_composite.py:_build_gcc_segments]
-- `value_field` and its companion list (stream types or utility flags) must have equal length, otherwise `ValueError`. [primitives.py:_normalise_graph_values]
+- A non-scalar companion list (stream types or utility flags) must have the same length as `value_field`, otherwise `ValueError`; a scalar companion applies to every field. [primitives.py:_normalise_graph_values]
 - Energy transfer diagram curves plot stacked heat on x against temperature on y. [service.py:_make_energy_transfer_diagram_graph]
 
 ## Side Effects

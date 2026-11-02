@@ -12,12 +12,12 @@ Converts solved targets and tables into external forms: report contracts and JSO
 - `problem_table_frame`, `export_problem_table` (`problem_table.py`): detached dataframe view of a `ProblemTable`; write one to an `.xlsx` file.
 - `write_text_as_plain_strings`, `FORMULA_LEADING_CHARACTERS` (`excel_text.py`): store text cells as strings and quote-prefix formula-like text.
 - `export_stream_collection` (`stream_collection.py`): write ordered streams as CSV.
-- `hpr_summary`, `hpr_failure_summary` (`hpr.py`): plain-JSON summaries of a solved or failed HPR target.
+- `hpr_summary`, `hpr_failure_summary` (`hpr.py`): plain-JSON summaries of a solved HPR target and of an `HPRTargetingError`.
 - Subdirectories: none.
 
 ## Invariants
 - Reporting does no numerical execution; a non-reportable target, or one with no registered family, raises `NotImplementedError`. [adapters.py:adapt_analysis_result]
-- Metrics pass through `coerce_output_value` with the target's configuration, so they appear in the configured output units. [thermal.py:_metric]
+- Scalar metrics pass through `coerce_output_value` with the target's configuration, so those with an output-unit rule appear in the configured units; per-machine and per-stage tuples, the HPR objective, the design vector and the scalar `orc_condensing_temperature` are passed through unchanged. [thermal.py:_metric] [thermal.py:orc_result]
 - For a multiperiod target a utility's duty is reduced to the target's own period. [thermal.py:_period_duty]
 - Summary rows are footer rows for totals and content rows otherwise. [thermal.py:_utility_summary_result]
 - Text starting with `=`, `+`, `-`, `@`, tab or carriage return is stored as a string with a quote prefix. [excel_text.py:write_text_as_plain_strings]
@@ -29,8 +29,8 @@ Converts solved targets and tables into external forms: report contracts and JSO
 
 ## Side Effects
 - Writes `.xlsx` files and creates directories. [workbook.py:export_target_summary_to_excel_with_units] [problem_table.py:export_problem_table]
-- `export_problem_table` defaults to the current working directory. [problem_table.py:export_problem_table]
-- `export_stream_collection` defaults to `results/` inside the directory that contains the `OpenPinch` package, which is the repository root in a checkout but `site-packages/results` when installed, so callers should pass `output_dir`; it writes a CSV. [stream_collection.py:export_stream_collection]
+- `export_problem_table` and the Excel summary export default to the current working directory; `export_problem_table` keeps only the stem of `filename`. [problem_table.py:export_problem_table]
+- `export_stream_collection` defaults to the working directory, as `export_problem_table` does; it writes a CSV, and `filename` is not sanitised. [stream_collection.py:export_stream_collection]
 - `write_text_as_plain_strings` mutates the openpyxl workbook it is given. [excel_text.py:write_text_as_plain_strings]
 - Uses the openpyxl engine through pandas. [workbook.py:export_target_summary_to_excel_with_units]
 

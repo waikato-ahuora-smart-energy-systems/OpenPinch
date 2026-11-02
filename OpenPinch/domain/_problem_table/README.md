@@ -17,8 +17,8 @@ Private helpers behind `OpenPinch.domain.problem_table.ProblemTable`: the tolera
 - The canonical grid is finite values only, rounded to the tolerance decimals, in descending order. [intervals.py:canonical_temperature_values]
 - Table rows run from the hottest to the coldest temperature; the interval width in row `i` is `T[i-1] - T[i]` and the hottest row has width zero. [intervals.py:TemperatureIntervalEngine._refresh_interval_widths]
 - Rows inserted above the hottest or below the coldest row copy the interpolated columns of the neighbouring row and zero all other columns (NaN stays NaN). [intervals.py:TemperatureIntervalEngine._build_top_or_bottom_block]
-- Rows inserted between two rows linearly interpolate the `INTERPOLATION_KEYS` columns by temperature; a NaN in the lower row leaves the column NaN. [intervals.py:TemperatureIntervalEngine._interpolate_heat_columns]
-- Table equality treats NaN equal to NaN, uses `rtol=0` and an absolute tolerance, and requires identical column label order. [equality.py:numeric_arrays_equal] [equality.py:problem_tables_equal]
+- Rows inserted between two rows linearly interpolate the `INTERPOLATION_KEYS` columns by temperature; a NaN in the lower row leaves the column NaN; non-interpolated columns copy the lower row. [intervals.py:TemperatureIntervalEngine._interpolate_heat_columns]
+- Table equality treats NaN equal to NaN, uses `rtol=0` and an absolute tolerance for numeric arrays (object columns compare numeric cells with NumPy's default relative tolerance), and requires identical column label order. [equality.py:numeric_arrays_equal] [equality.py:problem_tables_equal]
 - `ProblemTable.update` rejects the temperature column in `updates`. [../problem_table.py:ProblemTable._validate_updates]
 
 ## Side Effects
