@@ -4,6 +4,16 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Documentation
+~~~~~~~~~~~~~
+
+- Corrected the documentation against the code, including examples that raised,
+  retired option and notebook names, and the ``openpinch schema`` command. The
+  page on adding an analysis method is now a followable checklist.
+- Each package directory now has a ``README.md`` stating its interface,
+  invariants and side effects. These stay out of the wheel, and a test checks
+  that what they cite still exists.
+
 0.7.6 (2026-11-02)
 ------------------
 
