@@ -18,7 +18,7 @@ The deterministic core of pinch analysis: the problem table cascade, grand compo
 - Subdirectories: none.
 
 ## Invariants
-- Problem tables run from high to low shifted temperature; `H_NET` is `-cumsum(dT * CP_NET)` shifted so its minimum is zero, so the first row is the hot utility target and the last the cold utility target. [cascade.py:_problem_table_algorithm] [cascade.py:set_zonal_targets]
+- Problem tables run from high to low shifted temperature; in the shifted-temperature table `H_NET` is `-cumsum(dT * CP_NET)` shifted so its minimum is zero, so the first row is the hot utility target and the last the cold utility target. The real-temperature table is re-shifted to the shifted table's heat recovery, so its `H_NET` minimum is not zero. [cascade.py:_problem_table_algorithm] [cascade.py:set_zonal_targets] [cascade.py:_shift_pt_to_set_heat_recovery]
 - Heat recovery is `H_HOT[0] - H_NET[-1]`. [cascade.py:get_heat_recovery_target_from_pt]
 - Ordinary targeting uses the canonical temperature grid with an interval tolerance of `10 * tol`; the inverse dt_min path uses exact temperatures and zero tolerances. [cascade.py:problem_table_algorithm] [cascade.py:_get_precise_process_heat_cascade]
 - Runtime `args` may contain only `period_idx`, `period_id`, `base_target_type`, `_calculate_area_cost`, `_prepared_direct_profiles`, `maximum_iterations`, `maximum_evaluations` and `simulation_backend`; other keys raise `ValueError`. [context.py:apply_zone_config_overrides]

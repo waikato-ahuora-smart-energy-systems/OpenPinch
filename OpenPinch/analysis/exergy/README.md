@@ -18,7 +18,8 @@ Enriches an existing thermal target with exergy outputs: the exergetic grand com
 - Absolute temperature must be above 0 K and the unit must be `"C"` or `"K"`. [service.py:compute_exergetic_temperature]
 - Intervals are split where they cross the environment temperature. [service.py:_insert_breaks]
 - The exergy transfer effectiveness is gained over released exergy, and 0 when nothing is released. [service.py:apply_exergy_targeting]
-- Values within `tol` of zero are set to 0.0 in outputs. [service.py:_round_small_noise]
+- Values within `tol` of zero in the exergy curves (`T`, `X_GCC`, `X_SUR`, `X_DEF`) are set to 0.0; the scalar fields are not cleaned. [service.py:_round_small_noise]
+- A target of an unsupported type, or without a problem table or GCC column, is returned unenriched, and the service still adds that clone to the zone. [service.py:apply_exergy_targeting] [service.py:_resolve_target_exergy_spec]
 - The environment temperature is read from `config.environment.temperature`, defaulting to 15 degC. [service.py:_resolve_target_exergy_spec]
 
 ## Side Effects

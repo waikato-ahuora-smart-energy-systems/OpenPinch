@@ -15,7 +15,7 @@ Builds the energy transfer diagram and its surplus/deficit table for a zone. Eac
 ## Invariants
 - The default base-target order is Indirect Integration then Direct Integration; a zone with no Indirect target and no subzones uses Direct Integration only. [selection.py:ENERGY_TRANSFER_TARGET_ORDER] [selection.py:candidate_order]
 - An explicit `base_target_type` that cannot be produced raises `RuntimeError`; the implicit order falls through to the next type. [service.py:run_energy_transfer_analysis_service]
-- The shared grid is the descending union of all source temperatures, rounded to the decimal places implied by `tol`. [cascade.py:compile_temperature_intervals]
+- The shared grid starts as the descending union of the source and base-table temperatures, rounded to the decimal places implied by `tol`; with `simplify` (the default) adjacent intervals of equal heat capacity are then merged, so the payload `temperatures` are a subset of that union. [cascade.py:compile_temperature_intervals]
 - Interval heat has the sign of a change in `H_NET` down the interval (`-dT * CP_NET`): positive is surplus. [cascade.py:transpose_operation_cascades] [diagram.py:create_heat_surplus_deficit_table]
 - Stack order is by mode (`C`, then `R`, then `H`), then descending sort key, then name. [cascade.py:stack_order]
 - A source's own `ProblemTable` is preferred over its saved GCC graph, which is rounded for plotting. [diagram.py:get_source_problem_table]

@@ -19,7 +19,7 @@ Targets an organic Rankine cycle (ORC) that takes the process surplus below the 
 ## Invariants
 - Units: heat in kW, temperatures in degC, capital in $, costs in $/y; `capital_recovery_factor` is 1/y and is zero when `COSTING_ORC_CAPITAL_RECOVERY_ENABLED` is disabled. [inputs.py:OrcTargetInputs] [service.py:orc_target_inputs]
 - `OrcTargetInputs` rejects fewer than one stage, `eta_ii` outside (0, 1], `load_fraction` outside [0, 1], no fluids, and negative `dt_cont`, `min_lift`, `dt_phase_change`, `annual_hours` or `max_superheat`. [inputs.py:OrcTargetInputs.__post_init__]
-- `OrcHeatSource` temperatures must fall, and heat is clamped at zero. [profile.py:OrcHeatSource.__post_init__]
+- `OrcHeatSource` temperatures must not rise, and heat is clamped at zero. [profile.py:OrcHeatSource.__post_init__]
 - The pinch is the coldest zero of the GCC; a surplus is required or the source is `None`. [profile.py:orc_heat_source_from_gcc]
 - Designs never take more than the cascaded heat available, so no extra hot utility is needed. [carnot.py:carnot_orc_design] [simulated.py:simulated_orc_design] [profile.py:OrcHeatSource.max_sink_duty]
 - Carnot net power is `eta_ii * (1 - T_cond/T_evap) * Q_in` on absolute temperatures. [carnot.py:carnot_orc_work]
@@ -27,7 +27,7 @@ Targets an organic Rankine cycle (ORC) that takes the process surplus below the 
 - Evaporation stays 5 K below the fluid's critical temperature, and the evaporating temperature must exceed the condensing one. [cycle.py:CRITICAL_MARGIN] [cycle.py:solve_orc_cycle]
 - A design counts as beneficial only if it saves at least 1 $/y; otherwise `OrcTargetingError`. [search.py:require_beneficial]
 - The simulated search is seeded from the Carnot design when it exists. [service.py:compute_direct_orc_target] [simulated.py:_seed_from_carnot]
-- `ORC_MODEL` must be `"carnot"` or `"simulated"`, otherwise `ValueError`. [service.py:compute_direct_orc_target]
+- `ORC_MODEL` must be `"carnot"` or `"simulated"`, otherwise `ValueError`, which is raised only after a surplus is found (with no surplus the result is `None`); `OrcTargetingError` and `OrcCycleError` also subclass `ValueError`. [service.py:compute_direct_orc_target]
 - The residual GCC is lifted so it is non-negative before utilities are re-targeted. [service.py:_residual_utility_summary]
 
 ## Side Effects

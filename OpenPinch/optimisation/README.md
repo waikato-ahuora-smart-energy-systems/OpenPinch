@@ -20,7 +20,7 @@ Reusable bounded scalar minimisation that returns several ranked local minima ra
 - Integer options reject booleans, text and fractions [service.py:_integer_option].
 - Constraints are validated before the solve [service.py:run_multistart_minimisation] [feasibility.py:validate_constraints].
 - The backend is asked for `4 * max_minima` basins, because infeasible and non-finite ones are dropped before the list is cut to `max_minima` [service.py:run_multistart_minimisation].
-- Candidates are ordered by objective, then coordinates; non-finite ones are skipped, and all-non-finite output raises `InvalidObjectiveValueError` [models.py:OptimisationCandidate] [service.py:_normalise_candidates].
+- Candidates are ordered by objective, then coordinates; non-finite ones are skipped, and all-non-finite output raises `InvalidObjectiveValueError`, and `NoOptimisationCandidatesError` is raised when no finite, in-bounds, constraint-feasible candidate remains [models.py:OptimisationCandidate] [service.py:_normalise_candidates] [service.py:run_multistart_minimisation].
 - `feasibility_tolerance` is not part of `to_backend_kwargs`; the service passes it separately [models.py:OptimisationOptions] [service.py:run_multistart_minimisation].
 - A polish is kept only if it succeeds, is finite, and is not less feasible or (when equally feasible) worse than its start; only numerical solver errors are swallowed [candidates.py:_polish_single_candidate].
 - Clustering normalises by the bound span and treats a zero span as one [candidates.py:_cluster_candidates].
