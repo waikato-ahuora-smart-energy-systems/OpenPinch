@@ -1790,7 +1790,7 @@ def test_flat_single_zone():
     assert len(process_zone.children) == 1
     operation_zone = process_zone.children[0]
     assert operation_zone.name == "O1"
-    assert operation_zone.type == ZoneType.O.value
+    assert operation_zone.type == ZoneType.UO.value
     assert operation_zone.children is None
 
 
@@ -1846,7 +1846,7 @@ def test_nested_zone_with_slash():
     assert line1.type == ZoneType.P.value
     assert len(line1.children) == 1
     assert line1.children[0].name == "O1"
-    assert line1.children[0].type == ZoneType.O.value
+    assert line1.children[0].type == ZoneType.UO.value
 
 
 def test_generic_zone_tree_defaults_by_depth():
@@ -1864,7 +1864,7 @@ def test_generic_zone_tree_defaults_by_depth():
     normalised = _validate_zone_tree_structure(zone_tree, [])
     assert normalised.type == ZoneType.S.value
     assert normalised.children[0].type == ZoneType.P.value
-    assert normalised.children[0].children[0].type == ZoneType.O.value
+    assert normalised.children[0].children[0].type == ZoneType.UO.value
 
 
 def test_canonical_zone_helpers_reject_invalid_config_and_multiplier_edges():
@@ -2201,7 +2201,7 @@ def test_zone_type_defaults_with_depth():
         ZoneTreeSchema(name="Grandchild", type="Zone"), depth=2
     )
     assert child_type == ZoneType.P.value
-    assert grandchild_type == ZoneType.O.value
+    assert grandchild_type == ZoneType.UO.value
 
 
 def test_unexpected_zone_type_raises():

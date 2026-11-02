@@ -12,19 +12,19 @@ from hypothesis import strategies as st
 
 pytest.importorskip("CoolProp")
 
-from OpenPinch.analysis.orc.cycle import (  # noqa: E402
+from OpenPinch.analysis.orc.cycle import (
     CRITICAL_MARGIN,
     OrcCycleError,
     _state,
     critical_temperature,
     solve_orc_cycle,
 )
-from OpenPinch.analysis.orc.inputs import OrcTargetInputs  # noqa: E402
-from OpenPinch.analysis.orc.profile import (  # noqa: E402
+from OpenPinch.analysis.orc.inputs import OrcTargetInputs
+from OpenPinch.analysis.orc.profile import (
     orc_heat_source_from_gcc,
     share_at,
 )
-from OpenPinch.analysis.orc.simulated import (  # noqa: E402
+from OpenPinch.analysis.orc.simulated import (
     optimise_simulated_orc,
     simulated_orc_design,
 )

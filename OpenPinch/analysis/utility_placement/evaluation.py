@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from collections import Counter
 from threading import Lock
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -51,8 +52,8 @@ class PlacementEvaluation(BaseModel):
 
     @field_validator("coordinates", mode="before")
     @classmethod
-    def _normalize_coordinates(cls, value: object) -> tuple[float, ...]:
-        return tuple(0.0 if float(item) == 0.0 else float(item) for item in value)  # type: ignore[arg-type]
+    def _normalize_coordinates(cls, value: Any) -> tuple[float, ...]:
+        return tuple(0.0 if float(item) == 0.0 else float(item) for item in value)
 
 
 def _public_level(level, request: UtilityPlacementRequest) -> UtilityLevelPeriodResult:

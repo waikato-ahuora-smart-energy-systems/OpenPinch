@@ -7,6 +7,7 @@ import json
 import sys
 from copy import deepcopy
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
@@ -438,7 +439,7 @@ def test_adapter_requires_prepared_problem_and_rejects_bypass_payloads() -> None
         derivative_thresholds=(0.5,),
         stage_selection=(1,),
     )
-    bypass_values = [
+    bypass_values: list[Any] = [
         [{"Designation": "Hot"}],
         TargetInput(streams=[]),
         manifest,
@@ -451,7 +452,7 @@ def test_adapter_requires_prepared_problem_and_rejects_bypass_payloads() -> None
 
     for value in bypass_values:
         with pytest.raises(TypeError, match="prepared PinchProblem"):
-            problem_to_solver_arrays(value, 14.0)  # type: ignore[arg-type]
+            problem_to_solver_arrays(value, 14.0)
 
 
 def test_adapter_rejects_non_positive_dtmin() -> None:

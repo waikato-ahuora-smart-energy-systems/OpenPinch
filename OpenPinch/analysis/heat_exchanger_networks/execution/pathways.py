@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, cast
 
 PDMMode = Literal["compact", "raw", "standard"]
 
@@ -111,7 +111,7 @@ def pathways_from_metadata(metadata: dict) -> tuple[TierPathway, ...]:
                 pathway_id=str(raw["pathway_id"]),
                 tier_origin=int(raw["tier_origin"]),
                 pathway_kind=str(raw["pathway_kind"]),
-                pdm_mode=str(raw["pdm_mode"]),  # type: ignore[arg-type]
+                pdm_mode=cast(PDMMode, str(raw["pdm_mode"])),
                 multiplier=(
                     None
                     if raw.get("pdm_multiplier") is None
@@ -199,14 +199,15 @@ def _quality_tier_pathways(settings, tier: int) -> tuple[TierPathway, ...]:
     )
     patience = 2 if max(ad_branches, rm_branches) > 1 else None
     pathways: list[TierPathway] = []
+    modes: tuple[PDMMode, ...] = ("compact", "raw")
     for multiplier in multipliers:
-        for mode in ("compact", "raw"):
+        for mode in modes:
             pathways.append(
                 TierPathway(
                     pathway_id=(f"tier{tier}-{mode}-{_multiplier_label(multiplier)}"),
                     tier_origin=tier,
                     pathway_kind=f"tier{tier}_quality",
-                    pdm_mode=mode,  # type: ignore[arg-type]
+                    pdm_mode=mode,
                     multiplier=float(multiplier),
                     uses_tdm=mode == "raw",
                     evm_n_ad_branches=ad_branches,

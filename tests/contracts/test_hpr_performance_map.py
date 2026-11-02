@@ -6,6 +6,7 @@ import json
 import math
 from pathlib import Path
 from time import perf_counter
+from typing import Any
 
 import pytest
 from jsonschema import validators
@@ -159,7 +160,7 @@ def _refrigeration_map() -> HprPerformanceMap:
     )
 
 
-def _payload() -> dict[str, object]:
+def _payload() -> dict[str, Any]:
     return _heat_pump_map().model_dump(mode="json")
 
 
@@ -226,12 +227,12 @@ def test_serialized_payload_is_detached_and_json_compatible() -> None:
     source = _heat_pump_map()
     first = source.model_dump(mode="json")
 
-    first["provenance"]["versions"]["openpinch"] = "changed"  # type: ignore[index]
-    first["points"][0]["q_sink"] = -1.0  # type: ignore[index]
+    first["provenance"]["versions"]["openpinch"] = "changed"
+    first["points"][0]["q_sink"] = -1.0
 
     second = source.model_dump(mode="json")
-    assert second["provenance"]["versions"]["openpinch"] == "0.6.4"  # type: ignore[index]
-    assert second["points"][0]["q_sink"] == 50.0  # type: ignore[index]
+    assert second["provenance"]["versions"]["openpinch"] == "0.6.4"
+    assert second["points"][0]["q_sink"] == 50.0
     json.dumps(second, allow_nan=False)
 
 
@@ -239,7 +240,7 @@ def test_contract_values_are_frozen() -> None:
     performance_map = _heat_pump_map()
 
     with pytest.raises(ValidationError, match="frozen"):
-        performance_map.map_id = "changed"  # type: ignore[misc]
+        setattr(performance_map, "map_id", "changed")
 
 
 def test_request_is_canonical_and_rejects_duplicate_coordinates() -> None:
@@ -385,7 +386,7 @@ def test_invalid_point_domains_are_rejected(
     field: str, value: float, message: str
 ) -> None:
     payload = _payload()
-    payload["points"][0][field] = value  # type: ignore[index]
+    payload["points"][0][field] = value
 
     with pytest.raises(ValidationError, match=message):
         HprPerformanceMap.model_validate(payload)
@@ -403,9 +404,9 @@ def test_physical_inconsistency_rejects_the_complete_map(
     field: str, value: float, message: str
 ) -> None:
     payload = _payload()
-    payload["points"][0][field] = value  # type: ignore[index]
+    payload["points"][0][field] = value
     if field == "q_sink":
-        payload["points"][0]["q_source"] = 36.5  # type: ignore[index]
+        payload["points"][0]["q_source"] = 36.5
 
     with pytest.raises(ValidationError, match=message):
         HprPerformanceMap.model_validate(payload)
@@ -413,12 +414,12 @@ def test_physical_inconsistency_rejects_the_complete_map(
 
 def test_point_names_and_coordinates_are_unique() -> None:
     duplicate_name = _payload()
-    duplicate_name["points"][1]["name"] = "hp-050"  # type: ignore[index]
+    duplicate_name["points"][1]["name"] = "hp-050"
     with pytest.raises(ValidationError, match="point names.*unique"):
         HprPerformanceMap.model_validate(duplicate_name)
 
     duplicate_coordinate = _payload()
-    duplicate_coordinate["points"][1].update(  # type: ignore[index]
+    duplicate_coordinate["points"][1].update(
         source_temperature=20.0,
         sink_temperature=60.0,
         load_fraction=0.5,
@@ -429,12 +430,12 @@ def test_point_names_and_coordinates_are_unique() -> None:
 
 def test_each_curve_has_one_temperature_pair_and_ascending_loads() -> None:
     mixed_temperature = _payload()
-    mixed_temperature["points"][1]["source_temperature"] = 25.0  # type: ignore[index]
+    mixed_temperature["points"][1]["source_temperature"] = 25.0
     with pytest.raises(ValidationError, match="one source/sink temperature pair"):
         HprPerformanceMap.model_validate(mixed_temperature)
 
     unordered = _payload()
-    unordered["points"][0], unordered["points"][1] = (  # type: ignore[index]
+    unordered["points"][0], unordered["points"][1] = (
         unordered["points"][1],
         unordered["points"][0],
     )
@@ -442,14 +443,14 @@ def test_each_curve_has_one_temperature_pair_and_ascending_loads() -> None:
         HprPerformanceMap.model_validate(unordered)
 
     noncanonical_curves = _payload()
-    point = dict(noncanonical_curves["points"][0])  # type: ignore[index]
+    point = dict(noncanonical_curves["points"][0])
     point.update(
         name="earlier-curve-point",
         curve_id="earlier-curve",
         source_temperature=10.0,
         sink_temperature=50.0,
     )
-    noncanonical_curves["points"].append(point)  # type: ignore[union-attr]
+    noncanonical_curves["points"].append(point)
     with pytest.raises(ValidationError, match="canonical temperature order"):
         HprPerformanceMap.model_validate(noncanonical_curves)
 
@@ -483,12 +484,12 @@ def test_extra_fields_are_rejected_at_every_contract_level() -> None:
         HprPerformanceMap.model_validate(map_payload)
 
     point_payload = _payload()
-    point_payload["points"][0]["period"] = "winter"  # type: ignore[index]
+    point_payload["points"][0]["period"] = "winter"
     with pytest.raises(ValidationError, match="period"):
         HprPerformanceMap.model_validate(point_payload)
 
     units_payload = _payload()
-    units_payload["units"]["cop"] = "dimensionless"  # type: ignore[index]
+    units_payload["units"]["cop"] = "dimensionless"
     with pytest.raises(ValidationError, match="cop"):
         HprPerformanceMap.model_validate(units_payload)
 
