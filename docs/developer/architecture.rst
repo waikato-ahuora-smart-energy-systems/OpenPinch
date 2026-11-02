@@ -3,7 +3,8 @@ Package Architecture
 
 This page documents the internal architecture used to implement
 :class:`OpenPinch.PinchProblem` and :class:`OpenPinch.PinchWorkspace`. Module
-ownership and dependency direction are enforced by tests.
+ownership and dependency direction are enforced by
+``tests/architecture/test_dependency_rules.py``.
 
 Owner Responsibilities
 ----------------------
@@ -16,9 +17,9 @@ Owner Responsibilities
      - May depend on
    * - ``domain``
      - Business state, invariants, arithmetic, indexing, parent-owned records
-     - domain peers and third-party numerical/value libraries
+     - domain peers, pydantic, CoolProp (loaded lazily), and numerical/value libraries
    * - ``contracts``
-     - Request, response, report, workspace, HPR, and HEN wire models
+     - Request, response, report, workspace, heat pump and refrigeration (HPR), and heat exchanger network (HEN) wire models
      - contracts and domain
    * - ``optimisation``
      - Reusable scalar optimisation models, candidates, execution, and backends
@@ -31,10 +32,11 @@ Owner Responsibilities
      - analysis, contracts, domain, optimisation, and explicit adapter leaves
    * - ``application``
      - Use-case orchestration, caches, replay, workspaces, and coordination
-     - inward owners and lazy presentation calls
+     - inward owners and presentation; optional presentation leaves load lazily
    * - ``presentation``
      - Reports, tables, figures, dashboards, diagrams, and exports
-     - presentation, analysis, adapters, contracts, and domain
+     - presentation, analysis, adapters, contracts, and domain; never
+       application or optimisation
 
 Dependency Direction
 --------------------
@@ -46,10 +48,13 @@ Application coordinates concrete owners but does not import solver backends,
 Plotly, Streamlit, or filesystem classes directly. Optional dependencies are
 loaded only by the leaf that owns the feature.
 
-The architecture test records a small exact set of existing cross-layer HEN
-service and type dependencies. The test fails if those exceptions spread to a
-new file. This makes remaining coupling visible rather than silently treating
-it as a general dependency direction.
+Report adapters live in ``OpenPinch/presentation/reporting/`` and follow the
+presentation row above: they may import ``analysis``, ``adapters``,
+``contracts`` and ``domain``, but not ``application`` or ``optimisation``.
+The ``application`` owner calls them to serialise results.
+
+The architecture test (``test_layer_dependencies_follow_explicit_allowed_directions``) records no cross-layer exceptions: the set of allowed
+exceptions is empty, and the test fails if any new cross-layer import appears.
 
 Execution Flow
 --------------
@@ -59,8 +64,9 @@ The supported request follows this sequence:
 1. ``PinchProblem`` validates input through ``contracts``.
 2. ``application`` constructs and coordinates the problem use case.
 3. ``analysis`` performs deterministic targeting using ``domain`` state.
-4. ``presentation`` and ``adapters`` shape outputs only when requested by an
-   internal advanced workflow.
+4. ``application`` serialises results through ``presentation`` on every target
+   run; ``adapters`` translate input formats, and reports, exports and plots
+   are produced on request.
 5. ``PinchProblem`` caches the validated output contract for observation.
 
 Optimisation Boundary

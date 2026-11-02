@@ -14,15 +14,19 @@ real-engine pytest profiles provide
 additional evidence for the specialist target-owned HPR map operation.
 
 Operation coverage and notebook execution coverage are different. The ``base``
-profile is executed in routine CI. ``slow-hpr``, ``solver``, and ``interactive``
-have executable opt-in gates and require their declared environment. A profile
+profile is executed in routine CI. ``interactive`` runs in the same lane, ``slow-hpr``
+runs in the ``notebooks-hpr`` lane on every CI run, and only ``solver`` is gated
+to runs bound for ``main``; each needs its declared environment. A profile
 is not reported as executed merely because its operations are mapped. The
 ``execution_evidence`` column distinguishes routine execution, opt-in profiles,
 and batch-delegation contracts.
 
 The two Brayton callables, and their batch mirrors, are marked
 ``unmapped; under development``. They remain public but raise while the Brayton
-solver is under development, so no tutorial demonstrates them.
+solver is under development, so no tutorial demonstrates them. The ORC
+operations (``carnot_orc``, ``organic_rankine_cycle``, their all-period and
+batch mirrors, and two ORC plots) are also unmapped while ORC is under
+development; they run, but no tutorial owns them.
 
 Counting Rules
 --------------
@@ -68,7 +72,7 @@ Release Verification Snapshot
 For this release candidate, all declared profiles were executed from clean
 temporary directories:
 
-- ``base``: 10 notebooks, passed in the routine non-solver suite;
+- ``base``: 11 notebooks, passed in the routine non-solver suite;
 - ``slow-hpr``: 4 notebooks, passed;
 - ``solver``: 3 HEN notebooks, passed with the synthesis environment; and
 - ``interactive``: 1 notebook, passed with dashboard launch guarded while real
