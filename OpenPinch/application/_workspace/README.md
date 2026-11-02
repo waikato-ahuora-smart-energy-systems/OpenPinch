@@ -8,7 +8,7 @@ Private helpers owned by `OpenPinch/application/workspace.py`. They normalise ca
 - `project_name_from_case_input` (`case_inputs.py`): root `zone_tree.name`, or `None`.
 - `merge_case_inputs` (`case_inputs.py`): deep merge of two case input dictionaries; the overlay wins and nested dictionaries merge.
 - `canonical_case_input_from_source` (`case_inputs.py`): converts a `PinchProblem`, `TargetInput`, dict, path or CSV tuple into `(case_input, project_name)`.
-- `JsonDict`, `PathLike` (`case_inputs.py`): type aliases re-exported for the workspace.
+- `JsonDict` (defined in `case_inputs.py`), `PathLike` (imported there from `adapters.io.problem_sources`): type aliases used by the workspace.
 - `case_for_name` (`state.py`): returns the cached live problem for a case or builds and caches one.
 - `default_case_name` (`state.py`): active case, else the baseline, else the first case, else `None`.
 - `resolve_case_name` (`state.py`): resolves an optional name or raises `KeyError`.
@@ -28,7 +28,7 @@ Private helpers owned by `OpenPinch/application/workspace.py`. They normalise ca
 - `default_case_name` sets `workspace._active_case_name` as a side effect of resolving a default [state.py:default_case_name].
 - `case_for_name` constructs a `PinchProblem` (validation and zone-tree build) and stores it in the cache [state.py:case_for_name].
 - `sync_case_input` replaces the stored input for a case when it differs from the live canonical input [state.py:sync_case_input].
-- No file or network IO in this directory.
+- `canonical_case_input_from_source` reads a file when the source is a path or CSV tuple (via `PinchProblem`); nothing else here does IO [case_inputs.py:canonical_case_input_from_source].
 
 ## Verification
 - Run: `uv run --no-sync pytest tests/application/test_pinch_workspace.py`

@@ -1,14 +1,14 @@
 # Heat Exchanger Helpers
 
 ## Overview
-Private helpers owned by `OpenPinch.domain.heat_exchanger` and `OpenPinch.domain.heat_exchanger_network`. They hold the per-period state record, the local area-slice record and the validation rules for exchanger and network records. The rules module is also imported by the input contract (`OpenPinch/contracts/input.py`), so the runtime models and the transport schemas share one implementation.
+Private helpers owned by `OpenPinch.domain.heat_exchanger` and `OpenPinch.domain.heat_exchanger_network`. They hold the per-period state record, the local area-slice record and the validation rules for exchanger and network records. Only the rules module is shared with the input contract (`OpenPinch/contracts/input.py`); the period-state and area-slice checks are duplicated there.
 
 ## Interface
 - `HeatExchangerPeriodState` (`period_state.py`): Pydantic record of one exchanger's duty, activity, split fractions, approach temperatures and source/sink temperatures for one ordered period; `source_mid_temperature` and `sink_mid_temperature` properties.
 - `HeatExchangerAreaSlice` (`area.py`): frozen Pydantic record of one duty-aligned local area slice (period, segment identities, duty, temperatures, HTCs, LMTD, area).
 - `segment_duty_by_period`, `segment_area_by_period` (`area.py`): sum slice duty or area per period id.
 - `segment_design_area` (`area.py`): maximum period-total slice area, or `None` without slices.
-- `validate_segment_design_area` (`area.py`): return the slice-derived design area, or raise if a supplied area disagrees.
+- `validate_segment_design_area` (`area.py`): return the slice-derived design area when slices exist (raising if a supplied area disagrees), otherwise the supplied area.
 - `optional_identity`, `optional_non_negative_finite` (`rules.py`): strip a non-empty identity or check a finite non-negative float, passing `None` through.
 - `check_period_states`, `check_period_alignment` (`rules.py`): period ordering, uniqueness and cross-exchanger alignment checks.
 - `check_direction_semantics` (`rules.py`): endpoint distinctness, kind-consistent stream roles and recovery stage presence.

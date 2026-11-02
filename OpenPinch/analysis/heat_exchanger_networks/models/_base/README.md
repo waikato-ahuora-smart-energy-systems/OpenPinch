@@ -4,7 +4,7 @@
 Private helper modules that hold the equation, post-processing and solver-execution logic shared by `PinchDecompModel` and `StageWiseModel`. `../base.py` (`BaseHeatExchangerNetworkModel`) delegates to these modules, and `../_stagewise` and `../_pinch_design` import them directly. Every function takes the owning model as its first argument and reads or writes attributes on it; nothing here defines a class.
 
 ## Interface
-The parent imports these modules by name (`alpha`, `approach`, `area`, `costing`, `execution`, `parameters`, `piecewise`, `superstructure`).
+The parent imports `alpha`, `approach`, `execution`, `parameters` and `piecewise`; `area`, `costing` and `superstructure` are used directly by `_stagewise` and `_pinch_design`.
 - `get_alpha_values`, `alpha_value`, `set_alpha_dqda_equations` (`alpha.py`): post-optimisation alpha flow-on solve, neutral-alpha lookup, and the alpha and dQ/dA equations.
 - `utility_minimum_approach_by_period`, `utility_match_feasibility`, `set_match_restrictions` (`approach.py`): least heater and cooler approach by period, reachable (stream, utility) flags, and the `z_allowed`, `z_hu_allowed`, `z_cu_allowed` restriction arrays. Underscore helpers used by siblings: `_set_minimum_approach_temperatures`, `_recovery_approach_temperature`, `_utility_solved_outlet_temperature`, `_set_multiperiod_utility_approach_equations`, `_weighted_state_average`.
 - `solved_utility_duties`, `used_utility_matches`, `recovered_utility_price`, `set_utility_lmtd_and_areas` (`area.py`): solved heater and cooler duties, used-unit flags, recovered-heat price, and utility LMTD and area by period. Used by siblings: `_post_process_lmtd`, `_apply_segment_recovery_areas`, `_segment_exact_dqda`.
@@ -16,7 +16,7 @@ The parent imports these modules by name (`alpha`, `approach`, `area`, `costing`
 - Subdirectories: none.
 
 ## Invariants
-- `period_ids` and `period_weights` must be present, the weights finite with a positive sum and one per period; every `*_period` input array is 2-D with one row per period. [parameters.py:_normalise_state_arrays]
+- `period_ids` and `period_weights` must be present, the weights finite with a positive sum and one per period; the stream and utility `*_period` input arrays are non-empty, 2-D, with one row per period. [parameters.py:_normalise_state_arrays]
 - The unsuffixed arrays (`T_h_in`, `f_h`, `dT_r` and similar) are copies of period 0. [parameters.py:_normalise_state_arrays] [approach.py:_set_minimum_approach_temperatures]
 - Grid orientation: recovery `[hot][cold][stage]`, heaters `[period][cold][utility]`, coolers `[period][hot][utility]`; each (stream, utility) pair is its own unit. [superstructure.py:create_utility_duty_grids] [approach.py:utility_minimum_approach_by_period]
 - Disallowed matches are fixed `Param` objects at 0, not variables. [superstructure.py:create_match_binaries]

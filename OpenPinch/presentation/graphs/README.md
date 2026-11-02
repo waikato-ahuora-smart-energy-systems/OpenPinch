@@ -15,12 +15,12 @@ Turns the serialised graph data of a solved problem into Plotly figures and HTML
 
 ## Invariants
 - `zone_name` is matched against the graph key, name, zone name, zone address and target type, also by the part after the first `/` (selector and candidate alike); no match raises `KeyError` listing the zones. [problem.py:_graph_set_matches_zone_selector] [problem.py:_PlotAccessor._select_graphs]
-- `graph_type` must be a `GraphType`; no match raises `ValueError`, an out-of-range `index` raises `IndexError`. [problem.py:_PlotAccessor._select_graph]
+- `graph_type` must be a `GraphType` (otherwise `TypeError`); no match raises `ValueError`, an out-of-range `index` raises `IndexError`, and a negative `index` counts from the end. [problem.py:_PlotAccessor._select_graphs] [problem.py:_PlotAccessor._select_graph]
 - `show=True` with `return_graph_data=True` raises `ValueError`. [problem.py:_PlotAccessor._plot_graph]
 - The `plot` argument of the export methods must be a bound method of this problem's accessor. [problem.py:_PlotAccessor._graph_type_for_method]
 - With no target selected, `data()` returns the all-periods graphs keyed `<key> [<period_id>]`; with none available it raises `RuntimeError`. [problem.py:_PlotAccessor.data]
 - Heat-pump and refrigeration plots need a selector supplied by the application layer. [problem.py:_PlotAccessor._plot_hpr]
-- Axes are heat flow in kW against temperature in degC; segment colours come from `LineColour`. [plotly.py:_apply_default_layout] [plotly.py:_SEGMENT_COLOURS]
+- `plotly.py` figure axis labels are fixed to kW and degC whatever the graph data's units; in `simple.py`, `plot_t_h_curve` and `plot_t_h_curve_with_piecewise_and_bounds` hard-code the same labels and `graph_simple_cc_plot` uses unit-less titles `Enthalpy` and `Temperature`; segment colours come from `LineColour`. [plotly.py:_apply_default_layout] [plotly.py:_SEGMENT_COLOURS]
 - A legend entry shows once per series id. [plotly.py:_legend_details]
 - Exported file stems are slugified from zone, graph type and position. [problem.py:_slugify]
 

@@ -4,13 +4,13 @@
 Use-case orchestration for OpenPinch. `PinchProblem` loads, validates and prepares one case and runs targeting through its `target`, `design`, `plot` and `components` accessors; `PinchWorkspace` manages several named cases; `commands` exposes both as JSON-in/JSON-out commands for browser and backend engines. The remaining modules are service functions and derivations that these classes call. Private subpackages hold the problem internals and the workspace helpers.
 
 ## Interface
-- `PinchProblem` (`problem.py`): load, validate, prepare, target (via accessors), summarise (`summary_frame`, `metrics`, `report`), export Excel, compare, update options and `dt_cont` multipliers, derive residual and utility-transfer cases, show the dashboard.
+- `PinchProblem` (`problem.py`): load, validate (`source_validation_report` reports on a source without raising), prepare, target (via accessors), summarise (`summary_frame`, `metrics`, `report`), export Excel, compare, update options and `dt_cont` multipliers, derive residual and utility-transfer cases, show the dashboard.
 - `PinchWorkspace` (`workspace.py`, in `__all__`): named cases, scenarios, active-case delegation, batches (`cases(...)`), comparison, bundle save and load.
 - `CaseBatchResult` (`workspace.py`): frozen dataclass of per-case `results` and `errors` mappings.
 - `run_command`, `run_command_json`, `MAX_BATCH_CASES`, `UnknownSessionError` (`commands.py`): engine commands over fresh problems or stored sessions; `run_command_json` is the Pyodide entry point.
 - `data_preprocessing_service`, `direct_heat_integration_service`, `indirect_heat_integration_service`, `direct_heat_pump_service`, `indirect_heat_pump_service`, `direct_refrigeration_service`, `indirect_refrigeration_service`, `direct_orc_service`, `power_cogeneration_service`, `exergy_targeting_service`, `area_cost_targeting_service`, `energy_transfer_analysis_service` (`targeting.py`, in `__all__`): zone-level services; `data_preprocessing_service` builds the zone tree from a `TargetInput`, and the others take a prepared `Zone` and optional args, add targets, and return the zone.
 - `calculate_heat_recovery_dt_min`, `calculate_all_period_heat_recovery_dt_min` (`heat_recovery_dt_min.py`, in `__all__`): inverse dt_min for a requested recovery, one period or every period.
-- `run_problem_utility_placement`, `build_problem_placement_context` (`utility_placement.py`, in `__all__`): optimise a utility set and return it as a new solved `PinchProblem`, or build the detached placement context.
+- `run_problem_utility_placement`, `build_problem_placement_context` (`utility_placement.py`, in `__all__`): optimise a utility set and return it as a new solved `PinchProblem`, or build the detached `(blueprints, context)` pair.
 - `with_utilities_from` (`case_derivation.py`): receiver problem with the donor's utilities, aligned by period identity.
 - `residual_basis`, `create_hpr_residual_case`, `residual_utility_service`, `prepare_residual_problem` (`residual_utility.py`): frozen HPR residual cases.
 - `hpr_result_digest`, `retain_hpr_target`, `validate_hpr_target`, `select_hpr_graphs` (`hpr_selection.py`): identify local HPR targets and select their graphs.
@@ -18,28 +18,28 @@ Use-case orchestration for OpenPinch. `PinchProblem` loads, validates and prepar
 
 ## Invariants
 - Getters on `PinchProblem` return deep copies or `MappingProxyType` views [problem.py:PinchProblem.results] [problem.py:PinchProblem.master_zone] [problem.py:PinchProblem.period_results]; `process_components` and `components.inventory` return a read-only mapping of the live component objects [problem.py:PinchProblem.process_components] [component.py:_ComponentAccessor.inventory].
-- Changing `project_name`, options or a multiplier invalidates cached analysis [problem.py:PinchProblem.project_name] [problem.py:PinchProblem._invalidate_analysis].
+- Changing options or a multiplier rebuilds the prepared state, clearing cached results and emptying `_process_components`, so process components must be added again; changing `project_name` clears cached analysis but keeps components [loading.py:rebuild_problem_state] [problem.py:PinchProblem.project_name] [problem.py:PinchProblem._invalidate_analysis].
 - A frozen HPR residual case refuses `set_dt_cont_multiplier` [problem.py:PinchProblem.set_dt_cont_multiplier]; it replaces a non-finite or negative value by 1.0 with a `UserWarning`; the same value in a zone tree raises `ValueError` [canonicalization.py:_resolve_zone_dt_cont_multiplier].
 - Period flags are bools and select one of `selected`, `weighted_average`, `all`, `all_with_weighted_average` [problem.py:_period_mode].
 - Case names are validated by `validate_workspace_case_name`; a batch needs at least one unique name [workspace.py:PinchWorkspace.load] [workspace.py:_CaseBatch].
-- Batch operations isolate failures per case; the `target`, `target.all_periods` and `design` batch accessors refuse `base_target`; Excel batch export confines each case to a subdirectory of the destination [workspace.py:_CaseBatchAccessor._run] [workspace.py:_CaseBatch.export_excel].
-- `PinchWorkspace.load` stores invalid input so it can be corrected and returns `None` for it, otherwise the live case; it renames the workspace only for the first case or an explicit `project_name` [workspace.py:PinchWorkspace.load].
+- Once a batch is built, failures during each case's run are collected per case; the `target`, `target.all_periods` and `design` batch accessors refuse `base_target`; Excel batch export confines each case to a subdirectory of the destination [workspace.py:_CaseBatchAccessor._run] [workspace.py:_CaseBatch.export_excel].
+- `PinchWorkspace.load` stores a dict or `TargetInput` whose validation report is invalid and returns `None`; if the report is valid but building the problem raises (for example an unknown zone type) the input is still stored and the error propagates; a file or CSV source that fails to parse or validate raises and is not stored; it renames the workspace only for the first case or an explicit `project_name` [workspace.py:PinchWorkspace.load].
 - Bundles are written with schema version `"3"` [workspace.py:PinchWorkspace.to_bundle].
 - Commands never read host files: `{"sample_case": ...}` loads packaged cases only, workspace `source` must be JSON, and exports go to a private temporary directory [commands.py:_load_problem] [commands.py:_set_case_input] [commands.py:_export_excel].
 - Command names starting with an underscore are rejected, and only `target` and `design` namespaces resolve to accessors [commands.py:_accessor_method].
 - Command responses carry no NaN or infinity; they are replaced by `None` [commands.py:_finite].
 - `workspace.batch` runs at most `MAX_BATCH_CASES` cases and cannot nest [commands.py:_batch].
-- Heat flows for dt_min are canonicalised in kW; `heat_recovery` must be a finite non-negative scalar, and exceeding the thermodynamic limit raises `ValueError` [heat_recovery_dt_min.py:_canonical_recovery] [heat_recovery_dt_min.py:calculate_heat_recovery_dt_min].
+- Heat flows for dt_min are canonicalised in kW (a bare number is taken in the configured heat-flow input unit); `heat_recovery` must be a finite, non-negative scalar, and exceeding the thermodynamic limit raises `ValueError` [heat_recovery_dt_min.py:_canonical_recovery] [heat_recovery_dt_min.py:calculate_heat_recovery_dt_min] [analysis/targeting/heat_recovery_dt_min.py:_validate_real_scalar].
 - dt_min targeting is supported only for Site, Process Zone and Unit Operation zones [heat_recovery_dt_min.py:_resolve_zone_and_period].
 - Utility placement runs on isolated copies of the problem and checks that retargeted duties match the winning allocation (`rel_tol=1e-5`, `abs_tol=1e-4`) [utility_placement.py:_extract_period] [utility_placement.py:_finalize_placement_case].
-- Utility placement scope follows the zone type (Process Zone and Unit Operation direct, Site total site, Community and Region indirect, Utility Zone unsupported) [utility_placement.py:_scope_for_zone].
+- Utility placement scope follows the zone type (Process Zone and Unit Operation direct, Site total site, Community and Region indirect, Utility Zone unsupported); a frozen HPR residual case always uses direct scope [utility_placement.py:_scope_for_zone] [utility_placement.py:_build_problem_placement_request].
 - Maximum duties are finite and non-negative, in the request's heat flow unit [utility_placement.py:_normalize_maximum_duties].
 - A local HPR target is valid only if its owner id, input fingerprint and retained result digest all match the problem [hpr_selection.py:validate_hpr_target].
 - A residual case is frozen to one period, and its utilities start with zero duty (segmented utilities carry duty fractions) [residual_utility.py:create_hpr_residual_case].
 - `with_utilities_from` requires matching period sets and a `PinchProblem` donor, and does not copy donor results [case_derivation.py:with_utilities_from].
 
 ## Side Effects
-- `commands._SESSIONS` is module-level state holding live problems, workspaces and returned targets for the life of the process [commands.py:_SESSIONS].
+- `commands._SESSIONS` is module-level state holding live problems, workspaces and returned targets until the `close` command or process exit; each `open` and each returned case adds an entry [commands.py:_SESSIONS].
 - While commands run, `warnings.showwarning` (and process-wide warning filters on interpreters without context-aware warnings) are replaced and later restored, guarded by a lock and a depth counter [commands.py:_collected_warnings].
 - Commands read packaged sample data and the supplied file contents, and write export files only in temporary directories [commands.py:_load_problem] [commands.py:_import] [commands.py:_export_excel].
 - `PinchProblem.load` can read JSON, Excel or CSV files from a path; `export_excel` writes a workbook; `show_dashboard` launches Streamlit [problem.py:PinchProblem.load] [problem.py:PinchProblem.export_excel] [problem.py:PinchProblem.show_dashboard].
