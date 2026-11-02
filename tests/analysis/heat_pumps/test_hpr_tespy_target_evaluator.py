@@ -394,6 +394,24 @@ def test_real_public_tespy_target_and_minimal_map_stay_within_smoke_budget(
     assert total_elapsed < 300.0
 
 
+def test_real_tespy_target_starts_from_the_carnot_seed_on_a_tight_budget() -> None:
+    # The unseeded first restart stalls in a flat zero-duty region and this
+    # budget has no other restart, so the search found no target.
+    target = PinchProblem("basic_pinch.json").target.vapour_compression_heat_pump(
+        simulation_backend="tespy",
+        condensers=1,
+        evaporators=1,
+        refrigerants=["R245fa"],
+        allow_integrated_expander=False,
+        maximum_restarts=1,
+        maximum_iterations=20,
+        maximum_evaluations=50,
+    )
+
+    assert target.hpr_success is True
+    assert target.hpr_details.target_simulation_record.simulation_backend == "tespy"
+
+
 @pytest.mark.parametrize(
     ("refrigerant", "evaporating", "condensing"),
     [("R134a", 5.0, 55.0), ("water", 100.0, 170.0)],

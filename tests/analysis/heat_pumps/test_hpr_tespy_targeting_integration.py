@@ -164,6 +164,41 @@ def test_optimizer_owns_one_open_cache_and_close_for_complete_call(
     assert fake.state == "closed"
 
 
+@pytest.mark.parametrize(
+    ("initialise", "expected_seed"),
+    [(True, "carnot-seed"), (False, None)],
+)
+def test_tespy_search_honours_the_carnot_seed_option(
+    monkeypatch,
+    initialise: bool,
+    expected_seed: str | None,
+) -> None:
+    args = _target_args(initialise_simulated_cycle=initialise, max_multi_start=1)
+    prepared = preflight_tespy_hpr_targeting(args)
+    fake = FakeHprTargetEvaluator()
+    seeds: list[str | None] = []
+
+    def setup(init_res, _args):
+        seeds.append(init_res)
+        return None, []
+
+    monkeypatch.setattr(
+        cascade,
+        "optimise_cascade_carnot_heat_pump_placement",
+        lambda _args: "carnot-seed",
+    )
+    monkeypatch.setattr(cascade, "_get_cascade_hp_opt_setup", setup)
+    monkeypatch.setattr(cascade, "get_hpr_target_evaluator", lambda _prepared: fake)
+    monkeypatch.setattr(
+        cascade, "solve_hpr_placement", lambda *, f_obj, x0_ls, bnds, args: "solved"
+    )
+
+    result = cascade.optimise_cascade_heat_pump_placement(args, prepared_tespy=prepared)
+
+    assert result == "solved"
+    assert seeds == [expected_seed]
+
+
 def test_tespy_objective_values_determine_candidate_ranking_and_final_target(
     monkeypatch,
 ) -> None:

@@ -118,7 +118,8 @@ def _optimise_tespy_cascade_heat_pump_placement(
     prepared: PreparedTespyHprTargeting,
 ) -> HPRBackendResult:
     """Run one scalar placement with a call-owned TESPy evaluator session."""
-    x0_ls, bnds = _get_cascade_hp_opt_setup(None, args)
+    init_res = initialise_hpr_seed(optimise_cascade_carnot_heat_pump_placement, args)
+    x0_ls, bnds = _get_cascade_hp_opt_setup(init_res, args)
     coordinator = HprTargetEvaluatorCoordinator(get_hpr_target_evaluator(prepared))
     coordinator.open()
     try:

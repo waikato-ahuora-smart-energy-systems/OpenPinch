@@ -28,6 +28,11 @@ Heat pumps and refrigeration
   adapter specified it, so a candidate at the zero-subcooling bound always
   failed, and with a small search budget that could be the only candidate
   reached, raising ``HPRTargetingError``.
+- TESPy vapour-compression targets now start their search from the Carnot seed,
+  as CoolProp targets do, and honour ``HPR_INITIALISE_SIMULATED_CYCLE``. The
+  unseeded first restart could stall where the allocated duty is zero, so with
+  a small search budget a target such as R245fa on ``basic_pinch.json`` raised
+  ``HPRTargetingError``. TESPy target values can change.
 
 Exergy
 ~~~~~~
