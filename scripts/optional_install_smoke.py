@@ -192,6 +192,14 @@ def _check_synthesis_surface() -> None:
     assert dependencies.require_declared_synthesis_dependencies()
 
 
+def _check_full_surface() -> None:
+    _check_dashboard_surface()
+    _check_notebook_surface()
+    _check_brayton_cycle_surface()
+    _check_tespy_surface()
+    _check_synthesis_surface()
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Create the CLI parser for smoke checks."""
     parser = argparse.ArgumentParser(
@@ -207,6 +215,7 @@ def build_parser() -> argparse.ArgumentParser:
             "brayton_cycle",
             "tespy",
             "synthesis",
+            "full",
         ],
         help="Install surface to verify.",
     )
@@ -230,6 +239,8 @@ def main(argv: list[str] | None = None) -> int:
         _check_tespy_surface()
     elif args.surface == "synthesis":
         _check_synthesis_surface()
+    elif args.surface == "full":
+        _check_full_surface()
 
     print(f"OpenPinch optional install smoke passed for: {args.surface}")
     return 0

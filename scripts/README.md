@@ -26,7 +26,7 @@ CI and release
 - `artifact_install_smoke.py` (`artifact_install_smoke.py`): `is_checkout_source_import`; smoke-checks
   an installed wheel (`--surface core|tespy`). Used by `ci.yml` and `ci_local.sh`.
 - `optional_install_smoke.py` (`optional_install_smoke.py`): smoke-checks an install surface
-  (`core dashboard notebook brayton_cycle tespy synthesis`). Used by `ci.yml` and `ci_local.sh`.
+  (`core dashboard notebook brayton_cycle tespy synthesis full`). Used by `ci.yml` and `ci_local.sh`.
 
 Developer tooling
 - `update_toolchain.py` (`update_toolchain.py`): runs `uv python install`, `uv python pin`,
