@@ -25,7 +25,7 @@ from ....contracts.hpr import (
 )
 from ....domain.configuration import tol as _tol
 from ....domain.enums import ProblemTableLabel
-from ....domain.fluids import critical_point
+from ....domain.fluids import build_coolprop_abstract_state, critical_point
 from ....domain.stream_collection import StreamCollection
 from ....domain.value import Value
 from ..optimisation_adapter import (
@@ -63,6 +63,8 @@ __all__ = [
     "is_negligible_useful_duty",
     "condensing_temperature_search_range",
     "floor_stage_evaporating_temperatures",
+    "limit_cascade_pressure_ratios",
+    "limit_parallel_pressure_ratios",
     "calc_simulated_hpr_annualized_costs",
     "hpr_penalty_cost_scale",
     "refrigeration_allowance",
@@ -876,6 +878,99 @@ def floor_stage_evaporating_temperatures(
     for index in range(floored.size - 2, -1, -1):
         floored[index] = max(floored[index], floored[index + 1])
     return floored
+
+
+def _coldest_evaporator_within_pressure_ratio(
+    refrigerant: str,
+    T_cond: float,
+    max_ratio: float,
+) -> float:
+    """Return the evaporating temperature (degC) at ``max_ratio`` below ``T_cond``.
+
+    Returns -inf where there is no such state, as for a condenser beyond the
+    critical point or a pressure below the triple point: those candidates fail
+    or are floored elsewhere.
+    """
+    state = build_coolprop_abstract_state(refrigerant)
+    try:
+        state.update(_coolprop.QT_INPUTS, 0.0, T_cond + 273.15)
+        state.update(_coolprop.PQ_INPUTS, state.p() / max_ratio, 1.0)
+    except ValueError:
+        return -np.inf
+    return float(state.T()) - 273.15 + EVAPORATING_FLOOR_MARGIN_K
+
+
+def _pressure_ratio_limit(args: HeatPumpTargetInputs) -> float | None:
+    """Return the compressor pressure ratio limit, if the backend applies one."""
+    if getattr(args, "simulation_backend", "coolprop") == "tespy":
+        return None
+    if not getattr(args, "refrigerant_ls", None):
+        return None
+    return getattr(args, "max_pressure_ratio", None)
+
+
+def limit_parallel_pressure_ratios(
+    T_cond: np.ndarray,
+    T_evap: np.ndarray,
+    args: HeatPumpTargetInputs,
+) -> np.ndarray:
+    """Raise each machine's evaporator until its pressure ratio is within the limit.
+
+    Machine ``i`` uses ``args.refrigerant_ls[i]``. As with the evaporating
+    floor, limiting at decode keeps candidates evaluable; the result is
+    non-increasing (a raised machine lifts the warmer machines with it).
+    """
+    T_evap = np.asarray(T_evap, dtype=float)
+    max_ratio = _pressure_ratio_limit(args)
+    if max_ratio is None:
+        return T_evap
+    refrigerants = args.refrigerant_ls
+    limited = T_evap.copy()
+    for index in range(limited.size):
+        limited[index] = max(
+            limited[index],
+            _coldest_evaporator_within_pressure_ratio(
+                refrigerants[min(index, len(refrigerants) - 1)],
+                float(T_cond[index]),
+                max_ratio,
+            ),
+        )
+    for index in range(limited.size - 2, -1, -1):
+        limited[index] = max(limited[index], limited[index + 1])
+    return limited
+
+
+def limit_cascade_pressure_ratios(
+    T_cond: np.ndarray,
+    T_evap: np.ndarray,
+    args: HeatPumpTargetInputs,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Raise a cascade's lower levels until every stage is within the limit.
+
+    The levels run hottest first through ``T_cond`` then ``T_evap``, and stage
+    ``i`` with ``args.refrigerant_ls[i]`` lifts from level ``i + 1`` to level
+    ``i``. Working from the top lets each raised level set the stage below it.
+    """
+    T_cond = np.asarray(T_cond, dtype=float)
+    T_evap = np.asarray(T_evap, dtype=float)
+    max_ratio = _pressure_ratio_limit(args)
+    if max_ratio is None:
+        return T_cond, T_evap
+    refrigerants = args.refrigerant_ls
+    dt_hx = float(getattr(args, "dt_cascade_hx", 0.0))
+    n_cond = T_cond.size
+    levels = np.concatenate([T_cond, T_evap])
+    for stage in range(levels.size - 1):
+        # A cascade exchanger's temperature difference sits between the stages.
+        stage_T_cond = levels[stage] + (dt_hx if stage >= n_cond else 0.0)
+        floor = _coldest_evaporator_within_pressure_ratio(
+            refrigerants[min(stage, len(refrigerants) - 1)],
+            float(stage_T_cond),
+            max_ratio,
+        )
+        lower = stage + 1
+        levels[lower] = max(levels[lower], floor + (dt_hx if lower < n_cond else 0.0))
+    return levels[:n_cond], levels[n_cond:]
 
 
 def validate_vapour_hp_refrigerant_ls(

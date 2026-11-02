@@ -41,7 +41,7 @@ Interaction Matrix
      - Dependency
    * - ``load``, ``validate``, ``validation_report``, ``to_problem_json``
      - Prepare, check, and serialize input
-     - zone, report, or mapping
+     - zone, validated input, report, or mapping
      - prepare or observe
      - base
    * - ``target.direct_heat_integration``, ``indirect_heat_integration``,
@@ -61,14 +61,19 @@ Interaction Matrix
      - frozen diagnostic result
      - source unchanged
      - base
-   * - ``target.carnot_*``, ``vapour_compression_*``, ``brayton_*``,
-       ``mvr_heat_pump``
-     - Model-specific HPR studies
+   * - ``target.carnot_*``, ``vapour_compression_*``, ``mvr_heat_pump``
+     - Model-specific HPR studies. ``brayton_*`` raises
+       ``NotImplementedError`` pending solver repair
      - target output
      - targeted
-     - HPR extras by model
+     - base; TESPy for ``simulation_backend="tespy"``
    * - ``target.cogeneration`` and named turbine-model methods
      - Cogeneration screening
+     - target output
+     - targeted
+     - base
+   * - ``target.organic_rankine_cycle``, ``carnot_orc``
+     - Organic Rankine cycle screening
      - target output
      - targeted
      - base
@@ -78,7 +83,8 @@ Interaction Matrix
      - source unchanged
      - base
    * - ``target.all_periods.*``
-     - Mirror supported targeting over ordered periods
+     - Mirror supported targeting over ordered periods; ``utility_placement``
+       forwards to the single detached placement call
      - period-to-output mapping
      - period cache
      - method-specific
@@ -87,9 +93,9 @@ Interaction Matrix
      - Add or inspect process MVR mutations
      - component or mapping
      - invalidates on mutation
-     - HPR extras
+     - base
    * - ``design.*heat_exchanger_network``, ``open_hens``, ``pinch_design``,
-       ``thermal_derivative``, ``network_evolution``
+       ``thermal_derivative``, ``network_evolution``, ``optimise_duties``
      - HEN synthesis and improvement
      - design view
      - designed
@@ -107,7 +113,7 @@ Interaction Matrix
    * - ``plot.export``, ``plot.export_gallery``, ``export_excel``,
        ``show_dashboard``
      - Explicit publication side effects
-     - paths or dashboard handle
+     - paths; ``show_dashboard`` returns none
      - none
      - output-specific
 
@@ -138,7 +144,7 @@ rejected with the request, limit, scope, period, and units in the error.
 ``HeatRecoveryDtMinResult`` is frozen and contains ``scope``, canonical
 ``period_id``, ``dt_min``, ``requested_heat_recovery``,
 ``achieved_heat_recovery``, ``thermodynamic_limit``,
-``heat_recovery_residual``, ``status``, and ``iterations``. Status is
+``heat_recovery_residual``, ``status``, ``iterations``, and ``provenance``. Status is
 ``solved`` for an interior request, ``at_thermodynamic_limit`` for the
 greatest approach retaining maximum recovery, or ``zero_recovery_boundary``
 for the first approach that produces zero recovery. The
@@ -184,8 +190,8 @@ Argument Precedence
 Effective arguments resolve as ``named keyword > options > stored config >
 default``. Named keywords and ``options`` apply only to that call. Use
 ``update_options(...)`` when a later call should inherit a persistent
-engineering value. Configuration never stores which target or design method to
-run.
+engineering value. Target and design method selectors are not user-settable
+options; the ``target`` or ``design`` method you call selects the method.
 
 Process MVR Component Results
 -----------------------------
@@ -198,8 +204,13 @@ engineering argument names such as ``compressor_efficiency`` and
 Changing component activity invalidates cached targets, so rerun the chosen
 target method afterward.
 
-Complete API
-------------
+Class Members
+-------------
+
+The members below are those defined on the class itself. The ``target``,
+``design``, ``plot`` and ``components`` accessors are implemented by internal
+classes and are not expanded here, so their full signatures and defaults are
+not listed on this page.
 
 .. autoclass:: OpenPinch.PinchProblem
    :members:

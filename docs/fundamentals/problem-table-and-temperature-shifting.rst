@@ -31,7 +31,7 @@ At the class level, the stream model stores:
 
 - the base ``delta_t_contribution``
 - the ``effective_delta_t_contribution``
-- shifted temperatures such as `t_min_star` and `t_max_star`
+- shifted temperatures such as ``shifted_minimum_temperature`` and ``shifted_maximum_temperature``
 
 That allows workflows such as sensitivity studies or zone-level multiplier
 updates without overwriting the original input assumption.

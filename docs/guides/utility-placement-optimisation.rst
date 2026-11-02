@@ -44,8 +44,9 @@ public target-type string to coordinate separately.
 If both counts are omitted, OpenPinch infers templates from the existing utilities.
 A missing or near-equal target temperature is isothermal; a larger
 span, segmented utility, or multi-point profile is sensible. ``Both`` utilities
-form paired hot and cold templates. Supplying either count explicitly replaces
-the existing templates with generated levels. ``HU`` and ``CU`` are reserved
+form paired hot and cold templates. Supplying ``isothermal`` replaces the
+existing templates with generated levels; ``sensible`` is optional with it, and
+supplying ``sensible`` without ``isothermal`` is rejected. ``HU`` and ``CU`` are reserved
 balancing fallbacks and are never inferred as placement options.
 
 Utility placement uses ``cmaes`` as its default black-box optimizer. Select a
@@ -103,10 +104,13 @@ Its supply temperature is fixed 50 K above the context-wide maximum process
 temperature for ``HU`` or 50 K below the context-wide minimum for ``CU``. This
 keeps fallback last in ordinary utility targeting.
 The optimizer changes temperatures and sensible spans only. For every
-candidate and period, OpenPinch installs those utilities in a detached case and
-runs the same direct, Total Site, or indirect target method used after the
-optimization. That exact target determines named duties, same-level Total Site
-utility matching, target totals, and fallback duty. A requested candidate level
+candidate and period, a direct-scope placement installs those utilities in a
+detached case and runs the ordinary direct target method. Total Site and other
+aggregate scopes instead replay cached child-zone profiles without touching the
+problem. After the optimization, the real direct, Total Site, or indirect target
+method runs on the returned case and must reproduce the optimizer duties, or
+placement raises. That exact target determines named duties, same-level Total
+Site utility matching, target totals, and fallback duty. A requested candidate level
 may therefore have zero duty; there is no implicit minimum-duty constraint.
 Retargeting replaces prior utility duties, including writing exact zero for
 capped, unused, and zero-load levels.
@@ -145,8 +149,8 @@ Run Site-level placement separately. Because the master zone is a Site, no
 The standard GCC and Total Site Profile figures include the utilities stored
 on their corresponding returned cases. Use ``return_graph_data=True`` on either
 plot method for a deterministic graph mapping. Retargeted named and fallback
-duties match the optimizer evidence because both use the same ordinary target
-workflow.
+duties match the optimizer evidence because placement checks the final target
+against the optimizer duties.
 
 For a Process target, ordinary utility targeting limits each sensible duty at
 the tightest endpoint or interior GCC breakpoint. The cumulative hot and cold

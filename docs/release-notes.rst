@@ -4,6 +4,30 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat pumps and refrigeration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Vapour-compression targets now limit each compressor's pressure ratio, with
+  the new ``HPR_MAX_PRESSURE_RATIO`` option (default 15). A candidate over the
+  limit evaporates warmer, or in a cascade raises its lower levels, so targets
+  with a large lift in one compressor can change or find no design. Raise the
+  option to relax the limit. TESPy targets and the Carnot models are not
+  limited.
+- Single-stage and cascade vapour-compression targets can now subcool the
+  condensate down to the coldest evaporating temperature, the same limit as
+  parallel machines. The limit was previously the gap to the top of the sink
+  profile, about 10 K when the condenser sits at the top of its load. Targets
+  can fall, by up to several percent where subcooling was at that limit.
+
+Exergy
+~~~~~~
+
+- ``problem.target.exergy()`` no longer raises ``AttributeError`` after a heat
+  pump or refrigeration target, with or without ``base_target``. The check that
+  a selected target has not been modified assumed every graph was a table, but
+  exergy adds its curves as plain mappings. Those derived curves are now left
+  out of that check, and the enriched target can be selected as a base target.
+
 0.7.6 (2026-11-02)
 ------------------
 

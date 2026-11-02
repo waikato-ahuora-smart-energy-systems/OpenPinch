@@ -38,8 +38,10 @@ This is the primary OpenPinch workflow for a process engineer.
 
 The lifecycle is explicit. Construction prepares the case,
 ``all_heat_integration()`` performs dependency-aware analysis, and subsequent
-operations observe the cached result. Invalid input raises a Pydantic
-validation error before analysis begins.
+operations observe the cached result. Invalid input raises a
+``ValueError`` with the formatted validation messages before analysis begins.
+
+``problem.plot.*`` needs Plotly (``python -m pip install "openpinch[notebook]"``).
 
 Use a focused method when appropriate:
 

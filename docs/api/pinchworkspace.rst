@@ -84,7 +84,7 @@ Interaction Matrix
      - method-specific
    * - ``update_options`` and ``set_dt_cont_multiplier``
      - Change persistent fallback values on a named or active case
-     - none
+     - problem (``update_options``) or zone (``set_dt_cont_multiplier``)
      - invalidates case
      - base
    * - ``summary_frame``, ``metrics``, ``report``, validation and state
@@ -93,14 +93,20 @@ Interaction Matrix
      - dataframe, mapping, report, or record
      - none
      - base
-   * - ``save_bundle``, ``load_bundle``, ``to_problem_json``
+   * - ``set_case_input``
+     - Replace the input of an existing case, keeping the other cases
+     - validation report
+     - replaces case input
+     - base
+   * - ``save_bundle``, ``load_bundle``, ``to_bundle``, ``from_bundle``,
+       ``to_problem_json``
      - Persist or recover case inputs
      - path, workspace, or mapping
      - explicit persistence
      - base
    * - ``export_excel`` and ``show_dashboard``
      - Explicit output side effects for the active case
-     - path or dashboard handle
+     - path; ``show_dashboard`` returns none
      - none
      - output-specific
 

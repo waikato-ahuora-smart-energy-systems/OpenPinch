@@ -25,7 +25,7 @@ Copy one tutorial:
 
 .. code-block:: bash
 
-   openpinch notebook --name 01_first_solve_and_core_curves.ipynb -o notebooks
+   openpinch notebook --name 01_first_solve_and_core_curves.ipynb -o notebooks/
 
 The nineteen tutorials are described in :doc:`../examples/notebook-series`.
 Their complete public-operation ownership is published in
