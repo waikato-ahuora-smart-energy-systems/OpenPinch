@@ -3,7 +3,8 @@ Notebook Series
 
 The packaged series teaches the public :class:`OpenPinch.PinchProblem` and
 :class:`OpenPinch.PinchWorkspace` experience. Code cells use package-root
-imports, contain no stored outputs, and declare one honest execution profile.
+imports (the heat pump notebooks also import the HPR contract and reporting
+modules), contain no stored outputs, and declare one honest execution profile.
 
 Every notebook follows the same lifecycle: prepare the study, run one named
 engineering method, then inspect the cached results. Observation cells read
@@ -79,7 +80,7 @@ Copy one notebook:
 
 .. code-block:: bash
 
-   openpinch notebook --name 01_first_solve_and_core_curves.ipynb -o notebooks
+   openpinch notebook --name 01_first_solve_and_core_curves.ipynb -o notebooks/
 
 Profiles
 --------
@@ -91,8 +92,8 @@ profile decides which CI lane runs it:
    Runs in the routine unit lane.
 
 ``slow-hpr``
-   Requires the HPR model dependencies (``tespy`` extra) and a longer
-   numerical run; executed in the dedicated ``notebooks-hpr`` lane.
+   Heat pump notebooks with a longer numerical run; notebook 09 needs the
+   ``tespy`` extra; executed in the dedicated ``notebooks-hpr`` lane.
 
 ``solver``
    Requires the HEN synthesis extras and an available solver; executed in the
