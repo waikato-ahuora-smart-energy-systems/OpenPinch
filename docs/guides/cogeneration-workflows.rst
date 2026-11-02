@@ -5,7 +5,8 @@ Purpose
 -------
 
 Use cogeneration targeting when a solved thermal target should be screened for
-above Pinch or below Pinch turbine work opportunities.
+above Pinch turbine work opportunities. The public workflow runs the above
+Pinch screening only.
 
 Prerequisites
 -------------
@@ -30,13 +31,16 @@ Runnable Workflow
    problem.target.all_heat_integration()
    base = problem.target.total_site_heat_integration()
    cogeneration_target = problem.target.cogeneration(base_target=base)
-   summary = problem.summary_frame()
+   cogeneration_target.work_target
+   cogeneration_target.turbine_efficiency_target
 
 Expected Output
 ---------------
 
-The cogeneration target adds turbine work and efficiency fields to the solved
-target context. It does not replace the base thermal answer.
+The cogeneration target adds turbine work and efficiency fields. Read them on
+the returned target or in ``problem.results.targets``; ``summary_frame()`` has
+no work or efficiency column. The cogeneration target does not replace the base
+thermal answer.
 
 Convergence
 -----------
@@ -57,11 +61,14 @@ Read cogeneration results in this order:
 1. base thermal target and utility levels
 2. work target
 3. turbine efficiency target
-4. stage details
 
-Key turbine assumptions live on ``zone.config`` and include ``TURB_T_IN``,
-``TURB_P_IN``, ``MIN_EFF``, ``LOAD_FRACTION``, ``ETA_MECH``,
-``TURB_MODEL``, and ``IS_HIGH_P_COND_FLASH``.
+Stage details are not stored on the result.
+
+Key turbine assumptions are the option keys ``POWER_TURB_T_IN``,
+``POWER_TURB_P_IN``, ``POWER_MIN_EFF``, ``POWER_LOAD_FRACTION``,
+``POWER_ETA_MECH``, and ``POWER_HIGH_P_COND_FLASH_ENABLED``. They are read at
+runtime from ``zone.config.power`` (for example ``zone.config.power.turb_t_in``).
+The turbine model is selected by the target method name, not by an option.
 
 Next Steps
 ----------
