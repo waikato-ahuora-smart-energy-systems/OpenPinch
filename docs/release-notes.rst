@@ -13,6 +13,14 @@ Heat pumps and refrigeration
   profile, about 10 K when the condenser sits at the top of its load. Targets
   can fall, by up to several percent where subcooling was at that limit.
 
+Reporting
+~~~~~~~~~
+
+- ``export_stream_collection`` writes to the working directory when no
+  ``output_dir`` is given, as ``export_problem_table`` does. It previously
+  wrote to a ``results`` folder beside the package, which is inside
+  ``site-packages`` for an installed copy.
+
 0.7.6 (2026-11-02)
 ------------------
 
