@@ -15,7 +15,7 @@ The importable package. `PinchProblem` and `PinchWorkspace` are the only names e
 - [adapters](./adapters/README.md): file formats and optional dependency messages. May import `adapters`, `contracts`, `domain` and `resources`.
 - [analysis](./analysis/README.md): deterministic engineering calculations. May import `adapters`, `analysis`, `contracts`, `domain` and `optimisation`.
 - [presentation](./presentation/README.md): graphs, dashboards, reports and exports. May import `adapters`, `analysis`, `contracts`, `domain` and `presentation`.
-- [application](./application/README.md): `PinchProblem`, `PinchWorkspace`, their accessors and the JSON commands. May import every package above.
+- [application](./application/README.md): `PinchProblem`, `PinchWorkspace`, their accessors and the JSON commands. May import `adapters`, `analysis`, `application`, `contracts`, `domain` and `presentation` (not `optimisation`).
 - [tutorials](./tutorials/README.md): packaged notebooks and sample cases, with no logic.
 
 ## Global Invariants
