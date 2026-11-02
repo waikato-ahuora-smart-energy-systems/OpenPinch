@@ -310,7 +310,13 @@ def _problem_tutorial(name: str) -> int:
         "master_zone",
     }:
         return 3
-    if name in {"target", "validate", "validation_report", "project_name"}:
+    if name in {
+        "target",
+        "validate",
+        "validation_report",
+        "source_validation_report",
+        "project_name",
+    }:
         return 1
     return 18
 

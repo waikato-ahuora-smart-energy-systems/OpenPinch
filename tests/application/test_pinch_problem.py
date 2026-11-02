@@ -1145,25 +1145,135 @@ def test_summary_frame_compact_and_detailed(monkeypatch):
     assert detailed.iloc[0]["Scope"] == "Plant"
 
 
-def test_validation_report_returns_structured_errors_without_raising():
-    obj = PinchProblem()
-    obj._problem_data = {
-        "streams": [
-            {
-                "zone": "Zone A",
-                "name": "Hot Feed",
-                "t_supply": 150.0,
-                "heat_flow": 100.0,
-            }
-        ],
-        "utilities": [],
-        "options": {},
-    }
-
-    report = obj.validation_report()
+def test_source_validation_report_returns_structured_errors_without_raising():
+    report = PinchProblem.source_validation_report(
+        {
+            "streams": [
+                {
+                    "zone": "Zone A",
+                    "name": "Hot Feed",
+                    "t_supply": 150.0,
+                    "heat_flow": 100.0,
+                }
+            ],
+            "utilities": [],
+            "options": {},
+        }
+    )
 
     assert report.valid is False
     assert any(issue.path == "streams[0].t_target" for issue in report.issues)
+
+
+def _bad_source(kind, tmp_path, sample_problem):
+    """Return one invalid source of the given kind, as ``PinchProblem`` takes it."""
+    missing_target = deepcopy(sample_problem)
+    del missing_target["streams"][0]["t_target"]
+    if kind == "schema error":
+        return missing_target
+    if kind == "unbuildable zone":
+        return {**sample_problem, "zone_tree": {"name": "Site", "type": "Bogus"}}
+    if kind == "malformed streams":
+        return {"streams": [123], "utilities": []}
+    if kind == "not a source":
+        return 123
+    if kind == "no source":
+        return None
+    if kind == "missing file":
+        return tmp_path / "missing.json"
+    if kind == "invalid json file":
+        path = tmp_path / "invalid.json"
+        path.write_text(json.dumps(missing_target), encoding="utf-8")
+        return path
+    if kind == "unparseable json file":
+        path = tmp_path / "garbled.json"
+        path.write_text("{not json", encoding="utf-8")
+        return path
+    if kind == "unparseable workbook":
+        path = tmp_path / "garbled.xlsx"
+        path.write_bytes(b"not a workbook")
+        return path
+    if kind == "unsupported file":
+        path = tmp_path / "problem.txt"
+        path.write_text("streams", encoding="utf-8")
+        return path
+    if kind == "csv directory without files":
+        return tmp_path
+    assert kind == "unparseable csv pair"
+    streams, utilities = tmp_path / "streams.csv", tmp_path / "utilities.csv"
+    streams.write_text("a,b\n1,2\n", encoding="utf-8")
+    utilities.write_text("a,b\n1,2\n", encoding="utf-8")
+    return (streams, utilities)
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "schema error",
+        "unbuildable zone",
+        "malformed streams",
+        "not a source",
+        "no source",
+        "missing file",
+        "invalid json file",
+        "unparseable json file",
+        "unparseable workbook",
+        "unsupported file",
+        "csv directory without files",
+        "unparseable csv pair",
+    ],
+)
+def test_source_validation_report_reports_every_bad_source_without_raising(
+    kind, tmp_path, sample_problem
+):
+    source = _bad_source(kind, tmp_path, sample_problem)
+
+    report = PinchProblem.source_validation_report(source)
+
+    assert isinstance(report, ValidationReport)
+    assert report.valid is False
+    assert any(issue.severity == "error" for issue in report.issues)
+
+
+def test_source_validation_report_locates_issues_in_a_file(tmp_path, sample_problem):
+    source = _bad_source("invalid json file", tmp_path, sample_problem)
+
+    report = PinchProblem.source_validation_report(source)
+
+    assert [issue.path for issue in report.issues] == ["streams[0].t_target"]
+
+
+def test_source_validation_report_explains_input_that_cannot_be_built(sample_problem):
+    source = _bad_source("unbuildable zone", None, sample_problem)
+
+    report = PinchProblem.source_validation_report(source)
+
+    assert "Zone name and type" in report.issues[0].message
+    with pytest.raises(ValueError, match="Zone name and type"):
+        PinchProblem(source)
+
+
+@pytest.mark.parametrize("as_file", [False, True])
+def test_source_validation_report_passes_what_the_constructor_accepts(
+    as_file, tmp_path, sample_problem
+):
+    source = sample_problem
+    if as_file:
+        source = tmp_path / "valid.json"
+        source.write_text(json.dumps(sample_problem), encoding="utf-8")
+
+    report = PinchProblem.source_validation_report(source)
+
+    assert report.valid is True
+    assert report == PinchProblem(source).validation_report()
+
+
+def test_source_validation_report_leaves_a_mapping_source_unchanged(sample_problem):
+    source = deepcopy(sample_problem)
+
+    PinchProblem.source_validation_report(source)
+
+    assert source == sample_problem
 
 
 def test_report_and_metrics_are_typed_and_do_not_require_exports(sample_problem):
