@@ -78,6 +78,11 @@ Plots
 - The hover label of a merged exchanger match in the network grid diagram
   shows the summed area of its exchangers. It previously showed the area of
   the first exchanger only.
+- TESPy vapour-compression targets and performance maps now solve a cycle with
+  no subcooling or no superheat. CoolProp refused the saturated state as the
+  adapter specified it, so a candidate at the zero-subcooling bound always
+  failed, and with a small search budget that could be the only candidate
+  reached, raising ``HPRTargetingError``.
 
 0.7.6 (2026-11-02)
 ------------------
