@@ -1,0 +1,51 @@
+# HPR Cycle Models
+
+## Overview
+Thermodynamic models of the heat-pump and refrigeration cycles that the
+targeting modules in `../targeting` evaluate. A single closed vapour-compression
+cycle (`VapourCompressionCycle`) is built on CoolProp; the cascade and parallel
+networks aggregate several of them, the MVR classes model open vapour
+recompression, and the Carnot and Brayton classes cover the idealised and TESPy
+cases. Models return compressor work from `solve` and, for vapour cycles,
+expose piecewise condenser and evaporator streams for the cascade accounting
+in `../common`. `__init__.py` has only a docstring.
+
+## Interface
+- `VapourCompressionCycle` (`vapour_compression_cycle.py`): six-state single-stage cycle with optional internal heat exchanger, heat-pump or refrigeration mode, cascade duty hand-off, and `build_stream_collection`.
+- `CascadeVapourCompressionCycle` (`cascade_vapour_compression_cycle.py`): stages coupled through cascade exchangers; `solve` takes condenser and evaporator temperature arrays and a `DutyAllocationRequest`.
+- `ParallelVapourCompressionCycles` (`parallel_vapour_compression_cycles.py`): independent subcycles solved side by side.
+- `MechanicalVapourRecompressionCycle` (`mechanical_vapour_recompression_cycle.py`): open MVR stage with liquid-injection desuperheating, solved by `solve_from_source_heat` or `solve_from_mass_flow`; `process_heat_components` gives desuperheat, latent and subcool heat.
+- `VapourCompressionMvrCascade` (`vapour_compression_mvr_cascade.py`): vapour-compression stages feeding a serial MVR train; `MAX_MVR_STAGE_LIFT` limits stage lift.
+- `CascadeCarnotCycle`, `ParallelCarnotCycles` (`carnot_cycles.py`): Carnot-family heat pump, heat engine and heat recovery stages with second-law efficiency factors.
+- `SimpleBraytonHeatPumpCycle` (`brayton_heat_pump.py`): TESPy Brayton model (experimental, no `__all__`); `solve`, `get_hp_th_profiles`, `get_hp_hot_and_cold_streams`, `build_stream_collection`.
+- `_MultiVapourCompressionCycleBase` (`_multi_cycle_base.py`): private base aggregating duties, temperatures and COPs over `subcycles`; `__all__` is empty.
+- Subdirectories: none.
+
+## Invariants
+- Profile, state-point, COP and stream accessors raise `RuntimeError` until `solved` is true. Duty and work accessors of the single cycle return `None` or stale values before a solve; the cascade, MVR and VC+MVR `work` returns a finite infeasibility work and the multi-cycle `penalty` returns 0.0 while unsolved. The multi-cycle duty accessors (`Q_heat`, `Q_cond`, `Q_evap` and their array forms) and the parallel `work` raise `RuntimeError` while unsolved, yet `ParallelVapourCompressionCycles.solve` returns `sum(cycle.work)` even when `solved` is false. `COP_h`, `COP_r` and `COP_o` raise `ZeroDivisionError` when work is at most 1e-9. The Carnot accessors never raise; Carnot `solve` raises `ValueError` for inconsistent stage array sizes. [vapour_compression_cycle.py:VapourCompressionCycle._require_solution] [_multi_cycle_base.py:_MultiVapourCompressionCycleBase._require_solution]
+- Cycle temperatures are given in degC, held internally in K, and reported in degC after solving; state points hold `H`, `S`, `P`, `T` in SI units. [vapour_compression_cycle.py:VapourCompressionCycle.solve] [vapour_compression_cycle.py:VapourCompressionCycle._save_cycle_state]
+- A single cycle has `STATECOUNT = 6` states; the MVR cycle has 4. [vapour_compression_cycle.py:VapourCompressionCycle] [mechanical_vapour_recompression_cycle.py:MechanicalVapourRecompressionCycle]
+- `solve` raises `ValueError` for an evaporating temperature below the refrigerant's `Tmin`, an evaporator pressure above the condenser pressure, or a condenser with no enthalpy drop. [vapour_compression_cycle.py:VapourCompressionCycle.solve]
+- A cycle is marked solved only when work is finite and non-negative. [vapour_compression_cycle.py:VapourCompressionCycle.solve]
+- Excess subcooling and missing IHX superheat are returned as penalties scaled by mass flow, not as exceptions. [vapour_compression_cycle.py:VapourCompressionCycle.solve]
+- VC, Carnot, TESPy and MVR source/evaporator streams carry `delta_t_contribution = 0`; the MVR process-condenser streams (`MVR_process_H<n>`) carry the `dtcont` passed to `build_stream_collection`. [vapour_compression_cycle.py:VapourCompressionCycle.build_stream_collection] [mechanical_vapour_recompression_cycle.py:MechanicalVapourRecompressionCycle._build_streams] [mechanical_vapour_recompression_cycle.py:MechanicalVapourRecompressionCycle._build_process_condenser_streams]
+- Cascade solves return a finite infeasibility work, with `solved` left false, for temperature-order violations and unsolved subcycles; subcooling and IHX penalties on a solved cascade stay in `.penalty`. VC+MVR solves also return infeasibility work for input-bound penalties (stage-lift, split, subcool and approach). Wrong array sizes and missing duties raise `ValueError`. A bad refrigerant count raises in the cascade and parallel models, but VC+MVR pads or truncates the fluid list. `ValueError`s raised by a subcycle propagate from the cascade. [cascade_vapour_compression_cycle.py:CascadeVapourCompressionCycle.solve] [vapour_compression_mvr_cascade.py:VapourCompressionMvrCascade.solve]
+- A cascade with `T_cond` of size n and `T_evap` of size m has `n + m - 1` subcycles; condensing and evaporating temperatures must descend and every condenser must be `dt_cascade_hx` above every evaporator. [cascade_vapour_compression_cycle.py:CascadeVapourCompressionCycle._validate_T_cond_and_evap] [cascade_vapour_compression_cycle.py:CascadeVapourCompressionCycle.solve]
+- In a cascade only the entry at index `n_heat - 1` of `Q_heat` (the last of an `n_heat`-length input) and the last entry of `Q_cool` may be `None` or NaN; the check applies in both modes. [cascade_vapour_compression_cycle.py:CascadeVapourCompressionCycle._normalize_Q_heat] [cascade_vapour_compression_cycle.py:CascadeVapourCompressionCycle._normalize_Q_cool]
+- A side with a `DutyAllocationRequest` `Q_base` overrides the explicit `Q_heat` or `Q_cool` of the primary side. [cascade_vapour_compression_cycle.py:CascadeVapourCompressionCycle._allocate_process_duties] [parallel_vapour_compression_cycles.py:ParallelVapourCompressionCycles._allocate_process_duties]
+- Parallel cycles require every condenser temperature above its evaporator temperature, and a list of refrigerants must have one entry or one per cycle. [parallel_vapour_compression_cycles.py:ParallelVapourCompressionCycles._normalize_temperature_arrays] [parallel_vapour_compression_cycles.py:ParallelVapourCompressionCycles._normalize_refrigerant]
+- `MechanicalVapourRecompressionCycle.solve` is disabled (`solve = None`); use the `solve_from_*` methods. Electrical work is shaft work divided by `eta_motor`. [mechanical_vapour_recompression_cycle.py:MechanicalVapourRecompressionCycle]
+- In the VC+MVR cascade the last MVR stage always condenses all remaining vapour (`process_split` ends at 1), the first MVR stage takes its source heat from the top VC stage's condenser, and later stages receive the previous stage's uncondensed vapour mass flow. [vapour_compression_mvr_cascade.py:VapourCompressionMvrCascade._normalise_process_split] [vapour_compression_mvr_cascade.py:VapourCompressionMvrCascade.solve]
+- Carnot cycles cap stage duties at the available evaporator duty without penalty and mark `solved` only if the energy balance closes within `tol` and entropy generation is non-negative. [carnot_cycles.py:ParallelCarnotCycles.solve] [carnot_cycles.py:CascadeCarnotCycle.solve]
+- Cycle models in this directory depend on `../common` (encoding, shared helpers) but not on `../targeting`. [carnot_cycles.py] [cascade_vapour_compression_cycle.py]
+
+## Side Effects
+- CoolProp abstract states are created for each property lookup and temperature is root-found with SciPy `brentq`; `minimize_scalar` is used in the cascade Carnot solve. [vapour_compression_cycle.py:VapourCompressionCycle._solve_single_phase_state_from_pressure_target] [carnot_cycles.py:CascadeCarnotCycle.solve]
+- `solve` and `build_stream_collection` mutate the cycle object (states, duties, `dtcont`, `dt_diff_max`, cached condenser and evaporator curves). [vapour_compression_cycle.py:VapourCompressionCycle.solve] [vapour_compression_cycle.py:VapourCompressionCycle.build_stream_collection]
+- The Brayton model imports TESPy optionally at module load, raises `ImportError` with install guidance when it is used without it, builds and solves a TESPy network, and issues a `UserWarning` when recuperation is requested. [brayton_heat_pump.py:_require_tespy] [brayton_heat_pump.py:SimpleBraytonHeatPumpCycle.solve]
+- `_normalize_secondary_process_duty` sets the last element of a multi-element duty array to NaN in place, which can alter the caller's array. [cascade_vapour_compression_cycle.py:CascadeVapourCompressionCycle._normalize_secondary_process_duty]
+- No file or network IO.
+
+## Verification
+- Run: `uv run --no-sync pytest tests/analysis/heat_pumps/test_simple_heat_pump_cycle.py tests/analysis/heat_pumps/test_cascade_heat_pump_cycle.py tests/analysis/heat_pumps/test_parallel_heat_pump_cycle.py tests/analysis/heat_pumps/test_vapour_compression_mvr.py tests/analysis/heat_pumps/test_cascade_carnot.py tests/analysis/heat_pumps/test_parallel_carnot.py`
+- Brayton: `tests/analysis/heat_pumps/test_brayton_heat_pump.py`.
