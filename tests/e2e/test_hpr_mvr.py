@@ -61,6 +61,7 @@ def test_standard_problem_hpr_service_is_bounded_and_robust(
                     maximum_iterations=assignment.profile.iteration_limit(
                         sentinel=is_sentinel
                     ),
+                    sentinel=is_sentinel,
                 )
             )
         except HPRTargetingError as caught:

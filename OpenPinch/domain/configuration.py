@@ -242,6 +242,7 @@ class HprConfig:
     dt_ihx: float
     dt_cascade_hx: float
     dt_env_cont: float
+    max_pressure_ratio: float
     max_multistart: int
     eta_penalty: float
     rho_penalty: float
