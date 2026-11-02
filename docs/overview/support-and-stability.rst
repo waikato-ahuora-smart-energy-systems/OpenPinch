@@ -41,8 +41,11 @@ Advanced HPR Reliability Boundary
 ---------------------------------
 
 Supported HPR target methods expose explicit search bounds and either return a
-detached successful target or raise ``HPRTargetingError`` with bounded typed
-diagnostics. Required workflows do not convert unexpected service defects into
+detached successful target or, when targeting runs and fails, raise
+``HPRTargetingError`` with bounded typed diagnostics. A selection the method
+does not support, such as an unsupported topology, raises
+``HprTargetCompatibilityError`` (a ``ValueError``) before any work starts, and a
+missing optional package raises ``ImportError``. Required workflows do not convert unexpected service defects into
 screening statuses. TESPy and Brayton remain explicit selections: TESPy never
 falls back to CoolProp, and the currently unavailable Brayton runtime raises
 ``NotImplementedError`` before target state is committed.

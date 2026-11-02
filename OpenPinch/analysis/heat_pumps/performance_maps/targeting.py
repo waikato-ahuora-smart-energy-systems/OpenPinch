@@ -10,6 +10,7 @@ from typing import Literal, cast
 
 from CoolProp.CoolProp import PropsSI
 
+from ....adapters.optional_dependencies import optional_dependency_error
 from ....contracts.hpr import HeatPumpTargetInputs, MultiPeriodHPRTargetInputs
 from ....domain.enums import HeatPumpAndRefrigerationCycle
 from .fluids import (
@@ -37,6 +38,10 @@ class HprTargetCompatibilityError(ValueError):
     def __init__(self, code: str, message: str) -> None:
         self.code = code
         super().__init__(message)
+
+
+class HprTargetDependencyError(HprTargetCompatibilityError, ImportError):
+    """The optional package a targeting selection needs is not installed."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -475,9 +480,13 @@ def preflight_tespy_hpr_targeting(
             "TESPy single-stage targeting does not include an internal heat exchanger.",
         )
     if find_spec("tespy") is None:
-        raise HprTargetCompatibilityError(
+        raise HprTargetDependencyError(
             "dependency_unavailable",
-            "TESPy targeting requires the optional 'tespy' extra.",
+            optional_dependency_error(
+                package="TESPy",
+                purpose="TESPy heat pump targeting",
+                extras="tespy",
+            ),
         )
 
     refrigerant = _select_single_loop_refrigerant(args)
@@ -566,6 +575,7 @@ def _property_probe_temperatures(
 __all__ = [
     "HprSimulationBackend",
     "HprTargetCompatibilityError",
+    "HprTargetDependencyError",
     "HprTargetCacheStats",
     "HprTargetEvaluatorCoordinator",
     "HprTargetValidationTolerances",

@@ -455,7 +455,13 @@ def _error_json(error: Exception) -> dict[str, Any]:
         details = {"code": error.code}
     elif isinstance(error, UtilityChoiceError):
         details = {"side": error.side, "utilities": list(error.utilities)}
-    return {"type": type(error).__name__, "message": str(error), "details": details}
+    # The missing-TESPy subclass keeps the type engines already match on.
+    kind = (
+        "HprTargetCompatibilityError"
+        if isinstance(error, HprTargetCompatibilityError)
+        else type(error).__name__
+    )
+    return {"type": kind, "message": str(error), "details": details}
 
 
 def _accessor_method(problem: PinchProblem, command: str) -> Any:
