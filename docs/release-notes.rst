@@ -11,6 +11,15 @@ Input and validation
   for a ``.xlsx`` save. It was accepted as a source suffix but failed with
   ``ImportError: Import xlrd failed``, because no install extra provides
   ``xlrd``.
+Documentation
+~~~~~~~~~~~~~
+
+- The tutorial coverage manifest is generated and checked against the committed
+  file. Plots, design-result views and read-only calls are now marked
+  ``cached observation``, ``optional_dependency`` names real extras
+  (``notebook``, ``dashboard``, ``synthesis``, ``tespy``), ``interactive`` and ``slow-hpr``
+  notebooks are described as routine CI runs, and ``design_result.views`` maps
+  to the multiperiod HEN notebook.
 
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

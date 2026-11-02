@@ -14,12 +14,11 @@ real-engine pytest profiles provide
 additional evidence for the specialist target-owned HPR map operation.
 
 Operation coverage and notebook execution coverage are different. The ``base``
-profile is executed in routine CI. ``interactive`` runs in the same lane, ``slow-hpr``
-runs in the ``notebooks-hpr`` lane on every CI run, and only ``solver`` is gated
-to runs bound for ``main``; each needs its declared environment. A profile
-is not reported as executed merely because its operations are mapped. The
-``execution_evidence`` column distinguishes routine execution, opt-in profiles,
-and batch-delegation contracts.
+profile is executed in routine CI, as are ``interactive`` (in the unit lane) and
+``slow-hpr`` (in the ``notebooks-hpr`` lane). Only ``solver`` is gated to
+main-bound runs. A profile is not reported as executed merely because its
+operations are mapped. The ``execution_evidence`` column distinguishes routine
+execution, main-bound solver execution, and batch-delegation contracts.
 
 The two Brayton callables, and their batch mirrors, are marked
 ``unmapped; under development``. They remain public but raise while the Brayton
@@ -38,8 +37,12 @@ Counting Rules
 - A removed operation leaves the denominator only after it is absent from the
   live facade and tutorials. No compatibility alias is counted.
 - Properties and accessors use the ``cached observation`` semantic mode.
-- Named analysis/design methods use ``explicit execution``. Export and
-  dashboard calls use ``explicit side effect``.
+- Named analysis/design methods use ``explicit execution``. Export, dashboard
+  and bundle-save calls use ``explicit side effect``. Plots, design-result
+  views and read-only calls such as ``validate`` use ``cached observation``;
+  calls that set up a case or component use ``preparation``.
+- ``optional_dependency`` names the extras in ``pyproject.toml`` that an
+  operation needs.
 - Constructors and returned result operations are included; coverage is not
   limited to methods reached by a shallow accessor scan.
 - Source type, zone scope, configuration precedence, placement, period scope,
