@@ -11,6 +11,15 @@ Input and validation
   for a ``.xlsx`` save. It was accepted as a source suffix but failed with
   ``ImportError: Import xlrd failed``, because no install extra provides
   ``xlrd``.
+- New ``PinchProblem.source_validation_report(source)`` returns a
+  ``ValidationReport`` for any source the constructor takes, without raising for
+  bad input of any format. ``valid`` is true only if the constructor accepts the
+  source. ``problem.validation_report()`` could never report invalid input,
+  because the constructor raises first; its docstring and the input guide now say
+  so. The ``validate`` command uses the new report, so inline input is checked
+  after the same normalisation as loading: for example, a stream entry that is
+  not a record is now reported as the loader sees it.
+
 Documentation
 ~~~~~~~~~~~~~
 
@@ -20,17 +29,12 @@ Documentation
   (``notebook``, ``dashboard``, ``synthesis``, ``tespy``), ``interactive`` and ``slow-hpr``
   notebooks are described as routine CI runs, and ``design_result.views`` maps
   to the multiperiod HEN notebook.
-Input validation
-~~~~~~~~~~~~~~~~
-
-- New ``PinchProblem.source_validation_report(source)`` returns a
-  ``ValidationReport`` for any source the constructor takes, without raising for
-  bad input of any format. ``valid`` is true only if the constructor accepts the
-  source. ``problem.validation_report()`` could never report invalid input,
-  because the constructor raises first; its docstring and the input guide now say
-  so. The ``validate`` command uses the new report, so inline input is checked
-  after the same normalisation as loading: for example, a stream entry that is
-  not a record is now reported as the loader sees it.
+- Corrected the documentation against the code, including examples that raised,
+  retired option and notebook names, and the ``openpinch schema`` command. The
+  page on adding an analysis method is now a followable checklist.
+- Each package directory now has a ``README.md`` stating its interface,
+  invariants and side effects. These stay out of the wheel, and a test checks
+  that what they cite still exists.
 
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -56,6 +60,11 @@ Heat pumps and refrigeration
   advise handling. It is still an ``HprTargetCompatibilityError`` (a
   ``ValueError``) with code ``dependency_unavailable``, so existing handlers
   and the command layer's error response are unchanged.
+- TESPy vapour-compression targets and performance maps now solve a cycle with
+  no subcooling or no superheat. CoolProp refused the saturated state as the
+  adapter specified it, so a candidate at the zero-subcooling bound always
+  failed, and with a small search budget that could be the only candidate
+  reached, raising ``HPRTargetingError``.
 
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -90,15 +99,6 @@ Exergy
   exergy adds its curves as plain mappings. Those derived curves are now left
   out of that check, and the enriched target can be selected as a base target.
 
-Documentation
-~~~~~~~~~~~~~
-
-- Corrected the documentation against the code, including examples that raised,
-  retired option and notebook names, and the ``openpinch schema`` command. The
-  page on adding an analysis method is now a followable checklist.
-- Each package directory now has a ``README.md`` stating its interface,
-  invariants and side effects. These stay out of the wheel, and a test checks
-  that what they cite still exists.
 Reporting
 ~~~~~~~~~
 
@@ -113,11 +113,6 @@ Plots
 - The hover label of a merged exchanger match in the network grid diagram
   shows the summed area of its exchangers. It previously showed the area of
   the first exchanger only.
-- TESPy vapour-compression targets and performance maps now solve a cycle with
-  no subcooling or no superheat. CoolProp refused the saturated state as the
-  adapter specified it, so a candidate at the zero-subcooling bound always
-  failed, and with a small search budget that could be the only candidate
-  reached, raising ``HPRTargetingError``.
 
 0.7.6 (2026-11-02)
 ------------------
