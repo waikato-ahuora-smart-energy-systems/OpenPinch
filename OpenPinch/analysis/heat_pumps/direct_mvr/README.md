@@ -11,7 +11,7 @@ Solves mechanical vapour recompression (MVR) of a hot gas or vapour process stre
 - `DirectGasMVRStageResult`, `DirectGasMVRStreamSolveResult` (`models.py`): per-stage accounting and the solve result.
 - `DirectGasMVROutputUnits` (`models.py`): frozen output units.
 - `DirectGasMVRFallbackDiagnostic`, `DirectGasMVRStageError` (`models.py`): named fallback evidence and a bounded stage error.
-- Default constants `DEFAULT_*` (`models.py`).
+- Default constants `DEFAULT_*` (`models.py`); `execution.py` repeats them and adds `DEFAULT_MVR_STAGE_T_SAT_LIFT`, `MAX_DIRECT_MVR_STAGE_T_LIFT` and `MAX_DIRECT_MVR_STAGE_PRESSURE_RATIO`.
 - `thermodynamics.py`: `source_enthalpies`, `state_property_at_temperature_pressure`, `find_pressure_for_actual_discharge`, `actual_outlet_at_pressure`, `build_cooling_temperature_enthalpy_curve`, `profile_enthalpy_values`.
 - `units.py`: unit conversion helpers (`to_pascal`, `to_watt`, `to_kilowatt`, `convert_value`, `source_output_units`, `profile_to_output_units`, `stage_mass_flow`, and others).
 
@@ -28,7 +28,7 @@ Solves mechanical vapour recompression (MVR) of a hot gas or vapour process stre
 - Each stage's inlet is the previous stage's outlet pressure and the stream target temperature; the next stage's mass flow is the previous hot mass flow [execution.py:solve_direct_gas_mvr_stream].
 
 ## Side Effects
-- CoolProp `PropsSI` calls throughout [thermodynamics.py, execution.py:_solve_compression_stage].
+- CoolProp `PropsSI` calls throughout, except that the source states use the stream's own `supply_enthalpy` and `target_enthalpy` when both are present; otherwise they fall back to saturated vapour at supply and saturated liquid at target [thermodynamics.py:source_enthalpies, execution.py:_solve_compression_stage].
 - None otherwise; the source `Stream` is not modified.
 
 ## Verification

@@ -9,7 +9,7 @@ Concrete engine backends for the engine-neutral protocols in the parent package.
 - `TespyHprTargetEvaluator` (`tespy.py`): implements `HprTargetEvaluator`; each candidate is a fresh design solve returning `HprTargetThermodynamicResult`.
 
 ## Invariants
-- A simulator can be prepared once and closed once; a second `close` raises `HprSimulatorFailure` with `session_fatal=True` [coolprop.py:CoolPropHprPointSimulator.close, tespy.py:TespyHprPointSimulator.close, tespy.py:TespyHprTargetEvaluator.close].
+- A simulator can be prepared once and closed once; a second `close` raises `HprSimulatorFailure` with `session_fatal=True`, or `HprTargetEvaluatorError` for the TESPy target evaluator, which can also be opened only once [coolprop.py:CoolPropHprPointSimulator.close, tespy.py:TespyHprPointSimulator.close, tespy.py:TespyHprTargetEvaluator.close].
 - Each simulator checks that the context backend matches its own [coolprop.py:CoolPropHprPointSimulator.prepare, tespy.py:TespyHprPointSimulator.prepare].
 - Map results are in kW; the CoolProp cycle takes and returns W, converted by a factor of 1000 [coolprop.py:CoolPropHprPointSimulator.simulate]. TESPy uses W internally and the same factor [tespy.py:_WATTS_PER_KILOWATT].
 - Power boundary is compressor only; there are no modelled auxiliaries [../models.py:HprSimulatorMetadata].

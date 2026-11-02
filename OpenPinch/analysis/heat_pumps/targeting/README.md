@@ -28,7 +28,7 @@ One module per heat pump and refrigeration (HPR) cycle topology. Each defines ho
 
 ## Side Effects
 - `args` is mutated: stage counts, `refrigerant_ls` and `mvr_fluid_ls` [parallel_vapour_compression.py:optimise_parallel_heat_pump_placement, cascade_vapour_compression.py:optimise_cascade_heat_pump_placement, vapour_compression_mvr.py:optimise_vapour_compression_mvr_heat_pump_placement].
-- CoolProp fluid preflights and a Carnot seed search run before the main search [cascade_vapour_compression.py:optimise_cascade_heat_pump_placement].
+- CoolProp fluid preflights run before the main search, as does a Carnot seed search when `hpr.initialise_simulated_cycle` is true (the default); a seed failure is ignored and the TESPy path never seeds [cascade_vapour_compression.py:optimise_cascade_heat_pump_placement].
 - A TESPy evaluator session is opened and closed around the search [cascade_vapour_compression.py:_optimise_tespy_cascade_heat_pump_placement].
 - A debug log line is emitted by the VC+MVR objective only when `debug` is true and the cycle raised `ValueError` before it was evaluated [vapour_compression_mvr.py:_compute_vc_mvr_system_obj].
 
