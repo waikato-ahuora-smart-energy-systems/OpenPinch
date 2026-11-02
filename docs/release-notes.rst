@@ -4,6 +4,15 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat pumps and refrigeration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Single-stage and cascade vapour-compression targets can now subcool the
+  condensate down to the coldest evaporating temperature, the same limit as
+  parallel machines. The limit was previously the gap to the top of the sink
+  profile, about 10 K when the condenser sits at the top of its load. Targets
+  can fall, by up to several percent where subcooling was at that limit.
+
 Exergy
 ~~~~~~
 
