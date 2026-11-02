@@ -228,6 +228,12 @@ def build_problem_report(
     warnings: list[str] | None = None,
 ) -> ProblemReport:
     """Build a typed report from current validation and optional solved results."""
+    target_warnings = [
+        f"{target.scope} {target.integration_type}"
+        f"{'' if target.period_id is None else f' ({target.period_id})'}: {message}"
+        for target in getattr(results, "targets", []) or []
+        for message in getattr(target, "turbine_diagnostics", [])
+    ]
     return ProblemReport(
         project_name=project_name,
         solved=results is not None,
@@ -240,7 +246,7 @@ def build_problem_report(
         ],
         metrics=build_report_metrics(results) if results is not None else [],
         graph_catalog=build_graph_availability(graph_data),
-        warnings=list(warnings or []),
+        warnings=[*(warnings or []), *target_warnings],
     )
 
 

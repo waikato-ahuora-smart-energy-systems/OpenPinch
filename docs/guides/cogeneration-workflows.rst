@@ -38,6 +38,17 @@ Expected Output
 The cogeneration target adds turbine work and efficiency fields to the solved
 target context. It does not replace the base thermal answer.
 
+Convergence
+-----------
+
+``turbine_converged`` on the target and on its result row is ``False`` when the
+extraction mass balance did not settle within its iteration limit, and
+``turbine_diagnostics`` holds the messages. The same messages are raised as a
+``UserWarning`` and listed in ``problem.report().warnings``. The work target of
+such a run is its last iteration, so treat it as unreliable: a small change in
+duty or in the turbine model usually restores convergence. A weighted-average
+row is flagged if any period did not converge.
+
 Interpretation
 --------------
 
