@@ -29,10 +29,10 @@ python -m pip install openpinch
 Install optional extras only for the workflows that need them:
 
 ```bash
-python -m pip install "openpinch[notebook]"      # Jupyter, Plotly graphs, Excel I/O
+python -m pip install "openpinch[notebook]"      # Jupyter kernel, Plotly graphs, Excel I/O
 python -m pip install "openpinch[dashboard]"     # Streamlit dashboard
 python -m pip install "openpinch[synthesis]"     # HEN synthesis, then run: idaes get-extensions
-python -m pip install "openpinch[brayton_cycle]" # TESPy-backed Brayton-cycle tooling
+python -m pip install "openpinch[brayton_cycle]" # alias of the tespy extra; Brayton targeting is unavailable
 python -m pip install "openpinch[tespy]"          # TESPy HPR targeting and performance maps
 python -m pip install "openpinch[full]"          # all optional surfaces, including synthesis
 ```
@@ -119,8 +119,9 @@ Notebooks and sample cases live in `OpenPinch/tutorials/notebooks` and
 The nineteen-notebook series progresses from first solve through multiperiod
 HPR, cogeneration, HEN synthesis, and publication workflows.
 
-The CLI intentionally copies notebooks only. Solves, validation, graph export,
-Excel export, dashboards, and advanced targeting happen through Python.
+The CLI copies notebooks (`openpinch notebook`) and writes the contract JSON
+Schemas (`openpinch schema -o DIR`). Solves, validation, graph export, Excel
+export, dashboards, and advanced targeting happen through Python.
 
 ## Documentation Map
 
@@ -156,7 +157,8 @@ git config core.hooksPath .githooks
 ```
 
 Before pushing work meant for `main`, also run `scripts/ci_local.sh all`, which adds the
-TESPy, performance, solver and notebook lanes that CI runs for pull requests into `main`.
+TESPy, performance, solver and notebook lanes. CI runs the solver lane only for
+pull requests into `main`; it runs the others on every pull request.
 
 The script does not run every CI lane. CI also runs the Pyodide lane (the test suite
 inside WebAssembly against the built wheel), the lowest-allowed-versions `floors` lane,

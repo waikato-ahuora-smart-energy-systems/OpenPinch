@@ -5,7 +5,9 @@ OpenPinch has two package-root workflow classes. Use :class:`PinchProblem
 <OpenPinch.PinchProblem>` for one engineering case and :class:`PinchWorkspace
 <OpenPinch.PinchWorkspace>` for named cases and scenarios.
 
-Install the package, then run a complete heat-integration study:
+Install the package (``python -m pip install "openpinch[notebook]"`` adds
+Plotly, which ``problem.plot.*`` needs), then run a complete heat-integration
+study:
 
 .. code-block:: python
 
@@ -82,8 +84,11 @@ Named Scenarios
 
    comparison = workspace.compare_cases("baseline", "tight")
 
-Method arguments are one-call overrides. ``update_options(...)`` changes the
-stored fallback for later calls. Configuration supplies engineering values; it
+Method arguments are one-call overrides, except for load-time keys (the
+``problem`` and ``input_units`` option groups, ``THERMAL_DT_CONT``,
+``THERMAL_DT_PHASE_CHANGE``, ``THERMAL_HTC`` and ``COSTING_UTILITY_PRICE``),
+which a per-call ``options`` argument rejects with ``ValueError``.
+``update_options(...)`` changes the stored fallback for later calls. Configuration supplies engineering values; it
 does not select which core method runs.
 
 Next Steps

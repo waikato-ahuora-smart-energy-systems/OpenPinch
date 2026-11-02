@@ -255,7 +255,7 @@ def _parse_cascade_hp_state_variables(
         first_stage=n_cond - 1,
     )
     T_cond, T_evap = limit_cascade_pressure_ratios(T_cond, T_evap, args)
-    dT_subcool = map_x_arr_to_DT_arr(x_subcool, T_cond, args.T_cold[0])
+    dT_subcool = map_x_arr_to_DT_arr(x_subcool, T_cond, T_evap[-1])
     Q_heat_available = (
         limit_available_duty(
             get_Q_vals_at_T_hpr_from_bckgrd_profile(
