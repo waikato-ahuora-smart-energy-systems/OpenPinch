@@ -19,11 +19,11 @@ Use-case orchestration for OpenPinch. `PinchProblem` loads, validates and prepar
 ## Invariants
 - Getters on `PinchProblem` return deep copies or `MappingProxyType` views [problem.py:PinchProblem.results] [problem.py:PinchProblem.master_zone] [problem.py:PinchProblem.period_results]; `process_components` and `components.inventory` return a read-only mapping of the live component objects [problem.py:PinchProblem.process_components] [component.py:_ComponentAccessor.inventory].
 - Changing `project_name`, options or a multiplier invalidates cached analysis [problem.py:PinchProblem.project_name] [problem.py:PinchProblem._invalidate_analysis].
-- A frozen HPR residual case refuses `set_dt_cont_multiplier` [problem.py:PinchProblem.set_dt_cont_multiplier]; `dt_cont_multiplier` values that are non-finite or negative are replaced by 1.0 with a `UserWarning`.
+- A frozen HPR residual case refuses `set_dt_cont_multiplier` [problem.py:PinchProblem.set_dt_cont_multiplier]; it replaces a non-finite or negative value by 1.0 with a `UserWarning`; the same value in a zone tree raises `ValueError` [canonicalization.py:_resolve_zone_dt_cont_multiplier].
 - Period flags are bools and select one of `selected`, `weighted_average`, `all`, `all_with_weighted_average` [problem.py:_period_mode].
 - Case names are validated by `validate_workspace_case_name`; a batch needs at least one unique name [workspace.py:PinchWorkspace.load] [workspace.py:_CaseBatch].
 - Batch operations isolate failures per case; the `target`, `target.all_periods` and `design` batch accessors refuse `base_target`; Excel batch export confines each case to a subdirectory of the destination [workspace.py:_CaseBatchAccessor._run] [workspace.py:_CaseBatch.export_excel].
-- `PinchWorkspace.load` stores invalid input so it can be corrected and returns `None`; it renames the workspace only for the first case or an explicit `project_name` [workspace.py:PinchWorkspace.load].
+- `PinchWorkspace.load` stores invalid input so it can be corrected and returns `None` for it, otherwise the live case; it renames the workspace only for the first case or an explicit `project_name` [workspace.py:PinchWorkspace.load].
 - Bundles are written with schema version `"3"` [workspace.py:PinchWorkspace.to_bundle].
 - Commands never read host files: `{"sample_case": ...}` loads packaged cases only, workspace `source` must be JSON, and exports go to a private temporary directory [commands.py:_load_problem] [commands.py:_set_case_input] [commands.py:_export_excel].
 - Command names starting with an underscore are rejected, and only `target` and `design` namespaces resolve to accessors [commands.py:_accessor_method].

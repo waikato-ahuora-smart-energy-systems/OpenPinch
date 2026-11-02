@@ -26,7 +26,7 @@ module and its `_TargetRunSpec`.
 - A period without a heat pump or refrigeration row gets a zero-load row built from its own base row. [aggregation.py:_fill_zero_load_hpr_rows]
 - Each metric is aggregated by its `AggregationPolicy` (weighted mean, maximum, consensus, exclude); a metric with none of these and not listed as derived raises `ValueError`. [aggregation.py:_weighted_average_target]
 - Ratios (degree of integration, ETE, COP, efficiencies) are ratios of weighted totals, falling back to the weighted mean when the totals are zero. [aggregation.py:_ratio_of_totals]
-- The weighted row leaves pinch temperatures empty; `hpr_success` is true only if every run succeeded. [aggregation.py:_weighted_average_target]
+- The weighted row leaves pinch temperatures empty; `hpr_success` is true only if every run that reports it succeeded, and is `None` when no run reports it. [aggregation.py:_weighted_average_target]
 - Partially missing fields cannot be aggregated. [aggregation.py:_weighted_report_value]
 - Shared-design heat-pump machines take their own peak capital; otherwise the per-machine fields are cleared. [aggregation.py:_apply_peak_machine_capital]
 - Values are converted to the first period's unit before aggregation. [aggregation.py:_collect_report_values]
