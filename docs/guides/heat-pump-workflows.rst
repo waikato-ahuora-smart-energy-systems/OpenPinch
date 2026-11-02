@@ -74,9 +74,12 @@ HPR utilities are priced relative to the HPR electricity price
   costs ``COSTING_HPR_PRICE_RATIO_COOLING_WATER_TO_ELE`` (default 0.025).
 - Cooling below cooling water uses a default refrigeration utility. It
   evaporates ``COSTING_HPR_REFRIGERATION_DT`` (default 5 K) below the
-  problem's minimum temperature, rejects heat at the cooling-water level and
-  runs at ``COSTING_HPR_REFRIGERATION_ETA_II`` (default 0.4) of the Carnot
-  COP, so it costs electricity divided by that COP.
+  minimum shifted temperature of the targeted zone's problem table, rejects
+  heat at the cooling-water level and runs at
+  ``COSTING_HPR_REFRIGERATION_ETA_II`` (default 0.4) of the Carnot COP. Its
+  price is the larger of electricity divided by that COP and the cooling-water
+  price ratio, and it falls back to the cooling-water ratio when the
+  condensing temperature does not exceed the evaporating temperature.
 
 Notebook 08 uses a cooling-water ratio of 0.1 to illustrate inexpensive
 cooling without changing global defaults.
@@ -90,7 +93,7 @@ heat-pump machine costs::
 
 ``Q_cap`` is the heat the machine rejects (heating side), ``n_closed`` and
 ``n_mvr`` count its refrigerant and MVR stages, and ``T_hot_max`` is the
-highest temperature at which it delivers heat. Parallel cycles are costed as
+maximum condensing temperature. Parallel cycles are costed as
 separate machines; cascades and VC+MVR systems as one. The defaults are
 ``COSTING_HPR_EQUIPMENT_COST`` = 485,000 (equipment for 1 MW, one stage, at or
 below 75 °C; fitted to the IEA HPT Project 68 cost data and converted to 2025
@@ -197,12 +200,29 @@ Simulated Models
 
    # CoolProp is the default targeting backend.
    vc = problem.target.vapour_compression_heat_pump(
-       refrigerants=["ammonia"],
+       refrigerants=["water"],
        load_fraction=0.25,
        condensers=1,
        evaporators=1,
+       maximum_restarts=1,
+       maximum_iterations=20,
+       maximum_evaluations=50,
    )
-   mvr_cascade = problem.target.mvr_heat_pump(load_fraction=0.25)
+   mvr_cascade = problem.target.mvr_heat_pump(
+       mvr_fluids=["Water"],
+       mvr_stages=1,
+       load_fraction=0.25,
+       condensers=1,
+       evaporators=1,
+       maximum_restarts=1,
+       maximum_iterations=3,
+       maximum_evaluations=50,
+       options={"HPR_REFRIGERANTS": ["water"]},
+   )
+
+The ``maximum_*`` arguments cap the optimizer budget so the example finishes
+quickly. Other refrigerants can raise ``HPRTargetingError`` on this case when no
+design beats the baseline; ammonia does on this case.
 
 Refrigeration uses ``vapour_compression_refrigeration()``. Model-specific
 callables expose only arguments that make sense for that model.
@@ -230,18 +250,25 @@ CoolProp remains the result-identical default when the selector is omitted or
 set explicitly to ``"coolprop"``.
 
 The first TESPy targeting surface is one refrigerant loop with one evaporator
-and one condenser. Disable features that require a different topology:
+and one condenser. Disable features that require a different topology. This
+example uses ``process_mvr.json``; on ``basic_pinch.json`` the same call raises
+``HPRTargetingError`` for water, ammonia, R134a and the R32/R125 mixture, so
+guard a TESPy call on a new case as notebook 09 does:
 
 .. code-block:: python
 
-   tespy_target = problem.target.vapour_compression_heat_pump(
+   tespy_problem = PinchProblem("process_mvr.json", project_name="TESPy Study")
+   tespy_target = tespy_problem.target.vapour_compression_heat_pump(
        simulation_backend="tespy",
-       refrigerants=["HEOS::R32[0.5]&R125[0.5]"],
+       refrigerants=["water"],
        load_fraction=0.25,
        condensers=1,
        evaporators=1,
        initialize_from_carnot=False,
        allow_integrated_expander=False,
+       maximum_restarts=1,
+       maximum_iterations=20,
+       maximum_evaluations=50,
    )
 
 The selected backend, winning temperatures, duty, working-fluid identity, and
@@ -269,7 +296,7 @@ only when the downstream study needs one:
        sink_temperatures=[sink_at_design],
        load_fractions=[0.50, 0.75, 1.00],
    )
-   performance_map = problem.target.hpr_performance_map(
+   performance_map = tespy_problem.target.hpr_performance_map(
        target=tespy_target,
        request=request,
    )
