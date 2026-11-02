@@ -4,6 +4,16 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Heat pumps and refrigeration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Vapour-compression targets now limit each compressor's pressure ratio, with
+  the new ``HPR_MAX_PRESSURE_RATIO`` option (default 15). A candidate over the
+  limit evaporates warmer, or in a cascade raises its lower levels, so targets
+  with a large lift in one compressor can change or find no design. Raise the
+  option to relax the limit. TESPy targets and the Carnot models are not
+  limited.
+
 0.7.6 (2026-11-02)
 ------------------
 

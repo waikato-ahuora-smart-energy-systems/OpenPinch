@@ -35,6 +35,7 @@ from ..common.shared import (
     condensing_temperature_search_range,
     evaluate_vapour_hpr_result,
     floor_stage_evaporating_temperatures,
+    limit_cascade_pressure_ratios,
     validate_vapour_hp_refrigerant_ls,
 )
 from ..cycles.cascade_vapour_compression_cycle import CascadeVapourCompressionCycle
@@ -253,6 +254,7 @@ def _parse_cascade_hp_state_variables(
         # Process evaporators sit on the coldest stages.
         first_stage=n_cond - 1,
     )
+    T_cond, T_evap = limit_cascade_pressure_ratios(T_cond, T_evap, args)
     dT_subcool = map_x_arr_to_DT_arr(x_subcool, T_cond, args.T_cold[0])
     Q_heat_available = (
         limit_available_duty(
