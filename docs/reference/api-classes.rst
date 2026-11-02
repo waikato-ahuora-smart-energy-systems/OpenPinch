@@ -68,7 +68,7 @@ identity; raw solver axis positions remain lower-level implementation details.
 Heat Exchanger Network Unit Models
 ----------------------------------
 
-The HEN synthesis unit-model modules sit below the internal design accessors.
+The HEN synthesis unit-model modules sit below the ``problem.design`` accessor.
 They are useful when inspecting how the pinch-design and stagewise equations
 are assembled, but users normally call the methods through
 ``problem.design``.
@@ -102,9 +102,10 @@ Units and Scalar Helpers
 ------------------------
 
 :class:`~OpenPinch.domain.value.Value` supports both ordinary scalar
-quantities and discrete-period values held in period order with normalised
-``weights``; a ``period_ids`` key is rejected. This makes it suitable for both
-deterministic reports and period-weighted scenario data.
+quantities and discrete-period values held in period order with ``weights``.
+``weights`` are kept as given, not normalised, and a ``period_ids`` key is
+rejected, because a value has no period identity. This makes it suitable for
+both deterministic reports and period-weighted scenario data.
 
 .. automodule:: OpenPinch.domain.value
    :members:
