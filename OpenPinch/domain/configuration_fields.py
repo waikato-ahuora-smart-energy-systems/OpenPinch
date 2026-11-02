@@ -400,6 +400,7 @@ CONFIG_FIELD_SPECS: dict[str, ConfigurationFieldSpec] = {
     "HPR_DT_IHX": _spec(float, 0.0, "hpr", "dt_ihx", numeric_min=0.0),
     "HPR_DT_CASCADE_HX": _spec(float, 0.0, "hpr", "dt_cascade_hx", numeric_min=0.0),
     "HPR_DT_ENV_CONT": _spec(float, 10.0, "hpr", "dt_env_cont", numeric_min=0.0),
+    "HPR_MAX_PRESSURE_RATIO": _spec(float, 15.0, "hpr", "max_pressure_ratio", numeric_min=1.0),
     "HPR_MAX_MULTISTART": _spec(int, 10, "hpr", "max_multistart", numeric_min=0.0),
     "HPR_ETA_PENALTY": _spec(float, 0.001, "hpr", "eta_penalty", numeric_min=0.0),
     "HPR_RHO_PENALTY": _spec(float, 10.0, "hpr", "rho_penalty", numeric_min=0.0),

@@ -14,8 +14,9 @@ process-engineer workflows. Named target and design methods execute analyses;
 read, report, plot, and export methods consume prepared or cached state.
 
 The published CLI is intentionally narrow: ``openpinch notebook`` copies the
-packaged notebook series, while solving, validation, graph export, Excel
-export, and advanced targeting all happen in Python.
+packaged notebook series and ``openpinch schema`` writes the contract JSON
+Schemas, while solving, validation, graph export, Excel export, and advanced
+targeting all happen in Python.
 
 Start Here
 ----------
