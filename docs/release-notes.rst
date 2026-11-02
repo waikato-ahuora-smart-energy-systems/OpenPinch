@@ -81,6 +81,17 @@ Cogeneration
   between the two branches for all 50 iterations. Numeric targets are unchanged;
   a run that did not converge still reports its last iteration.
 
+Values
+~~~~~~
+
+- A direct ``Value`` call with a ``period_ids`` key (for example
+  ``Value({"values": [10, 20], "period_ids": ["b", "a"]})``) now raises
+  ``ValueError``, with the same guidance as a domain ``Stream``. ``Value`` holds
+  magnitudes in order and has no period identity, so it dropped the ids and
+  gave the first period 10 whatever its id. Give the values in the problem's
+  period order. A utility's ``maximum_heat_flow`` and utility placement
+  ``maximum_duties``, which key values by period id on purpose, still take it.
+
 Exergy
 ~~~~~~
 

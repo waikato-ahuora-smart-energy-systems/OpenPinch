@@ -89,7 +89,14 @@ def test_resolve_period_value_static_fixture_edge_cases():
     with pytest.raises(ValueError, match="cannot be empty"):
         get_period_value(fixture["empty_values_payload"])
 
-    period_value = Value(fixture["period_payload"])
+    # Value takes magnitudes in order and rejects period_ids.
+    period_value = Value(
+        {
+            key: item
+            for key, item in fixture["period_payload"].items()
+            if key != "period_ids"
+        }
+    )
     assert get_period_value(period_value, period_idx=1) == pytest.approx(6.0)
     period_object = SimpleNamespace(**fixture["period_object"])
     assert get_period_value(period_object, period_idx=1) == pytest.approx(10.0)
