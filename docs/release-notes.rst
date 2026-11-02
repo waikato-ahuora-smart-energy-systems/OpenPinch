@@ -90,6 +90,14 @@ Cogeneration
   between the two branches for all 50 iterations. Numeric targets are unchanged;
   a run that did not converge still reports its last iteration.
 
+Streams
+~~~~~~~
+
+- Inverting a utility copy no longer detaches the original's segments. For a
+  segmented utility, ``get_hot_streams`` and ``get_cold_streams`` with
+  ``invert_utility=True`` left the original's segments without a parent
+  (``segment.parent`` was ``None``).
+
 Values
 ~~~~~~
 
