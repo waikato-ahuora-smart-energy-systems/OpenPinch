@@ -71,7 +71,7 @@ The packaged basic case has a zero-``dt_min`` thermodynamic limit of about
    result.thermodynamic_limit
    result.status
 
-   assert problem.results is cached_results_before
+   assert problem.results == cached_results_before
    assert problem.period_results == {}
 
 The returned ``dt_min`` is the full hot-to-cold global spacing. OpenPinch applies
@@ -242,6 +242,8 @@ contains only finite, JSON-serializable values:
      - Number of deterministic bisection iterations. A positive threshold
        boundary is solved by bisection; the degenerate zero-limit case returns
        without iterating.
+   * - ``provenance``
+     - Analysis provenance record for the solve.
 
 Use the Pydantic serialization surface when recording a study:
 
