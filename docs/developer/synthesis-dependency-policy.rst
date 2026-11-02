@@ -1,8 +1,8 @@
 Synthesis Dependency Policy
 ===========================
 
-OpenPinch core remains the default install target. The heat exchanger network
-synthesis migration uses an isolated ``synthesis`` optional extra so users who
+OpenPinch core remains the default install target. Heat exchanger network
+synthesis uses an isolated ``synthesis`` optional extra so users who
 only run core pinch, targeting, graph-data, and workspace workflows do not
 install solver stacks, plot export tooling, workbook engines, or
 wake-management packages.
@@ -15,7 +15,7 @@ develops on the version in ``.python-version``. Synthesis dependencies must
 resolve and import on every supported Python; CI runs the unit tests on 3.12,
 3.13 and the development version.
 
-The HENS-01 viability set is:
+The synthesis dependency set is:
 
 - ``pyomo>=6.10.0``
 - ``gekko>=1.3.2``
@@ -28,7 +28,7 @@ The HENS-01 viability set is:
 Optional Install
 ----------------
 
-Install the future synthesis runtime dependencies explicitly:
+Install the synthesis runtime dependencies explicitly:
 
 .. code-block:: bash
 
@@ -38,38 +38,40 @@ Repository development should use uv:
 
 .. code-block:: bash
 
-   rtk uv sync --extra synthesis
+   uv sync --extra synthesis
 
-The ``full`` extra intentionally does not include ``synthesis``. ``full`` keeps
-covering the established dashboard, notebook, and Brayton-cycle optional
-surfaces; heat exchanger network synthesis has separate solver-binary and
-dependency expectations.
+The ``full`` extra includes the synthesis stack (Pyomo, GEKKO, Kaleido, wakepy,
+and IDAES) together with the dashboard, notebook, TESPy, and Brayton-cycle
+surfaces. External solver binaries are still installed separately.
 
 Test Marker Policy
 ------------------
 
-Fast tests are unmarked and must not require the ``synthesis`` extra or solver
-binaries. Run them in default CI with:
+Fast tests are unmarked and should not require the ``synthesis`` extra or solver
+binaries. CI does not enforce this: the unit lanes sync the ``dev`` group,
+which already contains the synthesis stack, and select tests with
+``-m "not solver and not tespy and not performance and not docs"``, so
+``synthesis``-marked tests run there. To run only the fast tests locally:
 
 .. code-block:: bash
 
-   rtk uv run pytest -m "not synthesis and not solver"
+   uv run pytest -m "not synthesis and not solver"
 
 Use ``@pytest.mark.synthesis`` for tests that require
 ``openpinch[synthesis]`` but no external solver binary:
 
 .. code-block:: bash
 
-   rtk uv run pytest -m synthesis
+   uv run pytest -m synthesis
 
 Use ``@pytest.mark.solver`` for tests that require external solver binaries
 such as Couenne or IPOPT:
 
 .. code-block:: bash
 
-   rtk uv run pytest -m solver
+   uv run pytest -m solver
 
 Missing optional Python packages should raise
 ``MissingSynthesisDependencyError`` with the ``openpinch[synthesis]`` install
 path. Missing external executables should raise ``MissingSynthesisSolverError``
-with the binary name and the solver-marker rerun command.
+with the binary name and a pointer to these policy docs.

@@ -253,7 +253,7 @@ def _parse_cascade_hp_state_variables(
         # Process evaporators sit on the coldest stages.
         first_stage=n_cond - 1,
     )
-    dT_subcool = map_x_arr_to_DT_arr(x_subcool, T_cond, args.T_cold[0])
+    dT_subcool = map_x_arr_to_DT_arr(x_subcool, T_cond, T_evap[-1])
     Q_heat_available = (
         limit_available_duty(
             get_Q_vals_at_T_hpr_from_bckgrd_profile(

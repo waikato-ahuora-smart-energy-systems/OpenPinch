@@ -75,6 +75,8 @@ def hpr_result_digest(target):
         "graphs": {
             key: (table.columns, hashlib.sha256(table.data.tobytes()).hexdigest())
             for key, table in target.graphs.items()
+            # Exergy enrichment adds plain-dict curves derived from the target.
+            if not isinstance(table, dict)
         },
     }
     return hashlib.sha256(canonical_json(payload).encode()).hexdigest()
