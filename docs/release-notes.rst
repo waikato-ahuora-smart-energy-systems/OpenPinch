@@ -46,6 +46,16 @@ Heat pumps and refrigeration
   ``ValueError``) with code ``dependency_unavailable``, so existing handlers
   and the command layer's error response are unchanged.
 
+Heat exchanger network synthesis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``design.heat_exchanger_network()``, its multiperiod form and
+  ``design.enhanced_heat_exchanger_network()`` now run
+  ``HENS_SYNTHESIS_QUALITY_TIER`` when the problem's options set it, and they
+  ignored it before. Only problems that set the option see a change: without it
+  the methods keep tiers 0 and 2, and ``quality_tier=`` still wins.
+  ``design.open_hens()`` stays at tier 1.
+
 Exergy
 ~~~~~~
 

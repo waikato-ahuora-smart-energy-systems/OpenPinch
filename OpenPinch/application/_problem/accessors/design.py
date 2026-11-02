@@ -6,6 +6,8 @@ from copy import deepcopy
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 
 from ..arguments import (
+    ArgumentSpec,
+    resolve_effective_arguments,
     split_runtime_and_configuration_options,
     temporary_zone_configuration,
 )
@@ -250,6 +252,26 @@ class _DesignAccessor:
             runtime["period_id"] = period_id
         return runtime, configuration
 
+    def _quality_tier(
+        self,
+        configuration: Mapping[str, Any],
+        *,
+        default: int,
+        named: int | None = None,
+    ) -> int:
+        """Resolve a call's tier; the field default of 1 does not count as set."""
+        effective = resolve_effective_arguments(
+            {
+                "quality_tier": ArgumentSpec(
+                    "HENS_SYNTHESIS_QUALITY_TIER", default=default
+                )
+            },
+            named={} if named is None else {"quality_tier": named},
+            options=configuration,
+            config_values=self._problem.to_problem_json().get("options"),
+        )
+        return effective.values["quality_tier"]
+
     def _run(self, service, *, surface, runtime, configuration, **service_kwargs):
         from ....domain.enums import StreamLoc
         from ..targeting.execution import walk_zone_tree
@@ -309,9 +331,12 @@ class _DesignAccessor:
         best_solutions=None,
         solve_tolerance=None,
     ) -> HeatExchangerNetworkDesignView:
-        """Run the fixed default HEN synthesis workflow."""
+        """Run the default HEN synthesis workflow.
+
+        It runs quality tier 0 unless ``HENS_SYNTHESIS_QUALITY_TIER`` is set.
+        """
         from ....analysis.heat_exchanger_networks.service import (
-            heat_exchanger_network_synthesis_service,
+            _heat_exchanger_network_enhanced_synthesis_method_service,
         )
 
         runtime, configuration = self._arguments(
@@ -328,23 +353,26 @@ class _DesignAccessor:
             solve_tolerance=solve_tolerance,
         )
         return self._run(
-            heat_exchanger_network_synthesis_service,
+            _heat_exchanger_network_enhanced_synthesis_method_service,
             surface="heat_exchanger_network",
             runtime=runtime,
             configuration=configuration,
-            method=None,
+            quality_tier=self._quality_tier(configuration, default=0),
             workspace_variant=None,
         )
 
     def enhanced_heat_exchanger_network(
         self,
         *,
-        quality_tier: int = 2,
+        quality_tier: int | None = None,
         options: Mapping[str, Any] | None = None,
         period_id: str | None = None,
         **kwargs,
     ) -> HeatExchangerNetworkDesignView:
-        """Run enhanced OpenHENS synthesis at an explicit quality tier."""
+        """Run enhanced OpenHENS synthesis at a chosen quality tier.
+
+        ``quality_tier`` wins, then ``HENS_SYNTHESIS_QUALITY_TIER`` if set, then 2.
+        """
         from ....analysis.heat_exchanger_networks.service import (
             _heat_exchanger_network_enhanced_synthesis_method_service,
         )
@@ -357,7 +385,9 @@ class _DesignAccessor:
             surface="enhanced_heat_exchanger_network",
             runtime=runtime,
             configuration=configuration,
-            quality_tier=quality_tier,
+            quality_tier=self._quality_tier(
+                configuration, default=2, named=quality_tier
+            ),
             workspace_variant=None,
         )
 

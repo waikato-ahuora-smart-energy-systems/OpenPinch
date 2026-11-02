@@ -14,6 +14,7 @@ import pytest
 
 import OpenPinch
 import OpenPinch.analysis.heat_exchanger_networks as hens_package
+import OpenPinch.analysis.heat_exchanger_networks.service as service_module
 import OpenPinch.analysis.heat_exchanger_networks.targeting.open_hens_method as workflow_module
 from OpenPinch.analysis.heat_exchanger_networks.errors import (
     WorkflowContractError,
@@ -700,11 +701,40 @@ def test_open_hens_method_accessor_runs_original_tier_one(monkeypatch) -> None:
     )
 
 
+def _resolved_tier(design) -> int:
+    assert design.result.manifest is not None
+    return design.result.manifest.synthesis_quality_tier
+
+
+def _reload_from_problem_json(problem: PinchProblem) -> PinchProblem:
+    return PinchProblem(
+        source=json.loads(json.dumps(problem.to_problem_json())),
+        project_name=problem.project_name,
+    )
+
+
+def _reload_from_bundle(problem: PinchProblem) -> PinchProblem:
+    workspace = PinchWorkspace()
+    workspace.load(problem, case_name="case")
+    bundle = workspace.to_bundle()
+    reloaded = PinchWorkspace.from_bundle(
+        type(bundle).model_validate(json.loads(bundle.model_dump_json()))
+    )
+    return reloaded.case("case")
+
+
+def _two_period_problem_with_options(options: dict) -> PinchProblem:
+    payload = _duplicate_two_state_no_sweep_payload()
+    payload["options"].pop("HENS_SYNTHESIS_QUALITY_TIER", None)
+    payload["options"].update(options)
+    return PinchProblem(source=payload, project_name="two-period")
+
+
 def test_default_dispatch_is_fast_tier_zero_and_explicit_openhens_is_tier_one(
     monkeypatch,
 ) -> None:
     _use_fake_default_executor(monkeypatch)
-    default_problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 4})
+    default_problem = _small_problem()
     explicit_problem = _small_problem()
 
     default_design = default_problem.design.heat_exchanger_network()
@@ -721,7 +751,152 @@ def test_default_dispatch_is_fast_tier_zero_and_explicit_openhens_is_tier_one(
     assert explicit_design.result.manifest is not None
     assert default_design.result.manifest.synthesis_quality_tier == 0
     assert explicit_design.result.manifest.synthesis_quality_tier == 1
-    assert default_problem.master_zone.config.hens.synthesis_quality_tier == 4
+    assert default_problem.master_zone.config.hens.synthesis_quality_tier == 1
+
+
+@pytest.mark.parametrize("configured_tier", [0, 1, 4])
+def test_default_dispatch_runs_the_quality_tier_the_user_set(
+    monkeypatch,
+    configured_tier: int,
+) -> None:
+    _use_fake_default_executor(monkeypatch)
+    problem = _small_problem_with_options(
+        {"HENS_SYNTHESIS_QUALITY_TIER": configured_tier}
+    )
+
+    design = problem.design.heat_exchanger_network()
+
+    assert _resolved_tier(design) == configured_tier
+
+
+@pytest.mark.parametrize("configured_tier", [0, 1, 4])
+def test_enhanced_synthesis_method_runs_the_quality_tier_the_user_set(
+    monkeypatch,
+    configured_tier: int,
+) -> None:
+    _use_fake_default_executor(monkeypatch)
+    problem = _small_problem_with_options(
+        {"HENS_SYNTHESIS_QUALITY_TIER": configured_tier}
+    )
+
+    design = problem.design.enhanced_heat_exchanger_network()
+
+    assert _resolved_tier(design) == configured_tier
+
+
+def test_call_argument_beats_call_options_beats_the_quality_tier_the_user_set(
+    monkeypatch,
+) -> None:
+    _use_fake_default_executor(monkeypatch)
+    tier_option = "HENS_SYNTHESIS_QUALITY_TIER"
+    problem = _small_problem_with_options({tier_option: 4})
+
+    from_argument = problem.design.enhanced_heat_exchanger_network(
+        quality_tier=3,
+        options={tier_option: 2},
+    )
+    enhanced_from_options = problem.design.enhanced_heat_exchanger_network(
+        options={tier_option: 2},
+    )
+    default_from_options = problem.design.heat_exchanger_network(
+        options={tier_option: 2},
+    )
+
+    assert _resolved_tier(from_argument) == 3
+    assert _resolved_tier(enhanced_from_options) == 2
+    assert _resolved_tier(default_from_options) == 2
+    assert problem.to_problem_json()["options"][tier_option] == 4
+
+
+def test_call_options_tier_does_not_count_as_set_on_later_calls(monkeypatch) -> None:
+    _use_fake_default_executor(monkeypatch)
+    problem = _small_problem()
+
+    overridden = problem.design.heat_exchanger_network(
+        options={"HENS_SYNTHESIS_QUALITY_TIER": 3},
+    )
+    later = problem.design.heat_exchanger_network()
+
+    assert _resolved_tier(overridden) == 3
+    assert _resolved_tier(later) == 0
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"HENS_SYNTHESIS_QUALITY_TIER": 0},
+        {"HENS_SYNTHESIS_QUALITY_TIER": 4},
+    ],
+)
+def test_open_hens_stays_tier_one_whatever_tier_is_set(
+    monkeypatch,
+    options: dict,
+) -> None:
+    _use_fake_default_executor(monkeypatch)
+    configured = _small_problem_with_options(options)
+
+    assert _resolved_tier(configured.design.open_hens()) == 1
+    assert _resolved_tier(_small_problem().design.open_hens(options=options)) == 1
+
+
+@pytest.mark.parametrize("reload", [_reload_from_problem_json, _reload_from_bundle])
+def test_set_quality_tier_survives_a_reload(monkeypatch, reload) -> None:
+    _use_fake_default_executor(monkeypatch)
+    # Tier 1 is the field default, so only a retained "set" tells it from unset.
+    configured = reload(_small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 1}))
+    unset = reload(_small_problem())
+
+    assert _resolved_tier(configured.design.heat_exchanger_network()) == 1
+    assert _resolved_tier(configured.design.enhanced_heat_exchanger_network()) == 1
+    assert _resolved_tier(unset.design.heat_exchanger_network()) == 0
+    assert _resolved_tier(unset.design.enhanced_heat_exchanger_network()) == 2
+
+
+def test_update_options_can_set_and_clear_the_quality_tier(monkeypatch) -> None:
+    _use_fake_default_executor(monkeypatch)
+    problem = _small_problem()
+
+    problem.update_options({"HENS_SYNTHESIS_QUALITY_TIER": 1})
+    assert _resolved_tier(problem.design.heat_exchanger_network()) == 1
+
+    options = problem.to_problem_json()["options"]
+    del options["HENS_SYNTHESIS_QUALITY_TIER"]
+    problem.update_options(options, replace=True)
+    assert _resolved_tier(problem.design.heat_exchanger_network()) == 0
+
+
+@pytest.mark.parametrize(
+    ("options", "expected_tier"),
+    [
+        ({}, 0),
+        ({"HENS_SYNTHESIS_QUALITY_TIER": 1}, 1),
+        ({"HENS_SYNTHESIS_QUALITY_TIER": 3}, 3),
+    ],
+)
+def test_period_zone_and_multiperiod_designs_resolve_the_same_tier(
+    monkeypatch,
+    options: dict,
+    expected_tier: int,
+) -> None:
+    # The fake executor has no multi-period networks, so stop at the dispatch.
+    class TierResolved(Exception):
+        pass
+
+    def stop_at_dispatch(problem, *, quality_tier, **kwargs):
+        raise TierResolved(quality_tier)
+
+    monkeypatch.setattr(
+        service_module, "_run_open_hens_quality_tier_service", stop_at_dispatch
+    )
+    problem = _two_period_problem_with_options(options)
+
+    with pytest.raises(TierResolved) as for_period:
+        problem.design.heat_exchanger_network(period_id="base")
+    with pytest.raises(TierResolved) as for_all_periods:
+        problem.design.multiperiod_heat_exchanger_network(prerequisites=True)
+
+    assert for_period.value.args == (expected_tier,)
+    assert for_all_periods.value.args == (expected_tier,)
 
 
 def test_enhanced_synthesis_method_runs_requested_quality_tier(monkeypatch) -> None:
@@ -1102,6 +1277,13 @@ def _single_state_no_sweep_problem() -> PinchProblem:
 
 
 def _duplicate_two_state_no_sweep_problem() -> PinchProblem:
+    return PinchProblem(
+        source=_duplicate_two_state_no_sweep_payload(),
+        project_name="duplicate-two-state-no-sweep",
+    )
+
+
+def _duplicate_two_state_no_sweep_payload() -> dict:
     payload = _single_state_no_sweep_payload()
     for record in payload["streams"]:
         for key, value in list(record.items()):
@@ -1117,10 +1299,7 @@ def _duplicate_two_state_no_sweep_problem() -> PinchProblem:
         "PROBLEM_PERIOD_WEIGHTS": [0.1, 0.9],
         "HENS_RUN_ID": "duplicate-two-state-no-sweep",
     }
-    return PinchProblem(
-        source=payload,
-        project_name="duplicate-two-state-no-sweep",
-    )
+    return payload
 
 
 def _single_state_no_sweep_payload() -> dict:
