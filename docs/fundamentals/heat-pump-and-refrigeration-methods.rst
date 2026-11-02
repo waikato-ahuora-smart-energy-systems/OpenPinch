@@ -11,7 +11,8 @@ OpenPinch separates engineering model choice into descriptive methods:
    Refrigerant-specific simulated cycles with explicit refrigerant candidates.
 
 ``brayton_heat_pump`` and ``brayton_refrigeration``
-   Brayton-cycle studies using the model-specific backend.
+   Brayton-cycle studies. These raise ``NotImplementedError`` until the
+   Brayton solver is complete.
 
 ``mvr_heat_pump``
    Vapour-compression/MVR cascade targeting.
@@ -85,8 +86,9 @@ provenance. OpenPinch does not impose a component-count allowlist.
 
 Capability is checked at the actual states. Evaporation pressure uses the dew
 point and condensation pressure uses the bubble point, which matters for
-zeotropic blends. A fluid unsupported at either state fails preflight before
-optimization. The external ``REFPROP`` backend is outside this contract.
+zeotropic blends. Preflight checks one probe state, so a fluid that passes it can still be
+unsupported at other states the optimizer tries; those candidates are rejected
+during optimization. The external ``REFPROP`` backend is outside this contract.
 
 Winning Design and Part-Load Maps
 ---------------------------------

@@ -310,6 +310,7 @@ class HeatPumpTargetInputs(BaseModel):
     eta_penalty: float
     rho_penalty: float
     period_idx: int = 0
+    max_pressure_ratio: float | None = None
     simulation_backend: Literal["coolprop", "tespy"] = "coolprop"
     debug: bool
 

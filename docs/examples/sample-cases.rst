@@ -35,8 +35,8 @@ Included Cases
    Larger site-style example used in the packaged Total Site notebook.
 
 ``chocolate_factory.json``
-   Advanced direct-versus-indirect Carnot HPR and refrigeration example used in
-   the packaged notebook workflow.
+   Process heat-pump targeting example used for the vapour-compression
+   refrigeration target in notebook 09 and in the utility placement notebook.
 
 ``process_mvr.json``
    Small pressure-defined gas-stream case for direct process MVR component
@@ -86,8 +86,8 @@ Choosing The Right Case
 - Use ``zonal_site_multiperiod.json`` when the site answer needs seasonal or
   named-period comparison.
 - Use ``basic_pinch.json`` when you want a small direct HPR screening case.
-- Use ``chocolate_factory.json`` when you want to study the advanced
-  direct-versus-indirect HPR and refrigeration surface used by notebook 09.
+- Use ``chocolate_factory.json`` when you want to study the vapour-compression
+  refrigeration target used by notebook 09.
 - Use ``process_mvr.json`` for the pressure-defined process MVR component
   workflow in notebook 11.
 - Use ``Four-stream-Yee-and-Grossmann-1990-1.json`` when you want the converted

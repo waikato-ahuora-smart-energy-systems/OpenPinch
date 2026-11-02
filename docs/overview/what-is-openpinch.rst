@@ -23,7 +23,8 @@ select or launch an analysis.
 
 Configuration provides reusable numerical and engineering defaults. The method
 name selects the workflow. Per-call keywords override ``options``, stored
-configuration, and defaults without mutating persistent configuration.
+configuration, and defaults without mutating persistent configuration, except
+for load-time keys, which a per-call ``options`` argument rejects.
 
 Start with :doc:`../getting-started` and the
 :doc:`../examples/notebook-series`. When recovery is the design input rather
