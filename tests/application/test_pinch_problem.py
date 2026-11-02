@@ -1,5 +1,6 @@
 """Regression tests for the pinch problem classes."""
 
+import base64
 import json
 
 # import types
@@ -3443,3 +3444,24 @@ def test_comparison_text_columns_keep_none_for_missing_values():
     assert result["unit"].dtype == object
     assert result["unit"].tolist() == ["kW", None]
     assert result["value"].dtype == float
+
+
+def test_xls_source_is_rejected_with_a_save_as_xlsx_message(tmp_path):
+    legacy = tmp_path / "problem.xls"
+    legacy.write_bytes(b"")
+
+    with pytest.raises(ValueError, match=r"\.xls.*\.xlsx"):
+        PinchProblem().load(legacy)
+
+
+def test_xls_file_import_is_rejected_with_a_save_as_xlsx_message():
+    files = [
+        {
+            "name": "problem.xls",
+            "role": "problem",
+            "content_base64": base64.b64encode(b"").decode(),
+        }
+    ]
+
+    with pytest.raises(ValueError, match=r"\.xls.*\.xlsx"):
+        source_adapter.load_problem_source_from_files(files)
