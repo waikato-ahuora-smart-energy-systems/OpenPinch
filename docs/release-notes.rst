@@ -67,6 +67,20 @@ Heat exchanger network synthesis
   the methods keep tiers 0 and 2, and ``quality_tier=`` still wins.
   ``design.open_hens()`` stays at tier 1.
 
+Cogeneration
+~~~~~~~~~~~~
+
+- A cogeneration target now says whether its turbine solve converged. Targets and
+  result rows carry ``turbine_converged`` and ``turbine_diagnostics``, a solve
+  that did not converge or reports a diagnostic raises a ``UserWarning``,
+  ``problem.report().warnings`` lists the messages, and the Excel summary has a
+  ``Turbine Converged`` column. A weighted-average row is flagged if any period
+  did not converge and names the period of each message. These were previously
+  dropped, so the mass balance could fail unseen: the Varbanov correlation steps
+  at 2 MW, and a duty that puts the first stage near that step alternates
+  between the two branches for all 50 iterations. Numeric targets are unchanged;
+  a run that did not converge still reports its last iteration.
+
 Exergy
 ~~~~~~
 
