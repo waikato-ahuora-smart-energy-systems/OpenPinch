@@ -13,6 +13,16 @@ Heat pumps and refrigeration
   profile, about 10 K when the condenser sits at the top of its load. Targets
   can fall, by up to several percent where subcooling was at that limit.
 
+Heat exchanger network synthesis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``design.heat_exchanger_network()``, its multiperiod form and
+  ``design.enhanced_heat_exchanger_network()`` now run
+  ``HENS_SYNTHESIS_QUALITY_TIER`` when the problem's options set it, and they
+  ignored it before. Only problems that set the option see a change: without it
+  the methods keep tiers 0 and 2, and ``quality_tier=`` still wins.
+  ``design.open_hens()`` stays at tier 1.
+
 Exergy
 ~~~~~~
 
