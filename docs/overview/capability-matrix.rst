@@ -51,7 +51,7 @@ Capability Matrix
      - ``problem.components.add_process_mvr()`` for direct process MVR;
        ``problem.target.mvr_heat_pump()`` for optimized VC+MVR
      - replacement streams, stage/work evidence, or bounded optimized target
-     - HPR extras
+     - base (CoolProp)
    * - Area/cost, exergy, and energy transfer
      - named ``problem.target`` enrichment methods
      - enriched target and graph families
