@@ -36,8 +36,9 @@ One current prepared state per canonical period is retained in memory. For
 example, ``target.all_periods.direct_heat_integration()`` followed by
 ``target.all_periods.exergy()`` reuses compatible thermal prerequisites. State
 is replaced when superseded and is not serialized as run history. A scalar
-mutation supersedes the published all-period report; run the desired all-period
-workflow again to publish a complete batch.
+target run leaves the published all-period report in place; only an input
+change discards it, and the desired all-period workflow must then be run again
+to publish a complete batch.
 
 Published rows and graphs belong to the selected zone and, when requested,
 its descendants. Switching between sibling zones does not include the earlier

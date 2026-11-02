@@ -15,28 +15,29 @@ What Each Layer Does
 
 ``TargetInput`` and related schemas
    Define the request format for process streams, utilities, the optional
-   zone tree, and an optional serialized heat exchanger network.
+   zone tree, an optional serialized heat exchanger network, and the
+   ``residual_basis`` and ``plant_profile_data`` fields.
 
 ``TargetOutput`` and target/result schemas
    Define the structured response returned by the top-level service boundary.
 
 ``Configuration``
    Stores numerical and engineering defaults for heat pumps, utilities,
-   costing, turbines, and solvers. It does not select core methods. Each prepared
-   :class:`~OpenPinch.domain.zone.Zone` owns one config object.
+   costing, turbines, and solvers. Its method selectors are not user-settable.
+   Each prepared :class:`~OpenPinch.domain.zone.Zone` owns one config object.
 
 Discovering Options
 -------------------
 
-Use ``config_options()`` or ``Configuration.options_catalog()`` to inspect the
+Use ``configuration_options()`` to inspect the
 supported flat ``TargetInput.options`` keys, their groups, runtime status,
 enum choices, numeric bounds, and config paths:
 
 .. code-block:: python
 
-   from OpenPinch.presentation.configuration import configuration_options as config_options
+   from OpenPinch.presentation.configuration import configuration_options
 
-   options = config_options()
+   options = configuration_options()
    hpr_options = [field for field in options if field.group == "hpr"]
 
 Common options include ``THERMAL_DT_CONT`` for minimum contribution
@@ -71,8 +72,10 @@ Streams that share a name within a zone are renamed with a numeric suffix
 ``REPORTING_DEBUG_ENABLED`` is true; it is off by default because published
 data often gives one stream as several same-named segments.
 
-Configuration does not contain target-method selectors; the descriptive ``problem.target.*`` or
-``problem.design.*`` callable selects the analysis.
+Target-method selectors such as ``HPR_TYPE``, ``ORC_MODEL`` and
+``POWER_TURB_MODEL`` are not user-settable: passing one in ``options`` raises a
+``ValueError``. The descriptive ``problem.target.*`` or ``problem.design.*``
+callable selects the analysis and sets the selector for that run.
 
 Configuration
 -------------
@@ -175,8 +178,8 @@ stored at ``problem.results.design``. Serialize it explicitly:
    design = problem.design.heat_exchanger_network()
    payload = design.result.model_dump(mode="json")
 
-The result's ``ranked_networks``, ``manifest``, diagnostics, task metadata,
-``design_method``, and task ``method`` remain available through
+The result's ``ranked_networks``, ``manifest``, ``diagnostic_references``,
+task metadata, ``design_method``, and task ``method`` remain available through
 ``design.result``. The design view does not forward unknown attributes and is
 not itself a Pydantic model.
 
@@ -191,8 +194,8 @@ selected pathway, and protected-fallback status.
 default of tier 1 for prepared-problem workflows. User code should prefer
 ``problem.design.enhanced_heat_exchanger_network(quality_tier=...)`` for method-level
 tier selection because it applies a call-local override without mutating the
-loaded problem configuration. Runtime ``options`` passed to design accessors are
-reserved for runtime context and do not accept persistent ``HENS_*`` overrides.
+loaded problem configuration. Runtime ``options`` passed to design accessors accept ``HENS_*`` overrides
+that apply to that call only and do not change the stored configuration.
 
 Method-level inputs and outputs are Pydantic models. Their shared input
 contract contains run/problem metadata, settings, optional seed network,
@@ -349,4 +352,4 @@ Design Notes
 The schema layer should be the source of truth for external input contracts.
 The configuration layer should be the source of truth for runtime toggles and
 per-zone behavior. Keeping those roles distinct is what makes the package
-predictable when used from notebooks, services, and the CLI.
+predictable when used from notebooks and services.
