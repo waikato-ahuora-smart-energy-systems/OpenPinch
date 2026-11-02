@@ -58,7 +58,12 @@ def load_external_problem_source(
             problem_filepath=source_path,
             project_name=project_name,
         )
-    if suffix in {".xlsx", ".xls", ".xlsb", ".xlsm"}:
+    if suffix == ".xls":
+        raise ValueError(
+            f"Legacy Excel workbook '{source_path}' (.xls) is not supported. "
+            "Open it in Excel and save it as .xlsx."
+        )
+    if suffix in {".xlsx", ".xlsb", ".xlsm"}:
         return ExternalProblemSource(
             input_data=get_problem_from_excel(source_path, output_json=None),
             source_kind="excel",

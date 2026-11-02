@@ -4,6 +4,14 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Input and validation
+~~~~~~~~~~~~~~~~~~~~
+
+- A legacy ``.xls`` workbook is now rejected with a ``ValueError`` that asks
+  for a ``.xlsx`` save. It was accepted as a source suffix but failed with
+  ``ImportError: Import xlrd failed``, because no install extra provides
+  ``xlrd``.
+
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
