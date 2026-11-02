@@ -9,6 +9,9 @@ that are still open. Both audit reports are kept outside the repository. The
 plan groups the findings into work packages, each one pull request into
 ``develop``, and fixes their order and the conventions the fixes follow.
 
+All twelve packages shipped together in 0.7.2; this plan is kept as the
+historical record and was not rewritten after execution.
+
 The finding ids (C1, H1, M1 and so on) are the second report's. First-audit
 ids are prefixed ``A1-``.
 
@@ -374,59 +377,59 @@ Tracking
      - Input and Engine Hardening (0.7.2)
      - C1, M25, M26, H10
      - no
-     - planned
+     - done (#186)
    * - 2
      - Heat Pump Second Law
      - C2, M3
      - yes
-     - planned
+     - done (#183)
    * - 3
      - Area and Tolerance Correctness
      - C4, H1, H3, M24, A1-M13
      - yes
-     - planned
+     - done (#189)
    * - 4
      - Utility Cost and Totals
      - H2, M21, M22
      - yes
-     - planned
+     - done (#185)
    * - 5
      - HEN Utility Approach Constraints
      - C3
      - possibly
-     - planned
+     - done (#190)
    * - 6
      - HEN Utilities and Multiperiod Synthesis
      - H6, H7
      - possibly
-     - planned
+     - done (#192, #193)
    * - 7
      - HEN Orchestration
      - H8, M5, M6, M7, A1-H8, A1-H10
      - possibly
-     - planned
+     - done (#195)
    * - 8
      - Multiperiod Correctness
      - H4, H5, M17, M18
      - yes
-     - planned
+     - done (#187)
    * - 9
      - Input, Contracts and Exports
      - H11, M14, M19, M20, M23, A1-M10
      - no
-     - planned
+     - done (#184)
    * - 10
      - Optimisers and Utility Placement
      - H9, H12, M8, M10, M11, M12, A1-M14
      - possibly
-     - planned
+     - done (#188)
    * - 11
      - Heat Pump Conventions, Exergy and Targeting Details
      - M1, M2, M4, M9, M13, M15, M16
      - yes
-     - planned
+     - done (#191)
    * - 12
      - Command Layer
      - low items
      - no
-     - planned
+     - done (#194)

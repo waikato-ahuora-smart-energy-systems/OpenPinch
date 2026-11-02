@@ -4,20 +4,23 @@ CLI and Resources
 OpenPinch ships packaged learning assets in addition to the Python API. The
 resource helpers are the primary programmatic surface for discovering,
 inspecting, and copying those assets. The command-line surface is intentionally
-narrow and only copies notebooks.
+narrow: it copies notebooks and writes contract JSON Schemas.
 
 Command-Line Interface
 ----------------------
 
-The published package currently exposes one CLI subcommand:
+The published package currently exposes two CLI subcommands:
 
 - ``notebook`` for copying packaged example notebooks
+- ``schema`` for writing the JSON Schema of each public contract to
+  ``<Contract>.schema.json`` files
 
 .. automodule:: OpenPinch.__main__
    :members:
    :no-index:
 
-This means the CLI is an onboarding surface, not a solve surface. Validation,
+This means the CLI is an onboarding and schema-export surface, not a solve
+surface. Validation,
 targeting, graph export, Excel export, and dashboard launch all happen through
 Python.
 
@@ -35,24 +38,25 @@ The main helpers are:
 - ``list_notebooks()``, ``notebook_metadata()``, and ``copy_notebook()`` for
   the packaged notebook series
 
-The internal ``PinchProblem`` and ``PinchWorkspace`` coordinators also resolve
+The ``PinchProblem`` and ``PinchWorkspace`` classes also resolve
 packaged sample-case names such as ``basic_pinch.json`` directly when no local
 file with the same name exists.
 
-The packaged notebooks include saved execution outputs and can be copied for
-local exploration. They exercise the same unsupported
-``PinchWorkspace`` and plotting internals documented elsewhere in RTD. The
-series is ordered around first solves, Total Site method interpretation,
-multiperiod studies, advanced Heat Pump screening, direct gas/vapour MVR,
-VC+MVR cascade mechanics, HEN synthesis, energy-transfer analysis, and
-schema/service integration.
+The packaged notebooks are saved without execution outputs and can be copied
+for local exploration. They exercise the ``PinchProblem`` and
+``PinchWorkspace`` workflows. The series is ordered around first solves, Total
+Site method interpretation, workspace cases and persistence, multiperiod
+studies, area, cost and exergy, heat pump and refrigeration screening, process
+MVR and cascade mechanics, cogeneration, energy-transfer analysis, HEN
+synthesis, results, plots and exports, and utility placement.
 
 The current optional install split is:
 
 - ``openpinch[notebook]`` for Jupyter, Plotly graph rendering, and Excel I/O
 - ``openpinch[dashboard]`` for Streamlit plus the same plotting/export stack
 - ``openpinch[synthesis]`` for solver-backed heat exchanger network synthesis
-- ``openpinch[brayton_cycle]`` for TESPy-backed Brayton-cycle tooling
+- ``openpinch[brayton_cycle]`` as an alias of ``openpinch[tespy]``; the public
+  Brayton targeting methods currently raise ``NotImplementedError``
 - ``openpinch[tespy]`` for optional TESPy vapour-compression targeting and
   target-owned HPR performance-map generation
 - ``openpinch[full]`` for every optional surface, including the IDAES/Pyomo

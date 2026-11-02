@@ -3,7 +3,8 @@ Examples
 
 OpenPinch ships nineteen output-free process-engineer tutorials and maintained
 sample cases. Every supported public operation has an executable tutorial owner
-in the canonical coverage manifest.
+in the canonical coverage manifest; the ORC and Brayton operations, which are
+under development, are the exception.
 
 .. toctree::
    :maxdepth: 1
