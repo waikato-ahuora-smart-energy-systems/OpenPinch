@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -257,12 +258,11 @@ def test_grid_diagram_service_reports_invalid_network_inputs() -> None:
 
 
 def test_grid_diagram_service_reports_wrong_input_types() -> None:
+    not_a_network: Any = "not-a-network"
     with pytest.raises(TypeError, match="networks must be a HeatExchangerNetwork"):
-        build_grid_diagram("not-a-network")  # type: ignore[arg-type]
+        build_grid_diagram(not_a_network)
     with pytest.raises(TypeError, match="item 1 is str"):
-        build_grid_diagram(  # type: ignore[list-item]
-            [_network("first"), "not-a-network"],
-        )
+        build_grid_diagram([_network("first"), not_a_network])
 
 
 def test_grid_diagram_dependency_error_names_extra() -> None:

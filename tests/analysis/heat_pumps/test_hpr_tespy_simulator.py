@@ -1,7 +1,5 @@
 """TESPy HPR adapter, deterministic settings, and owned-resource tests."""
 
-# ruff: noqa: E402 - optional dependency gate must run before concrete imports.
-
 from __future__ import annotations
 
 import builtins
@@ -17,7 +15,6 @@ from types import SimpleNamespace
 import pytest
 
 pytest.importorskip("tespy")
-pytestmark = pytest.mark.tespy
 
 import OpenPinch.analysis.heat_pumps.performance_maps.adapters.tespy as tespy_adapter
 from OpenPinch.analysis.heat_pumps.cycles.vapour_compression_cycle import (
@@ -49,6 +46,8 @@ from OpenPinch.analysis.heat_pumps.performance_maps.settings import (
     TESPY_CONVERGENCE_SETTINGS,
 )
 from tests.analysis.heat_pumps.test_hpr_map_generation import _basis, _request
+
+pytestmark = pytest.mark.tespy
 
 EXPECTED_CHARACTERISTIC_POINTS = (
     (0.49, 0.78),

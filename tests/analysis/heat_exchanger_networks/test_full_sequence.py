@@ -9,6 +9,7 @@ import sys
 from collections import Counter
 from copy import deepcopy
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -774,7 +775,7 @@ def test_enhanced_synthesis_method_rejects_non_integer_quality_tier(
     problem = _small_problem()
 
     with pytest.raises(TypeError, match="quality_tier"):
-        problem.design.enhanced_heat_exchanger_network(quality_tier=quality_tier)  # type: ignore[arg-type]
+        problem.design.enhanced_heat_exchanger_network(quality_tier=quality_tier)
 
 
 @pytest.mark.synthesis
@@ -1047,8 +1048,9 @@ def test_hen_synthesis_has_no_public_target_or_root_service_bypass() -> None:
     assert not hasattr(hens_package, "run_synthesis_workflow")
     assert not hasattr(workflow_module, "run_synthesis_workflow")
 
+    payload: Any = _small_payload()
     with pytest.raises(TypeError, match="PinchProblem"):
-        heat_exchanger_network_synthesis_service(_small_payload())  # type: ignore[arg-type]
+        heat_exchanger_network_synthesis_service(payload)
 
 
 def test_synthesis_imports_do_not_load_live_solver_dependencies() -> None:

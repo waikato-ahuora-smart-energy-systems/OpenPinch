@@ -32,7 +32,7 @@ class ZoneType(Enum):
     S = "Site"
     P = "Process Zone"
     U = "Utility Zone"
-    O = "Unit Operation"  # noqa: E741
+    UO = "Unit Operation"
 
     def __str__(self):
         return self.value
