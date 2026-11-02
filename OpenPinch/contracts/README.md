@@ -24,7 +24,7 @@ application layer builds on these models.
 - Utility placement (`utility_placement.py`): `UtilityPlacementRequest`, `UtilityPlacementOptions`, `UtilityPlacementResult`, `UtilityPlacementModel`, templates, envelopes, candidates and enums.
 - `HeatRecoveryDtMinResult`, `HeatRecoveryDtMinStatus`, `HeatRecoveryQuantity` (`heat_recovery_dt_min.py`): inverse heat-recovery result.
 - `HeatExchangerNetworkControllabilityResult` and its endpoint, actuator, pairing and component models (`controllability.py`).
-- `TurbineSolveResult`, `TurbineStageResult` (`turbine.py`): turbine solve output.
+- `TurbineSolveResult`, `TurbineStageResult` (`turbine.py`): turbine solve output, raw floats in fixed units (kW, degC, bar, kJ/kg, kg/s); reported per period as `TargetResults.turbine_result`.
 - `CONTRACTS`, `VALUE_JSON_SCHEMA`, `STREAM_COLLECTION_JSON_SCHEMA` (module-level, not in `__all__`), `contract_json_schemas` (`schema.py`): JSON Schema for the public contracts.
 - Subdirectories: [synthesis](./synthesis/README.md) - HEN synthesis task, result and design-view models; [resources](./resources/README.md) - packaged JSON data, with the HPR performance-map schema and fixtures under it.
 
