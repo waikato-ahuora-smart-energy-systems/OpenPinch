@@ -165,7 +165,7 @@ def test_cascade_x0_bounds_and_parse(monkeypatch):
     )
     np.testing.assert_allclose(vars.T_cond, np.array([110.0, 78.0]))
     np.testing.assert_allclose(vars.T_evap, np.array([105.0, 70.0]))
-    np.testing.assert_allclose(vars.dT_subcool, np.array([0.2, 1.04]))
+    np.testing.assert_allclose(vars.dT_subcool, np.array([0.4, 0.16]))
     assert vars.Q_heat_base == pytest.approx(
         decode_available_fractions(vars.x_heat_split, vars.Q_heat_available).sum()
     )
@@ -370,6 +370,24 @@ def test_cascade_optimiser_allows_missing_initial_seed(monkeypatch):
 
     assert captured["x0_ls"] is None
     assert out.success is True
+
+
+def test_cascade_subcooling_scales_with_the_lift_to_the_coldest_evaporator():
+    args = _base_args(n_cond=1, n_evap=1)
+    args.refrigerant_ls = ["water"]
+    _, bnds = hp_cascade._get_cascade_hp_opt_setup(None, args)
+    x = np.zeros(len(bnds))
+    layout = hp_cascade.HPRoptVectorLayout(
+        n_cond=1, n_evap=1, n_subcool=1, n_heat_split=1, n_cool_split=0, n_ihx=1
+    )
+    x[layout.subcool_slice] = 0.5
+
+    state = hp_cascade._parse_cascade_hp_state_variables(x, args)
+
+    # The same limit as a parallel machine: the liquid can cool to the evaporator.
+    assert state.dT_subcool[0] == pytest.approx(
+        0.5 * (state.T_cond[0] - state.T_evap[0])
+    )
 
 
 def test_cascade_parse_floors_evaporation_at_the_refrigerant_minimum():
