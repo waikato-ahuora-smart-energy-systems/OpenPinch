@@ -53,7 +53,7 @@ from ..analysis.utility_placement.units import (
     INTERNAL_TEMPERATURE_DIFFERENCE,
 )
 from ..contracts.input import UtilitySchema
-from ..contracts.units import standardise_input_value
+from ..contracts.units import standardise_input_value, without_period_ids
 from ..contracts.utility_placement import (
     DecodedPlacement,
     QuantityValue,
@@ -476,7 +476,7 @@ def _normalize_maximum_duties(
             )
         try:
             value = standardise_input_value(
-                raw_value,
+                without_period_ids(raw_value),
                 field_name="heat_flow",
                 config=config,
             )

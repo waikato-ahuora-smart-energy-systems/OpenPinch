@@ -13,6 +13,17 @@ Heat pumps and refrigeration
   profile, about 10 K when the condenser sits at the top of its load. Targets
   can fall, by up to several percent where subcooling was at that limit.
 
+Values
+~~~~~~
+
+- A direct ``Value`` call with a ``period_ids`` key (for example
+  ``Value({"values": [10, 20], "period_ids": ["b", "a"]})``) now raises
+  ``ValueError``, with the same guidance as a domain ``Stream``. ``Value`` holds
+  magnitudes in order and has no period identity, so it dropped the ids and
+  gave the first period 10 whatever its id. Give the values in the problem's
+  period order. A utility's ``maximum_heat_flow`` and utility placement
+  ``maximum_duties``, which key values by period id on purpose, still take it.
+
 Exergy
 ~~~~~~
 

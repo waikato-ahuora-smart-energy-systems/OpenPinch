@@ -13,6 +13,7 @@ from ....contracts.input import TargetInput
 from ....contracts.units import (
     heat_flow_from_heat_capacity_flowrate,
     standardise_input_value,
+    without_period_ids,
 )
 from ....contracts.workspace import ValidationIssue
 from ....domain.configuration import tol
@@ -264,6 +265,8 @@ def _coerce_validation_values(
         if field_name in optional_field_names and _raw_value_is_missing(raw_value):
             values[field_name] = None
             continue
+        if field_name == "maximum_heat_flow":
+            raw_value = without_period_ids(raw_value)
         try:
             values[field_name] = standardise_input_value(
                 raw_value,

@@ -102,9 +102,9 @@ Units and Scalar Helpers
 ------------------------
 
 :class:`~OpenPinch.domain.value.Value` supports both ordinary scalar
-quantities and discrete-period values with ``period_ids`` and normalised
-``weights``. This makes it suitable for both deterministic reports and
-period-weighted scenario data.
+quantities and discrete-period values held in period order with normalised
+``weights``; a ``period_ids`` key is rejected. This makes it suitable for both
+deterministic reports and period-weighted scenario data.
 
 .. automodule:: OpenPinch.domain.value
    :members:

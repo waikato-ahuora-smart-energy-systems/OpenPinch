@@ -27,7 +27,11 @@ def _align_period_values(value, donor_ids, receiver_ids):
 
 def _bind_implicit_units(value, donor_config, receiver_config):
     """Keep unlabelled quantities physical when case unit defaults differ."""
-    from ..contracts.units import INPUT_UNIT_RULES, standardise_input_value
+    from ..contracts.units import (
+        INPUT_UNIT_RULES,
+        standardise_input_value,
+        without_period_ids,
+    )
 
     if isinstance(value, list):
         return [
@@ -45,11 +49,13 @@ def _bind_implicit_units(value, donor_config, receiver_config):
             and item is not None
             and not (isinstance(item, dict) and item.get("unit"))
         ):
+            # The ids are carried over below; only magnitudes are converted.
+            magnitudes = without_period_ids(item)
             source = standardise_input_value(
-                item, field_name=field, config=donor_config
+                magnitudes, field_name=field, config=donor_config
             )
             local = standardise_input_value(
-                item, field_name=field, config=receiver_config
+                magnitudes, field_name=field, config=receiver_config
             )
             if source.to_dict() != local.to_dict():
                 converted = source.to_dict()
