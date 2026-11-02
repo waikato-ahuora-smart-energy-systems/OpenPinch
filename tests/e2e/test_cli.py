@@ -30,6 +30,13 @@ def test_help_surfaces_supported_commands_and_flags(argv, expected, capsys):
     assert "sample" not in captured.out
 
 
+def test_parser_description_covers_both_commands():
+    description = cli.build_parser().description
+
+    assert "notebooks" in description
+    assert "JSON Schema" in description
+
+
 def test_schema_command_writes_one_json_schema_file_per_contract(tmp_path: Path):
     import json
 

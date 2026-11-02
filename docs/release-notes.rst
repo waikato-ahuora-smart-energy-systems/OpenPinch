@@ -64,6 +64,20 @@ Documentation
 - Each package directory now has a ``README.md`` stating its interface,
   invariants and side effects. These stay out of the wheel, and a test checks
   that what they cite still exists.
+Reporting
+~~~~~~~~~
+
+- ``export_stream_collection`` writes to the working directory when no
+  ``output_dir`` is given, as ``export_problem_table`` does. It previously
+  wrote to a ``results`` folder beside the package, which is inside
+  ``site-packages`` for an installed copy.
+
+Plots
+~~~~~
+
+- The hover label of a merged exchanger match in the network grid diagram
+  shows the summed area of its exchangers. It previously showed the area of
+  the first exchanger only.
 
 0.7.6 (2026-11-02)
 ------------------

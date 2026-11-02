@@ -185,6 +185,13 @@ def test_version_bump_runs_once_per_release_cycle():
     assert "git push origin HEAD:develop" in script
 
 
+def test_version_bump_hint_uses_a_tool_a_synced_checkout_can_run():
+    # bump-my-version is in no dependency group, so `uv run` cannot find it.
+    script = runs(workflow("ci.yml")["jobs"]["version"])
+    assert "uvx bump-my-version bump patch" in script
+    assert "uv run bump-my-version" not in script
+
+
 def test_dependabot_watches_actions_and_the_uv_lock():
     config = yaml.safe_load((WORKFLOW_DIR.parent / "dependabot.yml").read_text())
     updates = {entry["package-ecosystem"]: entry for entry in config["updates"]}

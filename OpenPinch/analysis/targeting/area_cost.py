@@ -37,7 +37,7 @@ def get_capital_cost_targets(
     area: float,
     num_units: int,
     config: Configuration,
-) -> dict:
+) -> tuple[float, float]:
     """Estimate equipment and annualized capital costs from area/unit targets.
 
     Parameters
