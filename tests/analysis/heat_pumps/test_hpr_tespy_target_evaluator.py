@@ -8,9 +8,11 @@ import gc
 import math
 import time
 import weakref
+from dataclasses import replace
 
 import numpy as np
 import pytest
+from CoolProp.CoolProp import PropsSI
 
 pytest.importorskip("tespy")
 pytestmark = pytest.mark.tespy
@@ -390,3 +392,70 @@ def test_real_public_tespy_target_and_minimal_map_stay_within_smoke_budget(
     )
     assert all(point.cop > 0.0 for point in performance_map.points)
     assert total_elapsed < 300.0
+
+
+@pytest.mark.parametrize(
+    ("refrigerant", "evaporating", "condensing"),
+    [("R134a", 5.0, 55.0), ("water", 100.0, 170.0)],
+)
+@pytest.mark.parametrize(
+    ("superheat", "subcooling"),
+    [(5.0, 0.0), (0.0, 5.0), (0.0, 0.0)],
+)
+def test_target_candidate_solves_at_saturation_ends(
+    refrigerant: str,
+    evaporating: float,
+    condensing: float,
+    superheat: float,
+    subcooling: float,
+) -> None:
+    """No superheat or subcooling is a valid state on the saturation line."""
+    _evaluator, coordinator, _metadata, request = _coordinator(refrigerant=refrigerant)
+
+    result = coordinator.evaluate(
+        replace(
+            request,
+            evaporating_temperature=evaporating,
+            condensing_temperature=condensing,
+            superheat=superheat,
+            subcooling=subcooling,
+        )
+    )
+    coordinator.close()
+
+    def saturated(temperature: float, quality: float) -> tuple[float, float]:
+        kelvin = temperature + 273.15
+        return (
+            PropsSI("P", "T", kelvin, "Q", quality, refrigerant),
+            PropsSI("H", "T", kelvin, "Q", quality, refrigerant),
+        )
+
+    assert isinstance(result, HprTargetThermodynamicResult)
+    p_low, h_vapour = saturated(evaporating, 1.0)
+    p_high, h_liquid = saturated(condensing, 0.0)
+    h_in = (
+        h_vapour
+        if superheat == 0.0
+        else PropsSI(
+            "H", "P", p_low, "T", evaporating + superheat + 273.15, refrigerant
+        )
+    )
+    s_in = (
+        PropsSI("S", "T", evaporating + 273.15, "Q", 1.0, refrigerant)
+        if superheat == 0.0
+        else PropsSI(
+            "S", "P", p_low, "T", evaporating + superheat + 273.15, refrigerant
+        )
+    )
+    h_out_ideal = PropsSI("H", "P", p_high, "S", s_in, refrigerant)
+    h_out = h_in + (h_out_ideal - h_in) / request.compressor_isentropic_efficiency
+    h_condensate = (
+        h_liquid
+        if subcooling == 0.0
+        else PropsSI(
+            "H", "P", p_high, "T", condensing - subcooling + 273.15, refrigerant
+        )
+    )
+    assert result.cop == pytest.approx(
+        (h_out - h_condensate) / (h_out - h_in), rel=1e-4
+    )
