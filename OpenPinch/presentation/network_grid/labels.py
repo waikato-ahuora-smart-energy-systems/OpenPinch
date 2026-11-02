@@ -249,8 +249,7 @@ def short_stream_name(stream: str) -> str:
 
 def exchanger_tooltip(match: GridDiagramMatch) -> str:
     """Build the hover label for one exchanger match."""
-    exchanger = match.exchanger
-    area = "n/a" if exchanger.area is None else f"{exchanger.area:.2f} m^2"
+    area = "n/a" if match.area is None else f"{match.area:.2f} m^2"
     stage = "" if match.stage is None else f" | stage {match.stage}"
     return (
         f"{short_stream_name(match.source_stream)} -> "

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -53,7 +55,7 @@ from OpenPinch.presentation.network_grid.dependencies import (
     require_network_grid_diagram_dependency,
 )
 from OpenPinch.presentation.network_grid.geometry import build_grid_model
-from OpenPinch.presentation.network_grid.labels import add_label
+from OpenPinch.presentation.network_grid.labels import add_label, exchanger_tooltip
 from OpenPinch.presentation.network_grid.plotly import (
     _PlotlyAxes,
     _PlotlyLine,
@@ -65,7 +67,10 @@ from OpenPinch.presentation.network_grid.results import (
     build_result_grid_diagram,
 )
 from OpenPinch.presentation.network_grid.service import build_grid_diagram
-from OpenPinch.presentation.network_grid.state import HeatExchangerNetworkGridModel
+from OpenPinch.presentation.network_grid.state import (
+    GridDiagramMatch,
+    HeatExchangerNetworkGridModel,
+)
 from OpenPinch.presentation.network_grid.temperatures import (
     midpoint_temperature,
     recovery_match_x_pair,
@@ -1326,6 +1331,23 @@ def test_grid_diagram_exchanger_artists_include_hover_tooltips() -> None:
     assert any("H1 -> C1 | stage 1" in tooltip for tooltip in tooltips)
     assert any("Duty: 1.20 MW" in tooltip for tooltip in tooltips)
     assert any("Area: 123.40 m^2" in tooltip for tooltip in tooltips)
+
+
+def test_exchanger_tooltip_shows_the_merged_match_area() -> None:
+    first_exchanger = SimpleNamespace(area=10.0)
+    match = GridDiagramMatch(
+        exchanger=first_exchanger,
+        state=None,
+        source_stream="H1",
+        sink_stream="C1",
+        stage=1,
+        duty=1000.0,
+        area=25.0,
+    )
+
+    assert "Area: 25.00 m^2" in exchanger_tooltip(match)
+    unknown = replace(match, area=None)
+    assert "Area: n/a" in exchanger_tooltip(unknown)
 
 
 def test_grid_diagram_height_is_proportional_to_lane_count() -> None:

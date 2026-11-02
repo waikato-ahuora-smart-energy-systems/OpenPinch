@@ -21,6 +21,13 @@ Reporting
   wrote to a ``results`` folder beside the package, which is inside
   ``site-packages`` for an installed copy.
 
+Plots
+~~~~~
+
+- The hover label of a merged exchanger match in the network grid diagram
+  shows the summed area of its exchangers. It previously showed the area of
+  the first exchanger only.
+
 0.7.6 (2026-11-02)
 ------------------
 
