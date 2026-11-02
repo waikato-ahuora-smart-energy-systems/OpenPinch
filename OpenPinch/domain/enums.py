@@ -18,9 +18,13 @@ class CogenerationTarget(Protocol):
     """Compatible target surface required by cogeneration analysis helpers."""
 
     config: Configuration
+    name: str
+    period_id: str | None
     hot_utilities: StreamCollection
     work_target: float | None
     turbine_efficiency_target: float | None
+    turbine_converged: bool | None
+    turbine_diagnostics: list[str]
     period_ids: dict[str, int] | None
 
 
