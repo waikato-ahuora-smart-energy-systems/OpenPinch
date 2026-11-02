@@ -20,6 +20,17 @@ Documentation
   (``notebook``, ``dashboard``, ``synthesis``, ``tespy``), ``interactive`` and ``slow-hpr``
   notebooks are described as routine CI runs, and ``design_result.views`` maps
   to the multiperiod HEN notebook.
+Input validation
+~~~~~~~~~~~~~~~~
+
+- New ``PinchProblem.source_validation_report(source)`` returns a
+  ``ValidationReport`` for any source the constructor takes, without raising for
+  bad input of any format. ``valid`` is true only if the constructor accepts the
+  source. ``problem.validation_report()`` could never report invalid input,
+  because the constructor raises first; its docstring and the input guide now say
+  so. The ``validate`` command uses the new report, so inline input is checked
+  after the same normalisation as loading: for example, a stream entry that is
+  not a record is now reported as the loader sees it.
 
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

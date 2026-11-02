@@ -459,6 +459,19 @@ def test_validate_reports_input_that_passes_the_schema_but_cannot_be_built():
     assert "Zone name and type" in report["issues"][0]["message"]
 
 
+def test_validate_reports_a_load_failure_the_source_report_cannot_see():
+    # The input is valid; only the request's project name stops it loading.
+    data = load_packaged_sample_case("basic_pinch.json")
+
+    response = run_command(
+        {"command": "validate", "problem": {"data": data, "project_name": None}}
+    )
+
+    assert response["value"]["input"] is None
+    assert response["value"]["report"]["valid"] is False
+    assert response["value"]["report"]["issues"][0]["path"] == ""
+
+
 def test_options_returns_fields_effective_values_and_options_set():
     data = load_packaged_sample_case("basic_pinch.json")
     data["options"] = {"THERMAL_DT_CONT": 5.0}
