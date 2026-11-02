@@ -23,6 +23,11 @@ Heat pumps and refrigeration
   parallel machines. The limit was previously the gap to the top of the sink
   profile, about 10 K when the condenser sits at the top of its load. Targets
   can fall, by up to several percent where subcooling was at that limit.
+- TESPy vapour-compression targets and performance maps now solve a cycle with
+  no subcooling or no superheat. CoolProp refused the saturated state as the
+  adapter specified it, so a candidate at the zero-subcooling bound always
+  failed, and with a small search budget that could be the only candidate
+  reached, raising ``HPRTargetingError``.
 
 Exergy
 ~~~~~~
