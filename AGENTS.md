@@ -17,6 +17,9 @@ Python package published to PyPI; documentation on Read the Docs.
   example, a solver binary or optional extra missing) is allowed.
 - Every user-visible change gets an entry in `docs/release-notes.rst` under
   "Unreleased".
+- Each directory's `README.md` under `OpenPinch/` and `scripts/` is its contract.
+  When a change alters a directory's interface, invariants or side effects,
+  update the README in the same commit.
 
 ## Layout
 
