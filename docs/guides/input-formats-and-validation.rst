@@ -57,7 +57,8 @@ Supported Source Shapes
 
 - packaged sample-case names such as ``basic_pinch.json``
 - JSON files
-- Excel workbooks such as ``.xlsx``, ``.xls``, ``.xlsb``, and ``.xlsm``
+- Excel workbooks (``.xlsx``, ``.xlsb`` and ``.xlsm``); a legacy ``.xls``
+  workbook is rejected, so save it as ``.xlsx`` first
 - CSV directories containing ``streams.csv`` and ``utilities.csv``
 - ``(streams_csv, utilities_csv)`` tuples
 - ``TargetInput`` instances
