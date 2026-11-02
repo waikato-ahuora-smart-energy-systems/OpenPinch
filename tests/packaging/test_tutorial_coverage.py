@@ -233,8 +233,8 @@ def test_optional_dependencies_name_real_extras() -> None:
         value = row["optional_dependency"].split(" (")[0]
         assert value in extras | {"none", "n/a"}, row["operation"]
     by_operation = {row["operation"]: row["optional_dependency"] for row in rows}
-    assert by_operation["problem.plot.composite_curve"] == "dashboard"
-    assert by_operation["problem.plot.export"] == "dashboard"
+    assert by_operation["problem.plot.composite_curve"] == "notebook"
+    assert by_operation["problem.plot.export"] == "notebook"
     assert by_operation["problem.plot.catalog"] == "none"
     assert by_operation["problem.design.heat_exchanger_network"] == "synthesis"
     assert by_operation["problem.target.vapour_compression_heat_pump"].startswith(

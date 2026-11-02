@@ -221,8 +221,10 @@ def _mode(owner_name: str, name: str, classification: str) -> str:
 def _optional_dependency(owner_name: str, name: str) -> str:
     """Return the extras an operation needs beyond the base install."""
     if owner_name == "Plot":
-        return "none" if name in {"catalog", "data"} else "dashboard"
-    if name in {"export_excel", "show_dashboard"}:
+        return "none" if name in {"catalog", "data"} else "notebook"
+    if name == "export_excel":
+        return "notebook"
+    if name == "show_dashboard":
         return "dashboard"
     if owner_name in {"Design", "Batch design", "Design result"}:
         return "synthesis"
