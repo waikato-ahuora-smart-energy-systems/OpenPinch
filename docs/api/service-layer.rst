@@ -23,8 +23,8 @@ Use Cases
 
 Use the service layer when you need to:
 
-- develop repository applications that need more control than the supported
-  request/response boundary
+- develop repository applications that need more control than
+  :class:`OpenPinch.PinchProblem` and :class:`OpenPinch.PinchWorkspace`
 - prepare a zone hierarchy once and run multiple advanced studies against it
 - inspect the prepared model before solving
 - mutate a live prepared model with process components before rerunning targets
@@ -34,7 +34,7 @@ Use the service layer when you need to:
 Main Service Surface
 --------------------
 
-.. automodule:: OpenPinch.analysis
+.. automodule:: OpenPinch.application.targeting
    :members:
    :no-index:
 
@@ -105,7 +105,7 @@ enter through ``PinchProblem.design``:
    problem.design.enhanced_heat_exchanger_network(quality_tier=2)
    problem.design.open_hens()
    problem.design.heat_exchanger_network()
-   problem.design.multiperiod_heat_exchanger_network()
+   problem.design.multiperiod_heat_exchanger_network(prerequisites=True)
    problem.design.network_evolution((existing_network,))
    problem.design.optimise_duties(network, objective="cost")
 
@@ -125,7 +125,10 @@ The HEN synthesis package is intentionally method-oriented:
 - ``results`` contains result assembly and seed lookup.
 - ``reporting`` contains ranking, verification, and export helpers.
 - ``solver`` contains optional-dependency checks, array adapters,
-  backend calls, and network extraction.
+  backend calls, piecewise helpers, and pinch-design decomposition.
+- ``extraction`` contains network extraction from solved models.
+- ``duty_optimisation.py`` contains the duty optimisation used by
+  ``design.optimise_duties``.
 - ``models`` contains the equation/unit model layer for pinch design and
   stagewise models.
 
@@ -165,9 +168,16 @@ controllability services. OpenPinch does not silently select period zero.
 
 .. code-block:: python
 
+   from OpenPinch.analysis.heat_exchanger_networks.controllability import (
+       quantify_heat_exchanger_network_controllability,
+   )
+
    design = problem.results.design
    period_id = design.network.period_ids[0]
-   assessment = design.network.quantify_controllability(period_id=period_id)
+   assessment = quantify_heat_exchanger_network_controllability(
+       design.network,
+       period_id=period_id,
+   )
    assessment.score
    assessment.components.rank
 
@@ -186,7 +196,7 @@ Typical Preparation and Solve Pattern
 .. code-block:: python
 
    from OpenPinch.contracts.input import TargetInput
-   from OpenPinch.analysis import (
+   from OpenPinch.application.targeting import (
        data_preprocessing_service,
        direct_heat_integration_service,
        indirect_heat_integration_service,
