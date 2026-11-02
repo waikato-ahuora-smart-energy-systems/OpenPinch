@@ -12,6 +12,11 @@ Heat pumps and refrigeration
   parallel machines. The limit was previously the gap to the top of the sink
   profile, about 10 K when the condenser sits at the top of its load. Targets
   can fall, by up to several percent where subcooling was at that limit.
+- A TESPy heat pump target without the optional ``tespy`` package now raises
+  an ``ImportError`` that names the ``openpinch[tespy]`` extra, as the docs
+  advise handling. It is still an ``HprTargetCompatibilityError`` (a
+  ``ValueError``) with code ``dependency_unavailable``, so existing handlers
+  and the command layer's error response are unchanged.
 
 0.7.6 (2026-11-02)
 ------------------
