@@ -18,7 +18,7 @@ JSON input files for example problems, shipped inside the wheel. The `__init__.p
 - A name not in the directory raises `FileNotFoundError` listing the available names. [resources.py:_resolve_resource]
 
 ## Side Effects
-- None in this directory. `copy_sample_case` writes a copy to the destination and creates its parent directory. [resources.py:copy_sample_case]
+- None in this directory. `copy_sample_case` writes a copy to the destination and creates its parent directory; unlike `copy_notebook`, it treats the destination as a directory only if it already exists as one, so a missing `out/` becomes a file named `out`. [resources.py:copy_sample_case]
 
 ## Verification
 - Run: `uv run --no-sync pytest tests/packaging/test_resources.py`

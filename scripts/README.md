@@ -61,7 +61,7 @@ OpenHENS migration and benchmarks (manual, not run in CI)
 - A release is skipped only when its GitHub release has both the wheel and sdist attached; when the version is not already released, a lower
   version than any existing tag, or a tag on another commit, is an error (exit 1)
   [release_plan.py:decide].
-- The generators write canonical output: LF line endings and a fixed column order; HPR resources are
+- The generators write canonical output with a fixed column order. `generate_tutorial_coverage.py` and `generate_hpr_performance_map_contract.py` write LF line endings on every platform, but `generate_analysis_catalog.py` calls `write_text` without `newline=""`, so it writes CRLF on Windows; HPR resources are
   sorted-key JSON, and the fixture version is pinned so golden files do not change with the
   installed release [generate_hpr_performance_map_contract.py:FIXTURE_GENERATOR_VERSION].
 - `artifact_install_smoke.py` must run against the installed wheel, not the checkout

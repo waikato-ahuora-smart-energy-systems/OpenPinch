@@ -1,7 +1,7 @@
 # Streamlit dashboard
 
 ## Overview
-Renders a solved zone as a Streamlit page: a sidebar of target metrics and utilities, graph cards and shifted and real problem tables with Excel download. It consumes graph data from `analysis.graphs.service`, figures from `presentation.graphs.plotly` and tables from `presentation.reporting`. Streamlit and openpyxl are optional dependencies.
+Renders a solved zone as a Streamlit page: a sidebar of target metrics and utilities, graph cards and shifted and real problem tables that can be saved as Excel to a typed server-side path. It consumes graph data from `analysis.graphs.service`, figures from `presentation.graphs.plotly` and tables from `presentation.reporting`. Streamlit and openpyxl are optional dependencies.
 
 ## Interface
 - `render_streamlit_dashboard` (`rendering.py`): renders the dashboard for a `Zone`; takes optional `graph_data`, `page_title` and `value_rounding`.
@@ -12,7 +12,7 @@ Renders a solved zone as a Streamlit page: a sidebar of target metrics and utili
 
 ## Invariants
 - Only targets with `reportable` set are listed; a repeated target name gets the scope (or object id) appended so none is hidden. [rendering.py:_collect_targets]
-- Metrics are shown in the zone's configured output units, converted from degC and kW; failure to convert falls back to the canonical unit; absent values show "n/a". [rendering.py:_display]
+- Metrics are shown in the zone's configured output units, converted from degC and kW; failure to convert falls back to the canonical unit; absent values show "n/a". Only the overview metrics are converted: the sidebar utility cards are fixed to kW. [rendering.py:_display] [rendering.py:render_streamlit_dashboard]
 - Free text put into HTML is escaped. [rendering.py:render_streamlit_dashboard]
 - The stylesheet is read from the package as UTF-8 beside `rendering.py`. [rendering.py:_dashboard_css]
 - Exported Excel text cells are stored as plain strings, not formulas. [exports.py:render_table_export]

@@ -8,13 +8,13 @@ Turns the serialised graph data of a solved problem into Plotly figures and HTML
 - `_PlotAccessor` (`problem.py`): constructed with a problem and an optional heat-pump/refrigeration graph selector; the `PinchProblem` plot accessor wraps it. Methods:
   - `catalog`, `data`: graph inventory as a dataframe and as serialised graph sets.
   - `export`, `export_gallery`: write graphs as HTML files, the latter with an `index.html`.
-  - One method per graph type, named in `PLOT_METHOD_GRAPH_TYPES` (for example `composite_curve`, `grand_composite_curve`, `net_load_profiles`, `energy_transfer_diagram`), each taking `zone_name`, `index`, `show` and `return_graph_data`; the heat-pump, refrigeration and ORC variants are listed there too.
+  - One method per graph type, named in `PLOT_METHOD_GRAPH_TYPES` (for example `composite_curve`, `grand_composite_curve`, `net_load_profiles`, `energy_transfer_diagram`), each taking `zone_name`, `index`, `show` and `return_graph_data`; the heat-pump, refrigeration and ORC variants are listed there too, and the heat-pump and refrigeration methods (`grand_composite_curve_with_heat_pump`, `..._with_refrigeration`, the `net_load_profiles_with_*` pair) also take `target` [problem.py:_PlotAccessor._plot_hpr].
 - `PLOT_METHOD_GRAPH_TYPES`, `PlotlyJs` (`problem.py`): method name to `GraphType` map; the allowed `include_plotlyjs` values (`True`, `"cdn"`, `"directory"`).
 - `graph_simple_cc_plot`, `plot_t_h_curve`, `plot_t_h_curve_with_piecewise_and_bounds` (`simple.py`): quick composite curve and T-H plots that call `show()`.
 - Subdirectories: none.
 
 ## Invariants
-- `zone_name` is matched against the graph key, name, zone name, zone address and target type, also by the part after the last `/`; no match raises `KeyError` listing the zones. [problem.py:_graph_set_matches_zone_selector] [problem.py:_PlotAccessor._select_graphs]
+- `zone_name` is matched against the graph key, name, zone name, zone address and target type, also by the part after the first `/` (selector and candidate alike); no match raises `KeyError` listing the zones. [problem.py:_graph_set_matches_zone_selector] [problem.py:_PlotAccessor._select_graphs]
 - `graph_type` must be a `GraphType`; no match raises `ValueError`, an out-of-range `index` raises `IndexError`. [problem.py:_PlotAccessor._select_graph]
 - `show=True` with `return_graph_data=True` raises `ValueError`. [problem.py:_PlotAccessor._plot_graph]
 - The `plot` argument of the export methods must be a bound method of this problem's accessor. [problem.py:_PlotAccessor._graph_type_for_method]

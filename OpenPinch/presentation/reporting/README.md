@@ -30,7 +30,7 @@ Converts solved targets and tables into external forms: report contracts and JSO
 ## Side Effects
 - Writes `.xlsx` files and creates directories. [workbook.py:export_target_summary_to_excel_with_units] [problem_table.py:export_problem_table]
 - `export_problem_table` defaults to the current working directory. [problem_table.py:export_problem_table]
-- `export_stream_collection` defaults to `results/` beside the directory that contains the `OpenPinch` package, which is the repository root in a checkout but `site-packages/results` when installed, so callers should pass `output_dir`; it writes a CSV. [stream_collection.py:export_stream_collection]
+- `export_stream_collection` defaults to `results/` inside the directory that contains the `OpenPinch` package, which is the repository root in a checkout but `site-packages/results` when installed, so callers should pass `output_dir`; it writes a CSV. [stream_collection.py:export_stream_collection]
 - `write_text_as_plain_strings` mutates the openpyxl workbook it is given. [excel_text.py:write_text_as_plain_strings]
 - Uses the openpyxl engine through pandas. [workbook.py:export_target_summary_to_excel_with_units]
 

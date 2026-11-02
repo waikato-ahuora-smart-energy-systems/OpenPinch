@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import CoolProp.CoolProp as CoolProp
@@ -11,10 +13,12 @@ import pytest
 import OpenPinch.analysis.heat_pumps.targeting.cascade_vapour_compression as hp_cascade
 import OpenPinch.analysis.heat_pumps.targeting.parallel_vapour_compression as hp_parallel
 import OpenPinch.analysis.heat_pumps.targeting.vapour_compression_mvr as hp_mvr
+from OpenPinch import PinchProblem
 from OpenPinch.analysis.heat_pumps.common.shared import (
     limit_cascade_pressure_ratios,
     limit_parallel_pressure_ratios,
 )
+from OpenPinch.contracts.hpr import HPRTargetingError
 from OpenPinch.domain.configuration_fields import CONFIG_FIELD_SPECS
 
 from .helpers import _base_args
@@ -158,3 +162,39 @@ def test_decoding_an_mvr_design_limits_the_closed_stage():
 
     T_cond_vc = state.T_cond[-1]
     assert _ratio("water", T_cond_vc, state.T_evap[-1]) <= 15.0 * (1 + 1e-6)
+
+
+def _ahmad_utility_refrigeration(*, limit: float | None = None):
+    path = Path(__file__).parents[3] / "examples/stream_data/p_Ahmad (example 3).json"
+    problem = PinchProblem(json.loads(path.read_text()))
+    problem.target.direct_heat_integration()
+    options = {} if limit is None else {"HPR_MAX_PRESSURE_RATIO": limit}
+    return problem.target.vapour_compression_refrigeration(
+        load_fraction=0.25,
+        condensers=2,
+        evaporators=1,
+        maximum_restarts=1,
+        maximum_iterations=3,
+        maximum_evaluations=48,
+        refrigerants=["Water"],
+        is_utility_refrigeration=True,
+        is_cascade_cycle=False,
+        options=options,
+    )
+
+
+def test_a_refrigerator_that_cannot_reach_its_duty_within_the_limit_is_a_failure():
+    with pytest.raises(HPRTargetingError):
+        _ahmad_utility_refrigeration(limit=1.5)
+
+
+def test_a_refrigerator_still_carrying_a_penalty_is_a_failure():
+    # This small search budget ends on penalised designs.
+    with pytest.raises(HPRTargetingError):
+        _ahmad_utility_refrigeration()
+
+
+def test_the_same_refrigerator_is_a_target_without_the_limit():
+    target = _ahmad_utility_refrigeration(limit=1e6)
+
+    assert target.hpr_details.obj > 0.0
