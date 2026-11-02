@@ -4,6 +4,16 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Documentation
+~~~~~~~~~~~~~
+
+- The tutorial coverage manifest is generated and checked against the committed
+  file. Plots, design-result views and read-only calls are now marked
+  ``cached observation``, ``optional_dependency`` names real extras
+  (``dashboard``, ``synthesis``, ``tespy``), ``interactive`` and ``slow-hpr``
+  notebooks are described as routine CI runs, and ``design_result.views`` maps
+  to the multiperiod HEN notebook.
+
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
