@@ -56,6 +56,7 @@ class HPRProfile:
         *,
         maximum_evaluations: int | None = None,
         maximum_iterations: int | None = None,
+        sentinel: bool = False,
     ) -> dict[str, Any]:
         """Build fresh explicit public kwargs without exposing mutable profile data."""
         kwargs: dict[str, Any] = {
@@ -91,6 +92,11 @@ class HPRProfile:
                 refrigerants=list(self.refrigerants),
                 is_cascade_cycle=self.is_cascade_cycle,
             )
+        if sentinel and self.profile_id in HPR_SENTINELS_WITHOUT_PRESSURE_RATIO_LIMIT:
+            kwargs["options"] = {
+                **kwargs.get("options", {}),
+                "HPR_MAX_PRESSURE_RATIO": 1e6,
+            }
         return kwargs
 
     def search_limits(self, *, sentinel: bool) -> tuple[int, int]:
@@ -190,6 +196,16 @@ HPR_SENTINEL_FILENAMES = {
     "direct-optimized-vc-mvr-heat-pump": "p_Barbaro and Bagajewicz.json",
     "utility-optimized-vc-mvr-heat-pump": "p_Feng et al (case study 1).json",
 }
+
+# These sentinels prove the search succeeds on a solvable problem, and their
+# lifts are beyond one compressor at the default pressure ratio limit.
+HPR_SENTINELS_WITHOUT_PRESSURE_RATIO_LIMIT = frozenset(
+    {
+        "utility-parallel-vc-refrigeration",
+        "direct-optimized-vc-mvr-heat-pump",
+        "utility-optimized-vc-mvr-heat-pump",
+    }
+)
 
 # A utility refrigerator must lift heat from below ambient to the hot-utility
 # level. At such lifts no heat pump may pay, so these sentinels accept the

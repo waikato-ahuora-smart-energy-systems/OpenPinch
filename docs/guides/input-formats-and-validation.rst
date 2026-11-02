@@ -94,7 +94,7 @@ are ignored:
 - ``heat_flow`` (``ΔH``, ``Duty``), ``heat_capacity_flowrate`` (``CP``,
   streams only, used for the heat flow when it is not given), ``dt_cont``
   (``ΔTcont``), ``htc`` and
-  ``price``.
+  ``price`` (utilities only).
 
 A column with an unrecognised header is ignored with a warning, and two
 columns for the same field are an error. A header row with no recognised name
@@ -244,7 +244,8 @@ Choose the source shape by ownership:
 
 Configuration belongs in ``TargetInput.options`` and is materialized as a
 runtime ``Configuration`` object on prepared zones. Use
-``config_options()`` to discover supported option keys.
+``OpenPinch.presentation.configuration.configuration_options()`` to discover
+supported option keys.
 
 Consuming HPR Performance Maps
 ------------------------------
