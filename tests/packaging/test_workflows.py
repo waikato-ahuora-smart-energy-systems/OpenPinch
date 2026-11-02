@@ -2,9 +2,11 @@
 
 import json
 import re
+import tomllib
 
 import yaml
 
+from scripts import optional_install_smoke
 from tests.support.paths import REPOSITORY_ROOT
 
 WORKFLOW_DIR = REPOSITORY_ROOT / ".github" / "workflows"
@@ -104,9 +106,38 @@ def test_every_ci_lane_is_present():
         "brayton_cycle",
         "tespy",
         "synthesis",
+        "full",
     }
     assert {row["os"] for row in smoke["include"]} == {"windows-latest", "macos-latest"}
     assert "SOURCE_DATE_EPOCH" in runs(jobs["build"])
+
+
+def test_every_extra_has_a_smoke_surface_the_script_accepts():
+    jobs = workflow("ci.yml")["jobs"]
+    surfaces = set(jobs["smoke"]["strategy"]["matrix"]["surface"])
+    pyproject = tomllib.loads((REPOSITORY_ROOT / "pyproject.toml").read_text())
+    assert surfaces == {"core", *pyproject["project"]["optional-dependencies"]}
+    parser = optional_install_smoke.build_parser()
+    for surface in surfaces:
+        assert parser.parse_args([surface]).surface == surface
+    # full contains the tespy extra, so its wheel runs the tespy artifact path.
+    assert (
+        "full) uv run --no-sync python scripts/artifact_install_smoke.py --surface tespy"
+        in runs(jobs["smoke"])
+    )
+
+
+def test_full_smoke_runs_every_other_optional_surface(monkeypatch):
+    checked = []
+    surfaces = ("dashboard", "notebook", "brayton_cycle", "tespy", "synthesis")
+    for surface in surfaces:
+        monkeypatch.setattr(
+            optional_install_smoke,
+            f"_check_{surface}_surface",
+            lambda surface=surface: checked.append(surface),
+        )
+    assert optional_install_smoke.main(["full"]) == 0
+    assert sorted(checked) == sorted(surfaces)
 
 
 def test_pyodide_shards_cover_the_presentation_tests():
