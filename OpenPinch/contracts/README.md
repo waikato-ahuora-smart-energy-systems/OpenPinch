@@ -25,7 +25,7 @@ application layer builds on these models.
 - `HeatRecoveryDtMinResult`, `HeatRecoveryDtMinStatus`, `HeatRecoveryQuantity` (`heat_recovery_dt_min.py`): inverse heat-recovery result.
 - `HeatExchangerNetworkControllabilityResult` and its endpoint, actuator, pairing and component models (`controllability.py`).
 - `TurbineSolveResult`, `TurbineStageResult` (`turbine.py`): turbine solve output.
-- `CONTRACTS`, `VALUE_JSON_SCHEMA`, `STREAM_COLLECTION_JSON_SCHEMA`, `contract_json_schemas` (`schema.py`): JSON Schema for the public contracts.
+- `CONTRACTS`, `VALUE_JSON_SCHEMA`, `STREAM_COLLECTION_JSON_SCHEMA` (module-level, not in `__all__`), `contract_json_schemas` (`schema.py`): JSON Schema for the public contracts.
 - Subdirectories: [synthesis](./synthesis/README.md) - HEN synthesis task, result and design-view models; [resources](./resources/README.md) - packaged JSON data, with the HPR performance-map schema and fixtures under it.
 
 ## Invariants
@@ -34,13 +34,13 @@ application layer builds on these models.
 - Every `TargetResults` field carries an aggregation policy; `metric_specifications` raises for a field without one [report_metrics.py:metric_specifications].
 - Report values are converted to configured display units; annual-cost units are rescaled by `COSTING_ANNUAL_OP_TIME` rather than the calendar year [units.py:coerce_output_value].
 - Input values are converted to canonical units (degC, kPa, kJ/kg, kW, kW/delta_degC, delta_degC, kW/m^2/delta_degC, $/MWh); `dt_cont` given in degC or K is read as a temperature difference [units.py:INPUT_UNIT_RULES, standardise_input_value].
-- A stream has either `segments`, a `profile`, or ordinary thermal data (`t_supply`, `t_target` and `heat_flow` or `heat_capacity_flowrate`); `segments` and `profile` are mutually exclusive and `heat_capacity_flowrate` cannot accompany either. Parent `t_supply`/`t_target`/`heat_flow` may accompany nested data and are checked against it at input validation [input.py:StreamSchema].
+- A stream has either `segments`, a `profile`, or ordinary thermal data (`t_supply`, `t_target` and `heat_flow` or `heat_capacity_flowrate`); `segments` and `profile` are mutually exclusive and `heat_capacity_flowrate` cannot accompany either. Parent `t_supply`/`t_target`/`heat_flow` may accompany nested data; `StreamSchema` does not compare them, the match is checked when the application prepares the problem [segments.py:_validate_supplied_parent_aggregates] [input.py:StreamSchema].
 - Sibling zone names are unique [input.py:ZoneTreeSchema].
 - A residual-basis input cannot contain streams, networks or plant profiles and must use its single frozen period [input.py:TargetInput].
 - Exchanger period states, direction semantics and segment area totals are checked; `area` must match the largest period total of segment areas [input.py:HeatExchangerSchema].
 - Workspace bundles accept only `schema_version` `"3"`; case names are portable (no path characters, control characters, trailing period or Windows device names) [workspace.py:PinchWorkspaceBundle, validate_workspace_case_name].
 - A performance map must be in canonical point order, satisfy `q_sink = q_source + electric_power` within tolerance, have useful duty equal to `load_fraction * reference_capacity`, and use basis `q_sink` for heat pumps and `q_source` for refrigeration [hpr_performance_map.py:HprPerformanceMap].
-- `HprTargetSimulationRecord.topology_id` must equal `cycle_id`; multi-loop topologies need loop evidence; the condensing temperature exceeds the evaporating temperature [hpr.py:HprTargetSimulationRecord].
+- `HprTargetSimulationRecord.topology_id` must equal `cycle_id`; every topology other than single-stage vapour compression needs loop evidence; the condensing temperature exceeds the evaporating temperature [hpr.py:HprTargetSimulationRecord].
 - `HeatRecoveryDtMinResult` checks that requested and achieved recovery do not exceed the thermodynamic limit, that the residual equals achieved minus requested, and that `status` agrees with the values [heat_recovery_dt_min.py:HeatRecoveryDtMinResult].
 - Controllability scores and interaction entries lie in 0..1 [controllability.py:_validate_score].
 - Utility-placement values are frozen and finite, and period ids are unique and aligned with weights [utility_placement.py:_FrozenContract, UtilityPlacementResult].

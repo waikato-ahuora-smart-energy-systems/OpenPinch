@@ -27,7 +27,7 @@ problem-owned result, and a frozen design view for clients that draw it. They us
 - Method output `objective_value` and result `objective_values` are finite and non-negative; `stage_count` is positive [method.py:HeatExchangerNetworkSynthesisMethodOutput, result.py:HeatExchangerNetworkSynthesisResult].
 - Topology restriction `stage` is positive and `duty` non-negative and finite [topology.py:HeatExchangerNetworkTopologyRestriction].
 - Models forbid extra fields and validate on assignment, except the view models, which are frozen [view.py:_ViewModel].
-- Grid matches list recovery exchangers first, then heaters, then coolers; drawing positions are left to the client [view.py:HeatExchangerNetworkGridLayout].
+- By convention, layouts built by `presentation/network_grid/layout.py` list recovery, then heater, then cooler matches; the model does not enforce the order, and drawing positions are left to the client [view.py:HeatExchangerNetworkGridLayout].
 
 ## Side Effects
 - None. Method input fills `task_id` and output fills `method` from `task` during validation [method.py:_ensure_task_id, _fill_method_from_task].
