@@ -329,6 +329,42 @@ def test_real_tespy_design_and_offdesign_support_approved_fluid_categories(
 
 
 @pytest.mark.tespy
+@pytest.mark.parametrize(
+    ("superheat", "subcooling"),
+    [(5.0, 0.0), (0.0, 5.0), (0.0, 0.0)],
+)
+def test_real_tespy_design_and_offdesign_solve_at_saturation_ends(
+    superheat,
+    subcooling,
+):
+    context = build_hpr_map_generation_context(
+        _basis(
+            simulation_backend="tespy",
+            refrigerant_spec="R134a",
+            superheat=superheat,
+            subcooling=subcooling,
+        ),
+        _request(
+            source_temperatures=[8.0],
+            sink_temperatures=[51.0],
+            load_fractions=(0.7,),
+        ),
+    )
+    simulator = TespyHprPointSimulator()
+
+    metadata = simulator.prepare(context)
+    result = simulator.simulate(next(iter_hpr_operating_points(context)))
+    simulator.close()
+
+    assert metadata.design_converged is True
+    assert result.converged is True
+    assert result.q_sink == pytest.approx(
+        result.q_source + result.compressor_power,
+        abs=context.energy_balance_tolerance,
+    )
+
+
+@pytest.mark.tespy
 def test_every_point_restores_the_design_snapshot_and_is_order_independent():
     context = _tespy_context(loads=(0.55, 0.85))
     first, second = tuple(iter_hpr_operating_points(context))
