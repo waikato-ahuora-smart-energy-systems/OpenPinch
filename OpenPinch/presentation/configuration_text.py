@@ -620,6 +620,13 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
             "HPR model reads it."
         ),
     ),
+    "HPR_MAX_PRESSURE_RATIO": FieldText(
+        "HPR compressor pressure ratio limit", None,
+        (
+            "Largest ratio of condensing to evaporating pressure across one "
+            "vapour-compression compressor."
+        ),
+    ),
     "HPR_DT_CASCADE_HX": FieldText(
         "HPR cascade heat exchanger approach", "delta_degC",
         (

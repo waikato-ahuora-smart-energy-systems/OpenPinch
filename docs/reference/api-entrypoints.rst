@@ -7,7 +7,8 @@ Application workflows begin at the package root:
 
    from OpenPinch import PinchProblem, PinchWorkspace
 
-The ``openpinch notebook`` CLI copies maintained tutorial sources. Resource
+The ``openpinch notebook`` CLI subcommand copies maintained tutorial sources,
+and ``openpinch schema`` writes the JSON Schema of each public contract. Resource
 helpers under :mod:`OpenPinch.resources` list, inspect, read, and copy packaged
 sample cases and notebooks.
 

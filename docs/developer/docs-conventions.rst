@@ -9,7 +9,8 @@ Content Rules
 -------------
 
 - Document the protected main contract by user intent first.
-- Label every deep-owner workflow ``Unsupported internal``; never imply that
+- Label every deep-owner workflow as an unsupported contributor reference or
+  unsupported advanced owner, as the reference pages do; never imply that
   tested repository functionality is compatibility-protected.
 - Explain the thermodynamic decision question before explaining the API call.
 - Keep each guide on the standard structure: purpose, prerequisites, sample
@@ -68,6 +69,3 @@ Docs Maintenance Expectations
   that compare examples docs with ``OpenPinch.resources``.
 - Keep unsupported owner examples clearly labelled in guides, notebooks, and
   the support matrix.
-- Legacy pages under ``docs/user-guide`` and moved ``docs/reference`` entry
-  points should remain as orphan transition pages unless a deliberate redirect
-  strategy replaces them.

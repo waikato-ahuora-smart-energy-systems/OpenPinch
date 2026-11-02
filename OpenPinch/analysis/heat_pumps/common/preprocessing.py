@@ -113,6 +113,7 @@ def construct_HPRTargetInputs(
         dtcont_hp=hpr.dt_cont,
         dt_hp_ihx=hpr.dt_ihx,
         dt_cascade_hx=hpr.dt_cascade_hx,
+        max_pressure_ratio=hpr.max_pressure_ratio,
         T_env=environment.temperature,
         dt_env_cont=hpr.dt_env_cont,
         dt_phase_change=thermal.dt_phase_change,

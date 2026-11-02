@@ -45,8 +45,9 @@ The core OpenPinch solve path can be read as one analysis-dataflow diagram:
        -> tables, plots, Excel export, and dashboard views
 
 This matters because the same prepared model feeds the ``PinchProblem``
-wrapper, the service layer, and the packaged notebooks. The CLI only copies
-notebook sources; it does not run this solve path.
+wrapper, the service layer, and the packaged notebooks. The CLI copies
+notebook sources and writes contract JSON Schemas; it does not run this solve
+path.
 
 Minimum Approach Temperature
 ----------------------------
@@ -68,8 +69,9 @@ the original input.
 Global ``dt_min`` and exchanger EMAT
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The process-level global ``dt_min`` (sometimes called HRAT) is the separation
-between the shifted hot and cold process composite curves. OpenPinch can invert
+The process-level global ``dt_min`` (sometimes called HRAT) is the minimum
+hot-to-cold temperature separation between the process composite curves at the
+pinch; the shifted curves touch there. OpenPinch can invert
 that relationship: given a required process heat recovery, it calculates the
 equivalent global ``dt_min`` with
 ``problem.target.heat_recovery_dt_min(...)``. The calculation
