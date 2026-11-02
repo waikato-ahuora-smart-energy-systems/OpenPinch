@@ -23,6 +23,11 @@ Heat pumps and refrigeration
   parallel machines. The limit was previously the gap to the top of the sink
   profile, about 10 K when the condenser sits at the top of its load. Targets
   can fall, by up to several percent where subcooling was at that limit.
+- A utility level that sits on an air or cooling-water limit can now use that
+  service. A level's 0.1 K band ended just past the limit, so the whole duty
+  was priced as refrigeration. For example, with ``HPR_DT_CONT`` of 5 a 25 C
+  level sits on the 15 C air limit. Utility placement targets with such a level
+  can fall by about half: one 25% load test case went from 836.6 to 427.3 k$/y.
 
 Exergy
 ~~~~~~

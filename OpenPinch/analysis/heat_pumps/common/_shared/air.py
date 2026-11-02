@@ -73,6 +73,12 @@ class CascadeWithAir:
     Q_cooling_water: float = 0.0
 
 
+# Utility levels are modelled as 0.1 K bands. A band on an air or cooling-water
+# level ends just past it, so a cascade temperature within this margin counts as
+# at the level; otherwise 0.1 K would move the whole duty to a dearer service.
+UTILITY_LEVEL_MARGIN_K = 0.1 + 1e-6
+
+
 def cascade_with_air(
     T: np.ndarray,
     H_net: np.ndarray,
@@ -100,6 +106,12 @@ def cascade_with_air(
     if T.size == 0:
         return CascadeWithAir(0.0, 0.0, 0.0, 0.0)
 
+    T_air_source = _level_reaching_a_band(T, T_air_source, UTILITY_LEVEL_MARGIN_K)
+    T_air_sink = _level_reaching_a_band(T, T_air_sink, -UTILITY_LEVEL_MARGIN_K)
+    if T_cooling_water is not None:
+        T_cooling_water = _level_reaching_a_band(
+            T, T_cooling_water, -UTILITY_LEVEL_MARGIN_K
+        )
     levels = (T_air_source, T_air_sink) + (
         () if T_cooling_water is None else (T_cooling_water,)
     )
@@ -131,6 +143,15 @@ def cascade_with_air(
         Q_air_sink=Q_air_sink,
         Q_cooling_water=Q_cooling_water,
     )
+
+
+def _level_reaching_a_band(T: np.ndarray, level: float, margin: float) -> float:
+    """Move ``level`` to the furthest cascade temperature within ``margin`` of it."""
+    within = T[(T - level) * np.sign(margin) > 0.0]
+    within = within[np.abs(within - level) <= abs(margin)]
+    if not within.size:
+        return level
+    return float(within.max() if margin > 0.0 else within.min())
 
 
 def _at_or_above(T_grid: np.ndarray, level: float) -> np.ndarray:
