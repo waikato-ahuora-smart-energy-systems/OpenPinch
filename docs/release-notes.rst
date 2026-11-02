@@ -20,6 +20,14 @@ Input and validation
   after the same normalisation as loading: for example, a stream entry that is
   not a record is now reported as the loader sees it.
 
+- ``PinchWorkspace.load`` with input that fails while the case is prepared, such
+  as an unknown zone type in ``zone_tree``, now stores the case and returns
+  ``None``, as it does for other bad input. It stored the case, then raised
+  ``ValueError`` from ``self.case(name)``, and ``validation_report(name).valid``
+  said ``True``. ``workspace.validation_report`` now uses
+  ``PinchProblem.source_validation_report``, so it reports that input as
+  invalid. Loading valid input prepares it once more for the check.
+
 Documentation
 ~~~~~~~~~~~~~
 

@@ -23,7 +23,7 @@ Use-case orchestration for OpenPinch. `PinchProblem` loads, validates and prepar
 - Period flags are bools and select one of `selected`, `weighted_average`, `all`, `all_with_weighted_average` [problem.py:_period_mode].
 - Case names are validated by `validate_workspace_case_name`; a batch needs at least one unique name [workspace.py:PinchWorkspace.load] [workspace.py:_CaseBatch].
 - Batch operations isolate failures per case; the `target`, `target.all_periods` and `design` batch accessors refuse `base_target`; Excel batch export confines each case to a subdirectory of the destination [workspace.py:_CaseBatchAccessor._run] [workspace.py:_CaseBatch.export_excel].
-- `PinchWorkspace.load` stores invalid input so it can be corrected and returns `None` for it, otherwise the live case; it renames the workspace only for the first case or an explicit `project_name` [workspace.py:PinchWorkspace.load].
+- `PinchWorkspace.load` stores input that fails validation or preparation so it can be corrected and returns `None` for it, otherwise the live case; it renames the workspace only for the first case or an explicit `project_name` [workspace.py:PinchWorkspace.load].
 - Bundles are written with schema version `"3"` [workspace.py:PinchWorkspace.to_bundle].
 - Commands never read host files: `{"sample_case": ...}` loads packaged cases only, workspace `source` must be JSON, and exports go to a private temporary directory [commands.py:_load_problem] [commands.py:_set_case_input] [commands.py:_export_excel].
 - Command names starting with an underscore are rejected, and only `target` and `design` namespaces resolve to accessors [commands.py:_accessor_method].
