@@ -246,6 +246,7 @@ Claude outputs/
 
 # Local CI runner (scripts/ci_local.sh)
 .venv-smoke/
+.venv-no-synthesis/
 reports/
 
 # Git bundles used to move commits between machines

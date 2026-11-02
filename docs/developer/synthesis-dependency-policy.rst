@@ -47,9 +47,10 @@ surfaces. External solver binaries are still installed separately.
 Test Marker Policy
 ------------------
 
-Fast tests are unmarked and should not require the ``synthesis`` extra or solver
-binaries. CI does not enforce this: the unit lanes sync the ``dev`` group,
-which already contains the synthesis stack, and select tests with
+Fast tests are unmarked and must not require the ``synthesis`` extra or solver
+binaries. CI's ``no-synthesis`` lane enforces this: it removes Pyomo, GEKKO,
+Kaleido, wakepy and IDAES and runs the unmarked tests. The other unit lanes sync
+the ``dev`` group, which contains that stack, and select tests with
 ``-m "not solver and not tespy and not performance and not docs"``, so
 ``synthesis``-marked tests run there. To run only the fast tests locally:
 

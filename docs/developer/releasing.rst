@@ -26,7 +26,7 @@ Validation profiles
    :header-rows: 1
 
    * - Change
-     - Lint, unit tests (95% branch coverage; also on Python 3.12 and 3.13), floors, docs, TESPy, performance, build, install smoke, Pyodide
+     - Lint, unit tests (95% branch coverage; also on Python 3.12 and 3.13), floors, no-synthesis, docs, TESPy, performance, build, install smoke, Pyodide
      - Solver tests (external Couenne and IPOPT solver binaries)
      - Version-bump check (the **Version bump** job in ``ci.yml``)
    * - PR into ``develop`` / push to ``develop``
@@ -43,7 +43,7 @@ Validation profiles
      - no
 
 Install smoke tests install the built wheel, not the checkout: the core
-surface on Ubuntu, Windows and macOS, and every optional extra except the aggregate ``full`` on Ubuntu.
+surface on Ubuntu, Windows and macOS, and every optional extra on Ubuntu.
 Tests use Hypothesis seed ``20260715``. Python comes from ``.python-version``, except the ``unit-py312`` and
 ``unit-py313`` lanes, which pin their own version.
 

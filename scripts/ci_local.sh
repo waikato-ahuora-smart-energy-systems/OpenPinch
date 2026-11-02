@@ -7,7 +7,7 @@
 #   scripts/ci_local.sh unit solver  # any lanes by name
 #   scripts/ci_local.sh --linux all  # same, inside a Linux container like CI (needs Docker)
 #
-# Lanes: lint unit docs tespy performance solver notebooks build
+# Lanes: lint unit no_synthesis docs tespy performance solver notebooks build
 # Not covered here: the Pyodide lane (see scripts/pyodide/run_tests.mjs), the
 # floors and py312/py313 unit lanes, the non-core and Windows/macOS smoke
 # tests, and the dependency audit. CI runs those.
@@ -40,16 +40,18 @@ if [ "${1:-}" = "--linux" ]; then
     -v openpinch-ci-uv-cache:/root/.cache/uv \
     -v openpinch-ci-idaes:/root/.idaes \
     -e UV_PROJECT_ENVIRONMENT=/opt/venv -e SMOKE_ENV=/opt/venv-smoke \
+    -e NO_SYNTHESIS_ENV=/opt/venv-no-synthesis \
     -e UV_LINK_MODE=copy -e SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)" \
     ghcr.io/astral-sh/uv:0.11.29-bookworm-slim \
     bash scripts/ci_local.sh ${1+"$@"}
 fi
 SMOKE_ENV=${SMOKE_ENV:-.venv-smoke}
+NO_SYNTHESIS_ENV=${NO_SYNTHESIS_ENV:-.venv-no-synthesis}
 
 SEED=20260715
 UNIT_MARKERS="not solver and not tespy and not performance and not docs"
 DEFAULT_LANES=(lint unit docs build)
-ALL_LANES=(lint unit docs tespy performance solver notebooks build)
+ALL_LANES=(lint unit no_synthesis docs tespy performance solver notebooks build)
 mkdir -p reports
 
 say() { printf '\n\033[1m== %s ==\033[0m\n' "$*"; }
@@ -78,6 +80,14 @@ lane_unit() {
   uv run --no-sync coverage run --branch --source=OpenPinch -m pytest \
     --hypothesis-seed="$SEED" -m "$UNIT_MARKERS" --junitxml=reports/unit.xml --durations=20
   uv run --no-sync coverage report --fail-under=95
+}
+lane_no_synthesis() {
+  # A separate environment without the synthesis stack, as the CI lane installs.
+  export UV_PROJECT_ENVIRONMENT="$NO_SYNTHESIS_ENV"
+  uv sync --frozen --group dev --no-install-package pyomo --no-install-package gekko \
+    --no-install-package kaleido --no-install-package wakepy --no-install-package idaes-pse
+  uv run --no-sync python scripts/check_synthesis_stack_absent.py
+  pytest_lane no_synthesis "not synthesis and $UNIT_MARKERS"
 }
 lane_docs() { pytest_lane docs "docs"; }
 lane_tespy() { pytest_lane tespy "tespy and not tutorial_profile"; }

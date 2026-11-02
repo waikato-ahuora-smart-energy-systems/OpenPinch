@@ -97,6 +97,21 @@ jobs:
             sync: --group dev
             markers: not solver and not tespy and not performance and not docs
             floors: true
+          # Fast tests must not need the synthesis stack (see
+          # docs/developer/synthesis-dependency-policy.rst). plotly and openpyxl
+          # stay: the dashboard and notebook extras need them too.
+          - lane: no-synthesis
+            runner: ubuntu-latest
+            timeout: 45
+            sync: >-
+              --group dev
+              --no-install-package pyomo
+              --no-install-package gekko
+              --no-install-package kaleido
+              --no-install-package wakepy
+              --no-install-package idaes-pse
+            markers: not synthesis and not solver and not tespy and not performance and not docs
+            no_synthesis: true
           - lane: docs
             runner: ubuntu-latest
             timeout: 20
@@ -141,6 +156,9 @@ jobs:
           uv pip install --python .venv --resolution lowest-direct \
             --only-binary :all: -r pyproject.toml
           uv pip list --python .venv | grep -iE '^(numpy|pint|pandas|coolprop|pydantic|scipy) '
+      - name: Check the synthesis stack is absent
+        if: ${{ matrix.no_synthesis }}
+        run: uv run --no-sync python scripts/check_synthesis_stack_absent.py
       - name: Run pytest
         env:
           MARKERS: ${{ matrix.markers }}
@@ -263,7 +281,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        surface: [core, dashboard, notebook, brayton_cycle, tespy, synthesis]
+        surface: [core, dashboard, notebook, brayton_cycle, tespy, synthesis, full]
         include:
           - os: windows-latest
             surface: core
@@ -296,6 +314,7 @@ jobs:
           uv run --no-sync python scripts/optional_install_smoke.py "$SURFACE"
           case "$SURFACE" in
             core|tespy) uv run --no-sync python scripts/artifact_install_smoke.py --surface "$SURFACE" ;;
+            full) uv run --no-sync python scripts/artifact_install_smoke.py --surface tespy ;;
           esac
 
   pyodide:
