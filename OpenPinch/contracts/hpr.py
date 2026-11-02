@@ -458,6 +458,9 @@ class HPRThermoArtifacts(BaseModel):
 
 
 ZERO_USEFUL_DUTY_REASON = "Candidate delivers zero useful duty (no heat pump)."
+INFEASIBLE_REFRIGERATION_REASON = (
+    "Refrigeration candidate carries a feasibility penalty, such as unserved cooling."
+)
 """Final-evaluation failure reason for a design equivalent to no heat pump.
 
 During the search a zero-duty design is valid: it carries no penalty and its
