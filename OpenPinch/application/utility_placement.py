@@ -167,7 +167,7 @@ def _resolve_placement_zone(problem: "PinchProblem", zone: str | Zone | None) ->
 
 def _scope_for_zone(zone: Zone) -> UtilityPlacementBaseTarget:
     """Map a hierarchy node to its physically compatible target profile."""
-    if zone.type in {ZoneType.P.value, ZoneType.O.value}:
+    if zone.type in {ZoneType.P.value, ZoneType.UO.value}:
         return UtilityPlacementBaseTarget.DIRECT
     if zone.type == ZoneType.S.value:
         return UtilityPlacementBaseTarget.TOTAL_SITE

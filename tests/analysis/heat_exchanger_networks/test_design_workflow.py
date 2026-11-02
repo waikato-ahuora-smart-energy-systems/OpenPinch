@@ -6,6 +6,7 @@ import importlib.util
 import json
 import tomllib
 from copy import deepcopy
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -102,20 +103,18 @@ def test_no_openhens_command_parity_contract() -> None:
         type("SynthesisStudy", (), {})(),
     ],
 )
-def test_internal_service_requires_live_problem(raw_input: object) -> None:
+def test_internal_service_requires_live_problem(raw_input: Any) -> None:
     with pytest.raises(TypeError, match="live PinchProblem"):
-        heat_exchanger_network_synthesis_service(raw_input)  # type: ignore[arg-type]
+        heat_exchanger_network_synthesis_service(raw_input)
 
 
 def test_design_options_are_validated_at_their_owner_boundary(monkeypatch) -> None:
     _use_fake_default_executor(monkeypatch)
     problem = _public_example_problem()
+    target_input: Any = TargetInput(streams=[], utilities=[])
 
     with pytest.raises(TypeError, match="runtime options.*dict"):
-        heat_exchanger_network_synthesis_service(
-            problem,
-            options=TargetInput(streams=[], utilities=[]),  # type: ignore[arg-type]
-        )
+        heat_exchanger_network_synthesis_service(problem, options=target_input)
 
     with pytest.raises(ValueError, match="TargetInput.options"):
         heat_exchanger_network_synthesis_service(
@@ -146,7 +145,7 @@ def test_public_design_accessor_rejects_separate_options_objects(
     problem = _public_example_problem()
 
     with pytest.raises(TypeError, match="design options.*mapping"):
-        problem.design.heat_exchanger_network(options=options)  # type: ignore[arg-type]
+        problem.design.heat_exchanger_network(options=options)
 
 
 def test_public_design_accessor_separates_runtime_and_configuration() -> None:

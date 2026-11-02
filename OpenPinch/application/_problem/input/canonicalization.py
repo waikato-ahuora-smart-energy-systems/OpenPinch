@@ -84,7 +84,7 @@ def _get_validated_zone_info(
             "Zone": ZoneType.P.value,
             "Sub-Zone": ZoneType.P.value,
             "Process Zone": ZoneType.P.value,
-            "Unit Operation": ZoneType.O.value,
+            "Unit Operation": ZoneType.UO.value,
             "Site": ZoneType.S.value,
             "Community": ZoneType.C.value,
             "Region": ZoneType.R.value,
@@ -106,7 +106,7 @@ def _get_validated_zone_info(
             elif depth == 1:
                 zone_type = ZoneType.P.value
             else:
-                zone_type = ZoneType.O.value
+                zone_type = ZoneType.UO.value
 
         zone_name = zone_tree.name
     else:
@@ -339,7 +339,7 @@ def _validate_zone_tree_structure(
 
         current["children"][operation_zone_name] = {
             "name": operation_zone_name,
-            "type": ZoneType.O.value,
+            "type": ZoneType.UO.value,
             "children": {},
         }
         stream.zone = _build_full_path(path_components, operation_zone_name)

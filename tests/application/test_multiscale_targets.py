@@ -14,7 +14,7 @@ from OpenPinch.domain.zone import Zone
 def _zone_tree() -> Zone:
     site = Zone(name="Site", type=ZoneType.S.value)
     process = Zone(name="Process", type=ZoneType.P.value)
-    operation = Zone(name="Operation", type=ZoneType.O.value)
+    operation = Zone(name="Operation", type=ZoneType.UO.value)
     process.add_zone(operation)
     site.add_zone(process)
     return site

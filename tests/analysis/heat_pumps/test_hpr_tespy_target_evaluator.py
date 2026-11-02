@@ -1,7 +1,5 @@
 """Real and classified-failure tests for TESPy nominal target evaluation."""
 
-# ruff: noqa: E402 - optional dependency gate precedes concrete imports.
-
 from __future__ import annotations
 
 import gc
@@ -15,7 +13,6 @@ import pytest
 from CoolProp.CoolProp import PropsSI
 
 pytest.importorskip("tespy")
-pytestmark = pytest.mark.tespy
 
 import OpenPinch.analysis.heat_pumps.performance_maps.adapters.tespy as adapter
 import OpenPinch.analysis.heat_pumps.targeting.cascade_vapour_compression as cascade
@@ -38,6 +35,8 @@ from OpenPinch.contracts.hpr_performance_map import HprPerformanceMapRequest
 from tests.analysis.heat_pumps.test_hpr_target_evaluator_contracts import _request
 from tests.analysis.heat_pumps.test_hpr_targeting_preflight import _target_args
 from tests.analysis.heat_pumps.test_hpr_tespy_targeting_integration import _candidate
+
+pytestmark = pytest.mark.tespy
 
 
 def _coordinator(*, mode="heat_pump", refrigerant="R134a"):

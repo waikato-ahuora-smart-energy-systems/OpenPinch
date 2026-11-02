@@ -7,6 +7,7 @@ import pickle
 from copy import deepcopy
 from functools import lru_cache
 from types import SimpleNamespace
+from typing import Any
 
 import numpy as np
 import openpyxl
@@ -954,7 +955,7 @@ def test_public_signature_uses_optional_counts_and_zone_only() -> None:
     ("zone_type", "expected"),
     [
         (ZoneType.P, UtilityPlacementBaseTarget.DIRECT),
-        (ZoneType.O, UtilityPlacementBaseTarget.DIRECT),
+        (ZoneType.UO, UtilityPlacementBaseTarget.DIRECT),
         (ZoneType.S, UtilityPlacementBaseTarget.TOTAL_SITE),
         (ZoneType.C, UtilityPlacementBaseTarget.INDIRECT),
         (ZoneType.R, UtilityPlacementBaseTarget.INDIRECT),
@@ -972,7 +973,7 @@ def test_zone_resolution_defaults_to_root_and_accepts_unique_name_path_and_objec
     root = Zone(name="Community", type=ZoneType.C.value)
     site = Zone(name="Site A", type=ZoneType.S.value, parent_zone=root)
     process = Zone(name="Process A", type=ZoneType.P.value, parent_zone=site)
-    operation = Zone(name="Operation A", type=ZoneType.O.value, parent_zone=process)
+    operation = Zone(name="Operation A", type=ZoneType.UO.value, parent_zone=process)
     root.add_zone(site)
     site.add_zone(process)
     process.add_zone(operation)
@@ -1603,8 +1604,9 @@ def test_workspace_add_validates_case_and_name_and_can_activate(
     workspace = PinchWorkspace(source="chocolate_factory.json")
     optimized_case = deepcopy(shared_isothermal_total_site_case)
 
+    not_a_problem: Any = {}
     with pytest.raises(TypeError, match="PinchProblem"):
-        workspace.add({}, name="invalid")  # type: ignore[arg-type]
+        workspace.add(not_a_problem, name="invalid")
     with pytest.raises(ValueError, match="case name"):
         workspace.add(optimized_case, name="../invalid")
 

@@ -29,7 +29,7 @@ except PintError:  # pragma: no cover - Pint may already know this unit.
 # Every unit or quantity text Pint parses is held to a bounded grammar first.
 ureg.preprocessors.append(_value_units.check_unit_text)
 set_application_registry(ureg)
-Q_ = ureg.Quantity  # type: ignore
+Q_ = ureg.Quantity
 
 _SERIALIZED_SCALAR_KEYS = {"value", "unit"}
 _SERIALIZED_PERIOD_KEYS = {"values", "period_ids", "weights", "unit"}

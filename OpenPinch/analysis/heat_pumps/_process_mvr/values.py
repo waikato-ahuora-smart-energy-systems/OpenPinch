@@ -5,7 +5,7 @@ from __future__ import annotations
 from ....domain.value import Value
 from ..common.units import to_degrees_celsius as to_degrees_celsius
 from ..common.units import to_kelvin as to_kelvin
-from ..common.units import to_kilopascal as to_kilopascals  # noqa: F401
+from ..common.units import to_kilopascal as to_kilopascal
 from ..common.units import value_at_index
 
 
