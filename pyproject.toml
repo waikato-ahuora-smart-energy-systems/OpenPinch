@@ -24,6 +24,7 @@ exclude = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["OpenPinch"]
+exclude = ["/OpenPinch/**/README.md"]
 [project]
 name = "OpenPinch"
 # Floors are the oldest releases with Python 3.14 wheels that pass the test
