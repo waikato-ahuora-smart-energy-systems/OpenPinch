@@ -13,6 +13,15 @@ Heat pumps and refrigeration
   profile, about 10 K when the condenser sits at the top of its load. Targets
   can fall, by up to several percent where subcooling was at that limit.
 
+Exergy
+~~~~~~
+
+- ``problem.target.exergy()`` no longer raises ``AttributeError`` after a heat
+  pump or refrigeration target, with or without ``base_target``. The check that
+  a selected target has not been modified assumed every graph was a table, but
+  exergy adds its curves as plain mappings. Those derived curves are now left
+  out of that check, and the enriched target can be selected as a base target.
+
 0.7.6 (2026-11-02)
 ------------------
 
