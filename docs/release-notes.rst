@@ -39,6 +39,19 @@ Documentation
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- **Behaviour change:** ``update_options`` and ``set_dt_cont_multiplier``, on
+  ``PinchProblem`` and ``PinchWorkspace``, now keep components added with
+  ``components.add_process_mvr``. These calls used to discard them silently, so
+  later targets ran without the MVR. Each component is now re-solved on the
+  rebuilt input and its handle stays valid, with its active state kept. Remove
+  any code that adds a component again after these calls, as the repeat call now
+  adds a second MVR or fails because the source stream is inactive. Efficiencies
+  passed explicitly stay as given; efficiencies left unset take the new
+  ``PROCESS_MVR_ETA_COMP`` and ``PROCESS_MVR_ETA_MOTOR`` values, so changing those
+  options can change a kept component's work. If a component cannot be re-solved,
+  the call raises and the problem and its components are unchanged. Components
+  remain memory-only: ``load`` discards them, and ``to_problem_json`` and workspace
+  bundles do not carry them.
 - Vapour-compression targets now limit each compressor's pressure ratio, with
   the new ``HPR_MAX_PRESSURE_RATIO`` option (default 15). A candidate over the
   limit evaporates warmer, or in a cascade raises its lower levels, so targets

@@ -46,6 +46,7 @@ import from here.
 - `load_problem_source` reads files or tuples of files through the adapters for non-in-memory sources. [loading.py:load_problem_source]
 - `apply_loaded_source` and `replace_loaded_source` assign attributes on the parent `PinchProblem`. [loading.py:apply_loaded_source]
 - `rebuild_problem_state` calls `problem._invalidate_analysis()`. [loading.py:rebuild_problem_state]
+- `rebuild_problem_state` empties `_process_components`; `replace_problem_inputs` keeps them by replaying them on the rebuilt tree, and a failed replay restores the prior state. [loading.py:rebuild_problem_state] [loading.py:replace_problem_inputs]
 - Zone-tree normalisation rewrites `stream.zone` on the stream models it is given and may append process nodes to the tree. [canonicalization.py:_rewrite_stream_zones_from_tree]
 - `validate_problem_semantics` emits `InputValidationWarning`. [validation.py:validate_problem_semantics]
 - Utility completion mutates deep copies of the given utility schemas (target, `dt_cont`, price, HTC, `active`). [utilities.py:_complete_utility_data]
