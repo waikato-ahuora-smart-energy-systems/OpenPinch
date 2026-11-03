@@ -52,6 +52,9 @@ OpenHENS migration and benchmarks (manual, not run in CI)
   `time_hens_tier_case_with_timeout`, `summarize_hens_tier_comparisons`,
   `small_hens_benchmark_cases`, `BenchmarkSolverCallTracer`, `BenchmarkTraceExecutor`; non-gating
   HEN synthesis quality-tier benchmark writing incremental JSON.
+- `benchmark_nine_stream.py` (`benchmark_nine_stream.py`): `compare_to_expected`; the live-solver
+  nine-stream OpenHENS run with eight workers, checked against the expected values. Can take
+  hours, no CI use.
 
 - Subdirectories: [pyodide](./pyodide/README.md): Node runner for the suite under Pyodide.
 
@@ -95,6 +98,8 @@ OpenHENS migration and benchmarks (manual, not run in CI)
 - `benchmark_performance.py` forks worker processes (POSIX only: it requests the `fork` start method), monkeypatches
   `solver_backend.solve_gekko_model` while tracing, runs solvers, and writes the JSON results file
   (default under `results/`) [benchmark_performance.py:BenchmarkSolverCallTracer.patched_backend].
+- `benchmark_nine_stream.py` runs the full OpenHENS workflow with the local solvers and imports the
+  helpers in `tests/analysis/heat_exchanger_networks/test_solver_regressions.py` when run.
 - `release_plan.py` reads the tag and release files named on its command line.
 
 ## Verification
