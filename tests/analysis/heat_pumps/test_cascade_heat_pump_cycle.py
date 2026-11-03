@@ -876,6 +876,50 @@ def test_stage_with_no_heat_to_pass_up_subcools_freely():
     assert stage.dT_subcool == pytest.approx(40.0)
 
 
+def test_ihx_limit_follows_the_subcooling_the_process_duty_allows():
+    def stage(dT_subcool):
+        cycle = VapourCompressionCycle()
+        cycle.solve(
+            T_evap=0.0,
+            T_cond=80.0,
+            dtcont=5.0,
+            dT_subcool=dT_subcool,
+            eta_comp=0.7,
+            refrigerant="Ammonia",
+            dT_ihx_gas_side=30.0,
+            Q_heat=0.0,
+            Q_cas_heat=100.0,
+        )
+        return cycle
+
+    # No process duty, so the request cannot be met and must not limit the IHX.
+    capped, plain = stage(80.0), stage(0.0)
+
+    assert capped.dT_subcool == pytest.approx(0.0, abs=1e-6)
+    assert capped.work == pytest.approx(plain.work, rel=1e-9)
+    assert capped.penalty == pytest.approx(plain.penalty)
+
+
+@pytest.mark.parametrize("Q_heat", [1.0, 5.0, 20.0, 60.0])
+@pytest.mark.parametrize("dT_ihx", [5.0, 30.0, 60.0, 200.0])
+def test_ihx_and_subcooling_settle_on_a_stage_with_a_small_process_duty(Q_heat, dT_ihx):
+    stage = VapourCompressionCycle()
+    stage.solve(
+        T_evap=0.0,
+        T_cond=80.0,
+        dtcont=5.0,
+        dT_subcool=78.0,
+        eta_comp=0.7,
+        refrigerant="R245fa",
+        dT_ihx_gas_side=dT_ihx,
+        Q_heat=Q_heat,
+        Q_cas_heat=100.0,
+    )
+
+    assert stage.solved
+    assert stage.dT_subcool < 78.0
+
+
 def _two_condenser_refrigeration(Q_heat=None, dT_subcool=0.0):
     cycle = CascadeVapourCompressionCycle()
     cycle.solve(

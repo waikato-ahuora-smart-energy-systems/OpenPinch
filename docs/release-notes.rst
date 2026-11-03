@@ -16,6 +16,8 @@ Behaviour changes
   7700 kW on one test case its mass balance never settled. Each new model uses one
   size band and does not switch. Work targets change from the old method wherever
   it would have used the other band.
+- A cogeneration target reused through ``base_target`` with no usable turbine stage
+  no longer keeps its earlier ``turbine_converged`` and ``turbine_diagnostics``.
 - If a stage's work is outside the chosen band, the target reports the number and
   a message goes to ``turbine_diagnostics``, a ``UserWarning`` and
   ``problem.report().warnings``; ``turbine_converged`` is not affected. For some
@@ -24,6 +26,8 @@ Behaviour changes
 Input and validation
 ~~~~~~~~~~~~~~~~~~~~
 
+- A failed ``update_options`` or other input replacement now keeps retained heat
+  pump targets valid, as the rest of the problem's state already was.
 - ``ZoneType.UO`` is the new name of the unit operation zone type. ``ZoneType.O``
   and ``ZoneType["O"]`` still work and give the same member, but its ``.name``
   is now ``UO``.
@@ -88,6 +92,10 @@ Heat pumps and refrigeration
   heat must now fit in the stage's own process duty, so a stage that only passes
   heat up does not subcool. Multi-stage targets rise where this applied, by up to
   about 20% in tests.
+- Cascade targets now scale each condenser's subcooling variable by the lift to
+  that stage's own evaporator, not the coldest in the cascade. Much of the old
+  range was only penalised. The internal heat exchanger's limit also now follows
+  the subcooling a stage can apply. Multi-stage targets can change as a result.
 - **Behaviour change:** ``update_options`` and ``set_dt_cont_multiplier``, on
   ``PinchProblem`` and ``PinchWorkspace``, now keep components added with
   ``components.add_process_mvr``. These calls used to discard them silently, so
@@ -118,8 +126,8 @@ Heat pumps and refrigeration
   profile, about 10 K when the condenser sits at the top of its load. Targets
   can fall, by up to several percent where subcooling was at that limit.
 - A utility level that sits on an air or cooling-water limit can now use that
-  service. A level's 0.1 K band ended just past the limit, so the whole duty
-  was priced as refrigeration. For example, with ``HPR_DT_CONT`` of 5 a 25 C
+  service, on utility placement only. A level's band, of up to 0.1 K, ended just
+  past the limit, so the whole duty was priced as refrigeration. For example, with ``HPR_DT_CONT`` of 5 a 25 C
   level sits on the 15 C air limit. Utility placement targets with such a level
   can fall by about half: one 25% load test case went from 836.6 to 427.3 k$/y.
 - A TESPy heat pump target without the optional ``tespy`` package now raises

@@ -23,6 +23,10 @@ _SATURATION_QUALITY_TOL = 1e-9
 __all__ = ["VapourCompressionCycle"]
 
 
+# More IHX in a re-solve only moves the applied subcooling this little, by rounding.
+SUBCOOLING_SETTLED_K = 1e-6
+
+
 class VapourCompressionCycle:
     """Single vapour-compression heat pump cycle.
 
@@ -734,15 +738,14 @@ class VapourCompressionCycle:
             T=min(self._T_cond_sat_liq, self._t_crit - 0.1) - self._dT_subcool,
             phase=0,
         ).hmass()
-        h_cond_out = max(
-            h_cond_out_min,
-            h_cond_out_tar,
+        h_cond_out_cascade = (
             self._coldest_outlet_serving_cascade_heat(P_hi, state1.hmass())
             if is_heat_pump
             else self._coldest_outlet_serving_cascade_heat_given_cooling(
                 P_hi, h_ihx_out
-            ),
+            )
         )
+        h_cond_out = max(h_cond_out_min, h_cond_out_tar, h_cond_out_cascade)
         state2 = self._compute_state_from_pressure_enthalpy(
             P=P_hi,
             h=h_cond_out,
@@ -751,6 +754,28 @@ class VapourCompressionCycle:
             self._T_cond_sat_liq - state2.T()
         )  # Actual subcooling possible
         self._save_cycle_state(state2, 2)
+
+        if (
+            dT_ihx_gas_side > self._ihx_gas_dt
+            and h_cond_out_cascade > max(h_cond_out_min, h_cond_out_tar)
+            and dT_subcool - self._dT_subcool > SUBCOOLING_SETTLED_K
+        ):
+            # The IHX was limited by subcooling this stage cannot have.
+            return self.solve(
+                T_evap=T_evap,
+                T_cond=T_cond,
+                dtcont=dtcont,
+                dT_superheat=dT_superheat,
+                dT_subcool=float(self._dT_subcool),
+                eta_comp=eta_comp,
+                refrigerant=refrigerant,
+                dT_ihx_gas_side=dT_ihx_gas_side,
+                Q_heat=Q_heat,
+                Q_cas_heat=Q_cas_heat,
+                Q_cool=Q_cool,
+                Q_cas_cool=Q_cas_cool,
+                is_heat_pump=is_heat_pump,
+            )
 
         if h_cond_out_min > h_cond_out_tar:
             # Penalise excessive subcooling beyond the maximum allowed

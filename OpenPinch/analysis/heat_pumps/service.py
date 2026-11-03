@@ -180,6 +180,7 @@ def _compute_single_period_hpr_target(
         period_idx=idx,
         simulation_backend=(args or {}).get("simulation_backend", "coolprop"),
         search_budget=_hpr_search_budget(args),
+        background_is_utility=not is_direct,
     )
     pt = _calc_hpr_cascade(
         pt=pt,
@@ -327,6 +328,7 @@ def _get_hpr_targets(
     period_idx: int = 0,
     simulation_backend: str = "coolprop",
     search_budget: HPRSearchBudget | None = None,
+    background_is_utility: bool = False,
 ) -> HeatPumpTargetOutputs:
     normalized_backend = normalize_hpr_simulation_backend(simulation_backend)
     args = construct_HPRTargetInputs(
@@ -340,6 +342,7 @@ def _get_hpr_targets(
         debug=False,
         simulation_backend=normalized_backend,
         search_budget=search_budget,
+        background_is_utility=background_is_utility,
     )
     handler = _HP_PLACEMENT_HANDLERS.get(args.hpr_type)
     if handler is None:

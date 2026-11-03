@@ -52,6 +52,9 @@ from ._shared.air import (
 from ._shared.air import (
     cooling_water_sink_temperature as _cooling_water_sink_temperature,
 )
+from ._shared.air import (
+    utility_bands as _utility_bands,
+)
 
 __all__ = [
     "HPRCostUnit",
@@ -377,6 +380,11 @@ def refrigeration_allowance(args: HeatPumpTargetInputs) -> float:
                 _ambient_source_temperature(args),
                 _ambient_sink_temperature(args),
                 _cooling_water_sink_temperature(args),
+                T_background=_cascade.get_process_heat_cascade(
+                    hot_streams=streams,
+                    is_shifted=True,
+                    period_idx=args.period_idx,
+                )[ProblemTableLabel.T],
             ).Q_ext_bottom
         )
     try:
@@ -393,8 +401,13 @@ def _cascade_air_duties(
     T_air_source: float,
     T_air_sink: float,
     T_cooling_water: float | None = None,
+    *,
+    T_background: np.ndarray | None = None,
 ) -> CascadeWithAir:
-    """Cascade the streams and let air, then any cooling water, cover what they can."""
+    """Cascade the streams and let air, then any cooling water, cover what they can.
+
+    On a utility background, the narrow steps of ``T_background`` are utility bands.
+    """
     if not len(hot_streams) and not len(cold_streams):
         return CascadeWithAir(0.0, 0.0, 0.0, 0.0)
     pt = _cascade.get_process_heat_cascade(
@@ -409,6 +422,12 @@ def _cascade_air_duties(
         T_air_source=T_air_source,
         T_air_sink=T_air_sink,
         T_cooling_water=T_cooling_water,
+        utility_bands=(
+            _utility_bands(T_background)
+            if T_background is not None
+            and getattr(args, "background_is_utility", False)
+            else ()
+        ),
     )
 
 
@@ -448,6 +467,7 @@ def evaluate_carnot_hpr_result(
         args,
         T_air_source,
         T_air_sink,
+        T_background=args.T_cold,
     )
     evap = _cascade_air_duties(
         args.bckgrd_hot_streams,
@@ -551,7 +571,12 @@ def evaluate_vapour_hpr_result(
     cond_hot_streams = hpr_streams.get_hot_utility_streams()
     cond_cold_streams = args.bckgrd_cold_streams
     cond = _cascade_air_duties(
-        cond_hot_streams, cond_cold_streams, args, T_air_source, T_air_sink
+        cond_hot_streams,
+        cond_cold_streams,
+        args,
+        T_air_source,
+        T_air_sink,
+        T_background=args.T_cold,
     )
     Q_ext_heat = cond.Q_ext_top
     cond_wrong_side = cond.Q_ext_bottom
@@ -565,6 +590,7 @@ def evaluate_vapour_hpr_result(
         T_air_source,
         T_air_sink,
         _cooling_water_sink_temperature(args),
+        T_background=args.T_hot,
     )
     Q_cooling_water = evap.Q_cooling_water
     Q_refrigeration = evap.Q_ext_bottom

@@ -14,6 +14,7 @@ One module per heat pump and refrigeration (HPR) cycle topology. Each defines ho
 - Private `_get_*_opt_setup`, `_parse_*_state*`, `_compute_*_obj` functions in each module: starting point and bounds, vector decoding, and objective. Other modules import these.
 
 ## Invariants
+- The cascade optimiser scales each condenser's subcooling variable by the lift to that stage's own evaporator: the next condenser level less `dt_cascade_hx`, then the warmest process evaporator. After a solve, the parsed state and results report the subcooling the cycle applied, which can be less than requested. [cascade_vapour_compression.py:_condenser_stage_evaporating_temperatures] [cascade_vapour_compression.py:_build_and_solve_cascade_cycle]
 - Carnot objective vectors hold condenser fractions, evaporator fractions and heat-split fractions, all bounded to [0, 1]; the initial point starts every heat split at 1 [_carnot_common.py:carnot_opt_setup].
 - Parallel Carnot and parallel vapour compression equalise `n_cond` and `n_evap` to the larger value on `args`, and callers rely on that after the solve [_carnot_common.py:normalise_carnot_stage_counts, parallel_vapour_compression.py:optimise_parallel_heat_pump_placement].
 - Condenser temperatures are capped and evaporator temperatures floored through `common.shared` helpers before use [cascade_vapour_compression.py:_parse_cascade_hp_state_variables, parallel_vapour_compression.py:_parse_parallel_hp_state_temperatures].

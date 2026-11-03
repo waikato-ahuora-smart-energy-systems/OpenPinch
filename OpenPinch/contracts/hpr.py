@@ -302,6 +302,8 @@ class HeatPumpTargetInputs(BaseModel):
     allow_integrated_expander: bool
     bckgrd_hot_streams: StreamCollection
     bckgrd_cold_streams: StreamCollection
+    # True when the background is the utility levels, not the process.
+    background_is_utility: bool = False
     # Refrigeration only: the cooling warmer than the targeted coldest
     # Q_hpr_target, and the default refrigeration it needs on its own.
     untargeted_cooling_streams: StreamCollection | None = None
