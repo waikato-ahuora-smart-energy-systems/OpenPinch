@@ -805,3 +805,72 @@ def test_cascade_q_heat_allows_last_heat_side_stage_to_be_unspecified():
     assert cycle.Q_heat_arr[0] == pytest.approx(0.0)
     assert cycle.Q_heat_arr[1] == pytest.approx(cycle.Q_cond_arr[1])
     assert cycle.Q_heat_arr[2] == pytest.approx(0.0)
+
+
+def _two_stage_cascade(Q_heat, dT_subcool):
+    cycle = CascadeVapourCompressionCycle()
+    cycle.solve(
+        T_evap=np.array([-0.2]),
+        T_cond=np.array([84.9, 84.8]),
+        dtcont=5.0,
+        dT_subcool=np.array(dT_subcool),
+        dT_ihx_gas_side=0.0,
+        eta_comp=0.7,
+        refrigerant=["Ammonia", "R1234ze(E)"],
+        dt_cascade_hx=5.0,
+        Q_heat=np.array(Q_heat),
+        is_heat_pump=True,
+    )
+    assert cycle.solved
+    return cycle
+
+
+def test_subcooling_heat_does_not_reach_the_upper_evaporator():
+    # All the lower stage's heat goes up to an evaporator at 79.8 C, so liquid
+    # subcooled towards 0 C has nowhere to put the heat it gives up.
+    plain = _two_stage_cascade([250.0, 0.0], [0.0, 0.0])
+    subcooled = _two_stage_cascade([250.0, 0.0], [0.0, 85.0])
+
+    assert subcooled.dT_subcool[1] == pytest.approx(0.0, abs=1e-6)
+    assert subcooled.work == pytest.approx(plain.work, rel=1e-9)
+
+
+def test_stage_passing_heat_up_can_subcool_into_its_process_duty():
+    plain = _two_stage_cascade([200.0, 100.0], [0.0, 0.0])
+    subcooled = _two_stage_cascade([200.0, 100.0], [0.0, 20.0])
+
+    assert subcooled.dT_subcool[1] == pytest.approx(20.0)
+    assert subcooled.work < plain.work
+    stage = subcooled._subcycles[1]
+    assert stage.Q_heat == pytest.approx(100.0)
+    # The subcooling heat is delivered to the process, down to the liquid outlet.
+    profile = stage._build_condenser_profile()
+    assert profile[:, 1].min() == pytest.approx(64.8, abs=1e-6)
+
+
+def test_process_duty_limits_subcooling_on_a_stage_passing_heat_up():
+    # A small process duty can only take the coldest of the liquid's heat.
+    stage = _two_stage_cascade([250.0, 5.0], [0.0, 85.0])._subcycles[1]
+
+    assert 0.0 < stage.dT_subcool < 85.0
+    # The cascade exchanger's share ends at the saturated liquid.
+    from CoolProp.CoolProp import PropsSI
+
+    saturated_liquid = PropsSI("H", "T", 84.8 + 273.15, "Q", 0, "R1234ze(E)")
+    assert stage.Hs[4] == pytest.approx(saturated_liquid, rel=1e-4)
+
+
+def test_stage_with_no_heat_to_pass_up_subcools_freely():
+    stage = VapourCompressionCycle()
+    stage.solve(
+        T_evap=0.0,
+        T_cond=80.0,
+        dtcont=5.0,
+        dT_subcool=40.0,
+        eta_comp=0.7,
+        refrigerant="Ammonia",
+        dT_ihx_gas_side=0.0,
+        Q_heat=100.0,
+    )
+
+    assert stage.dT_subcool == pytest.approx(40.0)
