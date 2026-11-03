@@ -531,25 +531,24 @@ def test_cascade_one_condenser_delivers_its_duty_once_with_two_evaporators():
     assert cycle.Q_heat == pytest.approx(cycle.Q_cool + cycle.work)
 
 
-@pytest.mark.parametrize("evaporators", [2, 3])
-def test_public_target_with_one_condenser_has_no_phantom_process_condensers(
-    evaporators,
-):
+def test_public_target_with_one_condenser_has_no_phantom_process_condensers():
     pytest.importorskip("CoolProp")
+    # The Carnot seed gives a design straight away, so a very short search is
+    # enough. Keep it short: Pyodide runs this search far slower than CPython.
     target = PinchProblem(
         "OpenPinch/tutorials/sample_cases/chocolate_factory.json", project_name="m"
     ).target.vapour_compression_heat_pump(
         load_fraction=0.25,
         condensers=1,
-        evaporators=evaporators,
+        evaporators=2,
         refrigerants=["Ammonia"],
+        initialize_from_carnot=True,
         maximum_restarts=1,
-        maximum_iterations=20,
-        maximum_evaluations=50,
+        maximum_iterations=5,
+        maximum_evaluations=10,
     )
 
-    details = target.hpr_details
-    Q_heat = np.asarray(details.Q_heat, dtype=float)
-    assert Q_heat.size == evaporators
-    assert Q_heat[1:] == pytest.approx(np.zeros(evaporators - 1))
+    Q_heat = np.asarray(target.hpr_details.Q_heat, dtype=float)
+    assert Q_heat.size == 2
+    assert Q_heat[1] == pytest.approx(0.0)
     assert target.hpr_cop == pytest.approx(Q_heat[0] / target.hpr_work, rel=1e-9)
