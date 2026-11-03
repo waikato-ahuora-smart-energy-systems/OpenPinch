@@ -193,7 +193,7 @@ def _get_cascade_hp_opt_setup(
         init_res.T_evap[::-1], args.T_hot[-1], args.T_hot[0]
     ).tolist()
     x_subcool = [0.0] * int(args.n_cond)
-    init_heat = init_res.Q_cond if is_heat_pumping else init_res.Q_cond[:n_heat]
+    init_heat = init_res.Q_cond if is_heat_pumping else init_res.Q_cond[1:]
     init_cool = init_res.Q_evap[:n_cool] if is_heat_pumping else init_res.Q_evap
     x_ihx = [0.0] * (int(args.n_cond) + int(args.n_evap) - 1)
     pack_kwargs = {
@@ -265,7 +265,7 @@ def _parse_cascade_hp_state_variables(
     Q_heat_available = (
         limit_available_duty(
             get_Q_vals_at_T_hpr_from_bckgrd_profile(
-                T_cond if is_heat_pumping else T_cond[:n_heat],
+                T_cond if is_heat_pumping else T_cond[1:],
                 args.T_cold,
                 args.H_cold,
                 is_cond=True,

@@ -73,6 +73,19 @@ Documentation
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- **Behaviour change:** Multi-stage cascade refrigeration now passes heat from
+  each stage's condenser up to the evaporator of the warmer stage. It used to
+  pass heat down, from the warm stage's condenser into the cold stage's
+  evaporator, and rejected nearly everything at the coldest condenser. With
+  several process evaporators, heat from the colder stages was dropped from the
+  balance altogether. A single evaporator's ``Q_cool`` is no longer applied to
+  every stage, and the top stage now takes the remaining heat, so ``Q_heat``
+  values for refrigeration run ``[nan, ...]`` rather than ``[..., nan]``.
+  Multi-stage refrigeration targets change: with ammonia, 100 kW of cooling at
+  -20 C with condensers at 40 C and 10 C now takes 43.9 kW of work, where the old
+  model reported 63.1 kW for 200 kW of cooling. Single-stage refrigeration
+  targets are unaffected. Subcooling heat on these stages must also fit in the
+  stage's own process duty.
 - Cascade and vapour-compression plus MVR targets no longer credit a stage's
   subcooling heat to the evaporator above it, which is too warm to take it. That
   gave the stage impossible COPs, up to about 90% of the Carnot limit. Subcooling
