@@ -408,43 +408,6 @@ def test_user_couenne_options_are_written_to_model_run_directory(
     assert solve_run.failure_reason is None
 
 
-def test_couenne_without_user_options_matches_source_no_option_file(
-    monkeypatch,
-    tmp_path: Path,
-) -> None:
-    def present_binary(binary_name: str, *, purpose: str | None = None) -> str:
-        del purpose
-        return f"/usr/local/bin/{binary_name}"
-
-    class _FakeSolverFactory:
-        def available(self, exception_flag: bool = False) -> bool:
-            del exception_flag
-            return True
-
-    def present_dependency(import_name: str, **_kwargs):
-        if import_name == "pyomo.environ":
-            return SimpleNamespace(SolverFactory=lambda _name: _FakeSolverFactory())
-        return object()
-
-    monkeypatch.setattr(backend, "require_solver_binary", present_binary)
-    monkeypatch.setattr(backend, "require_synthesis_dependency", present_dependency)
-    model = _FakeGekkoModel(tmp_path / "gekko-run")
-
-    run = backend.configure_gekko_solver(model, "couenne")
-
-    assert run.option_file is None
-    assert run.solver_options is None
-    assert not (tmp_path / "gekko-run" / "couenne.opt").exists()
-
-    original_cwd = Path.cwd()
-    solve_run = backend.solve_gekko_model(model, solver_name="couenne")
-
-    assert Path.cwd() == original_cwd
-    assert model.cwd_during_solve == original_cwd
-    assert solve_run.option_file is None
-    assert solve_run.solver_options is None
-
-
 def test_ipopt_pyomo_option_file_uses_keyword_factory_availability(
     monkeypatch,
     tmp_path: Path,
@@ -3298,6 +3261,17 @@ def test_pinch_decomp_post_process_skips_failed_model_and_copy_helpers_cover_sha
     assert non_iso_target.Y_by_period[0][0][0][0][0] == 0.0
     assert non_iso_target.T_h_out_x_by_period[0][0][0][0][0] == 470.0
     assert non_iso_target.T_c_out_y_by_period[0][0][0][0][0] == 330.0
+
+
+def test_pinch_decomp_amalgamate_failure_reports_the_side_solver_reason() -> None:
+    timed_out = _pdm_side_result(hot_utility_target=1.0, m_success=0)
+    timed_out.solver_run = SimpleNamespace(failure_reason="time limit reached")
+
+    with pytest.raises(ValueError, match="above: time limit reached"):
+        _pdm_amalgamation_driver().amalgamate_networks(
+            above_case=timed_out,
+            below_case=_pdm_side_result(),
+        )
 
 
 def test_pinch_decomp_amalgamate_handles_failure_and_single_sided_networks() -> None:

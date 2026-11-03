@@ -40,10 +40,24 @@ def amalgamate_networks(
     if (above_required and above_case.mSuccess == 0) or (
         below_required and below_case.mSuccess == 0
     ):
+        reasons = "".join(
+            f"; {side}: {reason}"
+            for side, required, case in (
+                ("above", above_required, above_case),
+                ("below", below_required, below_case),
+            )
+            if required
+            and case.mSuccess == 0
+            and (
+                reason := getattr(
+                    getattr(case, "solver_run", None), "failure_reason", None
+                )
+            )
+        )
         raise ValueError(
             "Pinch Decomposition failed: "
             f"Above {above_case.mSuccess} Below {below_case.mSuccess} "
-            f"dTmin {owner.dTmin}"
+            f"dTmin {owner.dTmin}{reasons}"
         )
 
     if above_required and above_case.mSuccess == 1:

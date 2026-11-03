@@ -69,6 +69,22 @@ Heat pumps and refrigeration
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- A Couenne solve now has a time limit of 600 s by default, so one solve cannot
+  run indefinitely: single solves reached 98 CPU minutes on a nine-stream case.
+  Set ``time_limit`` in ``HENS_SOLVER_OPTIONS_PDM`` or
+  ``HENS_SOLVER_OPTIONS_TDM`` to change it. A solve that reaches its limit fails
+  its task with a message naming the limit, and any incumbent Couenne holds is
+  discarded. This also applies to a ``time_limit`` you already set: such a solve
+  was previously recorded as a success, and a limit that passed during
+  preprocessing could report the relaxation as optimal. Results of solves that
+  finish inside the limit are unchanged. The longest solve in the solver-marked
+  tests and HEN notebooks takes 46 s.
+- A failed HEN task now reports the solver's reason instead of a generic
+  message, including which side failed in a pinch design solve.
+- Every Couenne solve now writes ``couenne.opt``, so Couenne solves in one process
+  take turns. Tasks run in separate processes and are not affected, but setting
+  ``HENS_SOLVER_EVM`` to ``couenne`` makes its evolution candidates solve one at
+  a time.
 - ``design.heat_exchanger_network()``, its multiperiod form and
   ``design.enhanced_heat_exchanger_network()`` now run
   ``HENS_SYNTHESIS_QUALITY_TIER`` when the problem's options set it, and they

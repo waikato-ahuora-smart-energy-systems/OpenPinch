@@ -28,7 +28,9 @@ PYOMO_SOLVER_BINARIES = {
 }
 COUENNE_OPTION_FILE = "couenne.opt"
 IPOPT_OPTION_FILE = "ipopt.opt"
-DEFAULT_COUENNE_OPTIONS: dict[str, Any] = {}
+# Seconds per solve, about 13 times the longest solve in the solver-marked tests
+# and HEN notebooks (46 s). Couenne has no limit of its own.
+DEFAULT_COUENNE_OPTIONS: dict[str, Any] = {"time_limit": 600}
 DEFAULT_IPOPT_GEKKO_OPTIONS: dict[str, Any] = {
     "tol": "1e-3",
     "acceptable_tol": "1e-2",
@@ -160,13 +162,15 @@ def configure_gekko_solver(
 
     if model.options.SOLVER_EXTENSION == "pyomo":
         if solver_name == "couenne":
-            effective_options = _normalise_solver_options(solver_options)
-            if effective_options:
-                option_file = _write_solver_option_file(
-                    model,
-                    COUENNE_OPTION_FILE,
-                    effective_options,
-                )
+            effective_options = _merge_solver_options(
+                DEFAULT_COUENNE_OPTIONS,
+                solver_options,
+            )
+            option_file = _write_solver_option_file(
+                model,
+                COUENNE_OPTION_FILE,
+                effective_options,
+            )
         else:
             effective_options = _normalise_solver_options(solver_options)
             if effective_options:
@@ -212,6 +216,8 @@ def solve_gekko_model(
     failure_reason = None
     try:
         with _solver_working_directory(model, extension):
+            # Waiting for the working directory is not solve time.
+            start = time.time()
             with suppress_gekko_numpy_array_copy_deprecation():
                 model.solve(disp=disp, debug=debug)
     except Exception as exc:  # GEKKO/Pyomo exceptions become task metadata.
@@ -222,6 +228,8 @@ def solve_gekko_model(
     objective_value = getattr(model.options, "objfcnval", None)
     if failure_reason is None and status != 1:
         failure_reason = f"solver status {status}"
+    if failure_reason is None and solver_name == "couenne":
+        failure_reason = _couenne_time_limit_failure(model, solve_time)
 
     return SolverRun(
         name=solver_name,
@@ -246,6 +254,26 @@ def suppress_gekko_numpy_array_copy_deprecation():
             category=DeprecationWarning,
         )
         yield
+
+
+def _couenne_time_limit_failure(model: Any, solve_time: float) -> str | None:
+    """Return a failure reason when a Couenne solve used up its time limit.
+
+    Couenne stops at the limit and reports its incumbent, or the relaxation as
+    "optimal" when the limit passes during preprocessing, and GEKKO records
+    either as a successful solve. Its log does not always say so, so elapsed
+    time decides: Couenne counts the limit in CPU seconds, which do not outrun
+    the clock for its single thread.
+    """
+
+    options = getattr(model, "_openpinch_solver_options", None) or {}
+    limit = _as_float_or_none(options.get("time_limit"))
+    if limit is None or solve_time < limit:
+        return None
+    return (
+        f"Couenne reached its time limit of {limit:g} s; raise time_limit in "
+        "HENS_SOLVER_OPTIONS_PDM or HENS_SOLVER_OPTIONS_TDM to give it longer"
+    )
 
 
 def _as_float_or_none(value: Any) -> float | None:

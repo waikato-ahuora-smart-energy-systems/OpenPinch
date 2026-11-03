@@ -390,10 +390,10 @@ def _solve_built_task(
             )
         solved = internal_problem.get_solution(**solve_kwargs)
         if solved is None or getattr(solved, "mSuccess", 0) != 1:
-            reason = getattr(
-                internal_problem,
-                "solution_failure_reason",
-                "solver did not return a successful heat exchanger network model",
+            reason = (
+                getattr(internal_problem, "solution_failure_reason", None)
+                or getattr(getattr(solved, "solver_run", None), "failure_reason", None)
+                or "solver did not return a successful heat exchanger network model"
             )
             return task, _failed_task_outcome(task, reason), None
         verify = getattr(solved, "verify", None)

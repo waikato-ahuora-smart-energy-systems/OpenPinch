@@ -34,6 +34,31 @@ The design view also exposes ``selected_network``, total recovery, hot and cold
 utility duty, and ``utility(name)``. Serialize the complete result with
 ``design.result.model_dump(mode="json")``.
 
+Couenne Time Limit
+------------------
+
+Each Couenne solve has a limit of 600 s by default, about 13 times the longest
+solve in the solver-marked tests and HEN notebooks. A solve that reaches the
+limit fails its task, and the task's ``error`` names the limit. Any incumbent
+Couenne holds at that point is discarded: it has no optimality proof, and which
+incumbent is reached depends on machine speed. The synthesis carries on with the
+remaining tasks, and raises ``WorkflowContractError`` with each task's reason only
+if none succeeds.
+
+Raise or lower the limit per method through the solver options:
+
+.. code-block:: python
+
+   options = {
+       "HENS_SOLVER_OPTIONS_PDM": {"time_limit": 1800},
+       "HENS_SOLVER_OPTIONS_TDM": {"time_limit": 1800},
+   }
+
+The limit applies to each solve, not to the whole synthesis. Couenne counts it in
+CPU seconds and overruns it slightly, while OpenPinch compares elapsed time, so
+on a heavily loaded machine a solve can fail a little before Couenne has used the
+full limit. APOPT and IPOPT have no default time limit.
+
 Several Hot or Cold Utilities
 -----------------------------
 
