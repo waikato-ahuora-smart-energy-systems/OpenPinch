@@ -190,3 +190,29 @@ def test_vc_mvr_heating_cop_never_exceeds_carnot(
     assert cycle.solved
 
     assert cycle.COP_h <= _carnot_cop_h(T_cond, T_evap) * (1.0 + _RTOL)
+
+
+def test_subcooling_heat_does_not_reach_the_mvr_train():
+    def vc_stage(dT_subcool_vc, source_split):
+        cycle = VapourCompressionMvrCascade()
+        cycle.solve(
+            T_evap_vc=np.array([5.0]),
+            T_cond_vc=np.array([65.0]),
+            dT_lift_mvr=np.array([10.0]),
+            Q_heat_vc=np.array([1000.0]),
+            mvr_source_split=source_split,
+            mvr_process_split=np.array([]),
+            dT_subcool_vc=np.array([dT_subcool_vc]),
+            dT_subcool_mvr=np.array([0.0]),
+            dT_ihx_gas_side_vc=np.array([0.0]),
+            eta_comp=0.7,
+            eta_mvr_comp=0.7,
+            refrigerant=["Ammonia"],
+            mvr_fluid=["Water"],
+            dt_cascade_hx=2.0,
+        )
+        assert cycle.solved
+        return cycle.vc_cycles[0]
+
+    assert vc_stage(40.0, 1.0).dT_subcool == pytest.approx(0.0, abs=1e-6)
+    assert vc_stage(40.0, 0.5).dT_subcool == pytest.approx(40.0)

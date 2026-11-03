@@ -734,7 +734,11 @@ class VapourCompressionCycle:
             T=min(self._T_cond_sat_liq, self._t_crit - 0.1) - self._dT_subcool,
             phase=0,
         ).hmass()
-        h_cond_out = max(h_cond_out_min, h_cond_out_tar)
+        h_cond_out = max(
+            h_cond_out_min,
+            h_cond_out_tar,
+            self._coldest_outlet_serving_cascade_heat(P_hi, state1.hmass()),
+        )
         state2 = self._compute_state_from_pressure_enthalpy(
             P=P_hi,
             h=h_cond_out,
@@ -888,6 +892,20 @@ class VapourCompressionCycle:
                 is_condenser=False,
             )
         return streams
+
+    def _coldest_outlet_serving_cascade_heat(self, P_hi: float, h_in: float) -> float:
+        """Lowest condenser outlet enthalpy that keeps cascade heat above saturation.
+
+        The cascade exchanger takes the hottest of the condenser's heat and the
+        process duty the coldest. The exchanger's evaporator is colder than
+        condensation by only the cascade gap, so subcooled liquid cannot heat it:
+        subcooling heat must all fit in the process duty.
+        """
+        if self._Q_cas_heat <= tol:
+            return -np.inf
+        h_sat_liq = self._compute_state_from_pressure_quality(P=P_hi, Q=0).hmass()
+        q_subcool_max = (h_in - h_sat_liq) * max(self._Q_heat, 0.0) / self._Q_cas_heat
+        return h_sat_liq - q_subcool_max
 
     def _build_condenser_profile(self) -> np.ndarray:
         """

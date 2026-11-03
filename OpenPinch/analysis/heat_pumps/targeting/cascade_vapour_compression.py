@@ -380,6 +380,8 @@ def _build_and_solve_cascade_cycle(
         dt_cascade_hx=args.dt_cascade_hx,
         is_heat_pump=is_heat_pumping,
     )
+    if hp.solved:
+        state_vars.dT_subcool = hp.dT_subcool[: state_vars.dT_subcool.size]
     return hp
 
 

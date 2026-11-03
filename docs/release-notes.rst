@@ -69,6 +69,12 @@ Documentation
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Cascade and vapour-compression plus MVR targets no longer credit a stage's
+  subcooling heat to the evaporator above it, which is too warm to take it. That
+  gave the stage impossible COPs, up to about 90% of the Carnot limit. Subcooling
+  heat must now fit in the stage's own process duty, so a stage that only passes
+  heat up does not subcool. Multi-stage targets rise where this applied, by up to
+  about 20% in tests.
 - **Behaviour change:** ``update_options`` and ``set_dt_cont_multiplier``, on
   ``PinchProblem`` and ``PinchWorkspace``, now keep components added with
   ``components.add_process_mvr``. These calls used to discard them silently, so

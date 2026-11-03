@@ -220,6 +220,7 @@ def test_compute_cascade_hp_system_obj_unsolved_and_solved(monkeypatch):
         Q_cool = 70.0
         Q_heat_arr = np.array([120.0, 80.0])
         Q_cool_arr = np.array([50.0, 20.0])
+        dT_subcool = np.array([5.0, 5.0])
         penalty = 1.0
 
         def solve(self, **kwargs):
@@ -279,6 +280,7 @@ def test_compute_cascade_refrigeration_obj_solves_refrigeration_mode(monkeypatch
         work_arr = np.array([20.0])
         Q_heat_arr = np.array([100.0])
         Q_cool_arr = np.array([80.0])
+        dT_subcool = np.array([0.0])
         penalty = 0.0
 
         def solve(self, **kwargs):
@@ -412,3 +414,29 @@ def test_cascade_process_evaporator_uses_the_bottom_stage_refrigerant_minimum():
 
     # The process evaporator belongs to the ammonia stage, not the water stage.
     assert state.T_evap[0] == pytest.approx(-20.0)
+
+
+def test_cascade_state_reports_the_subcooling_the_cycle_applied():
+    pytest.importorskip("CoolProp")
+    state = HPRParsedState.model_validate(
+        {
+            "T_cond": np.array([84.9, 84.8]),
+            "dT_subcool": np.array([0.0, 85.0]),
+            "T_evap": np.array([-0.2]),
+            "dT_ihx_gas_side": np.array([0.0, 0.0]),
+            "Q_heat_base": 250.0,
+            "x_heat_split": np.array([1.0, 0.0]),
+            "Q_heat_available": np.array([250.0, 250.0]),
+        }
+    )
+    args = SimpleNamespace(
+        dtcont_hp=5.0,
+        eta_comp=0.7,
+        refrigerant_ls=["Ammonia", "R1234ze(E)"],
+        dt_cascade_hx=5.0,
+    )
+
+    cycle = hp_cascade._build_and_solve_cascade_cycle(state, args, True)
+
+    assert cycle.solved
+    assert state.dT_subcool == pytest.approx([0.0, 0.0], abs=1e-6)
