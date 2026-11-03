@@ -334,7 +334,7 @@ def test_real_public_tespy_target_and_minimal_map_stay_within_smoke_budget(
     def bounded_candidate_search(*, f_obj, x0_ls, bnds, args):
         # One condenser and one evaporator: [x_cond, x_evap, x_subcool,
         # x_heat_split, x_ihx].
-        point = np.array([0.35, 0.20, 0.02, 0.50, 0.0])
+        point = np.array([0.20, 0.20, 0.02, 0.50, 0.0])
         result = f_obj(point, args)
         assert result.success is True
         return translate_hpr_result(result, ambient_args=args)
@@ -391,6 +391,41 @@ def test_real_public_tespy_target_and_minimal_map_stay_within_smoke_budget(
     )
     assert all(point.cop > 0.0 for point in performance_map.points)
     assert total_elapsed < 300.0
+
+
+def test_real_tespy_target_starts_from_the_carnot_seed_on_a_tight_budget() -> None:
+    # The unseeded first restart stalls in a flat zero-duty region and this
+    # budget has no other restart, so the search found no target.
+    target = PinchProblem("basic_pinch.json").target.vapour_compression_heat_pump(
+        simulation_backend="tespy",
+        condensers=1,
+        evaporators=1,
+        refrigerants=["R245fa"],
+        allow_integrated_expander=False,
+        maximum_restarts=1,
+        maximum_iterations=20,
+        maximum_evaluations=50,
+    )
+
+    assert target.hpr_success is True
+    assert target.hpr_details.target_simulation_record.simulation_backend == "tespy"
+
+
+def test_real_tespy_target_stays_below_the_critical_margin_on_a_tight_budget() -> None:
+    # R245fa's critical temperature is 153.86 C, so the ceiling is 151.86 C.
+    target = PinchProblem("basic_pinch.json").target.vapour_compression_heat_pump(
+        simulation_backend="tespy",
+        condensers=1,
+        evaporators=1,
+        refrigerants=["R245fa"],
+        allow_integrated_expander=False,
+        maximum_restarts=1,
+        maximum_iterations=20,
+        maximum_evaluations=50,
+    )
+
+    record = target.hpr_details.target_simulation_record
+    assert record.nominal_condensing_temperature <= 151.86 + 0.01
 
 
 @pytest.mark.parametrize(

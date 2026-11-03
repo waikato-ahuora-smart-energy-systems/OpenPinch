@@ -49,7 +49,7 @@ def _exercise_tespy_public_target_and_map() -> None:
     def bounded_candidate_search(*, f_obj, x0_ls, bnds, args):
         # One condenser and one evaporator: [x_cond, x_evap, x_subcool,
         # x_heat_split, x_ihx].
-        point = np.array([0.35, 0.20, 0.02, 0.50, 0.0])
+        point = np.array([0.20, 0.20, 0.02, 0.50, 0.0])
         result = f_obj(point, args)
         if not result.success:
             raise AssertionError(

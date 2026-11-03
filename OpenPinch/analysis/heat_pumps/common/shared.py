@@ -742,7 +742,9 @@ def calc_carnot_heat_engine_eta(
 
 # Condensing temperatures within this margin of a refrigerant's critical
 # temperature have no usable saturation state (the cycle's pressure lookup
-# switches to the critical isochore there), so the search stays below it.
+# switches to the critical isochore there), so the search stays below it. TESPy
+# still solves inside the margin, but both backends share the limit so their
+# targets compare the same designs.
 SUBCRITICAL_CONDENSING_MARGIN_K = 2.0
 
 
@@ -774,15 +776,12 @@ def condensing_temperature_search_range(
     The range spans the heat-sink profile (``args.T_cold``) but is capped just
     below the highest critical temperature among the candidate refrigerants:
     a subcritical vapour-compression condenser cannot operate above it, and
-    every candidate there fails in CoolProp. Without the cap the search can
-    spend its whole budget in that infeasible region. The range is returned
-    unchanged for the TESPy backend (which solves its own cycle states), when
-    the refrigerants' critical points are unknown, or when the cap would leave
-    nothing to search.
+    every candidate there fails in CoolProp and TESPy. Without the cap the
+    search can spend its whole budget in that infeasible region. The range is
+    returned unchanged when the refrigerants' critical points are unknown or
+    when the cap would leave nothing to search.
     """
     t_hot, t_cold = float(args.T_cold[0]), float(args.T_cold[-1])
-    if getattr(args, "simulation_backend", "coolprop") == "tespy":
-        return t_hot, t_cold
     try:
         refrigerants = list(getattr(args, "refrigerant_ls", None) or ["water"])
         t_crit = max(float(critical_point(ref)[0]) for ref in refrigerants)
@@ -820,8 +819,6 @@ def cap_stage_condensing_temperatures(
     non-increasing (a capped stage pulls the colder stages down with it).
     """
     T_cond = np.asarray(T_cond, dtype=float)
-    if getattr(args, "simulation_backend", "coolprop") == "tespy":
-        return T_cond
     refrigerants = list(getattr(args, "refrigerant_ls", None) or [])
     if not refrigerants:
         return T_cond
