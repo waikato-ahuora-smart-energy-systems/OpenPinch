@@ -8,6 +8,7 @@ import OpenPinch.analysis.heat_pumps.common._shared.plotting as hp_plotting
 import OpenPinch.analysis.heat_pumps.common.shared as hp_shared
 import OpenPinch.analysis.heat_pumps.targeting.cascade_vapour_compression as hp_cascade
 import OpenPinch.analysis.targeting.cascade as target_cascade
+from OpenPinch import PinchProblem
 from OpenPinch.analysis.heat_pumps.common._shared.streams import (
     get_Q_vals_at_T_hpr_from_bckgrd_profile,
 )
@@ -491,3 +492,64 @@ def test_cascade_refrigeration_heat_controls_sit_below_the_top_stage():
     assert warm.Q_cool == pytest.approx(0.0)
     assert warm.Q_heat == pytest.approx(warm.Q_cond)
     assert cycle.Q_heat == pytest.approx(cycle.Q_cool + cycle.work)
+
+
+def test_cascade_one_condenser_delivers_its_duty_once_with_two_evaporators():
+    pytest.importorskip("CoolProp")
+    args = SimpleNamespace(
+        dtcont_hp=5.0,
+        eta_comp=0.7,
+        refrigerant_ls=["Ammonia", "Ammonia"],
+        dt_cascade_hx=1.0,
+    )
+    state = HPRParsedState.model_validate(
+        {
+            "T_cond": np.array([80.0]),
+            "dT_subcool": np.array([0.0]),
+            "T_evap": np.array([24.0, 5.0]),
+            "dT_ihx_gas_side": np.array([0.0, 0.0]),
+            "Q_heat_base": 100.0,
+            "x_heat_split": np.array([1.0]),
+            "Q_heat_available": np.array([100.0]),
+            "Q_cool_base": 50.0,
+            "x_cool_split": np.array([1.0]),
+            "Q_cool_available": np.array([50.0]),
+        }
+    )
+
+    cycle = hp_cascade._build_and_solve_cascade_cycle(state, args, True)
+
+    assert cycle.solved
+    # The lower stage condenses at 25 degC into the upper stage's evaporator.
+    assert cycle.Q_heat_arr == pytest.approx([100.0, 0.0])
+    # The upper evaporator takes 50 from the process; the lower stage covers
+    # the rest of its evaporator through the cascade and balances the cooling.
+    upper, lower = cycle.subcycles
+    assert upper.Q_cool == pytest.approx(50.0)
+    assert lower.Q_cond == pytest.approx(upper.Q_cas_cool)
+    assert lower.Q_cool == pytest.approx(lower.Q_evap)
+    assert cycle.Q_heat == pytest.approx(cycle.Q_cool + cycle.work)
+
+
+@pytest.mark.parametrize("evaporators", [2, 3])
+def test_public_target_with_one_condenser_has_no_phantom_process_condensers(
+    evaporators,
+):
+    pytest.importorskip("CoolProp")
+    target = PinchProblem(
+        "OpenPinch/tutorials/sample_cases/chocolate_factory.json", project_name="m"
+    ).target.vapour_compression_heat_pump(
+        load_fraction=0.25,
+        condensers=1,
+        evaporators=evaporators,
+        refrigerants=["Ammonia"],
+        maximum_restarts=1,
+        maximum_iterations=20,
+        maximum_evaluations=50,
+    )
+
+    details = target.hpr_details
+    Q_heat = np.asarray(details.Q_heat, dtype=float)
+    assert Q_heat.size == evaporators
+    assert Q_heat[1:] == pytest.approx(np.zeros(evaporators - 1))
+    assert target.hpr_cop == pytest.approx(Q_heat[0] / target.hpr_work, rel=1e-9)

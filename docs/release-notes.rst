@@ -69,6 +69,20 @@ Documentation
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- **Behaviour change:** Cascade vapour-compression heat pump targets with one
+  condenser and several evaporators no longer deliver the condenser's duty again
+  from every lower stage. Those stages condense into the evaporator above and
+  have no process condenser, yet each one added the same process heat at its own
+  low temperature, so the heat pump moved heat it never needed to and counted it
+  in the COP. Targets with ``condensers=1, evaporators>1`` change: on
+  ``chocolate_factory`` with ammonia at a 0.25 load and a short search, work goes
+  from 55.5 to 42.1 kW, COP from 9.75 to 6.42 and cold utility from 409.6 to
+  666.8 kW, with hot utility unchanged at 811.9 kW. ``process_mvr``, which found
+  no design at that budget, now finds one. Other topologies are unaffected. In
+  ``CascadeVapourCompressionCycle.solve``, a scalar or one-element ``Q_heat`` now
+  applies to each process condenser, and lower stages deliver none, where it
+  applied to every stage. Calling ``solve`` without ``Q_heat`` follows the same
+  rule, using its default of 1.
 - **Behaviour change:** Multi-stage cascade refrigeration now passes heat from
   each stage's condenser up to the evaporator of the warmer stage. It used to
   pass heat down, from the warm stage's condenser into the cold stage's

@@ -585,6 +585,42 @@ def test_cascade_property_sweep_and_normalization_branches():
     assert inf >= 0.0
 
 
+@pytest.mark.parametrize(
+    "Q_heat, n_heat, n_cool, expected",
+    [
+        (100.0, 1, 1, [100.0]),
+        (100.0, 1, 2, [100.0, 0.0]),
+        (np.array([100.0]), 1, 2, [100.0, 0.0]),
+        (100.0, 1, 3, [100.0, 0.0, 0.0]),
+        (100.0, 2, 1, [100.0, 100.0]),
+        (100.0, 2, 2, [100.0, 100.0, 0.0]),
+        (np.nan, 1, 2, [None, 0.0]),
+    ],
+)
+def test_cascade_scalar_q_heat_applies_to_each_process_condenser(
+    Q_heat, n_heat, n_cool, expected
+):
+    hp = CascadeVapourCompressionCycle()
+
+    assert hp._normalize_Q_heat(Q_heat, n_heat, n_cool).tolist() == expected
+
+
+@pytest.mark.parametrize("Q_heat", [100.0, np.array([100.0]), np.array([100.0, 0.0])])
+def test_cascade_scalar_q_heat_matches_the_explicit_stage_array(Q_heat):
+    cycle = CascadeVapourCompressionCycle()
+    cycle.solve(
+        T_evap=np.array([24.0, 5.0]),
+        T_cond=np.array([80.0]),
+        dtcont=0.0,
+        refrigerant="ammonia",
+        Q_heat=Q_heat,
+    )
+
+    assert cycle.solved
+    assert cycle.Q_heat_arr == pytest.approx([100.0, 0.0])
+    assert cycle.Q_heat == pytest.approx(cycle.Q_cool + cycle.work)
+
+
 def test_cascade_property_arrays_and_unsolved_work_branch():
     hp = CascadeVapourCompressionCycle()
     hp._subcycles = [_DummyCascadeCycle(), _DummyCascadeCycle()]
