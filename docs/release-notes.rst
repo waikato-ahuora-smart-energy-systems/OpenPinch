@@ -4,6 +4,23 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Behaviour changes
+~~~~~~~~~~~~~~~~~
+
+- ``target.varbanov_cogeneration()`` and ``TurbineModel.VARBANOV`` are removed.
+  They are replaced by ``target.varbanov_small_turbine_cogeneration()`` and
+  ``target.varbanov_large_turbine_cogeneration()``, with
+  ``TurbineModel.VARBANOV_SMALL`` and ``TurbineModel.VARBANOV_LARGE``, also through
+  ``all_periods`` and workspace batches. The old method switched coefficients at
+  2000 kW inside the model, which also changed the turbine type, so from 7200 to
+  7700 kW on one test case its mass balance never settled. Each new model uses one
+  size band and does not switch. Work targets change from the old method wherever
+  it would have used the other band.
+- If a stage's work is outside the chosen band, the target reports the number and
+  a message goes to ``turbine_diagnostics``, a ``UserWarning`` and
+  ``problem.report().warnings``; ``turbine_converged`` is not affected. For some
+  duties both models warn.
+
 Input and validation
 ~~~~~~~~~~~~~~~~~~~~
 

@@ -18,6 +18,7 @@ Targets shaft power from steam turbines driven by a zone's hot utilities. A mult
 - Above-pinch mode needs `T_in` and `P_in`; below-pinch mode needs `T_sink`; any other mode raises `ValueError`. [steam_turbine.py:MultiStageSteamTurbine.solve]
 - Stage efficiency is bounded between `min_eff` and 1; the shaft work is the fluid work times `mech_eff`, while the reported overall efficiency excludes mechanical losses. [steam_turbine.py:_apply_efficiency_limits] [steam_turbine.py:MultiStageSteamTurbine._solve_above_pinch]
 - The extraction mass balance iterates at most 50 times and reports `converged`. [steam_turbine.py:_MASS_BALANCE_MAX_ITERATIONS]
+- Each Varbanov model uses one size band and never switches on size; a wet back-pressure exit still switches type to condensing. A stage's fluid work outside the band adds one diagnostic per solve and does not change `converged`. [steam_turbine.py:_varbanov_band_diagnostics]
 - A below-pinch sink temperature outside water's saturation range is clamped and a diagnostic is recorded. [steam_turbine.py:MultiStageSteamTurbine._solve_below_pinch]
 - On a target's `turbine_result`, a stage's `source_index` is its position in the target's `hot_utilities`, not in the solver's filtered input. [service.py:_result_with_utility_indices]
 - The solve result is validated against `TurbineSolveResult`; reading results before a solve raises `RuntimeError`. [steam_turbine.py:MultiStageSteamTurbine._require_solution]

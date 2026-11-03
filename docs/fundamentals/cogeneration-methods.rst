@@ -40,7 +40,11 @@ from ``zone.config.power`` (for example ``zone.config.power.turb_t_in``):
 - ``POWER_ETA_MECH``
 - ``POWER_HIGH_P_COND_FLASH_ENABLED``
 
-The turbine model is selected by the target method name, not by an option.
+The turbine model is selected by the target method name, not by an option. The
+Varbanov et al. (2004) correlation is offered as two methods, one for each of its
+size bands, ``varbanov_small_turbine_cogeneration`` (stage work at or below
+2000 kW) and ``varbanov_large_turbine_cogeneration`` (above 2000 kW). Using one
+outside its band gives a warning; see :doc:`../guides/cogeneration-workflows`.
 
 This keeps the turbine workflow aligned with the rest of the package model:
 configuration lives on the prepared zone, not in workbook-style side channels.

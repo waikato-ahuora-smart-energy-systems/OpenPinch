@@ -35,7 +35,8 @@ EXPECTED_TARGET_METHODS = {
     "utility_placement",
     "vapour_compression_heat_pump",
     "vapour_compression_refrigeration",
-    "varbanov_cogeneration",
+    "varbanov_large_turbine_cogeneration",
+    "varbanov_small_turbine_cogeneration",
 }
 
 FORBIDDEN_AMBIGUOUS_TARGET_METHODS = {

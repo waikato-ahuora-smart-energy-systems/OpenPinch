@@ -363,7 +363,8 @@ class TurbineModel(Enum):
 
     MEDINA_FLORES = "Medina-Flores et al. (2010)"
     SUN_SMITH = "Sun & Smith (2015)"
-    VARBANOV = "Varbanov et al. (2004)"
+    VARBANOV_SMALL = "Varbanov et al. (2004), turbines up to 2 MW"
+    VARBANOV_LARGE = "Varbanov et al. (2004), turbines above 2 MW"
     ISENTROPIC = "Fixed Isentropic Turbine"
 
 
