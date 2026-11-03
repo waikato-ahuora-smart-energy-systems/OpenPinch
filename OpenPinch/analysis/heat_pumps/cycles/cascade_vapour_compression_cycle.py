@@ -110,7 +110,14 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
             if v is None or (isinstance(v, (float, np.floating)) and np.isnan(v)):
                 arr_out = _default_Q_heat()
             else:
-                arr_out = np.full(n_cycles, float(v), dtype=object)
+                # One duty per process condenser; the stages below only pass
+                # heat up the cascade.
+                arr_out = np.concatenate(
+                    [
+                        np.full(n_heat, float(v), dtype=object),
+                        np.zeros(n_cool - 1, dtype=object),
+                    ]
+                )
         elif arr.size == n_heat:
             arr_out = np.concatenate([arr, np.zeros(n_cool - 1, dtype=object)])
         else:
@@ -325,9 +332,10 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
         dT_ihx_gas_side : np.ndarray | float, optional
             Delta-T on the gas side of the internal heat exchanger [K].
         Q_heat : np.ndarray, optional
-            Heat delivered to the process [W]. Only the balancing stage may be
-            None or NaN to take what is left: the last process condenser in heat
-            pump mode, the top stage in refrigeration mode.
+            Heat delivered to the process [W]. A scalar applies to each process
+            condenser, and stages without one deliver none. Only the balancing
+            stage may be None or NaN to take what is left: the last process
+            condenser in heat pump mode, the top stage in refrigeration mode.
         Q_cool : np.ndarray, optional
             Cooling delivered to the process [W].
         duty_allocation : DutyAllocationRequest, optional
