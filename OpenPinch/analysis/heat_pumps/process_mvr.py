@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from ...analysis.numerics import get_period_index
@@ -12,11 +13,13 @@ from ...domain.zone import Zone
 from ._process_mvr.membership import (
     add_replacement_streams_to_memberships,
     find_hot_stream_memberships,
+    walk_zones,
 )
 from ._process_mvr.replacement_streams import build_process_mvr_stream_record
 from ._process_mvr.selection import (
     match_source_streams,
     normalise_source_selectors,
+    validate_process_mvr_source,
 )
 from ._process_mvr.state import _ProcessMVRStreamRecord
 from ._process_mvr.work import work_for_zone as calculate_work_for_zone
@@ -36,6 +39,8 @@ class ProcessMVRComponent(ProcessComponent):
     source_selectors: list[Any] = field(default_factory=list)
     stream_records: list[_ProcessMVRStreamRecord] = field(default_factory=list)
     component_type: str = "process_mvr"
+    _requested_eta_mvr_comp: float | None = None
+    _requested_eta_motor: float | None = None
 
     def activate(self):
         """Use the MVR replacement streams in subsequent targeting."""
@@ -143,13 +148,7 @@ def create_process_mvr_component(
         mvr_stage_t_lift=resolved_stage_t_lift,
         mvr_stage_pressure_ratio=mvr_stage_pressure_ratio,
         liquid_injection=bool(liquid_injection),
-        eta_mvr_comp=float(
-            root.config.process_mvr.eta_comp if eta_mvr_comp is None else eta_mvr_comp
-        ),
-        eta_motor=float(
-            root.config.process_mvr.eta_motor if eta_motor is None else eta_motor
-        ),
-        dt_diff_max=float(getattr(root.config, "DT_DIFF_MAX", 0.1)),
+        **_settings_from_configuration(root, eta_mvr_comp, eta_motor),
     )
     component_id = _resolve_component_id(problem, mvr_id)
     selectors = normalise_source_selectors(source_streams)
@@ -170,12 +169,101 @@ def create_process_mvr_component(
         settings=settings,
         source_selectors=selectors,
         stream_records=records,
+        _requested_eta_mvr_comp=eta_mvr_comp,
+        _requested_eta_motor=eta_motor,
     )
     for record in records:
         add_replacement_streams_to_memberships(record, component_id)
     problem._process_components[component_id] = component
     component.activate()
     return component
+
+
+def replay_process_components(
+    components: Mapping[str, ProcessMVRComponent],
+    root: Zone,
+) -> None:
+    """Re-solve components on a rebuilt tree, changing none of them on failure."""
+    zones = {_path_below_root(zone): zone for zone in walk_zones(root)}
+    replayed = [
+        _replay_component(component, root, zones) for component in components.values()
+    ]
+    for component, (settings, records) in zip(components.values(), replayed):
+        component.settings = settings
+        component.stream_records = records
+
+
+def _replay_component(
+    component: ProcessMVRComponent,
+    root: Zone,
+    zones: dict[str, Zone],
+) -> tuple[DirectGasMVRSettings, list[_ProcessMVRStreamRecord]]:
+    settings = replace(
+        component.settings,
+        **_settings_from_configuration(
+            root,
+            component._requested_eta_mvr_comp,
+            component._requested_eta_motor,
+        ),
+    )
+    records = []
+    for previous in component.stream_records:
+        source = _find_replay_source(component.id, previous, zones)
+        # Earlier replays may have switched the source off; its flag is restored below.
+        source.is_active = True
+        validate_process_mvr_source(source, source.name)
+        record = build_process_mvr_stream_record(
+            source_stream=source,
+            memberships=find_hot_stream_memberships(root, source),
+            settings=settings,
+            period_ids=root.period_ids,
+            num_periods=root.num_periods,
+        )
+        add_replacement_streams_to_memberships(record, component.id)
+        source.is_active = previous.original_stream.is_active
+        for stream, previous_stream in zip(
+            record.replacement_streams, previous.replacement_streams, strict=True
+        ):
+            stream.is_active = previous_stream.is_active
+        records.append(record)
+    return settings, records
+
+
+def _find_replay_source(
+    component_id: str,
+    previous: _ProcessMVRStreamRecord,
+    zones: dict[str, Zone],
+) -> Stream:
+    membership = previous.original_memberships[0]
+    zone = zones.get(_path_below_root(membership.zone))
+    streams = {} if zone is None else dict(zone.hot_streams.items())
+    if membership.key not in streams:
+        raise ValueError(
+            f"Process component {component_id!r} cannot be rebuilt: source stream "
+            f"{previous.original_stream.name!r} was not found."
+        )
+    return streams[membership.key]
+
+
+def _path_below_root(zone: Zone) -> str:
+    return zone.address.partition("/")[2]
+
+
+def _settings_from_configuration(
+    root: Zone,
+    eta_mvr_comp: float | None,
+    eta_motor: float | None,
+) -> dict[str, float]:
+    """Resolve settings that take the configuration's value unless given."""
+    return {
+        "eta_mvr_comp": float(
+            root.config.process_mvr.eta_comp if eta_mvr_comp is None else eta_mvr_comp
+        ),
+        "eta_motor": float(
+            root.config.process_mvr.eta_motor if eta_motor is None else eta_motor
+        ),
+        "dt_diff_max": float(getattr(root.config, "DT_DIFF_MAX", 0.1)),
+    }
 
 
 def _resolve_component_id(
@@ -192,4 +280,8 @@ def _resolve_component_id(
     return f"mvr_{counter}"
 
 
-__all__ = ["ProcessMVRComponent", "create_process_mvr_component"]
+__all__ = [
+    "ProcessMVRComponent",
+    "create_process_mvr_component",
+    "replay_process_components",
+]

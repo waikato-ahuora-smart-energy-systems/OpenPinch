@@ -42,10 +42,8 @@ class AnalysisLifecycle(RuleBasedStateMachine):
         self.problem.update_options({"ENV_TEMPERATURE": float(ambient)})
         assert not self.problem._period_states
         assert not self.problem.period_results
-        # Input rebuilding discards memory-only components; explicitly recreate.
-        self.component = self.problem.components.add_process_mvr(
-            "Evaporator vapour", mvr_stage_t_lift=10.0
-        )
+        # Input rebuilding replays components and keeps the handle.
+        assert self.problem.process_components[self.component.id] is self.component
 
     @rule()
     def snapshot(self):

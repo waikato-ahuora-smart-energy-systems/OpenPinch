@@ -5,9 +5,9 @@ Private helpers behind `ProcessMVRComponent` in `../process_mvr.py`. They select
 
 ## Interface
 What `../process_mvr.py` imports:
-- `add_replacement_streams_to_memberships`, `find_hot_stream_memberships` (`membership.py`): attach replacement streams wherever the original sits; find every hot-stream collection holding a stream by identity.
+- `add_replacement_streams_to_memberships`, `find_hot_stream_memberships`, `walk_zones` (`membership.py`): attach replacement streams wherever the original sits; find every hot-stream collection holding a stream by identity; walk a zone tree.
 - `build_process_mvr_stream_record` (`replacement_streams.py`): solve all periods and return a `_ProcessMVRStreamRecord`.
-- `normalise_source_selectors`, `match_source_streams` (`selection.py`): normalise selectors and resolve them to unique, validated hot streams.
+- `normalise_source_selectors`, `match_source_streams`, `validate_process_mvr_source` (`selection.py`): normalise selectors and resolve them to unique, validated hot streams; check one source stream.
 - `_ProcessMVRStreamRecord` (`state.py`): original stream, memberships, replacement streams and per-period stage results.
 - `work_for_zone` (`work.py`; imported as `calculate_work_for_zone`): compressor work for records inside a zone subtree and period.
 - Internal modules: `values.py` (period-value and unit helpers), `state.py` also defines `_StreamMembership`.

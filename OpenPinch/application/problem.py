@@ -616,7 +616,7 @@ class PinchProblem:
         *,
         zone_name: Optional[str] = None,
     ) -> Zone:
-        """Update one zone-tree multiplier and rebuild the prepared analysis state."""
+        """Update one zone-tree multiplier, rebuild state and re-solve components."""
         if (
             self._validated_data is not None
             and self._validated_data.residual_basis is not None
@@ -649,7 +649,7 @@ class PinchProblem:
         *,
         replace: bool = False,
     ) -> Zone:
-        """Update the problem options in-place and rebuild the analysis state."""
+        """Update the options in-place, rebuild state and re-solve components."""
         if not isinstance(options, dict):
             raise TypeError("options must be provided as a dict.")
 
