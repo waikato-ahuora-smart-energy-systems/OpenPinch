@@ -130,6 +130,15 @@ class TargetResults(_ReportModel):
     turbine_efficiency_target: Value | None = report_field(
         "turbine_efficiency_target", "derived", None, representation="quantity"
     )
+    turbine_converged: Optional[bool] = report_field(
+        "turbine_converged", "derived", None, representation="structured"
+    )
+    turbine_diagnostics: List[str] = report_field(
+        "turbine_diagnostics",
+        "derived",
+        default_factory=list,
+        representation="structured",
+    )
     area: Value | None = report_field(
         "area", "maximum", None, representation="quantity"
     )

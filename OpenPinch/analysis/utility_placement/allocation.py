@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import Protocol, Self
+from typing import Any, Protocol, Self
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
@@ -50,8 +50,8 @@ class AllocationAdapterResult(_FrozenAllocation):
 
     @field_validator("hot_duties", "cold_duties", mode="before")
     @classmethod
-    def _validate_duties(cls, value: object) -> tuple[float, ...]:
-        result = tuple(float(item) for item in value)  # type: ignore[arg-type]
+    def _validate_duties(cls, value: Any) -> tuple[float, ...]:
+        result = tuple(float(item) for item in value)
         if any(not math.isfinite(item) or item < 0.0 for item in result):
             raise ValueError("allocation duties must be finite and non-negative")
         return result

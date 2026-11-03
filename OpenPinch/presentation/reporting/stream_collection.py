@@ -16,7 +16,8 @@ def export_stream_collection(
 ) -> Path:
     """Write ordered stream data as CSV and return the resulting path."""
     if output_dir is None:
-        output_dir = Path(__file__).resolve().parents[3] / "results"
+        # The working directory, never a folder inside the installed package.
+        output_dir = Path.cwd()
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"{filename}.csv"
 

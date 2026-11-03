@@ -69,6 +69,14 @@ def build_validation_report(
     )
 
 
+def load_failure_report(error: Exception) -> ValidationReport:
+    """Report a source that could not be loaded or prepared as one error issue."""
+    return ValidationReport(
+        valid=False,
+        issues=[ValidationIssue(severity="error", path="", message=str(error))],
+    )
+
+
 # Location tags Pydantic adds for the branches of a value union (ScalarOrVU).
 _VALUE_UNION_BRANCHES = frozenset(
     {

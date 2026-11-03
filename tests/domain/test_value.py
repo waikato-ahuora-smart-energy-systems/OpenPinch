@@ -30,7 +30,6 @@ def test_period_value_stores_only_ordered_magnitudes():
     value = Value(
         {
             "values": [10.0, 4.0],
-            "period_ids": ["base", "peak"],
             "weights": [0.25, 0.75],
             "unit": "kW",
         }
@@ -42,6 +41,22 @@ def test_period_value_stores_only_ordered_magnitudes():
         "unit": "kW",
         "weights": [0.25, 0.75],
     }
+
+
+def test_period_value_rejects_period_ids():
+    # A Value holds magnitudes in order and has no period identity, so ids
+    # given beside them used to be dropped silently: {"values": [10, 20],
+    # "period_ids": ["b", "a"]} gave the first period 10 whatever its id.
+    # It now raises, as a domain Stream does.
+    with pytest.raises(ValueError, match="do not take period_ids"):
+        Value(
+            {
+                "values": [10.0, 4.0],
+                "period_ids": ["base", "peak"],
+                "weights": [0.25, 0.75],
+                "unit": "kW",
+            }
+        )
 
 
 def test_period_value_requires_explicit_summary_for_scalar_face():

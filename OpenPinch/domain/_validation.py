@@ -10,7 +10,7 @@ Raising ``ValueError`` inside these validators produces the same pydantic
 from __future__ import annotations
 
 import math
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import AfterValidator, BeforeValidator
 
@@ -51,8 +51,8 @@ def finite_float(
         raise ValueError("finite_float accepts at most one of ge and gt")
     bound_text = message if bound_message is None else bound_message
 
-    def _validate(value: object) -> float:
-        result = float(value)  # type: ignore[arg-type]
+    def _validate(value: Any) -> float:
+        result = float(value)
         if not math.isfinite(result):
             raise ValueError(message)
         if ge is not None and result < ge:

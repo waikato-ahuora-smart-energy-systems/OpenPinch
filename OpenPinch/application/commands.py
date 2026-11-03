@@ -30,8 +30,6 @@ from ..contracts.hpr import HPRTargetingError
 from ..contracts.reporting import TargetResults
 from ..contracts.workspace import (
     PinchWorkspaceBundle,
-    ValidationIssue,
-    ValidationReport,
 )
 from ..domain.progress import reporting
 from ..domain.targets import BaseTargetModel
@@ -44,7 +42,7 @@ from ._problem.accessors.design import (
 )
 from ._problem.input.validation import (
     InputValidationWarning,
-    build_validation_report,
+    load_failure_report,
 )
 from .problem import PinchProblem
 from .workspace import PinchWorkspace
@@ -455,7 +453,13 @@ def _error_json(error: Exception) -> dict[str, Any]:
         details = {"code": error.code}
     elif isinstance(error, UtilityChoiceError):
         details = {"side": error.side, "utilities": list(error.utilities)}
-    return {"type": type(error).__name__, "message": str(error), "details": details}
+    # The missing-TESPy subclass keeps the type engines already match on.
+    kind = (
+        "HprTargetCompatibilityError"
+        if isinstance(error, HprTargetCompatibilityError)
+        else type(error).__name__
+    )
+    return {"type": kind, "message": str(error), "details": details}
 
 
 def _accessor_method(problem: PinchProblem, command: str) -> Any:
@@ -502,16 +506,13 @@ def _validate(problem: PinchProblem) -> dict[str, Any]:
 def _invalid_input_report(data: Mapping[str, Any], error: ValueError) -> dict[str, Any]:
     """The validation report of inline input that would not load.
 
-    Built from the input alone, never by constructing the problem again.
-    Input the report passes but construction rejects (an unknown zone type,
-    for example) is reported with the construction error as its issue.
+    Input the report passes but the request still failed on (a bad
+    ``project_name``, which the report does not see) is reported with the load
+    error as its issue.
     """
-    report = build_validation_report(dict(data))
+    report = PinchProblem.source_validation_report(dict(data))
     if report.valid:
-        report = ValidationReport(
-            valid=False,
-            issues=[ValidationIssue(severity="error", path="", message=str(error))],
-        )
+        report = load_failure_report(error)
     return {"input": None, "report": report.model_dump(mode="json")}
 
 

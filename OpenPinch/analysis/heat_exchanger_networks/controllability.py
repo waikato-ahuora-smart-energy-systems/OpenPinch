@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from collections import OrderedDict
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from scipy.optimize import linear_sum_assignment
@@ -171,7 +171,7 @@ def _build_outputs(
     *,
     period_id: str,
 ) -> tuple[HeatExchangerNetworkControllabilityEndpoint, ...]:
-    totals: OrderedDict[str, dict[str, float | int | str]] = OrderedDict()
+    totals: OrderedDict[str, dict[str, Any]] = OrderedDict()
 
     for exchanger in exchangers:
         state = exchanger.state(period_id)
@@ -195,7 +195,7 @@ def _build_outputs(
         HeatExchangerNetworkControllabilityEndpoint(
             output_id=output_id,
             stream_id=str(values["stream_id"]),
-            side=values["side"],  # type: ignore[arg-type]
+            side=values["side"],
             exchanger_count=int(values["exchanger_count"]),
             total_duty=float(values["total_duty"]),
         )
