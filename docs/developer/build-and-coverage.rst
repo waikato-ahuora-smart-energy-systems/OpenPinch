@@ -99,8 +99,8 @@ Current Quality Gates
 - CI runs Ruff, a warning-free docs build, and the unit suite (everything except
   solver, TESPy, performance, and docs tests) with a 95% branch-aware coverage
   floor.
-- Every published optional extra except the aggregate ``full``, including
-  ``synthesis``, has an isolated installation smoke check.
+- Every published optional extra, including ``synthesis`` and the aggregate
+  ``full``, has an isolated installation smoke check.
 - Generated wheels are installed and smoke-tested on Ubuntu, Windows, and macOS.
 - Docs consistency checks run under pytest as part of the normal suite.
 - The docs build helper fails on Sphinx warnings by default.

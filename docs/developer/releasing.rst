@@ -43,7 +43,7 @@ Validation profiles
      - no
 
 Install smoke tests install the built wheel, not the checkout: the core
-surface on Ubuntu, Windows and macOS, and every optional extra except the aggregate ``full`` on Ubuntu.
+surface on Ubuntu, Windows and macOS, and every optional extra, including the aggregate ``full``, on Ubuntu.
 Tests use Hypothesis seed ``20260715``. Python comes from ``.python-version``, except the ``unit-py312`` and
 ``unit-py313`` lanes, which pin their own version.
 

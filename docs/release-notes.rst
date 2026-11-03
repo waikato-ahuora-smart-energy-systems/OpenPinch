@@ -253,6 +253,11 @@ Testing and CI
   traceback) in the Pyodide job, where its Node packages are installed. It
   used to skip in every lane, so the behaviour had no CI coverage.
 
+- CI smoke-tests the ``full`` extra on Ubuntu, so every published extra now has
+  an installation check, and a test requires the smoke matrix to match the extras
+  in ``pyproject.toml``. Nine fast tests that need GEKKO or Kaleido now carry the
+  ``synthesis`` marker.
+
 0.7.2 (2026-10-20)
 ------------------
 
