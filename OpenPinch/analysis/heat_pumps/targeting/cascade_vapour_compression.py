@@ -257,7 +257,11 @@ def _parse_cascade_hp_state_variables(
         first_stage=n_cond - 1,
     )
     T_cond, T_evap = limit_cascade_pressure_ratios(T_cond, T_evap, args)
-    dT_subcool = map_x_arr_to_DT_arr(x_subcool, T_cond, T_evap[-1])
+    dT_subcool = map_x_arr_to_DT_arr(
+        x_subcool,
+        T_cond,
+        _condenser_stage_evaporating_temperatures(T_cond, T_evap, args),
+    )
     Q_heat_available = (
         limit_available_duty(
             get_Q_vals_at_T_hpr_from_bckgrd_profile(
@@ -309,6 +313,16 @@ def _parse_cascade_hp_state_variables(
         Q_heat_available=Q_heat_available,
         Q_cool_available=Q_cool_available,
     )
+
+
+def _condenser_stage_evaporating_temperatures(
+    T_cond: np.ndarray,
+    T_evap: np.ndarray,
+    args: HeatPumpTargetInputs,
+) -> np.ndarray:
+    """Evaporating temperature of each process condenser's own stage."""
+    dt_cascade_hx = float(getattr(args, "dt_cascade_hx", 0.0))
+    return np.concatenate([T_cond[1:] - dt_cascade_hx, T_evap[:1]])
 
 
 def _cascade_process_control_counts(

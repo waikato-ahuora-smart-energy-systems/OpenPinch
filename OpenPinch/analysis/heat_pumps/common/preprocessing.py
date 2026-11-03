@@ -37,6 +37,7 @@ def construct_HPRTargetInputs(
     debug: bool = False,
     simulation_backend: str = "coolprop",
     search_budget: HPRSearchBudget | None = None,
+    background_is_utility: bool = False,
 ) -> HeatPumpTargetInputs:
     """Prepare normalised background cascades and solver arguments for HPR targeting."""
     T_vals, H_hot, H_cold = T_vals.copy(), H_hot.copy(), H_cold.copy()
@@ -80,6 +81,7 @@ def construct_HPRTargetInputs(
         z_amb_cold=z_amb_cold,
         bckgrd_hot_streams=s_hot,
         bckgrd_cold_streams=s_cold,
+        background_is_utility=background_is_utility,
         untargeted_cooling_streams=s_hot_untargeted,
         is_heat_pumping=bool(is_heat_pumping),
         debug=debug,

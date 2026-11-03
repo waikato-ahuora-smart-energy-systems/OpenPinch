@@ -113,6 +113,7 @@ class PinchProblem:
         self._validated_data = None
         self._master_zone = None
         self._process_components = {}
+        self._retained_hpr_targets = {}
         self._last_target_run_spec = None
         self._suspend_target_run_recording = False
         self._period_results = {}

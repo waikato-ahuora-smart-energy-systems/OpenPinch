@@ -165,7 +165,11 @@ def test_cascade_x0_bounds_and_parse(monkeypatch):
     )
     np.testing.assert_allclose(vars.T_cond, np.array([110.0, 78.0]))
     np.testing.assert_allclose(vars.T_evap, np.array([105.0, 70.0]))
-    np.testing.assert_allclose(vars.dT_subcool, np.array([0.4, 0.16]))
+    # Each condenser's lift to its own stage's evaporator: the stage below's
+    # condenser level less the 2 K cascade gap, then the first process evaporator.
+    np.testing.assert_allclose(
+        vars.dT_subcool, np.array([0.01 * (110.0 - 76.0), 0.02 * abs(78.0 - 105.0)])
+    )
     assert vars.Q_heat_base == pytest.approx(
         decode_available_fractions(vars.x_heat_split, vars.Q_heat_available).sum()
     )
@@ -440,3 +444,29 @@ def test_cascade_state_reports_the_subcooling_the_cycle_applied():
 
     assert cycle.solved
     assert state.dT_subcool == pytest.approx([0.0, 0.0], abs=1e-6)
+
+
+def test_cascade_subcooling_scales_with_each_stages_own_evaporator():
+    args = _base_args(n_cond=3, n_evap=2)
+    args.refrigerant_ls = ["water"]
+    args.dt_cascade_hx = 5.0
+    _, bnds = hp_cascade._get_cascade_hp_opt_setup(None, args)
+    x = np.full(len(bnds), 0.5)
+    layout = hp_cascade.HPRoptVectorLayout(
+        n_cond=3, n_evap=2, n_subcool=3, n_heat_split=3, n_cool_split=1, n_ihx=4
+    )
+    x[:5] = [0.1, 0.2, 0.3, 0.1, 0.05]
+    x[layout.subcool_slice] = [0.5, 0.25, 1.0]
+
+    state = hp_cascade._parse_cascade_hp_state_variables(x, args)
+
+    T_cond, T_evap = state.T_cond, state.T_evap
+    # The first two condensers pass heat to the stage below's condenser level;
+    # the last pairs with the warmest process evaporator.
+    assert state.dT_subcool == pytest.approx(
+        [
+            0.5 * (T_cond[0] - (T_cond[1] - 5.0)),
+            0.25 * (T_cond[1] - (T_cond[2] - 5.0)),
+            T_cond[2] - T_evap[0],
+        ]
+    )

@@ -37,6 +37,7 @@ _PROBLEM_STATE_FIELDS = (
     "_period_states",
     "_period_result_states",
     "_utility_placement_result",
+    "_retained_hpr_targets",
 )
 
 

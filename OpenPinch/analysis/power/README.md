@@ -5,7 +5,7 @@ Targets shaft power from steam turbines driven by a zone's hot utilities. A mult
 
 ## Interface
 - `run_power_cogeneration_service(zone, args, *, refresh_services, cogeneration_func)` (`service.py`): adds a power-enriched copy of the first compatible target to the zone.
-- `get_power_cogeneration_above_pinch(target, args)` (`service.py`): sets `work_target`, `turbine_efficiency_target`, `turbine_converged`, `turbine_diagnostics` and `turbine_result` on a target from its hot utilities, or returns the target untouched when no usable utility stage is found, in which case the service still adds the clone [service.py:_preprocess_utilities].
+- `get_power_cogeneration_above_pinch(target, args)` (`service.py`): sets `work_target`, `turbine_efficiency_target`, `turbine_converged`, `turbine_diagnostics` and `turbine_result` on a target from its hot utilities, or, when no usable utility stage is found, resets `turbine_converged` and `turbine_diagnostics` and returns the target with its other fields unchanged, in which case the service still adds the clone [service.py:get_power_cogeneration_above_pinch] [service.py:_preprocess_utilities].
 - `get_power_cogeneration_below_pinch(temperatures, heat_flows, *, config, T_sink)` (`service.py`): solves a below-pinch turbine; returns `(total_work, details)`.
 - `MultiStageSteamTurbine` (`steam_turbine.py`): `solve(temperatures, heat_flows, *, mode, ...)` returns `(total_work, details)`; the `solved`, `result`, `stages` and `total_work` properties read the last result.
 - Subdirectories: none.
