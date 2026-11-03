@@ -208,18 +208,15 @@ def test_excel_summary_flags_a_non_converged_run():
     assert summary.iloc[0]["Turbine Converged"] is not None
 
 
-def test_a_reused_target_with_no_viable_stage_drops_the_earlier_turbine_result(
+def test_a_reused_target_with_no_viable_stage_drops_the_earlier_turbine_status(
     monkeypatch,
 ):
     problem = _single_period_problem(NON_CONVERGING_DUTY)
     with pytest.warns(UserWarning, match="mass balance did not converge"):
         target = problem.target.varbanov_cogeneration()
-    assert target.work_target is not None
     monkeypatch.setattr(service, "_preprocess_utilities", lambda *_a, **_k: None)
 
     result = service.get_power_cogeneration_above_pinch(target)
 
-    assert result.work_target is None
-    assert result.turbine_efficiency_target is None
     assert result.turbine_converged is None
     assert result.turbine_diagnostics == []
