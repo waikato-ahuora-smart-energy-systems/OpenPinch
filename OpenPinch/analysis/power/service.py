@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from ...contracts.turbine import TurbineSolveResult
 from ...domain.configuration import T_CRIT, Configuration, tol
 from ...domain.enums import CogenerationTarget, TargetType
 from ..numerics import get_period_index
@@ -81,6 +82,9 @@ def get_power_cogeneration_above_pinch(
     target.turbine_efficiency_target = details["overall_efficiency"]
     target.turbine_converged = details["converged"]
     target.turbine_diagnostics = details["diagnostics"]
+    target.turbine_result = _result_with_utility_indices(
+        turbine.result, utility_data["source_indices"]
+    )
     for message in details["diagnostics"]:
         warnings.warn(
             f"Cogeneration target {target.name!r}"
@@ -225,6 +229,27 @@ def _prepare_turbine_parameters(config: Configuration) -> dict:
         "mech_eff": min(max(float(power.eta_mech), 0.0), 1.0),
         "is_high_p_cond_flash": bool(power.high_p_cond_flash_enabled),
     }
+
+
+def _result_with_utility_indices(
+    result: TurbineSolveResult,
+    utility_indices: np.ndarray,
+) -> TurbineSolveResult:
+    """Point each stage's ``source_index`` at the target's hot utilities.
+
+    The solver only sees the utilities that passed preprocessing, so its index
+    is a position in that shorter list.
+    """
+    return result.model_copy(
+        update={
+            "stages": [
+                stage.model_copy(
+                    update={"source_index": int(utility_indices[stage.source_index])}
+                )
+                for stage in result.stages
+            ]
+        }
+    )
 
 
 def _preprocess_utilities(

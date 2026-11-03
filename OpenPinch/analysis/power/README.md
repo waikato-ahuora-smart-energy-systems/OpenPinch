@@ -5,7 +5,7 @@ Targets shaft power from steam turbines driven by a zone's hot utilities. A mult
 
 ## Interface
 - `run_power_cogeneration_service(zone, args, *, refresh_services, cogeneration_func)` (`service.py`): adds a power-enriched copy of the first compatible target to the zone.
-- `get_power_cogeneration_above_pinch(target, args)` (`service.py`): sets `work_target` and `turbine_efficiency_target` on a target from its hot utilities, or returns the target untouched when no usable utility stage is found, in which case the service still adds the clone [service.py:_preprocess_utilities].
+- `get_power_cogeneration_above_pinch(target, args)` (`service.py`): sets `work_target`, `turbine_efficiency_target`, `turbine_converged`, `turbine_diagnostics` and `turbine_result` on a target from its hot utilities, or returns the target untouched when no usable utility stage is found, in which case the service still adds the clone [service.py:_preprocess_utilities].
 - `get_power_cogeneration_below_pinch(temperatures, heat_flows, *, config, T_sink)` (`service.py`): solves a below-pinch turbine; returns `(total_work, details)`.
 - `MultiStageSteamTurbine` (`steam_turbine.py`): `solve(temperatures, heat_flows, *, mode, ...)` returns `(total_work, details)`; the `solved`, `result`, `stages` and `total_work` properties read the last result.
 - Subdirectories: none.
@@ -19,6 +19,7 @@ Targets shaft power from steam turbines driven by a zone's hot utilities. A mult
 - Stage efficiency is bounded between `min_eff` and 1; the shaft work is the fluid work times `mech_eff`, while the reported overall efficiency excludes mechanical losses. [steam_turbine.py:_apply_efficiency_limits] [steam_turbine.py:MultiStageSteamTurbine._solve_above_pinch]
 - The extraction mass balance iterates at most 50 times and reports `converged`. [steam_turbine.py:_MASS_BALANCE_MAX_ITERATIONS]
 - A below-pinch sink temperature outside water's saturation range is clamped and a diagnostic is recorded. [steam_turbine.py:MultiStageSteamTurbine._solve_below_pinch]
+- On a target's `turbine_result`, a stage's `source_index` is its position in the target's `hot_utilities`, not in the solver's filtered input. [service.py:_result_with_utility_indices]
 - The solve result is validated against `TurbineSolveResult`; reading results before a solve raises `RuntimeError`. [steam_turbine.py:MultiStageSteamTurbine._require_solution]
 
 ## Side Effects

@@ -61,8 +61,16 @@ Read cogeneration results in this order:
 1. base thermal target and utility levels
 2. work target
 3. turbine efficiency target
+4. stage details
 
-Stage details are not stored on the result.
+Stage details are in ``turbine_result`` on the target and on its result row: a
+``TurbineSolveResult`` whose ``stages`` holds one ``TurbineStageResult`` for each
+extraction level, hottest first. A stage's ``source_index`` is its position in
+the target's ``hot_utilities``. These are raw floats in fixed units, whatever
+display units are configured: heat flow and work in kW, temperature in degC,
+pressure in bar, specific enthalpy in kJ/kg and mass flow in kg/s. In a
+multiperiod problem each period row has its own record. The weighted-average row
+has none, because an average is not a solved operating point.
 
 Key turbine assumptions are the option keys ``POWER_TURB_T_IN``,
 ``POWER_TURB_P_IN``, ``POWER_MIN_EFF``, ``POWER_LOAD_FRACTION``,

@@ -99,6 +99,12 @@ Cogeneration
   at 2 MW, and a duty that puts the first stage near that step alternates
   between the two branches for all 50 iterations. Numeric targets are unchanged;
   a run that did not converge still reports its last iteration.
+- Cogeneration targets and their result rows now carry the turbine's stage
+  records as ``turbine_result``, a ``TurbineSolveResult`` in fixed units (kW,
+  degC, bar, kJ/kg, kg/s). Each period row has its own record, and a
+  weighted-average row has none. The Excel summary is unchanged. A stage's
+  ``source_index`` now gives its position in the target's ``hot_utilities``; it
+  was a position in the list left after skipping unusable utilities.
 
 Values
 ~~~~~~
