@@ -14,16 +14,16 @@ Builds the energy transfer diagram and its surplus/deficit table for a zone. Eac
 
 ## Invariants
 - The default base-target order is Indirect Integration then Direct Integration; a zone with no Indirect target and no subzones uses Direct Integration only. [selection.py:ENERGY_TRANSFER_TARGET_ORDER] [selection.py:candidate_order]
-- An explicit `base_target_type` that cannot be produced raises `RuntimeError`; the implicit order falls through to the next type. [service.py:run_energy_transfer_analysis_service]
+- An explicit `base_target_type` that is unsupported raises `ValueError`, and one that cannot be produced raises `RuntimeError`; the implicit order falls through to the next type. [service.py:run_energy_transfer_analysis_service]
 - The shared grid starts as the descending union of the source and base-table temperatures, rounded to the decimal places implied by `tol`; with `simplify` (the default) adjacent intervals of equal heat capacity are then merged, so the payload `temperatures` are a subset of that union. [cascade.py:compile_temperature_intervals]
 - Interval heat has the sign of a change in `H_NET` down the interval (`-dT * CP_NET`): positive is surplus. [cascade.py:transpose_operation_cascades] [diagram.py:create_heat_surplus_deficit_table]
-- Stack order is by mode (`C`, then `R`, then `H`), then descending sort key, then name. [cascade.py:stack_order]
+- Stack order is by mode (`C`, then `R`, then `H`; `H` when the hot utility target exceeds the tolerance, else `C` when the cold utility target does, else `R`), then descending sort key, then name. [cascade.py:stack_order]
 - A source's own `ProblemTable` is preferred over its saved GCC graph, which is rounded for plotting. [diagram.py:get_source_problem_table]
 - A base target without a `ProblemTable` raises `TypeError`. [diagram.py:get_base_problem_table]
 - Values within `tol` of zero are cleaned to exactly 0.0 in the payload. [serialization.py:_clean_value]
 
 ## Side Effects
-- Sets `zone._selected_energy_transfer_base_target_type` and adds a target to the zone. [service.py:run_energy_transfer_analysis_service]
+- Sets `zone._selected_energy_transfer_base_target_type` and adds a target to the zone, removing any dependent targets; base-target refreshes can also drop dependents. [service.py:run_energy_transfer_analysis_service]
 - May call the supplied refresh services, which re-run Direct and Indirect Integration on the zone and its subzones. [selection.py:ensure_base_target]
 - Records the selected period on the zone through `prepare_enrichment_run`. [service.py:run_energy_transfer_analysis_service]
 

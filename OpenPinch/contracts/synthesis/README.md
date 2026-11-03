@@ -23,8 +23,8 @@ problem-owned result, and a frozen design view for clients that draw it. They us
 - Identity strings are stripped and must be non-empty [common.py:_validate_optional_identity].
 - Approach-temperature and derivative-threshold grids are non-empty, finite and positive; `stage_selection` is non-empty, positive and unique [common.py:HeatExchangerNetworkSynthesisManifest].
 - `synthesis_quality_tier` and `selected_tier_origin` lie in 0..5; `pdm_stage_pair_limit` in 0..12; `stage_packing` is one of auto, none, pdm, tdm, all [common.py:HeatExchangerNetworkSynthesisManifest].
-- `task_id` is `hens-task-` plus the first 16 hex characters of a SHA-256 of the sorted-key JSON of the task definition, so equal definitions give equal ids [method.py:HeatExchangerNetworkSynthesisMethodInput.generate_task_id].
-- Method output `objective_value` and result `objective_values` are finite and non-negative; `stage_count` is positive [method.py:HeatExchangerNetworkSynthesisMethodOutput, result.py:HeatExchangerNetworkSynthesisResult].
+- `task_id` is `hens-task-` plus the first 16 hex characters of a SHA-256 of the sorted-key JSON of the task's identifying fields (`task_id`, `seed_network` and `metadata` are excluded; `settings` must be JSON-serialisable), so equal definitions give equal ids; a supplied `task_id` is kept (stripped of surrounding whitespace) [method.py:HeatExchangerNetworkSynthesisMethodInput.generate_task_id].
+- Method output `objective_value` and result `objective_values` are finite and non-negative; `stage_count` is positive on the method input and the result [method.py:HeatExchangerNetworkSynthesisMethodOutput, result.py:HeatExchangerNetworkSynthesisResult].
 - Topology restriction `stage` is positive and `duty` non-negative and finite [topology.py:HeatExchangerNetworkTopologyRestriction].
 - Models forbid extra fields and validate on assignment, except the view models, which are frozen [view.py:_ViewModel].
 - By convention, layouts built by `presentation/network_grid/layout.py` list recovery, then heater, then cooler matches; the model does not enforce the order, and drawing positions are left to the client [view.py:HeatExchangerNetworkGridLayout].
@@ -33,4 +33,4 @@ problem-owned result, and a frozen design view for clients that draw it. They us
 - None. Method input fills `task_id` and output fills `method` from `task` during validation [method.py:_ensure_task_id, _fill_method_from_task].
 
 ## Verification
-- Run: `uv run --no-sync pytest tests/analysis/heat_exchanger_networks/test_contracts.py` (the nearest existing test; there is no tests/contracts test for this package).
+- Run: `uv run --no-sync pytest tests/analysis/heat_exchanger_networks/test_contracts.py` (the nearest existing test; there is no dedicated synthesis model test under tests/contracts).

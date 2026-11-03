@@ -44,4 +44,4 @@ only to supply the tests. It is driven by the Pyodide lane of `.github/workflows
 ## Verification
 - Run: `uv run --no-sync pytest tests/packaging/test_pyodide_pins.py tests/packaging/test_pyodide_runner.py`
   (the runner test skips unless `npm ci` has been run in `scripts/pyodide`).
-- Full lane: `uv build --out-dir dist` then `node scripts/pyodide/run_tests.mjs dist/*.whl -q tests/domain`.
+- Example: `uv build --out-dir dist` then `node scripts/pyodide/run_tests.mjs dist/*.whl -q tests/domain`; CI runs sharded paths with deselections (see `.github/workflows/ci.yml`).

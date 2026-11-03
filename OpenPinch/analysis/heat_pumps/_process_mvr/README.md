@@ -15,7 +15,7 @@ What `../process_mvr.py` imports:
 ## Invariants
 - A source must be an active, hot, process stream with `fluid_phase` of gas, vapour or vapor and a `fluid_name` [selection.py:validate_process_mvr_source].
 - Streams are matched by identity, key or display name; a detached `Stream` that is not in the tree is resolved by a unique name, and an ambiguous name raises `ValueError` [selection.py:match_one_selector].
-- A source with a temperature drop under 1 degC is treated as a vapour and its pressure must be near saturation (rtol 1e-2, atol 0.5 kPa); larger drops require `p_supply` and a gas or supercritical state [selection.py:validate_process_mvr_source_phase, selection.py:validate_vapour_state].
+- A source with a temperature drop under 1 degC is treated as a vapour and its pressure, when given, must be near saturation (rtol 1e-2, atol 0.5 kPa); larger drops require `p_supply` and a gas or supercritical state [selection.py:validate_process_mvr_source_phase, selection.py:validate_vapour_state].
 - Replacement stream keys are `<original key>.<component_id>.<stream name>`, and replacements are added to every zone holding the original [membership.py:add_replacement_streams_to_memberships].
 - Zone tree walks are pre-order and deterministic [membership.py:walk_zones].
 - Zone membership is decided by address prefix (`zone/`) [membership.py:record_affects_zone].

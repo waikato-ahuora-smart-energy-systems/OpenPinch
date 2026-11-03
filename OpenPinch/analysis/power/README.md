@@ -22,6 +22,7 @@ Targets shaft power from steam turbines driven by a zone's hot utilities. A mult
 - The solve result is validated against `TurbineSolveResult`; reading results before a solve raises `RuntimeError`. [steam_turbine.py:MultiStageSteamTurbine._require_solution]
 
 ## Side Effects
+- A turbine solve that does not converge sets `turbine_converged` and `turbine_diagnostics` on the target and raises a `UserWarning`; the numeric targets are left as the last iteration. [service.py:get_power_cogeneration_above_pinch]
 - `get_power_cogeneration_above_pinch` mutates the target it is given. [service.py:get_power_cogeneration_above_pinch]
 - The service sets `zone._selected_cogeneration_target_type`, adds a target to the zone without invalidating dependents, and may call refresh services that re-run base targeting. [service.py:run_power_cogeneration_service]
 - Every steam property lookup calls CoolProp through `thermodynamics.water`. [steam_turbine.py:MultiStageSteamTurbine._solve_above_pinch]

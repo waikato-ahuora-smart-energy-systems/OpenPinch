@@ -22,7 +22,7 @@ Deterministic engineering calculations that sit between the domain model (`OpenP
   - [utility_placement](./utility_placement/README.md): utility placement optimisation.
 
 ## Invariants
-- `get_period_index` resolves `period_id` or `period_idx` to one index, defaults to 0, and raises `ValueError` for a negative index, for a conflicting id and index pair whether or not period ids are registered (an id with none registered resolves to 0), and, when the collection has period ids, for an unknown id or index; a boolean or non-integer index raises `TypeError`. [numerics.py:get_period_index]
+- `get_period_index` resolves `period_id` or `period_idx` to one index, defaults to 0, and raises `ValueError` for a negative index, for a conflicting id and index pair whether or not period ids are registered (an id with none registered resolves to 0), and, when the collection has period ids, for an unknown id or index; a boolean or float index raises `TypeError` and a non-integer string raises `ValueError`. [numerics.py:get_period_index]
 - Differences within `tol` of zero are set to exactly 0.0. [numerics.py:delta_vals]
 - The capital recovery factor is `1/n` at a zero rate, and rejects a non-positive life or a rate at or below -1. [economics.py:compute_capital_recovery_factor]
 - Annualised capital cost requires a discount rate of at least 0 and a service life of at least 1 year, and returns 0 for capital within `tol` of zero. [economics.py:compute_annual_capital_cost]
