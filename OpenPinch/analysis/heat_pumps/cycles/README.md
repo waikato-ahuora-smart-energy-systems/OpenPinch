@@ -12,7 +12,7 @@ in `../common`. `__init__.py` has only a docstring.
 
 ## Interface
 - `VapourCompressionCycle` (`vapour_compression_cycle.py`): six-state single-stage cycle with an internal heat exchanger (gas-side change defaults to 10 K, 0 disables it), heat-pump or refrigeration mode, cascade duty hand-off, and `build_stream_collection`.
-- `CascadeVapourCompressionCycle` (`cascade_vapour_compression_cycle.py`): stages coupled through cascade exchangers; `solve` takes condenser and evaporator temperature arrays and a `DutyAllocationRequest`.
+- `CascadeVapourCompressionCycle` (`cascade_vapour_compression_cycle.py`): stages coupled through cascade exchangers; `solve` takes condenser and evaporator temperature arrays and a `DutyAllocationRequest`. Stages are ordered hottest first and heat always passes up the cascade. A heat pump solves from the top stage down and the coldest stage takes the remaining cooling; a refrigerator solves from the coldest stage up and the top stage rejects the remaining heat.
 - `ParallelVapourCompressionCycles` (`parallel_vapour_compression_cycles.py`): independent subcycles solved side by side.
 - `MechanicalVapourRecompressionCycle` (`mechanical_vapour_recompression_cycle.py`): open MVR stage with liquid-injection desuperheating, solved by `solve_from_source_heat` or `solve_from_mass_flow`; `process_heat_components` gives desuperheat, latent and subcool heat.
 - `VapourCompressionMvrCascade` (`vapour_compression_mvr_cascade.py`): vapour-compression stages feeding a serial MVR train; `MAX_MVR_STAGE_LIFT` limits stage lift.

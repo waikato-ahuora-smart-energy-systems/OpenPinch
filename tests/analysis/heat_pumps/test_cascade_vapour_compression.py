@@ -8,7 +8,13 @@ import OpenPinch.analysis.heat_pumps.common._shared.plotting as hp_plotting
 import OpenPinch.analysis.heat_pumps.common.shared as hp_shared
 import OpenPinch.analysis.heat_pumps.targeting.cascade_vapour_compression as hp_cascade
 import OpenPinch.analysis.targeting.cascade as target_cascade
-from OpenPinch.analysis.heat_pumps.common.encoding import decode_available_fractions
+from OpenPinch.analysis.heat_pumps.common._shared.streams import (
+    get_Q_vals_at_T_hpr_from_bckgrd_profile,
+)
+from OpenPinch.analysis.heat_pumps.common.encoding import (
+    decode_available_fractions,
+    limit_available_duty,
+)
 from OpenPinch.contracts.hpr import HPRParsedState, HPRTopologyIdentifier
 
 from .helpers import (
@@ -114,11 +120,21 @@ def test_cascade_refrigeration_uses_full_evaporator_duty_seed():
 
     np.testing.assert_allclose(
         decode_available_fractions(vars.x_heat_split, vars.Q_heat_available),
-        np.minimum(init_res.Q_cond[:-1], vars.Q_heat_available),
+        np.minimum(init_res.Q_cond[1:], vars.Q_heat_available),
     )
     np.testing.assert_allclose(
         decode_available_fractions(vars.x_cool_split, vars.Q_cool_available),
         np.minimum(init_res.Q_evap, vars.Q_cool_available),
+    )
+    # Heat controls are the condensers below the top stage, which takes the rest.
+    np.testing.assert_allclose(
+        vars.Q_heat_available,
+        limit_available_duty(
+            get_Q_vals_at_T_hpr_from_bckgrd_profile(
+                vars.T_cond[1:], args.T_cold, args.H_cold, is_cond=True
+            ),
+            args.Q_heat_max,
+        ),
     )
 
 
@@ -440,3 +456,38 @@ def test_cascade_state_reports_the_subcooling_the_cycle_applied():
 
     assert cycle.solved
     assert state.dT_subcool == pytest.approx([0.0, 0.0], abs=1e-6)
+
+
+def test_cascade_refrigeration_heat_controls_sit_below_the_top_stage():
+    pytest.importorskip("CoolProp")
+    args = SimpleNamespace(
+        dtcont_hp=5.0,
+        eta_comp=0.7,
+        refrigerant_ls=["Ammonia", "Ammonia"],
+        dt_cascade_hx=5.0,
+    )
+    state = HPRParsedState.model_validate(
+        {
+            "T_cond": np.array([40.0, 10.0]),
+            "dT_subcool": np.array([0.0, 0.0]),
+            "T_evap": np.array([-20.0]),
+            "dT_ihx_gas_side": np.array([0.0, 0.0]),
+            "Q_heat_base": 50.0,
+            "x_heat_split": np.array([1.0]),
+            "Q_heat_available": np.array([50.0]),
+            "Q_cool_base": 100.0,
+            "x_cool_split": np.array([1.0]),
+            "Q_cool_available": np.array([100.0]),
+        }
+    )
+
+    cycle = hp_cascade._build_and_solve_cascade_cycle(state, args, False)
+
+    assert cycle.solved
+    warm, cold = cycle.subcycles
+    assert cold.T_cond == pytest.approx(10.0)
+    assert cold.Q_heat == pytest.approx(50.0)
+    assert cold.Q_cool == pytest.approx(100.0)
+    assert warm.Q_cool == pytest.approx(0.0)
+    assert warm.Q_heat == pytest.approx(warm.Q_cond)
+    assert cycle.Q_heat == pytest.approx(cycle.Q_cool + cycle.work)

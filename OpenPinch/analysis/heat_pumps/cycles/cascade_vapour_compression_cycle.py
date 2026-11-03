@@ -80,13 +80,20 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
         Q_heat: np.ndarray,
         n_heat: int,
         n_cool: int,
+        *,
+        is_heat_pump: bool = True,
     ) -> np.ndarray:
         n_cycles = n_heat + n_cool - 1
+        # Refrigeration passes heat up, so the top stage takes what is left.
+        heat_default_idx = max(n_heat - 1, 0) if is_heat_pump else 0
+
+        def _default_Q_heat() -> np.ndarray:
+            default = np.zeros(n_cycles, dtype=object)
+            default[heat_default_idx] = None
+            return default
+
         if Q_heat is None:
-            return np.array(
-                [0.0] * max(n_heat - 1, 0) + [None] + [0.0] * (n_cool - 1),
-                dtype=object,
-            )
+            return _default_Q_heat()
 
         arr = np.asarray(Q_heat, dtype=object)
         if arr.ndim == 0:
@@ -101,10 +108,7 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
         elif arr.size == 1:
             v = arr[0]
             if v is None or (isinstance(v, (float, np.floating)) and np.isnan(v)):
-                arr_out = np.array(
-                    [0.0] * max(n_heat - 1, 0) + [None] + [0.0] * (n_cool - 1),
-                    dtype=object,
-                )
+                arr_out = _default_Q_heat()
             else:
                 arr_out = np.full(n_cycles, float(v), dtype=object)
         elif arr.size == n_heat:
@@ -114,14 +118,15 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
                 "Incompatible Q_heat input to solving a cascade heat pump."
             )
 
-        heat_default_idx = max(n_heat - 1, 0)
         for i in range(n_cycles):
             v = arr_out[i]
             if v is None:
                 if i == heat_default_idx:
                     arr_out[i] = None
                     continue
-                raise ValueError("Only the last Q_heat value may be None or np.nan.")
+                raise ValueError(
+                    "Only the balancing stage's Q_heat may be None or np.nan."
+                )
             try:
                 v_float = float(v)
             except (TypeError, ValueError) as e:
@@ -132,7 +137,9 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
                 if i == heat_default_idx:
                     arr_out[i] = None
                     continue
-                raise ValueError("Only the last Q_heat value may be None or np.nan.")
+                raise ValueError(
+                    "Only the balancing stage's Q_heat may be None or np.nan."
+                )
             arr_out[i] = v_float
 
         return arr_out
@@ -142,6 +149,8 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
         Q_cool: np.ndarray,
         n_heat: int,
         n_cool: int,
+        *,
+        is_heat_pump: bool = True,
     ) -> np.ndarray:
         n_cycles = n_heat + n_cool - 1
 
@@ -156,7 +165,10 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
                 "Incompatible Q_cool input to solving a cascade heat pump."
             )
 
-        if arr.size == 1:
+        if not is_heat_pump and arr.size == n_cool:
+            # Process cooling belongs on the stages with process evaporators.
+            arr = np.concatenate([np.zeros(n_heat - 1, dtype=object), arr])
+        elif arr.size == 1:
             v = arr[0]
             if v is None or (isinstance(v, (float, np.floating)) and np.isnan(v)):
                 arr = np.array([0.0] * (n_cycles - 1) + [None], dtype=object)
@@ -262,8 +274,9 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
             Q_heat_out = Q_heat
             if heat.Q_base is not None:
                 heat_allocation = heat.allocate("heat")
-                Q_heat_out = self._normalize_secondary_process_duty(
-                    np.concatenate([heat_allocation.Q_model, np.array([np.nan])])
+                # The controlled condensers sit below the balancing top stage.
+                Q_heat_out = np.concatenate(
+                    [np.array([np.nan]), heat_allocation.Q_model]
                 )
             return Q_heat_out, cool_allocation.Q_model
 
@@ -312,7 +325,9 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
         dT_ihx_gas_side : np.ndarray | float, optional
             Delta-T on the gas side of the internal heat exchanger [K].
         Q_heat : np.ndarray, optional
-            Heat delivered to the process [W].
+            Heat delivered to the process [W]. Only the balancing stage may be
+            None or NaN to take what is left: the last process condenser in heat
+            pump mode, the top stage in refrigeration mode.
         Q_cool : np.ndarray, optional
             Cooling delivered to the process [W].
         duty_allocation : DutyAllocationRequest, optional
@@ -376,8 +391,12 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
 
         dT_superheat_all = self._normalize_dT_superheat(dT_superheat, n_heat, n_cool)
         dT_subcool_all = self._normalize_dT_subcool(dT_subcool, n_heat, n_cool)
-        Q_heat_all = self._normalize_Q_heat(Q_heat, n_heat, n_cool)
-        Q_cool_all = self._normalize_Q_cool(Q_cool, n_heat, n_cool)
+        Q_heat_all = self._normalize_Q_heat(
+            Q_heat, n_heat, n_cool, is_heat_pump=is_heat_pump
+        )
+        Q_cool_all = self._normalize_Q_cool(
+            Q_cool, n_heat, n_cool, is_heat_pump=is_heat_pump
+        )
 
         if isinstance(refrigerant, list):
             if len(refrigerant) == self._num_cycles:
@@ -401,7 +420,10 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
 
         Q_cas_heat = 0.0
         Q_cas_cool = 0.0
-        for i in range(self._num_cycles):
+        # Heat flows up the cascade, so each stage's load is set by its neighbour:
+        # a heat pump's by the stage above, a refrigerator's by the stage below.
+        stage_order = range(self._num_cycles)
+        for i in stage_order if is_heat_pump else reversed(stage_order):
             hp = VapourCompressionCycle()
             hp.solve(
                 T_evap=T_evap_all[i],
@@ -426,6 +448,9 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
                 return self._max_work
             Q_cas_heat = hp.Q_cas_cool if is_heat_pump else 0.0
             Q_cas_cool = 0.0 if is_heat_pump else hp.Q_cas_heat
+
+        if not is_heat_pump:
+            self._subcycles.reverse()
 
         # Finish analysis
         work = sum(cycle.work for cycle in self._subcycles)

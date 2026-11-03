@@ -649,7 +649,7 @@ def test_cascade_normalize_q_heat_edge_cases_and_numeric_errors():
 
     with pytest.raises(ValueError, match="Incompatible Q_heat input"):
         hp._normalize_Q_heat(np.array([[1.0, 2.0]]), n_heat=2, n_cool=2)
-    with pytest.raises(ValueError, match="Only the last Q_heat value"):
+    with pytest.raises(ValueError, match="Only the balancing stage's Q_heat"):
         hp._normalize_Q_heat([None, 1.0, 0.0], n_heat=2, n_cool=2)
     with pytest.raises(ValueError, match="Q_heat values must be numeric"):
         hp._normalize_Q_heat([0.0, object(), 0.0], n_heat=2, n_cool=2)
@@ -694,7 +694,7 @@ def test_cascade_allocate_process_duties_covers_heat_pump_and_refrigeration_mode
         is_heat_pump=False,
     )
 
-    np.testing.assert_allclose(Q_heat, [20.0, np.nan])
+    np.testing.assert_allclose(Q_heat, [np.nan, 20.0])
     np.testing.assert_allclose(Q_cool, [15.0, 30.0])
 
 
@@ -786,7 +786,7 @@ def test_cascade_rejects_none_or_nan_q_cool_before_last_stage(bad_q_cool):
         )
 
 
-def test_cascade_q_heat_allows_last_heat_side_stage_to_be_unspecified():
+def test_cascade_q_heat_allows_top_stage_to_be_unspecified_in_refrigeration():
     cycle = CascadeVapourCompressionCycle()
     cycle.solve(
         T_evap=np.array([20.0, 0.0]),
@@ -798,12 +798,12 @@ def test_cascade_q_heat_allows_last_heat_side_stage_to_be_unspecified():
         dT_ihx_gas_side=np.array([5.0, 5.0, 5.0]),
         eta_comp=0.75,
         refrigerant=["R134a", "R134a", "R134a"],
-        Q_heat=np.array([0.0, np.nan]),
+        Q_heat=np.array([np.nan, 0.0]),
         Q_cool=np.array([0.0, 900.0]),
         is_heat_pump=False,
     )
-    assert cycle.Q_heat_arr[0] == pytest.approx(0.0)
-    assert cycle.Q_heat_arr[1] == pytest.approx(cycle.Q_cond_arr[1])
+    assert cycle.Q_heat_arr[0] == pytest.approx(cycle.Q_cond_arr[0])
+    assert cycle.Q_heat_arr[1] == pytest.approx(0.0)
     assert cycle.Q_heat_arr[2] == pytest.approx(0.0)
 
 
@@ -874,3 +874,146 @@ def test_stage_with_no_heat_to_pass_up_subcools_freely():
     )
 
     assert stage.dT_subcool == pytest.approx(40.0)
+
+
+def _two_condenser_refrigeration(Q_heat=None, dT_subcool=0.0):
+    cycle = CascadeVapourCompressionCycle()
+    cycle.solve(
+        T_evap=np.array([-20.0]),
+        T_cond=np.array([40.0, 10.0]),
+        dtcont=5.0,
+        dT_subcool=dT_subcool,
+        dT_ihx_gas_side=0.0,
+        eta_comp=0.7,
+        refrigerant="Ammonia",
+        dt_cascade_hx=5.0,
+        Q_heat=Q_heat,
+        Q_cool=np.array([100.0]),
+        is_heat_pump=False,
+    )
+    assert cycle.solved
+    return cycle
+
+
+def test_refrigeration_cascade_passes_heat_from_cold_stage_to_warm_stage():
+    cycle = _two_condenser_refrigeration()
+    warm, cold = cycle.subcycles
+
+    assert (warm.T_cond, warm.T_evap) == pytest.approx((40.0, 5.0))
+    assert (cold.T_cond, cold.T_evap) == pytest.approx((10.0, -20.0))
+    # The cold stage's condenser at 10 C feeds the warm stage's evaporator at 5 C.
+    assert cold.Q_cas_heat == pytest.approx(cold.Q_cond)
+    assert warm.Q_cas_cool == pytest.approx(cold.Q_cas_heat)
+    assert warm.Q_cas_heat == pytest.approx(0.0)
+    assert cold.Q_cas_cool == pytest.approx(0.0)
+    # The warm stage rejects everything to the process at 40 C.
+    assert warm.Q_heat == pytest.approx(warm.Q_cond)
+    assert cold.Q_heat == pytest.approx(0.0)
+
+
+def test_refrigeration_cascade_delivers_requested_cooling_once():
+    cycle = _two_condenser_refrigeration()
+
+    np.testing.assert_allclose(cycle.Q_cool_arr, [0.0, 100.0], atol=1e-9)
+
+
+@pytest.mark.parametrize(
+    ("T_cond", "T_evap", "Q_cool"),
+    [
+        ([40.0, 10.0], [-20.0], [100.0]),
+        ([40.0], [5.0, -20.0], [30.0, 100.0]),
+        ([60.0, 40.0], [5.0, -20.0], [30.0, 100.0]),
+    ],
+)
+def test_refrigeration_cascade_conserves_energy(T_cond, T_evap, Q_cool):
+    cycle = CascadeVapourCompressionCycle()
+    cycle.solve(
+        T_evap=np.array(T_evap),
+        T_cond=np.array(T_cond),
+        dtcont=5.0,
+        dT_ihx_gas_side=0.0,
+        eta_comp=0.7,
+        refrigerant="Ammonia",
+        dt_cascade_hx=5.0,
+        Q_cool=np.array(Q_cool),
+        is_heat_pump=False,
+    )
+
+    assert cycle.solved
+    assert cycle.Q_cool == pytest.approx(sum(Q_cool))
+    assert cycle.Q_heat == pytest.approx(cycle.Q_cool + cycle.work)
+
+
+def test_refrigeration_cascade_matches_heat_pump_mode_at_the_same_duties():
+    refrigeration = _two_condenser_refrigeration()
+
+    heat_pump = CascadeVapourCompressionCycle()
+    heat_pump.solve(
+        T_evap=np.array([-20.0]),
+        T_cond=np.array([40.0, 10.0]),
+        dtcont=5.0,
+        dT_ihx_gas_side=0.0,
+        eta_comp=0.7,
+        refrigerant="Ammonia",
+        dt_cascade_hx=5.0,
+        Q_heat=np.array([refrigeration.Q_heat, 0.0]),
+        is_heat_pump=True,
+    )
+
+    assert refrigeration.work == pytest.approx(heat_pump.work)
+    assert refrigeration.Q_cool == pytest.approx(heat_pump.Q_cool)
+
+
+def test_refrigeration_stage_delivering_process_heat_passes_the_rest_up():
+    warm, cold = _two_condenser_refrigeration(Q_heat=[np.nan, 50.0]).subcycles
+
+    assert cold.Q_heat == pytest.approx(50.0)
+    assert warm.Q_cas_cool == pytest.approx(cold.Q_cond - 50.0)
+    assert warm.Q_heat == pytest.approx(warm.Q_cond)
+
+
+def test_refrigeration_only_the_top_stage_may_leave_q_heat_unspecified():
+    with pytest.raises(ValueError, match="Q_heat"):
+        _two_condenser_refrigeration(Q_heat=[0.0, np.nan])
+
+
+def test_refrigeration_subcooling_heat_does_not_reach_the_upper_evaporator():
+    # All the cold stage's heat goes up to an evaporator at 5 C, so liquid
+    # subcooled below 10 C has nowhere to put the heat it gives up.
+    plain = _two_condenser_refrigeration()
+    subcooled = _two_condenser_refrigeration(dT_subcool=np.array([0.0, 25.0]))
+
+    assert subcooled.dT_subcool[1] == pytest.approx(0.0, abs=1e-6)
+    assert subcooled.work == pytest.approx(plain.work, rel=1e-9)
+
+
+def test_refrigeration_top_stage_subcools_into_the_process_freely():
+    plain = _two_condenser_refrigeration()
+    subcooled = _two_condenser_refrigeration(dT_subcool=np.array([10.0, 0.0]))
+
+    assert subcooled.dT_subcool[0] == pytest.approx(10.0)
+    assert subcooled.work < plain.work
+
+
+def test_refrigeration_process_duty_limits_subcooling_on_a_stage_passing_heat_up():
+    # A small process duty can only take the coldest of the liquid's heat.
+    _, cold = _two_condenser_refrigeration(
+        Q_heat=[np.nan, 5.0], dT_subcool=np.array([0.0, 25.0])
+    ).subcycles
+
+    assert 0.0 < cold.dT_subcool < 25.0
+    # The cascade exchanger's share ends at the saturated liquid.
+    from CoolProp.CoolProp import PropsSI
+
+    saturated_liquid = PropsSI("H", "T", 10.0 + 273.15, "Q", 0, "Ammonia")
+    assert cold.Hs[4] == pytest.approx(saturated_liquid, rel=1e-4)
+    assert cold.Q_heat == pytest.approx(5.0)
+
+
+def test_refrigeration_large_process_duty_leaves_subcooling_unlimited():
+    _, cold = _two_condenser_refrigeration(
+        Q_heat=[np.nan, 1e6], dT_subcool=np.array([0.0, 25.0])
+    ).subcycles
+
+    assert cold.dT_subcool == pytest.approx(25.0)
+    assert cold.Q_cas_heat == pytest.approx(0.0)
