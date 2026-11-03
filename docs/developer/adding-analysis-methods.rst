@@ -70,7 +70,7 @@ Contribution checklist
       ),
 
    ``scopes`` are ``ZoneType`` letters (``R`` region, ``C`` community, ``S``
-   site, ``P`` process zone, ``O`` unit operation, from ``domain/enums.py``);
+   site, ``P`` process zone, ``UO`` unit operation, from ``domain/enums.py``);
    the defaults are the ``PROCESS_SCOPES`` and ``AGGREGATE_SCOPES`` constants
    in the same file. ``prerequisites`` names targets that must exist first
    (for example ``("direct_heat_integration",)``). ``periods`` is one of
@@ -149,7 +149,8 @@ Contribution checklist
     ``docs/overview/analysis-migration.rst`` when behavior of existing state
     changes, and an entry under "Unreleased" in ``docs/release-notes.rst``.
     Add the method to ``TARGET_TUTORIALS`` (and ``ALL_PERIOD_TUTORIALS`` when it
-    has an all-period mirror) in ``scripts/generate_tutorial_coverage.py``,
+    has an all-period mirror), or to ``DESIGN_TUTORIALS`` for a ``problem.design``
+    method, in ``scripts/generate_tutorial_coverage.py``,
     mapping it to a notebook number under ``OpenPinch/tutorials/notebooks``;
     the generator raises ``KeyError`` for an unmapped public method. Then
     regenerate and commit the two generated files, which tests compare with the

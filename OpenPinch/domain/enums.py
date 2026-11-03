@@ -37,6 +37,8 @@ class ZoneType(Enum):
     P = "Process Zone"
     U = "Utility Zone"
     UO = "Unit Operation"
+    # Earlier name of UO, kept for existing callers.
+    vars()["O"] = "Unit Operation"
 
     def __str__(self):
         return self.value

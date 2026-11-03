@@ -291,10 +291,12 @@ def _dimensions(
             else "n/a"
         ),
         "period_scope": "all periods"
-        if "period" in owner_name.lower()
+        if "period" in owner_name.lower() or operation == "design result.views"
         else "selected period",
         "aggregation": (
-            "per-period;weighted average"
+            "per-period"
+            if operation == "design result.views"
+            else "per-period;weighted average"
             if tutorial_number in {6, 10, 13, 17}
             else "single result"
         ),
