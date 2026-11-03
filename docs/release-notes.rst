@@ -83,6 +83,16 @@ Heat pumps and refrigeration
   applies to each process condenser, and lower stages deliver none, where it
   applied to every stage. Calling ``solve`` without ``Q_heat`` follows the same
   rule, using its default of 1.
+- **Behaviour change:** In heat pump mode, ``CascadeVapourCompressionCycle.solve``
+  now applies a scalar or one-element ``Q_cool`` to each process evaporator except
+  the coldest, and the coldest stage takes the remaining cooling. It used to apply
+  to every stage, which also fixed the coldest stage's cooling, so the energy
+  balance did not close: with ``Q_heat=100, Q_cool=10``, an 80 C condenser and
+  24 C and 5 C evaporators on ammonia, ``Q_cool`` plus work came to 52.95 against
+  100 delivered. A scalar now gives the same result as ``[10, None]``. With one
+  evaporator the value has no effect, because that evaporator balances the cycle.
+  Heat pump targets do not use this path and are unchanged, and neither is
+  refrigeration mode.
 - **Behaviour change:** Multi-stage cascade refrigeration now passes heat from
   each stage's condenser up to the evaporator of the warmer stage. It used to
   pass heat down, from the warm stage's condenser into the cold stage's

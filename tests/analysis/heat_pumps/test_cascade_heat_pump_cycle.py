@@ -566,8 +566,10 @@ def test_cascade_property_sweep_and_normalization_branches():
 
     qcool_none = cycle._normalize_Q_cool(None, 2, 2)
     assert qcool_none.tolist() == [0.0, 0.0, None]
+    # Was [3, 3, 3]: the top stage has no process evaporator, and fixing the
+    # coldest stage left the energy balance open.
     qcool_scalar = cycle._normalize_Q_cool(np.array([3.0]), 2, 2)
-    assert qcool_scalar.tolist() == [3.0, 3.0, 3.0]
+    assert qcool_scalar.tolist() == [0.0, 3.0, None]
     qcool_last_nan = cycle._normalize_Q_cool(
         np.array([1.0, 2.0, np.nan], dtype=object), 2, 2
     )
@@ -619,6 +621,85 @@ def test_cascade_scalar_q_heat_matches_the_explicit_stage_array(Q_heat):
     assert cycle.solved
     assert cycle.Q_heat_arr == pytest.approx([100.0, 0.0])
     assert cycle.Q_heat == pytest.approx(cycle.Q_cool + cycle.work)
+
+
+@pytest.mark.parametrize(
+    "Q_cool, n_heat, n_cool, expected",
+    [
+        (10.0, 1, 1, [None]),
+        (np.array([10.0]), 1, 1, [None]),
+        (10.0, 1, 2, [10.0, None]),
+        (np.array([10.0]), 1, 2, [10.0, None]),
+        (10.0, 1, 3, [10.0, 10.0, None]),
+        (10.0, 2, 1, [0.0, None]),
+        (np.array([10.0]), 2, 1, [0.0, None]),
+        (10.0, 2, 2, [0.0, 10.0, None]),
+        (10.0, 3, 2, [0.0, 0.0, 10.0, None]),
+        (np.nan, 1, 2, [0.0, None]),
+    ],
+)
+def test_cascade_scalar_q_cool_applies_to_process_evaporators_above_the_coldest(
+    Q_cool, n_heat, n_cool, expected
+):
+    hp = CascadeVapourCompressionCycle()
+
+    assert hp._normalize_Q_cool(Q_cool, n_heat, n_cool).tolist() == expected
+
+
+def test_cascade_scalar_q_cool_is_every_stage_in_refrigeration_mode():
+    # Cooling is the set duty here; the top stage balances through Q_heat.
+    hp = CascadeVapourCompressionCycle()
+
+    assert hp._normalize_Q_cool(5.0, 1, 2, is_heat_pump=False).tolist() == [5.0, 5.0]
+
+
+@pytest.mark.parametrize(
+    "T_cond, T_evap, Q_cool",
+    [
+        ([80.0], [24.0], 10.0),
+        ([80.0], [24.0, 5.0], 10.0),
+        ([80.0], [24.0, 5.0], np.array([10.0])),
+        ([80.0], [40.0, 24.0, 5.0], 10.0),
+        ([80.0, 60.0], [24.0], 10.0),
+        ([80.0, 60.0], [24.0, 5.0], 10.0),
+    ],
+)
+def test_cascade_scalar_q_cool_closes_the_energy_balance(T_cond, T_evap, Q_cool):
+    cycle = CascadeVapourCompressionCycle()
+    cycle.solve(
+        T_evap=np.array(T_evap),
+        T_cond=np.array(T_cond),
+        dtcont=0.0,
+        refrigerant="ammonia",
+        Q_heat=100.0,
+        Q_cool=Q_cool,
+    )
+
+    assert cycle.solved
+    assert cycle.Q_heat == pytest.approx(cycle.Q_cool + cycle.work)
+    assert cycle.subcycles[-1].Q_cas_cool == pytest.approx(0.0, abs=1e-9)
+
+
+@pytest.mark.parametrize("Q_cool", [10.0, np.array([10.0])])
+def test_cascade_scalar_q_cool_matches_the_explicit_stage_array(Q_cool):
+    def _solve(duty):
+        cycle = CascadeVapourCompressionCycle()
+        cycle.solve(
+            T_evap=np.array([24.0, 5.0]),
+            T_cond=np.array([80.0]),
+            dtcont=0.0,
+            refrigerant="ammonia",
+            Q_heat=100.0,
+            Q_cool=duty,
+        )
+        return cycle
+
+    scalar = _solve(Q_cool)
+    explicit = _solve(np.array([10.0, None], dtype=object))
+
+    assert scalar.Q_cool_arr == pytest.approx(explicit.Q_cool_arr)
+    assert scalar.Q_cool_arr[0] == pytest.approx(10.0)
+    assert scalar.work == pytest.approx(explicit.work)
 
 
 def test_cascade_property_arrays_and_unsolved_work_branch():
