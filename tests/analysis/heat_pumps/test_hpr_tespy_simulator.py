@@ -1,7 +1,5 @@
 """TESPy HPR adapter, deterministic settings, and owned-resource tests."""
 
-# ruff: noqa: E402 - optional dependency gate must run before concrete imports.
-
 from __future__ import annotations
 
 import builtins
@@ -17,7 +15,6 @@ from types import SimpleNamespace
 import pytest
 
 pytest.importorskip("tespy")
-pytestmark = pytest.mark.tespy
 
 import OpenPinch.analysis.heat_pumps.performance_maps.adapters.tespy as tespy_adapter
 from OpenPinch.analysis.heat_pumps.cycles.vapour_compression_cycle import (
@@ -49,6 +46,8 @@ from OpenPinch.analysis.heat_pumps.performance_maps.settings import (
     TESPY_CONVERGENCE_SETTINGS,
 )
 from tests.analysis.heat_pumps.test_hpr_map_generation import _basis, _request
+
+pytestmark = pytest.mark.tespy
 
 EXPECTED_CHARACTERISTIC_POINTS = (
     (0.49, 0.78),
@@ -326,6 +325,42 @@ def test_real_tespy_design_and_offdesign_support_approved_fluid_categories(
 
     simulator.close()
     assert not snapshot.parent.exists()
+
+
+@pytest.mark.tespy
+@pytest.mark.parametrize(
+    ("superheat", "subcooling"),
+    [(5.0, 0.0), (0.0, 5.0), (0.0, 0.0)],
+)
+def test_real_tespy_design_and_offdesign_solve_at_saturation_ends(
+    superheat,
+    subcooling,
+):
+    context = build_hpr_map_generation_context(
+        _basis(
+            simulation_backend="tespy",
+            refrigerant_spec="R134a",
+            superheat=superheat,
+            subcooling=subcooling,
+        ),
+        _request(
+            source_temperatures=[8.0],
+            sink_temperatures=[51.0],
+            load_fractions=(0.7,),
+        ),
+    )
+    simulator = TespyHprPointSimulator()
+
+    metadata = simulator.prepare(context)
+    result = simulator.simulate(next(iter_hpr_operating_points(context)))
+    simulator.close()
+
+    assert metadata.design_converged is True
+    assert result.converged is True
+    assert result.q_sink == pytest.approx(
+        result.q_source + result.compressor_power,
+        abs=context.energy_balance_tolerance,
+    )
 
 
 @pytest.mark.tespy

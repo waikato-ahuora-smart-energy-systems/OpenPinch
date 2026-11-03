@@ -123,6 +123,13 @@ class ValueCoercion:
         unit: str | None,
     ) -> tuple[Any, np.ndarray]:
         if self._is_serialized_period_data(data):
+            if "period_ids" in data:
+                # A Value keeps magnitudes in order and has no period identity;
+                # ids given beside them would be silently dropped.
+                raise ValueError(
+                    "Value data do not take period_ids: give the values in the "
+                    "problem's period order (PROBLEM_PERIOD_IDS)."
+                )
             quantity = self._quantity_from_values(
                 data.get("values"),
                 data.get("unit") or unit,

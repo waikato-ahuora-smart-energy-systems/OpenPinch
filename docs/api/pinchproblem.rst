@@ -44,6 +44,11 @@ Interaction Matrix
      - zone, validated input, report, or mapping
      - prepare or observe
      - base
+   * - ``source_validation_report`` (classmethod)
+     - Report on a source that may be invalid, without raising
+     - report
+     - none; no problem is kept
+     - base
    * - ``target.direct_heat_integration``, ``indirect_heat_integration``,
        ``total_site_heat_integration``, ``all_heat_integration``
      - Core Pinch and Total Site analysis

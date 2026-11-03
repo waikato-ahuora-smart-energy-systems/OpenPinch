@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from enum import StrEnum
-from typing import Annotated, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -224,10 +224,10 @@ class UtilityPlacementOptions(_FrozenContract):
 
     @field_validator("backend_options", mode="before")
     @classmethod
-    def _validate_backend_options(cls, value: object):
+    def _validate_backend_options(cls, value: Any):
         if value is None:
             return ()
-        entries = tuple(value)  # type: ignore[arg-type]
+        entries = tuple(value)
         normalized: list[tuple[str, str | int | float | bool | None]] = []
         names: set[str] = set()
         for entry in entries:

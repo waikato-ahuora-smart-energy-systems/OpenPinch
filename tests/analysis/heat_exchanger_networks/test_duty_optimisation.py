@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from copy import deepcopy
 from types import SimpleNamespace
+from typing import Any
 
 import numpy as np
 import pytest
@@ -124,8 +125,9 @@ def test_from_structure_requires_utility_names_for_utility_exchangers() -> None:
 def test_request_rejects_unknown_objective_and_non_network() -> None:
     with pytest.raises(ValueError, match="objective must be one of"):
         _request(objective="tac")
+    not_a_network: Any = object()
     with pytest.raises(TypeError, match="HeatExchangerNetwork"):
-        build_duty_optimisation_request(object(), objective="utility")  # type: ignore[arg-type]
+        build_duty_optimisation_request(not_a_network, objective="utility")
 
 
 def test_area_objective_requires_a_utility_cap() -> None:

@@ -191,11 +191,19 @@ For tiered OpenHENS runs, the manifest also records the synthesis quality tier,
 selected pathway, and protected-fallback status.
 
 ``HENS_SYNTHESIS_QUALITY_TIER`` remains a persistent configuration field with a
-default of tier 1 for prepared-problem workflows. User code should prefer
+default of tier 1 for prepared-problem workflows. If the problem's options set
+it, ``problem.design.heat_exchanger_network()``, its multiperiod form and
+``problem.design.enhanced_heat_exchanger_network()`` run that tier. If they do
+not, those methods run their own defaults, tiers 0 and 2, even though the
+configuration still reads 1; the key in ``problem.to_problem_json()["options"]``
+is what counts as set. ``problem.design.open_hens()`` always runs tier 1. User
+code should prefer
 ``problem.design.enhanced_heat_exchanger_network(quality_tier=...)`` for method-level
 tier selection because it applies a call-local override without mutating the
-loaded problem configuration. Runtime ``options`` passed to design accessors accept ``HENS_*`` overrides
-that apply to that call only and do not change the stored configuration.
+loaded problem configuration. That argument wins over a tier in the call's
+``options``, which wins over the stored option for that call only. Runtime
+``options`` passed to design accessors accept other ``HENS_*`` overrides the same
+way: they apply to that call only and do not change the stored configuration.
 
 Method-level inputs and outputs are Pydantic models. Their shared input
 contract contains run/problem metadata, settings, optional seed network,

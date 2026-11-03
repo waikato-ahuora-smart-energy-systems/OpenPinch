@@ -4,6 +4,38 @@ Pre-Release Notes
 Unreleased
 ----------
 
+Input and validation
+~~~~~~~~~~~~~~~~~~~~
+
+- A legacy ``.xls`` workbook is now rejected with a ``ValueError`` that asks
+  for a ``.xlsx`` save. It was accepted as a source suffix but failed with
+  ``ImportError: Import xlrd failed``, because no install extra provides
+  ``xlrd``.
+- New ``PinchProblem.source_validation_report(source)`` returns a
+  ``ValidationReport`` for any source the constructor takes, without raising for
+  bad input of any format. ``valid`` is true only if the constructor accepts the
+  source. ``problem.validation_report()`` could never report invalid input,
+  because the constructor raises first; its docstring and the input guide now say
+  so. The ``validate`` command uses the new report, so inline input is checked
+  after the same normalisation as loading: for example, a stream entry that is
+  not a record is now reported as the loader sees it.
+
+Documentation
+~~~~~~~~~~~~~
+
+- The tutorial coverage manifest is generated and checked against the committed
+  file. Plots, design-result views and read-only calls are now marked
+  ``cached observation``, ``optional_dependency`` names real extras
+  (``notebook``, ``dashboard``, ``synthesis``, ``tespy``), ``interactive`` and ``slow-hpr``
+  notebooks are described as routine CI runs, and ``design_result.views`` maps
+  to the multiperiod HEN notebook.
+- Corrected the documentation against the code, including examples that raised,
+  retired option and notebook names, and the ``openpinch schema`` command. The
+  page on adding an analysis method is now a followable checklist.
+- Each package directory now has a ``README.md`` stating its interface,
+  invariants and side effects. These stay out of the wheel, and a test checks
+  that what they cite still exists.
+
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -23,6 +55,51 @@ Heat pumps and refrigeration
   parallel machines. The limit was previously the gap to the top of the sink
   profile, about 10 K when the condenser sits at the top of its load. Targets
   can fall, by up to several percent where subcooling was at that limit.
+- A TESPy heat pump target without the optional ``tespy`` package now raises
+  an ``ImportError`` that names the ``openpinch[tespy]`` extra, as the docs
+  advise handling. It is still an ``HprTargetCompatibilityError`` (a
+  ``ValueError``) with code ``dependency_unavailable``, so existing handlers
+  and the command layer's error response are unchanged.
+- TESPy vapour-compression targets and performance maps now solve a cycle with
+  no subcooling or no superheat. CoolProp refused the saturated state as the
+  adapter specified it, so a candidate at the zero-subcooling bound always
+  failed, and with a small search budget that could be the only candidate
+  reached, raising ``HPRTargetingError``.
+
+Heat exchanger network synthesis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``design.heat_exchanger_network()``, its multiperiod form and
+  ``design.enhanced_heat_exchanger_network()`` now run
+  ``HENS_SYNTHESIS_QUALITY_TIER`` when the problem's options set it, and they
+  ignored it before. Only problems that set the option see a change: without it
+  the methods keep tiers 0 and 2, and ``quality_tier=`` still wins.
+  ``design.open_hens()`` stays at tier 1.
+
+Cogeneration
+~~~~~~~~~~~~
+
+- A cogeneration target now says whether its turbine solve converged. Targets and
+  result rows carry ``turbine_converged`` and ``turbine_diagnostics``, a solve
+  that did not converge or reports a diagnostic raises a ``UserWarning``,
+  ``problem.report().warnings`` lists the messages, and the Excel summary has a
+  ``Turbine Converged`` column. A weighted-average row is flagged if any period
+  did not converge and names the period of each message. These were previously
+  dropped, so the mass balance could fail unseen: the Varbanov correlation steps
+  at 2 MW, and a duty that puts the first stage near that step alternates
+  between the two branches for all 50 iterations. Numeric targets are unchanged;
+  a run that did not converge still reports its last iteration.
+
+Values
+~~~~~~
+
+- A direct ``Value`` call with a ``period_ids`` key (for example
+  ``Value({"values": [10, 20], "period_ids": ["b", "a"]})``) now raises
+  ``ValueError``, with the same guidance as a domain ``Stream``. ``Value`` holds
+  magnitudes in order and has no period identity, so it dropped the ids and
+  gave the first period 10 whatever its id. Give the values in the problem's
+  period order. A utility's ``maximum_heat_flow`` and utility placement
+  ``maximum_duties``, which key values by period id on purpose, still take it.
 
 Exergy
 ~~~~~~
@@ -32,6 +109,21 @@ Exergy
   a selected target has not been modified assumed every graph was a table, but
   exergy adds its curves as plain mappings. Those derived curves are now left
   out of that check, and the enriched target can be selected as a base target.
+
+Reporting
+~~~~~~~~~
+
+- ``export_stream_collection`` writes to the working directory when no
+  ``output_dir`` is given, as ``export_problem_table`` does. It previously
+  wrote to a ``results`` folder beside the package, which is inside
+  ``site-packages`` for an installed copy.
+
+Plots
+~~~~~
+
+- The hover label of a merged exchanger match in the network grid diagram
+  shows the summed area of its exchangers. It previously showed the area of
+  the first exchanger only.
 
 0.7.6 (2026-11-02)
 ------------------

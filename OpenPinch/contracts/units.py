@@ -194,6 +194,7 @@ __all__ = [
     "OUTPUT_UNIT_RULES",
     "coerce_output_value",
     "standardise_input_value",
+    "without_period_ids",
 ]
 
 
@@ -311,6 +312,19 @@ def _ensure_value(value: Any, *, user_unit: str | None) -> Value:
     if _has_explicit_unit(value_data):
         return Value(value_data)
     return Value(value_data, unit=user_unit)
+
+
+def without_period_ids(value: Any) -> Any:
+    """Return an id-keyed period mapping without its ids, for magnitudes only.
+
+    ``Value`` rejects ``period_ids``; callers that read the ids themselves (a
+    utility's ``maximum_heat_flow``, utility placement ``maximum_duties``) pass
+    the data through this before unit standardisation.
+    """
+    data = value.model_dump(mode="python") if hasattr(value, "model_dump") else value
+    if isinstance(data, Mapping) and "period_ids" in data:
+        return {key: item for key, item in data.items() if key != "period_ids"}
+    return value
 
 
 def standardise_input_value(

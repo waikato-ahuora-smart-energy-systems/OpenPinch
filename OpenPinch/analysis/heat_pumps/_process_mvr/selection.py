@@ -15,7 +15,7 @@ from .values import (
     required_period_value,
     to_degrees_celsius,
     to_kelvin,
-    to_kilopascals,
+    to_kilopascal,
     value_at_index,
 )
 
@@ -136,7 +136,7 @@ def validate_process_mvr_source_phase(stream: Stream, selector) -> None:
         critical_temperature = to_degrees_celsius(
             coolprop_value("TCRIT", str(stream.fluid_name))
         )
-        critical_pressure = to_kilopascals(
+        critical_pressure = to_kilopascal(
             coolprop_value("PCRIT", str(stream.fluid_name))
         )
         temperature_drop = supply_temperature - target_temperature
@@ -204,7 +204,7 @@ def validate_vapour_state(
             f"MVR vapour source stream {selector!r} requires t_supply below "
             f"the critical temperature ({t_crit:.3g} degC)."
         )
-    saturation_pressure = to_kilopascals(
+    saturation_pressure = to_kilopascal(
         PropsSI("P", "T", to_kelvin(t_supply), "Q", 1.0, fluid)
     )
     if p_supply is None:
@@ -238,7 +238,7 @@ def validate_gas_or_supercritical_state(
         return
     if t_c > t_crit:
         return
-    saturation_pressure = to_kilopascals(
+    saturation_pressure = to_kilopascal(
         PropsSI("P", "T", to_kelvin(t_c), "Q", 1.0, fluid)
     )
     if p_kpa >= saturation_pressure:

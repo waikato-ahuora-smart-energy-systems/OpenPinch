@@ -191,6 +191,7 @@ def test_export_writes_expected_excel(tmp_path: Path, monkeypatch):
         "Work Target (unit)",
         "Turbine Eff Target (value)",
         "Turbine Eff Target (unit)",
+        "Turbine Converged",
         "ETE (value)",
         "ETE (unit)",
         "Exergy Sources (value)",

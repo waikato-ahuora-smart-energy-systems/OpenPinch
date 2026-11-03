@@ -213,13 +213,16 @@ class TespyHprPointSimulator:
             evaporating_temperature,
             condensing_temperature,
         )
+        # Differences from saturation, because CoolProp refuses a pressure and
+        # temperature pair on the saturation line. The pressures fix the dew and
+        # bubble points at the evaporating and condensing temperatures.
         self._compressor_inlet.set_attr(
             p=evaporating_pressure,
-            T=(evaporating_temperature + context.basis.superheat + 273.15),
+            td_dew=context.basis.superheat,
         )
         self._condenser_outlet.set_attr(
             p=condensing_pressure,
-            T=(condensing_temperature - context.basis.subcooling + 273.15),
+            td_bubble=context.basis.subcooling,
         )
         if context.basis.mode == "heat_pump":
             self._evaporator.set_attr(Q=None)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+
 import numpy as np
 import pytest
 from hypothesis import given, seed
@@ -150,6 +152,20 @@ def test_preflight_reports_missing_optional_dependency_before_fluid_work(
         preflight_tespy_hpr_targeting(_target_args())
 
     assert captured.value.code == "dependency_unavailable"
+
+
+def test_missing_tespy_raises_import_error_and_keeps_the_compatibility_code(
+    monkeypatch,
+) -> None:
+    # The docs advise handling ImportError for an optional dependency.
+    monkeypatch.setitem(sys.modules, "tespy", None)
+
+    with pytest.raises(ImportError) as captured:
+        preflight_tespy_hpr_targeting(_target_args())
+
+    assert isinstance(captured.value, HprTargetCompatibilityError)
+    assert captured.value.code == "dependency_unavailable"
+    assert "openpinch[tespy]" in str(captured.value)
 
 
 @pytest.mark.parametrize(
