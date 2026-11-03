@@ -43,7 +43,7 @@ A pure model for choosing the supply temperatures and spans of utility levels so
 - The default runner starts optimiser worker processes; `PlacementEvaluationSession` is picklable and drops its memo and lock on pickling [service.py:optimise_utility_placement] [evaluation.py:PlacementEvaluationSession.__getstate__].
 - `PlacementEvaluationSession` holds a per-process memo and a thread lock and accumulates counters; `merge_task_reports` mutates it [evaluation.py:PlacementEvaluationSession.merge_task_reports].
 - Replay mutates only deep copies of utility collections [replay.py:allocate_from_aggregate_profiles].
-- No file or network IO.
+- No network IO. With several search or polish workers on a spawn or forkserver platform, the default runner reads the main script to check for its guard [../../optimisation/execution.py:_main_module_reruns_in_workers]; nothing else here reads files.
 
 ## Verification
 - Run: `uv run --no-sync pytest tests/analysis/utility_placement`

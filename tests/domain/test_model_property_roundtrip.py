@@ -70,7 +70,8 @@ def test_stream_property_roundtrip_and_mutation_paths():
     assert float(s.shifted_maximum_temperature) == pytest.approx(154.0)
 
 
-def test_stream_collection_edge_paths():
+def test_stream_collection_edge_paths(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
     st1 = Stream(
         name="A", supply_temperature=120.0, target_temperature=80.0, heat_flow=20.0
     )
@@ -117,6 +118,7 @@ def test_stream_collection_edge_paths():
     )
     assert isinstance(csv_path, Path)
     assert csv_path.exists()
+    assert csv_path.parent.resolve() == tmp_path.resolve()
 
     assert (sc == 1) is False
 

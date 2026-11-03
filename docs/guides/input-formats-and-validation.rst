@@ -245,7 +245,8 @@ Choose the source shape by ownership:
 
 Configuration belongs in ``TargetInput.options`` and is materialized as a
 runtime ``Configuration`` object on prepared zones. Use
-``OpenPinch.presentation.configuration.configuration_options()`` to discover
+``configuration_options()`` (``from OpenPinch.presentation.configuration import
+configuration_options``) to discover
 supported option keys.
 
 Consuming HPR Performance Maps

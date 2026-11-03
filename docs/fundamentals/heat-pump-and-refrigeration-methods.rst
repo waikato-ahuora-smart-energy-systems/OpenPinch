@@ -86,8 +86,8 @@ provenance. OpenPinch does not impose a component-count allowlist.
 
 Capability is checked at the actual states. Evaporation pressure uses the dew
 point and condensation pressure uses the bubble point, which matters for
-zeotropic blends. Preflight checks one probe state, so a fluid that passes it can still be
-unsupported at other states the optimizer tries; those candidates are rejected
+zeotropic blends. Preflight checks one evaporating and condensing probe pair for
+each stage, so a fluid that passes it can still be unsupported at other states the optimizer tries; those candidates are rejected
 during optimization. The external ``REFPROP`` backend is outside this contract.
 
 Winning Design and Part-Load Maps

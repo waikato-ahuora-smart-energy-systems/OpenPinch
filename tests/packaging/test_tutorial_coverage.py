@@ -256,3 +256,11 @@ def test_execution_evidence_matches_ci_gating() -> None:
     assert "opt-in slow-hpr" not in text
     assert "routine pytest execution" in evidence["interactive"]
     assert "main-bound solver CI execution" in evidence["solver"]
+
+
+def test_design_views_row_describes_every_period_without_an_average():
+    row = next(row for row in _rows() if row["operation"] == "design_result.views")
+
+    assert row["primary_tutorial"] == "17_multiperiod_hen_synthesis.ipynb"
+    assert row["period_scope"] == "all periods"
+    assert row["aggregation"] == "per-period"

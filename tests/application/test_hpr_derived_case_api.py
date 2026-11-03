@@ -379,3 +379,17 @@ def test_existing_base_selection_honours_runtime_period_options():
         base_target=target, period_id="base", options={"period_id": "peak"}
     )
     assert observed.period_id == "base"
+
+
+def test_replacing_a_heat_pump_graph_with_a_mapping_counts_as_modified():
+    problem = PinchProblem("basic_pinch.json")
+    hp = problem.target.carnot_heat_pump(
+        load_fraction=0.25, condensers=1, evaporators=1, maximum_restarts=1
+    )
+    original = next(
+        key for key, graph in hp.graphs.items() if not isinstance(graph, dict)
+    )
+    hp.graphs[original] = {"replaced": [1.0, 2.0]}
+
+    with pytest.raises(ValueError, match="stale or modified"):
+        problem.target.direct_heat_integration(base_target=hp)

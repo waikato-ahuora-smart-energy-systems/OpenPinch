@@ -7,6 +7,9 @@ Unreleased
 Input and validation
 ~~~~~~~~~~~~~~~~~~~~
 
+- ``ZoneType.UO`` is the new name of the unit operation zone type. ``ZoneType.O``
+  and ``ZoneType["O"]`` still work and give the same member, but its ``.name``
+  is now ``UO``.
 - A legacy ``.xls`` workbook is now rejected with a ``ValueError`` that asks
   for a ``.xlsx`` save. It was accepted as a source suffix but failed with
   ``ImportError: Import xlrd failed``, because no install extra provides
@@ -35,6 +38,8 @@ Documentation
 - Each package directory now has a ``README.md`` stating its interface,
   invariants and side effects. These stay out of the wheel, and a test checks
   that what they cite still exists.
+- ``openpinch --help`` now says the command also writes the JSON Schema of each
+  public contract.
 
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
