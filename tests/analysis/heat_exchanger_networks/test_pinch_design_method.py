@@ -907,6 +907,7 @@ def test_solver_array_optional_value_helper_accepts_supported_shapes() -> None:
     assert arrays_module._optional_value(8.0, "K") == 8.0
 
 
+@pytest.mark.synthesis
 def test_stagewise_model_rejects_solver_arrays_without_state_metadata() -> None:
     arrays = problem_to_solver_arrays(_four_stream_problem(), 14.0)
     incomplete_arrays = {
@@ -951,6 +952,7 @@ def test_solver_arrays_reject_zero_total_period_weight() -> None:
         )
 
 
+@pytest.mark.synthesis
 def test_stagewise_multiperiod_cost_objective_uses_shared_topology_and_area() -> None:
     arrays = problem_to_solver_arrays(
         _two_state_problem(
@@ -989,6 +991,7 @@ def test_stagewise_multiperiod_cost_objective_uses_shared_topology_and_area() ->
     assert _weighted_state_average(model, [10.0, 20.0]) == pytest.approx(17.5)
 
 
+@pytest.mark.synthesis
 def test_internal_problem_loads_pdm_and_stagewise_with_parent_context() -> None:
     pdm_problem = InternalHeatExchangerNetworkProblem(
         solver_arrays=problem_to_solver_arrays(_four_stream_problem(), 14.0),
@@ -1584,6 +1587,7 @@ def test_executor_stage_packing_scope_and_factory_helpers() -> None:
     )
 
 
+@pytest.mark.synthesis
 def test_internal_problem_load_reports_missing_pdm_solver_binary(monkeypatch) -> None:
     def missing_binary(binary_name: str, *, purpose: str | None = None) -> str:
         raise MissingSynthesisSolverError(
@@ -3263,6 +3267,7 @@ def test_pinch_decomp_post_process_skips_failed_model_and_copy_helpers_cover_sha
     assert non_iso_target.T_c_out_y_by_period[0][0][0][0][0] == 330.0
 
 
+@pytest.mark.synthesis
 def test_pinch_decomp_amalgamate_failure_reports_the_side_solver_reason() -> None:
     timed_out = _pdm_side_result(hot_utility_target=1.0, m_success=0)
     timed_out.solver_run = SimpleNamespace(failure_reason="time limit reached")
@@ -3274,6 +3279,7 @@ def test_pinch_decomp_amalgamate_failure_reports_the_side_solver_reason() -> Non
         )
 
 
+@pytest.mark.synthesis
 def test_pinch_decomp_amalgamate_handles_failure_and_single_sided_networks() -> None:
     driver = _pdm_amalgamation_driver()
 
@@ -3304,6 +3310,7 @@ def test_pinch_decomp_amalgamate_handles_failure_and_single_sided_networks() -> 
     assert below_only.z_allowed[0][0] == [1]
 
 
+@pytest.mark.synthesis
 def test_pdm_amalgamation_retains_later_period_only_nonisothermal_matches() -> None:
     driver = _pdm_amalgamation_driver(multiperiod=True, non_isothermal=True)
 
@@ -3324,6 +3331,7 @@ def test_pdm_amalgamation_retains_later_period_only_nonisothermal_matches() -> N
     assert network.T_c_out_y_by_period[1][0][0][0][0] == pytest.approx(330.0)
 
 
+@pytest.mark.synthesis
 def test_pinch_decomp_amalgamate_combines_successful_above_and_below_networks() -> None:
     driver = _pdm_amalgamation_driver()
 

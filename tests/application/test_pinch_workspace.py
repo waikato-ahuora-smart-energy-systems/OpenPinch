@@ -404,6 +404,20 @@ def test_workspace_load_sets_active_case_when_empty():
     assert not hasattr(workspace, "set_variant_input")
 
 
+def test_workspace_load_stores_an_unknown_zone_type_and_reports_it_invalid():
+    workspace = PinchWorkspace()
+    payload = PinchWorkspace(_basic_payload()).to_problem_json()
+    payload["zone_tree"]["type"] = "Not a zone type"
+
+    stored = workspace.load(payload, case_name="bad")
+
+    assert stored is None
+    assert workspace.list_cases() == ["bad"]
+    report = workspace.validation_report("bad")
+    assert not report.valid
+    assert any(issue.severity == "error" for issue in report.issues)
+
+
 def test_workspace_batch_isolates_case_failures(monkeypatch):
     workspace = PinchWorkspace(_basic_payload(), project_name="Demo")
     workspace.scenario("broken")

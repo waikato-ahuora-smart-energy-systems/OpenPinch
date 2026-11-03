@@ -52,12 +52,12 @@ def test_capping_keeps_each_temperature_with_its_own_refrigerant():
     assert capped[1] == pytest.approx(capped[0])
 
 
-def test_tespy_stages_are_not_capped():
+def test_tespy_stages_are_capped_like_coolprop():
     args = SimpleNamespace(refrigerant_ls=["R134a"], simulation_backend="tespy")
 
     capped = cap_stage_condensing_temperatures(np.array([140.0]), args)
 
-    assert capped[0] == pytest.approx(140.0)
+    assert capped[0] == pytest.approx(99.06, abs=0.1)
 
 
 # 3.3 Near-zero duty is no heat pump

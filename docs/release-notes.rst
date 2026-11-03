@@ -7,6 +7,9 @@ Unreleased
 Input and validation
 ~~~~~~~~~~~~~~~~~~~~
 
+- ``ZoneType.UO`` is the new name of the unit operation zone type. ``ZoneType.O``
+  and ``ZoneType["O"]`` still work and give the same member, but its ``.name``
+  is now ``UO``.
 - A legacy ``.xls`` workbook is now rejected with a ``ValueError`` that asks
   for a ``.xlsx`` save. It was accepted as a source suffix but failed with
   ``ImportError: Import xlrd failed``, because no install extra provides
@@ -19,6 +22,14 @@ Input and validation
   so. The ``validate`` command uses the new report, so inline input is checked
   after the same normalisation as loading: for example, a stream entry that is
   not a record is now reported as the loader sees it.
+
+- ``PinchWorkspace.load`` with input that fails while the case is prepared, such
+  as an unknown zone type in ``zone_tree``, now stores the case and returns
+  ``None``, as it does for other bad input. It stored the case, then raised
+  ``ValueError`` from ``self.case(name)``, and ``validation_report(name).valid``
+  said ``True``. ``workspace.validation_report`` now uses
+  ``PinchProblem.source_validation_report``, so it reports that input as
+  invalid. Loading valid input prepares it once more for the check.
 
 Documentation
 ~~~~~~~~~~~~~
@@ -35,10 +46,25 @@ Documentation
 - Each package directory now has a ``README.md`` stating its interface,
   invariants and side effects. These stay out of the wheel, and a test checks
   that what they cite still exists.
+- ``openpinch --help`` now says the command also writes the JSON Schema of each
+  public contract.
 
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- **Behaviour change:** ``update_options`` and ``set_dt_cont_multiplier``, on
+  ``PinchProblem`` and ``PinchWorkspace``, now keep components added with
+  ``components.add_process_mvr``. These calls used to discard them silently, so
+  later targets ran without the MVR. Each component is now re-solved on the
+  rebuilt input and its handle stays valid, with its active state kept. Remove
+  any code that adds a component again after these calls, as the repeat call now
+  adds a second MVR or fails because the source stream is inactive. Efficiencies
+  passed explicitly stay as given; efficiencies left unset take the new
+  ``PROCESS_MVR_ETA_COMP`` and ``PROCESS_MVR_ETA_MOTOR`` values, so changing those
+  options can change a kept component's work. If a component cannot be re-solved,
+  the call raises and the problem and its components are unchanged. Components
+  remain memory-only: ``load`` discards them, and ``to_problem_json`` and workspace
+  bundles do not carry them.
 - Vapour-compression targets now limit each compressor's pressure ratio, with
   the new ``HPR_MAX_PRESSURE_RATIO`` option (default 15). A candidate over the
   limit evaporates warmer, or in a cascade raises its lower levels, so targets
@@ -55,6 +81,11 @@ Heat pumps and refrigeration
   parallel machines. The limit was previously the gap to the top of the sink
   profile, about 10 K when the condenser sits at the top of its load. Targets
   can fall, by up to several percent where subcooling was at that limit.
+- A utility level that sits on an air or cooling-water limit can now use that
+  service. A level's 0.1 K band ended just past the limit, so the whole duty
+  was priced as refrigeration. For example, with ``HPR_DT_CONT`` of 5 a 25 C
+  level sits on the 15 C air limit. Utility placement targets with such a level
+  can fall by about half: one 25% load test case went from 836.6 to 427.3 k$/y.
 - A TESPy heat pump target without the optional ``tespy`` package now raises
   an ``ImportError`` that names the ``openpinch[tespy]`` extra, as the docs
   advise handling. It is still an ``HprTargetCompatibilityError`` (a
@@ -65,6 +96,16 @@ Heat pumps and refrigeration
   adapter specified it, so a candidate at the zero-subcooling bound always
   failed, and with a small search budget that could be the only candidate
   reached, raising ``HPRTargetingError``.
+- TESPy vapour-compression targets now start their search from the Carnot seed,
+  as CoolProp targets do, and honour ``HPR_INITIALISE_SIMULATED_CYCLE``. The
+  unseeded first restart could stall where the allocated duty is zero, so with
+  a small search budget a target such as R245fa on ``basic_pinch.json`` raised
+  ``HPRTargetingError``. TESPy target values can change.
+- TESPy vapour-compression targets now keep condensing at least 2 K below the
+  refrigerant's critical temperature, the same limit as CoolProp targets. A
+  TESPy design could previously sit just below the critical point, where
+  CoolProp targets cannot go, so its cost was not comparable. TESPy targets for
+  a refrigerant near that limit can cost more.
 
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -105,6 +146,20 @@ Cogeneration
   at 2 MW, and a duty that puts the first stage near that step alternates
   between the two branches for all 50 iterations. Numeric targets are unchanged;
   a run that did not converge still reports its last iteration.
+- Cogeneration targets and their result rows now carry the turbine's stage
+  records as ``turbine_result``, a ``TurbineSolveResult`` in fixed units (kW,
+  degC, bar, kJ/kg, kg/s). Each period row has its own record, and a
+  weighted-average row has none. The Excel summary is unchanged. A stage's
+  ``source_index`` now gives its position in the target's ``hot_utilities``; it
+  was a position in the list left after skipping unusable utilities.
+
+Streams
+~~~~~~~
+
+- Inverting a utility copy no longer detaches the original's segments. For a
+  segmented utility, ``get_hot_streams`` and ``get_cold_streams`` with
+  ``invert_utility=True`` left the original's segments without a parent
+  (``segment.parent`` was ``None``).
 
 Values
 ~~~~~~
@@ -252,6 +307,15 @@ Testing and CI
 - CI runs the Pyodide runner's own regression test (a failed run prints its
   traceback) in the Pyodide job, where its Node packages are installed. It
   used to skip in every lane, so the behaviour had no CI coverage.
+
+- CI smoke-tests the ``full`` extra on Ubuntu, so every published extra now has
+  an installation check, and a test requires the smoke matrix to match the extras
+  in ``pyproject.toml``. Nine fast tests that need GEKKO or Kaleido now carry the
+  ``synthesis`` marker.
+
+- The nine-stream live solver benchmark, which pytest always skipped, is now
+  ``scripts/benchmark_nine_stream.py``, run by hand. It can take hours and has
+  no CI use.
 
 0.7.2 (2026-10-20)
 ------------------

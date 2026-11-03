@@ -20,7 +20,6 @@ from ..contracts.workspace import (
     WorkspaceCaseBundleEntry,
     validate_workspace_case_name,
 )
-from ._problem.input.validation import build_validation_report
 from ._problem.targeting.catalog import install_catalog_forwarders
 from ._workspace import state as _workspace_state
 from ._workspace.case_inputs import (
@@ -304,7 +303,7 @@ class PinchWorkspace:
         if activate or self._active_case_name is None:
             self._active_case_name = name
 
-        if build_validation_report(case_input).valid:
+        if PinchProblem.source_validation_report(case_input).valid:
             return self.case(name)
         return None
 
@@ -339,7 +338,7 @@ class PinchWorkspace:
 
     def validation_report(self, case_name: Optional[str] = None):
         """Return a structured validation report for one case input."""
-        return build_validation_report(
+        return PinchProblem.source_validation_report(
             self._get_case_input(self._resolve_case_name(case_name))
         )
 

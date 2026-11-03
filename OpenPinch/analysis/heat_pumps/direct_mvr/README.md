@@ -16,7 +16,7 @@ Solves mechanical vapour recompression (MVR) of a hot gas or vapour process stre
 - `units.py`: unit conversion helpers (`to_pascal`, `to_watt`, `to_kilowatt`, `convert_value`, `source_output_units`, `profile_to_output_units`, `stage_mass_flow`, and others).
 
 ## Invariants
-- Specify at most one of `mvr_stage_t_lift` and `mvr_stage_pressure_ratio`; the default lift is 20 K, capped at 200 K, and the pressure ratio must be in (1, 20] [execution.py:_resolve_compression_target].
+- Specify at most one of `mvr_stage_t_lift` and `mvr_stage_pressure_ratio`; the default lift is 20 K, a lift above 200 K raises `ValueError`, and the pressure ratio must be in (1, 20] [execution.py:_resolve_compression_target].
 - `eta_mvr_comp` and `eta_motor` must be in (0, 1] [execution.py:_validate_efficiencies].
 - The source needs positive duty, `p_supply`, finite states and `t_supply > t_target` [execution.py:solve_direct_gas_mvr_stream].
 - Stage count must be a finite integer of at least 1; booleans are rejected [execution.py:coerce_positive_mvr_stage_count].
@@ -28,7 +28,7 @@ Solves mechanical vapour recompression (MVR) of a hot gas or vapour process stre
 - Each stage's inlet is the previous stage's outlet pressure and the stream target temperature; the next stage's mass flow is the previous hot mass flow [execution.py:solve_direct_gas_mvr_stream].
 
 ## Side Effects
-- CoolProp `PropsSI` calls throughout, except that the source states use the stream's own `supply_enthalpy` and `target_enthalpy` when both are present; otherwise they fall back to saturated vapour at supply and saturated liquid at target [thermodynamics.py:source_enthalpies, execution.py:_solve_compression_stage].
+- CoolProp `PropsSI` calls throughout, except that the source states use the stream's own `supply_enthalpy` and `target_enthalpy` when both are present; otherwise they come from CoolProp at (temperature, supply pressure), using saturated vapour (supply) or saturated liquid (target) only when that state is within 0.05 K of saturation, and any other failure is raised [thermodynamics.py:source_enthalpies, execution.py:_solve_compression_stage].
 - None otherwise; the source `Stream` is not modified.
 
 ## Verification

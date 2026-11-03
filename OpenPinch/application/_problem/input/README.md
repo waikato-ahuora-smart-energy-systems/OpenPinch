@@ -11,7 +11,7 @@ import from here.
 
 ## Interface
 - `prepare_problem` (`construction.py`): builds the master `Zone` hierarchy, streams and utilities from schemas.
-- `_find_extreme_process_temperatures` (`construction.py`): shifted hot-stream minimum and cold-stream maximum; imported by `utility_placement.py`.
+- `_find_extreme_process_temperatures` (`construction.py`): returns `(hu_t_min, cu_t_max)`, the highest shifted cold-stream temperature and the lowest shifted hot-stream temperature, `(20, 20)` with no streams; imported by `utility_placement.py`.
 - `canonical_problem_inputs` (`canonicalization.py`): deep-copied input dict with a normalised zone tree and rewritten stream zones.
 - `_LoadedProblemSource`, `load_problem_source`, `prepare_in_memory_problem_source`, `normalize_problem_mapping` (`loading.py`): normalise a source into inputs plus validation context.
 - `apply_loaded_source`, `rebuild_problem_state`, `replace_loaded_source`, `replace_problem_inputs` (`loading.py`): set or replace a problem's state; `replace_loaded_source` restores prior state on failure.
@@ -32,7 +32,7 @@ import from here.
 - Multipliers are applied before streams are built, because each stream takes its zone's multiplier and default utilities are placed from shifted temperatures. [construction.py:prepare_problem]
 - Streams are sorted by name before preparation; a stream without `dt_cont` takes `THERMAL_DT_CONT`. [construction.py:prepare_problem], [construction.py:_build_prepared_stream_collection]
 - Validated temperatures are in degC; below -273.15 is an error. Temperatures are compared in canonical units. [semantics.py:_validate_above_absolute_zero], [construction.py:_validate_stream_temperatures]
-- A near-isothermal stream is widened to `THERMAL_DT_PHASE_CHANGE`; its duty is unchanged. [construction.py:_widen_near_isothermal_target]
+- A non-segmented stream whose non-zero temperature span is below `THERMAL_DT_PHASE_CHANGE` has its target moved out to that span; its duty is unchanged, and an exactly isothermal stream is rejected. [construction.py:_widen_near_isothermal_target]
 - Per-period arrays must have one entry per `PROBLEM_PERIOD_IDS` id. [semantics.py:_validate_period_lengths]
 - Supplied `heat_flow` must agree with `heat_capacity_flowrate` x |dT| to a relative 1e-4. [semantics.py:_validate_heat_capacity_flowrate_agreement]
 - Segment temperatures chain end to start, keep one direction, and carry positive heat flow and HTC; profile cumulative heat increases strictly. [semantics.py:_validate_segmented_stream_states], [semantics.py:_validate_temperature_heat_profile_states]
@@ -46,6 +46,7 @@ import from here.
 - `load_problem_source` reads files or tuples of files through the adapters for non-in-memory sources. [loading.py:load_problem_source]
 - `apply_loaded_source` and `replace_loaded_source` assign attributes on the parent `PinchProblem`. [loading.py:apply_loaded_source]
 - `rebuild_problem_state` calls `problem._invalidate_analysis()`. [loading.py:rebuild_problem_state]
+- `rebuild_problem_state` empties `_process_components`; `replace_problem_inputs` keeps them by replaying them on the rebuilt tree, and a failed replay restores the prior state. [loading.py:rebuild_problem_state] [loading.py:replace_problem_inputs]
 - Zone-tree normalisation rewrites `stream.zone` on the stream models it is given and may append process nodes to the tree. [canonicalization.py:_rewrite_stream_zones_from_tree]
 - `validate_problem_semantics` emits `InputValidationWarning`. [validation.py:validate_problem_semantics]
 - Utility completion mutates deep copies of the given utility schemas (target, `dt_cont`, price, HTC, `active`). [utilities.py:_complete_utility_data]

@@ -24,7 +24,7 @@ Private helper modules for `PinchDecompModel` (`../pinch_decomposition.py`), whi
 
 ## Side Effects
 - `amalgamate_networks` constructs a `StageWiseModel` (a new GEKKO model) and writes solved values into its variables through `.VALUE.value`. [amalgamation.py:amalgamate_networks] [amalgamation.py:_copy_recovery_match]
-- When the above side is not required, `amalgamate_networks` sets `above_case.S` and `above_case.K` to 0, mutating its argument. [amalgamation.py:amalgamate_networks]
+- When the above side is not required but the below side is, `amalgamate_networks` sets `above_case.S` and `above_case.K` to 0, mutating its argument. [amalgamation.py:amalgamate_networks]
 - Post-processing sets many attributes on the model (`z`, `theta_*`, `LMTD_r`, `area_r`, `TAC`). [postprocess.py:_get_multiperiod_post_process]
 - Imports `StageWiseModel` from `../stagewise` at module load and `_value` from `../_stagewise/verification`. [amalgamation.py] [postprocess.py]
 

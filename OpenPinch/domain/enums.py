@@ -7,7 +7,7 @@ column names, graph labels, and options keys used by configuration and schemas.
 from __future__ import annotations
 
 from enum import Enum
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from ..domain.stream_collection import StreamCollection
@@ -25,6 +25,7 @@ class CogenerationTarget(Protocol):
     turbine_efficiency_target: float | None
     turbine_converged: bool | None
     turbine_diagnostics: list[str]
+    turbine_result: Any
     period_ids: dict[str, int] | None
 
 
@@ -37,6 +38,8 @@ class ZoneType(Enum):
     P = "Process Zone"
     U = "Utility Zone"
     UO = "Unit Operation"
+    # Earlier name of UO, kept for existing callers.
+    vars()["O"] = "Unit Operation"
 
     def __str__(self):
         return self.value

@@ -7,7 +7,7 @@ Renders a solved zone as a Streamlit page: a sidebar of target metrics and utili
 - `render_streamlit_dashboard` (`rendering.py`): renders the dashboard for a `Zone`; takes optional `graph_data`, `page_title` and `value_rounding`.
 - `render_table_export` (`exports.py`): renders a path input and button that save a problem-table dataframe as an Excel file.
 - `dashboard.css` (data): stylesheet injected into the page.
-- Private helpers: `_require_streamlit`, `_require_openpyxl` (`dependencies.py`) and `_DashboardGraphSet` (`state.py`) group targets' graphs.
+- Private helpers: `_require_streamlit`, `_require_openpyxl` (`dependencies.py`) guard optional imports; `_DashboardGraphSet` (`state.py`) groups targets' graphs.
 - Subdirectories: none.
 
 ## Invariants
@@ -19,7 +19,7 @@ Renders a solved zone as a Streamlit page: a sidebar of target metrics and utili
 - A blank save path shows an error and writes nothing. [exports.py:render_table_export]
 
 ## Side Effects
-- Calls Streamlit page configuration, markdown, sidebar and chart functions; imports Streamlit lazily, preferring an already loaded module. [rendering.py:render_streamlit_dashboard] [dependencies.py:_require_streamlit]
+- Calls Streamlit page configuration first (it must be the first Streamlit call in the script), markdown, sidebar and chart functions; imports Streamlit lazily, preferring an already loaded module. [rendering.py:render_streamlit_dashboard] [dependencies.py:_require_streamlit]
 - Reads `dashboard.css` through `importlib.resources`. [rendering.py:_dashboard_css]
 - The save button creates parent directories and writes the workbook to the user-typed path, defaulting to `results/<target>_shifted.xlsx` or `_real.xlsx`; an `OSError` is shown in the page. [exports.py:render_table_export]
 - Imports openpyxl lazily. [dependencies.py:_require_openpyxl]

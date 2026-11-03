@@ -288,6 +288,7 @@ def test_flat_utility_dt_cont_keeps_scalar_contribution():
     assert _utility_outlet_temperature_contribution(model, "cold", 0, 0, 0, 25.0) == 5.0
 
 
+@pytest.mark.synthesis
 def test_segmented_utility_dt_cont_mapping_is_built_into_stagewise_constraints():
     arrays = problem_to_solver_arrays(
         _segmented_problem(

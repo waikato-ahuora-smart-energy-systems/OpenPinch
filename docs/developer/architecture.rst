@@ -64,9 +64,11 @@ The supported request follows this sequence:
 1. ``PinchProblem`` validates input through ``contracts``.
 2. ``application`` constructs and coordinates the problem use case.
 3. ``analysis`` performs deterministic targeting using ``domain`` state.
-4. ``application`` serialises results through ``presentation`` on every target
-   run; ``adapters`` translate input formats, and reports, exports and plots
-   are produced on request.
+4. ``application`` serialises results through ``presentation`` on target runs
+   that update the problem's results; a non-mutating target such as
+   ``target.heat_recovery_dt_min`` returns its contract directly. ``adapters``
+   translate input formats, and reports, exports and plots are produced on
+   request.
 5. ``PinchProblem`` caches the validated output contract for observation.
 
 Optimisation Boundary

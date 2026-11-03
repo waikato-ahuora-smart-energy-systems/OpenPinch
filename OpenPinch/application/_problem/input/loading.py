@@ -101,15 +101,26 @@ def replace_problem_inputs(
     problem: "PinchProblem",
     problem_inputs: JsonDict,
 ) -> "Zone":
-    """Replace canonical inputs while preserving external source identity."""
+    """Replace canonical inputs, keeping source identity and process components."""
     loaded_source = prepare_in_memory_problem_source(
         problem_inputs,
         source_kind=problem._input_source_kind or "target_input",
     )
+    components = problem._process_components
+
+    def rebuild_with_components() -> "Zone":
+        root = problem._rebuild_problem_state()
+        if components:
+            from ....analysis.heat_pumps.process_mvr import replay_process_components
+
+            replay_process_components(components, root)
+            problem._process_components = components
+        return root
+
     return replace_loaded_source(
         problem,
         loaded_source,
-        rebuild=problem._rebuild_problem_state,
+        rebuild=rebuild_with_components,
         preserve_filepath=True,
     )
 

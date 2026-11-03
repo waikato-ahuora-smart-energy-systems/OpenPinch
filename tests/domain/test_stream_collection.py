@@ -409,6 +409,44 @@ def test_get_cold_streams_includes_process_and_utility_when_enabled():
     assert set(cold_streams._streams.keys()) == {"C_PRO", "C_UT"}
 
 
+def test_inverting_a_segmented_utility_copy_keeps_the_original_segments_owned():
+    sc = StreamCollection()
+    sc.add(
+        Stream(
+            name="C_UT",
+            is_process_stream=False,
+            segments=[
+                {
+                    "name": "S1",
+                    "supply_temperature": 60.0,
+                    "target_temperature": 100.0,
+                    "heat_flow": 40.0,
+                },
+                {
+                    "name": "S2",
+                    "supply_temperature": 100.0,
+                    "target_temperature": 140.0,
+                    "heat_flow": 80.0,
+                },
+            ],
+        )
+    )
+    original = sc["C_UT"]
+    original_segments = original.segments
+
+    hot = sc.get_hot_streams(
+        include_process_streams=False,
+        include_utility_streams=True,
+        invert_utility=True,
+    )
+
+    assert hot["C_UT"].supply_temperature == 140.0
+    assert [segment.parent for segment in original.segments] == [original] * 2
+    assert original.segments == original_segments
+    assert original.supply_temperature == 60.0
+    assert original.target_temperature == 140.0
+
+
 def test_get_cold_streams_can_invert_utility_without_mutating_original_streams():
     sc = StreamCollection()
     sc.add(

@@ -22,11 +22,11 @@ A pure model for choosing the supply temperatures and spans of utility levels so
 - Subdirectories: none.
 
 ## Invariants
-- The analysis works internally in degC and delta_degC; results are converted back to the request's units only in `optimise_utility_placement` [units.py:INTERNAL_TEMPERATURE] [service.py:optimise_utility_placement].
-- Context and result models are frozen and reject extra fields and non-finite numbers [context.py:_FrozenContext] [allocation.py:_FrozenAllocation].
+- The analysis works internally in degC and delta_degC; `optimise_utility_placement` converts the temperatures of each returned candidate (`best` and `alternatives`) back to the request's units, while result-level `diagnostics` stay in degC and delta_degC [units.py:INTERNAL_TEMPERATURE] [service.py:optimise_utility_placement].
+- Context and allocation models are frozen and reject extra fields and non-finite numbers; `PlacementTaskReport` and `PlacementOptimisationOutcome` are frozen and reject extra fields only [context.py:_FrozenContext] [allocation.py:_FrozenAllocation] [evaluation.py:PlacementTaskReport] [optimisation.py:PlacementOptimisationOutcome].
 - Every period must supply each placement coordinate exactly once, period ids are unique, and at least one weight is positive [context.py:build_utility_placement_context] [bounds.py:_period_index].
-- Caller bounds may narrow but never expand the physical bounds; an empty intersection raises `EmptyPlacementFeasibleRegionError` [bounds.py:_intersection].
-- Hot supplies descend and cold supplies ascend by at least the minimum separation [bounds.py:_propagate_order] [codec.py:verify_candidate].
+- Caller bounds may narrow but never expand the physical bounds (expanding raises `UtilityTemplateValidationError`); an empty intersection raises `EmptyPlacementFeasibleRegionError` [bounds.py:_intersection].
+- Without generated pairs, hot supplies descend and cold supplies ascend in declaration order by at least the minimum separation; with generated pairs, hot supplies descend within each level kind and across kinds only the physical spacing is enforced; all checks allow `tolerances.ordering` slack [bounds.py:_propagate_order] [codec.py:verify_candidate].
 - Decision coordinates are ordered per side with isothermal supplies first, then each sensible supply followed by its span; paired requests list only the hot side [codec.py:build_decision_coordinates].
 - For generated pairs, each cold level is the exact reversal of its hot partner [codec.py:decode_verified_placement] [codec.py:encode_placement].
 - Scalar objectives partition the range: feasible values lie in (0, 1), infeasible in [1, 2) [penalties.py:feasible_objective_scalar] [penalties.py:infeasible_objective_scalar].
@@ -34,8 +34,8 @@ A pure model for choosing the supply temperatures and spans of utility levels so
 - The optimiser searches the unit box; supply ordering is imposed structurally when mapping back to physical values [optimisation.py:_optimizer_point_to_physical] [optimisation.py:coordinate_optimisation].
 - Memoisation is keyed on exact coordinates with negative zero normalised [evaluation.py:PlacementEvaluationSession.evaluate].
 - The evaluation budget is split evenly across tasks, earlier tasks taking the remainder; a search batch from the top-level session leaves a polish reserve [evaluation.py:PlacementEvaluationSession.task_session].
-- Only the listed thermodynamic error codes reject one candidate; any other raises [evaluation.py:PlacementEvaluationSession.evaluate].
-- Candidates returned by the optimiser are re-evaluated in a fresh parent session before ranking [optimisation.py:coordinate_optimisation].
+- Only the error codes `invalid_balanced_composite`, `negative_entropy_generation`, `zero_utility_temperature_span` and `nonpositive_kelvin` reject one candidate; any other raises [evaluation.py:PlacementEvaluationSession.evaluate].
+- The model's initial points and the optimiser's candidates are de-duplicated and re-evaluated in a fresh session, with the evaluation limit raised to cover them, before ranking [optimisation.py:coordinate_optimisation].
 - Allocation adapter exceptions other than `PlacementTargetingError` are wrapped in one [allocation.py:allocate_placement_period].
 
 ## Side Effects
@@ -43,7 +43,7 @@ A pure model for choosing the supply temperatures and spans of utility levels so
 - The default runner starts optimiser worker processes; `PlacementEvaluationSession` is picklable and drops its memo and lock on pickling [service.py:optimise_utility_placement] [evaluation.py:PlacementEvaluationSession.__getstate__].
 - `PlacementEvaluationSession` holds a per-process memo and a thread lock and accumulates counters; `merge_task_reports` mutates it [evaluation.py:PlacementEvaluationSession.merge_task_reports].
 - Replay mutates only deep copies of utility collections [replay.py:allocate_from_aggregate_profiles].
-- No file or network IO.
+- No network IO. With several search or polish workers on a spawn or forkserver platform, the default runner reads the main script to check for its guard [../../optimisation/execution.py:_main_module_reruns_in_workers]; nothing else here reads files.
 
 ## Verification
 - Run: `uv run --no-sync pytest tests/analysis/utility_placement`

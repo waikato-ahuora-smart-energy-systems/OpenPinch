@@ -1,4 +1,10 @@
-"""Schemas for turbine solve outputs."""
+"""Schemas for turbine solve outputs.
+
+Fields are raw floats in fixed units, whatever the configured display units:
+heat flow and work in kW, temperature in degC, pressure in bar, specific
+enthalpy in kJ/kg and mass flow in kg/s. Efficiencies and fractions are
+dimensionless, from 0 to 1.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +14,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class TurbineStageResult(BaseModel):
-    """Detailed result for one solved turbine stage."""
+    """Detailed result for one solved turbine stage, in the module's fixed units.
+
+    ``work_actual`` is shaft work, after mechanical losses. On a cogeneration
+    target, ``source_index`` is the stage's position in ``hot_utilities``.
+    """
 
     stage: int
     source_index: int
@@ -32,7 +42,7 @@ class TurbineStageResult(BaseModel):
 
 
 class TurbineSolveResult(BaseModel):
-    """Validated output for a multi-stage turbine targeting solve."""
+    """Validated output for a multi-stage turbine solve, in the module's fixed units."""
 
     model_config = ConfigDict(extra="forbid")
 
