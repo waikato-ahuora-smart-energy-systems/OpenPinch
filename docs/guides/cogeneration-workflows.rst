@@ -42,6 +42,29 @@ the returned target or in ``problem.results.targets``; ``summary_frame()`` has
 no work or efficiency column. The cogeneration target does not replace the base
 thermal answer.
 
+Turbine Models
+--------------
+
+``cogeneration`` uses Medina-Flores et al. (2010). ``sun_smith_cogeneration``,
+``varbanov_small_turbine_cogeneration``, ``varbanov_large_turbine_cogeneration``
+and ``isentropic_cogeneration`` select the other models.
+
+The two Varbanov methods each use one size band of the Varbanov et al. (2004)
+coefficients: the small model for stage work at or below 2000 kW, and the large
+model for stage work above 2000 kW. Neither switches band, so choose by the size
+of the turbine. Both change from a back-pressure to a condensing turbine when the
+exit would be wet.
+
+If a stage's work is outside the band, the target still reports the number. One
+message, naming the stages, is added to ``turbine_diagnostics``, and this alone
+does not set ``turbine_converged`` to ``False``. The test uses the steam's work
+before ``POWER_ETA_MECH`` is applied.
+
+The two models can give very different work at the same duty, so for some duties
+neither is in range: the small model predicts more than 2000 kW and the large
+model 2000 kW or less. A train whose stages lie either side of 2000 kW also warns
+under both. Treat such a target as an extrapolation.
+
 Convergence
 -----------
 
@@ -50,7 +73,9 @@ extraction mass balance did not settle within its iteration limit, and
 ``turbine_diagnostics`` holds the messages. The same messages are raised as a
 ``UserWarning`` and listed in ``problem.report().warnings``. The work target of
 such a run is its last iteration, so treat it as unreliable: a small change in
-duty or in the turbine model usually restores convergence. A weighted-average
+duty or in the turbine model usually restores convergence. For the Varbanov
+models this can happen in a narrow range of duty around the change to a
+condensing turbine, where the condensing branch does less work. A weighted-average
 row is flagged if any period did not converge.
 
 Interpretation

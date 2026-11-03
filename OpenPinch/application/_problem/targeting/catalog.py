@@ -100,7 +100,8 @@ METHOD_CATALOG = MappingProxyType(
             for name in (
                 "cogeneration",
                 "sun_smith_cogeneration",
-                "varbanov_cogeneration",
+                "varbanov_small_turbine_cogeneration",
+                "varbanov_large_turbine_cogeneration",
                 "isentropic_cogeneration",
                 "exergy",
                 "energy_transfer",

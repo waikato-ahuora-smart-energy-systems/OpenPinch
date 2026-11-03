@@ -1169,9 +1169,18 @@ class _TargetAccessor:
             "sun_smith_cogeneration", TurbineModel.SUN_SMITH, **kwargs
         )
 
-    def varbanov_cogeneration(self, **kwargs):
+    def varbanov_small_turbine_cogeneration(self, **kwargs):
         return self._cogeneration(
-            "varbanov_cogeneration", TurbineModel.VARBANOV, **kwargs
+            "varbanov_small_turbine_cogeneration",
+            TurbineModel.VARBANOV_SMALL,
+            **kwargs,
+        )
+
+    def varbanov_large_turbine_cogeneration(self, **kwargs):
+        return self._cogeneration(
+            "varbanov_large_turbine_cogeneration",
+            TurbineModel.VARBANOV_LARGE,
+            **kwargs,
         )
 
     def isentropic_cogeneration(self, *, efficiency, **kwargs):

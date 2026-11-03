@@ -43,6 +43,12 @@ _T_TRIPLE = 0.01
 _T_CRITICAL = 373.946
 _P_CRITICAL = 220.64  # bar
 _MASS_BALANCE_MAX_ITERATIONS = 50
+# The size limit between the Varbanov coefficient bands, kW.
+_VARBANOV_SIZE_LIMIT = 2000.0
+_VARBANOV_SIZES = {
+    TurbineModel.VARBANOV_SMALL.value: "<2MW",
+    TurbineModel.VARBANOV_LARGE.value: ">2MW",
+}
 
 
 def _segment_enthalpy(
@@ -94,7 +100,7 @@ def _predict_stage_work(
         )
     if model == TurbineModel.MEDINA_FLORES.value:
         return _work_MedinaModel(pressure_in, mass_flow, dh_isentropic)
-    if model == TurbineModel.VARBANOV.value:
+    if model in _VARBANOV_SIZES:
         return _work_THM(
             pressure_in,
             enthalpy_in,
@@ -103,6 +109,7 @@ def _predict_stage_work(
             mass_flow,
             dh_isentropic,
             mech_eff,
+            _VARBANOV_SIZES[model],
         )
     if model == TurbineModel.ISENTROPIC.value:
         return mass_flow * dh_isentropic * min_eff
@@ -282,7 +289,7 @@ def _work_SunModel(P_in, h_in, P_out, h_sat, m, m_max, dh_is, n_mech, t_type=1):
     return w_act
 
 
-def _work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size=1, t_type=1):
+def _work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size, t_type=1):
     """Determine power generation using Varbanov et al. (2004)."""
     coeff = {
         "BPST": {
@@ -316,16 +323,38 @@ def _work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size=1, t_type=1):
     b = coeff[t_type_key][t_size_key][2] + coeff[t_type_key][t_size_key][3] * dT_sat
     w_max = (dh_is * m - a) / b
 
-    if w_max > 2000 and t_size_key == "<2MW":
-        w_max = _work_THM(
-            P_in, h_in, P_out, h_sat, m, dh_is, n_mech, ">2MW", t_type_key
-        )
-
     h_out = h_in - w_max / m  # fluid work; mechanical losses act on the shaft
     if h_out <= h_sat + tol and t_type_key == "BPST":
         w_max = _work_THM(P_in, h_in, P_out, h_sat, m, dh_is, n_mech, t_size_key, "CT")
 
     return w_max
+
+
+def _varbanov_band_diagnostics(model: str, stage_work: list[float]) -> list[str]:
+    """Return one message if any stage's fluid work is outside the model's band."""
+    if model == TurbineModel.VARBANOV_SMALL.value:
+        band = f"at or below {_VARBANOV_SIZE_LIMIT:.0f} kW"
+        other = "varbanov_large_turbine_cogeneration"
+        outside = [work > _VARBANOV_SIZE_LIMIT for work in stage_work]
+    elif model == TurbineModel.VARBANOV_LARGE.value:
+        band = f"above {_VARBANOV_SIZE_LIMIT:.0f} kW"
+        other = "varbanov_small_turbine_cogeneration"
+        outside = [tol < work <= _VARBANOV_SIZE_LIMIT for work in stage_work]
+    else:
+        return []
+
+    stages = ", ".join(
+        f"stage {number} does {work:.0f} kW"
+        for number, (work, is_outside) in enumerate(zip(stage_work, outside), start=1)
+        if is_outside
+    )
+    if not stages:
+        return []
+    return [
+        f"{model} is outside its range: {stages}, but its coefficients are for "
+        f"stage work {band}. The work target is an extrapolation; "
+        f"target.{other}() is the alternative, but it may also be out of range."
+    ]
 
 
 class MultiStageSteamTurbine:
@@ -603,6 +632,7 @@ class MultiStageSteamTurbine:
                 f"{mass_flow_change:.3g} kg/s. The work and efficiency targets "
                 "are from the last iteration."
             )
+        diagnostics.extend(_varbanov_band_diagnostics(state.model, state.w_k[1:]))
 
         stages = []
         for j in range(1, state.s):
@@ -700,6 +730,7 @@ class MultiStageSteamTurbine:
         h_sink_sat = hV_p(P_sink)
 
         stages = []
+        stage_fluid_work: list[float] = []
         total_work = 0.0
         total_fluid_work = 0.0
         total_isentropic_work = 0.0
@@ -758,9 +789,13 @@ class MultiStageSteamTurbine:
             stages.append(stage)
             total_work += w_act * params["mech_eff"]  # shaft work
             total_fluid_work += w_act
+            stage_fluid_work.append(float(w_act))
             total_isentropic_work += w_is
             total_mass_flow += m_stage
 
+        diagnostics.extend(
+            _varbanov_band_diagnostics(params["model"], stage_fluid_work)
+        )
         overall_efficiency = (
             total_fluid_work / total_isentropic_work
             if total_isentropic_work > tol

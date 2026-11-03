@@ -16,7 +16,8 @@ target.carnot_orc,Site; Process Zone; Unit Operation,independent,direct_heat_int
 target.organic_rankine_cycle,Site; Process Zone; Unit Operation,independent,direct_heat_integration,thermal,available
 target.cogeneration,Region; Community; Site; Process Zone; Unit Operation,independent,compatible_thermal_target,thermal,available
 target.sun_smith_cogeneration,Region; Community; Site; Process Zone; Unit Operation,independent,compatible_thermal_target,thermal,available
-target.varbanov_cogeneration,Region; Community; Site; Process Zone; Unit Operation,independent,compatible_thermal_target,thermal,available
+target.varbanov_small_turbine_cogeneration,Region; Community; Site; Process Zone; Unit Operation,independent,compatible_thermal_target,thermal,available
+target.varbanov_large_turbine_cogeneration,Region; Community; Site; Process Zone; Unit Operation,independent,compatible_thermal_target,thermal,available
 target.isentropic_cogeneration,Region; Community; Site; Process Zone; Unit Operation,independent,compatible_thermal_target,thermal,available
 target.exergy,Region; Community; Site; Process Zone; Unit Operation,independent,compatible_thermal_target,thermal,available
 target.energy_transfer,Region; Community; Site; Process Zone; Unit Operation,independent,compatible_thermal_target,thermal,available

@@ -242,7 +242,7 @@ For all integration, omitted ``include_subzones`` means true for ordinary cases
 and false for a scalar HPR or residual case; explicit expansion is unsupported
 for a frozen scalar basis.
 
-Exergy, energy transfer and the four cogeneration methods retain their existing
+Exergy, energy transfer and the five cogeneration methods retain their existing
 base-target capabilities and infer omitted scalar zone/period selections.
 Area/cost, new HPR targeting and aggregate integration do not gain new basis
 capabilities in this release. ``hpr_performance_map`` keeps its required

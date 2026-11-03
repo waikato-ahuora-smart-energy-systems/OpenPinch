@@ -186,7 +186,8 @@ def stamp_targets(problem, surface: str, previous: dict[int, Any]) -> None:
                 "exergy",
                 "cogeneration",
                 "sun_smith_cogeneration",
-                "varbanov_cogeneration",
+                "varbanov_small_turbine_cogeneration",
+                "varbanov_large_turbine_cogeneration",
                 "isentropic_cogeneration",
                 "heat_exchanger_area_and_cost",
             }:
