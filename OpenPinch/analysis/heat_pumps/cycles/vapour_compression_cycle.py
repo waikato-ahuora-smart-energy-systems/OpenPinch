@@ -737,7 +737,11 @@ class VapourCompressionCycle:
         h_cond_out = max(
             h_cond_out_min,
             h_cond_out_tar,
-            self._coldest_outlet_serving_cascade_heat(P_hi, state1.hmass()),
+            self._coldest_outlet_serving_cascade_heat(P_hi, state1.hmass())
+            if is_heat_pump
+            else self._coldest_outlet_serving_cascade_heat_given_cooling(
+                P_hi, h_ihx_out
+            ),
         )
         state2 = self._compute_state_from_pressure_enthalpy(
             P=P_hi,
@@ -906,6 +910,23 @@ class VapourCompressionCycle:
         h_sat_liq = self._compute_state_from_pressure_quality(P=P_hi, Q=0).hmass()
         q_subcool_max = (h_in - h_sat_liq) * max(self._Q_heat, 0.0) / self._Q_cas_heat
         return h_sat_liq - q_subcool_max
+
+    def _coldest_outlet_serving_cascade_heat_given_cooling(
+        self, P_hi: float, h_comp_in: float
+    ) -> float:
+        """The same subcooling limit when evaporator duty sets the flow.
+
+        Refrigeration fixes the evaporator duty, so the outlet also moves the
+        flow. With ``q_evap = h_comp_in - h_out``, requiring the subcooling heat
+        to fit in the process duty is linear in ``h_out``.
+        """
+        if self._Q_heat is None or np.isnan(self._Q_heat) or self._Q_evap <= tol:
+            return -np.inf
+        share = max(self._Q_heat, 0.0) / self._Q_evap
+        if share >= 1.0:
+            return -np.inf
+        h_sat_liq = self._compute_state_from_pressure_quality(P=P_hi, Q=0).hmass()
+        return (h_sat_liq - share * h_comp_in) / (1.0 - share)
 
     def _build_condenser_profile(self) -> np.ndarray:
         """
