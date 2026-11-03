@@ -5,9 +5,9 @@ Private helpers behind `ProcessMVRComponent` in `../process_mvr.py`. They select
 
 ## Interface
 What `../process_mvr.py` imports:
-- `add_replacement_streams_to_memberships`, `find_hot_stream_memberships` (`membership.py`): attach replacement streams wherever the original sits; find every hot-stream collection holding a stream by identity.
+- `add_replacement_streams_to_memberships`, `find_hot_stream_memberships`, `walk_zones` (`membership.py`): attach replacement streams wherever the original sits; find every hot-stream collection holding a stream by identity; walk a zone tree.
 - `build_process_mvr_stream_record` (`replacement_streams.py`): solve all periods and return a `_ProcessMVRStreamRecord`.
-- `normalise_source_selectors`, `match_source_streams` (`selection.py`): normalise selectors and resolve them to unique, validated hot streams.
+- `normalise_source_selectors`, `match_source_streams`, `validate_process_mvr_source` (`selection.py`): normalise selectors and resolve them to unique, validated hot streams; check one source stream.
 - `_ProcessMVRStreamRecord` (`state.py`): original stream, memberships, replacement streams and per-period stage results.
 - `work_for_zone` (`work.py`; imported as `calculate_work_for_zone`): compressor work for records inside a zone subtree and period.
 - Internal modules: `values.py` (period-value and unit helpers), `state.py` also defines `_StreamMembership`.
@@ -15,7 +15,7 @@ What `../process_mvr.py` imports:
 ## Invariants
 - A source must be an active, hot, process stream with `fluid_phase` of gas, vapour or vapor and a `fluid_name` [selection.py:validate_process_mvr_source].
 - Streams are matched by identity, key or display name; a detached `Stream` that is not in the tree is resolved by a unique name, and an ambiguous name raises `ValueError` [selection.py:match_one_selector].
-- A source with a temperature drop under 1 degC is treated as a vapour and its pressure must be near saturation (rtol 1e-2, atol 0.5 kPa); larger drops require `p_supply` and a gas or supercritical state [selection.py:validate_process_mvr_source_phase, selection.py:validate_vapour_state].
+- A source with a temperature drop under 1 degC is treated as a vapour and its pressure, when given, must be near saturation (rtol 1e-2, atol 0.5 kPa); larger drops require `p_supply` and a gas or supercritical state [selection.py:validate_process_mvr_source_phase, selection.py:validate_vapour_state].
 - Replacement stream keys are `<original key>.<component_id>.<stream name>`, and replacements are added to every zone holding the original [membership.py:add_replacement_streams_to_memberships].
 - Zone tree walks are pre-order and deterministic [membership.py:walk_zones].
 - Zone membership is decided by address prefix (`zone/`) [membership.py:record_affects_zone].

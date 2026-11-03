@@ -12,9 +12,7 @@ steam extraction levels in a multistage turbine train. The workflow estimates:
 
 - turbine work target
 - turbine efficiency target
-
-The stage-level extraction results are computed inside the turbine solve but are
-not stored on the result.
+- stage-level extraction details, as ``turbine_result``
 
 This is a thermodynamic screening and targeting workflow, not a full plant
 equipment design package.

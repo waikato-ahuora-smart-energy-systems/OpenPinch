@@ -15,7 +15,7 @@ Names re-exported by `__init__.py`:
 
 Used by sibling packages but not re-exported:
 - `coolprop_preflight.py`: `preflight_coolprop_fluid_names`, `preflight_coolprop_hpr_targeting`, `representative_hpr_point`, `PreparedCoolPropTargeting`.
-- `targeting.py`: `preflight_tespy_hpr_targeting`, `normalize_hpr_simulation_backend`, `get_hpr_target_evaluator`, `HprTargetEvaluatorCoordinator`, `validate_hpr_target_result`, `PreparedTespyHprTargeting`, `HprTargetCompatibilityError`, `HprTargetValidationTolerances`, `HprTargetCacheStats`.
+- `targeting.py`: `preflight_tespy_hpr_targeting`, `normalize_hpr_simulation_backend`, `get_hpr_target_evaluator`, `HprTargetEvaluatorCoordinator`, `validate_hpr_target_result`, `PreparedTespyHprTargeting`, `HprTargetCompatibilityError`, `HprTargetDependencyError` (also an `ImportError`, for a missing `tespy`), `HprTargetValidationTolerances`, `HprTargetCacheStats`.
 - `targeting_models.py`: request, result, metadata, failure, error and protocol types for target evaluation, and `HprThermalProfilePoint`.
 - `target_records.py`: `build_coolprop_target_simulation_record`, `build_tespy_target_simulation_record`.
 - `provenance.py`: `build_hpr_map_provenance`. `settings.py`: `TESPY_CONVERGENCE_SETTINGS`. `resources.py`: compressor characteristic loaders. `errors.py`: `HprSimulatorFailure`, `diagnostic_from_failure`, `sanitize_details`.
@@ -42,6 +42,7 @@ Used by sibling packages but not re-exported:
 - `find_spec("tespy")` checks the optional extra; `adapters.tespy` is imported lazily and a missing extra becomes a typed failure [targeting.py:preflight_tespy_hpr_targeting, factory.py:get_hpr_point_simulator, targeting.py:get_hpr_target_evaluator].
 - Package versions are read through `importlib.metadata` [provenance.py:_package_version, target_records.py:_distribution_version].
 - The compressor characteristic is read from package data [resources.py:read_tespy_compressor_characteristic_bytes].
+- With the TESPy backend each point simulator writes and reads a private temporary directory, removed on close [adapters/tespy.py:TespyHprPointSimulator.prepare].
 - Simulator sessions are opened and closed by the generator and the coordinator [generation.py:generate_hpr_performance_map, targeting.py:HprTargetEvaluatorCoordinator].
 
 ## Verification

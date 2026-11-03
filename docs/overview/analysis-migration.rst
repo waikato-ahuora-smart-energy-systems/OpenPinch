@@ -15,9 +15,13 @@ read-only mappings. Editing them does not edit a problem. Replace input through
 temperature multipliers through ``set_dt_cont_multiplier``. Keep component
 handles returned by ``components.add_process_mvr`` and use their explicit
 ``activate`` and ``deactivate`` methods. The component inventory mapping cannot
-be edited to register or remove a component. Input rebuilding (including
-``update_options`` and ``set_dt_cont_multiplier``) continues to discard memory-only
-component registrations; recreate components on the rebuilt input before solving.
+be edited to register or remove a component. ``update_options`` and
+``set_dt_cont_multiplier`` keep components: each one is re-solved on the rebuilt
+input and its handle stays valid. Explicit efficiencies stay as given, and
+efficiencies left unset take the new option values. If a component cannot be
+re-solved, the call raises and the problem is unchanged. Components are
+memory-only: ``load`` discards them, and ``to_problem_json`` and workspace
+bundles do not carry them.
 
 Input, configuration, zone, and component changes invalidate scalar outputs,
 prepared period states, graphs, and design/placement caches together. A failed

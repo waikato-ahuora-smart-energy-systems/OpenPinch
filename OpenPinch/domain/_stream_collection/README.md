@@ -12,7 +12,7 @@ Private helpers behind `OpenPinch.domain.stream_collection.StreamCollection`: fi
 - `_sort_by_attr`, `_sort_by_attrs`, `_stream_attr_value`, `_is_picklable` (`sorting.py`): the private functions the collection imports for sort keys, per-period attribute reads and the pickle probe.
 
 ## Invariants
-- A subset shares its parent's period context and sort settings, holds the same stream objects (inverted utility streams are shallow copies that are inverted), and is flagged for re-sorting. [filters.py:build_stream_subset]
+- A subset shares its parent's period context and sort settings, holds the same stream objects (inverted utility streams are inverted shallow copies), and is flagged for re-sorting. [filters.py:build_stream_subset]
 - When `invert_utility` is set, only utility streams of the opposite type to the requested one are returned. [filters.py:build_stream_subset]
 - Numeric views are NaN where a value is `None`, and a scalar value is used for every period. [numeric_view.py:value_at_idx]
 - Segment views list a stream's segments in order, or the stream itself with `segment_index` of -1. [numeric_view.py:build_segment_numeric_view]
@@ -20,7 +20,7 @@ Private helpers behind `OpenPinch.domain.stream_collection.StreamCollection`: fi
 - Period indexes are non-negative integers. [numeric_view.py:value_at_idx] [sorting.py:_stream_attr_value]
 
 ## Side Effects
-- `build_stream_subset` calls `invert()` on copies of utility streams, not the originals. [filters.py:build_stream_subset]
+- `build_stream_subset` calls `invert()` on copies of utility streams, not the originals; a copy shares its original's segments until `invert()` replaces them, and that leaves the original's segments owned by the original. [filters.py:build_stream_subset] [../_stream/segments.py:replace]
 - `_is_picklable` serialises its argument with `pickle.dumps` and discards the bytes. [sorting.py:_is_picklable]
 
 ## Verification

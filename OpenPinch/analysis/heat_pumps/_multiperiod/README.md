@@ -19,7 +19,7 @@ Internal to the directory:
 ## Invariants
 - Periods are processed in the order of `zone.period_ids` (default `{"0": 0}`), and the aggregated `period_outputs` keep that order [aggregation.py:evaluate_multiperiod_candidate, preparation.py:_canonical_period_items].
 - A period whose target load is below `tol` is excluded from the shared design; its weight is carried separately as the idle weight [preparation.py:build_multiperiod_hpr_cases, preparation.py:idle_period_weight].
-- Period problem tables are merged onto one shared temperature grid by inserting missing intervals in place; preparation raises `ValueError` only if the merged grids still differ by more than `tol` [preparation.py:_align_hpr_problem_tables].
+- Period problem tables are merged onto one shared temperature grid by inserting missing intervals in place; preparation raises `ValueError` if the merged grids differ in length or by more than `tol`, or, in `build_multiperiod_hpr_cases`, if a period has no base target [preparation.py:_align_hpr_problem_tables] [preparation.py:build_multiperiod_hpr_cases].
 - A shared design is "no heat pump" only if every period returns `ZERO_USEFUL_DUTY_REASON`; otherwise idle periods are re-evaluated in search mode and priced as an idle machine [aggregation.py:evaluate_multiperiod_candidate, aggregation.py:_as_idle_period].
 - Any non-idle period failure fails the whole candidate with a reason naming the period [aggregation.py:_period_failure].
 - The selected period is resolved by id first, then by index; absence raises `ValueError` [aggregation.py:selected_period_case].

@@ -24,7 +24,7 @@ Checks, ranks and exports synthesis designs. Feasibility checks work on service-
 - Export paths in the manifest are relative to the output directory in POSIX form [exports.py:_record].
 
 ## Side Effects
-- Export creates `results/` and `metrics/` under the output directory and writes `results/<task_id>.json`, `metrics/solution_metrics.csv`, `metrics/run_summary.csv` and `manifest.json` [exports.py:export_heat_exchanger_network_synthesis_results].
+- Export creates `results/` and `metrics/` under the output directory and writes `results/<task_id>.json`, `metrics/solution_metrics.csv`, `metrics/run_summary.csv` and `manifest.json`; tasks without an id share `results/unknown-task.json` and existing files are overwritten [exports.py:export_heat_exchanger_network_synthesis_results].
 - Verification and ranking are pure.
 
 ## Verification

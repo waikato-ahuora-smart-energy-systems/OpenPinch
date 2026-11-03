@@ -21,7 +21,7 @@ Four concrete global-search backends for bounded scalar minimisation: dual annea
 - A coordinate with equal lower and upper bounds stays at that value. Dual annealing anneals only the free coordinates. The surrogate and CMA-ES paths return the fixed point directly only when every coordinate is fixed; otherwise they still sample all dimensions, and fixed ones are held by clipping to their bounds [dual_annealing.py:_run_da_single] [_surrogate.py:run_surrogate_loop] [cma_es.py:_run_cma_single].
 - BO, RBF and CMA-ES take their evaluation cap from `maxfevals`, falling back to `maxfun`; dual annealing passes `maxfun` straight to scipy [bayesian.py:_get_bo_multiminima_in_parallel] [rbf.py:_get_rbf_surrogate_multiminima_in_parallel] [cma_es.py:_get_cma_multiminima_in_parallel] [dual_annealing.py:_get_da_multiminima_in_parallel].
 - Surrogate backends search in the unit box and map back with clipping to the original bounds [_surrogate.py:run_surrogate_loop].
-- Non-finite objective values are excluded when fitting the BO and RBF models [bayesian.py:_fit_bo_gp_model] [rbf.py:_fit_rbf_surrogate_model].
+- Non-finite objective values are excluded when fitting the BO and RBF models [bayesian.py:_run_bo_single] [rbf.py:_fit_rbf_surrogate_model].
 - CMA-ES uses correctly rounded dot products and its own Jacobi eigendecomposition so the same inputs give the same samples on every platform; do not replace them with `numpy.linalg` calls [cma_es.py:_exact_dot] [cma_es.py:_symmetric_eigh].
 
 ## Side Effects

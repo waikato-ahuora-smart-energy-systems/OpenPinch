@@ -23,6 +23,14 @@ Input and validation
   after the same normalisation as loading: for example, a stream entry that is
   not a record is now reported as the loader sees it.
 
+- ``PinchWorkspace.load`` with input that fails while the case is prepared, such
+  as an unknown zone type in ``zone_tree``, now stores the case and returns
+  ``None``, as it does for other bad input. It stored the case, then raised
+  ``ValueError`` from ``self.case(name)``, and ``validation_report(name).valid``
+  said ``True``. ``workspace.validation_report`` now uses
+  ``PinchProblem.source_validation_report``, so it reports that input as
+  invalid. Loading valid input prepares it once more for the check.
+
 Documentation
 ~~~~~~~~~~~~~
 
@@ -44,6 +52,19 @@ Documentation
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- **Behaviour change:** ``update_options`` and ``set_dt_cont_multiplier``, on
+  ``PinchProblem`` and ``PinchWorkspace``, now keep components added with
+  ``components.add_process_mvr``. These calls used to discard them silently, so
+  later targets ran without the MVR. Each component is now re-solved on the
+  rebuilt input and its handle stays valid, with its active state kept. Remove
+  any code that adds a component again after these calls, as the repeat call now
+  adds a second MVR or fails because the source stream is inactive. Efficiencies
+  passed explicitly stay as given; efficiencies left unset take the new
+  ``PROCESS_MVR_ETA_COMP`` and ``PROCESS_MVR_ETA_MOTOR`` values, so changing those
+  options can change a kept component's work. If a component cannot be re-solved,
+  the call raises and the problem and its components are unchanged. Components
+  remain memory-only: ``load`` discards them, and ``to_problem_json`` and workspace
+  bundles do not carry them.
 - Vapour-compression targets now limit each compressor's pressure ratio, with
   the new ``HPR_MAX_PRESSURE_RATIO`` option (default 15). A candidate over the
   limit evaporates warmer, or in a cascade raises its lower levels, so targets
@@ -75,6 +96,16 @@ Heat pumps and refrigeration
   adapter specified it, so a candidate at the zero-subcooling bound always
   failed, and with a small search budget that could be the only candidate
   reached, raising ``HPRTargetingError``.
+- TESPy vapour-compression targets now start their search from the Carnot seed,
+  as CoolProp targets do, and honour ``HPR_INITIALISE_SIMULATED_CYCLE``. The
+  unseeded first restart could stall where the allocated duty is zero, so with
+  a small search budget a target such as R245fa on ``basic_pinch.json`` raised
+  ``HPRTargetingError``. TESPy target values can change.
+- TESPy vapour-compression targets now keep condensing at least 2 K below the
+  refrigerant's critical temperature, the same limit as CoolProp targets. A
+  TESPy design could previously sit just below the critical point, where
+  CoolProp targets cannot go, so its cost was not comparable. TESPy targets for
+  a refrigerant near that limit can cost more.
 
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -99,6 +130,20 @@ Cogeneration
   at 2 MW, and a duty that puts the first stage near that step alternates
   between the two branches for all 50 iterations. Numeric targets are unchanged;
   a run that did not converge still reports its last iteration.
+- Cogeneration targets and their result rows now carry the turbine's stage
+  records as ``turbine_result``, a ``TurbineSolveResult`` in fixed units (kW,
+  degC, bar, kJ/kg, kg/s). Each period row has its own record, and a
+  weighted-average row has none. The Excel summary is unchanged. A stage's
+  ``source_index`` now gives its position in the target's ``hot_utilities``; it
+  was a position in the list left after skipping unusable utilities.
+
+Streams
+~~~~~~~
+
+- Inverting a utility copy no longer detaches the original's segments. For a
+  segmented utility, ``get_hot_streams`` and ``get_cold_streams`` with
+  ``invert_utility=True`` left the original's segments without a parent
+  (``segment.parent`` was ``None``).
 
 Values
 ~~~~~~
@@ -246,6 +291,15 @@ Testing and CI
 - CI runs the Pyodide runner's own regression test (a failed run prints its
   traceback) in the Pyodide job, where its Node packages are installed. It
   used to skip in every lane, so the behaviour had no CI coverage.
+
+- CI smoke-tests the ``full`` extra on Ubuntu, so every published extra now has
+  an installation check, and a test requires the smoke matrix to match the extras
+  in ``pyproject.toml``. Nine fast tests that need GEKKO or Kaleido now carry the
+  ``synthesis`` marker.
+
+- The nine-stream live solver benchmark, which pytest always skipped, is now
+  ``scripts/benchmark_nine_stream.py``, run by hand. It can take hours and has
+  no CI use.
 
 0.7.2 (2026-10-20)
 ------------------

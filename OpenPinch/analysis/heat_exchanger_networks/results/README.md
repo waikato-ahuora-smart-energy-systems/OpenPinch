@@ -24,8 +24,8 @@ Turns executed task outcomes into the canonical synthesis result, resolves seed 
 
 ## Side Effects
 - `select_network` mutates its `result` argument (network, task id, solver status, method, stage count, objective values) [selection.py:select_network].
-- `ranking` is imported lazily to avoid an import cycle [assembly.py:_accepted_outcome, selection.py:ranked_networks].
-- Everything else returns new objects via `model_copy`, except that `resolve_seed_networks` returns the cached design's network and `network_for_rank` returns the stored outcome network; no IO. [seeds.py:resolve_seed_networks] [selection.py:network_for_rank]
+- `ranking` is imported inside the function rather than at module level [assembly.py:_accepted_outcome, selection.py:ranked_networks].
+- Only demoted outcomes and the accepted network are copied; feasible outcomes, ranked outcomes and seed networks are returned as stored; no IO. [seeds.py:resolve_seed_networks] [selection.py:network_for_rank]
 
 ## Verification
 - Run: `uv run --no-sync pytest tests/analysis/heat_exchanger_networks/test_reporting.py tests/analysis/heat_exchanger_networks/test_hen_audit.py`

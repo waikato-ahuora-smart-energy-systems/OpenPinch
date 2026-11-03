@@ -263,7 +263,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        surface: [core, dashboard, notebook, brayton_cycle, tespy, synthesis]
+        surface: [core, dashboard, notebook, brayton_cycle, tespy, synthesis, full]
         include:
           - os: windows-latest
             surface: core
@@ -296,6 +296,7 @@ jobs:
           uv run --no-sync python scripts/optional_install_smoke.py "$SURFACE"
           case "$SURFACE" in
             core|tespy) uv run --no-sync python scripts/artifact_install_smoke.py --surface "$SURFACE" ;;
+            full) uv run --no-sync python scripts/artifact_install_smoke.py --surface tespy ;;
           esac
 
   pyodide:
