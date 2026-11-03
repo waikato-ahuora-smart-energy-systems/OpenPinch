@@ -179,6 +179,13 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
             v = arr[0]
             if v is None or (isinstance(v, (float, np.floating)) and np.isnan(v)):
                 arr = np.array([0.0] * (n_cycles - 1) + [None], dtype=object)
+            elif is_heat_pump:
+                # One duty per process evaporator, except the coldest, which
+                # balances the heat delivered. The stages above only pass heat up.
+                arr = np.array(
+                    [0.0] * (n_heat - 1) + [float(v)] * (n_cool - 1) + [None],
+                    dtype=object,
+                )
             else:
                 arr = np.full(n_cycles, float(v), dtype=object)
         elif arr.size == n_cycles:
@@ -337,7 +344,11 @@ class CascadeVapourCompressionCycle(_MultiVapourCompressionCycleBase):
             stage may be None or NaN to take what is left: the last process
             condenser in heat pump mode, the top stage in refrigeration mode.
         Q_cool : np.ndarray, optional
-            Cooling delivered to the process [W].
+            Cooling delivered to the process [W]. In heat pump mode a scalar
+            applies to each process evaporator except the coldest, and the
+            coldest stage always takes the remaining cooling, so a scalar has no
+            effect with one evaporator. In refrigeration mode a scalar applies
+            to every stage.
         duty_allocation : DutyAllocationRequest, optional
             Base-duty/split/availability inputs; a side with ``Q_base`` set
             overrides ``Q_heat`` or ``Q_cool``.
