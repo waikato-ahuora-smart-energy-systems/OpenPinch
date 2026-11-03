@@ -112,3 +112,53 @@ def test_cooling_water_takes_heat_below_warmer_air():
     assert out.Q_air_sink == pytest.approx(20.0)
     assert out.Q_cooling_water == pytest.approx(20.0)
     assert out.Q_ext_bottom == pytest.approx(60.0)
+
+
+def test_air_takes_a_utility_level_that_sits_on_its_sink_temperature():
+    # A utility level is a 0.1 K band, so one at the air limit ends just below it.
+    T = np.array([20.0, 19.9])
+    H = np.array([0.0, 2000.0])
+
+    out = cascade_with_air(T, H, T_air_source=0.0, T_air_sink=20.0)
+
+    assert out.Q_air_sink == pytest.approx(2000.0)
+    assert out.Q_ext_bottom == pytest.approx(0.0)
+
+
+def test_air_does_not_take_a_level_further_below_its_sink_temperature():
+    T = np.array([19.5, 19.4])
+    H = np.array([0.0, 2000.0])
+
+    out = cascade_with_air(T, H, T_air_source=0.0, T_air_sink=20.0)
+
+    assert out.Q_air_sink == pytest.approx(0.0)
+    assert out.Q_ext_bottom == pytest.approx(2000.0)
+
+
+def test_cooling_water_takes_a_utility_level_that_sits_on_its_temperature():
+    T = np.array([25.0, 24.9])
+    H = np.array([0.0, 500.0])
+
+    out = cascade_with_air(
+        T, H, T_air_source=0.0, T_air_sink=10.0, T_cooling_water=25.0
+    )
+
+    assert out.Q_air_sink == pytest.approx(500.0)
+
+    out = cascade_with_air(
+        T, H, T_air_source=0.0, T_air_sink=30.0, T_cooling_water=25.0
+    )
+
+    assert out.Q_air_sink == pytest.approx(0.0)
+    assert out.Q_cooling_water == pytest.approx(500.0)
+
+
+def test_air_supplies_a_utility_level_that_sits_on_its_source_temperature():
+    # The same band at the air source: it needs heat just above the limit.
+    T = np.array([10.1, 10.0])
+    H = np.array([300.0, 0.0])
+
+    out = cascade_with_air(T, H, T_air_source=10.0, T_air_sink=200.0)
+
+    assert out.Q_air_source == pytest.approx(300.0)
+    assert out.Q_ext_top == pytest.approx(0.0)
