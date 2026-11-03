@@ -145,6 +145,14 @@ Streams
   ``invert_utility=True`` left the original's segments without a parent
   (``segment.parent`` was ``None``).
 
+Streams
+~~~~~~~
+
+- Inverting a utility copy no longer detaches the original's segments. For a
+  segmented utility, ``get_hot_streams`` and ``get_cold_streams`` with
+  ``invert_utility=True`` left the original's segments without a parent
+  (``segment.parent`` was ``None``).
+
 Values
 ~~~~~~
 

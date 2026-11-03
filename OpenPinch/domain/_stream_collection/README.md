@@ -20,7 +20,7 @@ Private helpers behind `OpenPinch.domain.stream_collection.StreamCollection`: fi
 - Period indexes are non-negative integers. [numeric_view.py:value_at_idx] [sorting.py:_stream_attr_value]
 
 ## Side Effects
-- `build_stream_subset` inverts shallow copies of utility streams; a non-segmented original is untouched, but a segmented copy shares the original's segment objects, so inverting it detaches the original's segments from their parent. [filters.py:build_stream_subset]
+- `build_stream_subset` calls `invert()` on copies of utility streams, not the originals; a copy shares its original's segments until `invert()` replaces them, and that leaves the original's segments owned by the original. [filters.py:build_stream_subset] [../_stream/segments.py:replace]
 - `_is_picklable` serialises its argument with `pickle.dumps` and discards the bytes. [sorting.py:_is_picklable]
 
 ## Verification
