@@ -590,11 +590,19 @@ class MultiStageSteamTurbine:
             previous_m_in = state.m_in_est
             _iterate_turbine_state(state)
             iterations += 1
-            if abs(previous_m_in - state.m_in_est) <= tol * max(
-                1.0, abs(state.m_in_est)
-            ):
+            mass_flow_change = abs(previous_m_in - state.m_in_est)
+            if mass_flow_change <= tol * max(1.0, abs(state.m_in_est)):
                 converged = True
                 break
+
+        diagnostics: list[str] = []
+        if not converged:
+            diagnostics.append(
+                f"Extraction mass balance did not converge in {iterations} "
+                f"iterations; the steam flow still changes by "
+                f"{mass_flow_change:.3g} kg/s. The work and efficiency targets "
+                "are from the last iteration."
+            )
 
         stages = []
         for j in range(1, state.s):
@@ -634,6 +642,7 @@ class MultiStageSteamTurbine:
             "mode": "above_pinch",
             "converged": converged,
             "mass_balance_iterations": iterations,
+            "diagnostics": diagnostics,
             "turbine_model": state.model,
             "load_frac": state.load_frac,
             "mech_eff": state.n_mech,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from functools import partial
 from typing import TYPE_CHECKING
 
@@ -75,6 +76,16 @@ def get_power_cogeneration_above_pinch(
 
     target.work_target = total_work
     target.turbine_efficiency_target = details["overall_efficiency"]
+    target.turbine_converged = details["converged"]
+    target.turbine_diagnostics = details["diagnostics"]
+    for message in details["diagnostics"]:
+        warnings.warn(
+            f"Cogeneration target {target.name!r}"
+            f"{format_selected_period_suffix({'period_id': target.period_id})}: "
+            f"{message}",
+            UserWarning,
+            stacklevel=2,
+        )
     return target
 
 

@@ -28,6 +28,8 @@ def direct_result(target, *, is_total=False):
                 target,
                 "turbine_efficiency_target",
             ),
+            "turbine_converged": target.turbine_converged,
+            "turbine_diagnostics": list(target.turbine_diagnostics),
             "area": _metric(target, "area"),
             "num_units": target.num_units,
             "capital_cost": _metric(target, "capital_cost"),
@@ -45,6 +47,8 @@ def indirect_result(target, *, is_total=False):
                 target,
                 "turbine_efficiency_target",
             ),
+            "turbine_converged": target.turbine_converged,
+            "turbine_diagnostics": list(target.turbine_diagnostics),
         }
     )
 
@@ -58,6 +62,8 @@ def hpr_result(target, *, is_total=False):
                 target,
                 "turbine_efficiency_target",
             ),
+            "turbine_converged": target.turbine_converged,
+            "turbine_diagnostics": list(target.turbine_diagnostics),
             "hpr_cycle": target.hpr_cycle,
             "hpr_simulation_backend": target.hpr_simulation_backend,
             "hpr_target_simulation_record": _target_simulation_record(target),

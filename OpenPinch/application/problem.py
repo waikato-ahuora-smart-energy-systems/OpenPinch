@@ -32,6 +32,7 @@ from ._problem.input.loading import (
 )
 from ._problem.input.validation import (
     build_validation_report,
+    load_failure_report,
 )
 from ._problem.input.validation import (
     format_schema_validation_error as _format_schema_validation_error,
@@ -336,7 +337,11 @@ class PinchProblem:
         return input_data
 
     def validation_report(self) -> ValidationReport:
-        """Return structured validation results without raising for bad inputs."""
+        """Return the validation results of the loaded input, warnings included.
+
+        Loading rejects invalid input, so this report never holds an error. Use
+        ``source_validation_report`` to get a report on input that may be invalid.
+        """
         if self._problem_data is None:
             raise RuntimeError("No input loaded. Call load(...) first.")
         return build_validation_report(
@@ -344,6 +349,42 @@ class PinchProblem:
             context=self._validation_context or {},
             source_kind=self._input_source_kind or "target_input",
         )
+
+    @classmethod
+    def source_validation_report(
+        cls,
+        source: TargetInput | JsonDict | PathLike | tuple[PathLike, PathLike],
+    ) -> ValidationReport:
+        """Return the validation report of a source without raising for bad input.
+
+        Takes any source the constructor takes. ``valid`` is true only if the
+        constructor accepts the source, so input that passes the checks is also
+        prepared once and discarded. A source that cannot be read or prepared is
+        reported as one error issue with an empty path. Warnings are emitted as
+        the constructor emits them.
+        """
+        problem = cls()
+        # Whatever a bad source raises while loading or preparing, in any format,
+        # is a finding about that source.
+        try:
+            loaded_source = load_problem_source(
+                source,
+                current_project_name=problem.project_name,
+            )
+            report = build_validation_report(
+                loaded_source.input_data,
+                context=loaded_source.validation_context,
+                source_kind=loaded_source.source_kind,
+            )
+            if report.valid:
+                _input_loading.replace_loaded_source(
+                    problem,
+                    loaded_source,
+                    rebuild=problem._rebuild_problem_state,
+                )
+        except Exception as error:
+            return load_failure_report(error)
+        return report
 
     def summary_frame(
         self,

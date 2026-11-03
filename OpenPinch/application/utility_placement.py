@@ -53,7 +53,7 @@ from ..analysis.utility_placement.units import (
     INTERNAL_TEMPERATURE_DIFFERENCE,
 )
 from ..contracts.input import UtilitySchema
-from ..contracts.units import standardise_input_value
+from ..contracts.units import standardise_input_value, without_period_ids
 from ..contracts.utility_placement import (
     DecodedPlacement,
     QuantityValue,
@@ -167,7 +167,7 @@ def _resolve_placement_zone(problem: "PinchProblem", zone: str | Zone | None) ->
 
 def _scope_for_zone(zone: Zone) -> UtilityPlacementBaseTarget:
     """Map a hierarchy node to its physically compatible target profile."""
-    if zone.type in {ZoneType.P.value, ZoneType.O.value}:
+    if zone.type in {ZoneType.P.value, ZoneType.UO.value}:
         return UtilityPlacementBaseTarget.DIRECT
     if zone.type == ZoneType.S.value:
         return UtilityPlacementBaseTarget.TOTAL_SITE
@@ -476,7 +476,7 @@ def _normalize_maximum_duties(
             )
         try:
             value = standardise_input_value(
-                raw_value,
+                without_period_ids(raw_value),
                 field_name="heat_flow",
                 config=config,
             )

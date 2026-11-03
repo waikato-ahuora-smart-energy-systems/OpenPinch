@@ -214,6 +214,7 @@ def _make_summary_row(t) -> dict:
             t.turbine_efficiency_target,
             period_idx=period_idx,
         ),
+        "Turbine Converged": getattr(t, "turbine_converged", None),
         **_value_unit_columns("ETE", t.ETE, period_idx=period_idx),
         **_value_unit_columns(
             "Exergy Sources", t.exergy_sources, period_idx=period_idx

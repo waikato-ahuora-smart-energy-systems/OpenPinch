@@ -9,7 +9,7 @@ from ....domain.zone import Zone
 
 __all__ = ["run_targeting_for_zone_and_subzones"]
 
-_DIRECT_ZONE_TYPES = frozenset({ZoneType.S.value, ZoneType.P.value, ZoneType.O.value})
+_DIRECT_ZONE_TYPES = frozenset({ZoneType.S.value, ZoneType.P.value, ZoneType.UO.value})
 _INDIRECT_ZONE_TYPES = frozenset(
     {ZoneType.R.value, ZoneType.C.value, ZoneType.S.value, ZoneType.P.value}
 )
