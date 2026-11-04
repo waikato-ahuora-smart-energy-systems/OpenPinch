@@ -420,9 +420,13 @@ def test_process_mvr_rejects_cold_stream_selection():
         problem.components.add_process_mvr("Product heating")
 
 
-def _vapour_payload(*, fluid, t_supply, t_target, heat_flow):
+def _vapour_payload(
+    *, fluid, t_supply, t_target, heat_flow, p_supply=None, fluid_phase="gas"
+):
     """Return a process MVR case; list arguments give one value per period."""
     multiperiod = isinstance(heat_flow, list)
+    if p_supply is None:
+        p_supply = [101.325] * len(heat_flow) if multiperiod else 101.325
 
     def valued(values, unit):
         return {"values": values, "unit": unit} if multiperiod else values
@@ -434,14 +438,12 @@ def _vapour_payload(*, fluid, t_supply, t_target, heat_flow):
                 "name": "Vapour",
                 "t_supply": valued(t_supply, "degC"),
                 "t_target": valued(t_target, "degC"),
-                "p_supply": valued(
-                    [101.325] * len(heat_flow) if multiperiod else 101.325, "kPa"
-                ),
+                "p_supply": valued(p_supply, "kPa"),
                 "heat_flow": valued(heat_flow, "kW"),
                 "dt_cont": 0.0,
                 "htc": 1.0,
                 "fluid_name": fluid,
-                "fluid_phase": "gas",
+                "fluid_phase": fluid_phase,
             },
             {
                 "zone": "Site/Train",
@@ -468,9 +470,8 @@ def _vapour_payload(*, fluid, t_supply, t_target, heat_flow):
     [
         # Air stays dry: its periods share breakpoints that differ only by rounding.
         ("Air", [120.0, 125.0], [80.0, 82.0], [100.0, 130.0], [False, False]),
-        ("Water", [120.0, 125.0], [100.0, 102.0], [100.0, 130.0], [True, True]),
     ],
-    ids=["dry_air", "injected_water"],
+    ids=["dry_air"],
 )
 def test_two_period_process_mvr_default_matches_each_period_alone(
     fluid, t_supply, t_target, heat_flow, injection_applied
@@ -541,6 +542,83 @@ def test_two_period_process_mvr_default_matches_each_period_alone(
         assert float(replacement.heat_flow[index]) == pytest.approx(
             released_kw, rel=1e-6
         )
+
+
+def test_two_period_injected_water_matches_each_period_alone():
+    pytest.importorskip("CoolProp")
+    from CoolProp.CoolProp import PropsSI
+
+    # Liquid injection needs a source that condenses, so saturated vapour.
+    t_supply, t_target, heat_flow = [100.0, 105.0], [99.5, 104.5], [100.0, 130.0]
+    p_supply = [
+        PropsSI("P", "T", t + 273.15, "Q", 1.0, "Water") / 1e3 for t in t_supply
+    ]
+    payload = {"fluid": "Water", "fluid_phase": "vapour"}
+    problem = PinchProblem(
+        _vapour_payload(
+            t_supply=t_supply,
+            t_target=t_target,
+            heat_flow=heat_flow,
+            p_supply=p_supply,
+            **payload,
+        ),
+        project_name="Site",
+    )
+
+    component = problem.components.add_process_mvr(
+        "Vapour", mvr_stage_pressure_ratio=1.5, motor_efficiency=0.95
+    )
+
+    replacement = component.replacement_streams[0]
+    for index, period_id in enumerate(("0", "peak")):
+        stage = component.stage_results_by_period[period_id][0]
+        assert stage.liquid_injection_applied is True
+
+        alone = PinchProblem(
+            _vapour_payload(
+                t_supply=t_supply[index],
+                t_target=t_target[index],
+                heat_flow=heat_flow[index],
+                p_supply=p_supply[index],
+                **payload,
+            ),
+            project_name="Site",
+        ).components.add_process_mvr(
+            "Vapour", mvr_stage_pressure_ratio=1.5, motor_efficiency=0.95
+        )
+        alone_stream = alone.replacement_streams[0]
+        alone_stage = next(iter(alone.stage_results_by_period.values()))[0]
+        assert stage.work == pytest.approx(alone_stage.work, rel=1e-12)
+        assert float(replacement.heat_flow[index]) == pytest.approx(
+            float(alone_stream.heat_flow[0]), rel=1e-9
+        )
+        assert float(replacement.supply_temperature[index]) == pytest.approx(
+            float(alone_stream.supply_temperature[0]), abs=1e-6
+        )
+        assert float(replacement.target_temperature[index]) == pytest.approx(
+            float(alone_stream.target_temperature[0]), abs=1e-6
+        )
+        # The source duty already holds the latent heat. The tolerance covers the
+        # small rise in liquid enthalpy from supply to discharge pressure.
+        assert float(replacement.heat_flow[index]) == pytest.approx(
+            heat_flow[index] + stage.work * 0.95, rel=1e-3
+        )
+
+
+def test_gas_source_condensing_at_stage_pressure_is_rejected_in_any_period():
+    pytest.importorskip("CoolProp")
+    problem = PinchProblem(
+        _vapour_payload(
+            fluid="Water",
+            t_supply=[120.0, 125.0],
+            t_target=[100.0, 102.0],
+            heat_flow=[100.0, 130.0],
+        ),
+        project_name="Site",
+    )
+
+    with pytest.raises(ValueError, match="period 0, stage 1"):
+        problem.components.add_process_mvr("Vapour", mvr_stage_pressure_ratio=1.5)
 
 
 def test_process_mvr_solves_all_periods_for_multiperiod_streams():

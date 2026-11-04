@@ -19,6 +19,7 @@ What `../process_mvr.py` imports:
 - Replacement stream keys are `<original key>.<component_id>.<stream name>`, and replacements are added to every zone holding the original [membership.py:add_replacement_streams_to_memberships].
 - Zone tree walks are pre-order and deterministic [membership.py:walk_zones].
 - Zone membership is decided by address prefix (`zone/`) [membership.py:record_affects_zone].
+- A period whose stage would cross into liquid raises `DirectGasMVRPhaseError` naming the period and stage; no partial record is built [replacement_streams.py:build_process_mvr_stream_record].
 - Replacement streams are segmented across periods after aligning the stage profiles, and are named `<source>_direct_MVR_H<stage>` [replacement_streams.py:build_multiperiod_stage_streams].
 - Work for a period is looked up by id, then by index label, then falls back to the first stored period; an inactive component yields 0.0 [work.py:record_stage_results_for_period, work.py:work_for_zone].
 

@@ -88,6 +88,13 @@ per-period stage results, compressor work, affected zones, and active state are
 separate from the optimized ``problem.target.mvr_heat_pump(...)`` VC+MVR
 service.
 
+A source with a vapour target must stay vapour: a stage target below the
+saturation temperature at that stage's outlet pressure raises
+``DirectGasMVRPhaseError``, a ``ValueError``. A saturated vapour source may
+condense, in one stage only, because a later stage would start from liquid; with
+``n_stages`` above 1 it raises the same error. Multi-stage MVR of a condensing
+stream is not modelled.
+
 .. automodule:: OpenPinch.contracts.hpr_performance_map
    :members:
    :no-index:
