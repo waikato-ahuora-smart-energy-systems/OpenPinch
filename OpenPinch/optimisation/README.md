@@ -9,7 +9,7 @@ Reusable bounded scalar minimisation that returns several ranked local minima ra
 - `OptimisationError`, `InvalidOptimisationProblemError`, `InvalidObjectiveValueError`, `NoOptimisationCandidatesError` (`errors.py`): failure types.
 - `is_feasible`, `validate_constraints`, `constraint_items`, `DEFAULT_FEASIBILITY_TOLERANCE` (`feasibility.py`): bounds and scipy-style constraint checks.
 - `TaskScopedObjective`, `TaskPhase` (`execution.py`): protocol for objectives that hold per-task state.
-- `_collect_candidates_in_parallel` (`execution.py`): run backend runs in a process pool, serially when needed.
+- `_collect_candidates_in_parallel` (`execution.py`): run backend runs in worker processes when a batch is slow enough to justify them, serially otherwise.
 - `_cluster_candidates`, `_polish_candidates`, `_postprocess_candidates`, `_evaluate_scalar_objective` (`candidates.py`): shared ranking, clustering and local polishing, listed in `__all__` for the backends.
 - Subdirectories: [backends](./backends/README.md) - the four search backends and their multistart plumbing.
 
@@ -25,10 +25,15 @@ Reusable bounded scalar minimisation that returns several ranked local minima ra
 - A polish is kept only if it succeeds, is finite, and is not less feasible or (when equally feasible) worse than its start; only numerical solver errors are swallowed [candidates.py:_polish_single_candidate].
 - Clustering normalises by the bound span and treats a zero span as one [candidates.py:_cluster_candidates].
 - A `TaskScopedObjective` gets `for_task` calls in the parent in task order, runs each copy serially or in a worker, and receives every `task_report()` through `merge_task_reports` in task order [execution.py:_run_objective_tasks].
-- An exception raised by the objective propagates unchanged out of the pool [execution.py:_map_in_process_pool].
+- An exception raised by the objective propagates unchanged, whether it ran in a worker or this process [execution.py:_map_in_process_pool] [execution.py:_map_with_late_pool].
+- Under spawn and forkserver a batch runs in this process until `_POOL_PATIENCE_SECONDS` (1 s) pass, because each worker imports OpenPinch before its first task, which costs seconds. Only then does a pool of `workers - 1` start, this process being the other worker, and a worker gets a task only after it has finished importing, so a batch is never held up by importing workers [execution.py:_map_with_late_pool].
+- Under fork, workers start in milliseconds, so a batch of two or more tasks starts its pool at once [execution.py:_map_in_process_pool].
+- Results keep task order and do not depend on where a task ran: each task is independent, and workers get tasks pickled when the batch began, before this process changes any state they share [execution.py:_map_with_late_pool].
 
 ## Side Effects
-- Spawns `ProcessPoolExecutor` workers; falls back to serial execution on Emscripten, an unpicklable task, a pool that cannot start or breaks, or a `__main__` script with no main guard [execution.py:_pool_worker_count] [execution.py:_map_in_process_pool].
+- Spawns `ProcessPoolExecutor` workers; falls back to serial execution on Emscripten, an unpicklable task, a pool that cannot start or breaks, or a `__main__` script with no main guard [execution.py:_pool_worker_count] [execution.py:_map_in_process_pool] [execution.py:_map_with_late_pool].
+- Under spawn and forkserver, starts a timer thread per batch, which outlives the batch if a pool it started is not up yet; that thread starts, feeds and stops the pool, while objectives still run on the calling thread [execution.py:_map_with_late_pool].
+- A batch can return while its pool's workers are still importing; they then exit by themselves, so interpreter exit can wait for them for up to the import time [execution.py:_map_with_late_pool].
 - Reads and parses the main script file to look for a main guard when the start method is not fork [execution.py:_main_module_reruns_in_workers].
 - Logs warnings and debug messages through `logging` [execution.py:_map_in_process_pool] [candidates.py:_polish_single_candidate].
 - Calls `scipy.optimize.minimize` for polishing [candidates.py:_polish_single_candidate].

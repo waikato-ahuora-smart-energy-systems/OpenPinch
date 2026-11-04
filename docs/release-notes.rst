@@ -7,6 +7,15 @@ Unreleased
 Behaviour changes
 ~~~~~~~~~~~~~~~~~
 
+- Optimisation searches no longer pay for worker processes they do not need under
+  the spawn and forkserver start methods (macOS, Windows, and Linux from Python 3.14),
+  where each worker imports OpenPinch first. A batch of tasks now runs in the calling
+  process, a pool starts only if the batch is still running after one second, and a
+  worker gets a task only once it has finished importing. A two-stream
+  ``carnot_orc(stages=2, maximum_iterations=50)`` drops from about 9 s to 0.3 s under
+  spawn, as fast as running serially. Searches long enough to use the pool keep their
+  speed-up and can take about one second longer per batch. Results do not change, and
+  the fork start method (Linux before Python 3.14) behaves as before.
 - ``components.add_process_mvr`` and ``solve_direct_gas_mvr_stream`` now raise
   ``DirectGasMVRPhaseError``, a ``ValueError``, instead of returning a result when
   a stage would cross into liquid. The message names the stage, temperatures and
