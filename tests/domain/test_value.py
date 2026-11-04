@@ -1,14 +1,18 @@
 """Regression tests for the simplified state-array ``Value`` model."""
 
+import copy
 import json
 import pickle
 from types import SimpleNamespace
+from unittest import mock
 
 import numpy as np
+import pint
 import pytest
 
 from OpenPinch.domain.value import Q_, Value
 from tests.support.paths import FIXTURES_ROOT
+from tests.support.quantity_count import count_quantities
 
 FIXTURE_PATH = FIXTURES_ROOT / "value_and_stream_edge_cases.json"
 
@@ -387,3 +391,103 @@ def test_to_still_rejects_another_dimension():
 def test_to_does_not_convert_a_difference_to_an_offset_temperature():
     with pytest.raises(Exception, match="Cannot convert"):
         Value(5.0, "delta_degC").to("degC")
+
+
+def test_stored_magnitudes_cannot_be_written_in_place():
+    magnitudes = Value([1.0, 2.0], "kW")._quantity.magnitude
+
+    with pytest.raises(ValueError, match="read-only"):
+        magnitudes[0] = 5.0
+
+
+def test_deepcopy_builds_no_quantity():
+    value = Value([1.0, 2.0], "kW")
+
+    with count_quantities() as built:
+        copy.deepcopy(value)
+
+    assert built[0] == 0
+
+
+def test_deepcopy_is_isolated_and_keeps_weights_and_read_only_state():
+    value = Value({"values": [1.0, 3.0], "weights": [1.0, 2.0], "unit": "kW"})
+    frozen = copy.deepcopy(Value(1.0, "kW")._make_read_only("owned"))
+    copied = copy.deepcopy(value)
+
+    copied[0] = 9.0
+    copied._weights[0] = 7.0
+
+    assert value.period_values.tolist() == [1.0, 3.0]
+    assert value.weights.tolist() == [1.0, 2.0]
+    assert copied.period_values.tolist() == [9.0, 3.0]
+    with pytest.raises(TypeError, match="owned"):
+        frozen.value = 2.0
+
+
+def test_value_from_value_in_the_same_unit_builds_no_quantity():
+    value = Value([1.0, 2.0], "kW")
+
+    with count_quantities() as built:
+        Value(value)
+        Value(value, "kW")
+
+    assert built[0] == 0
+
+
+def test_value_from_a_scalar_builds_one_quantity():
+    with count_quantities() as built:
+        value = Value(1.5, "kW")
+
+    assert built[0] == 1
+    assert value.to_dict() == {"value": 1.5, "unit": "kW"}
+
+
+def test_scalar_shortcut_matches_the_general_scalar_path():
+    class Celsius(float):
+        pass
+
+    for unit in ("degC", "-", "$/y", None):
+        plain = Value(1.5, unit)
+        general = Value(Celsius(1.5), unit)
+
+        assert plain.to_dict() == general.to_dict()
+        assert plain.unit == general.unit
+
+
+def test_to_the_same_unit_builds_no_quantity_and_is_isolated():
+    value = Value({"values": [1.0, 3.0], "weights": [1.0, 2.0], "unit": "kW"})
+    value._make_read_only("owned")
+
+    with count_quantities() as built:
+        same = value.to("kW")
+
+    assert built[0] == 0
+    same[0] = 9.0
+    same._weights[0] = 7.0
+    assert value.period_values.tolist() == [1.0, 3.0]
+    assert value.weights.tolist() == [1.0, 2.0]
+
+
+def test_value_from_a_foreign_registry_quantity_in_the_same_unit():
+    foreign = pint.UnitRegistry().Quantity(np.array([1.5]), "kW")
+
+    assert Value(foreign, "kW").to_dict() == {"value": 1.5, "unit": "kW"}
+
+
+def test_unpickled_magnitudes_stay_read_only():
+    restored = pickle.loads(pickle.dumps(Value([1.0, 2.0], "kW")))
+
+    with pytest.raises(ValueError, match="read-only"):
+        restored._quantity.magnitude[0] = 5.0
+
+
+def test_unit_text_is_formatted_once_per_unit():
+    first = Value(1.0, "kW/m^2")
+    second = Value(2.0, "kW/m^2")
+    assert first.unit == "kW/m^2"
+
+    with mock.patch(
+        "OpenPinch.domain._value.units.clean_unit_text",
+        side_effect=AssertionError("unit text formatted again"),
+    ):
+        assert second.unit == "kW/m^2"
