@@ -13,6 +13,7 @@ import from here.
 - `prepare_problem` (`construction.py`): builds the master `Zone` hierarchy, streams and utilities from schemas.
 - `_find_extreme_process_temperatures` (`construction.py`): returns `(hu_t_min, cu_t_max)`, the highest shifted cold-stream temperature and the lowest shifted hot-stream temperature, `(20, 20)` with no streams; imported by `utility_placement.py`.
 - `canonical_problem_inputs` (`canonicalization.py`): deep-copied input dict with a normalised zone tree and rewritten stream zones.
+- `rename_canonical_root` (`canonicalization.py`): renames the root of canonical inputs in place, with the stream zone paths that start at it.
 - `_LoadedProblemSource`, `load_problem_source`, `prepare_in_memory_problem_source`, `normalize_problem_mapping` (`loading.py`): normalise a source into inputs plus validation context.
 - `apply_loaded_source`, `rebuild_problem_state`, `replace_loaded_source`, `replace_problem_inputs` (`loading.py`): set or replace a problem's state; `replace_loaded_source` restores prior state on failure.
 - `find_zone_tree_node` (`loading.py`): look up a zone-tree dict node by absolute or relative name.

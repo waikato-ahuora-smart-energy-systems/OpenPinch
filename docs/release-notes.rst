@@ -52,6 +52,14 @@ Input and validation
   after the same normalisation as loading: for example, a stream entry that is
   not a record is now reported as the loader sees it.
 
+- After ``problem.project_name = "New"``, ``update_options`` and
+  ``set_dt_cont_multiplier`` no longer put a root zone named by ``zone_tree`` back
+  to its old name, also through ``PinchWorkspace``. The root zone,
+  ``to_problem_json``, stored case inputs and results keyed by root zone keep the
+  new name, so ``zone_name="New/Area"`` is the path to use. Setting
+  ``workspace.project_name`` now renames the live cases and drops their cached
+  results; before, it reached only cases built afterwards.
+
 - ``PinchWorkspace.load`` with input that fails while the case is prepared, such
   as an unknown zone type in ``zone_tree``, now stores the case and returns
   ``None``, as it does for other bad input. It stored the case, then raised

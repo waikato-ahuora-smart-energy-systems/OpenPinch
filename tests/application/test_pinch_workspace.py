@@ -790,3 +790,57 @@ def test_set_case_input_replaces_one_case_and_keeps_the_others() -> None:
     assert workspace.case("wide_dt").config["THERMAL_DT_CONT"] == 20.0
     with pytest.raises(KeyError, match="Unknown case"):
         workspace.set_case_input("missing", edited)
+
+
+def _explicit_tree_workspace() -> PinchWorkspace:
+    payload = _basic_payload()
+    payload["zone_tree"] = {
+        "name": "Site",
+        "type": "Site",
+        "children": [{"name": "Area", "type": "Process Zone"}],
+    }
+    for stream in payload["streams"]:
+        stream["zone"] = "Site/Area"
+    return PinchWorkspace(payload, project_name="Site")
+
+
+_WORKSPACE_REBUILDS = [
+    lambda workspace: workspace.update_options({"ENV_TEMPERATURE": 30.0}),
+    lambda workspace: workspace.set_dt_cont_multiplier(0.5),
+]
+
+
+@pytest.mark.parametrize(
+    "rebuild", _WORKSPACE_REBUILDS, ids=["update_options", "set_dt_cont_multiplier"]
+)
+def test_case_rename_survives_a_workspace_rebuild_and_reaches_the_stored_input(
+    rebuild,
+):
+    workspace = _explicit_tree_workspace()
+    workspace.case().project_name = "Renamed"
+
+    rebuild(workspace)
+
+    assert workspace.case().project_name == "Renamed"
+    assert workspace.case().master_zone.name == "Renamed"
+    assert workspace.to_bundle().cases["baseline"].case_input["zone_tree"]["name"] == (
+        "Renamed"
+    )
+
+
+@pytest.mark.parametrize(
+    "rebuild", _WORKSPACE_REBUILDS, ids=["update_options", "set_dt_cont_multiplier"]
+)
+def test_workspace_rename_reaches_live_cases_through_a_rebuild(rebuild):
+    workspace = _explicit_tree_workspace()
+    workspace.case().target.direct_heat_integration()
+
+    workspace.project_name = "Renamed"
+
+    assert workspace.case().results is None
+    rebuild(workspace)
+    assert workspace.project_name == "Renamed"
+    assert workspace.case().project_name == "Renamed"
+    assert workspace.case().master_zone.name == "Renamed"
+    workspace.case().target.direct_heat_integration()
+    assert workspace.case().results.name == "Renamed"
