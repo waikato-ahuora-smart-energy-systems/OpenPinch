@@ -39,6 +39,10 @@ Input and validation
   for a ``.xlsx`` save. It was accepted as a source suffix but failed with
   ``ImportError: Import xlrd failed``, because no install extra provides
   ``xlrd``.
+- Opening a workbook without its Excel reader still raises ``ImportError``, but
+  the message now names the missing package and the ``dashboard`` and
+  ``notebook`` extras that provide it. ``.xls`` content in a renamed file gets a
+  message asking for a ``.xlsx`` save.
 - New ``PinchProblem.source_validation_report(source)`` returns a
   ``ValidationReport`` for any source the constructor takes, without raising for
   bad input of any format. ``valid`` is true only if the constructor accepts the
@@ -196,6 +200,11 @@ Heat pumps and refrigeration
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``HeatExchangerNetworkGridDiagram.save`` to an image file without Kaleido now
+  raises ``MissingSynthesisDependencyError``, an ``ImportError``, with the
+  ``openpinch[synthesis]`` install command. It used to pass on Plotly's own
+  error, which names no OpenPinch extra. Other export errors,
+  such as a bad file extension, are unchanged.
 - ``design.heat_exchanger_network()``, its multiperiod form and
   ``design.enhanced_heat_exchanger_network()`` now run
   ``HENS_SYNTHESIS_QUALITY_TIER`` when the problem's options set it, and they

@@ -1,5 +1,7 @@
 """Regression tests for wkbook to json utility helpers."""
 
+import sys
+import zipfile
 from pathlib import Path
 
 import numpy as np
@@ -712,3 +714,76 @@ def test_excel_input_template_lists_current_option_names():
     ]
 
     assert sorted(names) == sorted(USER_CONFIG_FIELD_SPECS)
+
+
+_EXCEL_ENGINES = ("openpyxl", "pyxlsb", "xlrd", "python_calamine")
+_XLS_SIGNATURE = bytes.fromhex("D0CF11E0A1B11AE1") + bytes(100)
+
+
+def _hide_excel_engines(monkeypatch):
+    for module_name in _EXCEL_ENGINES:
+        monkeypatch.setitem(sys.modules, module_name, None)
+
+
+def _zip_workbook(path: Path, member: str) -> Path:
+    """Write the smallest file pandas identifies as a zipped workbook."""
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr(member, "")
+    return path
+
+
+@pytest.mark.parametrize(
+    "read",
+    [
+        wkbook_to_json.get_problem_from_excel,
+        lambda path: wkbook_to_json.get_results_from_excel(path, None, "Proj"),
+        wkbook_to_json._parse_options_sheet,
+    ],
+    ids=["problem", "results", "options"],
+)
+def test_xlsx_without_openpyxl_names_package_and_extras(tmp_path, monkeypatch, read):
+    xlsx = _zip_workbook(tmp_path / "case.xlsx", "xl/workbook.xml")
+    _hide_excel_engines(monkeypatch)
+
+    with pytest.raises(ImportError) as exc_info:
+        read(xlsx)
+
+    message = str(exc_info.value)
+    assert "openpyxl is required" in message
+    assert 'python -m pip install "openpinch[dashboard]"' in message
+    assert 'python -m pip install "openpinch[notebook]"' in message
+
+
+def test_xlsb_without_reader_names_package_and_extras(tmp_path, monkeypatch):
+    xlsb = _zip_workbook(tmp_path / "case.xlsb", "xl/workbook.bin")
+    _hide_excel_engines(monkeypatch)
+
+    with pytest.raises(ImportError) as exc_info:
+        get_problem_from_excel(xlsb)
+
+    message = str(exc_info.value)
+    assert "pyxlsb is required" in message
+    assert 'python -m pip install "openpinch[dashboard]"' in message
+
+
+def test_legacy_xls_content_without_reader_asks_for_xlsx_save(tmp_path, monkeypatch):
+    workbook = tmp_path / "renamed.xlsx"
+    workbook.write_bytes(_XLS_SIGNATURE)
+    _hide_excel_engines(monkeypatch)
+
+    with pytest.raises(ImportError, match=r"save it as \.xlsx"):
+        get_problem_from_excel(workbook)
+
+
+def test_outdated_excel_engine_error_is_unchanged(monkeypatch):
+    outdated = ImportError("Pandas requires version '3.1.5' or newer of 'openpyxl'.")
+
+    def raise_outdated(_excel_file):
+        raise outdated
+
+    monkeypatch.setattr(wkbook_to_json.pd, "ExcelFile", raise_outdated)
+
+    with pytest.raises(ImportError) as exc_info:
+        get_problem_from_excel("case.xlsx")
+
+    assert exc_info.value is outdated

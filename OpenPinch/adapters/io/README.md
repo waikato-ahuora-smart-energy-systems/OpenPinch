@@ -37,7 +37,7 @@ Readers and writers that turn external problem sources (JSON, Excel workbooks, C
 - Emits `UserWarning` for renamed, unnamed or unrecognised columns, names and rows. [records.py:validate_stream_data] [tabular.py:_map_header_row]
 - Writes uploaded and exported files to a `TemporaryDirectory` that is removed on exit. [problem_sources.py:load_problem_source_from_files] [file_exports.py:export_files]
 - Reads packaged sample cases through `OpenPinch.resources`. [problem_sources.py:load_packaged_sample_case]
-- Excel reading needs a pandas Excel engine installed. [workbook.py:_parse_sheet_with_units]
+- Excel reading needs a pandas Excel engine installed. A missing engine raises `ImportError` naming the package and the `dashboard` and `notebook` extras, or asking for a `.xlsx` save for `.xls` content. [workbook.py:_open_workbook]
 
 ## Verification
 - Run: `uv run --no-sync pytest tests/adapters`

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import sys
 from dataclasses import replace
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from typing import Any
 
 import pytest
@@ -27,6 +28,9 @@ from OpenPinch.analysis.heat_exchanger_networks.reporting.verification import (
 from OpenPinch.analysis.heat_exchanger_networks.results.selection import (
     ranked_networks,
     select_network,
+)
+from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
+    MissingSynthesisDependencyError,
 )
 from OpenPinch.application._problem.accessors.design import (
     HeatExchangerNetworkDesignView,
@@ -311,6 +315,70 @@ def test_grid_diagram_save_uses_html_writer_for_html_paths(tmp_path: Path) -> No
     assert fig.shown is True
     assert fig.html_path == tmp_path / "grid.html"
     assert fig.image_path is None
+
+
+class _ImageFigure:
+    """Figure whose image export raises ``error``, or records that it ran."""
+
+    def __init__(self, error: Exception | None = None):
+        self.error = error
+        self.image_path = None
+        self.html_path = None
+
+    def write_html(self, path):
+        self.html_path = path
+
+    def write_image(self, path):
+        if self.error is not None:
+            raise self.error
+        self.image_path = path
+
+
+def _diagram_with(fig: _ImageFigure) -> HeatExchangerNetworkGridDiagram:
+    network = _network("save-image")
+    return HeatExchangerNetworkGridDiagram(
+        fig=fig,
+        ax=object(),
+        network=network,
+        grid_model=build_grid_model(network),
+    )
+
+
+def test_grid_diagram_image_save_without_kaleido_names_extra(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setitem(sys.modules, "kaleido", None)
+    fig = _ImageFigure()
+
+    with pytest.raises(
+        MissingSynthesisDependencyError, match=r"kaleido.*openpinch\[synthesis\]"
+    ):
+        _diagram_with(fig).save(tmp_path / "grid.png")
+
+    assert fig.image_path is None
+
+
+def test_grid_diagram_html_save_does_not_need_kaleido(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setitem(sys.modules, "kaleido", None)
+    fig = _ImageFigure()
+
+    _diagram_with(fig).save(tmp_path / "grid.html")
+
+    assert fig.html_path == tmp_path / "grid.html"
+
+
+def test_grid_diagram_image_save_keeps_other_export_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setitem(sys.modules, "kaleido", ModuleType("kaleido"))
+    bad_format = ValueError("Invalid format 'bad'.")
+
+    with pytest.raises(ValueError) as exc_info:
+        _diagram_with(_ImageFigure(bad_format)).save(tmp_path / "grid.bad")
+
+    assert exc_info.value is bad_format
 
 
 def test_grid_diagram_ranks_successful_networks_by_total_annual_cost() -> None:
