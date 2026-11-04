@@ -24,6 +24,7 @@ Resolves synthesis settings from a prepared problem, plans the quality-tier path
 - Outcomes are returned in the order of the input tasks [executor.py:LocalSynthesisExecutor._collect_outcomes].
 - Settings are a frozen dataclass; only `evm_solver_options` is copied on construction, while `pdm_solver_options` and `tdm_solver_options` are shared references [settings.py:SynthesisWorkflowSettings.__post_init__].
 - Tier 0 has one unprotected pathway per configured multiplier and tier 1 a single unprotected route; tiers 2 to 5 include tier 0 and 1 routes as protected and add expanded routes [pathways.py:tier_pathways].
+- Tier 0 and 1 routes evolve at branch breadth 1, protected or not; `evm_n_ad_branches` and `evm_n_rm_branches` apply only to the expanded routes and to the pathway-less evolution tasks of the Couenne fallback [pathways.py:_tier0_pathways, _tier1_pathway, _quality_tier_pathways; executor.py:_evolution_options].
 - The Couenne fallback applies only when the stage's configured solver (`pdm_solver` or `tdm_solver`) is `couenne`, the stage has tasks and outcomes, and every outcome failed with a "couenne ... not found on PATH" error [fallbacks.py:_missing_couenne_failure].
 - Utility-only networks (no active staged recovery exchanger) are not valid seeds [task_builders.py:has_recovery_topology].
 - The fake executor requires successful parents for downstream tasks [fake_executor.py:FakeSynthesisExecutor.execute].

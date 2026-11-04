@@ -8,6 +8,10 @@ Tier semantics:
 * 3: base and doubled-dTmin compact/direct and raw/TDM routes.
 * 4: tier-3 dTmin routes with wider EVM branch exploration.
 * 5: experimental reduced/base/doubled-dTmin search at tier-4 breadth.
+
+Tier 0 and 1 routes always evolve at breadth 1, protected or not, so a broader
+search can fall back to the original result. ``HENS_EVM_N_AD_BRANCHES`` and
+``HENS_EVM_N_RM_BRANCHES`` apply to the expanded routes of tiers 2 to 5 only.
 """
 
 from __future__ import annotations

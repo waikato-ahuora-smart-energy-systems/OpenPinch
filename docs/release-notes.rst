@@ -7,6 +7,13 @@ Unreleased
 Behaviour changes
 ~~~~~~~~~~~~~~~~~
 
+- A heat exchanger network manifest's ``evm_n_ad_branches`` and
+  ``evm_n_rm_branches`` now report the widest breadth any network evolution task
+  ran. A tier 0 or tier 1 run with ``HENS_EVM_N_AD_BRANCHES`` or
+  ``HENS_EVM_N_RM_BRANCHES`` set used to report the option's value, although those
+  routes evolve at a breadth of 1. Search and results are unchanged: the options still
+  apply only to the expanded routes of tiers 2 to 5, which the option help and
+  documentation now say.
 - ``target.varbanov_cogeneration()`` and ``TurbineModel.VARBANOV`` are removed.
   They are replaced by ``target.varbanov_small_turbine_cogeneration()`` and
   ``target.varbanov_large_turbine_cogeneration()``, with

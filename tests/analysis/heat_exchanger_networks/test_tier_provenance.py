@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import pytest
 
+from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
+    _evolution_options,
+)
 from OpenPinch.analysis.heat_exchanger_networks.execution.fake_executor import (
     FakeSynthesisExecutor,
 )
@@ -16,6 +19,7 @@ from OpenPinch.analysis.heat_exchanger_networks.targeting.open_hens_method impor
 from OpenPinch.contracts.synthesis.task import (
     HeatExchangerNetworkSynthesisTaskOutcome,
 )
+from OpenPinch.domain.enums import HeatExchangerNetworkDesignMethod
 
 from .test_full_sequence import (
     _small_problem,
@@ -146,3 +150,100 @@ def test_provenance_settings_record_the_quality_tier_that_ran(
 
     assert design.result.provenance.effective_settings[_TIER] == expected_tier
     assert design.result.manifest.synthesis_quality_tier == expected_tier
+
+
+def _evolution_breadths(problem, tasks) -> dict[tuple[str, ...], tuple[int, int]]:
+    breadths = {}
+    for task in tasks:
+        if task.method != HeatExchangerNetworkDesignMethod.NetworkEvolution:
+            continue
+        options = _evolution_options(problem, task, max_parallel=1)
+        breadths[tuple(task.metadata["pathway_ids"])] = (
+            options["n_ad_branches"],
+            options["n_rm_branches"],
+        )
+    return breadths
+
+
+@pytest.mark.parametrize(
+    ("tier", "expected_manifest_breadth"),
+    [(0, (1, 1)), (1, (1, 1)), (2, (2, 3)), (3, (2, 3)), (4, (2, 3)), (5, (2, 3))],
+)
+def test_protected_routes_stay_exact_and_manifest_reports_what_ran(
+    tier: int,
+    expected_manifest_breadth: tuple[int, int],
+) -> None:
+    problem = _small_problem_with_options(
+        {
+            "HENS_SYNTHESIS_QUALITY_TIER": tier,
+            "HENS_EVM_N_AD_BRANCHES": 2,
+            "HENS_EVM_N_RM_BRANCHES": 3,
+        }
+    )
+
+    result = execute_open_hens_method(
+        problem,
+        workflow_settings_from_problem(problem),
+        executor=FakeSynthesisExecutor(),
+    )
+
+    manifest = result.accepted_result.manifest
+    breadths = _evolution_breadths(problem, result.tasks)
+    assert breadths
+    for pathway_ids, breadth in breadths.items():
+        protected = all(
+            pathway_id.startswith(("tier0-", "tier1-")) for pathway_id in pathway_ids
+        )
+        assert breadth == ((1, 1) if protected else (2, 3))
+    assert (manifest.evm_n_ad_branches, manifest.evm_n_rm_branches) == (
+        expected_manifest_breadth
+    )
+
+
+def test_manifest_reports_widest_breadth_at_default_options() -> None:
+    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 4})
+
+    result = execute_open_hens_method(
+        problem,
+        workflow_settings_from_problem(problem),
+        executor=FakeSynthesisExecutor(),
+    )
+
+    manifest = result.accepted_result.manifest
+    breadths = _evolution_breadths(problem, result.tasks)
+    assert set(breadths.values()) == {(1, 1), (2, 2)}
+    assert (manifest.evm_n_ad_branches, manifest.evm_n_rm_branches) == (2, 2)
+
+
+@pytest.mark.parametrize(
+    "missing_for", ["pinch_design_method", "thermal_derivative_method"]
+)
+def test_couenne_fallback_follows_the_breadth_options_and_manifest_agrees(
+    missing_for: str,
+) -> None:
+    problem = _small_problem_with_options(
+        {
+            "HENS_SYNTHESIS_QUALITY_TIER": 1,
+            "HENS_EVM_N_AD_BRANCHES": 2,
+            "HENS_EVM_N_RM_BRANCHES": 3,
+        }
+    )
+
+    with pytest.warns(RuntimeWarning, match="Couenne is unavailable"):
+        result = execute_open_hens_method(
+            problem,
+            workflow_settings_from_problem(problem),
+            executor=_NoCouenneForMethod(missing_for),
+        )
+
+    manifest = result.accepted_result.manifest
+    evolution_tasks = [
+        task
+        for task in result.tasks
+        if task.method == HeatExchangerNetworkDesignMethod.NetworkEvolution
+    ]
+    assert evolution_tasks
+    for task in evolution_tasks:
+        options = _evolution_options(problem, task, max_parallel=1)
+        assert (options["n_ad_branches"], options["n_rm_branches"]) == (2, 3)
+    assert (manifest.evm_n_ad_branches, manifest.evm_n_rm_branches) == (2, 3)
