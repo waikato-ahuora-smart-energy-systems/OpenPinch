@@ -29,7 +29,7 @@ Builds grid diagrams of heat exchanger networks and the plain-data design view o
 
 ## Side Effects
 - Imports Plotly lazily. [service.py:_build_single_grid_diagram] [dependencies.py:require_network_grid_diagram_dependency]
-- `show` opens a viewer; `save` writes HTML or an image file (images need a Plotly image engine). [results.py:HeatExchangerNetworkGridDiagram]
+- `show` opens a viewer; `save` writes HTML or an image file; without Kaleido an image save raises `MissingSynthesisDependencyError` (extra `synthesis`) and any other export error from Plotly is left as it is. [results.py:HeatExchangerNetworkGridDiagram]
 - Renderer objects hold mutable per-diagram state (label slot counts, tooltips, split groups) and add traces and annotations to their figure. [rendering.py:_PlotlyGridRenderer] [labels.py:add_label]
 
 ## Verification

@@ -17,6 +17,7 @@ Turns executed task outcomes into the canonical synthesis result, resolves seed 
 - Infeasible outcomes are demoted before acceptance, keeping their network and a reason; `WorkflowContractError` is raised only when no success remains [assembly.py:demote_infeasible_outcomes, _accepted_outcome].
 - The accepted network must be present, and its run id, task id, period id, method are overwritten from settings and task, and the stage count is kept from the network when it has one [assembly.py:build_synthesis_result].
 - Manifest approach temperatures are those the tasks actually ran, falling back to the settings values [assembly.py:build_synthesis_result].
+- Manifest `method_sequence` lists each method once, in outcome order (PDM, TDM, EVM, though tiers above 1 also run some EVM tasks before TDM), without outcomes that failed because Couenne is missing; `settings.method_sequence` does not affect it [assembly.py:_executed_method_sequence].
 - `solution_rank` is one-based; ranks below 1 or beyond the available count raise `IndexError` [selection.py:network_for_rank].
 - `select_network` keeps whatever `ranked_networks` the result holds; for a finalised design that is the unique feasible ranking built by `finalise_design_result`, not every outcome, and `solution_rank` indexes that list [selection.py:select_network] [context.py:finalise_design_result].
 - A cached seed must come from the expected upstream method, and for problems with segmented streams must carry the current `SEGMENT_PROFILE_VERSION` [seeds.py:resolve_seed_networks].

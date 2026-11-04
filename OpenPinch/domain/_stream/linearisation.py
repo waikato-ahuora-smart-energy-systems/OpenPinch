@@ -13,6 +13,10 @@ __all__ = [
     "normalise_temperature_heat_profile",
 ]
 
+# Well above the rounding in a cumulative duty fraction (about 1e-15) and far below
+# any duty a real segment carries.
+_COINCIDENT_DUTY_FRACTION = 1e-9
+
 
 ################################################################################
 # Public API
@@ -108,6 +112,15 @@ def align_temperature_heat_profiles(profiles) -> tuple[np.ndarray, ...]:
     if not prepared:
         raise ValueError("At least one period profile is required.")
     union = np.unique(np.concatenate(breakpoints))
+    # Periods often share a breakpoint whose fractions differ only by rounding;
+    # kept apart, the pair would map to a zero-duty segment. The last fraction is
+    # always 1.0, restored in case a neighbour stood in for it.
+    kept = [union[0]]
+    for fraction in union[1:]:
+        if fraction - kept[-1] > _COINCIDENT_DUTY_FRACTION:
+            kept.append(fraction)
+    kept[-1] = 1.0
+    union = np.asarray(kept)
     aligned = []
     for points, fractions in prepared:
         heat = np.interp(union, fractions, points[:, 0])

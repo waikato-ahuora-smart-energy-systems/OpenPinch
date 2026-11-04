@@ -11,7 +11,7 @@ from typing import Any, Callable, Dict, Optional
 import pandas as pd
 from pydantic import ValidationError
 
-from ..contracts.input import TargetInput
+from ..contracts.input import ProcessComponentSchema, TargetInput
 from ..contracts.output import TargetOutput
 from ..contracts.reporting import ProblemReport, ReportMetric
 from ..contracts.workspace import ValidationReport
@@ -23,7 +23,10 @@ from ._problem.accessors.design import _DesignAccessorDescriptor
 from ._problem.accessors.plot import _PlotAccessorDescriptor
 from ._problem.accessors.target import _TargetAccessorDescriptor
 from ._problem.input import loading as _input_loading
-from ._problem.input.canonicalization import canonical_problem_inputs
+from ._problem.input.canonicalization import (
+    canonical_problem_inputs,
+    rename_canonical_root,
+)
 from ._problem.input.loading import (
     JsonDict,
     PathLike,
@@ -335,7 +338,12 @@ class PinchProblem:
             input_data,
             context=self._validation_context or {},
         )
+        if self._process_components:
+            input_data.process_components = self._process_component_records()
         return input_data
+
+    def _process_component_records(self) -> list[ProcessComponentSchema]:
+        return [c._to_record() for c in self._process_components.values()]
 
     def validation_report(self) -> ValidationReport:
         """Return the validation results of the loaded input, warnings included.
@@ -530,8 +538,17 @@ class PinchProblem:
 
     @property
     def problem_data(self) -> Optional[TargetInput | JsonDict]:
-        """Return a detached snapshot of the loaded raw problem definition."""
-        return deepcopy(self._problem_data)
+        """Return a detached snapshot of the raw definition and its components."""
+        data = deepcopy(self._problem_data)
+        if self._process_components:
+            records = self._process_component_records()
+            if isinstance(data, TargetInput):
+                data.process_components = records
+            else:
+                data["process_components"] = [
+                    record.model_dump(mode="python") for record in records
+                ]
+        return data
 
     @property
     def results(self) -> Optional[TargetOutput]:
@@ -545,7 +562,7 @@ class PinchProblem:
 
     @property
     def process_components(self) -> dict[str, Any]:
-        """Memory-only process components applied to the prepared model."""
+        """Process components applied to the prepared model."""
         return MappingProxyType(dict(self._process_components))
 
     @property
@@ -579,12 +596,13 @@ class PinchProblem:
         changed = self._project_name != value
         self._project_name = value
         if isinstance(self._master_zone, Zone):
+            changed = changed or self._master_zone.name != value
             self._master_zone.name = value
             if changed:
                 self._invalidate_analysis()
 
     def to_problem_json(self) -> JsonDict:
-        """Return canonical JSON-compatible problem inputs."""
+        """Return canonical JSON-compatible problem inputs, with any components."""
         if self._problem_data is None:
             raise RuntimeError("No problem data is available. Call load(...) first.")
         return self._canonical_problem_inputs()
@@ -667,7 +685,13 @@ class PinchProblem:
     def _canonical_problem_inputs(self) -> JsonDict:
         """Return canonical mutable problem inputs with an explicit zone tree."""
         validated = self.validate()
-        return canonical_problem_inputs(validated, project_name=self.project_name)
+        problem_inputs = canonical_problem_inputs(
+            validated, project_name=self.project_name
+        )
+        # The source still holds its own root name after a rename; the live root wins.
+        if isinstance(self._master_zone, Zone):
+            rename_canonical_root(problem_inputs, self._master_zone.name)
+        return problem_inputs
 
     def __repr__(self) -> str:
         """Return a compact summary of the source and cached result state."""

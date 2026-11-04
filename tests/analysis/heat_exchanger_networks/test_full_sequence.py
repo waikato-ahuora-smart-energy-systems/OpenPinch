@@ -8,6 +8,7 @@ import subprocess
 import sys
 from collections import Counter
 from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -22,10 +23,14 @@ from OpenPinch.analysis.heat_exchanger_networks.errors import (
 )
 from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
     LocalSynthesisExecutor,
+    _evolution_options,
     _topology_restriction_values,
 )
 from OpenPinch.analysis.heat_exchanger_networks.execution.fake_executor import (
     FakeSynthesisExecutor,
+)
+from OpenPinch.analysis.heat_exchanger_networks.execution.pathways import (
+    pathways_from_metadata,
 )
 from OpenPinch.analysis.heat_exchanger_networks.execution.settings import (
     workflow_settings_from_problem,
@@ -514,6 +519,113 @@ def test_missing_couenne_before_pdm_runs_direct_evolution() -> None:
     assert result.accepted_result.method == "network_evolution_method"
 
 
+class _MissingCouenneExecutor(FakeSynthesisExecutor):
+    def __init__(self, missing_for: str) -> None:
+        super().__init__()
+        self.missing_for = missing_for
+
+    def execute(self, tasks, *, problem, parent_outcomes, max_parallel):
+        if tasks and tasks[0].method == self.missing_for:
+            return tuple(
+                HeatExchangerNetworkSynthesisTaskOutcome(
+                    task=task,
+                    status="failed",
+                    solver_status="failed",
+                    error=(
+                        "The 'couenne' solver executable is required for "
+                        "couenne heat exchanger network synthesis solves, but it was not found "
+                        "on PATH."
+                    ),
+                )
+                for task in tasks
+            )
+        return super().execute(
+            tasks,
+            problem=problem,
+            parent_outcomes=parent_outcomes,
+            max_parallel=max_parallel,
+        )
+
+
+@pytest.mark.parametrize(
+    ("missing_for", "options", "run_tier", "expected_breadth"),
+    [
+        ("pinch_design_method", {"HENS_SYNTHESIS_QUALITY_TIER": 4}, 0, 1),
+        ("pinch_design_method", {"HENS_SYNTHESIS_QUALITY_TIER": 4}, 1, 1),
+        ("pinch_design_method", {"HENS_SYNTHESIS_QUALITY_TIER": 1}, 4, 2),
+        ("thermal_derivative_method", {"HENS_SYNTHESIS_QUALITY_TIER": 4}, 1, 1),
+        (
+            "pinch_design_method",
+            {
+                "HENS_SYNTHESIS_QUALITY_TIER": 4,
+                "HENS_EVM_N_AD_BRANCHES": 3,
+                "HENS_EVM_N_RM_BRANCHES": 3,
+            },
+            1,
+            3,
+        ),
+    ],
+)
+def test_evolution_breadth_without_pathways_follows_the_run_tier(
+    missing_for: str,
+    options: dict,
+    run_tier: int,
+    expected_breadth: int,
+) -> None:
+    problem = _small_problem_with_options(options)
+    settings = replace(
+        workflow_settings_from_problem(problem),
+        synthesis_quality_tier=run_tier,
+    )
+
+    with pytest.warns(RuntimeWarning, match="Couenne is unavailable"):
+        result = workflow_module.execute_open_hens_method(
+            problem,
+            settings,
+            executor=_MissingCouenneExecutor(missing_for),
+        )
+
+    evolution_tasks = [
+        task for task in result.tasks if task.method == "network_evolution_method"
+    ]
+    assert evolution_tasks
+    assert not any(pathways_from_metadata(task.metadata) for task in evolution_tasks)
+    manifest = result.accepted_result.manifest
+    assert manifest.evm_n_ad_branches == expected_breadth
+    assert manifest.evm_n_rm_branches == expected_breadth
+    for task in evolution_tasks:
+        evolution_options = _evolution_options(problem, task, max_parallel=1)
+        assert evolution_options["n_ad_branches"] == expected_breadth
+        assert evolution_options["n_rm_branches"] == expected_breadth
+
+
+def test_evolution_breadth_for_a_derivative_parent_without_pathways() -> None:
+    problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 4})
+    settings = replace(
+        workflow_settings_from_problem(problem),
+        synthesis_quality_tier=1,
+    )
+    parent_task = HeatExchangerNetworkSynthesisTask(
+        run_id=settings.run_id,
+        method="thermal_derivative_method",
+        approach_temperature=settings.approach_temperatures[0],
+        stage_count=2,
+    )
+    parent_outcome = FakeSynthesisExecutor().execute(
+        (parent_task,),
+        problem=problem,
+        parent_outcomes={},
+        max_parallel=1,
+    )[0]
+
+    tasks = build_network_evolution_method_tasks(settings, (parent_outcome,))
+
+    assert len(tasks) == 1
+    evolution_options = _evolution_options(problem, tasks[0], max_parallel=1)
+    assert evolution_options["n_ad_branches"] == 1
+    assert evolution_options["n_rm_branches"] == 1
+
+
 def test_failed_workflow_reports_task_errors() -> None:
     problem = _small_problem()
     settings = workflow_settings_from_problem(problem)
@@ -955,8 +1067,13 @@ def test_enhanced_synthesis_method_rejects_non_integer_quality_tier(
 
 @pytest.mark.synthesis
 @pytest.mark.solver
+# A string condition is evaluated when the test runs, so collecting this module
+# does not import the solver packages.
+@pytest.mark.skipif(
+    "not _live_solver_environment_available()",
+    reason="needs the couenne and ipopt binaries and the gekko and pyomo packages",
+)
 def test_duplicate_two_state_case_matches_single_state_without_sweeps() -> None:
-    _skip_if_live_solver_environment_missing()
     single_period = _single_state_no_sweep_problem()
     duplicate_period = _duplicate_two_state_no_sweep_problem()
 
@@ -1420,7 +1537,7 @@ def _successful_counts_by_method(result) -> dict[str, int]:
     )
 
 
-def _skip_if_live_solver_environment_missing() -> None:
+def _live_solver_environment_available() -> bool:
     try:
         require_solver_binary(
             "couenne",
@@ -1439,8 +1556,9 @@ def _skip_if_live_solver_environment_missing() -> None:
             package="pyomo",
             purpose="single-period/multiperiod HeatExchangerNetworkLabel equivalence test",
         )
-    except (MissingSynthesisDependencyError, MissingSynthesisSolverError) as exc:
-        pytest.skip(str(exc))
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
 
 
 def _use_fake_default_executor(monkeypatch) -> None:

@@ -420,6 +420,129 @@ def test_process_mvr_rejects_cold_stream_selection():
         problem.components.add_process_mvr("Product heating")
 
 
+def _vapour_payload(*, fluid, t_supply, t_target, heat_flow):
+    """Return a process MVR case; list arguments give one value per period."""
+    multiperiod = isinstance(heat_flow, list)
+
+    def valued(values, unit):
+        return {"values": values, "unit": unit} if multiperiod else values
+
+    return {
+        "streams": [
+            {
+                "zone": "Site/Train",
+                "name": "Vapour",
+                "t_supply": valued(t_supply, "degC"),
+                "t_target": valued(t_target, "degC"),
+                "p_supply": valued(
+                    [101.325] * len(heat_flow) if multiperiod else 101.325, "kPa"
+                ),
+                "heat_flow": valued(heat_flow, "kW"),
+                "dt_cont": 0.0,
+                "htc": 1.0,
+                "fluid_name": fluid,
+                "fluid_phase": "gas",
+            },
+            {
+                "zone": "Site/Train",
+                "name": "Product",
+                "t_supply": 30.0,
+                "t_target": 100.0,
+                "heat_flow": 120.0,
+                "dt_cont": 0.0,
+                "htc": 1.0,
+            },
+        ],
+        "utilities": [],
+        "zone_tree": {
+            "name": "Site",
+            "type": "Site",
+            "children": [{"name": "Train", "type": "Process Zone"}],
+        },
+        "options": {"PROBLEM_PERIOD_IDS": ["0", "peak"]} if multiperiod else {},
+    }
+
+
+@pytest.mark.parametrize(
+    ("fluid", "t_supply", "t_target", "heat_flow", "injection_applied"),
+    [
+        # Air stays dry: its periods share breakpoints that differ only by rounding.
+        ("Air", [120.0, 125.0], [80.0, 82.0], [100.0, 130.0], [False, False]),
+        ("Water", [120.0, 125.0], [100.0, 102.0], [100.0, 130.0], [True, True]),
+    ],
+    ids=["dry_air", "injected_water"],
+)
+def test_two_period_process_mvr_default_matches_each_period_alone(
+    fluid, t_supply, t_target, heat_flow, injection_applied
+):
+    pytest.importorskip("CoolProp")
+    from CoolProp.CoolProp import PropsSI
+
+    problem = PinchProblem(
+        _vapour_payload(
+            fluid=fluid, t_supply=t_supply, t_target=t_target, heat_flow=heat_flow
+        ),
+        project_name="Site",
+    )
+
+    component = problem.components.add_process_mvr(
+        "Vapour", mvr_stage_pressure_ratio=1.5, motor_efficiency=0.95
+    )
+
+    replacement = component.replacement_streams[0]
+    for index, period_id in enumerate(("0", "peak")):
+        stage = component.stage_results_by_period[period_id][0]
+        assert stage.liquid_injection_applied is injection_applied[index]
+
+        alone = PinchProblem(
+            _vapour_payload(
+                fluid=fluid,
+                t_supply=t_supply[index],
+                t_target=t_target[index],
+                heat_flow=heat_flow[index],
+            ),
+            project_name="Site",
+        ).components.add_process_mvr(
+            "Vapour", mvr_stage_pressure_ratio=1.5, motor_efficiency=0.95
+        )
+        alone_stream = alone.replacement_streams[0]
+        alone_stage = next(iter(alone.stage_results_by_period.values()))[0]
+        assert stage.work == pytest.approx(alone_stage.work, rel=1e-12)
+        assert float(replacement.heat_flow[index]) == pytest.approx(
+            float(alone_stream.heat_flow[0]), rel=1e-9
+        )
+        assert float(replacement.supply_temperature[index]) == pytest.approx(
+            float(alone_stream.supply_temperature[0]), abs=1e-6
+        )
+        assert float(replacement.target_temperature[index]) == pytest.approx(
+            float(alone_stream.target_temperature[0]), abs=1e-6
+        )
+
+        # Energy balance: heat released is the source vapour's enthalpy after
+        # compression (shaft work added), cooled to the target at discharge pressure.
+        h_in = PropsSI(
+            "H",
+            "T",
+            t_supply[index] + 273.15,
+            "P",
+            101325.0,
+            fluid,
+        )
+        h_target = PropsSI(
+            "H",
+            "T",
+            t_target[index] + 273.15,
+            "P",
+            1.5 * 101325.0,
+            fluid,
+        )
+        shaft_kw = stage.work * 0.95
+        released_kw = shaft_kw + stage.source_mass_flow * (h_in - h_target) / 1e3
+        assert float(replacement.heat_flow[index]) == pytest.approx(
+            released_kw, rel=1e-6
+        )
+
+
 def test_process_mvr_solves_all_periods_for_multiperiod_streams():
     pytest.importorskip("CoolProp")
     problem = _problem(multiperiod=True)
@@ -963,7 +1086,7 @@ def test_replay_covers_every_period():
     pytest.importorskip("CoolProp")
     problem = _problem(multiperiod=True)
     component = problem.components.add_process_mvr(
-        "Evaporator vapour", liquid_injection=False
+        "Evaporator vapour", mvr_stage_pressure_ratio=1.5
     )
     work = {
         period_id: component.work_for_zone(problem._master_zone, period_id=period_id)

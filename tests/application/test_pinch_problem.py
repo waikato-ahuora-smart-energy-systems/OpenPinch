@@ -44,7 +44,7 @@ from OpenPinch.presentation.graphs.problem import (
     _PlotAccessor,
     _slugify,
 )
-from OpenPinch.resources import copy_sample_case
+from OpenPinch.resources import copy_sample_case, read_sample_case
 from tests.strategies.problem_inputs import (
     nested_zone_multiplier_cases,
     transactional_problem_scenarios,
@@ -3575,3 +3575,101 @@ def test_xls_file_import_is_rejected_with_a_save_as_xlsx_message():
 
     with pytest.raises(ValueError, match=r"\.xls.*\.xlsx"):
         source_adapter.load_problem_source_from_files(files)
+
+
+def _renamable_problem() -> PinchProblem:
+    payload = json.loads(read_sample_case("basic_pinch.json"))
+    payload["zone_tree"] = {
+        "name": "Plant",
+        "type": "Site",
+        "children": [{"name": "Area", "type": "Process Zone"}],
+    }
+    for stream in payload["streams"]:
+        stream["zone"] = "Plant/Area"
+    return PinchProblem(payload, project_name="Plant")
+
+
+@pytest.mark.parametrize(
+    "rebuild",
+    [
+        lambda problem: problem.update_options({"ENV_TEMPERATURE": 30.0}),
+        lambda problem: problem.set_dt_cont_multiplier(0.5),
+    ],
+    ids=["update_options", "set_dt_cont_multiplier"],
+)
+def test_rename_survives_a_rebuild_of_an_explicit_zone_tree(rebuild):
+    problem = _renamable_problem()
+    problem.project_name = "Renamed"
+
+    rebuild(problem)
+
+    assert problem.project_name == "Renamed"
+    assert problem.master_zone.name == "Renamed"
+    assert problem.master_zone.get_subzone("Area").address == "Renamed/Area"
+    inputs = problem.to_problem_json()
+    assert inputs["zone_tree"]["name"] == "Renamed"
+    assert {stream["zone"] for stream in inputs["streams"]} == {"Renamed/Area"}
+
+
+def test_rename_after_a_rebuild_reaches_the_next_rebuild():
+    problem = _renamable_problem()
+    problem.update_options({"ENV_TEMPERATURE": 30.0})
+    problem.project_name = "First"
+    problem.update_options({"ENV_TEMPERATURE": 25.0})
+    problem.project_name = "Second"
+
+    problem.set_dt_cont_multiplier(0.5, zone_name="Second/Area")
+
+    assert problem.master_zone.name == "Second"
+    assert problem.master_zone.get_subzone("Area").dt_cont_multiplier == 0.5
+
+
+def test_results_after_a_rename_and_rebuild_use_the_new_root_name():
+    problem = _renamable_problem()
+    problem.target.direct_heat_integration()
+    problem.project_name = "Renamed"
+
+    problem.update_options({"ENV_TEMPERATURE": 30.0})
+    problem.target.direct_heat_integration()
+
+    assert problem.results.name == "Renamed"
+    assert problem.results.targets
+    assert all(
+        target.scope.split("/")[0] == "Renamed" for target in problem.results.targets
+    )
+
+
+def test_rebuild_keeps_an_explicit_root_name_that_was_never_renamed():
+    payload = _renamable_problem().to_problem_json()
+    problem = PinchProblem(payload, project_name="Label")
+
+    problem.update_options({"ENV_TEMPERATURE": 30.0})
+
+    assert problem.project_name == "Label"
+    assert problem.master_zone.name == "Plant"
+
+
+def test_renaming_to_the_current_project_name_still_renames_the_root_and_results():
+    payload = _renamable_problem().to_problem_json()
+    problem = PinchProblem(payload, project_name="Label")
+    problem.target.direct_heat_integration()
+
+    problem.project_name = "Label"
+
+    assert problem.master_zone.name == "Label"
+    assert problem.results is None
+
+
+def test_rename_also_updates_an_explicit_top_zone_name_option():
+    source = PinchProblem("basic_pinch.json").to_problem_json()
+    source["options"] = {
+        **(source.get("options") or {}),
+        "PROBLEM_TOP_ZONE_NAME": source["zone_tree"]["name"],
+    }
+    problem = PinchProblem(source)
+    problem.project_name = "Renamed"
+
+    problem.update_options({"ENV_TEMPERATURE": 30.0})
+
+    assert problem.master_zone.name == "Renamed"
+    assert problem.to_problem_json()["options"]["PROBLEM_TOP_ZONE_NAME"] == "Renamed"

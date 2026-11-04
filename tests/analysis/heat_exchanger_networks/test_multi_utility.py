@@ -22,6 +22,11 @@ from OpenPinch.analysis.heat_exchanger_networks.reporting.verification import (
 from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
     problem_to_solver_arrays,
 )
+from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
+    MissingSynthesisDependencyError,
+    MissingSynthesisSolverError,
+    require_solver_binary,
+)
 from OpenPinch.application.problem import PinchProblem
 from OpenPinch.domain.enums import HeatExchangerKind
 
@@ -165,7 +170,22 @@ def test_default_backup_utilities_stay_out_of_synthesis():
     assert axis_maps["cold_utilities"] == {"Cold Utility.CW": 0}
 
 
+def _solver_binaries_available() -> bool:
+    try:
+        for binary in ("couenne", "ipopt"):
+            require_solver_binary(binary, purpose="multi-utility regression")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
 @pytest.mark.solver
+# A string condition is evaluated when the test runs, so collecting this module
+# does not import the solver packages.
+@pytest.mark.skipif(
+    "not _solver_binaries_available()",
+    reason="needs the couenne and ipopt binaries",
+)
 def test_dairy_chilling_synthesis_cools_chilled_streams_with_glycol():
     # Every chilling stream ends at 2 to 5 C, below cooling water (20 to
     # 25 C); synthesis used only the first cold utility and so failed.
@@ -177,20 +197,10 @@ def test_dairy_chilling_synthesis_cools_chilled_streams_with_glycol():
     from OpenPinch.analysis.heat_exchanger_networks.execution.settings import (
         workflow_settings_from_problem,
     )
-    from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
-        MissingSynthesisDependencyError,
-        MissingSynthesisSolverError,
-        require_solver_binary,
-    )
     from OpenPinch.analysis.heat_exchanger_networks.targeting.open_hens_method import (
         execute_open_hens_method,
     )
 
-    try:
-        for binary in ("couenne", "ipopt"):
-            require_solver_binary(binary, purpose="multi-utility regression")
-    except (MissingSynthesisDependencyError, MissingSynthesisSolverError) as exc:
-        pytest.skip(str(exc))
     problem = PinchProblem("dairy_chilling_multiperiod.json")
     problem.target.all_heat_integration()
     settings = replace(

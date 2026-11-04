@@ -13,6 +13,7 @@ import from here.
 - `prepare_problem` (`construction.py`): builds the master `Zone` hierarchy, streams and utilities from schemas.
 - `_find_extreme_process_temperatures` (`construction.py`): returns `(hu_t_min, cu_t_max)`, the highest shifted cold-stream temperature and the lowest shifted hot-stream temperature, `(20, 20)` with no streams; imported by `utility_placement.py`.
 - `canonical_problem_inputs` (`canonicalization.py`): deep-copied input dict with a normalised zone tree and rewritten stream zones.
+- `rename_canonical_root` (`canonicalization.py`): renames the root of canonical inputs in place, with the stream zone paths that start at it.
 - `_LoadedProblemSource`, `load_problem_source`, `prepare_in_memory_problem_source`, `normalize_problem_mapping` (`loading.py`): normalise a source into inputs plus validation context.
 - `apply_loaded_source`, `rebuild_problem_state`, `replace_loaded_source`, `replace_problem_inputs` (`loading.py`): set or replace a problem's state; `replace_loaded_source` restores prior state on failure.
 - `find_zone_tree_node` (`loading.py`): look up a zone-tree dict node by absolute or relative name.
@@ -47,7 +48,7 @@ import from here.
 - `load_problem_source` reads files or tuples of files through the adapters for non-in-memory sources. [loading.py:load_problem_source]
 - `apply_loaded_source` and `replace_loaded_source` assign attributes on the parent `PinchProblem`. [loading.py:apply_loaded_source]
 - `rebuild_problem_state` calls `problem._invalidate_analysis()`. [loading.py:rebuild_problem_state]
-- `rebuild_problem_state` empties `_process_components`; `replace_problem_inputs` keeps them by replaying them on the rebuilt tree, and a failed replay restores the prior state. [loading.py:rebuild_problem_state] [loading.py:replace_problem_inputs]
+- `rebuild_problem_state` empties `_process_components`, moves any `process_components` records out of `_problem_data` and `_validated_data`, and rebuilds the components from them, so the live components are the only copy; `replace_problem_inputs` keeps the live components by replaying them on the rebuilt tree, and a failed rebuild or replay restores the prior state. [loading.py:rebuild_problem_state] [loading.py:_detach_process_components] [loading.py:replace_problem_inputs]
 - Zone-tree normalisation rewrites `stream.zone` on the stream models it is given and may append process nodes to the tree. [canonicalization.py:_rewrite_stream_zones_from_tree]
 - `validate_problem_semantics` emits `InputValidationWarning`. [validation.py:validate_problem_semantics]
 - Utility completion mutates deep copies of the given utility schemas (target, `dt_cont`, price, HTC, `active`). [utilities.py:_complete_utility_data]

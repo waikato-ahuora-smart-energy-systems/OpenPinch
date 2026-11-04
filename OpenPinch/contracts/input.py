@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import Annotated, List, Optional, Self, Union
+from typing import Annotated, List, Literal, Optional, Self, Union
 
 from pydantic import (
     BaseModel,
@@ -592,6 +592,34 @@ class PlantProfileSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ProcessComponentSourceSchema(BaseModel):
+    """The stream a saved process component replaces."""
+
+    # Slash-separated path below the root zone, so a renamed project still resolves.
+    zone: str
+    name: Annotated[str, non_empty_str("source stream name must be non-empty")]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ProcessComponentSchema(BaseModel):
+    """Saved ``components.add_process_mvr`` call, re-solved when the case loads."""
+
+    type: Literal["process_mvr"] = "process_mvr"
+    id: Annotated[str, non_empty_str("process component id must be non-empty")]
+    source_streams: Annotated[List[ProcessComponentSourceSchema], Field(min_length=1)]
+    n_stages: int = 1
+    liquid_injection: bool = True
+    mvr_stage_t_lift: Optional[float] = None
+    mvr_stage_pressure_ratio: Optional[float] = None
+    # None takes the case's PROCESS_MVR_ETA_COMP and PROCESS_MVR_ETA_MOTOR.
+    compressor_efficiency: Optional[float] = None
+    motor_efficiency: Optional[float] = None
+    active: bool = True
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class TargetInput(BaseModel):
     """Validated top-level input data for :class:`PinchProblem`."""
 
@@ -602,17 +630,24 @@ class TargetInput(BaseModel):
     zone_tree: Optional[ZoneTreeSchema] = None
     network: HeatExchangerNetworkSchema | None = None
     plant_profile_data: List[PlantProfileSchema] = Field(default_factory=list)
+    # Omitted from dumps when empty, so a case without components exports as before.
+    process_components: List[ProcessComponentSchema] = Field(
+        default_factory=list, exclude_if=lambda components: not components
+    )
 
     model_config = ConfigDict(extra="forbid")
 
     @model_validator(mode="after")
     def _validate_residual_basis(self):
         if self.residual_basis is not None and (
-            self.streams or self.network or self.plant_profile_data
+            self.streams
+            or self.network
+            or self.plant_profile_data
+            or self.process_components
         ):
             raise ValueError(
                 "Residual utility input cannot contain physical streams, "
-                "networks or plant profiles."
+                "networks, plant profiles or process components."
             )
         if self.residual_basis is not None:
             sid = self.residual_basis.data.period_id
@@ -666,6 +701,8 @@ __all__ = [
     "HeatExchangerSchema",
     "NonLinearStream",
     "PlantProfileDataSchema",
+    "ProcessComponentSchema",
+    "ProcessComponentSourceSchema",
     "PlantProfileSchema",
     "StreamSchema",
     "StreamSegmentSchema",

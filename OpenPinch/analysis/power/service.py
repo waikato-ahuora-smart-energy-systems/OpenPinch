@@ -59,9 +59,12 @@ def get_power_cogeneration_above_pinch(
     )
     utility_data = _preprocess_utilities(target, turbine_params, idx=idx)
     if utility_data is None:
-        # A target reused through base_target must not keep its earlier status.
+        # A target reused through base_target must not keep its earlier run.
+        target.work_target = None
+        target.turbine_efficiency_target = None
         target.turbine_converged = None
         target.turbine_diagnostics = []
+        target.turbine_result = None
         return target
 
     turbine = MultiStageSteamTurbine()

@@ -28,7 +28,7 @@ class ProcessComponentHost(Protocol):
 
 @dataclass
 class ProcessComponent:
-    """Base class for memory-only process components."""
+    """Base class for process components attached to a prepared problem."""
 
     id: str
     problem: ProcessComponentHost

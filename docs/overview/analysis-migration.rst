@@ -19,9 +19,10 @@ be edited to register or remove a component. ``update_options`` and
 ``set_dt_cont_multiplier`` keep components: each one is re-solved on the rebuilt
 input and its handle stays valid. Explicit efficiencies stay as given, and
 efficiencies left unset take the new option values. If a component cannot be
-re-solved, the call raises and the problem is unchanged. Components are
-memory-only: ``load`` discards them, and ``to_problem_json`` and workspace
-bundles do not carry them.
+re-solved, the call raises and the problem is unchanged. ``to_problem_json``,
+workspace bundles and ``scenario`` carry components as the ``process_components``
+input field, and loading that input re-solves them. ``load`` replaces the
+components with those of the new source.
 
 Input, configuration, zone, and component changes invalidate scalar outputs,
 prepared period states, graphs, and design/placement caches together. A failed

@@ -186,7 +186,9 @@ not itself a Pydantic model.
 The
 :class:`~OpenPinch.domain.enums.HeatExchangerNetworkDesignMethod` enum is the
 single method identity used for dispatch and result metadata.
-``design.result.manifest.method_sequence`` records the executed task sequence.
+``design.result.manifest.method_sequence`` records the executed task sequence:
+a stage that the tier leaves out, or that could not run because Couenne is
+missing, is not listed.
 For tiered OpenHENS runs, the manifest also records the synthesis quality tier,
 selected pathway, and protected-fallback status.
 
@@ -196,7 +198,9 @@ it, ``problem.design.heat_exchanger_network()``, its multiperiod form and
 ``problem.design.enhanced_heat_exchanger_network()`` run that tier. If they do
 not, those methods run their own defaults, tiers 0 and 2, even though the
 configuration still reads 1; the key in ``problem.to_problem_json()["options"]``
-is what counts as set. ``problem.design.open_hens()`` always runs tier 1. User
+is what counts as set. ``problem.design.open_hens()`` always runs tier 1. The
+tier that ran is in ``design.result.manifest.synthesis_quality_tier`` and in the
+``HENS_SYNTHESIS_QUALITY_TIER`` value of ``design.result.provenance``. User
 code should prefer
 ``problem.design.enhanced_heat_exchanger_network(quality_tier=...)`` for method-level
 tier selection because it applies a call-local override without mutating the

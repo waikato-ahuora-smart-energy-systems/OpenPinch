@@ -16,8 +16,8 @@ a docstring.
 - `translate_hpr_result`, `translate_hpr_output` (`optimisation_adapter.py`): attach ambient streams to a backend result and validate it as the public `HeatPumpTargetOutputs`; `translate_hpr_result` marks the result successful, so call it only on an accepted candidate.
 - `aggregate_hpr_period_results` (`optimisation_adapter.py`): combine period results for a shared multiperiod design (weighted operation, peak capital).
 - `build_hpr_accounting`, `calc_hpr_obj`, `relative_feasibility_penalty`, `normalise_hpr_penalty_terms`, `normalise_initial_points`, `initialise_hpr_seed` (`optimisation_adapter.py`): objective, penalty and seed helpers (`initialise_hpr_seed` is public but not in `__all__`).
-- `ProcessComponent`, `ProcessComponentHost` (`components.py`): memory-only component base record and the protocol it needs from the problem object.
-- `ProcessMVRComponent`, `create_process_mvr_component`, `replay_process_components` (`process_mvr.py`): direct process MVR component with replacement streams, its factory, and its re-solve on a rebuilt zone tree.
+- `ProcessComponent`, `ProcessComponentHost` (`components.py`): component base record and the protocol it needs from the problem object.
+- `ProcessMVRComponent`, `create_process_mvr_component`, `replay_process_components`, `restore_process_components` (`process_mvr.py`): direct process MVR component with replacement streams, its factory, its re-solve on a rebuilt zone tree, and its rebuild from saved records.
 - Subdirectories:
   - [_multiperiod](./_multiperiod/README.md): shared-design preparation, execution and aggregation across periods (documented elsewhere).
   - [_process_mvr](./_process_mvr/README.md): private helpers for process MVR selection, membership, replacement streams and work.
@@ -45,9 +45,10 @@ a docstring.
 - Period aggregation weights operation (duties, work, operating cost, penalty) with the schedule share of loaded periods, leaves ratios (`cop_h`, `eta_he`) undiluted, and sizes capital per machine for its own peak period when every period reports the same per-machine breakdown, otherwise taking the peak of the period totals. [optimisation_adapter.py:aggregate_hpr_period_results] [optimisation_adapter.py:_peak_machine_capital]
 - Carnot candidates minimise the dimensionless ratio `(work + heat*ratio + cold*ratio + cooling water*ratio + penalty) / Q_hpr_target`. Vapour-compression, VC+MVR and TESPy candidates minimise total annualised cost in $/y plus a $/y feasibility penalty. [optimisation_adapter.py:calc_hpr_obj] [shared.py:evaluate_vapour_hpr_result]
 - Process component ids are unique within a problem; `mvr_stage_t_lift` and `mvr_stage_pressure_ratio` are mutually exclusive; a conflicting `period_id` raises `ValueError`. [process_mvr.py:_resolve_component_id] [process_mvr.py:create_process_mvr_component]
-- Activating an MVR component deactivates the original source streams and activates the replacement streams, and deactivating reverses this; both invalidate the problem's analysis. [process_mvr.py:ProcessMVRComponent.activate] [components.py:ProcessComponent._invalidate_problem_targets]
+- Activating an MVR component deactivates the original source streams and activates the replacement streams, and deactivating reverses this, except that a source another active component replaced stays off; both invalidate the problem's analysis. [process_mvr.py:ProcessMVRComponent.activate] [process_mvr.py:ProcessMVRComponent.deactivate] [components.py:ProcessComponent._invalidate_problem_targets]
 - The analysis layer uses `ProcessComponentHost` so it does not import the application layer. [components.py:ProcessComponentHost]
 - Replay keeps the component objects and each stream's `is_active` flag; efficiencies not passed explicitly and `dt_diff_max` are re-read from the new configuration; a failure changes no component. [process_mvr.py:replay_process_components]
+- A saved record names each source by its owning zone's path below the root and its stream name, so a name selector that matched several streams saves all of them and a renamed project still resolves; the `options` and `period_id` of the original call only check the call and are not saved. A missing source raises `ValueError`. [process_mvr.py:ProcessMVRComponent._to_record] [process_mvr.py:restore_process_components]
 - `original_streams`, `replacement_streams` and `stage_results_by_period` return deep copies. [process_mvr.py:ProcessMVRComponent]
 
 ## Side Effects

@@ -16,8 +16,12 @@ Behaviour changes
   7700 kW on one test case its mass balance never settled. Each new model uses one
   size band and does not switch. Work targets change from the old method wherever
   it would have used the other band.
-- A cogeneration target reused through ``base_target`` with no usable turbine stage
-  no longer keeps its earlier ``turbine_converged`` and ``turbine_diagnostics``.
+- A cogeneration target re-run with no usable turbine stage, with or without
+  ``base_target``, no longer keeps its earlier values. ``work_target``,
+  ``turbine_efficiency_target``, ``turbine_converged`` and ``turbine_result`` are
+  now ``None`` and ``turbine_diagnostics`` is empty, as for a run from a thermal
+  target. Process-component work, if any, still fills ``work_target``. Previously
+  the old work stayed on the target and its result row, so it looked valid.
 - If a stage's work is outside the chosen band, the target reports the number and
   a message goes to ``turbine_diagnostics``, a ``UserWarning`` and
   ``problem.report().warnings``; ``turbine_converged`` is not affected. For some
@@ -40,6 +44,10 @@ Input and validation
   for a ``.xlsx`` save. It was accepted as a source suffix but failed with
   ``ImportError: Import xlrd failed``, because no install extra provides
   ``xlrd``.
+- Opening a workbook without its Excel reader still raises ``ImportError``, but
+  the message now names the missing package and the ``dashboard`` and
+  ``notebook`` extras that provide it. ``.xls`` content in a renamed file gets a
+  message asking for a ``.xlsx`` save.
 - New ``PinchProblem.source_validation_report(source)`` returns a
   ``ValidationReport`` for any source the constructor takes, without raising for
   bad input of any format. ``valid`` is true only if the constructor accepts the
@@ -48,6 +56,14 @@ Input and validation
   so. The ``validate`` command uses the new report, so inline input is checked
   after the same normalisation as loading: for example, a stream entry that is
   not a record is now reported as the loader sees it.
+
+- After ``problem.project_name = "New"``, ``update_options`` and
+  ``set_dt_cont_multiplier`` no longer put a root zone named by ``zone_tree`` back
+  to its old name, also through ``PinchWorkspace``. The root zone,
+  ``to_problem_json``, stored case inputs and results keyed by root zone keep the
+  new name, so ``zone_name="New/Area"`` is the path to use. Setting
+  ``workspace.project_name`` now renames the live cases and drops their cached
+  results; before, it reached only cases built afterwards.
 
 - ``PinchWorkspace.load`` with input that fails while the case is prepared, such
   as an unknown zone type in ``zone_tree``, now stores the case and returns
@@ -78,6 +94,11 @@ Documentation
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``add_process_mvr`` on a multiperiod case no longer fails with "Profile heat
+  coordinates must be strictly monotonic" when periods share a stage profile
+  breakpoint that differs only by rounding. It failed with or without liquid
+  injection. Multiperiod structured stream profiles use the same alignment.
+  Single-period results do not change.
 - **Behaviour change:** Cascade vapour-compression heat pump targets with one
   condenser and several evaporators no longer deliver the condenser's duty again
   from every lower stage. Those stages condense into the evaporator above and
@@ -135,9 +156,20 @@ Heat pumps and refrigeration
   passed explicitly stay as given; efficiencies left unset take the new
   ``PROCESS_MVR_ETA_COMP`` and ``PROCESS_MVR_ETA_MOTOR`` values, so changing those
   options can change a kept component's work. If a component cannot be re-solved,
-  the call raises and the problem and its components are unchanged. Components
-  remain memory-only: ``load`` discards them, and ``to_problem_json`` and workspace
-  bundles do not carry them.
+  the call raises and the problem and its components are unchanged.
+- Deactivating one of two process components on the same source no longer turns the
+  source back on while the other is still active, which counted the stream twice.
+- **Behaviour change:** process components now survive ``to_problem_json``, workspace
+  bundles and ``PinchWorkspace.scenario``. They used to be lost with no warning, so a
+  saved or copied case targeted different utilities from the original. The input has
+  a new optional ``process_components`` field holding each ``add_process_mvr`` call
+  and its active state, and loading it re-solves the component. A load fails if a
+  saved source stream is gone. Files and bundles without components load as before,
+  their export does not gain the field, and the bundle ``schema_version`` stays "3".
+  A file that holds components cannot be read by an older OpenPinch, which rejects the
+  unknown field. Utility placement on a case with components now places utilities for
+  the case with the MVR, not without it, so its utility levels change, and the
+  returned case keeps the components.
 - Vapour-compression targets now limit each compressor's pressure ratio, with
   the new ``HPR_MAX_PRESSURE_RATIO`` option (default 15). A candidate over the
   limit evaporates warmer, or in a cascade raises its lower levels, so targets
@@ -183,12 +215,30 @@ Heat pumps and refrigeration
 Heat exchanger network synthesis
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``HeatExchangerNetworkGridDiagram.save`` to an image file without Kaleido now
+  raises ``MissingSynthesisDependencyError``, an ``ImportError``, with the
+  ``openpinch[synthesis]`` install command. It used to pass on Plotly's own
+  error, which names no OpenPinch extra. Other export errors,
+  such as a bad file extension, are unchanged.
 - ``design.heat_exchanger_network()``, its multiperiod form and
   ``design.enhanced_heat_exchanger_network()`` now run
   ``HENS_SYNTHESIS_QUALITY_TIER`` when the problem's options set it, and they
   ignored it before. Only problems that set the option see a change: without it
   the methods keep tiers 0 and 2, and ``quality_tier=`` still wins.
   ``design.open_hens()`` stays at tier 1.
+- ``result.manifest.method_sequence`` now lists the stages that ran. It always
+  listed all three methods, including ``thermal_derivative_method`` on tier 0,
+  which leaves it out, and stages that could not run without Couenne.
+- ``result.provenance`` now shows the ``HENS_SYNTHESIS_QUALITY_TIER`` that ran,
+  matching the manifest. It showed the configured value, for example 1 on a
+  default tier 0 run, or 3 on a ``design.open_hens()`` run. The change does not
+  affect ``input_fingerprint``.
+- Network evolution tasks with no pathway metadata now use the branch breadth of
+  the tier that ran, as the manifest's ``evm_n_ad_branches`` and
+  ``evm_n_rm_branches`` report. These are the tasks that run when Couenne is
+  missing. They read the tier stored in the options, so a stored tier of 4 gave
+  a tier 0 or tier 1 run a breadth of 2 and a stored tier of 1 gave a tier 4 run
+  a breadth of 1. Their task IDs change, because a task ID includes its settings.
 
 Cogeneration
 ~~~~~~~~~~~~
