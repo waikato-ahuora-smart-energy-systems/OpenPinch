@@ -1,6 +1,8 @@
 """Regression tests for stream period handling with collection-owned metadata."""
 
 import json
+from copy import deepcopy
+from unittest import mock
 
 import numpy as np
 import pytest
@@ -599,3 +601,17 @@ def test_stream_rejects_period_ids_in_a_value_it_would_ignore():
             target_temperature=50.0,
             heat_flow={"values": [10.0, 20.0], "period_ids": ["b", "a"], "unit": "kW"},
         )
+
+
+def test_deepcopy_of_a_stream_skips_generic_object_reconstruction():
+    stream = Stream(
+        "A", supply_temperature=200.0, target_temperature=100.0, heat_flow=500.0
+    )
+
+    with mock.patch("copy._reconstruct", side_effect=AssertionError("generic copy")):
+        copied = deepcopy(stream)
+
+    assert copied is not stream
+    assert copied.heat_flow == stream.heat_flow
+    assert copied.period_ids is not stream.period_ids
+    assert copied.weights is not stream.weights

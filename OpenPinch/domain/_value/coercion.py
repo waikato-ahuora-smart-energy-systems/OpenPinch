@@ -9,6 +9,9 @@ from typing import Any
 import numpy as np
 from pint.errors import DimensionalityError
 
+# The most common inputs: their exact types skip the input-shape checks.
+_PLAIN_SCALAR_TYPES = frozenset({float, int, np.float64})
+
 
 def is_value_with_unit(data: Any) -> bool:
     """Return whether an object exposes value and unit attributes."""
@@ -35,6 +38,15 @@ def coerce_period_index(value: Any) -> int:
     if resolved < 0:
         raise IndexError("period index must be a non-negative integer.")
     return resolved
+
+
+def frozen_magnitudes(magnitude: Any) -> np.ndarray:
+    """Return a private read-only 1-D float copy of ``magnitude``."""
+    magnitudes = np.array(magnitude, dtype=float, copy=True).reshape(-1)
+    if magnitudes.size == 0:
+        raise ValueError("Values cannot be empty.")
+    magnitudes.flags.writeable = False
+    return magnitudes
 
 
 def is_array_like_input(data: Any) -> bool:
@@ -86,11 +98,17 @@ class ValueCoercion:
         data,
         unit: str | None,
     ) -> tuple[Any, np.ndarray]:
+        if type(data) in _PLAIN_SCALAR_TYPES:
+            return self._quantity_from_scalar(data, unit), None
+
         normalised_data = self._normalise_input_object(data)
 
         if isinstance(normalised_data, self._value_type):
-            quantity = normalised_data._quantity
+            quantity = self._coerce_quantity_to_unit(normalised_data._quantity, unit)
             weights = normalised_data.weights
+            if quantity is normalised_data._quantity:
+                return quantity, weights
+            return self._frozen_quantity(quantity), weights
         elif isinstance(normalised_data, Mapping):
             # Fall through so a mapping's own unit is converted to ``unit``.
             quantity, weights = self._coerce_mapping_input(normalised_data, unit)
@@ -110,7 +128,13 @@ class ValueCoercion:
             weights = None
 
         quantity = self._coerce_quantity_to_unit(quantity, unit)
-        return quantity, weights
+        return self._frozen_quantity(quantity), weights
+
+    def _frozen_quantity(self, quantity):
+        """Return a new quantity with a private read-only magnitude array."""
+        return self._quantity_factory(
+            frozen_magnitudes(quantity.magnitude), quantity.units
+        )
 
     def _normalise_input_object(self, data):
         if hasattr(data, "model_dump") and not isinstance(data, Mapping):
@@ -171,7 +195,7 @@ class ValueCoercion:
         if is_bool_like(data):
             raise TypeError("Boolean values are not supported.")
         resolved_unit = self._normalise_unit_input(unit)
-        magnitude = np.asarray([data], dtype=float)
+        magnitude = frozen_magnitudes([data])
         return (
             self._quantity_factory(magnitude, self._unit_from_normalised(resolved_unit))
             if resolved_unit
@@ -204,14 +228,17 @@ class ValueCoercion:
         )
 
     def _coerce_quantity_to_unit(self, quantity, unit: str | None):
+        if unit is None:
+            return quantity
+        resolved_unit = self._normalise_unit_input(unit)
+        unit_obj = self._unit_from_normalised(resolved_unit)
+        # Only a quantity of this registry can be compared with its units.
+        if isinstance(quantity, self._quantity_factory) and quantity.units == unit_obj:
+            return quantity
         copied = self._quantity_factory(
             np.asarray(quantity.magnitude, dtype=float).reshape(-1),
             quantity.units,
         )
-        if unit is None:
-            return copied
-        resolved_unit = self._normalise_unit_input(unit)
-        unit_obj = self._unit_from_normalised(resolved_unit)
         try:
             return copied.to(unit_obj)
         except (DimensionalityError, TypeError, ValueError):

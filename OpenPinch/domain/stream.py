@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import warnings
 from collections.abc import Mapping
+from copy import deepcopy
 from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
@@ -245,6 +246,15 @@ class Stream:
                 f"Stream has no attribute {name!r}; use the descriptive runtime name."
             )
         super().__setattr__(name, value)
+
+    def __deepcopy__(self, memo) -> Stream:
+        """Copy the stored state directly, without re-deriving any property."""
+        copied = object.__new__(type(self))
+        memo[id(self)] = copied
+        copied.__dict__ = {
+            name: deepcopy(value, memo) for name, value in self.__dict__.items()
+        }
+        return copied
 
     def __init__(
         self,

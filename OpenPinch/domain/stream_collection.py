@@ -226,16 +226,22 @@ class StreamCollection:
         return copied
 
     def __deepcopy__(self, memo):
-        """Copy live state without applying the pickle-only callable fallback."""
+        """Copy live state without applying the pickle-only callable fallback.
+
+        The numeric cache and sort key are rebuilt. The sort signature identifies
+        the source streams by ``id``, so it can only be dropped.
+        """
         copied = type(self).__new__(type(self))
         memo[id(self)] = copied
         state = {
             key: value
             for key, value in self.__dict__.items()
-            if key != "_numeric_cache"
+            if key not in {"_numeric_cache", "_sort_key", "_sort_signature"}
         }
         copied.__dict__ = deepcopy(state, memo)
         copied._numeric_cache = {}
+        copied._sort_signature = None
+        copied._rebuild_sort_key()
         return copied
 
     def set_period_context(

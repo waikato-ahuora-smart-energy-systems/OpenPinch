@@ -31,6 +31,7 @@ Core in-memory state of OpenPinch: unit-aware values, streams and stream collect
 ## Invariants
 - Domain code does not import from the analysis, application, contracts, adapters or presentation packages. [enums.py:CogenerationTarget]
 - Every quantity carries a unit; `Stream` stores its values in fixed units (degC, kPa, kJ/kg, kW, `delta_degC`, `$/MW/h`) and converts on assignment. [stream.py:Stream]
+- `deepcopy` of a `Stream` or `StreamCollection` copies the stored state and re-derives nothing. Copied values share their read-only magnitudes; a copied collection drops its numeric views and sorts again on first use. [stream.py:Stream.__deepcopy__] [stream_collection.py:StreamCollection.__deepcopy__]
 - Values owned by a stream are read-only; changes go through the stream setters, and for a segmented stream the aggregate temperatures, heat flow and HTC are derived, so edit segments instead. [stream.py:Stream._read_only_value]
 - Retired short attribute names on `Stream` (for example `t_supply`, `htc`) raise `AttributeError` on assignment. [stream.py:Stream.__setattr__]
 - Configuration group dataclasses must match `CONFIG_FIELD_SPECS` field for field, checked at import. [configuration.py:_check_group_types]

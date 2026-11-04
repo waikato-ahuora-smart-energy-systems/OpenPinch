@@ -2,7 +2,9 @@
 
 import csv
 import pickle
+from copy import deepcopy
 from types import SimpleNamespace
+from unittest import mock
 from uuid import uuid4
 
 import numpy as np
@@ -944,3 +946,16 @@ def test_stream_collection_subset_sort_and_inverted_utility_edges():
     assert inverted_hot_utilities["CU"].stream_type == StreamType.Hot.value
     assert set(inverted_cold_utilities._streams) == {"HU"}
     assert inverted_cold_utilities["HU"].stream_type == StreamType.Cold.value
+
+
+def test_deepcopy_skips_generic_reconstruction_and_stale_sort_signature(sample_streams):
+    collection = StreamCollection(list(sample_streams))
+    names = [stream.name for stream in collection]
+
+    with mock.patch("copy._reconstruct", side_effect=AssertionError("generic copy")):
+        copied = deepcopy(collection)
+
+    assert copied._sort_signature is None
+    assert [stream.name for stream in copied] == names
+    assert copied["A"] is not collection["A"]
+    assert copied[0] is copied[names[0]]

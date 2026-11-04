@@ -1167,3 +1167,21 @@ def test_segment_period_setter_changes_only_the_named_period():
         [100.0, 100.0, 10.0]
     )
     assert stream.heat_flow.period_values == pytest.approx([150.0, 150.0, 60.0])
+
+
+def test_deepcopy_of_a_collection_isolates_segmented_streams():
+    collection = StreamCollection(
+        [Stream(name="Variable CP", segments=_hot_segments())]
+    )
+    shared_weights = collection["Variable CP"].weights
+
+    copied = deepcopy(collection)
+    stream = copied["Variable CP"]
+
+    assert stream.segments[0].parent is stream
+    assert stream.segments[0] is not collection["Variable CP"].segments[0]
+    assert stream.weights is not shared_weights
+    stream.update_segment(0, heat_flow=75.0)
+    assert stream.heat_flow.value == pytest.approx(175.0)
+    assert collection["Variable CP"].heat_flow.value == pytest.approx(150.0)
+    assert collection["Variable CP"].segments[0].heat_flow.value == pytest.approx(50.0)
