@@ -252,3 +252,13 @@ def test_indirect_refrigeration_ambient_balance_and_residual_placement():
     )
     final = optimized.target.direct_heat_integration()
     assert final.cold_utility_target == pytest.approx(allocated.cold_utility_target)
+
+
+def test_residual_input_cannot_carry_process_components(solved_hpr):
+    problem, hp, _ = solved_hpr
+    payload = problem.residual_utility(base_target=hp).to_problem_json()
+    payload["process_components"] = [
+        {"id": "mvr_1", "source_streams": [{"zone": "", "name": "Any"}]}
+    ]
+    with pytest.raises(ValueError, match="process components"):
+        PinchProblem(payload)

@@ -130,9 +130,18 @@ Heat pumps and refrigeration
   passed explicitly stay as given; efficiencies left unset take the new
   ``PROCESS_MVR_ETA_COMP`` and ``PROCESS_MVR_ETA_MOTOR`` values, so changing those
   options can change a kept component's work. If a component cannot be re-solved,
-  the call raises and the problem and its components are unchanged. Components
-  remain memory-only: ``load`` discards them, and ``to_problem_json`` and workspace
-  bundles do not carry them.
+  the call raises and the problem and its components are unchanged.
+- **Behaviour change:** process components now survive ``to_problem_json``, workspace
+  bundles and ``PinchWorkspace.scenario``. They used to be lost with no warning, so a
+  saved or copied case targeted different utilities from the original. The input has
+  a new optional ``process_components`` field holding each ``add_process_mvr`` call
+  and its active state, and loading it re-solves the component. A load fails if a
+  saved source stream is gone. Files and bundles without components load as before,
+  their export does not gain the field, and the bundle ``schema_version`` stays "3".
+  A file that holds components cannot be read by an older OpenPinch, which rejects the
+  unknown field. Utility placement on a case with components now places utilities for
+  the case with the MVR, not without it, so its utility levels change, and the
+  returned case keeps the components.
 - Vapour-compression targets now limit each compressor's pressure ratio, with
   the new ``HPR_MAX_PRESSURE_RATIO`` option (default 15). A candidate over the
   limit evaporates warmer, or in a cascade raises its lower levels, so targets

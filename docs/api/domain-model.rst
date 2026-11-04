@@ -49,8 +49,8 @@ last non-zero segment proportions instead of mutating the derived parent duty.
    temperatures, utility cascades, and several advanced targeting routines.
 
 ``ProcessComponent``
-   Memory-only component attached to a prepared problem when the model needs
-   to be mutated before targeting. The direct process MVR component uses this
+   Component attached to a prepared problem when the model needs to be mutated
+   before targeting. The direct process MVR component uses this
    layer to replace selected hot gas/vapour streams with compressed
    replacement streams.
 
@@ -104,9 +104,10 @@ Key Classes
 Process Components
 ------------------
 
-Process components are attached to a live ``PinchProblem`` and are not part of
-the external input schema. They are useful for before/after studies where a
-specific unit operation changes the active process stream set before targeting.
+Process components are attached to a live ``PinchProblem``. They are useful for
+before/after studies where a specific unit operation changes the active process
+stream set before targeting. The input's ``process_components`` field saves each
+component as the call that made it, and loading that input re-solves it.
 
 .. autoclass:: OpenPinch.analysis.heat_pumps.components.ProcessComponent
    :members:

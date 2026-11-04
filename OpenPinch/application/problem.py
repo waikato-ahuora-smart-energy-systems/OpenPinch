@@ -11,7 +11,7 @@ from typing import Any, Callable, Dict, Optional
 import pandas as pd
 from pydantic import ValidationError
 
-from ..contracts.input import TargetInput
+from ..contracts.input import ProcessComponentSchema, TargetInput
 from ..contracts.output import TargetOutput
 from ..contracts.reporting import ProblemReport, ReportMetric
 from ..contracts.workspace import ValidationReport
@@ -335,7 +335,12 @@ class PinchProblem:
             input_data,
             context=self._validation_context or {},
         )
+        if self._process_components:
+            input_data.process_components = self._process_component_records()
         return input_data
+
+    def _process_component_records(self) -> list[ProcessComponentSchema]:
+        return [c.to_record() for c in self._process_components.values()]
 
     def validation_report(self) -> ValidationReport:
         """Return the validation results of the loaded input, warnings included.
@@ -530,8 +535,17 @@ class PinchProblem:
 
     @property
     def problem_data(self) -> Optional[TargetInput | JsonDict]:
-        """Return a detached snapshot of the loaded raw problem definition."""
-        return deepcopy(self._problem_data)
+        """Return a detached snapshot of the raw definition and its components."""
+        data = deepcopy(self._problem_data)
+        if self._process_components:
+            records = self._process_component_records()
+            if isinstance(data, TargetInput):
+                data.process_components = records
+            else:
+                data["process_components"] = [
+                    record.model_dump(mode="python") for record in records
+                ]
+        return data
 
     @property
     def results(self) -> Optional[TargetOutput]:
@@ -545,7 +559,7 @@ class PinchProblem:
 
     @property
     def process_components(self) -> dict[str, Any]:
-        """Memory-only process components applied to the prepared model."""
+        """Process components applied to the prepared model."""
         return MappingProxyType(dict(self._process_components))
 
     @property
@@ -584,7 +598,7 @@ class PinchProblem:
                 self._invalidate_analysis()
 
     def to_problem_json(self) -> JsonDict:
-        """Return canonical JSON-compatible problem inputs."""
+        """Return canonical JSON-compatible problem inputs, with any components."""
         if self._problem_data is None:
             raise RuntimeError("No problem data is available. Call load(...) first.")
         return self._canonical_problem_inputs()

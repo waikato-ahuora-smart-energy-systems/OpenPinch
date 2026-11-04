@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from typing import Any
 
 from ...analysis.numerics import get_period_index
+from ...contracts.input import ProcessComponentSchema, ProcessComponentSourceSchema
 from ...domain.stream import Stream
 from ...domain.zone import Zone
 from ._process_mvr.membership import (
@@ -33,7 +34,7 @@ from .direct_mvr.models import (
 
 @dataclass
 class ProcessMVRComponent(ProcessComponent):
-    """Memory-only direct process MVR component."""
+    """Direct process MVR component, saved with its case as the call that made it."""
 
     settings: DirectGasMVRSettings = field(default_factory=DirectGasMVRSettings)
     source_selectors: list[Any] = field(default_factory=list)
@@ -88,6 +89,29 @@ class ProcessMVRComponent(ProcessComponent):
             for membership in record.original_memberships
         }
         return sorted(paths)
+
+    def to_record(self) -> ProcessComponentSchema:
+        """Return the call that rebuilds this component from the case's input."""
+        return ProcessComponentSchema(
+            type=self.component_type,
+            id=self.id,
+            source_streams=[
+                ProcessComponentSourceSchema(
+                    # The last membership is the zone that owns the stream, where
+                    # its name is unique; parents can repeat it across children.
+                    zone=_path_below_root(record.original_memberships[-1].zone),
+                    name=record.original_stream.name,
+                )
+                for record in self.stream_records
+            ],
+            n_stages=self.settings.n_stages,
+            liquid_injection=self.settings.liquid_injection,
+            mvr_stage_t_lift=self.settings.mvr_stage_t_lift,
+            mvr_stage_pressure_ratio=self.settings.mvr_stage_pressure_ratio,
+            compressor_efficiency=self._requested_eta_mvr_comp,
+            motor_efficiency=self._requested_eta_motor,
+            active=self.active,
+        )
 
     def work_for_zone(
         self,
@@ -193,6 +217,64 @@ def replay_process_components(
         component.stream_records = records
 
 
+def restore_process_components(
+    problem: ProcessComponentHost,
+    records: Sequence[ProcessComponentSchema],
+) -> None:
+    """Rebuild saved components, in call order, on a freshly prepared problem."""
+    zones = {
+        _path_below_root(zone): zone
+        for zone in walk_zones(problem._require_prepared_root_zone())
+    }
+    restored: list[ProcessMVRComponent] = []
+    for record in records:
+        sources = [
+            _find_saved_source(record.id, source, zones)
+            for source in record.source_streams
+        ]
+        # An earlier component on this source was inactive when this one was added;
+        # every component's saved state is applied below.
+        for stream in sources:
+            stream.is_active = True
+        restored.append(
+            create_process_mvr_component(
+                problem,
+                source_streams=sources,
+                mvr_id=record.id,
+                n_stages=record.n_stages,
+                liquid_injection=record.liquid_injection,
+                mvr_stage_t_lift=record.mvr_stage_t_lift,
+                mvr_stage_pressure_ratio=record.mvr_stage_pressure_ratio,
+                eta_mvr_comp=record.compressor_efficiency,
+                eta_motor=record.motor_efficiency,
+            )
+        )
+    pairs = list(zip(restored, records, strict=True))
+    for component, record in pairs:
+        if not record.active:
+            component.deactivate()
+    # In call order, so a component fed by an earlier one turns that one's output off.
+    for component, record in pairs:
+        if record.active:
+            component.activate()
+
+
+def _find_saved_source(
+    component_id: str,
+    source: ProcessComponentSourceSchema,
+    zones: dict[str, Zone],
+) -> Stream:
+    zone = zones.get(source.zone)
+    streams = () if zone is None else zone.hot_streams.items()
+    for _, stream in streams:
+        if stream.name == source.name:
+            return stream
+    raise ValueError(
+        f"Process component {component_id!r} cannot be rebuilt: source stream "
+        f"{source.name!r} was not found in zone {source.zone!r}."
+    )
+
+
 def _replay_component(
     component: ProcessMVRComponent,
     root: Zone,
@@ -284,4 +366,5 @@ __all__ = [
     "ProcessMVRComponent",
     "create_process_mvr_component",
     "replay_process_components",
+    "restore_process_components",
 ]
