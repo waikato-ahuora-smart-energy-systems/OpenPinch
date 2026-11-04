@@ -18,6 +18,11 @@ Behaviour changes
   to report 5881 kW released, 94% of it latent heat outside the source duty. A saved case with such
   a component no longer loads, and an option change that causes it fails and keeps
   the earlier state. Other MVR results do not change.
+- ``DirectGasMVRPhaseError`` now also covers a stage at or above the critical pressure
+  whose target or inlet is below the critical temperature, which used to be accepted:
+  steam from 500 to 350 degC at 15 MPa and pressure ratio 2 left the stage at 30 MPa
+  as a compressed liquid. The error's ``above_critical_pressure`` is true, its
+  ``t_saturation`` is the critical temperature and its message says so.
 - Indirect Carnot heat pump and refrigeration targets now treat a source-side utility
   band on the ambient air or cooling water limit as at that limit, as the vapour
   compression targets do. Previously its whole duty could be charged to refrigeration,

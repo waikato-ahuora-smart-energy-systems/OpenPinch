@@ -134,6 +134,7 @@ class DirectGasMVRPhaseError(DirectGasMVRStageError):
         t_target: float,
         t_saturation: float,
         pressure_kpa: float,
+        above_critical_pressure: bool = False,
     ) -> None:
         super().__init__(
             reason_code=reason_code,
@@ -145,10 +146,12 @@ class DirectGasMVRPhaseError(DirectGasMVRStageError):
         self.t_target = t_target
         self.t_saturation = t_saturation
         self.pressure_kpa = pressure_kpa
+        self.above_critical_pressure = above_critical_pressure
+        limit = "critical" if above_critical_pressure else "saturation"
         context = (
             f"Direct MVR stream {_bounded_context(source_stream)!r} "
             f"({_bounded_context(fluid)}), period {period_index}, stage {stage_index}: "
-            f"target {t_target:.2f} degC is below the saturation temperature "
+            f"target {t_target:.2f} degC is below the {limit} temperature "
             f"{t_saturation:.2f} degC at {pressure_kpa:.2f} kPa"
         )
         if reason_code == PHASE_LIQUID_STAGE_INLET:
@@ -177,6 +180,7 @@ class DirectGasMVRPhaseError(DirectGasMVRStageError):
                     t_target=self.t_target,
                     t_saturation=self.t_saturation,
                     pressure_kpa=self.pressure_kpa,
+                    above_critical_pressure=self.above_critical_pressure,
                 ),
             ),
         )
