@@ -923,6 +923,18 @@ def test_profile_alignment_merges_breakpoints_that_differ_only_by_rounding():
     np.testing.assert_allclose(second, [[0.0, 210.0], [7.0, 160.0], [15.0, 110.0]])
 
 
+def test_profile_alignment_measures_each_breakpoint_from_the_last_one_kept():
+    aligned = align_temperature_heat_profiles(
+        [
+            [[0.0, 200.0], [50.0, 150.0], [100.0, 100.0]],
+            [[0.0, 210.0], [50.00000006, 160.0], [100.0, 110.0]],
+            [[0.0, 220.0], [50.00000012, 170.0], [100.0, 120.0]],
+        ]
+    )
+
+    assert aligned[0].shape == (4, 2)
+
+
 def test_profile_alignment_keeps_exact_end_points_when_merging_at_the_end():
     first, second = align_temperature_heat_profiles(
         [

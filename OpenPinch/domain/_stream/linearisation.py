@@ -115,8 +115,12 @@ def align_temperature_heat_profiles(profiles) -> tuple[np.ndarray, ...]:
     # Periods often share a breakpoint whose fractions differ only by rounding;
     # kept apart, the pair would map to a zero-duty segment. The last fraction is
     # always 1.0, restored in case a neighbour stood in for it.
-    union = union[np.diff(union, prepend=-np.inf) > _COINCIDENT_DUTY_FRACTION]
-    union[-1] = 1.0
+    kept = [union[0]]
+    for fraction in union[1:]:
+        if fraction - kept[-1] > _COINCIDENT_DUTY_FRACTION:
+            kept.append(fraction)
+    kept[-1] = 1.0
+    union = np.asarray(kept)
     aligned = []
     for points, fractions in prepared:
         heat = np.interp(union, fractions, points[:, 0])

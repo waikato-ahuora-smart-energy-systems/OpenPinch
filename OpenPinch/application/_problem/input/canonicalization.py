@@ -50,6 +50,10 @@ def rename_canonical_root(problem_inputs: dict[str, Any], name: str) -> None:
     for stream in problem_inputs["streams"]:
         if stream["zone"].startswith(old_prefix):
             stream["zone"] = f"{name}/{stream['zone'].removeprefix(old_prefix)}"
+    # An explicit option would otherwise override the renamed root on rebuild.
+    options = problem_inputs.get("options")
+    if options and "PROBLEM_TOP_ZONE_NAME" in options:
+        options["PROBLEM_TOP_ZONE_NAME"] = name
 
 
 def _build_zone_config(

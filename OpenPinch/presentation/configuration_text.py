@@ -450,15 +450,17 @@ CONFIGURATION_FIELD_TEXT: dict[str, FieldText] = {
     "HENS_EVM_N_AD_BRANCHES": FieldText(
         "Network evolution add branches", None,
         (
-            "Match-adding candidates explored per network evolution step. None uses the"
-            " quality tier's default."
+            "Match-adding candidates explored per network evolution step on every "
+            "route, including the standard OpenHENS route. None uses the quality "
+            "tier's default, and 1 on tier 0 and 1 routes."
         ),
     ),
     "HENS_EVM_N_RM_BRANCHES": FieldText(
         "Network evolution remove branches", None,
         (
-            "Match-removing candidates explored per network evolution step. None uses "
-            "the quality tier's default."
+            "Match-removing candidates explored per network evolution step on every "
+            "route, including the standard OpenHENS route. None uses the quality "
+            "tier's default, and 1 on tier 0 and 1 routes."
         ),
     ),
     "HENS_EVM_BEAM_WIDTH": FieldText(

@@ -280,6 +280,7 @@ def _create_process_stream(stream: StreamSchema, zone: Zone) -> Stream:
         fluid_name=stream.fluid_name,
         fluid_phase=stream.fluid_phase,
     )
+    stream_obj.is_active = stream.active
     return stream_obj
 
 
@@ -333,6 +334,8 @@ def _find_extreme_process_temperatures(
     cold_streams: StreamCollection,
 ) -> Tuple[float, float]:
     """Find cold-stream high and hot-stream low target temperatures."""
+    hot_streams = [stream for stream in hot_streams if stream.is_active]
+    cold_streams = [stream for stream in cold_streams if stream.is_active]
     if len(hot_streams) == 0 and len(cold_streams) == 0:
         return 20, 20
     hu_t_min: float = None

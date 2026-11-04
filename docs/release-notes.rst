@@ -18,6 +18,13 @@ Behaviour changes
   to report 5881 kW released, 94% of it latent heat outside the source duty. A saved case with such
   a component no longer loads, and an option change that causes it fails and keeps
   the earlier state. Other MVR results do not change.
+- ``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` now apply to the tier 0
+  and tier 1 routes when set, including ``design.open_hens()`` and the protected
+  routes of tiers 2 to 5. These routes used to ignore the options and run at a
+  breadth of 1, although the manifest reported the option's value. A run with
+  either option above 1 now searches more of these routes, takes longer and can
+  return a different network, and those tasks get new IDs. Runs that do not set the
+  options are unchanged.
 - ``target.varbanov_cogeneration()`` and ``TurbineModel.VARBANOV`` are removed.
   They are replaced by ``target.varbanov_small_turbine_cogeneration()`` and
   ``target.varbanov_large_turbine_cogeneration()``, with
@@ -41,6 +48,11 @@ Behaviour changes
 Input and validation
 ~~~~~~~~~~~~~~~~~~~~
 
+- ``active: false`` on a process stream given by ``t_supply``, ``t_target`` and
+  ``heat_flow`` was ignored, so the stream stayed in the targets. It now applies
+  as it already did for streams given by ``segments`` or ``profile``. Inactive
+  streams of any form also no longer set the default utility temperatures. Results
+  change only for inputs that set ``active: false`` on a process stream.
 - A failed ``update_options`` or other input replacement now keeps retained heat
   pump targets valid, as the rest of the problem's state already was.
 - ``ZoneType.UO`` is the new name of the unit operation zone type. ``ZoneType.O``
@@ -163,6 +175,8 @@ Heat pumps and refrigeration
   ``PROCESS_MVR_ETA_COMP`` and ``PROCESS_MVR_ETA_MOTOR`` values, so changing those
   options can change a kept component's work. If a component cannot be re-solved,
   the call raises and the problem and its components are unchanged.
+- Deactivating one of two process components on the same source no longer turns the
+  source back on while the other is still active, which counted the stream twice.
 - **Behaviour change:** process components now survive ``to_problem_json``, workspace
   bundles and ``PinchWorkspace.scenario``. They used to be lost with no warning, so a
   saved or copied case targeted different utilities from the original. The input has
@@ -237,6 +251,12 @@ Heat exchanger network synthesis
   matching the manifest. It showed the configured value, for example 1 on a
   default tier 0 run, or 3 on a ``design.open_hens()`` run. The change does not
   affect ``input_fingerprint``.
+- Network evolution tasks with no pathway metadata now use the branch breadth of
+  the tier that ran, as the manifest's ``evm_n_ad_branches`` and
+  ``evm_n_rm_branches`` report. These are the tasks that run when Couenne is
+  missing. They read the tier stored in the options, so a stored tier of 4 gave
+  a tier 0 or tier 1 run a breadth of 2 and a stored tier of 1 gave a tier 4 run
+  a breadth of 1. Their task IDs change, because a task ID includes its settings.
 
 Cogeneration
 ~~~~~~~~~~~~
