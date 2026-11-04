@@ -721,3 +721,33 @@ def test_condensing_search_range_is_unchanged_when_no_cap_applies():
         T_cold=np.array([300.0, 250.0]), refrigerant_ls=["ammonia"]
     )
     assert hp_shared.condensing_temperature_search_range(cold_sink) == (300.0, 250.0)
+
+
+def test_carnot_evaporator_cascade_gets_the_utility_bands(monkeypatch):
+    args = _base_args()
+    backgrounds = []
+    real_duties = hp_shared._cascade_air_duties
+
+    def recording_duties(*call_args, **kwargs):
+        backgrounds.append(kwargs.get("T_background"))
+        return real_duties(*call_args, **kwargs)
+
+    monkeypatch.setattr(hp_shared, "_cascade_air_duties", recording_duties)
+
+    hp_shared.evaluate_carnot_hpr_result(
+        args=args,
+        state=HPRParsedState(
+            Q_amb_hot=0.0,
+            Q_amb_cold=0.0,
+            T_cond=np.array([100.0]),
+            T_evap=np.array([60.0]),
+        ),
+        w_net=10.0,
+        w_hpr=np.array([10.0]),
+        Q_cond_total=np.array([40.0]),
+        Q_evap_total=np.array([30.0]),
+    )
+
+    condenser, evaporator = backgrounds
+    np.testing.assert_allclose(condenser, args.T_cold)
+    np.testing.assert_allclose(evaporator, args.T_hot)

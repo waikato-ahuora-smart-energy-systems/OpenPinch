@@ -18,6 +18,10 @@ Behaviour changes
   to report 5881 kW released, 94% of it latent heat outside the source duty. A saved case with such
   a component no longer loads, and an option change that causes it fails and keeps
   the earlier state. Other MVR results do not change.
+- Indirect Carnot heat pump and refrigeration targets now treat a source-side utility
+  band on the ambient air or cooling water limit as at that limit, as the vapour
+  compression targets do. Previously its whole duty could be charged to refrigeration,
+  so these targets can change on a utility background.
 - ``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` now apply to the tier 0
   and tier 1 routes when set, including ``design.open_hens()`` and the protected
   routes of tiers 2 to 5. These routes used to ignore the options and run at a
@@ -44,7 +48,6 @@ Behaviour changes
   a message goes to ``turbine_diagnostics``, a ``UserWarning`` and
   ``problem.report().warnings``; ``turbine_converged`` is not affected. For some
   duties both models warn.
-
 Input and validation
 ~~~~~~~~~~~~~~~~~~~~
 

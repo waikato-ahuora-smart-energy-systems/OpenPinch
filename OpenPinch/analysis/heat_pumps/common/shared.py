@@ -476,6 +476,7 @@ def evaluate_carnot_hpr_result(
         T_air_source,
         T_air_sink,
         _cooling_water_sink_temperature(args),
+        T_background=args.T_hot,
     )
     Q_ext_heat, Q_ext_cold, penalty, obj = _build_hpr_accounting(
         work=float(w_net),
