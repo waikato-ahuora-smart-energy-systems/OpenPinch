@@ -228,6 +228,12 @@ Heat exchanger network synthesis
   matching the manifest. It showed the configured value, for example 1 on a
   default tier 0 run, or 3 on a ``design.open_hens()`` run. The change does not
   affect ``input_fingerprint``.
+- Network evolution tasks with no pathway metadata now use the branch breadth of
+  the tier that ran, as the manifest's ``evm_n_ad_branches`` and
+  ``evm_n_rm_branches`` report. These are the tasks that run when Couenne is
+  missing. They read the tier stored in the options, so a stored tier of 4 gave
+  a tier 0 or tier 1 run a breadth of 2 and a stored tier of 1 gave a tier 4 run
+  a breadth of 1. Their task IDs change, because a task ID includes its settings.
 
 Cogeneration
 ~~~~~~~~~~~~
