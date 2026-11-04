@@ -158,11 +158,12 @@ git config core.hooksPath .githooks
 
 Before pushing work meant for `main`, also run `scripts/ci_local.sh all`, which adds the
 TESPy, performance, solver and notebook lanes. CI runs the solver lane only for
-pull requests into `main`; it runs the others on every pull request.
+pull requests into `main`, and the performance lane with it; it runs the others on
+every pull request.
 
 The script does not run every CI lane. CI also runs the Pyodide lane (the test suite
-inside WebAssembly against the built wheel), the lowest-allowed-versions `floors` lane,
-the Python 3.12 and 3.13 unit lanes, the wheel smoke tests of the optional surfaces
+inside WebAssembly against the built wheel), the lowest-allowed-versions `floors` lane
+and the Python 3.12 and 3.13 unit lanes (both for pull requests into `main` only), the wheel smoke tests of the optional surfaces
 and other operating systems, and the dependency audit. To run a Pyodide shard, build
 the wheel and run it under Node 22 (the shard paths and deselections are in
 `.github/workflows/ci.yml`):

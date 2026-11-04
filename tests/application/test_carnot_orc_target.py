@@ -40,6 +40,7 @@ def _problem(*, hot_duty: float = 20000.0) -> PinchProblem:
     )
 
 
+@pytest.mark.process_pools
 def test_carnot_orc_turns_surplus_into_power_without_extra_hot_utility():
     problem = _problem()
     base = problem.target.direct_heat_integration()

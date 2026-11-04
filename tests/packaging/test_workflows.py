@@ -53,6 +53,7 @@ def test_ci_triggers_and_single_required_check():
     assert gate["if"] == "${{ always() }}"
     assert set(gate["needs"]) == set(ci["jobs"]) - {"ci-ok"}
     assert '"solver"' in runs(gate) and '"version"' in runs(gate)
+    assert '"solver","compat"' in runs(gate).replace(", ", ",")
     (required,) = re.findall(r"^required='(.*)'$", runs(gate), re.MULTILINE)
     # audit stays informational; every other always-on lane blocks a merge.
     assert json.loads(required) == ["lint", "tests", "build", "smoke", "pyodide"]
@@ -62,6 +63,7 @@ def test_main_only_lanes():
     jobs = workflow("ci.yml")["jobs"]
     assert "refs/heads/main" in jobs["solver"]["if"]
     assert "github.base_ref == 'main'" in jobs["solver"]["if"]
+    assert jobs["compat"]["if"] == jobs["solver"]["if"]
     assert jobs["version"]["if"] == (
         "${{ github.event_name == 'pull_request' && github.base_ref == 'main' }}"
     )
@@ -70,31 +72,35 @@ def test_main_only_lanes():
 
 def test_every_ci_lane_is_present():
     jobs = workflow("ci.yml")["jobs"]
-    lanes = {row["lane"] for row in jobs["tests"]["strategy"]["matrix"]["include"]}
-    assert lanes == {
+    include = jobs["tests"]["strategy"]["matrix"]["include"]
+    # One Python on every change; the rest of the matrix is for release.
+    assert {row["lane"] for row in include} == {
         "unit",
-        "unit-py312",
-        "unit-py313",
-        "floors",
         "docs",
         "tespy",
         "notebooks-hpr",
+    }
+    markers = {row["lane"]: row["markers"] for row in include}
+    compat = jobs["compat"]["strategy"]["matrix"]["include"]
+    assert {row["lane"] for row in compat} == {
+        "unit-py312",
+        "unit-py313",
+        "floors",
         "performance",
     }
-    markers = {
-        row["lane"]: row["markers"]
-        for row in jobs["tests"]["strategy"]["matrix"]["include"]
-    }
+    compat_markers = {row["lane"]: row["markers"] for row in compat}
     # Every supported Python minor version runs the unit selection.
-    pythons = {
-        row["lane"]: row.get("python")
-        for row in jobs["tests"]["strategy"]["matrix"]["include"]
-    }
+    pythons = {row["lane"]: row.get("python") for row in compat}
     assert pythons["unit-py312"] == "3.12"
     assert pythons["unit-py313"] == "3.13"
-    assert markers["unit-py312"] == markers["unit-py313"] == markers["unit"]
+    assert compat_markers["unit-py312"] == markers["unit"]
+    assert compat_markers["unit-py313"] == markers["unit"]
     # The floors lane runs the unit selection at the lowest allowed versions.
-    assert markers["floors"] == markers["unit"]
+    assert compat_markers["floors"] == markers["unit"]
+    # The release lanes keep the worker processes the other lanes skip.
+    assert jobs["compat"]["env"]["OPENPINCH_TEST_REAL_POOLS"] == "1"
+    # The unit lane shares the runner's cores between test workers.
+    assert "-n auto" in runs(jobs["tests"])
     # HPR tutorial notebooks run once, in their own long-timeout lane.
     assert markers["tespy"] == "tespy and not tutorial_profile"
     assert markers["notebooks-hpr"] == "tespy and tutorial_profile"

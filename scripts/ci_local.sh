@@ -72,11 +72,10 @@ lane_lint() {
 }
 lane_quick() {
   lane_lint
-  pytest_lane unit "$UNIT_MARKERS" -x -q
+  pytest_lane unit "$UNIT_MARKERS" -n auto -x -q
 }
 lane_unit() {
-  uv run --no-sync coverage run --branch --source=OpenPinch -m pytest \
-    --hypothesis-seed="$SEED" -m "$UNIT_MARKERS" --junitxml=reports/unit.xml --durations=20
+  pytest_lane unit "$UNIT_MARKERS" -n auto --cov=OpenPinch --cov-branch --cov-report=
   uv run --no-sync coverage report --fail-under=95
 }
 lane_docs() { pytest_lane docs "docs"; }
