@@ -443,12 +443,12 @@ def test_value_from_a_scalar_builds_one_quantity():
 
 
 def test_scalar_shortcut_matches_the_general_scalar_path():
-    class Celsius(float):
+    class FloatSubclass(float):
         pass
 
     for unit in ("degC", "-", "$/y", None):
         plain = Value(1.5, unit)
-        general = Value(Celsius(1.5), unit)
+        general = Value(FloatSubclass(1.5), unit)
 
         assert plain.to_dict() == general.to_dict()
         assert plain.unit == general.unit
