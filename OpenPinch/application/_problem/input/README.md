@@ -38,6 +38,7 @@ import from here.
 - Segment temperatures chain end to start, keep one direction, and carry positive heat flow and HTC; profile cumulative heat increases strictly. [semantics.py:_validate_segmented_stream_states], [semantics.py:_validate_temperature_heat_profile_states]
 - Supplied parent `t_supply`, `t_target` and `heat_flow` must match the nested profile. [segments.py:_validate_supplied_parent_aggregates]
 - A default utility (HU, CU, then HU_1, CU_1, ...) is added unless an active, uncapped utility of that type reaches the process temperatures; a capped utility never replaces it. Default-utility streams are marked by identity. [utilities.py:_complete_utility_data], [utilities.py:_add_default_utilities], [utilities.py:_create_utilities_list]
+- A stream's `active` flag reaches the prepared stream on every input form, and inactive streams do not place default utilities. [construction.py:_create_process_stream], [segments.py:_create_segmented_process_stream], [construction.py:_find_extreme_process_temperatures]
 - Default utilities are placed for the largest zone multiplier. [construction.py:_largest_dt_cont_multiplier]
 - A state replacement either completes or leaves all `_PROBLEM_STATE_FIELDS` as before. [loading.py:replace_loaded_source]
 - Excel and CSV sources report records as sheet row `index + 3`. [validation.py:_build_record_context]

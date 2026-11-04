@@ -26,6 +26,11 @@ Behaviour changes
 Input and validation
 ~~~~~~~~~~~~~~~~~~~~
 
+- ``active: false`` on a process stream given by ``t_supply``, ``t_target`` and
+  ``heat_flow`` was ignored, so the stream stayed in the targets. It now applies
+  as it already did for streams given by ``segments`` or ``profile``. Inactive
+  streams of any form also no longer set the default utility temperatures. Results
+  change only for inputs that set ``active: false`` on a process stream.
 - A failed ``update_options`` or other input replacement now keeps retained heat
   pump targets valid, as the rest of the problem's state already was.
 - ``ZoneType.UO`` is the new name of the unit operation zone type. ``ZoneType.O``
