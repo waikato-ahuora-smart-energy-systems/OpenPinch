@@ -206,6 +206,9 @@ engineering argument names such as ``compressor_efficiency`` and
 ``motor_efficiency``. The returned object exposes ``active``, ``activate()``,
 ``deactivate()``, ``original_streams``, ``replacement_streams``,
 ``stage_results_by_period``, ``affected_zone_paths``, and ``work_for_zone()``.
+It raises ``DirectGasMVRPhaseError`` (a ``ValueError``) if a stage would cross
+into liquid, naming the stage, temperatures and pressure; see
+:doc:`../reference/api-heat-pump`.
 Changing component activity invalidates cached targets, so rerun the chosen
 target method afterward.
 

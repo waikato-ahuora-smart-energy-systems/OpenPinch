@@ -7,6 +7,17 @@ Unreleased
 Behaviour changes
 ~~~~~~~~~~~~~~~~~
 
+- ``components.add_process_mvr`` and ``solve_direct_gas_mvr_stream`` now raise
+  ``DirectGasMVRPhaseError``, a ``ValueError``, instead of returning a result when
+  a stage would cross into liquid. The message names the stage, temperatures and
+  pressure. Condensing multi-stage MVR now raises: on a saturated vapour source
+  (100 to 99.5 degC) ``n_stages=2`` used to compress the liquid from stage 1, up to
+  1159 bar at the default lift. One condensing stage still solves. A source with
+  a vapour target now raises when its target is below saturation at a stage outlet:
+  100 kW of steam from 120 to 100 degC at 101.325 kPa and pressure ratio 1.5 used
+  to report 5881 kW released, 94% of it latent heat outside the source duty. A saved case with such
+  a component no longer loads, and an option change that causes it fails and keeps
+  the earlier state. Other MVR results do not change.
 - ``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` now apply to the tier 0
   and tier 1 routes when set, including ``design.open_hens()`` and the protected
   routes of tiers 2 to 5. These routes used to ignore the options and run at a

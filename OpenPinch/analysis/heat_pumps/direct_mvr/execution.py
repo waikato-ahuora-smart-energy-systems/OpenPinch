@@ -11,10 +11,17 @@ from ....domain.stream import Stream
 from ....domain.stream_collection import StreamCollection
 from ....domain.value import Value
 from .models import (
+    PHASE_LIQUID_STAGE_INLET,
+    PHASE_TARGET_BELOW_SATURATION,
+)
+from .models import (
     DirectGasMVRFallbackDiagnostic as _DirectGasMVRFallbackDiagnostic,
 )
 from .models import (
     DirectGasMVROutputUnits as _DirectGasMVROutputUnits,
+)
+from .models import (
+    DirectGasMVRPhaseError as _DirectGasMVRPhaseError,
 )
 from .models import (
     DirectGasMVRSettings as _DirectGasMVRSettings,
@@ -37,7 +44,9 @@ from .thermodynamics import (
 from .thermodynamics import (
     find_pressure_for_actual_discharge as _find_pressure_for_actual_discharge,
 )
+from .thermodynamics import saturation_temperature_c as _saturation_temperature_c
 from .thermodynamics import source_enthalpies as _source_enthalpies
+from .thermodynamics import source_target_is_condensed as _source_target_is_condensed
 from .thermodynamics import (
     state_property_at_temperature_pressure as _state_property_at_temperature_pressure,
 )
@@ -136,13 +145,29 @@ def solve_direct_gas_mvr_stream(
     stage_results: list[_DirectGasMVRStageResult] = []
     p_in = _to_pascal(p_supply)
     t_in = t_supply
+    # A source that condenses has latent heat in its duty and mass flow; a vapour
+    # target does not, so condensing it would add heat the source never declared.
+    source_condenses = _source_target_is_condensed(fluid, p_in, h_target)
     output_units = _source_output_units(stream)
 
     eta_comp = settings.eta_mvr_comp
     eta_motor = settings.eta_motor
     liquid_injection = settings.liquid_injection
     for stage_idx in range(n_mvr):
+        phase_check = {
+            "fluid": fluid,
+            "source_stream": stream.name,
+            "period_index": idx,
+            "stage_index": stage_idx + 1,
+            "t_target": t_target,
+        }
         try:
+            if stage_idx > 0:
+                _reject_stage_below_saturation(
+                    reason_code=PHASE_LIQUID_STAGE_INLET,
+                    pressure=p_in,
+                    **phase_check,
+                )
             stage = _solve_compression_stage(
                 fluid=fluid,
                 source_stream=stream.name,
@@ -159,6 +184,12 @@ def solve_direct_gas_mvr_stream(
                 dt_diff_max=settings.dt_diff_max,
                 output_units=output_units,
             )
+            if not source_condenses:
+                _reject_stage_below_saturation(
+                    reason_code=PHASE_TARGET_BELOW_SATURATION,
+                    pressure=_stage_pressure_to_pa(stage.p_out, stage.pressure_unit),
+                    **phase_check,
+                )
         except _DirectGasMVRStageError:
             raise
         except ValueError as exc:
@@ -240,6 +271,30 @@ def _validate_efficiencies(eta_comp: float, eta_motor: float) -> None:
         or not (0.0 < eta_motor <= 1.0)
     ):
         raise ValueError("eta_mvr_comp and eta_motor must be in the interval (0, 1].")
+
+
+def _reject_stage_below_saturation(
+    *,
+    reason_code: str,
+    fluid: str,
+    source_stream: str,
+    period_index: int,
+    stage_index: int,
+    t_target: float,
+    pressure: float,
+) -> None:
+    t_saturation = _saturation_temperature_c(fluid, pressure)
+    if t_saturation is not None and t_target < t_saturation:
+        raise _DirectGasMVRPhaseError(
+            reason_code=reason_code,
+            source_stream=source_stream,
+            period_index=period_index,
+            stage_index=stage_index,
+            fluid=fluid,
+            t_target=t_target,
+            t_saturation=t_saturation,
+            pressure_kpa=_to_kpa(pressure),
+        )
 
 
 def _solve_compression_stage(

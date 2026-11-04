@@ -87,6 +87,26 @@ def state_property_at_temperature_pressure(
         )
 
 
+def saturation_temperature_c(fluid: str, pressure_pascal: float) -> float | None:
+    """Return the saturation temperature, or ``None`` above the critical point."""
+    try:
+        temperature = PropsSI("T", "P", pressure_pascal, "Q", 1.0, fluid)
+    except ValueError:
+        return None
+    return to_degrees_celsius(temperature) if np.isfinite(temperature) else None
+
+
+def source_target_is_condensed(
+    fluid: str, pressure_pascal: float, target_enthalpy: float
+) -> bool:
+    """Return whether the source's own enthalpy drop already includes latent heat."""
+    try:
+        saturated_vapour = PropsSI("H", "P", pressure_pascal, "Q", 1.0, fluid)
+    except ValueError:
+        return False
+    return bool(np.isfinite(saturated_vapour) and target_enthalpy < saturated_vapour)
+
+
 def find_pressure_for_actual_discharge(
     *,
     fluid: str,
