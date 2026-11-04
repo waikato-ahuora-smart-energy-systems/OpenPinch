@@ -236,8 +236,8 @@ def test_get_power_cogeneration_above_pinch_returns_zone_when_no_viable_stage(
 
     out = pca.get_power_cogeneration_above_pinch(zone)
     assert out is zone
-    assert out.work_target == 0.0
-    assert out.turbine_efficiency_target == 0.0
+    assert out.work_target is None
+    assert out.turbine_efficiency_target is None
 
 
 def test_get_power_cogeneration_below_pinch_uses_environment_default(monkeypatch):
