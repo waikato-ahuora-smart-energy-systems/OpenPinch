@@ -1015,15 +1015,24 @@ def test_executor_reports_structure_errors_as_failed_outcomes() -> None:
 # --- live solver (GEKKO) ------------------------------------------------------
 
 
-def _skip_without_live_solver() -> None:
+def _live_solver_available() -> bool:
     try:
         require_synthesis_dependency("gekko", purpose="fixed-structure duty test")
         require_synthesis_dependency(
             "pyomo.environ", purpose="fixed-structure duty test"
         )
         require_solver_binary("ipopt", purpose="fixed-structure duty test")
-    except (MissingSynthesisDependencyError, MissingSynthesisSolverError) as exc:
-        pytest.skip(str(exc))
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
+# A string condition is evaluated when the test runs, so collecting this module
+# does not import the solver packages.
+_needs_live_solver = pytest.mark.skipif(
+    "not _live_solver_available()",
+    reason="needs the ipopt binary and the gekko and pyomo packages",
+)
 
 
 def _recovery_approaches(network: HeatExchangerNetwork, exchanger_id=None):
@@ -1040,8 +1049,8 @@ def _recovery_approaches(network: HeatExchangerNetwork, exchanger_id=None):
 
 @pytest.mark.synthesis
 @pytest.mark.solver
+@_needs_live_solver
 def test_three_duty_objectives_on_four_stream_case() -> None:
-    _skip_without_live_solver()
     structure = _four_stream_structure()
     problem = _four_stream_problem()
 
@@ -1081,8 +1090,8 @@ def test_three_duty_objectives_on_four_stream_case() -> None:
 
 @pytest.mark.synthesis
 @pytest.mark.solver
+@_needs_live_solver
 def test_per_exchanger_minimum_approach_is_enforced() -> None:
-    _skip_without_live_solver()
     strict_id = "recovery:HT Flash->CIP Water:S2"
     problem = _four_stream_problem()
     structure = {
@@ -1112,8 +1121,8 @@ def test_per_exchanger_minimum_approach_is_enforced() -> None:
 
 @pytest.mark.synthesis
 @pytest.mark.solver
+@_needs_live_solver
 def test_live_solver_runs_cheaper_utility_first() -> None:
-    _skip_without_live_solver()
     lps = _utility("LPS", "Hot", 600.0, 600.0, 40.0, 5.0)
     problem = PinchProblem(_small_payload(extra_hot_utility=lps))
     network = _with(
@@ -1142,8 +1151,8 @@ def test_live_solver_runs_cheaper_utility_first() -> None:
 
 @pytest.mark.synthesis
 @pytest.mark.solver
+@_needs_live_solver
 def test_live_solver_enforces_approach_at_segment_boundaries() -> None:
-    _skip_without_live_solver()
 
     view = _segmented().design.optimise_duties(
         SEGMENTED_STRUCTURE, objective="utility", min_approach_temperature=30.0
@@ -1438,8 +1447,8 @@ def test_profile_without_flow_stays_at_supply() -> None:
 
 @pytest.mark.synthesis
 @pytest.mark.solver
+@_needs_live_solver
 def test_live_solver_area_with_a_stream_off_in_one_period() -> None:
-    _skip_without_live_solver()
 
     view = _off_period_problem().design.optimise_duties(
         SMALL_STRUCTURE,
