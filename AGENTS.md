@@ -72,6 +72,8 @@ Python package published to PyPI; documentation on Read the Docs.
 - Values carry units (`{"value": ..., "unit": ...}`); multiperiod values use
   `{"values": [...], "unit": ...}`. Configuration keys are defined in
   `OpenPinch/domain/configuration_fields.py`.
+- Tests run optimisation tasks serially (`tests/conftest.py`); mark a test
+  `process_pools` when it needs real worker processes.
 - Numerical tolerances are explicit in tests; do not loosen one to make a
   test pass without recording why.
 - No emojis in documentation.

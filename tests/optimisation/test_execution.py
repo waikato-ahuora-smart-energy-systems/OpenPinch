@@ -15,6 +15,8 @@ import OpenPinch.optimisation.execution as execution
 from OpenPinch.optimisation.models import OptimisationOptions, OptimisationProblem
 from OpenPinch.optimisation.service import run_multistart_minimisation
 
+pytestmark = pytest.mark.process_pools
+
 _CALLS: list[int] = []
 
 

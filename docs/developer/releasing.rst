@@ -26,8 +26,8 @@ Validation profiles
    :header-rows: 1
 
    * - Change
-     - Lint, unit tests (95% branch coverage; also on Python 3.12 and 3.13), floors, docs, TESPy, performance, build, install smoke, Pyodide
-     - Solver tests (external Couenne and IPOPT solver binaries)
+     - Lint, unit tests (95% branch coverage), docs, TESPy, build, install smoke, Pyodide
+     - Solver tests (external Couenne and IPOPT solver binaries), unit tests on Python 3.12 and 3.13, floors, performance
      - Version-bump check (the **Version bump** job in ``ci.yml``)
    * - PR into ``develop`` / push to ``develop``
      - yes
