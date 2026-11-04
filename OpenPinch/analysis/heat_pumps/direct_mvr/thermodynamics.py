@@ -96,6 +96,17 @@ def saturation_temperature_c(fluid: str, pressure_pascal: float) -> float | None
     return to_degrees_celsius(temperature) if np.isfinite(temperature) else None
 
 
+def critical_limit_temperature_c(fluid: str, pressure_pascal: float) -> float | None:
+    """Return the critical temperature at or above its pressure, else ``None``."""
+    try:
+        if pressure_pascal < PropsSI("Pcrit", fluid):
+            return None
+        temperature = PropsSI("Tcrit", fluid)
+    except ValueError:
+        return None
+    return to_degrees_celsius(temperature) if np.isfinite(temperature) else None
+
+
 def source_target_is_condensed(
     fluid: str, pressure_pascal: float, target_enthalpy: float
 ) -> bool:

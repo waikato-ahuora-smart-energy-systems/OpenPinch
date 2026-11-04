@@ -340,3 +340,54 @@ def test_command_layer_reports_the_phase_error_message():
                 },
             }
         )
+
+
+P_ABOVE_CRITICAL_OUTLET_KPA = 15000.0
+T_CRITICAL_WATER = PropsSI("Tcrit", "Water") - 273.15
+
+
+def _steam_doubled_above_critical_pressure(t_target):
+    return solve_direct_gas_mvr_stream(
+        _steam(t_target, t_supply=500.0, supply_pressure=P_ABOVE_CRITICAL_OUTLET_KPA),
+        settings=_settings(mvr_stage_pressure_ratio=2.0),
+    )
+
+
+def test_target_below_critical_temperature_above_critical_pressure_raises():
+    with pytest.raises(DirectGasMVRPhaseError) as caught:
+        # Vapour at its 15 MPa supply (saturation 342 degC), not at the 30 MPa outlet.
+        _steam_doubled_above_critical_pressure(350.0)
+
+    error = caught.value
+    assert error.reason_code == "phase.target_below_saturation"
+    assert error.t_saturation == pytest.approx(T_CRITICAL_WATER)
+    assert "below the critical temperature" in str(error)
+    assert "saturation" not in str(error)
+    restored = pickle.loads(pickle.dumps(error))
+    assert str(restored) == str(error)
+
+
+def test_target_above_critical_point_still_solves():
+    solved = _steam_doubled_above_critical_pressure(T_CRITICAL_WATER + 1.0)
+
+    assert solved.stage_results[0].p_out == pytest.approx(30000.0)
+
+
+def test_stage_inlet_below_critical_temperature_above_critical_pressure_raises():
+    p_supply = 15000.0
+    t_saturation = PropsSI("T", "P", p_supply * 1e3, "Q", 1.0, "Water") - 273.15
+
+    with pytest.raises(DirectGasMVRPhaseError) as caught:
+        solve_direct_gas_mvr_stream(
+            _steam(
+                t_saturation - 0.5,
+                t_supply=t_saturation,
+                phase="vapour",
+                supply_pressure=p_supply,
+            ),
+            settings=_settings(mvr_stage_pressure_ratio=2.0, n_stages=2),
+        )
+
+    assert caught.value.reason_code == "phase.liquid_stage_inlet"
+    assert caught.value.stage_index == 2
+    assert caught.value.t_saturation == pytest.approx(T_CRITICAL_WATER)

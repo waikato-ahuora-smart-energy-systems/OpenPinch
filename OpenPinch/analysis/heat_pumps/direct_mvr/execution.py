@@ -42,6 +42,9 @@ from .thermodynamics import (
     build_cooling_temperature_enthalpy_curve as _build_cooling_th_curve,
 )
 from .thermodynamics import (
+    critical_limit_temperature_c as _critical_limit_temperature_c,
+)
+from .thermodynamics import (
     find_pressure_for_actual_discharge as _find_pressure_for_actual_discharge,
 )
 from .thermodynamics import saturation_temperature_c as _saturation_temperature_c
@@ -284,6 +287,9 @@ def _reject_stage_below_saturation(
     pressure: float,
 ) -> None:
     t_saturation = _saturation_temperature_c(fluid, pressure)
+    above_critical_pressure = t_saturation is None
+    if above_critical_pressure:
+        t_saturation = _critical_limit_temperature_c(fluid, pressure)
     if t_saturation is not None and t_target < t_saturation:
         raise _DirectGasMVRPhaseError(
             reason_code=reason_code,
@@ -294,6 +300,7 @@ def _reject_stage_below_saturation(
             t_target=t_target,
             t_saturation=t_saturation,
             pressure_kpa=_to_kpa(pressure),
+            above_critical_pressure=above_critical_pressure,
         )
 
 
