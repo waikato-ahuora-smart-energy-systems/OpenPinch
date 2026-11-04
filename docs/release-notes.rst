@@ -305,7 +305,7 @@ Values
 - Building and copying ``Value``, ``Stream`` and ``StreamCollection`` objects costs
   less. A ``Value`` given in its target unit now builds at most two Pint quantities
   rather than four, and copies share read-only magnitudes, so ``deepcopy`` of a
-  ``Stream`` took about 18 us rather than 198 us. Four test modules heavy in targeting
+  ``Stream`` took about 14 us rather than 198 us. Four test modules heavy in targeting
   and optimisation used 38% less CPU (183 s to 113 s) in serial runs. Results do
   not change.
 
