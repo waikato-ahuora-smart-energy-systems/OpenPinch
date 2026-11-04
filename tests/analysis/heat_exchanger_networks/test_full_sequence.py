@@ -955,8 +955,13 @@ def test_enhanced_synthesis_method_rejects_non_integer_quality_tier(
 
 @pytest.mark.synthesis
 @pytest.mark.solver
+# A string condition is evaluated when the test runs, so collecting this module
+# does not import the solver packages.
+@pytest.mark.skipif(
+    "not _live_solver_environment_available()",
+    reason="needs the couenne and ipopt binaries and the gekko and pyomo packages",
+)
 def test_duplicate_two_state_case_matches_single_state_without_sweeps() -> None:
-    _skip_if_live_solver_environment_missing()
     single_period = _single_state_no_sweep_problem()
     duplicate_period = _duplicate_two_state_no_sweep_problem()
 
@@ -1420,7 +1425,7 @@ def _successful_counts_by_method(result) -> dict[str, int]:
     )
 
 
-def _skip_if_live_solver_environment_missing() -> None:
+def _live_solver_environment_available() -> bool:
     try:
         require_solver_binary(
             "couenne",
@@ -1439,8 +1444,9 @@ def _skip_if_live_solver_environment_missing() -> None:
             package="pyomo",
             purpose="single-period/multiperiod HeatExchangerNetworkLabel equivalence test",
         )
-    except (MissingSynthesisDependencyError, MissingSynthesisSolverError) as exc:
-        pytest.skip(str(exc))
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
 
 
 def _use_fake_default_executor(monkeypatch) -> None:
