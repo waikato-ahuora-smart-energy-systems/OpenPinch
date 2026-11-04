@@ -27,6 +27,11 @@ from OpenPinch.analysis.heat_exchanger_networks.reporting.verification import (
 from OpenPinch.analysis.heat_exchanger_networks.solver.arrays import (
     problem_to_solver_arrays,
 )
+from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
+    MissingSynthesisDependencyError,
+    MissingSynthesisSolverError,
+    require_solver_binary,
+)
 from OpenPinch.application.problem import PinchProblem
 from tests.support.paths import FIXTURES_ROOT
 
@@ -131,7 +136,22 @@ def test_apopt_extracted_network_records_utility_approaches():
     assert verify_network_feasibility(network) == ()
 
 
+def _solver_binaries_available() -> bool:
+    try:
+        for binary in ("couenne", "ipopt"):
+            require_solver_binary(binary, purpose="utility approach regression")
+    except (MissingSynthesisDependencyError, MissingSynthesisSolverError):
+        return False
+    return True
+
+
 @pytest.mark.solver
+# A string condition is evaluated when the test runs, so collecting this module
+# does not import the solver packages.
+@pytest.mark.skipif(
+    "not _solver_binaries_available()",
+    reason="needs the couenne and ipopt binaries",
+)
 def test_open_hens_method_networks_have_no_utility_cross():
     from OpenPinch.analysis.heat_exchanger_networks.errors import (
         WorkflowContractError,
@@ -142,21 +162,11 @@ def test_open_hens_method_networks_have_no_utility_cross():
     from OpenPinch.analysis.heat_exchanger_networks.execution.settings import (
         workflow_settings_from_problem,
     )
-    from OpenPinch.analysis.heat_exchanger_networks.solver.dependencies import (
-        MissingSynthesisDependencyError,
-        MissingSynthesisSolverError,
-        require_solver_binary,
-    )
     from OpenPinch.analysis.heat_exchanger_networks.targeting.open_hens_method import (
         execute_open_hens_method,
     )
     from OpenPinch.domain.enums import HeatExchangerKind
 
-    try:
-        for binary in ("couenne", "ipopt"):
-            require_solver_binary(binary, purpose="utility approach regression")
-    except (MissingSynthesisDependencyError, MissingSynthesisSolverError) as exc:
-        pytest.skip(str(exc))
     problem = _cross_problem()
     problem.target.all_heat_integration()
     settings = replace(workflow_settings_from_problem(problem), max_parallel=1)

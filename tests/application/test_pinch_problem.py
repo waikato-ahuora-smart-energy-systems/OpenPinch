@@ -3658,3 +3658,18 @@ def test_renaming_to_the_current_project_name_still_renames_the_root_and_results
 
     assert problem.master_zone.name == "Label"
     assert problem.results is None
+
+
+def test_rename_also_updates_an_explicit_top_zone_name_option():
+    source = PinchProblem("basic_pinch.json").to_problem_json()
+    source["options"] = {
+        **(source.get("options") or {}),
+        "PROBLEM_TOP_ZONE_NAME": source["zone_tree"]["name"],
+    }
+    problem = PinchProblem(source)
+    problem.project_name = "Renamed"
+
+    problem.update_options({"ENV_TEMPERATURE": 30.0})
+
+    assert problem.master_zone.name == "Renamed"
+    assert problem.to_problem_json()["options"]["PROBLEM_TOP_ZONE_NAME"] == "Renamed"

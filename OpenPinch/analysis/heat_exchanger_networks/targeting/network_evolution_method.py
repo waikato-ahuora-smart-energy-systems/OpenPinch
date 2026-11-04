@@ -270,6 +270,7 @@ def build_network_evolution_method_tasks_from_pinch_design_method(
                 workspace_variant=outcome.task.workspace_variant,
                 period_id=outcome.task.period_id,
                 parent_task_id=outcome.task.task_id,
+                settings={} if settings is None else _run_breadth_settings(settings),
                 topology_restrictions=restrictions,
             )
         )
@@ -295,6 +296,7 @@ def _standard_evolution_task(
         workspace_variant=settings.workspace_variant,
         period_id=settings.period_id,
         parent_task_id=parent_outcome.task.task_id,
+        settings=_run_breadth_settings(settings),
         topology_restrictions=topology_restrictions,
     )
 
@@ -360,6 +362,14 @@ def _evolution_task_settings(
     return settings
 
 
+def _run_breadth_settings(settings: SynthesisWorkflowSettings) -> dict[str, int]:
+    """Branch breadth of this run, for a task with no pathway to carry it."""
+    return {
+        "evolution_n_ad_branches": settings.effective_evm_n_ad_branches,
+        "evolution_n_rm_branches": settings.effective_evm_n_rm_branches,
+    }
+
+
 def _build_seeded_quality_network_evolution_method_tasks(
     settings: SynthesisWorkflowSettings,
     seed_networks: Sequence[HeatExchangerNetwork],
@@ -389,6 +399,7 @@ def build_direct_network_evolution_method_tasks(
             problem_id=settings.problem_id,
             workspace_variant=settings.workspace_variant,
             period_id=settings.period_id,
+            settings=_run_breadth_settings(settings),
         )
         for approach_temperature in settings.approach_temperatures
         for stage_count in settings.stage_selection
