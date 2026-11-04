@@ -17,7 +17,7 @@ a docstring.
 - `aggregate_hpr_period_results` (`optimisation_adapter.py`): combine period results for a shared multiperiod design (weighted operation, peak capital).
 - `build_hpr_accounting`, `calc_hpr_obj`, `relative_feasibility_penalty`, `normalise_hpr_penalty_terms`, `normalise_initial_points`, `initialise_hpr_seed` (`optimisation_adapter.py`): objective, penalty and seed helpers (`initialise_hpr_seed` is public but not in `__all__`).
 - `ProcessComponent`, `ProcessComponentHost` (`components.py`): component base record and the protocol it needs from the problem object.
-- `ProcessMVRComponent`, `create_process_mvr_component`, `replay_process_components`, `restore_process_components` (`process_mvr.py`): direct process MVR component with replacement streams and `to_record`, its factory, its re-solve on a rebuilt zone tree, and its rebuild from saved records.
+- `ProcessMVRComponent`, `create_process_mvr_component`, `replay_process_components`, `restore_process_components` (`process_mvr.py`): direct process MVR component with replacement streams, its factory, its re-solve on a rebuilt zone tree, and its rebuild from saved records.
 - Subdirectories:
   - [_multiperiod](./_multiperiod/README.md): shared-design preparation, execution and aggregation across periods (documented elsewhere).
   - [_process_mvr](./_process_mvr/README.md): private helpers for process MVR selection, membership, replacement streams and work.
@@ -48,7 +48,7 @@ a docstring.
 - Activating an MVR component deactivates the original source streams and activates the replacement streams, and deactivating reverses this; both invalidate the problem's analysis. [process_mvr.py:ProcessMVRComponent.activate] [components.py:ProcessComponent._invalidate_problem_targets]
 - The analysis layer uses `ProcessComponentHost` so it does not import the application layer. [components.py:ProcessComponentHost]
 - Replay keeps the component objects and each stream's `is_active` flag; efficiencies not passed explicitly and `dt_diff_max` are re-read from the new configuration; a failure changes no component. [process_mvr.py:replay_process_components]
-- A saved record names each source by its owning zone's path below the root and its stream name, so a name selector that matched several streams saves all of them and a renamed project still resolves; the `options` and `period_id` of the original call only check the call and are not saved. A missing source raises `ValueError`. [process_mvr.py:ProcessMVRComponent.to_record] [process_mvr.py:restore_process_components]
+- A saved record names each source by its owning zone's path below the root and its stream name, so a name selector that matched several streams saves all of them and a renamed project still resolves; the `options` and `period_id` of the original call only check the call and are not saved. A missing source raises `ValueError`. [process_mvr.py:ProcessMVRComponent._to_record] [process_mvr.py:restore_process_components]
 - `original_streams`, `replacement_streams` and `stage_results_by_period` return deep copies. [process_mvr.py:ProcessMVRComponent]
 
 ## Side Effects

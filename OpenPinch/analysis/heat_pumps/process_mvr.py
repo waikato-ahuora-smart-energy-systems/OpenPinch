@@ -90,7 +90,7 @@ class ProcessMVRComponent(ProcessComponent):
         }
         return sorted(paths)
 
-    def to_record(self) -> ProcessComponentSchema:
+    def _to_record(self) -> ProcessComponentSchema:
         """Return the call that rebuilds this component from the case's input."""
         return ProcessComponentSchema(
             type=self.component_type,

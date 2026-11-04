@@ -340,7 +340,7 @@ class PinchProblem:
         return input_data
 
     def _process_component_records(self) -> list[ProcessComponentSchema]:
-        return [c.to_record() for c in self._process_components.values()]
+        return [c._to_record() for c in self._process_components.values()]
 
     def validation_report(self) -> ValidationReport:
         """Return the validation results of the loaded input, warnings included.
