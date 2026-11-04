@@ -73,6 +73,7 @@ from OpenPinch.application._problem.input.utilities import (
     _orient_utility_temperatures,
     _utility_temperature_arrays,
 )
+from OpenPinch.application.problem import PinchProblem
 from OpenPinch.contracts.common import ValueWithUnit
 from OpenPinch.contracts.input import (
     StreamSchema,
@@ -2362,3 +2363,96 @@ def test_assign_process_streams_to_subzones_rejects_unresolved_and_neutral_strea
             process_streams=neutral_streams,
             process_zone_paths={"Site.AreaA.NeutralA": "Site/AreaA"},
         )
+
+
+def _active_flag_payload(*, h2_active: bool = True, h2_segmented: bool = False) -> dict:
+    h2 = {
+        "zone": "Site/P",
+        "name": "H2",
+        "dt_cont": 5.0,
+        "htc": 1.0,
+        "active": h2_active,
+    }
+    if h2_segmented:
+        h2["segments"] = [
+            {"t_supply": 260.0, "t_target": 100.0, "heat_flow": 50.0},
+            {"t_supply": 100.0, "t_target": 60.0, "heat_flow": 40.0},
+        ]
+    else:
+        h2.update({"t_supply": 260.0, "t_target": 60.0, "heat_flow": 90.0})
+    return {
+        "streams": [
+            {
+                "zone": "Site/P",
+                "name": "H1",
+                "t_supply": 200.0,
+                "t_target": 100.0,
+                "heat_flow": 100.0,
+                "dt_cont": 5.0,
+                "htc": 1.0,
+            },
+            h2,
+            {
+                "zone": "Site/P",
+                "name": "C1",
+                "t_supply": 50.0,
+                "t_target": 180.0,
+                "heat_flow": 150.0,
+                "dt_cont": 5.0,
+                "htc": 1.0,
+            },
+        ],
+        "utilities": [],
+        "zone_tree": {
+            "name": "Site",
+            "type": "Site",
+            "children": [{"name": "P", "type": "Process Zone"}],
+        },
+    }
+
+
+def _without_h2(payload: dict) -> dict:
+    return {
+        **payload,
+        "streams": [row for row in payload["streams"] if row["name"] != "H2"],
+    }
+
+
+@pytest.mark.parametrize("h2_segmented", [False, True])
+def test_inactive_process_stream_targets_as_if_removed(h2_segmented):
+    payload = _active_flag_payload(h2_active=False, h2_segmented=h2_segmented)
+    problem = PinchProblem(payload, project_name="Site")
+    removed = PinchProblem(_without_h2(payload), project_name="Site")
+
+    zone = problem.master_zone.get_subzone("P")
+    assert next(s for s in zone.hot_streams if s.name == "H2").is_active is False
+
+    target = problem.target.direct_heat_integration()
+    expected = removed.target.direct_heat_integration()
+    assert target.hot_utility_target == pytest.approx(expected.hot_utility_target)
+    assert target.cold_utility_target == pytest.approx(expected.cold_utility_target)
+    assert target.heat_recovery_target == pytest.approx(expected.heat_recovery_target)
+
+
+@pytest.mark.parametrize("h2_segmented", [False, True])
+def test_inactive_process_stream_does_not_place_default_utilities(h2_segmented):
+    payload = _active_flag_payload(h2_active=False, h2_segmented=h2_segmented)
+    problem = PinchProblem(payload, project_name="Site").master_zone
+    removed = PinchProblem(_without_h2(payload), project_name="Site").master_zone
+
+    cold_utility = next(iter(problem.cold_utilities))
+    expected_cold_utility = next(iter(removed.cold_utilities))
+    assert float(cold_utility.supply_temperature) == pytest.approx(
+        float(expected_cold_utility.supply_temperature)
+    )
+
+
+def test_all_inactive_process_streams_still_prepare():
+    payload = _active_flag_payload(h2_active=False)
+    for row in payload["streams"]:
+        row["active"] = False
+
+    zone = PinchProblem(payload, project_name="Site").master_zone
+
+    assert not any(stream.is_active for stream in zone.hot_streams)
+    assert not any(stream.is_active for stream in zone.cold_streams)
