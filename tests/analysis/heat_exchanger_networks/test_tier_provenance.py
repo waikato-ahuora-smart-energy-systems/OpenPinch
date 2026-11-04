@@ -106,6 +106,21 @@ def test_manifest_method_sequence_omits_a_stage_couenne_could_not_run(
     assert result.accepted_result.manifest.method_sequence == expected_sequence
 
 
+def test_manifest_method_sequence_omits_an_evolution_stage_couenne_could_not_run():
+    problem = _small_problem()
+
+    result = execute_open_hens_method(
+        problem,
+        workflow_settings_from_problem(problem),
+        executor=_NoCouenneForMethod("network_evolution_method"),
+    )
+
+    assert result.accepted_result.manifest.method_sequence == (
+        "pinch_design_method",
+        "thermal_derivative_method",
+    )
+
+
 _TIER = "HENS_SYNTHESIS_QUALITY_TIER"
 
 

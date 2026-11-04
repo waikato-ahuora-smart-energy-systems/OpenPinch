@@ -45,10 +45,16 @@ def _can_skip_preliminary_stages_for_missing_couenne(
 
 
 def _missing_couenne_failure(outcome: HeatExchangerNetworkSynthesisTaskOutcome) -> bool:
-    if outcome.status == "success" or outcome.task.method not in {
+    if outcome.task.method not in {
         HeatExchangerNetworkDesignMethod.PinchDesign,
         HeatExchangerNetworkDesignMethod.ThermalDerivative,
     }:
+        return False
+    return _couenne_was_missing(outcome)
+
+
+def _couenne_was_missing(outcome: HeatExchangerNetworkSynthesisTaskOutcome) -> bool:
+    if outcome.status == "success":
         return False
     error = outcome.error or ""
     return "couenne" in error and "not found on PATH" in error

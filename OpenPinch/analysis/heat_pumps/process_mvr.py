@@ -53,10 +53,19 @@ class ProcessMVRComponent(ProcessComponent):
 
     def deactivate(self):
         """Restore the original source streams for subsequent targeting."""
+        # A source another active component replaced stays off, or it counts twice.
+        replaced_elsewhere = {
+            id(record.original_stream)
+            for component in self.problem._process_components.values()
+            if component is not self and component.active
+            for record in component.stream_records
+        }
         for record in self.stream_records:
             for stream in record.replacement_streams:
                 stream.is_active = False
-            record.original_stream.is_active = True
+            record.original_stream.is_active = (
+                id(record.original_stream) not in replaced_elsewhere
+            )
         return super().deactivate()
 
     @property
