@@ -184,6 +184,12 @@ Heat exchanger network synthesis
   ignored it before. Only problems that set the option see a change: without it
   the methods keep tiers 0 and 2, and ``quality_tier=`` still wins.
   ``design.open_hens()`` stays at tier 1.
+- Network evolution tasks with no pathway metadata now use the branch breadth of
+  the tier that ran, as the manifest's ``evm_n_ad_branches`` and
+  ``evm_n_rm_branches`` report. These are the tasks that run when Couenne is
+  missing. They read the tier stored in the options, so a stored tier of 4 gave
+  a tier 0 or tier 1 run a breadth of 2 and a stored tier of 1 gave a tier 4 run
+  a breadth of 1. Their task IDs change, because a task ID includes its settings.
 
 Cogeneration
 ~~~~~~~~~~~~
