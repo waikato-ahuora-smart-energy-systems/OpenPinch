@@ -910,6 +910,51 @@ def test_multiperiod_profile_alignment_uses_stable_union_fraction_grid():
     np.testing.assert_allclose(second[:, 0], [0.0, 25.0, 50.0, 80.0, 100.0])
 
 
+def test_profile_alignment_merges_breakpoints_that_differ_only_by_rounding():
+    first, second = align_temperature_heat_profiles(
+        [
+            [[0.0, 200.0], [7.0, 150.0], [15.0, 100.0]],
+            [[0.0, 210.0], [np.nextafter(7.0, 8.0), 160.0], [15.0, 110.0]],
+        ]
+    )
+
+    assert first.shape == second.shape == (3, 2)
+    np.testing.assert_allclose(first, [[0.0, 200.0], [7.0, 150.0], [15.0, 100.0]])
+    np.testing.assert_allclose(second, [[0.0, 210.0], [7.0, 160.0], [15.0, 110.0]])
+
+
+def test_profile_alignment_keeps_exact_end_points_when_merging_at_the_end():
+    first, second = align_temperature_heat_profiles(
+        [
+            [[0.0, 200.0], [15.0 * (1.0 - 1e-13), 101.0], [15.0, 100.0]],
+            [[0.0, 210.0], [15.0, 110.0]],
+        ]
+    )
+
+    assert first.shape == second.shape == (2, 2)
+    np.testing.assert_allclose(first[-1], [15.0, 100.0], rtol=0.0, atol=1e-12)
+    np.testing.assert_allclose(second[-1], [15.0, 110.0], rtol=0.0, atol=1e-12)
+
+
+def test_profile_alignment_keeps_breakpoints_a_small_real_duty_apart():
+    first, second = align_temperature_heat_profiles(
+        [
+            [[0.0, 200.0], [50.0, 150.0], [100.0, 100.0]],
+            [[0.0, 210.0], [50.0 + 1e-5, 160.0], [100.0, 110.0]],
+        ]
+    )
+
+    assert first.shape == second.shape == (4, 2)
+
+
+def test_profile_alignment_leaves_a_single_profile_unchanged():
+    profile = np.asarray([[0.0, 200.0], [1.0 / 3.0, 175.0], [100.0, 100.0]])
+
+    (aligned,) = align_temperature_heat_profiles([profile])
+
+    np.testing.assert_array_equal(aligned, profile)
+
+
 def test_profile_alignment_rejects_heat_coordinate_reversal():
     with pytest.raises(ValueError, match="strictly monotonic"):
         align_temperature_heat_profiles([[[0.0, 200.0], [50.0, 150.0], [40.0, 100.0]]])

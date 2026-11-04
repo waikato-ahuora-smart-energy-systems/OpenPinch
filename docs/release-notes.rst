@@ -77,6 +77,11 @@ Documentation
 Heat pumps and refrigeration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``add_process_mvr`` on a multiperiod case no longer fails with "Profile heat
+  coordinates must be strictly monotonic" when periods share a stage profile
+  breakpoint that differs only by rounding. It failed with or without liquid
+  injection. Multiperiod structured stream profiles use the same alignment.
+  Single-period results do not change.
 - **Behaviour change:** Cascade vapour-compression heat pump targets with one
   condenser and several evaporators no longer deliver the condenser's duty again
   from every lower stage. Those stages condense into the evaporator above and
