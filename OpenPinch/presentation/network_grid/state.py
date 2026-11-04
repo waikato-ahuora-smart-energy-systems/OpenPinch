@@ -22,6 +22,9 @@ class GridDiagramMatch:
     # The heat transfer area of the match's exchangers, summed; None when any
     # of them has none.
     area: float | None = None
+    # The period states of the exchangers merged in after the first, whose state
+    # is ``state``.
+    merged_states: tuple[HeatExchangerPeriodState, ...] = ()
 
 
 @dataclass(frozen=True)

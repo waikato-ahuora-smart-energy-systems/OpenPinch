@@ -155,6 +155,7 @@ def _add_or_accumulate(
         stage=current.stage,
         duty=current.duty + exchanger.state(period_id).duty,
         area=_summed_area(current.area, exchanger.area),
+        merged_states=(*current.merged_states, exchanger.state(period_id)),
     )
 
 

@@ -53,6 +53,11 @@ Behaviour changes
   a message goes to ``turbine_diagnostics``, a ``UserWarning`` and
   ``problem.report().warnings``; ``turbine_converged`` is not affected. For some
   duties both models warn.
+- The grid layout's ``stream_temperatures`` now cover every exchanger a match merges,
+  so a stream's supply and target temperatures are its hottest and coldest ends.
+  Previously only the first parallel exchanger's temperatures counted. Each match's
+  own temperatures and the drawn grid do not change.
+
 Input and validation
 ~~~~~~~~~~~~~~~~~~~~
 
