@@ -152,3 +152,47 @@ def test_each_period_row_has_its_own_record_and_the_average_has_none():
         6000.0, rel=1e-6
     )
     assert rows["weighted_average"].turbine_result is None
+
+
+_NO_VIABLE_STAGE = {"POWER_TURB_P_IN": 0.01}
+
+_NO_TURBINE_STATE = {
+    "work_target": None,
+    "turbine_efficiency_target": None,
+    "turbine_converged": None,
+    "turbine_diagnostics": [],
+    "turbine_result": None,
+}
+
+
+def _turbine_state(target):
+    return {name: getattr(target, name) for name in _NO_TURBINE_STATE}
+
+
+@pytest.mark.parametrize(
+    ("method", "kwargs"),
+    [
+        ("cogeneration", {}),
+        ("sun_smith_cogeneration", {}),
+        ("varbanov_small_turbine_cogeneration", {}),
+        ("varbanov_large_turbine_cogeneration", {}),
+        ("isentropic_cogeneration", {"efficiency": 0.8}),
+    ],
+)
+def test_rerun_with_no_viable_stage_matches_a_run_from_the_thermal_base(method, kwargs):
+    problem = _problem(cold_duty={"value": 6000, "unit": "kW"})
+    base = getattr(problem.target, method)(**kwargs)
+    base_work = base.work_target
+    assert base_work > 0.0
+
+    again = getattr(problem.target, method)(
+        base_target=base, options=_NO_VIABLE_STAGE, **kwargs
+    )
+
+    fresh_problem = _problem(cold_duty={"value": 6000, "unit": "kW"})
+    fresh = getattr(fresh_problem.target, method)(options=_NO_VIABLE_STAGE, **kwargs)
+    assert _turbine_state(fresh) == _NO_TURBINE_STATE
+    assert _turbine_state(again) == _NO_TURBINE_STATE
+    assert base.work_target == base_work
+    assert _turbine_rows(problem.results.targets) == []
+    assert all(row.work_target is None for row in problem.results.targets)

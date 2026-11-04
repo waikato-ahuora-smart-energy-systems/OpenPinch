@@ -16,8 +16,12 @@ Behaviour changes
   7700 kW on one test case its mass balance never settled. Each new model uses one
   size band and does not switch. Work targets change from the old method wherever
   it would have used the other band.
-- A cogeneration target reused through ``base_target`` with no usable turbine stage
-  no longer keeps its earlier ``turbine_converged`` and ``turbine_diagnostics``.
+- A cogeneration target re-run with no usable turbine stage, with or without
+  ``base_target``, no longer keeps its earlier values. ``work_target``,
+  ``turbine_efficiency_target``, ``turbine_converged`` and ``turbine_result`` are
+  now ``None`` and ``turbine_diagnostics`` is empty, as for a run from a thermal
+  target. Process-component work, if any, still fills ``work_target``. Previously
+  the old work stayed on the target and its result row, so it looked valid.
 - If a stage's work is outside the chosen band, the target reports the number and
   a message goes to ``turbine_diagnostics``, a ``UserWarning`` and
   ``problem.report().warnings``; ``turbine_converged`` is not affected. For some
