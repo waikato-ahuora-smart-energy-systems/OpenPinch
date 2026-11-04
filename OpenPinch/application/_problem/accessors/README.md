@@ -25,6 +25,7 @@ Private accessor namespaces that `PinchProblem` exposes as `target`, `design`, `
 - Ranks are one-based positive integers; booleans are rejected [design.py:HeatExchangerNetworkDesignView.network] [design.py:HeatExchangerNetworkDesignView.top].
 - A design run works on an isolated snapshot and commits it to the problem only after the service returns; the view holds a deep copy of the result [design.py:_DesignAccessor._run].
 - `heat_exchanger_network`, its multiperiod form and `enhanced_heat_exchanger_network` take the quality tier from the argument, then the call's `options`, then the option if the problem's stored options set it, then their own default (0, or 2 for `enhanced`); `open_hens` always runs tier 1 [design.py:_DesignAccessor._quality_tier].
+- A design result's provenance settings show the quality tier that ran, taken from its manifest, not the configured one [design.py:_DesignAccessor._run].
 - `multiperiod_heat_exchanger_network` needs existing all-period results (or `prerequisites=True`) and does not accept `period_id` [design.py:_DesignAccessor.multiperiod_heat_exchanger_network].
 - `optimise_duties` mapping structures accept only the keys `recovery`, `heaters`, `coolers`, `hot_utility`, `cold_utility`, `stage_count`, and require `recovery` [design.py:_DesignAccessor._network_from_structure].
 - `inventory` returns a `MappingProxyType` copy of the process components [component.py:_ComponentAccessor.inventory].

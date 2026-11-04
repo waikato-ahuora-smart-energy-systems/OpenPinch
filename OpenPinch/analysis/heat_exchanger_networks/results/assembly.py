@@ -15,6 +15,7 @@ from ....contracts.synthesis.task import (
 )
 from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ..errors import WorkflowContractError
+from ..execution.fallbacks import _missing_couenne_failure
 from ..execution.pathways import pathways_from_metadata
 from ..execution.settings import SynthesisWorkflowSettings
 from ..reporting.verification import verify_network_feasibility
@@ -78,7 +79,7 @@ def build_synthesis_result(
         or settings.approach_temperatures,
         derivative_thresholds=settings.quality_derivative_thresholds,
         stage_selection=settings.stage_selection,
-        method_sequence=settings.method_sequence,
+        method_sequence=_executed_method_sequence(outcomes),
         export_formats=settings.output_formats,
         solve_tolerance=settings.solve_tolerance,
         best_solutions_to_save=settings.best_solutions_to_save,
@@ -126,6 +127,19 @@ def _selected_pathway_metadata(
         return {}
     pathway = pathways[0]
     return pathway.metadata()
+
+
+def _executed_method_sequence(
+    outcomes: Sequence[HeatExchangerNetworkSynthesisTaskOutcome],
+) -> tuple[HeatExchangerNetworkDesignMethod, ...]:
+    """Return the methods that ran, in order, without stages Couenne could not run."""
+    return tuple(
+        dict.fromkeys(
+            outcome.task.method
+            for outcome in outcomes
+            if not _missing_couenne_failure(outcome)
+        )
+    )
 
 
 def _task_count_by_method(

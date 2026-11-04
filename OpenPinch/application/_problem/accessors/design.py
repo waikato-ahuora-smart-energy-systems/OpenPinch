@@ -293,12 +293,18 @@ class _DesignAccessor:
                 if runtime.get("period_id") is not None
                 else tuple(root.period_ids)
             )
+            settings = {**root.config._values, **configuration, **runtime}
+            # The configuration keeps its tier; the service may run another one.
+            if result.manifest is not None:
+                settings["HENS_SYNTHESIS_QUALITY_TIER"] = (
+                    result.manifest.synthesis_quality_tier
+                )
             result.provenance = make_provenance(
                 isolated,
                 "design." + surface,
                 isolated._master_zone,
                 period_ids=period_ids,
-                settings={**root.config._values, **configuration, **runtime},
+                settings=settings,
             )
             if isolated._results is not None:
                 isolated._results.design = result

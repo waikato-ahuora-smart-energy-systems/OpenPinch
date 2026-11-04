@@ -184,6 +184,13 @@ Heat exchanger network synthesis
   ignored it before. Only problems that set the option see a change: without it
   the methods keep tiers 0 and 2, and ``quality_tier=`` still wins.
   ``design.open_hens()`` stays at tier 1.
+- ``result.manifest.method_sequence`` now lists the stages that ran. It always
+  listed all three methods, including ``thermal_derivative_method`` on tier 0,
+  which leaves it out, and stages that could not run without Couenne.
+- ``result.provenance`` now shows the ``HENS_SYNTHESIS_QUALITY_TIER`` that ran,
+  matching the manifest. It showed the configured value, for example 1 on a
+  default tier 0 run, or 3 on a ``design.open_hens()`` run. The change does not
+  affect ``input_fingerprint``.
 
 Cogeneration
 ~~~~~~~~~~~~
