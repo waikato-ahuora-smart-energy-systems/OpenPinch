@@ -6,9 +6,12 @@ import ast
 import logging
 import multiprocessing
 import os
+import pickle
 import sys
+import threading
+from collections import deque
 from collections.abc import Callable, Iterable, Sequence
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import Future, ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from functools import partial
 from multiprocessing.reduction import ForkingPickler
@@ -21,6 +24,10 @@ logger = logging.getLogger(__name__)
 
 # Raised while a pool starts or tasks are submitted: the objective has not run.
 _POOL_STARTUP_ERRORS = (OSError, RuntimeError)
+
+# Spawn and forkserver workers import OpenPinch (seconds) before their first
+# task, so a batch shorter than this never starts a pool.
+_POOL_PATIENCE_SECONDS = 1.0
 
 
 TaskPhase = Literal["search", "polish"]
@@ -116,6 +123,110 @@ def _pool_worker_count(requested: int, task_count: int) -> int:
     return workers
 
 
+def _worker_ready() -> None:
+    """Do nothing; a worker that returns this has finished importing."""
+
+
+def _run_pickled_task(payload: bytes) -> object:
+    fn, item = pickle.loads(payload)
+    return fn(item)
+
+
+def _map_with_late_pool(
+    fn: Callable,
+    items: list,
+    *,
+    workers: int,
+    pool_executor_cls,
+    broken_pool_exc,
+) -> list:
+    """Return ``[fn(item) for item in items]``, with a pool only for slow batches.
+
+    This process runs the tasks in order. If some remain after
+    ``_POOL_PATIENCE_SECONDS``, a timer thread starts a pool of ``workers - 1``
+    and gives each worker a task once it has finished importing, so importing
+    workers never hold a task up. Tasks a broken pool lost rerun here.
+    """
+    # Pickled now: a task running here may change state the others share.
+    try:
+        payloads = [bytes(ForkingPickler.dumps((fn, item))) for item in items]
+    except Exception:
+        # Whatever pickling raises, the task cannot reach a worker.
+        logger.debug("Optimisation task is not picklable; running serially.")
+        return [fn(item) for item in items]
+    lock = threading.Lock()
+    unclaimed = deque(range(len(items)))
+    futures: dict[int, Future] = {}
+    free_workers = threading.Semaphore(0)
+
+    def free_a_worker(_finished: Future) -> None:
+        # Only this: a breaking pool calls back holding a lock that submit needs.
+        free_workers.release()
+
+    def run_pool() -> None:
+        with lock:
+            size = min(workers - 1, len(unclaimed))
+        if size < 1:
+            return
+        pool = None
+        try:
+            pool = pool_executor_cls(max_workers=size)
+            for _ in range(size):
+                pool.submit(_worker_ready).add_done_callback(free_a_worker)
+            while True:
+                free_workers.acquire()
+                with lock:
+                    if not unclaimed:
+                        return
+                    # Left unclaimed if this raises, so this process takes it.
+                    future = pool.submit(_run_pickled_task, payloads[unclaimed[0]])
+                    futures[unclaimed.popleft()] = future
+                future.add_done_callback(free_a_worker)
+        except _POOL_STARTUP_ERRORS as exc:
+            logger.warning(
+                "Process pool unavailable (%s); running tasks serially.", exc
+            )
+        finally:
+            if pool is not None:
+                # Workers still importing finish that and exit by themselves.
+                pool.shutdown(wait=False, cancel_futures=True)
+
+    def next_index() -> int | None:
+        with lock:
+            return unclaimed.popleft() if unclaimed else None
+
+    timer = threading.Timer(_POOL_PATIENCE_SECONDS, run_pool)
+    timer.start()
+    results: dict[int, object] = {}
+    try:
+        while (index := next_index()) is not None:
+            results[index] = fn(items[index])
+        with lock:
+            unclaimed.clear()
+            in_pool = sorted(futures.items())
+        reason = None
+        for index, future in in_pool:
+            try:
+                results[index] = future.result()
+            except broken_pool_exc as exc:
+                reason = exc
+        if reason is not None:
+            logger.warning(
+                "Process pool unavailable (%s); running tasks serially.", reason
+            )
+        for index, item in enumerate(items):
+            if index not in results:
+                results[index] = fn(item)
+    finally:
+        # Not joined: starting a first forkserver worker blocks until the server
+        # has imported the main script. run_pool stops the pool when that ends.
+        timer.cancel()
+        with lock:
+            unclaimed.clear()
+        free_workers.release()
+    return [results[index] for index in range(len(items))]
+
+
 def _map_in_process_pool(
     fn: Callable,
     items: Sequence,
@@ -138,6 +249,15 @@ def _map_in_process_pool(
     if not _is_picklable((fn, items[0])):
         logger.debug("Optimisation task is not picklable; running serially.")
         return [fn(item) for item in items]
+
+    if multiprocessing.get_start_method() != "fork":
+        return _map_with_late_pool(
+            fn,
+            items,
+            workers=workers,
+            pool_executor_cls=pool_executor_cls,
+            broken_pool_exc=broken_pool_exc,
+        )
 
     started = False
     try:
