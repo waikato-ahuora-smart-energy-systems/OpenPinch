@@ -11,7 +11,7 @@ application layer builds on these models.
 
 ## Interface
 - `ValueWithUnit`, `PeriodValueWithUnit`, `PeriodValueWithUnitAndWeights`, `PeriodValueWithUnitAndIds`, `ScalarOrVU`, `MaybeVU`, `HPRMetric` (`common.py`): value-with-unit containers and aliases.
-- `TargetInput`, `StreamSchema`, `UtilitySchema`, `StreamSegmentSchema`, `TemperatureHeatProfileSchema`, `ZoneTreeSchema`, `HeatExchangerSchema`, `HeatExchangerNetworkSchema`, `PlantProfileSchema`, `NonLinearStream` and related (`input.py`): validated case input.
+- `TargetInput`, `StreamSchema`, `UtilitySchema`, `StreamSegmentSchema`, `TemperatureHeatProfileSchema`, `ZoneTreeSchema`, `HeatExchangerSchema`, `HeatExchangerNetworkSchema`, `PlantProfileSchema`, `ProcessComponentSchema`, `ProcessComponentSourceSchema`, `NonLinearStream` and related (`input.py`): validated case input.
 - `TargetOutput` (`output.py`): cached targeting output with targets, graphs and optional design result.
 - `TargetResults`, `HeatUtility`, `PinchTemp`, `ReportMetric`, `GraphAvailability`, `ProblemReport` (`reporting.py`): report-facing results.
 - `report_field`, `metric_specifications`, `AggregationPolicy`, `MetricSpecification` (`report_metrics.py`): per-field period aggregation policy metadata.
@@ -36,7 +36,8 @@ application layer builds on these models.
 - Input values are converted to canonical units (degC, kPa, kJ/kg, kW, kW/delta_degC, delta_degC, kW/m^2/delta_degC, $/MWh); `dt_cont` given in degC or K is read as a temperature difference [units.py:INPUT_UNIT_RULES, standardise_input_value].
 - A stream has either `segments`, a `profile`, or ordinary thermal data (`t_supply`, `t_target` and `heat_flow` or `heat_capacity_flowrate`); `segments` and `profile` are mutually exclusive and `heat_capacity_flowrate` cannot accompany either. Parent `t_supply`/`t_target`/`heat_flow` may accompany nested data; `StreamSchema` does not compare them, the match is checked when the application prepares the problem [application/_problem/input/segments.py:_validate_supplied_parent_aggregates] [input.py:StreamSchema].
 - Sibling zone names are unique [input.py:ZoneTreeSchema].
-- A residual-basis input cannot contain streams, networks or plant profiles, must use its single frozen period, cannot enable shared-period HPR, and allows only a childless Process Zone with no temperature-shift multiplier other than 1.0 [input.py:TargetInput._validate_residual_basis].
+- `TargetInput.process_components` is left out of dumps when empty, so input without components dumps as it did before the field existed [input.py:TargetInput].
+- A residual-basis input cannot contain streams, networks, plant profiles or process components, must use its single frozen period, cannot enable shared-period HPR, and allows only a childless Process Zone with no temperature-shift multiplier other than 1.0 [input.py:TargetInput._validate_residual_basis].
 - Exchanger period states, direction semantics and segment area totals are checked; `area` must match the largest period total of segment areas [input.py:HeatExchangerSchema].
 - Workspace bundles accept only `schema_version` `"3"`; case names are portable (non-empty, no path characters, control characters, leading or trailing whitespace, trailing period or Windows device names, and not `.` or `..`) [workspace.py:PinchWorkspaceBundle, validate_workspace_case_name].
 - A performance map must be in canonical point order, satisfy `q_sink = q_source + electric_power` within tolerance, have useful duty equal to `load_fraction * reference_capacity`, and use basis `q_sink` for heat pumps and `q_source` for refrigeration [hpr_performance_map.py:HprPerformanceMap].
