@@ -23,7 +23,10 @@ from ._problem.accessors.design import _DesignAccessorDescriptor
 from ._problem.accessors.plot import _PlotAccessorDescriptor
 from ._problem.accessors.target import _TargetAccessorDescriptor
 from ._problem.input import loading as _input_loading
-from ._problem.input.canonicalization import canonical_problem_inputs
+from ._problem.input.canonicalization import (
+    canonical_problem_inputs,
+    rename_canonical_root,
+)
 from ._problem.input.loading import (
     JsonDict,
     PathLike,
@@ -579,6 +582,7 @@ class PinchProblem:
         changed = self._project_name != value
         self._project_name = value
         if isinstance(self._master_zone, Zone):
+            changed = changed or self._master_zone.name != value
             self._master_zone.name = value
             if changed:
                 self._invalidate_analysis()
@@ -667,7 +671,13 @@ class PinchProblem:
     def _canonical_problem_inputs(self) -> JsonDict:
         """Return canonical mutable problem inputs with an explicit zone tree."""
         validated = self.validate()
-        return canonical_problem_inputs(validated, project_name=self.project_name)
+        problem_inputs = canonical_problem_inputs(
+            validated, project_name=self.project_name
+        )
+        # The source still holds its own root name after a rename; the live root wins.
+        if isinstance(self._master_zone, Zone):
+            rename_canonical_root(problem_inputs, self._master_zone.name)
+        return problem_inputs
 
     def __repr__(self) -> str:
         """Return a compact summary of the source and cached result state."""

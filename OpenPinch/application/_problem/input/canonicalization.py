@@ -43,6 +43,15 @@ def canonical_problem_inputs(
     return problem_inputs
 
 
+def rename_canonical_root(problem_inputs: dict[str, Any], name: str) -> None:
+    """Rename the root of canonical inputs and the stream paths that start at it."""
+    old_prefix = f"{problem_inputs['zone_tree']['name']}/"
+    problem_inputs["zone_tree"]["name"] = name
+    for stream in problem_inputs["streams"]:
+        if stream["zone"].startswith(old_prefix):
+            stream["zone"] = f"{name}/{stream['zone'].removeprefix(old_prefix)}"
+
+
 def _build_zone_config(
     *,
     options: Configuration | dict | None,
