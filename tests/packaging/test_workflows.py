@@ -152,6 +152,18 @@ def test_pyodide_shards_cover_the_presentation_tests():
     assert "tests/presentation" in shards["core"]
 
 
+def test_pyodide_heat_pump_shards_cover_the_directory_between_them():
+    matrix = workflow("ci.yml")["jobs"]["pyodide"]["strategy"]["matrix"]
+    shards = {row["shard"]: row["paths"].split() for row in matrix["include"]}
+    targets = shards["heat-pump-targets"]
+    assert targets
+    assert all((REPOSITORY_ROOT / path).is_file() for path in targets)
+    assert shards["heat-pumps"] == [
+        "tests/analysis/heat_pumps",
+        *(f"--ignore={path}" for path in targets),
+    ]
+
+
 def test_pyodide_job_runs_the_runner_test_once_its_node_packages_are_installed():
     # The runner test skips without scripts/pyodide/node_modules, which only
     # the Pyodide job installs, so it runs there (on CPython, in one shard)

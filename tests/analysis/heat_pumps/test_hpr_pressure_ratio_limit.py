@@ -18,7 +18,7 @@ from OpenPinch.analysis.heat_pumps.common.shared import (
     limit_cascade_pressure_ratios,
     limit_parallel_pressure_ratios,
 )
-from OpenPinch.contracts.hpr import HPRTargetingError
+from OpenPinch.contracts.hpr import INFEASIBLE_REFRIGERATION_REASON, HPRTargetingError
 from OpenPinch.domain.configuration_fields import CONFIG_FIELD_SPECS
 
 from .helpers import _base_args
@@ -175,7 +175,9 @@ def _ahmad_utility_refrigeration(*, limit: float | None = None):
         evaporators=1,
         maximum_restarts=1,
         maximum_iterations=3,
-        maximum_evaluations=48,
+        # The penalty decides the default limit's outcome at 28, but not at 24
+        # or 32: its test checks the reason, so a change here must keep it.
+        maximum_evaluations=28,
         refrigerants=["Water"],
         is_utility_refrigeration=True,
         is_cascade_cycle=False,
@@ -184,14 +186,21 @@ def _ahmad_utility_refrigeration(*, limit: float | None = None):
 
 
 def test_a_refrigerator_that_cannot_reach_its_duty_within_the_limit_is_a_failure():
+    # Whether this ends on a penalised or a zero-duty design depends on the
+    # platform's numerics. The test below shows the limit is the cause.
     with pytest.raises(HPRTargetingError):
         _ahmad_utility_refrigeration(limit=1.5)
 
 
 def test_a_refrigerator_still_carrying_a_penalty_is_a_failure():
     # This small search budget ends on penalised designs.
-    with pytest.raises(HPRTargetingError):
+    with pytest.raises(HPRTargetingError) as raised:
         _ahmad_utility_refrigeration()
+
+    assert any(
+        failure.summary == INFEASIBLE_REFRIGERATION_REASON
+        for failure in raised.value.diagnostics.representative_failures
+    )
 
 
 def test_the_same_refrigerator_is_a_target_without_the_limit():
