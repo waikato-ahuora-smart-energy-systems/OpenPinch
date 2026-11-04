@@ -9,9 +9,9 @@ Tier semantics:
 * 4: tier-3 dTmin routes with wider EVM branch exploration.
 * 5: experimental reduced/base/doubled-dTmin search at tier-4 breadth.
 
-Tier 0 and 1 routes always evolve at breadth 1, protected or not, so a broader
-search can fall back to the original result. ``HENS_EVM_N_AD_BRANCHES`` and
-``HENS_EVM_N_RM_BRANCHES`` apply to the expanded routes of tiers 2 to 5 only.
+``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` apply to every route
+when set, protected or not. Unset, tier 0 and 1 routes evolve at breadth 1 in any
+tier, and the expanded routes use the breadth of the tier that added them.
 """
 
 from __future__ import annotations
@@ -155,6 +155,7 @@ def pathway_metadata(pathways: Iterable[TierPathway]) -> dict[str, object]:
 
 def _tier0_pathways(settings, *, protected: bool) -> tuple[TierPathway, ...]:
     multipliers = _explicit_or_default_multipliers(settings, default=(1.0,))
+    ad_branches, rm_branches, patience = _evolution_search(settings, tier=0)
     return tuple(
         TierPathway(
             pathway_id=f"tier0-compact-{_multiplier_label(multiplier)}",
@@ -163,9 +164,9 @@ def _tier0_pathways(settings, *, protected: bool) -> tuple[TierPathway, ...]:
             pdm_mode="compact",
             multiplier=float(multiplier),
             uses_tdm=False,
-            evm_n_ad_branches=1,
-            evm_n_rm_branches=1,
-            evm_no_improvement_patience=None,
+            evm_n_ad_branches=ad_branches,
+            evm_n_rm_branches=rm_branches,
+            evm_no_improvement_patience=patience,
             protected=protected,
         )
         for multiplier in multipliers
@@ -173,6 +174,7 @@ def _tier0_pathways(settings, *, protected: bool) -> tuple[TierPathway, ...]:
 
 
 def _tier1_pathway(settings, *, protected: bool) -> TierPathway:
+    ad_branches, rm_branches, patience = _evolution_search(settings, tier=1)
     return TierPathway(
         pathway_id="tier1-open-hens",
         tier_origin=1,
@@ -180,9 +182,9 @@ def _tier1_pathway(settings, *, protected: bool) -> TierPathway:
         pdm_mode="standard",
         multiplier=None,
         uses_tdm=True,
-        evm_n_ad_branches=1,
-        evm_n_rm_branches=1,
-        evm_no_improvement_patience=None,
+        evm_n_ad_branches=ad_branches,
+        evm_n_rm_branches=rm_branches,
+        evm_no_improvement_patience=patience,
         protected=protected,
         exact_open_hens=True,
     )
@@ -193,15 +195,7 @@ def _quality_tier_pathways(settings, tier: int) -> tuple[TierPathway, ...]:
         settings,
         default=tier_pdm_multipliers(tier),
     )
-    ad_branches = _branch_breadth(
-        settings.evm_n_ad_branches,
-        tier=tier,
-    )
-    rm_branches = _branch_breadth(
-        settings.evm_n_rm_branches,
-        tier=tier,
-    )
-    patience = 2 if max(ad_branches, rm_branches) > 1 else None
+    ad_branches, rm_branches, patience = _evolution_search(settings, tier=tier)
     pathways: list[TierPathway] = []
     modes: tuple[PDMMode, ...] = ("compact", "raw")
     for multiplier in multipliers:
@@ -231,6 +225,13 @@ def _explicit_or_default_multipliers(
     if settings.user_dt_cont_multipliers:
         return tuple(float(value) for value in settings.dt_cont_multipliers or ())
     return default
+
+
+def _evolution_search(settings, *, tier: int) -> tuple[int, int, int | None]:
+    ad_branches = _branch_breadth(settings.evm_n_ad_branches, tier=tier)
+    rm_branches = _branch_breadth(settings.evm_n_rm_branches, tier=tier)
+    patience = 2 if max(ad_branches, rm_branches) > 1 else None
+    return ad_branches, rm_branches, patience
 
 
 def _branch_breadth(value: int | None, *, tier: int) -> int:

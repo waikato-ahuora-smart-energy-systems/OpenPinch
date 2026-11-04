@@ -210,13 +210,13 @@ loaded problem configuration. That argument wins over a tier in the call's
 way: they apply to that call only and do not change the stored configuration.
 
 ``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` set the network evolution
-breadth of the expanded routes in tiers 2 to 5. Tier 0 and tier 1 routes always use
-a breadth of 1, including when tiers 2 to 5 run them as protected routes, so a broader
-search can fall back to the original result. A tier 0 or tier 1 run with these options
-set therefore searches at 1, unless Couenne is missing: the fallback evolution tasks
-are not tier routes, and they follow the options. ``manifest.evm_n_ad_branches`` and
-``manifest.evm_n_rm_branches`` report the widest breadth any evolution task ran, which
-is not always the breadth behind the selected network: check
+breadth of every route when they are set, including the tier 0 and tier 1 routes that
+tiers 2 to 5 run as protected routes, and including ``problem.design.open_hens()``.
+With either option above 1, the tier 1 route is no longer the original search. When
+they are not set, tier 0 and tier 1 routes use a breadth of 1 in any tier, while tiers
+4 and 5 use 2 on their expanded routes. ``manifest.evm_n_ad_branches`` and
+``manifest.evm_n_rm_branches`` report the widest of these, so at tier 4 or 5 a
+protected route can be selected at a narrower breadth than the manifest shows: check
 ``manifest.selected_protected_pathway``.
 
 Method-level inputs and outputs are Pydantic models. Their shared input

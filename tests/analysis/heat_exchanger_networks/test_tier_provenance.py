@@ -10,6 +10,9 @@ from OpenPinch.analysis.heat_exchanger_networks.execution.executor import (
 from OpenPinch.analysis.heat_exchanger_networks.execution.fake_executor import (
     FakeSynthesisExecutor,
 )
+from OpenPinch.analysis.heat_exchanger_networks.execution.pathways import (
+    tier_pathways,
+)
 from OpenPinch.analysis.heat_exchanger_networks.execution.settings import (
     workflow_settings_from_problem,
 )
@@ -165,14 +168,8 @@ def _evolution_breadths(problem, tasks) -> dict[tuple[str, ...], tuple[int, int]
     return breadths
 
 
-@pytest.mark.parametrize(
-    ("tier", "expected_manifest_breadth"),
-    [(0, (1, 1)), (1, (1, 1)), (2, (2, 3)), (3, (2, 3)), (4, (2, 3)), (5, (2, 3))],
-)
-def test_protected_routes_stay_exact_and_manifest_reports_what_ran(
-    tier: int,
-    expected_manifest_breadth: tuple[int, int],
-) -> None:
+@pytest.mark.parametrize("tier", range(6))
+def test_breadth_options_apply_on_every_route_and_manifest_agrees(tier: int) -> None:
     problem = _small_problem_with_options(
         {
             "HENS_SYNTHESIS_QUALITY_TIER": tier,
@@ -190,17 +187,35 @@ def test_protected_routes_stay_exact_and_manifest_reports_what_ran(
     manifest = result.accepted_result.manifest
     breadths = _evolution_breadths(problem, result.tasks)
     assert breadths
-    for pathway_ids, breadth in breadths.items():
-        protected = all(
-            pathway_id.startswith(("tier0-", "tier1-")) for pathway_id in pathway_ids
-        )
-        assert breadth == ((1, 1) if protected else (2, 3))
-    assert (manifest.evm_n_ad_branches, manifest.evm_n_rm_branches) == (
-        expected_manifest_breadth
+    assert set(breadths.values()) == {(2, 3)}
+    assert (manifest.evm_n_ad_branches, manifest.evm_n_rm_branches) == (2, 3)
+
+
+@pytest.mark.parametrize("tier", [0, 1])
+@pytest.mark.parametrize(
+    ("options", "expected_patience"),
+    [({}, None), ({"HENS_EVM_N_AD_BRANCHES": 2}, 2)],
+)
+def test_tier_zero_and_one_routes_prune_only_when_widened(
+    tier: int,
+    options: dict[str, int],
+    expected_patience: int | None,
+) -> None:
+    problem = _small_problem_with_options(
+        {"HENS_SYNTHESIS_QUALITY_TIER": tier, **options}
     )
 
+    pathways = tier_pathways(workflow_settings_from_problem(problem))
 
-def test_manifest_reports_widest_breadth_at_default_options() -> None:
+    assert pathways
+    assert {pathway.evm_no_improvement_patience for pathway in pathways} == {
+        expected_patience
+    }
+
+
+def test_protected_routes_stay_at_one_by_default_while_manifest_reports_widest() -> (
+    None
+):
     problem = _small_problem_with_options({"HENS_SYNTHESIS_QUALITY_TIER": 4})
 
     result = execute_open_hens_method(

@@ -87,20 +87,8 @@ def build_synthesis_result(
         pdm_stage_pair_limit=settings.pdm_stage_pair_limit,
         tdm_parent_limit=settings.tdm_parent_limit,
         stage_packing=settings.stage_packing,
-        # The breadth the evolution tasks ran, which protected routes hold at 1
-        # whatever the options say.
-        evm_n_ad_branches=_widest_evolution_breadth(
-            tasks,
-            setting="evolution_n_ad_branches",
-            pathway_field="evm_n_ad_branches",
-            default=settings.effective_evm_n_ad_branches,
-        ),
-        evm_n_rm_branches=_widest_evolution_breadth(
-            tasks,
-            setting="evolution_n_rm_branches",
-            pathway_field="evm_n_rm_branches",
-            default=settings.effective_evm_n_rm_branches,
-        ),
+        evm_n_ad_branches=settings.effective_evm_n_ad_branches,
+        evm_n_rm_branches=settings.effective_evm_n_rm_branches,
         task_ids=tuple(task.task_id for task in tasks if task.task_id is not None),
         problem_id=settings.problem_id,
         workspace_variant=settings.workspace_variant,
@@ -139,23 +127,6 @@ def _selected_pathway_metadata(
         return {}
     pathway = pathways[0]
     return pathway.metadata()
-
-
-def _widest_evolution_breadth(
-    tasks: Sequence[HeatExchangerNetworkSynthesisTask],
-    *,
-    setting: str,
-    pathway_field: str,
-    default: int,
-) -> int:
-    breadths = []
-    for task in tasks:
-        if task.method != HeatExchangerNetworkDesignMethod.NetworkEvolution:
-            continue
-        pathways = pathways_from_metadata(task.metadata)
-        fallback = getattr(pathways[0], pathway_field) if pathways else default
-        breadths.append(int((task.settings or {}).get(setting, fallback)))
-    return max(breadths, default=default)
 
 
 def _executed_method_sequence(
