@@ -209,6 +209,16 @@ loaded problem configuration. That argument wins over a tier in the call's
 ``options`` passed to design accessors accept other ``HENS_*`` overrides the same
 way: they apply to that call only and do not change the stored configuration.
 
+``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` set the network evolution
+breadth of every route when they are set, including the tier 0 and tier 1 routes that
+tiers 2 to 5 run as protected routes, and including ``problem.design.open_hens()``.
+With either option above 1, the tier 1 route is no longer the original search. When
+they are not set, tier 0 and tier 1 routes use a breadth of 1 in any tier, while tiers
+4 and 5 use 2 on their expanded routes. ``manifest.evm_n_ad_branches`` and
+``manifest.evm_n_rm_branches`` report the widest of these, so at tier 4 or 5 a
+protected route can be selected at a narrower breadth than the manifest shows: check
+``manifest.selected_protected_pathway``.
+
 Method-level inputs and outputs are Pydantic models. Their shared input
 contract contains run/problem metadata, settings, optional seed network,
 optional seed-network index, and trace metadata. Their shared output contract

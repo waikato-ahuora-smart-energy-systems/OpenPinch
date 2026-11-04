@@ -7,6 +7,13 @@ Unreleased
 Behaviour changes
 ~~~~~~~~~~~~~~~~~
 
+- ``HENS_EVM_N_AD_BRANCHES`` and ``HENS_EVM_N_RM_BRANCHES`` now apply to the tier 0
+  and tier 1 routes when set, including ``design.open_hens()`` and the protected
+  routes of tiers 2 to 5. These routes used to ignore the options and run at a
+  breadth of 1, although the manifest reported the option's value. A run with
+  either option above 1 now searches more of these routes, takes longer and can
+  return a different network, and those tasks get new IDs. Runs that do not set the
+  options are unchanged.
 - ``target.varbanov_cogeneration()`` and ``TurbineModel.VARBANOV`` are removed.
   They are replaced by ``target.varbanov_small_turbine_cogeneration()`` and
   ``target.varbanov_large_turbine_cogeneration()``, with
