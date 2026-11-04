@@ -5,6 +5,7 @@ from __future__ import annotations
 import pandas as pd
 from pandas.errors import EmptyDataError
 
+from ..optional_dependencies import optional_dependency_error
 from .json import write_json
 from .records import (
     validate_stream_data,
@@ -27,6 +28,27 @@ __all__ = ["get_problem_from_excel", "get_results_from_excel"]
 
 
 _TEXT_COLUMNS = frozenset({"name", "zone", "type"})
+_XLS_ADVICE = (
+    "A legacy .xls file is not supported: open it in Excel and save it as .xlsx."
+)
+
+
+def _engine_install_message(package: str, workbook_types: str) -> str:
+    return optional_dependency_error(
+        package=package,
+        purpose=f"reading {workbook_types} workbooks",
+        extras=("dashboard", "notebook"),
+    )
+
+
+# Keyed by the module pandas failed to import. pandas falls back to
+# python_calamine for .xlsb and .xls content when pyxlsb or xlrd is absent.
+_MISSING_ENGINE_MESSAGES = {
+    "openpyxl": _engine_install_message("openpyxl", ".xlsx and .xlsm"),
+    "pyxlsb": _engine_install_message("pyxlsb", ".xlsb"),
+    "python_calamine": f"{_engine_install_message('pyxlsb', '.xlsb')} {_XLS_ADVICE}",
+    "xlrd": _XLS_ADVICE,
+}
 
 
 def get_problem_from_excel(excel_file, output_json=None):
@@ -79,6 +101,19 @@ def get_results_from_excel(excel_file, output_json, project_name):
     return output_dict
 
 
+def _open_workbook(excel_file):
+    """Open a workbook, explaining how to install a missing pandas Excel engine."""
+    try:
+        return pd.ExcelFile(excel_file)
+    except ImportError as exc:
+        # pandas words this differently across versions, but always raises it
+        # while handling the failed import. An engine too old has no such cause.
+        message = _MISSING_ENGINE_MESSAGES.get(getattr(exc.__context__, "name", None))
+        if message is None:
+            raise
+        raise ImportError(message) from exc
+
+
 def _parse_sheet_with_units(
     excel_file,
     sheet_name,
@@ -87,7 +122,7 @@ def _parse_sheet_with_units(
     project_name=None,
 ):
     """Read one workbook sheet and convert it to row dictionaries."""
-    with pd.ExcelFile(excel_file) as workbook:
+    with _open_workbook(excel_file) as workbook:
         if sheet_name not in workbook.sheet_names:
             available = ", ".join(workbook.sheet_names)
             raise ValueError(
@@ -131,7 +166,7 @@ def _parse_options_sheet(
     sheet_name: str = "Options",
 ):
     """Read key/value option rows from one workbook sheet."""
-    with pd.ExcelFile(excel_file) as workbook:
+    with _open_workbook(excel_file) as workbook:
         if sheet_name not in workbook.sheet_names:
             return {}
         df_full = pd.read_excel(workbook, sheet_name=sheet_name, header=None)
