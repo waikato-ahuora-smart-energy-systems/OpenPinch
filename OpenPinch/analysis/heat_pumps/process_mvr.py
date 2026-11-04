@@ -184,7 +184,7 @@ def replay_process_components(
     root: Zone,
 ) -> None:
     """Re-solve components on a rebuilt tree, changing none of them on failure."""
-    zones = {zone.address: zone for zone in walk_zones(root)}
+    zones = {_path_below_root(zone): zone for zone in walk_zones(root)}
     replayed = [
         _replay_component(component, root, zones) for component in components.values()
     ]
@@ -235,7 +235,7 @@ def _find_replay_source(
     zones: dict[str, Zone],
 ) -> Stream:
     membership = previous.original_memberships[0]
-    zone = zones.get(membership.zone.address)
+    zone = zones.get(_path_below_root(membership.zone))
     streams = {} if zone is None else dict(zone.hot_streams.items())
     if membership.key not in streams:
         raise ValueError(
@@ -243,6 +243,10 @@ def _find_replay_source(
             f"{previous.original_stream.name!r} was not found."
         )
     return streams[membership.key]
+
+
+def _path_below_root(zone: Zone) -> str:
+    return zone.address.partition("/")[2]
 
 
 def _settings_from_configuration(
