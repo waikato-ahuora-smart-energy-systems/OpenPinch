@@ -332,8 +332,20 @@ jobs:
               tests/packaging/test_pyodide_pins.py
               tests/packaging/test_hypothesis_profile.py
               tests/analysis --ignore=tests/analysis/heat_pumps
+          - shard: heat-pump-targets
+            # The slowest heat pump files; a new file runs in heat-pumps.
+            paths: >-
+              tests/analysis/heat_pumps/test_hpr_pressure_ratio_limit.py
+              tests/analysis/heat_pumps/test_ihx_thermodynamic_bounds.py
+              tests/analysis/heat_pumps/test_cascade_vapour_compression.py
+              tests/analysis/heat_pumps/test_multiperiod_hpr.py
           - shard: heat-pumps
-            paths: tests/analysis/heat_pumps
+            paths: >-
+              tests/analysis/heat_pumps
+              --ignore=tests/analysis/heat_pumps/test_hpr_pressure_ratio_limit.py
+              --ignore=tests/analysis/heat_pumps/test_ihx_thermodynamic_bounds.py
+              --ignore=tests/analysis/heat_pumps/test_cascade_vapour_compression.py
+              --ignore=tests/analysis/heat_pumps/test_multiperiod_hpr.py
           - shard: placement
             paths: >-
               tests/application/test_utility_placement.py
