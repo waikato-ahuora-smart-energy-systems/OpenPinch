@@ -15,7 +15,7 @@ from ....contracts.synthesis.task import (
 )
 from ....domain.enums import HeatExchangerNetworkDesignMethod
 from ..errors import WorkflowContractError
-from ..execution.fallbacks import _missing_couenne_failure
+from ..execution.fallbacks import _couenne_was_missing
 from ..execution.pathways import pathways_from_metadata
 from ..execution.settings import SynthesisWorkflowSettings
 from ..reporting.verification import verify_network_feasibility
@@ -137,7 +137,7 @@ def _executed_method_sequence(
         dict.fromkeys(
             outcome.task.method
             for outcome in outcomes
-            if not _missing_couenne_failure(outcome)
+            if not _couenne_was_missing(outcome)
         )
     )
 

@@ -152,6 +152,8 @@ Heat pumps and refrigeration
   ``PROCESS_MVR_ETA_COMP`` and ``PROCESS_MVR_ETA_MOTOR`` values, so changing those
   options can change a kept component's work. If a component cannot be re-solved,
   the call raises and the problem and its components are unchanged.
+- Deactivating one of two process components on the same source no longer turns the
+  source back on while the other is still active, which counted the stream twice.
 - **Behaviour change:** process components now survive ``to_problem_json``, workspace
   bundles and ``PinchWorkspace.scenario``. They used to be lost with no warning, so a
   saved or copied case targeted different utilities from the original. The input has
@@ -226,6 +228,12 @@ Heat exchanger network synthesis
   matching the manifest. It showed the configured value, for example 1 on a
   default tier 0 run, or 3 on a ``design.open_hens()`` run. The change does not
   affect ``input_fingerprint``.
+- Network evolution tasks with no pathway metadata now use the branch breadth of
+  the tier that ran, as the manifest's ``evm_n_ad_branches`` and
+  ``evm_n_rm_branches`` report. These are the tasks that run when Couenne is
+  missing. They read the tier stored in the options, so a stored tier of 4 gave
+  a tier 0 or tier 1 run a breadth of 2 and a stored tier of 1 gave a tier 4 run
+  a breadth of 1. Their task IDs change, because a task ID includes its settings.
 
 Cogeneration
 ~~~~~~~~~~~~

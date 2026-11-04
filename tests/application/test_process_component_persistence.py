@@ -441,6 +441,23 @@ def test_a_file_written_before_this_field_loads_without_components():
     assert reloaded.to_problem_json() == exported
 
 
+def test_deactivating_a_component_leaves_a_source_another_one_replaced_off():
+    problem = _with_mvr(mvr_id="first")
+    first = problem.process_components["first"]
+    first.deactivate()
+    second = problem.components.add_process_mvr(
+        SOURCE, mvr_id="second", mvr_stage_t_lift=5.0, liquid_injection=False
+    )
+    first.activate()
+
+    first.deactivate()
+
+    source = first.stream_records[0].original_stream
+    assert source.is_active is False
+    assert second.active is True
+    _assert_same_targets(_reloaded(problem), problem)
+
+
 def test_round_trip_keeps_an_inactive_component_inactive():
     original = _with_mvr()
     original.process_components["mvr_1"].deactivate()
