@@ -19,7 +19,7 @@ Private helpers behind `OpenPinch.domain.value.Value`: input-shape predicates an
 - A single-element period vector resolves without a `period_idx`; a longer vector defaults to period zero unless `default_allowed` is false, and an out-of-range index raises for vectors with more than one element. [resolution.py:_resolve_period_values]
 - Period weights are finite, non-negative and sum to a positive value, and their length must equal the period count. [units.py:validate_weights]
 - A dimensionless quantity is converted normally when the requested unit is dimensionless-compatible (fraction to %); only when conversion raises does it adopt the requested unit with its magnitude unchanged. Differing offset and delta temperature units convert as differences. [coercion.py:ValueCoercion._coerce_quantity_to_unit]
-- A `Value` never writes its magnitudes in place: stored arrays are read-only, so copies share a quantity (`Value(value)`, `deepcopy`, `to` the same unit), and assignment replaces the quantity. [coercion.py:frozen_magnitudes]
+- A `Value` never writes its magnitudes in place: stored arrays are read-only, so copies share a quantity (`Value(value)`, `deepcopy`, `to` the same unit), and assignment replaces the quantity. Unpickling keeps them read-only at any pickle protocol. [coercion.py:frozen_magnitudes]
 - Empty value sequences are rejected. [coercion.py:ValueCoercion._coerce_magnitude_array]
 - Unit spellings: `$` becomes `USD`, `-` and `fraction` become dimensionless, per-year suffixes become `/year`. [units.py:normalise_unit_text]
 

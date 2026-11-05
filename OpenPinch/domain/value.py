@@ -353,6 +353,11 @@ class Value:
         copied._weights = self.weights
         return copied
 
+    def __setstate__(self, state: dict) -> None:
+        """Restore a pickled value; pickle protocols below 5 lose the read-only flag."""
+        self.__dict__.update(state)
+        self._quantity.magnitude.flags.writeable = False
+
     def _make_read_only(self, reason: str) -> "Value":
         """Mark this value as an immutable domain-owned view."""
         self._read_only_reason = str(reason)
