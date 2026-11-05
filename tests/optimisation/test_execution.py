@@ -437,6 +437,36 @@ def test_cancelled_error_raised_by_an_objective_propagates(
         )
 
 
+_POOL_TASK_RUNNING = threading.Event()
+_POOL_TASK_FINISHED = threading.Event()
+
+
+def _fail_while_the_pool_runs_a_task(run):
+    if run == 0:
+        assert _POOL_TASK_RUNNING.wait(timeout=30)
+        raise ValueError("task failed")
+    _POOL_TASK_RUNNING.set()
+    time.sleep(0.5)
+    _POOL_TASK_FINISHED.set()
+    return [np.asarray([float(run)])], [float(run)]
+
+
+@needs_threads
+def test_exception_waits_for_tasks_the_pool_is_running(importing_workers, monkeypatch):
+    _POOL_TASK_RUNNING.clear()
+    _POOL_TASK_FINISHED.clear()
+    monkeypatch.setattr(execution, "_POOL_PATIENCE_SECONDS", 0.0)
+
+    with pytest.raises(ValueError, match="task failed"):
+        execution._collect_candidates_in_parallel(
+            _fail_while_the_pool_runs_a_task,
+            n_runs=2,
+            pool_executor_cls=_ThreadWorkers,
+        )
+
+    assert _POOL_TASK_FINISHED.is_set()
+
+
 class _StillImportingWorkers(ThreadPoolExecutor):
     """Pool double whose workers never finish importing OpenPinch."""
 

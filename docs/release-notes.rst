@@ -4,6 +4,17 @@ Pre-Release Notes
 Unreleased
 ----------
 
+0.8.1 (2026-11-06)
+------------------
+
+Behaviour changes
+~~~~~~~~~~~~~~~~~
+
+- When an optimisation task raises under the spawn and forkserver start methods,
+  the exception now reaches the caller only after tasks already running in worker
+  processes have finished. In 0.8.0 those tasks kept running after the call had
+  failed, so they could overlap a retry. The fork start method already waited.
+
 0.8.0 (2026-11-05)
 ------------------
 

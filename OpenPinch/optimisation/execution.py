@@ -13,6 +13,7 @@ from collections import deque
 from collections.abc import Callable, Iterable, Sequence
 from concurrent.futures import CancelledError, Future, ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
+from contextlib import suppress
 from functools import partial
 from multiprocessing.reduction import ForkingPickler
 from pathlib import Path
@@ -230,7 +231,13 @@ def _map_with_late_pool(
         timer.cancel()
         with lock:
             unclaimed.clear()
+            submitted = list(futures.values())
         free_workers.release()
+        # An exception must not leave tasks running after the caller has it. Not
+        # concurrent.futures.wait: it never returns for a future shutdown cancelled.
+        for future in submitted:
+            with suppress(CancelledError):
+                future.exception()
     return [results[index] for index in range(len(items))]
 
 
