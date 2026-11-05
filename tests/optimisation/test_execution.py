@@ -369,6 +369,42 @@ def test_slow_batch_shares_its_remaining_tasks_with_a_pool(
     assert fs.tolist() == [0.0, 1.0, 2.0]
 
 
+_POOL_CLAIMED_A_TASK = threading.Event()
+
+
+def _wait_for_a_claimed_task(run):
+    """Parent's task: finish only once the pool has claimed another task."""
+    if run == 0:
+        assert _POOL_CLAIMED_A_TASK.wait(timeout=30)
+    return [np.asarray([float(run)])], [float(run)]
+
+
+class _CancellingWorkers(ThreadPoolExecutor):
+    """Pool double that cancels claimed tasks, as a shutdown does before they start."""
+
+    def submit(self, fn, *args, **kwargs):
+        if fn is execution._worker_ready:
+            return super().submit(fn, *args, **kwargs)
+        future = Future()
+        future.cancel()
+        _POOL_CLAIMED_A_TASK.set()
+        return future
+
+
+@needs_threads
+def test_task_cancelled_in_the_pool_reruns_in_this_process(
+    importing_workers, monkeypatch
+):
+    _POOL_CLAIMED_A_TASK.clear()
+    monkeypatch.setattr(execution, "_POOL_PATIENCE_SECONDS", 0.0)
+
+    xs, fs = execution._collect_candidates_in_parallel(
+        _wait_for_a_claimed_task, n_runs=3, pool_executor_cls=_CancellingWorkers
+    )
+
+    assert fs.tolist() == [0.0, 1.0, 2.0]
+
+
 class _StillImportingWorkers(ThreadPoolExecutor):
     """Pool double whose workers never finish importing OpenPinch."""
 

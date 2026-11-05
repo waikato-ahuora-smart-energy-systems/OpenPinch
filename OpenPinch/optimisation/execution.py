@@ -11,7 +11,7 @@ import sys
 import threading
 from collections import deque
 from collections.abc import Callable, Iterable, Sequence
-from concurrent.futures import Future, ProcessPoolExecutor
+from concurrent.futures import CancelledError, Future, ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from functools import partial
 from multiprocessing.reduction import ForkingPickler
@@ -145,7 +145,8 @@ def _map_with_late_pool(
     This process runs the tasks in order. If some remain after
     ``_POOL_PATIENCE_SECONDS``, a timer thread starts a pool of ``workers - 1``
     and gives each worker a task once it has finished importing, so importing
-    workers never hold a task up. Tasks a broken pool lost rerun here.
+    workers never hold a task up. Tasks a broken pool lost, or that its shutdown
+    cancelled before they started, rerun here.
     """
     # Pickled now: a task running here may change state the others share.
     try:
@@ -208,6 +209,9 @@ def _map_with_late_pool(
         for index, future in in_pool:
             try:
                 results[index] = future.result()
+            except CancelledError:
+                # run_pool shut the pool down before this task started.
+                continue
             except broken_pool_exc as exc:
                 reason = exc
         if reason is not None:
