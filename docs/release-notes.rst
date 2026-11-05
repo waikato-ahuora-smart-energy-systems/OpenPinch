@@ -4,6 +4,9 @@ Pre-Release Notes
 Unreleased
 ----------
 
+0.7.7 (2026-11-05)
+------------------
+
 Behaviour changes
 ~~~~~~~~~~~~~~~~~
 
