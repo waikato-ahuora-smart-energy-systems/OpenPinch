@@ -474,8 +474,10 @@ def test_value_from_a_foreign_registry_quantity_in_the_same_unit():
     assert Value(foreign, "kW").to_dict() == {"value": 1.5, "unit": "kW"}
 
 
-def test_unpickled_magnitudes_stay_read_only():
-    restored = pickle.loads(pickle.dumps(Value([1.0, 2.0], "kW")))
+@pytest.mark.parametrize("protocol", [4, 5])
+def test_unpickled_magnitudes_stay_read_only(protocol):
+    # Protocol 4 is the default before Python 3.14 and drops NumPy's read-only flag.
+    restored = pickle.loads(pickle.dumps(Value([1.0, 2.0], "kW"), protocol=protocol))
 
     with pytest.raises(ValueError, match="read-only"):
         restored._quantity.magnitude[0] = 5.0
