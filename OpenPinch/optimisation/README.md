@@ -28,7 +28,7 @@ Reusable bounded scalar minimisation that returns several ranked local minima ra
 - An exception raised by the objective propagates unchanged, whether it ran in a worker or this process [execution.py:_map_in_process_pool] [execution.py:_map_with_late_pool].
 - Under spawn and forkserver a batch runs in this process until `_POOL_PATIENCE_SECONDS` (1 s) pass, because each worker imports OpenPinch before its first task, which costs seconds. Only then does a pool of `workers - 1` start, this process being the other worker, and a worker gets a task only after it has finished importing, so a batch is never held up by importing workers [execution.py:_map_with_late_pool].
 - Under fork, workers start in milliseconds, so a batch of two or more tasks starts its pool at once [execution.py:_map_in_process_pool].
-- Results keep task order and do not depend on where a task ran: each task is independent, and workers get tasks pickled when the batch began, before this process changes any state they share [execution.py:_map_with_late_pool].
+- Results keep task order and do not depend on where a task ran: each task is independent, and workers get tasks pickled when the batch began, before this process changes any state they share. A task the pool lost, or that its shutdown cancelled before it started, reruns in this process [execution.py:_map_with_late_pool].
 
 ## Side Effects
 - Spawns `ProcessPoolExecutor` workers; falls back to serial execution on Emscripten, an unpicklable task, a pool that cannot start or breaks, or a `__main__` script with no main guard [execution.py:_pool_worker_count] [execution.py:_map_in_process_pool] [execution.py:_map_with_late_pool].
